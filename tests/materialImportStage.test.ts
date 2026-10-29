@@ -57,6 +57,38 @@ async function upload(stage:ReturnType<typeof createStage>, records:unknown[], c
 const deferred=()=>{let resolve!:()=>void;const promise=new Promise<void>(done=>resolve=done);return {promise,resolve};};
 
 describe('clearing materials and import staging',()=>{
+  it.each(['throw','async-reject','function'] as const)('keeps a real import valid when a progress observer returns %s',async mode=>{
+    const target=instance(),record=await material(`progress-observer-${mode}`),{token}=await upload(target.stage,[record]);
+    const observer=vi.fn(()=>{if(mode==='throw')throw Error('observer failed');if(mode==='async-reject')return Promise.reject(Error('observer failed'));return ()=>{};});
+    await target.stage.seal(token,{onProgress:observer});
+    expect(observer).toHaveBeenCalled();expect((await target.stage.status(token)).state).toBe('sealed');
+    expect(await target.stage.commit(token)).toEqual({inserted:1,updated:0,skipped:0});
+    expect(await target.repo.get(record.id)).not.toBeNull();
+  });
+  it('isolates non-promise function results from commit and cleanup observers',async()=>{
+    const clock={now:100},db=database(),cleanupObserver=vi.fn(()=>()=>{}),stage=createStage(db,{limits:opts,clock:()=>clock.now,onCleanupCorruption:cleanupObserver});
+    const notified=vi.fn(()=>()=>{}),stop=stage.observeCommitted(notified),empty=frameRecords([],opts.frameBytes).manifest;
+    const done=await stage.begin(empty,{generation:0,capturedAt:100});await stage.seal(done);await stage.commit(done);
+    expect(notified).toHaveBeenCalledOnce();
+    const corrupt=await stage.begin(empty,{generation:0,capturedAt:100});await stage.sessions.update(corrupt.id,{expiresAt:NaN});
+    expect(await stage.cleanup()).toMatchObject({sessions:1,corruptSessions:1});expect(cleanupObserver).toHaveBeenCalledOnce();stop();
+  });
+  it('rejects a missing capability and malformed persisted owner hashes without exposing session data',async()=>{
+    const target=instance(),payload=frameRecords([],opts.frameBytes),cap=await target.stage.begin(payload.manifest,{generation:0,capturedAt:100});
+    await expect(target.stage.resume(undefined as unknown as Capability)).rejects.toThrow('session unavailable');
+    for(const ownerHash of ['a','a'.repeat(65)]){
+      await target.stage.sessions.update(cap.id,{ownerHash});
+      await expect(target.stage.resume(cap)).rejects.toThrow('session unavailable');
+    }
+    expect(await target.stage.frames.count()).toBe(0);
+  });
+  it('rejects corrupt stored session expiry before reserving capacity for another import',async()=>{
+    const target=instance(),payload=frameRecords([],opts.frameBytes),cap=await target.stage.begin(payload.manifest,{generation:0,capturedAt:100});
+    await target.stage.sessions.update(cap.id,{expiresAt:NaN});
+    await expect(target.stage.begin(payload.manifest,{generation:0,capturedAt:100})).rejects.toThrow('invalid expiry');
+    expect(await target.stage.sessions.count()).toBe(1);
+    expect(await target.stage.budgets.get('stage')).toMatchObject({slots:1,reserved:0,reservedFrames:0});
+  });
   it('reports only real increasing frame reads during seal and commit without claiming a transaction result',async()=>{
     const target=instance(),record=await material('progress'),{token,input}=await upload(target.stage,[record]);
     expect(input.frames.length).toBeGreaterThan(1);

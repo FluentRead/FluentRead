@@ -113,6 +113,17 @@ describe('material backup recovery orchestration',()=>{
     commitProgress({done:2,total:2});commit.resolve(result);await vi.advanceTimersByTimeAsync(0);
     expect(await pending).toMatchObject({kind:'committed',result});expect(active.close).toHaveBeenCalledOnce();
   });
+  it('ignores late progress from a completed seal while commit is pending',async()=>{
+    vi.useFakeTimers();const commit=deferred<MaterialImportResult>();let sealProgress!:(value:{done:number;total:number})=>void;
+    active.seal.mockImplementationOnce(async progress=>{sealProgress=progress!;return {state:'sealed'};});
+    active.commit.mockReturnValueOnce(commit.promise);
+    const pending=restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
+    await vi.advanceTimersByTimeAsync(0);expect(active.commit).toHaveBeenCalledOnce();
+    sealProgress({done:1,total:1});
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(await pending).toMatchObject({kind:'unknown',commitDispatched:true});
+    commit.resolve(result);expect(active.close).toHaveBeenCalledOnce();
+  });
   it('still times out a stalled seal without inferring a committed result',async()=>{
     vi.useFakeTimers();const seal=deferred<{state:'sealed'}>();active.seal.mockReturnValueOnce(seal.promise);
     const pending=restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}});
@@ -160,6 +171,17 @@ describe('material backup recovery orchestration',()=>{
     active.begin.mockRejectedValueOnce(error);const onCapability=vi.fn();
     expect(await restoreLargeMaterialBackup(file,guard,{onCapability})).toEqual({kind:'failed',error,cleanupPending:false});
     expect(onCapability).toHaveBeenCalledOnce();expect(active.discard).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
+  });
+  it('keeps the capability when cancellation races a capacity rejection during begin',async()=>{
+    const controller=new AbortController();let capability:unknown;
+    active.begin.mockImplementationOnce(()=>{
+      controller.abort();
+      return Promise.reject(Object.assign(new Error('容量不足'),{name:'MaterialBackupCapacityError'}));
+    });
+    const out=await restoreLargeMaterialBackup(file,guard,{signal:controller.signal,onCapability:value=>{capability=value;}});
+    expect(capability).toBeDefined();
+    expect(out).toEqual({kind:'cancelled',cleanupPending:true,capability});
+    expect(active.discard).not.toHaveBeenCalled();expect(active.commit).not.toHaveBeenCalled();expect(active.close).toHaveBeenCalledOnce();
   });
   it.each([true,false])('handles append quota failure according to whether discard succeeds: %s',async discarded=>{
     const error=Object.assign(new Error('quota'),{name:'QuotaExceededError'});let cap:unknown;

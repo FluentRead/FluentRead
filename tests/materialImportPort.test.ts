@@ -410,6 +410,13 @@ describe('material import Port client',()=>{
     postMessage(value:unknown){if(this.closed)throw Error('closed');this.sent.push(structuredClone(value));}
     disconnect(){if(this.closed)return;this.closed=true;this.onDisconnect.emit();}
   }
+  it('disconnects when a terminal response has a missing or non-boolean success field',async()=>{
+    const {createMaterialImportPortClient,MaterialImportPortDisconnectedError}=await import('@/src/features/vocabulary/materialImportPortClient');
+    for(const response of [{id:1},{id:1,ok:'true'}]){
+      const port=new ClientPort(),client=createMaterialImportPortClient(port),pending=client.status();
+      port.onMessage.emit(response);await expect(pending).rejects.toBeInstanceOf(MaterialImportPortDisconnectedError);expect(port.closed).toBe(true);
+    }
+  });
   it('negotiates validated, strictly increasing progress for a seal without resolving it early',async()=>{
     const {createMaterialImportPortClient}=await import('@/src/features/vocabulary/materialImportPortClient');
     const port=new ClientPort(),client=createMaterialImportPortClient(port),progress=vi.fn();

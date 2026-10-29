@@ -37,6 +37,15 @@ describe('material backup save targets', () => {
         await expect(waitForMaterialBackupTarget(denied.promise,aborted.signal)).rejects.toMatchObject({name:'AbortError'});
         denied.reject(Error('late permission failure'));await Promise.resolve();await Promise.resolve();
     });
+    it('contains an exception from the late-cleanup reporting callback',async()=>{
+        const controller=new AbortController(),pending=deferred<MaterialBackupSaveTarget>(),cleanupFailure=Error('cleanup failed');
+        const report=vi.fn(()=>{throw Error('reporting failed');});
+        const selection=waitForMaterialBackupTarget(pending.promise,controller.signal,report);
+        controller.abort();await expect(selection).rejects.toMatchObject({name:'AbortError'});
+        pending.resolve({write:async()=>{},commit:async()=> 'saved',abort:async()=>{throw cleanupFailure;}});
+        await vi.waitFor(()=>expect(report).toHaveBeenCalledOnce());
+        expect(report).toHaveBeenCalledWith(cleanupFailure);
+    });
     it('leaves an already delivered target to its owner when cancellation follows selection',async()=>{
         const target:MaterialBackupSaveTarget={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
         const controller=new AbortController(),selected=await waitForMaterialBackupTarget(Promise.resolve(target),controller.signal);

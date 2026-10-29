@@ -435,6 +435,26 @@ describe('trusted material page bridge',()=>{
         const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
         expect(output).toContain('"type":"complete"');bridge.dispose();
     });
+    it('cancels a coalesced progress update without releasing the unfinished scan',async()=>{
+        const {repo}=fixture(3);let finishSecond!:(value:MaterialRecord|null)=>void,finishThird!:(value:MaterialRecord|null)=>void,beginThird!:()=>void;
+        const second=new Promise<MaterialRecord|null>(resolve=>{finishSecond=resolve;}),third=new Promise<MaterialRecord|null>(resolve=>{finishThird=resolve;});
+        const thirdStarted=new Promise<void>(resolve=>{beginThird=resolve;});
+        const original=repo.readSnapshotRecord.getMockImplementation()!;let calls=0;
+        repo.readSnapshotRecord.mockImplementation(async(revision,id)=>{
+            calls++;if(calls===2)return second;if(calls===3){beginThird();return third;}return original(revision,id);
+        });
+        const bridge=createMaterialPageBridge({repository:repo,ready:Promise.resolve(),isPrivateContext:()=>false,isTrustedSender:()=>true,maxSessions:1});
+        const [server,client]=pair();bridge.connect(server);let first!:()=>void;
+        const firstProgress=new Promise<void>(resolve=>{first=resolve;}),chunks:Uint8Array[]=[];
+        const reading=receiveMaterialRead(client as MaterialReadPort,bytes=>{chunks.push(bytes);first();}).catch(error=>error);
+        client.postMessage(start());await firstProgress;finishSecond(item('01'));await thirdStarted;
+        client.disconnect();expect(await reading).toBeInstanceOf(Error);
+        expect(await transfer(bridge,start())).toEqual([{type:'error',code:'busy'}]);
+        finishThird(item('02'));await tick();await tick();
+        const output=new TextDecoder().decode(Uint8Array.from(chunks.flatMap(chunk=>[...chunk])));
+        expect(output).toContain('"processed":1');expect(output).not.toContain('"processed":2');
+        expect(complete(await transfer(bridge,start())).count).toBe(3);await bridge.dispose();
+    });
     it('does not keep an idle connection alive with fabricated progress while readiness is pending',async()=>{
         const {repo}=fixture();const bridge=createMaterialPageBridge({repository:repo,ready:new Promise(()=>{}),isPrivateContext:()=>false,isTrustedSender:()=>true,idleTimeoutMs:15});
         const [server,client]=pair();bridge.connect(server);const read=receiveMaterialRead(client as MaterialReadPort,()=>{}).catch(error=>error);

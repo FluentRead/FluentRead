@@ -66,6 +66,10 @@ export const settingsSearchTargets: readonly SettingsSearchTarget[] = [
     label: '译文外观', description: '界面风格', searchTerms: '译文颜色、线条颜色、标记底色、译文字号、译文字重、译文字体、译文不透明度',
   },
   {
+    id: 'video-semantic-segmentation', sectionId: 'settings-video', targetId: 'video-semantic-segmentation',
+    label: 'AI 语义断句', description: '视频字幕', searchTerms: 'AI 断句、语义边界、视频学习、断句服务、断句模型',
+  },
+  {
     id: 'video-sentence-learning-appearance', sectionId: 'settings-interface', targetId: 'video-sentence-learning-appearance',
     label: '完整句学习外观', description: '界面风格', searchTerms: '视频学习、面板样式、紧凑布局、舒适布局、背景不透明度、面板宽度、默认位置、拖动位置',
   },
@@ -289,7 +293,7 @@ export const settingsPagePanels: Readonly<Record<string, readonly SettingsPagePa
     {id: 'preview', labelKey: 'options.panel.sitePreview', searchTerms: '生效预览 网址匹配 检查规则 优先级', targetIds: []},
   ],
   'settings-video': [
-    {"id": "general", "labelKey": "options.panel.video", "searchTerms": "字幕 开关 翻译服务 术语库", "targetIds": []},
+    {"id": "general", "labelKey": "options.panel.video", "searchTerms": "字幕 开关 翻译服务 术语库 AI 断句 语义", "targetIds": ["video-semantic-segmentation"]},
     {"id": "appearance", "labelKey": "options.panel.appearance", "searchTerms": "字幕外观 显示模式 颜色 字号 双语顺序 双语上下顺序 原文在上 译文在上 读音标注 拉丁字母辅助读音 拼音 罗马音", "targetIds": []},
     {"id": "local", "labelKey": "options.panel.local", "searchTerms": "X 本地 AI Whisper 语音 识别", "targetIds": []},
   ],

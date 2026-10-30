@@ -3,6 +3,7 @@
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
  * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；服务能力仅从当前编辑目标派生，翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，术语库按分区及缓存活跃状态同步显示快照，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围，网站适配区域复用来源返回条并隔离配置及范围变化后的迟到操作，划词设置顶部提供不带修复说明的来源返回按钮并按所属配置及分区启停；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，网页辅助和主题说明用稳定 key 直接渲染，软件语言控件随分区及缓存活跃状态启停，并保留固定 Language 识别词以便选错语言后恢复，提供当前默认服务的配置入口，将专项服务分配按需展开，并把译文样式与翻译设置跨页入口放入对应分组标题；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本复用配置编辑会话隔离草稿与权威基线，批量水合时暂停完整草稿扫描，在途与失败编辑保留字段归属，继续同步保存和离页补丁交接，协调网站入口、配置及凭据保存、历史恢复和能力过滤。
  * 锚点编排：翻译设置保留连续表单，双语逐句阅读辅助与智能高亮各有独立锚点；智能高亮仅在翻译设置分区激活时挂载，定位不隐藏其他分组，既有表单配置保持原归属。新建兼容服务对话框只在首次请求打开时挂载，此后保留实例与关闭动画；加载中或失败时在添加入口旁显示可关闭提示，并停用入口说明气泡以免遮挡反馈，离开后不复活旧提示，草稿仍由原有活跃上下文和关闭流程管理。
+ * 语义断句：扩展视频设置提供默认关闭的开关、独立服务与模型选择；说明主动触发和费用，不自动请求模型。
  * 两点选取：在划词触发组内按需显示紧凑开关与快捷键编辑，分区活跃状态限制录制归属。
  * 交互延迟归属：悬浮与划词延迟只在所属活跃分区确认后提交，外部同步或离开使旧输入失效，保留原步长、范围及空值恢复规则。
  * 多段预算：全文页使用独立紧凑组件编辑片段与字符上限，每次预算更新由父组件原子交接现有配置队列。
@@ -224,6 +225,7 @@
         <SettingsItem label="优先使用人工字幕" description="YouTube、Udemy、Disney+ 有目标语言人工字幕时优先使用；不可用时继续翻译原字幕" :disabled="!config.videoTranslationEnabled">
           <el-switch v-model="config.videoPreferHumanSubtitles" class="settings-toggle" aria-label="优先使用人工字幕" :disabled="!config.videoTranslationEnabled" />
         </SettingsItem>
+        <VideoSemanticSegmentationSettings v-if="browserCapabilities.extensionDom" :config="config" :services="availableServiceOptions" />
         <SettingsItem label="视频翻译服务" description="默认跟随网页翻译服务，也可单独选择；AI 服务会提前预取字幕" :disabled="!config.videoTranslationEnabled">
           <el-select v-model="config.videoService" :empty-values="[null, undefined]" aria-label="视频字幕翻译服务" :disabled="!config.videoTranslationEnabled" placeholder="请选择服务" filterable>
             <el-option :label="t('featureServices.followDefault')" value="" />
@@ -550,6 +552,7 @@
 </template>
 
 <script lang="ts" setup>
+import VideoSemanticSegmentationSettings from '@/src/features/settings/ui/VideoSemanticSegmentationSettings.vue';
 import SettingsPanel from './components/SettingsPanel.vue';
 import ServiceRepairReturn from './services/ServiceRepairReturn.vue';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';

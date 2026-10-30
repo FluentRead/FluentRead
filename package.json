@@ -34,7 +34,7 @@
     "zip": "node scripts/testing/run-resource-safe.mjs -- wxt zip",
     "zip:edge": "node scripts/testing/run-resource-safe.mjs -- wxt zip -b edge",
     "zip:firefox": "node scripts/testing/run-resource-safe.mjs -- wxt zip -b firefox",
-    "compile": "node scripts/testing/verify-pinned-userscript-languages.mjs && node scripts/testing/run-resource-safe.mjs -- vue-tsc --noEmit",
+    "compile": "node scripts/testing/verify-pinned-userscript-languages.mjs && node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-typecheck.mjs",
     "test": "node scripts/testing/run-resource-safe.mjs -- vitest run",
     "test:audit": "node scripts/testing/audit-test-suite.mjs",
     "test:agent-bridge": "node --test tests/agentBridge.test.mjs",

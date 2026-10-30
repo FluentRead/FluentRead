@@ -553,6 +553,8 @@ async function waitForObservedCandidateCount(
 describe("全文翻译可见性锚点", () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        // 默认用例统一逻辑时钟；8ms 耗时切片用例会显式推进 performance，32ms 截止断言保持不变。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.candidates = [];
         runtime.pointCandidate = null;
         runtime.pointCalls = [];
@@ -3222,18 +3224,27 @@ describe("全文翻译可见性锚点", () => {
         });
 
         it('aborts a pending reply translation and rejects its late response when protection forms', async () => {
-            const {link, owner} = setup('readArticle');
+            const {link, owner, body} = setup('readArticle');
             const pending = deferred<string[]>();
             runtime.requests.mockImplementation(origins => origins.some(origin => origin.includes('Reply to this comment'))
                 ? pending.promise : Promise.resolve(origins.map(origin => `译:${origin}`)));
-            autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(51); await waitForRequestCount(1);
+            autoTranslateEnglishPage();
+            const replyRequests = () => runtime.requests.mock.calls.filter(([origins]) =>
+                origins.some(origin => origin.includes('Reply to this comment')));
+            for (let tick = 0; tick < 200 && (replyRequests().length === 0 || getTranslationState(owner)?.phase !== 'loading'); tick++) {
+                await vi.advanceTimersByTimeAsync(1);
+            }
+            expect(replyRequests()).toHaveLength(1);
             const state = getTranslationState(owner)!;
             expect(state.phase).toBe('loading');
             changeAction(link, 'replyToComment');
             expect(state.controller.signal.aborted).toBe(true);
             expect(getTranslationState(owner)).toBeUndefined();
             pending.resolve(['迟到译文不得出现']); await finishScheduledWork();
+            expect(replyRequests()).toHaveLength(1);
             expect(owner.querySelector('.fluent-read-bilingual-content')).toBeNull();
+            expect(getTranslationState(body)?.phase).toBe('translated');
+            expect(body.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
         });
 
         it('rediscovers a reply when its action ceases to be protected without redoing comment prose', async () => {
@@ -10635,6 +10646,8 @@ describe("全文翻译可见性锚点", () => {
 describe("悬停重挂请求与 synthetic 提交回归", () => {
     beforeEach(() => {
         vi.useFakeTimers();
+        // 默认用例统一逻辑时钟；8ms 耗时切片用例会显式推进 performance，32ms 截止断言保持不变。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.candidates = [];
         runtime.pointCandidate = null;
         runtime.requests.mockReset();

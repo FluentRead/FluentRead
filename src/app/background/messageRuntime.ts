@@ -44,7 +44,7 @@ import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionT
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
 import {createConfigImageOcrLanguageStorage, installBrowserConfigStorageBroadcast, installBrowserTabBroadcastRuntime} from './configStorageRuntime';
 import {releaseVideoSubtitleOwnerForTab} from '@/src/features/video-subtitle/background/handlers';
-import {createVideoSubtitleBackgroundRuntime} from '@/src/features/video-subtitle/background/runtime';
+import {createBackgroundVideoRuntime} from './videoRuntime';
 import {createLocalModelMessageHandlers} from './localModelMessageRuntime';
 import {localTtsOffscreenAdapter} from '@/src/features/local-tts/background/offscreenAdapter';
 import {createSelectionTtsSynthesizer} from '@/src/features/selection-translation/background/selectionTtsSynthesis';
@@ -161,7 +161,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             }),
             logOperationFailure: (error) => console.error('[FluentRead] vocabulary book operation failed:', error),
         }),
-        ...createVideoSubtitleBackgroundRuntime(),
+        ...createBackgroundVideoRuntime(),
         ...createLocalModelMessageHandlers<BackgroundRuntimeContext>(),
         createDownloadProgressHandler({runtimeId: browser.runtime.id, offscreenUrl: browser.runtime.getURL('/offscreen.html'), storage: browser.storage.local}), createDownloadProgressQueryHandler({runtimeId: browser.runtime.id, storage: browser.storage.local}),
     ];

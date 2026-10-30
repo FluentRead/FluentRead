@@ -66,7 +66,6 @@ import {
   buildYoutubeTimedTextUrl,
   chooseYoutubeCaptionTrackForLocation,
   finalizeVideoSubtitleCues,
-  parseYoutubeTimedTextResponse,
   type VideoSubtitleCue,
 } from './youtubeSubtitleData';
 import {validateYoutubeTimedTextMessage} from './youtubeTimedTextMessage';
@@ -89,6 +88,7 @@ import {
   type VideoAiFullCaptureProgress,
 } from './video-ai/fullCapture';
 import { encodeVideoAiPcm16Base64 } from './video-ai/audioWindow';
+import {parseYoutubeTimedTextDocument} from './subtitleSourceProvenance';
 import type { VideoAiStabilizedCue } from './video-ai/streamingTranscript';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {
@@ -597,12 +597,11 @@ export function mountVideoSubtitleTranslation(): () => void {
       try {
         const text = await readVideoCaptionText(url, fetch, {credentials: 'include', signal: controller.signal});
         if (destroyed || controller.signal.aborted || requestVersion !== pretranslationCacheVersion) return;
-        const cues = finalizeVideoSubtitleCues(parseYoutubeTimedTextResponse(text));
-        if (cues.length === 0) {
+        const entry = {url, ...parseYoutubeTimedTextDocument(text)};
+        if (entry.cues.length === 0) {
           pretranslationTrackRetryAt = Date.now() + 5000;
           return;
         }
-        const entry = { url, cues };
         capturedSubtitleTracks.set(key, entry);
         setPretranslationTrack(key, entry);
         pretranslationTrackRetryAt = 0;

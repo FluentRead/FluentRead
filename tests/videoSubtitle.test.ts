@@ -382,7 +382,14 @@ describe('YouTube timedtext MAIN bridge 消息边界', () => {
         responseText,
     };
 
-    it('只接收绑定到当前 watch/shorts videoId 的真实 timedtext URL', () => {
+    it('只从已验证响应正文构建来源附表，不接受页面提供的伪造附表', () => {
+        const result = validateYoutubeTimedTextMessage({...payload, provenance: {sourceRevision: 'forged'}}, 'https://www.youtube.com/watch?v=current-video')!;
+        expect(result.provenance?.sourceRevision).not.toBe('forged');
+        expect(result.provenance?.events[0].segments[0].text).toBe('Current subtitle.');
+        expect(result.provenance?.timingEvidence).toBe('unverified-source-metadata');
+        expect(Object.keys(result.cues[0]).sort()).toEqual(['durationMs', 'startMs', 'text']);
+    });
+    it('只接收绑定到当前 watch/shorts videoId 的真实 timedtext URL' , () => {
         expect(validateYoutubeTimedTextMessage(
             payload,
             'https://www.youtube.com/watch?v=current-video',

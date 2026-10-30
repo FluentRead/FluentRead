@@ -8,6 +8,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import * as vue from 'vue';
 import {Config} from '@/src/core/config/model';
+import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
@@ -113,6 +114,7 @@ function portalKeyboardFixture() {
 }
 
 beforeEach(() => {
+  (browserCapabilities as {extensionDom: boolean}).extensionDom = true;
   errorLocale.language = vue.ref<UiLanguage>('zh-CN');
   vi.useFakeTimers();
   materialTransport.extension.inIncognitoContext = false;
@@ -786,4 +788,205 @@ describe('视频句子通过真实公开客户端关联材料', () => {
     state.explain(); readingCallbacks.result({success: true, text: 'Private answer', sessionId: 'private-session'}); await flush();
     expect(materialTransport.sendMessage).not.toHaveBeenCalled(); expect(materialCaptures()).toEqual([]);
   });
+});
+
+describe('语义断句真实组件接线', () => {
+  it('默认无 AI 请求；规则句内切分保留相同回放包络及当前选择', async () => {
+    props.cues = [{text: 'First sentence. Second sentence!', startMs: 0, durationMs: 9000}];
+    await mount(); expect(state.sentences).toHaveLength(2);
+    expect(state.sentences.map((item: any) => [item.startMs, item.endMs])).toEqual([[0, 9000], [0, 9000]]);
+    expect(state.index).toBe(0); video.currentTime = 4; video.dispatchEvent(new Event('timeupdate')); await flush();
+    expect(state.index).toBe(0); await state.segmentCurrentGroup(); expect(sendRuntimeMessage).not.toHaveBeenCalled();
+  });
+  it('AI 改变 B 段边界后保留用户固定材料，不跳回正在播放的 A 段', async () => {
+    config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model';
+    props.cues = [{text: first, startMs: 0, durationMs: 1000}, {text: 'one two three four.', startMs: 2000, durationMs: 1000}];
+    sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: ['b8', 'b19']}}));
+    await mount(); state.step(1); await flush(); video.currentTime = 0;
+    await state.segmentCurrentGroup(); await flush();
+    expect(state.pinned).toBe(true); expect(state.sentence.text).toBe('one two ');
+    expect(state.sentence.startMs).toBe(2000); expect(state.sentence.endMs).toBe(3000);
+    expect(video.currentTime).toBe(0);
+    expect(sendRuntimeMessage.mock.calls.filter(([message]) => message.type === 'fluentReadSegmentVideoSemantics')).toHaveLength(1);
+  });
+  it('错误模型边界保留规则结果并显示错误，不改写源字幕', async () => {
+    config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model'; await mount();
+    const original = state.sentence.text;
+    sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: ['b999']}}));
+    await state.segmentCurrentGroup(); await flush();
+    expect(state.sentence.text).toBe(original); expect(state.error).toBe('video.learning.segmentationFailed');
+    expect(props.cues[0].text).toBe(first);
+  });
+  it.each(['close', 'collapse', 'source', 'config'])('在 %s 时取消模型请求，迟到结果不进入界面', async mode => {
+    config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model'; await mount();
+    const pending = deferred<unknown>(); let id = '';
+    sendRuntimeMessage.mockImplementation(message => {
+      if (message.type === 'fluentReadSegmentVideoSemantics') {id = message.requestId; return pending.promise;}
+      return Promise.resolve({success: true});
+    });
+    const request = state.segmentCurrentGroup(); await flush();
+    if (mode === 'close') close();
+    if (mode === 'collapse') state.expanded = false;
+    if (mode === 'source') props.sourceUrl = 'https://www.youtube.com/watch?v=changed';
+    if (mode === 'config') {config.videoSemanticSegmentationEnabled = false; subscription();}
+    await flush(); pending.resolve({success: true, requestId: id, algorithmVersion: 2, result: {boundaries: ['b15']}}); await request; await flush();
+    expect(sendRuntimeMessage.mock.calls.some(([message]) => message.type === 'fluentReadCancelVideoSemantics')).toBe(true);
+    expect(state.semanticOverrides.size).toBe(0);
+  });
+});
+
+it('显式点击经过真实客户端、后台边界校验和假模型，结果进入学习面板', async () => {
+  const {createVideoSemanticHandlers} = await import('@/src/features/video-subtitle/background/semanticSegmentation');
+  const generate = vi.fn(async (_document: {text: string}, _signal: AbortSignal) => ({boundaries: ['b8', 'b19']}));
+  const handlers = createVideoSemanticHandlers({runtimeId: 'ext', privateContext: () => false,
+    settings: () => ({enabled: true, revision: 'configured'}), generate});
+  const sender = {id: 'ext', tab: {id: 42, incognito: false}, frameId: 0, documentId: 'test-document'};
+  sendRuntimeMessage.mockImplementation(message => handlers.find(handler => handler.type === message.type)!.handle(message, {sender}));
+  config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model';
+  props.cues = [{text: 'one two three four.', startMs: 100, durationMs: 3000}];
+  const host = await mountRendered();
+  host.querySelector('[data-learning-action="segment"]')!.dispatchEvent(new document.defaultView!.Event('click'));
+  await flush(); await flush();
+  expect(generate).toHaveBeenCalledTimes(1); expect(generate.mock.calls[0][0].text).toBe('one two three four.');
+  expect(state.sentences.map((item: any) => item.text).join('')).toBe('one two three four.');
+  expect(host.querySelector('[data-learning-original]')?.textContent).toBe('one two ');
+  expect(host.querySelector('[data-learning-timing-precision]')?.textContent).toBe('video.learning.cueEnvelope');
+  expect(state.sentences.every((item: any) => item.startMs === 100 && item.endMs === 3100)).toBe(true);
+});
+
+it('切换同一来源 cue 内语义句不重复跳回播放起点，显式重播仍使用来源范围', async () => {
+  props.cues = [{text: 'First sentence. Second sentence!', startMs: 0, durationMs: 9000}];
+  await mount(); video.currentTime = 4; await step(1);
+  expect(state.sentence.text).toBe('Second sentence!'); expect(video.currentTime).toBe(4);
+  await state.replay(); expect(video.currentTime).toBe(0);
+});
+
+it('过期的回放组引用不会发出语义断句请求', async () => {
+  config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model'; await mount();
+  state.sentence.playbackGroupId = 'retired-playback-group';
+  await state.segmentCurrentGroup();
+  expect(sendRuntimeMessage).not.toHaveBeenCalled();
+  expect(state.semanticBusy).toBe(false);
+});
+
+it.each(['unmount', 'revision'])('会话已返回但组件提交前 %s 时不接受结果', async mode => {
+  config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model'; await mount();
+  sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: ['b15']}}));
+  const original = state.semanticSession.request.bind(state.semanticSession);
+  vi.spyOn(state.semanticSession, 'request').mockImplementation(async (cues: any) => {
+    const units = await original(cues);
+    // 保留真实 transport、校验和会话；仅在两个异步 owner 之间制造卸载/来源更新。
+    if (mode === 'unmount') close();
+    else props.sourceUrl = 'https://www.youtube.com/watch?v=next-owner';
+    return units;
+  });
+  await state.segmentCurrentGroup(); await flush();
+  expect(state.semanticOverrides.size).toBe(0);
+});
+
+it('第101个片段结果淘汰最旧覆盖记录并保留当前结果', async () => {
+  config.videoSemanticSegmentationEnabled = true; config.videoSemanticSegmentationService = 'openai'; config.videoSemanticSegmentationModel = 'fixture-model'; await mount();
+  const entries = Array.from({length: 100}, (_, i) => [`previous-source-${i}`, []] as const);
+  state.semanticOverrides = new Map(entries);
+  sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: ['b15']}}));
+  await state.segmentCurrentGroup(); await flush();
+  expect(state.semanticOverrides.size).toBe(100);
+  expect(state.semanticOverrides.has('previous-source-0')).toBe(false);
+  expect(state.semanticOverrides.has('previous-source-1')).toBe(true);
+  expect([...state.semanticOverrides.values()].at(-1)[0].text).toBe(first);
+  expect(state.sentence.text).toBe(first);
+});
+
+function enableReadySemantics(): void {
+  config.videoSemanticSegmentationEnabled = true;
+  config.videoSemanticSegmentationService = 'openai';
+  config.videoSemanticSegmentationModel = 'fixture-model';
+}
+it.each(['disabled', 'service', 'model', 'unsupported'] as const)('AI setup %s exposes a configuration route without sending material', async missing => {
+  enableReadySemantics();
+  if (missing === 'disabled') config.videoSemanticSegmentationEnabled = false;
+  if (missing === 'service') config.videoSemanticSegmentationService = '';
+  if (missing === 'model') config.videoSemanticSegmentationModel = '';
+  if (missing === 'unsupported') config.videoSemanticSegmentationService = 'google';
+  const host = await mountRendered();
+  expect(host.querySelector('[data-learning-action="segment"]')).toBeNull();
+  const setup = host.querySelector<HTMLButtonElement>('[data-learning-action="segment-configure"]')!;
+  expect(setup.textContent).toContain('video.learning.configureSegmentation');
+  setup.click(); await flush();
+  expect(sendRuntimeMessage).toHaveBeenCalledWith({type: 'openOptionsPage', section: 'settings-video', target: 'video-semantic-segmentation'});
+  await state.segmentCurrentGroup();
+  expect(sendRuntimeMessage.mock.calls.filter(([m]) => m.type === 'fluentReadSegmentVideoSemantics')).toHaveLength(0);
+});
+it('AI cancellation is reachable while waiting and an old request cannot clear a new busy state', async () => {
+  enableReadySemantics();
+  const pending = deferred<any>(); const fresh = deferred<any>();
+  let count = 0;
+  sendRuntimeMessage.mockImplementation(message => message.type === 'fluentReadSegmentVideoSemantics'
+    ? (++count === 1 ? pending.promise : fresh.promise) : Promise.resolve({success: true}));
+  const host = await mountRendered();
+  const old = state.segmentCurrentGroup(); await flush();
+  expect(host.querySelector('[data-learning-semantic-status]')?.getAttribute('role')).toBe('status');
+  host.querySelector<HTMLButtonElement>('[data-learning-action="segment-cancel"]')!.click();
+  expect(state.semanticBusy).toBe(false);
+  const next = state.segmentCurrentGroup(); await old; await flush();
+  expect(state.semanticBusy).toBe(true); expect(state.error).toBe('');
+  expect(host.querySelector('[data-learning-action="segment-cancel"]')).not.toBeNull();
+  state.cancelSemanticRequest(); await next; await flush();
+  expect(state.semanticStatus).toBe('video.learning.segmentationCancelled');
+  expect(state.semanticBusy).toBe(false); expect(state.semanticOverrides.size).toBe(0);
+});
+it('AI timeout explains retained current segmentation and permits another attempt', async () => {
+  enableReadySemantics();
+  sendRuntimeMessage.mockImplementation(message => message.type === 'fluentReadSegmentVideoSemantics'
+    ? new Promise(() => {}) : Promise.resolve({success: true}));
+  const host = await mountRendered(); const pending = state.segmentCurrentGroup();
+  await advance(30_000); await pending; await flush();
+  expect(state.error).toBe('video.learning.segmentationTimeout');
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('video.learning.segmentationTimeout');
+  expect(host.querySelector('[data-learning-action="segment"]')?.hasAttribute('disabled')).toBe(false);
+  expect(state.semanticOverrides.size).toBe(0);
+});
+it('unchanged AI results visibly complete and label subsequent requests as reanalysis', async () => {
+  enableReadySemantics(); props.cues = [{text: first, startMs: 0, durationMs: 1000}];
+  sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: [`b${first.length}`]}}));
+  const host = await mountRendered(); await state.segmentCurrentGroup(); await flush();
+  expect(state.semanticStatus).toBe('video.learning.segmentationUnchanged');
+  expect(host.querySelector('[data-learning-action="segment"]')?.textContent).toContain('video.learning.resegment');
+  expect(host.querySelector('[data-learning-semantic-status]')?.textContent).toContain('video.learning.segmentationUnchanged');
+});
+it('updated AI feedback survives sentence identity changes and failed reanalysis retains that result', async () => {
+  enableReadySemantics(); props.cues = [{text: 'one two three four', startMs: 0, durationMs: 4000}];
+  sendRuntimeMessage.mockImplementation(async message => ({success: true, requestId: message.requestId, algorithmVersion: 2, result: {boundaries: ['b8', 'b18']}}));
+  const host = await mountRendered(); await state.segmentCurrentGroup(); await flush();
+  expect(state.semanticStatus).toBe('video.learning.segmentationUpdated');
+  expect(host.querySelector('[data-learning-semantic-status]')?.textContent).toContain('video.learning.segmentationUpdated');
+  const before = state.sentences.map((s: any) => s.text);
+  sendRuntimeMessage.mockResolvedValue({success: false});
+  await state.segmentCurrentGroup(); await flush();
+  expect(state.sentences.map((s: any) => s.text)).toEqual(before);
+  expect(state.error).toBe('video.learning.segmentationFailed');
+});
+
+it('non-extension hosts expose no AI setup or request controls', async () => {
+  (browserCapabilities as {extensionDom: boolean}).extensionDom = false;
+  enableReadySemantics(); const host = await mountRendered();
+  expect(host.querySelector('[data-learning-action="segment-configure"]')).toBeNull();
+  expect(host.querySelector('[data-learning-action="segment"]')).toBeNull();
+  await state.segmentCurrentGroup(); expect(sendRuntimeMessage).not.toHaveBeenCalled();
+});
+it('cancelling with no current source remains harmless', async () => {
+  props.cues = []; await mount(); state.cancelSemanticRequest(); await flush();
+  expect(state.semanticBusy).toBe(false); expect(state.semanticFeedback).toBeUndefined();
+});
+
+
+it.each([true, undefined])('private or unknown privacy %s explains unavailability without a request', async privacy => {
+  (materialTransport.extension as {inIncognitoContext: boolean | undefined}).inIncognitoContext = privacy;
+  enableReadySemantics(); const host = await mountRendered();
+  expect(host.querySelector('[data-learning-action="segment"]')).toBeNull();
+  expect(host.querySelector('[data-learning-action="segment-configure"]')).toBeNull();
+  expect(host.querySelector('[data-learning-semantic-privacy]')?.textContent).toContain(privacy === true
+    ? 'video.learning.segmentationPrivate' : 'video.learning.segmentationPrivacyUnknown');
+  expect(host.querySelector('[data-learning-original]')?.textContent).toBe(first);
+  await state.segmentCurrentGroup(); expect(sendRuntimeMessage).not.toHaveBeenCalled();
 });

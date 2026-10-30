@@ -1,15 +1,14 @@
 /**
  * @file src/features/video-subtitle/content/youtubeTimedTextMessage.ts
  * 文件职责：校验 isolated world 收到的 YouTube timedtext 桥消息，只把当前视频的有界字幕数据交给播放器运行时。
- * 主要内容：复验消息协议、页面与请求 URL、当前 videoId、响应体积、cue 数量和单条文本长度，并输出规范化字幕时间轴。
+ * 主要内容：复验消息协议、页面与请求 URL、当前 videoId、响应体积、cue 数量和单条文本长度，并输出规范化字幕时间轴和有界原始来源附表；附表独立于可翻译 cue。
  * 模块边界：本文件不监听 window 消息、不缓存字幕也不操作播放器 DOM；MAIN world 只负责采集，content runtime 负责事件来源校验和消费结果。
  */
 import {
-    finalizeVideoSubtitleCues,
     getYoutubeVideoId,
-    parseYoutubeTimedTextResponse,
     type VideoSubtitleCue,
 } from './youtubeSubtitleData';
+import {parseYoutubeTimedTextDocument, type SubtitleSourceProvenance} from './subtitleSourceProvenance';
 import {
     isYoutubeTimedTextUrl,
     YOUTUBE_TIMED_TEXT_MESSAGE,
@@ -32,6 +31,7 @@ export const YOUTUBE_TIMED_TEXT_MESSAGE_LIMITS: Readonly<YoutubeTimedTextMessage
 export interface ValidatedYoutubeTimedTextMessage {
     url: string;
     cues: VideoSubtitleCue[];
+    provenance?: SubtitleSourceProvenance;
 }
 
 function isYoutubeVideoUrl(url: URL): boolean {
@@ -65,10 +65,11 @@ export function validateYoutubeTimedTextMessage(
         const requestUrl = new URL(payload.url, pageHref);
         if (!currentVideoId || requestUrl.searchParams.get('v') !== currentVideoId) return null;
 
-        const cues = finalizeVideoSubtitleCues(parseYoutubeTimedTextResponse(payload.responseText));
+        const document = parseYoutubeTimedTextDocument(payload.responseText);
+        const {cues} = document;
         if (cues.length === 0 || cues.length > limits.maxCues) return null;
         if (cues.some((cue) => Array.from(cue.text).length > limits.maxCueChars)) return null;
-        return {url: requestUrl.href, cues};
+        return {url: requestUrl.href, ...document};
     } catch {
         return null;
     }

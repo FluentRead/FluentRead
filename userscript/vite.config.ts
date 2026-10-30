@@ -616,6 +616,7 @@ export function createStandaloneOpenAITransportPlugin(): Plugin {
 }
 
 export const userscriptAliases = [
+    {find: '@/src/features/settings/ui/VideoSemanticSegmentationSettings.vue', replacement: resolve(root, 'userscript/videoSemanticSettings.ts')},
     ...(bundleLibraries ? [{find: '@/userscript/pakoRuntime', replacement: resolve(root, 'userscript/pakoBundled.ts')}] : []),
     // dexie 官方 ESM 入口把自身注册到跨 realm 共享的 globalThis[Symbol.for('Dexie')]，版本不一致时会在
     // 模块求值阶段直接抛错。脚本管理器（如 Safari 的 Userscripts）把脚本注入页面主 world，与宿主页面共享

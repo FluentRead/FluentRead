@@ -288,3 +288,9 @@ describe('settings page categories', () => {
     }
   })
 })
+
+
+it('routes AI segmentation setup to its registered video general-panel anchor', () => {
+  expect(resolveSettingsPanel('settings-video', 'video-semantic-segmentation')).toBe('general');
+  expect(filterSettingsSearchTargets('断句服务')).toEqual([expect.objectContaining({sectionId: 'settings-video', targetId: 'video-semantic-segmentation'})]);
+});

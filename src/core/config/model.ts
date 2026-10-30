@@ -384,6 +384,9 @@ export class Config {
     documentModel: IMapping; // 文档翻译按服务保存的独立模型选择
     documentCustomModel: IMapping; // 文档翻译按服务保存的独立自定义模型
     videoTranslationEnabled: boolean; // 是否启用视频字幕翻译 Beta
+    videoSemanticSegmentationEnabled: boolean; // AI 断句默认关闭，仍需在视频内主动触发
+    videoSemanticSegmentationService: string; // 显式选择，不跟随翻译默认
+    videoSemanticSegmentationModel: string; // 独立模型编号
     videoMeetingAutoEnabled: boolean; // 自动开启会议平台的本地字幕显示
     videoPreferHumanSubtitles: boolean; // 优先使用目标语言人工字幕
     videoService: string; // 字幕服务，空值跟随网页默认
@@ -596,6 +599,9 @@ export class Config {
         );
         this.documentCustomModel = {};
         this.videoTranslationEnabled = true; // 默认开启视频字幕翻译
+        this.videoSemanticSegmentationEnabled = false;
+        this.videoSemanticSegmentationService = '';
+        this.videoSemanticSegmentationModel = '';
         this.videoMeetingAutoEnabled = true;
         this.videoPreferHumanSubtitles = true;
         this.videoService = ''; // 默认跟随网页服务
@@ -1287,6 +1293,9 @@ export function normalizeConfig(value: unknown): Config {
         normalized.videoTranslationEnabled = true;
     }
     normalized.videoMeetingAutoEnabled = typeof source.videoMeetingAutoEnabled === 'boolean' ? source.videoMeetingAutoEnabled : true;
+    normalized.videoSemanticSegmentationEnabled = source.videoSemanticSegmentationEnabled === true;
+    normalized.videoSemanticSegmentationService = typeof source.videoSemanticSegmentationService === 'string' ? source.videoSemanticSegmentationService.trim().slice(0, 200) : '';
+    normalized.videoSemanticSegmentationModel = typeof source.videoSemanticSegmentationModel === 'string' ? source.videoSemanticSegmentationModel.trim().slice(0, 200) : '';
     normalized.videoPreferHumanSubtitles = typeof source.videoPreferHumanSubtitles === 'boolean' ? source.videoPreferHumanSubtitles : true;
     // 缺失或非法选择统一使用质量默认；明确保存的 Tiny/Base/Small 继续保留。
     if (normalized.videoLocalModel !== 'tiny' && normalized.videoLocalModel !== 'base' && normalized.videoLocalModel !== 'small') {

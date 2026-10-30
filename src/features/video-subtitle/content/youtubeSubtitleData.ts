@@ -2,7 +2,7 @@
  * @file src/features/video-subtitle/content/youtubeSubtitleData.ts
  * 文件职责：提供 YouTube 字幕轨道发现、timedtext 响应解析、增量词流合并、时间轴规范化和 SRT 导出的纯数据处理能力。
  * 主要内容：定义 caption track 与 cue 模型，从页面脚本提取平衡 JSON，选择目标轨道、构造 json3 URL，校验 XML/json3 时间字段，按事件边界及有限撇号/引用规则合并词流并收敛增量前缀，生成可重复导出的时间轴和安全文件名。
- * 模块边界：模块不监听网络、不修改播放器 DOM也不调用翻译；runtime 消费生成的 cues，youtubeTimedTextBridge 只负责捕获响应，函数可在离线 fixture 中独立验证。
+ * 模块边界：模块不监听网络、不修改播放器 DOM也不调用翻译；runtime 消费生成的 cues，youtubeTimedTextBridge 只负责捕获响应，函数可在离线 fixture 中独立验证；可选 recorder 只观察来源关系，不改变旧 cue 输出。
  */
 import {decodeTextareaHtml} from '@/src/shared/text/htmlEntities';
 
@@ -17,6 +17,14 @@ export interface VideoSubtitleCue {
   startMs: number;
   durationMs: number;
   text: string;
+}
+
+export type SubtitleCueTransformation = 'duration-inferred' | 'prefix-collapse' | 'word-merge';
+/** Optional observer contract belongs to the parser; it does not depend on any provenance consumer. */
+export interface SubtitleCueRecorder {
+  begin(events: readonly unknown[]): void;
+  parsed(cue: VideoSubtitleCue, eventIndex: number): void;
+  derived(cue: VideoSubtitleCue, inputs: readonly VideoSubtitleCue[], operation: SubtitleCueTransformation | 'duration-preserved', winner?: VideoSubtitleCue): void;
 }
 
 interface YoutubeTimedTextSegment {
@@ -319,7 +327,7 @@ function isPrefixPair(left: string, right: string): boolean {
 }
 
 /** 同一时间点的增量 cue 只保留最长版本，避免短词抢先命中并阻断完整句预翻译。 */
-function collapseIncrementalCues(cues: VideoSubtitleCue[]): VideoSubtitleCue[] {
+function collapseIncrementalCues(cues: VideoSubtitleCue[], recorder?: SubtitleCueRecorder): VideoSubtitleCue[] {
   const result: VideoSubtitleCue[] = [];
   cues.forEach((cue) => {
     const previous = result[result.length - 1];
@@ -336,10 +344,9 @@ function collapseIncrementalCues(cues: VideoSubtitleCue[]): VideoSubtitleCue[] {
       previous.startMs + previous.durationMs,
       cue.startMs + cue.durationMs,
     );
-    result[result.length - 1] = {
-      ...winner,
-      durationMs: Math.max(winner.durationMs, endMs - winner.startMs),
-    };
+    const collapsed = {...winner, durationMs: Math.max(winner.durationMs, endMs - winner.startMs)};
+    recorder?.derived(collapsed, [previous, cue], 'prefix-collapse', winner);
+    result[result.length - 1] = collapsed;
   });
   return result;
 }
@@ -362,7 +369,7 @@ function hasWordStreamRun(cues: VideoSubtitleCue[], startIndex: number): boolean
 }
 
 /** 将明确的逐词 timedtext 合并为播放器可直接显示的短句，普通整段 cue 保持原样。 */
-function mergeWordStreamCues(cues: VideoSubtitleCue[]): VideoSubtitleCue[] {
+function mergeWordStreamCues(cues: VideoSubtitleCue[], recorder?: SubtitleCueRecorder): VideoSubtitleCue[] {
   const result: VideoSubtitleCue[] = [];
   let index = 0;
   while (index < cues.length) {
@@ -403,22 +410,21 @@ function mergeWordStreamCues(cues: VideoSubtitleCue[]): VideoSubtitleCue[] {
       cue.text,
       run.slice(cueIndex + 1).map((followingCue) => followingCue.text).join(' '),
     ), '');
-    result.push({
-      startMs: first.startMs,
-      durationMs: Math.max(500, endMs - first.startMs),
-      text: normalizeCueComparisonText(text),
-    });
+    const merged = {startMs: first.startMs, durationMs: Math.max(500, endMs - first.startMs), text: normalizeCueComparisonText(text)};
+    recorder?.derived(merged, run, 'word-merge');
+    result.push(merged);
     index = endIndex + 1;
   }
   return result;
 }
 
-function parseJson3Events(value: unknown): VideoSubtitleCue[] {
+function parseJson3Events(value: unknown, recorder?: SubtitleCueRecorder): VideoSubtitleCue[] {
   if (!value || typeof value !== 'object') return [];
   const events = (value as { events?: YoutubeTimedTextEvent[] }).events;
   if (!Array.isArray(events)) return [];
 
-  return events.flatMap((event) => {
+  recorder?.begin(events);
+  return events.flatMap((event, eventIndex) => {
     if (!event || typeof event !== 'object') return [];
     const startMs = numericValue(event.tStartMs);
     if (startMs === null || startMs < 0 || !Array.isArray(event.segs)) return [];
@@ -428,7 +434,9 @@ function parseJson3Events(value: unknown): VideoSubtitleCue[] {
     if (!text) return [];
     const durationMs = event.dDurationMs === undefined ? 0 : numericValue(event.dDurationMs);
     if (durationMs === null || durationMs < 0 || !Number.isFinite(startMs + durationMs)) return [];
-    return [{ startMs, durationMs, text }];
+    const cue = {startMs, durationMs, text};
+    recorder?.parsed(cue, eventIndex);
+    return [cue];
   });
 }
 
@@ -465,12 +473,12 @@ function parseXmlEvents(source: string): VideoSubtitleCue[] {
 }
 
 /** 解析 YouTube JSON3 或 XML timedtext 响应为统一时间轴。 */
-export function parseYoutubeTimedTextResponse(source: string): VideoSubtitleCue[] {
+export function parseYoutubeTimedTextResponse(source: string, recorder?: SubtitleCueRecorder): VideoSubtitleCue[] {
   const trimmed = source.trim();
   if (!trimmed) return [];
   try {
     const json = JSON.parse(trimmed);
-    const cues = parseJson3Events(json);
+    const cues = parseJson3Events(json, recorder);
     if (cues.length > 0) return cues;
   } catch {
     // 尝试 XML/VTT 回退。
@@ -478,7 +486,7 @@ export function parseYoutubeTimedTextResponse(source: string): VideoSubtitleCue[
   return parseXmlEvents(trimmed);
 }
 
-export function finalizeVideoSubtitleCues(cues: VideoSubtitleCue[]): VideoSubtitleCue[] {
+export function finalizeVideoSubtitleCues(cues: VideoSubtitleCue[], recorder?: SubtitleCueRecorder): VideoSubtitleCue[] {
   const ordered = [...cues]
     .filter((cue) => Number.isFinite(cue.startMs) && cue.startMs >= 0 && Number.isFinite(cue.durationMs)
       && Number.isFinite(cue.startMs + cue.durationMs) && cue.text.trim())
@@ -488,12 +496,14 @@ export function finalizeVideoSubtitleCues(cues: VideoSubtitleCue[]): VideoSubtit
     const nextStart = ordered[index + 1]?.startMs;
     const inferredDuration = nextStart !== undefined ? nextStart - cue.startMs : 2000;
     const durationMs = cue.durationMs > 0 ? cue.durationMs : Math.max(500, Math.min(8000, inferredDuration));
-    withDurations.push({ ...cue, durationMs });
+    const normalized = {...cue, durationMs};
+    recorder?.derived(normalized, [cue], cue.durationMs > 0 ? 'duration-preserved' : 'duration-inferred');
+    withDurations.push(normalized);
   });
   // 词流合并可能新产生增量前缀关系；每次有效转换都减少 cue 数，有限收敛保证重复调用幂等。
   let result = withDurations;
   while (true) {
-    const finalized = mergeWordStreamCues(collapseIncrementalCues(result));
+    const finalized = mergeWordStreamCues(collapseIncrementalCues(result, recorder), recorder);
     if (finalized.length === result.length) return finalized;
     result = finalized;
   }

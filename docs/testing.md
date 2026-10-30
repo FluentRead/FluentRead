@@ -1637,3 +1637,11 @@ Popup 服务概览显示默认、继承和独立功能在配置中选择的模�
 生成语音和播放状态栏位于正文之后，带独立分隔线并按控件实际高度参与布局。自动尺寸卡片为底栏自然增高，达到当前位置的可用高度上限时正文滚动；手动调整过尺寸的卡片保留用户外框，正文独立滚动。停止后底栏收起，自动卡恢复自然高度。
 
 针对该边界运行 `pnpm test tests/selectionTranslatorLifecycle.test.ts`。生产构建后运行 `node scripts/run-selection-speech-test.cjs --layout-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <扩展界面测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`，验证等待生成、播放、停止和重播、原文与译文切换、窄屏与深色，以及手动缩小卡片后正文末尾和操作按钮仍可访问。断言正文滚动区域不与底栏相交，所有播放按钮完整位于底栏内；自动卡未到高度上限时不得因语音栏出现而压缩正文。测试使用临时后台 Edge 和确定性翻译/WAV 夹具，不能代替外部语音合成质量或 Firefox 实机验证。
+
+### 完整程序的串行类型诊断
+
+`pnpm compile` 仍检查原 `tsconfig.json` 的全部根文件、Vue 模板、依赖与全局声明，保留现有严格选项和 4096 MiB CI 堆上限。为避免单进程保留所有检查缓存，类型诊断分四个串行进程执行；每个进程构建完全相同的原始 Vue/TypeScript Program，不拆根文件或改变模块解析。
+
+分配仅发生在原始 TypeScript 的逐文件 semantic diagnostics 聚合处，随后仍由 Volar 的原有全文件转换映射 Vue 诊断。配置、语法、选项及全局诊断不被替换。各进程记录有序文件内容指纹和任务收据，总入口核对同一 Program 的每个文件恰好检查一次；失败、缺少收据、输入改变或中断都不能报告整体成功。
+
+实现绑定锁定的 TypeScript 5.7.3、vue-tsc 2.2.0、Volar TypeScript 2.4.11；升级时须重新验证原生诊断与分批诊断的一致性。当前不支持 watch、incremental、composite、项目引用或输出产物模式，不能用分批通过替代这些模式的验证。`tests/typecheckPartitions.test.ts` 对照原生检查验证跨文件全局冲突、模块增强、未使用变量及 Vue 模板错误，并验证失败传播和收据完整性。

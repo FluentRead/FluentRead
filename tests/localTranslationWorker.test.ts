@@ -37,6 +37,22 @@ function hunyuanEngine() {
         createChatCompletion: vi.fn().mockResolvedValue({choices: [{finish_reason: 'stop', message: {content: '你好'}}]})};
 }
 describe('actual local translation Worker message boundary', () => {
+    it.each(['text', 'sourceLanguage', 'targetLanguage'])('rejects a validated %s cleared before its queued execution', async field => {
+        const scope = await start();
+        const request: Record<string, unknown> = {...command, requestId: 1};
+        scope.send(request);
+        request[field] = field === 'text' ? undefined : '';
+        await vi.waitFor(() => expect(scope.postMessage).toHaveBeenCalledWith({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_INVALID_REQUEST'}));
+        expect(mocks.pipeline).not.toHaveBeenCalled();
+    });
+
+    it('normalizes a non-Error validation fault without acquiring a model', async () => {
+        const scope = await start();
+        scope.send({requestId: 1, get type() {throw null;}});
+        expect(scope.postMessage).toHaveBeenCalledWith({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_INVALID_REQUEST'});
+        expect(mocks.pipeline).not.toHaveBeenCalled();
+    });
+
     it('rejects malformed controls before loading a model, then translates and disposes through the same queue', async () => {
         const scope = await start();
         for (const value of [null, {}, {requestId: '1'}, {requestId: 0}, {requestId: NaN}]) scope.send(value);
@@ -111,7 +127,10 @@ describe('actual local translation Worker message boundary', () => {
         const artifact = {repo: 'hunyuan', revision: 'pinned'};const blob = new Blob(['verified model']);
         mocks.artifacts.mockReturnValue([artifact]);mocks.artifactBlob.mockResolvedValue(blob);
         const scope = await start(), hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, text: '  Hello.\n\nWorld!  '};
-        expect(await reply(scope, {...hunyuanCommand, requestId: 1})).toMatchObject({success: true, result: '  你好\n\n你好  ', backend: mode === 'gpu' ? 'webgpu' : 'wasm'});
+        const result = await reply(scope, {...hunyuanCommand, requestId: 1});
+        expect(result).toMatchObject({success: true, result: '  你好\n\n你好  '});
+        if (mode === 'gpu') expect(result).not.toHaveProperty('backend');
+        else expect(result.backend).toBe('wasm');
         expect(active.setCompat).toHaveBeenCalledWith(null);
         expect(active.loadModel).toHaveBeenCalledWith([blob], expect.objectContaining({n_gpu_layers: mode === 'gpu' ? 99 : 0, n_threads: 1, n_ctx: 2048}));
         expect(active.createChatCompletion).toHaveBeenCalledTimes(2);
@@ -121,6 +140,26 @@ describe('actual local translation Worker message boundary', () => {
         expect(active.loadModel).toHaveBeenCalledOnce();expect(mocks.artifactBlob).toHaveBeenCalledOnce();
         expect(await reply(scope, {...command, requestId: 3})).toMatchObject({success: true});
         expect(active.exit).toHaveBeenCalledOnce();
+    });
+
+    it.each([false, true])('never carries an old WASM label into an unconfirmed GPU session after disposal failure=%s', async failDisposal => {
+        vi.stubGlobal('navigator', {gpu: {}});
+        vi.stubGlobal('WebAssembly', {Suspending: class {}});
+        mocks.engine.mockImplementation(() => hunyuanEngine());
+        mocks.artifacts.mockReturnValue([{}]);
+        mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const scope = await start(), hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan};
+        expect(await reply(scope, {...command, requestId: 1})).toMatchObject({success: true, backend: 'wasm'});
+        if (failDisposal) {
+            mocks.dispose.mockRejectedValueOnce(new Error('dispose failed'));
+            expect(await reply(scope, {...hunyuanCommand, requestId: 2})).toMatchObject({success: false, error: 'dispose failed'});
+        }
+        const gpu = await reply(scope, {...hunyuanCommand, requestId: 3});
+        expect(gpu).toMatchObject({success: true, result: '你好'});
+        expect(gpu).not.toHaveProperty('backend');
+        expect(await reply(scope, {...command, requestId: 4})).toMatchObject({success: true, backend: 'wasm'});
+        expect(await reply(scope, {type: 'dispose', requestId: 5})).toMatchObject({success: true});
+        expect(await reply(scope, {...hunyuanCommand, requestId: 6})).not.toHaveProperty('backend');
     });
 
     it.each(['unsupported', 'missing-artifact', 'cpu-load', 'gpu-and-cpu-load'] as const)('reports Hunyuan %s failure without retaining a broken engine', async mode => {

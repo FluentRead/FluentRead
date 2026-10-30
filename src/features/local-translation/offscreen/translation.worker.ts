@@ -24,7 +24,7 @@ const MAX_INFERENCE_MS = 90_000;
 let translator: Translator | undefined;
 let translatorRepository = '';
 let hunyuan: Wllama | undefined;
-let backend: 'wasm' | 'webgpu' = 'wasm';
+let backend: WorkerResponse['backend'];
 let taskQueue = Promise.resolve();
 
 function extensionUrl(path: string): string { return new URL(path, self.location.href).toString(); }
@@ -58,6 +58,7 @@ function configureEnvironment(): void {
 }
 
 async function dispose(): Promise<void> {
+    backend = undefined;
     const previousTranslator = translator;
     const previousHunyuan = hunyuan;
     translator = undefined;
@@ -117,7 +118,8 @@ async function getHunyuan(model: string): Promise<Wllama> {
     }));
     try {
         await load(supportsGpu);
-        backend = supportsGpu ? 'webgpu' : 'wasm';
+        // 能力探测和请求 GPU 层数不证明实际卸载；无执行证据时保持未知。
+        backend = supportsGpu ? undefined : 'wasm';
     } catch (error) {
         await engine.exit().catch(() => undefined);
         if (!supportsGpu) throw error;
@@ -185,7 +187,7 @@ export function startLocalTranslationWorker(): void {
                 if (request.type === 'dispose') { await dispose(); post({requestId: request.requestId, success: true}); return; }
                 const started = performance.now();
                 const result = await translate(request);
-                post({requestId: request.requestId, success: true, result, backend, elapsedMs: performance.now() - started});
+                post({requestId: request.requestId, success: true, result, ...(backend === undefined ? {} : {backend}), elapsedMs: performance.now() - started});
             } catch (error) {
                 post({requestId: request.requestId, success: false, error: error instanceof Error ? error.message : 'LOCAL_TRANSLATION_FAILED', ...(localWasmThreads()>1?{retrySingleThread:true}:{})});
             }

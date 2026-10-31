@@ -7,7 +7,7 @@
 import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createNativePdfSelectionAdapter, mountNativePdfSelectionApp, parseNativePdfSelectionPayload, readNativePdfSelectionToken,
-    type NativePdfSelectionPageDependencies} from '@/src/app/selection/page';
+    NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS, type NativePdfSelectionPageDependencies} from '@/src/app/selection/page';
 import {observeNativePdfSelectionCard} from '@/src/app/selection/cardVisibility';
 import {createNativePdfSelectionBridge, NATIVE_PDF_SELECTION_TTL_MS} from '@/src/features/selection-translation/background/nativePdfSelection';
 
@@ -26,7 +26,7 @@ const cleanups: Array<() => void> = [];
 beforeEach(() => {ports.createApp.mockReset(); ports.plugin.mockReset(); ports.sendMessage.mockReset(); ports.translate.mockReset();
     ports.subscribeConfig.mockReset(); ports.subscribeConfig.mockReturnValue(() => {});
     Object.assign(ports.config, {on: true, disableSelectionTranslator: false, selectionTranslatorMode: 'bilingual', disabledExtensionDomains: []});});
-afterEach(() => {cleanups.splice(0).forEach(cleanup => cleanup()); vi.unstubAllGlobals(); vi.restoreAllMocks();});
+afterEach(() => {cleanups.splice(0).forEach(cleanup => cleanup()); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers();});
 const tick = async () => {for (let index = 0; index < 8; index++) await Promise.resolve();};
 function deferred<T>() {let resolve!: (value: T) => void, reject!: (error: unknown) => void;
     const promise = new Promise<T>((done, fail) => {resolve = done; reject = fail;}); return {promise, resolve, reject};}
@@ -291,5 +291,90 @@ describe('结果窗口的自有卡片可见性观察', () => {
         card.remove(); notify(records([card]), {} as MutationObserver); expect(dismiss).toHaveBeenCalledOnce();
         notify([], {} as MutationObserver); expect(dismiss).toHaveBeenCalledOnce(); stop(); stop();
         notify(records([card]), {} as MutationObserver); expect(dismiss).toHaveBeenCalledOnce(); expect(disconnect).toHaveBeenCalledTimes(2);
+    });
+});
+
+
+describe('未领取结果页独立于后台的超时退出', () => {
+    it('后台模块 A 打开窗口后终止，重建 B 无票据时由原结果页独立退出', async () => {
+        vi.useFakeTimers();
+        const issuedToken = 'a'.repeat(32), pageUrl = 'chrome-extension://test/selection.html';
+        const timeout = vi.spyOn(globalThis, 'setTimeout');
+        const dependencies = {
+            extensionId: 'test', resultUrl: pageUrl, now: Date.now, wallNow: Date.now, randomToken: () => issuedToken,
+            openWindow: vi.fn(async () => ({id: 12, tabs: [{id: 88, windowId: 12}]})),
+        };
+        const first = await import('@/src/features/selection-translation/background/nativePdfSelection');
+        const workerA = first.createNativePdfSelectionBridge(dependencies);
+        expect(await workerA.open(payload)).toBe(true);
+        const workerTimers = timeout.mock.results.map(result => result.value as ReturnType<typeof setTimeout>);
+        timeout.mockRestore();
+        expect(workerTimers).toHaveLength(1);
+        const config = deferred<void>(), f = fixture(`#token=${issuedToken}`);
+        f.dependencies.ready = config.promise;
+        const page = f.start();
+        expect(vi.getTimerCount()).toBe(2);
+        workerTimers.forEach(timer => clearTimeout(timer)); // Terminating A removes only A's timers.
+        expect(vi.getTimerCount()).toBe(1);
+        vi.resetModules();
+        const restarted = await import('@/src/features/selection-translation/background/nativePdfSelection');
+        expect(restarted.createNativePdfSelectionBridge).not.toBe(first.createNativePdfSelectionBridge);
+        const workerB = restarted.createNativePdfSelectionBridge(dependencies);
+        f.dependencies.claim = vi.fn(value => workerB.claim(value, {
+            id: 'test', url: pageUrl, frameId: 0, tab: {id: 88, windowId: 12},
+        }));
+        config.resolve(); await page.ready;
+        expect(f.dependencies.claim).toHaveBeenCalledWith(issuedToken);
+        expect(f.dependencies.mountCard).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS);
+        expect(f.dependencies.close).toHaveBeenCalledOnce();
+
+    });
+
+    it.each(['ready-pending', 'claim-pending', 'claim-null', 'claim-reject', 'disabled'])('%s 到期仅关闭一次并拒绝迟到交付', async stage => {
+        vi.useFakeTimers();
+        const f = fixture(), ready = deferred<void>(), claim = deferred<unknown>();
+        if (stage === 'ready-pending') f.dependencies.ready = ready.promise;
+        if (stage === 'claim-pending') f.dependencies.claim = vi.fn(() => claim.promise);
+        if (stage === 'claim-null') f.dependencies.claim = vi.fn(async () => null);
+        if (stage === 'claim-reject') f.dependencies.claim = vi.fn(async () => {throw new Error('worker unavailable');});
+        if (stage === 'disabled') f.setEnabled(false);
+        const page = f.start(); await tick();
+        await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS - 1);
+        expect(f.dependencies.close).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(f.dependencies.close).toHaveBeenCalledOnce();
+        ready.resolve(); claim.resolve(payload); await page.ready;
+        expect(f.dependencies.mountCard).not.toHaveBeenCalled();
+        expect(f.card.translate).not.toHaveBeenCalled();
+        expect(f.document.querySelector('#app')!.textContent).toBe('');
+        page.dispose(); await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS);
+        expect(f.dependencies.close).toHaveBeenCalledOnce();
+    });
+    it('有效正文已领取但卡片尚未挂载时取消超时，迟到回调也不能误关', async () => {
+        vi.useFakeTimers();
+        const f = fixture(), mounted = deferred<typeof f.card>();
+        const timeout = vi.spyOn(globalThis, 'setTimeout');
+        f.dependencies.mountCard = vi.fn(() => mounted.promise);
+        const page = f.start();
+        const callback = timeout.mock.calls.find(([, delay]) => delay === NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS)![0] as () => void;
+        await tick(); expect(vi.getTimerCount()).toBe(0);
+        callback(); await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS * 2);
+        expect(f.dependencies.close).not.toHaveBeenCalled();
+        mounted.resolve(f.card); await page.ready;
+        expect(f.card.translate).toHaveBeenCalledOnce();
+    });
+    it('页面先离开时取消计时器，已排队回调不重复关闭', async () => {
+        vi.useFakeTimers(); const f = fixture(), ready = deferred<void>(); f.dependencies.ready = ready.promise;
+        const timeout = vi.spyOn(globalThis, 'setTimeout'); const page = f.start();
+        const callback = timeout.mock.calls.find(([, delay]) => delay === NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS)![0] as () => void;
+        page.dispose(); expect(vi.getTimerCount()).toBe(0); callback();
+        ready.resolve(); await page.ready; expect(f.dependencies.close).not.toHaveBeenCalled();
+    });
+    it.each(['', '#error=too-long'])('错误窗口 %s 不安装领取计时器', async hash => {
+        vi.useFakeTimers(); const f = fixture(hash); await f.start().ready;
+        expect(vi.getTimerCount()).toBe(0);
+        await vi.advanceTimersByTimeAsync(NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS * 2);
+        expect(f.dependencies.close).not.toHaveBeenCalled();
     });
 });

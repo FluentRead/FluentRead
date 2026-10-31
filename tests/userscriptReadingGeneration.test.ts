@@ -27,6 +27,24 @@ const gemini = (text = 'Visible answer') => [{modelVersion: 'server-model', cand
 beforeEach(() => {transport.mockReset();setRuntimeFetch(transport);});
 afterEach(() => {setRuntimeFetch();vi.restoreAllMocks();});
 
+it.each(['gpt-6-luna', 'gpt-6.1-terra'])('keeps %s completion limits and custom parameters equivalent across reading transports', async model => {
+    const value = config();
+    value.customBody.openai = JSON.stringify({max_tokens: null, max_completion_tokens: 32, reasoning_effort: 'none', service_tier: 'fast', stream: false, messages: [], tools: []});
+    transport.mockImplementation(async () => events([openai()]));
+    for (const factory of [nativeGenerator, createHarnessGenerator]) {
+        const result = await factory(value, 'openai', model, tools)(input());
+        expect(result.text).toBe('Visible answer');
+    }
+    expect(transport).toHaveBeenCalledTimes(2);
+    for (const [, init] of transport.mock.calls) {
+        const serialized = String(init!.body), body = JSON.parse(serialized);
+        expect(serialized).not.toContain('"max_tokens"');
+        expect(body).toMatchObject({model, max_completion_tokens: 32, reasoning_effort: 'none', service_tier: 'fast', stream: true});
+        expect(body.messages).toEqual([{role: 'system', content: 'Explain only the selected text.'}, {role: 'user', content: 'Practice helps.'}]);
+        expect(body.tools[0].function.name).toBe('read_context');
+    }
+});
+
 it.each(['openai', 'claude', 'gemini'] as const)('keeps %s text, tool schema, endpoint and auth equivalent to the native SDK request', async service => {
     const value = config(service), request = input();const fixture = service === 'openai' ? [openai()] : service === 'claude' ? claude() : gemini();
     transport.mockImplementation(async () => events(fixture));

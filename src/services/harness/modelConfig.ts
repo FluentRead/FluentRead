@@ -1,7 +1,7 @@
 /**
  * @file src/services/harness/modelConfig.ts
  * 文件职责：集中定义阅读模型的配置快照、请求身份与供应商认证规则，供扩展和脚本共用。
- * 主要内容：规范化端点、请求头、思考开关和智谱签名，计算模型输入指纹，并对供应商错误中的凭据与网址参数脱敏。
+ * 主要内容：规范化端点、请求头、Chat Completions 自定义生成参数与输出上限、思考开关和智谱签名，计算模型输入指纹，并对供应商错误中的凭据与网址参数脱敏。
  * 模块边界：只处理配置与错误值，不初始化 AI SDK、不发送网络请求；具体传输和密钥轮换由各运行环境的生成适配器负责。
  */
 import hmacSha256 from 'crypto-js/hmac-sha256';
@@ -15,6 +15,8 @@ import {normalizeLlmTransportError} from '@/src/providers/translation/ai-sdk/tra
 import {isHarnessService} from '@/src/core/config/harness';
 import {BILIBILI_FREE_TRANSLATION_DOMAIN, BILIBILI_FREE_TRANSLATION_MODEL} from '@/src/core/config/freeTranslation';
 import {isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
+import {normalizeChatCompletionRequest} from '@/src/providers/translation/ai-sdk/chatCompletionRequest';
+import {parseCustomBody} from '@/src/core/config/customBody';
 import {parseCustomHeaders} from '@/src/core/config/customHeaders';
 import {getServiceApiKeys} from '@/src/core/config/apiKeys';
 import {createTranslationProviderConfigSnapshot} from '@/src/services/translation/requestSnapshot';
@@ -59,12 +61,22 @@ export function serviceHeaders(service: string, apiKey: string): Record<string, 
   return Object.keys(headers).length ? headers : undefined;
 }
 
-export function transformBody(service: string, config: Config, model: string, body: Record<string, unknown>): Record<string, unknown> {
-  if (service !== services.deepseek) return body;
-  return {
-    ...body,
-    thinking: {type: isModelThinkingEnabled(config.modelThinking, service, model) ? 'enabled' : 'disabled'},
-  };
+export function transformBody(service: string, config: Config, model: string, body: Record<string, unknown>, endpoint: string): Record<string, unknown> {
+  const custom = parseCustomBody(config.customBody[service]);
+  if (!custom) throw new Error('自定义请求体必须是有效的 JSON 对象');
+  // 兼容服务均遵循顶层用户参数优先；会话和协议字段仍由调用方管理。
+  const parameters = {...custom};
+  for (const key of ['model', 'messages', 'tools', 'tool_choice', 'parallel_tool_calls', 'stream', 'stream_options', 'response_format']) {
+    delete parameters[key];
+  }
+  // null 不作为禁用预算的哨兵，避免重新发送被拒绝的旧字段或丢失功能默认预算。
+  for (const key of ['max_tokens', 'max_completion_tokens']) {
+    if (parameters[key] == null) delete parameters[key];
+  }
+  const defaults = service === services.deepseek
+    ? {...body, thinking: {type: isModelThinkingEnabled(config.modelThinking, service, model) ? 'enabled' : 'disabled'}}
+    : body;
+  return normalizeChatCompletionRequest(endpoint, {...defaults, ...parameters});
 }
 
 /** 将 provider 错误归一为不泄露 API Key 的用户可见错误。 */
@@ -92,6 +104,7 @@ export function getHarnessModelInputKey(config: Config, service: string, model: 
   catch { endpoint = 'invalid'; }
   const headers = !native && isCustomOpenAIProviderId(service) ? parseCustomHeaders(config.customHeaders[service]) : {};
   return sha256Hex(JSON.stringify([
+    !native ? config.customBody[service] : null,
     service, requestedModel, isHarnessService(service, config.customOpenAIProviders), endpoint,
     headers ? Object.entries(headers).sort(([a], [b]) => a.localeCompare(b)) : null,
     rotating ? keys : [keys[0] ?? ''], rotating, rotating ? normalizeApiKeyRecoveryMs(config.apiKeyRecoveryMs) : null,

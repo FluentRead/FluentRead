@@ -11,26 +11,33 @@ on:
         description: Git baseline for affected tests
         default: HEAD^
         required: true
+      upload_packages:
+        description: Save Chrome and Firefox preview builds for one day
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: extension-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # PRs supersede older checks; each main commit keeps its own diff and evidence.
+  group: extension-quality-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUENTREAD_TEST_MAX_WORKERS: 1
+  FLUENTREAD_TEST_CONCURRENCY: 1
+  FLUENTREAD_DISABLE_BROWSER_RUNNER: 1
+  NODE_OPTIONS: --max-old-space-size=4096
+  # Event values are data, never interpolated into shell source.
+  FLUENTREAD_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base || 'HEAD^' }}
 
 jobs:
-  extension-quality:
-    runs-on: ubuntu-latest
-    # A single-worker sample completed 210 of 447 files in 32 minutes; reserve time for the remaining scope and builds.
-    timeout-minutes: 75
-    env:
-      FLUENTREAD_TEST_MAX_WORKERS: 1
-      FLUENTREAD_TEST_CONCURRENCY: 1
-      FLUENTREAD_DISABLE_BROWSER_RUNNER: 1
-      NODE_OPTIONS: --max-old-space-size=4096
-      # Event values are data, never interpolated into shell source.
-      FLUENTREAD_CI_BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base || 'HEAD^' }}
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      extension_changed: ${{ steps.affected.outputs.extension_changed }}
     steps:
       - name: Checkout tested commit and diff history
         uses: actions/checkout@v6
@@ -38,7 +45,31 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v5
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Plan affected tests and builds without running tests
+        id: affected
+        run: node scripts/testing/run-affected-tests.mjs --plan-only
+
+  tests:
+    needs: plan
+    runs-on: ubuntu-24.04
+    # Keep one Vitest worker; build lanes run on separate standard runners.
+    timeout-minutes: 75
+    steps:
+      - name: Checkout tested commit and diff history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
       - name: Set up Node.js and dependency cache
         uses: actions/setup-node@v6
         with:
@@ -59,35 +90,13 @@ jobs:
           rg --version
       - name: Audit test registration
         run: pnpm test:audit
-      - name: Test, build and verify the Zotero integration
-        run: |
-          pnpm test:zotero
-          pnpm build:zotero
-          pnpm verify:zotero
+      - name: Test the Zotero integration
+        if: needs.plan.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
+        run: pnpm test:zotero
       - name: Check native bridge and verification fixture contracts
         run: node scripts/testing/run-resource-safe.mjs -- node --test --test-concurrency=1 tests/*.test.mjs
       - name: Run architecture gates, affected behavior and changed strict coverage once
-        id: affected
         run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json
-      - name: Check extension and shared Vue types
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: pnpm compile
-      - name: Build Chrome and Firefox and verify generated manifests
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm build
-          pnpm build:firefox
-          pnpm verify:extension-manifests
-      - name: Build and verify the userscript
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm build:userscript
-          node scripts/verify-userscript-build.mjs
-      - name: Build and verify the standalone userscript
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: |
-          pnpm build:userscript:standalone
-          node scripts/verify-userscript-standalone-build.mjs
       - name: Preserve affected test plan and coverage evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -98,3 +107,125 @@ jobs:
             coverage/affected/coverage-summary.json
           if-no-files-found: ignore
           retention-days: 7
+
+  builds:
+    needs: plan
+    if: needs.plan.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [extensions, companions]
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+      - name: Set up Node.js and dependency cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare build tools and WXT types
+        run: |
+          pnpm rebuild esbuild
+          pnpm exec wxt prepare
+      - name: Check extension and shared Vue types
+        if: matrix.target == 'extensions'
+        run: pnpm compile
+      - name: Build Chrome and Firefox and verify generated manifests
+        if: matrix.target == 'extensions'
+        run: |
+          pnpm build
+          pnpm build:firefox
+          pnpm verify:extension-manifests
+      - name: Build and verify Safari web extension resources
+        if: matrix.target == 'extensions'
+        run: |
+          pnpm build:safari
+          pnpm safari:verify
+      - name: Package Thunderbird from the existing Firefox build
+        if: matrix.target == 'extensions'
+        run: node scripts/thunderbird/package.mjs
+      - name: Report actual extension sizes in the run summary
+        if: matrix.target == 'extensions'
+        run: node scripts/testing/report-ci-builds.mjs .output/chrome-mv3 .output/firefox-mv2 .output/safari-mv2
+      - name: Build and verify the userscript
+        if: matrix.target == 'companions'
+        run: |
+          pnpm build:userscript
+          node scripts/verify-userscript-build.mjs
+      - name: Build and verify the standalone userscript
+        if: matrix.target == 'companions'
+        run: |
+          pnpm build:userscript:standalone
+          node scripts/verify-userscript-standalone-build.mjs
+      - name: Build and verify the Zotero integration
+        if: matrix.target == 'companions'
+        run: |
+          pnpm build:zotero
+          pnpm verify:zotero
+      - name: Build the Obsidian integration
+        if: matrix.target == 'companions'
+        run: pnpm build:obsidian
+      - name: Preserve small build reports
+        if: always() && matrix.target == 'extensions'
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-build-reports
+          path: reports/ci-builds/*.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Prepare requested preview builds and checksums without rebuilding
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_packages && matrix.target == 'extensions'
+        run: |
+          mkdir -p reports/ci-preview
+          cp -R .output/chrome-mv3 .output/firefox-mv2 reports/ci-preview/
+          cd reports/ci-preview
+          find chrome-mv3 firefox-mv2 -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          writeFileSync('BUILD.json', JSON.stringify({commit: process.env.GITHUB_SHA,
+            repository: process.env.GITHUB_REPOSITORY, runId: process.env.GITHUB_RUN_ID,
+            runAttempt: process.env.GITHUB_RUN_ATTEMPT, signed: false}, null, 2) + '\n');
+          NODE
+      - name: Upload requested Chrome and Firefox preview builds for one day
+        if: github.event_name == 'workflow_dispatch' && inputs.upload_packages && matrix.target == 'extensions'
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/ci-preview/
+          if-no-files-found: error
+          retention-days: 1
+
+  # Preserve the original required check name and fail when a dependency failed or was cancelled.
+  extension-quality:
+    if: always()
+    needs: [plan, tests, builds]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require all planned checks to pass
+        env:
+          PLAN_RESULT: ${{ needs.plan.result }}
+          TEST_RESULT: ${{ needs.tests.result }}
+          BUILD_RESULT: ${{ needs.builds.result }}
+          EXTENSION_CHANGED: ${{ needs.plan.outputs.extension_changed }}
+          BUILDS_REQUIRED: ${{ needs.plan.outputs.extension_changed == 'true' || github.event_name == 'workflow_dispatch' }}
+        run: |
+          test "$PLAN_RESULT" = success
+          test "$TEST_RESULT" = success
+          case "$EXTENSION_CHANGED" in
+            true|false) ;;
+            *) exit 1 ;;
+          esac
+          if [ "$BUILDS_REQUIRED" = true ]; then
+            test "$BUILD_RESULT" = success
+          else
+            test "$BUILD_RESULT" = skipped
+          fi

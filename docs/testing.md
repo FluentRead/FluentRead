@@ -719,7 +719,11 @@ node scripts/verify-userscript-build.mjs  # userscript 元数据与产物边界
 
 ### PR 的扩展质量检查
 
-`.github/workflows/extension-quality.yml` 在面向 `main` 的 PR、主线提交和手动运行时检查扩展。使用锁文件安装与 pnpm 缓存，单个 Vitest worker、一个资源槽和串行构建；同一 PR 的新提交取消旧检查。工作流先执行测试登记审计，再由 `scripts/testing/run-affected-tests.mjs` 将完整架构组与受影响行为测试合并去重，统一执行一次。架构组中已有真实 runtime 消费者；它们在同一覆盖率运行中贡献执行证据，不能按分类标签排除。涉及扩展、共享源码、测试、资源或构建脚本时，继续检查 TypeScript/Vue、Chrome 与 Firefox 构建、生成清单，以及标准和 standalone userscript 的构建、元数据与原有体积门禁。文档内容独立变化仍执行架构门禁，不触发这些扩展构建。
+`.github/workflows/extension-quality.yml` 在面向 `main` 的 PR、主线提交和手动运行时检查扩展。规划 job 先通过 `scripts/testing/run-affected-tests.mjs --plan-only` 确定范围，随后测试与两条构建任务在独立的标准 Ubuntu runner 中并行。每个 runner 使用锁文件安装与 pnpm 缓存，保留单个 Vitest worker、一个资源槽和任务内串行命令；并行的是不同 runner，不在同一台机器上放大 worker 数量。同一 PR 的新提交取消旧检查；主线按提交 SHA 分组，避免连续合并取消前一批改动的检查。
+
+测试任务执行登记审计、原生 Node 夹具、Zotero 测试，并将完整架构组与受影响行为测试合并去重、统一执行一次。架构组中已有真实 runtime 消费者；它们在同一覆盖率运行中贡献执行证据，不能按分类标签排除。涉及扩展、共享源码、测试、资源或构建脚本时，扩展构建任务检查 TypeScript/Vue、Chrome 与 Firefox 构建及生成清单、Safari 网页产物校验，并复用 Firefox 产物生成 Thunderbird 包；配套构建任务检查标准和 standalone userscript 的构建、元数据与原有体积门禁，以及 Zotero 和 Obsidian 构建。文档内容独立变化仍执行测试任务，普通 PR/push 不触发这些构建；手动运行始终执行两条构建任务。最后的 `extension-quality` 汇总门禁检查规划、测试与应执行的全部构建结果，失败、取消或意外跳过不能显示通过。
+
+日常只保存小型影响计划与覆盖率 JSON，并在 job summary 中显示结果；完整构建产物默认不上传。手动运行可显式开启 `upload_packages`，将本次 Chrome/Firefox 产物保存一天，供下载复测。工作流不会创建 GitHub Release、上传扩展商店或执行签名；Safari 网页构建与 Thunderbird 打包也不代表对应应用实机验收。免费条件、操作步骤与验证边界见 [GitHub Actions 维护](maintainers/github-actions.md)。
 
 影响规划以 PR 基线到实际检出提交的 Git diff 为准，跟踪静态 import、使用明确路径的动态 import、barrel、CSS、夹具路径，以及现有组件测试直接读取 SFC 的文件路径；删除和重命名的旧路径同样参与追踪。测试归类复用 `tests/test-matrix.json`，架构组只执行一次。单纯新增测试登记或覆盖率清单保持定向范围；共享依赖、TypeScript/Vitest 执行环境变化则显式扩大到全部受影响行为套件，计划记录扩大原因。改动的严格覆盖模块没有可追踪行为测试时检查失败，不能以空选择通过。
 

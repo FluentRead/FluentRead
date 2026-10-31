@@ -95,7 +95,7 @@ function createSingleHarnessLanguageModel(config: Config, service: string, model
     apiKey: service === services.azureOpenai ? undefined : apiKey || undefined,
     headers: serviceHeaders(service, configuredKey),
     queryParams: endpoint.queryParams,
-    transformRequestBody: body => transformBody(service, config, requestedModel, body),
+    transformRequestBody: body => transformBody(service, config, requestedModel, body, endpoint.endpoint),
     fetch: async (input, init) => runtimeFetch(endpoint.exactEndpoint || input, {
       ...init, headers: mergeCustomHeaders(init?.headers, customHeaders), redirect: 'error',
     }),

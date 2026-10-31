@@ -60,6 +60,7 @@ export default defineConfig({
                 'userscript/readingRuntime.ts',
                 'userscript/readingGeneration.ts',
                 'src/services/harness/modelConfig.ts',
+                'src/providers/translation/ai-sdk/chatCompletionRequest.ts',
                 'src/services/harness/visibleStream.ts',
                 'src/services/harness/generation.ts',
                 'src/services/harness/readContext.ts',

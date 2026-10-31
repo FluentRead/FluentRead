@@ -1,3 +1,4 @@
+import {normalizeChatCompletionRequest} from '@/src/providers/translation/ai-sdk/chatCompletionRequest';
 import {describe, expect, it, vi} from 'vitest';
 
 vi.mock('@/src/services/config/store', () => ({config: {}}));
@@ -354,5 +355,30 @@ describe('New API URL 规范化', () => {
     it('拒绝空地址和非 HTTP(S) 协议', () => {
         expect(() => normalizeNewApiEndpoint('')).toThrow('New API 地址未配置');
         expect(() => normalizeNewApiEndpoint('file:///tmp/api')).toThrow('仅支持 HTTP 或 HTTPS');
+    });
+});
+
+
+describe('Chat Completions output budget protocol', () => {
+    it.each([
+        ['https://api.openai.com/v1/chat/completions', {max_tokens: 64}, {max_completion_tokens: 64}],
+        ['https://api.openai.com/v1/chat/completions/?tenant=a', {max_tokens: null}, {}],
+        ['https://api.openai.com/v1/chat/completions', {}, {}],
+        ['https://gateway.test/v1/chat/completions', {max_tokens: 64}, {max_tokens: 64}],
+        ['https://gateway.test/v1/chat/completions', {max_tokens: 64, max_completion_tokens: 32}, {max_completion_tokens: 32}],
+        ['https://api.openai.com/v1/chat/completions', {max_tokens: 64, max_completion_tokens: 32}, {max_completion_tokens: 32}],
+        ['https://gateway.test/v1/chat/completions', {max_tokens: 64, max_completion_tokens: null}, {max_tokens: 64}],
+        ['https://gateway.test/v1/chat/completions', {max_tokens: null, max_completion_tokens: null}, {}],
+        ['https://api.openai.com.evil.test/v1/chat/completions', {max_tokens: 64}, {max_tokens: 64}],
+        ['http://api.openai.com/v1/chat/completions', {max_tokens: 64}, {max_tokens: 64}],
+        ['https://api.openai.com:8443/v1/chat/completions', {max_tokens: 64}, {max_tokens: 64}],
+        ['https://api.openai.com/v1/responses', {max_output_tokens: 64}, {max_output_tokens: 64}],
+        ['https://reader.openai.azure.com/openai/deployments/alias/chat/completions?api-version=2024-02-15-preview', {max_tokens: 64}, {max_tokens: 64}],
+    ])('normalizes %s with %j without mutating input or unrelated fields', (endpoint, budget, expected) => {
+        const body = {model: 'arbitrary-model', messages: [{role: 'user', content: 'Hello'}], stream: true, reasoning_effort: 'none', service_tier: 'fast', ...budget};
+        const before = structuredClone(body);
+        const result = normalizeChatCompletionRequest(endpoint, body);
+        expect(JSON.parse(JSON.stringify(result))).toEqual({model: 'arbitrary-model', messages: body.messages, stream: true, reasoning_effort: 'none', service_tier: 'fast', ...expected});
+        expect(body).toEqual(before);
     });
 });

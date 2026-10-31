@@ -57,6 +57,7 @@ export default defineConfig({
                 'userscript/readingStorage.ts',
                 'userscript/dataEncoding.ts',
                 'userscript/buildDataEncoding.ts',
+                'userscript/buildGzip.ts',
                 'userscript/readingRuntime.ts',
                 'userscript/readingGeneration.ts',
                 'src/services/harness/modelConfig.ts',

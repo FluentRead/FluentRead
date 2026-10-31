@@ -5,7 +5,7 @@ import {inflateWithPako} from '@/userscript/pakoBundled';
 import {decodeUserscriptData} from '@/userscript/dataEncoding';
 import {gzipUserscriptBuildData} from '@/userscript/buildGzip';
 import ts from 'typescript';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugin';
 
 const root = process.cwd();
@@ -13,6 +13,23 @@ const tables = [
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
     ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels'],
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
+    ['src/core/config/catalog.ts', 'multilingualTargetLanguageLabels'],
+    ['src/core/config/catalog.ts', 'englishTargetLanguageLabels'],
+    ['src/core/config/interfaceAppearance.ts', 'interfaceSkinOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'interfaceFontOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'popupModuleOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'popupQuickFeatureOptions'],
+    ['src/features/full-page-translation/ui/translationIndicators.ts', 'iconPaths'],
+    ['src/providers/translation/aliyun-translation.ts', 'aliyunErrorHints'],
+    ['src/core/i18n/language.ts', 'localizedUiLanguageLabels'],
+    ['src/features/reading-assistant/sentenceAnalysis.ts', 'ROLES'],
+    ['src/core/harness/promptDefaults.ts', 'GRAMMAR_CARD_FORMAT'],
+    ['src/services/diagnostics/index.ts', 'diagnosticUiKeys'],
+    ['src/core/language/codes.ts', 'LANGUAGE_ALIASES'],
+    ['src/core/language/codes.ts', 'DEFAULT_SCRIPTS'],
+    ['src/features/image-translation/ocrLanguages.ts', 'IMAGE_OCR_LANGUAGE_PACKS'],
+    ['src/core/config/selectionPreview.ts', 'learningPreviewAnswers'],
+    ['src/ui/translationLoadingIndicator.ts', 'HOST_IMPORTANT_STYLES'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {
@@ -51,7 +68,49 @@ describe('standalone static settings data representation', () => {
         expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before)), undefined, true));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
-        expect(transformed.replace(initializer(transformed, name), initializer(source, name)).replace('/* @__PURE__ */ ', '').endsWith(source)).toBe(true);
+        let restored = transformed;
+        for (const [owner, table] of tables) {
+            if (owner === path) restored = restored.replace(`/* @__PURE__ */ ${initializer(transformed, table)}`, initializer(source, table));
+        }
+        expect(restored.replace(/import \{inflateWithPako as __fluentreadInflateSettingsData\} from '@\/userscript\/pakoRuntime';\n/u, '')
+            .replace(/import \{decodeUserscriptData as __fluentreadDecodeSettingsData\} from '@\/userscript\/dataEncoding';\n/u, '')).toBe(source);
+    });
+
+    it.each([
+        ['ordinary', '0', '0', false],
+        ['standalone', '1', '0', true],
+        ['greasy-fork', '0', '1', false],
+        ['standalone-and-greasy', '1', '1', false],
+    ] as const)('preserves full language labels through the actual %s Vite configuration', async (_label, standalone, greasy, enabled) => {
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', standalone);
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', greasy);
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
+        try {
+            vi.resetModules();
+            // This case checks real settings-plugin registration and complete label data.
+            // Unrelated large UI-message worker compression has its own real-worker suite.
+            // Keep its lossless baseline here; the settings AST/codec remain the real ones.
+            vi.doMock('@/userscript/buildGzip', async original => {
+                const actual = await original<typeof import('@/userscript/buildGzip')>();
+                return {...actual, gzipLargeStandaloneUserscriptData: async (data: Uint8Array) => actual.gzipUserscriptBuildData(data)};
+            });
+            const {default: configuration} = await import('@/userscript/vite.config');
+            const config = configuration as {plugins: Array<{name?: string; transform?: unknown}>};
+            const plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
+            const run = plugin.transform as (code: string, id: string) => {code: string} | null;
+            const path = resolve(root, 'src/core/config/catalog.ts');
+            const original = readFileSync(path, 'utf8');
+            const result = run(original, path);
+            if (!enabled) expect(result).toBeNull();
+            else for (const name of ['multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']) {
+                expect(JSON.stringify(value(initializer(result!.code, name)))).toBe(JSON.stringify(value(initializer(original, name))));
+            }
+        } finally {
+            vi.doUnmock('@/userscript/buildGzip');
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        }
     });
 
     it('keeps the standard build style table in Base85 with identical gzip bytes and values', () => {

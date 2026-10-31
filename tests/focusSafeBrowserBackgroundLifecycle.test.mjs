@@ -24,6 +24,13 @@ const guardPath = path.resolve(process.env.FLUENTREAD_SIGNAL_TEST_GUARD ||
 const require = createRequire(import.meta.url);
 const actualGuard = require(guardPath);
 const options = {timeout: 15000, concurrency: false};
+// Error messages may contain process output. Report only structural error names
+// and codes so CI exposes secondary cleanup failures without dumping payloads.
+const closeReceiptCodes = error => {
+  const codes = value => ({name: value?.name, code: value?.code});
+  return JSON.stringify({error: codes(error), cause: codes(error?.cause),
+    errors: Array.isArray(error?.errors) ? error.errors.map(codes) : []});
+};
 const deferred = () => {
   let resolve, reject;
   const promise = new Promise((yes, no) => {resolve = yes; reject = no;});
@@ -154,6 +161,18 @@ if (process.argv.includes('--actor')) {
     budgets: 'Unmodified actual guard; native5000/capture1500/detach500/PS750/grace250/TERM750/KILL1500',
     scope: 'Serial pure ports plus exact parent-owned Node actors and helper workers; no browser/network/build'}));
 
+  test('unexpected close diagnostics retain secondary codes without error messages', options, () => {
+    const native = Object.assign(new Error('synthetic-private-native-message'), {code: 'NATIVE_CLOSE_TIMEOUT'});
+    const cleanup = Object.assign(new Error('synthetic-private-process-output'), {code: 'PS_TIMEOUT'});
+    const combined = new AggregateError([native, cleanup], 'synthetic-private-summary', {cause: native});
+    const report = JSON.parse(closeReceiptCodes(combined));
+    assert.equal(report.error.name, 'AggregateError');
+    assert.equal(report.cause.code, 'NATIVE_CLOSE_TIMEOUT');
+    assert.deepEqual(report.errors.map(error => error.code), ['NATIVE_CLOSE_TIMEOUT', 'PS_TIMEOUT']);
+    assert.equal(closeReceiptCodes(combined).includes('synthetic-private'), false);
+    assert.deepEqual(JSON.parse(closeReceiptCodes(native)).errors, []);
+  });
+
   test('non-arrow receivers, self registration and settled fulfilled cache preserve one whole close', options, async () => {
     const port = new ProcessPort(), native = deferred(), cleanup = deferred(), entered = deferred();
     const value = Object.freeze({receipt: 'same-reference'});
@@ -252,7 +271,11 @@ if (process.argv.includes('--actor')) {
     assert.equal(port.emit('SIGTERM'), true); assertRouted(port);
     assert.deepEqual(port.exits, []);
     let rejection;
-    await assert.rejects(first, error => {rejection = error; return error.code === 'NATIVE_CLOSE_TIMEOUT';});
+    await assert.rejects(first, error => {
+      rejection = error;
+      assert.equal(error.code, 'NATIVE_CLOSE_TIMEOUT', 'Unexpected close receipt: ' + closeReceiptCodes(error));
+      return true;
+    });
     await port.exitReady.promise;
     assert.deepEqual(await owner.done, {code: 0, signal: null});
     assert.deepEqual(port.exits, [143]); assertReleased(port);

@@ -115,6 +115,30 @@ beforeEach(() => {
 });
 
 describe('内容脚本 runtime 消息协议', () => {
+    it('独立阅读外观转发、失败回执与停用边界', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        let invalid = false;
+        const handle = vi.fn(async () => ({status: 'success', font: 'system'}));
+        const respond = vi.fn();
+        const state = {isSiteDisabled: () => false, updateSiteDisabled: vi.fn(async () => undefined), readingAppearance: {handle}};
+        const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, state);
+        for (const type of ['getReadingAppearanceState', 'setReadingAppearance']) {
+            expect(handler({type}, {}, respond)).toBe(true);
+            await Promise.resolve();
+            expect(handle).toHaveBeenLastCalledWith({type});
+            expect(respond).toHaveBeenLastCalledWith({status: 'success', font: 'system'});
+        }
+        handle.mockRejectedValueOnce(new Error('failure'));
+        handler({type: 'setReadingAppearance'}, {}, respond); await Promise.resolve();
+        expect(respond).toHaveBeenLastCalledWith({status: 'failed'});
+        invalid = true; handler({type: 'getReadingAppearanceState'}, {}, respond);
+        expect(respond).toHaveBeenLastCalledWith({status: 'disabled'});
+        invalid = false; mocks.config.on = false; handler({type: 'getReadingAppearanceState'}, {}, respond);
+        expect(respond).toHaveBeenLastCalledWith({status: 'disabled'});
+        mocks.config.on = true;
+        createContentRuntimeMessageHandler({} as ContentScriptContext, {...state, readingAppearance: undefined})({type: 'getReadingAppearanceState'}, {}, respond);
+        expect(respond).toHaveBeenLastCalledWith({status: 'disabled'});
+    });
     it('状态查询与全文及恢复回执共享当前文档标识，不缓存上一个文档标识', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
         const respond = vi.fn();

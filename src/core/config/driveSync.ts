@@ -200,7 +200,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     interfaceSkin: '界面皮肤', interfaceFont: '界面字体', interfaceVisibility: '界面栏目',
     popupModuleOrder: '菜单栏布局顺序', popupQuickFeatureVisibility: '快捷功能卡片', popupQuickFeatureOrder: '快捷功能顺序',
     translationAppearance: '译文外观', browserDefaultTranslationFont: '浏览器默认译文字体', translationStyleProfiles: '译文样式', activeTranslationStyleProfileId: '译文样式',
-    siteAdaptation: '网站规则', alwaysTranslateDomains: '网站规则', disabledExtensionDomains: '网站规则',
+    readingAppearanceSites: '网站规则', siteAdaptation: '网站规则', alwaysTranslateDomains: '网站规则', disabledExtensionDomains: '网站规则',
     excludedLanguages: '跳过翻译的语言', videoSubtitleAppearance: '视频字幕外观',
     videoSentenceLearningAppearance: '完整句学习外观',
     system_role: 'System 提示词', user_role: 'User 提示词', glossaryLibraries: '术语库内容',

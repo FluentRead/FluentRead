@@ -25,6 +25,7 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !key.startsWith('diagnostics.')
         && !['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].some(name => key === `document.pdfReading.${name}`)
         && !key.startsWith('safari.freePool.')
+        && !key.startsWith('popup.readingAppearance.')
         && !key.startsWith('popup.compact.') && !key.startsWith('popup.displayMode.') && !key.startsWith('popup.pageFont.') && !key.startsWith('document.config.')
         && !key.startsWith('document.translationRecovery.')
         && !key.startsWith('document.retainedRevisions.') && !key.startsWith('document.translationProgress.'))) as T;

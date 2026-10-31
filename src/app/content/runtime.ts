@@ -1,9 +1,10 @@
 /**
  * @file src/app/content/runtime.ts
  * 文件职责：作为内容脚本应用的顶层 composition root，协调配置就绪、站点规则、公共样式、主世界桥、功能注册表、快捷键和消息监听生命周期。
- * 主要内容：通过既有配置订阅即时重排网页双语与仅译文工件，不重发翻译请求；按全局配置同步当前文档的译文字体，刷新与路由变化保留选择，停用、挂起和销毁只撤销文档样式，恢复时重新应用；装配学习材料继续阅读的来源校验、定位与自动位置更新生命周期；先排除原始 XML 文档与失效扩展上下文，再安装内联 page.css 并按 capability 和配置挂载页面功能；配置变更时更新页面私有网站名单索引，按已提交地址检查自动翻译与站点禁用，锚点跳转保留请求，协调停用、往返缓存暂停恢复与销毁。
+ * 主要内容：装配阅读字体预览与站点记忆，共用译文字体所有者；通过既有配置订阅即时重排网页双语与仅译文工件，不重发翻译请求；按全局配置同步当前文档的译文字体，刷新与路由变化保留选择，停用、挂起和销毁只撤销文档样式，恢复时重新应用；装配学习材料继续阅读的来源校验、定位与自动位置更新生命周期；先排除原始 XML 文档与失效扩展上下文，再安装内联 page.css 并按 capability 和配置挂载页面功能；配置变更时更新页面私有网站名单索引，按已提交地址检查自动翻译与站点禁用，锚点跳转保留请求，协调停用、往返缓存暂停恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
+import {createContentReadingAppearance} from './readingAppearance';
 import {createLearningContentFeatures} from './learningFeatures';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createShadowRootUi} from 'wxt/utils/content-script-ui/shadow-root';
@@ -21,12 +22,9 @@ import {createContentHotkeyRuntime} from './hotkeyRuntime';
 import {createContentRuntimeMessageHandler, type ContentRuntimeMessageHandler} from './messageRuntime';
 import {
     autoTranslateEnglishPage,
-    cancelPendingHoverTranslation,
-    createInputTranslationContentFeature,
-    handleTranslation,
-    inputBoxTranslationConfigKey,
-    isAreaTranslatorMounted,
-    isFullPageTranslationActive, noteBilingualHostGesture,
+    cancelPendingHoverTranslation, createInputTranslationContentFeature,
+    handleTranslation, inputBoxTranslationConfigKey,
+    isAreaTranslatorMounted, isFullPageTranslationActive, noteBilingualHostGesture,
     mountAreaTranslator, startAreaTranslationFromContextMenu, mountFloatingBall, isFloatingBallAllowedOnPage,
     mountHoverTranslationContentFeature, mountImageTranslator, mountParagraphCopyContentFeature, mountSectionTranslationContentFeature,
     isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
@@ -35,8 +33,7 @@ import {
     isSupportedVideoPage,
     restoreOriginalContent, resetFullPageTranslationRouteState, createPageTranslationDisplayModeSync,
     unmountAreaTranslator, unmountFloatingBall, unmountImageTranslator,
-    unmountSelectionTranslator,
-    unmountTranslationProgressPanel,
+    unmountSelectionTranslator, unmountTranslationProgressPanel,
 } from './features';
 import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
@@ -112,7 +109,9 @@ export async function startContentApp(ctx: ContentScriptContext,
     if (import.meta.env.BROWSER !== 'userscript' && capabilities.browser !== 'userscript') {
         installEmbeddedTopFrameBridge(isPageRuntimeEnabled, pageEventController.signal, () => pageTranslationFont?.read() === true);
     }
+    const readingAppearance = import.meta.env.BROWSER === 'userscript' ? undefined : createContentReadingAppearance(document, isPageRuntimeEnabled, () => window.location.href, pageTranslationFont);
     const disposePageFeatures = (): void => {
+        readingAppearance?.suspend();
         if (import.meta.env.BROWSER !== 'userscript') pageTranslationFont?.reset(); featureController?.abort(); featureController = null;
         optionalContentFeatures?.dispose(); optionalContentFeatures = null;
         restoreOriginalContent(); cancelAllTranslations();
@@ -124,6 +123,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         if (!isPageRuntimeEnabled() || featureController) return;
         removePageStyles = installPageStyles(ctx);
         pageTranslationFont?.set(config.browserDefaultTranslationFont === true);
+        readingAppearance?.activate();
         syncBilingualSentenceHighlight(document, config.bilingualSentenceHighlightEnabled === true, config.bilingualSentenceHighlightStyle, config.bilingualSentenceHighlightAppearance);
         const activationController = new AbortController();
         featureController = activationController;
@@ -221,7 +221,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     };
     document.addEventListener('fluentread-route-change', createContentRouteChangeHandler({
         getHref: () => window.location.href,
-        routeChanged: href => { informationHighlight?.routeChanged(); siteAdaptation.routeChanged(new URL(href)); },
+        routeChanged: href => { readingAppearance?.routeChanged(); informationHighlight?.routeChanged(); siteAdaptation.routeChanged(new URL(href)); },
         resetTranslationRoute: () => { resetPageTranslationContextCache(); resetFullPageTranslationRouteState(); },
         siteDisabled: href => siteRules.isExtensionDisabled(href),
         currentSiteDisabled: () => currentPageSiteDisabled,
@@ -229,7 +229,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         reconcileFeatures: () => { void activePageFeatureRegistry?.reconcileEnabled(); },
     }), {signal: pageEventController.signal});
     const runtimeMessageListener: ContentRuntimeMessageHandler = createContentRuntimeMessageHandler(ctx, {
-        ...(import.meta.env.BROWSER === 'userscript' ? {} : {pageTranslationFont}), isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
+        ...(import.meta.env.BROWSER === 'userscript' ? {} : {pageTranslationFont, readingAppearance}), isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
         isPageSuspended: pageLifecycle.isSuspended, ...(import.meta.env.BROWSER === 'userscript' ? {reconcileUserscriptPage: () => reconcileCurrentContentPage(
             () => pageAvailability!.reconcile(), () => activePageFeatureRegistry, () => !cleanedUp && !ctx.isInvalid && !pageLifecycle.isSuspended() && !currentPageSiteDisabled, () => config.on)} : {informationHighlight}),
     }, capabilities);
@@ -243,7 +243,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         try {
             runtimeMessages.removeListener(runtimeMessageListener);
         } catch { /* 失效上下文的监听由浏览器释放，页面清理仍由本运行时负责。 */ }
-        disposePageFeatures(); if (import.meta.env.BROWSER !== 'userscript') pageTranslationFont?.dispose();
+        disposePageFeatures(); readingAppearance?.dispose(); if (import.meta.env.BROWSER !== 'userscript') pageTranslationFont?.dispose();
         unsubscribeContentConfig?.(); unsubscribeContentConfig = null;
     };
     runtimeMessages.addListener(runtimeMessageListener);
@@ -262,10 +262,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         }
         optionalContentFeatures?.sync();
         const nextSiteDisabled = siteRules.isExtensionDisabled(window.location.href);
-        if (nextSiteDisabled !== currentPageSiteDisabled) {
-            void applySiteDisabledState(nextSiteDisabled);
-            return;
-        }
+        if (nextSiteDisabled !== currentPageSiteDisabled) return void applySiteDisabledState(nextSiteDisabled);
         // 总开关是 content 生命周期的权威边界；配置历史/导入/其他上下文同步
         // 不依赖 popup/options 的易丢广播，也必须完整恢复 DOM 和释放所有 feature。
         if (pageAvailability!.needsLifecycleReconcile()) {
@@ -274,6 +271,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         }
         if (!isPageRuntimeEnabled()) return;
         pageTranslationFont?.set(nextConfig.browserDefaultTranslationFont === true);
+        readingAppearance?.sync();
         void activePageFeatureRegistry?.reconcileEnabled();
         // 关闭“始终翻译”不撤销当前会话；同页同值回声不会再次启动。
         pageAvailability!.refreshAutoTranslation();

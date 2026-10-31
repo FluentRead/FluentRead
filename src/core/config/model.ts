@@ -12,6 +12,7 @@
 
 import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS, normalizeAiMultiSegmentMaxSegments, normalizeAiMultiSegmentMaxCharacters} from './aiMultiSegment';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
+import {normalizeReadingAppearanceSites, type ReadingAppearanceSites} from './readingAppearance';
 import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
@@ -363,6 +364,7 @@ export class Config {
     autoTranslate: boolean; // 是否即时翻译
     alwaysTranslateDomains: string[]; // 始终自动翻译的可注册域名（eTLD+1）
     disabledExtensionDomains: string[]; // 禁用扩展的可注册域名（eTLD+1）
+    readingAppearanceSites: ReadingAppearanceSites; // 仅主动记住的网站阅读字体；当前页选择不保存
     siteAdaptation: SiteAdaptationSettings; // 网站内容范围、保护区域及本地 JSON 适配规则
     from: string;
     to: string;
@@ -573,6 +575,7 @@ export class Config {
         this.autoTranslate = false;
         this.alwaysTranslateDomains = [];
         this.disabledExtensionDomains = [];
+        this.readingAppearanceSites = {};
         this.siteAdaptation = normalizeSiteAdaptationSettings(undefined);
         this.from = defaultOption.from;
         this.to = defaultOption.to;
@@ -1398,6 +1401,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.translationBeforeOriginal = source.translationBeforeOriginal === true;
     normalized.alwaysTranslateDomains = normalizeAlwaysTranslateDomains(source.alwaysTranslateDomains);
     normalized.disabledExtensionDomains = normalizeDisabledExtensionDomains(source.disabledExtensionDomains);
+    normalized.readingAppearanceSites = normalizeReadingAppearanceSites(source.readingAppearanceSites);
     normalized.siteAdaptation = normalizeSiteAdaptationSettings(source.siteAdaptation);
     normalized.shareCard = normalizeShareCardPreferences(source.shareCard);
     normalized.interfaceSkin = normalizeInterfaceSkin(source.interfaceSkin);

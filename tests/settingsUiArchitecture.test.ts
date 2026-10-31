@@ -644,6 +644,7 @@ describe('options UI composition architecture', () => {
       .map(([, drawer, section]) => [drawer, section]))).toEqual({
       services: 'settings-services', aiContext: 'settings-general', hover: 'settings-translation',
       selection: 'settings-selection', appearance: 'settings-interface', image: 'settings-image-translation',
+      readingAppearance: 'settings-interface',
     })
     const popupTemplate = popup.match(/^<template>([\s\S]*?)^<\/template>/mu)?.[1]
     expect(popupTemplate).toBeDefined()

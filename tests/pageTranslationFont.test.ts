@@ -12,7 +12,7 @@ vi.mock('@/src/services/config/store', () => ({config: mocks.config}));
 vi.mock('@/src/core/config/catalog', () => ({options: {styles: []}}));
 vi.mock('@/src/app/content/features', () => ({getFullPageTranslationDocumentToken: () => mocks.token}));
 
-import {createPageTranslationFontRuntime, PAGE_TRANSLATION_FONT_CSS, PAGE_TRANSLATION_FONT_STYLE_ID} from '@/src/app/content/pageTranslationFont';
+import {createPageTranslationFontRuntime, PAGE_TRANSLATION_FONT_CSS, PAGE_READING_SYSTEM_FONT_CSS, PAGE_TRANSLATION_FONT_STYLE_ID} from '@/src/app/content/pageTranslationFont';
 import {handlePageTranslationFontMessage} from '@/src/app/content/pageTranslationFontMessage';
 import {appendBilingualTranslation, appendSingleTranslationSlots} from '@/src/features/full-page-translation/content/renderer';
 import {prepareTranslationFontStyleRoot} from '@/src/features/full-page-translation/content/fontStyleRoots';
@@ -219,5 +219,33 @@ describe('当前页译文字体消息身份与生命周期门禁', () => {
         handle(get); expect(response).toHaveBeenLastCalledWith({status: 'unavailable'});
         expect(pageTranslationFont.read()).toBe(false);
         pageTranslationFont.dispose();
+    });
+});
+
+
+describe('阅读系统字体与浏览器默认译文字体共享样式所有权', () => {
+    it.each([[false, false], [false, true], [true, false], [true, true]])('default=%s reading=%s 的优先级及重置', (browserDefault, readingSystem) => {
+        const document = setupDocument(); const runtime = createPageTranslationFontRuntime({document});
+        runtime.setReadingSystem(readingSystem); runtime.set(browserDefault);
+        const style = document.getElementById(PAGE_TRANSLATION_FONT_STYLE_ID);
+        expect(style?.textContent ?? '').toBe(browserDefault ? PAGE_TRANSLATION_FONT_CSS : readingSystem ? PAGE_READING_SYSTEM_FONT_CSS : '');
+        expect(runtime.read()).toBe(browserDefault);
+        runtime.reset(); expect(document.getElementById(PAGE_TRANSLATION_FONT_STYLE_ID)).toBeNull();
+        runtime.dispose(); expect(runtime.setReadingSystem(true)).toBe(false);
+    });
+    it('已有和后续样式根立即切换模式，关闭全局偏好后恢复仍开启的阅读字体', () => {
+        const document = setupDocument(); const runtime = createPageTranslationFontRuntime({document});
+        const host = document.createElement('span'); document.body.append(host);
+        const root = host.attachShadow({mode: 'closed'}); prepareTranslationFontStyleRoot(root);
+        runtime.setReadingSystem(true);
+        expect(root.querySelector('style')!.textContent).toBe(PAGE_READING_SYSTEM_FONT_CSS);
+        runtime.set(true); expect(root.querySelector('style')!.textContent).toBe(PAGE_TRANSLATION_FONT_CSS);
+        runtime.setReadingSystem(false); expect(root.querySelector('style')!.textContent).toBe(PAGE_TRANSLATION_FONT_CSS);
+        runtime.setReadingSystem(true); runtime.set(false);
+        expect(root.querySelector('style')!.textContent).toBe(PAGE_READING_SYSTEM_FONT_CSS);
+        const later = document.createElement('span').attachShadow({mode: 'open'});
+        prepareTranslationFontStyleRoot(later); expect(later.querySelector('style')!.textContent).toBe(PAGE_READING_SYSTEM_FONT_CSS);
+        runtime.setReadingSystem(false); expect(root.querySelector('style')).toBeNull(); expect(later.querySelector('style')).toBeNull();
+        runtime.dispose();
     });
 });

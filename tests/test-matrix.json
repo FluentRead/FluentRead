@@ -814,7 +814,11 @@
       "tests/zoteroFontCache.test.ts",
       "tests/clickSelection.test.ts",
       "tests/clickSelectionSettingsLifecycle.test.ts",
-      "tests/aiMultiSegmentSettingsLifecycle.test.ts"
+      "tests/aiMultiSegmentSettingsLifecycle.test.ts",
+      "tests/readingAppearanceRuntime.test.ts",
+      "tests/readingAppearanceContent.test.ts",
+      "tests/popupReadingAppearance.test.ts",
+      "tests/readingAppearanceComposition.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

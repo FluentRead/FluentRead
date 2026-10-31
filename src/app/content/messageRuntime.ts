@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/messageRuntime.ts
  * 文件职责：创建 content 侧 runtime 消息处理函数，把 popup/background 的设置变化和功能命令映射为当前页面上的精确 mount、unmount 或状态响应。
- * 主要内容：处理悬浮球、划词模式与延迟、区域/图片能力、进度面板、站点禁用及旧缓存清理消息，将当前页字体查询和切换交给文档身份门禁，并把右键菜单的划词、圈选、整页与恢复请求及 Popup 的局部翻译请求转给对应 feature；结合 BrowserCapabilities 对不支持功能确定性拒绝，并更新共享运行时状态。
+ * 主要内容：路由独立阅读外观的文档令牌与预览请求；处理悬浮球、划词模式与延迟、区域/图片能力、进度面板、站点禁用及旧缓存清理消息，将当前页字体查询和切换交给文档身份门禁，并把右键菜单的划词、圈选、整页与恢复请求及 Popup 的局部翻译请求转给对应 feature；结合 BrowserCapabilities 对不支持功能确定性拒绝，并更新共享运行时状态。
  * 模块边界：本文件只做消息到 feature 生命周期的适配，右键动作与反馈委托给 contextMenuCommands，全文状态与完成查询委托给 fullPageCompletionQuery，不注册全局监听器、不执行供应商翻译，也不实现组件 UI；监听安装及配置订阅由 content/runtime 负责。
  */
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
@@ -28,6 +28,7 @@ import {handleInformationHighlightMessage, type InformationHighlightMessageState
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
 export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
+    readingAppearance?: {handle(payload: Record<string, unknown>): Promise<unknown>};
     reconcileUserscriptPage?(): Promise<boolean>;
 }
 export type ContentRuntimeMessageHandler = (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => boolean;
@@ -77,6 +78,13 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         }
         if ((state.isSiteDisabled() || state.isPageSuspended?.()) && payload.type !== 'getFullPageTranslationState') {
             sendResponse({status: 'disabled'});
+            return true;
+        }
+        if (payload.type === 'getReadingAppearanceState' || payload.type === 'setReadingAppearance') {
+            if (!state.readingAppearance || ctx.isInvalid || config.on === false) {
+                sendResponse({status: 'disabled'}); return true;
+            }
+            void state.readingAppearance.handle(payload).then(sendResponse, () => sendResponse({status: 'failed'}));
             return true;
         }
         if (payload.type === 'toggleFloatingBall') {

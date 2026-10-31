@@ -19,6 +19,7 @@ type LegacyCorrectionRow = readonly [source: string, enUS: string, jaJP: string,
 /** 设置页、弹窗、文档页和各功能面板中的标签、按钮与说明。 */
 export const correctionRows: readonly LegacyCorrectionRow[] = [
     // 配置差异和云同步沿用中文字段名，与设置页的语义资源保持一致。
+    ["网站阅读字体", "Website reading font", "ウェブサイトの読書用フォント", "웹사이트 읽기 글꼴", "Police de lecture du site", "Шрифт для чтения на сайте", "Fuente de lectura del sitio web"],
     ["AI 多段每批最多片段数", "Maximum text fragments per AI translation batch", "AI 翻訳のバッチあたりの最大テキスト断片数", "AI 번역 배치당 최대 텍스트 조각 수", "Nombre maximal de fragments par lot de traduction IA", "Максимум текстовых фрагментов в пакете ИИ-перевода", "Máximo de fragmentos por lote de traducción con IA"],
     ["AI 多段每批最多字符数", "Maximum source characters per AI translation batch", "AI 翻訳のバッチあたりの最大原文文字数", "AI 번역 배치당 최대 원문 글자 수", "Nombre maximal de caractères source par lot de traduction IA", "Максимум символов оригинала в пакете ИИ-перевода", "Máximo de caracteres originales por lote de traducción con IA"],
     // 两点选取的设置说明、快捷键校验和起终点提示；动态 Esc 后缀由 legacy-patterns 组合。

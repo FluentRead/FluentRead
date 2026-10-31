@@ -336,6 +336,78 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     else getTab.mockResolvedValue([{id:7,url:kind==='pdf'?'https://example.com/article.pdf':'chrome://settings'}]);
     await mount();expect(button('page-font-entry')).toBeNull();expect(send.mock.calls.some(call=>['getPageTranslationFontState','setPageTranslationFont'].includes(call[1].type))).toBe(false);
   });
+  it('阅读外观真实抽屉预览当前页，显式保存和清除网站偏好，并立即恢复原样',async()=>{
+    let font='original',remembered=false
+    const fallback=send.getMockImplementation()!
+    send.mockImplementation(async(id,message)=>{
+      if(message.type==='getReadingAppearanceState')return {status:'success',font,remembered,documentToken:'reading-doc'}
+      if(message.type==='setReadingAppearance'){
+        font=message.font;if(message.remember!==undefined)remembered=message.remember
+        return {status:'success',font,remembered,documentToken:'reading-doc'}
+      }
+      return fallback(id,message)
+    })
+    await mount();eventOf(button('reading-appearance-entry'))()
+    for(let i=0;i<100&&!document.querySelector('.reading-appearance-content');i++){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
+    await drain()
+    const choices=document.querySelectorAll('.reading-appearance-content .chips button')
+    expect(choices).toHaveLength(2);expect(choices[0].getAttribute('aria-pressed')).toBe('true')
+    await eventOf(choices[1])();await drain()
+    expect(send).toHaveBeenLastCalledWith(7,{type:'setReadingAppearance',font:'system',documentToken:'reading-doc'},{frameId:0})
+    expect(choices[1].getAttribute('aria-pressed')).toBe('true')
+    await eventOf(document.querySelector('.reading-appearance-save')!)();await drain()
+    expect(send).toHaveBeenLastCalledWith(7,{type:'setReadingAppearance',font:'system',documentToken:'reading-doc',remember:true},{frameId:0})
+    const actions=document.querySelectorAll('.reading-appearance-actions button')
+    await eventOf(actions[0])();await drain();expect(font).toBe('original');expect(remembered).toBe(true)
+    await eventOf(actions[1])();await drain();expect(remembered).toBe(false)
+    expect(patches).not.toHaveBeenCalled()
+    eventOf(document.querySelector('.drawer-header > button')!)();await drain()
+    expect(document.querySelector('.reading-appearance-content')).toBeNull()
+  })
+  it('关闭阅读抽屉使在途预览和缓存事件失效；禁用网站时入口禁用',async()=>{
+    const fallback=send.getMockImplementation()!,pending=deferred()
+    send.mockImplementation(async(id,message)=>message.type==='getReadingAppearanceState'
+      ?{status:'success',font:'original',remembered:false,documentToken:'reading-doc'}
+      :message.type==='setReadingAppearance'?pending.promise:fallback(id,message))
+    await mount();eventOf(button('reading-appearance-entry'))()
+    for(let i=0;i<100&&!document.querySelector('.reading-appearance-content');i++){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
+    await drain()
+    const choose=eventOf(document.querySelectorAll('.reading-appearance-content .chips button')[1])
+    const changing=choose();await drain()
+    eventOf(document.querySelector('.drawer-header > button')!)();await drain()
+    pending.resolve({status:'success',font:'system',remembered:true,documentToken:'reading-doc'});await changing;await drain()
+    expect(state.readingAppearance.ready).toBe(false);expect(state.readingAppearance.font).toBe('original')
+    const count=send.mock.calls.length;choose();await drain();expect(send).toHaveBeenCalledTimes(count)
+    state.config.disabledExtensionDomains=['example.com'];await drain()
+    expect(button('reading-appearance-entry').hasAttribute('disabled')).toBe(true)
+  })
+
+  it('阅读外观失败反馈随语言即时变化，关闭重开重新读取且不复用旧按钮',async()=>{
+    localized=true;englishLoaded=true
+    const fallback=send.getMockImplementation()!
+    let fail=true
+    send.mockImplementation(async(id,message)=>{
+      if(message.type==='getReadingAppearanceState') {
+        if(fail) throw new Error('unavailable')
+        return {status:'success',font:'system',remembered:false,documentToken:'fresh-reading-doc'}
+      }
+      return fallback(id,message)
+    })
+    await mount();eventOf(button('reading-appearance-entry'))()
+    for(let i=0;i<100&&!document.querySelector('.reading-appearance-content');i++){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
+    await drain()
+    const error=()=>document.querySelector('.reading-appearance-content [role="alert"]')!.textContent
+    expect(error()).toBe(catalogs['zh-CN']['popup.readingAppearance.error'])
+    locale.value='en-US';bundleRevision.value++;await drain()
+    expect(error()).toBe(catalogs['en-US']['popup.readingAppearance.error'])
+    expect(button('reading-appearance-entry').textContent).toContain(catalogs['en-US']['popup.readingAppearance.title'])
+    const oldRetry=eventOf(document.querySelector('.reading-appearance-content > .secondary-action')!)
+    eventOf(document.querySelector('.drawer-header > button')!)();await drain()
+    fail=false;eventOf(button('reading-appearance-entry'))();await drain()
+    expect(state.readingAppearance.ready).toBe(true);expect(state.readingAppearance.font).toBe('system')
+    const count=send.mock.calls.length;oldRetry();await drain();expect(send).toHaveBeenCalledTimes(count)
+  })
+
   it('真实服务搜索在键盘 viewport 变化时保留输入，清除、返回与关闭仍属当前抽屉',async()=>{
     executeServicePicker=true;await mount();eventOf(document.querySelector('.provider-summary')!)()
     for(const deadline=Date.now()+2000;Date.now()<deadline&&!document.querySelector('[data-feature-service="default"]');){await drain();await new Promise(resolve=>setTimeout(resolve,2))}

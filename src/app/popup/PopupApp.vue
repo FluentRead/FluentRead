@@ -77,6 +77,12 @@
       </div>
     </header>
 
+    <button class="reading-appearance-entry" type="button" data-testid="reading-appearance-entry" data-i18n-ignore
+      :disabled="!config.on || currentSiteExtensionDisabled || !!currentPdfSource" aria-haspopup="dialog"
+      :aria-expanded="drawerVisible && activeDrawer === 'readingAppearance'" :onClick="popupActions.readingAppearance">
+      <span aria-hidden="true">Aa</span><strong>{{ t('popup.readingAppearance.title') }}</strong><small>{{ t('popup.readingAppearance.font') }}</small><span aria-hidden="true">›</span>
+    </button>
+
     <Transition name="donation-fade">
       <div
         v-if="donationVisible"
@@ -318,6 +324,31 @@
       <div v-if="activeDrawer === 'services'" class="drawer-content provider-drawer-content">
         <PopupServices ref="servicesPanel" :config="config" :service-options="allServiceOptions" :active="drawerVisible && activeDrawer === 'services'" :onClose="drawerActions.close" />
       </div>
+      <div v-else-if="activeDrawer === 'readingAppearance'" class="drawer-content reading-appearance-content" data-i18n-ignore :aria-busy="readingAppearance.busy">
+        <div class="choice-block">
+          <label>{{ t('popup.readingAppearance.font') }}</label>
+          <div class="chips two" role="group" :aria-label="t('popup.readingAppearance.font')">
+            <button type="button" :class="{selected: readingAppearance.ready && readingAppearance.font === 'original'}"
+              :aria-pressed="readingAppearance.ready && readingAppearance.font === 'original'" :disabled="!readingAppearance.ready || readingAppearance.busy" :onClick="readingButtons.original">{{ t('popup.readingAppearance.original') }}</button>
+            <button type="button" :class="{selected: readingAppearance.ready && readingAppearance.font === 'system'}"
+              :aria-pressed="readingAppearance.ready && readingAppearance.font === 'system'" :disabled="!readingAppearance.ready || readingAppearance.busy" :onClick="readingButtons.system">{{ t('popup.readingAppearance.system') }}</button>
+          </div>
+        </div>
+        <p class="reading-appearance-hint">{{ t('popup.readingAppearance.previewHint') }}</p>
+        <div class="setting-row">
+          <span><strong>{{ t('popup.readingAppearance.remember') }}</strong><small>{{ pageState.domain || t('popup.readingAppearance.currentSite') }} · {{ readingAppearance.remembered ? t('popup.readingAppearance.saved') : t('popup.readingAppearance.unsaved') }}</small></span>
+          <button class="reading-appearance-save" type="button" :disabled="!readingAppearance.ready || readingAppearance.busy" :onClick="readingButtons.remember">{{ t('popup.readingAppearance.save') }}</button>
+        </div>
+        <p v-if="readingAppearance.remembered" class="reading-appearance-hint">{{ t('popup.readingAppearance.savedHint') }}</p>
+        <div class="reading-appearance-actions">
+          <button class="secondary-action" type="button" :disabled="!readingAppearance.ready || readingAppearance.busy" :onClick="readingButtons.restore">{{ t('popup.readingAppearance.restore') }}</button>
+          <button class="secondary-action" type="button" :disabled="!readingAppearance.ready || readingAppearance.busy || !readingAppearance.remembered" :onClick="readingButtons.forget">{{ t('popup.readingAppearance.forget') }}</button>
+        </div>
+        <p class="reading-appearance-hint">{{ t('popup.readingAppearance.forgetHint') }}</p>
+        <p v-if="readingAppearance.error" class="notice error" role="alert">{{ t(readingAppearance.error) }}</p>
+        <button v-if="readingAppearance.error" class="secondary-action" type="button" :disabled="readingAppearance.busy" :onClick="readingButtons.retry">{{ t('popup.readingAppearance.retry') }}</button>
+        <p v-else class="reading-appearance-hint" role="status">{{ readingAppearance.busy ? t('popup.readingAppearance.applying') : readingAppearance.ready ? t('popup.readingAppearance.ready') : t('popup.readingAppearance.loading') }}</p>
+      </div>
       <div v-else-if="activeDrawer === 'aiContext'" class="drawer-content ai-context-details" data-i18n-ignore>
         <div class="ai-context-detail-state" :data-ai-context-state="aiContextPresentation.state">
           <span class="ai-context-status" role="status">{{ t(`popup.aiContext.status.${aiContextPresentation.state}`) }}</span>
@@ -404,7 +435,7 @@
       </div>
 
         <p v-if="notice && noticeType === 'error'" class="notice error" role="alert">{{ notice }}</p>
-        <button v-if="!['aiContext', 'services'].includes(activeDrawer)" class="drawer-settings-link" type="button" data-i18n-ignore :onClick="drawerActions.options">
+        <button v-if="!['aiContext', 'services', 'readingAppearance'].includes(activeDrawer)" class="drawer-settings-link" type="button" data-i18n-ignore :onClick="drawerActions.options">
           <span><strong>{{ t('popup.quickSettings.moreSettings') }}</strong></span>
           <span aria-hidden="true">↗</span>
         </button>
@@ -464,6 +495,7 @@ import {
 } from '@/src/core/config/interfaceAppearance';
 import { resolveAIContextPresentation } from '@/src/ui/view-model/aiContext';
 import {createPopupPageActions, type PopupPageState, type PopupSiteRulePatch} from './pageActions';
+import {createReadingAppearanceActions, type ReadingAppearanceState} from './readingAppearanceActions';
 import {createPopupTabSource} from './sourceTab';
 import {createPopupPageFontActions, type PopupPageFontState} from './pageFontActions';
 import {getEmbeddedPopupTabId, closePopupSurface} from './embedded';
@@ -486,7 +518,7 @@ import {
   isTranslationServiceAvailable,
 } from '@/src/services/translation/capabilities';
 
-type DrawerName = 'services' | 'hover' | 'selection' | 'appearance' | 'image' | 'aiContext';
+type DrawerName = 'readingAppearance' | 'services' | 'hover' | 'selection' | 'appearance' | 'image' | 'aiContext';
 type SettingsSection = 'settings-selection' | 'settings-general' | 'settings-interface' | 'settings-image-translation' | 'settings-area-translation' | 'settings-translation' | 'settings-services' | 'settings-sites' | 'settings-video' | 'settings-vocabulary';
 interface PopupQuickFeatureViewModel {
   id: PopupQuickFeatureId;
@@ -550,6 +582,7 @@ let pageExitSaveStarted = false;
 let noticeTimer: ReturnType<typeof setTimeout> | undefined;
 const darkMode = window.matchMedia('(prefers-color-scheme: dark)');
 const drawerSettingsSection: Record<DrawerName, SettingsSection> = {
+  readingAppearance: 'settings-interface',
   services: 'settings-services',
   aiContext: 'settings-general',
   hover: 'settings-translation',
@@ -800,8 +833,9 @@ const popupQuickFeatureViewModels = computed<Record<PopupQuickFeatureId, PopupQu
 };});
 const visiblePopupQuickFeatures = computed(() => visiblePopupQuickFeatureIds.value
   .map((featureId) => popupQuickFeatureViewModels.value[featureId]));
-const drawerTitle = computed(() => ({ services: t('popup.providers.title'), aiContext: t('popup.aiContext.title'), hover: t('popup.quickTranslation.defaultHoverShortcut'), selection: t('popup.selectionTranslation'), appearance: '译文显示设置', image: '图片翻译' }[activeDrawer.value]));
+const drawerTitle = computed(() => ({ readingAppearance: t('popup.readingAppearance.title'), services: t('popup.providers.title'), aiContext: t('popup.aiContext.title'), hover: t('popup.quickTranslation.defaultHoverShortcut'), selection: t('popup.selectionTranslation'), appearance: '译文显示设置', image: '图片翻译' }[activeDrawer.value]));
 const drawerDescription = computed(() => ({
+  readingAppearance: t('popup.readingAppearance.description'),
   services: '',
   aiContext: t('popup.aiContext.intro'),
   hover: '',
@@ -884,13 +918,32 @@ let cacheController: AbortController | undefined;
 const tabSource = createPopupTabSource(window.location?.search || '', {
   get: id => browser.tabs.get(id), query: () => browser.tabs.query({active: true, currentWindow: true}),
 }, getEmbeddedPopupTabId());
+const readingAppearance = reactive<ReadingAppearanceState>({font: 'original', remembered: false, busy: false, ready: false, error: ''});
+const readingContext = useSettingsActionContext(() => popupContext.active.value && config.value.on && !currentSiteExtensionDisabled.value && !currentPdfSource.value && drawerVisible.value && activeDrawer.value === 'readingAppearance',
+  () => [pageState.tabId, pageState.url, pageContext.revision.value]);
+const readingActions = createReadingAppearanceActions({state: readingAppearance, active: () => readingContext.active.value,
+  target: () => ({tabId: pageState.tabId, url: pageState.url}), getTab: tabSource.getTab,
+  send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0})});
+watch(readingContext.revision, () => {readingActions.invalidate();if (readingContext.active.value) void readingActions.read()}, {flush: 'sync'});
+const readingButtons = computed(() => {
+  const current = readingContext.capture();
+  const bind = (action: () => Promise<void>) => () => {if (current()) return action()};
+  return {original: bind(() => readingActions.set('original')), system: bind(() => readingActions.set('system')),
+    remember: bind(() => readingActions.set(readingAppearance.font, true)), forget: bind(() => readingActions.set(readingAppearance.font, false)),
+    restore: bind(() => readingActions.set('original')), retry: bind(() => readingActions.read())};
+});
 const pageActions = createPopupPageActions({state: pageState, config: () => config.value, active: () => pageContext.active.value,
   warning: () => credentialWarning.value || '', getTab: tabSource.getTab,
   persistRule: persistSiteRulePatch,
   openPdf: source => browser.tabs.create({url: createPdfReaderUrl(browser.runtime.getURL('document.html'), source)}),
   onStatus: readPageResult, onFailure: diagnostic => {pageDiagnostic.value = diagnostic;notice.value = ''},
   send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0}), notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
-const {hydrate: hydrateCurrentSite, toggle: togglePageTranslation, section: startSectionTranslation,
+async function hydrateCurrentSite() {
+  readingActions.invalidate();
+  await pageActions.hydrate();
+  if (readingContext.active.value) await readingActions.read();
+}
+const {toggle: togglePageTranslation, section: startSectionTranslation,
   setAlways: setCurrentSiteAlwaysTranslated, setDisabled: setCurrentSiteExtensionDisabled} = pageActions;
 watch(pageContext.revision, () => {pageActions.invalidate();readPageResult(undefined);if (!config.value.on || currentSiteExtensionDisabled.value) pageTranslated.value = false}, {flush: 'sync'});
 const pageRenderRevision = ref(0);
@@ -960,7 +1013,7 @@ const popupActions = computed(() => {
   const current = popupContext.capture();
   const bind = (run: () => void | Promise<void>) => () => {if (current()) return run()};
   return {settings: bind(() => openOptions()), serviceSettings: bind(() => openOptions('settings-services', undefined, config.value.service)),
-    services: bind(() => openDrawer('services')), cache: bind(clearCache)};
+    services: bind(() => openDrawer('services')), readingAppearance: bind(() => openDrawer('readingAppearance')), cache: bind(clearCache)};
 });
 // 快捷模式属于整个弹窗；服务、显示模式或在途操作变化会淘汰旧按钮回调。
 const displayModeContext = useSettingsActionContext(() => popupContext.active.value,
@@ -1049,6 +1102,9 @@ watch([drawerVisible, drawerSurface, popupContext.active], ([visible, surface, a
   };
 }, {flush: 'sync'});
 watch(() => config.value.on, enabled => {if (!enabled && activeDrawer.value !== 'services' && activeDrawer.value !== 'aiContext') drawerVisible.value = false}, {flush: 'sync'});
+watch([currentSiteExtensionDisabled, currentPdfSource], ([disabled, pdf]) => {
+  if ((disabled || pdf) && activeDrawer.value === 'readingAppearance') drawerVisible.value = false;
+}, {flush: 'sync'});
 watch(cacheContext.active, enabled => {
   if (!enabled) {
     const controller = cacheController;
@@ -1261,7 +1317,7 @@ function showNotice(message: string, type: 'success' | 'error' | 'pending' = 'su
 }
 
 // 配置订阅是内容功能的唯一状态来源；避免无 revision 的广播晚到后覆盖新快照。
-function openDrawer(name: DrawerName) {if (!popupContext.active.value || (!config.value.on && name !== 'services' && name !== 'aiContext')) return;activeDrawer.value = name;drawerMounted.value = true;drawerVisible.value = true;}
+function openDrawer(name: DrawerName) {if ((name === 'readingAppearance' && (currentSiteExtensionDisabled.value || !!currentPdfSource.value)) || !popupContext.active.value || (!config.value.on && name !== 'services' && name !== 'aiContext')) return;activeDrawer.value = name;drawerMounted.value = true;drawerVisible.value = true;}
 async function openOptions(section?: SettingsSection, target?: string, service?: string, repairSource = false) {
   if (!popupContext.active.value) return;
   const current = popupContext.capture();

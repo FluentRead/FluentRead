@@ -177,7 +177,27 @@
     "learning.collection.speechOnlineSynthesis": "在线合成：{error}",
     "learning.collection.speechGoogleFallback": "Google 回退：{error}",
     "learning.collection.speechOnlineRequestFailed": "在线请求或音频播放失败：{error}",
-    "learning.collection.speechFailedDetail": "朗读失败：{details}"
+    "learning.collection.speechFailedDetail": "朗读失败：{details}",
+    "popup.readingAppearance.title": "阅读外观",
+    "popup.readingAppearance.font": "网页正文字体",
+    "popup.readingAppearance.original": "网站原样",
+    "popup.readingAppearance.system": "系统默认",
+    "popup.readingAppearance.previewHint": "立即预览原文和译文的正文字体。默认仅作用于当前页面。 译文启用“浏览器默认字体”时，该设置优先；阅读字体仍作用于原文。",
+    "popup.readingAppearance.remember": "记住此网站",
+    "popup.readingAppearance.currentSite": "当前网站",
+    "popup.readingAppearance.saved": "已有保存偏好",
+    "popup.readingAppearance.unsaved": "尚未保存偏好",
+    "popup.readingAppearance.save": "保存当前选择",
+    "popup.readingAppearance.savedHint": "预览和恢复仅作用于当前页；点击“保存当前选择”才会更新网站偏好。",
+    "popup.readingAppearance.restore": "恢复网站原样",
+    "popup.readingAppearance.forget": "清除此网站偏好",
+    "popup.readingAppearance.forgetHint": "清除网站偏好后，下次打开此网站将使用网站原样。",
+    "popup.readingAppearance.retry": "重试读取",
+    "popup.readingAppearance.applying": "正在应用…",
+    "popup.readingAppearance.ready": "切换字体只改变阅读显示，不影响翻译内容。",
+    "popup.readingAppearance.loading": "正在读取当前网页…",
+    "popup.readingAppearance.description": "为当前网页选择舒适的正文字体。",
+    "popup.readingAppearance.error": "无法应用阅读外观，请确认当前网页已加载后重试。"
   },
   "legacy": {}
 }

@@ -1009,3 +1009,13 @@ footer button { font-weight: 500; color: var(--muted); }
 }
 :root[data-fluentread-android-popup] .popup-shell .display-mode-button { width: 46px; height: 46px; flex-shrink: 0; }
 :root[data-fluentread-android-popup] .popup-shell .display-mode-slot.with-page-font { flex-basis: max(98px, var(--popup-secondary-action-width)); width: max(98px, var(--popup-secondary-action-width)); }
+/* 阅读外观沿用页面 token 和抽屉控件，不将网页字体选择混入扩展界面设置。 */
+.reading-appearance-entry { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; text-align: left; }
+.reading-appearance-entry > span:first-child { color: var(--brand-strong); font: 600 15px system-ui, sans-serif; }
+.reading-appearance-entry strong { font-size: 12px; }
+.reading-appearance-entry small { flex: 1; color: var(--muted); font-size: 11px; }
+.reading-appearance-entry:disabled, .reading-appearance-content button:disabled { opacity: .5; cursor: not-allowed; }
+.reading-appearance-hint { margin: 8px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.reading-appearance-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.reading-appearance-actions .secondary-action { flex: 1; margin-top: 0; }
+.reading-appearance-save { flex-shrink: 0; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); color: var(--ink); font-size: 11px; cursor: pointer; }

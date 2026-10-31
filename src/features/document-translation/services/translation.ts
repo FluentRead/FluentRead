@@ -211,11 +211,13 @@ function documentTimeout(): TranslationRequestError {
 
 /** 预算包含真正的请求耗时；即使网关忽略取消，也及时结束等待并观察迟到结算。 */
 async function runAttempt<T>(work: (attempt: DocumentTranslationAttempt) => Promise<T>, signal: AbortSignal | undefined, deadlineAt: number, requestTimeout?: number): Promise<T> {
-    const remaining = deadlineAt - Date.now();
+    const startedAt = Date.now();
+    const remaining = deadlineAt - startedAt;
     if (remaining <= 0) throw documentTimeout();
     const timeout = Math.min(remaining, requestTimeout ?? remaining);
     // 在同步注册监听器之前拒绝已取消任务，不为它建立子控制器和计时器。
     throwIfAborted(signal);
+    const attemptDeadlineAt = Math.min(deadlineAt, startedAt + timeout);
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, {once: true});
@@ -224,6 +226,12 @@ async function runAttempt<T>(work: (attempt: DocumentTranslationAttempt) => Prom
     let result: T;
     try {
         result = await waitWithAbort(work({signal: controller.signal, timeout}), controller.signal);
+        throwIfAborted(signal);
+        if (timedOut || Date.now() >= attemptDeadlineAt) {
+            timedOut = true;
+            controller.abort();
+            throw documentTimeout();
+        }
     } catch (error) {
         throwIfAborted(signal);
         throw timedOut ? documentTimeout() : error;

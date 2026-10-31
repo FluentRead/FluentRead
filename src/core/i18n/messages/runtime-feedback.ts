@@ -11,6 +11,8 @@ type RuntimeFeedbackRow = readonly [source: string, enUS: string, jaJP: string, 
 
 /** 翻译调度、服务商适配器与连接测试返回给页面、划词卡片和设置页的反馈。 */
 const translationRows: readonly RuntimeFeedbackRow[] = [
+    ["Claude 响应未完整完成，已拒绝部分输出","Claude did not finish the response; partial output was rejected.","Claude の応答が完了していないため、部分的な出力を拒否しました。","Claude 응답이 완료되지 않아 부분 출력을 거부했습니다.","Claude n’a pas terminé la réponse ; la sortie partielle a été rejetée.","Ответ Claude не завершён; частичный вывод отклонён.","Claude no terminó la respuesta; se rechazó la salida parcial."],
+    ["DeepSeek Responses 未完整完成，已拒绝部分输出","DeepSeek Responses did not finish; partial output was rejected.","DeepSeek Responses が完了していないため、部分的な出力を拒否しました。","DeepSeek Responses가 완료되지 않아 부분 출력을 거부했습니다.","DeepSeek Responses n’a pas terminé ; la sortie partielle a été rejetée.","DeepSeek Responses не завершён; частичный вывод отклонён.","DeepSeek Responses no terminó; se rechazó la salida parcial."],
     ["调整本地模型", "Adjust local model", "ローカルモデルを変更", "로컬 모델 조정", "Ajuster le modèle local", "Настроить локальную модель", "Ajustar modelo local"],
     ["切换图片翻译服务", "Change image translation service", "画像翻訳サービスを変更", "이미지 번역 서비스 변경", "Changer le service de traduction des images", "Сменить сервис перевода изображений", "Cambiar servicio de traducción de imágenes"],
     ["查看错误详情", "View error details", "エラーの詳細を表示", "오류 세부 정보 보기", "Voir les détails de l’erreur", "Подробности ошибки", "Ver detalles del error"],

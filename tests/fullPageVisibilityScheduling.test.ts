@@ -622,12 +622,13 @@ describe("全文翻译可见性锚点", () => {
         restoreOriginalContent();
         runtime.realCore = null;
         vi.clearAllTimers();
-        vi.useRealTimers();
         for (const [name, descriptor] of replacedGlobals) {
             if (descriptor) Object.defineProperty(globalThis, name, descriptor);
             else Reflect.deleteProperty(globalThis, name);
         }
         replacedGlobals.clear();
+        // 先恢复自定义全局，再卸载 fake timers，不能把旧 fake performance 装回真实时钟环境。
+        vi.useRealTimers();
     });
 
     it('可见性锚点跳过无法读取的布局盒，并优先找到开放 ShadowRoot 内的渲染盒', () => {
@@ -967,6 +968,8 @@ describe("全文翻译可见性锚点", () => {
             return {owner, shell, revoke};
         }
         it.each(['id', 'translate', 'move', 'disabled', 'override'])('rejects a slow result after %s revokes automatic permission before observer delivery', async change => {
+            // 本例验证撤销后的提交归属；发现预算必须与受控计时器共用时钟。
+            replaceGlobal('performance', {now: () => Date.now()});
             const {owner, revoke} = fixture(); const pending = deferred<string[]>();
             runtime.requests.mockReturnValueOnce(pending.promise); autoTranslateEnglishPage();
             await vi.advanceTimersByTimeAsync(60); await waitForRequestCount(1);
@@ -4744,6 +4747,8 @@ describe("全文翻译可见性锚点", () => {
 
     it.each(['NATIVE_BATCH_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
         '原生 broker 最终恢复失败 code=%s 时全文 runtime 保留原文并呈现失败状态', async code => {
+        // 固定本例的单批前提；跨时间片调度不应取决于 coverage 插桩耗时。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.nativeBatchEnabled = true;
         runtime.config.display = 1;
         runtime.config.fullPageTranslationMode = 'all';

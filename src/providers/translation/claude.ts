@@ -77,6 +77,28 @@ async function claude(message: TranslationProviderRequest<string>) {
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model
             : configuredModel;
+        // 旧兼容端点可省略 stop_reason；显式截断、工具交接、拒绝或错误不得作为完整译文。
+        const incompleteMessage = result?.type === 'error'
+            || result?.error != null
+            || (result?.stop_reason !== undefined
+                && result.stop_reason !== 'end_turn' && result.stop_reason !== 'stop_sequence')
+            || (Array.isArray(result?.content) && result.content.some((item: any) =>
+                item?.type === 'refusal' || item?.type === 'error' || item?.type === 'tool_use'));
+        if (incompleteMessage) {
+            const error = Object.assign(new Error('Claude 响应未完整完成，已拒绝部分输出'), {
+                kind: 'response', retryable: false, statusCode: resp.status,
+            });
+            attemptReported = true;
+            reportTranslationModelUsage(message, {
+                ...normalizeClaudeUsage(result?.usage, actualModel),
+                startedAt,
+                durationMs: Math.max(0, Date.now() - startedAt),
+                outcome: 'error',
+                statusCode: resp.status,
+            });
+            throw error;
+        }
+
         const translatedText = Array.isArray(result?.content)
             ? result.content
                 .filter((item: unknown): item is {type?: string; text: string} => Boolean(

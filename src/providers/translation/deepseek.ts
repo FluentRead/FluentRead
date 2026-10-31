@@ -94,6 +94,33 @@ async function deepseek(message: TranslationProviderRequest<string>) {
         const actualModel = typeof result?.model === 'string' && result.model.trim()
             ? result.model
             : configuredModel;
+        // 兼容省略 status 的旧代理；显式非完成状态或错误不能作为部分译文成功返回。
+        const incompleteResponse = isResponses && (
+            result?.error != null
+            || result?.incomplete_details != null
+            || (result?.status !== undefined && result.status !== 'completed')
+            || (Array.isArray(result?.output) && result.output.some((item: any) =>
+                // Translation-only responses cannot hand control to tools or unknown output kinds.
+                (item?.type !== 'message' && item?.type !== 'reasoning')
+                || (item?.status !== undefined && item.status !== 'completed')
+                || (item?.type === 'message' && Array.isArray(item.content)
+                    && item.content.some((part: any) => part?.type === 'refusal'))))
+        );
+        if (incompleteResponse) {
+            const error = Object.assign(new Error('DeepSeek Responses 未完整完成，已拒绝部分输出'), {
+                kind: 'response', retryable: false, statusCode: resp.status,
+            });
+            attemptReported = true;
+            reportTranslationModelUsage(message, {
+                ...normalizeDeepSeekResponsesUsage(result?.usage, actualModel),
+                startedAt,
+                durationMs: Math.max(0, Date.now() - startedAt),
+                outcome: 'error',
+                statusCode: resp.status,
+            });
+            throw error;
+        }
+
         const translatedText = isResponses
             ? extractResponsesContent(result)
             : extractChatContent(result);

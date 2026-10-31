@@ -240,6 +240,7 @@
       "tests/translationCache.test.ts",
       "tests/translationBroker.test.ts",
       "tests/microsoftTransport.test.ts",
+      "tests/providerResponseIntegrity.test.ts",
       "tests/nativeBatch.test.ts",
       "tests/nativeBatchConfig.test.ts",
       "tests/translationConfigCheck.test.ts",

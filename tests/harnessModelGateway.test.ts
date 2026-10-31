@@ -27,6 +27,75 @@ describe('harness model gateway', () => {
     planBuild.enabled = false;
   });
 
+  it.each(['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6-luna-2026-10-01', 'gpt-6.1-terra-2026-10-01'])(
+    'serializes completion limits for %s in generation and streaming without mutating settings', async modelId => {
+      const config = new Config();
+      for (const [custom, expectedLimit] of [
+        ['', 1200], ['{"max_tokens":64}', 64],
+        ['{"max_tokens":null,"max_completion_tokens":32,"service_tier":"fast","reasoning_effort":"none"}', 32],
+        ['{"max_tokens":null}', 1200], ['{"max_completion_tokens":48}', 48],
+        ['{"max_tokens":64,"max_completion_tokens":32}', 32],
+        ['{"max_tokens":64,"max_completion_tokens":null}', 64],
+      ] as const) {
+        config.customBody[services.openai] = custom;
+        const before = JSON.stringify(config);
+        const calls: Record<string, unknown>[] = [];
+        setRuntimeFetch(async (_input, init) => {
+          const serialized = String(init?.body);
+          expect(serialized).not.toContain('"max_tokens"');
+          const body = JSON.parse(serialized); calls.push(body);
+          expect(body.max_completion_tokens).toBe(expectedLimit);
+          if (custom.includes('service_tier')) expect(body).toMatchObject({service_tier: 'fast', reasoning_effort: 'none'});
+          if (body.stream) return new Response('data: {"choices":[{"index":0,"delta":{"content":"done"},"finish_reason":null}]}\n\ndata: {"choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', {headers: {'content-type': 'text/event-stream'}});
+          return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+        });
+        const model = createHarnessLanguageModel(config, services.openai, modelId);
+        expect((await generateText({model, prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0})).text).toBe('done');
+        expect(await streamText({model, prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0}).text).toBe('done');
+        expect(calls).toHaveLength(2);
+        expect(JSON.stringify(config)).toBe(before);
+      }
+    },
+  );
+
+  it.each([[services.openai, 'gpt-4o'], [services.openai, 'gpt-6-luna-other'], [services.openrouter, 'gpt-6-luna'], ['custom:limit', 'gpt-6.1-terra']])(
+    'preserves legacy token parameters for %s / %s', async (service, modelId) => {
+      const config = new Config();
+      config.customOpenAIProviders = [{id: 'custom:limit', name: 'Local', endpoint: 'https://fixture.test/v1', models: [modelId]}];
+      setRuntimeFetch(async (_input, init) => {
+        const body = JSON.parse(String(init?.body));
+        expect(body.max_tokens).toBe(1200); expect(body).not.toHaveProperty('max_completion_tokens');
+        return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+      });
+      await generateText({model: createHarnessLanguageModel(config, service, modelId), prompt: 'Explain', maxOutputTokens: 1200, maxRetries: 0});
+    },
+  );
+
+  it('merges OpenAI generation parameters while retaining SDK session and protocol ownership', async () => {
+    const config = new Config();
+    const originalKey = getHarnessModelInputKey(config, services.openai, 'gpt-6-luna');
+    config.customBody[services.openai] = JSON.stringify({model: 'wrong', messages: [], tools: [], tool_choice: 'none', parallel_tool_calls: false, stream: true, stream_options: {bad: true}, response_format: {type: 'bad'}, temperature: 0.2, service_tier: 'fast', reasoning_effort: 'none'});
+    expect(getHarnessModelInputKey(config, services.openai, 'gpt-6-luna')).not.toBe(originalKey);
+    setRuntimeFetch(async (_input, init) => {
+      const body = JSON.parse(String(init?.body));
+      expect(body).toMatchObject({model: 'gpt-6-luna', temperature: 0.2, service_tier: 'fast', reasoning_effort: 'none'});
+      expect(body.messages).toEqual([{role: 'system', content: 'System'}, {role: 'user', content: 'Explain'}]);
+      expect(body.tools[0].function.name).toBe('lookup');
+      expect(body.tool_choice).not.toBe('none'); expect(body.parallel_tool_calls).not.toBe(false);
+      expect(body.stream).not.toBe(true); expect(body).not.toHaveProperty('stream_options'); expect(body).not.toHaveProperty('response_format');
+      expect(body).not.toHaveProperty('max_tokens'); expect(body).not.toHaveProperty('max_completion_tokens');
+      return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
+    });
+    await generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), system: 'System', prompt: 'Explain', tools: {lookup: tool({inputSchema: z.object({q: z.string()})})}, maxRetries: 0});
+  });
+
+  it('rejects invalid OpenAI custom JSON before sending a request', async () => {
+    const config = new Config(); config.customBody[services.openai] = '{invalid';
+    const fetch = vi.fn(); setRuntimeFetch(fetch);
+    await expect(generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), prompt: 'Explain', maxRetries: 0})).rejects.toThrow('有效的 JSON 对象');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each([services.claude, services.gemini])('tracks a native %s proxy change without exposing its credentials', service => {
     const config = new Config();delete config.proxy[service];
     const direct = getHarnessModelInputKey(config, service, 'reader');

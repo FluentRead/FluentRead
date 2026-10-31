@@ -84,3 +84,9 @@
 
 - [词性与句法](/guide/sentence-analysis)
 - [遇到问题](/guide/faq)
+
+## OpenAI 生成参数兼容
+
+使用内置 OpenAI 服务时，「读懂」与共用模型网关的写作功能会继承该服务的自定义请求体参数，例如 `service_tier` 和 `reasoning_effort`。参数在顶层覆盖默认值，但模型、会话消息、工具调用和流式响应协议仍由功能自身管理，不能通过自定义请求体替换。非法 JSON 会在发送前报错。具体参数是否可用由所选模型、端点和账户决定。
+
+对于 `gpt-6-luna`、`gpt-6.1-terra` 及其日期快照，输出上限使用 `max_completion_tokens`，最终请求不会包含 `max_tokens`。显式的非空 `max_completion_tokens` 优先，其次是非空自定义 `max_tokens`，最后使用功能默认上限；把旧字段设置为 `null` 不会让它出现在请求中。其他型号和其他 OpenAI-compatible 服务不执行此自动转换。

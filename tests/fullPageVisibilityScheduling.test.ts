@@ -3224,22 +3224,20 @@ describe("全文翻译可见性锚点", () => {
             expect(body.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
         });
 
-        it('aborts a pending reply translation and rejects its late response when protection forms', async () => {
+        it.each([0, 150])('aborts a pending reply translation and rejects its late response when protection forms (request start %i ms)', async (requestStartDelay) => {
             const {link, owner} = setup('readArticle');
             const pending = deferred<string[]>();
             const replyRequest = vi.fn();
-            runtime.requests.mockImplementation(origins => {
+            runtime.requests.mockImplementation(async origins => {
                 if (origins.some(origin => origin.includes('Reply to this comment'))) {
+                    if (requestStartDelay) await new Promise<void>(resolve => setTimeout(resolve, requestStartDelay));
                     replyRequest(); return pending.promise;
                 }
-                return Promise.resolve(origins.map(origin => `译:${origin}`));
+                return origins.map(origin => `译:${origin}`);
             });
-            autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(51);
-            // 正文可能独立成批；只等待并核对需要撤销的回复请求。
-            for (let attempt = 0; attempt < 20 && replyRequest.mock.calls.length < 1; attempt += 1) {
-                await Promise.resolve(); await vi.advanceTimersByTimeAsync(1);
-            }
-            expect(replyRequest).toHaveBeenCalledOnce();
+            autoTranslateEnglishPage();
+            // 准备和派发可跨多个切片；有界等待真实请求开始，再验证取消，不能把固定 71ms 当作已进入 pending。
+            await vi.waitFor(() => expect(replyRequest).toHaveBeenCalledOnce(), {timeout: 1_000, interval: 10});
             const state = getTranslationState(owner)!;
             expect(state.phase).toBe('loading');
             changeAction(link, 'replyToComment');

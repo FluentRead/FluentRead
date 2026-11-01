@@ -2202,24 +2202,21 @@ describe('standalone About images at explicit use boundaries', () => {
     }
 
     it('restores both actual standalone images exactly and never enlarges the compact gzip', async () => {
-        const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, true) as unknown as {
-            load(id: string): Promise<string>;
-        };
-        const source = await plugin.load(helperId);
-        const bytes = encodedDataBytes(source);
+        const h = await loadAccessors(undefined, true);
+        const bytes = encodedDataBytes(h.source);
         expect(bytes).toHaveLength(2);
         for (const [index, kind] of (['support', 'contact'] as const).entries()) {
             const input = Buffer.from(expectedUrl(kind));
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        const h = await loadAccessors(undefined, true);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');
         assertImage(h.api.getContactImageUrl(), 'contact');
         h.api.getSupportImageUrl('normal'); h.api.getContactImageUrl();
         expect(h.decoder).toHaveBeenCalledTimes(2); expect(h.decode).toHaveBeenCalledTimes(2);
-    });
+        // 两张真实图片各经过一次 48 轮构建压缩，保留独立于全局与生产超时的有限测试预算。
+    }, 15_000);
 
     it('propagates an isolated standalone image compressor failure', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-about-worker-failure-'));

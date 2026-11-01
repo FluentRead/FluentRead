@@ -1,7 +1,7 @@
 <!--
  * @file src/features/area-translation/ui/AreaTranslator.vue
  * 文件职责：提供独立圈选阅读工具，按配置的快捷键（默认 Shift+Z）进入选区模式，松开鼠标后展示可拖动、可核对、可复制的原文与译文卡片。
- * 主要内容：尚未确认的圈选与文字/局部选择共享指针会话互斥；相同译文保留原文且不重复展示；由可信快捷键或右键命令按需挂载，管理选择、截图、识别、翻译、结果和失败状态；截图后保留阅读卡片，页面滚动或缩放不丢失结果；缺少语言包时一键下载并显示进度条和百分比，随后续接原截图，重试复用同一截图，取消或新选区使旧请求失效。
+ * 主要内容：失败提示按语言包、截图、无文字、服务配置和普通失败展示简短原因与单一主恢复动作，其他操作和原始详情默认收起；尚未确认的圈选与文字/局部选择共享指针会话互斥；相同译文保留原文且不重复展示；由可信快捷键或右键命令按需挂载，管理选择、截图、识别、翻译、结果和失败状态；截图后保留阅读卡片，页面滚动或缩放不丢失结果；缺少语言包时一键下载并显示进度条和百分比，随后续接原截图，重试复用同一截图，取消或新选区使旧请求失效。
  * 模块边界：组件只调用圈选客户端，不执行 OCR 或网络请求；截图权限归后台，像素只在封闭 Shadow UI 展示，所有页面监听、异步状态与临时截图在关闭或卸载时清理。
  -->
 <template>
@@ -22,7 +22,7 @@
             <span v-if="result.model" class="fr-area-model"> · {{ result.model }}</span>
           </div>
         </div>
-        <button type="button" aria-label="关闭圈选翻译结果" title="关闭" @click="clearResult">×</button>
+        <button type="button" aria-label="关闭圈选翻译结果" title="关闭" @click="clearResult"><UiIcon name="close" :size="16" /></button>
       </header>
       <div v-if="phase === 'loading'" class="fr-area-loading" role="status" aria-live="polite">
         <span class="fr-area-spinner" :class="{'fr-area-static': !animationsEnabled}" aria-hidden="true" />
@@ -30,15 +30,13 @@
         <button type="button" @click="clearResult">取消</button>
         <DownloadProgress v-if="preparingLanguages" class="fr-area-download" detail="percent" :progress="languagePercent === undefined ? undefined : {loaded: languagePercent, total: 100}" :label="translateLegacy('下载中…')" />
       </div>
-      <div v-else-if="phase === 'error'" class="fr-area-error-body" role="alert">
-        <strong>圈选翻译失败</strong>
-        <p>{{ errorMessage }}</p>
-        <div class="fr-area-actions">
-          <button v-if="needsLanguages" type="button" @click="downloadLanguagesAndRetry">下载语言包并重试</button>
-          <button type="button" @click="retryTranslation">重试</button>
-          <button type="button" @click="beginSelection">重新圈选</button>
-          <button type="button" @click="openSettings">圈选设置</button>
+      <div v-else-if="phase === 'error'" class="fr-area-error-body">
+        <div role="alert" data-i18n-ignore><h3>{{ t(`area.error.${errorRecovery}.title`) }}</h3><p>{{ t(`area.error.${errorRecovery}.hint`) }}</p></div>
+        <div class="fr-area-recovery-actions">
+          <button class="fr-area-primary" type="button" :data-recovery="errorRecovery" @click="recoverTranslation">{{ translateLegacy(errorRecovery === 'languages' ? '下载语言包并重试' : errorRecovery === 'empty' ? '重新圈选' : errorRecovery === 'settings' ? '圈选设置' : '重试') }}</button>
+          <details class="fr-area-more"><summary>{{ t('area.error.more') }}<UiIcon name="chevron-down" :size="14" /></summary><div><button v-if="errorRecovery !== 'empty'" type="button" @click="beginSelection">重新圈选</button><button v-if="errorRecovery !== 'settings'" type="button" @click="openSettings">圈选设置</button><button v-if="errorRecovery === 'empty' || errorRecovery === 'settings' || errorRecovery === 'languages'" type="button" @click="retryTranslation">重试</button></div></details>
         </div>
+        <details class="fr-area-error-details"><summary>{{ t('area.error.details') }}</summary><p data-i18n-ignore>{{ errorMessage }}</p></details>
       </div>
       <template v-else-if="result">
         <div class="fr-area-content">
@@ -80,6 +78,8 @@ import browser from 'webextension-polyfill';
 import { config, subscribeConfig } from '@/src/services/config/store';
 import { isCustomOpenAIProviderId } from '@/src/core/config/customOpenAI';
 import { useUiI18n } from '@/src/ui/i18n';
+import UiIcon from '@/src/ui/components/UiIcon.vue';
+import {serializeTranslationError} from '@/src/services/translation/errors';
 import { captureVisibleAreaInExtension, translateCapturedAreaInExtension, type AreaTranslationResult } from '@/src/features/area-translation/services/client';
 import { isUsableAreaRect, normalizeAreaRect, type AreaPoint, type AreaRect, type AreaTranslationSelection } from '@/src/features/area-translation/core';
 import {prepareImageOcrLanguages} from '@/src/features/image-translation/public';
@@ -115,6 +115,14 @@ function beginPanelDrag(event: PointerEvent): void {
 const result = ref<AreaTranslationResult | null>(null);
 const errorMessage = ref('');
 const needsLanguages = ref(false);
+const errorRecovery = computed(() => {
+  const message = errorMessage.value;
+  if (needsLanguages.value) return 'languages';
+  if (!capturedImage) return 'capture';
+  if (/^(没有识别到(?:圈选区域|图片)文字|未识别到文字|视觉圈选识别未返回有效文字)$/u.test(message)) return 'empty';
+  const kind = serializeTranslationError(message).kind;
+  return kind === 'authentication' || kind === 'bad-request' ? 'settings' : 'retry';
+});
 const preparingLanguages = ref(false);
 // 缺失语言包合并后的下载百分比；收到首个进度前为空，卡片显示不确定进度条。
 const languagePercent = ref<number>();
@@ -319,6 +327,12 @@ function downloadLanguagesAndRetry(): void {
   phase.value = 'loading';
   void requestTranslation(activeRect.value, true);
 }
+function recoverTranslation(): void {
+  if (errorRecovery.value === 'languages') downloadLanguagesAndRetry();
+  else if (errorRecovery.value === 'empty') beginSelection();
+  else if (errorRecovery.value === 'settings') void openSettings();
+  else retryTranslation();
+}
 function retryTranslation(): void {
   if (!activeRect.value) return;
   phase.value = 'loading';
@@ -438,9 +452,20 @@ onBeforeUnmount(() => {
 .fr-area-source img { display: block; width: 100%; height: auto; margin-top: 10px; border-radius: 5px; }
 .fr-area-translator-root .fr-area-note { font-size: 11px; color: #817584; margin-top: 14px; }
 .fr-area-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 11px 14px; border-top: 1px solid #ece8ef; flex-shrink: 0; }
-.fr-area-error-body { padding: 16px; overflow: auto; }
-.fr-area-error-body > strong { color: #bc355e; }
-.fr-area-error-body .fr-area-actions { border: 0; padding: 14px 0 0; }
+.fr-area-error { border-color: #e2e6f0; box-shadow: 0 8px 28px #1b24391f, 0 2px 6px #1b24390a; }
+.fr-area-error-body { padding: 22px; overflow: auto; color: #1d2535; }
+.fr-area-error-body h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; }
+.fr-area-error-body [role=alert] > p { margin-top: 9px; color: #788196; font-size: 13px; line-height: 1.7; }
+.fr-area-recovery-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 20px; }
+.fr-area-translator-root .fr-area-primary { min-height: 40px; padding: 9px 16px; border: 0; border-radius: 9px; color: #fff; background: linear-gradient(135deg, #f35482, #e93267); font-size: 13px; font-weight: 600; }
+.fr-area-translator-root .fr-area-primary:hover { background: linear-gradient(135deg, #f35482, #e93267); filter: brightness(1.04); }
+.fr-area-more > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 4px; color: #788196; font-size: 12px; list-style: none; cursor: pointer; }
+.fr-area-more > summary::-webkit-details-marker { display: none; }
+.fr-area-more[open] > summary .fr-ui-icon { transform: rotate(180deg); }
+.fr-area-more > div { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 0; }
+.fr-area-error-details { margin-top: 18px; padding-top: 13px; border-top: 1px solid #e2e6f0; color: #788196; font-size: 11px; }
+.fr-area-error-details > summary { cursor: pointer; }
+.fr-area-error-details > p { max-height: 112px; overflow: auto; font-size: 11px; line-height: 1.7; }
 .fr-area-translator-root .fr-area-feedback { margin: 0; padding: 7px 14px; color: #ab3565; font-size: 12px; flex-shrink: 0; }
 .fr-area-dark { color: #ece5ef; }
 .fr-area-dark .fr-area-panel { border-color: #514653; background: #2b2630; }
@@ -448,6 +473,11 @@ onBeforeUnmount(() => {
 .fr-area-dark button { border-color: #65556a; }
 .fr-area-dark button:hover { background: #413548; }
 .fr-area-dark .fr-area-provider, .fr-area-dark .fr-area-mode, .fr-area-dark .fr-area-note, .fr-area-dark .fr-area-text-heading, .fr-area-dark summary { color: #c1b1c5; }
-.fr-area-dark .fr-area-feedback, .fr-area-dark .fr-area-error-body > strong { color: #ffa7ca; }
+.fr-area-dark .fr-area-feedback { color: #ffa7ca; }
+.fr-area-dark .fr-area-error { border-color: #343b4b; background: #202632; }
+.fr-area-dark .fr-area-error .fr-area-toolbar { border-color: #343b4b; }
+.fr-area-dark .fr-area-error-body { color: #f3f5fa; }
+.fr-area-dark .fr-area-error-body [role=alert] > p, .fr-area-dark .fr-area-more > summary, .fr-area-dark .fr-area-error-details { color: #aab2c3; }
+.fr-area-dark .fr-area-error-details { border-color: #343b4b; }
 @media (prefers-reduced-motion: reduce) { .fr-area-spinner { animation: none; } }
 </style>

@@ -593,6 +593,7 @@
       "tests/googleDriveSync.test.ts",
       "tests/harnessConversationPersistence.test.ts",
       "tests/harnessSessionRepository.test.ts",
+      "tests/imageAlphaProtection.test.ts",
       "tests/imageAuthorizedReadBudget.test.ts",
       "tests/imageClientRecoveryBudget.test.ts",
       "tests/imageEncoding.test.ts",

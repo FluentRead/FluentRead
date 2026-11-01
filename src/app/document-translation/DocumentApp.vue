@@ -3,7 +3,7 @@
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
  主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
  OCR 续译：混合 PDF 补入扫描段落时，按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。
- 下载面板：紧邻工具栏直接提供双语、仅译文两种下载动作，PDF 排版独立于阅读视图，原文件单列；不重复文件名或堆叠预览、装饰图标，未完成的译文才进入一次明确确认，生成与失败可取消或重试。
+ 下载面板：紧邻工具栏直接提供双语、仅译文两种下载动作，沿用 Popup 的品牌主按钮、轻量次按钮与设置页现有分段控件；PDF 排版独立于阅读视图，原文件单列；不重复文件名或堆叠预览、装饰图标，未完成的译文才进入一次明确确认，生成与失败可取消或重试。
  材料接入：按原文件内容指纹加入本机学习工作区，恢复文档页码与章节，重解析后只按唯一原句重新匹配位置；原文件记录缺失时重新选择并核对指纹，不把同名文件误认作原件。
  模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，草稿共享设置编辑会话并保留文档字段与模型映射的原子补丁，运行时适配由本目录 runtime 注入。
 -->
@@ -410,7 +410,7 @@
       <p>{{ pendingAction === 'remove' ? t('document.batch.removeWarning') : pendingAction === 'reset' ? (documentQueue.length > 1 ? t('document.batch.clearWarning') : t(historyAvailable ? 'document.changeDocument.historyHint' : 'document.changeDocument.downloadHint')) : '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。' }}</p>
       <div class="dialog-actions"><button class="ghost-button" type="button" autofocus @click="confirmDialog?.close()">返回文档</button><button class="translate-document-button" type="button" @click="confirmAction">{{ pendingAction === 'remove' ? t('document.batch.remove') : pendingAction === 'reset' ? (documentQueue.length > 1 ? t('document.batch.clear') : '打开新文件') : '重新翻译' }}</button></div>
     </dialog>
-    <dialog id="document-download-panel" ref="downloadDialog" class="document-dialog download-dialog" :style="downloadPosition" aria-labelledby="download-document-heading" :aria-busy="preparingDownload" @click="closeDownloadOnBackdrop" @close="downloadOpen = false" @cancel="preparingDownload && $event.preventDefault()">
+    <dialog id="document-download-panel" ref="downloadDialog" class="document-dialog download-dialog" aria-labelledby="download-document-heading" :aria-busy="preparingDownload" @click="closeDownloadOnBackdrop" @close="downloadOpen = false" @cancel="preparingDownload && $event.preventDefault()">
       <header class="download-heading"><h2 id="download-document-heading">{{ downloadCopy.title }}</h2><button type="button" :aria-label="downloadCopy.close" :disabled="preparingDownload" @click="downloadDialog?.close()"><UiIcon name="close" :size="16" /></button></header>
       <div v-if="preparingDownload" class="export-progress"><p role="status" aria-live="polite">{{ downloadProgress || downloadCopy.preparing }}</p><progress v-if="downloadPdfProgress" :value="downloadPdfProgress.phase === 'rendering' ? downloadPdfProgress.completedPages : undefined" :max="downloadPdfProgress.totalPages || 1" :aria-label="downloadProgress || downloadCopy.preparing" /><button class="download-cancel" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button></div>
       <section v-else-if="pendingDownloadMode" class="download-confirmation">
@@ -420,11 +420,11 @@
       </section>
       <template v-else>
         <div class="download-versions">
-          <button class="download-version" type="button" :disabled="!hasTranslation || queueBusy" autofocus :aria-label="downloadCopy.bilingualAction" @click="requestDownload('bilingual')"><strong>{{ downloadCopy.bilingual }}</strong><small>{{ downloadCopy.bilingualHint }}</small></button>
-          <button class="download-version" type="button" :disabled="!hasTranslation || queueBusy" :aria-label="downloadCopy.translatedAction" @click="requestDownload('translated')"><strong>{{ downloadCopy.translated }}</strong><small>{{ downloadCopy.translatedHint }}</small></button>
+          <button class="download-version" data-mode="bilingual" type="button" :disabled="!hasTranslation || queueBusy" autofocus :aria-label="downloadCopy.bilingualAction" :title="downloadCopy.bilingualHint" @click="requestDownload('bilingual')">{{ downloadCopy.bilingualAction }}</button>
+          <button class="download-version" data-mode="translated" type="button" :disabled="!hasTranslation || queueBusy" :aria-label="downloadCopy.translatedAction" :title="downloadCopy.translatedHint" @click="requestDownload('translated')">{{ downloadCopy.translatedAction }}</button>
         </div>
         <p v-if="!hasTranslation" class="download-help">{{ downloadCopy.translationRequired }}</p>
-        <label v-if="hasTranslation && isPdfDocument" class="download-layout"><span>{{ downloadCopy.layoutLabel }}</span><select :value="downloadPdfPresentation" :disabled="queueBusy" :aria-label="downloadCopy.layoutLabel" @change="downloadPdfPresentation = ($event.target as HTMLSelectElement).value as PdfReadingPresentation"><option value="layout">{{ downloadCopy.layoutOriginal }}</option><option value="readable">{{ downloadCopy.layoutReadable }}</option></select></label>
+        <div v-if="hasTranslation && isPdfDocument" class="download-layout"><span>{{ downloadCopy.layoutLabel }}</span><SegmentedControl class="download-layout-control" :label="downloadCopy.layoutLabel" :model-value="downloadPdfPresentation" :options="[{value: 'layout', label: downloadCopy.layoutOriginal}, {value: 'readable', label: downloadCopy.layoutReadable}]" :disabled="queueBusy" compact @update:model-value="downloadPdfPresentation = $event as PdfReadingPresentation" /></div>
       </template>
       <p v-if="hasTranslation && settingsChanged" class="notice warning">设置已更改，本次下载仍是当前保留的译文。</p>
       <p v-if="!preparingDownload && downloadProgress" class="notice" role="status">{{ downloadProgress }}</p>
@@ -526,9 +526,10 @@ import {
   type PdfReadingPresentation,
   type ParsedDocument,
   ElSelect,
+  UiIcon,
+  SegmentedControl,
 } from '@/src/app/document-translation';
 import {getDocumentDownloadCopy, getDocumentDownloadErrorCopy} from './downloadCopy';
-import UiIcon from '@/src/ui/components/UiIcon.vue';
 
 const READER_PAGE_SIZE = 80;
 
@@ -606,7 +607,6 @@ const downloadDialog = ref<HTMLDialogElement | null>(null);
 const downloadButton = ref<HTMLButtonElement | null>(null);
 const downloadOpen = ref(false);
 const downloadPdfPresentation = ref<PdfReadingPresentation>('layout');
-const downloadPosition = ref<{left: string; top: string}>();
 const pendingDownloadMode = ref<DocumentRenderMode | null>(null);
 const queueExpanded = ref(false);
 const documentSettingsDialog = ref<HTMLDialogElement | null>(null);
@@ -1870,12 +1870,11 @@ function editSegment(index: number, value: string): void {
 // 面板保持在下载入口旁；窄屏、展开错误和浏览器缩放后仍完整位于视口中。
 function positionDownloadPanel(): void {
   const panel = downloadDialog.value, button = downloadButton.value;
-  if (!downloadOpen.value || !panel || !button?.getBoundingClientRect) return;
+  if (!downloadOpen.value || !panel?.open || !button?.getBoundingClientRect) return;
   const anchor = button.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
-  downloadPosition.value = {
-    left: `${Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12))}px`,
-    top: `${anchor.bottom + 6 + height <= window.innerHeight - 12 ? anchor.bottom + 6 : Math.max(12, anchor.top - height - 6)}px`,
-  };
+  // 定位只更新当前面板的样式，视口变化时不再为坐标触发整页 Vue 重渲染。
+  panel.style.left = `${Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12))}px`;
+  panel.style.top = `${anchor.bottom + 6 + height <= window.innerHeight - 12 ? anchor.bottom + 6 : Math.max(12, anchor.top - height - 6)}px`;
 }
 
 function closeDownloadOnBackdrop(event: MouseEvent): void {
@@ -1885,7 +1884,8 @@ function closeDownloadOnBackdrop(event: MouseEvent): void {
   if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) panel.close();
 }
 
-watch([downloadOpen, pendingDownloadMode, preparingDownload, downloadProgress, downloadError, originalDownloadError, hasTranslation, settingsChanged, language], () => {void nextTick(positionDownloadPanel);});
+// 仅打开时订阅面板尺寸依赖，关闭后不为定位而逐段读取流式更新的译文。
+watch(() => downloadOpen.value ? [pendingDownloadMode.value, preparingDownload.value, downloadProgress.value, downloadError.value, originalDownloadError.value, hasTranslation.value, settingsChanged.value, language.value] : null, () => {void nextTick(positionDownloadPanel);});
 watch(preparingDownload, busy => {void nextTick(() => {
   if (downloadOpen.value) downloadDialog.value?.querySelector?.<HTMLButtonElement>(busy ? '.download-cancel' : pendingDownloadMode.value ? '.download-confirmation .ghost-button' : '.download-version:not(:disabled)')?.focus();
 });});

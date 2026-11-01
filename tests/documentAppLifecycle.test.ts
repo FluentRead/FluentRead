@@ -1487,8 +1487,8 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         await state.loadFiles([file('independent-layout.pdf')]); state.editSegment(0, '完整校订');
         state.openDownload(); await flush();
         expect(walkHost(root).filter(entry => entry.props.class === 'download-version')).toHaveLength(2);
-        const select = walkHost(root).find(entry => entry.type === 'select' && entry.props['aria-label'] === getDocumentDownloadCopy('zh-CN').layoutLabel)!;
-        select.props.onChange({target: {value: 'readable'}}); await flush();
+        const choice = walkHost(root).find(entry => entry.props.role === 'radio' && hostText(entry) === getDocumentDownloadCopy('zh-CN').layoutReadable)!;
+        choice.props.onClick(); await flush();
         expect(state.pdfPresentation).toBe('layout'); expect(state.downloadPdfPresentation).toBe('readable');
         const encode = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'result.pdf', mimeType: 'application/pdf'});
         await state.downloadDocument(); await flush();
@@ -1519,8 +1519,8 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const walk = (entry: HostNode): HostNode[] => [entry, ...entry.children.flatMap(walk)];
         const text = (entry: HostNode): string => (entry.text || '') + entry.children.map(text).join('');
         const dialog = walk(root).find(entry => entry.type === 'dialog' && entry.props['aria-labelledby'] === 'download-document-heading')!;
-        const select = walk(dialog).find(entry => entry.type === 'select' && entry.props['aria-label'] === getDocumentDownloadCopy('zh-CN').layoutLabel)!;
-        expect(select.props.value).toBe(presentation);
+        const selected = walk(dialog).find(entry => entry.props.role === 'radio' && entry.props['aria-checked'] === true)!;
+        expect(text(selected)).toBe(getDocumentDownloadCopy('zh-CN')[presentation === 'layout' ? 'layoutOriginal' : 'layoutReadable']);
         expect(walk(dialog).some(entry => entry.type === 'pre')).toBe(false);
         expect(text(dialog)).not.toContain('presentation.pdf');
         const download = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'presentation.pdf', mimeType: 'application/pdf'});

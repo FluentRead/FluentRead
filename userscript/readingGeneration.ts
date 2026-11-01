@@ -134,7 +134,7 @@ function prepare(config: Config, service: string, model: string, tools: readonly
     return {url: url.toString(), headers: mergeCustomHeaders(headers, customHeaders), body: transformBody(service, config, model, {
         model: resolveOfficialMimoModel(endpoint.endpoint, model), messages: openaiMessages(input), stream: true, max_tokens: 1200,
         ...(tools.length ? {tools: tools.map(tool => ({type: 'function', function: {name: tool.name, description: tool.description, parameters: toolSchema}})), tool_choice: 'auto'} : {}),
-    })};
+    }, endpoint.endpoint)};
 }
 
 /** SSE 的 CR/LF 和多行 data 均按事件边界组装；读取上限与 abort 清理不依赖 provider 配合。 */

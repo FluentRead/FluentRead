@@ -3902,6 +3902,75 @@ describe('real-site translation matrix gates', () => {
     ]);
   });
 
+  it('requires Microsoft Learn technical labels while leaving descriptions and Authentication headers translatable', async () => {
+    const config = cases['microsoft-learn-translator-v3'];
+    const selectors = config.forbiddenSelectors.filter(selector => selector.includes('code-block-header-language') || selector.includes('table[aria-label='));
+    const {document, window} = parseHTML(`<html><body><main id="main">
+      <div data-code-block-header><span id="language" class="code-block-header-language">JSON</span><button>Copy</button></div>
+      <table aria-label="Required parameters"><tbody><tr><td id="parameter">api-version</td><td id="description">The requested API version.</td></tr></tbody></table>
+      <table aria-label="Response headers"><tbody><tr><td id="response">X-requestid</td><td>A generated request identifier.</td></tr></tbody></table>
+      <table aria-label="Handle profanity"><tbody><tr><td id="enum">Marked</td><td id="marker">Asterisk</td><td id="action">Replace profane words with asterisks.</td><td id="example">Readable example.</td></tr></tbody></table>
+      <table aria-label="Optional parameters"><tbody><tr><td id="authentication">Authentication headers</td><td>See authentication options.</td></tr></tbody></table>
+      <p><span id="ordinary-label" class="code-block-header-language">An ordinary explanation.</span></p>
+    </main></body></html>`);
+    expect(selectors).toHaveLength(4);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, []))
+      .toEqual(expect.arrayContaining(selectors));
+    expect(selectors.flatMap(selector => [...document.querySelectorAll(selector)].map(node => node.id)))
+      .toEqual(['language', 'parameter', 'response', 'enum', 'marker']);
+    for (const id of ['description', 'action', 'example', 'authentication', 'ordinary-label']) {
+      expect(document.querySelector(`#${id}`)!.matches(selectors.join(',')), id).toBe(false);
+    }
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], selectors, [], [], []);
+      document.querySelector('#authentication')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">身份验证标头</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'readable label')).resolves.toBeDefined();
+      for (const id of ['language', 'parameter', 'response', 'enum', 'marker']) {
+        const translated = document.createElement('span'); translated.className = 'fluent-read-bilingual-content';
+        translated.textContent = 'Unexpected technical translation'; document.querySelector(`#${id}`)!.append(translated);
+        await expect(assertPageContract(page, baseline, [], config.url, id)).rejects.toThrow('forbidden DOM 出现译文');
+        translated.remove();
+      }
+      await expect(assertPageContract(page, baseline, [], config.url, 'restored labels')).resolves.toBeDefined();
+    } finally {vi.unstubAllGlobals();}
+  });
+
+  it.each([
+    ['bluesky-official-profile', 'aria-pressed', `<div data-testid="feedItem-by-fixture"><div><div></div><div><div></div><div id="late-owner"></div></div></div><div data-testid="postText"><a id="body-link" href="/profile/example" role="link" aria-label="Profile" aria-pressed="false" data-no-underline="1"><svg></svg><div><div><div dir="auto">Readable mention</div></div></div></a></div></div>`,
+      '<a id="protected-action" href="/profile/example" role="link" aria-label="Reposted by Example" aria-pressed="false" data-no-underline="1"><svg></svg><div><div><div dir="auto">Reposted by Example</div></div></div></a>'],
+    ['linkedin-public-pulse-article', 'replyToComment', `<main><div class="comments"><section class="comment"><p class="comment__text"><a id="body-link" class="comment__reply" data-feed-action="replyToComment">Readable reply explanation.</a></p><div id="late-owner" class="comment__actions"></div></section></div></main>`,
+      '<a id="protected-action" class="comment__reply" data-feed-action="replyToComment">Reply</a>'],
+  ] as const)('observes optional %s metadata when it appears without protecting readable body links', async (caseName, marker, fixture, action) => {
+    const config = cases[caseName];
+    const selector = config.forbiddenSelectors.find(value => value.includes(marker))!;
+    expect(selector).toBeDefined();
+    expect(config.optionalForbiddenSelectors).toContain(selector);
+    expect(config.dynamicForbiddenSelectors).toContain(selector);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors,
+      'forbiddenMustExistSelectors' in config ? config.forbiddenMustExistSelectors : [], config.optionalForbiddenSelectors)).not.toContain(selector);
+    const {document, window} = parseHTML(`<html><body>${fixture}</body></html>`);
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], [selector], [], [selector], [selector]);
+      expect(baseline.forbiddenState[0]).toMatchObject({count: 0, optional: true, dynamic: true});
+      document.querySelector('#late-owner')!.innerHTML = action;
+      expect([...document.querySelectorAll(selector)].map(node => node.id)).toEqual(['protected-action']);
+      await expect(assertPageContract(page, baseline, [], config.url, 'late clean metadata')).resolves.toBeDefined();
+      expect(baseline.forbiddenState[0]).toMatchObject({count: 1});
+      document.querySelector('#body-link')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">Readable translation</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'readable body link')).resolves.toBeDefined();
+      document.querySelector('#protected-action')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">Unexpected metadata translation</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'damaged metadata')).rejects.toThrow('forbidden DOM 出现译文');
+    } finally {vi.unstubAllGlobals();}
+  });
+
   it.each([
     ['legacy', 'ReposListItem-module__TopicsList__fixture', 'ReposListItem-module__LabelsContainer__fixture'],
     ['current-small', 'TopicsList__XBoKUv SmallScreenOnly__KktHod', 'LabelsContainer__Bi_rOW'],

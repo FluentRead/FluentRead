@@ -17,3 +17,4 @@ export function createResourceOptions(command: string, args?: string[]): Resourc
 export function acquireLock(options: ResourceOptions): Promise<void>;
 export function releaseLock(): Promise<void>;
 export function hasInheritedLock(): Promise<boolean>;
+export function runResourceSafe(argv?: string[]): Promise<number>;

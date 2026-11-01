@@ -50,6 +50,15 @@ jobs:
         run: |
           pnpm rebuild esbuild
           pnpm exec wxt prepare
+      - name: Restore verified build caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            .wxt/cache/extension.tsbuildinfo
+            .wxt/cache/userscript-gzip
+          key: fluentread-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            fluentread-build-${{ runner.os }}-node22-${{ hashFiles('pnpm-lock.yaml', 'package.json', 'tsconfig.json') }}-
       - name: Install audit tools
         run: |
           if ! command -v rg >/dev/null 2>&1; then

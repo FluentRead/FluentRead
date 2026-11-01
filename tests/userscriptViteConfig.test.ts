@@ -203,21 +203,26 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        // Exercise two real five-iteration workers above the production 64 KiB gate,
-        // without compressing a needlessly large repeated fixture under instrumentation.
+        // 用独立缓存验证 64 KiB 以上真实 worker 的首次压缩与后续命中，避免旧产物跳过压缩器。
+        const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-positive-'));
+        mkdirSync(resolve(root, 'userscript'));
+        writeFileSync(resolve(root, 'userscript/zopfliBuildWorker.cjs'),
+            `require(${JSON.stringify(resolve(process.cwd(), 'userscript/zopfliBuildWorker.cjs'))});\n`);
         const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
         expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
-        const first = await gzipLargeStandaloneUserscriptData(input, process.cwd());
-        const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), process.cwd());
-        expect(first).toEqual(second);
-        expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
-        expect(gunzipSync(first)).toEqual(before);
-        expect(input).toEqual(before);
-        expect(process.listeners('uncaughtException')).toEqual(uncaught);
-        expect(process.listeners('unhandledRejection')).toEqual(unhandled);
+        try {
+            const first = await gzipLargeStandaloneUserscriptData(input, root);
+            const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), root);
+            expect(first).toEqual(second);
+            expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
+            expect(gunzipSync(first)).toEqual(before);
+            expect(input).toEqual(before);
+            expect(process.listeners('uncaughtException')).toEqual(uncaught);
+            expect(process.listeners('unhandledRejection')).toEqual(unhandled);
+        } finally {rmSync(root, {recursive: true, force: true});}
     });
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {

@@ -944,7 +944,7 @@ describe('test group real CLI and controlled pnpm process', () => {
         expect(result.code).toBe(1); expect(result.stderr).toContain('[test-group] spawn pnpm ENOENT');
         expect(result.stderr).not.toContain("Unhandled 'error' event");
     });
-    it.each(['', 'true'])('passes the complete group and coverage flag to the child without filtering cases with CI=%j', async ci => {
+    it.each(['', 'true'])('passes the compact reporter, complete group and coverage flag to the child without filtering cases with CI=%j', async ci => {
         const result = await invoke(group, 'success', ['--coverage'], {CI: ci});
         const matrix = JSON.parse(readFileSync(path.join(project, 'tests/test-matrix.json'), 'utf8'));
         const pnpm = result.events.find(e => e.kind === 'pnpm');

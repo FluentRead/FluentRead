@@ -4,7 +4,7 @@
 /**
  * @file scripts/testing/run-document-export-pages-test.cjs
  * 文件职责：在生产扩展与第二屏临时 Edge 中，验证文档页实际导出按钮的 PDF 页数与完整性。
- * 主要内容：真实导入 PDF、人工校订和下载，PDF.js 独立重开及逐页渲染；--outline-only 限定章节书签、标题回退、层级、双语和重排落点，不运行其它分页场景。
+ * 主要内容：真实导入 PDF、人工校订和下载，PDF.js 独立重开及逐页渲染；--outline-only 限定目录与目标页，--dialog-only 限定默认主操作、折叠选项、排版选择、原文下载、错误与重试，不运行其它分页场景。
  * 模块边界：只写本轮临时 profile 的人工校订和真实仓库字体缓存，不调用或模拟翻译供应商，不操作用户浏览器。
  */
 const assert = require('node:assert/strict');
@@ -21,17 +21,19 @@ const packages = path.resolve(argument('playwright-root', path.join(os.homedir()
 const extensionDir = path.resolve(argument('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(argument('artifacts-dir', '/private/tmp/fluentread-document-export-pages'));
 const outlineOnly = process.argv.includes('--outline-only');
+const dialogOnly = process.argv.includes('--dialog-only');
 const encryptedInput = argument('encrypted-input');
-assert(!encryptedInput || outlineOnly, '--encrypted-input requires --outline-only');
+assert(!encryptedInput || outlineOnly || dialogOnly, '--encrypted-input requires --outline-only or --dialog-only');
+assert(!dialogOnly || encryptedInput, '--dialog-only requires the controlled --encrypted-input fixture');
 const diagnosticsHelper = argument('runtime-diagnostics-helper');
-assert(!outlineOnly || diagnosticsHelper, '--outline-only requires --runtime-diagnostics-helper');
+assert(!(outlineOnly || dialogOnly) || diagnosticsHelper, 'Outline and dialog tests require --runtime-diagnostics-helper');
 const diagnostics = diagnosticsHelper ? require(path.resolve(diagnosticsHelper)).createRuntimeDiagnostics() : undefined;
 const requireRepo = createRequire(path.join(repository, 'package.json'));
 const {chromium} = require(path.join(packages, 'playwright'));
 const compact = text => text.normalize('NFKC').replace(/\s/gu, '');
 const report = {ok: false, extensionDir, artifactKind: 'production', scope: 'document page actual PDF export button only',
   limitations: ['Translations are manual corrections entered through the real editor; no provider translation quality is covered.',
-    `${outlineOnly ? 'Controlled two-page PDFs with native and inferred headings' : 'Controlled one-page text PDFs'} only; no reporter file, public complex document, Firefox, Safari or physical mobile acceptance.`],
+    `${dialogOnly ? 'Controlled one- and two-page PDF fixtures' : outlineOnly ? 'Controlled two-page PDFs with native and inferred headings' : 'Controlled one-page text PDFs'} only; no reporter file, public complex document, Firefox, Safari or physical mobile acceptance.`],
   cases: [], corrections: [], downloads: [], screenshots: [], consoleErrors: [], workerErrors: [], blockedRequests: [], cleanupErrors: []};
 fs.mkdirSync(artifacts, {recursive: true});
 function fingerprint(directory) {
@@ -158,6 +160,8 @@ async function main() {
     const download = async (name, kind, mode, entries, expectedPages) => {
       await presentation(kind); await page.locator('.taskbar-actions .download-button').click();
       const dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
+      const options = dialog.locator('.download-options');
+      if (!await options.evaluate(node => node.open)) await options.locator(':scope > summary').click();
       await dialog.locator('.export-options button').nth(mode === 'bilingual' ? 0 : 1).click();
       const partial = dialog.locator('.partial-export input'); if (await partial.isVisible()) await partial.check();
       await shot(`${name}-download-dialog`);
@@ -197,11 +201,66 @@ async function main() {
       }
       if (expectedPages) assert.equal(sheets.length, expectedPages, `${name}: no extra blank or continuation page`);
       else assert(sheets.length > 1, `${name}: genuine overflow must create readable continuation pages`);
-      if (await dialog.isVisible()) await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
+      if (await dialog.isVisible()) await dialog.getByRole('button', {name: '关闭下载窗口', exact: true}).click();
       report.cases.push({name, ok: true, pageCount: sheets.length});
       return result;
     };
-    if (outlineOnly) {
+    if (dialogOnly) {
+      report.scope = 'Compact download dialog, independent layout choice, original bytes, partial confirmation, protected-file error and retry';
+      const rows = await importPdf(short);
+      await correct(rows.slice(0, 1), () => '首段校订保留。', 'partial-dialog');
+      await page.locator('.taskbar-actions .download-button').click();
+      let dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
+      assert(await dialog.locator('.dialog-actions .translate-document-button').isDisabled());
+      assert.equal(await dialog.locator('.download-options').evaluate(node => node.open), false);
+      await dialog.locator('.download-options > summary').click();
+      const layoutSelect = dialog.getByRole('combobox', {name: 'PDF 排版', exact: true});
+      await layoutSelect.selectOption('readable');
+      assert.equal(await page.locator('[data-document-reader="pdf"]').getAttribute('data-pdf-presentation'), 'layout');
+      assert.equal(await dialog.locator('.pdf-export-summary').getAttribute('data-pdf-export-presentation'), 'readable');
+      await dialog.screenshot({path: path.join(artifacts, 'partial-download-dialog.png')});
+      await dialog.getByRole('button', {name: '关闭下载窗口', exact: true}).click();
+      await page.locator('.taskbar-actions .download-button').click(); await dialog.waitFor();
+      assert.equal(await dialog.locator('.download-options').evaluate(node => node.open), false);
+      assert.equal(await dialog.getByRole('combobox', {name: 'PDF 排版', exact: true}).count(), 0);
+      assert.equal(await dialog.locator('select').inputValue(), 'layout');
+      assert.equal(await dialog.locator('.partial-export input').isChecked(), false);
+      const original = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', {name: '下载原文', exact: true}).click()]);
+      const originalPath = path.join(artifacts, 'exact-original.pdf'); await original[0].saveAs(originalPath);
+      assert(fs.readFileSync(originalPath).equals(short.bytes), 'Original shortcut must keep exact source bytes');
+      report.cases.push({name: 'partial-confirmation-independent-layout-original-bytes', ok: true});
+      await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
+      await diagnostics.attachPage(page, 'download-dialog-protected');
+      await page.goto(`${origin}/document.html`); await page.locator('.file-drop-zone').waitFor();
+      const input = {name: '一份文件名较长的研究资料-用于验证下载文件名不会超出窗口-protected.pdf', bytes: fs.readFileSync(encryptedInput)};
+      const protectedRows = await importPdf(input);
+      const entries = await correct(protectedRows, row => `第${row.id + 1}段校订内容保留。`, 'protected-dialog');
+      await page.locator('.taskbar-actions .download-button').click(); dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
+      await dialog.locator('.download-options > summary').click();
+      await dialog.locator('.export-options button').first().click();
+      await dialog.locator('.download-options > summary').click();
+      const metrics = async name => {
+        const result = await dialog.evaluate(node => {const r = node.getBoundingClientRect();return {width:r.width,height:r.height,viewportWidth:innerWidth,horizontalOverflow:node.scrollWidth-node.clientWidth};});
+        assert(result.width <= 400.5 && result.width <= result.viewportWidth - 31, 'Dialog width must remain compact and fit the viewport');
+        assert(result.height <= 480 && result.horizontalOverflow <= 1, 'Dialog must remain compact without horizontal overflow');
+        await dialog.screenshot({path: path.join(artifacts, `${name}.png`)});
+        report.cases.push({name, ok:true, ...result});
+      };
+      await metrics('download-dialog-desktop');
+      await dialog.locator('.dialog-actions .translate-document-button').click();
+      const failure = dialog.locator('.download-failure'); await failure.waitFor();
+      assert((await failure.getByRole('alert').textContent()).includes('此文件受保护'));
+      assert(!(await failure.getByRole('alert').textContent()).includes('PDFDocument'));
+      assert.equal(await failure.locator('details').evaluate(node => node.open), false);
+      assert.equal(await failure.locator('pre').isVisible(), false);
+      await metrics('download-dialog-error-collapsed');
+      await failure.locator('summary').click(); assert((await failure.locator('pre').textContent()).includes('PDFDocument.load'));
+      await failure.locator('summary').click();
+      await page.setViewportSize({width:390,height:740}); await metrics('download-dialog-narrow-error');
+      await page.setViewportSize({width:1440,height:960});
+      await dialog.getByRole('button', {name:'关闭下载窗口',exact:true}).click();
+      await download('download-dialog-protected-retry', 'layout', 'translated', entries, 2);
+    } else if (outlineOnly) {
       report.scope = encryptedInput ? 'Protected PDF translated download with detected-heading outline fallback' : 'PDF native and detected chapter outlines through actual download buttons';
       for (const native of encryptedInput ? [false] : [true, false]) {
         const input = encryptedInput ? {name: path.basename(encryptedInput), file: path.resolve(encryptedInput), bytes: fs.readFileSync(encryptedInput)} : await outlineFixture(native);

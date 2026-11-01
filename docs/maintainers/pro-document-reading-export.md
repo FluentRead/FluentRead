@@ -66,6 +66,7 @@ PDF.js 已能读取、但 pdf-lib 因加密拒绝读取的文件，在无需嵌�
 - `run-document-export-pages-test.cjs --extension-dir <生产扩展目录> --playwright-root <Node包目录> --artifacts-dir <证据目录>`：经文档页校订与实际导出按钮，检查带首尾空行的短译文、36 行重排及长译文续页；重开下载文件核对页数、全文与逐页渲染。仅使用受控 PDF 与人工校订，不代表反馈原文件或在线供应商验收。
 - 同一脚本追加 `--outline-only --runtime-diagnostics-helper <扩展UI测试技能>/scripts/runtime-diagnostics.cjs`，只运行两页 PDF 的原生目录与识别标题回退，分别下载原版双语、原版译文和重排译文六个场景。重开产物检查层级、中文标题、译文侧落点及插页后的实际目标页，同时采集扩展页与后台错误和告警；不会调用翻译供应商。
   配合 `--encrypted-input <相同章节的空用户密码受保护夹具>` 可单独复验完整纯译文下载和识别标题回退，不尝试已不支持的受保护原页嵌入。
+- `--dialog-only --encrypted-input <上述受保护夹具> --runtime-diagnostics-helper <采集器>` 限定下载弹窗：默认折叠选项、排版不改阅读器、未完成确认、原文逐字节保存、400px 桌面/390px 窄视口尺寸、简短错误与技术详情，以及失败后仅译文重试。
 - `run-pdf-performance-test.cjs --extension-dir <生产扩展目录> --label <构建标识> --artifacts-dir <证据目录>`：后台第二屏临时 Edge 中运行两页 24 段人工校订，记录首次及三次重复的阅读、翻页、原版双语和长文重排导出；原样包装 Canvas API 记录读回、像素与测量量，下载后独立检查页序、全文与逐页非空，并渲染首次及末次输出。保留构建指纹、原始样本与中位数；耗时包含调度与计数开销，不设墙钟通过阈值，首次和缓存复用样本分开解释，不代表供应商或复杂文档整体性能。
 - `run-document-live-translation.cjs --inputs <明确文件>`：公开原页节选的实际免费服务翻译与下载，独立记录供应商成功、错误及未覆盖项。
 - `run-pdf-export-benchmark.cjs --self-test-expectations`：离线检查页序与批注验收逻辑。Mock 压力模式仍要求至少 300 页，不用于普通公开文档的翻译质量验证。

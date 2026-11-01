@@ -944,10 +944,10 @@ describe('test group real CLI and controlled pnpm process', () => {
         expect(result.code).toBe(1); expect(result.stderr).toContain('[test-group] spawn pnpm ENOENT');
         expect(result.stderr).not.toContain("Unhandled 'error' event");
     });
-    it('passes the complete group and coverage flag to the child without filtering cases', async () => {
+    it('passes the compact reporter, complete group and coverage flag to the child without filtering cases', async () => {
         const result = await invoke(group, 'success', ['--coverage']);
         const matrix = JSON.parse(readFileSync(path.join(project, 'tests/test-matrix.json'), 'utf8'));
-        expect(result.code).toBe(0); expect(result.events.find(e => e.kind === 'pnpm')?.args).toEqual(['exec', 'vitest', 'run', '--coverage', ...matrix.groups.unit]);
+        expect(result.code).toBe(0); expect(result.events.find(e => e.kind === 'pnpm')?.args).toEqual(['exec', 'vitest', 'run', '--reporter=dot', '--coverage', ...matrix.groups.unit]);
     });
     it('preserves the actual child exit status instead of converting failed tests to success', async () => {
         const result = await invoke(group, 'child-exit'); expect(result.code).toBe(7);

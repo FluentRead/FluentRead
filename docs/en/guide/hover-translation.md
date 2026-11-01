@@ -10,7 +10,7 @@ Point at a paragraph and press **Control** to show its translation below the ori
 2. Point at a paragraph and press **Control**.
 3. Hold the key and move to other paragraphs to translate them. Releasing the key keeps translations already shown.
 
-Inputs and editable areas are excluded. Change the key or trigger delay in [Shortcuts & triggers](/en/guide/custom-hotkey). The delay starts when you enter a paragraph; moving within it does not restart the wait. Set it to 0 for an immediate trigger.
+Hover shortcuts, including the tilde key, let you type in inputs and editable areas or compose text with an input method, even while the pointer rests on a paragraph. A focus change or the start of text composition cancels pending hover translation. Leave the editor and press the shortcut again to resume. Change the key or trigger delay in [Shortcuts & triggers](/en/guide/custom-hotkey). The delay starts when you enter a paragraph; moving within it does not restart the wait. Set it to 0 for an immediate trigger.
 
 ## Retry or restart
 

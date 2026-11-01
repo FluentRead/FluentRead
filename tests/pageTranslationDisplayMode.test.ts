@@ -65,6 +65,16 @@ function committed(mode: 'bilingual' | 'single' = 'bilingual', overrides: Partia
 }
 
 describe('已提交网页译文显示切换', () => {
+    it('无页面地址时沿用全局显示，配置订阅和既有骨架重放都不误匹配网站名单', () => {
+        const {owner, state} = committed();
+        vi.stubGlobal('location', undefined);
+        config.display = 0; config.translationOnlyDomains = ['example.com'];
+        expect(refreshTranslationDisplayMode(owner, state)).toBe(true); expect(state.mode).toBe('single');
+        const preferences = {display: 0, translationOnlyDomains: ['example.com']};
+        const apply = vi.fn(), sync = createPageTranslationDisplayModeSync(preferences, apply);
+        sync({...preferences, display: 1}); expect(state.mode).toBe('bilingual');
+        expect(apply).toHaveBeenCalledOnce();
+    });
     it('网站偏好切换立即复用已有译文，忽略无关网站变化，移除后恢复全局模式与原文身份', () => {
         const {owner, state, nodes, sourceHTML} = committed();
         const preferences = {display: 1, translationOnlyDomains: [] as string[]};

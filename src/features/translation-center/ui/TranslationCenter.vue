@@ -1,7 +1,7 @@
 <!--
  * @file src/features/translation-center/ui/TranslationCenter.vue
  * 文件职责：提供以输入和多服务对照为中心的翻译工作台，清晰展示凭据、请求进度和旧结果。
- * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话；侧边栏用紧凑按钮显示服务或已选数量，完整保留多服务对比与模型标识，移除重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
+ * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话，侧栏专用布局由原生入口样式负责；侧边栏用紧凑按钮显示服务或已选数量，完整保留多服务对比与模型标识，移除重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
  * 模块边界：不实现 provider 协议、不保存原文和译文、不更改网页默认服务；翻译复用 app client 的服务超时配置，设置导航交给外层，卸载时释放自有页面监听器和请求。
  -->
 <template>
@@ -352,40 +352,4 @@ onUnmounted(() => {disposed = true; session.dispose(); endCardDrag(); unsubscrib
 @media (max-width: 1200px) { .translation-center { padding: 18px; }.translation-center-layout { grid-template-columns: minmax(260px, .9fr) minmax(0, 1.1fr); gap: 14px; }.translation-input-panel { padding: 16px; }.translation-result-list.is-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 900px) { .translation-center { overflow-y: auto; }.translation-center-layout { display: flex; flex-direction: column; flex: none; }.translation-input-panel { min-height: 390px; }.translation-editor { min-height: 170px; }.translation-results-panel { min-height: 320px; }.translation-result-list { overflow: visible; flex: none; }.translation-result-list.is-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .translation-center { padding: 12px; gap: 12px; }.translation-center-intro { align-items: flex-start; }.translation-center-intro p { font-size: 11px; }.translation-input-panel, .translation-results-panel { padding: 16px 12px; border-radius: 11px; }.translation-result-list.is-grid { grid-template-columns: minmax(0, 1fr); }.results-heading { gap: 8px; }.results-heading h3 { font-size: 14px; }.results-controls { flex-wrap: wrap; }.results-heading-actions { gap: 10px; }.service-picker-popover { width: 330px; max-width: calc(100vw - 56px); max-height: 480px; }.translation-result-service-name small { max-width: 140px; }.translation-center-toolbar { margin-top: 16px; }.translation-result-content { padding-right: 14px; padding-left: 14px; } }
-/* 原生面板高度由浏览器决定；单一滚动区让短窗口仍能到达输入、停止与全部结果。 */
-.translation-center.is-sidebar { flex: 1; height: auto; padding: 10px 12px; gap: 8px; overflow-y: auto; scrollbar-width: thin; background: var(--surface); }
-.is-sidebar .translation-center-layout { display: flex; flex-direction: column; flex: none; gap: 12px; }
-.is-sidebar .translation-input-panel, .is-sidebar .translation-results-panel { min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
-.is-sidebar .translation-center-toolbar { margin: 0 0 8px; gap: 6px; }
-.is-sidebar .translation-editor, .is-sidebar .translation-editor textarea { min-height: 128px; height: 144px; flex: none; }
-.is-sidebar .translation-editor textarea { padding: 10px 36px 10px 12px; line-height: 1.7; }
-.is-sidebar .sidebar-clear-button { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; }
-.is-sidebar .translation-input-meta { margin: 6px 0; }
-.is-sidebar .translation-input-footer { padding-top: 6px; }
-.is-sidebar .translation-input-footer p { margin-top: 8px; }
-.is-sidebar .translate-primary-button, .is-sidebar .translate-stop-button { min-height: 32px; padding: 6px 10px; }
-.is-sidebar .results-heading { align-items: center; gap: 8px; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.is-sidebar .translation-center-service-picker { flex: 1; min-width: 0; }
-.is-sidebar .sidebar-copy-button { order: 1; flex: none; white-space: nowrap; }
-.is-sidebar .add-service-button { max-width: 100%; min-width: 0; min-height: 28px; padding: 3px 0; border: 0; color: var(--muted); }
-.is-sidebar .add-service-button > .fr-ui-icon { flex: none; }
-.is-sidebar .service-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.is-sidebar .service-picker-count { flex: none; padding: 0 5px; border-radius: 4px; background: var(--surface-soft); font-size: 11px; }
-.is-sidebar .results-controls { justify-content: flex-end; padding: 0 0 8px; }
-.is-sidebar .translation-result-list { flex: none; overflow: visible; padding: 0; gap: 8px; }
-.is-sidebar .translation-result-card { border: 0; border-radius: 0; background: transparent; }
-.is-sidebar .translation-result-card + .translation-result-card { padding-top: 8px; border-top: 1px solid var(--line); }
-.is-sidebar .translation-result-card-header { padding: 0; }
-.is-sidebar .translation-result-service-name { flex: 1; }
-.is-sidebar .translation-result-service-name > div { display: flex; align-items: baseline; gap: 6px; width: 100%; }
-.is-sidebar .translation-result-service-name strong { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.is-sidebar .translation-result-service-name small { min-width: 0; max-width: none; flex: 1; margin-top: 0; }
-.is-sidebar .translation-result-placeholder { min-height: 64px; padding: 12px; }
-.is-sidebar .translation-result-content { padding: 4px 0 0; }
-.is-sidebar .translation-result-content p { margin-bottom: 6px; }
-.is-sidebar .translation-result-content footer { overflow-wrap: anywhere; }
-.is-sidebar .card-connection-footer { padding: 6px 12px 8px; }
-/* 服务菜单脱离内容滚动区，短面板里搜索与关闭始终可达。 */
-.is-sidebar .service-picker-popover { position: fixed; inset: 44px 10px auto; width: auto; max-width: none; max-height: calc(100dvh - 56px); padding: 12px; }
-.is-sidebar .service-picker-header { align-items: center; margin-bottom: 8px; }
 </style>

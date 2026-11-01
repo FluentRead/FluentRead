@@ -4,6 +4,8 @@
 
 `translationSidepanel`、`sidepanelBootstrap`、`sidepanelApp`、`translationCenterComponent` 和 `popupAppLifecycle` 验证原生打开保留点击手势、错误重试、配置准备、页面退出取消与共享工作台。新版 Chromium 可能缓存关闭的面板，工作台在进入 hidden 时停止请求；同一实例重开保留输入与已有结果，不自动重启翻译。页面销毁或刷新后内容消失，不写入配置。`verify:extension-manifests` 同时检查 Chrome 的 `side_panel` 与唯一 `sidePanel` 权限，以及 Firefox 的 `sidebar_action`、安装时不自动展开和不声明 Chromium 权限。
 
+侧栏专用布局只由原生入口引入。`userscriptTranslationCenterBuild` 使用真实 SFC 验证构建时保留设置页的多服务对比、裁剪不可用的原生展示，并检查文字、注释和其它组件不被改写；交付还需执行 `pnpm test:userscript:standalone`，沿用现有体积上限。
+
 生产 Chrome 构建后运行：
 
 ```bash

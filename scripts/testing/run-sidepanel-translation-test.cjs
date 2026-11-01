@@ -110,10 +110,14 @@ async function geometry(label) {
     const result = await native.evaluate(() => {
         const root = document.querySelector('.translation-center'), ids = [...document.querySelectorAll('[id]')].map(node => node.id);
         return {width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, rootWidth: root.clientWidth, rootScrollWidth: root.scrollWidth,
+            editorHeight: document.querySelector('.translation-editor').getBoundingClientRect().height,
+            serviceControlHeight: document.querySelector('.add-service-button').getBoundingClientRect().height,
             colorScheme: getComputedStyle(document.documentElement).colorScheme, background: getComputedStyle(root).backgroundColor, dark: document.documentElement.classList.contains('dark'),
             duplicateIds: ids.filter((id, index) => ids.indexOf(id) !== index)};
     });
     assert(result.scrollWidth <= result.width + 1 && result.rootScrollWidth <= result.rootWidth + 1, `${label} horizontal overflow: ${JSON.stringify(result)}`);assert.equal(result.duplicateIds.length, 0);
+    assert.equal(result.editorHeight, 144, `${label}: sidebar editor expanded into the reading space`);
+    assert(result.serviceControlHeight <= 30, `${label}: service control expanded vertically`);
     report.cases.push({name: label, geometry: result});
 }
 async function main() {

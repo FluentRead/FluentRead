@@ -22,6 +22,7 @@ export default defineConfig({
                 'src/platform/browser/translationSidepanel.ts',
                 'src/app/sidepanel/index.ts',
                 'src/app/sidepanel/SidepanelApp.vue',
+                'userscript/translationCenterPlugin.ts',
                 'src/features/vocabulary/materialBackupReader.ts',
                 'src/features/vocabulary/materialBackupJson.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',

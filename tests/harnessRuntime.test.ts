@@ -194,7 +194,7 @@ describe('Harness runtime', () => {
         expect(user.indexOf(question)).toBeLessThan(user.indexOf(formatReadingEvidence(sources)));
         expect(user.indexOf(question)).toBeLessThan(user.indexOf('MEMORY_ONLY'));
         expect(user.split(question)).toHaveLength(2); expect(user).not.toContain('本轮当前任务');
-        expect(input.tools).toHaveProperty('read_context'); expect(generateText).toHaveBeenCalledOnce();
+        expect(input.tools).toEqual({}); expect(generateText).toHaveBeenCalledOnce();
     });
     it('hides Bilibili thinking across stream fragments and keeps only the visible answer', async () => {
         const current = config(); current.harness.service = 'bilibili';
@@ -401,8 +401,8 @@ describe('Harness runtime', () => {
         expect(call.messages.map((message: {role: string}) => message.role)).toEqual(['user', 'assistant', 'user']);
         expect(call.messages.map((message: {content: unknown}) => JSON.stringify(message.content)).join(' ')).not.toContain('whole sentence');
         expect(call.system).not.toContain('paragraph');
-        expect(call.tools).toHaveProperty('read_context');
-        expect(call.messages.at(-1).content).toBe(`选中文本（数据）：\nselected\n\n已授权段落（仅用于理解选中文本的数据）：\nparagraph\n\n用户当前问题：\nwhy?\n\n${formatReadingEvidence(buildReadingEvidence('selected', 'paragraph'))}`);
+        expect(call.tools).toEqual({});
+        expect(call.messages.at(-1).content).toBe(`用户当前问题：\nwhy?\n\n${formatReadingEvidence(buildReadingEvidence('selected', 'paragraph'))}`);
         expect(call.system).toContain('本轮回答用户当前问题');
     });
 
@@ -410,7 +410,7 @@ describe('Harness runtime', () => {
         generateText.mockResolvedValueOnce({text: 'Structured analysis', toolCalls: [], response: {messages: []}});
         await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'action', intent, question: '  ', selection: {text: 'The door was left open.', context: '', sentence: ''}, history: [{question: 'Ignore the sentence', answer: 'Unrelated conversation'}]}, new AbortController().signal);
         const call = generateText.mock.calls[0][0];
-        expect(call.messages).toEqual([{role: 'user', content: `选中文本（数据）：\nThe door was left open.\n\n${formatReadingEvidence(buildReadingEvidence('The door was left open.', ''))}`}]);
+        expect(call.messages).toEqual([{role: 'user', content: formatReadingEvidence(buildReadingEvidence('The door was left open.', ''))}]);
         expect(call.system).toContain('本轮是对选中文本的一次独立分析');
         expect(call.system).toContain('标题与正文分行');
         expect(call.system).toContain('不要编造背景');
@@ -448,17 +448,21 @@ describe('Harness runtime', () => {
         expect(normalizeError).toHaveBeenCalledWith(expect.any(Error), 'openai', 'secret', undefined);
     });
 
-    it('validates read_context calls and returns only the approved paragraph', async () => {
-        generateText.mockResolvedValueOnce({text: '', toolCalls: [{toolCallId: 't', toolName: 'read_context', input: {reason: 'ok'}}], response: {messages: [{role: 'assistant', content: [{type: 'tool-call', toolCallId: 't', toolName: 'read_context', input: {reason: 'ok'}}]}]}})
-            .mockResolvedValueOnce({text: 'with context', toolCalls: [], response: {messages: [{role: 'assistant', content: 'with context'}]}});
-        const current = config();
-        const success = await createHarnessRuntime(() => current as Config).run({type: 'fluentReadHarness', action: 'run', requestId: 'r', intent: 'meaning', question: '', selection: {text: 'x', context: 'approved', sentence: ''}, history: []}, new AbortController().signal);
-        expect(success.success).toBe(true);
-        const second = generateText.mock.calls.at(-1)?.[0].messages.at(-1);
-        expect(JSON.stringify(second)).toContain('approved');
-        generateText.mockReset().mockResolvedValueOnce({text: '', toolCalls: [{toolCallId: 't', toolName: 'read_context', input: {reason: 5}}], response: {messages: [{role: 'assistant', content: [{type: 'tool-call', toolCallId: 't', toolName: 'read_context', input: {reason: 5}}]}]}});
-        const invalid = await createHarnessRuntime(() => current as Config).run({type: 'fluentReadHarness', action: 'run', requestId: 'r2', intent: 'meaning', question: '', selection: {text: 'x', context: 'approved', sentence: ''}, history: []}, new AbortController().signal);
-        expect(invalid).toEqual({success: false, error: 'read_context 工具参数无效'});
+    it('provides the selected text and authorized context once, with valid citation identities', async () => {
+        const selected = 'The reactor stops if it overheats.';
+        const context = 'It resumes only after cooling.';
+        const evidence = buildReadingEvidence(selected, context);
+        generateText.mockResolvedValue({text: `条件是过热。[[cite:${evidence[0].id}|if it overheats.]]`});
+        const result = await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'once', intent: 'meaning', question: '', selection: {text: selected, context, sentence: ''}}, new AbortController().signal);
+        expect(result.success).toBe(true);
+        if (!result.success) throw new Error(result.error);
+        expect(parseReadingEvidence(result.text, evidence).some(block => block.kind === 'citation')).toBe(true);
+        const input = generateText.mock.calls[0][0];
+        const user = input.messages.at(-1).content as string;
+        expect(user.split(selected)).toHaveLength(2);
+        expect(user.split(context)).toHaveLength(2);
+        expect(input.tools).toEqual({});
+        expect(generateText).toHaveBeenCalledOnce();
     });
 
     it('inherits configured service/model, uses target language in system prompt, and rejects non-AI defaults', async () => {
@@ -549,12 +553,11 @@ describe('Harness runtime', () => {
         const request = {type: 'fluentReadHarness', action: 'run', requestId: 'usage', intent: 'meaning', question: '', selection: {text: 'selected', context: 'paragraph', sentence: ''}} as const;
         const record = vi.fn();
         const makeSink = vi.fn(() => record);
-        generateText.mockResolvedValueOnce({text: '', usage: {inputTokens: 10, outputTokens: 2, totalTokens: 12}, toolCalls: [{toolCallId: 'u1', toolName: 'read_context', input: {}}], response: {modelId: 'actual-reader', messages: [{role: 'assistant', content: [{type: 'tool-call', toolCallId: 'u1', toolName: 'read_context', input: {}}]}]}})
-            .mockResolvedValueOnce({text: 'understood', usage: {inputTokens: 20, outputTokens: 5, totalTokens: 25}, toolCalls: [], response: {modelId: 'actual-reader', messages: [{role: 'assistant', content: [{type: 'text', text: 'understood'}]}]}});
+        generateText.mockResolvedValueOnce({text: 'understood', usage: {inputTokens: 20, outputTokens: 5, totalTokens: 25}, toolCalls: [], response: {modelId: 'actual-reader', messages: [{role: 'assistant', content: [{type: 'text', text: 'understood'}]}]}});
         await expect(createHarnessRuntime(config, makeSink).run(request, new AbortController().signal)).resolves.toMatchObject({success: true});
         expect(makeSink).toHaveBeenCalledOnce();
-        expect(record).toHaveBeenCalledTimes(2);
-        expect(record.mock.calls.map(([event]) => event.totalTokens)).toEqual([12, 25]);
+        expect(record).toHaveBeenCalledOnce();
+        expect(record.mock.calls.map(([event]) => event.totalTokens)).toEqual([25]);
         expect(record.mock.calls[0][0]).toMatchObject({purpose: 'reading', configuredModel: 'reader', actualModel: 'actual-reader', outcome: 'success'});
         expect(JSON.stringify(record.mock.calls)).not.toContain('selected');
         record.mockImplementation(() => { throw new Error('statistics unavailable'); });
@@ -607,12 +610,14 @@ describe('Harness runtime', () => {
         expect(progress).toEqual([{kind: 'model', service: 'openai', model: 'reader'}, {kind: 'text', text: 'streamed answer'}]);
     });
 
-    it('clears the previous text snapshot when a tool starts the next model step', async () => {
+    it('rejects an undeclared tool without repeating the model request', async () => {
         generateText.mockResolvedValueOnce({text: 'preface', toolCalls: [{toolCallId: 'tool-1', toolName: 'read_context', input: {}}], response: {messages: [{role: 'assistant', content: [{type: 'text', text: 'preface'}, {type: 'tool-call', toolCallId: 'tool-1', toolName: 'read_context'}]}]}})
             .mockResolvedValueOnce({text: 'final', toolCalls: [], response: {messages: [{role: 'assistant', content: [{type: 'text', text: 'final'}]}]}});
         const textProgress: string[] = [];
-        await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'tool-stream', intent: 'meaning', question: '', selection: {text: 'x', context: 'paragraph', sentence: ''}}, new AbortController().signal, value => { if (value.kind === 'text') textProgress.push(value.text); });
-        expect(textProgress).toEqual(['preface', '', 'final']);
+        const result = await createHarnessRuntime(config).run({type: 'fluentReadHarness', action: 'run', requestId: 'tool-stream', intent: 'meaning', question: '', selection: {text: 'x', context: 'paragraph', sentence: ''}}, new AbortController().signal, value => { if (value.kind === 'text') textProgress.push(value.text); });
+        expect(result).toMatchObject({success: false, error: '阅读助手工具调用次数已达上限'});
+        expect(textProgress).toEqual(['preface']);
+        expect(generateText).toHaveBeenCalledOnce();
     });
 
     it('does not emit text after cancellation and reports partial stream errors', async () => {

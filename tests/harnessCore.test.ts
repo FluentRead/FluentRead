@@ -9,6 +9,28 @@ const result = (text: string, toolCalls: HarnessGenerateResult['toolCalls'] = []
     assistant: {role: 'assistant', content: text ? [{type: 'text', text}] : toolCalls.map(call => ({type: 'tool-call', toolCallId: call.id, toolName: call.name, input: call.input}))}, text, toolCalls,
 });
 
+describe('tool-free reading generation', () => {
+    it('does not require an unused executor when the original text is already supplied', async () => {
+        const generate = vi.fn().mockResolvedValue(result('direct answer'));
+        const output = await runHarnessLoop({generate, system: '', user: 'supplied source', tools: [], signal: new AbortController().signal});
+        expect(output.text).toBe('direct answer');
+        expect(generate).toHaveBeenCalledOnce();
+        await expect(runHarnessLoop({generate, system: '', user: 'source', tools, signal: new AbortController().signal})).rejects.toThrow('已声明的阅读工具缺少执行器');
+        expect(generate).toHaveBeenCalledOnce();
+    });
+
+    it('clears streamed text before a tool result starts another model answer', async () => {
+        const text: string[] = [];
+        const generate = vi.fn().mockImplementationOnce(async input => {
+            input.onText('preface');
+            return result('', [{id: 'context', name: 'read_context', input: {}}]);
+        }).mockImplementationOnce(async input => {input.onText('final');return result('final');});
+        await runHarnessLoop({generate, executeTool: async () => 'authorized paragraph', system: '', user: 'source', tools,
+            signal: new AbortController().signal, onText: value => text.push(value)});
+        expect(text).toEqual(['preface', '', 'final']);
+    });
+});
+
 describe('shared read_context wire validation', () => {
     it('matches the installed native strict schema for JSON boundaries, inherited keys and non-JSON tool values', () => {
         const native = z.object({reason: z.string().max(200).optional()}).strict();

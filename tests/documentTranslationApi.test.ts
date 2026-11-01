@@ -1921,6 +1921,40 @@ describe('document service timeout compatibility', () => {
         translateTextBatch: mocks.translateTextBatch,
     });
 
+    it.each(['batch', 'single'])('rejects a successful %s settlement at the attempt deadline before its timer fires', async mode => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        try {
+            vi.setSystemTime(0);
+            const getRequestTimeout = vi.fn(() => 250);
+            const committed = vi.fn(), aborted = vi.fn();
+            let observed: {timeout?: number; signal?: AbortSignal} | undefined;
+            let settlement: {now: number; timers: number; aborted: boolean | undefined} | undefined;
+            const translate = (source: string | string[], _context: string, options: {timeout?: number; signal?: AbortSignal}) => new Promise(resolve => {
+                observed = options;
+                options.signal?.addEventListener('abort', aborted, {once: true});
+                const attemptDeadlineAt = Date.now() + options.timeout!;
+                // 只移动系统时钟，不执行超时回调，让成功结算后的截止检查负责拒收。
+                vi.setSystemTime(attemptDeadlineAt);
+                settlement = {now: Date.now(), timers: vi.getTimerCount(), aborted: options.signal?.aborted};
+                resolve(Array.isArray(source) ? ['边界译文'] : '边界译文');
+            });
+            mocks.translateTextBatch.mockImplementation(translate); mocks.translateText.mockImplementation(translate);
+            const failure = await createTranslator(getRequestTimeout)(segments, {fileName: 'book.epub', batchTranslation: mode === 'batch', signal: controller.signal,
+                retryBackoff: {maxWaitMs: 0, maxDurationMs: 1000}, onSegment: committed,
+            }).catch(error => error);
+            expect(settlement).toEqual({now: 250, timers: 1, aborted: false});
+            expect(observed?.timeout).toBe(250);
+            expect(serializeTranslationError(failure)).toMatchObject({kind: 'timeout', retryable: true});
+            expect(observed?.signal).not.toBe(controller.signal); expect(observed?.signal?.aborted).toBe(true);
+            expect(aborted).toHaveBeenCalledOnce(); expect(controller.signal.aborted).toBe(false);
+            expect(committed).not.toHaveBeenCalled();
+            expect(mocks.translateTextBatch).toHaveBeenCalledTimes(mode === 'batch' ? 1 : 0);
+            expect(mocks.translateText).toHaveBeenCalledTimes(mode === 'single' ? 1 : 0);
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {controller.abort(); vi.useRealTimers();}
+    });
+
     it.each(['batch', 'single'])('keeps each %s attempt within the frozen service timeout while spending the overall recovery budget', async mode => {
         vi.useFakeTimers();
         const controller = new AbortController();

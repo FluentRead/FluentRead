@@ -13,6 +13,9 @@ const tables = [
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
     ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels'],
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
+    ['src/features/full-page-translation/ui/translationIndicators.ts', 'iconPaths'],
+    ['src/providers/translation/aliyun-translation.ts', 'aliyunErrorHints'],
+    ['src/core/i18n/language.ts', 'localizedUiLanguageLabels'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {
@@ -103,7 +106,7 @@ describe('standalone static settings data representation', () => {
     it('leaves partially used catalogs visible to standard tree shaking while compressing its complete style table', () => {
         const plugin = createUserscriptSettingsDataPlugin(root, true, false);
         const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-        for (const [path, name] of tables.slice(0, 2)) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        for (const [path, name] of [...tables.slice(0, 2), ...tables.slice(3)]) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
         expect(run('const TRANSLATION_STYLE_PRESETS = [];', resolve(root, tables[2][0]))?.code).toContain('JSON.parse');
     });
 

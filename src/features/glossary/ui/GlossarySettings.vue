@@ -1,7 +1,7 @@
 <!--
  * @file src/features/glossary/ui/GlossarySettings.vue
  * 文件职责：提供可直接上手的个人术语库设置，集中管理词库、适用语言、网站范围和固定译名。
- * 主要内容：直接展示导入、新建与匹配预览，词库卡片内固定保留设置入口，多词库优先级独立管理；以单一 Vue 状态控制设置展开，管理独立草稿、范围解释、重复词条校验与串行保存；非空搜索仅索引当前库的正文，逐次输入复用小写文本，清空时释放；完整词库字段未变时跳过重复规范化，隐藏时只保留最新通知，已接受的操作按身份和提交草稿在队列执行时合并存活配置服务的最新列表，覆盖外部增删、容量变化及组件卸载；回执只更新仍属于原操作的选择和导入界面，卸载后到达的删除确认不会再发起保存。
+ * 主要内容：导入先选择文件或粘贴内容，两种草稿和格式独立保留；只展示三条预览，完整内容与格式按需展开，确认导入前保留容量、异常与警告校验，切换方式取消旧文件读取；直接展示导入、新建与匹配预览，词库卡片内固定保留设置入口，多词库优先级独立管理；以单一 Vue 状态控制设置展开，管理独立草稿、范围解释、重复词条校验与串行保存；非空搜索仅索引当前库的正文，逐次输入复用小写文本，清空时释放；完整词库字段未变时跳过重复规范化，隐藏时只保留最新通知，已接受的操作按身份和提交草稿在队列执行时合并存活配置服务的最新列表，覆盖外部增删、容量变化及组件卸载；回执只更新仍属于原操作的选择和导入界面，卸载后到达的删除确认不会再发起保存。
  * 模块边界：配置通过现有 requestConfigPatch 保存并在失败时回读权威状态；文件只在本地解析，界面不请求翻译服务、不改写宿主网页。
  -->
 <template>
@@ -128,22 +128,33 @@
         </div>
       </div>
     </el-dialog>
-    <el-dialog v-model="importOpen" :title="t('glossary.import')" width="min(720px, calc(100vw - 28px))" :close-on-click-modal="false" class="glossary-import-dialog">
-      <div class="fluentread-glossary" data-i18n-ignore>
-        <p class="glossary-help">{{ t('glossary.importHelp') }}</p>
-        <label>{{ t('glossary.file') }}<input type="file" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" @change="readImportFile" /></label>
-        <label>{{ t('glossary.format') }}<ElSelect class="glossary-select"  v-model="importFormat" :aria-label="t('glossary.format')" @change="invalidateFileRead"><ElOption value="csv" label="CSV" /><ElOption value="tsv" label="TSV" /><ElOption value="json" label="JSON" /></ElSelect></label>
-        <label>{{ t('glossary.importText') }}<textarea v-model="importText" rows="6" placeholder="source,target,tgt_lng&#10;large language model,大语言模型,zh-Hans" @input="invalidateFileRead" /></label>
-        <p v-if="fileError" class="glossary-error" role="alert">{{ fileError }}</p>
-        <template v-if="importText.trim()">
-          <p role="status">{{ t('glossary.importSummary', {total: importPreview.totalEntries, accepted: importPreview.acceptedEntries, libraries: importPreview.libraries.length}) }}</p>
-          <div v-for="(message, index) in importErrors" :key="`error-${index}`" class="glossary-error" role="alert">{{ message }}</div>
-          <div v-for="(message, index) in importPreview.warnings" :key="`warning-${index}`" class="glossary-warning">{{ message }}</div>
-          <div class="glossary-import-preview"><details v-for="library in importPreview.libraries" :key="library.id" open><summary>{{ library.name }} · {{ t('glossary.entryCount', {count: library.entries.length}) }}</summary><p v-for="entry in library.entries" :key="entry.id">{{ entry.source }} → {{ entry.target || t('glossary.keepOriginal') }}</p></details></div>
-          <label v-if="importPreview.warnings.length" class="glossary-check"><input v-model="acceptWarnings" type="checkbox" />{{ t('glossary.acceptWarnings') }}</label>
-        </template>
-        <div class="glossary-actions glossary-dialog-actions"><button type="button" @click="importOpen = false">{{ t('common.cancel') }}</button><button type="button" class="primary" :disabled="!canImport || busy" @click="confirmImport">{{ t('glossary.confirmImport') }}</button></div>
+    <el-dialog v-model="importOpen" :title="t('glossary.import')" width="min(600px, calc(100vw - 28px))" top="8vh" :close-on-click-modal="false" class="glossary-import-dialog">
+      <div class="fluentread-glossary glossary-import-body" data-i18n-ignore>
+        <fieldset class="glossary-import-methods" :disabled="busy">
+          <legend class="glossary-visually-hidden">{{ t('glossary.import') }}</legend>
+          <label v-for="method in (['file', 'text'] as const)" :key="method" :data-selected="importMethod === method"><UiIcon :name="method === 'file' ? 'card' : 'pen'" :size="18" /><span>{{ t(method === 'file' ? 'glossary.file' : 'glossary.importPaste') }}</span><input type="radio" name="glossary-import-method" :value="method" :checked="importMethod === method" @change="changeImportMethod(method)" /></label>
+        </fieldset>
+        <div v-if="importMethod === 'file'" class="glossary-import-file" :class="{'has-file': importFileName && !readingImportFile}" :aria-busy="readingImportFile">
+          <input ref="importFileInput" class="glossary-visually-hidden" type="file" tabindex="-1" :aria-label="t('glossary.file')" accept=".csv,.tsv,.json,text/csv,text/tab-separated-values,application/json" @change="readImportFile" />
+          <UiIcon name="card" :size="28" />
+          <strong v-if="importFileName">{{ importFileName }}</strong>
+          <span v-else>{{ t('glossary.importFileHint') }}</span>
+          <button type="button" :disabled="busy || readingImportFile" @click="importFileInput?.click()">{{ t(readingImportFile ? 'glossary.importReading' : importFileName ? 'glossary.importReplace' : 'glossary.importChoose') }}</button>
+        </div>
+        <label v-else class="glossary-import-paste">{{ t('glossary.importPaste') }}<textarea v-model="importText" rows="5" spellcheck="false" placeholder="source,target,tgt_lng&#10;large language model,大语言模型,zh-Hans" @input="invalidateFileRead" /></label>
+        <details class="glossary-import-format"><summary>{{ t('glossary.format') }}<span>{{ importFormat.toUpperCase() }}<UiIcon class="details-chevron" name="chevron-down" :size="14" /></span></summary><label class="glossary-import-format-control"><span class="glossary-visually-hidden">{{ t('glossary.format') }}</span><ElSelect class="glossary-select" v-model="importFormat" :aria-label="t('glossary.format')" @change="invalidateFileRead"><ElOption value="csv" label="CSV" /><ElOption value="tsv" label="TSV" /><ElOption value="json" label="JSON" /></ElSelect></label></details>
+        <p v-if="fileError" class="glossary-error glossary-import-notice" role="alert">{{ fileError }}</p>
+        <p v-if="importSaveError" class="glossary-error glossary-import-notice" role="alert">{{ importSaveError }}</p>
+        <section v-if="importText.trim()" class="glossary-import-review">
+          <h3>{{ t('glossary.importReview') }}</h3>
+          <p class="glossary-help" role="status">{{ t('glossary.importSummary', {total: importPreview.totalEntries, accepted: importPreview.acceptedEntries, libraries: importPreview.libraries.length}) }}</p>
+          <div v-if="importErrors.length" class="glossary-import-notice glossary-error" role="alert"><p v-for="(message, index) in importErrors" :key="index">{{ message }}</p></div>
+          <table v-if="importSample.length" class="glossary-import-sample"><thead><tr><th>{{ t('glossary.source') }}</th><th>{{ t('glossary.target') }}</th></tr></thead><tbody><tr v-for="(entry, index) in importSample" :key="index"><td>{{ entry.source }}</td><td>{{ entry.target || t('glossary.keepOriginal') }}</td></tr></tbody></table>
+          <details v-if="importPreview.acceptedEntries > 3" class="glossary-import-preview"><summary>{{ t('glossary.importMore') }}<UiIcon class="details-chevron" name="chevron-down" :size="14" /></summary><div><details v-for="library in importPreview.libraries" :key="library.id" open><summary>{{ library.name }} · {{ t('glossary.entryCount', {count: library.entries.length}) }}</summary><p v-for="entry in library.entries" :key="entry.id">{{ entry.source }} → {{ entry.target || t('glossary.keepOriginal') }}</p></details></div></details>
+          <div v-if="importPreview.warnings.length" class="glossary-import-notice glossary-warning"><p v-for="(message, index) in importPreview.warnings" :key="index">{{ message }}</p><label class="glossary-check"><input v-model="acceptWarnings" type="checkbox" />{{ t('glossary.acceptWarnings') }}</label></div>
+        </section>
       </div>
+      <template #footer><div class="fluentread-glossary glossary-import-footer" data-i18n-ignore><p class="glossary-help">{{ t('glossary.importPreserves') }}</p><div class="glossary-actions"><button type="button" @click="importOpen = false">{{ t('common.cancel') }}</button><button type="button" class="primary" :disabled="!canImport || busy || readingImportFile" @click="confirmImport">{{ t('glossary.confirmImport') }}</button></div></div></template>
     </el-dialog>
   </div>
 </template>
@@ -501,14 +512,22 @@ const preview = computed(() => resolveGlossary(libraries.value, previewContext.v
 const previewLibraries = computed(() => libraries.value.map(library => ({library, reason: getGlossaryScopeReason(library, previewContext.value)})));
 
 const importOpen = ref(false);
-const importText = ref('');
-const importFormat = ref<GlossaryImportFormat>('csv');
+const importMethod = ref<'file' | 'text'>('file');
+const importFileInput = ref<HTMLInputElement>();
+const importFileName = ref('');
+const readingImportFile = ref(false);
+const importDrafts = ref({file: '', text: ''});
+const importFormats = ref<Record<'file' | 'text', GlossaryImportFormat>>({file: 'csv', text: 'csv'});
+const importText = computed({get: () => importDrafts.value[importMethod.value], set: value => {importDrafts.value[importMethod.value] = value;}});
+const importFormat = computed({get: () => importFormats.value[importMethod.value], set: value => {importFormats.value[importMethod.value] = value;}});
 const acceptWarnings = ref(false);
 const fileError = ref('');
+const importSaveError = ref('');
 let importRevision = 0;
 // 输入变更即失效旧回执；即使文本或弹窗之后恢复原值，也仍属于新的导入会话。
-watch([importText, importFormat, acceptWarnings, importOpen], () => {importRevision++;}, {flush: 'sync'});
+watch([importText, importFormat, acceptWarnings, importOpen, importMethod], () => {importRevision++; importSaveError.value = '';}, {flush: 'sync'});
 const importPreview = computed(() => parseGlossaryImport(importText.value, importFormat.value));
+const importSample = computed(() => importPreview.value.libraries.flatMap(library => library.entries.slice(0, 3)).slice(0, 3));
 const importErrors = computed(() => {
   const result = [...importPreview.value.errors];
   if (libraries.value.length + importPreview.value.libraries.length > GLOSSARY_LIMITS.libraries || libraries.value.reduce((total, library) => total + library.entries.length, 0) + importPreview.value.acceptedEntries > GLOSSARY_LIMITS.totalEntries) result.push(t('glossary.capacity'));
@@ -517,26 +536,33 @@ const importErrors = computed(() => {
 const canImport = computed(() => Boolean(importText.value.trim()) && !fileError.value && !importErrors.value.length && importPreview.value.acceptedEntries > 0 && (!importPreview.value.warnings.length || acceptWarnings.value));
 watch([importText, importFormat], () => {acceptWarnings.value = false;}, {flush: 'sync'});
 watch(importOpen, () => {fileReadGeneration++;});
-function invalidateFileRead(): void {fileReadGeneration++; fileError.value = '';}
-function openImport(): void {fileReadGeneration++; importText.value = ''; fileError.value = ''; acceptWarnings.value = false; importOpen.value = true;}
+function invalidateFileRead(): void {fileReadGeneration++; fileError.value = ''; readingImportFile.value = false;}
+function changeImportMethod(method: 'file' | 'text'): void {
+  if (method === importMethod.value || busy.value) return;
+  if (readingImportFile.value) importFileName.value = '';
+  invalidateFileRead(); importMethod.value = method; acceptWarnings.value = false;
+}
+function openImport(): void {invalidateFileRead(); importDrafts.value = {file: '', text: ''}; importFileName.value = ''; importMethod.value = 'file'; acceptWarnings.value = false; importOpen.value = true;}
 async function readImportFile(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement; const file = input.files?.[0]; if (!file) return;
   const generation = ++fileReadGeneration;
-  importText.value = ''; fileError.value = '';
+  importText.value = ''; fileError.value = ''; importFileName.value = ''; readingImportFile.value = false;
   if (file.size > GLOSSARY_LIMITS.importBytes) {fileError.value = t('glossary.fileTooLarge'); input.value = ''; return;}
   importFormat.value = file.name.toLowerCase().endsWith('.json') ? 'json' : file.name.toLowerCase().endsWith('.tsv') ? 'tsv' : 'csv';
+  importFileName.value = file.name; readingImportFile.value = true;
   try {
     // 字节读取才能识别 Excel 的 UTF-16/GB18030 文件；旧运行时没有 arrayBuffer 时保留 UTF-8 兜底。
     const text = typeof file.arrayBuffer === 'function' ? decodeGlossaryText(await file.arrayBuffer()) : await file.text();
     if (!disposed && importOpen.value && generation === fileReadGeneration) importText.value = text;
   }
   catch {if (!disposed && importOpen.value && generation === fileReadGeneration) fileError.value = t('glossary.fileFailed');}
-  if (!disposed && generation === fileReadGeneration) input.value = '';
+  if (!disposed && generation === fileReadGeneration) {input.value = ''; readingImportFile.value = false;}
 }
 async function confirmImport(): Promise<void> {
   if (!disposed) hydrate();
   if (!canImport.value || busy.value) return;
   const importedLibraries = normalizeGlossaryLibraries(importPreview.value.libraries);
+  importSaveError.value = '';
   const revision = importRevision, selectedRevision = selectionRevision;
   let firstId = '';
   const success = await persist(current => {
@@ -551,6 +577,7 @@ async function confirmImport(): Promise<void> {
     }
     return {glossaryLibraries: next};
   });
+  if (!success && !disposed && revision === importRevision) importSaveError.value = error.value || t('glossary.saveFailed');
   if (success && !disposed && revision === importRevision) {
     if (selectedRevision === selectionRevision && libraries.value.some(item => item.id === firstId)) selectLibrary(firstId);
     importOpen.value = false;

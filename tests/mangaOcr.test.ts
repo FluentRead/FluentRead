@@ -373,7 +373,7 @@ describe('owner在全部局部映回后生成既有视图词界proof',()=>{
         vi.mocked(document.createElement).mockImplementation(()=>{
             if(mocks.canvases.length===1&&first&&stage==='canvas'){first=false;throw failure;}
             const canvas=factory('canvas'),context=mocks.contexts.at(-1);
-            if(mocks.canvases.length===2&&first){first=false;if(stage==='context')canvas.getContext.mockReturnValue(null);else context[stage==='draw'?'drawImage':'getImageData'].mockImplementation(()=>{throw failure;});}
+            if(mocks.canvases.length===2&&first){first=false;if(stage==='context')vi.mocked((canvas as HTMLCanvasElement).getContext).mockReturnValue(null);else context[stage==='draw'?'drawImage':'getImageData'].mockImplementation(()=>{throw failure;});}
             return canvas;
         });
         mocks.recognize.mockReset().mockImplementation(function(this:any){owner=this;const rect={left:0,top:0,width:200,height:200};

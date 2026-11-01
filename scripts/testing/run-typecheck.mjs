@@ -6,9 +6,10 @@
  * 模块边界：不修改 shell 或其他构建任务的环境、不排除源码或改变诊断；可见内存快照不是可用内存或进程树硬上限，CI 的独立内存门禁继续执行。
  */
 import {createRequire} from 'node:module';
+import {realpathSync} from 'node:fs';
 import {totalmem} from 'node:os';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {releaseLock, runResourceSafe} from './run-resource-safe.mjs';
 
 const require = createRequire(import.meta.url);
@@ -33,7 +34,16 @@ async function main() {
         '--noEmit', '--incremental', '--tsBuildInfoFile', '.wxt/cache/extension.tsbuildinfo', ...process.argv.slice(2)]);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+let commandLineEntry = false;
+if (process.argv[1]) {
+    try {
+        commandLineEntry = import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href ||
+            realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+    } catch {
+        // 被测试模块导入时，调用方路径可能只是合成名称。
+    }
+}
+if (commandLineEntry) {
     main().catch(async error => {
         await releaseLock().catch(() => undefined);
         console.error(`[compile] ${error instanceof Error ? error.message : String(error)}`);

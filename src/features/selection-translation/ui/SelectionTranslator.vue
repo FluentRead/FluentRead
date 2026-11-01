@@ -1,5 +1,6 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
+ * 失败呈现：无结果时以简短原因、下一步提示和一个主操作展示；当前鉴权错误优先配置服务，重试按需展开，已有结果仍保留行内提示。
  * 来源提交：翻译与词典异步结果交付前复核已克隆选区的正文、连接和适配器边界，不依赖原生高亮仍然存在；来源失效时撤销旧卡片，词书保存仍保留失联上下文回退。
  * 两点选取：默认关闭及文档适配器跳过快捷键冲突计算，快捷键开启单次起终点选择并放行开放 Shadow DOM 编辑区；复用原生选区与现有划词入口，完成后的首次选区读取保留同轮延迟滚动，随后恢复普通滚动收起，取消、编辑与卸载撤销首帧保护；短状态提示不捕获页面指针，未命中文字或起终点重合时说明可继续操作，配置变更和卸载释放控制器。
  * 通知布局：收藏与语音设置通知沿用安全可见视口订阅，触摸动作保留完整命中区；通知不增加独立监听或请求。
@@ -44,7 +45,7 @@
             :aria-pressed="isVocabularySaved"
             @click="saveVocabularyEntry"
           ><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2.7 2.86 5.8 6.4.93-4.63 4.51 1.09 6.38L12 17.3l-5.72 3.02 1.09-6.38-4.63-4.51 6.4-.93L12 2.7Z" /></svg></button>
-          <button class="fr-close-btn" type="button" title="关闭" aria-label="关闭翻译结果" @click="closeTooltip">×</button>
+          <button class="fr-close-btn" type="button" title="关闭" aria-label="关闭翻译结果" @click="closeTooltip"><UiIcon name="close" :size="16" /></button>
         </div>
       </div>
       <div v-if="readingSelection" v-show="readingMode" class="fr-tooltip-content fr-reading-content">
@@ -52,7 +53,14 @@
       </div>
       <div v-show="!readingMode" class="fr-tooltip-content" aria-live="polite">
         <div v-if="isLoading && !translationResult && !wordCard && !wordCardError && !isWordSelection" class="fr-loading-state"><span :class="['fr-loading-spinner', { 'fr-static': !config.animations }]" aria-hidden="true" /><span>正在查询…</span></div>
-        <div v-else-if="error && !translationResult && !wordCard" class="fr-error-state"><span>{{ error }}</span><span class="fr-error-actions"><button type="button" @click="retryTranslation">重试</button><button v-if="isAuthenticationErrorCurrent(authenticationError)" type="button" :disabled="!!openingAuthenticationSettings" @click="openAuthenticationSettings">{{ translateLegacy('配置服务') }}</button></span></div>
+        <div v-else-if="error && !translationResult && !wordCard" class="fr-error-state">
+          <div role="alert"><h3>{{ error }}</h3><p data-i18n-ignore>{{ t(isAuthenticationErrorCurrent(authenticationError) ? 'feedback.serviceHint' : 'feedback.retryHint') }}</p></div>
+          <div class="fr-recovery-actions">
+            <button v-if="isAuthenticationErrorCurrent(authenticationError)" class="fr-recovery-primary" type="button" :disabled="!!openingAuthenticationSettings" @click="openAuthenticationSettings">{{ translateLegacy('配置服务') }}</button>
+            <button v-else class="fr-recovery-primary" type="button" @click="retryTranslation">重试</button>
+            <details v-if="isAuthenticationErrorCurrent(authenticationError)" class="fr-recovery-more"><summary>{{ translateLegacy('更多操作') }}<UiIcon name="chevron-down" :size="14" /></summary><button type="button" @click="retryTranslation">重试</button></details>
+          </div>
+        </div>
         <div v-else class="fr-translation-container">
           <section v-if="isWordSelection && (wordCard || isWordCardLoading)" class="fr-word-learning-card" aria-label="单词学习卡">
             <div v-if="isWordCardLoading && !wordCard" class="fr-word-card-loading" role="status"><span :class="['fr-loading-spinner', { 'fr-static': !config.animations }]" aria-hidden="true" /><span>{{ hasDistinctTranslationResult ? '译文已显示，正在补充词典…' : '正在查询词典，译文会先显示…' }}</span></div>
@@ -214,6 +222,7 @@ import {projectMaterialOriginalText} from '@/src/features/vocabulary/material/te
 import {HARNESS_ACTIONS, getHarnessModelCacheKey, isReadingActionSupported, isReadingService, normalizeHarnessPreferences, type HarnessActionId} from '@/src/core/config/harness';
 import {services} from '@/src/core/config/catalog';
 import {useUiI18n} from '@/src/ui/i18n';
+import UiIcon from '@/src/ui/components/UiIcon.vue';
 
 const props = defineProps<{
   onSelectionRangeChange?: (range: Range | null) => void;
@@ -2892,8 +2901,19 @@ onBeforeUnmount(() => {
 .fr-tooltip-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 14px; scrollbar-color: rgba(108, 105, 112, .4) transparent; scrollbar-width: thin; }
 .fr-translation-container { display: grid; gap: 9px; }
 .fr-loading-state, .fr-error-state { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 80px; color: #777780; font-size: 13px; }
-.fr-error-state { flex-direction: column; color: #c43b63; }
-.fr-error-state button { border: 1px solid currentColor; border-radius: 7px; padding: 4px 10px; background: transparent; color: inherit; cursor: pointer; }
+.fr-error-state { align-items: stretch; flex-direction: column; gap: 0; padding: 10px 8px 12px; color: #1d2535; }
+.fr-error-state h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; }
+.fr-error-state p { margin: 9px 0 0; color: #788196; font-size: 13px; line-height: 1.7; }
+.fr-recovery-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin-top: 20px; }
+.fr-error-state button { min-height: 36px; border: 0; border-radius: 9px; padding: 8px 14px; background: transparent; color: inherit; font: inherit; font-size: 12px; cursor: pointer; }
+.fr-error-state .fr-recovery-primary { color: #fff; background: linear-gradient(135deg, #f35482, #e93267); font-weight: 600; }
+.fr-error-state .fr-recovery-primary:disabled { opacity: .55; cursor: default; }
+.fr-recovery-more > summary { display: flex; align-items: center; gap: 6px; min-height: 36px; color: #788196; font-size: 12px; list-style: none; cursor: pointer; }
+.fr-recovery-more > summary::-webkit-details-marker { display: none; }
+.fr-recovery-more[open] > summary .fr-ui-icon { transform: rotate(180deg); }
+.fr-recovery-more > button { margin-top: 6px; }
+.fr-dark-theme .fr-error-state { color: #f3f5fa; }
+.fr-dark-theme .fr-error-state p, .fr-dark-theme .fr-recovery-more > summary { color: #b5bdcc; }
 .fr-error-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; min-width: 0; max-width: 100%; }
 .fr-error-actions button { max-width: 100%; }
 .fr-error-actions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }

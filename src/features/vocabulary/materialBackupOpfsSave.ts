@@ -8,6 +8,10 @@ import type {MaterialBackupSaveTarget, MaterialBackupWritable} from './materialB
 
 const PREFIX='fluentread-material-backup-v1-';
 const FILE_PATTERN=/^fluentread-material-backup-v1-(\d{13})-([a-f0-9]{32})\.tmp$/u;
+export function materialBackupTemporaryFileName(now:number,id:string):string {
+    if (!/^[a-f0-9]{32}$/u.test(id) || !Number.isSafeInteger(now) || now<1000000000000 || now>9999999999999) throw new Error('材料备份临时文件参数无效');
+    return `${PREFIX}${now}-${id}.tmp`;
+}
 export function materialBackupTemporaryFileTime(name:string):number|undefined {
     const match=FILE_PATTERN.exec(name);
     return match ? Number(match[1]) : undefined;
@@ -43,8 +47,8 @@ export async function createMaterialBackupOpfsTarget(filename:string,platform:Ma
     const startTimeoutMs=options.startTimeoutMs ?? 30000;
     if(!Number.isSafeInteger(startTimeoutMs)||startTimeoutMs<1)throw new Error('材料备份下载启动时限无效');
     const id=platform.randomId(), now=platform.now();
-    if (!filename || filename.length>255 || !/^[a-f0-9]{32}$/u.test(id) || !Number.isSafeInteger(now) || now<1000000000000 || now>9999999999999) throw new Error('材料备份临时文件参数无效');
-    const name=`${PREFIX}${now}-${id}.tmp`, release=await platform.acquire(name);
+    if (!filename || filename.length>255) throw new Error('材料备份临时文件参数无效');
+    const name=materialBackupTemporaryFileName(now,id), release=await platform.acquire(name);
     if (!release) throw new Error('材料备份临时文件正在使用');
     let writable:Awaited<ReturnType<MaterialBackupOpfsPlatform['create']>>;
     try {writable=await platform.create(name);} catch(error) {release();throw error;}

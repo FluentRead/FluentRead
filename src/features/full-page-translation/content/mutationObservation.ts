@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/mutationObservation.ts
  * 文件职责：为全文翻译组合 DOM 观察选项，并计算突发变化的扫描边界、安全节点目标和本片就绪扫描根。
- * 主要内容：按既有 matches/tagName/style 契约识别元素，保留 ShadowRoot 的宿主观察目标并按宿主连接性释放失效根；保留通用保护、按钮标签及资格、产物完整性属性，合并网站依赖；复杂选择器取消属性过滤，校验合成段身份标记，按断言批量判定增删节点，按检查点去重同节点同属性的变化，并按树包含关系合并扫描根。
+ * 主要内容：按既有 matches/tagName/style 契约识别元素，保留 ShadowRoot 的宿主观察目标并按宿主连接性释放失效根；保留通用保护、话题标签 rel、按钮标签及资格、产物完整性属性，合并网站依赖；复杂选择器取消属性过滤，校验合成段身份标记，按断言批量判定增删节点，按检查点去重同节点同属性的变化，并按树包含关系合并扫描根。
  * 模块边界：仅生成选项、读取传入节点的树关系并按注入时钟消费根队列，不创建观察器或计时器、不读取全局 DOM、配置或页面会话；标记核验只接收最小状态，不反向依赖翻译状态实现。
  */
 import {getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler';
@@ -98,7 +98,7 @@ export function createTranslationAttributeMutationFilter(): (element: Element, a
 export function createTranslationMutationObserverOptions(adapters: readonly TranslationSiteAdapter[]): MutationObserverInit {
     const attributeFilter = getSiteAdapterAttributeFilter(adapters, [
         'style', 'class', 'role', 'open', 'aria-modal', 'hidden', 'inert', 'contenteditable', 'aria-hidden', 'translate',
-        'lang', 'dir', 'href', 'title', 'value', 'type', 'name', 'data-notranslate', 'data-fr-translation-owned',
+        'lang', 'dir', 'href', 'rel', 'title', 'value', 'type', 'name', 'data-notranslate', 'data-fr-translation-owned',
     ]);
     return {
         childList: true, subtree: true, characterData: true, characterDataOldValue: true,

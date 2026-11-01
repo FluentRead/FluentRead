@@ -1,5 +1,19 @@
 [
   {
+    "id": "openai-community",
+    "name": "OpenAI 社区帖子标题",
+    "match": {"hosts": ["community.openai.com"]},
+    "allScopes": true,
+    "mode": "augment",
+    "content": [
+      {
+        "css": [".topic-list-item .link-top-line"],
+        "resolve": "closest",
+        "key": "openai-community:topic-title"
+      }
+    ]
+  },
+  {
     "id": "kagi-news",
     "name": "Kagi News 新闻标题",
     "match": {

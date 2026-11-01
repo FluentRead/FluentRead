@@ -13,7 +13,7 @@
       <button v-if="topicNext !== null" type="button" :disabled="topicLoading || busy" @click="showMoreTopics">更多主题</button>
       <details class="fr-material-menu" @keydown.esc.stop.prevent="closeMenu">
         <summary aria-label="材料管理"><UiIcon name="sliders" :size="16" /></summary>
-        <div @click="closeMenu"><button type="button" :disabled="loading || busy" @click="reload()">刷新材料</button><button type="button" :disabled="busy" @click="toggleArchive">{{ archived ? '返回阅读材料' : '查看已移除材料' }}</button><button type="button" :disabled="busy || !!fallbackDownloadUrl" @click="exportMaterials">导出材料备份</button><button type="button" :disabled="busy || !!pendingImport" @click="importInput?.click()">恢复材料备份</button><button v-if="isFirefox" type="button" :disabled="busy" @click="openTemporaryBackups">查看材料备份临时文件</button><button type="button" :disabled="busy" @click="confirmClear = true">清空全部材料</button></div>
+        <div @click="closeMenu"><button type="button" :disabled="loading || busy" @click="reload()">刷新材料</button><button type="button" :disabled="busy" @click="toggleArchive">{{ archived ? '返回阅读材料' : '查看已移除材料' }}</button><button type="button" :disabled="busy || fallbackDownloadPending" @click="exportMaterials">导出材料备份</button><button type="button" :disabled="busy || !!pendingImport" @click="importInput?.click()">恢复材料备份</button><button v-if="canShowTemporaryBackups" type="button" :disabled="busy" @click="openTemporaryBackups">查看材料备份临时文件</button><button type="button" :disabled="busy" @click="confirmClear = true">清空全部材料</button></div>
       </details>
       <input ref="importInput" type="file" accept=".json,application/json" hidden aria-label="恢复材料备份" @change="importMaterials" />
     </div>
@@ -24,7 +24,7 @@
     <p v-if="error" class="fr-material-feedback error" role="alert">{{ error }} <button type="button" :disabled="busy" @click="reload()">重试</button></p>
     <p v-if="backupWarning" class="fr-material-feedback error" role="alert">{{ backupWarning }}</p>
     <p v-if="largeRestoreRunning" class="fr-material-feedback" role="status"><span>正在读取并恢复材料备份…</span> <span>请保持此页面打开，以便中断后查询结果。</span> <button type="button" @click="cancelLargeRestore">取消恢复</button></p>
-    <p v-if="exportRunning" class="fr-material-feedback" role="status">正在导出材料备份… <span v-if="exportKeepOpen">下载完成前请保持此页面打开。</span> <span v-if="exportBuffered">当前浏览器使用内存准备下载，大备份可能占用较多内存。</span> <button type="button" @click="exportController?.abort()">取消导出</button></p>
+    <p v-if="exportRunning" class="fr-material-feedback" role="status">正在导出材料备份… <span v-if="exportKeepOpen">下载完成前请保持此页面打开。</span> <span v-if="exportBuffered">正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。</span> <button type="button" @click="exportController?.abort()">取消导出</button></p>
     <section v-if="exportCapacityPrompt" class="fr-material-editor" aria-label="确认保存超出恢复上限的备份">
       <strong>备份超过当前恢复上限</strong>
       <p v-if="exportCapacityPrompt.recordTooLarge">备份中有材料超过 128 MiB，当前版本无法恢复该材料。</p>
@@ -32,7 +32,7 @@
       <p>仍可保存以备后续处理；恢复还受设备可用空间限制。</p>
       <div class="fr-material-actions"><button type="button" @click="answerExportCapacity(true)">仍然保存备份</button><button type="button" @click="answerExportCapacity(false)">取消导出</button></div>
     </section>
-    <p v-if="fallbackDownloadUrl" class="fr-material-feedback" role="status">下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。 <button type="button" @click="releaseFallbackDownload">下载已完成，释放临时数据</button></p>
+    <p v-if="fallbackDownloadPending" class="fr-material-feedback" role="status">{{ fallbackDownloadUncertain ? '无法确认下载是否开始，请检查浏览器下载。' : '下载已发起，关闭页面可能中断下载。' }} 请先确认浏览器下载完成，再释放临时数据。 <button v-if="fallbackDownloadUncertain" type="button" :disabled="fallbackReleasing" @click="retryFallbackDownload">重新下载</button> <button type="button" :disabled="fallbackReleasing" @click="releaseFallbackDownload">下载已完成，释放临时数据</button></p>
     <p v-if="lateBackupWarning" class="fr-material-feedback error" role="alert">{{ lateBackupWarning }} <button type="button" @click="clearLateBackupWarning">知道了</button></p>
     <p v-if="lateBackupStatus" class="fr-material-feedback" role="status">{{ lateBackupStatus }} <button type="button" aria-label="关闭保存结果提示" @click="clearLateBackupStatus">知道了</button></p>
     <section v-if="showTemporaryBackups" class="fr-material-editor" aria-label="材料备份临时文件">
@@ -134,6 +134,8 @@
 import {ref as sharedRef} from 'vue';
 // Blob URL 属于当前文档；组件切换不能丢失用户尚未确认的下载。
 const sharedFallbackDownloadUrl = sharedRef('');
+const sharedFallbackDownloadPending = sharedRef(false), sharedFallbackDownloadUncertain = sharedRef(false), sharedFallbackReleasing = sharedRef(false);
+let sharedFallbackFile:Blob|undefined,sharedFallbackName='',sharedFallbackRelease:(()=>Promise<void>)|undefined;
 const sharedLateBackupWarnings = sharedRef<string[]>([]);
 const sharedLateBackupStatuses = sharedRef<string[]>([]);
 </script>
@@ -153,7 +155,7 @@ import {MaterialPageClientError, requestMaterialPage, requestMaterialDetail, req
 import type {MaterialSummary} from '../materialSummary';
 import type {MaterialDetailMetadata} from '../materialDetailPage';
 import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSavePlatform} from '../materialBackupSave';
-import {beginFirefoxMaterialBackup, beginFirefoxRecoveredMaterialBackup, listFirefoxMaterialBackupLeftovers, removeFirefoxMaterialBackupLeftover, prepareFirefoxMaterialBackupContext, type MaterialBackupLeftover} from '../materialBackupBrowserSave';
+import {beginFirefoxMaterialBackup, beginFirefoxRecoveredMaterialBackup, createMaterialBackupFallbackTarget, supportsMaterialBackupTemporaryFiles, listMaterialBackupLeftoversInBrowser, removeMaterialBackupLeftoverInBrowser, prepareFirefoxMaterialBackupContext, type MaterialBackupLeftover} from '../materialBackupBrowserSave';
 import {startMaterialBackupExport} from '../materialBackupExportClient';
 import {MATERIAL_BACKUP_EXPORT_PORT_NAME} from '../materialBackupExportProtocol';
 import type {MaterialReadPort} from '../materialReadTransport';
@@ -188,9 +190,11 @@ const exportBuffered = ref(false);
 const exportCapacityPrompt=ref<{recordTooLarge:boolean;tooManyFrames:boolean}|null>(null);
 let exportCapacityAnswer:((proceed:boolean)=>void)|undefined;
 const fallbackDownloadUrl = sharedFallbackDownloadUrl;
+const fallbackDownloadPending=sharedFallbackDownloadPending,fallbackDownloadUncertain=sharedFallbackDownloadUncertain,fallbackReleasing=sharedFallbackReleasing;
 const lateBackupWarning = computed(()=>sharedLateBackupWarnings.value[0] ?? '');
 const lateBackupStatus = computed(()=>sharedLateBackupStatuses.value[0] ?? '');
 const isFirefox = import.meta.env.BROWSER === 'firefox';
+const canShowTemporaryBackups=isFirefox||supportsMaterialBackupTemporaryFiles();
 const showTemporaryBackups=ref(false),temporaryLoading=ref(false),temporaryItems=ref<MaterialBackupLeftover[]>([]);
 const temporaryError=ref(''),temporaryDelete=ref(''),temporaryTruncated=ref(false),temporaryFailed=ref(0);
 let temporaryGeneration=0;
@@ -604,8 +608,8 @@ async function saveNote() {
 async function removeNote(reference: MaterialReference) { const item = selected.value; if (!item)
     return; await mutate(() => workspaceMaterialRemoveReference(item.id, reference.kind, reference.id), () => {if (editingNoteId.value === reference.id) {editingNoteId.value = ''; note.value = '';} feedback.value = '笔记已删除。'; }); }
 async function clearMaterials() { await mutate(async () => { await materialClear(); }, () => { materials.value = []; resetSelection(); noteDrafts.clear(); materialDrafts.clear(); confirmClear.value = false; feedback.value = '全部材料已清空。'; }); }
-function reportLateBackupCleanup(kind:'firefox'|'picker'|'buffered') {
-    recordBackupWarning(kind==='firefox'?'取消后无法清理材料备份临时文件。确认没有下载进行后，重载当前页面以释放占用，再在临时文件列表处理。'
+function reportLateBackupCleanup(kind:'opfs'|'picker'|'buffered') {
+    recordBackupWarning(kind==='opfs'?'取消后无法清理材料备份临时文件。确认没有下载进行后，重载当前页面以释放占用，再在临时文件列表处理。'
         :kind==='picker'?'取消后无法清理已选择的文件，请检查保存位置是否留有不完整文件。':'取消后无法清理下载缓存，请检查浏览器下载。');
 }
 function recordBackupWarning(message:string) {sharedLateBackupWarnings.value.push(message);}
@@ -615,31 +619,32 @@ function clearLateBackupStatus() {sharedLateBackupStatuses.value.shift();}
 function isBackupError(failure:unknown,name:string):boolean {
     try {return failure instanceof Error && failure.name===name;} catch {return false;}
 }
-function backupFailureMessage(failure:unknown,cancelledMessage:string,fallback:string,firefoxTarget=false):string {
+function backupFailureMessage(failure:unknown,cancelledMessage:string,fallback:string,temporaryTarget=false):string {
     try {
         if(!(failure instanceof Error))return fallback;
         const name=failure.name;
         if(name==='AbortError')return cancelledMessage;
+        if(name==='QuotaExceededError')return '临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。';
         if(name==='MaterialBackupOpfsCleanupError')
             return '备份已下载，但临时文件未清理。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
         if(name==='MaterialBackupSaveCleanupError')
-            return firefoxTarget?'备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。':'材料备份未完成，清理失败，请检查保存位置是否存在不完整文件';
+            return temporaryTarget?'备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。':'材料备份未完成，清理失败，请检查保存位置是否存在不完整文件';
         const message=failure.message;
         if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(message))
             return '无法确认备份下载状态。请先检查浏览器下载，确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。';
         return message;
     } catch {return fallback;}
 }
-function retainUnmountedBackupFailure(failure:unknown,kind:'firefox'|'picker'|'buffered') {
+function retainUnmountedBackupFailure(failure:unknown,kind:'opfs'|'picker'|'buffered') {
     try {
         if(!(failure instanceof Error))return;
         const name=failure.name;
         if(name==='AbortError')return;
-        if(kind==='firefox' && (name==='MaterialBackupSaveCleanupError' || name==='MaterialBackupOpfsCleanupError'))
+        if(kind==='opfs' && ['MaterialBackupSaveCleanupError','MaterialBackupOpfsCleanupError','MaterialBackupInitializationCleanupError'].includes(name))
             recordBackupWarning(backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',true));
         else if(kind==='picker' && name==='MaterialBackupSaveCleanupError')
             recordBackupWarning('备份未完成且无法清理已选择的文件，请检查保存位置是否留有不完整文件。');
-        else if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(failure.message) && kind==='firefox')
+        else if(['无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'].includes(failure.message) && kind==='opfs')
             recordBackupWarning(backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',true));
     } catch {recordBackupWarning('导出失败，请重试。');}
 }
@@ -647,7 +652,7 @@ async function openTemporaryBackups() {
     const ticket=++temporaryGeneration;showTemporaryBackups.value=true;temporaryLoading.value=true;
     temporaryError.value='';temporaryDelete.value='';temporaryItems.value=[];temporaryFailed.value=0;temporaryTruncated.value=false;
     try {
-        const result=await listFirefoxMaterialBackupLeftovers();
+        const result=await listMaterialBackupLeftoversInBrowser();
         if(!active||ticket!==temporaryGeneration)return;
         temporaryItems.value=result.items;temporaryTruncated.value=result.truncated;temporaryFailed.value=result.failed;
     } catch(failure) {
@@ -661,7 +666,7 @@ async function removeTemporaryBackup(item:MaterialBackupLeftover) {
     if(busy.value||temporaryDelete.value!==item.name)return;
     busy.value=true;temporaryError.value='';
     try {
-        await removeFirefoxMaterialBackupLeftover(item.name);
+        await removeMaterialBackupLeftoverInBrowser(item.name);
         if(active){temporaryItems.value=temporaryItems.value.filter(value=>value.name!==item.name);temporaryDelete.value='';}
     } catch(failure) {if(active)temporaryError.value=failure instanceof Error?failure.message:'临时文件删除失败，请重试。';}
     finally {if(active){busy.value=false;flushVisibleReads();}}
@@ -674,11 +679,9 @@ async function recoverTemporaryBackup(item:MaterialBackupLeftover) {
     const filename=`fluentread-materials-recovered-${new Date().toISOString().slice(0,10)}.json`;
     try {
         // Firefox 的权限请求必须在用户点击的同步调用栈里启动。
-        const pending=beginFirefoxRecoveredMaterialBackup(item.name,filename).then(choice=>{
-            if(choice.status!=='ready')throw new Error(choice.status==='denied'?'未获得下载权限，无法取回备份。':'当前浏览器无法取回临时备份。');
-            return choice.target;
-        });
-        const target=await waitForMaterialBackupTarget(pending,controller.signal,()=>reportLateBackupCleanup('firefox'));
+        const fallback=()=>createMaterialBackupFallbackTarget(filename,(file,release,signal)=>handoffFallbackFile(filename,file,signal,release).then(()=>{}),item.name);
+        const pending=beginFirefoxRecoveredMaterialBackup(item.name,filename).then(choice=>choice.status==='ready'?choice.target:fallback());
+        const target=await waitForMaterialBackupTarget(pending,controller.signal,()=>reportLateBackupCleanup('opfs'));
         const result=await saveMaterialBackup(target,async()=>{},{signal:controller.signal});
         const message=result.state==='saved'?'备份下载完成，临时文件仍保留；确认后可删除。':'已发起备份下载，临时文件仍保留；请确认下载完成后再处理。';
         if(active&&ticket===generation)feedback.value=message;
@@ -687,15 +690,50 @@ async function recoverTemporaryBackup(item:MaterialBackupLeftover) {
         if(isBackupError(failure,'MaterialBackupContextError'))void prepareFirefoxMaterialBackupContext();
         if(active&&ticket===generation)temporaryError.value=backupFailureMessage(failure,'已取消取回备份。','取回备份失败，请重试。',true);
         else if(isBackupError(failure,'AbortError'))recordBackupStatus('此前开始的临时备份取回已取消。');
-        else retainUnmountedBackupFailure(failure,'firefox');
+        else retainUnmountedBackupFailure(failure,'opfs');
     } finally {
         if(exportController===controller)exportController=undefined;exportRunning.value=false;exportKeepOpen.value=false;
         if(active&&ticket===generation){busy.value=false;flushVisibleReads();}
     }
 }
-function releaseFallbackDownload() {
-    if (!fallbackDownloadUrl.value) return;
-    URL.revokeObjectURL(fallbackDownloadUrl.value);fallbackDownloadUrl.value='';
+async function releaseFallbackDownload():Promise<boolean> {
+    if(!fallbackDownloadPending.value)return true;
+    if(fallbackReleasing.value)return false;
+    fallbackReleasing.value=true;
+    let released=false;
+    try {
+        await sharedFallbackRelease?.();
+        if(fallbackDownloadUrl.value)URL.revokeObjectURL(fallbackDownloadUrl.value);
+        fallbackDownloadUrl.value='';fallbackDownloadPending.value=false;fallbackDownloadUncertain.value=false;
+        sharedFallbackFile=undefined;sharedFallbackName='';sharedFallbackRelease=undefined;
+        released=true;
+    }catch(failure){backupWarning.value=backupFailureMessage(failure,'已取消清理。','临时文件清理失败，请重试。',true);}
+    finally{fallbackReleasing.value=false;}
+    return released;
+}
+function startFallbackDownload() {
+    // pending 生命周期始终持有文件；释放时同步清空文件和 pending。
+    fallbackDownloadUrl.value ||= URL.createObjectURL(sharedFallbackFile!);
+    const anchor=document.createElement('a');anchor.href=fallbackDownloadUrl.value;anchor.download=sharedFallbackName;anchor.click();
+    fallbackDownloadUncertain.value=false;
+}
+function retryFallbackDownload() {
+    if(!fallbackDownloadPending.value)return;
+    try{startFallbackDownload();}
+    catch{fallbackDownloadUncertain.value=true;backupWarning.value='无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。';}
+}
+async function handoffFallbackFile(filename:string,file:Blob,signal:AbortSignal,release?:()=>Promise<void>):Promise<'initiated'> {
+    if(fallbackDownloadPending.value){await release?.();throw new Error('请先确认上一份备份下载完成。');}
+    sharedFallbackFile=file;sharedFallbackName=filename;sharedFallbackRelease=release;
+    fallbackDownloadPending.value=true;fallbackDownloadUncertain.value=true;
+    try {
+        if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
+        startFallbackDownload();return 'initiated';
+    }catch(failure){
+        // URL 尚未生成时可证明没有发起下载；其余情况保留文件与释放入口。
+        if(!fallbackDownloadUrl.value)await releaseFallbackDownload();
+        throw failure;
+    }
 }
 function answerExportCapacity(proceed:boolean) {exportCapacityAnswer?.(proceed);}
 function confirmExportCapacity(statistics:{maxRecordBytes:number;frames:number},signal:AbortSignal):Promise<void> {
@@ -713,7 +751,7 @@ function confirmExportCapacity(statistics:{maxRecordBytes:number;frames:number},
     });
 }
 async function exportMaterials() {
-    if (busy.value || fallbackDownloadUrl.value)
+    if (busy.value || fallbackDownloadPending.value)
         return;
     if (loading.value) pendingRefresh = true;
     busy.value = true;
@@ -726,15 +764,15 @@ async function exportMaterials() {
     const picker=(window as Window & {showSaveFilePicker?:MaterialBackupSavePlatform['pick']}).showSaveFilePicker;
     // 文件选择器和 Firefox 可选权限必须在首次 await 前由用户手势启动。
     const firefoxChoice=picker?undefined:beginFirefoxMaterialBackup(name);
+    let selectedDisk=false;
     const fallback=()=>chooseMaterialBackupTarget(name,{
         ...(picker?{pick:picker.bind(window)}:{}),
         async downloadBuffered(filename,parts,signal) {
-            if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
-            if(fallbackDownloadUrl.value)throw new Error('请先确认上一份备份下载完成。');
-            const blob=new Blob(parts.map(part=>part as Uint8Array<ArrayBuffer>),{type:'application/json'}), url=URL.createObjectURL(blob);
-            const revoke=()=>{try{URL.revokeObjectURL(url);}catch{/* 清理失败不覆盖导出结果。 */}};
-            try {const anchor=document.createElement('a');anchor.href=url;anchor.download=filename;anchor.click();fallbackDownloadUrl.value=url;return 'initiated' as const;}
-            catch(error){revoke();throw error;}
+            return handoffFallbackFile(filename,new Blob(parts.map(part=>part as Uint8Array<ArrayBuffer>),{type:'application/json'}),signal);
+        },
+        spill:filename=>{
+            selectedDisk=true;exportKeepOpen.value=true;
+            return createMaterialBackupFallbackTarget(filename,(file,release,signal)=>handoffFallbackFile(filename,file,signal,release).then(()=>{}));
         },
     });
     let selectedFirefox=false,selectedBuffered=false;
@@ -749,7 +787,7 @@ async function exportMaterials() {
         return fallback();
     }):fallback();
     try {
-        const target=await waitForMaterialBackupTarget(targetPromise,controller.signal,()=>reportLateBackupCleanup(selectedFirefox?'firefox':picker?'picker':'buffered'));
+        const target=await waitForMaterialBackupTarget(targetPromise,controller.signal,()=>reportLateBackupCleanup(selectedFirefox||selectedDisk?'opfs':picker?'picker':'buffered'));
         exportKeepOpen.value=selectedFirefox;exportBuffered.value=selectedBuffered;
         const result=await saveMaterialBackup(target,async (consume,signal)=>{
             const port=browser.runtime.connect({name:MATERIAL_BACKUP_EXPORT_PORT_NAME}) as unknown as MaterialReadPort;
@@ -778,9 +816,9 @@ async function exportMaterials() {
     }
     catch (failure) {
         if (active && ticket === generation)
-            error.value = backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',selectedFirefox);
+            error.value = backupFailureMessage(failure,'已取消导出。','导出失败，请重试。',selectedFirefox||selectedDisk);
         else if(isBackupError(failure,'AbortError'))recordBackupStatus('此前开始的材料备份导出已取消。');
-        else retainUnmountedBackupFailure(failure,selectedFirefox?'firefox':picker?'picker':'buffered');
+        else retainUnmountedBackupFailure(failure,selectedFirefox||selectedDisk?'opfs':picker?'picker':'buffered');
     }
     finally {
         if(exportController===controller)exportController=undefined;exportRunning.value=false;exportKeepOpen.value=false;exportBuffered.value=false;

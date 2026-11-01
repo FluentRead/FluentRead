@@ -55,7 +55,7 @@ export function mountAreaTranslator(component: typeof AreaTranslator = AreaTrans
     Object.assign(event, fields); target.dispatchEvent(event); return event;
   };
   const click = async (text: string) => {
-    const button = [...host.querySelectorAll('button')].find(node => node.textContent === text);
+    const button = [...host.querySelectorAll('button')].find(node => node.textContent === text || node.getAttribute('aria-label') === text);
     if (!button) throw new Error(`Missing visible area button: ${text}`);
     dispatch(button, 'click'); await Vue.nextTick(); await Promise.resolve(); await Vue.nextTick();
   };

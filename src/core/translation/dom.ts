@@ -1,11 +1,12 @@
 /**
  * @file src/core/translation/dom.ts
  *
- * 文件职责：封装翻译候选发现使用的 composed tree 遍历与不可覆盖安全守卫，识别扩展 DOM、其他翻译器已接管的段落、脚本、表单、图标字体、代码及禁止翻译区域；仅为对象身份登记的 man 手册 PRE 放开正文遍历。
+ * 文件职责：封装翻译候选发现使用的 composed tree 遍历与不可覆盖安全守卫，识别扩展 DOM、其他翻译器已接管的段落、脚本、表单、图标字体、代码、话题标签及禁止翻译区域；仅为对象身份登记的 man 手册 PRE 放开正文遍历。
  * 主要内容：提供抗表单命名属性遮蔽的标签读取、Shadow DOM 父级与祖先遍历、硬裁剪标签、按钮型 input 的可译标签属性判定、受保护文本元素（含 time 与 timer）、text/plain 顶层 pre、独立 tooltip 边界、隐藏/可编辑/no-translate 判断，并限制祖先深度以避免异常页面结构拖垮扫描；语言预检可单独读取行内 code 上下文，仍遵守其他保护及代码块祖先边界，默认翻译槽继续排除代码。 可核对的公开符号包括 maxComposedAncestorDepth、getComposedParent、isDocumentSurface、isExtensionElementSelf、getTranslatableControlValueAttribute、isHardPruneTag、isProtectedTextElement、isPlainTextDocumentPre、hasNoTranslateMarker、isDocumentSurfaceNoTranslateShell、isTopLevelApplicationShell。
  * 模块边界：本文件属于可独立测试的 core 候选领域；可以读取传入 DOM 以计算结果，但不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 import {isPreparedManpagePre} from './manpage';
+import {isTagMetadataElement} from './tagMetadata';
 
 /** 表单命名控件可遮蔽 tagName；沿原型读取原生 getter，不能把输入节点当作字符串。 */
 export function getElementTagName(element: Element): string {
@@ -268,6 +269,7 @@ export function isProtectedDescendantElement(
         !element.classList.contains('notranslate') && element.getAttribute('data-notranslate') !== 'true';
     return (!ignoreExtensionSelf && !ownSourceSlot && isExtensionElementSelf(element)) ||
         isForeignTranslationBoundary(element) ||
+        isTagMetadataElement(element) ||
         (isProtectedTextElement(element) && !(options?.includeInlineCodeForLanguage === true
             && getElementTagName(element) === 'code' && element.getAttribute('role') !== 'timer'
             && !/\p{Script=Han}/u.test(element.textContent!))) ||
@@ -289,6 +291,7 @@ export interface HardGuardResult {
 export function evaluateElementHardGuard(element: Element): HardGuardResult {
     if (isExtensionElementSelf(element)) return {prune: true, reason: 'fluentread-owned'};
     if (isForeignTranslationBoundary(element)) return {prune: true, reason: 'foreign-translation'};
+    if (isTagMetadataElement(element)) return {prune: true, reason: 'topic-tag'};
     if (isHardPruneTag(element)) return {prune: true, reason: `protected-tag:${getElementTagName(element)}`};
     if (isMathRendererElement(element)) return {prune: true, reason: 'math-renderer'};
     if (hasNoTranslateMarker(element) && !isDocumentSurfaceNoTranslateShell(element)) {

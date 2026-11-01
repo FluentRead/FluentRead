@@ -417,7 +417,7 @@ describe('公开可读漫画画布的任务与显示所有权', () => {
         const retry=feedback.querySelector<HTMLButtonElement>('.fluent-read-image-translation-button')!;
         const click=(target:Element,trusted=true)=>{const event=new f.window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});target.dispatchEvent(event);};
         expect(feedback.hidden).toBe(false);expect(feedback.style.left).toBe('108px');expect(feedback.style.top).toBe('58px');
-        expect(feedback.textContent).toContain('本地化:图片文字已识别');expect(feedback.querySelector('details')!.textContent).toContain('provider detail');
+        expect(feedback.textContent).toContain('本地化:图片文字已识别');expect(feedback.querySelector('.fr-image-error-details')!.textContent).toContain('provider detail');
         click(retry,false);expect(recovery.retry).not.toHaveBeenCalled();click(retry);expect(recovery.retry).toHaveBeenCalledWith(f.canvas);expect(retry.disabled).toBe(false);
         recovery.retry.mockReturnValue(true);click(retry);expect(retry.disabled).toBe(true);
         click(feedback.querySelector('.fr-image-model-settings')!);await flush();expect(recovery.openSettings).toHaveBeenCalledWith('settings-services');
@@ -481,7 +481,7 @@ describe('公开可读漫画画布的任务与显示所有权', () => {
         f.ports.enabled.mockReturnValue(false);click(feedback.querySelector('.fluent-read-image-translation-button')!);click(feedback.querySelector('.fr-image-service-settings')!);await flush();
         expect(retry).not.toHaveBeenCalled();expect(openSettings).not.toHaveBeenCalled();
         f.ports.enabled.mockReturnValue(true);click(feedback.querySelector('.fr-image-service-settings')!);await flush();
-        expect(feedback.textContent).toContain('无法打开设置');expect(feedback.querySelector('details')!.textContent).toContain('settings offline');
+        expect(feedback.textContent).toContain('无法打开设置');expect(feedback.querySelector('.fr-image-error-details')!.textContent).toContain('settings offline');
         // 关闭后已经在途的设置异常也不能重新挂载提示。
         await f.runtime.translate(f.canvas);f.ports.translate.mockRejectedValueOnce(new Error('new failure'));f.ports.cacheEnabled.mockReturnValue(false);
         f.runtime.release(f.canvas);await expect(f.runtime.translate(f.canvas)).rejects.toThrow('new failure');

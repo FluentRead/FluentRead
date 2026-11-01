@@ -4201,26 +4201,34 @@ describe('selection authentication settings action ownership and rendered entry'
         const selector = surface === 'standalone' ? '.fr-error-state' : '.fr-inline-error';
         const other = surface === 'standalone' ? '.fr-inline-error' : '.fr-error-state';
         expect(port.root.querySelector(other)).toBeNull();
-        const buttons = Array.from(port.root.querySelectorAll(`${selector} .fr-error-actions button`));
-        expect(buttons.map(button => button.textContent)).toEqual(['重试', '配置服务']);
+        const buttons = Array.from(port.root.querySelectorAll(`${selector} button`));
+        expect(buttons.map(button => button.textContent)).toEqual(surface === 'standalone' ? ['配置服务', '重试'] : ['重试', '配置服务']);
         expect(buttons).toHaveLength(2);
         expect(buttons.every(button => button.getAttribute('type') === 'button')).toBe(true);
+        const retryButton = buttons.find(button => button.textContent === '重试')!;
+        const settingsButton = buttons.find(button => button.textContent === '配置服务')!;
+        if (surface === 'standalone') {
+            expect(port.root.querySelectorAll('.fr-error-state .fr-recovery-primary')).toHaveLength(1);
+            expect(port.root.querySelector('.fr-recovery-more')?.hasAttribute('open')).toBe(false);
+            expect(settingsButton.classList.contains('fr-recovery-primary')).toBe(true);
+            expect(retryButton.closest('details')).not.toBeNull();
+        }
         const dictionary = fixture.state.dictionaryAnswer, card = fixture.state.wordCard;
         const calls = fixture.browser.runtime.sendMessage.mock.calls.length;
         const response = deferred<unknown>();
         settingsResponse(fixture, response.promise);
-        const pending = port.click(buttons[1]!);
+        const pending = port.click(settingsButton);
         const action = fixture.state.openingAuthenticationSettings;
         await Vue.nextTick();
         expect(action.authentication).toBe(fixture.state.authenticationError);
-        expect(buttons[1]!.hasAttribute('disabled')).toBe(true);
-        expect(buttons[0]!.hasAttribute('disabled')).toBe(false);
+        expect(settingsButton.hasAttribute('disabled')).toBe(true);
+        expect(retryButton.hasAttribute('disabled')).toBe(false);
         await fixture.state.openAuthenticationSettings();
         expect(settingsCalls(fixture).map(([message]) => message)).toEqual([settingsMessage]);
         response.resolve({success: true});
         await pending;
         await Vue.nextTick();
-        expect(buttons[1]!.hasAttribute('disabled')).toBe(false);
+        expect(settingsButton.hasAttribute('disabled')).toBe(false);
         expect(fixture.state.openingAuthenticationSettings).toBeNull();
         expect(fixture.browser.runtime.sendMessage).toHaveBeenCalledTimes(calls + 1);
         expect(fixture.state.dictionaryAnswer).toBe(dictionary);
@@ -4235,7 +4243,7 @@ describe('selection authentication settings action ownership and rendered entry'
         expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
         // Retry is the actual compiled template handler, not a setup-only assertion.
         fixture.translateText.mockResolvedValueOnce('好想法值得关注。');
-        await port.click(buttons[0]!);
+        await port.click(retryButton);
         await vi.advanceTimersByTimeAsync(0);
         await Vue.nextTick();
         expect(fixture.translateText).toHaveBeenCalledTimes(2);
@@ -4249,7 +4257,7 @@ describe('selection authentication settings action ownership and rendered entry'
     it.each(['standalone', 'dictionary inline'] as const)('renders only retry for an ordinary error in the %s surface', async surface => {
         const fixture = await failedSelection({render: true, inline: surface === 'dictionary inline', cause: new TypeError('Failed to fetch')});
         const selector = surface === 'standalone' ? '.fr-error-state' : '.fr-inline-error';
-        const buttons = Array.from(fixture.renderPort!.root.querySelectorAll(`${selector} .fr-error-actions button`));
+        const buttons = Array.from(fixture.renderPort!.root.querySelectorAll(`${selector} button`));
         expect(buttons.map(button => button.textContent)).toEqual(['重试']);
         expect(fixture.state.authenticationError).toBeNull();
         await fixture.state.openAuthenticationSettings();

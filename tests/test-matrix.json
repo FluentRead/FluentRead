@@ -48,6 +48,7 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/userscriptBuildCache.test.ts",
       "tests/downloadTextFile.test.ts",
       "tests/safariTabBroadcast.test.ts",
       "tests/safariTabBroadcastIntegration.test.ts",
@@ -248,6 +249,7 @@
       "tests/translationConfigCheck.test.ts",
       "tests/translationFont.test.ts",
       "tests/translationCore.test.ts",
+      "tests/translationTagMetadata.test.ts",
       "tests/inlineCodeProtocol.test.ts",
       "tests/inlineCodeMarkers.test.ts",
       "tests/identicalTranslation.test.ts",
@@ -521,7 +523,11 @@
       "tests/clickSelectionConfig.test.ts",
       "tests/pointerSelectionSession.test.ts",
       "tests/aiMultiSegmentConfig.test.ts",
-      "tests/areaRuntimeComposition.test.ts"
+      "tests/userscriptBuildGzip.test.ts",
+      "tests/areaRuntimeComposition.test.ts",
+      "tests/francRuntimeBuild.test.ts",
+      "tests/longPageMockTransport.test.ts",
+      "tests/compactExtensionZip.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

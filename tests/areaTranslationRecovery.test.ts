@@ -50,6 +50,46 @@ describe('圈选缺少语言包的一键恢复', () => {
 });
 
 
+describe('圈选失败的主恢复动作', () => {
+  it.each([
+    ['没有识别到圈选区域文字','empty','重新圈选'],
+    ['视觉圈选识别未返回有效文字','empty','重新圈选'],
+    ['401 Unauthorized','settings','圈选设置'],
+    ['invalid model','settings','圈选设置'],
+    ['network unavailable','retry','重试'],
+  ])('根据 %s 展示单一主动作并收起详细原因', async (message,kind,label) => {
+    const f=mountRecovery();f.translate.mockReset().mockRejectedValueOnce(new Error(message)).mockResolvedValue(f.result);
+    await f.state.requestTranslation(f.rect);await Vue.nextTick();
+    const primary=f.host.querySelectorAll('.fr-area-primary');expect(primary).toHaveLength(1);
+    expect(primary[0].getAttribute('data-recovery')).toBe(kind);expect(primary[0].textContent).toBe(label);
+    expect(f.host.querySelector('[role=alert]')?.textContent).not.toContain(message);
+    expect(f.host.querySelector('.fr-area-error-details')?.hasAttribute('open')).toBe(false);
+    expect(f.host.querySelector('.fr-area-more')?.hasAttribute('open')).toBe(false);
+    await f.click(label);
+    if(kind==='empty')expect(f.state.phase).toBe('selecting');
+    else if(kind==='settings')expect(f.sendMessage).toHaveBeenCalledWith({type:'openOptionsPage',section:'settings-area-translation'});
+    else {await vi.waitFor(()=>expect(f.state.phase).toBe('translated'));expect(f.capture).toHaveBeenCalledOnce();}
+  });
+  it('截图重试成功后依据新出现的服务错误更新主动作', async () => {
+    const f=mountRecovery();f.capture.mockRejectedValueOnce(new Error('capture unavailable'));
+    f.translate.mockReset().mockRejectedValueOnce(new Error('401 Unauthorized'));
+    await f.state.requestTranslation(f.rect);await Vue.nextTick();
+    expect(f.host.querySelector('.fr-area-primary')?.getAttribute('data-recovery')).toBe('capture');
+    await f.click('重试');
+    await vi.waitFor(()=>expect(f.host.querySelector('.fr-area-primary')?.getAttribute('data-recovery')).toBe('settings'));
+    expect(f.capture).toHaveBeenCalledTimes(2);expect(f.prepare).not.toHaveBeenCalled();
+  });
+  it('截图失败时提供重试，并在缺包时优先下载而不并排展示另一个主按钮', async () => {
+    const f=mountRecovery();f.capture.mockRejectedValueOnce(new Error('capture unavailable'));
+    await f.state.requestTranslation(f.rect);await Vue.nextTick();
+    expect(f.host.querySelector('.fr-area-primary')?.getAttribute('data-recovery')).toBe('capture');
+    await f.click('重试');await vi.waitFor(()=>expect(f.state.phase).toBe('error'));
+    expect(f.host.querySelector('.fr-area-primary')?.getAttribute('data-recovery')).toBe('languages');
+    await f.click('下载语言包并重试');await vi.waitFor(()=>expect(f.state.phase).toBe('translated'));
+    expect(f.prepare).toHaveBeenCalledOnce();expect(f.capture).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe('圈选结果拖动', () => {
   it('标题栏拖动受视口边界约束，重试保留位置，关闭释放指针并重置位置', () => {
     const f = mountRecovery();
@@ -123,7 +163,7 @@ describe('圈选真实控件与异步所有权', () => {
     await f.click('圈选设置'); expect(f.sendMessage).toHaveBeenCalledWith({type: 'openOptionsPage', section: 'settings-area-translation'});
     await f.click('重新圈选'); expect(f.state.phase).toBe('selecting'); expect(f.host.querySelector('[role="dialog"]')).toBeNull();
     f.dispatch(document, 'keydown', {isTrusted: true, key: 'Escape'}); await Vue.nextTick(); expect(f.state.phase).toBe('idle');
-    await select(f); await vi.waitFor(() => expect(f.state.phase).toBe('translated')); await f.click('×');
+    await select(f); await vi.waitFor(() => expect(f.state.phase).toBe('translated')); await f.click('关闭圈选翻译结果');
     expect(f.host.querySelector('[role="dialog"]')).toBeNull(); expect(f.state.result).toBeNull();
   });
   it('下载按钮显示真实进度、使用原语言和截图恢复，错误按钮支持重新圈选', async () => {
@@ -167,7 +207,7 @@ describe('圈选真实控件与异步所有权', () => {
     f.sendMessage.mockResolvedValueOnce({success: false}); await f.click('圈选设置'); expect(f.host.textContent).toContain('无法打开设置');
     vi.useFakeTimers(); await f.click('复制原文'); expect(f.host.textContent).toContain('已复制'); await vi.advanceTimersByTimeAsync(2500); expect(f.host.querySelector('.fr-area-feedback')).toBeNull(); vi.useRealTimers();
     const copying = deferred(), settings = deferred(); f.copy.mockReturnValueOnce(copying.promise); f.sendMessage.mockReturnValueOnce(settings.promise.then(() => {throw new Error('late');}));
-    await f.click('复制译文'); await f.click('圈选设置'); await f.click('×'); copying.resolve(); settings.resolve(); await Vue.nextTick(); await Vue.nextTick();
+    await f.click('复制译文'); await f.click('圈选设置'); await f.click('关闭圈选翻译结果'); copying.resolve(); settings.resolve(); await Vue.nextTick(); await Vue.nextTick();
     expect(f.state.feedback).toBe(''); expect(f.state.phase).toBe('idle');
   });
   it('切到后台取消未完成截图，页面恢复后允许重选，配置关闭会清理结果和监听', async () => {
@@ -208,7 +248,7 @@ describe('圈选真实控件与异步所有权', () => {
     await vi.waitFor(() => expect(f.state.phase).toBe('translated')); expect(f.state.errorMessage).toBe('');
     f.sendMessage.mockResolvedValueOnce(undefined); await f.click('圈选设置'); expect(f.state.feedback).toBe('');
     const pending = deferred(); f.copy.mockReturnValueOnce(pending.promise.then(() => {throw new Error('late copy');}));
-    await f.click('复制原文'); await f.click('×'); pending.resolve(); await Vue.nextTick(); await Vue.nextTick(); expect(f.state.feedback).toBe('');
+    await f.click('复制原文'); await f.click('关闭圈选翻译结果'); pending.resolve(); await Vue.nextTick(); await Vue.nextTick(); expect(f.state.feedback).toBe('');
   });
   it('拖动标题真实绑定持有指针，面板脱离后保持边界，内部滚动不重置坐标', async () => {
     const f = mountControls(); await select(f); await vi.waitFor(() => expect(f.state.phase).toBe('translated')); await Vue.nextTick();

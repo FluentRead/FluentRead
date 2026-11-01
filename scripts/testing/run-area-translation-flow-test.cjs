@@ -107,6 +107,8 @@ async function click(selector) {
   assert.ok(point, selector); await page.mouse.click(point.x, point.y);
 }
 async function clickText(text) {
+  const disclosure = await ui(`const n=[...this.querySelectorAll('button')].find(n=>n.textContent.trim()===${JSON.stringify(text)});const d=n?.closest('details');if(!d||d.open)return null;const r=d.querySelector('summary').getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};`);
+  if(disclosure) await page.mouse.click(disclosure.x,disclosure.y);
   const point = await ui(`const n=[...this.querySelectorAll('button,summary')].find(n=>n.textContent.trim()===${JSON.stringify(text)});if(!n)return null;const r=n.getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2};`);
   assert.ok(point, text); await page.mouse.click(point.x, point.y);
 }

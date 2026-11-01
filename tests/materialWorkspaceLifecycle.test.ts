@@ -23,11 +23,13 @@ vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
 ].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.api[name.replace('workspaceMaterial','material')](...args)])));
 vi.mock('@/src/features/vocabulary/materialBackupExportClient', () => ({startMaterialBackupExport: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.exportStart(...args)}));
 vi.mock('@/src/features/vocabulary/materialBackupBrowserSave', () => ({
+  createMaterialBackupFallbackTarget:(...args:any[])=>(globalThis as any).__fluentreadMaterialUiTest.spillBackup(...args),
+  supportsMaterialBackupTemporaryFiles:()=>(globalThis as any).__fluentreadMaterialUiTest.supportsSpill??false,
   prepareFirefoxMaterialBackupContext: () => (globalThis as any).__fluentreadMaterialUiTest.prepareBackupContext(),
   beginFirefoxMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.browserSave(...args),
   beginFirefoxRecoveredMaterialBackup: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.recoverTemporary(...args),
-  listFirefoxMaterialBackupLeftovers: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.listTemporary(...args),
-  removeFirefoxMaterialBackupLeftover: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.removeTemporary(...args),
+  listMaterialBackupLeftoversInBrowser: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.listTemporary(...args),
+  removeMaterialBackupLeftoverInBrowser: (...args: any[]) => (globalThis as any).__fluentreadMaterialUiTest.removeTemporary(...args),
 }));
 vi.mock('@/src/features/vocabulary/materialBackupRestore', () => Object.fromEntries([
   'restoreLargeMaterialBackup','queryMaterialBackup','acknowledgeMaterialBackup','discardMaterialBackup',
@@ -42,7 +44,7 @@ vi.mock('webextension-polyfill', () => ({default: {get runtime() {return (global
 vi.mock('@/src/features/reading-assistant/public', () => ({getHarnessSession: (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.getSession(...args), listLearningMemories: (...args: unknown[]) => (globalThis as any).__fluentreadMaterialUiTest.memories(...args)}));
 vi.mock('@/src/features/reading-assistant/ui/answer/public', () => ({ReadingAnswer: {render: () => null}}));
 vi.mock('@/src/ui/dateFormat', () => ({useRenderDateFormatter: () => () => '10/15'}));
-async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...args: any[]) => Promise<MaterialRecord[]>; session?: (...args: any[]) => Promise<unknown>; update?: (...args: any[]) => Promise<MaterialRecord>; memories?: () => Promise<unknown[]>; getEntry?: (message: unknown) => Promise<unknown>; surface?: ReturnType<typeof parseHTML>} = {}) {
+async function mount(options: {supportsSpill?:boolean;shown?: import('vue').Ref<boolean>; list?: (...args: any[]) => Promise<MaterialRecord[]>; session?: (...args: any[]) => Promise<unknown>; update?: (...args: any[]) => Promise<MaterialRecord>; memories?: () => Promise<unknown[]>; getEntry?: (message: unknown) => Promise<unknown>; surface?: ReturnType<typeof parseHTML>} = {}) {
   let items = [record(),record('b')]; let listener: ((message: unknown) => void) | undefined;
   const api = {
     materialList:vi.fn(options.list || (async ({archived}: {archived:boolean}) => items.filter(item => Boolean(item.archivedAt) === archived).map(item => structuredClone(item)))),
@@ -59,6 +61,11 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
   const exportReceive=vi.fn(async (_port:unknown, consume:(bytes:Uint8Array)=>Promise<void>)=>{await consume(new TextEncoder().encode('{}'));});
   const exportStart=vi.fn((...args:any[])=>({result:Promise.resolve((exportReceive as any)(...args)).then(value=>value ?? {records:0,recordBytes:0,maxRecordBytes:0,frames:0}),assertOpen:()=>{}}));
   const browserSave=vi.fn(async (_name:string):Promise<any>=>({status:'unavailable'}));
+  const spillRelease=vi.fn(async()=>{});
+  const spillBackup=vi.fn(async(_name:string,handoff:(file:Blob,release:()=>Promise<void>,signal:AbortSignal)=>Promise<void>)=>{
+    let chunks:Uint8Array[]=[],handedOff=false;
+    return {write:async(chunk:Uint8Array)=>{chunks.push(chunk.slice());},commit:async(signal:AbortSignal)=>{const file=new Blob(chunks as BlobPart[]);chunks=[];handedOff=true;await handoff(file,spillRelease,signal);return 'initiated' as const;},abort:async()=>{if(!handedOff)chunks=[];}};
+  });
   const recoverTemporary=vi.fn(async (_name:string,_filename:string):Promise<any>=>({status:'unavailable'}));
   const listTemporary=vi.fn(async ():Promise<any>=>({items:[],truncated:false,failed:0}));
   const removeTemporary=vi.fn(async (_name:string)=>{});
@@ -71,7 +78,7 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     acknowledgeMaterialBackup:vi.fn(async()=>undefined),discardMaterialBackup:vi.fn(async():Promise<{state:'discarded'}|{state:'committed';result:{inserted:number;updated:number;skipped:number}}>=>({state:'discarded'})),
   };
   const prepareBackupContext=vi.fn(async()=>true);
-  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,exportStart,browserSave,recoverTemporary,listTemporary,removeTemporary,prepareBackupContext,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
+  (globalThis as any)[KEY] = {api,pages:materialPageFixture(api),backup,exportReceive,exportStart,browserSave,spillBackup,spillRelease,supportsSpill:options.supportsSpill,recoverTemporary,listTemporary,removeTemporary,prepareBackupContext,getSession:options.session || (async()=>null),memories:options.memories || (async()=>[]),browser:{runtime:{connect:()=>exportPort,getURL:(p:string)=>`chrome-extension://fixture/${p}`,sendMessage:options.getEntry || (async()=>({success:true,data:null})),onMessage:{addListener:(value:typeof listener)=>{listener=value;},removeListener}}}};
   const {document, window} = options.surface || parseHTML('<html><body><main></main></body></html>');
   delete (window as any).showSaveFilePicker;
   vi.stubGlobal('document', document); vi.stubGlobal('window', window);
@@ -99,10 +106,10 @@ async function mount(options: {shown?: import('vue').Ref<boolean>; list?: (...ar
     ? runtime.h(runtime.KeepAlive,null,{default:()=>options.shown!.value?material():runtime.h(otherPage)})
     : material()});
   app.mount(document.querySelector('main')!);
-  let active=true; const unmount=()=>{if(active){active=false;app.unmount();}}; dispose.push(()=>{if(panel?.fallbackDownloadUrl)panel.releaseFallbackDownload();while(panel?.lateBackupWarning)panel.clearLateBackupWarning();while(panel?.lateBackupStatus)panel.clearLateBackupStatus();unmount();});
+  let active=true; const unmount=()=>{if(active){active=false;app.unmount();}}; dispose.push(async()=>{if(panel?.fallbackDownloadPending)await panel.releaseFallbackDownload();while(panel?.lateBackupWarning)panel.clearLateBackupWarning();while(panel?.lateBackupStatus)panel.clearLateBackupStatus();unmount();});
   const flush=async()=>{for(let i=0;i<15;i++){await Promise.resolve();await runtime.nextTick();}};
   await flush();
-  return {panel,api,backup,cap,exportReceive,exportStart,browserSave,recoverTemporary,listTemporary,removeTemporary,exportPort,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
+  return {panel,api,backup,cap,exportReceive,exportStart,browserSave,spillBackup,spillRelease,recoverTemporary,listTemporary,removeTemporary,exportPort,flush,unmount,document,window,openTab,removeListener,notify:()=>listener?.({type:'fluentReadMaterialsChanged'})};
 }
 describe('material workspace action ownership',()=>{
   it.each(['export','edit'] as const)('applies a pending topic search after %s finishes',async operation=>{
@@ -330,7 +337,7 @@ it('大备份恢复的状态和限制在所有界面语言都有实际译文',()
   for(const message of ['确认保存超出恢复上限的备份','备份超过当前恢复上限','备份中有材料超过 128 MiB，当前版本无法恢复该材料。','备份超过 20,000 个恢复分片，当前版本无法完整恢复。','仍可保存以备后续处理；恢复还受设备可用空间限制。','仍然保存备份'])
     for(const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const)
       expect(translateLegacyText(message,language)).not.toBe(message);
-  for(const message of ['正在导出材料备份…','材料备份已保存，包含来源、原句与个人笔记，请妥善保管。','已发起材料备份下载，包含来源、原句与个人笔记，请检查浏览器下载。','下载完成前请保持此页面打开。','取消导出','当前浏览器使用内存准备下载，大备份可能占用较多内存。','下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。','下载已完成，释放临时数据'])
+  for(const message of ['正在导出材料备份…','材料备份已保存，包含来源、原句与个人笔记，请妥善保管。','已发起材料备份下载，包含来源、原句与个人笔记，请检查浏览器下载。','下载完成前请保持此页面打开。','取消导出','正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。','下载已发起，关闭页面可能中断下载。', '请先确认浏览器下载完成，再释放临时数据。','下载已完成，释放临时数据'])
     for(const language of ['en-US','es-ES','fr-FR','ja-JP','ko-KR','ru-RU'] as const)
       expect(translateLegacyText(message,language)).not.toBe(message);
   for(const message of ['查看材料备份临时文件','材料备份临时文件','可取回表示备份传输已完成且文件大小一致；请下载后检查备份。','正在读取临时文件…','部分临时文件无法读取，请重试。','只显示前 200 个临时文件，请处理后重新查看。','没有材料备份临时文件。','可取回','未完成','取回备份','删除临时文件','删除可能中断尚在运行的下载。确定删除这份临时文件？','确认删除临时文件','刷新临时文件','取消后无法清理材料备份临时文件。确认没有下载进行后，重载当前页面以释放占用，再在临时文件列表处理。','无法确认备份下载状态。请先检查浏览器下载，确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。','备份已下载，但临时文件未清理。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。','备份未完成，临时文件清理失败。确认没有下载进行后重载当前页面以释放占用，再在临时文件列表处理。','取消后无法清理已选择的文件，请检查保存位置是否留有不完整文件。','备份未完成且无法清理已选择的文件，请检查保存位置是否留有不完整文件。','取消后无法清理下载缓存，请检查浏览器下载。','知道了','临时文件读取失败，请重试。','临时文件删除失败，请重试。','未获得下载权限，无法取回备份。','当前浏览器无法取回临时备份。','备份下载完成，临时文件仍保留；确认后可删除。','已发起备份下载，临时文件仍保留；请确认下载完成后再处理。','关闭保存结果提示','此前开始的材料备份已保存，包含来源、原句与个人笔记，请妥善保管。','此前开始的材料备份下载已发起，包含来源、原句与个人笔记，请检查浏览器下载。','此前开始的临时备份下载已完成，临时文件仍保留；确认后可删除。','此前开始的临时备份下载已发起，临时文件仍保留；请确认下载完成后再处理。','此前开始的备份较大，恢复受设备空间、单份材料 128 MiB 和总计 20,000 个 128 KiB 分片的限制。请保留现有材料并妥善保存备份文件。','此前开始的材料备份导出已取消。','此前开始的临时备份取回已取消。','已取消取回备份。','取回备份失败，请重试。','请先确认上一份备份下载完成。','无法确认材料备份下载状态，临时文件已保留，请检查浏览器下载','无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载','临时材料备份未完成或无法验证，不能取回','当前浏览器无法查看材料备份临时文件','当前浏览器无法清理材料备份临时文件','无法确认材料备份临时文件已删除','材料备份临时文件正在使用，请等待下载结束','材料备份临时文件正在使用','材料备份下载中断','材料备份已下载，但临时文件清理失败','创建备份时未能清理新建的空临时文件，请在临时文件列表检查。','材料备份下载监听不可用，请重试','材料备份下载接口不可用，请重试'])
@@ -511,8 +518,48 @@ it.each(['denied','unavailable'] as const)('exports an intact backup larger than
   const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
   await ui.panel.exportMaterials();expect(blob?.size).toBeGreaterThan(20*1024*1024);
   expect(createHash('sha256').update(Buffer.from(await blob!.arrayBuffer())).digest('hex')).toBe(hash.digest('hex'));
-  expect(ui.panel.feedback).toContain('已发起材料备份下载');expect(revoke).not.toHaveBeenCalled();
-  await activate(ui,namedButton(ui,'下载已完成，释放临时数据'));expect(revoke).toHaveBeenCalledWith('blob:large');
+  expect(ui.panel.feedback).toContain('已发起材料备份下载');expect(revoke).not.toHaveBeenCalled();expect(ui.spillBackup).toHaveBeenCalledOnce();expect(ui.spillRelease).not.toHaveBeenCalled();
+  await activate(ui,namedButton(ui,'下载已完成，释放临时数据'));expect(revoke).toHaveBeenCalledWith('blob:large');expect(ui.spillRelease).toHaveBeenCalledOnce();
+});
+it('keeps a spilled download retryable when cleanup fails and serializes repeated confirmation',async()=>{
+  const ui=await mount({supportsSpill:true}),gate=deferred<void>();
+  ui.exportReceive.mockImplementationOnce(async(_port,consume)=>{const chunk=new Uint8Array(24*1024);for(let i=0;i<342;i++)await consume(chunk);});
+  const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:disk-cleanup'),revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  await ui.panel.exportMaterials();expect(namedButton(ui,'查看材料备份临时文件')).toBeTruthy();
+  ui.spillRelease.mockRejectedValueOnce(Error('temporary delete failed'));expect(await ui.panel.releaseFallbackDownload()).toBe(false);
+  expect(ui.panel.fallbackDownloadUrl).toBe('blob:disk-cleanup');expect(ui.panel.backupWarning).toContain('temporary delete failed');expect(revoke).not.toHaveBeenCalled();
+  ui.spillRelease.mockReturnValueOnce(gate.promise);const releasing=ui.panel.releaseFallbackDownload();expect(await ui.panel.releaseFallbackDownload()).toBe(false);expect(ui.spillRelease).toHaveBeenCalledTimes(2);
+  gate.resolve();expect(await releasing).toBe(true);expect(await ui.panel.releaseFallbackDownload()).toBe(true);
+  ui.panel.retryFallbackDownload();expect(create).toHaveBeenCalledOnce();expect(revoke).toHaveBeenCalledOnce();expect(ui.panel.fallbackDownloadPending).toBe(false);
+});
+it('does not overwrite a retained download when another handoff arrives',async()=>{
+  const ui=await mount();vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:owned');const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  await ui.panel.exportMaterials();const release=vi.fn(async()=>{}),file=new Blob(['later']);
+  await expect(ui.panel.handoffFallbackFile('later.json',file,new AbortController().signal)).rejects.toThrow('上一份备份');
+  await expect(ui.panel.handoffFallbackFile('later.json',file,new AbortController().signal,release)).rejects.toThrow('上一份备份');
+  expect(release).toHaveBeenCalledOnce();expect(ui.panel.fallbackDownloadUrl).toBe('blob:owned');expect(revoke).not.toHaveBeenCalled();
+});
+it('releases a buffer cancelled during Blob creation before any URL or download exists',async()=>{
+  const ui=await mount(),NativeBlob=Blob,create=vi.spyOn(URL,'createObjectURL');
+  vi.stubGlobal('Blob',class extends NativeBlob {constructor(parts?:BlobPart[],options?:BlobPropertyBag){super(parts,options);ui.panel.exportController.abort();}});
+  await ui.panel.exportMaterials();expect(ui.panel.error).toBe('已取消导出。');expect(create).not.toHaveBeenCalled();expect(ui.panel.fallbackDownloadPending).toBe(false);
+});
+it.each(['unsupported','quota'] as const)('reports %s temporary storage without downloading partial data or changing materials',async reason=>{
+  const ui=await mount(),before=ui.panel.materials.map((item:MaterialRecord)=>item.id),create=vi.spyOn(URL,'createObjectURL');
+  const abort=vi.fn(async()=>{});
+  if(reason==='unsupported')ui.spillBackup.mockRejectedValueOnce(Object.assign(Error('当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。'),{name:'MaterialBackupBufferCapacityError'}));
+  else ui.spillBackup.mockResolvedValueOnce({write:async()=>{throw new DOMException('storage full','QuotaExceededError');},commit:vi.fn(async()=> 'initiated' as const),abort});
+  ui.exportReceive.mockImplementationOnce(async(_port,consume)=>{const chunk=new Uint8Array(24*1024);for(let i=0;i<342;i++)await consume(chunk);});
+  await ui.panel.exportMaterials();expect(ui.panel.error).toContain('原材料未更改');expect(create).not.toHaveBeenCalled();expect(ui.panel.fallbackDownloadPending).toBe(false);
+  expect(ui.panel.materials.map((item:MaterialRecord)=>item.id)).toEqual(before);expect(ui.api.materialClear).not.toHaveBeenCalled();expect(ui.api.materialImport).not.toHaveBeenCalled();
+  if(reason==='quota'){expect(abort).toHaveBeenCalledOnce();expect(ui.panel.error).toContain('释放设备空间');}
+});
+it('keeps a disk initialization cleanup warning after unmount until the next material view acknowledges it',async()=>{
+  const ui=await mount(),surface={document:ui.document,window:ui.window} as ReturnType<typeof parseHTML>,gate=deferred<any>();ui.spillBackup.mockReturnValueOnce(gate.promise);
+  ui.exportReceive.mockImplementationOnce(async(_port,consume)=>{const chunk=new Uint8Array(24*1024);for(let i=0;i<342;i++)await consume(chunk);});
+  const work=ui.panel.exportMaterials();await vi.waitFor(()=>expect(ui.spillBackup).toHaveBeenCalledOnce());ui.unmount();
+  gate.reject(Object.assign(Error('创建备份时未能清理新建的空临时文件，请在临时文件列表检查。'),{name:'MaterialBackupInitializationCleanupError'}));await work;
+  const next=await mount({surface});expect(next.panel.lateBackupWarning).toContain('临时文件列表');expect(next.api.materialClear).not.toHaveBeenCalled();
 });
 it('exports through the rendered action, releases its download URL and reports a retryable storage failure',async()=>{
   const ui=await mount();const create=vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:materials');const revoke=vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});
@@ -557,11 +604,12 @@ it('starts recovery permission in the click, cancels immediately, and cleans a l
   ui.panel.exportController.abort();await ui.flush();expect(ui.panel.busy).toBe(false);expect(ui.panel.temporaryError).toBe('已取消取回备份。');
   permission.resolve({status:'ready',target});await vi.waitFor(()=>expect(target.abort).toHaveBeenCalledOnce());expect(target.commit).not.toHaveBeenCalled();
 });
-it('retains a completed temporary file after successful recovery and rejects unavailable permission',async()=>{
+it('retains a completed temporary file after recovery and uses an anchor when download permission is unavailable',async()=>{
   vi.stubEnv('BROWSER','firefox');const ui=await mount(),item={name:'ready',createdAt:1700000000000,bytes:120,ready:true};
   ui.listTemporary.mockResolvedValueOnce({items:[item],truncated:false,failed:0});await activate(ui,namedButton(ui,'查看材料备份临时文件'));
-  ui.recoverTemporary.mockResolvedValueOnce({status:'denied'});await ui.panel.recoverTemporaryBackup(item);expect(ui.panel.temporaryError).toBe('未获得下载权限，无法取回备份。');
-  ui.recoverTemporary.mockResolvedValueOnce({status:'unavailable'});await ui.panel.recoverTemporaryBackup(item);expect(ui.panel.temporaryError).toBe('当前浏览器无法取回临时备份。');
+  vi.spyOn(URL,'createObjectURL').mockReturnValue('blob:recovered');vi.spyOn(URL,'revokeObjectURL').mockImplementation(()=>{});vi.spyOn(ui.window.HTMLElement.prototype,'click').mockImplementation(()=>{});
+  for(const status of ['denied','unavailable']){ui.recoverTemporary.mockResolvedValueOnce({status:status as any});await ui.panel.recoverTemporaryBackup(item);expect(ui.panel.temporaryError).toBe('');expect(ui.panel.fallbackDownloadUrl).toBe('blob:recovered');await ui.panel.releaseFallbackDownload();}
+  expect(ui.spillBackup).toHaveBeenCalledWith(expect.any(String),expect.any(Function),'ready');expect(ui.spillRelease).toHaveBeenCalledTimes(2);
   const target={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved'),abort:vi.fn(async()=>{})};ui.recoverTemporary.mockResolvedValueOnce({status:'ready',target});
   await ui.panel.recoverTemporaryBackup(item);expect(target.commit).toHaveBeenCalledOnce();expect(ui.panel.feedback).toContain('临时文件仍保留');expect(ui.removeTemporary).not.toHaveBeenCalled();
 });
@@ -721,6 +769,7 @@ it.each([false,true])('retains the fallback URL without a duplicate initiated re
   expect(next.panel.fallbackDownloadUrl).toBe('blob:late-handoff');
   if(large)await activate(next,next.document.querySelector('button[aria-label="关闭保存结果提示"]')!);
   await activate(next,namedButton(next,'下载已完成，释放临时数据'));
+  if(large)expect(ui.spillRelease).toHaveBeenCalledOnce();
 });
 it('reports an unmounted cancelled recovery as a neutral prior-operation status',async()=>{
   const ui=await mount(),surface={document:ui.document,window:ui.window} as ReturnType<typeof parseHTML>,done=deferred<'saved'>();
@@ -869,9 +918,10 @@ describe('material workspace hidden accepted actions and focus ownership',()=>{
     if(outcome==='storage-failure')exported.reject(new Error('Export storage failed'));else exported.resolve();
     await exporting;expect(ui.panel.busy).toBe(false);
     if(outcome==='storage-failure'){expect(create).not.toHaveBeenCalled();expect(revoke).not.toHaveBeenCalled();expect(ui.panel.error).toBe('Export storage failed');}
-    else {expect(create).toHaveBeenCalledOnce();expect(downloads).toHaveLength(1);if(outcome==='success'){expect(revoke).not.toHaveBeenCalled();expect(ui.panel.feedback).toContain('已发起材料备份下载');}else {expect(revoke).toHaveBeenCalledWith('blob:hidden-materials');expect(ui.panel.error).toBe('Download failed');}}
+    else {expect(create).toHaveBeenCalledOnce();expect(downloads).toHaveLength(1);expect(revoke).not.toHaveBeenCalled();if(outcome==='success'){expect(ui.panel.feedback).toContain('已发起材料备份下载');}else {expect(ui.panel.fallbackDownloadUncertain).toBe(true);expect(ui.panel.error).toBe('Download failed');}}
     await visibility(ui,shown,true);expect(ui.panel.busy).toBe(false);
-    if(outcome==='success'){await activate(ui,namedButton(ui,'下载已完成，释放临时数据'));expect(revoke).toHaveBeenCalledWith('blob:hidden-materials');}
+    if(outcome==='download-failure'){await activate(ui,namedButton(ui,'重新下载'));expect(ui.panel.fallbackDownloadUncertain).toBe(true);expect(ui.panel.backupWarning).toContain('无法确认下载是否开始');vi.mocked(ui.window.HTMLElement.prototype.click).mockImplementationOnce(()=>{});await activate(ui,namedButton(ui,'重新下载'));expect(ui.panel.fallbackDownloadUncertain).toBe(false);expect(create).toHaveBeenCalledOnce();}
+    if(outcome!=='storage-failure'){await activate(ui,namedButton(ui,'下载已完成，释放临时数据'));expect(revoke).toHaveBeenCalledWith('blob:hidden-materials');}
   });
 
   it('remembers a list read interrupted by accepted export and refreshes once after returning idle and visible',async()=>{

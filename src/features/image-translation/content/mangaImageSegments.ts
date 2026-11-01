@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaImageSegments.ts
  * 文件职责：把已展示的超长漫画图片按稳定的原始像素位置分段，接入现有漫画会话与译图合成。
- * 主要内容：每段保留上下文并裁去重叠显示区，正文身份包含来源、重载与尺寸；只在会话调度时读取该段，跨域读取沿用当前图片授权，取消、换图和卸载释放快照与解码资源。
+ * 主要内容：每段保留上下文并裁去重叠显示区，正文身份包含来源、重载与尺寸；默认填充无需测量未使用的宽高比，contain 仍按实时几何校验；只在会话调度时读取该段，跨域读取沿用当前图片授权，取消、换图和卸载释放快照与解码资源。
  * 模块边界：不抓取章节、不修改原图和样式、不建立另一条 OCR 队列；仅支持无边框内距的纵向正文，所有译图和压缩缓存复用 mangaCanvas。
  */
 import {createMangaCanvas} from './mangaCanvas';
@@ -31,8 +31,9 @@ export function createMangaImageSegments(ports: Omit<Parameters<typeof createMan
         if ([style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft,
             style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth].some(value => parseFloat(value) > 0)) return false;
         if (style.objectFit && style.objectFit !== 'fill' && style.objectFit !== 'contain') return false;
+        if (style.objectFit !== 'contain') return true;
         const rect = image.getBoundingClientRect();
-        return style.objectFit !== 'contain' || Math.abs(rect.width / rect.height - image.naturalWidth / image.naturalHeight) < .001;
+        return Math.abs(rect.width / rect.height - image.naturalWidth / image.naturalHeight) < .001;
     }
 
     function identity(segment: MangaImageSegment): string | null {

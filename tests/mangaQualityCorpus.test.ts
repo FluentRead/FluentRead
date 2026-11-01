@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 const require=createRequire(import.meta.url);
-const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder}=require('../scripts/testing/manga-quality-corpus.cjs');
+const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes}=require('../scripts/testing/manga-quality-corpus.cjs');
 const box=(x0:number,y0:number,x1:number,y1:number)=>({x0,y0,x1,y1});
 const text=(sourceText:string,bbox=box(10,10,90,30),sourceBoxes?:ReturnType<typeof box>[])=>({text:'受控译文',sourceText,bbox,...(sourceBoxes?{sourceBoxes}:{})});
 const fixture=(overrides:any={})=>({name:'actual-quality',width:400,height:300,expectedSource:['WAIT FOR ME','WAIT FOR ME','GO NOW'],expectedAnchors:['WAIT FOR ME','GO NOW'],anchorOccurrences:{'WAIT FOR ME':2,'GO NOW':1},regions:[{id:'line-1',bbox:box(10,10,90,30)}],forbiddenRegions:[{id:'robot',bbox:box(200,100,300,250)}],...overrides});
@@ -49,6 +49,72 @@ const generalParagraphFixture=()=>{
     const source=regions.map(region=>region.text);
     return fixture({regions,expectedSource:source,expectedAnchors:source,anchorOccurrences:Object.fromEntries(source.map(value=>[value,1])),paragraphGroups:[['main-right','main-left'],['card'],['horizontal']]});
 };
+
+describe('完整已采集原文独立于翻译传输',()=>{
+    const capturedFixture=()=>fixture({
+        expectedSource:['CHECK THE OXYGEN','08:45'],expectedAnchors:['CHECK THE OXYGEN','08:45'],anchorOccurrences:{'CHECK THE OXYGEN':1,'08:45':1},
+        regions:[{id:'caption',text:'CHECK THE OXYGEN',anchor:'CHECK THE OXYGEN',bbox:box(10,10,190,30)},
+            {id:'clock',text:'08:45',anchor:'08:45',bbox:box(10,60,90,80)}],paragraphGroups:[['caption'],['clock']]
+    });
+    it('保留数字未送翻译仍算真实识别成功，锚点、段落与库存读取相同完整来源',()=>{
+        const lines=[text('CHECK THE OXYGEN',box(10,10,190,30)),{...text('08:45',box(10,60,90,80)),text:'08:45'}];
+        const before=JSON.stringify(lines),result=evaluateCapturedQualityFixture(capturedFixture(),lines);
+        expect(result.sourceTexts).toEqual(['CHECK THE OXYGEN','08:45']);
+        expect(result.anchors.every((anchor:any)=>anchor.found)).toBe(true);
+        expect(result.paragraphGroups.map((group:any)=>group.paragraphIndex)).toEqual([0,1]);
+        expect(result.qualityFailures).toEqual([]);expect(JSON.stringify(lines)).toBe(before);
+    });
+    it('真实漏识别与重复数字仍失败，译文中的完整期望文字不能补原文',()=>{
+        const f=capturedFixture();
+        const wrong={...text('08:4',box(10,60,90,80)),text:'08:45 CHECK THE OXYGEN'};
+        expect(evaluateCapturedQualityFixture(f,[text('CHECK THE OXYGEN'),wrong]).qualityFailures).toContainEqual(expect.objectContaining({type:'ocr-anchor',anchor:'08:45'}));
+        const duplicate=evaluateCapturedQualityFixture(f,[text('CHECK THE OXYGEN'),text('08:45'),text('08:45')]);
+        expect(duplicate.qualityFailures).toContainEqual(expect.objectContaining({type:'duplicate-anchor',anchor:'08:45',occurrences:2}));
+        expect(duplicate.qualityFailures).toContainEqual(expect.objectContaining({type:'unexpected-ocr-characters'}));
+    });
+    it('没有sourceText不回退到译文或期望值；真实空页与插画误报保持原门禁',()=>{
+        expect(()=>evaluateCapturedQualityFixture(capturedFixture(),undefined)).toThrow('layout was captured');
+        for(const line of [null,{text:'CHECK THE OXYGEN',bbox:box(10,10,190,30)}])
+            expect(()=>evaluateCapturedQualityFixture(capturedFixture(),[line])).toThrow('recognized source text');
+        const wordless=fixture({expectedSource:[],expectedAnchors:[],anchorOccurrences:{},expectedNoText:true});
+        expect(evaluateCapturedQualityFixture(wordless,[]).qualityFailures).toEqual([]);
+        const falsePositive=evaluateCapturedQualityFixture(wordless,[text('08:45',box(210,120,290,150))]);
+        expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'wordless-page-text'}));
+        expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'artwork-ocr-false-positive'}));
+    });
+});
+
+describe('冻结透明度探针真正进入质量门禁',()=>{
+    const alphaFixture=()=>fixture({protectedAlphaProbes:[{x:30,y:20,rgba:[0,0,0,0]},{x:60,y:20,rgba:[255,250,230,96]}]});
+    it('透明孔与半透明孔填成不透明都会保留为失败，且不修改捕获值或真值',()=>{
+        const f=alphaFixture(),sourcePixels=[[0,0,0,0],[255,250,231,96]],translatedPixels=[[255,250,230,255],[255,250,230,255]];
+        const before=JSON.stringify({f,sourcePixels,translatedPixels});
+        const result=evaluateQualityAlphaProbes(f,{sourcePixels,translatedPixels});
+        expect(result.protectedAlphaPixels.declared).toBe(2);expect(result.qualityFailures).toHaveLength(2);
+        expect(result.qualityFailures.map((failure:any)=>({type:failure.type,x:failure.x,expected:failure.expectedAlpha,actual:failure.translated[3]})))
+            .toEqual([{type:'alpha-protection',x:30,expected:0,actual:255},{type:'alpha-protection',x:60,expected:96,actual:255}]);
+        expect(JSON.stringify({f,sourcePixels,translatedPixels})).toBe(before);
+    });
+    it('只保护已声明alpha，Canvas半透明RGB舍入不制造透明度失败',()=>{
+        const result=evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels:[[0,0,0,0],[255,250,231,96]],translatedPixels:[[0,0,0,0],[255,249,231,96]]});
+        expect(result.qualityFailures).toEqual([]);expect(result.protectedAlphaPixels.probes.every((probe:any)=>probe.passed)).toBe(true);
+        expect(evaluateQualityAlphaProbes(fixture(),{}).protectedAlphaPixels).toMatchObject({declared:0,probes:[]});
+    });
+    it('缺失/错误捕获及原图alpha不符明确失败，不以空数组或期望像素补证据',()=>{
+        const sourcePixels=[[0,0,0,0],[255,250,231,96]];
+        for(const translatedPixels of [undefined,[],[[0,0,0,0]],[[0,0,0,0],[0,0,0]],[[0,0,0,0],[0,0,0,NaN]]])
+            expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels,translatedPixels})).toThrow('complete actual RGBA capture');
+        expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{translatedPixels:sourcePixels})).toThrow('complete actual RGBA capture');
+        expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels:[[0,0,0,255],sourcePixels[1]],translatedPixels:sourcePixels})).toThrow('Source alpha');
+    });
+    it('声明存在却非法时在启动浏览器前拒绝，未声明的旧RGB语料仍有效',()=>{
+        expect(()=>validateQualityFixtureExpectations(fixture())).not.toThrow();
+        for(const protectedAlphaProbes of [null,false,{},[],[{x:-1,y:20,rgba:[0,0,0,0]}],[{x:400,y:20,rgba:[0,0,0,0]}],
+            [{x:30,y:300,rgba:[0,0,0,0]}],[{x:30.5,y:20,rgba:[0,0,0,0]}],[{x:30,y:20,rgba:[0,0,0]}],
+            [{x:30,y:20,rgba:[0,0,0,256]}],[{x:30,y:20,rgba:[0,0,0,NaN]}]])
+            expect(()=>validateQualityFixtureExpectations(fixture({protectedAlphaProbes}))).toThrow('alpha probes');
+    });
+});
 
 describe('通用独立段落门禁',()=>{
     it('单张竖排卡片与横排标签各占独立段落，原文与输入元数据保持不变',()=>{
@@ -149,6 +215,44 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
         for(const result of results.slice(0,2))expect(evaluateQualityFixture(fixture(),{texts:result.lines.map((line:any)=>line.sourceText),lines:result.lines}).anchors.every((anchor:any)=>!anchor.found)).toBe(true);
         await chrome.runtime.sendMessage({type:'UNRELATED',requestId:'host'});
         expect(results).toHaveLength(limit);
+    });
+
+    it.each(['promise','callback'] as const)('真实observer的%s端口区分普通原图保留、失败与正常位图',async port=>{
+        let observer='';
+        const visit=(node:ts.Node)=>{
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst)==='worker.evaluate'&&node.arguments[0]?.getText(runnerAst).startsWith('({live,trace,traceLayout,layoutTraceLimit})=>'))observer=node.arguments[0].getText(runnerAst);
+            ts.forEachChild(node,visit);
+        };
+        visit(runnerAst);expect(observer).not.toBe('');
+        const line={text:'完整译文',sourceText:'complete original source',bbox:box(10,10,90,30),fontSize:20,renderSkipped:true};
+        const baseline={success:true,image:'data:image/png;base64,translated',lines:[line]};
+        let response:any=baseline;
+        const messages:unknown[]=[];
+        const chrome={runtime:{sendMessage:(message:unknown,callback?:Function)=>{messages.push(message);if(callback){callback(response);return;}return Promise.resolve(response);},onMessage:{addListener:()=>undefined}}};
+        const sandbox:any={chrome,fetch:()=>{throw new Error('Layout observer replay must not fetch');}};
+        runInNewContext(`(${observer})`,sandbox)({live:false,trace:false,traceLayout:true,layoutTraceLimit:20});
+        const cases=[
+            {response:{success:true,image:'',imageUnchanged:true,lines:[line]},manga:false,expected:true},
+            {response:{success:true,image:'',imageUnchanged:true,lines:[{...line,renderSkipped:undefined}]},manga:undefined,expected:true},
+            {response:{success:false,image:'',imageUnchanged:true,lines:[line]},manga:false,expected:false},
+            {response:{image:'',imageUnchanged:true,lines:[line]},manga:false,expected:false},
+            {response:baseline,manga:false,expected:false},
+            {response:{...baseline,imageUnchanged:false},manga:false,expected:false},
+            {response:{...baseline,imageUnchanged:'true'},manga:false,expected:false},
+            {response:{success:true,image:'data:image/png;base64,source',lines:[]},manga:false,expected:false},
+            {response:{success:true,image:'',lines:[line],mangaPatches:{patches:[]}},manga:true,expected:true},
+        ];
+        for(const [index,item] of cases.entries()){
+            response=item.response;const before=JSON.stringify(response);
+            const message={type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',requestId:String(index),manga:item.manga,image:'data:image/png;base64,source'};
+            if(port==='promise')expect(await chrome.runtime.sendMessage(message)).toBe(response);
+            else{let observed:unknown;expect(chrome.runtime.sendMessage(message,(value:unknown)=>{observed=value;})).toBeUndefined();expect(observed).toBe(response);}
+            expect(messages.at(-1)).toBe(message);expect(JSON.stringify(response)).toBe(before);
+            const captured=sandbox.__mangaTest.layoutResults.at(-1);
+            expect(captured.requestId).toBe(String(index));expect(captured.noBitmap).toBe(item.expected);
+            expect(captured.lines.map((value:any)=>value.sourceText)).toEqual(response.lines.map((value:any)=>value.sourceText));
+            expect(captured.lines.map((value:any)=>value.text)).toEqual(response.lines.map((value:any)=>value.text));
+        }
     });
 });
 

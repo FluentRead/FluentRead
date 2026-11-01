@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/controls.ts
  * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
- * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
+ * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
@@ -73,6 +73,23 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 
 export type ImageSettingsSection = 'settings-services' | 'settings-image-translation';
 
+/** 只在入口拥有完整焦点链或页面没有焦点时转移，避免抢走其他控件的焦点。 */
+function mayFocusReader(trigger: HTMLElement): boolean {
+    const doc = trigger.ownerDocument;
+    if (!trigger.isConnected) return false;
+    const source = trigger.getRootNode() as Document | ShadowRoot;
+    const active = doc.activeElement;
+    const noFocus = !!active && (active === doc.body || active === doc.documentElement)
+        && !active.matches(':focus-within') && (source === doc || source.activeElement === null);
+    let current: Node = trigger, owned = true;
+    for (;;) {
+        const root = current.getRootNode() as Document | ShadowRoot;
+        if (root.activeElement !== current) owned = false;
+        if (root === doc) return owned || noFocus;
+        current = (root as ShadowRoot).host;
+    }
+}
+
 export function createImageControls(actions: {onAction(): void; onPrepare(): void; onDismiss?(): void; onInspect?(): void; onSettings?(section: ImageSettingsSection): void; translate?(source: string): string; onWarning?(event: MouseEvent): void}) {
     const localize = (source: string) => actions.translate?.(source) ?? source;
     const element = document.createElement('div');
@@ -128,9 +145,24 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     dismiss.type = 'button';
     dismiss.className = 'fr-image-dismiss';
     dismiss.textContent = '关闭';
-    const reader = createImageTextReader(localize, () => {
+    let readerTrigger: HTMLElement | null = null;
+    let returningFocus = false;
+    const reader = createImageTextReader(localize, ownedFocus => {
         inspect.setAttribute('aria-expanded', 'false');
-        if (!disposed && !inspect.hidden) inspect.focus({preventScroll: true});
+        const trigger = readerTrigger;readerTrigger = null;
+        const canRead = phase === 'translated' && hasLines;
+        const canInspect = canRead && !inspect.hidden
+            && feedback.dataset.manga !== 'true' && inspect.isConnected;
+        const available = canRead && trigger === warningButton && !feedback.hidden && !warningButton.hidden && warningButton.isConnected
+            ? warningButton : trigger && canInspect ? inspect : null;
+        if (!disposed && ownedFocus && available) {
+            // 文字入口与面板同属操作条；在 focus 前显示祖先，避免焦点留在已隐藏面板内。
+            returningFocus = available === inspect;
+            if (returningFocus) {element.hidden = false;focused = true;}
+            // focus() 会同步派发 focusout/focusin；归还期间二者都不能隐藏目标祖先。
+            try {available.focus({preventScroll: true});}
+            finally {returningFocus = false;}
+        }
         if (!disposed) refreshVisibility();
     });
     const details = reader.element;
@@ -143,6 +175,16 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     let phase: ImageControlPhase = 'idle';
     let sourceMessage = '翻译图片';
     let progress: number | undefined;
+    const openReader = (trigger: HTMLElement) => {
+        const takeFocus = mayFocusReader(trigger);
+        readerTrigger = trigger;
+        // warning 位于独立 feedback 中；隐藏的操作条会让浏览器忽略面板 focus。
+        element.hidden = false;
+        reader.open(takeFocus);
+        inspect.setAttribute('aria-expanded', 'true');
+        actions.onInspect?.();
+        refreshVisibility();
+    };
     const refreshLanguage = () => {
         const brand = localize('流畅阅读');
         heading.textContent = `${brand} · ${localize('图片翻译')}`;
@@ -189,20 +231,19 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         if (target === serviceSettings) actions.onSettings?.('settings-image-translation');
         if (target === dismiss) actions.onDismiss?.();
         if (target === inspect) {
-            if (details.hidden) reader.open(); else reader.close();
-            inspect.setAttribute('aria-expanded', String(!details.hidden));
-            actions.onInspect?.();
-            refreshVisibility();
+            if (details.hidden) openReader(inspect);
+            else {reader.close();actions.onInspect?.();refreshVisibility();}
         }
     };
     const focusIn = (event: FocusEvent) => {
         // 鼠标点击也会产生焦点；只有键盘可见焦点才在离开图片后保留入口。
-        focused = (event.target as Element).matches(':focus-visible');
+        focused = returningFocus || (event.target as Element).matches(':focus-visible');
         refreshVisibility();
     };
     const focusOut = (event: FocusEvent) => {
         const target = event.relatedTarget as Node | null;
-        focused = Boolean(target && (element.contains(target) || details.contains(target)) && (target as Element).matches(':focus-visible'));
+        focused = Boolean(target && (element.contains(target) || details.contains(target))
+            && (returningFocus || (target as Element).matches(':focus-visible')));
         refreshVisibility();
     };
     element.addEventListener('focusin', focusIn);
@@ -222,9 +263,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         if (!event.isTrusted || disposed) return;
         event.stopPropagation();
         if (feedback.dataset.manga === 'true') actions.onWarning?.(event);
-        else if (hasLines && details.hidden) {
-            reader.open();inspect.setAttribute('aria-expanded', 'true');actions.onInspect?.();refreshVisibility();
-        }
+        else if (hasLines && details.hidden) openReader(warningButton);
     };
     warningButton.addEventListener('click', handleWarning);
     feedback.addEventListener('click', isolate);
@@ -272,6 +311,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         inspect.hidden = next !== 'translated' || !hasLines;
         if (next !== 'translated') {
             details.hidden = true;
+            readerTrigger = null;
             inspect.setAttribute('aria-expanded', 'false');
         }
     };
@@ -279,7 +319,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     return {
         element, feedback, button, status, spinner, dismiss, update, refreshLanguage, reader: details,
         setHovered(value: boolean) {hovered = value; refreshVisibility();},
-        hideReader() {details.hidden = true; inspect.setAttribute('aria-expanded', 'false'); refreshVisibility();},
+        hideReader() {details.hidden = true; readerTrigger = null; inspect.setAttribute('aria-expanded', 'false'); refreshVisibility();},
         setLines(lines: ImageReaderLine[]) {
             hasLines = lines.length > 0;
             reader.setLines(lines);

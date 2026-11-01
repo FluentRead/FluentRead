@@ -13,6 +13,8 @@ If text is missing or too much is translated, check the reading area first. Use 
 
 Some sites keep author names, timestamps, votes, and navigation unchanged while translating articles, comments, or product descriptions. If the area you need is still missed, adjust its content rule or report the URL and area.
 
+Explicit topic tags stay in their original language, including `chatgpt` and `rate-limit` on the OpenAI community and standard tag links on other forums and blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
+
 ## Translate every time—or leave it alone
 
 Open **Settings → Tools & learning → Website rules → Site preferences**:

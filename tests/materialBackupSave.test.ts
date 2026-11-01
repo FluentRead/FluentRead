@@ -5,6 +5,7 @@
  * 模块边界：使用可注入的文件和下载器替身，不代表真实浏览器、物理磁盘或扩展权限验证。
  */
 import {describe, expect, it, vi} from 'vitest';
+import {getEventListeners} from 'node:events';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSaveTarget, type MaterialBackupWritable} from '@/src/features/vocabulary/materialBackupSave';
@@ -21,6 +22,22 @@ function writable() {
 function deferred<T>() {let resolve!:(value:T)=>void;let reject!:(error:unknown)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 
 describe('material backup save targets', () => {
+    it('detaches the caller while a failed target is still releasing storage',async()=>{
+        const caller=new AbortController(),failure=Error('receive failed');
+        const cleanup=deferred<void>();let finished=false,activeSignal:AbortSignal|undefined;
+        const abort=vi.fn(async(_reason?:unknown)=>{await cleanup.promise;});
+        const target:MaterialBackupSaveTarget={write:async()=>{},commit:async()=> 'saved',abort};
+        const saving=saveMaterialBackup(target,async(_consume,signal)=>{activeSignal=signal;throw failure;},{signal:caller.signal}).then(
+            ()=>{finished=true;return undefined;},error=>{finished=true;return error;},
+        );
+        try{
+            await vi.waitFor(()=>expect(abort).toHaveBeenCalledWith(failure));
+            expect(getEventListeners(caller.signal,'abort')).toHaveLength(0);
+            expect(caller.signal.aborted).toBe(false);expect(activeSignal?.aborted).toBe(true);
+            expect(finished).toBe(false);
+        }finally{cleanup.resolve();expect(await saving).toBe(failure);}
+        expect(finished).toBe(true);
+    });
     it('rejects a buffered write with the original count failure and permits cleanup',async()=>{
         const failure=new MaterialError('limit-exceeded','材料备份超出当前保存容量限制'),download=vi.fn();
         const target=await chooseMaterialBackupTarget('materials.json',{downloadBuffered:download});

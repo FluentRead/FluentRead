@@ -73,7 +73,8 @@ function validResult(result: MaterialImportResult): boolean {
 export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOperationGuard, options: {signal?: AbortSignal; onCapability: (value: Capability) => void}): Promise<MaterialBackupOutcome> {
   const signal = options.signal, safeGuard = {generation: guard.generation, capturedAt: guard.capturedAt};
   let client: Client | undefined, cap: Capability | undefined, opened = false, beginDispatched = false, commitDispatched = false;
-  try {
+  let outcome: MaterialBackupOutcome;
+  restoreAttempt: try {
     check(signal);
     const prepared = await prepareMaterialBackup(file, {signal});
     check(signal);
@@ -85,7 +86,7 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     const deadline = Date.now() + BEGIN_DEADLINE_MS;
     beginDispatched = true;
     const state = await request(client.begin(cap, prepared.manifest, safeGuard, deadline), signal);
-    if (!state || state.state !== 'open' || state.nextSeq !== 0) return {kind: 'unknown', capability: cap, commitDispatched: false};
+    if (!state || state.state !== 'open' || state.nextSeq !== 0) {outcome = {kind: 'unknown', capability: cap, commitDispatched: false}; break restoreAttempt;}
     opened = true;
     check(signal);
     await sendMaterialBackup(file, prepared, frame => request(client!.append(frame), signal), {signal});
@@ -98,10 +99,10 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
     check(signal);
     commitDispatched = true;
     const result = await requestWithProgress(notify=>client!.commit(progress(notify)), signal);
-    if (!validResult(result)) return {kind: 'unknown', capability: cap, commitDispatched: true};
-    return {kind: 'committed', result, capability: cap};
+    if (!validResult(result)) {outcome = {kind: 'unknown', capability: cap, commitDispatched: true}; break restoreAttempt;}
+    outcome = {kind: 'committed', result, capability: cap};
   } catch (error) {
-    if (commitDispatched && cap) return {kind: 'unknown', capability: cap, commitDispatched: true};
+    if (commitDispatched && cap) {outcome = {kind: 'unknown', capability: cap, commitDispatched: true}; break restoreAttempt;}
     // 捕获值可能来自文件读取或调用方；异常元数据本身不可阻止暂存清理。
     let failure = error, name: string | undefined;
     try {if (error instanceof Error) name = error.name;}
@@ -118,8 +119,9 @@ export async function restoreLargeMaterialBackup(file: Blob, guard: MaterialOper
       }
     }
     const result = {cleanupPending, ...(cleanupPending && cap ? {capability: cap} : {})};
-    return interrupted && signal?.aborted ? {kind: 'cancelled', ...result} : {kind: 'failed', error: failure, ...result};
+    outcome = interrupted && signal?.aborted ? {kind: 'cancelled', ...result} : {kind: 'failed', error: failure, ...result};
   } finally {client?.close();}
+  return outcome;
 }
 
 /** 断线结果只能通过同一能力查询；无法查询时不得推断事务回滚。 */

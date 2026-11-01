@@ -118,6 +118,7 @@ export async function chooseMaterialBackupTarget(name:string, platform:MaterialB
 export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receive:MaterialBackupConsumer, options:{signal?:AbortSignal} = {}):Promise<{state:MaterialBackupSaveState;bytes:number}> {
     const controller = new AbortController(), caller = options.signal;
     const abort = () => controller.abort();
+    let state:MaterialBackupSaveState;
     let pending:Promise<void>|undefined, failed = false, failure:unknown, bytes = 0, accepting = true;
     let writeFailedBeforeCancel = false, writeFailure:unknown;
     const reject = (error:unknown):Promise<void> => {
@@ -159,8 +160,7 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         if (pending) throw new MaterialError('invalid-input','材料备份写入尚未完成');
         if (failed) throw failure;
         // 一旦开始提交，取消可能已经来不及；只依据提交结果报告保存状态。
-        const state = await target.commit(controller.signal);
-        return {state,bytes};
+        state = await target.commit(controller.signal);
     } catch (error) {
         accepting = false;
         // 写入错误已被观察后才取消时，传输层的取消不能掩盖它。
@@ -169,10 +169,14 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
             try {if((error as {name?:unknown}|null)?.name==='AbortError')cause=writeFailure;}
             catch {/* 不可信错误的 name 属性不能阻止清理或覆盖原错误。 */}
         }
+        // 失败后由内部信号终止工作；等待写入或保存目标清理时释放调用方监听。
+        removeAbortListener(caller,abort);
         controller.abort();
         const cleanup = Promise.resolve().then(()=>target.abort(cause));
         const settled = await Promise.allSettled(pending ? [cleanup,pending] : [cleanup]);
         if (settled[0].status === 'rejected') throw Object.assign(new Error('材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'),{name:'MaterialBackupSaveCleanupError',cause});
         throw cause;
-    } finally {removeAbortListener(caller,abort);}
+    }
+    removeAbortListener(caller,abort);
+    return {state,bytes};
 }

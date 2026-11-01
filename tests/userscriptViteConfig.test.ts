@@ -204,7 +204,8 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(4_000));
+        const input = Buffer.concat([Buffer.from('统计模型数据🙂\0\n'), Buffer.from(JSON.stringify(lockedFrancData))]);
+        expect(input.byteLength).toBeGreaterThan(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -219,7 +220,8 @@ describe('userscript build gzip portability', () => {
         expect(input).toEqual(before);
         expect(process.listeners('uncaughtException')).toEqual(uncaught);
         expect(process.listeners('unhandledRejection')).toEqual(unhandled);
-    });
+        // 真实模型经过两次隔离的 48 轮构建压缩，保留独立于生产 60 秒超时的有限测试预算。
+    }, 15_000);
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {
         const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-worker-'));

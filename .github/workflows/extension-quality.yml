@@ -88,9 +88,6 @@ jobs:
         run: |
           pnpm build:userscript:standalone
           node scripts/verify-userscript-standalone-build.mjs
-      - name: Build and verify pinned GreasyFork resources
-        if: steps.affected.outputs.extension_changed == 'true'
-        run: pnpm build:userscript:greasyfork
       - name: Preserve verified extension archives
         if: success() && steps.affected.outputs.extension_changed == 'true'
         uses: actions/upload-artifact@v4

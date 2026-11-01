@@ -220,7 +220,7 @@ describe('userscript build gzip portability', () => {
         expect(input).toEqual(before);
         expect(process.listeners('uncaughtException')).toEqual(uncaught);
         expect(process.listeners('unhandledRejection')).toEqual(unhandled);
-        // 真实模型经过两次隔离的 48 轮构建压缩，保留独立于生产 60 秒超时的有限测试预算。
+        // 真实模型经过两次隔离的构建压缩，保留独立于生产 60 秒超时的有限测试预算。
     }, 15_000);
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {
@@ -2215,7 +2215,7 @@ describe('standalone About images at explicit use boundaries', () => {
         assertImage(h.api.getContactImageUrl(), 'contact');
         h.api.getSupportImageUrl('normal'); h.api.getContactImageUrl();
         expect(h.decoder).toHaveBeenCalledTimes(2); expect(h.decode).toHaveBeenCalledTimes(2);
-        // 两张真实图片各经过一次 48 轮构建压缩，保留独立于全局与生产超时的有限测试预算。
+        // 两张真实图片各经过一次构建压缩，保留独立于全局与生产超时的有限测试预算。
     }, 15_000);
 
     it('propagates an isolated standalone image compressor failure', async () => {

@@ -273,7 +273,7 @@ describe('userscript remote UI language data', () => {
     it('propagates a standalone Chinese compression failure instead of emitting incomplete data',async()=>{
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE','1');vi.resetModules();
         try {
-            // 实际配置先以 48 轮压缩英文目录与界面增量，再进入下方注入的中文失败路径。
+            // 实际配置先压缩英文目录与界面增量，再进入下方注入的中文失败路径。
             const {createUserscriptCatalogCompressionPlugin:createPlugin}=await import('@/userscript/vite.config');
             const failure=new Error('controlled Chinese compression failure'),compress=vi.fn(async()=>{throw failure;});
             const plugin=createPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>Promise<string>};

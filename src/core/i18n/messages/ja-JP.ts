@@ -579,7 +579,7 @@ export const jaJPMessages = {
     "popup.pageFont.loading": "フォント設定を読み込み中…",
     "popup.pageFont.unavailable": "現在、訳文のフォントを変更できません。",
     "popup.pageFont.readError": "フォント設定を読み込めませんでした。再試行してください。",
-    "popup.pageFont.changeError": "フォント設定を保存できませんでした。再試行してください。",
+    "popup.pageFont.changeError": "フォント設定を保存できませんでした。",
     "popup.pageFont.retry": "再試行",
     "popup.quickSettings.appearanceDescription": "二言語モードでは原文と訳文を両方表示し、訳文のみのモードでは翻訳結果だけを表示します。",
     "popup.quickSettings.hoverSettings": "ホバー翻訳の設定",

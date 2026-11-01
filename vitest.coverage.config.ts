@@ -388,6 +388,8 @@ export default defineConfig({
                 'src/core/tts/speechProgress.ts',
                 'src/features/image-translation/services/mangaBubbles.ts',
                 'src/features/image-translation/services/mangaOcrAssets.ts',
+                'src/features/image-translation/services/mangaOnnxFields.ts',
+                'src/features/image-translation/services/mangaRecognitionShapes.ts',
                 'src/features/image-translation/services/mangaInpainting.ts',
                 'src/features/image-translation/services/imageEncoding.ts',
                 'src/features/image-translation/mangaPatchResult.ts',

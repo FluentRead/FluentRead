@@ -4,6 +4,7 @@
  * 主要内容：延迟导入浏览器 OCR 和本地 ONNX WASM，用频繁读取的画布完成 OCR 预处理，透明像素仅在识别画布上按前景亮度合成对比底色，读取已校验模型并融合 ONNX 执行图，硬件可用时加速识别，GPU 故障有界切换 CPU；SVG 复用已解码原图异步转为无损 PNG 后进入 Worker，取消或失败释放自有画布且保留借用原图；大图以有重叠的原像素瓦片识别并按物理行去重，整页原文与放大的独立气泡共同参与可靠性回退，竖列与纯像素估角的浅底斜行共用每页四框复识别预算，斜行只以高置信且有增益的原框结果替换，预处理另有像素预算，普通图片保留物理行供严格段落策略使用；滚动取消保留轻量模型端口，Worker owner 有界收尾，GPU 挂起重建一次 CPU 后端，空闲三分钟释放会话，统一清理 OCR 与修补会话。
  * 检测裁切：通过 SDK 公开处理器入口按原始字行短边计算留白，检测平面短边不足十二像素时保留原高度留白，不丢弃细小框；沿用原裁边、舍入与缩放顺序，水平框保持原语义，竖列不因列长吞入邻列和注音；复用原会话和一次区域检测。低置信纯拉丁竖框用原配额尝试反向，CJK 保留原批次复识别，反向与斜行共用整页两百万预处理像素预算，超额框回原框识别；同一次气泡扫描额外输出大型曲边气泡的布局归属，不创建大型局部识别裁图。
  * 识别颜色：仅装饰原生识别缩放副本的一次既有读回，在完整不透明端点边缘和原页像素预算内补足红通道缺失对比；复用原会话，不改裁切、原图或检测输入，推理收尾恢复上下文，页级 finally 清理取消信号。
+ * 模型形状：资源层仅在原文件完整校验与入库后生成固定识别图的内存副本，CPU 重载同样处理；本入口固定识别高度48，并在每次原生调用前核对正 batch、三通道和至少八像素宽度，不把未证明输入交给优化图。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
@@ -21,6 +22,7 @@ import {collectMangaOcrTileNumericEvidence,mergeMangaOcrTiles, planMangaOcrTiles
 import {numericProtection} from './mangaNumeric';
 import {createMangaOcrColorAdapter,withMangaOcrColorRead} from './mangaOcrColor';
 import {MANGA_DESKEW_PIXEL_BUDGET,planMangaOcrDeskew,trimMangaOcrDeskew} from './mangaOcrDeskew';
+import {assertMangaRecognitionInput} from './mangaRecognitionShapes';
 
 interface MangaOcrPort {
     recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress}): Promise<MangaOcrPage>;
@@ -285,7 +287,10 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 if(session){
                     const run=session.run.bind(session),invoke=run as (...args:Parameters<typeof run>)=>ReturnType<typeof run>;
                     session.run=(async(...args:Parameters<typeof run>)=>{
-                        try{return await paceLocalInference(()=>{assertMangaOcrActive(activeSignal);return invoke(...args);});}
+                        try{
+                            if(key==='recognition')assertMangaRecognitionInput(args[0]);
+                            return await paceLocalInference(()=>{assertMangaOcrActive(activeSignal);return invoke(...args);});
+                        }
                         catch(error){this.inferenceFailure??={error};throw error;}
                     }) as typeof session.run;
                 }
@@ -293,7 +298,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         }
     }
     const service = new MangaService({model, detection: {maxSideLength:1536,paddingVertical:0.1,paddingHorizontal:0.2},
-        recognition: {charactersDictionary: [], minimumConfidence:0.65,strategy:'per-box',spaceRecovery:true,mainThreadYieldMs:1,maxCropSourceSideLength:8192},
+        recognition: {charactersDictionary: [], imageHeight:48,minimumConfidence:0.65,strategy:'per-box',spaceRecovery:true,mainThreadYieldMs:1,maxCropSourceSideLength:8192},
         session: {executionProviders: gpu.available?['webgpu','wasm']:['wasm'], graphOptimizationLevel: 'all'}});
     try {
         await service.initialize(); assertMangaOcrActive(signal);

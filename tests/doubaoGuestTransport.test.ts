@@ -57,6 +57,19 @@ describe('豆包临时匿名网络请求', () => {
         expect(api.updateSessionRules).toHaveBeenLastCalledWith({removeRuleIds: [DOUBAO_GUEST_RULE_ID], addRules: []});
     });
 
+    it('Safari 不支持 initiatorDomains / requestMethods 时只保留精确 URL 与 XHR 条件', async () => {
+        const api = port();
+        const fetch = vi.fn().mockResolvedValue(new Response('ok'));
+        await createDoubaoGuestFetch(api, 'own', fetch, {scopeToInitiator: false})(new URL(url), init);
+        const rule = api.updateSessionRules.mock.calls[1][0].addRules[0];
+        expect(rule.condition).toMatchObject({resourceTypes: ['xmlhttprequest'], isUrlFilterCaseSensitive: true});
+        expect(rule.condition).not.toHaveProperty('initiatorDomains');
+        expect(rule.condition).not.toHaveProperty('requestMethods');
+        const pattern = new RegExp(rule.condition.regexFilter);
+        expect(pattern.test(url)).toBe(true);
+        expect(pattern.test(url + '&more=1')).toBe(false);
+    });
+
     it('Request 输入保留方法与取消信号，init 可以覆盖请求头', async () => {
         const api = port();
         const fetch = vi.fn().mockResolvedValue(new Response('ok'));

@@ -2,4 +2,4 @@
 const {parentPort, workerData} = require('node:worker_threads');
 const {gzipAsync} = require('@gfx/zopfli');
 
-gzipAsync(workerData, {numiterations: 5}).then(result => parentPort.postMessage(result));
+gzipAsync(workerData, {numiterations: 12}).then(result => parentPort.postMessage(result));

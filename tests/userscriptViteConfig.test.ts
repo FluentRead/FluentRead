@@ -15,6 +15,7 @@ import {ungzip} from 'pako';
 import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from '@/userscript/buildGzip';
 import {unpackLanguageUpdates, unpackUiLanguageBundle} from '@/userscript/languageData';
 import {decodeUserscriptData} from '@/userscript/dataEncoding';
+import {encodeUserscriptDataCompact} from '@/userscript/buildDataEncoding';
 import {zhCNMessages, UI_LANGUAGE_BUNDLES, userscriptMessages, currentUserscriptLanguageBundle, createUserscriptLanguageUpdate} from '@/userscript/languageBundles';
 import {zhCNMessages as extensionChinese} from '@/src/core/i18n/messages/zh-CN';
 import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
@@ -203,7 +204,7 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
+        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(4_000));
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -212,6 +213,9 @@ describe('userscript build gzip portability', () => {
         expect(first).toEqual(second);
         expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
         expect(gunzipSync(first)).toEqual(before);
+        const embedded = encodeUserscriptDataCompact(first);
+        expect(Buffer.from(decodeUserscriptData(embedded))).toEqual(first);
+        expect(inflateBundledFrancData(decodeUserscriptData(embedded))).toBe(before.toString('utf8'));
         expect(input).toEqual(before);
         expect(process.listeners('uncaughtException')).toEqual(uncaught);
         expect(process.listeners('unhandledRejection')).toEqual(unhandled);

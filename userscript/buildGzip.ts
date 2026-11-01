@@ -2,7 +2,7 @@
  * @file userscript/buildGzip.ts
  * 文件职责：在 userscript 构建期统一编码静态资源，避免宿主 Node/zlib 编码器版本影响内嵌 gzip 字节。
  * 主要内容：复用锁定的 pako 2.1.0 和 level 9，比较多个 memLevel；独立版增加有限策略比较，较大数据可在构建期通过隔离 worker 使用 Zopfli，输出仍是标准 gzip。
- * 构建成本：每份静态数据增加两次有限压缩，独立版部分数据再比较五次，较大数据还需五次 Zopfli 迭代；运行时仍读取同一标准格式，不增加解码路径。
+ * 构建成本：每份静态数据增加两次有限压缩，独立版部分数据再比较五次，较大数据还需十二次 Zopfli 迭代；运行时仍读取同一标准格式，不增加解码路径。
  * 模块边界：仅供构建配置与插件使用，不改变输入数据、运行时解压端口或产物大小上限；Zopfli 仅为构建依赖。
  */
 import {createRequire} from 'node:module';

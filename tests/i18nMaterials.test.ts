@@ -24,7 +24,7 @@ const languages = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as cons
 
 describe('学习材料旧模板本地化', () => {
     it('大备份临时存储、未知下载状态和释放重试均有六语提示',()=>{
-        for(const source of ['正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。','无法确认下载是否开始，请检查浏览器下载。','下载已发起，关闭页面可能中断下载。','请先确认浏览器下载完成，再释放临时数据。','重新下载','当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。','已取消清理。','临时文件清理失败，请重试。','临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。','无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。'])for(const language of languages){
+        for(const source of ['正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。','无法确认下载是否开始，请检查浏览器下载。','下载已发起，关闭页面可能中断下载。','请先确认浏览器下载完成，再释放临时数据。','无法确认下载是否开始，请检查浏览器下载。 请先确认浏览器下载完成，再释放临时数据。','下载已发起，关闭页面可能中断下载。 请先确认浏览器下载完成，再释放临时数据。','重新下载','当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。','已取消清理。','临时文件清理失败，请重试。','临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。','无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。'])for(const language of languages){
             const catalog:Readonly<Record<string,string>>=learningMaterialLegacyText[language],translated=translateLegacyText(source,language);expect(translated).toBe(catalog[source]);expect(translated).not.toBe(source);
         }
     });
@@ -142,6 +142,33 @@ describe('学习材料旧模板本地化', () => {
                 expect(translateLegacyText(source, language)).toBe(source);
             }
         }
+    });
+
+    it.each([false, true])('实际下载状态模板翻译拼接后的完整提示 uncertain=%s', async (fallbackDownloadUncertain) => {
+        const filename = 'src/features/vocabulary/ui/MaterialWorkspace.vue';
+        const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename});
+        const feedback = descriptor.template!.content.match(/<p v-if="fallbackDownloadPending"[\s\S]*?<\/p>/u)![0];
+        const compiled = compileTemplate({source: `<div>${feedback}</div>`, filename, id: 'material-download-status-i18n', compilerOptions: {mode: 'function'}});
+        expect(compiled.errors).toEqual([]);
+        const render = new Function('Vue', compiled.code)(Vue);
+        const html = await renderToString(Vue.h({setup: () => ({fallbackDownloadPending: true, fallbackDownloadUncertain, fallbackReleasing: false, retryFallbackDownload: () => {}, releaseFallbackDownload: () => {}}), render}));
+        const {document, window} = parseHTML(`<html><body>${html}</body></html>`);
+        const root = document.body.firstElementChild as unknown as HTMLElement;
+        for (const [name, value] of Object.entries({document, Node: window.Node, MutationObserver: window.MutationObserver, NodeFilter: {SHOW_TEXT: 4}})) vi.stubGlobal(name, value);
+        let directive: any;
+        const app = {config: {globalProperties: {}}, provide: () => {}, directive: (_name: string, value: unknown) => {directive = value;}, mixin: () => {}, unmount: () => {}};
+        const plugin = createUiI18nPlugin();
+        if (typeof plugin.install !== 'function') throw new Error('UI i18n plugin must expose install');
+        try {
+            plugin.install(app as any); directive.mounted(root);
+            const expected = (fallbackDownloadUncertain
+                ? 'Unable to confirm whether the download started. Check your browser downloads.'
+                : 'The download has started. Closing this page may interrupt it.')
+                + ' Confirm the download has finished in your browser before releasing temporary data.';
+            await vi.waitFor(() => expect(root.querySelector('[role="status"]')?.firstChild?.textContent?.trim()).toBe(expected));
+            const labels = Array.from(root.querySelectorAll('button'), button => button.textContent);
+            expect(labels).toEqual(fallbackDownloadUncertain ? ['Download again', 'Download complete, release temporary data'] : ['Download complete, release temporary data']);
+        } finally {app.unmount(); vi.unstubAllGlobals();}
     });
 
     it.each([

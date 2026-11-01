@@ -279,6 +279,8 @@
   "无法确认下载是否开始，请检查浏览器下载。": "No se puede confirmar si la descarga ha comenzado. Revisa las descargas del navegador.",
   "下载已发起，关闭页面可能中断下载。": "La descarga ha comenzado. Cerrar esta página puede interrumpirla.",
   "请先确认浏览器下载完成，再释放临时数据。": "Confirma que la descarga haya terminado en el navegador antes de liberar los datos temporales.",
+  "无法确认下载是否开始，请检查浏览器下载。 请先确认浏览器下载完成，再释放临时数据。": "No se puede confirmar si la descarga ha comenzado. Revisa las descargas del navegador. Confirma que la descarga haya terminado en el navegador antes de liberar los datos temporales.",
+  "下载已发起，关闭页面可能中断下载。 请先确认浏览器下载完成，再释放临时数据。": "La descarga ha comenzado. Cerrar esta página puede interrumpirla. Confirma que la descarga haya terminado en el navegador antes de liberar los datos temporales.",
   "重新下载": "Descargar de nuevo",
   "当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。": "Este navegador no puede crear archivos temporales para una copia grande. Inténtalo en un navegador que permita guardar archivos directamente o usar almacenamiento privado. Tus materiales originales no han cambiado.",
   "已取消清理。": "Limpieza cancelada.",

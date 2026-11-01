@@ -279,6 +279,8 @@
   "无法确认下载是否开始，请检查浏览器下载。": "Unable to confirm whether the download started. Check your browser downloads.",
   "下载已发起，关闭页面可能中断下载。": "The download has started. Closing this page may interrupt it.",
   "请先确认浏览器下载完成，再释放临时数据。": "Confirm the download has finished in your browser before releasing temporary data.",
+  "无法确认下载是否开始，请检查浏览器下载。 请先确认浏览器下载完成，再释放临时数据。": "Unable to confirm whether the download started. Check your browser downloads. Confirm the download has finished in your browser before releasing temporary data.",
+  "下载已发起，关闭页面可能中断下载。 请先确认浏览器下载完成，再释放临时数据。": "The download has started. Closing this page may interrupt it. Confirm the download has finished in your browser before releasing temporary data.",
   "重新下载": "Download again",
   "当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。": "This browser cannot create temporary files for a large backup. Retry in a browser that supports saving files directly or private file storage. Your original materials have not changed.",
   "已取消清理。": "Cleanup cancelled.",

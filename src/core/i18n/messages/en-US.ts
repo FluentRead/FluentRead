@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/en-US.json';
 import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesEnglishMessages} from './sectionTranslationRules';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -67,6 +68,10 @@ export const enUSMessages = {
     "translationCenter.endpointMissing": "Set the custom service endpoint first.",
     "translationCenter.modelMissing": "Choose or enter a model first.",
     "translationCenter.noReady": "Configure at least one service to translate.",
+    'sidepanel.title': 'Sidebar translation',
+    'sidepanel.openError': 'Could not open the sidebar. Try again or open FluentRead from the browser sidebar menu.',
+    'sidepanel.settingsError': 'Could not open settings. Try again.',
+    'sidepanel.startupError': 'Could not load the translation panel. Please reload.',
     "translationCenter.intro": "One text, different translations. Choose services and compare.",
     "translationCenter.input": "Source text",
     "translationCenter.source": "Source language",
@@ -548,6 +553,7 @@ export const enUSMessages = {
     "settings.requestLimits.globalTitle": "Request limits",
     "settings.requestLimits.globalHelp": "Services and models without custom settings share these limits.",
     ...aiRequestTimeoutMessages["en-US"],
+    ...selectionDictionaryMessages["en-US"],
     ...sectionTranslationRulesEnglishMessages,
     "settings.requestLimits.retryIntervals": "Retry intervals",
     "settings.requestLimits.apiKeyRecovery": "Failed key cooldown",
@@ -580,7 +586,7 @@ export const enUSMessages = {
     "popup.pageFont.loading": "Reading the font setting…",
     "popup.pageFont.unavailable": "Translation font cannot be changed right now.",
     "popup.pageFont.readError": "Could not read the font setting. Please retry.",
-    "popup.pageFont.changeError": "Could not save the font setting. Please retry.",
+    "popup.pageFont.changeError": "Could not save the font setting.",
     "popup.pageFont.retry": "Retry",
     "popup.quickSettings.appearanceDescription": "Bilingual mode shows the original and translation together; translation-only mode shows just the translated text.",
     "popup.quickSettings.hoverSettings": "Hover translation settings",
@@ -934,6 +940,12 @@ export const enUSMessages = {
     'glossary.builtin.financeDescription': 'Financial statements, valuation metrics, and equity markets.',
     'glossary.builtin.research': 'Academic research',
     'glossary.builtin.researchDescription': 'Research methods, statistics, and academic papers.',
+    'glossary.builtin.hardware': "Computer hardware",
+    'glossary.builtin.hardwareDescription': "Processors, memory, chips and circuits",
+    'glossary.builtin.networking': "Networking and cloud",
+    'glossary.builtin.networkingDescription': "Network protocols, cloud infrastructure and deployment",
+    'glossary.builtin.mathematics': "Mathematics",
+    'glossary.builtin.mathematicsDescription': "Linear algebra, calculus, probability and optimization",
     'glossary.builtin.products': 'Keep product names',
     'glossary.builtin.productsDescription': 'Keep common development tool and AI product names unchanged. Case sensitive.',
     'glossary.builtin.englishChinese': 'English → Simplified Chinese',

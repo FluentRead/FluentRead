@@ -4,6 +4,7 @@
  * 主要内容：保留分数坐标相位，在原框外加整数保护边；严格检查非零 alpha 像素单元、保护矩形及裁切前后四通道；首次墨迹前以完整读回域有界筛去无关的稳定数值孔，未知坐标仍走原像素谓词，页内共享累计与活动资源预算，失败释放画布和显式读回。
  * 模块边界：不运行 OCR、翻译、字体搜索或重排，不编码 PNG；调用方负责 h0/h1 策略和成功画布的最终释放，真实 Canvas 异常原样传播。
  */
+import {isTrustedMangaAlphaRectangles} from './mangaAlphaProtection';
 
 export interface MangaGlyphRasterBox {x0:number;y0:number;x1:number;y1:number}
 export interface MangaGlyphRasterPlan {
@@ -140,8 +141,21 @@ export function rasterizeMangaGlyphs(plan:MangaGlyphRasterPlan,box:MangaGlyphRas
         const target=verify.context;
         target.translate(-x,-y);target.beginPath();target.rect(box.x0,box.y0,box.x1-box.x0,box.y1-box.y0);target.clip();
         // 连续求交扣除每个孔；重叠孔仍是并集，不能用一次 evenodd 把重叠处重新放行。
-        for(const hole of holes){
+        // 只对生产者创建的不可变数值数组剔除远孔；未知输入仍保留原始访问和异常顺序。
+        // 完整读回域之外再保留1px余量，避免边界和分数坐标的光栅化差异。
+        const trusted=isTrustedMangaAlphaRectangles(holes);
+        const clipHole=(hole:MangaGlyphRasterBox)=>{
             target.beginPath();target.rect(x,y,width,height);target.rect(hole.x0,hole.y0,hole.x1-hole.x0,hole.y1-hole.y0);target.clip('evenodd');
+        };
+        if(trusted){
+            // 按索引读取冻结数组，不让可替换的迭代器把未认证对象混入快路径。
+            for(let index=0;index<holes.length;index++){
+                const hole=holes[index];
+                if(hole.x1<x-1||hole.x0>x+width+1||hole.y1<y-1||hole.y0>y+height+1)continue;
+                clipHole(hole);
+            }
+        }else{
+            for(const hole of holes)clipHole(hole);
         }
         target.drawImage(glyph.canvas,x,y);
         pixels=context.getImageData(0,0,width,height).data;ledger.liveReadbackPixels+=area;reads++;

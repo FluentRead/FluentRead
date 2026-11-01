@@ -8,6 +8,11 @@ function group(result: ReturnType<typeof buildConfigDiff>, id: string) {
 }
 
 describe('配置差异预览', () => {
+    it('词典来源在历史与同步预览中显示可读选项', () => {
+        expect(group(buildConfigDiff({selectionDictionarySource: 'auto'}, {selectionDictionarySource: 'free-dictionary'}), 'translation')?.changes).toEqual([
+            {key: 'selectionDictionarySource', label: '词典来源', before: '默认（自动选择）', after: 'Free Dictionary API'},
+        ]);
+    });
     it('浏览器默认译文字体以可读设置名称展示启停，独立于原有译文外观', () => {
         expect(configDiffFieldLabel('browserDefaultTranslationFont')).toBe('浏览器默认译文字体');
         for (const enabled of [true, false]) {

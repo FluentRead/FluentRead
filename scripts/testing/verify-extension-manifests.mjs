@@ -264,6 +264,22 @@ export function findUnexpectedCurrentVersionArchives(outputFiles, version, expec
         .sort();
 }
 
+/** 原生面板由 WXT 生成；验证最终产物，防止丢失权限或混入另一浏览器的字段。 */
+export function verifyTranslationSidepanelManifest(manifest, files, browser) {
+    assert(files.includes('sidepanel.html'), `${browser} 缺少原生翻译面板页面`);
+    if (browser === 'Chrome') {
+        assert(manifest.side_panel?.default_path === 'sidepanel.html' && !manifest.sidebar_action,
+            'Chrome 翻译面板清单无效');
+        assert(countPermission(manifest, 'sidePanel') === 1, 'Chrome 必须且只能声明一次 sidePanel 权限');
+    } else {
+        assert(manifest.sidebar_action?.default_panel === 'sidepanel.html' && manifest.sidebar_action.open_at_install === false && !manifest.side_panel,
+            'Firefox 翻译面板清单无效或安装时主动展开');
+        assert(countPermission(manifest, 'sidePanel') === 0, 'Firefox 不得声明 Chrome-only sidePanel 权限');
+    }
+    const publicFiles = (manifest.web_accessible_resources || []).flatMap(rule => typeof rule === 'string' ? [rule] : rule.resources);
+    assert(!publicFiles.includes('sidepanel.html'), `${browser} 不得向网页公开翻译面板`);
+}
+
 async function main() {
     const args = process.argv.slice(2);
     const chromeDir = path.resolve(PROJECT_ROOT, optionValue(args, '--chrome-dir', '.output/chrome-mv3'));
@@ -307,6 +323,8 @@ async function main() {
     assert(firefoxManifest.manifest_version === 2, 'Firefox 默认产物必须是 Manifest V2');
     assert(countPermission(firefoxManifest, 'offscreen') === 0, 'Firefox 不得声明 Chrome-only offscreen 权限');
     assert(firefoxArtifacts.includes('offscreen.html'), 'Firefox 缺少后台 iframe 使用的共享 DOM 页面');
+    verifyTranslationSidepanelManifest(chromeManifest, chromeFiles, 'Chrome');
+    verifyTranslationSidepanelManifest(firefoxManifest, firefoxFiles, 'Firefox');
     assert(!chromeManifest.browser_specific_settings?.gecko, 'Chrome manifest 不得包含 Firefox Gecko metadata');
     const firefoxGecko = firefoxManifest.browser_specific_settings?.gecko;
     assert(firefoxGecko?.id === '{3096bd53-3bda-4556-b076-ebf47442a5c1}', 'Firefox manifest 缺少稳定 AMO GUID');
@@ -381,6 +399,7 @@ async function main() {
         chrome: {
             manifestVersion: 3,
             offscreenPermission: true,
+            sidepanel: chromeManifest.side_panel.default_path,
             runtimeCapabilityMarker: chromeBuildMarker,
             metadataLocales: chromeMetadataLocales,
             artifacts: chromeArtifacts,
@@ -390,6 +409,7 @@ async function main() {
         firefox: {
             manifestVersion: 2,
             offscreenPermission: false,
+            sidepanel: firefoxManifest.sidebar_action.default_panel,
             runtimeCapabilityMarker: firefoxBuildMarker,
             metadataLocales: firefoxMetadataLocales,
             artifacts: firefoxArtifacts,

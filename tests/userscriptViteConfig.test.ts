@@ -203,7 +203,10 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
+        // Exercise two real five-iteration workers above the production 64 KiB gate,
+        // without compressing a needlessly large repeated fixture under instrumentation.
+        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
+        expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -505,6 +508,71 @@ describe('userscript bundled library notices', () => {
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
+    it('standalone shares the icon notice only when the complete identical terms follow', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-icons-shared-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices, wrapUserscriptEntry: standaloneWrap} = await import('@/userscript/vite.config');
+            const iconLicense = readFileSync(resolve(process.cwd(), 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8').trim();
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const terms = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const ids = ['First owner', 'Second owner'].map((owner, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/icon-test-${index}@1.0.0/node_modules/icon-test-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `icon-test-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), `Copyright (c) ${owner}\n\n${terms}`);
+                return resolve(directory, 'index.js');
+            });
+            const notices = standaloneNotices(ids);
+            const wrapped = standaloneWrap('ENTRY_SENTINEL', 'BOOTSTRAP_SENTINEL', notices);
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            expect(normalize(wrapped.replaceAll('[Shared MIT terms below]', terms))).toContain(normalize(iconLicense));
+            expect(wrapped.split(terms)).toHaveLength(2);
+            expect(wrapped).toContain('Copyright (c) First owner');
+            expect(wrapped).toContain('Copyright (c) Second owner');
+            expect(standaloneWrap('entry', 'bootstrap')).toContain(iconLicense);
+            expect(standaloneWrap('entry', 'bootstrap', 'Shared MIT permission and warranty terms for the references above:')).toContain(iconLicense);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
+    it('standalone shares identical single-quoted MIT terms without changing licenses or attribution', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-single-quoted-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices} = await import('@/userscript/vite.config');
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const canonical = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const singleQuoted = canonical.replace(/"/gu, "'");
+            const bodies = [
+                `Copyright (c) First owner\nSource: https://example.com/first\n\n${singleQuoted}\nExtra attribution.`,
+                `Copyright (c) Second owner\n\n${singleQuoted.replace(/\s+/gu, '\r\n ')}`,
+                `Copyright (c) Different terms\n\n${singleQuoted.replace('free of charge', 'subject to a fee')}`,
+                `Copyright (c) Double quotes\n\n${canonical}`,
+            ];
+            const ids = bodies.map((body, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/quoted-${index}@1.0.0/node_modules/quoted-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `quoted-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), body);
+                return resolve(directory, 'index.js');
+            });
+            const result = standaloneNotices(ids);
+            const marker = '[Shared single-quoted MIT terms below]';
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            const restored = normalize(result.replaceAll(marker, singleQuoted));
+            for (const body of bodies) expect(restored).toContain(normalize(body));
+            expect(result.split(marker)).toHaveLength(3);
+            expect(result.split(singleQuoted)).toHaveLength(2);
+            expect(result).toContain(bodies[2]);
+            expect(result).toContain(bodies[3]);
+            expect(standaloneNotices([ids[0]])).toContain(bodies[0]);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
     it('standalone preserves copyright, sources, surrounding clauses, different terms and non-MIT notices', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-shared-mit-notices-'));
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
@@ -548,7 +616,7 @@ describe('userscript bundled library notices', () => {
 });
 
 describe('standalone settings compression compatibility', () => {
-    it('keeps standard Base85 and standalone Base91 gzip data byte-identical', () => {
+    it('keeps shared preset gzip bytes identical while compressing the standalone style groups and categories', () => {
         const root = process.cwd(), id = resolve(root, 'src/core/config/translationAppearance.ts');
         const original = readFileSync(id, 'utf8');
         const transform = (full: boolean) => Reflect.apply(createUserscriptSettingsDataPlugin(root, true, full).transform as Function, {}, [original, id]) as {code:string};
@@ -556,7 +624,8 @@ describe('standalone settings compression compatibility', () => {
         expect(standard).toContain('~85:'); expect(standalone).toContain('~91:');
         const before = encodedDataBytes(standard, '__fluentreadDecodeSettingsData');
         const after = encodedDataBytes(standalone, '__fluentreadDecodeSettingsData');
-        expect(after.map(bytes=>Buffer.from(bytes))).toEqual(before.map(bytes=>Buffer.from(bytes)));
+        expect(before).toHaveLength(1); expect(after).toHaveLength(3);
+        expect(Buffer.from(after[2])).toEqual(Buffer.from(before[0]));
     });
 });
 
@@ -794,12 +863,13 @@ describe('userscript browser shim injection', () => {
         const readerDialogKeys = ['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].map(name => `document.pdfReading.${name}`);
         const safariPermissionKeys = Object.keys(extension).filter(key => key.startsWith('safari.freePool.'));
         expect(safariPermissionKeys).toHaveLength(8);
+        const sidepanelKeys = ['title', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
         const pageFontKeys = Object.keys(extension).filter(key => key.startsWith('popup.pageFont.'));
         const expectedPageFontKeys = ['title', 'original', 'browserDefault', 'hostAction', 'browserAction', 'changing', 'retryAction',
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);
         expect([...pageFontKeys].sort()).toEqual([...expectedPageFontKeys].sort());
         expect(Object.keys(projected).filter(key => key.startsWith('popup.pageFont.'))).toEqual([]);
-        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...pageFontKeys]) {
+        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...pageFontKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
@@ -818,7 +888,7 @@ describe('userscript browser shim injection', () => {
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
-            && !safariPermissionKeys.includes(key) && !pageFontKeys.includes(key)
+            && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key)
             && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);
@@ -868,6 +938,12 @@ describe('userscript browser shim injection', () => {
             const committed = execFileSync('git', ['show', `${commit}:${path}`], {cwd: process.cwd(), encoding: 'utf8'});
             expect(committed).toBe(readFileSync(resolve(process.cwd(), path), 'utf8'));
         }
+    });
+    it('keeps normal Chinese catalog compression synchronous and does not invoke standalone compression',()=>{
+        const compress=vi.fn(async()=>{throw Error('standalone compressor must not run');});
+        const plugin=createUserscriptCatalogCompressionPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>string};
+        const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
+        expect(plugin.load(id)).toContain('export const zhCNMessages');expect(compress).not.toHaveBeenCalled();
     });
     it('embeds the Chinese fallback catalog, minus the extension document and full-options statistics keys, as lossless static data', () => {
         const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {
@@ -1397,17 +1473,38 @@ describe('userscript lossless Unicode character data', () => {
     };
 
     it.each([[dataPath, chineseCharacterData], [wordDataPath, functionWordData]])(
-        'roundtrips the complete standalone character data from %s', (path, expected) => {
+        'roundtrips the complete standalone character data from %s', async (path, expected) => {
             const plugin = createUserscriptCharacterDataCompressionPlugin(process.cwd(), true, true) as unknown as {
-                transform: (code: string, id: string) => {code: string} | null;
+                transform: (code: string, id: string) => Promise<{code: string}>;
             };
-            const transformed = plugin.transform(readFileSync(path, 'utf8'), path)!;
+            const transformed = await plugin.transform(readFileSync(path, 'utf8'), path);
+            const [bytes] = encodedDataBytes(transformed.code);
+            const original = gunzipSync(bytes);
+            expect(bytes.length).toBeLessThan(gzipUserscriptBuildData(original, undefined, true).length);
             vi.stubGlobal('pako', {ungzip});
             try {
                 expect(restoreExports(transformed.code, Object.keys(expected))).toEqual({...expected});
             } finally {vi.unstubAllGlobals();}
         },
     );
+
+    it('keeps compact character gzip when the candidate is larger and propagates worker failures', async () => {
+        vi.resetModules();
+        const gzipModule = await import('@/userscript/buildGzip');
+        const worker = vi.spyOn(gzipModule, 'gzipLargeStandaloneUserscriptData')
+            .mockImplementation(async data => Buffer.alloc(data.byteLength + 100));
+        try {
+            const {createUserscriptCharacterDataCompressionPlugin: create} = await import('@/userscript/characterDataPlugin');
+            const plugin = create(process.cwd(), true, true) as unknown as {transform(code: string, id: string): Promise<{code: string}>};
+            const source = 'export const sample = "AÁ";';
+            const result = await plugin.transform(source, dataPath);
+            const [bytes] = encodedDataBytes(result.code);
+            expect(Buffer.from(bytes)).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify([[65, 128]])), undefined, true));
+            expect(worker).toHaveBeenCalledWith(expect.any(Uint8Array), process.cwd(), 0);
+            worker.mockRejectedValueOnce(new Error('controlled character worker failure'));
+            await expect(plugin.transform(source, dataPath)).rejects.toThrow('controlled character worker failure');
+        } finally {worker.mockRestore(); vi.resetModules();}
+    });
 
     it('restores every generated Unicode character exactly before Chinese detection consumes it', () => {
         const original = readFileSync(dataPath, 'utf8');
@@ -2059,9 +2156,9 @@ describe('standalone About images at explicit use boundaries', () => {
     const createPlugin = (enabled = true, fixtureRoot = root) => createUserscriptAboutImagesCompressionPlugin(fixtureRoot, enabled) as unknown as {
         name: string; load(id: string): string | null;
     };
-    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false) {
+    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false, generatedSource?: string) {
         const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, standalone) as unknown as {load(id: string): string | Promise<string>};
-        const source = await plugin.load(helperId);
+        const source = generatedSource ?? await plugin.load(helperId);
         const {transformWithEsbuild} = await import('vite');
         const compiled = await transformWithEsbuild(source, 'about-images-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as {getSupportImageUrl(normal: string): string; getContactImageUrl(): string}};
@@ -2096,7 +2193,8 @@ describe('standalone About images at explicit use boundaries', () => {
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        const h = await loadAccessors(undefined, true);
+        // Execute the exact generated source already checked above, without compressing both images twice.
+        const h = await loadAccessors(undefined, true, source);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');
         assertImage(h.api.getContactImageUrl(), 'contact');
@@ -2308,6 +2406,36 @@ describe('standalone service brand paths at actual icon use', () => {
         expect(realm.controlledHostData).toBe(hostData);
         return {api: module.exports, decoder, decode, parse, realm, hostData};
     }
+    it('compresses the complete standalone brand table without changing lazy restoration', async () => {
+        const plugin = createUserscriptServiceBrandIconsCompressionPlugin(root, true, true) as unknown as {
+            load(id: string): Promise<string>;
+        };
+        const source = await Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId]);
+        const [bytes] = encodedDataBytes(source);
+        const original = Buffer.from(JSON.stringify(expected));
+        expect(gunzipSync(bytes)).toEqual(original);
+        expect(bytes.length).toBeLessThan(gzipUserscriptBuildData(original, 8, true).length);
+        const h = await loadAccessors(undefined, source);
+        expect(h.api.getServiceBrandIcon('unknown')).toBeUndefined();
+        expect(h.decoder).not.toHaveBeenCalled();
+        assertAllBrands(h.api);
+        expect(h.decoder).toHaveBeenCalledTimes(1);
+    });
+    it('keeps compact brand gzip when the candidate is larger and propagates worker failures', async () => {
+        vi.resetModules();
+        const gzipModule = await import('@/userscript/buildGzip');
+        const worker = vi.spyOn(gzipModule, 'gzipLargeStandaloneUserscriptData')
+            .mockImplementation(async data => Buffer.alloc(data.byteLength + 100));
+        try {
+            const {createUserscriptServiceBrandIconsCompressionPlugin: create} = await import('@/userscript/serviceBrandIconsPlugin');
+            const plugin = create(root, true, true) as unknown as {load(id: string): Promise<string>};
+            const [bytes] = encodedDataBytes(await Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId]));
+            expect(Buffer.from(bytes)).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(expected)), 8, true));
+            expect(worker).toHaveBeenCalledWith(expect.any(Uint8Array), root, 0);
+            worker.mockRejectedValueOnce(new Error('controlled brand worker failure'));
+            await expect(Reflect.apply(plugin.load, {addWatchFile: vi.fn()}, [helperId])).rejects.toThrow('controlled brand worker failure');
+        } finally {worker.mockRestore(); vi.resetModules();}
+    });
     function assertAllBrands(api: BrandApi, input: Record<string, Shape> = expected) {
         for (const [service, shape] of Object.entries(input)) {
             const restored = api.getServiceBrandIcon(service);
@@ -2639,7 +2767,7 @@ describe('userscript appearance registry data owner', () => {
     const actualSource=readFileSync(id,'utf8');
     type Transform={transform(code:string,id:string):{code:string;map:null}|null};
     const plugin=(enabled=true)=>createUserscriptSettingsDataPlugin(root,enabled,true) as unknown as Transform;
-    const fixture=(skin='[{value:"skin"}]',font='[{value:"font"}]')=>`export const interfaceSkinOptions=${skin};export const interfaceFontOptions=${font};`;
+    const fixture=(skin='[{value:"skin"}]',font='[{value:"font"}]')=>`export const interfaceSkinOptions=${skin};export const interfaceFontOptions=${font};export const popupModuleOptions=[{value:"module"}];export const popupQuickFeatureOptions=[{value:"feature"}];`;
     function transformed(code=actualSource){const result=plugin().transform(code,id);expect(result).not.toBeNull();return result!.code;}
     async function execute(source:string){
         const {transformWithEsbuild}=await import('vite');
@@ -2659,6 +2787,8 @@ describe('userscript appearance registry data owner', () => {
     function complete(api:typeof originalAppearance){
         expect(ordered(api.interfaceSkinOptions)).toEqual(ordered(originalAppearance.interfaceSkinOptions));
         expect(ordered(api.interfaceFontOptions)).toEqual(ordered(originalAppearance.interfaceFontOptions));
+        expect(ordered(api.popupModuleOptions)).toEqual(ordered(originalAppearance.popupModuleOptions));
+        expect(ordered(api.popupQuickFeatureOptions)).toEqual(ordered(originalAppearance.popupQuickFeatureOptions));
         expect(api.interfaceSkinOptions).toHaveLength(14);expect(api.interfaceFontOptions).toHaveLength(10);
         for(const skin of api.interfaceSkinOptions){expect(api.getInterfaceSkinOption(skin.value)).toBe(skin);expect(api.normalizeInterfaceSkin(skin.value)).toBe(skin.value);expect(api.interfaceSkinUsesContentHeight(skin.value)).toBe(originalAppearance.interfaceSkinUsesContentHeight(skin.value));}
         for(const font of api.interfaceFontOptions){expect(api.getInterfaceFontOption(font.value)).toBe(font);expect(api.normalizeInterfaceFont(font.value)).toBe(font.value);}
@@ -2671,13 +2801,13 @@ describe('userscript appearance registry data owner', () => {
     }
     it('restores the whole real module synchronously with every ordered field, value and existing Map reference',async()=>{
         const code=transformed();expect(code.startsWith(actualSource.slice(0,actualSource.indexOf('export const')))).toBe(true);
-        expect(code).toContain(actualSource.slice(actualSource.indexOf('export type InterfaceFont')));
-        const {api,decode}=await execute(code);complete(api);expect(decode).toHaveBeenCalledTimes(2);
+        expect(code).toContain(actualSource.slice(actualSource.indexOf('export const interfaceVisibilityOptions')));
+        const {api,decode}=await execute(code);complete(api);expect(decode).toHaveBeenCalledTimes(4);
         const baseline=await execute(actualSource);complete(baseline.api);expect(baseline.decode).not.toHaveBeenCalled();
     });
     it('roundtrips all accepted literal runtime types, nested arrays and object enumeration order',async()=>{
         const skin='[{value:"one",integer:42,fraction:1.25,yes:true,no:false,empty:null,text:`literal`,nested:["x",{second:2,first:1}],constructor:"own"}]';
-        const {api,decode}=await execute(transformed(fixture(skin)));expect(ordered(api.interfaceSkinOptions)).toEqual(ordered([{value:'one',integer:42,fraction:1.25,yes:true,no:false,empty:null,text:'literal',nested:['x',{second:2,first:1}],constructor:'own'}]));expect(decode).toHaveBeenCalledTimes(2);
+        const {api,decode}=await execute(transformed(fixture(skin)));expect(ordered(api.interfaceSkinOptions)).toEqual(ordered([{value:'one',integer:42,fraction:1.25,yes:true,no:false,empty:null,text:'literal',nested:['x',{second:2,first:1}],constructor:'own'}]));expect(decode).toHaveBeenCalledTimes(4);
     });
     it.each([id+'?raw',id+'?vue&type=script','\0'+id,resolve(root,'src/core/config/other.ts'),resolve(root,'node_modules/interfaceAppearance.ts')])('does not transform another module or decorated id %s',other=>{
         expect(plugin().transform('arbitrary executable source',other)).toBeNull();
@@ -2719,7 +2849,8 @@ describe('userscript appearance registry data owner', () => {
             const results=Array.isArray(result)?result:[result];if(results.length!==1||!('output' in results[0])||results[0].output.length!==1||results[0].output[0].type!=='chunk')throw Error('Expected one real appearance consumer chunk');
             const chunk=results[0].output[0];expect(chunk.imports).toEqual([]);expect(chunk.dynamicImports).toEqual([]);
             const decode=vi.fn(),realm={appearanceOwner:undefined as typeof originalAppearance|undefined,atob,Uint8Array,ArrayBuffer,pako:{ungzip},__observeUserscriptDataDecode:decode};
-            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?2:0);
+            // Standalone shares one skin/font group decode, plus the two independently compressed popup catalogs.
+            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?(standalone==='1'?3:2):0);
             expect(readFileSync(resolve(root,'public/third-party-notices/lobe-icons-MIT.txt'),'utf8')).toContain('Copyright (c) 2023 LobeHub');
         }finally{rmSync(directory,{recursive:true,force:true});vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
@@ -2728,6 +2859,8 @@ describe('userscript appearance registry data owner', () => {
 describe('standalone immutable glossary and UI catalogs', () => {
     const targets = [
         ['src/core/glossary/builtins.ts', ['BUILTIN_GLOSSARIES']],
+        ['src/core/config/catalog.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels']],
+        ['src/core/config/featureServices.ts', ['featureServiceDefinitions']],
         ['src/core/config/videoSubtitleAppearance.ts', ['VIDEO_SUBTITLE_SKINS']],
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
@@ -2739,6 +2872,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/core/language/partOfSpeech.ts', ['PARTS']],
         ['src/core/config/sentenceHighlight.ts', ['SENTENCE_HIGHLIGHT_STYLES']],
         ['src/core/config/selectionTts.ts', ['SELECTION_TTS_VOICE_OPTIONS']],
+        ['src/core/config/localTts.ts', ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']],
     ] as const;
     it.each(targets)('restores every ordered value from %s without changing the consumer functions', async (path, names) => {
         const root = process.cwd(), id = resolve(root, path), original = readFileSync(id, 'utf8');

@@ -4116,6 +4116,7 @@ module.exports = {
   COVERAGE_PROTECTED_DESCENDANTS,
   COVERAGE_TRACKER_KEY,
   assertPageContract,
+  assertRequiredRestored,
   assertFreshProductionExtension,
   assertCoverageReport,
   assertCoverageRestoration,

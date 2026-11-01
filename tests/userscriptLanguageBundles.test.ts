@@ -6,8 +6,9 @@ import {runInNewContext} from 'node:vm';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 // 脚本发布的语言资源不含智能高亮文案；摘要必须按脚本实际使用的投影计算。
 import {UI_LANGUAGE_BUNDLES, currentUserscriptLanguageBundle, createUserscriptLanguageUpdate, userscriptPageMessages, zhCNMessages} from '../userscript/languageBundles';
-import {gzipUserscriptBuildData} from '../userscript/buildGzip';
+import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from '../userscript/buildGzip';
 import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
+import {zhCNMessages as extensionChinese} from '@/src/core/i18n/messages/zh-CN';
 import {aiRequestTimeoutMessages} from '@/src/core/i18n/messages/aiRequestTimeout';
 import {ungzip} from 'pako';
 import {packKeyColumn, unpackKeyColumn, packLanguageUpdates, unpackLanguageUpdates, packMessageCatalog, packUiLanguageBundle, unpackMessageCatalog, unpackUiLanguageBundle} from '@/userscript/languageData';
@@ -20,6 +21,15 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('preserves all real language updates after standalone build compression',async()=>{
+        const updates=Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES).filter(([language])=>language!=='en-US')
+            .map(([language,baseline])=>[language,createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as keyof typeof UI_LANGUAGE_BUNDLES),baseline)]));
+        const raw=Buffer.from(JSON.stringify(packLanguageUpdates(updates)));
+        const compressed=await gzipLargeStandaloneUserscriptData(raw,process.cwd());
+        const restored=JSON.parse(Buffer.from(ungzip(compressed)).toString('utf8'));
+        expect(unpackLanguageUpdates(restored)).toEqual(updates);
+        expect(compressed.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(raw).byteLength);
+    });
     it('roundtrips shared update columns, missing keys, empty values, patterns and legacy object format',()=>{
         const updates={
           'ja-JP':{messages:{a:'',b:'日本語'},legacyText:{x:'旧'},legacyPatterns:{early:[['same','一'],['same','二']],late:[]},patternOrder:{early:[1,-1]}},
@@ -147,6 +157,19 @@ describe('standalone default message provider', () => {
 });
 
 describe('userscript remote UI language data', () => {
+    it('keeps native sidebar messages in extension locales and omits them from every userscript locale', () => {
+        expect(extensionChinese['sidepanel.title']).toBeTruthy();
+        expect(Object.keys(zhCNMessages).some(key => key.startsWith('sidepanel.'))).toBe(false);
+        expect(zhCNMessages['translationCenter.manage']).toBe(extensionChinese['translationCenter.manage']);
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            const original = extensionBundles[language];
+            expect(original.messages['sidepanel.title']).toBeTruthy();
+            const projected = currentUserscriptLanguageBundle(language);
+            expect(Object.keys(projected.messages).some(key => key.startsWith('sidepanel.'))).toBe(false);
+            expect(projected.messages['translationCenter.manage']).toBe(original.messages['translationCenter.manage']);
+            expect(original.messages['sidepanel.title']).toBeTruthy();
+        }
+    });
     it('keeps the complete settings notice aligned with the shared locale source', () => {
         const component = readFileSync(resolve(process.cwd(), 'src/features/settings/ui/services/ServiceConfiguration.vue'), 'utf8');
         expect(component).toContain("translateLegacy('" + mimoRetirementSource + "')");
@@ -174,6 +197,7 @@ describe('userscript remote UI language data', () => {
             expect(Object.keys(bundle.messages).some(key => key.startsWith('popup.displayMode.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('popup.pageFont.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('safari.freePool.'))).toBe(false);
+            expect(Object.keys(bundle.messages).some(key => key.startsWith('sidepanel.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('learning.collection.speech') && key !== 'learning.collection.speechFailed')).toBe(false);
             expect(bundle.messages['learning.collection.speechFailed']).toBeTruthy();
             expect(bundle.messages['popup.translateCurrentPage']).toBeTruthy();
@@ -246,6 +270,24 @@ describe('userscript remote UI language data', () => {
         }
     });
 
+    it('propagates a standalone Chinese compression failure instead of emitting incomplete data',async()=>{
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE','1');vi.resetModules();
+        // This case injects the Chinese compressor failure, not an English build benchmark.
+        // Avoid unrelated Zopfli work during config import; the next integration case
+        // still exercises the actual standalone compressors and both language payloads.
+        vi.doMock('@/userscript/buildGzip', async importOriginal => {
+            const actual = await importOriginal<typeof import('@/userscript/buildGzip')>();
+            return {...actual, gzipLargeStandaloneUserscriptData: async (input: Uint8Array) => actual.gzipUserscriptBuildData(input)};
+        });
+        try {
+            const {createUserscriptCatalogCompressionPlugin:createPlugin}=await import('@/userscript/vite.config');
+            const failure=new Error('controlled Chinese compression failure'),compress=vi.fn(async()=>{throw failure;});
+            const plugin=createPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>Promise<string>};
+            const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
+            await expect(plugin.load(id)).rejects.toBe(failure);expect(compress).toHaveBeenCalledOnce();
+        } finally {vi.doUnmock('@/userscript/buildGzip');vi.unstubAllEnvs();vi.resetModules();}
+    });
+
     // The actual standalone configuration compresses catalogs in workers before this assertion.
     it('feeds the actual standalone Chinese virtual module to core and shares its provider with the actual English define', async () => {
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
@@ -258,6 +300,10 @@ describe('userscript remote UI language data', () => {
             expect(provider.readDefaultMessageKeys()).toBeUndefined();
             const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => Promise<string>};
             const generated = await plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
+            const encoded = JSON.parse(generated.match(/decodeUserscriptData\(("[^"\n]+")\)/u)![1]) as string;
+            const expectedColumns=packMessageCatalog(userscriptPageMessages(zhCNMessages));
+            const expectedBytes=Buffer.from(JSON.stringify([packKeyColumn(expectedColumns[0]),expectedColumns[1]]));
+            expect(Buffer.from(ungzip(encoding.decodeUserscriptData(encoded)))).toEqual(expectedBytes);
             const compiled = await transformWithEsbuild(generated, 'standalone-default-messages.js', {format: 'cjs', target: 'es2018'});
             const realm = {module: {exports: {} as {zhCNMessages: Record<string, string>}}, require: (id: string) => {
                 if (id === '@/userscript/pakoRuntime') return {inflateWithPako: (bytes: Uint8Array) => ungzip(bytes, {to: 'string'})};

@@ -1,5 +1,27 @@
 # 测试与回归
 
+## 原生侧边栏文本翻译（issue #1160）
+
+`translationSidepanel`、`sidepanelBootstrap`、`sidepanelApp`、`translationCenterComponent` 和 `popupAppLifecycle` 验证原生打开保留点击手势、错误重试、配置准备、页面退出取消与共享工作台。新版 Chromium 可能缓存关闭的面板，工作台在进入 hidden 时停止请求；同一实例重开保留输入与已有结果，不自动重启翻译。页面销毁或刷新后内容消失，不写入配置。`verify:extension-manifests` 同时检查 Chrome 的 `side_panel` 与唯一 `sidePanel` 权限，以及 Firefox 的 `sidebar_action`、安装时不自动展开和不声明 Chromium 权限。
+
+侧栏专用布局只由原生入口引入。`userscriptTranslationCenterBuild` 使用真实 SFC 验证构建时保留设置页的多服务对比、裁剪不可用的原生展示，并检查文字、注释和其它组件不被改写；交付还需执行 `pnpm test:userscript:standalone`，沿用现有体积上限。
+
+生产 Chrome 构建后运行：
+
+```bash
+node scripts/testing/run-sidepanel-translation-test.cjs \
+  --extension-dir .output/chrome-mv3 \
+  --browser-path <Chromium浏览器可执行文件> \
+  --playwright-root <Node包目录> \
+  --focus-safe-helper <扩展界面测试技能>/scripts/focus-safe-browser.cjs \
+  --runtime-diagnostics-helper <扩展界面测试技能>/scripts/runtime-diagnostics.cjs \
+  --artifacts-dir <证据目录>
+```
+
+新版 Chrome 使用 `--load-via-cdp`，由调试 API 载入扩展；支持启动参数加载扩展的 Edge 不加该参数。两者均使用第二屏正常尺寸后台窗口和临时 profile。专项从扩展页面中的真实点击打开原生面板，验证输入、翻译、受控复制、停止与关闭时中断上游请求、迟到结果隔离、重试、切换网页保持内容、缓存实例重开不自动继续请求、原生尺寸与 320×480 仿真视口。多服务场景配置 16 个本地供应商，验证模型搜索、多选保存、3 份译文的服务/模型归属、逐份复制、菜单内部滚动，以及设置页重开后保留同一份选择。复制端口只记录文本，不改系统剪贴板；翻译使用本地 HTTP 供应商，不代表在线翻译质量、原生工具栏 popup 或 Firefox 实机验收。
+
+浅色与深色同时检查 DOM 配色和截图像素。部分旧版 macOS Edge 曾出现[原生侧栏强制反色问题](https://github.com/microsoft/MicrosoftEdge-Extensions/discussions/204)，不能仅凭计算样式正确就判定通过。原生面板从 target 被发现时开始附着诊断，附着前的启动空窗和所测浏览器版本必须保留在报告中。
+
 版本标签触发的安装包发布、全部交付目标、完整测试门禁及手动演练见 [自动发布安装包](./maintainers/releases.md)。发布脚本的 Node 夹具由 `processRegression.test.ts` 登记，覆盖版本一致性、缺失/损坏产物、附件摘要、草稿恢复和公开 Release 禁止覆盖等行为。
 
 ## 运行时错误与告警
@@ -62,6 +84,17 @@ node scripts/testing/run-cache-clear-recovery-test.cjs \
 这些采样会改变测试时序，仅用于定位问题。Node `performance.now()` 与原生事件的 `systemUptime` 有不同原点，不能直接相减；跨来源须用 epoch 时间和采样区间关联。公开 CDP session 的五类命令记录不涵盖 Playwright 私有 page session 的全部协议；离线 `browserFocusSafety` 用例只验证报告接线、返回/拒绝身份和失败锁存，不能证明真实浏览器焦点问题已修复。
 
 ## 术语库排队保存
+
+网站仅译文与新增内置词库的生产扩展专项：
+
+```bash
+node scripts/testing/run-site-display-mode-test.cjs \
+  --extension-dir .output/chrome-mv3 --playwright-root <捆绑 Node 包目录> \
+  --runtime-diagnostics <扩展 UI 测试技能>/scripts/runtime-diagnostics.cjs \
+  --artifacts-dir <证据目录>
+```
+
+该专项只使用临时 Edge profile 与本地确定性服务，验证网站偏好保存重开、已有及迟到译文切换、动态正文、跨站继承、恢复重译、八套内置词库目录、新词搜索与副本持久化。页面导航前附着运行时采集；报告保留首次后台附着前等采集缺口，不能据此宣称真实供应商或 Firefox 验收。
 
 运行 `pnpm test tests/glossarySettingsComponent.test.ts tests/configApplication.test.ts` 验证术语库操作的真实 SFC 与配置传输边界。新建、内置库添加、排序和导入捕获用户操作，在组件保存队列执行时合并共享 store 的最新列表；排序携带库 ID，按当前顺序移动一格，导入固定已确认内容并重新检查容量。覆盖排队期间的外部增删、同 ID 与同名、无写入的 no-op、隐藏及组件卸载、容量恢复、旧回执对新选择/新导入草稿的保护，以及确认框与延迟焦点的草稿归属。
 
@@ -503,6 +536,8 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 播放页菜单校时使用真实按钮点击，验证正负半秒的字幕内容、视频进度不变、仅原文模式、时间轴空档、重新打开页面后持久化、跨页同步、连续点击、重置和播放期间按帧更新。没有时间轴时禁用无效的提前/延后操作，仍允许重置已保存的偏移。
 
 `node scripts/run-youtube-subtitle-sync-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-youtube-sync` 在临时 Edge profile 的后台可见窗口中验证文档全屏、菜单操作、整句/逐词字幕定位、时间边界、重复句、延迟译文、真实视频 seek、空字幕、原文模式和关闭清理。夹具使用真实视频进度、受控 YouTube DOM 与模拟翻译响应，不代表真实 YouTube 字幕供应或翻译服务质量。
+
+该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
 
 ## 中文格式清单与重复请求
 
@@ -1304,6 +1339,14 @@ CI 或本地报告必须分别说明：确定性回归、隔离浏览器回归�
 只读的正文骨架、来源指纹和测试探针快照使用无浏览上下文的文档复制。实时文档中的深拷贝即使没有挂载，或随后立即移除图片，也可能重新请求失败的图片；先浅复制 Document 壳，再由该惰性文档 importNode，可保留原始属性、命名空间和文本顺序。实际重新挂载的可信模板另行检查，不能与只读快照混改。机制验证使用本地 no-store 图片响应、逐路径请求计数和显式图片请求阳性对照；本地结果不能直接给原站错误归因，原始运行时失败、请求身份与采集缺口继续保留。
 
 ## 图片翻译完整流程
+
+### 漫画顺序与文字边界的离线回归
+
+`mangaReader` 与 `imageTranslationRuntime` 用确定性 DOM、布局帧和请求 gate 检查混合 IMG／Canvas／背景图片的顺序、重复或非法序号的稳定回退，以及布局变化通知到下一帧之间不启动过期任务。显式重试和开关仍读取最新布局，取消、暂停、释放与迟到结果的所有权断言保留。该范围不下载或加载识别模型，不证明公开漫画站点的真实 OCR 质量。
+
+`imageOcrNormalization`、`mangaQuality` 和 `imageTranslationRendering` 保留韩文 Jamo、补充平面汉字及 IVS、半角浊音、组合字符与 emoji 的完整原文，并检查现代字素分割和缺少 `Intl.Segmenter` 时的窄框排版。后者只在确定安全的空格两侧分词，复杂无空白词组保持整体；英语组合字符、法语、俄语、泰语与老挝语的多词段落另检查字号，不能以整段缩字代替换行。纯 ASCII 与普通东亚文字仍保留原快路径。
+
+回退使用固定 Unicode 17.0.0 的 Extend／SpacingMark／ZWJ／Prepend 区间，测试读取仓库内的官方原始属性文件独立核对，不在 CI 访问网络。运行 `node scripts/generate-image-grapheme-space-data.mjs --check` 校验离线生成与输入 SHA-256；来源、版本和许可见 `public/third-party-notices/image-grapheme-space-NOTICE.md`。该表只支持 ASCII 空格的局部边界判断，不是完整 UAX #29 分割器，也不声称恢复模型漏识别的文字。
 
 ### 漫画质量场景与模型复用
 

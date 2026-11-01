@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ru-RU.json';
 import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesRussianMessages} from './sectionTranslationRulesRussian';
 import {sectionTranslationRulesLegacyText} from './sectionTranslationRulesLegacy';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -66,6 +67,10 @@ export const ruRUMessages = {
     "translationCenter.endpointMissing": "Сначала укажите адрес пользовательского сервиса.",
     "translationCenter.modelMissing": "Сначала выберите или введите модель.",
     "translationCenter.noReady": "Настройте хотя бы один сервис для перевода.",
+    'sidepanel.title': 'Перевод на боковой панели',
+    'sidepanel.openError': 'Не удалось открыть боковую панель. Повторите попытку или откройте FluentRead через меню боковой панели браузера.',
+    'sidepanel.settingsError': 'Не удалось открыть настройки. Повторите попытку.',
+    'sidepanel.startupError': 'Не удалось загрузить панель перевода. Перезагрузите страницу.',
     "translationCenter.intro": "Один текст, разные переводы. Выберите сервисы и сравните.",
     "translationCenter.input": "Исходный текст",
     "translationCenter.source": "Исходный язык",
@@ -547,6 +552,7 @@ export const ruRUMessages = {
     "settings.requestLimits.globalTitle": "Ограничения запросов",
     "settings.requestLimits.globalHelp": "Сервисы и модели без отдельных настроек используют эти общие ограничения.",
     ...aiRequestTimeoutMessages["ru-RU"],
+    ...selectionDictionaryMessages["ru-RU"],
     ...sectionTranslationRulesRussianMessages,
     "settings.requestLimits.retryIntervals": "Интервалы повторов",
     "settings.requestLimits.apiKeyRecovery": "Пауза неисправного API Key",
@@ -579,7 +585,7 @@ export const ruRUMessages = {
     "popup.pageFont.loading": "Чтение настройки шрифта…",
     "popup.pageFont.unavailable": "Сейчас нельзя изменить шрифт перевода.",
     "popup.pageFont.readError": "Не удалось прочитать настройку шрифта. Повторите попытку.",
-    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта. Повторите попытку.",
+    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта.",
     "popup.pageFont.retry": "Повторить",
     "popup.quickSettings.appearanceDescription": "Двуязычный режим показывает оригинал и перевод, а режим «Только перевод» — лишь переведённый текст.",
     "popup.quickSettings.hoverSettings": "Настройки перевода при наведении",
@@ -1748,6 +1754,12 @@ export const ruRUMessages = {
     "glossary.builtin.financeDescription": "Финансовая отчётность, показатели оценки и фондовые рынки.",
     "glossary.builtin.research": "Научные исследования",
     "glossary.builtin.researchDescription": "Методы исследований, статистика и научные статьи.",
+    'glossary.builtin.hardware': "Компьютерное оборудование",
+    'glossary.builtin.hardwareDescription': "Процессоры, память, микросхемы и схемы",
+    'glossary.builtin.networking': "Сети и облака",
+    'glossary.builtin.networkingDescription': "Сетевые протоколы, облачная инфраструктура и развёртывание",
+    'glossary.builtin.mathematics': "Математика",
+    'glossary.builtin.mathematicsDescription': "Линейная алгебра, анализ, вероятность и оптимизация",
     "glossary.builtin.products": "Сохранять названия продуктов",
     "glossary.builtin.productsDescription": "Сохраняет названия популярных инструментов разработки и продуктов ИИ. С учётом регистра.",
     "glossary.builtin.englishChinese": "Английский → Китайский упрощённый",

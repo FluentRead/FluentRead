@@ -138,7 +138,7 @@ export function extendRemoteConfigBuildConfig(
     entrypoints: readonly {type: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
-    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page']);
+    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }
@@ -166,6 +166,8 @@ export function createExtensionManifest(
         key: process.env.WXT_EXTENSION_KEY?.trim() || GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY,
     } : {};
     const firefoxManifest = env.browser === 'firefox' ? {
+        // 大型材料备份需要在用户主动导出时观察下载终态；安装时不请求此权限。
+        optional_permissions: ['downloads'],
         browser_specific_settings: {
             gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',

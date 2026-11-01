@@ -6,7 +6,7 @@
  */
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
-import {gzipUserscriptBuildData} from './buildGzip';
+import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from './buildGzip';
 import {encodeUserscriptData, encodeUserscriptDataCompact} from './buildDataEncoding';
 import ts from 'typescript';
 import {normalizePath, type Plugin} from 'vite';
@@ -51,31 +51,37 @@ export function createUserscriptCharacterDataCompressionPlugin(root: string, ena
                 }
             }
             if (!names.length) throw unsupported();
-            const compressed = (standalone ? encodeUserscriptDataCompact : encodeUserscriptData)(gzipUserscriptBuildData(Buffer.from(JSON.stringify(tables)), undefined, standalone));
+            const input = Buffer.from(JSON.stringify(tables));
+            const baseline = gzipUserscriptBuildData(input, undefined, standalone);
             const digest = createHash('sha256').update(code).digest('hex');
-            return {
-                code: [
-                    code.slice(0, source.statements[0].getStart(source)),
-                    '/* Non-code language data; source sha256 ' + digest + '. */',
-                    "import {inflateWithPako} from '@/userscript/pakoRuntime';",
-                    "import {decodeUserscriptData} from '@/userscript/dataEncoding';",
-                    'const bytes = decodeUserscriptData(' + JSON.stringify(compressed) + ');',
-                    ...(mode === 'strings' ? ['const characterTables = JSON.parse(inflateWithPako(bytes));'] : [
-                        'const characterTables = JSON.parse(inflateWithPako(bytes)).map((deltas) => {',
-                        '    let point = 0;',
-                        '    return deltas.map((delta) => {',
-                        '        point += delta;',
-                        // fromCharCode 避免给旧内核新增 String.fromCodePoint 依赖；完整保留补充平面字符。
-                        '        return point > 0xFFFF',
-                        '            ? String.fromCharCode(0xD800 + ((point - 0x10000) >> 10), 0xDC00 + ((point - 0x10000) & 0x3FF))',
-                        '            : String.fromCharCode(point);',
-                        "    }).join('');",
-                        '});',
-                    ]),
-                    ...names.map((name, index) => 'export const ' + name + ' = characterTables[' + index + '];'),
-                ].join('\n'),
-                map: null,
+            const emit = (bytes: Uint8Array) => {
+                const compressed = (standalone ? encodeUserscriptDataCompact : encodeUserscriptData)(bytes);
+                return {
+                    code: [
+                        code.slice(0, source.statements[0].getStart(source)),
+                        '/* Non-code language data; source sha256 ' + digest + '. */',
+                        "import {inflateWithPako} from '@/userscript/pakoRuntime';",
+                        "import {decodeUserscriptData} from '@/userscript/dataEncoding';",
+                        'const bytes = decodeUserscriptData(' + JSON.stringify(compressed) + ');',
+                        ...(mode === 'strings' ? ['const characterTables = JSON.parse(inflateWithPako(bytes));'] : [
+                            'const characterTables = JSON.parse(inflateWithPako(bytes)).map((deltas) => {',
+                            '    let point = 0;',
+                            '    return deltas.map((delta) => {',
+                            '        point += delta;',
+                            // fromCharCode 避免给旧内核新增 String.fromCodePoint 依赖；完整保留补充平面字符。
+                            '        return point > 0xFFFF',
+                            '            ? String.fromCharCode(0xD800 + ((point - 0x10000) >> 10), 0xDC00 + ((point - 0x10000) & 0x3FF))',
+                            '            : String.fromCharCode(point);',
+                            "    }).join('');",
+                            '});',
+                        ]),
+                        ...names.map((name, index) => 'export const ' + name + ' = characterTables[' + index + '];'),
+                    ].join('\n'),
+                    map: null,
+                };
             };
+            return standalone ? gzipLargeStandaloneUserscriptData(input, root, 0)
+                .then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline)) : emit(baseline);
         },
     };
 }

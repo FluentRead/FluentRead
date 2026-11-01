@@ -1201,8 +1201,19 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
       return {success: true, hit: false};
     });
     const f = fixture();
+    // 本用例只验证模型准备后进入采集；Linkedom 缺少媒体 API，让扫描副本等待元数据直至卸载取消。
+    const createElement = f.document.createElement;
+    const scanVideos: HTMLElement[] = [];
+    defineBrowserPort(f.document, 'createElement', {configurable: true, value(tag: string, options?: ElementCreationOptions) {
+      const element = Reflect.apply(createElement, f.document, [tag, options]) as HTMLElement;
+      if (tag === 'video') {
+        Object.defineProperties(element, {load: {value: () => undefined}, pause: {value: () => undefined}, readyState: {value: 0}});
+        scanVideos.push(element);
+      }
+      return element;
+    }});
     f.video.src = 'blob:same-media'; f.video.poster = '';
-    f.start(); await settle();
+    const dispose = f.start(); await settle();
     const menu = f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!;
     menu.hidden = false;
     clickMenu(f, '[data-action="toggle-ai-subtitle"]'); await settle();
@@ -1216,6 +1227,8 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     else status.resolve({success: true, models: ['tiny']});
     await settle();
     expect(ports.send.mock.calls.filter(([message]) => message.type === 'fluentReadPrepareLocalVideoModel' && message.keepWarm)).toHaveLength(1);
+    expect(scanVideos).toHaveLength(1); expect(scanVideos[0].isConnected).toBe(true);
+    dispose(); await settle(); expect(scanVideos[0].isConnected).toBe(false);
   });
 
   it.each(['media', 'language', 'off', 'dispose'])('rejects a late downloaded-model status after %s invalidates the request', async change => {
@@ -1302,7 +1315,11 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     await vi.advanceTimersByTimeAsync(2450);
     expect(count).toBe(2);
     for (const button of menu.querySelectorAll<HTMLButtonElement>('.fluent-read-video-menu-download')) expect(button.disabled).toBe(true);
-    nextWindow.resolve({success: false, error: 'fixture stops after timer proof'}); await settle();
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      nextWindow.resolve({success: false, error: 'fixture stops after timer proof'}); await settle();
+      expect(warning.mock.calls).toEqual([['[FluentRead] X AI 完整字幕请求失败', new Error('fixture stops after timer proof')]]);
+    } finally {warning.mockRestore();}
   });
 
   it('displays completed AI sentences before the final window and clears an incomplete preview after failure', async () => {
@@ -1337,7 +1354,11 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     expect((menu.querySelector('[data-action="select-ai-model"]') as HTMLButtonElement).disabled).toBe(true);
     clickMenu(f, '[data-action="download-subtitles"]'); await settle();
     expect(menu.querySelector('[data-download-status]')?.textContent).toBe('');
-    nextWindow.resolve({success: false, error: 'fixture later window failed'}); await settle();
+    const warning = vi.spyOn(console, 'warn');
+    try {
+      nextWindow.resolve({success: false, error: 'fixture later window failed'}); await settle();
+      expect(warning.mock.calls).toEqual([['[FluentRead] X AI 完整字幕请求失败', new Error('fixture later window failed')]]);
+    } finally {warning.mockRestore();}
     expect(f.displayed().source || '').toBe('');
     expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadSetVideoAiSubtitleCache')).toBe(false);
     expect(menu.querySelector('[data-action="toggle-ai-subtitle"]')?.getAttribute('data-error')).toBe('true');
@@ -1611,6 +1632,74 @@ describe('public mounted video player button follows the video translation switc
     expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
     expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBeNull();
     expect(f.document.getElementById('host')?.textContent).toBe('host original');
+  });
+});
+
+describe('public mounted YouTube native caption visibility ownership', () => {
+  const hiddenClass = 'fluent-read-video-native-caption-hidden';
+
+  it('keeps native captions suppressed across empty, expired and replaced cues, and restores mode/config changes', async () => {
+    ports.config.videoPreferHumanSubtitles = false;
+    const f = fixture(undefined, 'youtube'); f.video.currentTime = .5;
+    const dispose = f.start(); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    f.emitTimedText([{startMs: 0, durationMs: 1000, text: 'The current caption.'}]);
+    f.setCaption('The current caption.'); await settle();
+    expect(f.displayed().source).toBe('The current caption.');
+
+    f.video.currentTime = 1.5; f.emitVideo('timeupdate'); await settle();
+    expect(f.displayed().source || '').toBe('');
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    f.setCaption(''); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    const previous = f.document.getElementById('ytp-caption-window-container')!;
+    const replacement = f.document.createElement('div'); replacement.id = previous.id;
+    replacement.innerHTML = '<span class="ytp-caption-segment">New native caption.</span>';
+    previous.replaceWith(replacement);
+    // 新容器无需先经过 observer；播放器上的稳定状态已覆盖后续原生节点。
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    expect(replacement.textContent).toBe('New native caption.');
+
+    for (const mode of ['original-only', 'translation-only', 'bilingual'] as const) {
+      f.changeConfig({videoSubtitleDisplayMode: mode}); await settle();
+      expect(f.player.classList.contains(hiddenClass)).toBe(mode !== 'original-only');
+    }
+    f.changeConfig({videoSubtitleVisible: false}); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    f.changeConfig({videoSubtitleDisplayMode: 'translation-only'}); await settle();
+    f.changeConfig({videoTranslationEnabled: false}); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(false);
+    expect(replacement.classList.contains('fluent-read-video-display-translation-only')).toBe(false);
+    expect(replacement.classList.contains('fluent-read-video-display-hidden')).toBe(false);
+    f.changeConfig({videoTranslationEnabled: true, videoSubtitleVisible: true}); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    f.changeConfig({on: false}); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(false);
+    f.changeConfig({on: true}); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    dispose(); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('moves suppression with the selected player and releases it when leaving the video page', async () => {
+    const f = fixture(undefined, 'youtube'); const dispose = f.start(); await settle();
+    const next = f.document.createElement('div'); next.id = 'movie_player'; next.className = 'html5-video-player';
+    next.innerHTML = '<div class="ytp-caption-window-container"><span class="ytp-caption-segment">Next player.</span></div><div class="ytp-right-controls"></div>';
+    f.player.id = 'old-player'; next.prepend(f.video); f.player.after(next);
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(f.player.classList.contains(hiddenClass)).toBe(false);
+    expect(next.classList.contains(hiddenClass)).toBe(true);
+    f.window.location.href = 'https://www.youtube.com/results?search_query=caption';
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(next.classList.contains(hiddenClass)).toBe(false);
+    dispose(); await settle(); expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('leaves X native caption handling with its existing TextTrack owner', async () => {
+    const f = fixture(nativeSource); f.start(); await settle();
+    expect(f.player.classList.contains(hiddenClass)).toBe(false);
+    expect(f.displayed()).toMatchObject({source: nativeSource, translated: translation(nativeSource)});
   });
 });
 

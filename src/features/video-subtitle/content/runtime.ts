@@ -1,6 +1,6 @@
 /**
  * @file src/features/video-subtitle/content/runtime.ts
- * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单、完整句学习与下载。
+ * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单、完整句学习与下载；独立管理 YouTube 播放器的原生字幕隐藏所有权，切句不释放，切模式、离开与卸载时恢复。
  * 主要内容：挂载原句学习与独立本地读音控制器，原文变化立即作废旧读音，字幕隐藏或关闭取消请求；读音开关复用既有配置与菜单并保持仅译文模式语义，说明与下载可独立展开，Escape 逐层关闭且菜单关闭重置临时展开状态；双语顺序复用现有外观配置即时保存与重排，不重发翻译；显示模式变化重新授予同句翻译资格并复用已有缓存，不混入字幕原文及导出；媒体切换和配置变化取消有界字幕预取并清理控制，协调字幕校时、预翻译与补译导出确认，并为可选逐字高亮提供当前句时间；X 分片加载尊重原生轨道优先级和原译文成对显示，播放器内换模型保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
  * 模块边界：本文件只在 content 页面编排，同视频底控的局部显隐订阅与字幕布局共用帧调度，帧内先校准自有菜单宿主再测菜单，并随关闭、重绑和销毁清理；完整 AI 字幕缓存请求与提交身份由 subtitleSession 拥有，requestSession 将完整采集映射为后台单流的唯一请求代际；采集资源仍归 fullCapture，不拦截 fetch/XHR 也不实现翻译 provider，翻译经统一 service client。
  */
@@ -27,6 +27,7 @@ import {
   VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS,
   VIDEO_DISPLAY_HIDDEN_CLASS,
   VIDEO_NORMALIZED_CAPTION_CLASS,
+  VIDEO_NATIVE_CAPTION_HIDDEN_CLASS,
   VIDEO_CAPTION_STABILITY_MS,
   VIDEO_CAPTION_MAX_WAIT_MS,
   normalizeVideoSubtitleDisplayMode,
@@ -146,6 +147,7 @@ export function mountVideoSubtitleTranslation(): () => void {
   let uiSyncTimer: number | undefined;
   let captionObserver: MutationObserver | undefined;
   let observedContainer: HTMLElement | null = null;
+  let nativeCaptionPlayer: HTMLElement | null = null;
   let menuElement: HTMLElement | null = null;
   let buttonElement: HTMLButtonElement | null = null;
   let pendingTranslationSource = '';
@@ -331,6 +333,18 @@ export function mountVideoSubtitleTranslation(): () => void {
   const canReadVideo = () => config.on && config.videoTranslationEnabled && config.videoSubtitleVisible !== false;
 
   const canTranslateVideo = () => canReadVideo() && normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode) !== 'original-only';
+
+  // 隐藏状态属于播放器会话，而非某一条 cue 或可被 YouTube 整块替换的字幕容器。
+  // 暂时隐藏字幕时仍接管原生显示；切回原文或关闭功能后交还给网站。
+  const syncNativeCaptionVisibility = () => {
+    const nextPlayer = config.on && config.videoTranslationEnabled && isYouTubeVideoPage()
+      && (config.videoSubtitleVisible === false || normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode) !== 'original-only')
+      ? playerLocator.getTarget()?.player || null : null;
+    if (nativeCaptionPlayer === nextPlayer) return;
+    nativeCaptionPlayer?.classList.remove(VIDEO_NATIVE_CAPTION_HIDDEN_CLASS);
+    nativeCaptionPlayer = nextPlayer;
+    nativeCaptionPlayer?.classList.add(VIDEO_NATIVE_CAPTION_HIDDEN_CLASS);
+  };
 
   const clearPretranslationState = (clearTrack = false, preserveTranslations = false) => {
     pretranslationController.clear();
@@ -1592,6 +1606,7 @@ export function mountVideoSubtitleTranslation(): () => void {
       resetTranslationState();
     }
     videoPageKey = nextVideoPageKey;
+    syncNativeCaptionVisibility();
     if (!canReadVideo()) closeSentenceLearning();
     if (!isSupportedVideoPage() || !config.on) {
       humanCaptions.clear();
@@ -1724,6 +1739,8 @@ export function mountVideoSubtitleTranslation(): () => void {
     learning.destroy();
     learningPlacement.dispose();
     destroyed = true; aiModelSetup.reset(); karaoke.destroy();
+    nativeCaptionPlayer?.classList.remove(VIDEO_NATIVE_CAPTION_HIDDEN_CLASS);
+    nativeCaptionPlayer = null;
     humanCaptions.clear();
     downloads.destroy();
     nativeFullscreen.destroy();

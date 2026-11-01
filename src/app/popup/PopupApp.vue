@@ -1,9 +1,10 @@
 <!--
  @file src/app/popup/PopupApp.vue
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页，并为从划词抽屉打开的设置保留明确返回原网页的入口。
- 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；复用真实全文完成状态呈现首次翻译指引和就地自助诊断，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
+ 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；复用真实全文完成状态呈现首次翻译指引和就地自助诊断，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
  信息层级：服务摘要只保留当前服务与模型；悬停和划词的快捷开关与标题同排，独立快捷方案的作用范围仍明确说明，圈选快捷键只在操作示意中展示。
  缓存清理：每次清理拥有独立的可取消等待，失活或卸载释放旧等待，超时恢复按钮并提示结果未确认，后台确认清除但页面仍同步时展示中性状态；全局暂停不取消清理，旧回复不能覆盖新请求。
+ 侧边栏入口：支持的浏览器提供直接粘贴文本翻译的原生面板，点击时同步调用 open 保留用户手势，成功后关闭弹窗；失败保留入口与重试提示，不把原文保存到配置。
  模块边界：组件编排 UI、浏览器导航事件与生命周期；页内面板通过授权来源固定发起网页，页面消息归属由 pageActions 管理，不实现翻译 provider、缓存存储或 content 挂载；公共配置由 services/config 管理；配置草稿复用共享编辑会话，保留 post 合并和关闭补丁交接。
 -->
 <!-- Popup 页面归 app 层所有；WXT 入口只负责调用挂载函数。 -->
@@ -165,6 +166,12 @@
         </button>
       </div>
 
+      <button v-if="sidepanelAvailable" class="sidebar-translation-entry" type="button" data-testid="sidebar-translation"
+        :aria-busy="sidepanelOpening" :disabled="sidepanelOpening || (browserCapabilities.browser !== 'firefox' && pageState.windowId === undefined)" :onClick="popupActions.sidebar">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13M5.5 8h4M5.5 11h4"/></svg>
+        <span>{{ t('sidepanel.title') }}</span><span aria-hidden="true">›</span>
+      </button>
+
       <template v-if="!pageDiagnostic">
         <p v-if="pageResultStatus === 'translating'" class="first-use-hint" role="status" data-i18n-ignore>{{ diagnosticUi('first-use-translating') }}</p>
         <p v-else-if="pageResultStatus === 'translated'" class="first-use-hint" role="status" data-i18n-ignore>{{ diagnosticUi('first-use-ready') }}</p>
@@ -178,7 +185,7 @@
         :onSetAlwaysTranslated="pageButtons.always"
         :onSetExtensionDisabled="pageButtons.disabled"
         />
-        <div class="translation-tools">
+        <div :ref="setPageFontFocusAnchor" class="translation-tools" tabindex="-1">
           <DiagnosticNotice v-if="pageDiagnostic" :diagnostic="pageDiagnostic" :language="config.uiLanguage" :busy="translating" :version="version" @action="diagnosticAction" />
           <span class="display-mode-slot" :class="{'with-page-font': pageFontEntryVisible}" data-i18n-ignore>
             <ElTooltip v-if="pageFontEntryVisible" :ref="setPageFontTooltip" :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="350" :hide-after="0"
@@ -186,7 +193,7 @@
               <template #content>
                 <span class="translation-tool-tooltip-copy" data-testid="page-font-tooltip"><span>{{ pageFontButton.label }}</span><small>{{ t('popup.pageFont.hint') }}</small></span>
               </template>
-              <button class="display-mode-button page-font-entry" :class="{'is-browser-default': config.browserDefaultTranslationFont}" type="button" data-testid="page-font-entry"
+              <button :ref="setPageFontEntry" class="display-mode-button page-font-entry" :class="{'is-browser-default': config.browserDefaultTranslationFont}" type="button" data-testid="page-font-entry"
                 :data-font-state="pageFontButton.state" :aria-label="pageFontButton.ariaLabel" :aria-pressed="config.browserDefaultTranslationFont"
                 :aria-description="pageFontState.error ? pageFontButton.label : undefined"
                 :aria-busy="pageFontState.busy" :disabled="pageFontButton.disabled" :onClick="pageFontButton.toggle">
@@ -200,10 +207,10 @@
               :persistent="false" :show-arrow="false" :disabled="!popupContext.active.value || drawerVisible" placement="top-end" effect="light" popper-class="translation-tool-tooltip">
               <template #content><span class="translation-tool-tooltip-copy" data-testid="display-mode-tooltip">{{ displayModeButton.label }}</span></template>
               <button class="display-mode-button" type="button" data-testid="popup-display-mode"
-                :data-display-mode="config.display === 1 ? 'bilingual' : 'translation-only'"
-                :aria-label="t('popup.displayMode.translationOnly')" :aria-pressed="config.display === 1" :aria-description="displayModeButton.disabled ? displayModeButton.label : undefined"
+                :data-display-mode="currentPageDisplay === 1 ? 'bilingual' : 'translation-only'"
+                :aria-label="t('popup.displayMode.translationOnly')" :aria-pressed="currentPageDisplay === 1" :aria-description="displayModeButton.disabled ? displayModeButton.label : undefined"
                 :disabled="displayModeButton.disabled" :onClick="displayModeButton.toggle">
-                <svg v-if="config.display === 1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg v-if="currentPageDisplay === 1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9.5 17h-5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2H12a2 2 0 0 1 2 2v3M5.5 12.5l2-5.5 2 5.5M6.2 10.5h2.6"/>
                   <rect x="9.5" y="8" width="12" height="13" rx="2"/>
                   <path d="M15.5 10.5v2M12.5 12.5h6M13.3 12.5c.4 2.5 2.3 4.5 5.2 5.5M17.7 12.5c-.4 2.5-2.3 4.5-5.2 5.5"/>
@@ -216,6 +223,15 @@
             </ElTooltip>
           </span>
         </div>
+      </div>
+
+      <div v-if="pageFontState.error && pageFontEntryVisible" class="page-font-error" data-testid="page-font-error" data-i18n-ignore>
+        <span class="page-font-error-copy" role="alert">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M8 4.5v4.1M8 11.3h.01"/></svg>
+          <span>{{ t(pageFontState.error) }}</span>
+        </span>
+        <button class="page-font-retry" type="button" data-testid="page-font-retry" :aria-label="t('popup.pageFont.retryAction')"
+          :disabled="pageFontButton.disabled" :onClick="retryPageFont">{{ t('popup.pageFont.retry') }}</button>
       </div>
 
       <p v-if="notice" class="notice" :class="noticeType" :role="noticeType === 'error' ? 'alert' : 'status'" :aria-live="noticeType === 'error' ? 'assertive' : 'polite'">{{ notice }}</p>
@@ -396,10 +412,11 @@
 
       <div v-else class="drawer-content">
         <div class="choice-block">
-          <label>翻译模式</label>
+          <label>{{ translateLegacy('全局翻译模式') }}</label>
           <div class="chips two" role="group" aria-label="翻译模式">
             <button v-for="item in drawerDisplayModes" :key="item.value" type="button" :class="{ selected: config.display === item.value }" :aria-pressed="config.display === item.value" :disabled="item.disabled" :onClick="item.choose">{{ item.label }}</button>
           </div>
+          <p v-if="currentSiteTranslationOnly" class="drawer-help">{{ translateLegacy('此网站已设为仅译文，可在网站偏好中修改') }} <button type="button" :onClick="popupActions.siteSettings">{{ translateLegacy('网站偏好') }}</button></p>
         </div>
       </div>
 
@@ -463,6 +480,7 @@ import {
   type PopupQuickFeatureId,
 } from '@/src/core/config/interfaceAppearance';
 import { resolveAIContextPresentation } from '@/src/ui/view-model/aiContext';
+import {resolveSiteTranslationDisplay} from '@/src/core/site-rules/domain';
 import {createPopupPageActions, type PopupPageState, type PopupSiteRulePatch} from './pageActions';
 import {createPopupTabSource} from './sourceTab';
 import {createPopupPageFontActions, type PopupPageFontState} from './pageFontActions';
@@ -478,6 +496,7 @@ import {popupQuickFeatureIconPaths, popupQuickFeatureIconTones, type PopupQuickF
 import {useUiI18n} from '@/src/ui/i18n';
 import PopupSiteRule from './PopupSiteRule.vue';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
+import {canOpenTranslationSidepanel, openTranslationSidepanel} from '@/src/platform/browser/translationSidepanel';
 import {readFreePoolAccess, requestFreeProviderAccess, subscribeFreeProviderAccessChanges, type FreePoolAccess} from '@/src/platform/browser/freeProviderPermissions';
 import {FREE_TRANSLATION_PROVIDERS} from '@/src/core/config/freeTranslation';
 import {createPdfReaderUrl, getPdfSourceUrl} from '@/src/features/document-translation/core/pdfSource';
@@ -504,9 +523,13 @@ import {featureServiceDefinitions, getFeatureService} from '@/src/core/config/fe
 const PopupServices = defineAsyncComponent(() => import('./PopupServices.vue'));
 const brandTooltip = ref<TooltipInstance>();
 const pageFontTooltip = ref<TooltipInstance>();
+const pageFontEntry = shallowRef<HTMLButtonElement>();
+const pageFontFocusAnchor = shallowRef<HTMLElement>();
 const displayModeTooltip = ref<TooltipInstance>();
 // 翻译卡片在模块顺序的 v-for 中，函数 ref 保留唯一实例，避免 Vue 将普通 ref 收集为数组。
 const setPageFontTooltip = (tooltip: unknown) => {pageFontTooltip.value = tooltip ? tooltip as TooltipInstance : undefined;};
+const setPageFontEntry = (element: unknown) => {pageFontEntry.value = element ? element as HTMLButtonElement : undefined;};
+const setPageFontFocusAnchor = (element: unknown) => {pageFontFocusAnchor.value = element ? element as HTMLElement : undefined;};
 const setDisplayModeTooltip = (tooltip: unknown) => {displayModeTooltip.value = tooltip ? tooltip as TooltipInstance : undefined;};
 const ElDrawer = defineAsyncComponent(() => import('./PopupDrawer'));
 const UiLanguageOnboarding = defineAsyncComponent(() => import('@/src/ui/components/UiLanguageOnboarding.vue'));
@@ -528,6 +551,8 @@ const activeDrawer = ref<DrawerName>('hover');
 const pageState = reactive<PopupPageState>({tabId: null, url: '', domain: '', translated: false, busy: false, savingRule: false});
 const {busy: translating, translated: pageTranslated, tabId: currentTabId, domain: currentSiteDomain} = toRefs(pageState);
 const currentPdfSource = computed(() => getPdfSourceUrl(pageState.url));
+const currentSiteTranslationOnly = computed(() => Boolean(pageState.domain && config.value.translationOnlyDomains?.includes(pageState.domain)));
+const currentPageDisplay = computed(() => resolveSiteTranslationDisplay(config.value, pageState.url));
 const pageTranslationLabel = computed(() => t(currentPdfSource.value ? 'document.pdfReading.openReader' : pageTranslated.value ? 'popup.restoreCurrentPage' : 'popup.translateCurrentPage'));
 const clearingCache = ref(false);
 const donationVisible = ref(false);
@@ -744,7 +769,7 @@ const selectionSummary = computed(() => config.value.selectionTranslatorMode ===
   ? '已关闭' : config.value.selectionTranslatorTrigger === 'contextMenu'
     ? t('selectionTrigger.contextMenu')
     : options.selectionTranslatorTriggers.find(item => item.value === config.value.selectionTranslatorTrigger)?.label || '显示图标');
-const displaySummary = computed(() => config.value.display === 1 ? `双语 · ${styleLabel.value}` : '仅显示译文');
+const displaySummary = computed(() => currentPageDisplay.value === 1 ? `双语 · ${styleLabel.value}` : '仅显示译文');
 const imageTranslationSummary = computed(() => !browserCapabilities.imageTranslation
   ? '当前浏览器不可用'
   : config.value.selectionAreaEnabled ? areaHotkeyDisplayName.value : config.value.disableImageTranslator ? '已关闭' : '悬停图片');
@@ -959,17 +984,30 @@ const donationActions = computed(() => {
 const popupActions = computed(() => {
   const current = popupContext.capture();
   const bind = (run: () => void | Promise<void>) => () => {if (current()) return run()};
-  return {settings: bind(() => openOptions()), serviceSettings: bind(() => openOptions('settings-services', undefined, config.value.service)),
-    services: bind(() => openDrawer('services')), cache: bind(clearCache)};
+  return {settings: bind(() => openOptions()), siteSettings: bind(() => openOptions('settings-sites')), serviceSettings: bind(() => openOptions('settings-services', undefined, config.value.service)),
+    services: bind(() => openDrawer('services')), sidebar: bind(openSidebarTranslation), cache: bind(clearCache)};
 });
+const sidepanelAvailable = canOpenTranslationSidepanel();
+const sidepanelOpening = ref(false);
+async function openSidebarTranslation() {
+  if (!popupContext.active.value || sidepanelOpening.value) return;
+  const current = popupContext.capture();
+  sidepanelOpening.value = true;
+  try {
+    // 原生 open 必须发生在点击调用栈内；窗口身份已由现有站点读取准备好。
+    await openTranslationSidepanel(pageState.windowId);
+    if (current()) closePopupSurface();
+  } catch {if (current()) showNotice(t('sidepanel.openError'), 'error');}
+  finally {sidepanelOpening.value = false;}
+}
 // 快捷模式属于整个弹窗；服务、显示模式或在途操作变化会淘汰旧按钮回调。
 const displayModeContext = useSettingsActionContext(() => popupContext.active.value,
-  () => [config.value, config.value.on, config.value.service, config.value.display, translating.value, pageState.savingRule]);
+  () => [config.value, config.value.on, config.value.service, config.value.display, currentSiteTranslationOnly.value, pageState.url, translating.value, pageState.savingRule]);
 const displayModeButton = computed(() => {
   const current = displayModeContext.capture(), next = config.value.display === 1 ? 0 : 1;
   const googleOnly = config.value.service === 'google' && next === 0;
-  const disabled = !config.value.on || translating.value || pageState.savingRule || googleOnly;
-  return {disabled, label: t(googleOnly ? 'popup.displayMode.googleBilingualOnly'
+  const disabled = !config.value.on || translating.value || pageState.savingRule || googleOnly || currentSiteTranslationOnly.value;
+  return {disabled, label: currentSiteTranslationOnly.value ? translateLegacy('此网站已设为仅译文，可在网站偏好中修改') : t(googleOnly ? 'popup.displayMode.googleBilingualOnly'
     : config.value.display === 1 ? 'popup.displayMode.bilingual' : 'popup.displayMode.translationOnly'),
     toggle: () => {if (current() && !disabled) config.value.display = next}};
 });
@@ -1001,6 +1039,15 @@ const pageFontButton = computed(() => {
     return pageFontState.error ? pageFontActions.retry() : pageFontActions.set(next);
   }};
 });
+async function retryPageFont() {
+  if (!pageFontState.error || pageFontButton.value.disabled) return;
+  // 重试会移除错误行且暂时禁用字体按钮；先保留工具组焦点，完成后仅在用户未移走焦点时返回按钮。
+  const anchor = pageFontFocusAnchor.value;
+  anchor?.focus({preventScroll: true});
+  await pageFontButton.value.toggle();
+  await nextTick();
+  if (anchor && document.activeElement === anchor && !pageFontButton.value.disabled) pageFontEntry.value?.focus({preventScroll: true});
+}
 // 按钮仅在能力可用时渲染；能力切换同步撤销 drawerContext，旧事件不能修改已隐藏功能。
 const drawerActions = computed(() => {
   const current = drawerContext.capture(), section = drawerSettingsSection[activeDrawer.value];

@@ -32,11 +32,12 @@ export function createTranslationCachePolicyBinding(deps: CachePolicyDependencie
         const signature = `${limits.maxBytes}:${limits.maxEntries}`;
         if (signature === requested) return maintenance;
         requested = signature;
-        maintenance = deps.setLimits(limits).catch((error: unknown) => {
-            // 只允许失败操作重置自己的去重标记，不能覆盖后来提交的新阈值。
-            if (requested === signature) requested = '';
+        const operation: Promise<void> = deps.setLimits(limits).catch((error: unknown) => {
+            // 配置可从 A 切到 B 再切回 A；只允许当前操作重置去重标记。
+            if (maintenance === operation) requested = '';
             throw error;
         });
+        maintenance = operation;
         // 每次维护只旁路告警一次；保留拒绝状态供管理请求重试，启动与配置订阅不用等待存储。
         void maintenance.catch(deps.warn);
         return maintenance;

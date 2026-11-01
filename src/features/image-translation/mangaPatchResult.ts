@@ -8,7 +8,7 @@ import type {OcrLine} from './core';
 import type {MangaRegion} from './services/mangaRegions';
 export interface MangaPatchRect {x: number; y: number; width: number; height: number}
 export interface MangaPatchPacket {width: number; height: number; patches: Array<MangaPatchRect & {image: string}>}
-export interface MangaCompressedPage {width: number; height: number; patches: Array<MangaPatchRect & {bytes: Uint8Array}>; lines: Array<OcrLine & {backgroundColor: string; sourceText?: string}>}
+export interface MangaCompressedPage {width: number; height: number; patches: Array<MangaPatchRect & {bytes: Uint8Array}>; lines: Array<OcrLine & {backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true}>}
 const MAX_PIXELS = 16_777_216;
 export const MANGA_LIGHT_CACHE_BYTES = 16 * 1024 * 1024;
 export const MANGA_LIGHT_CACHE_PAGES = 100;
@@ -87,7 +87,7 @@ export function compressMangaPage(packet: MangaPatchPacket, lines: MangaCompress
     })};
 }
 
-export function createMangaLightCache(maxPages = MANGA_LIGHT_CACHE_PAGES, maxBytes = MANGA_LIGHT_CACHE_BYTES) {
+export function createMangaLightCache(maxPages = MANGA_LIGHT_CACHE_PAGES, maxBytes = MANGA_LIGHT_CACHE_BYTES, onEvict?: (key:string,page:MangaCompressedPage)=>void) {
     const entries = new Map<string, {page: MangaCompressedPage; bytes: number}>();
     let bytes = 0;
     function remove(key: string) {const entry = entries.get(key); if (entry) {bytes -= entry.bytes; entries.delete(key);}}
@@ -100,7 +100,10 @@ export function createMangaLightCache(maxPages = MANGA_LIGHT_CACHE_PAGES, maxByt
                 + page.patches.reduce((sum, patch) => sum + patch.bytes.byteLength, 0);
             if (size > maxBytes || maxPages <= 0) return false;
             entries.set(key, {page, bytes: size}); bytes += size;
-            while (entries.size > maxPages || bytes > maxBytes) remove(entries.keys().next().value!);
+            while (entries.size > maxPages || bytes > maxBytes) {
+                const oldest=entries.keys().next().value!,entry=entries.get(oldest)!;remove(oldest);
+                try{onEvict?.(oldest,entry.page);}catch{/* 缓存上限不可被观察者阻断 */}
+            }
             return true;
         },
         remove,

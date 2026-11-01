@@ -1,7 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 const browserMock=vi.hoisted(()=>({permissions:{request:vi.fn()},extension:{inIncognitoContext:false},tabs:{getCurrent:vi.fn(async()=>({incognito:false}))},downloads:undefined as unknown}));
 vi.mock('webextension-polyfill',()=>({default:browserMock}));
-import {beginFirefoxMaterialBackup,beginFirefoxRecoveredMaterialBackup,beginMaterialBrowserBackup,beginRecoveredMaterialBackup,createMaterialBrowserOpfsPlatform,listFirefoxMaterialBackupLeftovers,listMaterialBackupLeftovers,prepareFirefoxMaterialBackupContext,removeFirefoxMaterialBackupLeftover,removeMaterialBackupLeftover,startObservedMaterialDownload,type MaterialBrowserBackupEnvironment,type MaterialBrowserDownloads} from '@/src/features/vocabulary/materialBackupBrowserSave';
+import {beginFirefoxMaterialBackup,beginFirefoxRecoveredMaterialBackup,beginMaterialBrowserBackup,beginRecoveredMaterialBackup,createMaterialBackupFallbackTarget,createMaterialBrowserFallbackTarget,createMaterialBrowserOpfsPlatform,supportsMaterialBackupTemporaryFiles,listMaterialBackupLeftoversInBrowser,listMaterialBackupLeftovers,prepareFirefoxMaterialBackupContext,removeMaterialBackupLeftoverInBrowser,removeMaterialBackupLeftover,startObservedMaterialDownload,type MaterialBrowserBackupEnvironment,type MaterialBrowserDownloads} from '@/src/features/vocabulary/materialBackupBrowserSave';
 import {saveMaterialBackup} from '@/src/features/vocabulary/materialBackupSave';
 
 const deferred=<T,>()=>{let resolve!:(value:T)=>void,reject!:(error:Error)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
@@ -13,15 +13,16 @@ function downloads(){
 }
 function filesystem(){
     const files=new Map<string,Uint8Array[]>(),deleted:string[]=[];let held=0;
+    const controls:{write?:(chunk:Uint8Array|string)=>Promise<void>;close?:()=>Promise<void>;abort?:()=>Promise<void>;read?:()=>void}={};
     const dir={getFileHandle:vi.fn(async(name:string,options?:{create?:boolean})=>{
         if(!files.has(name)){if(!options?.create)throw new DOMException('missing','NotFoundError');files.set(name,[]);}
-        return {createWritable:async()=>({write:async(chunk:Uint8Array|string)=>{files.get(name)!.push(typeof chunk==='string'?new TextEncoder().encode(chunk):chunk.slice());},close:async()=>{},abort:async()=>{files.set(name,[]);}}),getFile:async()=>new Blob(files.get(name))};
+        return {createWritable:async()=>({write:async(chunk:Uint8Array|string)=>{await controls.write?.(chunk);files.get(name)!.push(typeof chunk==='string'?new TextEncoder().encode(chunk):chunk.slice());},close:async()=>{await controls.close?.();},abort:async()=>{await controls.abort?.();files.set(name,[]);}}),getFile:async()=>{controls.read?.();return new Blob(files.get(name));}};
     }),removeEntry:vi.fn(async(name:string)=>{if(!files.has(name))throw new DOMException('missing','NotFoundError');files.delete(name);deleted.push(name);}),async *values(){for(const name of files.keys())yield {kind:'file',name};}};
     const names=new Set<string>();
     const root={getDirectoryHandle:async()=>dir},locks={request:async(name:string,_options:unknown,callback:(lock:unknown)=>Promise<void>)=>{
         if(names.has(name)){await callback(null);return;}names.add(name);held++;try{await callback({name});}finally{held--;names.delete(name);}
     }};
-    return {files,deleted,dir,root,locks,get held(){return held;}};
+    return {files,deleted,dir,root,locks,controls,get held(){return held;}};
 }
 function fixture(){
     const d=downloads(),fs=filesystem(),permission=vi.fn(async()=>true),urls:Blob[]=[];
@@ -30,6 +31,95 @@ function fixture(){
 }
 afterEach(async()=>{vi.stubEnv('BROWSER','firefox');browserMock.extension.inIncognitoContext=true;await prepareFirefoxMaterialBackupContext();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();browserMock.extension.inIncognitoContext=false;browserMock.tabs.getCurrent.mockReset().mockResolvedValue({incognito:false});Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});});
 describe('browser material backup target',()=>{
+    it('retains a disk-backed anchor source until the recipient confirms release',async()=>{
+        const f=fixture();let release!:()=>Promise<void>,file!:Blob;
+        Object.defineProperty(f.env,'downloads',{get(){throw Error('optional downloads permission must not be read');}});
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async(value,cleanup)=>{file=value;release=cleanup;});
+        await target.write(new Uint8Array([1,2,3]));expect(f.fs.files.size).toBe(1);
+        await expect(target.commit(new AbortController().signal)).resolves.toBe('initiated');
+        expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([1,2,3]);expect(f.permission).not.toHaveBeenCalled();
+        expect(f.fs.files.size).toBe(2);expect(f.fs.held).toBe(1);await target.abort();expect(f.fs.files.size).toBe(2);
+        await expect(target.write(new Uint8Array([4]))).rejects.toThrow('写入状态无效');await expect(target.commit(new AbortController().signal)).rejects.toThrow('提交状态无效');
+        await release();await release();await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('keeps a ready file recoverable when anchor handoff rejects after taking ownership',async()=>{
+        const f=fixture(),failure=Error('download start unknown');let release!:()=>Promise<void>;
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async(_file,cleanup)=>{release=cleanup;throw failure;});
+        await target.write(new Uint8Array([1]));await expect(target.commit(new AbortController().signal)).rejects.toBe(failure);await target.abort();
+        const result=await listMaterialBackupLeftovers(f.fs.root as unknown as FileSystemDirectoryHandle);expect(result.items).toHaveLength(1);expect(result.items[0].ready).toBe(true);
+        await expect(removeMaterialBackupLeftover(f.fs.root as unknown as FileSystemDirectoryHandle,f.fs.locks as unknown as LockManager,result.items[0].name)).rejects.toThrow('正在使用');
+        await release();await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it.each(['before-close','after-close','after-file'] as const)('cleans a cancelled fallback before handoff: %s',async phase=>{
+        const f=fixture(),controller=new AbortController(),handoff=vi.fn(async()=>{});
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,handoff);await target.write(new Uint8Array([1]));
+        if(phase==='before-close')controller.abort();else if(phase==='after-close')f.fs.controls.close=async()=>{controller.abort();};else f.fs.controls.read=()=>{controller.abort();};
+        await expect(target.commit(controller.signal)).rejects.toMatchObject({name:'AbortError'});await target.abort();await tick();
+        expect(handoff).not.toHaveBeenCalled();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('waits for an active disk write before aborting and rejects overlapping work',async()=>{
+        const f=fixture(),gate=deferred<void>();f.fs.controls.write=()=>gate.promise;
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async()=>{}),writing=target.write(new Uint8Array([1]));
+        await expect(target.write(new Uint8Array([2]))).rejects.toThrow('写入状态无效');await expect(target.commit(new AbortController().signal)).rejects.toThrow('提交状态无效');
+        let stopped=false;const stopping=target.abort().then(()=>{stopped=true;});await tick();expect(stopped).toBe(false);
+        gate.resolve();await writing;await stopping;await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('cleans after a failed pending write without hiding its failure',async()=>{
+        const f=fixture(),gate=deferred<void>(),failure=Error('disk full');f.fs.controls.write=()=>gate.promise;
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async()=>{}),writing=target.write(new Uint8Array([1]));
+        const observed=writing.catch(error=>error),stopping=target.abort();gate.reject(failure);
+        expect(await observed).toBe(failure);await stopping;await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('retries partial cleanup and does not release the file lock before deletion succeeds',async()=>{
+        const f=fixture();let release!:()=>Promise<void>;
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async(_file,cleanup)=>{release=cleanup;});await target.write(new Uint8Array([1]));await target.commit(new AbortController().signal);
+        const remove=f.fs.dir.removeEntry.getMockImplementation()!;let failed=false;
+        f.fs.dir.removeEntry.mockImplementation(async name=>{if(name.endsWith('.ready')&&!failed){failed=true;throw Error('marker delete failed');}return remove(name);});
+        await expect(release()).rejects.toThrow('marker delete failed');expect(f.fs.held).toBe(1);expect(f.fs.files.size).toBe(1);
+        await release();await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('retries manual marker deletion after the payload was already removed',async()=>{
+        const f=fixture(),name='fluentread-material-backup-v1-1700000000000-'+ 'b'.repeat(32)+'.tmp';f.fs.files.set(name,[new Uint8Array([1])]);f.fs.files.set(`${name}.ready`,[new TextEncoder().encode('{"v":1,"size":1}')]);
+        const remove=f.fs.dir.removeEntry.getMockImplementation()!;let failed=false;
+        f.fs.dir.removeEntry.mockImplementation(async entry=>{if(entry.endsWith('.ready')&&!failed){failed=true;throw Error('marker delete failed');}return remove(entry);});
+        const root=f.fs.root as unknown as FileSystemDirectoryHandle,locks=f.fs.locks as unknown as LockManager;
+        await expect(removeMaterialBackupLeftover(root,locks,name)).rejects.toThrow('marker delete failed');await tick();expect(f.fs.files.has(name)).toBe(false);expect(f.fs.files.has(`${name}.ready`)).toBe(true);expect(f.fs.held).toBe(0);
+        await removeMaterialBackupLeftover(root,locks,name);await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('retains the original failure when rollback also fails and permits an explicit cleanup retry',async()=>{
+        const f=fixture(),failure=Error('close failed'),cleanup=Error('abort failed');f.fs.controls.close=async()=>{throw failure;};f.fs.controls.abort=vi.fn().mockRejectedValueOnce(cleanup).mockResolvedValue(undefined);
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async()=>{});await target.write(new Uint8Array([1]));
+        await expect(target.commit(new AbortController().signal)).rejects.toMatchObject({name:'MaterialBackupSaveCleanupError',cause:failure,cleanupError:cleanup});expect(f.fs.files.size).toBe(1);expect(f.fs.held).toBe(1);
+        await target.abort();await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('recovers the original ready file without rewriting or removing it on download confirmation',async()=>{
+        const f=fixture(),name='fluentread-material-backup-v1-1700000000000-'+ 'b'.repeat(32)+'.tmp';
+        f.fs.files.set(name,[new Uint8Array([8,9])]);f.fs.files.set(`${name}.ready`,[new TextEncoder().encode('{"v":1,"size":2}')]);let release!:()=>Promise<void>;
+        const target=await createMaterialBrowserFallbackTarget('recovered.json',f.env,async(file,cleanup)=>{expect([...new Uint8Array(await file.arrayBuffer())]).toEqual([8,9]);release=cleanup;},name);
+        await expect(target.write(new Uint8Array([1]))).rejects.toThrow('不能改写');await expect(target.commit(new AbortController().signal)).resolves.toBe('initiated');
+        await release();await tick();expect(f.fs.held).toBe(0);expect(f.fs.files.size).toBe(2);
+        await removeMaterialBackupLeftover(f.fs.root as unknown as FileSystemDirectoryHandle,f.fs.locks as unknown as LockManager,name);expect(f.fs.files.size).toBe(0);
+    });
+    it('rejects unsafe, unavailable and incomplete fallback files while releasing admission locks',async()=>{
+        const f=fixture(),handoff=async()=>{};
+        for(const filename of ['', 'x'.repeat(256),undefined])await expect(createMaterialBrowserFallbackTarget(filename as string,f.env,handoff)).rejects.toThrow('文件名无效');
+        await expect(createMaterialBrowserFallbackTarget('x.json',f.env,handoff,'../x')).rejects.toThrow('文件名无效');
+        const active=await createMaterialBrowserFallbackTarget('x.json',f.env,handoff);await expect(createMaterialBrowserFallbackTarget('x.json',f.env,handoff)).rejects.toThrow('正在使用');await active.abort();await tick();
+        const name='fluentread-material-backup-v1-1700000000000-'+ 'b'.repeat(32)+'.tmp';f.fs.files.set(name,[new Uint8Array([1])]);
+        await expect(createMaterialBrowserFallbackTarget('x.json',f.env,handoff,name)).rejects.toThrow('未完成或无法验证');await tick();expect(f.fs.held).toBe(0);
+        f.fs.dir.getFileHandle.mockRejectedValueOnce(Error('OPFS unavailable'));await expect(createMaterialBrowserFallbackTarget('x.json',f.env,handoff)).rejects.toThrow('OPFS unavailable');await tick();expect(f.fs.held).toBe(0);
+    });
+    it('uses generic OPFS storage without downloads permission and verifies the owning tab first',async()=>{
+        const f=fixture();vi.stubEnv('BROWSER','chrome');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});vi.stubGlobal('crypto',{randomUUID:()=> 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'});
+        expect(supportsMaterialBackupTemporaryFiles()).toBe(true);let release!:()=>Promise<void>;
+        const target=await createMaterialBackupFallbackTarget('x.json',async(_file,cleanup)=>{release=cleanup;});await target.write(new Uint8Array([1]));await target.commit(new AbortController().signal);await release();await tick();
+        expect(browserMock.permissions.request).not.toHaveBeenCalled();expect((await listMaterialBackupLeftoversInBrowser()).items).toEqual([]);
+        browserMock.tabs.getCurrent.mockResolvedValueOnce({incognito:true});await expect(createMaterialBackupFallbackTarget('x.json',async()=>{})).rejects.toMatchObject({name:'MaterialBackupContextError'});expect(f.fs.files.size).toBe(0);
+    });
+    it('reports unsupported raw-buffer spill capabilities instead of allocating another large buffer',async()=>{
+        for(const navigator of [undefined,{storage:{}},{storage:{getDirectory:async()=>{}},locks:{}}]){vi.stubGlobal('navigator',navigator);expect(supportsMaterialBackupTemporaryFiles()).toBe(false);await expect(createMaterialBackupFallbackTarget('x.json',async()=>{})).rejects.toMatchObject({name:'MaterialBackupBufferCapacityError'});}
+        const f=fixture();vi.stubEnv('BROWSER','userscript');vi.stubGlobal('navigator',{storage:{getDirectory:async()=>f.fs.root},locks:f.fs.locks});expect(supportsMaterialBackupTemporaryFiles()).toBe(false);
+    });
     it('requests permission synchronously before any caller can await',async()=>{
         const f=fixture(),gate=deferred<boolean>();f.permission.mockReturnValueOnce(gate.promise);
         const choice=beginMaterialBrowserBackup('backup.json',f.env);expect(f.permission).toHaveBeenCalledOnce();expect(f.fs.files.size).toBe(0);
@@ -135,11 +225,11 @@ describe('browser material backup target',()=>{
         const opening=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledWith({permissions:['downloads']});granted=true;gate.resolve(true);
         const choice=await opening;if(choice.status!=='ready')throw Error('not ready');
         const saved=saveMaterialBackup(choice.target,async consume=>{await consume(new Uint8Array([1]));});await tick();f.d.emit(7,'complete');expect((await saved).state).toBe('saved');
-        expect((await listFirefoxMaterialBackupLeftovers()).items).toEqual([]);
+        expect((await listMaterialBackupLeftoversInBrowser()).items).toEqual([]);
         const name='fluentread-material-backup-v1-1700000000000-'+ 'd'.repeat(32)+'.tmp';f.fs.files.set(name,[new Uint8Array([1])]);f.fs.files.set(`${name}.ready`,[new TextEncoder().encode('{"v":1,"size":1}')]);
         browserMock.permissions.request.mockResolvedValue(true);
         const recovery=await beginFirefoxRecoveredMaterialBackup(name,'backup.json');if(recovery.status!=='ready')throw Error('not ready');await expect(recovery.target.write(new Uint8Array([9]))).rejects.toThrow('不能改写');await recovery.target.abort();
-        await removeFirefoxMaterialBackupLeftover(name);expect(f.fs.files.has(name)).toBe(false);
+        await removeMaterialBackupLeftoverInBrowser(name);expect(f.fs.files.has(name)).toBe(false);
         Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});
     });
     it('waits for the actual Firefox tab privacy state even when downloads permission is already granted',async()=>{
@@ -161,13 +251,13 @@ describe('browser material backup target',()=>{
         for(const tab of [{incognito:true},undefined,{}] as const){
             browserMock.tabs.getCurrent.mockResolvedValue(tab as never);
             expect(await prepareFirefoxMaterialBackupContext()).toBe(false);
-            await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
-            await expect(removeFirefoxMaterialBackupLeftover(name)).rejects.toThrow('隐私');
+            await expect(listMaterialBackupLeftoversInBrowser()).rejects.toThrow('隐私');
+            await expect(removeMaterialBackupLeftoverInBrowser(name)).rejects.toThrow('隐私');
             await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toThrow('隐私');
             await expect(beginFirefoxRecoveredMaterialBackup(name,'backup.json')).rejects.toThrow('隐私');
         }
         browserMock.tabs.getCurrent.mockRejectedValue(Error('tab query failed'));
-        await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
+        await expect(listMaterialBackupLeftoversInBrowser()).rejects.toThrow('隐私');
         await expect(beginFirefoxRecoveredMaterialBackup(name,'backup.json')).rejects.toThrow('隐私');
         expect(browserMock.permissions.request).not.toHaveBeenCalled();expect(directory).not.toHaveBeenCalled();expect(f.fs.files.size).toBe(0);
     });
@@ -222,13 +312,13 @@ describe('browser material backup target',()=>{
         const opening=beginFirefoxMaterialBackup('backup.json');expect(browserMock.permissions.request).toHaveBeenCalledOnce();
         browserMock.extension.inIncognitoContext=true;privacy.resolve({incognito:false});await expect(opening).rejects.toThrow('隐私');
         await expect(beginFirefoxMaterialBackup('backup.json')).rejects.toThrow('隐私');
-        await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('隐私');
+        await expect(listMaterialBackupLeftoversInBrowser()).rejects.toThrow('隐私');
         expect(browserMock.permissions.request).toHaveBeenCalledOnce();expect(directory).not.toHaveBeenCalled();
     });
     it('reports unavailable browser capabilities without requesting downloads access',async()=>{
         vi.stubEnv('BROWSER','chrome');expect(await prepareFirefoxMaterialBackupContext()).toBe(false);expect(browserMock.tabs.getCurrent).not.toHaveBeenCalled();expect(await beginFirefoxMaterialBackup('backup.json')).toEqual({status:'unavailable'});
         expect(await beginFirefoxRecoveredMaterialBackup('invalid','backup.json')).toEqual({status:'unavailable'});
-        await expect(listFirefoxMaterialBackupLeftovers()).rejects.toThrow('无法查看');await expect(removeFirefoxMaterialBackupLeftover('invalid')).rejects.toThrow('无法清理');expect(browserMock.permissions.request).not.toHaveBeenCalled();
+        await expect(listMaterialBackupLeftoversInBrowser()).rejects.toThrow('无法查看');await expect(removeMaterialBackupLeftoverInBrowser('invalid')).rejects.toThrow('无法清理');expect(browserMock.permissions.request).not.toHaveBeenCalled();
     });
     it('bounds and rejects unsafe cleanup and recovery requests',async()=>{
         const f=fixture(),root=f.fs.root as unknown as FileSystemDirectoryHandle,locks=f.fs.locks as unknown as LockManager;

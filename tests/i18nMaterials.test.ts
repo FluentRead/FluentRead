@@ -23,6 +23,11 @@ registerAllUiLanguageBundles();
 const languages = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 
 describe('学习材料旧模板本地化', () => {
+    it('大备份临时存储、未知下载状态和释放重试均有六语提示',()=>{
+        for(const source of ['正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。','无法确认下载是否开始，请检查浏览器下载。','下载已发起，关闭页面可能中断下载。','请先确认浏览器下载完成，再释放临时数据。','重新下载','当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。','已取消清理。','临时文件清理失败，请重试。','临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。','无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。'])for(const language of languages){
+            const catalog:Readonly<Record<string,string>>=learningMaterialLegacyText[language],translated=translateLegacyText(source,language);expect(translated).toBe(catalog[source]);expect(translated).not.toBe(source);
+        }
+    });
     it('六种词典完整接入运行时，界面与恢复错误均有实际译文', () => {
         const sources = Object.keys(learningMaterialLegacyText['en-US']);
         expect(sources.length).toBeGreaterThan(100);

@@ -169,8 +169,6 @@
   "正在导出材料备份…": "Exportation de la sauvegarde des documents…",
   "下载完成前请保持此页面打开。": "Gardez cette page ouverte jusqu’à la fin du téléchargement.",
   "取消导出": "Annuler l’exportation",
-  "当前浏览器使用内存准备下载，大备份可能占用较多内存。": "Ce navigateur utilise de la mémoire pour préparer le téléchargement ; les sauvegardes volumineuses peuvent en utiliser beaucoup.",
-  "下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。": "Le téléchargement a commencé. Fermer cette page peut l’interrompre. Vérifiez qu’il est terminé avant de libérer les données temporaires.",
   "下载已完成，释放临时数据": "Téléchargement terminé, libérer les données temporaires",
   "确认保存超出恢复上限的备份": "Confirmer l’enregistrement d’une sauvegarde dépassant la limite de restauration",
   "备份超过当前恢复上限": "La sauvegarde dépasse la limite de restauration actuelle",
@@ -276,5 +274,15 @@
   "材料备份传输格式无效": "Format de transfert de sauvegarde invalide",
   "材料备份分片长度无效": "Longueur de fragment de sauvegarde invalide",
   "材料备份过大": "La sauvegarde des ressources est trop volumineuse",
-  "材料备份错误代码无效": "Code d’erreur de sauvegarde invalide"
+  "材料备份错误代码无效": "Code d’erreur de sauvegarde invalide",
+  "正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。": "Préparation de la sauvegarde à télécharger. Les sauvegardes volumineuses nécessitent du stockage temporaire ; vérifiez que vous avez assez d’espace.",
+  "无法确认下载是否开始，请检查浏览器下载。": "Impossible de confirmer le début du téléchargement. Vérifiez les téléchargements du navigateur.",
+  "下载已发起，关闭页面可能中断下载。": "Le téléchargement a commencé. Fermer cette page peut l’interrompre.",
+  "请先确认浏览器下载完成，再释放临时数据。": "Vérifiez que le téléchargement est terminé dans le navigateur avant de libérer les données temporaires.",
+  "重新下载": "Télécharger à nouveau",
+  "当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。": "Ce navigateur ne peut pas créer de fichiers temporaires pour une sauvegarde volumineuse. Réessayez avec un navigateur permettant l’enregistrement direct ou le stockage privé de fichiers. Vos documents d’origine sont inchangés.",
+  "已取消清理。": "Nettoyage annulé.",
+  "临时文件清理失败，请重试。": "Le nettoyage des fichiers temporaires a échoué. Veuillez réessayer.",
+  "无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。": "Impossible de confirmer le début du téléchargement. Vérifiez les téléchargements du navigateur avant de réessayer ou de libérer les données temporaires.",
+  "临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。": "Le stockage temporaire est plein. Libérez de l’espace sur votre appareil ou réessayez avec un navigateur permettant l’enregistrement direct de fichiers. Vos documents d’origine sont inchangés."
 }

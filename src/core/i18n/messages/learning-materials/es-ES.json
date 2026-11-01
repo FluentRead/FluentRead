@@ -169,8 +169,6 @@
   "正在导出材料备份…": "Exportando copia de seguridad de materiales…",
   "下载完成前请保持此页面打开。": "Mantén esta página abierta hasta que termine la descarga.",
   "取消导出": "Cancelar exportación",
-  "当前浏览器使用内存准备下载，大备份可能占用较多内存。": "Este navegador usa memoria para preparar la descarga; las copias grandes pueden consumir mucha memoria.",
-  "下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。": "La descarga ha comenzado. Cerrar esta página puede interrumpirla. Comprueba que haya terminado antes de liberar los datos temporales.",
   "下载已完成，释放临时数据": "Descarga terminada, liberar datos temporales",
   "确认保存超出恢复上限的备份": "Confirmar el guardado de una copia que supera el límite de restauración",
   "备份超过当前恢复上限": "La copia supera el límite de restauración actual",
@@ -276,5 +274,15 @@
   "材料备份传输格式无效": "Formato de transferencia de la copia no válido",
   "材料备份分片长度无效": "Longitud de fragmento de la copia no válida",
   "材料备份过大": "La copia de materiales es demasiado grande",
-  "材料备份错误代码无效": "Código de error de la copia no válido"
+  "材料备份错误代码无效": "Código de error de la copia no válido",
+  "正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。": "Preparando la copia para descargar. Las copias grandes necesitan almacenamiento temporal; asegúrate de tener espacio suficiente.",
+  "无法确认下载是否开始，请检查浏览器下载。": "No se puede confirmar si la descarga ha comenzado. Revisa las descargas del navegador.",
+  "下载已发起，关闭页面可能中断下载。": "La descarga ha comenzado. Cerrar esta página puede interrumpirla.",
+  "请先确认浏览器下载完成，再释放临时数据。": "Confirma que la descarga haya terminado en el navegador antes de liberar los datos temporales.",
+  "重新下载": "Descargar de nuevo",
+  "当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。": "Este navegador no puede crear archivos temporales para una copia grande. Inténtalo en un navegador que permita guardar archivos directamente o usar almacenamiento privado. Tus materiales originales no han cambiado.",
+  "已取消清理。": "Limpieza cancelada.",
+  "临时文件清理失败，请重试。": "No se pudieron limpiar los archivos temporales. Vuelve a intentarlo.",
+  "无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。": "No se puede confirmar si la descarga ha comenzado. Revisa las descargas del navegador antes de reintentar o liberar los datos temporales.",
+  "临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。": "El almacenamiento temporal está lleno. Libera espacio en el dispositivo o inténtalo en un navegador que permita guardar archivos directamente. Tus materiales originales no han cambiado."
 }

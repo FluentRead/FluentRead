@@ -1502,16 +1502,16 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         state.downloadError = 'Input document to PDFDocument.load is encrypted.'; await flush();
         const failure = walkHost(root).find(entry => entry.props.class === 'download-failure')!;
         const alert = walkHost(failure).find(entry => entry.props.role === 'alert')!;
-        expect(hostText(alert)).toBe(getDocumentDownloadCopy('zh-CN').protectedFailed);
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('zh-CN').failedTitle + getDocumentDownloadCopy('zh-CN').protectedFailed);
         const details = walkHost(failure).find(entry => entry.type === 'details')!;
         expect(details.props.open).toBeUndefined(); expect(hostText(details)).toContain(state.downloadError);
         expect(walkHost(root).find(entry => entry.type === 'button' && hostText(entry) === '下载原文')!.props.disabled).toBe(false);
         expect(state.translatedSegments).toEqual(['保留校订']);
         state.language = 'en-US'; await flush();
-        expect(hostText(alert)).toBe(getDocumentDownloadCopy('en-US').protectedFailed);
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('en-US').failedTitle + getDocumentDownloadCopy('en-US').protectedFailed);
     });
 
-    it.each(['layout', 'readable'] as const)('downloads the selected %s PDF presentation directly from its version action', async presentation => {
+    it.each(['layout', 'readable'] as const)('downloads the selected %s PDF presentation after choosing a version', async presentation => {
         await state.loadFiles([file('presentation.pdf')]);
         state.editSegment(0, '可复制的实际校订文字');
         if (presentation === 'readable') state.pdfPresentation = presentation;

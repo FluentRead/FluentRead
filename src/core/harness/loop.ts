@@ -1,7 +1,7 @@
 /**
  * @file src/core/harness/loop.ts
  * 文件职责：以供应商无关的循环串联会话消息、只读工具与最终回答，保持 DeepSeek Harness 的事件先记录后投影顺序。
- * 主要内容：注入模型生成和工具执行，记录每步开始、助手消息、配对工具结果与结束，约束次数、重复调用编号、取消及总超时。
+ * 主要内容：注入模型生成和可选工具执行，无工具请求无需执行器；记录每步事件并约束次数、重复编号、取消和总超时。
  * 模块边界：本模块不依赖 AI SDK、浏览器、配置或网络；FluentRead 服务层负责把实际模型协议适配为这里的纯类型端口。
  */
 import {HarnessLedger, type HarnessEvent, type HarnessMessage} from './surface';
@@ -14,7 +14,7 @@ export type HarnessGenerate = (input: HarnessGenerateInput) => Promise<HarnessGe
 export type HarnessToolExecutor = (call: HarnessToolCall, signal: AbortSignal) => Promise<string>;
 export interface HarnessLoopInput {
     generate: HarnessGenerate;
-    executeTool: HarnessToolExecutor;
+    executeTool?: HarnessToolExecutor;
     system: string;
     user: string;
     history?: readonly HarnessMessage[];
@@ -28,6 +28,7 @@ export interface HarnessLoopInput {
 export interface HarnessLoopResult {text: string; ledger: HarnessEvent[]}
 
 export async function runHarnessLoop(input: HarnessLoopInput): Promise<HarnessLoopResult> {
+    if (input.tools.length && !input.executeTool) throw new Error('已声明的阅读工具缺少执行器');
     const ledger = new HarnessLedger();
     const maxModelCalls = Math.min(6, Math.max(1, input.maxModelCalls ?? 4));
     const maxTools = Math.min(6, Math.max(0, input.maxTools ?? 2));
@@ -67,7 +68,7 @@ export async function runHarnessLoop(input: HarnessLoopInput): Promise<HarnessLo
         const callIds = new Set<string>();
         for (let step = 0; step < maxModelCalls; step += 1) {
             ensureActive();
-            if (step > 0) onText?.('');
+            if (step > 0 && onText) onText('');
             ledger.append('step/start', {step});
             const result = await wait(input.generate({system: input.system, messages: ledger.messagesSnapshot(), tools: input.tools, signal, onText}));
             ensureActive();
@@ -90,7 +91,7 @@ export async function runHarnessLoop(input: HarnessLoopInput): Promise<HarnessLo
             for (const call of result.toolCalls) {
                 ensureActive();
                 toolCount += 1;
-                const output = await wait(input.executeTool(call, signal));
+                const output = await wait(input.executeTool!(call, signal));
                 ensureActive();
                 ledger.appendToolResult({role: 'tool', content: [{type: 'tool-result', toolCallId: call.id, toolName: call.name, output: {type: 'text', value: output}}]});
             }

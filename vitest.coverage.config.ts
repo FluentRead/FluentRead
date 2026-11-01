@@ -809,6 +809,7 @@ export default defineConfig({
                 'src/core/config/pageTranslation.ts',
                 'src/core/translation/languages.ts',
                 'src/core/translation/prompts.ts',
+                'src/core/translation/pageSummaryReference.ts',
                 'src/core/translation/resultValidation.ts',
                 'src/features/vocabulary/background/handler.ts',
                 'src/features/vocabulary/learningModel.ts',

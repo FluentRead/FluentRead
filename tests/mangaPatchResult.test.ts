@@ -1,10 +1,16 @@
-import {describe, it, expect} from 'vitest';
+import {describe, it, expect, vi} from 'vitest';
 import {parseMangaPatchPacket, mangaPatchRects, mangaMaskBoxes, compressMangaPage, createMangaLightCache} from '@/src/features/image-translation/mangaPatchResult';
 import {normalizeMangaCachePages, mangaCachePixelBudget} from '@/src/core/config/manga';
 const region = (x0=10,y0=10,x1=20,y1=20,fontSize=10) => ({text:'Hello',bbox:{x0,y0,x1,y1},fontSize});
 const packet = () => ({width:100,height:100,patches:[{x:1,y:2,width:10,height:20,image:'data:image/png;base64,AQID'}]});
 const lines = [{text:'译文',sourceText:'Hello',bbox:{x0:1,y0:2,x1:11,y1:22},backgroundColor:'transparent'}];
 describe('漫画局部结果与有界轻量缓存',()=>{
+    it('容量淘汰通知抛错不阻止新缓存或破坏上限',()=>{
+        const page=compressMangaPage(packet(),lines),evicted=vi.fn(()=>{throw Error('observer failure');});
+        const cache=createMangaLightCache(1,10000,evicted);expect(cache.put('a',page)).toBe(true);
+        expect(cache.put('b',page)).toBe(true);expect(evicted).toHaveBeenCalledWith('a',page);
+        expect(cache.get('a')).toBeUndefined();expect(cache.get('b')).toBe(page);expect(cache.stats().pages).toBe(1);
+    });
     it.each([[undefined,12],[null,12],[NaN,12],[Infinity,12],['6',12],[0,1],[-2,1],[25,24],[3.9,3],[12,12]])('规范化快速容量 %s', (input,expected)=>{
         expect(normalizeMangaCachePages(input)).toBe(expected);expect(mangaCachePixelBudget(input)).toBe(Number(expected)*2_000_000);
     });

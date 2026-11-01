@@ -102,6 +102,13 @@
       ],
       "scenario": "实际模型下载、删除与错误恢复"
     },
+    "src/features/image-translation/ui/MangaReadingPanel.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/mangaReadingPanel.test.ts"
+      ],
+      "scenario": "实际 Vue 漫画目标选择、分页、复制竞争、取消与焦点"
+    },
     "src/features/image-translation/ui/MangaSettings.vue": {
       "kind": "behavior",
       "tests": [

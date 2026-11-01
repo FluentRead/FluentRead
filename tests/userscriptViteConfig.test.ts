@@ -203,18 +203,25 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
+        // 每次用独立缓存验证真实 worker 的首次压缩，避免旧构建缓存让断言跳过压缩器。
+        const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-positive-'));
+        mkdirSync(resolve(root, 'userscript'));
+        writeFileSync(resolve(root, 'userscript/zopfliBuildWorker.cjs'),
+            `require(${JSON.stringify(resolve(process.cwd(), 'userscript/zopfliBuildWorker.cjs'))});\n`);
         const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
-        const first = await gzipLargeStandaloneUserscriptData(input, process.cwd());
-        const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), process.cwd());
-        expect(first).toEqual(second);
-        expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
-        expect(gunzipSync(first)).toEqual(before);
-        expect(input).toEqual(before);
-        expect(process.listeners('uncaughtException')).toEqual(uncaught);
-        expect(process.listeners('unhandledRejection')).toEqual(unhandled);
+        try {
+            const first = await gzipLargeStandaloneUserscriptData(input, root);
+            const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), root);
+            expect(first).toEqual(second);
+            expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
+            expect(gunzipSync(first)).toEqual(before);
+            expect(input).toEqual(before);
+            expect(process.listeners('uncaughtException')).toEqual(uncaught);
+            expect(process.listeners('unhandledRejection')).toEqual(unhandled);
+        } finally {rmSync(root, {recursive: true, force: true});}
     });
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {

@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesJapaneseMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const jaJPMessages = {
     "settings.requestLimits.globalTitle": "リクエスト制限",
     "settings.requestLimits.globalHelp": "個別設定のないサービスとモデルは、この制限を共有します。",
     ...aiRequestTimeoutMessages["ja-JP"],
+    ...selectionDictionaryMessages["ja-JP"],
     ...sectionTranslationRulesJapaneseMessages,
     "settings.requestLimits.retryIntervals": "再試行の間隔",
     "settings.requestLimits.apiKeyRecovery": "失敗した Key のクールダウン",

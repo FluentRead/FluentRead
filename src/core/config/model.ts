@@ -3,6 +3,7 @@
  *
  * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
+ * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
  * AI 多段预算：默认每批最多 8 个可翻译片段、2000 原文字符，关闭功能保留预算，读取与导入时共享有界数字规范化。
@@ -12,6 +13,7 @@
 
 import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS, normalizeAiMultiSegmentMaxSegments, normalizeAiMultiSegmentMaxCharacters} from './aiMultiSegment';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
+import {normalizeWordDictionarySource, type WordDictionarySourceSetting} from './selectionDictionary';
 import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
@@ -524,6 +526,7 @@ export class Config {
     selectionTranslatorDelay: number; // 选区稳定后显示划词翻译入口的延迟（毫秒）
     selectionTranslatorAutoDismiss: boolean; // 继续阅读或复制原文时收起，避免浮层长时间遮挡页面
     selectionTranslatorBidirectional: boolean; // 中英目标下为同语言选区提供反向划词入口
+    selectionDictionarySource: WordDictionarySourceSetting; // auto 保留本地优先；指定后只查询所选词典
     selectionTtsVoices: string[]; // 划词朗读的 Edge TTS 音色回退顺序
     selectionTtsMode: LocalTtsMode; // 朗读在线/本地合成策略
     selectionTtsLocalVoice: LocalTtsVoiceId; // 本地 Kokoro 音色，auto 表示按语言选择
@@ -738,6 +741,7 @@ export class Config {
         this.selectionTranslatorDelay = DEFAULT_SELECTION_TRANSLATOR_DELAY;
         this.selectionTranslatorAutoDismiss = true;
         this.selectionTranslatorBidirectional = false; // 保留默认的同语言跳过，用户可按需开启双向入口
+        this.selectionDictionarySource = 'auto';
         this.selectionTtsVoices = []; // 默认按当前语言使用内置音色回退顺序
         this.selectionTtsMode = DEFAULT_LOCAL_TTS_MODE;
         this.selectionTtsLocalVoice = DEFAULT_LOCAL_TTS_VOICE;
@@ -1438,6 +1442,7 @@ export function normalizeConfig(value: unknown): Config {
         source.selectionTranslatorDelay,
     );
     normalized.selectionTranslatorBidirectional = source.selectionTranslatorBidirectional === true;
+    normalized.selectionDictionarySource = normalizeWordDictionarySource(source.selectionDictionarySource);
     normalized.selectionTranslatorAutoDismiss = typeof source.selectionTranslatorAutoDismiss === 'boolean'
         ? source.selectionTranslatorAutoDismiss : true;
     // 兼容上一版“触发方式 + 可选快捷键”配置，并将最终状态收敛为单一触发方式。

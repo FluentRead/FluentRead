@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/zh-CN.json';
 import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
 import {aiRequestTimeoutChineseMessages} from './aiRequestTimeout';
+import {selectionDictionaryChineseMessages} from './selectionDictionary';
 import {sectionTranslationRulesChineseMessages} from './sectionTranslationRules';
 import {pdfReadingChineseMessages} from './pdfReading';
 import {informationHighlightChineseMessages} from './informationHighlight';
@@ -543,6 +544,7 @@ export const zhCNMessages = {
     "settings.requestLimits.globalTitle": "请求限制",
     "settings.requestLimits.globalHelp": "未单独设置的服务和模型共用这些限制",
     ...aiRequestTimeoutChineseMessages,
+    ...selectionDictionaryChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",
     "settings.requestLimits.apiKeyRecovery": "失败 Key 冷却时间",

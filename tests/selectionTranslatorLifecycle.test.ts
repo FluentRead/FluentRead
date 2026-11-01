@@ -1278,6 +1278,37 @@ describe('SelectionTranslator lifecycle after extension reload', () => {
         expect(fixture.state.wordCardError).toBe('');
         expect(fixture.state.isWordCardSupportLoading).toBe(false);
     });
+
+    it('switches dictionary sources without restarting translation and discards the previous source response', async () => {
+        const fixture = mountSelection();
+        let release!: (response: any) => void;
+        fixture.browser.runtime.sendMessage.mockImplementation((message: any) => {
+            if (message.type !== 'selectionWordLookup') return Promise.resolve({success: true, zoom: 1});
+            if (fixture.config.selectionDictionarySource === 'auto') return new Promise(resolve => {release = resolve;});
+            return Promise.resolve({success: true, data: {...card(message.word), origin: 'selected source'}});
+        });
+        const request = beginWord(fixture, 'read');
+        fixture.state.showTooltip = true;
+        fixture.state.translationResult = '保留译文';
+        const previous = fixture.state.requestWordCard(request);
+        const previousController = fixture.state.wordLookupAbortController;
+        const translationCount = fixture.translateTextBatch.mock.calls.length;
+        fixture.config.selectionDictionarySource = 'free-dictionary';fixture.notifyConfig();
+        await Vue.nextTick();await vi.advanceTimersByTimeAsync(0);
+        expect(previousController.signal.aborted).toBe(true);
+        expect(fixture.state.wordCard.origin).toBe('selected source');
+        expect(fixture.state.translationResult).toBe('保留译文');
+        expect(fixture.translateTextBatch).toHaveBeenCalledTimes(translationCount);
+        release({success: true, data: {...card('read'), origin: 'old source'}});await previous;
+        expect(fixture.state.wordCard.origin).toBe('selected source');
+        expect(fixture.state.isWordCardSupportLoading).toBe(false);
+        fixture.state.showTooltip = false;
+        const messageCount = fixture.browser.runtime.sendMessage.mock.calls.length;
+        fixture.config.selectionDictionarySource = 'wiktionary-rest';fixture.notifyConfig();
+        await Vue.nextTick();await vi.advanceTimersByTimeAsync(0);
+        expect(fixture.browser.runtime.sendMessage).toHaveBeenCalledTimes(messageCount);
+        expect(fixture.state.wordCard).toBeNull();
+    });
 });
 
 function deferredTts() {

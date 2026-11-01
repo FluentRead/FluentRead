@@ -545,7 +545,8 @@ function formatFileSize(size: number): string {
 .transfer-icon { display: grid; flex: none; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: var(--brand-strong); background: var(--brand-soft); font-size: 16px; font-weight: 800; }
 .transfer-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .transfer-copy strong { color: var(--ink); font-size: 12.5px; }
-.transfer-copy small, .import-boundary { color: var(--muted); font-size: 10.5px; line-height: 1.55; }
+.transfer-copy small { color: var(--muted); font-size: 10.5px; line-height: 1.55; }
+.import-boundary { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .transfer-actions { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 7px; }
 .transfer-actions :deep(.el-button) { margin-left: 0; }
 .transfer-actions :deep(svg) { width: 14px; margin-right: 5px; }
@@ -577,14 +578,14 @@ function formatFileSize(size: number): string {
 .config-import-preview > summary b { margin-inline-start: auto; color: var(--muted); font-size: 12px; font-weight: 400; }
 .config-change-list { display: grid; gap: 11px; max-height: 34vh; margin-top: 12px; padding-right: 3px; overflow-y: auto; }
 .config-change-group { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
-.config-change-group h4 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 10.5px; }
+.config-change-group h4 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; }
 .config-change-group h4 span { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 8.5px; }
 .config-change-group article { display: grid; grid-template-columns: minmax(110px, .65fr) repeat(2, minmax(0, 1fr)); gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
 .config-change-group article:last-child { border-bottom: 0; }
-.config-change-group article > strong { align-self: center; color: var(--ink); font-size: 9.5px; }
+.config-change-group article > strong { align-self: center; color: var(--ink); font-size: 12px; }
 .config-change-group article div { min-width: 0; }
-.config-change-group article span { color: var(--muted); font-size: 8.5px; }
-.config-change-group article p { margin: 2px 0 0; overflow-wrap: anywhere; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.config-change-group article span { color: var(--muted); font-size: 11px; }
+.config-change-group article p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .config-same { margin: 12px 0 0; color: var(--muted); font-size: 10px; }
 
 @media (max-width: 820px) {

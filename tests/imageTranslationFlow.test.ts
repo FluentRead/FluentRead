@@ -218,6 +218,23 @@ describe('图片翻译流程优化',()=>{
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
     });
 
+    it.each([
+        {options: {prepare: true, modelSettings: true, serviceSettings: true}, primary: 'fr-image-prepare'},
+        {options: {modelSettings: true, serviceSettings: true}, primary: 'fr-image-model-settings'},
+        {options: {serviceSettings: true}, primary: 'fr-image-service-settings'},
+        {options: {}, primary: 'fluent-read-image-translation-button'},
+    ])('只突出当前恢复操作 $primary，其余动作按需展开并在恢复加载后归位', ({options, primary}) => {
+        const {document}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+        const ui=createImageControls({onAction(){},onPrepare(){}});
+        ui.update('error','需要恢复',options);
+        const row=ui.feedback.querySelector('.fr-image-actions')!,more=ui.feedback.querySelector<HTMLDetailsElement>('.fr-image-more')!;
+        const visible=Array.from(row.children).filter(n=>n.tagName==='BUTTON'&&!(n as HTMLButtonElement).hidden);
+        expect(visible.map(n=>n.className)).toEqual([primary]);expect(more.open).toBe(false);
+        more.open=true;ui.refreshLanguage();expect(more.open).toBe(true);
+        ui.update('loading','正在识别');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
+        expect(row.parentElement).toBe(ui.element);expect(row.firstElementChild).toBe(ui.button);ui.dispose();
+    });
+
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
         const {document,window} = parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
         const onAction=vi.fn(),onDismiss=vi.fn(),onSettings=vi.fn();

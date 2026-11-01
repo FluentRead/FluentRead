@@ -13,6 +13,7 @@
 .el-overlay .el-dialog .el-dialog__body { min-height:0; padding:0; overflow-y:auto; overscroll-behavior:contain; color:var(--ink); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
 .el-overlay .el-dialog .el-dialog__footer { flex:none; padding:20px 0 0; border:0; }
 .el-overlay .el-dialog .el-dialog__footer > .el-button + .el-button { margin-inline-start:8px; }
+.el-overlay .el-dialog .el-dialog__footer .el-button:not(.is-text, .is-link) { min-height:40px; height:auto; padding:9px 16px; font-size:13px; }
 .el-overlay :is(.el-dialog, .el-message-box) .el-button { min-height:40px; height:auto; padding:9px 16px; border-radius:9px; font-size:13px; }
 .el-overlay :is(.el-dialog, .el-message-box) .el-button--primary { background:var(--brand); border-color:var(--brand); }
 .el-overlay :is(.el-dialog, .el-message-box) .el-button--primary:not(:disabled):hover { filter:brightness(1.04); }

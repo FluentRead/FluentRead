@@ -597,22 +597,22 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 .settings-app .topbar .settings-page-tabs { flex: 1; margin: 0; }
 .settings-app .userscript-settings-close { margin-left: auto; width: 36px; height: 36px; flex-basis: 36px; border-radius: 8px; }
 /* 折叠标题保持清晰命中区域，用右侧箭头表达层级；常规设置不使用大面积强调色。 */
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary {
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary {
   display: flex; align-items: center; gap: 12px; list-style: none;
   min-height: 44px; padding: 11px 16px; border: 1px solid var(--line);
   border-radius: 8px; color: var(--ink); background: var(--surface);
   font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer;
 }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary::-webkit-details-marker { display: none; }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary::marker { content: ''; }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:not(:has(.advanced-chevron, .details-chevron, .credential-guide-chevron))::after {
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::-webkit-details-marker { display: none; }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::marker { content: ''; }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:not(:has(.advanced-chevron, .details-chevron, .credential-guide-chevron))::after {
   content: ''; width: 7px; height: 7px; flex: none; margin-left: auto;
   border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg);
 }
-.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content) > summary::after { transform: rotate(45deg); }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:hover { background: var(--surface-soft); }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content) > summary { margin-bottom: 12px; }
+.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::after { transform: rotate(45deg); }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:hover { background: var(--surface-soft); }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary { margin-bottom: 12px; }
 /* 设置分组内的折叠行与普通设置行齐平：不再画成嵌在分组里的独立圆角框。 */
 .settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings) > summary { padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px); border: 0; border-radius: 0; font-weight: 550; }
 .settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings)[open] > summary { margin-bottom: 0; border-bottom: 1px solid var(--line); }
@@ -627,7 +627,7 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
   .settings-app .sidebar .search-box { order: 3; flex-basis: 100%; margin: 0; }
   .settings-app .sidebar .search-box input { font-size: 12px; }
   .settings-app .topbar { margin-bottom: 16px; }
-  .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary { padding: 12px; }
+  .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary { padding: 12px; }
 }
 
 .settings-app .settings-group-body > .feature-enable-card { margin: 0; }

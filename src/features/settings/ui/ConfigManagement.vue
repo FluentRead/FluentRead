@@ -534,8 +534,8 @@ async function confirmRestore(operation: RestoreOperation) {
 .version-empty { padding: 28px 16px; color: var(--muted); font-size: 11px; text-align: center; }
 .preview-summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
 .preview-summary > div { display: flex; flex-direction: column; gap: 3px; }
-.preview-summary span { color: var(--muted); font-size: 10px; }
-.preview-summary strong { color: var(--ink); font-size: 12px; }
+.preview-summary span { color: var(--muted); font-size: 12px; }
+.preview-summary strong { color: var(--ink); font-size: 13px; }
 .preview-summary b { padding: 5px 9px; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 10px; }
 .preview-summary b.empty { color: #267260; background: #eaf8f4; }
 .diff-groups { display: grid; gap: 14px; max-height: 48vh; margin-top: 16px; padding-right: 4px; overflow-y: auto; }
@@ -544,10 +544,10 @@ async function confirmRestore(operation: RestoreOperation) {
 .diff-list { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
 .diff-item { display: grid; grid-template-columns: minmax(130px, .65fr) repeat(2, minmax(0, 1fr)); gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .diff-item:last-child { border-bottom: 0; }
-.diff-item > strong { align-self: center; color: var(--ink); font-size: 10.5px; }
+.diff-item > strong { align-self: center; color: var(--ink); font-size: 12px; }
 .diff-item div { min-width: 0; }
-.diff-item span { color: var(--muted); font-size: 9px; }
-.diff-item p { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.diff-item span { color: var(--muted); font-size: 11px; }
+.diff-item p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .diff-empty { margin-top: 16px; padding: 28px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 11px; text-align: center; }
 .json-details { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .json-details summary { padding: 11px 13px; color: var(--ink); cursor: pointer; font-size: 10.5px; font-weight: 700; }

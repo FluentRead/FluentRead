@@ -171,7 +171,20 @@ describe('standalone static settings data representation', () => {
     it('leaves partially used catalogs visible to standard tree shaking while compressing its complete style table', () => {
         const plugin = createUserscriptSettingsDataPlugin(root, true, false);
         const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-        for (const [path, name] of [...tables.slice(0, 2), ...tables.slice(3)]) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        const appearancePath = 'src/core/config/interfaceAppearance.ts';
+        for (const [path, name] of [...tables.slice(0, 2), ...tables.slice(3)].filter(([path]) => path !== appearancePath)) {
+            expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        }
+        // The ordinary build already owns the complete skin/font registries. Use their
+        // actual module to verify those round trips while popup-only catalogs stay literal.
+        const source = readFileSync(resolve(root, appearancePath), 'utf8');
+        const generated = run(source, resolve(root, appearancePath))!.code;
+        for (const name of ['interfaceSkinOptions', 'interfaceFontOptions']) {
+            expect(JSON.stringify(value(initializer(generated, name)))).toBe(JSON.stringify(value(initializer(source, name))));
+        }
+        for (const name of ['popupModuleOptions', 'popupQuickFeatureOptions']) {
+            expect(initializer(generated, name)).toBe(initializer(source, name));
+        }
         expect(run('const TRANSLATION_STYLE_PRESETS = [];', resolve(root, tables[2][0]))?.code).toContain('JSON.parse');
     });
 

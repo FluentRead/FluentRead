@@ -169,8 +169,6 @@
   "正在导出材料备份…": "Exporting material backup…",
   "下载完成前请保持此页面打开。": "Keep this page open until the download finishes.",
   "取消导出": "Cancel export",
-  "当前浏览器使用内存准备下载，大备份可能占用较多内存。": "This browser uses memory to prepare the download; large backups may use substantial memory.",
-  "下载已发起，关闭页面可能中断下载。请先确认浏览器下载完成，再释放临时数据。": "The download has started. Closing this page may interrupt it. Confirm it has finished in your browser before releasing temporary data.",
   "下载已完成，释放临时数据": "Download complete, release temporary data",
   "确认保存超出恢复上限的备份": "Confirm saving a backup over the restore limit",
   "备份超过当前恢复上限": "The backup exceeds the current restore limit",
@@ -276,5 +274,17 @@
   "材料备份传输格式无效": "Invalid material backup transfer format",
   "材料备份分片长度无效": "Invalid material backup chunk length",
   "材料备份过大": "The material backup is too large",
-  "材料备份错误代码无效": "Invalid material backup error code"
+  "材料备份错误代码无效": "Invalid material backup error code",
+  "正在为下载准备备份。较大备份需要临时存储，请确保有足够空间。": "Preparing the backup for download. Large backups need temporary storage; make sure enough space is available.",
+  "无法确认下载是否开始，请检查浏览器下载。": "Unable to confirm whether the download started. Check your browser downloads.",
+  "下载已发起，关闭页面可能中断下载。": "The download has started. Closing this page may interrupt it.",
+  "请先确认浏览器下载完成，再释放临时数据。": "Confirm the download has finished in your browser before releasing temporary data.",
+  "无法确认下载是否开始，请检查浏览器下载。 请先确认浏览器下载完成，再释放临时数据。": "Unable to confirm whether the download started. Check your browser downloads. Confirm the download has finished in your browser before releasing temporary data.",
+  "下载已发起，关闭页面可能中断下载。 请先确认浏览器下载完成，再释放临时数据。": "The download has started. Closing this page may interrupt it. Confirm the download has finished in your browser before releasing temporary data.",
+  "重新下载": "Download again",
+  "当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。": "This browser cannot create temporary files for a large backup. Retry in a browser that supports saving files directly or private file storage. Your original materials have not changed.",
+  "已取消清理。": "Cleanup cancelled.",
+  "临时文件清理失败，请重试。": "Temporary file cleanup failed. Please retry.",
+  "无法确认下载是否开始，请检查浏览器下载后重试或释放临时数据。": "Unable to confirm whether the download started. Check your browser downloads before retrying or releasing temporary data.",
+  "临时存储空间不足，请释放设备空间，或使用支持直接保存文件的浏览器重试。原材料未更改。": "Temporary storage is full. Free up space on your device, or retry in a browser that can save files directly. Your original materials have not changed."
 }

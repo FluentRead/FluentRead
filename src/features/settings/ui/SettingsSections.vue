@@ -10,6 +10,13 @@
     <SettingsGroup class="plugin-master-setting" data-testid="plugin-master-setting">
       <FeatureEnableCard v-model="config.on" :title="t('settings.general.masterTitle')" :description="t('settings.general.masterHelp')" @update:model-value="handlePluginStateChange" />
     </SettingsGroup>
+    <SettingsGroup v-if="isSafari" title="Safari 版说明" data-testid="safari-adaptation-notes">
+      <div class="safari-adaptation-notes">
+        <p><strong>启用扩展</strong>Safari → 设置 → 扩展，勾选“流畅阅读”，并把网站访问权限设为“允许所有网站”。</p>
+        <p><strong>图片与圈选翻译</strong>首次使用会打开一个“流畅阅读 · 后台运行页”标签页，作为 Safari 唯一可用的扩展 DOM 容器；关闭后会自动重建。</p>
+        <p><strong>不可用能力</strong>Chrome 内置翻译与 Google Drive 备份依赖 Chromium 专有 API，Safari 版不提供，配置会保留但不生效。</p>
+      </div>
+    </SettingsGroup>
     <SettingsGroup
       title="基础配置"
       data-testid="translation-display-settings"
@@ -656,6 +663,8 @@ const InterfaceSettings = defineAsyncComponent(() => import('./InterfaceSettings
 const AreaTranslationSettings = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./AreaTranslationSettings.vue'));
 const InputTranslationSettings = defineAsyncComponent(() => import('./InputTranslationSettings.vue'));
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
+// Safari 需要用户在系统设置里授予权限，且部分 Chromium 能力不可用；只在 Safari 产物显示说明。
+const isSafari = browserCapabilities.browser === 'safari';
 const ParagraphCopySettings = defineAsyncComponent(() => import('./ParagraphCopySettings.vue'));
 const SectionTranslationSettings = defineAsyncComponent(() => import('./SectionTranslationSettings.vue'));
 const ParagraphHandlingSettings = defineAsyncComponent(() => import('./ParagraphHandlingSettings.vue'));

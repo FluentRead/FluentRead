@@ -10,7 +10,21 @@ import {MAX_REQUEST_HEADER_RULES, normalizeRequestHeaderRules} from '@/src/core/
 export const REQUEST_HEADER_RULE_START = 2_763_000;
 export type RequestHeaderRulesPort = Pick<DeclarativeNetRequest.Static, 'getDynamicRules' | 'updateDynamicRules'>;
 
-export function createRequestHeaderRulesSynchronizer(api: RequestHeaderRulesPort | undefined, extensionDomain: string) {
+export interface RequestHeaderRuleOptions {
+    /**
+     * Safari 的 RuleCondition 只支持 domainType、excludedResourceTypes、isUrlFilterCaseSensitive、
+     * regexFilter 和 resourceTypes，没有 initiatorDomains。关闭后规则仍按精确域名和 xmlhttprequest
+     * 匹配，但不再限定发起方必须是本扩展。
+     */
+    readonly scopeToInitiator?: boolean;
+}
+
+export function createRequestHeaderRulesSynchronizer(
+    api: RequestHeaderRulesPort | undefined,
+    extensionDomain: string,
+    options: RequestHeaderRuleOptions = {},
+) {
+    const scopeToInitiator = options.scopeToInitiator !== false;
     let applied: string | undefined;
     let tail: Promise<void> = Promise.resolve();
     return {
@@ -37,7 +51,7 @@ export function createRequestHeaderRulesSynchronizer(api: RequestHeaderRulesPort
                     ]},
                     condition: {
                         regexFilter: `^https?://${entry.domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?::[0-9]+)?/`,
-                        initiatorDomains: [extensionDomain],
+                        ...(scopeToInitiator ? {initiatorDomains: [extensionDomain]} : {}),
                         resourceTypes: ['xmlhttprequest'],
                     },
                 }));

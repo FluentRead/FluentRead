@@ -488,3 +488,8 @@
 .image-settings-details { margin: 0; }
 .image-settings-details > summary, .area-translation-details > summary { cursor: pointer; font-size: 14px; font-weight: 600; color: var(--el-text-color-primary); }
 .image-settings-details[open] > summary { margin-bottom: 14px; }
+
+/* Safari 版说明：只在 Safari 产物出现，用列表式文案解释系统级授权与能力差异。 */
+.safari-adaptation-notes { display: grid; gap: 10px; font-size: 13px; line-height: 1.6; color: var(--el-text-color-regular, #606266); }
+.safari-adaptation-notes p { margin: 0; }
+.safari-adaptation-notes strong { display: block; color: var(--el-text-color-primary, #303133); font-weight: 600; }

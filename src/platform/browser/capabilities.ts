@@ -46,8 +46,11 @@ function normalizeBrowser(browser: string): string {
 export function resolveBrowserCapabilities(target: BrowserBuildTarget): BrowserCapabilities {
     const browser = normalizeBrowser(target.browser);
     const chromiumMv3 = target.manifestVersion === 3 && (browser === 'chrome' || browser === 'edge');
+    // Safari 的 MV3 后台只有 service worker，没有 offscreen API，也不支持 background page；
+    // 因此用扩展自己的后台标签页承载同一份 offscreen.html 运行时（见 platform/offscreen/safariDocument）。
+    const safariMv3 = target.manifestVersion === 3 && browser === 'safari';
 
-    const extensionDom = chromiumMv3 || (browser === 'firefox' && target.manifestVersion === 2);
+    const extensionDom = chromiumMv3 || safariMv3 || (browser === 'firefox' && target.manifestVersion === 2);
 
     return Object.freeze({
         browser,
@@ -74,8 +77,17 @@ export function applyRuntimeBrowserConstraints(
     if (capabilities.browser === 'firefox' && /\bThunderbird\//i.test(userAgent)) {
         return resolveBrowserCapabilities({browser: 'thunderbird', manifestVersion: capabilities.manifestVersion});
     }
+    // Safari 的 UA 保留 "Safari/605.x" 但没有任何 Chromium/Firefox 标记；若产物标记与宿主不符
+    // （例如用 Chromium 产物侧载进 Safari），按 Safari 能力降级，避免调用 offscreen 等专有 API。
+    if (capabilities.browser !== 'safari' && isSafariUserAgent(userAgent)) {
+        return resolveBrowserCapabilities({browser: 'safari', manifestVersion: capabilities.manifestVersion});
+    }
     if (capabilities.browser !== 'chrome' || !/\bEdg(?:A|iOS)?\//i.test(userAgent)) return capabilities;
     return Object.freeze({...capabilities, browser: 'edge', chromeTranslation: false});
+}
+
+function isSafariUserAgent(userAgent: string): boolean {
+    return /\bSafari\//i.test(userAgent) && !/\b(?:Chrome|Chromium|CriOS|Edg|EdgiOS|OPR|Firefox|FxiOS)\//i.test(userAgent);
 }
 
 export function readRuntimeUserAgent(host: {navigator?: {userAgent?: unknown}}): string {
@@ -83,7 +95,7 @@ export function readRuntimeUserAgent(host: {navigator?: {userAgent?: unknown}}):
 }
 
 function defaultManifestVersion(browser: string): 2 | 3 {
-    return browser === 'chrome' || browser === 'edge' ? 3 : 2;
+    return browser === 'chrome' || browser === 'edge' || browser === 'safari' ? 3 : 2;
 }
 
 /** 读取 WXT 的编译期常量，无需由 Node/Vitest 提供。 */

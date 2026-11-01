@@ -132,6 +132,16 @@ export function createExtensionManifest(
             },
         },
     } : {};
+    // Safari 16.4 起支持 MV3 与模块化 service worker；17 起 offscreen 依赖的后台标签页行为稳定。
+    const safariManifest = env.browser === 'safari' ? {
+        browser_specific_settings: {safari: {strict_min_version: '17.0'}},
+    } : {};
+    // Safari 的扩展页面使用系统默认 CSP；自定义 extension_pages 只对 Chromium/Firefox 有意义。
+    const contentSecurityPolicy = env.browser === 'safari' ? undefined : {
+        // 扩展页面只执行自身静态脚本和 WASM；本地 TTS Worker 通过打包的
+        // 静态 MJS 与随包原始 CPU/WebGPU WASM（Edge 商店拒绝嵌套压缩文件），不放宽到 blob 脚本。
+        extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
+    };
     return {
         name: '__MSG_extensionName__',
         default_locale: 'en',
@@ -144,11 +154,7 @@ export function createExtensionManifest(
             ...(env.browser === 'chrome' ? ['identity'] : []),
             ...(capabilities.offscreenDocument ? ['offscreen'] : []),
         ],
-        content_security_policy: {
-            // 扩展页面只执行自身静态脚本和 WASM；本地 TTS Worker 通过打包的
-            // 静态 MJS 与随包原始 CPU/WebGPU WASM（Edge 商店拒绝嵌套压缩文件），不放宽到 blob 脚本。
-            extension_pages: "script-src 'self' 'wasm-unsafe-eval'; object-src 'self';",
-        },
+        ...(contentSecurityPolicy ? {content_security_policy: contentSecurityPolicy} : {}),
         host_permissions: [
             '<all_urls>',
             'https://translate.google.com/*',
@@ -175,10 +181,12 @@ export function createExtensionManifest(
                 // 不要把需要 import() 执行的脚本放进这里：动态 ID 地址不满足内容脚本隔离环境的 script-src 'self'。
                 resources: ['icon/32.png', 'icon/48.png', 'icon/128.png', `${UI_LANGUAGE_BUNDLE_DIRECTORY}/*.json`],
                 matches: ['<all_urls>'],
-                use_dynamic_url: true,
+                // Safari 与 Firefox 没有动态 URL 机制，声明后会被忽略，这里只为支持的浏览器保留。
+                ...(env.browser === 'chrome' || env.browser === 'edge' ? {use_dynamic_url: true} : {}),
             },
         ],
         ...firefoxManifest,
+        ...safariManifest,
         ...googleDriveManifest,
     } as UserManifest;
 }

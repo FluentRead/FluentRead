@@ -18,20 +18,30 @@
   </section>
 </template>
 <script setup lang="ts">
-import {ref, watch} from 'vue';
+import {computed, ref, watch} from 'vue';
 import {ElAlert, ElTooltip} from 'element-plus';
 import 'element-plus/es/components/alert/style/css';
 import 'element-plus/es/components/tooltip/style/css';
 import {Lock} from '@element-plus/icons-vue';
 import {useUiI18n} from '@/src/ui/i18n';
+import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import GoogleDriveSync from './GoogleDriveSync.vue';
 import WebDavBackup from './WebDavBackup.vue';
 const {t} = useUiI18n();
 const hasExtensionBackground = import.meta.env.BROWSER !== 'userscript';
-const methods = [{id: 'google-drive', name: 'Google Drive'}, {id: 'webdav', name: 'WebDAV'}] as const;
-const selected = ref<'google-drive' | 'webdav'>('google-drive');
+// Google Drive 授权依赖 identity API；Safari 未声明该权限，只保留 WebDAV 入口。
+const supportsGoogleDrive = browserCapabilities.browser !== 'safari';
+interface BackupMethod {id: 'google-drive' | 'webdav'; name: string}
+const methods = computed<BackupMethod[]>(() => [
+    ...(supportsGoogleDrive ? [{id: 'google-drive' as const, name: 'Google Drive'}] : []),
+    {id: 'webdav' as const, name: 'WebDAV'},
+]);
+const selected = ref<'google-drive' | 'webdav'>(supportsGoogleDrive ? 'google-drive' : 'webdav');
 const busy = ref(false);
-try {if (localStorage.getItem('fluentread-cloud-backup-method') === 'webdav') selected.value = 'webdav';} catch { /* 存储受限时仍可使用默认选择。 */ }
+try {
+    const stored = localStorage.getItem('fluentread-cloud-backup-method');
+    if (stored === 'webdav' || (stored === 'google-drive' && supportsGoogleDrive)) selected.value = stored;
+} catch { /* 存储受限时仍可使用默认选择。 */ }
 watch(selected, value => {try {localStorage.setItem('fluentread-cloud-backup-method', value);} catch { /* 选择仍对本次页面有效。 */ }});
 </script>
 <style scoped>

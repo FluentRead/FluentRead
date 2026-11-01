@@ -299,7 +299,7 @@
       <div v-else-if="activeDrawer === 'image'" class="drawer-content image-methods">
         <div v-if="!browserCapabilities.imageTranslation" class="capability-unavailable" role="status">
           <strong>当前浏览器暂不支持图片翻译与 OCR</strong>
-          <small>原有开关偏好已保留；请在 Chrome 中使用此功能。</small>
+          <small>{{ capabilityUnavailableHint }}</small>
         </div>
         <button v-if="browserCapabilities.imageTranslation" class="image-method" :class="{enabled: !config.disableImageTranslator}" type="button" role="switch" :aria-checked="!config.disableImageTranslator" aria-label="启用或关闭图片翻译" :onClick="drawerActions.image">
           <svg class="image-method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></svg>
@@ -308,7 +308,7 @@
         </button>
         <div v-if="!browserCapabilities.areaTranslation" class="capability-unavailable" role="status">
           <strong>当前浏览器暂不支持圈选翻译</strong>
-          <small>原有开关偏好已保留；回到 Chrome 后仍会按原设置生效。</small>
+          <small>{{ capabilityUnavailableHint }}</small>
         </div>
         <button v-else class="image-method" :class="{enabled: config.selectionAreaEnabled}" type="button" role="switch" :aria-checked="config.selectionAreaEnabled" aria-label="启用或关闭圈选翻译" :onClick="drawerActions.area">
           <svg class="image-method-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
@@ -527,6 +527,10 @@ const canUseAIContext = computed(() => servicesType.isUseAIContext(
 const missingCredentialMessage = computed(() => getMissingCredentialMessage(config.value.service, config.value));
 const credentialWarning = computed(() => selectedServiceUnavailableMessage.value || missingCredentialMessage.value);
 const isThunderbird = browserCapabilities.browser === 'thunderbird';
+// Safari 没有 offscreen API，本地能力说明不能再指向 Chrome；其他浏览器沿用原有提示。
+const capabilityUnavailableHint = computed(() => browserCapabilities.browser === 'safari'
+  ? 'Safari 不为扩展提供离屏页面，该能力需要在 Chrome 或 Edge 中使用。'
+  : '原有开关偏好已保留；请在 Chrome 中使用此功能。');
 const currentSiteSupported = computed(() => !isThunderbird && currentTabId.value !== null && Boolean(currentSiteDomain.value));
 const currentSiteRuleEnabled = computed(() => currentSiteSupported.value
   && (config.value.alwaysTranslateDomains ?? []).includes(currentSiteDomain.value));

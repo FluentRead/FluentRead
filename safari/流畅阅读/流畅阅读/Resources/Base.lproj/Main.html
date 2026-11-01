@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <link rel="stylesheet" href="../Style.css">
+    <script src="../Script.js" defer></script>
+    <title>流畅阅读</title>
+</head>
+<body>
+    <main class="card">
+        <header class="brand">
+            <img src="../Icon.png" width="56" height="56" alt="">
+            <div class="brand-copy">
+                <h1>流畅阅读</h1>
+                <p class="tagline">Safari 版 · 双语对照翻译</p>
+            </div>
+            <span class="status" id="status" data-state="unknown">检查中</span>
+        </header>
+
+        <p class="state-unknown lead">正在读取 Safari 扩展状态…</p>
+        <p class="state-on lead">扩展已启用。打开任意网页后，点工具栏图标即可开始翻译。</p>
+        <p class="state-off lead">扩展尚未启用。按下面三步在 Safari 中打开它。</p>
+
+        <ol class="steps">
+            <li>
+                <span class="step-index">1</span>
+                <div><strong>启用扩展</strong><p>Safari → 设置 → 扩展，勾选“流畅阅读”。</p></div>
+            </li>
+            <li>
+                <span class="step-index">2</span>
+                <div><strong>授予网站访问权限</strong><p>选择“允许所有网站”。只授权单个站点时，其他网页不会生效。</p></div>
+            </li>
+            <li>
+                <span class="step-index">3</span>
+                <div><strong>固定工具栏图标</strong><p>在工具栏图标上右键 → 固定，方便随时打开翻译面板。</p></div>
+            </li>
+        </ol>
+
+        <button class="open-preferences primary" type="button">打开 Safari 扩展设置</button>
+
+        <p class="note">图片与圈选翻译首次使用会打开一个“后台运行页”，这是 Safari 允许扩展持有 DOM 的唯一方式，关闭后会自动重建。Chrome 内置翻译与 Google Drive 备份依赖 Chromium 专有 API，Safari 版不提供。</p>
+    </main>
+</body>
+</html>

@@ -6,14 +6,17 @@
  */
 import {config, configReady, subscribeConfig} from '@/src/services/config/store';
 import {createRequestHeaderRulesSynchronizer} from '@/src/platform/browser/requestHeaderRules';
+import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {BILIBILI_FREE_TRANSLATION_DOMAIN} from '@/src/core/config/freeTranslation';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {createDoubaoGuestFetch} from '@/src/platform/http/doubaoGuest';
 
 export function installRequestHeaderRuntime(): void {
     const extensionDomain = new URL(browser.runtime.getURL('')).hostname;
-    const sync = createRequestHeaderRulesSynchronizer(browser.declarativeNetRequest, extensionDomain);
-    const fetch = createDoubaoGuestFetch(browser.declarativeNetRequest, extensionDomain, (input, init) => globalThis.fetch(input, init));
+    // Safari 的 DNR 条件不支持 initiatorDomains，规则只能按精确 URL + xmlhttprequest 收窄。
+    const scopeToInitiator = browserCapabilities.browser !== 'safari';
+    const sync = createRequestHeaderRulesSynchronizer(browser.declarativeNetRequest, extensionDomain, {scopeToInitiator});
+    const fetch = createDoubaoGuestFetch(browser.declarativeNetRequest, extensionDomain, (input, init) => globalThis.fetch(input, init), {scopeToInitiator});
     // 官方 API 拒绝扩展 Origin；固定规则只作用于本扩展向该精确域名的请求。
     const refresh = () => sync.sync([
         ...(browser.declarativeNetRequest ? [{domain: BILIBILI_FREE_TRANSLATION_DOMAIN, removeOrigin: true, removeReferer: false}] : []),

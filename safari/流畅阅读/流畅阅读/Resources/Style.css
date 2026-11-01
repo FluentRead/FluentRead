@@ -1,0 +1,196 @@
+/* 容器应用样式：跟随后台翻译面板的品牌色与系统外观，保持 macOS 原生观感。 */
+* {
+    -webkit-user-select: none;
+    -webkit-user-drag: none;
+    cursor: default;
+}
+
+:root {
+    color-scheme: light dark;
+    --brand: #ef4776;
+    --brand-soft: rgba(239, 71, 118, .12);
+    --ink: #171a21;
+    --muted: #6b7280;
+    --line: rgba(0, 0, 0, .09);
+    --card: #ffffff;
+    --canvas: #f5f6f8;
+    --ok: #1a9f5a;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ink: #f2f3f6;
+        --muted: #a2a8b4;
+        --line: rgba(255, 255, 255, .12);
+        --card: #1c1f26;
+        --canvas: #131519;
+        --brand-soft: rgba(239, 71, 118, .18);
+    }
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+    padding: 28px;
+    box-sizing: border-box;
+    background: var(--canvas);
+    color: var(--ink);
+    font: -apple-system-body;
+    -webkit-font-smoothing: antialiased;
+}
+
+.card {
+    width: 100%;
+    max-width: 460px;
+    padding: 26px 26px 22px;
+    box-sizing: border-box;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--card);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, .10);
+    text-align: left;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.brand img {
+    border-radius: 12px;
+}
+
+.brand-copy {
+    flex: 1;
+    min-width: 0;
+}
+
+.brand h1 {
+    margin: 0;
+    font-size: 19px;
+    font-weight: 650;
+    letter-spacing: .2px;
+}
+
+.tagline {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.status {
+    flex: none;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: rgba(127, 127, 127, .12);
+}
+
+.status[data-state="on"] {
+    color: var(--ok);
+    background: rgba(26, 159, 90, .12);
+}
+
+.status[data-state="off"] {
+    color: var(--brand);
+    background: var(--brand-soft);
+}
+
+.lead {
+    margin: 0 0 18px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+.steps {
+    display: grid;
+    gap: 14px;
+    margin: 0 0 22px;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+}
+
+.steps li {
+    display: flex;
+    gap: 11px;
+}
+
+.step-index {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--brand);
+    background: var(--brand-soft);
+}
+
+.steps strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.steps p {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--muted);
+}
+
+button.primary {
+    width: 100%;
+    height: 38px;
+    border: 0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--brand);
+    box-shadow: 0 6px 16px rgba(239, 71, 118, .28);
+}
+
+button.primary:active {
+    background: #dc315f;
+}
+
+button.primary:focus-visible {
+    outline: 3px solid rgba(239, 71, 118, .35);
+    outline-offset: 2px;
+}
+
+.note {
+    margin: 16px 0 0;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--muted);
+}
+
+body:not(.state-on, .state-off) :is(.state-on, .state-off) {
+    display: none;
+}
+
+body.state-on :is(.state-off, .state-unknown) {
+    display: none;
+}
+
+body.state-off :is(.state-on, .state-unknown) {
+    display: none;
+}

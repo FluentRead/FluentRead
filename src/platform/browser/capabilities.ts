@@ -47,7 +47,9 @@ export function resolveBrowserCapabilities(target: BrowserBuildTarget): BrowserC
     const browser = normalizeBrowser(target.browser);
     const chromiumMv3 = target.manifestVersion === 3 && (browser === 'chrome' || browser === 'edge');
 
-    const extensionDom = chromiumMv3 || (browser === 'firefox' && target.manifestVersion === 2);
+    // Safari 的 MV2 后台是页面而不是 service worker，同样拥有 DOM，可复用后台 iframe 容器。
+    const backgroundPageDom = (browser === 'firefox' || browser === 'safari') && target.manifestVersion === 2;
+    const extensionDom = chromiumMv3 || backgroundPageDom;
 
     return Object.freeze({
         browser,

@@ -44,7 +44,7 @@ vi.mock('element-plus', () => ({
 vi.mock('@/src/ui/components/UiSelect.vue', () => ({default: {inheritAttrs: false, props: ['modelValue', 'disabled'], emits: ['update:modelValue', 'change'], setup(props: any, {attrs, slots, emit}: any) {
   return () => runtime.h('span', [runtime.h('input', {...attrs, value: props.modelValue, disabled: props.disabled, 'data-select-port': '', onInput: (event: any) => {emit('update:modelValue', event.target.value);emit('change', event.target.value);}}), runtime.h('span', {hidden: true}, slots.default?.())]);
 }}}));
-const dialogPort = {props: ['modelValue'], emits: ['update:modelValue'], setup: (props: any, {slots, emit}: any) => () => props.modelValue ? runtime.h('section', {role: 'dialog'}, [slots.default?.(), runtime.h('button', {'data-dialog-close': '', onClick: () => emit('update:modelValue', false)}, 'Close dialog')]) : null};
+const dialogPort = {props: ['modelValue'], emits: ['update:modelValue'], setup: (props: any, {slots, emit}: any) => () => props.modelValue ? runtime.h('section', {role: 'dialog'}, [slots.default?.(), slots.footer?.(), runtime.h('button', {'data-dialog-close': '', onClick: () => emit('update:modelValue', false)}, 'Close dialog')]) : null};
 function mountComponent(component: import('vue').Component | undefined = undefined, props: Record<string, unknown> = {}, shown?: import('vue').Ref<boolean>): void {
   elements = [];
   renderer = runtime.createRenderer({
@@ -1158,13 +1158,47 @@ describe('Glossary real template workflows', () => {
   it('imports through the actual text, format and warning controls, and closes both cancel routes', async () => {
     await click(button('glossary.import'));
     const panel = () => document.querySelector('.glossary-import-dialog')!;
+    panel().querySelector('input[value="text"]')!.dispatchEvent(new dom.window.Event('change', {bubbles:true}));await settle();
     await input(panel().querySelector('textarea'), 'source,target,tgt_lng,note\nwidget,组件,zh-hans,extra');
     const warning = panel().querySelector('input[type="checkbox"]') as HTMLInputElement;expect(warning).toBeTruthy();warning.checked=true;warning.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();
     await click(button('glossary.confirmImport',panel()));expect(config.glossaryLibraries[0].entries[0].target).toBe('组件');expect(panel()).toBeNull();
-    await click(button('glossary.import'));await input(panel().querySelector(`[aria-label="${tr('glossary.format')}"]`),'tsv');
+    await click(button('glossary.import'));panel().querySelector('input[value="text"]')!.dispatchEvent(new dom.window.Event('change', {bubbles:true}));await settle();await input(panel().querySelector(`[aria-label="${tr('glossary.format')}"]`),'tsv');
     await input(panel().querySelector('textarea'),'source\ttarget\nsecond\t第二');expect(state.importFormat).toBe('tsv');
     await click(button('common.cancel',panel()));expect(panel()).toBeNull();
     await click(button('glossary.import'));await click(document.querySelector('[data-dialog-close]'));expect(panel()).toBeNull();
+  });
+
+  it('keeps file and paste drafts independent, invalidates a pending file read when switching methods, and previews three entries before explicit import', async () => {
+    await click(button('glossary.import'));
+    const panel = () => document.querySelector('.glossary-import-dialog')!;
+    const method = async (value: string) => {panel().querySelector(`input[value="${value}"]`)!.dispatchEvent(new dom.window.Event('change', {bubbles:true}));await settle();};
+    expect(panel().querySelector('textarea')).toBeNull();
+    let finish!: (value: string) => void;
+    const pending = new Promise<string>(resolve => {finish=resolve;});
+    const reading=state.readImportFile({target:{files:[{name:'old.csv',size:30,text:()=>pending}],value:'old.csv'}});
+    await method('text');
+    const text='source,target\none,一\ntwo,二\nthree,三\nfour,四';
+    await input(panel().querySelector('textarea'),text);
+    finish('source,target\nlate,旧内容');await reading;await settle();
+    expect(state.importText).toBe(text);expect(state.readingImportFile).toBe(false);
+    expect(panel().querySelectorAll('.glossary-import-sample tbody tr')).toHaveLength(3);
+    expect(panel().querySelector('.glossary-import-preview')?.hasAttribute('open')).toBe(false);
+    expect(config.glossaryLibraries).toHaveLength(0);
+    await method('file');expect(state.importText).toBe('');expect(state.importFileName).toBe('');
+    await method('text');expect(state.importText).toBe(text);
+    await click(button('glossary.confirmImport',panel()));expect(config.glossaryLibraries[0].entries).toHaveLength(4);
+  });
+
+  it('shows an import save failure inside the dialog, keeps the draft, and permits an explicit retry', async () => {
+    await click(button('glossary.import'));state.changeImportMethod('text');state.importText='source,target\nkept,保留';await settle();
+    requestConfigPatch.mockRejectedValueOnce(new Error('fixture storage failure'));
+    await state.confirmImport();await settle();
+    const panel=document.querySelector('.glossary-import-dialog')!;
+    expect(panel.querySelector('[role=alert]')?.textContent).toContain(tr('glossary.saveFailed'));
+    expect(state.importText).toBe('source,target\nkept,保留');expect(state.canImport).toBe(true);
+    expect(config.glossaryLibraries).toHaveLength(0);
+    await click(button('glossary.confirmImport',panel));expect(config.glossaryLibraries[0].entries[0].target).toBe('保留');
+    expect(document.querySelector('.glossary-import-dialog')).toBeNull();
   });
 
   it('can start an entry if another page removes every library while preview is open', async () => {

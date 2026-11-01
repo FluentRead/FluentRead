@@ -1029,6 +1029,8 @@ issue #1017 的 `reddit-profile.html` 同样依据报告的 DOM 结构独立编�
 pnpm exec vitest run tests/glossary.test.ts tests/builtinGlossaries.test.ts tests/glossaryConfig.test.ts tests/glossarySettingsComponent.test.ts tests/translationGlossaryIntegration.test.ts tests/imageGlossaryContext.test.ts
 ```
 
+仅验证导入弹窗和圈选失败恢复时，可使用 `scripts/testing/run-import-recovery-ui-test.cjs`，显式传入 `--suite glossary` 或 `--suite area`，以及 `--artifacts-dir` 和 `--runtime-diagnostics-helper`。前者验证文件与粘贴草稿、三条预览、警告确认、持久化和响应式；后者用真实截图及本机 HTTP 夹具验证错误主动作和恢复，不证明线上模型质量或语言包公网下载。两者都使用第二屏后台临时 Edge，并保存运行时错误、告警与采集缺口。
+
 仅修改术语库管理界面时，使用 `--suite ui` 运行专项，不进入网页或文档翻译链路：
 
 ```bash

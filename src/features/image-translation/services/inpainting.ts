@@ -1,11 +1,12 @@
 /**
  * @file src/features/image-translation/services/inpainting.ts
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
- * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；全部八邻域已知边界为同一非透明颜色时等价填充去重蒙版并省去队列，否则按预乘透明度逐层修补；默认保留输入，也可显式复用调用方独占的像素缓冲。
- * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无法取得已知边界时保留原像素。
+ * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；无保护点分割蒙版的纯色边界仍省去队列；默认保留输入，也可显式复用调用方独占的像素缓冲。
+ * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
+import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from './mangaAlphaProtection';
 
 interface MaskRectangle {
     left: number;
@@ -64,6 +65,14 @@ function getMaskRectangle(line: OcrLine, width: number, height: number): MaskRec
     };
 }
 
+/** 仅导出普通图原有修补几何，供低 alpha 保护使用；不套用漫画字号描边余量。 */
+export function imageMaskBoxes(line: ImageTextRegion, width: number, height: number): OcrLine['bbox'][] {
+    return (line.sourceBoxes ?? [line.bbox]).flatMap(bbox => {
+        const rectangle = getMaskRectangle({text: line.text, bbox}, width, height);
+        return rectangle ? [{x0:rectangle.left,y0:rectangle.top,x1:rectangle.right,y1:rectangle.bottom}] : [];
+    });
+}
+
 /** 使用与实际修补相同的逐行扩边判断是否会碰到需要保留的原文。 */
 export function imageMaskBoxIntersects(box: OcrLine['bbox'], width: number, height: number, target: OcrLine['bbox']): boolean {
     const rectangle = getMaskRectangle({text: '', bbox: box}, width, height);
@@ -78,6 +87,7 @@ export function inpaintTextRegions(
     height: number,
     lines: ImageTextRegion[],
     inPlace = false,
+    protection?: MangaAlphaProtection,
 ): Uint8ClampedArray {
     const result = inPlace ? source : new Uint8ClampedArray(source);
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
@@ -88,18 +98,18 @@ export function inpaintTextRegions(
         .filter((rectangle): rectangle is MaskRectangle => rectangle !== undefined);
     if (rectangles.length === 0) return result;
 
-    for (const group of clusters(rectangles)) repairCluster(result, width, height, group);
+    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection);
     return result;
 }
 
-function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[]): void {
+function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[], protection?: MangaAlphaProtection): void {
     const bounds = rectangles.reduce(union);
     // 一像素已知边界保留原八邻域；触图边时不引入不存在的外围像素。
     const left = Math.max(0, bounds.left - 1), top = Math.max(0, bounds.top - 1);
     const width = Math.min(imageWidth, bounds.right + 1) - left;
     const height = Math.min(imageHeight, bounds.bottom + 1) - top;
 
-    // 0 = 已知背景，1 = 待修复，2 = 已进入队列但本层尚未完成。
+    // 0 = 已知背景，1 = 待修复，2 = 已进入队列但本层尚未完成，3 = 不可写且不可采样的保护点。
     const mask = new Uint8Array(width * height);
     let maskedCount = 0;
     for (const rectangle of rectangles) {
@@ -114,10 +124,35 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
         }
     }
 
+    let dividesMask = false;
+    if (protection) {
+        const {runs,rowStarts} = protection;
+        // 每行二分跳过左侧行段；仅访问局部蒙版及其一像素采样上下文相交的保护段。
+        for (let y = top; y < top + height; y += 1) {
+            let low = rowStarts[y], high = rowStarts[y + 1];
+            const end = high;
+            while (low < high) {
+                const middle = (low + high) >>> 1;
+                if (runs[middle * 3 + 2] <= left) low = middle + 1;
+                else high = middle;
+            }
+            for (let run = low; run < end && runs[run * 3 + 1] < left + width; run += 1) {
+                const start = Math.max(left,runs[run * 3 + 1]), stop = Math.min(left + width,runs[run * 3 + 2]);
+                for (let x = start; x < stop; x += 1) {
+                    const index = (y - top) * width + x - left;
+                    if (mask[index] === 1) {maskedCount -= 1;dividesMask = true;}
+                    mask[index] = 3;
+                }
+            }
+        }
+        if (maskedCount === 0) return;
+    }
+
     // 仅接受完整的实际扩散边界；触图边或全透明边界继续原路，避免补造像素或改变隐藏 RGB 规范化。
+    // 内部保护可能封死原字岛；此时先由队列证明可达，再使用已确认纯色，不能跨环填充。
     const uniform = bounds.left > 0 && bounds.top > 0 && bounds.right < imageWidth && bounds.bottom < imageHeight
         ? uniformKnownBoundary(result, imageWidth, mask, left, top, width, rectangles) : undefined;
-    if (uniform !== undefined) {
+    if (uniform !== undefined && !dividesMask) {
         // 只扫描去重后的局部蒙版一次；不扩张、不填行间孔洞，也不为纯色簇分配逐像素队列。
         for (let index = 0; index < mask.length; index += 1) {
             if (mask[index] !== 1) continue;
@@ -149,6 +184,27 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
                 }
             }
         }
+    }
+
+    if (uniform !== undefined) {
+        // 透明纯色页只做连通性检查，不重复逐像素RGBA加权；未确认全部可达前不擦写。
+        for (let head = 0; head < tail; head += 1) {
+            const index = queue[head], x = index % width, y = Math.floor(index / width);
+            for (let ny = Math.max(0,y-1); ny <= Math.min(height-1,y+1); ny += 1) {
+                for (let nx = Math.max(0,x-1); nx <= Math.min(width-1,x+1); nx += 1) {
+                    const neighbour = ny * width + nx;
+                    if (mask[neighbour] !== 1) continue;
+                    mask[neighbour] = 2;
+                    queue[tail++] = neighbour;
+                }
+            }
+        }
+        if (tail !== maskedCount) throw new ImageAlphaProtectionUnavailableError('透明保护区隔离了无法修补的原文字，已保留原图');
+        for (let position = 0; position < tail; position += 1) {
+            const index = queue[position], offset = ((Math.floor(index / width)+top)*imageWidth+index%width+left)*4;
+            for (let channel = 0; channel < 4; channel += 1) result[offset+channel] = uniform[channel];
+        }
+        return;
     }
 
     let head = 0;
@@ -201,6 +257,7 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
             }
         }
     }
+    if (protection && tail !== maskedCount) throw new ImageAlphaProtectionUnavailableError('透明保护区隔离了无法修补的原文字，已保留原图');
 }
 
 /** 并集的八邻域边界等于成员矩形一像素外周扣除并集；跳过重叠周、保留内孔，仅按周长检查相同 RGBA。 */

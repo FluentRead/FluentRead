@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
-import {inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
+import {imageMaskBoxes,inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
+import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 
 function solidPixels(width: number, height: number, color = [180, 200, 220, 255]): Uint8ClampedArray {
     const result = new Uint8ClampedArray(width * height * 4);
@@ -10,6 +11,13 @@ function solidPixels(width: number, height: number, color = [180, 200, 220, 255]
 
 function line(x0: number, y0: number, x1: number, y1: number) {
     return {text: '文字', bbox: {x0, y0, x1, y1}};
+}
+
+function protectedRuns(height:number,coordinates:Array<[number,number,number]>):MangaAlphaProtection {
+    const sorted=coordinates.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+    const rowStarts=new Uint32Array(height+1);let cursor=0;
+    for(let y=0;y<=height;y++){while(cursor<sorted.length&&sorted[cursor][0]<y)cursor++;rowStarts[y]=cursor;}
+    return {runs:Uint16Array.from(sorted.flat()),rowStarts,rectangles:[]};
 }
 
 function boundaryFixture(kind: string) {
@@ -61,6 +69,56 @@ function knownHoleFixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it('只读上下文的低alpha也不作为种子，纯色仍无队列且不改保护RGBA',()=>{
+        const w=64,h=48,p=solidPixels(w,h,[232,219,191,96]),queues:number[]=[],Queue=Uint32Array;
+        const r=line(20,20,40,28),hole=(22*w+42)*4;
+        // 真实mask为[18,18,42,30)，x42只在其一像素读取上下文。
+        p.set([17,53,191,32],hole);p.set([1,3,5,255],(24*w+25)*4);
+        const proof=protectedRuns(h,[[22,0,1],[22,2,3],[22,42,43],[22,62,63]]);
+        vi.stubGlobal('Uint32Array',class extends Queue {constructor(size:number){super(size);queues.push(size);}});
+        const result=inpaintTextRegions(p,w,h,[r],true,proof);
+        expect(queues).toEqual([]);expect(Array.from(result.subarray(hole,hole+4))).toEqual([17,53,191,32]);
+        expect(Array.from(result.subarray((22*w+41)*4,(22*w+41)*4+4))).toEqual([232,219,191,96]);
+        expect(Array.from(result.subarray((24*w+25)*4,(24*w+25)*4+4))).toEqual([232,219,191,96]);
+    });
+    it.each([false,true])('透明保护闭环不能跨环填纯色，非均匀=%s均拒绝不可达原字岛',nonuniform=>{
+        const w=64,h=48,p=solidPixels(w,h),r=line(12,12,52,36),coordinates:Array<[number,number,number]>=[];
+        for(let y=16;y<32;y++){
+            const spans:Array<[number,number]>=y===16||y===31?[[20,44]]:[[20,21],[43,44]];
+            for(const [x0,x1] of spans){coordinates.push([y,x0,x1]);for(let x=x0;x<x1;x++)p.set([17,53,191,0],(y*w+x)*4);}
+        }
+        p.set([1,3,5,255],(24*w+30)*4);
+        if(nonuniform)p.set([181,200,220,255],(9*w+24)*4);
+        const before=p.slice(),proof=protectedRuns(h,coordinates);
+        expect(()=>inpaintTextRegions(p,w,h,[r],false,proof)).toThrow(ImageAlphaProtectionUnavailableError);
+        expect(p).toEqual(before);
+    });
+    it('实际待修蒙版全部受保护时不分配队列，不写入原RGBA',()=>{
+        const w=32,h=24,p=solidPixels(w,h,[17,53,191,0]),before=p.slice(),Queue=Uint32Array,queues:number[]=[];
+        const proof=protectedRuns(h,Array.from({length:10},(_,y)=>[y+6,6,20]));
+        vi.stubGlobal('Uint32Array',class extends Queue {constructor(size:number){super(size);queues.push(size);}});
+        expect(inpaintTextRegions(p,w,h,[line(8,8,18,14)],true,proof)).toBe(p);
+        expect(p).toEqual(before);expect(queues).toEqual([]);
+    });
+    it('非均匀边界仍只采mask0，两个分离簇共同保护孔与隐藏RGB',()=>{
+        const w=64,h=48,p=solidPixels(w,h),boxes=[line(10,16,18,26),line(40,16,48,26)];
+        const proof=protectedRuns(h,[[20,0,1],[20,12,13],[20,42,43],[20,62,63]]);
+        p.set([17,53,191,0],(20*w+12)*4);p.set([27,63,181,32],(20*w+42)*4);
+        p.set([181,200,220,255],(13*w+12)*4);p.set([179,200,220,255],(13*w+42)*4);
+        const result=inpaintTextRegions(p,w,h,boxes,false,proof);
+        expect(Array.from(result.subarray((20*w+12)*4,(20*w+12)*4+4))).toEqual([17,53,191,0]);
+        expect(Array.from(result.subarray((20*w+42)*4,(20*w+42)*4+4))).toEqual([27,63,181,32]);
+        for(let y=14;y<28;y++)for(const [x0,x1]of [[8,20],[38,50]])for(let x=x0;x<x1;x++){
+            if(x===12&&y===20||x===42&&y===20)continue;
+            expect(result[(y*w+x)*4+3]).toBe(255);
+        }
+    });
+    it('保护规划复用普通图精确余量与半开边界，不使用漫画字号扩张',()=>{
+        expect(imageMaskBoxes({...line(10,10,40,40),fontSize:100},64,48)).toEqual([{x0:7,y0:7,x1:43,y1:43}]);
+        expect(imageMaskBoxes({...line(10,10,40,40),sourceBoxes:[line(-1,0,4,4).bbox,line(60,44,68,52).bbox,line(NaN,0,1,1).bbox]},64,48))
+            .toEqual([{x0:0,y0:0,x1:6,y1:6},{x0:58,y0:42,x1:64,y1:48}]);
+        expect(imageMaskBoxes({...line(10,10,40,40),sourceBoxes:[]},64,48)).toEqual([]);
+    });
     it.each([
         ['分离和触图边', [[-2, -2, 8, 8], [60, 60, 72, 72], [30, 20, 40, 30]], '8eb6e03e85b61098bc3f80a55d308193350aa391e407bc441f34e1dbd4f8d034'],
         ['后来桥接', [[10, 10, 20, 20], [35, 10, 45, 20], [19, 10, 36, 20]], '70a03e5e598e7c03179856fbb641d13899201714c0a6e3fa12ce566e6a8ea7e5'],

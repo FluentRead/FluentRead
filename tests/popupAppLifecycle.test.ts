@@ -282,15 +282,32 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(state.drawerVisible).toBe(false);expect(document.querySelector('.drawer-content')).toBeNull();expect(commands()).toHaveLength(0);
     expect(send.mock.calls.some(call=>['getPageTranslationFontState','setPageTranslationFont'].includes(call[1].type))).toBe(false);
   });
-  it('Aa 保存失败保持已确认偏好，同按钮重试真实后台保存后清除错误',async()=>{
+  it.each(['notice','font'] as const)('Aa 保存失败显示可读提示，使用 %s 重试并在真实后台保存后清除',async source=>{
     localized=true;await mount();const {sender,messages,records}=await attachPersistence();
-    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure')).mockRejectedValueOnce(Error('synthetic retry failure'));
     const entry=()=>button('page-font-entry');await eventOf(entry())();await drain();
     expect(entry().getAttribute('aria-pressed')).toBe('false');expect(entry().getAttribute('data-font-state')).toBe('error');
-    expect(entry().hasAttribute('disabled')).toBe(false);expect(button('page-font-error')).toBeNull();
+    expect(entry().hasAttribute('disabled')).toBe(false);
     expect(entry().getAttribute('aria-description')).toContain(zhCNMessages['popup.pageFont.changeError']);
-    await eventOf(entry())();await drain();expect(entry().getAttribute('aria-pressed')).toBe('true');expect(button('page-font-error')).toBeNull();
+    const notice=()=>button('page-font-error');const retry=()=>button('page-font-retry');
+    expect(notice().querySelector('[role="alert"]')?.textContent).toContain(zhCNMessages['popup.pageFont.changeError']);
+    expect(retry().textContent).toBe(zhCNMessages['popup.pageFont.retry']);
+    expect(retry().getAttribute('aria-label')).toBe(zhCNMessages['popup.pageFont.retryAction']);
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('false');expect(notice()).not.toBeNull();
+    if(source==='notice')expect(document.activeElement).toBe(entry());
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('true');expect(notice()).toBeNull();
     expect(messages).toHaveLength(1);expect(messages[0].config).toEqual({browserDefaultTranslationFont:true});expect(records.get('local:config')).toMatchObject({browserDefaultTranslationFont:true});
+  });
+  it('字体重试等待时保留临时焦点，不抢回用户主动移走的焦点',async()=>{
+    localized=true;await mount();const gate=deferred<void>(),{sender}=await attachPersistence([gate]);
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    await eventOf(button('page-font-entry'))();await drain();
+    const pending=eventOf(button('page-font-retry'))();await drain();
+    expect(document.activeElement).toBe(document.querySelector('.translation-tools'));
+    const outside=document.querySelector('.settings-button') as HTMLElement;outside.focus();gate.resolve();await pending;await drain();
+    expect(document.activeElement).toBe(outside);expect(button('page-font-error')).toBeNull();
   });
   it('Aa 接受其他页面的全局配置同步，导航和重开不重置选择也不额外保存',async()=>{
     await mount();const {store,sender,messages}=await attachPersistence();const saves=patches.mock.calls.length;

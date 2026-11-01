@@ -257,11 +257,26 @@ export const compatibilityPreludeEnd = '/* FluentRead userscript compatibility p
 export const executionGuardStart = '/* FluentRead userscript execution guard:start */';
 export const executionGuardEnd = '/* FluentRead userscript execution guard:end */';
 
+/** 独立版仅在后续存在完整相同的 MIT 正文时共享图标授权；否则保留完整原文。 */
+function serviceIconsNoticeForBundle(thirdPartyNotices: string): string {
+    if (!bundleLibraries) return sharedMitNotice;
+    const start = 'Permission is hereby granted';
+    const iconStart = serviceIconsLicense.indexOf(start), canonicalStart = tinycolorLicense.indexOf(start);
+    if (iconStart < 0 || canonicalStart < 0) return serviceIconsNotice;
+    const terms = tinycolorLicense.slice(canonicalStart).trim();
+    const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
+    const sharedBlock = `/*\nShared MIT permission and warranty terms for the references above:\n${terms}\n*/`;
+    if (normalize(serviceIconsLicense.slice(iconStart)) !== normalize(terms) || !thirdPartyNotices.includes(sharedBlock)) {
+        return serviceIconsNotice;
+    }
+    return `/*\n${serviceIconsLicense.slice(0, iconStart).trimEnd()}\n\n[Shared MIT terms below]\n*/`;
+}
+
 export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string, thirdPartyNotices = ''): string {
     return [
         metadata,
         unicodeNotice,
-        bundleLibraries ? serviceIconsNotice : sharedMitNotice,
+        serviceIconsNoticeForBundle(thirdPartyNotices),
         ...(thirdPartyNotices ? [thirdPartyNotices] : []),
         executionGuardStart,
         'if (!globalThis.__fluentReadUserscriptBootstrapped) {',
@@ -312,19 +327,26 @@ export function bundledLibraryNotices(moduleIds: readonly string[]): string {
         if (headings) headings.push(heading);
         else licenseGroups.set(licenseText, [heading]);
     }
-    const notices = [...licenseGroups].map(([licenseText, headings]) =>
+    let notices = [...licenseGroups].map(([licenseText, headings]) =>
         `/*\n${headings.join('\n')}\n${licenseText}\n*/`).join('\n');
     if (!bundleLibraries) return notices;
-    // 完整独立版还包含不同版权及内嵌子依赖的同一 MIT 正文。仅匹配现有许可文件的完整
-    // 授权与免责文字，允许换行/空白差异；每个版权、来源和前后附加条款保留在原位置。
+    // 完整独立版还包含不同版权及内嵌子依赖的同一 MIT 正文。分别共享双引号与单引号的
+    // 完整版本，仅允许换行/空白差异；每个版权、来源和前后附加条款保留在原位置。
     const permissionStart = tinycolorLicense.indexOf('Permission is hereby granted');
     if (permissionStart < 0) throw new Error('Canonical bundled MIT permission terms are missing');
     const terms = tinycolorLicense.slice(permissionStart).trim();
-    const escapedWords = terms.split(/\s+/u).map(word => word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
-    const repeatedTerms = new RegExp(escapedWords.join('\\s+'), 'gu');
-    if ([...notices.matchAll(repeatedTerms)].length < 2) return notices;
-    return notices.replace(repeatedTerms, '[Shared MIT terms below]')
-        + `\n/*\nShared MIT permission and warranty terms for the references above:\n${terms}\n*/`;
+    const variants = [
+        {terms, marker: '[Shared MIT terms below]', title: 'Shared MIT permission and warranty terms for the references above:'},
+        {terms: terms.replace(/"/gu, "'"), marker: '[Shared single-quoted MIT terms below]',
+            title: 'Shared single-quoted MIT permission and warranty terms for the references above:'},
+    ];
+    for (const variant of variants) {
+        const escapedWords = variant.terms.split(/\s+/u).map(word => word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+        const repeatedTerms = new RegExp(escapedWords.join('\\s+'), 'gu');
+        if ([...notices.matchAll(repeatedTerms)].length < 2) continue;
+        notices = notices.replace(repeatedTerms, variant.marker) + `\n/*\n${variant.title}\n${variant.terms}\n*/`;
+    }
+    return notices;
 }
 
 // Via 等旧内核可能缺少共享核心使用的基础方法；在单文件入口最前方注入小型兼容层。

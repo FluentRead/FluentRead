@@ -17,6 +17,7 @@ import {
 import {translationLoadingStyleOptions} from './translationLoadingStyle';
 import {SENTENCE_HIGHLIGHT_STYLES} from './sentenceHighlight';
 import {LOCAL_TTS_MODE_OPTIONS} from './localTts';
+import {WORD_DICTIONARY_SOURCE_OPTIONS} from './selectionDictionary';
 import {parseApiKeyRequirementKey} from './validation';
 
 export const CONFIG_DIFF_GROUPS = [
@@ -604,6 +605,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     customSelectionTranslatorHotkey: {group: 'translation', label: '自定义划词快捷键'},
     selectionTranslatorDelay: {group: 'translation', label: '划词显示延迟', format: (value) => formatNumber(value, ' ms')},
     selectionTranslatorBidirectional: {group: 'translation', label: '中英双向划词', format: (value) => formatBoolean(value)},
+    selectionDictionarySource: {group: 'translation', label: '词典来源', format: (value) => formatEnum(value, labelsFor(WORD_DICTIONARY_SOURCE_OPTIONS))},
     selectionTtsVoices: {group: 'translation', label: '划词朗读音色'},
     selectionTtsMode: {group: 'translation', label: '朗读合成策略', format: (value) => formatEnum(value, LOCAL_TTS_MODE_LABELS)},
     selectionTtsLocalVoice: {group: 'translation', label: '本地朗读音色'},

@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesSpanishMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const esESMessages = {
     "settings.requestLimits.globalTitle": "Límites de solicitudes",
     "settings.requestLimits.globalHelp": "Los servicios y modelos sin ajustes propios comparten estos límites.",
     ...aiRequestTimeoutMessages["es-ES"],
+    ...selectionDictionaryMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",
     "settings.requestLimits.apiKeyRecovery": "Enfriamiento de la API key fallida",
@@ -579,7 +581,7 @@ export const esESMessages = {
     "popup.pageFont.loading": "Leyendo la configuración de fuente…",
     "popup.pageFont.unavailable": "No se puede cambiar la fuente de traducción ahora.",
     "popup.pageFont.readError": "No se pudo leer la configuración de fuente. Vuelve a intentarlo.",
-    "popup.pageFont.changeError": "No se pudo guardar la configuración de fuente. Vuelve a intentarlo.",
+    "popup.pageFont.changeError": "No se pudo guardar la fuente.",
     "popup.pageFont.retry": "Reintentar",
     "popup.quickSettings.appearanceDescription": "El modo bilingüe muestra el original y la traducción; el modo de solo traducción muestra únicamente el texto traducido.",
     "popup.quickSettings.hoverSettings": "Ajustes de traducción al pasar el cursor",

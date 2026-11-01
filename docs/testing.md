@@ -515,6 +515,8 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 
 `node scripts/run-youtube-subtitle-sync-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-youtube-sync` 在临时 Edge profile 的后台可见窗口中验证文档全屏、菜单操作、整句/逐词字幕定位、时间边界、重复句、延迟译文、真实视频 seek、空字幕、原文模式和关闭清理。夹具使用真实视频进度、受控 YouTube DOM 与模拟翻译响应，不代表真实 YouTube 字幕供应或翻译服务质量。
 
+该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
+
 ## 中文格式清单与重复请求
 
 `tests/chineseLanguage.test.ts` 覆盖中文文档格式清单、简繁字形相同的“新增功能”标题、短中文中的 AI/PDF、带版本与后缀的技术名称（例如 GPT-6 Sol）、发布说明中的提交哈希、真正外语正文与简繁转换边界。`tests/fixtures/chinese-language-model-post.json` 保留用户反馈原文，分别验证四行和整段；这份测试语料不代表对其中新闻内容的事实确认。

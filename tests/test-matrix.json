@@ -726,6 +726,7 @@
       "tests/paragraphCopySettingsLifecycle.test.ts",
       "tests/pdfReadingFontDownload.test.ts",
       "tests/pdfTextExport.test.ts",
+      "tests/pdfExportOutline.test.ts",
       "tests/personalCorrectionComposition.test.ts",
       "tests/personalCorrectionDom.test.ts",
       "tests/personalCorrectionTranslation.test.ts",

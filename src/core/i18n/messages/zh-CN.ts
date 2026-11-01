@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/zh-CN.json';
 import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
 import {aiRequestTimeoutChineseMessages} from './aiRequestTimeout';
+import {selectionDictionaryChineseMessages} from './selectionDictionary';
 import {sectionTranslationRulesChineseMessages} from './sectionTranslationRules';
 import {pdfReadingChineseMessages} from './pdfReading';
 import {informationHighlightChineseMessages} from './informationHighlight';
@@ -543,6 +544,7 @@ export const zhCNMessages = {
     "settings.requestLimits.globalTitle": "请求限制",
     "settings.requestLimits.globalHelp": "未单独设置的服务和模型共用这些限制",
     ...aiRequestTimeoutChineseMessages,
+    ...selectionDictionaryChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",
     "settings.requestLimits.apiKeyRecovery": "失败 Key 冷却时间",
@@ -575,7 +577,7 @@ export const zhCNMessages = {
     "popup.pageFont.loading": "正在读取字体设置…",
     "popup.pageFont.unavailable": "暂时无法调整译文字体。",
     "popup.pageFont.readError": "未能读取字体设置，请重试。",
-    "popup.pageFont.changeError": "未能保存字体设置，请重试。",
+    "popup.pageFont.changeError": "字体设置保存失败",
     "popup.pageFont.retry": "重试",
     "popup.quickSettings.appearanceDescription": "双语模式同时显示原文与译文；仅译文模式只显示翻译结果。",
     "popup.quickSettings.hoverSettings": "悬停翻译设置",

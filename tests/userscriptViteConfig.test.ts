@@ -505,6 +505,71 @@ describe('userscript bundled library notices', () => {
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
+    it('standalone shares the icon notice only when the complete identical terms follow', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-icons-shared-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices, wrapUserscriptEntry: standaloneWrap} = await import('@/userscript/vite.config');
+            const iconLicense = readFileSync(resolve(process.cwd(), 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8').trim();
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const terms = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const ids = ['First owner', 'Second owner'].map((owner, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/icon-test-${index}@1.0.0/node_modules/icon-test-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `icon-test-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), `Copyright (c) ${owner}\n\n${terms}`);
+                return resolve(directory, 'index.js');
+            });
+            const notices = standaloneNotices(ids);
+            const wrapped = standaloneWrap('ENTRY_SENTINEL', 'BOOTSTRAP_SENTINEL', notices);
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            expect(normalize(wrapped.replaceAll('[Shared MIT terms below]', terms))).toContain(normalize(iconLicense));
+            expect(wrapped.split(terms)).toHaveLength(2);
+            expect(wrapped).toContain('Copyright (c) First owner');
+            expect(wrapped).toContain('Copyright (c) Second owner');
+            expect(standaloneWrap('entry', 'bootstrap')).toContain(iconLicense);
+            expect(standaloneWrap('entry', 'bootstrap', 'Shared MIT permission and warranty terms for the references above:')).toContain(iconLicense);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
+    it('standalone shares identical single-quoted MIT terms without changing licenses or attribution', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-single-quoted-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices} = await import('@/userscript/vite.config');
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const canonical = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const singleQuoted = canonical.replace(/"/gu, "'");
+            const bodies = [
+                `Copyright (c) First owner\nSource: https://example.com/first\n\n${singleQuoted}\nExtra attribution.`,
+                `Copyright (c) Second owner\n\n${singleQuoted.replace(/\s+/gu, '\r\n ')}`,
+                `Copyright (c) Different terms\n\n${singleQuoted.replace('free of charge', 'subject to a fee')}`,
+                `Copyright (c) Double quotes\n\n${canonical}`,
+            ];
+            const ids = bodies.map((body, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/quoted-${index}@1.0.0/node_modules/quoted-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `quoted-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), body);
+                return resolve(directory, 'index.js');
+            });
+            const result = standaloneNotices(ids);
+            const marker = '[Shared single-quoted MIT terms below]';
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            const restored = normalize(result.replaceAll(marker, singleQuoted));
+            for (const body of bodies) expect(restored).toContain(normalize(body));
+            expect(result.split(marker)).toHaveLength(3);
+            expect(result.split(singleQuoted)).toHaveLength(2);
+            expect(result).toContain(bodies[2]);
+            expect(result).toContain(bodies[3]);
+            expect(standaloneNotices([ids[0]])).toContain(bodies[0]);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
     it('standalone preserves copyright, sources, surrounding clauses, different terms and non-MIT notices', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-shared-mit-notices-'));
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');

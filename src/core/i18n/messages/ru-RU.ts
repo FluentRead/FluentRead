@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ru-RU.json';
 import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesRussianMessages} from './sectionTranslationRulesRussian';
 import {sectionTranslationRulesLegacyText} from './sectionTranslationRulesLegacy';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -547,6 +548,7 @@ export const ruRUMessages = {
     "settings.requestLimits.globalTitle": "Ограничения запросов",
     "settings.requestLimits.globalHelp": "Сервисы и модели без отдельных настроек используют эти общие ограничения.",
     ...aiRequestTimeoutMessages["ru-RU"],
+    ...selectionDictionaryMessages["ru-RU"],
     ...sectionTranslationRulesRussianMessages,
     "settings.requestLimits.retryIntervals": "Интервалы повторов",
     "settings.requestLimits.apiKeyRecovery": "Пауза неисправного API Key",
@@ -579,7 +581,7 @@ export const ruRUMessages = {
     "popup.pageFont.loading": "Чтение настройки шрифта…",
     "popup.pageFont.unavailable": "Сейчас нельзя изменить шрифт перевода.",
     "popup.pageFont.readError": "Не удалось прочитать настройку шрифта. Повторите попытку.",
-    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта. Повторите попытку.",
+    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта.",
     "popup.pageFont.retry": "Повторить",
     "popup.quickSettings.appearanceDescription": "Двуязычный режим показывает оригинал и перевод, а режим «Только перевод» — лишь переведённый текст.",
     "popup.quickSettings.hoverSettings": "Настройки перевода при наведении",

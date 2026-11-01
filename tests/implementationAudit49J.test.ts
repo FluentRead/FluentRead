@@ -720,11 +720,12 @@ if(mode.startsWith('native')) {
         const mediaDir = join(root, 'media'); mkdirSync(mediaDir);
         writeFileSync(join(mediaDir, 'video-direct.mp4'), 'controlled media fixture, never decoded');
         if (script.endsWith('run-x-native-subtitle-test.cjs') || script.endsWith('run-reported-fixes-test.cjs')) flags.push('--media-dir', mediaDir, '--extension-install', 'command-line');
-        if (script.endsWith('run-site-translation-test.cjs')) {
+        if (script.endsWith('run-site-translation-test.cjs') || script.endsWith('run-youtube-subtitle-sync-test.cjs')) {
             const diagnosticHelper = join(root, 'runtime-diagnostics.cjs');
-            writeFileSync(diagnosticHelper, `module.exports={redact:String,createRuntimeDiagnostics:()=>({start:async()=>{},attachPage:async()=>{},setExtensionId(){},setPhase(){},flush:async()=>{},snapshot:()=>({passed:false,completeCoverage:false}),assertClean(){},stop:async()=>{}})};`);
-            flags.push('--case', 'example-com', '--mode', 'hover', '--allow-network', '--runtime-diagnostics-helper', diagnosticHelper);
+            writeFileSync(diagnosticHelper, `module.exports={redact:String,createRuntimeDiagnostics:()=>({start:async()=>{},attachPage:async()=>{},setExtensionId(){},setPhase(){},flush:async()=>{console.log('DIAGNOSTICS_FLUSH');},snapshot:()=>({passed:false,completeCoverage:false}),assertClean(){},stop:async()=>{console.log('DIAGNOSTICS_STOP');}})};`);
+            flags.push('--runtime-diagnostics-helper', diagnosticHelper);
         }
+        if (script.endsWith('run-site-translation-test.cjs')) flags.push('--case', 'example-com', '--mode', 'hover', '--allow-network');
         if (script.endsWith('run-translation-viewport-test.cjs')) flags.push('--allow-network');
     }
     try {
@@ -1106,6 +1107,12 @@ describe('audit49 J continuation3 complete manual cleanup consumers', () => {
             expect(result.stdout, `${script} ${mode} acquired external port`).toContain('PUBLIC_LAUNCH_REACHED');
             expect(result.timedOut, `${script} ${mode} finite consumer`).toBe(false);
             if (mode !== 'scan-partial') expect(result.stdout, `${script} ${mode} closes acquired browser\n${result.stderr}`).toContain('SESSION_CLOSE');
+            if (script === 'scripts/run-youtube-subtitle-sync-test.cjs') {
+                // 诊断是显式外部端口；清理夹具不依赖 CI runner 安装本机 Codex 技能。
+                expect(result.stdout.split('DIAGNOSTICS_FLUSH')).toHaveLength(2);
+                expect(result.stdout.split('DIAGNOSTICS_STOP')).toHaveLength(2);
+                if (mode !== 'scan-partial') expect(result.stdout.indexOf('DIAGNOSTICS_STOP')).toBeLessThan(result.stdout.indexOf('SESSION_CLOSE'));
+            }
             if (continuation3ServerScripts.has(script)) expect(result.stdout, `${script} ${mode} releases independent HTTP fixture`).toContain('OWNED_HTTP_SERVER_CLOSED');
             if (mode === 'scan-report') expect(profiles, `${script} confirmed closed profile`).toEqual([]);
             else if (mode === 'scan-partial') expect(retainedMarkers, `${script} unknown active profile retained`).toContain('controlled active profile');

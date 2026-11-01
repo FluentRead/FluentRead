@@ -1,7 +1,7 @@
 /**
  * @file tests/settingsControlUiBehavior.test.ts
  * 文件职责：执行设置小组件真实 Vue 客户端模板与输入、切换和生命周期。
- * 主要内容：段落边界归一化、划词/阅读开关、语言筛选、提示词插入与迟到焦点所有权。
+ * 主要内容：段落边界归一化、划词/阅读开关、词典来源及脚本版本地词库禁用、语言筛选、提示词插入与迟到焦点所有权。
  * 模块边界：布局、子控件和语言端口可控；被测 SFC、Vue 状态与核心归一化函数保持真实。
  */
 import {parseHTML} from 'linkedom';
@@ -20,10 +20,16 @@ import {SENTENCE_HIGHLIGHT_STYLES} from '@/src/core/config/sentenceHighlight';
 import {getDefaultHarnessPrompt} from '@/src/core/harness/prompts';
 import {HARNESS_PROMPT_MAX_LENGTH, HARNESS_PROMPT_VARIABLES} from '@/src/core/config/harness';
 const webdav=vi.hoisted(()=>({settings:vi.fn(),clear:vi.fn(),save:vi.fn(),test:vi.fn(),confirm:vi.fn(),success:vi.fn(),warning:vi.fn(),status:vi.fn(),prepare:vi.fn(),prepareDelete:vi.fn(),cancel:vi.fn()}));
+const selectionBrowser=vi.hoisted(()=>({browser:'chrome'}));
 vi.mock('@/src/services/config/webDavBackupClient',()=>({webDavBackupClient:webdav}));
 vi.mock('webextension-polyfill',()=>({default:{runtime:{sendMessage:vi.fn()}}}));
 vi.mock('element-plus/es/components/alert/style/css',()=>({}));
-vi.mock('element-plus',()=>({ElAlert:{props:['title','type'],setup:(props:any)=>()=>h('p',{role:'alert','data-alert-type':props.type},props.title)},ElMessage:{success:webdav.success,warning:webdav.warning},ElMessageBox:{confirm:webdav.confirm}}));
+vi.mock('element-plus',()=>({ElAlert:{props:['title','type'],setup:(props:any)=>()=>h('p',{role:'alert','data-alert-type':props.type},props.title)},ElMessage:{success:webdav.success,warning:webdav.warning},ElMessageBox:{confirm:webdav.confirm},
+  ElOption:{props:['value','label','disabled'],setup:(props:any)=>()=>h('span',{'data-dictionary-option':props.value,'data-disabled':String(Boolean(props.disabled))},props.label)}}));
+vi.mock('@/src/platform/browser/capabilities',()=>({browserCapabilities:selectionBrowser}));
+// 保留选择器公开的值与更新事件端口；此套件执行实际设置模板，菜单与 CSS 由生产浏览器专项验证。
+vi.mock('@/src/ui/components/UiSelect.vue',()=>({default:{inheritAttrs:false,props:['modelValue','filterable'],emits:['update:modelValue'],setup:(props:any,{attrs,slots,emit}:any)=>()=>h('div',attrs,[
+  h('input',{value:props.modelValue,onInput:(event:Event)=>emit('update:modelValue',(event.target as HTMLInputElement).value)}),slots.default?.()])}}));
 // RemoteConfigSync's public client contract is driven through child UI events; its separate lifecycle suite keeps the full transaction implementation real.
 vi.mock('@/src/features/settings/ui/RemoteConfigSync.vue',()=>({default:{props:['client'],emits:['busy'],setup:(props:any,{slots,expose,emit}:any)=>{
   const status=ref<any>(null),result=ref('');
@@ -49,6 +55,7 @@ const frames = new Map<number, FrameRequestCallback>();
 let frameId = 0;
 async function flush() {for(let i=0;i<16;i++) await nextTick();}
 beforeEach(() => {
+  selectionBrowser.browser='chrome';
   const parsed=parseHTML('<html><body><main></main></body></html>'); doc=parsed.document as unknown as Document; win=parsed.window;
   for(const key of ['Node','Element','HTMLElement','HTMLButtonElement','SVGElement','Event','MutationObserver']) vi.stubGlobal(key,win[key]);
   vi.stubGlobal('window',win); vi.stubGlobal('document',doc);
@@ -105,6 +112,18 @@ it.each(['bilingual','translation-only','disabled'] as const)('preserves the pre
   if(mode==='disabled'){expect(config.selectionTranslatorMode).toBe('bilingual');expect(config.disableSelectionTranslator).toBe(false);}
   else{expect(config.selectionTranslatorMode).toBe('disabled');expect(config.disableSelectionTranslator).toBe(true);await click(toggle);expect(config.selectionTranslatorMode).toBe(mode);}
   await click(button(ui.host,'句子'));expect(ui.host.querySelector('output')).toBeTruthy();await click(button(ui.host,'单词'));expect(ui.host.querySelector('output')).toBeNull();
+});
+it.each(['chrome','userscript'] as const)('updates dictionary source through the actual settings template in %s',async browser=>{
+  selectionBrowser.browser=browser;
+  const config=reactive(new Config());const ui=mount(SelectionSettings,{config});
+  const field=ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
+  expect(field.value).toBe('auto');
+  expect(ui.host.querySelectorAll('[data-dictionary-option]')).toHaveLength(7);
+  expect(ui.host.querySelector('[data-dictionary-option="ecdict-local"]')?.getAttribute('data-disabled')).toBe(String(browser==='userscript'));
+  expect(ui.host.querySelector('[data-dictionary-option="free-dictionary"]')?.getAttribute('data-disabled')).toBe('false');
+  await input(field,'free-dictionary');expect(config.selectionDictionarySource).toBe('free-dictionary');
+  config.selectionDictionarySource='wiktionary-rest';await flush();expect(field.value).toBe('wiktionary-rest');
+  await input(field,'auto');expect(config.selectionDictionarySource).toBe('auto');
 });
 it.each(['unmount','replace','kind'] as const)('does not focus a prompt insertion after %s invalidates its field',async cause=>{
   const preferences=reactive(new Config().harness);preferences.systemPrompt='Example';const ui=mount(HarnessPromptSettings,{preferences});

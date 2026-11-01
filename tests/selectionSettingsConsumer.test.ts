@@ -30,13 +30,21 @@ import * as Vue from 'vue';
 import {Config} from '@/src/core/config/model';
 import * as preview from '@/src/core/config/selectionPreview';
 import * as clickSelection from '@/src/core/config/clickSelection';
+import * as selectionDictionary from '@/src/core/config/selectionDictionary';
 const warning = vi.fn();
+const browserCapabilities = {browser: 'chrome'};
 
 // 只观察目标传给公共展示边界的 props，不把子组件替身算作回答渲染或学习服务的验收。
 const ReadingAnswerPort = Vue.defineComponent({props: {text: String, sourceText: String},
     setup: props => () => Vue.h('div', {'data-reading-answer-port': '', 'data-source': props.sourceText}, props.text)});
 const HarnessSettingsPort = Vue.defineComponent({props: ['config'],
     setup: props => () => Vue.h('div', {'data-harness-settings-port': '', 'data-mode': props.config.selectionTranslatorMode})});
+// 共享设置行与选择器只提供公开插槽/更新端口；生产浏览器专项验证实际 Element Plus 菜单与持久化。
+const SettingsItemPort = Vue.defineComponent({props: ['label', 'help'], setup: (props, {slots}) =>
+    () => Vue.h('label', [Vue.h('span', props.label), slots.default?.()])});
+const SelectPort = Vue.defineComponent({props: ['modelValue', 'filterable'], emits: ['update:modelValue'], setup: (props, {slots, emit}) =>
+    () => Vue.h('select', {'data-model-value': props.modelValue, onChange: (event: Event) => emit('update:modelValue', (event.target as HTMLSelectElement).value)}, slots.default?.())});
+const OptionPort = Vue.defineComponent({props: ['value', 'label', 'disabled'], setup: props => () => Vue.h('option', {value: props.value, disabled: props.disabled ? '' : undefined}, props.label)});
 const actualComponents = new Set([
     'src/features/settings/ui/SelectionSettings.vue',
     'src/ui/components/FeatureEnableCard.vue',
@@ -53,7 +61,11 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         vue: Vue,
         '@/src/ui/i18n': {useUiI18n: () => ({t: (key: string, params?: Record<string, unknown>) => params ? key + ' ' + JSON.stringify(params) : key, translateLegacy: (value: string) => value})},
         '@/src/core/config/clickSelection': clickSelection,
-        'element-plus': {ElMessage: {warning}},
+        '@/src/core/config/selectionDictionary': selectionDictionary,
+        '@/src/platform/browser/capabilities': {browserCapabilities},
+        'element-plus': {ElMessage: {warning}, ElOption: OptionPort},
+        '@/src/ui/components/UiSelect.vue': {default: SelectPort},
+        './components/SettingsItem.vue': {default: SettingsItemPort},
         '@/src/core/config/selectionPreview': preview,
         '@/src/features/reading-assistant/ui/answer/public': {ReadingAnswer: ReadingAnswerPort},
         './HarnessSettings.vue': {default: HarnessSettingsPort},
@@ -78,7 +90,7 @@ async function mount(config = new Config()): Promise<void> {
     app = Vue.createApp({setup: () => () => Vue.h(component, {config: state.config})});
     app.mount(root);await settle();
 }
-afterEach(async () => {warning.mockClear();app?.unmount();app = undefined;await settle();dom.document.body.replaceChildren();});
+afterEach(async () => {warning.mockClear();browserCapabilities.browser = 'chrome';app?.unmount();app = undefined;await settle();dom.document.body.replaceChildren();});
 afterAll(() => dom.restore());
 function control<T extends Element = HTMLButtonElement>(selector: string): T {
     const node = root.querySelector<T>(selector);
@@ -101,6 +113,36 @@ function withoutSelectionSwitch(config: Config): Record<string, unknown> {
 const switchSelector = '.feature-enable-card button[role="switch"][aria-label="启用划词翻译"]';
 
 describe('SelectionSettings 真实模板消费者', () => {
+    it('脚本版保留在线来源并禁用没有打包的本地词库', async () => {
+        browserCapabilities.browser = 'userscript';await mount();
+        expect(control<HTMLOptionElement>('option[value="ecdict-local"]').hasAttribute('disabled')).toBe(true);
+        expect(control<HTMLOptionElement>('option[value="free-dictionary"]').hasAttribute('disabled')).toBe(false);
+    });
+    it('默认自动来源可切换全部词典，关闭重开和父级配置替换保留选择', async () => {
+        await mount();
+        const source = () => control<HTMLSelectElement>('[data-testid="selection-dictionary-source"]');
+        expect(source().getAttribute('aria-label')).toBe('selection.dictionary.source');
+        expect(state.config.selectionDictionarySource).toBe('auto');
+        expect([...source().querySelectorAll('option')].map(option => option.getAttribute('value')))
+            .toEqual(selectionDictionary.WORD_DICTIONARY_SOURCE_OPTIONS.map(option => option.value));
+        const before = snapshot(state.config);
+        for (const {value} of selectionDictionary.WORD_DICTIONARY_SOURCE_OPTIONS) {
+            const option = source().querySelector<HTMLOptionElement>(`option[value="${value}"]`)!;
+            for (const item of source().querySelectorAll('option')) item.removeAttribute('selected');
+            option.setAttribute('selected', '');
+            source().dispatchEvent(new dom.Event('change', {bubbles: true}));await settle();
+            expect(state.config.selectionDictionarySource).toBe(value);
+        }
+        await click(control(switchSelector));await click(control(switchSelector));
+        expect(state.config.selectionDictionarySource).toBe('datamuse');
+        state.config = Object.assign(new Config(), {selectionDictionarySource: 'free-dictionary' as const});await settle();
+        expect(state.config.selectionDictionarySource).toBe('free-dictionary');
+        expect(source().getAttribute('data-model-value')).toBe('free-dictionary');
+        const withoutSource = snapshot(state.config);delete withoutSource.selectionDictionarySource;
+        const original = {...before};delete original.selectionDictionarySource;
+        expect(withoutSource).toEqual(original);
+    });
+
     it.each(['hover','full-page','section'] as const)('%s 方案占用点选组合时再开启划词必须明确拒绝，调整方案后可恢复', async action => {
         const config=Object.assign(new Config(),{selectionTranslatorMode:'disabled',disableSelectionTranslator:true,selectionClickSelectEnabled:true,
             quickTranslationProfiles:[{id:'occupied',action,enabled:true,hotkey:'Alt+Shift+S',service:'',model:'',targetLanguage:'',displayMode:'inherit' as const,fullPageMode:'inherit' as const}]});

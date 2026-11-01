@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ko-KR.json';
 import selfHelpText from './self-help/ko-KR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesKoreanMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const koKRMessages = {
     "settings.requestLimits.globalTitle": "요청 제한",
     "settings.requestLimits.globalHelp": "개별 설정이 없는 서비스와 모델은 이 제한을 공유합니다.",
     ...aiRequestTimeoutMessages["ko-KR"],
+    ...selectionDictionaryMessages["ko-KR"],
     ...sectionTranslationRulesKoreanMessages,
     "settings.requestLimits.retryIntervals": "재시도 간격",
     "settings.requestLimits.apiKeyRecovery": "실패한 Key 쿨다운",

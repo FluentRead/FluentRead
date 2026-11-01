@@ -119,7 +119,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             onStateChanged: options.onFullPageStateChanged,
         }),
         createSelectionWordLookupHandler({
-            lookupWord,
+            lookupWord: (word) => lookupWord(word, config.selectionDictionarySource),
             getDefaultTargetLanguage: () => config.to,
             translate: (request) => translateWithCache({...request, serviceOverride: config.selectionTranslationService || config.service}),
             warn: (message, error) => console.warn(message, error),

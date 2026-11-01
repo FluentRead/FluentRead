@@ -100,8 +100,9 @@ async function deepseek(message: TranslationProviderRequest<string>) {
             || result?.incomplete_details != null
             || (result?.status !== undefined && result.status !== 'completed')
             || (Array.isArray(result?.output) && result.output.some((item: any) =>
-                // Translation-only responses cannot hand control to tools or unknown output kinds.
-                (item?.type !== 'message' && item?.type !== 'reasoning')
+                // 已完成的服务端搜索可随最终译文返回；客户端工具调用和未知输出仍不可当作译文。
+                (item?.type !== 'message' && item?.type !== 'reasoning'
+                    && !(item?.type === 'web_search_call' && item?.status === 'completed'))
                 || (item?.status !== undefined && item.status !== 'completed')
                 || (item?.type === 'message' && Array.isArray(item.content)
                     && item.content.some((part: any) => part?.type === 'refusal'))))

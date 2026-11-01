@@ -52,6 +52,12 @@ Google, Microsoft, DeepL, Azure, and Google Cloud enable **Request limits → Co
 
 This differs from **AI multi-paragraph translation**, which is off by default. Grouping reduces request count, not character-based charges. Missing or broken results trigger individual recovery; failed recovery keeps the original and shows a failure instead of caching invalid output.
 
+## Claude and DeepSeek Responses translation
+
+For translation through these interfaces, FluentRead waits for a complete nonstreaming response. Translation requests remain nonstreaming even if the custom request body sets `stream: true`. Explicit truncation, refusal, or unfinished tool calls produce an error instead of being presented as a complete translation.
+
+DeepSeek Responses can return a completed server-side search alongside the final translation; search availability depends on the selected model and service. Translation does not execute client-side tool calls.
+
 ## Combined translation services
 
 1. Choose **Custom service → Combined translation** and enter a name.

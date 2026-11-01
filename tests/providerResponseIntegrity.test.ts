@@ -48,11 +48,28 @@ describe('Claude translation completeness', () => {
 
 describe('DeepSeek Responses translation completeness', () => {
     const partial = {model: 'actual-model', status: 'completed', output: [text], usage};
+    it.each([undefined, 'completed'])('accepts completed server-side web search with response status %s', async status => {
+        const source = config('deepseek');
+        source.customBody = {deepseek: JSON.stringify({tools: [{type: 'web_search'}]})};
+        reply({...partial, status, output: [{type: 'web_search_call', status: 'completed'}, {...text, status: 'completed'}]});
+        const observe = vi.fn();
+        await expect(deepseek(attachTranslationModelUsageObserver(withProviderSnapshot({origin: 'source'}, source), observe))).resolves.toBe('translation');
+        const request = fetchMock.mock.calls[0][1];
+        expect(JSON.parse(request?.body as string).tools).toEqual([{type: 'web_search'}]);
+        expect(JSON.parse(request?.body as string).stream).toBe(false);
+        expect(observe).toHaveBeenCalledOnce();
+        expect(observe.mock.calls[0][0].outcome).toBe('success');
+    });
+    it.each([undefined, 'in_progress', 'searching', 'failed'])('rejects server-side web search with nonfinal status %s', async status => {
+        reply({...partial, output_text: 'tempting top-level text', output: [{type: 'web_search_call', status}, text]});
+        await expect(deepseek(withProviderSnapshot({origin: 'source'}, config('deepseek')))).rejects.toMatchObject({kind: 'response'});
+    });
     it.each([
         {status: 'incomplete'}, {status: 'failed'}, {status: 'in_progress'}, {status: null},
         {error: {code: 'bad'}}, {incomplete_details: {reason: 'max_output_tokens'}},
         {output: [{...text, status: 'incomplete'}]},
         {output: [{type: 'message', content: [...text.content, {type: 'refusal', refusal: 'no'}]}]},
+        {output: [{type: 'web_search_call', status: 'completed'}, {type: 'message', content: [...text.content, {type: 'refusal', refusal: 'no'}]}]},
         {output: [{type: 'error'}, text]},
     ])('rejects incomplete/error/refusal even with plausible text %#', async patch => {
         reply({...partial, ...patch});
@@ -62,7 +79,7 @@ describe('DeepSeek Responses translation completeness', () => {
         expect(observe).toHaveBeenCalledOnce();
         expect(observe.mock.calls[0][0]).toMatchObject({outcome: 'error', actualModel: 'actual-model', inputTokens: 2, outputTokens: 3});
     });
-    it.each(['function_call', 'web_search_call', 'computer_call', 'mcp_call', 'unknown', undefined])('rejects mixed tool/unknown output type %s before extracting text', async type => {
+    it.each(['function_call', 'computer_call', 'mcp_call', 'unknown', undefined])('rejects mixed tool/unknown output type %s before extracting text', async type => {
         for (const status of [undefined, 'completed']) {
             fetchMock.mockClear();
             reply({...partial, output_text: 'tempting top-level text', output: [{type, status}, text]});

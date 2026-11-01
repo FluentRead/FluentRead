@@ -2,11 +2,11 @@
  * @file src/features/document-translation/services/binary.ts
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
  * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
- * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
+ * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import type JSZip from 'jszip';
-import type {PDFDict, PDFEmbeddedPage} from 'pdf-lib';
+import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
 import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
@@ -1162,7 +1162,7 @@ async function renderPdf(
     options: CreateDocumentDownloadOptions,
 ): Promise<Uint8Array> {
     const binary = document.binary as Extract<NonNullable<ParsedDocument['binary']>, {kind: 'pdf'}>;
-    const {PDFDocument, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
+    const {PDFDocument, EncryptedPDFError, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
         concatTransformationMatrix, setTextRenderingMode, TextRenderingMode, beginText, endText, setFontAndSize, showText} = await import('pdf-lib');
     options.signal?.throwIfAborted();
     const outputPdf = await PDFDocument.create();
@@ -1198,9 +1198,19 @@ async function renderPdf(
     const labelLayoutPage = (label: string) => layoutPageLabels.push(outputPdf.getPageCount() - 1, outputPdf.context.obj({P: PDFHexString.fromText(label)}));
     const changedPages = binary.pages.map(page => page.segmentIndexes.some(segmentIndex =>
         hasDistinctTranslation(document.segments[segmentIndex]?.source ?? '', translations[segmentIndex])));
-    if (mode === 'bilingual' || changedPages.some(changed => !changed)) {
-        const sourcePdf = await awaitDocumentRead(PDFDocument.load(binary.bytes), options.signal);
+    const needsSource = mode === 'bilingual' || changedPages.some(changed => !changed);
+    let sourcePdf: PDFDocument | undefined;
+    try {sourcePdf = await awaitDocumentRead(PDFDocument.load(binary.bytes), options.signal);}
+    catch (error) {
         options.signal?.throwIfAborted();
+        // 纯译文光栅原本无需 pdf-lib 读取原页；已由 PDF.js 打开的受保护文件不能因可选目录提取而失去下载能力。
+        // 锁定的 pdf-lib 1.17.1 用 ES5 Error 继承，EncryptedPDFError 的 instanceof 不成立；只匹配该构造器的完整固定消息。
+        if (needsSource || !(error instanceof Error) || error.message !== new EncryptedPDFError().message) throw error;
+    }
+    options.signal?.throwIfAborted();
+    const {createPdfExportOutline} = await import('./pdfOutline');
+    const outline = createPdfExportOutline(sourcePdf, outputPdf, document, translations);
+    if (sourcePdf && needsSource) {
         const required = new Set(binary.pages.filter((_page, index) => mode === 'bilingual' || !changedPages[index]).map(page => page.pageNumber));
         const pages = sourcePdf.getPages().map((page, index) => ({page, pageNumber: index + 1}))
             .filter(({page, pageNumber}) => required.has(pageNumber) && page.node.Contents());
@@ -1429,6 +1439,7 @@ async function renderPdf(
             }
             const image = await embedImage(rendered.bytes, rendered.format);
             const page = outputPdf.addPage([rendered.width, rendered.height]);
+            if (!settings.layoutPage) outline.readingPage(pageData, page, rendered.items?.filter(item => item.kind === 'text') ?? rendered.textItems ?? []);
             if (settings.layoutPage) labelLayoutPage(`${pageData.pageNumber} · 译文续页 ${generatedPages + 1}`);
             page.drawImage(image, {x: 0, y: 0, width: rendered.width, height: rendered.height});
             if (text.length) await drawSelectableLayout(page, {...pageData, rotation: 0, width: rendered.width, height: rendered.height, blocks: []}, text, 0);
@@ -1492,6 +1503,7 @@ async function renderPdf(
         const offsetX = mode === 'bilingual' && !readingExport ? pageData.width + gap : 0;
         if (!pageChanged) {
             const page = outputPdf.addPage([offsetX ? pageData.width * 2 + gap : pageData.width, pageData.height]);
+            outline.layoutPage(pageData, page, offsetX);
             if (!readingExport) labelLayoutPage(String(pageData.pageNumber));
             if (source) drawSourcePage(page, source, pageData);
             if (source && offsetX) drawSourcePage(page, source, pageData, offsetX);
@@ -1531,6 +1543,7 @@ async function renderPdf(
                 })) {
                     options.signal?.throwIfAborted();
                     const page = outputPdf.addPage([rendered.width, rendered.height]);
+                    outline.readingPage(pageData, page, rendered.items.filter(item => item.kind === 'text'));
                     if (rendered.regionImage) {
                         const image = await embedImage(rendered.regionImage, 'png');
                         page.drawImage(image, {x: 0, y: 0, width: rendered.width, height: rendered.height});
@@ -1560,6 +1573,7 @@ async function renderPdf(
         const encoded = rendered instanceof Uint8Array ? {data: rendered} : rendered;
         const image = await embedImage(encoded.data, 'format' in encoded ? encoded.format : undefined);
         const page = outputPdf.addPage([offsetX ? pageData.width * 2 + gap : pageData.width, pageData.height]);
+        outline.layoutPage(pageData, page, offsetX);
         labelLayoutPage(String(pageData.pageNumber));
         if (source && mode === 'bilingual') drawSourcePage(page, source, pageData);
         page.drawImage(image, {x: offsetX, y: 0, width: pageData.width, height: pageData.height});
@@ -1575,6 +1589,7 @@ async function renderPdf(
     options.onPdfProgress?.({phase: 'saving', completedPages: totalPages, totalPages});
     await yieldToBrowser();
     options.signal?.throwIfAborted();
+    outline.write();
     if (layoutPageLabels.length) outputPdf.catalog.set(PDFName.of('PageLabels'), outputPdf.context.obj({Nums: layoutPageLabels}));
     if (fallbackUnicode) {
         const pairs = [...fallbackCharacters].map(([character, code]) => `<${code.toString(16).padStart(4, '0')}> <${PDFHexString.fromText(character).asString().slice(4)}>`);

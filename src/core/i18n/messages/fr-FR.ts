@@ -579,7 +579,7 @@ export const frFRMessages = {
     "popup.pageFont.loading": "Lecture du réglage de police…",
     "popup.pageFont.unavailable": "Impossible de modifier la police de traduction pour le moment.",
     "popup.pageFont.readError": "Impossible de lire le réglage de police. Réessayez.",
-    "popup.pageFont.changeError": "Impossible d’enregistrer le réglage de police. Réessayez.",
+    "popup.pageFont.changeError": "Impossible d’enregistrer la police.",
     "popup.pageFont.retry": "Réessayer",
     "popup.quickSettings.appearanceDescription": "Le mode bilingue affiche le texte original et sa traduction ; l’autre mode affiche uniquement la traduction.",
     "popup.quickSettings.hoverSettings": "Réglages de traduction au survol",

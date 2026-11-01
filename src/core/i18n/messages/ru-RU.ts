@@ -579,7 +579,7 @@ export const ruRUMessages = {
     "popup.pageFont.loading": "Чтение настройки шрифта…",
     "popup.pageFont.unavailable": "Сейчас нельзя изменить шрифт перевода.",
     "popup.pageFont.readError": "Не удалось прочитать настройку шрифта. Повторите попытку.",
-    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта. Повторите попытку.",
+    "popup.pageFont.changeError": "Не удалось сохранить настройку шрифта.",
     "popup.pageFont.retry": "Повторить",
     "popup.quickSettings.appearanceDescription": "Двуязычный режим показывает оригинал и перевод, а режим «Только перевод» — лишь переведённый текст.",
     "popup.quickSettings.hoverSettings": "Настройки перевода при наведении",

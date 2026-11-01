@@ -76,6 +76,25 @@ function quantile(values, probability) {
   return sorted[Math.ceil((sorted.length - 1) * probability)];
 }
 
+// Revealing every offscreen block changes upstream estimates. Compare the
+// target's own layout against its source, while retaining raw viewport positions.
+function assertResizeGeometryEquivalent(measurement, label) {
+  const {optimized, visibleControl} = measurement;
+  const keys = ['height', 'wrapperWidth', 'left', 'top', 'sourceLeft', 'sourceTop'];
+  for (const geometry of [optimized, visibleControl]) {
+    assert.ok(geometry && keys.every(key => Number.isFinite(geometry[key])), `${label}: incomplete resize geometry`);
+  }
+  for (const [key, before, after] of [
+    ['height', optimized.height, visibleControl.height],
+    ['wrapperWidth', optimized.wrapperWidth, visibleControl.wrapperWidth],
+    ['source-relative-left', optimized.left - optimized.sourceLeft, visibleControl.left - visibleControl.sourceLeft],
+    ['source-relative-top', optimized.top - optimized.sourceTop, visibleControl.top - visibleControl.sourceTop],
+  ]) {
+    assert.ok(Math.abs(before - after) <= .5,
+      `${label}: visible geometry retained an obsolete intrinsic size after resize/font change (${key})`);
+  }
+}
+
 // Main-world observations neither import product internals nor introduce a runtime debug API.
 function installHostObservation() {
   window.__longMock = {phase: 'load', observing: false, mutations: {}, frames: [], longTasks: [], autoEvents: [], guardAttributeChanges: [], installed: new WeakSet()};
@@ -445,7 +464,9 @@ async function main(args) {
           const originalControl = document.documentElement.getAttribute('data-long-render-control');
           const read = () => {
             const rect = wrapper.getBoundingClientRect();
+            const sourceRect = source.getBoundingClientRect();
             return {height: rect.height, wrapperWidth: rect.width, left: rect.left, top: rect.top,
+              sourceLeft: sourceRect.left, sourceTop: sourceRect.top, scrollY, documentTop: rect.top + scrollY,
               visible: wrapper.checkVisibility({contentVisibilityAuto: true}), intrinsicBlockSize: getComputedStyle(wrapper).containIntrinsicBlockSize};
           };
           const optimized = read();
@@ -459,11 +480,10 @@ async function main(args) {
           return {width: innerWidth, fontSize: getComputedStyle(document.body).fontSize, optimized, visibleControl,
             integrity: {sameNodeDuringControl, sameInnerHtmlDuringControl, exactOuterHtmlAfterRestore: wrapper.outerHTML === originalHtml}};
         }, farIndex);
+        result.resizeChecks.push(measurement); save();
         assert.ok(measurement.optimized.visible && measurement.optimized.height > 0 && measurement.optimized.wrapperWidth > 0);
         assert.ok(Object.values(measurement.integrity).every(Boolean), `${spec.id}: resize control rebuilt or changed the translated DOM`);
-        for (const key of ['height', 'wrapperWidth', 'left', 'top']) assert.ok(Math.abs(measurement.optimized[key] - measurement.visibleControl[key]) <= .5,
-          `${spec.id}: visible geometry retained an obsolete intrinsic size after resize/font change (${key})`);
-        result.resizeChecks.push(measurement);
+        assertResizeGeometryEquivalent(measurement, spec.id);
         save(); await assertSources(false);
       }
       await page.setViewportSize({width: 1280, height: 900});
@@ -678,5 +698,5 @@ async function main(args) {
   return report;
 }
 
-module.exports = {buildLongPageFixture, parseArgs, quantile, installLongPageMockTransport};
+module.exports = {buildLongPageFixture, parseArgs, quantile, installLongPageMockTransport, assertResizeGeometryEquivalent};
 if (require.main === module) main(parseArgs(process.argv.slice(2))).catch(error => { console.error(error); process.exitCode = 1; });

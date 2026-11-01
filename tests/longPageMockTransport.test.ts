@@ -12,7 +12,7 @@ import {isClearlyWrongLanguageResponse} from '@/src/core/translation/resultValid
 
 const require=createRequire(import.meta.url);
 const {controlledProviderRuntime}=require('../scripts/site-translation/controlled-provider.cjs');
-const {installLongPageMockTransport,parseArgs}=require('../scripts/testing/run-long-page-mock-test.cjs');
+const {installLongPageMockTransport,parseArgs,assertResizeGeometryEquivalent}=require('../scripts/testing/run-long-page-mock-test.cjs');
 const {buildLongPageFixture}=require('../scripts/testing/long-page-mock-fixtures.cjs');
 const endpoint='https://edge.microsoft.com/translate/translatetext';
 function runtime() {
@@ -67,6 +67,17 @@ describe('source-bound long-page mock transport',()=>{
         const context=runtime();
         await expect(runInContext('fetch("https://unexpected.example/",{body:"[]"})',context)).rejects.toThrow('forbids external provider');
         expect(runInContext('__longMockRequests.length',context)).toBe(0);
+    });
+    it('compares resize geometry relative to its source while rejecting changed dimensions and local offsets',()=>{
+        // Native observations: revealing upstream blocks moved both source and
+        // wrapper by 2.4375px without changing the target's own layout.
+        const optimized={height:296.953125,wrapperWidth:840,left:220,top:364.96875,sourceLeft:220,sourceTop:238.1875};
+        const visibleControl={...optimized,top:367.40625,sourceTop:240.625};
+        expect(()=>assertResizeGeometryEquivalent({optimized,visibleControl},'article')).not.toThrow();
+        for (const key of ['height','wrapperWidth','left','top'] as const) {
+            expect(()=>assertResizeGeometryEquivalent({optimized,visibleControl:{...visibleControl,[key]:visibleControl[key]+1}},'article')).toThrow();
+        }
+        expect(()=>assertResizeGeometryEquivalent({optimized,visibleControl:{...visibleControl,sourceTop:undefined}},'article')).toThrow('incomplete resize geometry');
     });
     it('binds a comparison build to its explicit production source root while retaining argument checks',()=>{
         const args=['--extension-dir','/tmp/build','--production-root','/tmp/frozen-source','--playwright-root','/tmp/packages','--artifacts-dir','/tmp/evidence'];

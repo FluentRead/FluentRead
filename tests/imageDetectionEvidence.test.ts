@@ -1,4 +1,8 @@
 import {describe,expect,it} from 'vitest';
+import {createRequire} from 'node:module';
+import {dirname} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {BaseDetectionService} from '../node_modules/ppu-paddle-ocr/core/base-detection.service.js';
 import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,getImageDetectionEvidence,
     type ImageDetectionFrame,type ImageDetectionFrameSource} from '@/src/features/image-translation/services/imageDetectionEvidence';
 
@@ -17,15 +21,73 @@ function bound(frames:ImageDetectionFrame[]=[frame({},[[20,18]])]) {
 const asFrame=(value:unknown)=>value as ImageDetectionFrame;
 const asSource=(value:unknown)=>value as ImageDetectionFrameSource;
 
+/** 仅替换Canvas字节存储；量化、灰度、threshold和连通域均执行锁定依赖的原函数。 */
+class ByteCanvas {
+    readonly data:Uint8ClampedArray;
+    constructor(readonly width:number,readonly height:number){this.data=new Uint8ClampedArray(width*height*4);}
+    getContext(){return {
+        createImageData:(width:number,height:number)=>({width,height,data:new Uint8ClampedArray(width*height*4)}),
+        getImageData:()=>({width:this.width,height:this.height,data:new Uint8ClampedArray(this.data)}),
+        putImageData:(image:{data:Uint8ClampedArray})=>{this.data.set(image.data);},
+    };}
+}
+interface SdkProcessor {
+    toCanvas():ByteCanvas;
+}
+interface SdkCanvasPort {
+    CanvasProcessor:new(canvas:ByteCanvas)=>SdkProcessor;
+    getPlatform():unknown;
+    setPlatform(platform:unknown):void;
+}
+async function actualSdkPlane(data:Float32Array,width:number,height:number,originalWidth=width,originalHeight=height){
+    // 从已锁定SDK的依赖图解析，避免要求主项目新增ppu-ocv直接依赖或写死pnpm存储路径。
+    const require=createRequire(import.meta.url),sdkRoot=dirname(require.resolve('ppu-paddle-ocr'));
+    const entry=pathToFileURL(require.resolve('ppu-ocv/canvas-web',{paths:[sdkRoot]})).href;
+    const canvas=await import(/* @vite-ignore */ entry) as SdkCanvasPort,previous=canvas.getPlatform();
+    const createCanvas=(w:number,h:number)=>new ByteCanvas(w,h);let processed:SdkProcessor|undefined;
+    canvas.setPlatform({createCanvas});
+    try{
+        const platform={createCanvas,canvas:{createProcessor:(source:ByteCanvas)=>processed=new canvas.CanvasProcessor(source)}};
+        const service=new BaseDetectionService(platform as never,{} as never,{minimumAreaThreshold:50},{},'canvas-native');
+        // SDK在类型声明中将后处理标为private；这里调用原实现，不覆盖方法或运行推理。
+        const postprocessor=service as unknown as {postprocessDetection:(probabilities:Float32Array,input:object)=>Array<{x:number;y:number;width:number;height:number}>};
+        const boxes=postprocessor.postprocessDetection(data,{width,height,originalWidth,originalHeight,resizeRatio:1});
+        if(!processed)throw new Error('实际SDK未经过canvas-native后处理');
+        return {binary:Array.from(processed.toCanvas().data).filter((_,i)=>i%4===0).map(value=>value!==0),boxes};
+    }finally{canvas.setPlatform(previous);}
+}
+const adjacentFloat=(value:number,step:number)=>{const value32=new Float32Array([value]),bits=new Uint32Array(value32.buffer);bits[0]+=step;return value32[0];};
+const unpack=(f:ImageDetectionFrame)=>Array.from({length:f.width*f.height},(_,i)=>(f.bits[i>>>3]&(1<<(i&7)))!==0);
+
 describe('同次检测概率的独占有界位图',()=>{
-    it('内容区逐行低位打包，模型padding不产生支持，严格按实际Float32值>.3',()=>{
+    it('内容区逐行低位打包，模型padding不产生支持，忠实锁定SDK的实际量化二值平面',async()=>{
         const b=createImageDetectionEvidenceBudget(),data=new Float32Array(32*32).fill(1);
         data[0]=0;data[1]=.29999;data[2]=.30001;data[3]=1;data[32]=.2;data[33]=.9;data[34]=0;data[35]=.8;
+        const sdk=await actualSdkPlane(data,32,32,4,2);
         b.capture(data,32,32,geometry({pageWidth:4,pageHeight:2,width:4,height:2}));
-        expect(b.frames()).toHaveLength(1);expect(Array.from(b.frames()[0].bits)).toEqual([0b10101100]);
-        const threshold=new Float32Array(32*32);threshold[0]=.3;
-        const actual=createImageDetectionEvidenceBudget();actual.capture(threshold,32,32,geometry({pageWidth:1,pageHeight:1,width:1,height:1}));
-        expect(actual.frames()[0].bits[0]).toBe(+(threshold[0]>.3));
+        expect(b.frames()).toHaveLength(1);expect(Array.from(b.frames()[0].bits)).toEqual([0b10111110]);
+        expect(unpack(b.frames()[0])).toEqual([0,1,2,3,32,33,34,35].map(i=>sdk.binary[i]));
+    });
+    it('实际SDK在Float32量化边界两侧与侧车一致，零和低于量化的平面仍无支持',async()=>{
+        const half=Math.fround(.5/255),values=new Float32Array([0,adjacentFloat(0,1),.001,adjacentFloat(half,-1),half,adjacentFloat(half,1),.002,.01,.1,.2,.3,.5,1]);
+        const data=new Float32Array(32*32);data.set(values);
+        const sdk=await actualSdkPlane(data,32,32,values.length,1),b=createImageDetectionEvidenceBudget();
+        b.capture(data,32,32,geometry({pageWidth:values.length,pageHeight:1,width:values.length,height:1}));
+        expect(sdk.binary.slice(0,values.length)).toEqual([false,false,false,false,true,true,true,true,true,true,true,true,true]);
+        expect(unpack(b.frames()[0])).toEqual(sdk.binary.slice(0,values.length));
+        const subquant=createImageDetectionEvidenceBudget();subquant.capture(new Float32Array(64*64).fill(values[3]),64,64,geometry());
+        expect(subquant.frames()[0].bits.every(v=>v===0)).toBe(true);
+        expect(bound([...subquant.frames()]).support!.forBox(box,observation)!(20,18)).toBe(false);
+    });
+    it('真实SDK以50面积下限接受低域.01的完整9×9连通域，侧车保留同一81点而不把padding当内容',async()=>{
+        const data=new Float32Array(32*32);for(let y=1;y<10;y++)for(let x=1;x<10;x++)data[y*32+x]=.01;
+        data[31*32+31]=1;
+        const sdk=await actualSdkPlane(data,32,32,11,11),b=createImageDetectionEvidenceBudget();
+        expect(sdk.boxes).toEqual([{x:0,y:0,width:11,height:11}]);
+        b.capture(data,32,32,geometry({pageWidth:11,pageHeight:11,width:11,height:11}));
+        const content=Array.from({length:121},(_,i)=>sdk.binary[Math.floor(i/11)*32+i%11]);
+        expect(content.filter(Boolean)).toHaveLength(81);expect(unpack(b.frames()[0])).toEqual(content);
+        expect(b.frames()[0].bits).toHaveLength(16);expect(b.frames()[0].bits[15]&0b11111110).toBe(0);
     });
     it('非整字节内容尾位为0，完全零概率仍只提供明确的无支持观察',()=>{
         const b=createImageDetectionEvidenceBudget();b.capture(new Float32Array(32*32).fill(1),32,32,geometry({width:3,height:3}));

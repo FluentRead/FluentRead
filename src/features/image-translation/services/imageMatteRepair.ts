@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageMatteRepair.ts
  * 文件职责：在原文字框的八像素观察域内证明一致RGBA静区、完整墨迹与外部图案的几何分离。
- * 主要内容：最多八个实际像素色仅提出背景候选，逐像素真实检测支持、完整静区闭环及整项共享的背景与墨色端点才允许通过；同alpha但RGB不同的AA仍属墨迹；颜色作者字节和Canvas逆量化域采用同一下闭上开舍入规则，共享预算限定最多64组端点；缺证据、穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
+ * 主要内容：最多八个实际像素色仅提出背景候选，逐像素真实检测支持、完整静区闭环及整项共享的背景与墨色端点才允许通过；同alpha但RGB不同的AA仍属墨迹；颜色作者字节和Canvas逆量化域采用同一下闭上开舍入规则，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；缺证据、穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
  * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；实际同帧DB支持由调用方验证并提供查询，不能从本mask反造支持。结果不证明语义分割；调用方须在首次原图上预付共享预算、完成全页冲突和完整译字预检后才应用mask，不能覆盖OCR框或扩大原文保护权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -172,6 +172,8 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         for(let channel=0;channel<3;channel++)ranges[i*3+channel]=sourceChannelRange((value>>>(channel*8))&255,alpha);
     }
     const interval:Interval={lowN:0,lowD:1,lowClosed:true,highN:1,highD:1,highClosed:true},endpoints=new Uint8Array(6);
+    // 暂借最终mask存0..3截断Chebyshev距离；不新增ROI数组或整页像素读取。
+    const mask=new Uint8Array(area);mask.fill(3);
     let fits=false;
     for(let candidate=0;candidate<combinations;candidate++){
         let remainder=candidate;
@@ -180,11 +182,27 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         for(let i=0;i<inkIndices.length;i++){
             if(--fitBudget.remaining<0)return;
             if(!forwardFits(colors[inkIndices[i]]>>>24,ranges,i*3,endpoints,bgAlpha,inkAlpha,interval)){valid=false;break;}
+            // 同一量化witness中可达t>=.9，才属近端核心；high=.9且开区间仍拒绝。
+            // constrain复用本pixel已验证的interval，下个forwardFits会完整重置。
+            mask[inkIndices[i]]=constrain(interval,-9,10,false)?0:3;
         }
         if(valid){fits=true;break;}
     }
     if(!fits)return;
-    const mask=new Uint8Array(area),artMask=new Uint8Array(area);
+    // 只对首个canonical有效共同端点跑一次薄边准入；不以64次距离变换穷举其他解释。
+    // 中间coverage只能作薄AA，不能让与黑字同色线上的整块灰牌都被当成字擦掉。
+    for(let y=0;y<roi.height;y++)for(let x=0;x<roi.width;x++){
+        const index=y*roi.width+x;
+        mask[index]=Math.min(mask[index],x?mask[index-1]+1:3,y?mask[index-roi.width]+1:3,
+            x&&y?mask[index-roi.width-1]+1:3,y&&x+1<roi.width?mask[index-roi.width+1]+1:3);
+    }
+    for(let y=roi.height-1;y>=0;y--)for(let x=roi.width-1;x>=0;x--){
+        const index=y*roi.width+x;
+        mask[index]=Math.min(mask[index],x+1<roi.width?mask[index+1]+1:3,y+1<roi.height?mask[index+roi.width]+1:3,
+            x+1<roi.width&&y+1<roi.height?mask[index+roi.width+1]+1:3,x&&y+1<roi.height?mask[index+roi.width-1]+1:3);
+    }
+    for(let index=0;index<area;index++)if(labels[index]===2&&mask[index]>2)return;
+    const artMask=new Uint8Array(area);
     for(let index=0;index<area;index++){mask[index]=+(labels[index]===2);artMask[index]=+(labels[index]===3);}
     return {...roi,mask,artMask,background:[background&255,(background>>>8)&255,(background>>>16)&255,bgAlpha],sourceBox:{...sourceBox},
         supportBox};

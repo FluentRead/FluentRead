@@ -1,5 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {imageMatteObservationBox,planImageMatteRepair as proveRepair,type ImageMatteFitBudget} from '@/src/features/image-translation/services/imageMatteRepair';
+import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
 import type {OcrLine} from '@/src/shared/image/types';
 
 type Color=readonly [number,number,number,number];
@@ -24,6 +25,54 @@ function composite(bg:Color,fg:Color,t:number,canvas=false):Color {
     out.push(a);return out as unknown as Color;
 }
 afterEach(()=>vi.unstubAllGlobals());
+
+describe('共同foreground端点的有界AA裙边',()=>{
+    it.each([.01,.9])('实际SDK量化会保留的coarse p=%s平台不能凭dense检测吞掉灰牌',probability=>{
+        const p=page([255,255,255,255],64,48),source={x0:18,y0:14,x1:46,y1:34};
+        rect(p,{x0:20,y0:16,x1:44,y1:32},[128,128,128,255],64);
+        rect(p,{x0:26,y0:20,x1:29,y1:28},[0,0,0,255],64);
+        rect(p,{x0:35,y0:20,x1:38,y1:28},[255,255,255,255],64);
+        const before=p.slice(),probabilities=new Float32Array(64*64),detector=createImageDetectionEvidenceBudget();
+        for(let y=16;y<32;y++)for(let x=20;x<44;x++)probabilities[y*64+x]=probability;
+        detector.capture(probabilities,64,64,{pageWidth:64,pageHeight:48,x:0,y:0,width:64,height:48,resizeRatio:1});
+        const regions:object[]=[],image=`coarse-card:${probability}`,frames=detector.frames();expect(frames).toHaveLength(1);
+        bindImageDetectionEvidence(regions,image,64,48,frames);
+        const observation=imageMatteObservationBox(64,48,source)!,query=getImageDetectionEvidence(regions,image,64,48)?.forBox(source,observation);
+        expect(query).toBeDefined();const unsupported:number[]=[];
+        // 字面整片检测概率来自测试输入，不能从待修mask反造支持；四角、黑白字和其余全部平台点均受支持。
+        for(let y=16;y<32;y++)for(let x=20;x<44;x++)if(!query!(x,y))unsupported.push(y*64+x);
+        expect(unsupported).toEqual([]);expect(query!(10,6)).toBe(false);
+        expect(proveRepair(p,64,48,source,query!,budget())).toBeUndefined();expect(p).toEqual(before);
+    });
+    it('宽渐变条不能被同一黑白颜色线解释成任意厚度AA',()=>{
+        const p=page([255,255,255,255]);
+        for(let y=20;y<28;y++)for(let x=20;x<28;x++)dot(p,x,y,composite([255,255,255,255],[0,0,0,255],(x-19)/8));
+        expect(planImageMatteRepair(p,48,48,box)).toBeUndefined();
+    });
+    it('宽低对比阴影连着黑字也不能由一个端点anchor授权',()=>{
+        const p=page([255,255,255,255]);rect(p,{x0:18,y0:18,x1:30,y1:30},[192,192,192,255]);
+        rect(p,{x0:23,y0:21,x1:26,y1:27},[0,0,0,255]);expect(planImageMatteRepair(p,48,48,box)).toBeUndefined();
+    });
+    it('一至两像素薄AA保留，第三像素孤立中间色未知',()=>{
+        const p=fixture([255,255,255,255],[0,0,0,255]);dot(p,24,20,[153,153,153,255]);
+        expect(planImageMatteRepair(p,48,48,box)).toBeDefined();dot(p,25,20,[153,153,153,255]);
+        expect(planImageMatteRepair(p,48,48,box)).toBeUndefined();
+    });
+    it('低alpha文字的相对端点与薄边按原RGBA量化解释，不套opaque绝对亮度',()=>{
+        const p=fixture([0,0,0,0],[255,255,255,32]);dot(p,24,20,[255,255,255,13]);
+        expect(planImageMatteRepair(p,48,48,box)).toBeDefined();
+    });
+    it('coverage上界恰为九成时沿用半开域，开上界不能冒作近端核心',()=>{
+        const open=fixture([0,0,0,255],[5,5,5,255]);dot(open,25,20,[4,4,4,255]);
+        expect(planImageMatteRepair(open,48,48,box)).toBeUndefined();
+        const closed=fixture([5,5,5,255],[0,0,0,255]);dot(closed,25,20,[1,1,1,255]);
+        expect(planImageMatteRepair(closed,48,48,box)).toBeDefined();
+    });
+    it('真实全黑平台填满原框时仍因没有框内matte观测而未知',()=>{
+        const p=page([255,255,255,255],64,48),source={x0:20,y0:16,x1:44,y1:32};
+        rect(p,source,[0,0,0,255],64);expect(proveRepair(p,64,48,source,controlledDenseSupport,budget())).toBeUndefined();
+    });
+});
 
 describe('完整RGBA静区与原矩形组件的有界观察',()=>{
     it('真实检测端口与全页fit预算必需，缺失/非法值不尝试证明',()=>{

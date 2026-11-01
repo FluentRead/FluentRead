@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageDetectionEvidence.ts
  * 文件职责：为同次普通图片识别保存有界检测位图，并将其绑定到私有识别数组与原图身份。
- * 主要内容：只接纳显式原比例完整帧和整数切片，借用 Float32 概率同步打包内容区；所有失败消耗尝试及已预留预算；外来帧完整校验后独占复制，查询须由一个真实帧覆盖完整 H8 观察区及两像素邻域。
+ * 主要内容：只接纳显式原比例完整帧和整数切片，按锁定SDK实际灰度量化和零阈值同步打包Float32内容区；所有失败消耗尝试及已预留预算；外来帧完整校验后独占复制，查询须由一个真实帧覆盖完整 H8 观察区及两像素邻域。
  * 模块边界：不运行模型，不改变 OCR 几何或文字，不持有或转移原张量；证据只在 WeakMap 中随本次数组存活，不进入阅读或缓存。检测支持不等同文字语义，生产者负责证明同次 Canvas、模型输入及显式 resizeRatio 的来源。
  */
 export interface ImageDetectionFrame {
@@ -63,7 +63,9 @@ export function createImageDetectionEvidenceBudget() {
             for(let y=0;y<modelHeight;y++)for(let x=0;x<modelWidth;x++){
                 const probability=data[y*modelWidth+x];
                 if(!Number.isFinite(probability)||probability<0||probability>1)return;
-                if(y<frame.height&&x<frame.width&&probability>.3){const index=y*frame.width+x;bits[index>>>3]|=1<<(index&7);}
+                // SDK6.6 canvas-native先tensorToCanvas(round(p*255))，再以gray>0检测。
+                // 此处忠实保存同一平面；额外使用常规DB的0.3阈值会凭空缩小已用范围。
+                if(y<frame.height&&x<frame.width&&Math.round(probability*255)>0){const index=y*frame.width+x;bits[index>>>3]|=1<<(index&7);}
             }
             captured.push(Object.freeze({pageWidth:frame.pageWidth,pageHeight:frame.pageHeight,
                 x:frame.x,y:frame.y,width:frame.width,height:frame.height,bits}));

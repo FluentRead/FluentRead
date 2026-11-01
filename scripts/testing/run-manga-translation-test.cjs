@@ -11,7 +11,7 @@ const assert = require('node:assert/strict');
 const {createHash} = require('node:crypto');
 const {execFileSync} = require('node:child_process');
 const {ensureImageTranslationModelFiles, defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest} = require('./image-model-cache.cjs');
-const {validateQualityFixtureExpectations,evaluateCapturedQualityFixture} = require('./manga-quality-corpus.cjs');
+const {validateQualityFixtureExpectations,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes} = require('./manga-quality-corpus.cjs');
 function arg(name, fallback) {const index = process.argv.indexOf(`--${name}`); return index < 0 ? fallback : process.argv[index + 1];}
 let extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 let diagnosticFixture;
@@ -1280,10 +1280,14 @@ async function verifyPipelinePerformance(extensionId) {
                 result.wordlessPage={noTextTransport:texts.length===0,noBitmap:!displayedBitmap,sourcePreserved:JSON.stringify(await page.locator('.zao-image').first().evaluate(image=>({src:image.src,srcset:image.getAttribute('srcset'),sizes:image.getAttribute('sizes'),style:image.getAttribute('style')})))===JSON.stringify(sourceState)};
                 if(!result.wordlessPage.noBitmap||!result.wordlessPage.sourcePreserved)result.qualityFailures.push({type:'wordless-page-render',reason:'A wordless source must remain visible without a translated bitmap',...result.wordlessPage});
             }
-            result.protectedPixels=await page.evaluate(async({source,translated,probes})=>{
+            const capturedPixels=await page.evaluate(async({source,translated,probes})=>{
                 const sample=async src=>{const image=new Image();image.src=src;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);return {width:canvas.width,height:canvas.height,pixels:probes.map(({x,y})=>Array.from(ctx.getImageData(x,y,1,1).data))};};
                 return {source:await sample(source),translated:await sample(translated)};
-            },{source:data,translated,probes:fixture.protectedProbes});
+            },{source:data,translated,probes:[...fixture.protectedProbes,...(fixture.protectedAlphaProbes??[])]});
+            const rgbCount=fixture.protectedProbes.length;
+            result.protectedPixels={source:{...capturedPixels.source,pixels:capturedPixels.source.pixels.slice(0,rgbCount)},translated:{...capturedPixels.translated,pixels:capturedPixels.translated.pixels.slice(0,rgbCount)}};
+            const {qualityFailures:alphaFailures,...alpha}=evaluateQualityAlphaProbes(fixture,{sourcePixels:capturedPixels.source.pixels.slice(rgbCount),translatedPixels:capturedPixels.translated.pixels.slice(rgbCount)});
+            Object.assign(result,alpha);result.qualityFailures.push(...alphaFailures);
             assert.equal(result.protectedPixels.source.width,fixture.width);assert.equal(result.protectedPixels.source.height,fixture.height);
             assert.equal(result.protectedPixels.translated.width,fixture.width);assert.equal(result.protectedPixels.translated.height,fixture.height);
             for(let index=0;index<fixture.protectedProbes.length;index++){

@@ -12,7 +12,16 @@ function countAnchorOccurrences(text, anchor) {if(!anchor)return 0;let count=0;f
 function validBox(box,width,height) {return box&&['x0','y0','x1','y1'].every(key=>Number.isFinite(box[key]))&&box.x0>=0&&box.y0>=0&&box.x0<box.x1&&box.y0<box.y1&&box.x1<=width&&box.y1<=height;}
 function intersects(a,b) {return Math.min(a.x1,b.x1)>Math.max(a.x0,b.x0)&&Math.min(a.y1,b.y1)>Math.max(a.y0,b.y0);}
 
+function validateProtectedAlphaProbes(fixture) {
+    if(fixture.protectedAlphaProbes===undefined)return;
+    assert.ok(Array.isArray(fixture.protectedAlphaProbes)&&fixture.protectedAlphaProbes.length>0,'Declared alpha probes form a nonempty array');
+    for(const probe of fixture.protectedAlphaProbes)assert.ok(probe&&Number.isInteger(probe.x)&&probe.x>=0&&probe.x<fixture.width
+        &&Number.isInteger(probe.y)&&probe.y>=0&&probe.y<fixture.height&&Array.isArray(probe.rgba)&&probe.rgba.length===4
+        &&probe.rgba.every(value=>Number.isInteger(value)&&value>=0&&value<=255),'Declared alpha probes have in-image coordinates and four RGBA bytes');
+}
+
 function validateQualityFixtureExpectations(fixture) {
+    validateProtectedAlphaProbes(fixture);
     assert.ok(Array.isArray(fixture.expectedSource)&&fixture.expectedSource.every(text=>typeof text==='string'&&text.trim()),'Quality scenes declare exact source text, or an empty array for a wordless page');
     assert.ok(fixture.expectedNoText===undefined||typeof fixture.expectedNoText==='boolean','Wordless expectation is explicit');
     assert.ok(Array.isArray(fixture.expectedAnchors)&&fixture.expectedAnchors.every(anchor=>typeof anchor==='string'&&normalizeOcrAnchor(anchor)),'Quality scenes declare normalized OCR anchors');
@@ -165,4 +174,19 @@ function evaluateCapturedQualityFixture(fixture,lines) {
     return {sourceTexts,...source,...order,qualityFailures:[...sourceFailures,...orderFailures]};
 }
 
-module.exports={normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityReadingOrder,evaluateQualityFixture,evaluateCapturedQualityFixture};
+function evaluateQualityAlphaProbes(fixture,{sourcePixels,translatedPixels}) {
+    validateProtectedAlphaProbes(fixture);
+    const probes=fixture.protectedAlphaProbes??[];
+    if(!probes.length)return {protectedAlphaPixels:{declared:0,probes:[],scope:'No protectedAlphaProbes declared; no transparency coverage claimed'},qualityFailures:[]};
+    for(const pixels of [sourcePixels,translatedPixels])assert.ok(Array.isArray(pixels)&&pixels.length===probes.length
+        &&pixels.every(pixel=>Array.isArray(pixel)&&pixel.length===4&&pixel.every(value=>Number.isInteger(value)&&value>=0&&value<=255)),'Every declared alpha probe has a complete actual RGBA capture');
+    const evaluated=probes.map((probe,index)=>{
+        const source=sourcePixels[index],translated=translatedPixels[index];
+        assert.equal(source[3],probe.rgba[3],'Source alpha agrees with the frozen fixture');
+        return {x:probe.x,y:probe.y,...(probe.regionId?{regionId:probe.regionId}:{}),expectedAlpha:probe.rgba[3],source,translated,passed:translated[3]===source[3]};
+    });
+    return {protectedAlphaPixels:{declared:probes.length,probes:evaluated,scope:'Declared alpha values only; RGB may round through premultiplied Canvas. No full-image alpha or glyph-ownership guarantee'},
+        qualityFailures:evaluated.filter(probe=>!probe.passed).map(({passed:_passed,...probe})=>({type:'alpha-protection',...probe,reason:'Translated output changes a source-declared protected alpha probe'}))};
+}
+
+module.exports={normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityReadingOrder,evaluateQualityFixture,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes};

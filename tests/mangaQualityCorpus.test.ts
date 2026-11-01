@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 const require=createRequire(import.meta.url);
-const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder,evaluateCapturedQualityFixture}=require('../scripts/testing/manga-quality-corpus.cjs');
+const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes}=require('../scripts/testing/manga-quality-corpus.cjs');
 const box=(x0:number,y0:number,x1:number,y1:number)=>({x0,y0,x1,y1});
 const text=(sourceText:string,bbox=box(10,10,90,30),sourceBoxes?:ReturnType<typeof box>[])=>({text:'受控译文',sourceText,bbox,...(sourceBoxes?{sourceBoxes}:{})});
 const fixture=(overrides:any={})=>({name:'actual-quality',width:400,height:300,expectedSource:['WAIT FOR ME','WAIT FOR ME','GO NOW'],expectedAnchors:['WAIT FOR ME','GO NOW'],anchorOccurrences:{'WAIT FOR ME':2,'GO NOW':1},regions:[{id:'line-1',bbox:box(10,10,90,30)}],forbiddenRegions:[{id:'robot',bbox:box(200,100,300,250)}],...overrides});
@@ -81,6 +81,38 @@ describe('完整已采集原文独立于翻译传输',()=>{
         const falsePositive=evaluateCapturedQualityFixture(wordless,[text('08:45',box(210,120,290,150))]);
         expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'wordless-page-text'}));
         expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'artwork-ocr-false-positive'}));
+    });
+});
+
+describe('冻结透明度探针真正进入质量门禁',()=>{
+    const alphaFixture=()=>fixture({protectedAlphaProbes:[{x:30,y:20,rgba:[0,0,0,0]},{x:60,y:20,rgba:[255,250,230,96]}]});
+    it('透明孔与半透明孔填成不透明都会保留为失败，且不修改捕获值或真值',()=>{
+        const f=alphaFixture(),sourcePixels=[[0,0,0,0],[255,250,231,96]],translatedPixels=[[255,250,230,255],[255,250,230,255]];
+        const before=JSON.stringify({f,sourcePixels,translatedPixels});
+        const result=evaluateQualityAlphaProbes(f,{sourcePixels,translatedPixels});
+        expect(result.protectedAlphaPixels.declared).toBe(2);expect(result.qualityFailures).toHaveLength(2);
+        expect(result.qualityFailures.map((failure:any)=>({type:failure.type,x:failure.x,expected:failure.expectedAlpha,actual:failure.translated[3]})))
+            .toEqual([{type:'alpha-protection',x:30,expected:0,actual:255},{type:'alpha-protection',x:60,expected:96,actual:255}]);
+        expect(JSON.stringify({f,sourcePixels,translatedPixels})).toBe(before);
+    });
+    it('只保护已声明alpha，Canvas半透明RGB舍入不制造透明度失败',()=>{
+        const result=evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels:[[0,0,0,0],[255,250,231,96]],translatedPixels:[[0,0,0,0],[255,249,231,96]]});
+        expect(result.qualityFailures).toEqual([]);expect(result.protectedAlphaPixels.probes.every((probe:any)=>probe.passed)).toBe(true);
+        expect(evaluateQualityAlphaProbes(fixture(),{}).protectedAlphaPixels).toMatchObject({declared:0,probes:[]});
+    });
+    it('缺失/错误捕获及原图alpha不符明确失败，不以空数组或期望像素补证据',()=>{
+        const sourcePixels=[[0,0,0,0],[255,250,231,96]];
+        for(const translatedPixels of [undefined,[],[[0,0,0,0]],[[0,0,0,0],[0,0,0]],[[0,0,0,0],[0,0,0,NaN]]])
+            expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels,translatedPixels})).toThrow('complete actual RGBA capture');
+        expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{translatedPixels:sourcePixels})).toThrow('complete actual RGBA capture');
+        expect(()=>evaluateQualityAlphaProbes(alphaFixture(),{sourcePixels:[[0,0,0,255],sourcePixels[1]],translatedPixels:sourcePixels})).toThrow('Source alpha');
+    });
+    it('声明存在却非法时在启动浏览器前拒绝，未声明的旧RGB语料仍有效',()=>{
+        expect(()=>validateQualityFixtureExpectations(fixture())).not.toThrow();
+        for(const protectedAlphaProbes of [null,false,{},[],[{x:-1,y:20,rgba:[0,0,0,0]}],[{x:400,y:20,rgba:[0,0,0,0]}],
+            [{x:30,y:300,rgba:[0,0,0,0]}],[{x:30.5,y:20,rgba:[0,0,0,0]}],[{x:30,y:20,rgba:[0,0,0]}],
+            [{x:30,y:20,rgba:[0,0,0,256]}],[{x:30,y:20,rgba:[0,0,0,NaN]}]])
+            expect(()=>validateQualityFixtureExpectations(fixture({protectedAlphaProbes}))).toThrow('alpha probes');
     });
 });
 

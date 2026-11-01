@@ -1,6 +1,6 @@
 /**
  * @file userscript/settingsDataPlugin.ts
- * 文件职责：在 userscript 构建时无损压缩固定设置数据，完整设置版再压缩学习、语言、词库、导航和同步字段等静态目录。
+ * 文件职责：在 userscript 构建时无损压缩固定设置数据，完整设置版再压缩学习、语言、词库、导航、图标和供应商提示等静态目录。
  * 主要内容：只从指定 const 的字面量 AST 读取 JSON 类型，拒绝计算、重复键和特殊原型键；以既有 ASCII85 或 standalone 的 Base91 保存完整 gzip 字节；AI 超时目录只接受已登记的中文 const 引用，分别压缩两份字面量并在还原聚合表时接回同一中文对象；原地替换初始化值，同步还原所有文本、类型和顺序；皮肤与字体注册表通过同一插件校验两个具名导出数组，保留文件注释、既有 Map 与函数。
  * 模块边界：不执行源模块、不压缩可执行逻辑，不改远程语言资源；标准版只压缩完整消费的样式与界面注册表，避免目录表示阻止原有裁剪；沿用 pako，消费函数保持原实现，Greasy Fork 保留可读数据。
  */
@@ -74,6 +74,9 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         targets.set(normalizePath(resolve(root, 'src/core/config/sentenceHighlight.ts')), {names: ['SENTENCE_HIGHLIGHT_STYLES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/selectionTts.ts')), {names: ['SELECTION_TTS_VOICE_OPTIONS']});
         targets.set(normalizePath(resolve(root, 'src/core/config/localTts.ts')), {names: ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']});
+        targets.set(normalizePath(resolve(root, 'src/features/full-page-translation/ui/translationIndicators.ts')), {names: ['iconPaths']});
+        targets.set(normalizePath(resolve(root, 'src/providers/translation/aliyun-translation.ts')), {names: ['aliyunErrorHints']});
+        targets.set(normalizePath(resolve(root, 'src/core/i18n/language.ts')), {names: ['localizedUiLanguageLabels']});
     }
     // 这些表已被完整设置页使用；其余表仍独立压缩，避免把可裁剪的数据重新引入。
     // 仅 standalone 合并，首次消费时同步还原并缓存 JSON 文本；每个声明独立解析，保持 query 模块的对象隔离。

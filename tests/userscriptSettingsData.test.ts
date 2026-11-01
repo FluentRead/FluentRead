@@ -13,6 +13,9 @@ const tables = [
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
     ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels'],
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
+    ['src/features/full-page-translation/ui/translationIndicators.ts', 'iconPaths'],
+    ['src/providers/translation/aliyun-translation.ts', 'aliyunErrorHints'],
+    ['src/core/i18n/language.ts', 'localizedUiLanguageLabels'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {

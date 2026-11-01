@@ -13,7 +13,8 @@ import {FREE_PROVIDER_ORIGINS} from '@/src/core/config/freeProviderOrigins';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from '@/src/platform/google-drive/constants';
 import {createDriveAuth, type DriveAuthPorts} from '@/src/platform/google-drive/auth';
 import type {Entrypoint, EntrypointGroup, UserManifest} from 'wxt';
-import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources} from '@/wxt.config';
+import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteConfigBuildConfig, groupModuleWorkers, finalizeExtensionZip, createSafariBackgroundPage, configureSafariBackgroundPage, configureStableContentUiResources, configureExtensionUiChunks} from '@/wxt.config';
+import type {InlineConfig} from 'vite';
 
 const PROJECT_ROOT = resolve(__dirname, '..');
 
@@ -1406,5 +1407,38 @@ describe('extension manifest capability contract', () => {
             extendRemoteConfigBuildConfig(group, config);
             expect(config.plugins).toEqual([]);
         }
+    });
+
+    it('只为扩展页面拆分 Vue 与域名算法，不覆盖显式分包配置', () => {
+        const config: InlineConfig = {};
+        configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}, {type: 'sidepanel'}], config);
+        const output = config.build!.rollupOptions!.output!;
+        expect(Array.isArray(output)).toBe(false);
+        const choose = (output as {manualChunks: (id: string) => string | undefined}).manualChunks;
+        expect(choose('/app/node_modules/vue/dist/vue.runtime.esm-bundler.js')).toBe('vue-runtime');
+        expect(choose('/app/node_modules/.pnpm/@vue+shared@3.5.13/node_modules/@vue/shared/dist/shared.esm-bundler.js')).toBe('vue-runtime');
+        expect(choose('C:\\app\\node_modules\\@vue\\reactivity\\dist\\reactivity.esm-bundler.js')).toBe('vue-runtime');
+        expect(choose('/app/node_modules/tldts/dist/es6/src/data/trie.js')).toBe('domain-parser');
+        expect(choose('/app/node_modules/tldts-core/dist/es6/index.js')).toBe('domain-parser');
+        expect(choose('/app/node_modules/vue-router/index.js')).toBeUndefined();
+        expect(choose('/app/src/core/i18n/index.ts')).toBeUndefined();
+        const existing = {framework: ['vue']};
+        const explicit: InlineConfig = {build: {rollupOptions: {output: [{manualChunks: existing}, {}]}}};
+        configureExtensionUiChunks([{type: 'options'}], explicit);
+        const outputs = explicit.build!.rollupOptions!.output as {manualChunks?: unknown}[];
+        expect(outputs[0].manualChunks).toBe(existing);
+        expect(outputs[1].manualChunks).toBeTypeOf('function');
+    });
+
+    it('内容脚本、后台、模块 Worker、未知和库模式构建保留原有输出结构', () => {
+        for (const group of [[], [{type: 'content-script'}], [{type: 'background'}], [{type: 'unlisted-script'}],
+            [{type: 'popup'}, {type: 'background'}], [{type: 'unknown'}]]) {
+            const config: InlineConfig = {};
+            configureExtensionUiChunks(group, config);
+            expect(config).toEqual({});
+        }
+        const library: InlineConfig = {build: {lib: {entry: 'fixture.ts', name: 'fixture'}}};
+        configureExtensionUiChunks([{type: 'popup'}], library);
+        expect(library.build!.rollupOptions).toBeUndefined();
     });
 });

@@ -696,6 +696,8 @@ export default defineConfig({
         outDir: resolve(root, bundleLibraries ? '.output/userscript-standalone'
             : greasyForkSource ? '.output/userscript-greasyfork' : '.output/userscript'),
         emptyOutDir: true,
+        // 发布体积由两个 verifier 检查，不重复压缩整份脚本来生成日志统计。
+        reportCompressedSize: false,
         target: 'es2018',
         minify: greasyForkSource ? false : 'esbuild',
         // 锁定的 CommonJS 26 默认 auto 会因条件 require 的分析时机改变 MD5 初始化包装。

@@ -689,6 +689,7 @@ const {
   COVERAGE_PROTECTED_DESCENDANTS,
   COVERAGE_TRACKER_KEY,
   assertPageContract,
+  assertRequiredRestored,
   assertFreshProductionExtension,
   assertCoverageReport,
   assertCoverageRestoration,
@@ -751,6 +752,11 @@ const {
     forbiddenState: Array<Record<string, unknown> & {signatures: unknown[]}>;
     interactionState: Array<Record<string, unknown>>;
   }>;
+  assertRequiredRestored: (
+    page: {evaluate: (fn: (argument: unknown) => unknown, argument: unknown) => Promise<unknown>},
+    baseline: Record<string, unknown>,
+    phase: string,
+  ) => Promise<void>;
   evaluateProductionBuildFreshness: (input: {
     extensionDir: string;
     manifestMtimeMs: number;
@@ -3981,10 +3987,44 @@ describe('real-site translation matrix gates', () => {
     expect(config.optionalForbiddenSelectors).toEqual(['#add-to-cart-button', '#buy-now-button']);
     expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, [], config.optionalForbiddenSelectors))
       .toEqual(['.a-price', '#acrPopover', '#acrCustomerReviewText', '#nav-search-bar-form']);
-    expect(config.requiredSelectors).toEqual(['h1#title', '#feature-bullets li', '.content-grid-block p',
+    expect(config.requiredSelectors).toEqual(['h1#title', '#feature-bullets li', '#atfCenter14_feature_div .content-grid-block p',
       '.content-grid-block h2', '.content-grid-block h3', '#tech p']);
     expect(config.modes).toEqual(['hover', 'full']);
   });
+
+  it.each(['new-banner', 'changed-stable-source', 'missing-stable-source', 'changed-stable-structure'])
+    ('keeps the Amazon restoration witness stable without reducing global paragraph coverage: %s', async variant => {
+      const config = cases['amazon-echo-dot-product'];
+      const selector = '#atfCenter14_feature_div .content-grid-block p';
+      const proseRule = config.coverageRules.find(rule => rule.name === 'product-detail-paragraphs')!;
+      expect(config.requiredSelectors).toContain(selector);
+      expect(proseRule).toMatchObject({selector: '.content-grid-block p', minInitial: 30, trackDynamic: true});
+      expect(config.hoverTargets.find(target => target.name === 'product-detail-paragraph')?.selector).toBe('.content-grid-block p');
+      const rest = Array.from({length: 30}, (_, index) => `<p>Independent product explanation ${index}.</p>`).join('');
+      const {document, window} = parseHTML(`<html><body><main><div id="atfCenter14_feature_div"><div class="content-grid-block"><p id="witness"><strong>We want you to know</strong></p></div></div><section class="content-grid-block">${rest}</section></main></body></html>`);
+      Object.defineProperty(window.HTMLElement.prototype, 'getBoundingClientRect', {configurable: true,
+        value: () => ({width: 400, height: 30, top: 0, left: 0, right: 400, bottom: 30})});
+      for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+        HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+        getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+      const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+      try {
+        const baseline = await capturePageContract(page, [selector], [], [], [], []);
+        expect(baseline.requiredState[0]).toMatchObject({sourceText: 'We want you to know'});
+        document.querySelector('main')!.insertAdjacentHTML('afterbegin', '<div class="content-grid-block"><p><strong>This device is designed for Alexa+</strong></p></div>');
+        expect(document.querySelector(proseRule.selector)!.textContent).toBe('This device is designed for Alexa+');
+        expect(document.querySelectorAll(proseRule.selector)).toHaveLength(32);
+        expect(document.querySelectorAll(selector)).toHaveLength(1);
+        expect([...document.querySelectorAll(proseRule.selector)].some(node => node.id === 'witness')).toBe(true);
+        const witness = document.querySelector('#witness')!;
+        if (variant === 'changed-stable-source') witness.querySelector('strong')!.textContent = 'A changed product notice.';
+        if (variant === 'missing-stable-source') witness.remove();
+        if (variant === 'changed-stable-structure') witness.innerHTML = '<em>We want you to know</em>';
+        const check = assertRequiredRestored(page, baseline, variant);
+        if (variant === 'new-banner') await expect(check).resolves.toBeUndefined();
+        else await expect(check).rejects.toThrow('未恢复原始文本/结构');
+      } finally {vi.unstubAllGlobals();}
+    });
 
   it.each(['add-to-cart-button', 'buy-now-button'])('adopts an absent Amazon %s only when it appears clean and rejects translated purchase controls', async id => {
     const config = cases['amazon-echo-dot-product'];

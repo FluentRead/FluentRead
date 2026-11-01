@@ -1363,7 +1363,7 @@
     "requiredSelectors": [
       "h1#title",
       "#feature-bullets li",
-      ".content-grid-block p",
+      "#atfCenter14_feature_div .content-grid-block p",
       ".content-grid-block h2",
       ".content-grid-block h3",
       "#tech p"

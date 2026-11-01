@@ -1,11 +1,11 @@
 /**
  * @file src/features/vocabulary/materialBackupBrowserSave.ts
- * 文件职责：为支持私有文件和下载 API 的扩展页面接入材料备份保存目标。
- * 主要内容：在用户手势内请求可选权限、逐块写入 OPFS，并通过下载事件和查询确认终态后清理；不确定时保留源文件。
+ * 文件职责：为扩展页面接入私有临时文件和材料备份下载。
+ * 主要内容：复用 OPFS、跨页面锁和完成标记；有下载 API 时确认终态后清理，anchor 回退则交给用户确认后清理；不确定时保留源文件并允许取回。
  * 模块边界：不触发备份读取、不修改材料，不保证页面卸载后下载继续；权限或平台不可用时由调用方选择回退方式。
  */
 import browser from 'webextension-polyfill';
-import {createMaterialBackupOpfsTarget, materialBackupTemporaryFileTime, MaterialBackupDownloadNotStartedError, type MaterialBackupOpfsPlatform, type MaterialBackupOpfsDownload, type MaterialBackupDownloadTerminal} from './materialBackupOpfsSave';
+import {createMaterialBackupOpfsTarget, materialBackupTemporaryFileTime, materialBackupTemporaryFileName, MaterialBackupDownloadNotStartedError, type MaterialBackupOpfsPlatform, type MaterialBackupOpfsDownload, type MaterialBackupDownloadTerminal} from './materialBackupOpfsSave';
 import type {MaterialBackupSaveTarget, MaterialBackupWritable} from './materialBackupSave';
 
 interface DownloadDelta {id:number;state?:{current?:string}}
@@ -18,13 +18,15 @@ export interface MaterialBrowserDownloads {
     onChanged:DownloadEvent<DownloadDelta>;
     onErased:DownloadEvent<number>;
 }
-export interface MaterialBrowserBackupEnvironment {
-    requestPermission():Promise<boolean>;
+export interface MaterialBrowserBackupStorageEnvironment {
     directory():Promise<FileSystemDirectoryHandle>;
     locks:LockManager;
-    downloads:MaterialBrowserDownloads;
     randomId():string;
     now():number;
+}
+export interface MaterialBrowserBackupEnvironment extends MaterialBrowserBackupStorageEnvironment {
+    requestPermission():Promise<boolean>;
+    downloads:MaterialBrowserDownloads;
     objectURL(file:Blob):string;
     revokeURL(url:string):void;
 }
@@ -36,6 +38,9 @@ const backupContextError=()=>Object.assign(new Error('无法在隐私浏览或�
 const notFound=(error:unknown)=>error instanceof DOMException&&error.name==='NotFoundError';
 async function exists(dir:FileSystemDirectoryHandle,name:string):Promise<boolean> {
     try {await dir.getFileHandle(name);return true;}catch(error){if(notFound(error))return false;throw error;}
+}
+async function removeBackupFiles(dir:FileSystemDirectoryHandle,name:string):Promise<void> {
+    for(const entry of [name,`${name}.ready`])try{await dir.removeEntry(entry);}catch(error){if(!notFound(error))throw error;}
 }
 async function readySize(dir:FileSystemDirectoryHandle,name:string):Promise<number|undefined> {
     try {
@@ -112,7 +117,7 @@ async function acquireLock(locks:LockManager,name:string):Promise<(()=>void)|und
     return acquired;
 }
 
-export function createMaterialBrowserOpfsPlatform(env:MaterialBrowserBackupEnvironment):MaterialBackupOpfsPlatform {
+function createMaterialBrowserOpfsStorage(env:MaterialBrowserBackupStorageEnvironment):Required<Pick<MaterialBackupOpfsPlatform,'acquire'|'create'|'markReady'|'remove'|'randomId'|'now'>> {
     let folder:Promise<FileSystemDirectoryHandle>|undefined;
     const directory=()=>folder ??= env.directory().then(root=>root.getDirectoryHandle(TEMP_DIRECTORY,{create:true}));
     return {
@@ -136,7 +141,13 @@ export function createMaterialBrowserOpfsPlatform(env:MaterialBrowserBackupEnvir
             try {await writer.write(JSON.stringify({v:1,size:file.size}));await writer.close();}
             catch(error){try{await writer.abort();}catch{/* 未完成标记不用于恢复。 */}throw error;}
         },
-        async remove(name){const dir=await directory();await dir.removeEntry(name);try{await dir.removeEntry(`${name}.ready`);}catch(error){if(!notFound(error))throw error;}},
+        async remove(name){await removeBackupFiles(await directory(),name);},
+        randomId:env.randomId,now:env.now,
+    };
+}
+export function createMaterialBrowserOpfsPlatform(env:MaterialBrowserBackupEnvironment):MaterialBackupOpfsPlatform {
+    return {
+        ...createMaterialBrowserOpfsStorage(env),
         objectURL:env.objectURL,revokeURL:env.revokeURL,
         startDownload:(url,name)=>{
             let downloads:MaterialBrowserDownloads;
@@ -144,8 +155,79 @@ export function createMaterialBrowserOpfsPlatform(env:MaterialBrowserBackupEnvir
             if(!downloads?.download||!downloads.search||!downloads.cancel||!downloads.onChanged||!downloads.onErased)throw new MaterialBackupDownloadNotStartedError('材料备份下载接口不可用，请重试');
             return startObservedMaterialDownload(downloads,url,name);
         },
-        randomId:env.randomId,now:env.now,
     };
+}
+
+/** 调用即接管文件与释放函数；拒绝也须保留可恢复的文件或显式清理。 */
+export type MaterialBackupFileHandoff = (file:Blob, release:()=>Promise<void>, signal:AbortSignal)=>Promise<void>;
+
+/** 复用私有临时文件与 ready 标记；anchor 下载只能由用户确认完成后释放。 */
+export async function createMaterialBrowserFallbackTarget(filename:string,env:MaterialBrowserBackupStorageEnvironment,handoff:MaterialBackupFileHandoff,existingName?:string):Promise<MaterialBackupSaveTarget> {
+    if(typeof filename!=='string'||!filename||filename.length>255)throw new Error('材料备份文件名无效');
+    const recovered=existingName!==undefined;
+    const name=existingName??materialBackupTemporaryFileName(env.now(),env.randomId());
+    if(materialBackupTemporaryFileTime(name)===undefined)throw new Error('材料备份临时文件名无效');
+    const platform=createMaterialBrowserOpfsStorage(env),unlock=await platform.acquire(name);
+    if(!unlock)throw new Error('材料备份临时文件正在使用');
+    let writable:Awaited<ReturnType<MaterialBackupOpfsPlatform['create']>>|undefined,recoveredFile:Blob|undefined;
+    try {
+        if(recovered){
+            const dir=await (await env.directory()).getDirectoryHandle(TEMP_DIRECTORY),file=await (await dir.getFileHandle(name)).getFile(),size=await readySize(dir,name);
+            if(size===undefined||file.size!==size)throw new Error('临时材料备份未完成或无法验证，不能取回');
+            recoveredFile=file;
+        }else writable=await platform.create(name);
+    }catch(error){unlock();throw error;}
+    let open=!recovered,finished=false,handedOff=false,pending:Promise<void>|undefined,cleanup:Promise<void>|undefined;
+    const release=():Promise<void>=>{
+        cleanup??=(async()=>{
+            if(pending)await pending.catch(()=>{});
+            if(open){await writable!.abort();open=false;}
+            if(!recovered)await platform.remove(name);
+            unlock();
+        })();
+        const task=cleanup;
+        return task.catch(error=>{if(cleanup===task)cleanup=undefined;throw error;});
+    };
+    return {
+        async write(chunk){
+            if(finished||pending)throw new Error('材料备份写入状态无效');
+            if(!writable)throw new Error('不能改写临时备份');
+            const task=writable.write(chunk);pending=task;
+            try{await task;}finally{if(pending===task)pending=undefined;}
+        },
+        async commit(signal){
+            if(finished||pending)throw new Error('材料备份提交状态无效');
+            finished=true;
+            try {
+                if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
+                if(writable)await writable.close();open=false;
+                if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
+                const file=recoveredFile??await writable!.file();
+                if(!recovered)await platform.markReady(name,file);
+                if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
+                handedOff=true;
+                await handoff(file,release,signal);
+                return 'initiated';
+            }catch(error){
+                if(!handedOff)try{await release();}
+                catch(cleanupError){throw Object.assign(new Error('材料备份未完成，清理失败，请检查保存位置是否存在不完整文件'),{name:'MaterialBackupSaveCleanupError',cause:error,cleanupError});}
+                throw error;
+            }
+        },
+        async abort(){finished=true;if(!handedOff)await release();},
+    };
+}
+
+function storageEnvironment():MaterialBrowserBackupStorageEnvironment|undefined {
+    if(import.meta.env.BROWSER==='userscript'||typeof navigator==='undefined'||typeof navigator.storage?.getDirectory!=='function'||typeof navigator.locks?.request!=='function')return undefined;
+    return {directory:()=>navigator.storage.getDirectory(),locks:navigator.locks,randomId:()=>crypto.randomUUID().replaceAll('-',''),now:()=>Date.now()};
+}
+export function supportsMaterialBackupTemporaryFiles():boolean {return storageEnvironment()!==undefined;}
+export async function createMaterialBackupFallbackTarget(filename:string,handoff:MaterialBackupFileHandoff,existingName?:string):Promise<MaterialBackupSaveTarget> {
+    const env=storageEnvironment();
+    if(!env)throw Object.assign(new Error('当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。'),{name:'MaterialBackupBufferCapacityError'});
+    await assertMaterialBackupContext();
+    return createMaterialBrowserFallbackTarget(filename,env,handoff,existingName);
 }
 
 /** 不可在调用前等待其他 Promise：Firefox 将此请求绑定当前点击事件。 */
@@ -168,7 +250,7 @@ function firefoxEnvironment():MaterialBrowserBackupEnvironment|undefined {
             if(!verifiedFirefoxBackupContext||browser.extension?.inIncognitoContext!==false)return Promise.reject(backupContextError());
             // 权限请求保留在点击栈内，之后再次验证所属标签才能访问 OPFS。
             const permission=browser.permissions.request({permissions:['downloads']});
-            return Promise.all([permission,assertFirefoxBackupContext()]).then(([allowed])=>allowed);
+            return Promise.all([permission,assertMaterialBackupContext()]).then(([allowed])=>allowed);
         },
         directory:()=>navigator.storage.getDirectory(),locks:navigator.locks,
         get downloads(){return browser.downloads as unknown as MaterialBrowserDownloads;},
@@ -183,14 +265,14 @@ export async function prepareFirefoxMaterialBackupContext():Promise<boolean> {
     verifiedFirefoxBackupContext=false;
     if(import.meta.env.BROWSER!=='firefox')return false;
     try {
-        await assertFirefoxBackupContext();
+        await assertMaterialBackupContext();
         if(generation!==firefoxContextGeneration)return false;
         verifiedFirefoxBackupContext=true;
         return true;
     } catch {return false;}
 }
 
-async function assertFirefoxBackupContext():Promise<void> {
+async function assertMaterialBackupContext():Promise<void> {
     const generation=firefoxContextGeneration;
     const invalidate=()=>{if(generation===firefoxContextGeneration)verifiedFirefoxBackupContext=false;};
     if(browser.extension?.inIncognitoContext!==false){invalidate();throw backupContextError();}
@@ -238,8 +320,7 @@ export async function removeMaterialBackupLeftover(root:FileSystemDirectoryHandl
     const release=await acquireLock(locks,name);if(!release)throw new Error('材料备份临时文件正在使用，请等待下载结束');
     try {
         const dir=await root.getDirectoryHandle(TEMP_DIRECTORY);
-        await dir.removeEntry(name);
-        try {await dir.removeEntry(`${name}.ready`);}catch(error){if(!notFound(error))throw error;}
+        await removeBackupFiles(dir,name);
         if(await exists(dir,name)||await exists(dir,`${name}.ready`))throw new Error('无法确认材料备份临时文件已删除');
     } finally {release();}
 }
@@ -267,14 +348,14 @@ export function beginRecoveredMaterialBackup(name:string,filename:string,env:Mat
     });
 }
 
-export async function listFirefoxMaterialBackupLeftovers():Promise<MaterialBackupLeftoverList> {
-    const env=firefoxEnvironment();if(!env)throw new Error('当前浏览器无法查看材料备份临时文件');
-    await assertFirefoxBackupContext();
+export async function listMaterialBackupLeftoversInBrowser():Promise<MaterialBackupLeftoverList> {
+    const env=storageEnvironment();if(!env)throw new Error('当前浏览器无法查看材料备份临时文件');
+    await assertMaterialBackupContext();
     return listMaterialBackupLeftovers(await env.directory());
 }
-export async function removeFirefoxMaterialBackupLeftover(name:string):Promise<void> {
-    const env=firefoxEnvironment();if(!env)throw new Error('当前浏览器无法清理材料备份临时文件');
-    await assertFirefoxBackupContext();
+export async function removeMaterialBackupLeftoverInBrowser(name:string):Promise<void> {
+    const env=storageEnvironment();if(!env)throw new Error('当前浏览器无法清理材料备份临时文件');
+    await assertMaterialBackupContext();
     await removeMaterialBackupLeftover(await env.directory(),env.locks,name);
 }
 export function beginFirefoxRecoveredMaterialBackup(name:string,filename:string):Promise<MaterialBrowserBackupChoice> {

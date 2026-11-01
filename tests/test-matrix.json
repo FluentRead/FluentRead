@@ -523,7 +523,10 @@
       "tests/pointerSelectionSession.test.ts",
       "tests/aiMultiSegmentConfig.test.ts",
       "tests/userscriptBuildGzip.test.ts",
-      "tests/areaRuntimeComposition.test.ts"
+      "tests/areaRuntimeComposition.test.ts",
+      "tests/francRuntimeBuild.test.ts",
+      "tests/longPageMockTransport.test.ts",
+      "tests/compactExtensionZip.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

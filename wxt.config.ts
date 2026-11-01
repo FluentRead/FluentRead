@@ -18,6 +18,8 @@ import {createReadingDictionaryAliases} from './scripts/testing/reading-annotati
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
 import type {InlineConfig} from 'vite';
+import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
+import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -302,7 +304,7 @@ export default defineConfig({
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
@@ -344,6 +346,8 @@ export default defineConfig({
         },
         'zip:extension:done': async (wxt, zipPath) => {
             await finalizeExtensionZip(wxt.config.browser, zipPath);
+            const compact = await compactExtensionZip(zipPath, __dirname);
+            wxt.logger.info(`WASM ZIP compression saved ${compact.savedBytes.toLocaleString('en-US')} bytes`);
         },
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';

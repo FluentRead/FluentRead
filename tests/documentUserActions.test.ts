@@ -415,7 +415,7 @@ describe('document user actions: download consumers', () => {
         const submit = button('下载双语文件', download);
         expect(submit.props.disabled).toBe(true);
         await fire(find(node => node.tag === 'input' && node.type === 'checkbox', download), 'change', {checked: true});
-        await fire(button('仅译文适合直接阅读和分享', download), 'click');
+        await fire(button('仅译文', download), 'click');
         expect(button('下载译文文件', download).props.disabled).toBe(false);
         await fire(button('下载译文文件', download), 'click');
         await vi.waitFor(() => expect(blobs).toHaveLength(1));
@@ -438,11 +438,11 @@ describe('document user actions: download consumers', () => {
         const download = await downloadReady();
         expect(textOf(download)).toContain('reading.translated.txt');
         expect(textOf(find(node => node.tag === 'pre', download))).toBe('校订');
-        await fire(button('返回文档', download), 'click');
+        await fire(find(node => node.tag === 'button' && node.props['aria-label'] === '关闭下载窗口', download), 'click');
         await fire(button('原文', labelled('阅读方式')), 'click');
         await fire(button('下载文件 ↓'), 'click');
         expect(textOf(download)).toContain('reading.translated.txt');
-        await fire(button('双语对照同时保留原文和译文', download), 'click');
+        await fire(button('双语对照', download), 'click');
         expect(textOf(find(node => node.tag === 'pre', download))).toContain('Original text.');
         expect(textOf(find(node => node.tag === 'pre', download))).toContain('校订');
     });

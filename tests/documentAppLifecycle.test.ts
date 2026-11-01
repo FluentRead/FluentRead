@@ -11,7 +11,7 @@ import {createDocumentHistory, documentHistoryId} from '@/src/features/document-
 import {acquirePdfDocument} from '@/src/features/document-translation/ui/pdfPreview';
 import {createDocumentDownload as createRuntimeDownload} from '@/src/app/document-translation/runtime';
 import DocumentApp from '@/src/app/document-translation/DocumentApp.vue';
-import {getDocumentDownloadCopy} from '@/src/app/document-translation/downloadCopy';
+import {getDocumentDownloadCopy, getDocumentDownloadErrorCopy} from '@/src/app/document-translation/downloadCopy';
 import DocumentSegmentEditor from '@/src/app/document-translation/DocumentSegmentEditor.vue';
 
 const ports = vi.hoisted(() => ({privateContext: false, tasks: [] as any[], zoomBindings: [] as any[], renderPending: undefined as any, pagePending: undefined as any, pageProvider: undefined as undefined | ((pageNumber: number, page: any) => Promise<any>), pageCount: 1, fetchPdf: vi.fn(), i18n: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), batch: vi.fn(), recognize: vi.fn(), createRecognizer: vi.fn(), actualRecognize: undefined as any, actualCreateRecognizer: undefined as any, unsubscribe: vi.fn(), observer: undefined as any, config: undefined as any}));
@@ -1050,6 +1050,8 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             const copy = getDocumentDownloadCopy(language);
             expect(Object.keys(copy)).toEqual(Object.keys(getDocumentDownloadCopy('zh-CN')));
             expect(Object.values(copy).every(value => value.trim())).toBe(true);
+            expect(getDocumentDownloadErrorCopy(language, 'Input document is encrypted.')).toBe(copy.protectedFailed);
+            expect(getDocumentDownloadErrorCopy(language, 'encoding failed')).toBe(copy.failed);
         }
         expect(getDocumentDownloadCopy('unsupported-language')).toBe(getDocumentDownloadCopy('zh-CN'));
         expect(getDocumentDownloadCopy(undefined)).toBe(getDocumentDownloadCopy('zh-CN'));
@@ -1482,6 +1484,36 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.tasks.filter(task => task.role === 'preview')).toHaveLength(0);
     });
 
+    it('chooses the PDF export layout in the dialog without changing the reading presentation', async () => {
+        await state.loadFiles([file('independent-layout.pdf')]); state.editSegment(0, '完整校订');
+        state.openDownload(); await flush();
+        const options = walkHost(root).find(entry => entry.type === 'details' && entry.props.class === 'download-options')!;
+        expect(options.props.open).toBe(false);
+        expect(walkHost(root).filter(entry => entry.type === 'button' && entry.props.class === 'translate-document-button' && hostText(entry).includes('下载'))).toHaveLength(1);
+        const select = walkHost(root).find(entry => entry.type === 'select' && entry.props['aria-label'] === getDocumentDownloadCopy('zh-CN').layoutLabel)!;
+        select.props.onChange({target: {value: 'readable'}}); await flush();
+        expect(state.pdfPresentation).toBe('layout'); expect(state.downloadPdfPresentation).toBe('readable');
+        const encode = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'result.pdf', mimeType: 'application/pdf'});
+        await state.downloadDocument(); await flush();
+        expect(encode).toHaveBeenCalledWith(state.parsedDocument, ['完整校订'], 'bilingual', expect.objectContaining({pdfPresentation: 'readable'}));
+        walkHost(root).find(entry => entry.type === 'dialog' && entry.props['aria-labelledby'] === 'download-document-heading')!.props.onClose();
+        state.openDownload(); await flush(); expect(state.downloadPdfPresentation).toBe('layout');
+    });
+
+    it('presents a localized actionable download failure with technical details collapsed and original download still available', async () => {
+        await state.loadFiles([file('protected.pdf')]); state.editSegment(0, '保留校订'); state.openDownload();
+        state.downloadError = 'Input document to PDFDocument.load is encrypted.'; await flush();
+        const failure = walkHost(root).find(entry => entry.props.class === 'download-failure')!;
+        const alert = walkHost(failure).find(entry => entry.props.role === 'alert')!;
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('zh-CN').protectedFailed);
+        const details = walkHost(failure).find(entry => entry.type === 'details')!;
+        expect(details.props.open).toBeUndefined(); expect(hostText(details)).toContain(state.downloadError);
+        expect(walkHost(root).find(entry => entry.type === 'button' && hostText(entry) === '下载原文')!.props.disabled).toBe(false);
+        expect(state.translatedSegments).toEqual(['保留校订']);
+        state.language = 'en-US'; await flush();
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('en-US').protectedFailed);
+    });
+
     it.each(['layout', 'readable'] as const)('downloads the selected %s PDF presentation with matching dialog guidance', async presentation => {
         await state.loadFiles([file('presentation.pdf')]);
         state.editSegment(0, '可复制的实际校订文字');
@@ -1499,7 +1531,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             expect(text(dialog)).not.toContain('document.pdfReading.exportPageCount');
             expect(text(dialog)).not.toContain('document.pdfReading.exportHint');
             expect(walk(summary).some(entry => String(entry.props.class).includes('pdf-export-page-pair'))).toBe(false);
-        } else expect(text(summary)).toContain('document.pdfReading.exportPageCount');
+        } else expect(text(summary)).toContain(getDocumentDownloadCopy('zh-CN').pageCount.replace('{count}', String(state.pdfExportPageCount)));
         const download = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'presentation.pdf', mimeType: 'application/pdf'});
         await state.downloadDocument(); await flush();
         expect(download).toHaveBeenCalledWith(state.parsedDocument, ['可复制的实际校订文字'], 'bilingual', expect.objectContaining({pdfPresentation: presentation}));

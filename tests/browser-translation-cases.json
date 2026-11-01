@@ -38,6 +38,10 @@
     "forbiddenSelectors": [
       "main#main pre",
       "main#main code",
+      "main#main [data-code-block-header] > span.code-block-header-language",
+      "main#main table[aria-label=\"Required parameters\"] tbody tr > td:first-child",
+      "main#main table[aria-label=\"Response headers\"] tbody tr > td:first-child",
+      "main#main table[aria-label=\"Handle profanity\"] tbody tr > td:nth-child(-n+2)",
       "nav#affixed-left-container",
       "nav#side-doc-outline"
     ],
@@ -57,7 +61,7 @@
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation",
-    "notes": "Microsoft Learn Translator v3 reference: cover the separate document title and prose container while protecting code and navigation. Controlled-provider runs verify DOM compatibility, not translation quality."
+    "notes": "Microsoft Learn Translator v3 reference: cover the separate document title and prose container while protecting code, code-language labels, required parameter names, response header names, the first two enum columns of Handle profanity, and navigation. Both Optional parameters tables contain different semantics, including the readable Authentication headers label; their token-only boundary is unit-tested rather than broadly forbidden here. Controlled-provider runs verify DOM compatibility, not translation quality."
   },
   "bambu-dual-nozzles": {
     "url": "https://wiki.bambulab.com/en/software/bambu-studio/manual/dual-nozzles-slicing-filament-grouping",
@@ -1270,6 +1274,7 @@
     ],
     "forbiddenSelectors": [
       "[data-testid=\"profileHeaderDisplayName\"]",
+      "[data-testid^=\"feedItem-by-\"] > div > div:nth-child(2) > div:nth-child(2) > a[role=\"link\"][aria-label][aria-pressed][data-no-underline][href^=\"/profile/\"]:not([href*=\"/post/\"]):has(> svg):has(> div > div > div[dir=\"auto\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
       "[data-testid^=\"feedItem-by-\"] a[aria-label][dir=\"auto\"][href^=\"/profile/\"]:not([href*=\"/post/\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
       "[data-testid^=\"feedItem-by-\"] a[data-tooltip][href*=\"/post/\"]",
       "[data-testid^=\"feedItem-by-\"] div:has(> div > [data-testid=\"replyBtn\"]):has([data-testid=\"likeCount\"])",
@@ -1290,9 +1295,11 @@
       "[data-testid^=\"feedItem-by-\"] div[role=\"link\"][aria-label] > div:nth-child(1):has([data-testid=\"userAvatarImage\"]):has([data-tooltip])"
     ],
     "optionalForbiddenSelectors": [
-      "textarea, [contenteditable=\"true\"], [role=\"textbox\"]"
+      "textarea, [contenteditable=\"true\"], [role=\"textbox\"]",
+      "[data-testid^=\"feedItem-by-\"] > div > div:nth-child(2) > div:nth-child(2) > a[role=\"link\"][aria-label][aria-pressed][data-no-underline][href^=\"/profile/\"]:not([href*=\"/post/\"]):has(> svg):has(> div > div > div[dir=\"auto\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)"
     ],
     "dynamicForbiddenSelectors": [
+      "[data-testid^=\"feedItem-by-\"] > div > div:nth-child(2) > div:nth-child(2) > a[role=\"link\"][aria-label][aria-pressed][data-no-underline][href^=\"/profile/\"]:not([href*=\"/post/\"]):has(> svg):has(> div > div > div[dir=\"auto\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
       "[data-testid^=\"feedItem-by-\"] a[aria-label][dir=\"auto\"][href^=\"/profile/\"]:not([href*=\"/post/\"]):not([data-testid=\"postText\"] a):not(div[role=\"link\"][aria-label] a)",
       "[data-testid^=\"feedItem-by-\"] a[data-tooltip][href*=\"/post/\"]",
       "[data-testid^=\"feedItem-by-\"] div:has(> div > [data-testid=\"replyBtn\"]):has([data-testid=\"likeCount\"])",
@@ -1312,7 +1319,7 @@
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation",
-    "notes": "公开官方 profile：正文与简介按首次配置正文集合冻结，逐节点完成翻译/恢复/再次翻译；hover另取普通正文和带提及链接正文。作者、handle、时间和整个计数操作行、资料顶部账号及关注/帖子计数必须保留；作者选择器明确排除 postText 中的提及。页面未登录，没有实际编辑器样本，optional editor guard 不算编辑器已验收。契约登记不代表实站通过，结果见对应运行产物；不代表无限滚动、登录信息流或私信验收。"
+    "notes": "公开官方 profile：正文与简介按首次配置正文集合冻结，逐节点完成翻译/恢复/再次翻译；hover另取普通正文和带提及链接正文。作者、handle、时间和整个计数操作行、资料顶部账号及关注/帖子计数必须保留；作者选择器明确排除 postText 中的提及。转发身份组件使用精确结构的 optional dynamic guard，未出现不算该边界已验收。页面未登录，没有实际编辑器样本，optional editor guard 不算编辑器已验收。契约登记不代表实站通过，结果见对应运行产物；不代表无限滚动、登录信息流或私信验收。"
   },
   "amazon-echo-dot-product": {
     "url": "https://www.amazon.com/dp/B09B8V1LZ3?language=en_US&th=1",
@@ -1356,7 +1363,7 @@
     "requiredSelectors": [
       "h1#title",
       "#feature-bullets li",
-      ".content-grid-block p",
+      "#atfCenter14_feature_div .content-grid-block p",
       ".content-grid-block h2",
       ".content-grid-block h3",
       "#tech p"
@@ -1412,7 +1419,13 @@
       "#nav-search-bar-form"
     ],
     "dynamicForbiddenSelectors": [
-      ".a-price"
+      ".a-price",
+      "#add-to-cart-button",
+      "#buy-now-button"
+    ],
+    "optionalForbiddenSelectors": [
+      "#add-to-cart-button",
+      "#buy-now-button"
     ],
     "interactionSelectors": [
       "#tech a[href]"
@@ -1425,7 +1438,7 @@
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation",
-    "notes": "2026-10-25 公开商品 DOM：主标题1、功能介绍6、content-grid p83/h2 11/h3 14、tech p42；逐个跟踪所有符合条件的节点，minInitial只是结构门槛。有限滚动到18,001px稳定底部；价格、评分和购物控件须保持原文，不执行购买/加购/登录。本次无 figcaption、评论正文及可见评论用户名，不宣称覆盖这些区域。规格说明参与翻译，数字/型号是否跳过由真实候选完成记录核验；controlled provider不提供翻译质量证据。"
+    "notes": "2026-10-25 公开商品 DOM：主标题1、功能介绍6、content-grid p83/h2 11/h3 14、tech p42；逐个跟踪所有符合条件的节点，minInitial只是结构门槛。保留原固定英文/variant查询 language=en_US&th=1；2026-11-01无query入口复跑原生转到?th=1且详情正文缺失，不能视为等价入口，technical-description的英文sourceIncludes继续验证正文。保留query的该次 #availability 明示商品无法配送到当前地址，两个购买按钮原生缺席；仅这两个按钮使用optional dynamic保护，未出现不算购物控件或购买交互已验收。有限滚动到18,001px稳定底部；价格、评分和出现的购物控件须保持原文，不执行购买/加购/登录。本次无 figcaption、评论正文及可见评论用户名，不宣称覆盖这些区域。规格说明参与翻译，数字/型号是否跳过由真实候选完成记录核验；controlled provider不提供翻译质量证据。"
   },
   "steam-dota2-product": {
     "url": "https://store.steampowered.com/app/570/Dota_2/?l=english",
@@ -2069,7 +2082,14 @@
       "article.article-main > header .publisher-author-card > .base-main-card__info > .base-main-card__metadata",
       "article.article-main .inline-articles .inline-article-meta",
       "main .right-rail .aside-article-card .base-aside-card__metadata",
-      "main .article-social-activity a.social-action-bar__button"
+      "main .article-social-activity a.social-action-bar__button",
+      "main .comments section.comment .comment__actions a.comment__reply[data-feed-action=\"replyToComment\"]:not(.comment__text *)"
+    ],
+    "optionalForbiddenSelectors": [
+      "main .comments section.comment .comment__actions a.comment__reply[data-feed-action=\"replyToComment\"]:not(.comment__text *)"
+    ],
+    "dynamicForbiddenSelectors": [
+      "main .comments section.comment .comment__actions a.comment__reply[data-feed-action=\"replyToComment\"]:not(.comment__text *)"
     ],
     "interactionSelectors": [
       "article.article-main .inline-articles a[href]",
@@ -2079,7 +2099,7 @@
       "hover",
       "full"
     ],
-    "notes": "Public native article observed HTTP200; dismiss only the exact optional contextual sign-in promotion with its native non-form dismissal button. Stop on authwall/challenge or unrecognized blocking UI; never mutate visibility/ARIA or authentication state. Sample contains one title, ten direct article paragraphs, three inline and ten aside recommendation titles, of which six aside titles have native layout and four are hidden behind the native expansion; every currently eligible visible title/paragraph is required, with complete Text/BR source ledgers for each main paragraph. Protect publisher name/date, inline/aside recommendation metadata and article action anchors. Native article has no body list/code/reading href, so those boundaries remain authored fixture evidence. Native expansion of the four hidden recommendations remains separate pending coverage. Readiness floor six is confirmed by actual per-node rects, not a reduction of the six visible-title corpus. The raw pre-fix run translated ten metadata owners and changed author class whitespace on restoration; retain that failure and global exact restoration guards."
+    "notes": "Public native article observed HTTP200; dismiss only the exact optional contextual sign-in promotion with its native non-form dismissal button. Stop on authwall/challenge or unrecognized blocking UI; never mutate visibility/ARIA or authentication state. Sample contains one title, ten direct article paragraphs, three inline and ten aside recommendation titles, of which six aside titles have native layout and four are hidden behind the native expansion; every currently eligible visible title/paragraph is required, with complete Text/BR source ledgers for each main paragraph. Protect publisher name/date, inline/aside recommendation metadata and article action anchors. Comment reply actions use an exact optional dynamic guard; absence does not count as reply-control acceptance. Native article has no body list/code/reading href, so those boundaries remain authored fixture evidence. Native expansion of the four hidden recommendations remains separate pending coverage. Readiness floor six is confirmed by actual per-node rects, not a reduction of the six visible-title corpus. The raw pre-fix run translated ten metadata owners and changed author class whitespace on restoration; retain that failure and global exact restoration guards."
   },
   "x-nasa-public-post": {
     "tier": "required",

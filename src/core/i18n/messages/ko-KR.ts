@@ -579,7 +579,7 @@ export const koKRMessages = {
     "popup.pageFont.loading": "글꼴 설정을 읽는 중…",
     "popup.pageFont.unavailable": "지금은 번역문 글꼴을 변경할 수 없습니다.",
     "popup.pageFont.readError": "글꼴 설정을 읽지 못했습니다. 다시 시도해 주세요.",
-    "popup.pageFont.changeError": "글꼴 설정을 저장하지 못했습니다. 다시 시도해 주세요.",
+    "popup.pageFont.changeError": "글꼴 설정을 저장하지 못했습니다.",
     "popup.pageFont.retry": "다시 시도",
     "popup.quickSettings.appearanceDescription": "이중 언어 모드는 원문과 번역문을 함께 표시하고, 번역문 전용 모드는 번역 결과만 표시합니다.",
     "popup.quickSettings.hoverSettings": "마우스 오버 번역 설정",

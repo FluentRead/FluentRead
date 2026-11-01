@@ -49,6 +49,18 @@ describe('browser material composition privacy and collection settings',()=>{
         privateContext.inIncognitoContext=true;
         expect(undo.isTrustedUndoSender({id:'test',url:'chrome-extension://test/options.html'})).toBe(false);
     });
+    it('allows lightweight workspace writes only from this extension settings page',async()=>{
+        sendMessage.mockResolvedValue({success:true});
+        const config = {on:true,vocabularyBookEnabled:false,harness:{enabled:false,memoryEnabled:false},disabledExtensionDomains:[]};
+        const handler = createBrowserMaterialHandler({ready:Promise.resolve(),config:config as never,vocabularyBook:{list:async()=>[]} as never});
+        const capture:MaterialRequest = {type:'fluentReadMaterials',action:'workspaceCapture',input:{source:{kind:'article',url:'https://example.test/'},reference:{kind:'note',id:'n',note:'private'}}};
+        expect(await handler.handle(capture,{sender:{id:'test',url:'chrome-extension://test/options.html?section=materials#list'}})).toEqual({success:true,data:{id:'material'}});
+        for (const sender of [{id:'other',url:'chrome-extension://test/options.html'}, {id:'test',url:'chrome-extension://test/popup.html'},
+            {id:'test',url:'chrome-extension://test/options.html.evil'}, {url:'chrome-extension://test/options.html'},
+            {id:'test',url:'chrome-extension://test/options.html',incognito:true}]) {
+            expect(await handler.handle(capture,{sender})).toMatchObject({success:false,error:{code:'privacy-disabled'}});
+        }
+    });
     it('wires read-only legacy migration and applies collection flags, site rules and private context',async()=>{
         sendMessage.mockResolvedValue({success:true});
         const config = {on:true,vocabularyBookEnabled:false,harness:{enabled:false,memoryEnabled:false},disabledExtensionDomains:['blocked.test']};

@@ -92,7 +92,7 @@ export function createMangaImageSegments(ports: Omit<Parameters<typeof createMan
     }
 
     const surface = createMangaCanvas<MangaImageSegment>({...ports, hostId: 'fluent-read-manga-segment-container', source: {
-        anchor: segment => segment.image, identity, capture, bounds,
+        anchor: segment => segment.image, identity, readingIdentity: identity, readingBounds: bounds, capture, bounds,
         viewport: segment => ({x: 0, y: segment.top - segment.contextTop, width: segment.width, height: segment.height}),
     }});
     return {...surface, bounds,

@@ -153,7 +153,7 @@ const compressedCatalogPrefix = '\0fluentread-userscript-site-catalog:';
 const externalChineseMessagesId = '\0fluentread-userscript-zh-cn.js';
 
 /** 只压缩站点规则与中文文案数据；产品逻辑仍留在可审查的 userscript 主文件中。 */
-export function createUserscriptCatalogCompressionPlugin(): Plugin {
+export function createUserscriptCatalogCompressionPlugin(compressStandalone = gzipLargeStandaloneUserscriptData): Plugin {
     return {
         name: 'compress-userscript-site-catalog',
         enforce: 'pre',
@@ -192,7 +192,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                         : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
                     ].join('\n');
                 };
-                return bundleLibraries ? gzipStandaloneUiMessages(input).then(emit)
+                return bundleLibraries ? gzipStandaloneUiMessages(input, compressStandalone).then(emit)
                     : emit(gzipUserscriptBuildData(input));
             }
             if (!id.startsWith(compressedCatalogPrefix)) return null;
@@ -236,9 +236,9 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 'export default JSON.parse(inflateWithPako(bytes));',
                 ].join('\n');
             };
-            // 仅独立版的大目录使用构建期 worker；较大结果保留现有紧凑 gzip。
-            return bundleLibraries && basename(sourcePath) === 'websites.json'
-                ? gzipLargeStandaloneUserscriptData(data, root).then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline))
+            // 独立版站点目录使用构建期 worker；较大结果保留现有紧凑 gzip。
+            return bundleLibraries
+                ? gzipLargeStandaloneUserscriptData(data, root, 0).then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline))
                 : emit(baseline);
         },
     };
@@ -650,7 +650,7 @@ export const userscriptAliases = [
 export default defineConfig({
     root,
     publicDir: false,
-    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
+    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
     resolve: {
         alias: userscriptAliases,
     },

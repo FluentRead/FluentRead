@@ -17,7 +17,8 @@ import {findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions,type 
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
-import {mergeMangaOcrTiles, planMangaOcrTiles, type MangaOcrTileResult} from './mangaOcrTiles';
+import {collectMangaOcrTileNumericEvidence,mergeMangaOcrTiles, planMangaOcrTiles, type MangaOcrTileResult} from './mangaOcrTiles';
+import {numericProtection} from './mangaNumeric';
 import {createMangaOcrColorAdapter,withMangaOcrColorRead} from './mangaOcrColor';
 import {MANGA_DESKEW_PIXEL_BUDGET,planMangaOcrDeskew,trimMangaOcrDeskew} from './mangaOcrDeskew';
 
@@ -170,6 +171,14 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
             this.inferenceFailure=undefined;
             try {
                 const page=await this.recognize(canvas,options);
+                // 替换、瓦片去重和局部候选之间可能丢失原始数值；仅保留物理证据，不增加推理。
+                const numericEvidence:typeof page.results=[];
+                const preserve=(item:(typeof page.results)[number])=>{
+                    if(!numericProtection(item.text?.replace(/\s+/gu,' ').trim()??''))return;
+                    if(numericEvidence.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+                    numericEvidence.push(item);
+                };
+                page.results.forEach(preserve);
                 // 批量裁切会把不同宽度补齐；只对已有低置信竖列有界复识别，不再运行检测或新增框。
                 const weak=page.results.filter(item=>item.confidence<.9&&item.box.height>item.box.width*1.8)
                     .sort((a,b)=>a.confidence-b.confidence).slice(0,this.remainingRetries);
@@ -203,6 +212,11 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                                 retried.push({...candidate,box:item.box});
                         }finally{crop.width=0;crop.height=0;}
                     }
+                    // 只接受映回本次待重试原框的证据；异常无关框不能阻挡其他文字。
+                    retried.forEach(candidate=>{
+                        if(weak.some(item=>candidate.box.x===item.box.x&&candidate.box.y===item.box.y
+                            &&candidate.box.width===item.box.width&&candidate.box.height===item.box.height))preserve(candidate);
+                    });
                     for(const item of weak)replacements.set(item,retried.find(candidate=>
                         candidate.box.x===item.box.x&&candidate.box.y===item.box.y&&candidate.box.width===item.box.width
                         &&candidate.box.height===item.box.height&&candidate.confidence>=item.confidence+.05));
@@ -239,13 +253,15 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             this.options.recognition!.charactersDictionary,'per-box',{...options,recBatchSize:1});
                         assertMangaOcrActive(activeSignal);
                         this.checkInferenceFailure();
+                        if(candidate&&candidate.box.x===0&&candidate.box.y===0&&candidate.box.width===trim.width&&candidate.box.height===trim.height)
+                            preserve({...candidate,box:item.box});
                         if(candidate&&candidate.box.x===0&&candidate.box.y===0&&candidate.box.width===trim.width&&candidate.box.height===trim.height
                             &&candidate.confidence>=.99&&candidate.confidence>=item.confidence+.01){
                             replacements.set(item,{...candidate,box:item.box});
                         }
                     }finally{crop.width=0;crop.height=0;rotated.width=0;rotated.height=0;trimmed.width=0;trimmed.height=0;}
                 }
-                return {...page,results:page.results.map(item=>replacements.get(item)??item)};
+                return {...page,results:page.results.map(item=>replacements.get(item)??item),...(numericEvidence.length?{numericEvidence}:{})};
             }
             finally {
                 this.checks.forEach(check=>check());
@@ -318,9 +334,10 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                                 tileContext.drawImage(canvas,tile.x,tile.y,tile.width,tile.height,0,0,tile.width,tile.height);
                                 const result=await service.recognizeManga(tileCanvas,sdkOptions);
                                 assertMangaOcrActive(options.signal);
-                                pages.push({tile,results:result.results});
+                                pages.push({tile,results:result.results,numericEvidence:result.numericEvidence});
                             }
-                            page={results:mergeMangaOcrTiles(pages,width,height)};
+                        const numericEvidence=collectMangaOcrTileNumericEvidence(pages,width,height);
+                        page={results:mergeMangaOcrTiles(pages,width,height),...(numericEvidence.length?{numericEvidence}:{})};
                         }finally{tileCanvas.width=0;tileCanvas.height=0;}
                     }
                     const bubbles:NonNullable<MangaOcrPage['bubbles']>=[];
@@ -335,12 +352,13 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             ctx.drawImage(canvas,bbox.x0,bbox.y0,width,height,0,0,crop.width,crop.height);
                             const result=await service.recognizeManga(crop,sdkOptions);
                             const sx=crop.width/width,sy=crop.height/height;
-                            bubbles.push({bbox,results:result.results.map(item=>({...item,box:{x:bbox.x0+item.box.x/sx,y:bbox.y0+item.box.y/sy,width:item.box.width/sx,height:item.box.height/sy}}))});
+                            const restore=(item:(typeof result.results)[number])=>({...item,box:{x:bbox.x0+item.box.x/sx,y:bbox.y0+item.box.y/sy,width:item.box.width/sx,height:item.box.height/sy}});
+                            bubbles.push({bbox,results:result.results.map(restore),...(result.numericEvidence?.length?{numericEvidence:result.numericEvidence.map(restore)}:{})});
                         }finally{crop.width=0;crop.height=0;}
                     }
                     assertMangaOcrActive(options.signal);
                     const layoutBubbles=assignMangaLayoutBubbles(pixels.data,canvas.width,canvas.height,ownership,page.results);
-                    return {results:page.results,bubbles,...(layoutBubbles.length?{layoutBubbles}:{})};
+                    return {results:page.results,bubbles,...(page.numericEvidence?.length?{numericEvidence:page.numericEvidence}:{}),...(layoutBubbles.length?{layoutBubbles}:{})};
                 }finally{canvas.width=0;canvas.height=0;}
                 }finally{if ('close' in bitmap)bitmap.close();}
                 }finally{try{colorAdapter.endPage();}finally{activeSignal=undefined;}}

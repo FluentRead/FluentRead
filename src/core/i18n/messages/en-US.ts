@@ -580,7 +580,7 @@ export const enUSMessages = {
     "popup.pageFont.loading": "Reading the font setting…",
     "popup.pageFont.unavailable": "Translation font cannot be changed right now.",
     "popup.pageFont.readError": "Could not read the font setting. Please retry.",
-    "popup.pageFont.changeError": "Could not save the font setting. Please retry.",
+    "popup.pageFont.changeError": "Could not save the font setting.",
     "popup.pageFont.retry": "Retry",
     "popup.quickSettings.appearanceDescription": "Bilingual mode shows the original and translation together; translation-only mode shows just the translated text.",
     "popup.quickSettings.hoverSettings": "Hover translation settings",

@@ -38,7 +38,7 @@ function isMediaLinkOverlay(surface: HTMLElement, foreground: Element): boolean 
 }
 
 /** 译层脱离宿主堆叠上下文，因此只在原图仍位于前景时交接显示权。 */
-export function isImagePresentationOccluded(surface: HTMLElement, visible: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>, overlayHost: HTMLElement | null, sourceImage?: HTMLImageElement): boolean {
+export function isImagePresentationOccluded(surface: HTMLElement, visible: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>, overlayHost: HTMLElement | null, sourceImage?: HTMLImageElement, readingHost: HTMLElement | null = null): boolean {
     const document = surface.ownerDocument;
     if (typeof document.elementsFromPoint !== 'function') return false;
     // 使用裁切后的区域；中心与四角任一被其他内容盖住，就撤下整个译层，避免压住弹窗或菜单。
@@ -47,7 +47,7 @@ export function isImagePresentationOccluded(surface: HTMLElement, visible: Pick<
     return samples.some(([x, y]) => {
         const hits = document.elementsFromPoint(visible.left + (visible.right - visible.left) * x,
             visible.top + (visible.bottom - visible.top) * y);
-        const foreground = hits.find(hit => hit !== overlayHost && !overlayHost?.contains(hit));
+        const foreground = hits.find(hit => hit !== overlayHost && !overlayHost?.contains(hit) && hit !== readingHost && !readingHost?.contains(hit));
         // 透明图片、pointer-events:none 图片和背景承载面可能命中其容器；自有控件不参与遮挡判定。
         if (!foreground || foreground === surface || surface.contains(foreground) || foreground.contains(surface)) return false;
         if (!ownedForegrounds.has(foreground)) {

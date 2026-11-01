@@ -575,7 +575,7 @@ export const zhCNMessages = {
     "popup.pageFont.loading": "正在读取字体设置…",
     "popup.pageFont.unavailable": "暂时无法调整译文字体。",
     "popup.pageFont.readError": "未能读取字体设置，请重试。",
-    "popup.pageFont.changeError": "未能保存字体设置，请重试。",
+    "popup.pageFont.changeError": "字体设置保存失败",
     "popup.pageFont.retry": "重试",
     "popup.quickSettings.appearanceDescription": "双语模式同时显示原文与译文；仅译文模式只显示翻译结果。",
     "popup.quickSettings.hoverSettings": "悬停翻译设置",

@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/mangaInpainting.ts
  * 文件职责：用按需加载的本地 LaMa 漫画模型修补复杂背景上的原字形，保留气泡之外和蒙版之外的原始像素。
  * 主要内容：共享本次原图背景分类，完整确认均匀的页面不等待其他页面的模型修补队列；默认返回独立像素副本，仅显式持有独占像素的调用方可在均匀页复用原缓冲，复杂页始终保留原图与输出分离；按识别行及其有界描边余量建立局部蒙版，以同样的最近邻源坐标将每个行框投影为补丁行段，避免每个补丁像素遍历全部文字行；截取有上下文且最长边不超过 512 的有界补丁，归一化 ONNX 张量并仅回写蒙版区域；所有区域共同跳过原图阶段冻结的低 alpha 行段并保留其四通道，透明补丁仅在完整外周透明度一致时压低 source-over 字形增加的 alpha，不把 RGB 模型当作 alpha 预测器；融合 ONNX 执行图，兼容的硬件 GPU 加速修补、设备失效有界切换 CPU；独立 Worker 串行推理、70% 计算时间预算、滚动取消保留模型端口并由 owner 有界收尾，三分钟空闲释放约束资源。
- * 模块边界：不读取网页 DOM、不上传图像、不翻译文字；均匀气泡无需加载模型，最后的译文排版由 mangaRendering 处理，模型生成内容始终局限于检测文字蒙版。
+ * 模块边界：不读取网页 DOM、不上传图像、不翻译文字；补丁逐行复用纵向源坐标，均匀气泡无需加载模型，最后的译文排版由 mangaRendering 处理，模型生成内容始终局限于检测文字蒙版。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
 import {mangaInferenceClient, mangaExtensionUrl, type MangaPatch} from './mangaInferenceClient';
@@ -51,12 +51,14 @@ export function createMangaPatch(pixels: Uint8ClampedArray, width: number, heigh
     const count = patchWidth * patchHeight;
     const image = new Float32Array(count * 3), mask = new Float32Array(count);
     let transparent = false;
-    for (let y = 0; y < patchHeight; y += 1) for (let x = 0; x < patchWidth; x += 1) {
-        const sx = left + Math.min(sourceWidth - 1, Math.floor(x * sourceWidth / patchWidth));
+    for (let y = 0; y < patchHeight; y += 1) {
         const sy = top + Math.min(sourceHeight - 1, Math.floor(y * sourceHeight / patchHeight));
-        const input = (sy * width + sx) * 4, output = y * patchWidth + x;
-        for (let channel = 0; channel < 3; channel += 1) image[channel * count + output] = pixels[input + channel] / 255;
-        transparent ||= pixels[input + 3] !== 255;
+        for (let x = 0; x < patchWidth; x += 1) {
+            const sx = left + Math.min(sourceWidth - 1, Math.floor(x * sourceWidth / patchWidth));
+            const input = (sy * width + sx) * 4, output = y * patchWidth + x;
+            for (let channel = 0; channel < 3; channel += 1) image[channel * count + output] = pixels[input + channel] / 255;
+            transparent ||= pixels[input + 3] !== 255;
+        }
     }
     // sx=left+floor(x*sourceWidth/patchWidth)：对整数源框反解其半开区间，
     // 边界使用 ceil，保证上下采样时都与逐像素包含判断完全一致。

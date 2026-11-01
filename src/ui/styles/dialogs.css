@@ -1,0 +1,42 @@
+/**
+ * @file src/ui/styles/dialogs.css
+ * 文件职责：统一扩展设置页面的任务弹窗与操作确认，让标题、正文、主操作和次要信息具有清楚的层级。
+ * 主要内容：复用品牌与皮肤变量，提供适度留白、轻量边框、稳定的底部操作和受限正文滚动；原生详情按需展开，短窗口与窄屏仍可操作。
+ * 模块边界：仅由设置页面样式入口引入，作用于自有 Element Plus 弹窗及确认框；不注入宿主页面，不改变确认、取消、焦点和业务事件。
+ */
+.el-overlay .el-dialog { max-width:calc(100vw - 28px); padding:22px; border:1px solid var(--line); border-radius:var(--fr-menu-radius, 14px); background:var(--surface); box-shadow:var(--fr-menu-shadow); color:var(--ink); }
+.el-overlay .el-dialog:not(.custom-openai-provider-dialog) { display:flex; flex-direction:column; max-height:calc(92dvh - 24px); margin-block:min(8vh, 48px) 24px; }
+.el-overlay .el-dialog.is-align-center { margin-block:auto; }
+.el-overlay .el-dialog .el-dialog__header { flex:none; margin:0 0 20px; padding:0 34px 0 0; }
+.el-overlay .el-dialog .el-dialog__title { color:var(--ink); font-size:16px; font-weight:650; line-height:1.5; }
+.el-overlay .el-dialog .el-dialog__headerbtn { top:18px; right:18px; width:28px; height:28px; }
+.el-overlay .el-dialog .el-dialog__body { min-height:0; padding:0; overflow-y:auto; overscroll-behavior:contain; color:var(--ink); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.el-overlay .el-dialog .el-dialog__footer { flex:none; padding:20px 0 0; border:0; }
+.el-overlay .el-dialog .el-dialog__footer > .el-button + .el-button { margin-inline-start:8px; }
+.el-overlay :is(.el-dialog, .el-message-box) .el-button { min-height:40px; height:auto; padding:9px 16px; border-radius:9px; font-size:13px; }
+.el-overlay :is(.el-dialog, .el-message-box) .el-button--primary { background:var(--brand); border-color:var(--brand); }
+.el-overlay :is(.el-dialog, .el-message-box) .el-button--primary:not(:disabled):hover { filter:brightness(1.04); }
+.el-overlay .el-message-box { width:460px; max-width:calc(100vw - 28px); max-height:calc(100dvh - 40px); padding:22px; overflow-y:auto; border:1px solid var(--line); border-radius:var(--fr-menu-radius, 14px); background:var(--surface); box-shadow:var(--fr-menu-shadow); color:var(--ink); }
+.el-overlay .el-message-box__header { padding:0 30px 0 0; }
+.el-overlay .el-message-box__title { color:var(--ink); font-size:16px; font-weight:650; line-height:1.5; }
+.el-overlay .el-message-box__headerbtn { top:18px; right:18px; width:28px; height:28px; }
+.el-overlay .el-message-box__content { padding:18px 0 0; color:var(--muted); font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.el-overlay .el-message-box__btns { flex-wrap:wrap; gap:8px; padding:22px 0 0; }
+.el-overlay .el-message-box__btns .el-button { margin:0; }
+.el-dialog details.fr-dialog-disclosure { margin:18px 0 0; border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+.el-dialog details.fr-dialog-disclosure > summary { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:0; padding:13px 0; border:0; border-radius:0; background:transparent; color:var(--muted); font-size:12px; font-weight:400; list-style:none; cursor:pointer; }
+.el-dialog details.fr-dialog-disclosure > summary::-webkit-details-marker { display:none; }
+.el-dialog details.fr-dialog-disclosure > summary::after { content:''; display:block; flex:none; width:6px; height:6px; margin:0 3px; border:solid currentColor; border-width:0 1px 1px 0; transform:rotate(45deg); }
+.el-dialog details.fr-dialog-disclosure[open] > summary::after { transform:rotate(225deg); }
+.fr-backup-export-options > p { margin:0; color:var(--muted); font-size:13px; line-height:1.7; }
+.fr-backup-export-option { display:flex; align-items:flex-start; gap:10px; margin-top:18px; padding:14px; border:1px solid var(--line); border-radius:10px; color:var(--ink); cursor:pointer; }
+.fr-backup-export-option input { flex:none; width:15px; height:15px; margin:3px 0 0; accent-color:var(--brand); }
+.fr-backup-export-option span { display:grid; gap:4px; }
+.fr-backup-export-option strong { font-size:13px; font-weight:600; }
+.fr-backup-export-option small { color:var(--muted); font-size:12px; line-height:1.6; }
+@media (max-width:520px) {
+  .el-overlay .el-dialog, .el-overlay .el-message-box { padding:18px; }
+  .el-overlay .el-dialog .el-dialog__headerbtn { top:14px; right:14px; }
+  .el-overlay .el-dialog .el-dialog__footer { white-space:normal; }
+  .el-overlay :is(.el-dialog, .el-message-box) .el-button { max-width:100%; white-space:normal; }
+}

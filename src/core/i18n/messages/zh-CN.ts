@@ -30,6 +30,9 @@ import {personalCorrectionChineseMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const zhCNMessages = {
+    "settings.backup.includeContext": "包含单词上下文",
+    "feedback.serviceHint": "检查所选服务的连接或模型配置后再试。",
+    "feedback.retryHint": "稍后重试，原文和当前选区会继续保留。",
     ...countForms['zh-CN'],
     ...personalCorrectionChineseMessages,
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",

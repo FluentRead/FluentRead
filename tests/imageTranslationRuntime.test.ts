@@ -1848,7 +1848,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const candidate=list.items.find(item=>item.kind===surface);expect(candidate).toBeDefined();
         expect(await readMangaReadingCandidate(candidate!.token,new AbortController().signal)).toEqual({status:'error'});
         const feedback=env.roots.at(-1)!.querySelector<HTMLElement>('.fr-image-feedback')!;
-        expect(feedback.hidden).toBe(false);expect(feedback.querySelector('details')!.textContent).toContain('provider error detail');
+        expect(feedback.hidden).toBe(false);expect(feedback.querySelector('.fr-image-error-details')!.textContent).toContain('provider error detail');
         expect(statuses.at(-1)).toMatchObject({errors:1,pending:false});
         env.dispatch(feedback.querySelector('.fr-image-model-settings')!,'click');await flush();
         expect(client.settings).toHaveBeenLastCalledWith({type:'openOptionsPage',section:'settings-services',service:'localTranslation'});

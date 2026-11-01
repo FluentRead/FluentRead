@@ -82,6 +82,8 @@ Collections and review records stay in this browser. Disabling saving or clearin
 
 Importing collection JSON merges with existing entries and reports added, updated, and skipped counts. Explanations merge by modification time, so an old file cannot replace newer explanations or restore cleared ones.
 
+Full backups and Anki exports leave context unchecked by default. Select **Include vocabulary context** before confirming if you need source sentences and sources. **Cancel** or closing the dialog downloads nothing.
+
 ## Related guides
 
 - [Selection and AI explanations](/en/guide/deepseek-harness)

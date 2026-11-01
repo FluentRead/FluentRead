@@ -1,6 +1,6 @@
 <!--
 @file src/features/settings/ui/ConfigManagement.vue
-文件职责：提供备份与恢复页面的配置云备份、完整数据备份和设置历史。
+文件职责：提供备份与恢复页面的配置云备份、完整数据备份和设置历史；历史预览以适度宽度呈现差异，完整配置按需展开。
 主要内容：按页内分类切换完整备份入口与设置历史，仅在历史分区活跃时派生和渲染列表；列表每行只保留版本、一句概要和时间——单项修改给出“改前 → 改后”，多项修改只给数量，自动快照只给时间和与当前的差异数——具体修改在详情里区分当时的修改和恢复时的差异，并保留动态服务名称、多语言与安全恢复。恢复确认、取消后的焦点归还及回包保持页面和预览目标归属。
 模块边界：本组件拥有设置历史的预览与恢复，并向本机备份入口转交页面与备份分区的活跃归属；本机备份与导入由 LocalDataManagement 编排，配置云备份由独立 CloudConfigBackup 组件及后台服务负责。
 -->
@@ -90,7 +90,7 @@
       v-model="previewVisible"
       class="config-preview-dialog"
       :title="previewTitle"
-      width="min(880px, calc(100vw - 32px))"
+      width="min(680px, calc(100vw - 32px))"
       destroy-on-close
       @closed="clearPreview"
     >
@@ -124,7 +124,7 @@
         </div>
         <div v-else class="diff-empty">{{ previewMode === 'changes' ? t(displayDiff ? 'settings.history.noVisibleChanges' : 'settings.history.noPrevious') : t('settings.history.sameConfig') }}</div>
 
-        <details class="json-details">
+        <details class="json-details fr-dialog-disclosure">
           <summary>查看完整配置 JSON</summary>
           <pre>{{ previewJson }}</pre>
         </details>

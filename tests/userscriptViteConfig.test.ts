@@ -204,23 +204,30 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
+        // 用独立缓存验证 64 KiB 以上真实 worker 的首次压缩与后续命中，避免旧产物跳过压缩器。
+        const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-positive-'));
+        mkdirSync(resolve(root, 'userscript'));
+        writeFileSync(resolve(root, 'userscript/zopfliBuildWorker.cjs'),
+            `require(${JSON.stringify(resolve(process.cwd(), 'userscript/zopfliBuildWorker.cjs'))});\n`);
         const input = Buffer.concat([Buffer.from('统计模型数据🙂\0\n'), Buffer.from(JSON.stringify(lockedFrancData))]);
         expect(input.byteLength).toBeGreaterThan(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
-        const first = await gzipLargeStandaloneUserscriptData(input, process.cwd());
-        const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), process.cwd());
-        expect(first).toEqual(second);
-        expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
-        expect(gunzipSync(first)).toEqual(before);
-        const embedded = encodeUserscriptDataCompact(first);
-        expect(Buffer.from(decodeUserscriptData(embedded))).toEqual(first);
-        expect(inflateBundledFrancData(decodeUserscriptData(embedded))).toBe(before.toString('utf8'));
-        expect(input).toEqual(before);
-        expect(process.listeners('uncaughtException')).toEqual(uncaught);
-        expect(process.listeners('unhandledRejection')).toEqual(unhandled);
-        // 真实模型经过两次隔离的构建压缩，保留独立于生产 60 秒超时的有限测试预算。
+        try {
+            const first = await gzipLargeStandaloneUserscriptData(input, root);
+            const second = await gzipLargeStandaloneUserscriptData(new Uint8Array(input), root);
+            expect(first).toEqual(second);
+            expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
+            expect(gunzipSync(first)).toEqual(before);
+            const embedded = encodeUserscriptDataCompact(first);
+            expect(Buffer.from(decodeUserscriptData(embedded))).toEqual(first);
+            expect(inflateBundledFrancData(decodeUserscriptData(embedded))).toBe(before.toString('utf8'));
+            expect(input).toEqual(before);
+            expect(process.listeners('uncaughtException')).toEqual(uncaught);
+            expect(process.listeners('unhandledRejection')).toEqual(unhandled);
+        } finally {rmSync(root, {recursive: true, force: true});}
+        // 真实模型首次压缩和缓存命中，沿用独立于生产 60 秒超时的测试预算。
     }, 15_000);
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {

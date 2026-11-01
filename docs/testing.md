@@ -146,3 +146,4 @@ pnpm compile
 | <span id="deeplx-默认直连-issue-968"></span>DeepLX 默认直连（issue #968） | [查看](testing/providers.md#deeplx-默认直连-issue-968) |
 | <span id="kagi-news-内容型标题按钮-issue-1045"></span>Kagi News 内容型标题按钮（issue #1045） | [查看](testing/sites.md#kagi-news-内容型标题按钮-issue-1045) |
 | <span id="划词语音栏与正文布局"></span>划词语音栏与正文布局 | [查看](testing/settings.md#划词语音栏与正文布局) |
+| <span id="编译与构建缓存"></span>编译与构建缓存 | [查看](testing/contracts.md#编译与构建缓存) |

@@ -318,6 +318,9 @@ async function main(argv = process.argv.slice(2)) {
     }
 }
 
+// 编译入口复用同一锁、信号转发和退出码路径，不再增加一层 CLI 子进程。
+export {main as runResourceSafe};
+
 // Node canonicalizes entry paths unless preserve-symlinks is enabled; file URLs also encode spaces and Unicode.
 let commandLineEntry = false;
 if (process.argv[1]) {

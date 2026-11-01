@@ -48,6 +48,7 @@
       "tests/testConfiguration.test.ts"
     ],
     "unit": [
+      "tests/userscriptBuildCache.test.ts",
       "tests/downloadTextFile.test.ts",
       "tests/safariTabBroadcast.test.ts",
       "tests/safariTabBroadcastIntegration.test.ts",
@@ -248,6 +249,7 @@
       "tests/translationConfigCheck.test.ts",
       "tests/translationFont.test.ts",
       "tests/translationCore.test.ts",
+      "tests/translationTagMetadata.test.ts",
       "tests/inlineCodeProtocol.test.ts",
       "tests/inlineCodeMarkers.test.ts",
       "tests/identicalTranslation.test.ts",

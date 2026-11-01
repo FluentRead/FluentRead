@@ -780,6 +780,7 @@ export default defineConfig({
                 'src/core/translation/manpage.ts',
                 'src/features/full-page-translation/content/manpagePreparation.ts',
                 'src/core/translation/dom.ts',
+                'src/core/translation/tagMetadata.ts',
                 'src/core/translation/font.ts',
                 'src/core/translation/result.ts',
                 'src/core/translation/documentLiterals.ts',

@@ -203,7 +203,10 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
+        // Exercise two real five-iteration workers above the production 64 KiB gate,
+        // without compressing a needlessly large repeated fixture under instrumentation.
+        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
+        expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -2154,9 +2157,9 @@ describe('standalone About images at explicit use boundaries', () => {
     const createPlugin = (enabled = true, fixtureRoot = root) => createUserscriptAboutImagesCompressionPlugin(fixtureRoot, enabled) as unknown as {
         name: string; load(id: string): string | null;
     };
-    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false) {
+    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false, generatedSource?: string) {
         const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, standalone) as unknown as {load(id: string): string | Promise<string>};
-        const source = await plugin.load(helperId);
+        const source = generatedSource ?? await plugin.load(helperId);
         const {transformWithEsbuild} = await import('vite');
         const compiled = await transformWithEsbuild(source, 'about-images-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as {getSupportImageUrl(normal: string): string; getContactImageUrl(): string}};
@@ -2191,7 +2194,8 @@ describe('standalone About images at explicit use boundaries', () => {
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        const h = await loadAccessors(undefined, true);
+        // Execute the same generated payload without compressing the two images twice.
+        const h = await loadAccessors(undefined, true, source);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');
         assertImage(h.api.getContactImageUrl(), 'contact');

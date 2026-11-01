@@ -628,6 +628,8 @@ export default defineConfig({
                 'src/features/image-translation/background/ocrLanguageRepository.ts',
                 'src/features/image-translation/core.ts',
                 'src/features/image-translation/paragraphs.ts',
+                'src/features/image-translation/textBoundary.ts',
+                'src/features/image-translation/graphemeSpaceData.ts',
                 'src/features/image-translation/progress.ts',
                 'src/features/image-translation/content/controls.ts',
                 'src/features/image-translation/content/sourceAuthorization.ts',

@@ -1,14 +1,14 @@
 /**
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译，碰撞的文字只显示于阅读面板；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞的文字只显示于阅读面板；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {createImageTranslationFailure} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
 import { selectChangedTranslations, type OcrLine } from '@/src/features/image-translation/core';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
-import { inpaintTextRegions } from './inpainting';
+import { imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
 import { recognizeImage } from './ocrRuntime';
 import { getImageTextBackgroundColor, drawTranslatedImageText } from './rendering';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
@@ -19,13 +19,14 @@ import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
-import {mangaMaskBoxes, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
+import {mangaMaskBoxIntersects, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
 export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
 
 export interface OffscreenImageTranslationResult {
     image: string;
+    imageUnchanged?: true;
     mangaPatches?: MangaPatchPacket;
     lines: OffscreenImageTranslationLine[];
 }
@@ -205,6 +206,17 @@ export async function cropAreaInOffscreen(
     return {image: croppedImage, lines: []};
 }
 
+/** 单图译文裁剪框既决定绘制范围，也用于保护附近保留的原文。 */
+function imageDrawBounds(line: ImageTextRegion, width: number, height: number): OcrLine['bbox'] {
+    const sourceHeight = line.fontSize ?? line.bbox.y1 - line.bbox.y0;
+    const paddingX = line.vertical ? 3 : 2;
+    const paddingY = line.vertical ? 2 : Math.max(2, Math.round(sourceHeight * 0.18));
+    const left = Math.max(0, line.bbox.x0 - paddingX), top = Math.max(0, line.bbox.y0 - paddingY);
+    const drawWidth = Math.max(1, Math.min(width - left, line.bbox.x1 - line.bbox.x0 + paddingX * 2));
+    const drawHeight = Math.max(1, Math.min(height - top, line.bbox.y1 - line.bbox.y0 + paddingY * 2));
+    return {x0:left,y0:top,x1:left+drawWidth,y1:top+drawHeight};
+}
+
 async function prepareTranslatedImage(
     source: HTMLImageElement,
     lines: ImageTextRegion[],
@@ -214,35 +226,71 @@ async function prepareTranslatedImage(
     requestId?: string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
-    const numeric = lines.filter(line => line.guardOnly || numericProtection(line.text));
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
-    const protectedBoxes = numeric.map(({bbox}) => ({x0: Math.max(0, Math.floor(bbox.x0) - 2), y0: Math.max(0, Math.floor(bbox.y0) - 2),
-        x1: Math.min(width, Math.ceil(bbox.x1) + 2), y1: Math.min(height, Math.ceil(bbox.y1) + 2)}));
-    const intersects = (a: OcrLine['bbox'], b: OcrLine['bbox']) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
-    let comparisons = 0;
     const skipped = new Set<number>();
-    const translatedLines = lines.flatMap((line, index) => {
-        if (line.guardOnly || numericProtection(line.text)) return [];
-        const changed = selectChangedTranslations([line], [translations[index]]);
-        if (!changed.length) return [];
-        if (protectedBoxes.length) {
-            const region = changed[0];
-            const pad = Math.max(4, Math.ceil((region.fontSize ?? region.bbox.y1 - region.bbox.y0) * .18));
-            const expand = (box: OcrLine['bbox'], margin: number) => ({x0:box.x0-margin,y0:box.y0-margin,x1:box.x1+margin,y1:box.y1+margin});
-            // 单图译文裁切框会在页边夹紧后扩大至多两倍余量；清字对每个源框最多外扩四像素。
-            const touched = manga ? [region.bbox, ...mangaMaskBoxes(region as MangaRegion, width, height)]
-                : [expand(region.bbox,pad*2),...(region.sourceBoxes ?? [region.bbox]).map(box=>expand(box,4))];
-            for (const box of touched) for (const protectedBox of protectedBoxes) {
-                if (++comparisons > 1_000_000 || ![box.x0,box.y0,box.x1,box.y1].every(Number.isFinite)
-                    || intersects(box, protectedBox)) { skipped.add(index); return []; }
+    const candidates: Array<{index: number; original: ImageTextRegion; translated: ImageTextRegion}> = [];
+    const originals: ImageTextRegion[] = [];
+    lines.forEach((line,index) => {
+        const changed = line.guardOnly || numericProtection(line.text) ? [] : selectChangedTranslations([line], [translations[index]]);
+        if (changed.length) candidates.push({index,original:line,translated:changed[0]});
+        else originals.push(line);
+    });
+    if (candidates.length && originals.length) {
+        // 所有保留原文（含碰撞后未绘制的译文）都必须避开后续修补和排版。
+        const protectedBoxes: OcrLine['bbox'][] = [], seen = new Set<string>();
+        let work = 0, exhausted = false;
+        const validBox = (box:OcrLine['bbox'] | null | undefined): box is OcrLine['bbox'] => !!box && Number.isFinite(box.x0) && Number.isFinite(box.y0)
+            && Number.isFinite(box.x1) && Number.isFinite(box.y1) && box.x1>box.x0 && box.y1>box.y0;
+        const protect = async (line: ImageTextRegion) => {
+            const sources = line.sourceBoxes ?? [];
+            for (let index=-1;index<sources.length;index++) {
+                const box = index<0 ? line.bbox : sources[index];
+                if (++work > 1_000_000 || !validBox(box)) {exhausted = true;return;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                const rect = {x0:Math.max(0,Math.floor(box.x0)-2),y0:Math.max(0,Math.floor(box.y0)-2),
+                    x1:Math.min(width,Math.ceil(box.x1)+2),y1:Math.min(height,Math.ceil(box.y1)+2)};
+                if (rect.x1<=rect.x0 || rect.y1<=rect.y0) continue;
+                const key = `${rect.x0},${rect.y0},${rect.x1},${rect.y1}`;
+                if (!seen.has(key)) {
+                    if (protectedBoxes.length>=8192) {exhausted=true;return;}
+                    seen.add(key);protectedBoxes.push(rect);
+                }
+            }
+        };
+        for (const line of originals) {await protect(line);if (exhausted) break;}
+        // 对新保留的原文继续传播；只对尚未跳过的候选比较，达到预算时不绘制任何候选。
+        for (let cursor=0;cursor<protectedBoxes.length && !exhausted && skipped.size<candidates.length;cursor++) {
+            const protectedBox = protectedBoxes[cursor];
+            for (const candidate of candidates) {
+                if (++work>1_000_000) {exhausted=true;break;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                if (skipped.has(candidate.index)) continue;
+                const region = candidate.translated, box = region.bbox;
+                if (++work>1_000_000 || !validBox(box) || ((manga || region.fontSize !== undefined) && !Number.isFinite(region.fontSize))) {exhausted=true;break;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                const drawBox = manga ? box : imageDrawBounds(region,width,height);
+                if (!validBox(drawBox)) {exhausted=true;break;}
+                let hit = drawBox.x0<protectedBox.x1 && protectedBox.x0<drawBox.x1 && drawBox.y0<protectedBox.y1 && protectedBox.y0<drawBox.y1;
+                const sources = region.sourceBoxes;
+                for (let index=0;!hit && index<(sources?.length ?? 1);index++) {
+                    const source = sources ? sources[index] : box;
+                    if (++work>1_000_000 || !validBox(source)) {exhausted=true;break;}
+                    if ((work & 32767)===0) await checkImageCancellation(signal);
+                    hit=manga ? mangaMaskBoxIntersects(source,region.fontSize!,width,height,protectedBox)
+                        : imageMaskBoxIntersects(source,width,height,protectedBox);
+                }
+                if (hit) {skipped.add(candidate.index);await protect(candidate.original);}
+                if (exhausted) break;
             }
         }
-        return changed;
-    });
+        if (exhausted) for (const candidate of candidates) skipped.add(candidate.index);
+    }
+    throwIfImageOperationAborted(signal);
+    const translatedLines = candidates.filter(candidate=>!skipped.has(candidate.index)).map(candidate=>candidate.translated);
     const readingLines = lines.flatMap((line, index) => line.guardOnly ? [] : [{...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
         ...(skipped.has(index) ? {renderSkipped: true as const} : {})}]);
     // 品牌名或已经是目标语言的文字仍可阅读/复制，不应把识别成功显示为错误。
-    if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: source.src, lines: readingLines};
+    if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: '', imageUnchanged: true, lines: readingLines};
     const canvas = document.createElement('canvas');
     try {
         canvas.width = source.naturalWidth || source.width;
@@ -291,19 +339,14 @@ async function prepareTranslatedImage(
             throwIfImageOperationAborted(signal);
             // 使用源行字形高度而非段落总高留白，竖排继续保持最小边距。
             const sourceHeight = line.fontSize ?? line.bbox.y1 - line.bbox.y0;
-            const paddingX = line.vertical ? 3 : 2;
-            const paddingY = line.vertical ? 2 : Math.max(2, Math.round(sourceHeight * 0.18));
-            const left = Math.max(0, line.bbox.x0 - paddingX);
-            const top = Math.max(0, line.bbox.y0 - paddingY);
-            const width = Math.min(canvas.width - left, line.bbox.x1 - line.bbox.x0 + paddingX * 2);
-            const height = Math.min(canvas.height - top, line.bbox.y1 - line.bbox.y0 + paddingY * 2);
+            const bounds = imageDrawBounds(line,canvas.width,canvas.height);
             drawTranslatedImageText(
                 context,
                 line.text,
-                left,
-                top,
-                Math.max(1, width),
-                Math.max(1, height),
+                bounds.x0,
+                bounds.y0,
+                bounds.x1 - bounds.x0,
+                bounds.y1 - bounds.y0,
                 line.backgroundColor,
                 line.vertical ? Infinity : sourceHeight * 1.2,
                 line.vertical ? 'center' : line.textAlign ?? 'left',

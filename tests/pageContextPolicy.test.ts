@@ -1,4 +1,5 @@
 import {describe, expect, it} from 'vitest';
+import {buildPageSummaryReference, COMPACT_PAGE_REFERENCE_LIMIT} from '@/src/core/translation/pageSummaryReference';
 import {
     buildPageTranslationContext,
     getPageTranslationMaterialIdentity,
@@ -7,6 +8,49 @@ import {
     pageContextLimits,
     shouldUseBoundedPageCapture,
 } from '@/src/services/translation/context/policy';
+
+describe('compact page summary references', () => {
+    it('keeps exact relevant facts from a later paragraph instead of replaying the full article', () => {
+        const irrelevant = 'Unrelated navigation and announcements.\n'.repeat(35);
+        const fact = 'TLS session resumption reduces latency to 40 ms under the stated conditions.';
+        const source = `Page title: Network protocol study\n${irrelevant}\n${fact}`;
+        const result = buildPageSummaryReference('Page summary: A study of network performance.', source, ['How does TLS resumption affect latency?']);
+        expect(result).toContain(fact);
+        expect(result).toContain('Page title: Network protocol study');
+        expect(result).not.toContain('Unrelated navigation');
+        expect(result.length).toBeLessThan(source.length / 2);
+    });
+
+    it('matches Chinese terminology and omits unrelated or already supplied text', () => {
+        const result = buildPageSummaryReference('摘要：讲解翻译系统。', '普通导航。\n术语库保留用户确认的译法。\n当前要翻译的句子。', ['如何使用术语库？', '当前要翻译的句子。']);
+        expect(result).toContain('术语库保留用户确认的译法。');
+        expect(result).not.toContain('普通导航');
+        expect(result).not.toContain('当前要翻译的句子。');
+        expect(buildPageSummaryReference('Short summary.', 'Unrelated paragraph.', ['TLS latency'])).toBe('Short summary.');
+    });
+
+    it('bounds long summary and source references while retaining a relevant excerpt', () => {
+        const result = buildPageSummaryReference('摘要。'.repeat(500), `Page title: ${'标题'.repeat(150)}\nTLS latency is limited to 40 ms.\n${'unrelated '.repeat(400)}`, ['TLS latency']);
+        expect(result.length).toBeLessThanOrEqual(COMPACT_PAGE_REFERENCE_LIMIT);
+        expect(result).toContain('TLS latency is limited to 40 ms.');
+        const emoji = buildPageSummaryReference('😀'.repeat(1000), '', []);
+        expect(emoji).not.toMatch(/[\ud800-\udbff]$/u);
+    });
+
+    it('handles empty queries and clips deep matches without splitting emoji or repeating source lines', () => {
+        expect(buildPageSummaryReference('Summary.', 'Unread context.', ['!?'])).toBe('Summary.');
+        const line = `${'x'.repeat(500)} TLS latency is 40 ms ${'z'.repeat(400)}`;
+        const result = buildPageSummaryReference('Summary.', `${line}\n${line}`, ['TLS latency']);
+        expect(result).toContain('…');
+        expect(result).toContain('TLS latency is 40 ms');
+        expect(result.split('TLS latency is 40 ms')).toHaveLength(2);
+        const emojiBoundary = `😀${'x'.repeat(99)}TLS ${'z'.repeat(400)}`;
+        const unicode = buildPageSummaryReference('Summary.', emojiBoundary, ['TLS']);
+        expect(unicode).toContain('😀');
+        expect(unicode).toContain('TLS');
+        expect(unicode).not.toMatch(/(?<![\ud800-\udbff])[\udc00-\udfff]/u);
+    });
+});
 
 describe('page translation context policy', () => {
     it.each([

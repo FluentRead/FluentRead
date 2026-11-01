@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugin';
 import * as originalAppearance from '@/src/core/config/interfaceAppearance';
-import {readFileSync, readdirSync, realpathSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import fs, {readFileSync, readdirSync, realpathSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {createHash, createHmac, createCipheriv} from 'node:crypto';
@@ -1000,7 +1000,21 @@ describe('userscript browser shim injection', () => {
         vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '1');
         vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
         vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
+        let pinnedRead: {mockRestore(): void} | undefined;
         try {
+            const resourcePath = resolve(process.cwd(), 'userscript/resources/fluentread-data.v1.js');
+            const data = runInNewContext(readFileSync(resourcePath, 'utf8'), {}, {timeout: 5000});
+            const current = Object.fromEntries(Object.entries(zhCNMessages).filter(([key]) => !key.startsWith('document.') && !key.startsWith('translationStats.')));
+            const changedKey = 'settings.floatingBall.hoverDelayHelp';
+            const addedKey = Object.keys(current).find(key => key !== changedKey && data.zhCNMessages[key] === current[key])!;
+            expect(addedKey).toBeTruthy();
+            data.zhCNMessages = {...data.zhCNMessages, [changedKey]: 'Pinned stale Chinese fixture'};
+            delete data.zhCNMessages[addedKey];
+            const before = JSON.stringify(data), staleSource = `globalThis.__FLUENTREAD_USERSCRIPT_DATA__=${before};`;
+            const nativeRead = fs.readFileSync;
+            // 固定旧文案与缺失键，不依赖当前已提交资源碰巧落后于源码。
+            pinnedRead = vi.spyOn(fs, 'readFileSync').mockImplementation(((file, options) =>
+                file === resourcePath ? staleSource : nativeRead(file, options)) as typeof readFileSync);
             vi.resetModules();
             const {createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
             const {transformWithEsbuild} = await import('vite');
@@ -1010,18 +1024,17 @@ describe('userscript browser shim injection', () => {
             const id = await Reflect.apply(resolveId, {}, ['./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')]);
             const source = await Reflect.apply(load, {}, [id]);
             const compiled = await transformWithEsbuild(source, 'pinned-chinese.js', {format: 'cjs', target: 'es2018'});
-            const data = runInNewContext(readFileSync(resolve(process.cwd(), 'userscript/resources/fluentread-data.v1.js'), 'utf8'), {}, {timeout: 5000});
-            const before = JSON.stringify(data);
             const realm = {module: {exports: {} as {zhCNMessages: Record<string, string>}}, __FLUENTREAD_USERSCRIPT_DATA__: data,
                 Uint8Array, atob, require: () => ({inflateWithPako: (bytes: Uint8Array) => ungzip(bytes, {to: 'string'})})};
             runInNewContext(compiled.code, realm, {timeout: 5000});
             const result = realm.module.exports.zhCNMessages;
-            const current = Object.fromEntries(Object.entries(zhCNMessages).filter(([key]) => !key.startsWith('document.') && !key.startsWith('translationStats.')));
             for (const [key, value] of Object.entries(current)) expect(result[key]).toBe(value);
             expect(result['settings.floatingBall.hoverDelayHelp']).toBeTruthy();
             expect(Object.keys(result).some(key => result[key] !== data.zhCNMessages[key])).toBe(true);
+            expect(data.zhCNMessages[changedKey]).toBe('Pinned stale Chinese fixture');
+            expect(data.zhCNMessages).not.toHaveProperty(addedKey);
             expect(JSON.stringify(data)).toBe(before);
-        } finally {vi.unstubAllEnvs();vi.resetModules();}
+        } finally {pinnedRead?.mockRestore();vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
     it('embeds the English bundle without the extension document and full-options statistics keys and preserves every other field', () => {

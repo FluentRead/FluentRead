@@ -7,11 +7,13 @@
 import {describe,expect,it} from 'vitest';
 import {createRequire} from 'node:module';
 import {createContext,runInContext} from 'node:vm';
+import {parseHTML} from 'linkedom';
 import {isClearlyWrongLanguageResponse} from '@/src/core/translation/resultValidation';
 
 const require=createRequire(import.meta.url);
 const {controlledProviderRuntime}=require('../scripts/site-translation/controlled-provider.cjs');
 const {installLongPageMockTransport,parseArgs}=require('../scripts/testing/run-long-page-mock-test.cjs');
+const {buildLongPageFixture}=require('../scripts/testing/long-page-mock-fixtures.cjs');
 const endpoint='https://edge.microsoft.com/translate/translatetext';
 function runtime() {
     const context=createContext({URL,Request,Response,TextEncoder,TextDecoder,setTimeout});
@@ -49,16 +51,17 @@ describe('source-bound long-page mock transport',()=>{
         expect(rows[0]!.translations[0]!.text.startsWith('长页译文 overview。')).toBe(true);
         expect(runInContext('__longMockRequests[0].texts[0]',context)).toBe('A reproducible observation.');
     });
-    it('preserves the authored long identifier so the browser still exercises native overflow',async()=>{
-        const context=runtime(),literal='UnbrokenIdentifier_'+'W'.repeat(240);
-        const source=`LPM-ARTICLE-004-0: Careful readers compare several observations before drawing a conclusion. The surrounding evidence describes a reproducible experiment, its assumptions, and the remaining uncertainty. ${literal}`;
-        context.body=JSON.stringify([source]);context.endpoint=endpoint;
-        const response:Response=await runInContext('fetch(endpoint,{body})',context);
-        const rows=await response.json() as {translations:{text:string}[]}[];
-        const output=rows[0]!.translations[0]!.text;
-        expect(output.split(literal)).toHaveLength(2);
-        expect(output).not.toContain('Careful readers');
-        expect(isClearlyWrongLanguageResponse(source,output,'zh-Hans')).toBe(false);
+    it('authors an unbreakable inline-code input without preventing the surrounding prose from wrapping',()=>{
+        const {html}=buildLongPageFixture('article',12);
+        const {document}=parseHTML(html);
+        const source=document.querySelector('[data-long-special="overflow"]')!;
+        const code=source.querySelector('code')!;
+        expect(code.attributes.length).toBe(0);
+        expect(code.textContent).toBe('UnbrokenIdentifier_'+'W'.repeat(240));
+        expect(source.querySelector('[data-long-link]')).not.toBeNull();
+        expect(source.querySelector('em')).not.toBeNull();
+        expect(html).toContain('[data-long-special="overflow"] code { white-space: nowrap; word-break: normal; overflow-wrap: normal; }');
+        expect(html).not.toContain('[data-long-special="overflow"] { white-space: nowrap; }');
     });
     it('rejects unexpected providers before making any network request',async()=>{
         const context=runtime();

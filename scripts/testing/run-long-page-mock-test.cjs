@@ -64,12 +64,6 @@ function installLongPageMockTransport(delay) {
     request.finishedAt = Date.now();
     rows.forEach((row, index) => {
       const token = texts[index].match(/LPM-[A-Z]+-\d{3}-(?:\d+|opening)/u)?.[0] || 'overview';
-      // Keep the fixture-authored technical identifier unbreakable. Encoding it as
-      // Han would introduce native line breaks and stop exercising overflow handling.
-      for (const literal of texts[index].match(/UnbrokenIdentifier_W{240}/gu) || []) {
-        const encoded = Array.from(new TextEncoder().encode(literal), byte => String.fromCharCode(0x4e00 + byte)).join('');
-        row.translations[0].text = row.translations[0].text.replaceAll(encoded, literal);
-      }
       row.translations[0].text = `长页译文 ${token}。${row.translations[0].text}`;
     });
     return new Response(JSON.stringify(rows), {status: response.status, headers: {'content-type': 'application/json'}});

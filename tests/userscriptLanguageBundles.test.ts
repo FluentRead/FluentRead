@@ -273,13 +273,20 @@ describe('userscript remote UI language data', () => {
 
     it('propagates a standalone Chinese compression failure instead of emitting incomplete data',async()=>{
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE','1');vi.resetModules();
+        // This case injects the Chinese compressor failure, not an English build benchmark.
+        // Avoid unrelated Zopfli work during config import; the next integration case
+        // still exercises the actual standalone compressors and both language payloads.
+        vi.doMock('@/userscript/buildGzip', async importOriginal => {
+            const actual = await importOriginal<typeof import('@/userscript/buildGzip')>();
+            return {...actual, gzipLargeStandaloneUserscriptData: async (input: Uint8Array) => actual.gzipUserscriptBuildData(input)};
+        });
         try {
             const {createUserscriptCatalogCompressionPlugin:createPlugin}=await import('@/userscript/vite.config');
             const failure=new Error('controlled Chinese compression failure'),compress=vi.fn(async()=>{throw failure;});
             const plugin=createPlugin(compress) as unknown as {resolveId:(source:string,importer:string)=>string;load:(id:string)=>Promise<string>};
             const id=plugin.resolveId('./messages/zh-CN',resolve(process.cwd(),'src/core/i18n/index.ts'));
             await expect(plugin.load(id)).rejects.toBe(failure);expect(compress).toHaveBeenCalledOnce();
-        } finally {vi.unstubAllEnvs();vi.resetModules();}
+        } finally {vi.doUnmock('@/userscript/buildGzip');vi.unstubAllEnvs();vi.resetModules();}
     });
 
     // The actual standalone configuration compresses catalogs in workers before this assertion.

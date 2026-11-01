@@ -4,7 +4,7 @@
 /**
  * @file scripts/testing/run-document-export-pages-test.cjs
  * 文件职责：在生产扩展与第二屏临时 Edge 中，验证文档页实际导出按钮的 PDF 页数与完整性。
- * 主要内容：真实导入一页 PDF、人工校订、原版双语和仅译文下载、36 行重排尾空行、真实长译文续页；PDF.js 独立重开及逐页渲染。
+ * 主要内容：真实导入 PDF、人工校订和下载，PDF.js 独立重开及逐页渲染；--outline-only 限定章节书签、标题回退、层级、双语和重排落点，不运行其它分页场景。
  * 模块边界：只写本轮临时 profile 的人工校订和真实仓库字体缓存，不调用或模拟翻译供应商，不操作用户浏览器。
  */
 const assert = require('node:assert/strict');
@@ -20,11 +20,16 @@ const repository = path.resolve(__dirname, '../..');
 const packages = path.resolve(argument('playwright-root', path.join(os.homedir(), '.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules')));
 const extensionDir = path.resolve(argument('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(argument('artifacts-dir', '/private/tmp/fluentread-document-export-pages'));
+const outlineOnly = process.argv.includes('--outline-only');
+const diagnosticsHelper = argument('runtime-diagnostics-helper');
+assert(!outlineOnly || diagnosticsHelper, '--outline-only requires --runtime-diagnostics-helper');
+const diagnostics = diagnosticsHelper ? require(path.resolve(diagnosticsHelper)).createRuntimeDiagnostics() : undefined;
 const requireRepo = createRequire(path.join(repository, 'package.json'));
 const {chromium} = require(path.join(packages, 'playwright'));
 const compact = text => text.normalize('NFKC').replace(/\s/gu, '');
 const report = {ok: false, extensionDir, artifactKind: 'production', scope: 'document page actual PDF export button only',
-  limitations: ['Translations are manual corrections entered through the real editor; no provider translation quality is covered.', 'Controlled one-page text PDFs only; no public complex document, Firefox, Safari or physical mobile acceptance.'],
+  limitations: ['Translations are manual corrections entered through the real editor; no provider translation quality is covered.',
+    `${outlineOnly ? 'Controlled two-page PDFs with native and inferred headings' : 'Controlled one-page text PDFs'} only; no reporter file, public complex document, Firefox, Safari or physical mobile acceptance.`],
   cases: [], corrections: [], downloads: [], screenshots: [], consoleErrors: [], workerErrors: [], blockedRequests: [], cleanupErrors: []};
 fs.mkdirSync(artifacts, {recursive: true});
 function fingerprint(directory) {
@@ -47,6 +52,28 @@ async function fixture(name, count) {
   const file = path.join(artifacts, name), bytes = Buffer.from(await pdf.save()); fs.writeFileSync(file, bytes);
   return {name, file, sources, bytes};
 }
+async function outlineFixture(native) {
+  const {PDFDocument, PDFName, PDFHexString} = requireRepo('pdf-lib');
+  const pdf = await PDFDocument.create(), first = pdf.addPage([600, 800]), second = pdf.addPage([600, 800]);
+  first.drawText('1 Introduction', {x: 44, y: 730, size: 24});
+  first.drawText('Source body before the next section.', {x: 44, y: 680, size: 12});
+  first.drawText('1.1 Details', {x: 44, y: 440, size: 20});
+  first.drawText('Source details paragraph.', {x: 44, y: 390, size: 12});
+  second.drawText('2 Conclusion', {x: 44, y: 730, size: 24});
+  second.drawText('Source final paragraph.', {x: 44, y: 680, size: 12});
+  if (native) {
+    const root = pdf.context.obj({Type: 'Outlines'}), rootRef = pdf.context.register(root);
+    const refs = ['1 Introduction', '1.1 Details', '2 Conclusion', 'Native appendix'].map((title, index) => pdf.context.register(pdf.context.obj({
+      Title: PDFHexString.fromText(title), Parent: rootRef, Dest: [index < 2 ? first.ref : second.ref, PDFName.of('Fit')],
+    })));
+    root.set(PDFName.of('First'), refs[0]); root.set(PDFName.of('Last'), refs[3]);
+    const chapter = pdf.context.lookup(refs[0]); chapter.set(PDFName.of('First'), refs[1]); chapter.set(PDFName.of('Last'), refs[1]); chapter.set(PDFName.of('Next'), refs[2]);
+    pdf.context.lookup(refs[1]).set(PDFName.of('Parent'), refs[0]); pdf.context.lookup(refs[2]).set(PDFName.of('Next'), refs[3]);
+    pdf.catalog.set(PDFName.of('Outlines'), rootRef);
+  }
+  const name = native ? 'native-chapters.pdf' : 'detected-chapters.pdf', file = path.join(artifacts, name), bytes = Buffer.from(await pdf.save());
+  fs.writeFileSync(file, bytes); return {name, file, bytes};
+}
 async function main() {
   assert(fs.existsSync(path.join(extensionDir, 'manifest.json')), 'A prebuilt production extension is required');
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-document-pages-'));
@@ -63,6 +90,7 @@ async function main() {
     Object.assign(report, {launchMode: session.launchMode, focusPolicy: session.focusPolicy, windowPlacement: session.windowPlacement});
     assert.equal(session.windowPlacement.browserFrontmost, false);
     const context = session.context;
+    if (diagnostics) await diagnostics.start(context);
     await context.route('**/*', route => {
       const url = route.request().url();
       if (/^https?:/u.test(url)) {report.blockedRequests.push(url); return route.abort();}
@@ -71,7 +99,9 @@ async function main() {
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});
     worker.on('console', message => {if (message.type() === 'error') report.workerErrors.push(message.text());});
     const origin = `chrome-extension://${new URL(worker.url()).host}`;
+    diagnostics?.setExtensionId(new URL(worker.url()).host);
     page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
+    if (diagnostics) await diagnostics.attachPage(page, 'pdf-export-document');
     page.on('pageerror', error => report.consoleErrors.push(error.message));
     page.on('console', message => {if (message.type() === 'error') report.consoleErrors.push(message.text());});
     page.on('dialog', dialog => {if (dialog.type() === 'beforeunload') void dialog.accept(); else void dialog.dismiss();});
@@ -133,9 +163,15 @@ async function main() {
       const file = path.join(artifacts, `${name}.pdf`); await item.saveAs(file); assert.equal(await item.failure(), null);
       const task = pdfjs.getDocument({data: new Uint8Array(fs.readFileSync(file)), isEvalSupported: false, useWorkerFetch: false, verbosity: 0,
         standardFontDataUrl: path.join(packages, 'pdfjs-dist/standard_fonts') + path.sep});
-      const sheets = [];
+      const sheets = [], chapters = [];
       try {
         const pdf = await task.promise, labels = await pdf.getPageLabels();
+        const collect = async (items, level = 1) => {for (const item of items) {
+          const dest = typeof item.dest === 'string' ? await pdf.getDestination(item.dest) : item.dest;
+          chapters.push({title: item.title, level, page: await pdf.getPageIndex(dest[0]) + 1, x: dest[2], y: dest[3]});
+          await collect(item.items, level + 1);
+        }};
+        await collect(await pdf.getOutline() || []);
         for (let number = 1; number <= pdf.numPages; number++) {
           const sheet = await pdf.getPage(number), text = (await sheet.getTextContent()).items.map(item => item.str || '').join('\n');
           const viewport = sheet.getViewport({scale: 1}), canvas = createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
@@ -146,9 +182,10 @@ async function main() {
           sheets.push({number, label: labels?.[number - 1] ?? null, width: viewport.width, height: viewport.height, text, inkPixels, png});
         }
       } finally {await task.destroy();}
-      const result = {name, kind, mode, file, pages: sheets.length, sheets}; report.downloads.push(result);
+      const result = {name, kind, mode, file, pages: sheets.length, sheets, chapters}; report.downloads.push(result);
       fs.writeFileSync(file.replace(/\.pdf$/u, '.text.json'), JSON.stringify(sheets, null, 2));
-      const whole = compact(sheets.map(sheet => sheet.text).join('\n')).replace(/原文第\d+页·译文续页·?\d+\/\d+/gu, '');
+      // 页脚只在各自页面剔除；跨页拼接后再匹配会把下一页数字开头的章节编号吞进分母。
+      const whole = sheets.map(sheet => compact(sheet.text).replace(/原文第\d+页·译文续页·?\d+\/\d+/gu, '')).join('');
       for (const correction of entries) assert(whole.includes(compact(correction.actual)), `${name}: complete correction ${correction.id} must survive`);
       if (mode === 'bilingual') for (const correction of entries) assert(whole.includes(compact(correction.source)), `${name}: complete original ${correction.id} must survive`);
       assert(!/工作区|工作空间|下载文件|打开新文件|服务连接设置|Document workspace/iu.test(whole), `${name}: document UI must not enter exported PDF`);
@@ -160,7 +197,30 @@ async function main() {
       else assert(sheets.length > 1, `${name}: genuine overflow must create readable continuation pages`);
       if (await dialog.isVisible()) await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
       report.cases.push({name, ok: true, pageCount: sheets.length});
+      return result;
     };
+    if (outlineOnly) {
+      report.scope = 'PDF native and detected chapter outlines through actual download buttons';
+      for (const native of [true, false]) {
+        const input = await outlineFixture(native);
+        const rows = await importPdf(input);
+        const titles = {'1 Introduction': '第一章 导言', '1.1 Details': '第一节 细节', '2 Conclusion': '第二章 总结'};
+        const entries = await correct(rows, row => titles[row.source] || (row.source.includes('before') ? '完整译文用于验证重排后目录的真实落点。'.repeat(250) : '正文译文完整保留。'), `${native ? 'native' : 'detected'}-chapters`);
+        const expected = ['第一章 导言', '第一节 细节', '第二章 总结', ...(native ? ['Native appendix'] : [])];
+        for (const [kind, mode] of [['layout', 'bilingual'], ['layout', 'translated'], ['readable', 'translated']]) {
+          const result = await download(`${native ? 'native' : 'detected'}-outline-${kind}-${mode}`, kind, mode, entries);
+          assert.deepEqual(result.chapters.map(item => item.title), expected);
+          assert.equal(result.chapters[1].level, 2);
+          for (const chapter of result.chapters.filter(item => item.title !== 'Native appendix')) assert(compact(result.sheets[chapter.page - 1].text).includes(compact(chapter.title)), 'Bookmark must target the page actually containing its translated heading');
+          if (kind === 'layout' && mode === 'bilingual') assert(result.chapters.slice(0, 3).every(item => item.x > 600), 'Bilingual bookmark must target the translated side');
+          if (kind === 'readable') assert(result.chapters[1].page > result.chapters[0].page, 'Long body must move the next heading to a later reflow page');
+        }
+        // 隔离下一次导入的队列和会话状态；采集器在新页导航前继续附着。
+        await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
+        if (diagnostics) await diagnostics.attachPage(page, 'pdf-export-document-next');
+        await page.goto(`${origin}/document.html`); await page.locator('.file-drop-zone').waitFor();
+      }
+    } else {
     const shortRows = await importPdf(short); assert.equal(shortRows.length, 3, 'Three separate source paragraphs must be parsed');
     const shortCorrections = await correct(shortRows, row => `\n\n短译文第${row.id + 1}段完整保留。\n \t\n`, 'short-whitespace');
     await download('short-layout-bilingual', 'layout', 'bilingual', shortCorrections, 1);
@@ -176,10 +236,17 @@ async function main() {
     await download('readable-36-lines-translated', 'readable', 'translated', lines, 1);
     const long = await correct(singleRows, () => '完整长译文必须跨页保留，每个字都能重新读取且末段完整。'.repeat(700) + '长译文终点标记玖零。', 'genuine-long');
     await download('long-layout-translated', 'layout', 'translated', long);
+    }
+    if (diagnostics) {await diagnostics.flush(); diagnostics.assertClean();}
     assert.deepEqual(report.consoleErrors, []); assert.deepEqual(report.workerErrors, []); assert.deepEqual(report.blockedRequests, []);
     report.ok = true;
   } catch (error) {report.failure = String(error.stack || error); process.exitCode = 1; if (page) await page.screenshot({path: path.join(artifacts, 'failure.png')}).catch(() => {});}
   finally {
+    if (diagnostics) {
+      await diagnostics.flush(); report.runtimeDiagnostics = diagnostics.snapshot();
+      fs.writeFileSync(path.join(artifacts, 'runtime-diagnostics.json'), JSON.stringify(report.runtimeDiagnostics, null, 2));
+      await diagnostics.stop();
+    }
     if (session) try {await session.close(); closed = true;} catch (error) {report.cleanupErrors.push(error.message);}
     if (closed || !launchAttempted) fs.rmSync(profileDir, {recursive: true, force: true}); else report.retainedProfile = profileDir;
     if (report.cleanupErrors.length) {report.ok = false; process.exitCode = 1;}

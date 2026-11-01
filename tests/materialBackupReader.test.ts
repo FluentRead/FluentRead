@@ -4,6 +4,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabulary/materialBackupReader';
+import {RecordCollector} from '@/src/features/vocabulary/materialBackupJson';
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
 import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
@@ -31,6 +32,20 @@ async function read(blob: Blob) {
 }
 
 describe('material backup source reader', () => {
+  it.each(['unfinished', 'missing-record'] as const)('rejects inconsistent parsing components before rereading: %s', async failure => {
+    // Fault injection at the internal parsing boundary; valid native input does not
+    // independently desynchronize the syntax parser and the byte collector.
+    const fault = failure === 'unfinished'
+      ? vi.spyOn(RecordCollector.prototype, 'end').mockImplementation(() => {})
+      : vi.spyOn(RecordCollector.prototype, 'start').mockImplementation(() => {});
+    const source = new Blob([wrap('{}')]), slices = vi.spyOn(source, 'slice');
+    try {
+      await expect(prepareMaterialBackup(source)).rejects.toThrow('材料记录不完整');
+      expect(slices).toHaveBeenCalledTimes(1);
+    } finally {
+      slices.mockRestore(); fault.mockRestore();
+    }
+  });
   it('rejects a changed Blob size after scanning instead of accepting an inconsistent plan', async () => {
     class ChangingSize extends Blob {
       reads = 0;

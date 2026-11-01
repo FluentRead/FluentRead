@@ -20,6 +20,7 @@ export default defineConfig({
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
                 'src/features/vocabulary/materialBackupReader.ts',
+                'src/features/vocabulary/materialBackupJson.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',
                 'src/features/vocabulary/materialBackupExport.ts',
                 'src/features/vocabulary/materialBackupSafeCount.ts',

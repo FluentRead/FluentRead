@@ -223,9 +223,10 @@ async function receiveMaterialReadFromChannel(pipe:ReturnType<typeof channel>, o
       } else if(type==='end') {
         const message=record(incoming,['v','type','seq','bytes','digest']);
         if(message.seq!==seq||message.bytes!==bytes||message.digest!==digestHex(hash.digest()))throw Error('Invalid material read completion');
-        pipe.send({v:VERSION,type:'done',seq});return;
+        pipe.send({v:VERSION,type:'done',seq});break;
       } else throw Error('Invalid material read message');
     }
   } catch(error) {pipe.fail(pipeFailure(error));throw error;}
-  finally {pipe.close();}
+  // Failure owns cleanup; only a verified end reaches the normal close.
+  pipe.close();
 }

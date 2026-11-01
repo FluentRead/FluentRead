@@ -1,6 +1,12 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 
+// Node 夹具没有扩展存储；替换浏览器边界，配置迁移与字幕 UI 仍执行实际实现。
+vi.mock('@/src/platform/storage/configStorageRuntime', () => ({configStorage: {
+  getItem: vi.fn().mockResolvedValue(null), setItem: vi.fn().mockResolvedValue(undefined),
+  removeItem: vi.fn().mockResolvedValue(undefined), watch: vi.fn().mockReturnValue(() => undefined),
+}}));
+
 import {
   createVideoPlayerMenu,
   handleVideoMenuDisclosure,

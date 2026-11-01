@@ -16,6 +16,10 @@
 
 `imageOcrNormalization`、`mangaQuality` 和 `imageTranslationRendering` 保留韩文 Jamo、补充平面汉字及 IVS、半角浊音、组合字符与 emoji 的完整原文，并检查现代字素分割和缺少 `Intl.Segmenter` 时的窄框排版。后者只在确定安全的空格两侧分词，复杂无空白词组保持整体；英语组合字符、法语、俄语、泰语与老挝语的多词段落另检查字号，不能以整段缩字代替换行。纯 ASCII 与普通东亚文字仍保留原快路径。
 
+`mangaViewWordBoundary` 与 `mangaOcr` 核对整页与气泡的两个已有拉丁识别视图：只有非空格字符完全一致、原图中稳定字形与明显间隔支持某一已有候选时才采用其文字，保留局部几何；透明、多墨色、纹理、连接字形或来源漂移均沿用原规则，不生成第三种文字。原图读取与既有方向、斜行预处理共用两百万像素，每页最多六十四次证明；不增加模型推理，已有颜色读回适配的预算与生命周期保持独立。测试覆盖原对象及 structured clone 绑定、去重后实际采用的来历、取消与失败计费，以及 `POSTCARD` 等不能偏好更多空格的反例。物理间隔只能约束已有候选，不保证语义词界。
+
+`imageParagraphs` 对普通图片的续行和扫描早停使用同一整数源像素间距，避免缩放还原后的亚像素误差拆段；真实下一像素、不同字号、列表、遮挡与栏位仍阻止合并。离线回归包含冻结自然漫画的原坐标与原 PNG 局部像素，但不代替当前完整产品的原生 OCR 验收，也不覆盖漏字或真实大行距的质量缺口。
+
 回退使用固定 Unicode 17.0.0 的 Extend／SpacingMark／ZWJ／Prepend 区间，测试读取仓库内的官方原始属性文件独立核对，不在 CI 访问网络。运行 `node scripts/generate-image-grapheme-space-data.mjs --check` 校验离线生成与输入 SHA-256；来源、版本和许可见 `public/third-party-notices/image-grapheme-space-NOTICE.md`。该表只支持 ASCII 空格的局部边界判断，不是完整 UAX #29 分割器，也不声称恢复模型漏识别的文字。
 
 ### 漫画质量场景与模型复用

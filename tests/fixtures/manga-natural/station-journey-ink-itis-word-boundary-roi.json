@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "scope": "Original repository PNG integer ROI and saved primitive public OCR rows only; not a captured native crop or crop SHA. Runtime test has no external workspace, decoder-library, model or browser dependency.",
+  "source": {
+    "file": "tests/fixtures/manga-natural/station-journey-ink.png",
+    "sha256": "c7355110ec11e7948032ff52291b8a34cd9435d40a709f70914f4fa3d1c17bb3",
+    "width": 1024,
+    "height": 1536,
+    "decodedRgbaSha256": "f62ae15f5c1ec98eff3447f2bfd36ed181a7b30f6082990f73c288557c9a74bf"
+  },
+  "roi": {
+    "left": 892,
+    "top": 557,
+    "width": 59,
+    "height": 25
+  },
+  "rgba": {
+    "encoding": "zlib-base64",
+    "bytes": 5900,
+    "sha256": "a2ba74d2af91a79017bd7bb792a150d1dffcfa9458fa96d0d333b00fc59fde06",
+    "data": "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"
+  },
+  "observed": {
+    "diagnosticId": "quality4d6fa38_20261101",
+    "publicAnalysisSHA256": "41f2a4dec6ab8db489ad6d0d09a585a893aac9fdd33ac3a6d7cee75f7efdf27c",
+    "analysisComplete": true,
+    "wholePublicCallIds": [
+      3,
+      4
+    ],
+    "wholeReturnedRowIndex": 5,
+    "wholeCanvas": {
+      "width": 1024,
+      "height": 1536
+    },
+    "whole": {
+      "text": "IT IS",
+      "confidence": 0.9824432253837585,
+      "box": {
+        "x": 894,
+        "y": 559,
+        "width": 52,
+        "height": 21
+      }
+    },
+    "localPublicCallIds": [
+      7,
+      8
+    ],
+    "localReturnedRowIndex": 0,
+    "localCanvas": {
+      "width": 459,
+      "height": 462
+    },
+    "local": {
+      "text": "ITIS",
+      "confidence": 0.9987249821424484,
+      "box": {
+        "x": 171,
+        "y": 131,
+        "width": 157,
+        "height": 56
+      }
+    },
+    "limitations": "Stable canvas IDs and dimensions are object correlation, not captured pixels, exact crop identity or asynchronous causal-parent proof."
+  },
+  "derivedMapping": {
+    "method": "Unique pure findMangaBubbleLayout replay on the unchanged original PNG; mapping is derived, not a captured native crop.",
+    "bubbleBox": {
+      "x0": 839,
+      "y0": 516,
+      "x1": 992,
+      "y1": 670
+    },
+    "scaleX": 3,
+    "scaleY": 3,
+    "nativeCropPixelsCaptured": false,
+    "nativeCropSHAKnown": false
+  }
+}

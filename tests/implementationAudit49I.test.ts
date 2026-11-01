@@ -561,7 +561,7 @@ async function ownerDeadline<T>(operation: Promise<T>): Promise<T> {
     } finally {if (timer) clearTimeout(timer);}
 }
 
-async function invoke(file: string, fault: string, extra: string[] = []): Promise<Result> {
+async function invoke(file: string, fault: string, extra: string[] = [], childEnv: NodeJS.ProcessEnv = {}): Promise<Result> {
     const fixture = path.join(suiteRoot, String(++invocation));
     const runtime = path.join(fixture, 'runtime/node_modules');
     const artifacts = path.join(fixture, 'artifacts/screenshots');
@@ -667,11 +667,11 @@ async function invoke(file: string, fault: string, extra: string[] = []): Promis
     if (file === group && fault !== 'missing-pnpm' && !extra.includes('--dry-run')) {
         commandPath = path.join(fixture, 'bin');
         mkdirSync(commandPath);
-        writeFileSync(path.join(commandPath, 'pnpm'), `#!${process.execPath}\nrequire('node:fs').appendFileSync(process.env.AUDIT_EVENTS, JSON.stringify({kind:'pnpm',args:process.argv.slice(2)})+'\\n');process.exit(${fault === 'child-exit' ? 7 : 0});\n`, {mode: 0o755});
+        writeFileSync(path.join(commandPath, 'pnpm'), `#!${process.execPath}\nrequire('node:fs').appendFileSync(process.env.AUDIT_EVENTS, JSON.stringify({kind:'pnpm',args:process.argv.slice(2),ci:process.env.CI})+'\\n');process.exit(${fault === 'child-exit' ? 7 : 0});\n`, {mode: 0o755});
     }
     const child = spawn(process.execPath, ['--require', preload, script, ...args, ...extra], {
         cwd: project, detached: process.platform !== 'win32', stdio: acquiredOwner ? ['ignore', 'pipe', 'pipe', 'ipc'] : ['ignore', 'pipe', 'pipe'],
-        env: {...process.env, NODE_PATH: path.join(project, 'node_modules'), TMPDIR: fixture + '/temp', AUDIT_EVENTS: eventsFile, AUDIT_FAULT: fault, AUDIT_SCRIPT: sourceModule, AUDIT_SOURCE_MODULE: sourceModule,
+        env: {...process.env, ...childEnv, NODE_PATH: path.join(project, 'node_modules'), TMPDIR: fixture + '/temp', AUDIT_EVENTS: eventsFile, AUDIT_FAULT: fault, AUDIT_SCRIPT: sourceModule, AUDIT_SOURCE_MODULE: sourceModule,
             AUDIT_PLAYWRIGHT_PORT: runtime + '/playwright/index.js', AUDIT_HELPER_PORT: helper,
             AUDIT_BASE_HELPER: helper, AUDIT_VIDEO_MENU: path.join(fixture,'client-menu.html'), AUDIT_INTERVAL_PORT: file === selectionTrigger ? '1' : '0',
             AUDIT_PARTIAL_OWNER: partialOwner ? '1' : '0', AUDIT_OWNER_ROOT: fixture,
@@ -944,10 +944,12 @@ describe('test group real CLI and controlled pnpm process', () => {
         expect(result.code).toBe(1); expect(result.stderr).toContain('[test-group] spawn pnpm ENOENT');
         expect(result.stderr).not.toContain("Unhandled 'error' event");
     });
-    it('passes the complete group and coverage flag to the child without filtering cases', async () => {
-        const result = await invoke(group, 'success', ['--coverage']);
+    it.each(['', 'true'])('passes the complete group and coverage flag to the child without filtering cases with CI=%j', async ci => {
+        const result = await invoke(group, 'success', ['--coverage'], {CI: ci});
         const matrix = JSON.parse(readFileSync(path.join(project, 'tests/test-matrix.json'), 'utf8'));
-        expect(result.code).toBe(0); expect(result.events.find(e => e.kind === 'pnpm')?.args).toEqual(['exec', 'vitest', 'run', '--coverage', ...matrix.groups.unit]);
+        const pnpm = result.events.find(e => e.kind === 'pnpm');
+        expect(result.code).toBe(0); expect(pnpm?.ci).toBe(ci);
+        expect(pnpm?.args).toEqual(['exec', 'vitest', 'run', '--reporter=dot', '--coverage', ...matrix.groups.unit]);
     });
     it('preserves the actual child exit status instead of converting failed tests to success', async () => {
         const result = await invoke(group, 'child-exit'); expect(result.code).toBe(7);

@@ -6,7 +6,7 @@
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import type JSZip from 'jszip';
-import type {PDFDict, PDFEmbeddedPage} from 'pdf-lib';
+import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
 import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
@@ -1162,7 +1162,7 @@ async function renderPdf(
     options: CreateDocumentDownloadOptions,
 ): Promise<Uint8Array> {
     const binary = document.binary as Extract<NonNullable<ParsedDocument['binary']>, {kind: 'pdf'}>;
-    const {PDFDocument, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
+    const {PDFDocument, EncryptedPDFError, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
         concatTransformationMatrix, setTextRenderingMode, TextRenderingMode, beginText, endText, setFontAndSize, showText} = await import('pdf-lib');
     options.signal?.throwIfAborted();
     const outputPdf = await PDFDocument.create();
@@ -1198,11 +1198,19 @@ async function renderPdf(
     const labelLayoutPage = (label: string) => layoutPageLabels.push(outputPdf.getPageCount() - 1, outputPdf.context.obj({P: PDFHexString.fromText(label)}));
     const changedPages = binary.pages.map(page => page.segmentIndexes.some(segmentIndex =>
         hasDistinctTranslation(document.segments[segmentIndex]?.source ?? '', translations[segmentIndex])));
-    const sourcePdf = await awaitDocumentRead(PDFDocument.load(binary.bytes), options.signal);
+    const needsSource = mode === 'bilingual' || changedPages.some(changed => !changed);
+    let sourcePdf: PDFDocument | undefined;
+    try {sourcePdf = await awaitDocumentRead(PDFDocument.load(binary.bytes), options.signal);}
+    catch (error) {
+        options.signal?.throwIfAborted();
+        // 纯译文光栅原本无需 pdf-lib 读取原页；已由 PDF.js 打开的受保护文件不能因可选目录提取而失去下载能力。
+        // 锁定的 pdf-lib 1.17.1 用 ES5 Error 继承，EncryptedPDFError 的 instanceof 不成立；只匹配该构造器的完整固定消息。
+        if (needsSource || !(error instanceof Error) || error.message !== new EncryptedPDFError().message) throw error;
+    }
     options.signal?.throwIfAborted();
     const {createPdfExportOutline} = await import('./pdfOutline');
     const outline = createPdfExportOutline(sourcePdf, outputPdf, document, translations);
-    if (mode === 'bilingual' || changedPages.some(changed => !changed)) {
+    if (sourcePdf && needsSource) {
         const required = new Set(binary.pages.filter((_page, index) => mode === 'bilingual' || !changedPages[index]).map(page => page.pageNumber));
         const pages = sourcePdf.getPages().map((page, index) => ({page, pageNumber: index + 1}))
             .filter(({page, pageNumber}) => required.has(pageNumber) && page.node.Contents());

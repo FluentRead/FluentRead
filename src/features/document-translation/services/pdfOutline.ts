@@ -85,8 +85,8 @@ function headingOutline(document: ParsedDocument): OutlineEntry[] {
     })).slice(0, MAX_OUTLINE_ITEMS);
 }
 
-export function createPdfExportOutline(source: PDFDocument, output: PDFDocument, document: ParsedDocument, translations: readonly string[]) {
-    const headings = headingOutline(document), native = sourceOutline(source);
+export function createPdfExportOutline(source: PDFDocument | undefined, output: PDFDocument, document: ParsedDocument, translations: readonly string[]) {
+    const headings = headingOutline(document), native = source ? sourceOutline(source) : [];
     const headingSegments = new Map<string, number | undefined>();
     const headingKey = (entry: OutlineEntry) => JSON.stringify([entry.pageNumber, entry.title.trim()]);
     for (const heading of headings) {

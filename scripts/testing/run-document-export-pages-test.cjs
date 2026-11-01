@@ -21,6 +21,8 @@ const packages = path.resolve(argument('playwright-root', path.join(os.homedir()
 const extensionDir = path.resolve(argument('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(argument('artifacts-dir', '/private/tmp/fluentread-document-export-pages'));
 const outlineOnly = process.argv.includes('--outline-only');
+const encryptedInput = argument('encrypted-input');
+assert(!encryptedInput || outlineOnly, '--encrypted-input requires --outline-only');
 const diagnosticsHelper = argument('runtime-diagnostics-helper');
 assert(!outlineOnly || diagnosticsHelper, '--outline-only requires --runtime-diagnostics-helper');
 const diagnostics = diagnosticsHelper ? require(path.resolve(diagnosticsHelper)).createRuntimeDiagnostics() : undefined;
@@ -200,14 +202,15 @@ async function main() {
       return result;
     };
     if (outlineOnly) {
-      report.scope = 'PDF native and detected chapter outlines through actual download buttons';
-      for (const native of [true, false]) {
-        const input = await outlineFixture(native);
+      report.scope = encryptedInput ? 'Protected PDF translated download with detected-heading outline fallback' : 'PDF native and detected chapter outlines through actual download buttons';
+      for (const native of encryptedInput ? [false] : [true, false]) {
+        const input = encryptedInput ? {name: path.basename(encryptedInput), file: path.resolve(encryptedInput), bytes: fs.readFileSync(encryptedInput)} : await outlineFixture(native);
+        if (encryptedInput) report.encryptedInput = {file: input.file, sha256: crypto.createHash('sha256').update(input.bytes).digest('hex')};
         const rows = await importPdf(input);
         const titles = {'1 Introduction': '第一章 导言', '1.1 Details': '第一节 细节', '2 Conclusion': '第二章 总结'};
         const entries = await correct(rows, row => titles[row.source] || (row.source.includes('before') ? '完整译文用于验证重排后目录的真实落点。'.repeat(250) : '正文译文完整保留。'), `${native ? 'native' : 'detected'}-chapters`);
         const expected = ['第一章 导言', '第一节 细节', '第二章 总结', ...(native ? ['Native appendix'] : [])];
-        for (const [kind, mode] of [['layout', 'bilingual'], ['layout', 'translated'], ['readable', 'translated']]) {
+        for (const [kind, mode] of encryptedInput ? [['layout', 'translated']] : [['layout', 'bilingual'], ['layout', 'translated'], ['readable', 'translated']]) {
           const result = await download(`${native ? 'native' : 'detected'}-outline-${kind}-${mode}`, kind, mode, entries);
           assert.deepEqual(result.chapters.map(item => item.title), expected);
           assert.equal(result.chapters[1].level, 2);

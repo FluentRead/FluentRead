@@ -1,8 +1,8 @@
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
-import {PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFString} from 'pdf-lib';
+import {EncryptedPDFError, PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRef, PDFString} from 'pdf-lib';
 import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import type {ParsedDocument, PdfDocumentPage} from '@/src/features/document-translation/core/document';
 import {createPdfExportOutline} from '@/src/features/document-translation/services/pdfOutline';
 import {createDocumentDownload} from '@/src/features/document-translation/services/binary';
@@ -38,6 +38,20 @@ async function readOutline(bytes: Uint8Array) {
 }
 
 describe('downloaded PDF chapter outlines', () => {
+    it('retains fully translated raster export when optional source-bookmark extraction encounters encryption', async () => {
+        const {document} = await fixture();
+        const load = vi.spyOn(PDFDocument, 'load').mockRejectedValueOnce(new EncryptedPDFError());
+        try {
+            const result = await createDocumentDownload(document, ['导言', '细节', '总结'], 'translated', {pdfPageRasterizer: async () => png});
+            expect((await readOutline(result.data as Uint8Array)).items.map(item => item.title)).toEqual(['导言', '总结']);
+            const sourceError = new EncryptedPDFError(); load.mockRejectedValueOnce(sourceError);
+            await expect(createDocumentDownload(document, ['导言', '细节', '总结'], 'bilingual', {pdfPageRasterizer: async () => png})).rejects.toBe(sourceError);
+            const unexpected = new Error('Unrelated source failure'); load.mockRejectedValueOnce(unexpected);
+            await expect(createDocumentDownload(document, ['导言', '细节', '总结'], 'translated', {pdfPageRasterizer: async () => png})).rejects.toBe(unexpected);
+            load.mockRejectedValueOnce('Non-error source failure');
+            await expect(createDocumentDownload(document, ['导言', '细节', '总结'], 'translated', {pdfPageRasterizer: async () => png})).rejects.toBe('Non-error source failure');
+        } finally {load.mockRestore();}
+    });
     it.each(['translated', 'bilingual'] as const)('writes translated hierarchical headings with source fallback in %s layout', async mode => {
         const {document} = await fixture();
         const result = await createDocumentDownload(document, ['第一章 导言', '', '第二章 总结'], mode, {pdfPageRasterizer: async () => png});

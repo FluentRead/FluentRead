@@ -22,6 +22,7 @@ import * as translationState from '@/src/features/full-page-translation/content/
 let document: Document;
 beforeEach(() => {
     config.display = 1;
+    config.translationOnlyDomains = [];
     config.on = true; config.personalCorrectionsEnabled = true;
     corrections.lookup.mockReset().mockResolvedValue({suggestions: [], conflicts: []});
     document = parseHTML('<html><head><base href="https://example.com/"></head><body><main></main></body></html>').document;
@@ -64,6 +65,31 @@ function committed(mode: 'bilingual' | 'single' = 'bilingual', overrides: Partia
 }
 
 describe('已提交网页译文显示切换', () => {
+    it('无页面地址时沿用全局显示，配置订阅和既有骨架重放都不误匹配网站名单', () => {
+        const {owner, state} = committed();
+        vi.stubGlobal('location', undefined);
+        config.display = 0; config.translationOnlyDomains = ['example.com'];
+        expect(refreshTranslationDisplayMode(owner, state)).toBe(true); expect(state.mode).toBe('single');
+        const preferences = {display: 0, translationOnlyDomains: ['example.com']};
+        const apply = vi.fn(), sync = createPageTranslationDisplayModeSync(preferences, apply);
+        sync({...preferences, display: 1}); expect(state.mode).toBe('bilingual');
+        expect(apply).toHaveBeenCalledOnce();
+    });
+    it('网站偏好切换立即复用已有译文，忽略无关网站变化，移除后恢复全局模式与原文身份', () => {
+        const {owner, state, nodes, sourceHTML} = committed();
+        const preferences = {display: 1, translationOnlyDomains: [] as string[]};
+        const sync = createPageTranslationDisplayModeSync(preferences, vi.fn());
+        const generation = state.generation, controller = state.controller;
+        preferences.translationOnlyDomains.push('example.com'); sync(preferences);
+        expect(state.mode).toBe('single'); expect(owner.querySelector('.fluent-read-bilingual-content')).toBeNull();
+        const hosts = state.singleTextSlotHosts;
+        preferences.translationOnlyDomains.push('another.test'); sync(preferences);
+        expect(state.singleTextSlotHosts).toBe(hosts);
+        preferences.translationOnlyDomains = ['another.test']; sync(preferences);
+        expect(state.mode).toBe('bilingual'); expect(state.generation).toBe(generation); expect(state.controller).toBe(controller);
+        expect(nodes.every(node => owner.contains(node))).toBe(true);
+        expect(restoreTranslation(owner)).toBe(true); expect(owner.innerHTML).toBe(sourceHTML);
+    });
     it('整句行内代码重放贯通双语与单语，代码或原始空白变化时拒绝旧译文', () => {
         vi.stubGlobal('getComputedStyle', () => ({display: 'inline', visibility: 'visible', contentVisibility: 'visible',
             opacity: '1', whiteSpace: 'normal', fontFamily: 'Arial', position: 'static', overflow: 'visible',

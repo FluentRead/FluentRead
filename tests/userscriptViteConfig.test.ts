@@ -2195,7 +2195,7 @@ describe('standalone About images at explicit use boundaries', () => {
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        // Execute the same generated payload without compressing the two images twice.
+        // Execute the exact generated source already checked above, without compressing both images twice.
         const h = await loadAccessors(undefined, true, source);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');

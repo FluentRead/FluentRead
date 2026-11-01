@@ -107,6 +107,7 @@ const configHydrated = ref(false);
 const translationEnabled = ref(false);
 let disposed = false;
 let unsubscribeConfig: (() => void) | undefined;
+let unsubscribeSidebar: (() => void) | undefined;
 let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 let saveSequence = 0;
@@ -298,15 +299,18 @@ async function copyText(text: string, key: string) {
 }
 function copyResult(card: ComparisonCard) {void copyText(card.result, card.service);}
 function copyAllResults() {void copyText(successfulCards.value.map(card => serviceLabel(card.service) + '\n' + card.result).join('\n\n'), 'all');}
-// 缓存的原生面板可能在 close 事件投递前冻结；hidden 是取消上游的最后可执行时机，输入和已完成结果不因此清除。
-function stopHiddenSidebar() {if (document.visibilityState === 'hidden') session.stop();}
 onMounted(async () => {
   await configReady; if (disposed) return; hydrateTranslationCenterConfig(); configHydrated.value = true;
   unsubscribeConfig = subscribeConfig(nextConfig => {if (configHydrated.value && !disposed) hydrateTranslationCenterConfig(nextConfig);});
   document.addEventListener('pointerdown', closeServicePicker); document.addEventListener('focusin', closePickerOnFocus);
-  if (props.surface === 'sidebar') document.addEventListener('visibilitychange', stopHiddenSidebar);
+  if (props.surface === 'sidebar') {
+    // 缓存的原生面板可能在 close 事件投递前冻结；hidden 是取消上游的最后可执行时机，输入和已完成结果不因此清除。
+    const stopHiddenSidebar = () => {if (document.visibilityState === 'hidden') session.stop();};
+    document.addEventListener('visibilitychange', stopHiddenSidebar);
+    unsubscribeSidebar = () => document.removeEventListener('visibilitychange', stopHiddenSidebar);
+  }
 });
-onUnmounted(() => {disposed = true; session.dispose(); endCardDrag(); unsubscribeConfig?.(); document.removeEventListener('pointerdown', closeServicePicker); document.removeEventListener('focusin', closePickerOnFocus); document.removeEventListener('visibilitychange', stopHiddenSidebar); if (copiedTimer) clearTimeout(copiedTimer); if (saveTimer) clearTimeout(saveTimer);});
+onUnmounted(() => {disposed = true; session.dispose(); endCardDrag(); unsubscribeConfig?.(); unsubscribeSidebar?.(); document.removeEventListener('pointerdown', closeServicePicker); document.removeEventListener('focusin', closePickerOnFocus); if (copiedTimer) clearTimeout(copiedTimer); if (saveTimer) clearTimeout(saveTimer);});
 </script>
 <style scoped>
 .translation-center { display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; height: 100%; padding: 22px 26px; color: var(--ink); background: var(--surface-soft); overflow: hidden; }

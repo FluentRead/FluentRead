@@ -512,7 +512,7 @@ export const models = new Map<string, Array<string>>([
     [services.deepinfra, [defaultModelIds[services.deepinfra], "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct", customModelString]],
     [services.perplexity, [defaultModelIds[services.perplexity], "sonar-pro", "sonar-reasoning", customModelString]],
     [services.runcrate, [defaultModelIds[services.runcrate], "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash", "openai/gpt-oss-120b", customModelString]],
-    [services.cloudgpu, [defaultModelIds[services.cloudgpu], "glm-5.3-flash", "kimi-k3", "qwen3.6-35b", customModelString]],
+    [services.cloudgpu, [defaultModelIds[services.cloudgpu], "kimi-k3", "qwen3.6-35b", customModelString]],
     [services.ollama, [defaultModelIds[services.ollama], "qwen3:8b", "gemma3:12b", "llama3.2:3b", "mistral:7b", customModelString]],
 ]);
 

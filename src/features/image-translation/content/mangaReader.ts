@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaReader.ts
  * 文件职责：把漫画站点的正文图片、超长图分段、可读画布、公开背景图和页面生命周期接入同一连续翻译会话。
- * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，任务交接等待后重新发现再排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
+ * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；任务交接等待后重新发现再排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
  * 模块边界：只检查已展示正文，不抓取章节、不读取站点私有数据或绕过访问限制；图片与画布的读取、翻译、缓存和原图恢复通过注入端口复用图片运行时。
  */
 import {createMangaSession, type MangaTranslationStatus} from './mangaSession';
@@ -14,6 +14,33 @@ type MangaCandidate = {image: MangaSurface; identity: string; ready: boolean; vi
 const isSegment = (surface: MangaSurface): surface is MangaImageSegment => 'image' in surface;
 const isCanvas = (surface: MangaSurface): surface is HTMLCanvasElement => !isSegment(surface) && surface.tagName === 'CANVAS';
 const isImage = (surface: MangaSurface): surface is HTMLImageElement => !isSegment(surface) && surface.tagName === 'IMG';
+const candidateElement = (candidate: MangaCandidate): HTMLElement => isSegment(candidate.image) ? candidate.image.image : candidate.image;
+
+/** 各选择器的结果已有 DOM 顺序；固定三路合并不新增扫描或全量排序。 */
+function mergeCandidateStreams(streams: MangaCandidate[][]): MangaCandidate[] {
+    const active = streams.filter(stream => stream.length > 0);
+    if (active.length === 0) return [];
+    if (active.length === 1) return active[0];
+    const positions = active.map(() => 0), merged: MangaCandidate[] = [];
+    while (true) {
+        let next = -1;
+        for (let i = 0; i < active.length; i++) {
+            const candidate = active[i][positions[i]];
+            if (!candidate) continue;
+            if (next < 0) {next = i;continue;}
+            const first = candidateElement(active[next][positions[next]]);
+            const other = candidateElement(candidate);
+            // 同节点分段、断开的节点和宿主重写异常保持发现次序，下一次变动再发现。
+            try {
+                const position = first.compareDocumentPosition(other);
+                if (!(position & 1) && (position & 2)) next = i;
+            } catch { /* 不让宿主 DOM 比较异常打断整个阅读器。 */ }
+        }
+        if (next < 0) return merged;
+        merged.push(active[next][positions[next]++]);
+    }
+}
+
 interface SurfacePorts<T> {
     identity: (surface: T) => string | null;
     translate: (surface: T) => Promise<void>;
@@ -230,7 +257,7 @@ export function createMangaReader(ports: {
                     && rect.right > 0 && rect.left < window.innerWidth && style.display !== 'none' && style.visibility !== 'hidden' && inViewport(element, rect);
             });} catch { /* 无效选择器不影响宿主页面。 */ }
         }
-        const candidates: MangaCandidate[] = [...images.flatMap<MangaCandidate>(image => {
+        const imageCandidates = images.flatMap<MangaCandidate>(image => {
             const rect = image.getBoundingClientRect();
             const style = getComputedStyle(image);
             // 明确阅读器内的正文允许可点击图片和 presentation 角色，不能复用普通悬浮图标的装饰图排除。
@@ -244,17 +271,20 @@ export function createMangaReader(ports: {
             });
             return [{image, identity: `${ports.identity(image)}:${imageLoadTracker.revision(image)}`, ready, visible: ready
                 && inViewport(image,rect), pixels: image.naturalWidth * image.naturalHeight}];
-        }), ...canvases.map(({canvas, identity}) => {
+        });
+        const canvasCandidates = canvases.map(({canvas, identity}) => {
             const rect = canvas.getBoundingClientRect(), style = getComputedStyle(canvas);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: canvas, identity: identity!, ready, visible: ready && inViewport(canvas, rect), pixels: canvas.width * canvas.height};
-        }), ...backgrounds.map(({element, identity}) => {
+        });
+        const backgroundCandidates = backgrounds.map(({element, identity}) => {
             const rect = ports.background!.bounds(element), style = getComputedStyle(element);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: element, identity: identity!, ready, visible: ready && inViewport(element, rect), pixels: ports.background!.pixels(element)};
-        })];
+        });
+        const candidates = mergeCandidateStreams([imageCandidates, canvasCandidates, backgroundCandidates]);
         // 原生 IO 会通知普通图片进出视口；分段在同一张长图内移动、画布和自定义选择器仍逐帧更新。
         needsScrollLayout = !intersection || custom || !!site?.generic || candidates.some(page => !isImage(page.image));
         const anchor = candidates.reduce((last, page, index) => page.visible ? index : last, -1);
@@ -318,8 +348,11 @@ export function createMangaReader(ports: {
     function scheduleLayout(check=true): void {
         invalidateReading(check);
         if(readingFrame!==null){window.cancelAnimationFrame(readingFrame);readingFrame=null;}
-        if (disposed || frame !== null) return;
+        if (disposed) return;
+        if (frame !== null) {session.deferScheduling();return;}
         if (!session.status().available && !mangaReaderSelector(window.location?.href || 'about:blank', ports.siteRules?.())) return;
+        // 通知与测量之间旧任务可能完成，先关闸，避免按旧页序启动下一页。
+        session.deferScheduling();
         frame = window.requestAnimationFrame(() => { frame = null; refresh(); });
     }
     function schedule(): void { discoveryDirty = true; scheduleLayout(); }

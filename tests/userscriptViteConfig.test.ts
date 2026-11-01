@@ -203,7 +203,10 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
+        // Exercise two real five-iteration workers above the production 64 KiB gate,
+        // without compressing a needlessly large repeated fixture under instrumentation.
+        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
+        expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');

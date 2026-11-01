@@ -152,6 +152,8 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || DOCS_TOOL_SCRIPTS.includes(path)
         || QUALITY_TOOL_SCRIPTS.includes(path)
         || path === 'scripts/generate-userscript-language-data.mjs'
+        // 固定 Unicode 源、全标量集合对照与离线再生成检查由图片排版专项负责。
+        || path === 'scripts/generate-image-grapheme-space-data.mjs'
         || path === 'scripts/build-userscript-standalone.mjs'
         || path === 'scripts/build-userscript-greasyfork.mjs'
         || path === 'scripts/verify-userscript-build.mjs'
@@ -301,6 +303,12 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
 ]);
 
 describe('repository verification ownership', () => {
+    it('图片字素空格数据可从固定 Unicode17 来源离线校验再生成结果', () => {
+        const output = execFileSync(process.execPath, ['scripts/generate-image-grapheme-space-data.mjs', '--check'],
+            {cwd: PROJECT_ROOT, encoding: 'utf8'});
+        expect(output).toContain('Unicode 17 grapheme-space data matches the pinned offline source.');
+    });
+
     it('质量评测工具入口可解析，核心行为专项已登记', () => {
         for (const path of listFiles('scripts/quality').filter(path => /\.(?:cjs|mjs)$/u.test(path))) {
             expect(() => execFileSync(process.execPath, ['--check', projectPath(path)], {stdio: 'pipe'})).not.toThrow();

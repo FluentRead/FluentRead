@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/runtime.ts
  * 文件职责：实现网页图片翻译的独立悬浮/右键入口、可信目标快照、异步请求所有权和单图及漫画连续模式的原图/译图切换，保持宿主图片与响应式图片资源不变。
- * 主要内容：单图失败提供模型与服务导航，译图操作条随指针隐藏并保留键盘入口；指针局部检查仅在本次调用内复用同图几何与样式读取，第二个重叠命中立即停止，下一帧重新定位；单图识别方式纳入缓存身份，切换后不复用旧结果；在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，默认 12 张可配置的快速缓存和 100 页/16 MiB 二进制局部结果，靠近视口时直接预合成画布，无文字页只保留轻量完成标记；返页不复用已经取消的预合成，旧任务结束不能删除新任务；漫画状态以订阅快照发送并隔离同步异常，避免订阅变化重复递送或阻断请求和卸载；图片重载、独立服务及模型变化使结果失效；组合按所选成员的安全连接摘要建立响应式依赖，成员变更撤销旧任务与缓存，漫画返页复用结果不等待其他页推理；预合成不得撤下当前译图，单页反馈展示真实阶段与进度，漫画错误恢复跟随图片可见边缘，正常处理与完成隐藏操作条，换图、取消与卸载时释放资源。
+ * 主要内容：普通图片全部译文不可安全绘制时保留宿主原图，并在文字面板提供译文；单图失败提供模型与服务导航，译图操作条随指针隐藏并保留键盘入口；指针局部检查仅在本次调用内复用同图几何与样式读取，第二个重叠命中立即停止，下一帧重新定位；单图识别方式纳入缓存身份，切换后不复用旧结果；在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，默认 12 张可配置的快速缓存和 100 页/16 MiB 二进制局部结果，靠近视口时直接预合成画布，无文字页只保留轻量完成标记；返页不复用已经取消的预合成，旧任务结束不能删除新任务；漫画状态以订阅快照发送并隔离同步异常，避免订阅变化重复递送或阻断请求和卸载；图片重载、独立服务及模型变化使结果失效；组合按所选成员的安全连接摘要建立响应式依赖，成员变更撤销旧任务与缓存，漫画返页复用结果不等待其他页推理；预合成不得撤下当前译图，单页反馈展示真实阶段与进度，漫画错误恢复跟随图片可见边缘，正常处理与完成隐藏操作条，换图、取消与卸载时释放资源。
  * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
@@ -89,6 +89,7 @@ interface ImageTranslationState {
     waitingForImage: boolean;
     lines: ImageTranslationLine[];
     translatedImage: TranslatedSurface | null;
+    imageUnchanged: boolean;
     resultIdentity: string | null;
     sourceStyleLease: {
         opacity: {value: string; priority: string};
@@ -102,6 +103,7 @@ interface CachedImageTranslation {
     sourceIdentity: string;
     configurationIdentity: string;
     translatedImage: TranslatedSurface | null;
+    imageUnchanged: boolean;
     lines: ImageTranslationLine[];
     pixels: number;
     manga: boolean;
@@ -183,7 +185,7 @@ function warmMangaPage(image: HTMLImageElement): Promise<void> {
             }
             const current = states.get(image) || createState(image); current.manga = true;
             releaseSurface(current);
-            current.translatedImage = surface || null; current.lines = page.lines; current.resultIdentity = identity;
+            current.translatedImage = surface || null; current.imageUnchanged = false; current.lines = page.lines; current.resultIdentity = identity;
             cacheResult(current, identity);
             // 隐藏页只进入快速缓存；真正可见时由同一会话完成显示交接。
             if (current.phase === 'loading') showTranslatedImage(current);
@@ -311,7 +313,7 @@ function reuseMangaImage(image: HTMLImageElement): boolean {
     const cached=resultCache.get(image);
     if (!config.useCache || !cached || cached.sourceIdentity!==sourceIdentity(image) || cached.configurationIdentity!==identity) return false;
     const current=state || createState(image);current.manga=true;
-    current.resultIdentity=identity;current.translatedImage=cached.translatedImage;current.lines=cached.lines;
+    current.resultIdentity=identity;current.translatedImage=cached.translatedImage;current.imageUnchanged=cached.imageUnchanged;current.lines=cached.lines;
     resultCache.delete(image);resultCache.set(image,cached);
     showTranslatedImage(current);
     return true;
@@ -433,6 +435,7 @@ function cacheResult(state: ImageTranslationState, identity: string): void {
         sourceIdentity: state.sourceIdentity,
         configurationIdentity: identity,
         translatedImage,
+        imageUnchanged: state.imageUnchanged,
         lines: state.lines,
         pixels,
         manga: state.manga === true,
@@ -573,6 +576,7 @@ function invalidateSource(state: ImageTranslationState): void {
     releaseSurface(state);
     state.lines = [];
     state.resultIdentity = null;
+    state.imageUnchanged = false;
     state.controls.setLines([]);
     state.needsPreparation = false;
     setButtonState(state, 'idle', '翻译图片');
@@ -658,7 +662,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.clipPath = `inset(${top - rect.top}px ${rect.right - right}px ${rect.bottom - bottom}px ${left - rect.left}px)`;
     state.controls.element.style.setProperty('left', `${left - rect.left + 8}px`, 'important');
     state.controls.element.style.setProperty('bottom', `${rect.bottom - bottom + 8}px`, 'important');
-    const edgeFeedback = state.manga && (state.phase === 'loading' || state.phase === 'error' || state.controls.feedback.dataset.warning === 'true');
+    const edgeFeedback = (state.manga && (state.phase === 'loading' || state.phase === 'error')) || state.controls.feedback.dataset.warning === 'true';
     state.controls.feedback.style.left = `${edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left}px`;
     state.controls.feedback.style.top = `${edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top}px`;
     state.controls.feedback.style.maxHeight = `${Math.max(0, bottom - top - 16)}px`;
@@ -730,7 +734,7 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
         image, presentation: resolveImagePresentation(image), needsPreparation: false, overlay, controls, phase: 'idle', abortController: null, hovered: true, hoverEntry,
         hoverTimer: null, resizeObserver: null, imageLoadHandler: null,
         sourceIdentity: sourceIdentity(image), waitingForImage: false,
-        lines: [], translatedImage: null, resultIdentity: null, sourceStyleLease: null,
+        lines: [], translatedImage: null, imageUnchanged: false, resultIdentity: null, sourceStyleLease: null,
     };
     state.imageLoadHandler = (event: Event) => {
         imageLoadTracker.loaded(event);
@@ -905,9 +909,10 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
-        warning: state.manga === true && phase === 'translated'
-            && (state.lines.some(line => line.renderSkipped) || (!state.translatedImage && state.lines.length > 0)),
-        warningAction: state.manga === true && state.lines.some(line => line.renderSkipped),
+        warning: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+            || (!state.translatedImage && state.lines.length > 0)),
+        warningAction: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+            || (state.manga !== true && !state.translatedImage && state.lines.length > 0)),
         queued: phase === 'loading' && Boolean(state.queuedTranslation),
         modelSettings: phase === 'error' && Boolean(state.localFailure),
         serviceSettings: phase === 'error' && !state.needsPreparation, errorDetails: state.errorDetails,
@@ -969,14 +974,15 @@ function showTranslatedImage(state: ImageTranslationState): void {
         state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
-    setButtonState(state, 'translated', state.manga && state.lines.some(line => line.renderSkipped)
-        ? '部分译文未绘制，请查看漫画文字' : state.manga && !image && state.lines.length
+    setButtonState(state, 'translated', state.lines.some(line => line.renderSkipped)
+        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !image && state.lines.length
             ? '已识别文字，原图未改动' : image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
     updateOverlayPosition(state);
 }
 
 function restoreImageTranslation(state: ImageTranslationState): void {
     state.resultIdentity = null;
+    state.imageUnchanged = false;
     warming.get(state.image)?.controller.abort();
     state.abortController?.abort();
     invalidateTranslationTask(state);
@@ -1052,7 +1058,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
     if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
     clearHoverTimer(state);
     const identity = configurationIdentity(state.manga);
-    if (!prepareLanguages && state.resultIdentity === identity && (state.translatedImage || state.manga)) {
+    if (!prepareLanguages && state.resultIdentity === identity && (state.translatedImage || state.manga || state.imageUnchanged)) {
         showTranslatedImage(state);
         return;
     }
@@ -1062,6 +1068,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         resultCache.set(state.image, cached);
         state.resultIdentity = identity;
         state.translatedImage = cached.translatedImage;
+        state.imageUnchanged = cached.imageUnchanged;
         state.lines = cached.lines;
         showTranslatedImage(state);
         return;
@@ -1072,6 +1079,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         return;
     }
     deleteCachedResult(state.image);
+    state.imageUnchanged = false;
     const sourceLanguage = state.manga ? mangaSourceLanguage() : config.from;
     if (state.manga && getMangaOcrEngine(sourceLanguage) === 'tesseract' && config.imageTranslationMangaDownloadConfirmed) prepareLanguages = true;
     state.needsPreparation = false;
@@ -1115,7 +1123,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         if (!requestIsCurrent(state, controller)) return;
         if (state.manga && result.lines.length === 0 && configurationIdentity(state.manga) === identity) {
             restoreOriginalImage(state);
-            state.translatedImage?.remove();state.translatedImage = null;
+            state.translatedImage?.remove();state.translatedImage = null;state.imageUnchanged = false;
             state.resultIdentity = identity;state.lines = [];
             if (config.useCache) saveLightResult(state, {width: 1, height: 1, patches: [], lines: []}, identity);
             cacheResult(state, identity);
@@ -1125,7 +1133,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         setButtonState(state, 'loading', '正在生成译图…');
         const page = state.manga && result.mangaPatches ? compressMangaPage(result.mangaPatches, result.lines) : undefined;
         const translatedImage = page ? (page.patches.length ? await composeMangaPage(state.image, page, controller.signal) : null)
-            : await withTimeout(loadImage(result.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '译图加载超时', controller.signal);
+            : result.imageUnchanged ? null : await withTimeout(loadImage(result.image, controller.signal), IMAGE_READ_TIMEOUT_MS, '译图加载超时', controller.signal);
         if (!requestIsCurrent(state, controller)) {
             if (translatedImage?.tagName === 'CANVAS') {(translatedImage as HTMLCanvasElement).width = 0; (translatedImage as HTMLCanvasElement).height = 0;}
             return;
@@ -1137,6 +1145,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         }
         state.resultIdentity = identity;
         state.translatedImage = translatedImage;
+        state.imageUnchanged = result.imageUnchanged === true;
         state.lines = result.lines;
         if (page && config.useCache) saveLightResult(state, page, identity);
         cacheResult(state, identity);

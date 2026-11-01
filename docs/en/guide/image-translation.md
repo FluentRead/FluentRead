@@ -4,6 +4,9 @@ Read translations over a webpage image, or open its text panel to compare and co
 
 <GuideVisual kind="image" en />
 
+
+Recognized text that remains unchanged, including brand names, target-language text and missing translations, also participates in protection. If a neighboring translation would erase or draw over that text, FluentRead preserves it and offers the withheld translation in the text panel. When no translation can be safely drawn on an ordinary image, the page keeps its original image. This protection does not cover unrecognized text or unknown artwork.
+
 ## Translate one image
 
 1. In **Settings → Image/manga translation**, enable webpage image translation and check the source language, target language, and service.
@@ -11,6 +14,10 @@ Read translations over a webpage image, or open its text panel to compare and co
 3. Prepare recognition resources when prompted on first use. Once finished, switch between original and translated images, or open **Text → Compare original** to check recognition, read long translations, and copy text.
 
 Choose **Cancel** to stop processing; downloaded resources remain available. The text panel helps when a translation is long or the image is small. Controls hide when you leave the image and return when you hover over it.
+
+Press **Escape** inside the text panel to close it and return to an available entry. Focus stays elsewhere if you have already moved to another page control. Copy feedback follows the current view and latest operation; if copying fails, select the text and copy it manually.
+
+Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
 
 The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
 
@@ -22,7 +29,7 @@ PaddleOCR automatically enhances recognition contrast for some colored text on l
 2. Click the manga button. If resources are missing, confirm preparation; choosing Later or closing the prompt starts no download.
 3. Visible pages translate first. Scroll to translate more pages, click the manga button again to show originals and pause, and click again to resume.
 
-After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Numbers identify the current visible candidates, not chapter page numbers.
+After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Mixed images, canvases, and background images follow document order. Numbers identify the current visible candidates, not chapter page numbers.
 
 The panel reads existing results without starting recognition or translation. It reports when a page is still processing, a result has been released, or content is too large to display; return to the page and check again. A long-image segment may include text from adjacent segments. Canvas text comes from the latest completed translation snapshot and may not reflect later changes to the canvas.
 

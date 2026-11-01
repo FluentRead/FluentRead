@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/mangaSession.ts
  * 文件职责：管理当前漫画章节的连续翻译会话，保证一次开启、逐页执行、原文暂停与异步任务所有权。
- * 主要内容：接收可见页和有界提前翻译窗口，当前页优先、串行处理；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
+ * 主要内容：接收可见页和有界提前翻译窗口，当前页优先、串行处理；同优先级按最新有效页序选取，缺失、重复或非法序号稳定保留进入顺序；阅读器移动期间暂停新识别但立即复用已完成结果，短暂离屏不取消在途推理，停稳后未译当前页可取消远处旧任务，最近页面仅保留不抢占队列；隐藏时停止新任务，换图、换章和关闭取消旧任务；显式单页重试进入同一队列并清除旧错误，不循环请求或并发绕过会话；未启动的延后任务重新排队，卸载后不再发送迟到通知。
  * 模块边界：只依赖注入的页面翻译与恢复端口，图片和可读画布共用一个队列；不查询 DOM、保存配置或实现 OCR；位图缓存、宿主样式与语言包由图片运行时管理。
  */
 import type {ImageTranslationStage} from '../progress';
@@ -75,8 +75,23 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
 
     function pump(): void {
         if (disposed || !active || suspended || schedulingDeferred || running) return;
-        const candidates = Array.from(pages).filter(([, page]) => page.retained && page.scheduled && !page.attempted);
-        const next = candidates.find(([, page]) => page.visible) ?? candidates[0];
+        let next: [T, Page] | undefined, first: [T, Page] | undefined, invalidOrdinal = false;
+        const ordinals = new Set<number>();
+        for (const [image, page] of pages) {
+            if (!page.retained || !page.scheduled || page.attempted) continue;
+            const current = next?.[1];
+            if (!current || (page.visible && !current.visible)) {
+                first = next = [image, page];invalidOrdinal = false;ordinals.clear();
+            } else if (page.visible !== current.visible) continue;
+            const ordinal = page.ordinal;
+            // 只比较同一优先级，全部为唯一正整数时才采用最新正文序号。
+            if (ordinal === undefined || !Number.isSafeInteger(ordinal) || ordinal <= 0 || ordinals.has(ordinal)) {
+                invalidOrdinal = true;next = first;
+            } else {
+                ordinals.add(ordinal);
+                if (!invalidOrdinal && ordinal < next![1].ordinal!) next = [image, page];
+            }
+        }
         if (!next) return;
         const [image, page] = next;
         page.attempted = true;

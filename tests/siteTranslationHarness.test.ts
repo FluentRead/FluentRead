@@ -3971,6 +3971,54 @@ describe('real-site translation matrix gates', () => {
     } finally {vi.unstubAllGlobals();}
   });
 
+  it('keeps the Amazon product ASIN and mandatory price, rating and search boundaries when purchasing is unavailable', () => {
+    const config = cases['amazon-echo-dot-product'];
+    expect(config.url).toBe('https://www.amazon.com/dp/B09B8V1LZ3');
+    const url = new URL(config.url);
+    expect(url.pathname).toBe('/dp/B09B8V1LZ3');
+    expect(url.search).toBe('');
+    expect(config.hoverTargets.find(target => target.name === 'technical-description')?.sourceIncludes).toEqual(['Dual-band Wi-Fi']);
+    expect(config.optionalForbiddenSelectors).toEqual(['#add-to-cart-button', '#buy-now-button']);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, [], config.optionalForbiddenSelectors))
+      .toEqual(['.a-price', '#acrPopover', '#acrCustomerReviewText', '#nav-search-bar-form']);
+    expect(config.requiredSelectors).toEqual(['h1#title', '#feature-bullets li', '.content-grid-block p',
+      '.content-grid-block h2', '.content-grid-block h3', '#tech p']);
+    expect(config.modes).toEqual(['hover', 'full']);
+  });
+
+  it.each(['add-to-cart-button', 'buy-now-button'])('adopts an absent Amazon %s only when it appears clean and rejects translated purchase controls', async id => {
+    const config = cases['amazon-echo-dot-product'];
+    const {document, window} = parseHTML(`<html><body><main>
+      <h1 id="title">Echo Dot product title</h1><div id="availability">This item cannot be shipped to your selected delivery location.</div>
+      <span class="a-price">$49.99</span><span id="acrPopover">4.5 out of 5 stars</span><span id="acrCustomerReviewText">1,234 ratings</span>
+      <form id="nav-search-bar-form"><input type="search"></form><div id="purchase-controls"></div>
+      <ul id="feature-bullets"><li>Readable product description.</li></ul><div class="content-grid-block"><h2>Product details</h2><h3>Product features</h3><p>A detailed description.</p></div>
+      <section id="tech"><p>Dual-band Wi-Fi</p></section>
+    </main></body></html>`);
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], config.forbiddenSelectors, [], config.dynamicForbiddenSelectors, config.optionalForbiddenSelectors);
+      for (const selector of config.optionalForbiddenSelectors) {
+        expect(baseline.forbiddenState.find(state => state.selector === selector)).toMatchObject({count: 0, optional: true, dynamic: true});
+      }
+      await expect(assertPageContract(page, baseline, [], config.url, 'unavailable product')).resolves.toBeDefined();
+      const button = document.createElement('input'); button.id = id; button.type = 'submit';
+      const value = id === 'add-to-cart-button' ? 'Add to Cart' : 'Buy Now'; button.setAttribute('value', value);
+      document.querySelector('#purchase-controls')!.append(button);
+      await expect(assertPageContract(page, baseline, [], config.url, 'clean control appeared')).resolves.toBeDefined();
+      expect(baseline.forbiddenState.find(state => state.selector === `#${id}`)).toMatchObject({count: 1});
+      button.setAttribute('value', 'Unexpected translated control');
+      await expect(assertPageContract(page, baseline, [], config.url, 'translated value')).rejects.toThrow('动态 forbidden DOM 基线丢失');
+      button.setAttribute('value', value); button.setAttribute('data-fr-translation-owned', 'true');
+      await expect(assertPageContract(page, baseline, [], config.url, 'owned purchase control')).rejects.toThrow('forbidden DOM 出现译文');
+      button.removeAttribute('data-fr-translation-owned');
+      await expect(assertPageContract(page, baseline, [], config.url, 'restored purchase control')).resolves.toBeDefined();
+    } finally {vi.unstubAllGlobals();}
+  });
+
   it.each([
     ['legacy', 'ReposListItem-module__TopicsList__fixture', 'ReposListItem-module__LabelsContainer__fixture'],
     ['current-small', 'TopicsList__XBoKUv SmallScreenOnly__KktHod', 'LabelsContainer__Bi_rOW'],

@@ -4,6 +4,9 @@ Read translations over a webpage image, or open its text panel to compare and co
 
 <GuideVisual kind="image" en />
 
+
+Recognized text that remains unchanged, including brand names, target-language text and missing translations, also participates in protection. If a neighboring translation would erase or draw over that text, FluentRead preserves it and offers the withheld translation in the text panel. When no translation can be safely drawn on an ordinary image, the page keeps its original image. This protection does not cover unrecognized text or unknown artwork.
+
 ## Translate one image
 
 1. In **Settings → Image/manga translation**, enable webpage image translation and check the source language, target language, and service.

@@ -22,8 +22,11 @@ Open **Settings → Tools & learning → Website rules → Site preferences**:
 | Always translate | Translate new pages on that website automatically |
 | Disable extension | Restore the original and stop the extension on that site; overrides automatic translation |
 | Hide floating button | Hide the button while keeping shortcuts and other features available |
+| Translation only | Show only translated text on this website; other websites keep the global display mode |
 
 Preferences use the root domain and include its subdomains, without paths or ports. Re-enabling a disabled site restores its other preferences. Removing preferences returns to global defaults. Global automatic translation applies to non-disabled sites and keeps your saved list.
+
+Choose **Translation only** when adding a site, or check it on an existing row. It does not enable automatic translation. Existing translations change display without another request; unchecking it returns to the global mode. **Restore** still returns the original text. A shortcut profile with an explicit display mode keeps its one-time choice. Google Translate supports bilingual display only, so choose another service for translation-only sites.
 
 The extension menu also offers always-translate and disable-site controls. Restoring the current article keeps it original, including when following its table-of-contents links. Always-translate takes effect again on the next article. Turning it off affects future automatic triggers and leaves current translations in place.
 

@@ -153,6 +153,7 @@ import {
     normalizeAlwaysTranslateDomains,
     normalizeDisabledExtensionDomains,
     normalizeFloatingBallDisabledDomains,
+    normalizeSiteDomains,
 } from "@/src/core/site-rules/domain";
 import {normalizeSiteAdaptationSettings} from '@/src/core/site-adaptation/schema';
 import type {SiteAdaptationSettings} from '@/src/core/site-adaptation/types';
@@ -365,6 +366,7 @@ export class Config {
     autoTranslate: boolean; // 是否即时翻译
     alwaysTranslateDomains: string[]; // 始终自动翻译的可注册域名（eTLD+1）
     disabledExtensionDomains: string[]; // 禁用扩展的可注册域名（eTLD+1）
+    translationOnlyDomains: string[]; // 仅显示译文的网站；其他网站继续沿用全局 display
     siteAdaptation: SiteAdaptationSettings; // 网站内容范围、保护区域及本地 JSON 适配规则
     from: string;
     to: string;
@@ -576,6 +578,7 @@ export class Config {
         this.autoTranslate = false;
         this.alwaysTranslateDomains = [];
         this.disabledExtensionDomains = [];
+        this.translationOnlyDomains = [];
         this.siteAdaptation = normalizeSiteAdaptationSettings(undefined);
         this.from = defaultOption.from;
         this.to = defaultOption.to;
@@ -1402,6 +1405,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.translationBeforeOriginal = source.translationBeforeOriginal === true;
     normalized.alwaysTranslateDomains = normalizeAlwaysTranslateDomains(source.alwaysTranslateDomains);
     normalized.disabledExtensionDomains = normalizeDisabledExtensionDomains(source.disabledExtensionDomains);
+    normalized.translationOnlyDomains = normalizeSiteDomains(source.translationOnlyDomains);
     normalized.siteAdaptation = normalizeSiteAdaptationSettings(source.siteAdaptation);
     normalized.shareCard = normalizeShareCardPreferences(source.shareCard);
     normalized.interfaceSkin = normalizeInterfaceSkin(source.interfaceSkin);

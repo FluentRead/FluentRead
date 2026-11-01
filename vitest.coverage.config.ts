@@ -19,6 +19,9 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/platform/browser/translationSidepanel.ts',
+                'src/app/sidepanel/index.ts',
+                'src/app/sidepanel/SidepanelApp.vue',
                 'src/features/vocabulary/materialBackupReader.ts',
                 'src/features/vocabulary/materialBackupJson.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',

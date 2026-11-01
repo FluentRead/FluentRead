@@ -851,7 +851,10 @@
       "tests/zoteroFontCache.test.ts",
       "tests/clickSelection.test.ts",
       "tests/clickSelectionSettingsLifecycle.test.ts",
-      "tests/aiMultiSegmentSettingsLifecycle.test.ts"
+      "tests/aiMultiSegmentSettingsLifecycle.test.ts",
+      "tests/translationSidepanel.test.ts",
+      "tests/sidepanelBootstrap.test.ts",
+      "tests/sidepanelApp.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

@@ -1,0 +1,24 @@
+/**
+ * @file src/app/sidepanel/sidepanel.css
+ * 文件职责：定义原生翻译侧边栏的自适应页面外壳与主题。
+ * 主要内容：使用共享 token 和界面字体，固定紧凑标题并将剩余高度交给可滚动的翻译工作台；浅色、深色和服务菜单消费同一组语义变量。
+ * 模块边界：这里只管理扩展自有文档，不匹配宿主网页；输入与结果布局由 translation-center 的 sidebar 展示变体负责。
+ */
+@import '../../ui/styles/tokens.css';
+
+/* Edge 原生侧栏可自动反转页面颜色；only 让浅色与深色都遵守扩展自己的主题。 */
+:root { color-scheme: only light; font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-synthesis: none; color: var(--ink); background: var(--surface-soft); --el-color-primary: var(--brand); }
+:root.dark { color-scheme: only dark; --brand: #ff6f9a; --brand-strong: #ff8aab; --brand-soft: #ef477629; --ink: #f4f5f8; --muted: #b7bdc9; --line: #363a45; --surface: #252830; --surface-soft: #20232a; }
+:root { --el-text-color-primary: var(--ink); --el-text-color-regular: var(--ink); --el-text-color-placeholder: var(--muted); --el-bg-color: var(--surface); --el-bg-color-overlay: var(--surface); --el-fill-color-blank: var(--surface); --el-fill-color-light: var(--surface-soft); --el-border-color: var(--line); --el-border-color-light: var(--line); }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; min-width: 0; margin: 0; }
+body { overflow: hidden; }
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+.sidepanel-shell { display: flex; flex-direction: column; height: 100dvh; min-height: 0; color: var(--ink); background: var(--surface-soft); }
+.sidepanel-header { display: flex; flex: none; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px; background: var(--surface); }
+.sidepanel-header h1 { flex: 1; min-width: 0; margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.sidepanel-header button { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; }
+.sidepanel-header button:hover { color: var(--ink); background: var(--surface-soft); }
+.sidepanel-header button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sidepanel-error { margin: 8px 12px 0; color: var(--fr-danger); font-size: 12px; line-height: 1.6; }

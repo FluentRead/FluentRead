@@ -664,6 +664,8 @@
       "tests/mangaOcrColor.test.ts",
       "tests/mangaOcrDeskew.test.ts",
       "tests/mangaOcrAssets.test.ts",
+      "tests/mangaOnnxFields.test.ts",
+      "tests/mangaRecognitionShapes.test.ts",
       "tests/mangaOnnxBuild.test.ts",
       "tests/mangaPatchResult.test.ts",
       "tests/mangaQuality.test.ts",

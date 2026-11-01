@@ -20,6 +20,8 @@ import {createBrowserMangaOcr, createMangaOcrRuntime, mangaOcrRuntime, removeMan
 import * as mangaOcrColor from '@/src/features/image-translation/services/mangaOcrColor';
 import {planMangaOcrTiles, mergeMangaOcrTiles,collectMangaOcrTileNumericEvidence} from '@/src/features/image-translation/services/mangaOcrTiles';
 import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
+// 原生会话端口仍用fake推理，feeds保持SDK真实固定输入域，不以空对象绕过门禁。
+const recognitionFeeds=()=>({x:{type:'float32',dims:[1,3,48,8]}});
 const opaquePixels=()=>{const pixels=new Uint8ClampedArray(200*200*4);for(let index=3;index<pixels.length;index+=4)pixels[index]=255;return pixels;};
 const response = {results:[{text:'Hello world',confidence:0.99,box:{x:10,y:10,width:100,height:20}}]};
 const deferred = <T,>() => {let resolve!:(v:T)=>void,reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
@@ -303,7 +305,7 @@ describe('漫画竖框的受限反向重试',()=>{
         mocks.retryRecognition.mockImplementationOnce(async()=>{
             if(stage==='cancel')controller.abort();
             if(stage==='throw')throw failure;
-            if(stage==='sdk-swallowed')try{await session.run();}catch{}
+            if(stage==='sdk-swallowed')try{await session.run(recognitionFeeds());}catch{}
             return [];
         });
         const port=await createBrowserMangaOcr(),result=port.recognize('one',{flatten:true,noCache:true,strategy:'per-box',signal:controller.signal});
@@ -540,7 +542,7 @@ describe('漫画本地神经 OCR 会话',()=>{
     it.each(['throw','sdk-swallowed'])('斜行原生失败保持首因，不能伪装为没有改进：%s',async stage=>{
         prepareDeskew();const failure=new Error('deskew inference failed'),session={run:vi.fn().mockRejectedValue(failure),release:vi.fn()};
         mocks.sessions=[undefined,session];mocks.recognize.mockResolvedValueOnce({results:[slanted(),{...slanted(),text:'another row'}]});
-        mocks.retryRecognition.mockImplementationOnce(async()=>{if(stage==='throw')throw failure;try{await session.run();}catch{}return [];});
+        mocks.retryRecognition.mockImplementationOnce(async()=>{if(stage==='throw')throw failure;try{await session.run(recognitionFeeds());}catch{}return [];});
         const port=await createBrowserMangaOcr();
         await expect(port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toBe(failure);
         expect(mocks.retryRecognition).toHaveBeenCalledOnce();
@@ -633,7 +635,7 @@ describe('漫画本地神经 OCR 会话',()=>{
         mocks.sessions=[undefined,session];mocks.recognize.mockResolvedValueOnce({results:[original]});
         mocks.retryRecognition.mockImplementationOnce(async()=>{
             if(stage==='thrown')throw failure;
-            try{await session.run();}catch{}return [];
+            try{await session.run(recognitionFeeds());}catch{}return [];
         });
         const port=await createBrowserMangaOcr();
         await expect(port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toBe(failure);
@@ -653,8 +655,8 @@ describe('漫画本地神经 OCR 会话',()=>{
         mocks.retryRecognition.mockImplementationOnce(async(_canvas,boxes)=>{
             // 复现 SDK 的单项批次与吞错行为；每个弱框都必须经过真实会话包装。
             try {
-                for(const box of boxes){
-                    await session.run(box);
+                for(let index=0;index<boxes.length;index++){
+                    await session.run(recognitionFeeds());
                     if(stage==='between-runs'&&nativeRun.mock.calls.length===1)controller.abort();
                 }
             }catch{}return [];
@@ -663,7 +665,7 @@ describe('漫画本地神经 OCR 会话',()=>{
         await expect(port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',signal:controller.signal}))
             .rejects.toMatchObject({name:'AbortError'});
         expect(mocks.retryRecognition.mock.calls[0][1]).toEqual(columns.map(item=>item.box));
-        expect(nativeRun).toHaveBeenCalledOnce();expect(nativeRun).toHaveBeenCalledWith(columns[0].box);
+        expect(nativeRun).toHaveBeenCalledOnce();expect(nativeRun).toHaveBeenCalledWith(recognitionFeeds());
         expect(mocks.pace).toHaveBeenCalledTimes(2);
         expect(mocks.canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
         expect(mocks.bitmapClose).toHaveBeenCalledOnce();await port.destroy();
@@ -895,7 +897,7 @@ describe('漫画本地神经 OCR 会话',()=>{
     });
 
     it('CPU detection 与 recognition 会话也经过推理间歇，保持 this、参数与返回值',async()=>{
-        const feeds={input:new Float32Array([1])},options={fetches:['output']};
+        const feeds=recognitionFeeds(),options={fetches:['output']};
         const detectionRun=vi.fn(async function(this:unknown,...args:unknown[]){expect(this).toBe(detection);expect(args).toEqual([feeds,options]);return response;});
         const recognitionRun=vi.fn(async function(this:unknown,...args:unknown[]){expect(this).toBe(recognition);expect(args).toEqual([feeds]);return response;});
         const detection={run:detectionRun,release:vi.fn()},recognition={run:recognitionRun,release:vi.fn()};
@@ -910,6 +912,27 @@ describe('漫画本地神经 OCR 会话',()=>{
         await port.destroy();
     });
 
+    it('识别入口固定48高度，超域feeds在GPU/CPU原调用前失败，SDK吞错也保留门禁首因',async()=>{
+        const native=vi.fn().mockResolvedValue(response),recognition={run:native,release:vi.fn()};
+        mocks.sessions=[undefined,recognition];mocks.gpu.mockResolvedValue({available:true,info:'hardware'});
+        const port=await createBrowserMangaOcr();
+        expect(mocks.options.mock.calls[0][0].recognition.imageHeight).toBe(48);
+        mocks.recognize.mockImplementationOnce(async()=>{try{await recognition.run({x:{type:'float32',dims:[1,3,32,8]}});}catch{}return {results:[]};});
+        await expect(port.recognize('unsupported',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toThrow('支持范围');
+        expect(native).not.toHaveBeenCalled();expect(mocks.cpuCreate).not.toHaveBeenCalled();await port.destroy();
+    });
+    it('识别GPU失败时CPU重载沿用资源层返回的会话模型，不另取来源/改feeds或多forward',async()=>{
+        const feeds=recognitionFeeds(),recognition={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};
+        const cpu={run:vi.fn(async()=>response),release:vi.fn(async()=>{})},sessionModel=new ArrayBuffer(3);
+        const assets={detection:new ArrayBuffer(2),recognition:sessionModel,charactersDictionary:new ArrayBuffer(4)};
+        mocks.sessions=[undefined,recognition];mocks.gpu.mockResolvedValue({available:true,info:'hardware'});mocks.assets.mockResolvedValue(assets);mocks.cpuCreate.mockResolvedValue(cpu);
+        const port=await createBrowserMangaOcr();mocks.recognize.mockImplementationOnce(async()=>recognition.run(feeds));
+        await expect(port.recognize('retry',{flatten:true,noCache:true,strategy:'per-box'})).resolves.toMatchObject(response);
+        expect(mocks.assets).toHaveBeenCalledTimes(2);expect(mocks.options.mock.calls[0][0].model.recognition).toBe(sessionModel);
+        expect(mocks.cpuCreate).toHaveBeenCalledOnce();expect(mocks.cpuCreate).toHaveBeenCalledWith(sessionModel,{executionProviders:['wasm'],graphOptimizationLevel:'all'});
+        expect(cpu.run).toHaveBeenCalledOnce();expect(cpu.run).toHaveBeenCalledWith(feeds);await port.destroy();
+    });
+
     it('硬件 GPU 执行失败时沿用当前请求切换 CPU，取消期间不留下新会话',async()=>{
         mocks.gpu.mockResolvedValue({available:true,info:'hardware'});
         const detection={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};
@@ -922,16 +945,16 @@ describe('漫画本地神经 OCR 会话',()=>{
         expect(mocks.cpuCreate).toHaveBeenCalledWith(assets.detection,{executionProviders:['wasm'],graphOptimizationLevel:'all'});await port.destroy();
         const controller=new AbortController(),second={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};mocks.sessions=[undefined,second];
         const next=await createBrowserMangaOcr();mocks.cpuCreate.mockImplementationOnce(async()=>{controller.abort();return cpu;});
-        mocks.recognize.mockImplementationOnce(async()=>second.run());
+        mocks.recognize.mockImplementationOnce(async()=>second.run(recognitionFeeds()));
         await expect(next.recognize('image',{flatten:true,noCache:true,strategy:'per-box',signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});expect(cpu.release).toHaveBeenCalledOnce();
         const pending=new AbortController(),third={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};mocks.sessions=[third,third];
-        const last=await createBrowserMangaOcr();mocks.recognize.mockImplementationOnce(async()=>{mocks.assets.mockImplementationOnce(async()=>{pending.abort();return assets;});return third.run();});
+        const last=await createBrowserMangaOcr();mocks.recognize.mockImplementationOnce(async()=>{mocks.assets.mockImplementationOnce(async()=>{pending.abort();return assets;});return third.run(recognitionFeeds());});
         await expect(last.recognize('image',{flatten:true,noCache:true,strategy:'per-box',signal:pending.signal})).rejects.toMatchObject({name:'AbortError'});
     });
     it('SDK 吞掉 CPU 回退失败时仍报告真实错误，不能把失败当成没有文字',async()=>{
         mocks.gpu.mockResolvedValue({available:true,info:'hardware'});
         const session={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};mocks.sessions=[session,undefined];mocks.cpuCreate.mockRejectedValueOnce(new Error('CPU failed'));
-        const port=await createBrowserMangaOcr();mocks.recognize.mockImplementationOnce(async()=>{try{await session.run();}catch{}return {results:[]};});
+        const port=await createBrowserMangaOcr();mocks.recognize.mockImplementationOnce(async()=>{try{await session.run(recognitionFeeds());}catch{}return {results:[]};});
         await expect(port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toThrow('CPU failed');
         expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);
     });
@@ -941,12 +964,12 @@ describe('漫画本地神经 OCR 会话',()=>{
         mocks.sessions=[session,undefined];
         const port=await createBrowserMangaOcr();
         mocks.recognize.mockImplementationOnce(async()=>{
-            try{await session.run();}catch{}
-            try{await session.run();}catch{}
+            try{await session.run(recognitionFeeds());}catch{}
+            try{await session.run(recognitionFeeds());}catch{}
             return {results:[]};
         });
         await expect(port.recognize('first',{flatten:true,noCache:true,strategy:'per-box'})).rejects.toBe(first);
-        mocks.recognize.mockImplementationOnce(async()=>session.run());
+        mocks.recognize.mockImplementationOnce(async()=>session.run(recognitionFeeds()));
         expect((await port.recognize('retry',{flatten:true,noCache:true,strategy:'per-box'})).results).toEqual(response.results);
         await port.destroy();
     });
@@ -1122,7 +1145,7 @@ describe('识别颜色适配器的公有 SDK 接入与页生命周期',()=>{
                 const output=this.platform.canvas.createProcessor({}).resize({width:8,height:48}).toCanvas();
                 expect(this.pendingColorReads.size).toBe(1);output.getContext('2d').getImageData(0,0,8,48);expect(this.pendingColorReads.size).toBe(0);
             }
-            started.resolve();await this.session.run({});return [];
+            started.resolve();await this.session.run(recognitionFeeds());return [];
         });
         const port=await createBrowserMangaOcr();recognitor=mocks.recognitors[0];mocks.recognize.mockImplementationOnce(async()=>({results:await recognitor.run({},[])}));
         const result=port.recognize('200 crops',recognitionOptions);await started.promise;
@@ -1163,7 +1186,7 @@ describe('识别颜色适配器的公有 SDK 接入与页生命周期',()=>{
         else await expect(port.recognize('setup',{...recognitionOptions,signal:controller.signal})).rejects.toBe(failure);
         expect(adapters[0].endPage).toHaveBeenCalledOnce();expect(adapters[0].beginPage).toHaveBeenCalledTimes(stage==='pre-aborted'?0:1);expect(mocks.bitmapClose).toHaveBeenCalledTimes(stage==='canvas'?1:0);
         // 页取消信号不得污染原会话下一次调用；不创建第二个模型或释放共享session。
-        controller.abort();await expect(session.run()).resolves.toEqual({});expect(native).toHaveBeenCalledOnce();await port.destroy();
+        controller.abort();await expect(session.run(recognitionFeeds())).resolves.toEqual({});expect(native).toHaveBeenCalledOnce();await port.destroy();
     });
     it('初始化中止也结束颜色控制器，初始化首因不被destroy失败覆盖',async()=>{
         const adapters=watchPages(),failure=new Error('initialize exact');mocks.initialize.mockRejectedValueOnce(failure);mocks.destroy.mockRejectedValueOnce(new Error('cleanup failed'));

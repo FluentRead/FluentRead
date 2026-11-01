@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 const require=createRequire(import.meta.url);
-const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder}=require('../scripts/testing/manga-quality-corpus.cjs');
+const {normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityFixture,evaluateQualityReadingOrder,evaluateCapturedQualityFixture}=require('../scripts/testing/manga-quality-corpus.cjs');
 const box=(x0:number,y0:number,x1:number,y1:number)=>({x0,y0,x1,y1});
 const text=(sourceText:string,bbox=box(10,10,90,30),sourceBoxes?:ReturnType<typeof box>[])=>({text:'受控译文',sourceText,bbox,...(sourceBoxes?{sourceBoxes}:{})});
 const fixture=(overrides:any={})=>({name:'actual-quality',width:400,height:300,expectedSource:['WAIT FOR ME','WAIT FOR ME','GO NOW'],expectedAnchors:['WAIT FOR ME','GO NOW'],anchorOccurrences:{'WAIT FOR ME':2,'GO NOW':1},regions:[{id:'line-1',bbox:box(10,10,90,30)}],forbiddenRegions:[{id:'robot',bbox:box(200,100,300,250)}],...overrides});
@@ -49,6 +49,40 @@ const generalParagraphFixture=()=>{
     const source=regions.map(region=>region.text);
     return fixture({regions,expectedSource:source,expectedAnchors:source,anchorOccurrences:Object.fromEntries(source.map(value=>[value,1])),paragraphGroups:[['main-right','main-left'],['card'],['horizontal']]});
 };
+
+describe('完整已采集原文独立于翻译传输',()=>{
+    const capturedFixture=()=>fixture({
+        expectedSource:['CHECK THE OXYGEN','08:45'],expectedAnchors:['CHECK THE OXYGEN','08:45'],anchorOccurrences:{'CHECK THE OXYGEN':1,'08:45':1},
+        regions:[{id:'caption',text:'CHECK THE OXYGEN',anchor:'CHECK THE OXYGEN',bbox:box(10,10,190,30)},
+            {id:'clock',text:'08:45',anchor:'08:45',bbox:box(10,60,90,80)}],paragraphGroups:[['caption'],['clock']]
+    });
+    it('保留数字未送翻译仍算真实识别成功，锚点、段落与库存读取相同完整来源',()=>{
+        const lines=[text('CHECK THE OXYGEN',box(10,10,190,30)),{...text('08:45',box(10,60,90,80)),text:'08:45'}];
+        const before=JSON.stringify(lines),result=evaluateCapturedQualityFixture(capturedFixture(),lines);
+        expect(result.sourceTexts).toEqual(['CHECK THE OXYGEN','08:45']);
+        expect(result.anchors.every((anchor:any)=>anchor.found)).toBe(true);
+        expect(result.paragraphGroups.map((group:any)=>group.paragraphIndex)).toEqual([0,1]);
+        expect(result.qualityFailures).toEqual([]);expect(JSON.stringify(lines)).toBe(before);
+    });
+    it('真实漏识别与重复数字仍失败，译文中的完整期望文字不能补原文',()=>{
+        const f=capturedFixture();
+        const wrong={...text('08:4',box(10,60,90,80)),text:'08:45 CHECK THE OXYGEN'};
+        expect(evaluateCapturedQualityFixture(f,[text('CHECK THE OXYGEN'),wrong]).qualityFailures).toContainEqual(expect.objectContaining({type:'ocr-anchor',anchor:'08:45'}));
+        const duplicate=evaluateCapturedQualityFixture(f,[text('CHECK THE OXYGEN'),text('08:45'),text('08:45')]);
+        expect(duplicate.qualityFailures).toContainEqual(expect.objectContaining({type:'duplicate-anchor',anchor:'08:45',occurrences:2}));
+        expect(duplicate.qualityFailures).toContainEqual(expect.objectContaining({type:'unexpected-ocr-characters'}));
+    });
+    it('没有sourceText不回退到译文或期望值；真实空页与插画误报保持原门禁',()=>{
+        expect(()=>evaluateCapturedQualityFixture(capturedFixture(),undefined)).toThrow('layout was captured');
+        for(const line of [null,{text:'CHECK THE OXYGEN',bbox:box(10,10,190,30)}])
+            expect(()=>evaluateCapturedQualityFixture(capturedFixture(),[line])).toThrow('recognized source text');
+        const wordless=fixture({expectedSource:[],expectedAnchors:[],anchorOccurrences:{},expectedNoText:true});
+        expect(evaluateCapturedQualityFixture(wordless,[]).qualityFailures).toEqual([]);
+        const falsePositive=evaluateCapturedQualityFixture(wordless,[text('08:45',box(210,120,290,150))]);
+        expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'wordless-page-text'}));
+        expect(falsePositive.qualityFailures).toContainEqual(expect.objectContaining({type:'artwork-ocr-false-positive'}));
+    });
+});
 
 describe('通用独立段落门禁',()=>{
     it('单张竖排卡片与横排标签各占独立段落，原文与输入元数据保持不变',()=>{

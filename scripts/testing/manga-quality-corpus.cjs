@@ -153,4 +153,16 @@ function evaluateQualityFixture(fixture,{texts,lines}) {
     return {anchors,negativeDetections,sourceCharacterInventory,qualityFailures};
 }
 
-module.exports={normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityReadingOrder,evaluateQualityFixture};
+// 生产翻译传输会跳过数字或保留原文；质量统计必须使用完整实际 sourceText，不能把传输子集当作 OCR 全集。
+function evaluateCapturedQualityFixture(fixture,lines) {
+    assert.ok(Array.isArray(lines),'Actual offscreen OCR layout was captured, including empty pages');
+    const sourceTexts=lines.map(line=>{
+        assert.ok(typeof line?.sourceText==='string','Actual offscreen lines retain their recognized source text, independently of translated output');
+        return line.sourceText;
+    });
+    const {qualityFailures:sourceFailures,...source}=evaluateQualityFixture(fixture,{texts:sourceTexts,lines});
+    const {qualityFailures:orderFailures,...order}=evaluateQualityReadingOrder(fixture,sourceTexts);
+    return {sourceTexts,...source,...order,qualityFailures:[...sourceFailures,...orderFailures]};
+}
+
+module.exports={normalizeOcrAnchor,countAnchorOccurrences,validateQualityFixtureExpectations,evaluateQualityReadingOrder,evaluateQualityFixture,evaluateCapturedQualityFixture};

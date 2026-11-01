@@ -63,25 +63,39 @@ class OwnedTarget {
     for (const record of this.listeners) if (record.type === type && record.callback === callback) this.listeners.delete(record);
   }
 }
-let server: ViteDevServer | undefined;
-let unmount: (() => void) | undefined;
-let assertClean: (() => void) | undefined;
-let restoreGlobals: (() => void) | undefined;
-afterEach(async () => {
+interface MountScope {
+  disposed: boolean;
+  key: string;
+  server?: ViteDevServer;
+  unmount?: () => void;
+  assertClean?: () => void;
+  restoreGlobals?: () => void;
+  context?: unknown;
+}
+let currentScope: MountScope | undefined;
+let nextScopeId = 0;
+async function cleanupHarness() {
+  const scope = currentScope;
+  if (!scope) return;
+  currentScope = undefined;
+  scope.disposed = true;
   try {
-    unmount?.(); unmount = undefined;
-    await runtime.nextTick(); assertClean?.();
-  } finally {
-    assertClean = undefined;
-    try {await server?.close();} finally {
-      server = undefined;
-      delete (globalThis as Record<string, unknown>)[KEY];
-      restoreGlobals?.(); restoreGlobals = undefined;
+    try {scope.unmount?.(); scope.unmount = undefined;}
+    finally {
+      // Restore this mount's globals before yielding so a later mount captures the original baseline.
+      if ((globalThis as Record<string, unknown>)[scope.key] === scope.context) delete (globalThis as Record<string, unknown>)[scope.key];
+      scope.restoreGlobals?.();
     }
+    await runtime.nextTick(); scope.assertClean?.();
+  } finally {
+    await scope.server?.close();
   }
-});
+}
+afterEach(cleanupHarness);
 
-async function mountPanel() {
+async function mountPanel(createServerImpl: typeof createServer = createServer, flush:()=>Promise<void> = () => runtime.nextTick()) {
+  const scope: MountScope = {disposed:false,key:`${KEY}_${++nextScopeId}`};
+  currentScope = scope;
   const calls: StreamCall[] = [];
   const media = Object.assign(new OwnedTarget(),{matches:false});
   const viewport = Object.assign(new OwnedTarget(),{width:1280,height:800,offsetLeft:0,offsetTop:0});
@@ -89,8 +103,10 @@ async function mountPanel() {
   const windowPort = Object.assign(new OwnedTarget(),{matchMedia:()=>media,visualViewport:viewport,innerWidth:1280,innerHeight:800});
   const ports = {document:documentPort,window:windowPort};
   const descriptors = new Map(Object.keys(ports).map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)]));
-  restoreGlobals = () => {
+  scope.restoreGlobals = () => {
     for (const [name,descriptor] of descriptors) {
+      // A newer mount may already own this global if cleanup overlaps its setup.
+      if ((globalThis as Record<string, unknown>)[name] !== ports[name as keyof typeof ports]) continue;
       if (descriptor) Object.defineProperty(globalThis,name,descriptor);
       else delete (globalThis as Record<string, unknown>)[name];
     }
@@ -113,12 +129,13 @@ async function mountPanel() {
     const snapshot = normalizeConfig(config); listeners.forEach(listener=>listener(snapshot));
   };
   const sendMessage = vi.fn(async () => ({success:true}));
-  (globalThis as Record<string, unknown>)[KEY] = {
+  scope.context = {
     config,subscribeConfig,browser:{runtime:{sendMessage}},
     streamReading(request: ReadingRequest, callbacks: StreamCall['callbacks']) {
       const call = {request,callbacks,cancel:vi.fn()}; calls.push(call); return {cancel:call.cancel};
     },
   };
+  (globalThis as Record<string, unknown>)[scope.key] = scope.context;
   const mocks: Plugin = {
     name:'reencounter-panel-lifecycle-ports',enforce:'pre',
     resolveId(id) {
@@ -129,15 +146,18 @@ async function mountPanel() {
       return null;
     },
     load(id) {
-      if (id === '\0reencounter-browser') return `export default globalThis.${KEY}.browser;`;
-      if (id === '\0reencounter-config') return `export const {config,subscribeConfig}=globalThis.${KEY};`;
-      if (id === '\0reencounter-reading') return `export const {streamReading}=globalThis.${KEY};export const ReadingAnswer={render:()=>null};`;
+      if (id === '\0reencounter-browser') return `export default globalThis[${JSON.stringify(scope.key)}].browser;`;
+      if (id === '\0reencounter-config') return `export const {config,subscribeConfig}=globalThis[${JSON.stringify(scope.key)}];`;
+      if (id === '\0reencounter-reading') return `export const {streamReading}=globalThis[${JSON.stringify(scope.key)}];export const ReadingAnswer={render:()=>null};`;
       if (id === '\0reencounter-i18n') return 'export const useUiI18n=()=>({t:key=>key,translateLegacy:text=>text});';
       return null;
     },
   };
-  server = await createServer({configFile:false,appType:'custom',logLevel:'silent',root:process.cwd(),plugins:[mocks,vue()],resolve:{alias:{'@':resolve(process.cwd())}},server:{hmr:false,middlewareMode:true},ssr:{noExternal:['webextension-polyfill']}});
+  const server = await createServerImpl({configFile:false,appType:'custom',logLevel:'silent',root:process.cwd(),plugins:[mocks,vue()],resolve:{alias:{'@':resolve(process.cwd())}},server:{hmr:false,middlewareMode:true},ssr:{noExternal:['webextension-polyfill']}});
+  if (scope.disposed) {await server.close(); throw Error('Panel mount was disposed');}
+  scope.server = server;
   const loaded = await server.ssrLoadModule('/src/features/vocabulary/ui/ReencounterPanel.vue');
+  if (scope.disposed) throw Error('Panel mount was disposed');
   const component = loaded.default as Component & {ssrRender?: undefined; render: () => null};
   component.ssrRender = undefined; component.render = () => null;
   const renderer = runtime.createRenderer<Record<string, never>, Record<string, unknown>>({
@@ -154,12 +174,13 @@ async function mountPanel() {
     ref:(instance: unknown)=>{if (instance) panel=(instance as {$:{setupState:PanelSetup}}).$.setupState;},
   })});
   app.provide(runtime.ssrContextKey,{modules:new Set<string>()}); app.config.warnHandler=()=>undefined;
-  unmount = () => app.unmount();
-  assertClean = () => {
+  scope.unmount = () => app.unmount();
+  scope.assertClean = () => {
     expect(listeners.size).toBe(0); expect(media.listeners.size).toBe(0);
     expect(documentPort.listeners.size).toBe(0); expect(windowPort.listeners.size).toBe(0); expect(viewport.listeners.size).toBe(0);
   };
-  app.mount({}); await runtime.nextTick();
+  app.mount({}); await flush();
+  if (scope.disposed) throw Error('Panel mount was disposed');
   const finish = (text: string, call = calls.at(-1)!) => call.callbacks.result({success:true,text,service:'fixture',model:'fixture',sessionId:'reencounter-a'});
   const late = (call: StreamCall) => {
     call.callbacks.progress({kind:'text',text:'Late obsolete delta'}); finish('Late obsolete answer',call);
@@ -169,6 +190,68 @@ async function mountPanel() {
 }
 
 describe('reencounter explanation configuration and owner lifecycle', () => {
+  it('restores globals when a new mount overlaps the previous server close', async () => {
+    const names = ['document','window'] as const;
+    const baseline = new Map(names.map(name=>[name,Object.getOwnPropertyDescriptor(globalThis,name)]));
+    await mountPanel();
+    const oldServer = currentScope!.server!, close = oldServer.close.bind(oldServer);
+    let release!:()=>void, markReady!:()=>void;
+    const gate = new Promise<void>(done=>{release=done;});
+    const ready = new Promise<void>(done=>{markReady=done;});
+    oldServer.close = async()=>{markReady(); await gate; await close();};
+    const oldCleanup = cleanupHarness();
+    try {
+      await ready;
+      const live = await mountPanel();
+      release(); await oldCleanup;
+      live.panel.explain(); expect(live.calls).toHaveLength(1);
+      await cleanupHarness();
+      for (const name of names) expect(Object.getOwnPropertyDescriptor(globalThis,name)).toEqual(baseline.get(name));
+    } finally {
+      release(); await Promise.allSettled([oldCleanup]); await cleanupHarness();
+      for (const [name,descriptor] of baseline) {
+        if (descriptor) Object.defineProperty(globalThis,name,descriptor);
+        else delete (globalThis as Record<string, unknown>)[name];
+      }
+    }
+  }, 20000);
+  it.each(['createServer','ssrLoadModule','nextTick'] as const)('closes a disposed mount delayed in %s without affecting the next mount', async stage => {
+    let release!:()=>void, markReady!:()=>void;
+    const gate = new Promise<void>(done=>{release=done;});
+    const ready = new Promise<void>(done=>{markReady=done;});
+    let close!:ReturnType<typeof vi.spyOn>;
+    const factory: typeof createServer = async options => {
+      const created = await createServer(options);
+      close = vi.spyOn(created,'close');
+      if (stage === 'createServer') {markReady(); await gate;}
+      else if (stage === 'ssrLoadModule') {
+        const load = created.ssrLoadModule.bind(created);
+        created.ssrLoadModule = async (...args) => {const result = await load(...args); markReady(); await gate; return result;};
+      }
+      return created;
+    };
+    const stale = mountPanel(factory, async () => {
+      await runtime.nextTick();
+      if (stage === 'nextTick') {markReady(); await gate;}
+    });
+    const staleScope = currentScope!;
+    const rejection = expect(stale).rejects.toThrow('Panel mount was disposed');
+    try {
+      await ready;
+      // Model afterEach running when Vitest has timed out the old test.
+      await cleanupHarness();
+      const live = await mountPanel();
+      const liveScope = currentScope!;
+      const liveContext = (globalThis as Record<string, unknown>)[liveScope.key];
+      release(); await rejection;
+      expect(close).toHaveBeenCalledOnce();
+      expect((globalThis as Record<string, unknown>)[staleScope.key]).toBeUndefined();
+      expect((globalThis as Record<string, unknown>)[liveScope.key]).toBe(liveContext);
+      expect(currentScope).toBe(liveScope);
+      live.panel.explain(); expect(live.calls).toHaveLength(1);
+      expect(live.listeners.size).toBe(1);
+    } finally {release(); await Promise.allSettled([stale]);}
+  }, 20000);
   it('requests only on explicit action using the actual current sentence and preserves the saved reference', async () => {
     const {panel,state,calls,sendMessage,finish} = await mountPanel();
     expect(calls).toHaveLength(0); expect(panel.canExplain).toBe(true);
@@ -228,7 +311,7 @@ describe('reencounter explanation configuration and owner lifecycle', () => {
     panel.explain(); const stopped = calls[0]; stopped.callbacks.progress({kind:'text',text:'Stopped partial answer'}); panel.stop(); late(stopped);
     expect(stopped.cancel).toHaveBeenCalledOnce(); expect(panel.answer).toBe('Stopped partial answer'); expect(panel.error).toBe('');
     panel.explain(); const leaving = calls[1]; leaving.callbacks.progress({kind:'text',text:'Before leaving'});
-    expect(listeners.size).toBe(1); unmount?.(); unmount=undefined;
+    expect(listeners.size).toBe(1); currentScope?.unmount?.(); if(currentScope)currentScope.unmount=undefined;
     expect(listeners.size).toBe(0); expect(leaving.cancel).toHaveBeenCalledOnce(); const notice = panel.notice;
     notifyConfig({on:false}); late(leaving);
     expect(leaving.cancel).toHaveBeenCalledOnce(); expect(panel.answer).toBe('Before leaving'); expect(panel.error).toBe(''); expect(panel.notice).toBe(notice);

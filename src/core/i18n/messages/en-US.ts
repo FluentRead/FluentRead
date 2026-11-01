@@ -35,6 +35,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const enUSMessages = {
+    "settings.backup.includeContext": "Include vocabulary context",
+    "feedback.serviceHint": "Check the selected service’s connection or model settings, then try again.",
+    "feedback.retryHint": "Try again shortly. Your source text and selection will stay available.",
     ...countForms['en-US'],
     ...personalCorrectionMessages['en-US'],
     "document.config.loadFailed": "Could not load settings. Reload and try again.",

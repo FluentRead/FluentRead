@@ -647,8 +647,11 @@ describe('真实 broker 的全文单条槽协议', () => {
         const name = '人工智能驱动的网页阅读辅助工具';
         const pageContext = `页面摘要：${name}，可帮助用户理解网页并阅读更多相关内容。`;
         h.provider.mockImplementation(async message => {
-            if ('summaryPrompt' in message) return '网页阅读工具摘要。';
-            if (message.origin === packet.payload) return renderPacket(packet, [name, translated[1]!]);
+            if ('summaryPrompt' in message) return `网页阅读工具摘要：${name}。`;
+            if (message.origin === packet.payload) {
+                expect(message.pageContext).toContain(name);
+                return renderPacket(packet, [name, translated[1]!]);
+            }
             if (message.origin === sources[0]) {
                 expect(message.pageContext).toBe('');
                 return name;

@@ -34,6 +34,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const jaJPMessages = {
+    "settings.backup.includeContext": "単語の文脈を含める",
+    "feedback.serviceHint": "選択したサービスの接続やモデル設定を確認して、もう一度お試しください。",
+    "feedback.retryHint": "少し待って再試行してください。原文と現在の選択範囲は保持されます。",
     ...countForms['ja-JP'],
     ...personalCorrectionMessages['ja-JP'],
     "document.config.loadFailed": "設定を読み込めませんでした。再読み込みしてもう一度お試しください。",

@@ -34,6 +34,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const ruRUMessages = {
+    "settings.backup.includeContext": "Включить контекст слов",
+    "feedback.serviceHint": "Проверьте подключение или модель выбранного сервиса и повторите попытку.",
+    "feedback.retryHint": "Повторите попытку чуть позже. Исходный текст и выделенная область сохранятся.",
     ...countForms['ru-RU'],
     ...personalCorrectionMessages['ru-RU'],
     "document.config.loadFailed": "Не удалось загрузить настройки. Обновите страницу и повторите попытку.",

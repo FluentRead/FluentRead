@@ -1,5 +1,6 @@
 /**
  * @file src/features/image-translation/content/controls.ts
+ * 失败层级：错误时仅突出语言准备、模型、服务或重试中的一个主操作，其余动作放入默认收起的原生详情；状态变化仍由同一操作条承接。
  * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
  * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
@@ -38,6 +39,15 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-feedback[data-phase=loading] .fr-image-status {gap:6px;}
 .fr-image-feedback[data-phase=error] {width:340px;padding:16px;pointer-events:auto;overflow:auto;overscroll-behavior:contain;}
 .fr-image-feedback[data-phase=error] .fr-image-status {color:#536074;}
+.fr-image-feedback[data-phase=error] {padding:20px;gap:12px;}
+.fr-image-feedback .fr-image-actions > button {background:var(--fr-image-brand);color:#fff;font-weight:650;}
+.fr-image-feedback .fr-image-actions > button:hover {background:#c62752;color:#fff;}
+.fr-image-more > summary {display:flex;align-items:center;gap:6px;min-height:36px;padding:0 4px;color:var(--fr-image-muted);font-size:12px;cursor:pointer;list-style:none;}
+.fr-image-more > summary::-webkit-details-marker {display:none;}
+.fr-image-more > summary::after {content:'';width:5px;height:5px;border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(45deg);}
+.fr-image-more[open] > summary::after {transform:rotate(225deg);}
+.fr-image-more > div {display:flex;flex-wrap:wrap;gap:6px;padding-top:6px;}
+.fr-image-feedback .fr-image-more button {background:transparent;color:var(--fr-image-muted);font-weight:500;}
 .fr-image-feedback .fr-image-service-settings {order:-1;}
 .fr-image-error-details {font-size:11px;color:var(--fr-image-muted);overflow-wrap:anywhere;}
 .fr-image-error-details summary {cursor:pointer;}
@@ -45,8 +55,6 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-feedback .fr-image-actions {flex-shrink:0;padding:4px 0 0;border:0;border-radius:0;box-shadow:none;gap:8px;background:transparent;}
 .fr-image-feedback[data-phase=error] .fr-image-error-details {min-height:0;overflow:auto;overscroll-behavior:contain;}
 .fr-image-feedback button {min-height:32px;max-width:100%;padding:6px 12px;white-space:normal;text-align:center;overflow-wrap:anywhere;}
-.fr-image-feedback .fr-image-prepare,.fr-image-feedback .fr-image-model-settings,.fr-image-feedback[data-preparation=false][data-recovery=false] .fluent-read-image-translation-button {order:-1;background:var(--fr-image-brand);color:#fff;font-weight:650;}
-.fr-image-feedback .fr-image-prepare:hover,.fr-image-feedback .fr-image-model-settings:hover,.fr-image-feedback[data-preparation=false][data-recovery=false] .fluent-read-image-translation-button:hover {background:#c62752;color:#fff;}
 .fr-image-feedback .fr-image-dismiss,.fr-image-feedback[data-preparation=true] .fluent-read-image-translation-button {color:var(--fr-image-muted);}
  .fr-image-feedback[data-manga=true][data-phase=loading] {flex-direction:row;align-items:center;gap:6px;transform:none;min-width:0;padding:6px 9px;font-size:11px;pointer-events:none;animation:fr-manga-feedback .12s ease .15s both;}
 .fr-image-feedback[data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
@@ -118,6 +126,11 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     progressBar.append(progressFill);
     const row = document.createElement('div');
     row.className = 'fr-image-actions';
+    const more = document.createElement('details');
+    more.className = 'fr-image-more';
+    const moreSummary = document.createElement('summary');
+    const moreActions = document.createElement('div');
+    more.append(moreSummary, moreActions);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'fluent-read-image-translation-button';
@@ -192,6 +205,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         modelSettings.textContent = localize('调整本地模型');
         serviceSettings.textContent = localize('切换图片翻译服务');
         errorSummary.textContent = localize('查看错误详情');
+        moreSummary.textContent = localize('更多操作');
         inspect.textContent = localize('文字');
         inspect.setAttribute('aria-label', localize('查看完整译文'));
         reader.refreshLanguage();
@@ -267,7 +281,8 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     };
     warningButton.addEventListener('click', handleWarning);
     feedback.addEventListener('click', isolate);
-    row.append(button, prepare, inspect, dismiss, modelSettings, serviceSettings);
+    const actionButtons = [button, prepare, inspect, dismiss, modelSettings, serviceSettings];
+    row.append(...actionButtons, more);
     feedback.append(heading, status, progressBar, errorDetails);
     element.append(details, row);
     const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
@@ -309,6 +324,19 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.insertBefore(row, feedbackOwnsActions ? errorDetails : null);
         inspect.hidden = next !== 'translated' || !hasLines;
+        if (next === 'error') {
+            const primary = !prepare.hidden ? prepare : !modelSettings.hidden ? modelSettings : !serviceSettings.hidden ? serviceSettings : button;
+            for (const control of actionButtons) {
+                const owner = control === primary ? row : moreActions;
+                if (control.parentElement !== owner) owner.append(control);
+            }
+            more.hidden = !actionButtons.some(control => control !== primary && !control.hidden);
+            more.open = false;
+            row.insertBefore(primary, more);
+        } else {
+            if (moreActions.childElementCount) for (const control of actionButtons) row.insertBefore(control, more);
+            more.hidden = true;
+        }
         if (next !== 'translated') {
             details.hidden = true;
             readerTrigger = null;

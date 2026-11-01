@@ -19,6 +19,7 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/ui/confirmExport.ts',
                 'src/platform/browser/translationSidepanel.ts',
                 'src/app/sidepanel/index.ts',
                 'src/app/sidepanel/SidepanelApp.vue',
@@ -780,6 +781,7 @@ export default defineConfig({
                 'src/core/translation/manpage.ts',
                 'src/features/full-page-translation/content/manpagePreparation.ts',
                 'src/core/translation/dom.ts',
+                'src/core/translation/tagMetadata.ts',
                 'src/core/translation/font.ts',
                 'src/core/translation/result.ts',
                 'src/core/translation/documentLiterals.ts',
@@ -807,6 +809,7 @@ export default defineConfig({
                 'src/core/config/pageTranslation.ts',
                 'src/core/translation/languages.ts',
                 'src/core/translation/prompts.ts',
+                'src/core/translation/pageSummaryReference.ts',
                 'src/core/translation/resultValidation.ts',
                 'src/features/vocabulary/background/handler.ts',
                 'src/features/vocabulary/learningModel.ts',

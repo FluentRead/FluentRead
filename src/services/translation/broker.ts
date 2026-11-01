@@ -50,6 +50,7 @@ import {
     isDefinitePageContextLeak,
     isLikelyPageContextLeak,
 } from '@/src/core/translation/prompts';
+import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryReference';
 import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/core/config/customOpenAI';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
 import {createCompositeTranslationRoutingState} from './compositeRouting';
@@ -121,6 +122,7 @@ interface PendingCacheValue {
 
 const PAGE_SUMMARY_CACHE_SIZE = 8;
 const PAGE_SUMMARY_LIMIT = 1200;
+type PageSummaryResult = {context: string; summarized: boolean};
 
 class AIMultiSegmentResponseError extends Error {
     readonly kind = 'response';
@@ -194,8 +196,8 @@ export {resolveTranslationRequestModel};
 export function createTranslationBroker(deps: TranslationBrokerDependencies): TranslationBroker {
     const pendingTranslations = new Map<string, Promise<string>>();
     const pendingBatches = new Map<string, Promise<string[]>>();
-    const pageSummaryCache = new Map<string, string>();
-    const pendingPageSummaries = new Map<string, Promise<string>>();
+    const pageSummaryCache = new Map<string, PageSummaryResult>();
+    const pendingPageSummaries = new Map<string, Promise<PageSummaryResult>>();
     const pendingCacheWrites = new Map<Promise<unknown>, number>();
     const pendingCacheValues = new Map<string, PendingCacheValue>();
     let cacheGeneration = 0;
@@ -1062,6 +1064,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const {config: current, service} = execution;
         return deps.buildTranslationCacheKey({
             requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2},
             sourceLanguage: current.from,
             targetLanguage: '',
             sourceText: pageContext,
@@ -1077,7 +1080,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         });
     }
 
-    function cachePageSummary(key: string, value: string): void {
+    function cachePageSummary(key: string, value: PageSummaryResult): void {
         if (pageSummaryCache.size >= PAGE_SUMMARY_CACHE_SIZE) {
             const oldestKey = pageSummaryCache.keys().next().value;
             if (oldestKey) pageSummaryCache.delete(oldestKey);
@@ -1131,8 +1134,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         requestDeadline: number,
         modelOverride?: string,
         requestTimeoutMs?: number,
-    ): Promise<string> {
-        if (!isAIContextEnabled(execution, modelOverride) || !pageContext.trim()) return '';
+    ): Promise<PageSummaryResult> {
+        if (!isAIContextEnabled(execution, modelOverride) || !pageContext.trim()) return {context: '', summarized: false};
 
         const key = buildPageSummaryCacheKey(execution, pageContext, modelOverride);
         if (useCache) {
@@ -1155,8 +1158,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                         execution.abortSignal,
                     );
                     if (persisted !== null) {
-                        if (requestGeneration === cacheGeneration) cachePageSummary(key, persisted);
-                        return persisted;
+                        if (requestGeneration === cacheGeneration) cachePageSummary(key, {context: persisted, summarized: true});
+                        return {context: persisted, summarized: true};
                     }
                 }
 
@@ -1181,14 +1184,14 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 );
                 const summary = typeof result === 'string' ? result.trim().slice(0, PAGE_SUMMARY_LIMIT) : '';
                 if (!summary) {
-                    if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, pageContext);
-                    return pageContext;
+                    if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, {context: pageContext, summarized: false});
+                    return {context: pageContext, summarized: false};
                 }
 
-                const summarizedContext = `Page summary (AI-generated reference):\n${summary}\n\n${pageContext}`.slice(0, 4000);
-                if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, summarizedContext);
+                const summarizedContext = `Page summary (AI-generated reference):\n${summary}`;
+                if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, {context: summarizedContext, summarized: true});
                 if (useCache) await persistCacheWrite(requestGeneration, key, summarizedContext);
-                return summarizedContext;
+                return {context: summarizedContext, summarized: true};
             } catch (error) {
                 if (execution.abortSignal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
                     throw error;
@@ -1198,9 +1201,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 if (!(error instanceof TranslationProviderDeadlineError)
                     && useCache
                     && requestGeneration === cacheGeneration) {
-                    cachePageSummary(key, pageContext);
+                    cachePageSummary(key, {context: pageContext, summarized: false});
                 }
-                return pageContext;
+                return {context: pageContext, summarized: false};
             }
         })();
 
@@ -1779,15 +1782,18 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const requestGeneration = cacheGeneration;
         // 步骤 2：摘要是 AI 上下文增强，只拿 provider deadline 的一小段预算。
         const summaryBudget = Math.min(10_000, Math.max(1_000, Math.floor(providerBudget / 4)));
-        const summarizedPageContext = imageInput ? '' : await addPageSummary(
+        const sharedPageSummary = await addPageSummary(
             execution,
-            rawPageContext,
+            imageInput ? '' : rawPageContext,
             useCache,
             requestGeneration,
             providerDeadline,
             message.modelOverride,
             summaryBudget,
         );
+        const summarizedPageContext = sharedPageSummary.summarized
+            ? buildPageSummaryReference(sharedPageSummary.context, rawPageContext, Array.isArray(message.origin) ? message.origin : [message.origin])
+            : sharedPageSummary.context;
         // 篇章证据不进入摘要缓存：每段只复用原有页面摘要，且总参考预算保持 4,000。
         const discourse = !imageInput && isAIContextEnabled(execution, message.modelOverride)
             && typeof message.discourseContext === 'string' ? message.discourseContext.slice(0, 2400) : '';

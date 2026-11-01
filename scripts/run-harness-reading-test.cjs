@@ -1227,7 +1227,7 @@ async function main() {
             const actionRequests = requests.slice(beforeAction);
             assert(actionRequests.every(item => item.messages?.filter(message => message.role === 'user').length === 1), `${action} 独立动作混入了先前问答`);
             const actionUser = actionRequests[0].messages.find(message => message.role === 'user');
-            assert(JSON.stringify(actionUser).includes('选中文本（数据）') && !JSON.stringify(actionUser).includes('这是当前卡片的既有问答'), `${action} 原文被包装成了会话指令`);
+            assert(JSON.stringify(actionUser).includes('本轮可核对原文') && !JSON.stringify(actionUser).includes('这是当前卡片的既有问答'), `${action} 原文未通过证据清单提供或被包装成了会话指令`);
             record(`action-${action}`, 'passed', {independentAnalysis: true});
         }
         const cachedPractice = await currentReadingAnswer(page);

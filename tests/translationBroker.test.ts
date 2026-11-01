@@ -2154,7 +2154,7 @@ describe('translation broker', () => {
         }));
         expect(mocks.service).toHaveBeenLastCalledWith(expect.objectContaining({
             origin: 'AI source',
-            pageContext: 'Page summary (AI-generated reference):\nAI summary\n\nAI article context',
+            pageContext: 'Page summary (AI-generated reference):\nAI summary',
         }));
         expect(mocks.config.enableAIContext).toBe(true);
     });
@@ -2190,6 +2190,27 @@ describe('translation broker', () => {
         }
     });
 
+    it('shares a compact summary while selecting relevant source facts per request and ignoring legacy summary caches', async () => {
+        mocks.config.service = 'ai'; mocks.config.enableAIContext = true;
+        const tls = 'TLS session resumption lowers latency to 40 ms.';
+        const glossary = 'Glossary entries preserve the user-confirmed wording.';
+        const pageContext = `Page title: Network and language study\n${tls}\n${glossary}`;
+        const identity = {requestMode: 'page-summary', sourceLanguage: 'auto', targetLanguage: '', sourceText: pageContext,
+            service: 'ai', model: 'ai-model', modelThinking: false, endpoint: '', customBody: ''};
+        mocks.cacheStore.set(cacheKey(identity), `Legacy summary plus full source: ${pageContext}`);
+        mocks.service.mockImplementation((message: {summaryPrompt?: string}) => Promise.resolve(message.summaryPrompt ? '简短摘要' : '中文译文'));
+        await expect(translateWithCache({origin: 'TLS latency', pageContext})).resolves.toBe('中文译文');
+        await expect(translateWithCache({origin: 'Glossary entries', pageContext})).resolves.toBe('中文译文');
+        expect(mocks.service.mock.calls.filter(([message]) => message.summaryPrompt)).toHaveLength(1);
+        const requests = mocks.service.mock.calls.filter(([message]) => !message.summaryPrompt).map(([message]) => message);
+        expect(requests[0].pageContext).toContain(tls); expect(requests[0].pageContext).not.toContain(glossary);
+        expect(requests[1].pageContext).toContain(glossary); expect(requests[1].pageContext).not.toContain(tls);
+        expect(requests.every(message => message.pageContext.length <= 1600)).toBe(true);
+        const summaryIdentity = mocks.buildTranslationCacheKey.mock.calls.map(([value]) => value as CacheIdentity).find(value => value.requestMode === 'page-summary')!;
+        expect(summaryIdentity).toMatchObject({pageSummaryPolicy: {version: 2}});
+        expect(mocks.cacheStore.get(cacheKey(summaryIdentity))).toBe('Page summary (AI-generated reference):\n简短摘要');
+    });
+
     it('请求级 AI 上下文策略覆盖实时配置，并同时约束摘要与正文 provider', async () => {
         mocks.config.service = 'ai';
         mocks.config.enableAIContext = false;
@@ -2208,7 +2229,7 @@ describe('translation broker', () => {
         }));
         expect(mocks.service).toHaveBeenLastCalledWith(expect.objectContaining({
             origin: 'Frozen enabled',
-            pageContext: expect.stringContaining('Session context'),
+            pageContext: expect.stringContaining('冻结摘要'),
         }));
 
         mocks.service.mockClear();
@@ -2655,7 +2676,7 @@ describe('translation broker', () => {
     ])('未膨胀的长上下文片段只触发一次无上下文重译并稳定复用复验缓存：$variant', async ({sourceLanguage, targetLanguage, origin, reference, summary}) => {
         mocks.config.service = 'ai';
         mocks.config.enableAIContext = true;
-        const pageContext = `Page title: Coastal research. ${reference} The appendix contains details of the monitoring schedule.`;
+        const pageContext = `Page title: Coastal research — ${reference} The appendix contains details of the monitoring schedule.`;
         const request = {origin, pageContext, sourceLanguage, ...(targetLanguage ? {targetLanguage} : {})};
         const effectiveTarget = targetLanguage ?? mocks.config.to;
         const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -3295,6 +3316,7 @@ describe('translation broker', () => {
 
         const persistedSummaryKey = cacheKey({
             requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2},
             sourceLanguage: 'auto',
             targetLanguage: '',
             sourceText: 'Persisted context',
@@ -3307,7 +3329,7 @@ describe('translation broker', () => {
         mocks.cacheStore.set(persistedSummaryKey, 'Persisted summary');
         await translateWithCache({origin: 'Persisted', pageContext: 'Persisted context'});
         expect(mocks.service).toHaveBeenCalledWith(expect.objectContaining({
-            pageContext: 'Persisted summary',
+            pageContext: expect.stringContaining('Persisted summary'),
         }));
         expect(mocks.service.mock.calls.some(([message]) => message.summaryPrompt === 'summarize:Persisted context')).toBe(false);
 
@@ -3910,6 +3932,7 @@ describe('translation broker', () => {
 
         const summaryKey = cacheKey({
             requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2},
             sourceLanguage: 'auto',
             targetLanguage: '',
             sourceText: 'Retry context',
@@ -3942,7 +3965,7 @@ describe('translation broker', () => {
             requestTimeoutMs: 4_000,
         })).resolves.toBe('Second-译文');
         expect(summaryCalls).toBe(2);
-        const freshContext = 'Page summary (AI-generated reference):\n新摘要\n\nRetry context';
+        const freshContext = 'Page summary (AI-generated reference):\n新摘要';
         expect(mocks.cacheStore.get(summaryKey)).toBe(freshContext);
         expect(mocks.cacheSet.mock.calls.filter(([key]) => key === summaryKey)).toHaveLength(1);
 
@@ -4328,6 +4351,7 @@ describe('translation broker', () => {
         expect(identities).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2},
                 customBody: '{"temperature":0}',
                 endpoint: 'https://aiSdk.endpoint.test',
                 model: 'ai-sdk-model',
@@ -4744,6 +4768,7 @@ describe('translation broker', () => {
         expect(oldWrites).toEqual(expect.arrayContaining([
             expect.objectContaining({
                 requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2},
                 model: 'summary-model-a',
                 endpoint: 'https://summary-a.example/v1',
                 customBody: '{"seed":"a"}',
@@ -4764,7 +4789,8 @@ describe('translation broker', () => {
         expect(providerCalls.slice(2).every(({snapshot}) => snapshot.model.aiSdk === 'summary-model-b')).toBe(true);
         const allWrites = mocks.cacheSet.mock.calls.map(([key]) => JSON.parse(key) as CacheIdentity);
         expect(allWrites).toEqual(expect.arrayContaining([
-            expect.objectContaining({requestMode: 'page-summary', model: 'summary-model-b'}),
+            expect.objectContaining({requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2}, model: 'summary-model-b'}),
             expect.objectContaining({requestMode: 'single', model: 'summary-model-b'}),
         ]));
     });
@@ -5116,8 +5142,10 @@ describe('translation broker', () => {
         await translateWithCache({origin: 'header cache source', pageContext: 'header cache context'});
         expect(mocks.service.mock.calls.length).toBeGreaterThan(firstCalls);
         expect(mocks.buildTranslationCacheKey.mock.calls.map(([identity]) => identity)).toEqual(expect.arrayContaining([
-            expect.objectContaining({requestMode: 'page-summary', customHeaders: '{"x-session":"session-a"}'}),
-            expect.objectContaining({requestMode: 'page-summary', customHeaders: '{"x-session":"session-b"}'}),
+            expect.objectContaining({requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2}, customHeaders: '{"x-session":"session-a"}'}),
+            expect.objectContaining({requestMode: 'page-summary',
+            pageSummaryPolicy: {version: 2}, customHeaders: '{"x-session":"session-b"}'}),
         ]));
     });
 

@@ -34,6 +34,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const koKRMessages = {
+    "settings.backup.includeContext": "단어 문맥 포함",
+    "feedback.serviceHint": "선택한 서비스의 연결 또는 모델 설정을 확인한 후 다시 시도하세요.",
+    "feedback.retryHint": "잠시 후 다시 시도하세요. 원문과 현재 선택 영역은 유지됩니다.",
     ...countForms['ko-KR'],
     ...personalCorrectionMessages['ko-KR'],
     "document.config.loadFailed": "설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.",

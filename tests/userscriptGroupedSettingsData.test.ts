@@ -13,7 +13,8 @@ const owners = [
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS', 'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES'],
     ['src/core/config/interfaceAppearance.ts', 'interfaceSkinOptions', 'interfaceFontOptions'],
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
-    ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels'],
+    ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels'],
+    ['src/core/config/featureServices.ts', 'featureServiceDefinitions'],
     ['src/core/glossary/builtins.ts', 'BUILTIN_GLOSSARIES'],
     ['src/core/config/videoSubtitleAppearance.ts', 'VIDEO_SUBTITLE_SKINS'],
     ['src/features/settings/model/chromeTranslationPreparation.ts', 'TEST_SAMPLES'],
@@ -104,7 +105,7 @@ describe('standalone grouped settings data', () => {
             }
             const plugin = createUserscriptSettingsDataPlugin(fixture, true, true, true);
             const transform = plugin.transform as (code: string, id: string) => {code: string};
-            const path = resolve(fixture, owners[2][0]);
+            const path = resolve(fixture, 'src/core/harness/promptLocales.ts');
             const changed = readFileSync(path, 'utf8').replace('You are the FluentRead', 'updated FluentRead');
             writeFileSync(path, changed);
             expect(() => transform(changed, path)).toThrow('changed during build');

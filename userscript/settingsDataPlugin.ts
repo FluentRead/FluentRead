@@ -54,7 +54,10 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
             names: ['TRANSLATION_STYLE_PRESETS', 'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES'],
         });
         targets.set(normalizePath(resolve(root, 'src/core/harness/promptLocales.ts')), {names: ['HARNESS_TRANSLATED_PROMPTS']});
-        targets.set(normalizePath(resolve(root, 'src/core/config/catalog.ts')), {names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']});
+        targets.set(normalizePath(resolve(root, 'src/core/config/catalog.ts')), {
+            names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels'],
+        });
+        targets.set(normalizePath(resolve(root, 'src/core/config/featureServices.ts')), {names: ['featureServiceDefinitions']});
         targets.set(normalizePath(resolve(root, 'src/core/glossary/builtins.ts')), {names: ['BUILTIN_GLOSSARIES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/videoSubtitleAppearance.ts')), {names: ['VIDEO_SUBTITLE_SKINS']});
         targets.set(normalizePath(resolve(root, 'src/features/settings/model/chromeTranslationPreparation.ts')), {names: ['TEST_SAMPLES']});
@@ -79,6 +82,7 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES',
         'HARNESS_TRANSLATED_PROMPTS', 'localizedTargetLanguageLabels', 'BUILTIN_GLOSSARIES',
         'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels',
+        'currentModelIds', 'cloudCredentialLabels', 'featureServiceDefinitions',
         'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets',
         'translationLoadingStyleOptions', 'FREE_TRANSLATION_PROVIDERS', 'translationLanguageOptions',
         'PARTS', 'SENTENCE_HIGHLIGHT_STYLES', 'SELECTION_TTS_VOICE_OPTIONS',

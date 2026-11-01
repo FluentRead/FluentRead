@@ -203,12 +203,13 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        // 每次用独立缓存验证真实 worker 的首次压缩，避免旧构建缓存让断言跳过压缩器。
+        // 用独立缓存验证 64 KiB 以上真实 worker 的首次压缩与后续命中，避免旧产物跳过压缩器。
         const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-positive-'));
         mkdirSync(resolve(root, 'userscript'));
         writeFileSync(resolve(root, 'userscript/zopfliBuildWorker.cjs'),
             `require(${JSON.stringify(resolve(process.cwd(), 'userscript/zopfliBuildWorker.cjs'))});\n`);
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(10_000));
+        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
+        expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -2159,9 +2160,9 @@ describe('standalone About images at explicit use boundaries', () => {
     const createPlugin = (enabled = true, fixtureRoot = root) => createUserscriptAboutImagesCompressionPlugin(fixtureRoot, enabled) as unknown as {
         name: string; load(id: string): string | null;
     };
-    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false) {
+    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false, generatedSource?: string) {
         const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, standalone) as unknown as {load(id: string): string | Promise<string>};
-        const source = await plugin.load(helperId);
+        const source = generatedSource ?? await plugin.load(helperId);
         const {transformWithEsbuild} = await import('vite');
         const compiled = await transformWithEsbuild(source, 'about-images-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as {getSupportImageUrl(normal: string): string; getContactImageUrl(): string}};
@@ -2196,7 +2197,8 @@ describe('standalone About images at explicit use boundaries', () => {
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        const h = await loadAccessors(undefined, true);
+        // Execute the exact generated source already checked above, without compressing both images twice.
+        const h = await loadAccessors(undefined, true, source);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');
         assertImage(h.api.getContactImageUrl(), 'contact');
@@ -2769,7 +2771,7 @@ describe('userscript appearance registry data owner', () => {
     const actualSource=readFileSync(id,'utf8');
     type Transform={transform(code:string,id:string):{code:string;map:null}|null};
     const plugin=(enabled=true)=>createUserscriptSettingsDataPlugin(root,enabled,true) as unknown as Transform;
-    const fixture=(skin='[{value:"skin"}]',font='[{value:"font"}]')=>`export const interfaceSkinOptions=${skin};export const interfaceFontOptions=${font};`;
+    const fixture=(skin='[{value:"skin"}]',font='[{value:"font"}]')=>`export const interfaceSkinOptions=${skin};export const interfaceFontOptions=${font};export const popupModuleOptions=[{value:"module"}];export const popupQuickFeatureOptions=[{value:"feature"}];`;
     function transformed(code=actualSource){const result=plugin().transform(code,id);expect(result).not.toBeNull();return result!.code;}
     async function execute(source:string){
         const {transformWithEsbuild}=await import('vite');
@@ -2789,6 +2791,8 @@ describe('userscript appearance registry data owner', () => {
     function complete(api:typeof originalAppearance){
         expect(ordered(api.interfaceSkinOptions)).toEqual(ordered(originalAppearance.interfaceSkinOptions));
         expect(ordered(api.interfaceFontOptions)).toEqual(ordered(originalAppearance.interfaceFontOptions));
+        expect(ordered(api.popupModuleOptions)).toEqual(ordered(originalAppearance.popupModuleOptions));
+        expect(ordered(api.popupQuickFeatureOptions)).toEqual(ordered(originalAppearance.popupQuickFeatureOptions));
         expect(api.interfaceSkinOptions).toHaveLength(14);expect(api.interfaceFontOptions).toHaveLength(10);
         for(const skin of api.interfaceSkinOptions){expect(api.getInterfaceSkinOption(skin.value)).toBe(skin);expect(api.normalizeInterfaceSkin(skin.value)).toBe(skin.value);expect(api.interfaceSkinUsesContentHeight(skin.value)).toBe(originalAppearance.interfaceSkinUsesContentHeight(skin.value));}
         for(const font of api.interfaceFontOptions){expect(api.getInterfaceFontOption(font.value)).toBe(font);expect(api.normalizeInterfaceFont(font.value)).toBe(font.value);}
@@ -2801,13 +2805,13 @@ describe('userscript appearance registry data owner', () => {
     }
     it('restores the whole real module synchronously with every ordered field, value and existing Map reference',async()=>{
         const code=transformed();expect(code.startsWith(actualSource.slice(0,actualSource.indexOf('export const')))).toBe(true);
-        expect(code).toContain(actualSource.slice(actualSource.indexOf('export type InterfaceFont')));
-        const {api,decode}=await execute(code);complete(api);expect(decode).toHaveBeenCalledTimes(2);
+        expect(code).toContain(actualSource.slice(actualSource.indexOf('export const interfaceVisibilityOptions')));
+        const {api,decode}=await execute(code);complete(api);expect(decode).toHaveBeenCalledTimes(4);
         const baseline=await execute(actualSource);complete(baseline.api);expect(baseline.decode).not.toHaveBeenCalled();
     });
     it('roundtrips all accepted literal runtime types, nested arrays and object enumeration order',async()=>{
         const skin='[{value:"one",integer:42,fraction:1.25,yes:true,no:false,empty:null,text:`literal`,nested:["x",{second:2,first:1}],constructor:"own"}]';
-        const {api,decode}=await execute(transformed(fixture(skin)));expect(ordered(api.interfaceSkinOptions)).toEqual(ordered([{value:'one',integer:42,fraction:1.25,yes:true,no:false,empty:null,text:'literal',nested:['x',{second:2,first:1}],constructor:'own'}]));expect(decode).toHaveBeenCalledTimes(2);
+        const {api,decode}=await execute(transformed(fixture(skin)));expect(ordered(api.interfaceSkinOptions)).toEqual(ordered([{value:'one',integer:42,fraction:1.25,yes:true,no:false,empty:null,text:'literal',nested:['x',{second:2,first:1}],constructor:'own'}]));expect(decode).toHaveBeenCalledTimes(4);
     });
     it.each([id+'?raw',id+'?vue&type=script','\0'+id,resolve(root,'src/core/config/other.ts'),resolve(root,'node_modules/interfaceAppearance.ts')])('does not transform another module or decorated id %s',other=>{
         expect(plugin().transform('arbitrary executable source',other)).toBeNull();
@@ -2849,7 +2853,8 @@ describe('userscript appearance registry data owner', () => {
             const results=Array.isArray(result)?result:[result];if(results.length!==1||!('output' in results[0])||results[0].output.length!==1||results[0].output[0].type!=='chunk')throw Error('Expected one real appearance consumer chunk');
             const chunk=results[0].output[0];expect(chunk.imports).toEqual([]);expect(chunk.dynamicImports).toEqual([]);
             const decode=vi.fn(),realm={appearanceOwner:undefined as typeof originalAppearance|undefined,atob,Uint8Array,ArrayBuffer,pako:{ungzip},__observeUserscriptDataDecode:decode};
-            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?(standalone==='1'?1:2):0);
+            // Standalone shares one skin/font group decode, plus the two independently compressed popup catalogs.
+            runInNewContext(chunk.code,realm,{timeout:5000});expect(realm.appearanceOwner).toBeDefined();complete(realm.appearanceOwner!);expect(decode).toHaveBeenCalledTimes(enabled?(standalone==='1'?3:2):0);
             expect(readFileSync(resolve(root,'public/third-party-notices/lobe-icons-MIT.txt'),'utf8')).toContain('Copyright (c) 2023 LobeHub');
         }finally{rmSync(directory,{recursive:true,force:true});vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);

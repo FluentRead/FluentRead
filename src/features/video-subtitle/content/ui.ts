@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/ui.ts
  *
- * 文件职责：封装视频字幕 content UI 的界面语言转换、可访问名称刷新及桌面/触屏安全视口菜单样式，避免 YouTube 播放器运行时承载重复的文案拼装。
+ * 文件职责：封装视频字幕 content UI 的界面语言转换、可访问名称刷新及桌面/触屏安全视口菜单样式，并以播放器级样式持续隐藏由 FluentRead 接管的 YouTube 原生字幕。
  * 主要内容：提供视频菜单本地化、局部外观变量、显式读音开关与示例说明、紧凑下载折叠入口、独立纯文本读音行及按语言命名；双语顺序用原文与译文双行示意并标记暂未生效的偏好，字幕按偏好交换原译文顺序，读音始终紧跟原文并计入字幕布局，防止缩成不可读小字；菜单仅管理自身交互，不参与字幕的宽度与水平居中计算；保留逐字高亮、校时与就地模型选择控件，过滤 YouTube 滚动窗口旧行，按实际画面及同视频可见底控约束字幕几何、换行与大字号完整高度，并封装字幕清理、媒体时钟读取、样式及字幕下载。
  * 模块边界：只读取界面配置并操作视频 feature 拥有的节点、样式和下载链接，不发起翻译或识别请求；任务生命周期由 runtime 管理。
  */
@@ -121,6 +121,7 @@ export const VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS = 'fluent-read-video-display-t
 export const VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS = 'fluent-read-video-display-original-only';
 export const VIDEO_DISPLAY_HIDDEN_CLASS = 'fluent-read-video-display-hidden';
 export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-caption';
+export const VIDEO_NATIVE_CAPTION_HIDDEN_CLASS = 'fluent-read-video-native-caption-hidden';
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
 
@@ -681,14 +682,15 @@ export function applyVideoDisplayState(container: HTMLElement): void {
     document.querySelectorAll<HTMLElement>(`#${VIDEO_SUBTITLE_PANEL_ID}`).forEach(panel => resetSubtitlePanelLayout(panel));
   }
   const mode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
-  container.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, mode === 'translation-only');
-  container.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, mode === 'original-only');
-  container.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, config.videoSubtitleVisible === false);
+  const enabled = config.on !== false && config.videoTranslationEnabled !== false;
+  container.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
+  container.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
+  container.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
   container.setAttribute('data-fluent-read-video-display-mode', mode);
   const layer = document.getElementById(VIDEO_TRANSLATION_LAYER_ID);
-  layer?.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, mode === 'translation-only');
-  layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, mode === 'original-only');
-  layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, config.videoSubtitleVisible === false);
+  layer?.classList.toggle(VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS, enabled && mode === 'translation-only');
+  layer?.classList.toggle(VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS, enabled && mode === 'original-only');
+  layer?.classList.toggle(VIDEO_DISPLAY_HIDDEN_CLASS, enabled && config.videoSubtitleVisible === false);
   layer?.setAttribute('data-fluent-read-video-display-mode', mode);
   if (layer) syncSubtitleScrollHostState(layer);
 }
@@ -865,6 +867,11 @@ export function installVideoSubtitleStyle(): HTMLStyleElement {
     :is(#${VIDEO_TRANSLATION_LAYER_ID}, #${VIDEO_SUBTITLE_SCROLL_HOST_ID}).${VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS} #${VIDEO_NORMALIZED_CAPTION_OVERLAY_ID} {
       display: none !important;
     }
+    /* 播放器接管期间，空档、seek 和原生容器重建都不能露出网站字幕；保留几何与文字供读取。 */
+    .${VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} :is(#ytp-caption-window-container, .ytp-caption-window-container) {
+      opacity: 0 !important;
+    }
+    .${VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} :is(#ytp-caption-window-container, .ytp-caption-window-container) :is(.ytp-caption-segment, .captions-text),
     #ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .ytp-caption-segment,
     #ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .captions-text,
     .ytp-caption-window-container.${VIDEO_NORMALIZED_CAPTION_CLASS} .ytp-caption-segment,

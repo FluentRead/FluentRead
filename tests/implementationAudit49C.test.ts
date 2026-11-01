@@ -1208,8 +1208,8 @@ describe('audit49C single-site preferences public preview', () => {
             elapsedMs: performance.now() - start, output: outputs, outputSHA256,
             }, null, 2));
         }
-        expect(outputs[0]).toEqual({url: 'https://docs.site7.com/article', domain: 'site7.com', extension: 'enabled', translation: 'site', floatingBall: 'hidden-site'});
-        expect(outputSHA256).toBe('0d6eb2f1949a7aee972ecce47af20ed2376dbe72847748e369ad8f09ecbd6829');
+        expect(outputs[0]).toEqual({url: 'https://docs.site7.com/article', domain: 'site7.com', extension: 'enabled', display: 'bilingual', translation: 'site', floatingBall: 'hidden-site'});
+        expect(outputSHA256).toBe('8ad77cb9c3128aac61b1a3ce74cf198faf00dc7bb4886c13126f5d3e20cc9fda');
         expect(comparisons).toBe(0);
     });
 });

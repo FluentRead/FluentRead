@@ -12,6 +12,8 @@ Translate an article or selected section, compare both languages, and return to 
 
 Display mode is saved and updates existing translations without another request. Google Translate supports bilingual display only; switch back to bilingual before using it.
 
+For translation-only display on selected websites, enable **Translation only** under **Tools & learning → Website rules → Site preferences**. Other websites keep the global mode. See [Website reading area](/en/config/site-adaptation).
+
 If the font is hard to read, click **Aa** at the bottom right of the card to use the browser's default font; click again to restore the previous font. This preference is saved for all webpages, immediately updates existing and future translations, and survives refreshes.
 
 Translation follows your reading position by default, including newly expanded comments and later-loaded text. Change the translation range in settings to process the whole page at once. Restoring the original ends the current session; choose another language or service and start again if needed.
@@ -24,6 +26,14 @@ Passages already in the target or an excluded language usually keep their source
 <figure class="doc-figure"><a href="/screenshots/en/translation.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/en/translation.webp" width="2560" height="1600" alt="Chinese paragraphs followed by English translations on the same webpage" loading="lazy" /></a><figcaption>Originals and translations appear paragraph by paragraph. Click to view the full-size screenshot.</figcaption></figure>
 
 </details>
+
+## AI context and terminology
+
+Open **Translation services → AI context** in the extension popup, enable the preference, and choose a configured AI service that supports it. New translations can reference the page topic, current section, nearby passages, and available earlier definitions and translations to help interpret ambiguous words and references. Enabling it does not rewrite existing translations; restore the original and translate again to apply it.
+
+Context has a length limit and may not include the entire article. It does not guarantee correct interpretation. The feature is off by default; enabling it sends additional page text to your selected service and may increase requests and cost. Ordinary machine translation and some specialized translation models do not support it; the popup explains the current state.
+
+For fixed terminology or words that should stay untranslated, use [Glossaries](/en/guide/glossary), which work with both machine and AI translation.
 
 ## Section translation
 

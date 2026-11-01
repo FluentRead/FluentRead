@@ -7,6 +7,7 @@
  * 文件职责：实现划词翻译的主要页面组件，覆盖选区捕获、触摸原生句柄稳定等待、避开原生菜单上下区域的行侧入口、可见视口与安全区定位、后台及宿主恢复来源校验、图标/小点/悬停/快捷键/仅右键菜单/直接弹出、原生菜单可信选区恢复与重复请求复用、翻译与词卡展示、免费 AI 讲解的显式启用、朗读、收藏选中的单词/表达/句子、双语分享卡片、鉴权服务配置入口、重试和关闭。
  * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；普通译文先于完整原文，单行可横向滚动的导航与右侧固定分享、收藏、关闭及更多操作把高度留给正文，次级菜单按可见窗口覆盖显示；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
+ * 词典来源：配置切换时只撤销并重查词卡，保留普通译文与学习会话，旧来源的迟到结果不能覆盖新来源。
  * 语音边界：单词朗读在仅本地模式下跳过词典外部音频，由既有后台本地语音链路处理失败与模型提示。
  * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，来源失效时取消当前请求，词书协议独立维护；Safari 仅为可信聚焦的同一追问框、卡片和原文保留初次键盘缩高或明确旋转后的有限宿主页平移窗口，明确方向先于可见视口宽度更新时也保留该固定窗口，宽度追上不续期；极矮可滚动卡片内的可信纵向触摸另有不续期的400ms尾窗，只容许累计2px宿主页偏移，不拦截原生滚动；输入与框内编辑键结束当前窗口，外部手势、缩放、失焦与关闭撤销身份，普通滚动仍收卡；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
  -->
@@ -510,6 +511,7 @@ const selectionSettings = computed(() => {
     from: config.from,
     to: config.to,
     bidirectional: config.selectionTranslatorBidirectional,
+    dictionarySource: config.selectionDictionarySource,
     service: config.selectionTranslationService || config.service,
     model: `${config.model?.[config.selectionTranslationService || config.service] || ''}:${config.customModel?.[config.selectionTranslationService || config.service] || ''}`,
   };
@@ -2723,6 +2725,7 @@ onMounted(() => {
     selectionSettings.value.model,
     config.vocabularyBookEnabled,
     selectionSettings.value.bidirectional,
+    selectionSettings.value.dictionarySource,
   ] as const, (nextSettings, previousSettings) => {
     const themeChanged = !previousSettings || nextSettings[0] !== previousSettings[0];
     const triggerChanged = !previousSettings
@@ -2736,6 +2739,7 @@ onMounted(() => {
       || nextSettings[7] !== previousSettings[7]
       || nextSettings[8] !== previousSettings[8];
     const directionEntryChanged = !previousSettings || nextSettings[10] !== previousSettings[10];
+    const dictionarySourceChanged = previousSettings && nextSettings[11] !== previousSettings[11];
     if (themeChanged) updateTheme();
     if (!snapshot.value) return;
     if (languageChanged) manuallyRequestedSelection.value = false;
@@ -2763,6 +2767,18 @@ onMounted(() => {
     }
     if (languageChanged || translationProviderChanged || directionEntryChanged) {
       if (showTooltip.value && !readingMode.value) void requestSelectionContent(snapshot.value.text);
+    }
+    else if (dictionarySourceChanged && isWordSelection.value) {
+      wordLookupRequestId += 1;
+      wordLookupAbortController?.abort();
+      wordLookupAbortController = null;
+      wordCard.value = null;
+      dictionaryAnswer.value = null;
+      wordCardError.value = '';
+      isWordCardLoading.value = false;
+      isWordCardSupportLoading.value = false;
+      const request = currentContentRequest.value;
+      if (showTooltip.value && request) void requestWordCard(request);
     }
     if (previousSettings && nextSettings[9] !== previousSettings[9] && showTooltip.value && isWordSelection.value) {
       const request = currentContentRequest.value;

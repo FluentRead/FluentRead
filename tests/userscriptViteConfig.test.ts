@@ -505,6 +505,71 @@ describe('userscript bundled library notices', () => {
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
+    it('standalone shares the icon notice only when the complete identical terms follow', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-icons-shared-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices, wrapUserscriptEntry: standaloneWrap} = await import('@/userscript/vite.config');
+            const iconLicense = readFileSync(resolve(process.cwd(), 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8').trim();
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const terms = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const ids = ['First owner', 'Second owner'].map((owner, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/icon-test-${index}@1.0.0/node_modules/icon-test-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `icon-test-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), `Copyright (c) ${owner}\n\n${terms}`);
+                return resolve(directory, 'index.js');
+            });
+            const notices = standaloneNotices(ids);
+            const wrapped = standaloneWrap('ENTRY_SENTINEL', 'BOOTSTRAP_SENTINEL', notices);
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            expect(normalize(wrapped.replaceAll('[Shared MIT terms below]', terms))).toContain(normalize(iconLicense));
+            expect(wrapped.split(terms)).toHaveLength(2);
+            expect(wrapped).toContain('Copyright (c) First owner');
+            expect(wrapped).toContain('Copyright (c) Second owner');
+            expect(standaloneWrap('entry', 'bootstrap')).toContain(iconLicense);
+            expect(standaloneWrap('entry', 'bootstrap', 'Shared MIT permission and warranty terms for the references above:')).toContain(iconLicense);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
+    it('standalone shares identical single-quoted MIT terms without changing licenses or attribution', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-single-quoted-mit-'));
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
+        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
+        try {
+            vi.resetModules();
+            const {bundledLibraryNotices: standaloneNotices} = await import('@/userscript/vite.config');
+            const license = readFileSync(resolve(process.cwd(), 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
+            const canonical = license.slice(license.indexOf('Permission is hereby granted')).trim();
+            const singleQuoted = canonical.replace(/"/gu, "'");
+            const bodies = [
+                `Copyright (c) First owner\nSource: https://example.com/first\n\n${singleQuoted}\nExtra attribution.`,
+                `Copyright (c) Second owner\n\n${singleQuoted.replace(/\s+/gu, '\r\n ')}`,
+                `Copyright (c) Different terms\n\n${singleQuoted.replace('free of charge', 'subject to a fee')}`,
+                `Copyright (c) Double quotes\n\n${canonical}`,
+            ];
+            const ids = bodies.map((body, index) => {
+                const directory = resolve(fixture, `node_modules/.pnpm/quoted-${index}@1.0.0/node_modules/quoted-${index}`);
+                mkdirSync(directory, {recursive: true});
+                writeFileSync(resolve(directory, 'package.json'), JSON.stringify({name: `quoted-${index}`, version: '1.0.0', license: 'MIT'}));
+                writeFileSync(resolve(directory, 'LICENSE'), body);
+                return resolve(directory, 'index.js');
+            });
+            const result = standaloneNotices(ids);
+            const marker = '[Shared single-quoted MIT terms below]';
+            const normalize = (value: string) => value.replace(/\s+/gu, ' ').trim();
+            const restored = normalize(result.replaceAll(marker, singleQuoted));
+            for (const body of bodies) expect(restored).toContain(normalize(body));
+            expect(result.split(marker)).toHaveLength(3);
+            expect(result.split(singleQuoted)).toHaveLength(2);
+            expect(result).toContain(bodies[2]);
+            expect(result).toContain(bodies[3]);
+            expect(standaloneNotices([ids[0]])).toContain(bodies[0]);
+        } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
+    }, 30_000);
+
     it('standalone preserves copyright, sources, surrounding clauses, different terms and non-MIT notices', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-shared-mit-notices-'));
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
@@ -548,7 +613,7 @@ describe('userscript bundled library notices', () => {
 });
 
 describe('standalone settings compression compatibility', () => {
-    it('keeps standard Base85 and standalone Base91 gzip data byte-identical', () => {
+    it('keeps shared preset gzip bytes identical while compressing the standalone style groups and categories', () => {
         const root = process.cwd(), id = resolve(root, 'src/core/config/translationAppearance.ts');
         const original = readFileSync(id, 'utf8');
         const transform = (full: boolean) => Reflect.apply(createUserscriptSettingsDataPlugin(root, true, full).transform as Function, {}, [original, id]) as {code:string};
@@ -556,7 +621,8 @@ describe('standalone settings compression compatibility', () => {
         expect(standard).toContain('~85:'); expect(standalone).toContain('~91:');
         const before = encodedDataBytes(standard, '__fluentreadDecodeSettingsData');
         const after = encodedDataBytes(standalone, '__fluentreadDecodeSettingsData');
-        expect(after.map(bytes=>Buffer.from(bytes))).toEqual(before.map(bytes=>Buffer.from(bytes)));
+        expect(before).toHaveLength(1); expect(after).toHaveLength(3);
+        expect(Buffer.from(after[2])).toEqual(Buffer.from(before[0]));
     });
 });
 
@@ -2784,6 +2850,8 @@ describe('userscript appearance registry data owner', () => {
 describe('standalone immutable glossary and UI catalogs', () => {
     const targets = [
         ['src/core/glossary/builtins.ts', ['BUILTIN_GLOSSARIES']],
+        ['src/core/config/catalog.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels']],
+        ['src/core/config/featureServices.ts', ['featureServiceDefinitions']],
         ['src/core/config/videoSubtitleAppearance.ts', ['VIDEO_SUBTITLE_SKINS']],
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
@@ -2795,6 +2863,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/core/language/partOfSpeech.ts', ['PARTS']],
         ['src/core/config/sentenceHighlight.ts', ['SENTENCE_HIGHLIGHT_STYLES']],
         ['src/core/config/selectionTts.ts', ['SELECTION_TTS_VOICE_OPTIONS']],
+        ['src/core/config/localTts.ts', ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']],
     ] as const;
     it.each(targets)('restores every ordered value from %s without changing the consumer functions', async (path, names) => {
         const root = process.cwd(), id = resolve(root, path), original = readFileSync(id, 'utf8');

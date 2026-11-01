@@ -138,7 +138,7 @@ export function createPlatformMessageHandler(openSettings: () => void) {
 
         if (message.type === 'selectionWordLookup') {
             try {
-                return {success: true, data: await lookupWord(String(message.word || ''))};
+                return {success: true, data: await lookupWord(String(message.word || ''), config.selectionDictionarySource)};
             } catch (error) {
                 return {success: false, error: error instanceof Error ? error.message : String(error)};
             }

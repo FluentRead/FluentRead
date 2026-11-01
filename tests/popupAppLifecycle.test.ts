@@ -142,6 +142,15 @@ async function focusedServiceSearchAtCompact(scrollTop = 22, naturalTop = 92) {
 }
 function growServiceViewport(height=263){Object.assign(viewport,{height});viewport.dispatchEvent(new win.Event('resize'));flushViewport()}
 describe('实际 Popup 缓存模板与页面操作',()=>{
+  it('网站仅译文优先展示且禁用全局快捷切换，外部移除与换站后重新沿用全局模式',async()=>{
+    config.service='bing';config.translationOnlyDomains=['example.com'];await mount();const mode=()=>document.querySelector('[data-testid="popup-display-mode"]')!;
+    expect(mode().getAttribute('data-display-mode')).toBe('translation-only');expect(mode().hasAttribute('disabled')).toBe(true);
+    expect(mode().getAttribute('aria-description')).toContain('网站偏好');eventOf(mode())();expect(state.config.display).toBe(1);
+    state.config.translationOnlyDomains=[];await drain();expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+    const old=eventOf(mode());state.config.translationOnlyDomains=['example.com'];await drain();old();expect(state.config.display).toBe(1);
+    getTab.mockResolvedValue([{id:8,windowId:3,url:'https://another.test/a'}]);tabEvent('onActivated',{tabId:8,windowId:3});await drain();
+    expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+  })
   it('源与目标语言控件只保存对应字段，抽屉遮罩关闭释放所属视口订阅',async()=>{
     await mount();patches.mockClear();const initialTarget=state.config.to
     eventOf(document.querySelector('[aria-label="源语言"]')!,'onUpdate:modelValue')('en');await drain();expect(state.config.from).toBe('en');expect(state.config.to).toBe(initialTarget);expect(patches).toHaveBeenLastCalledWith(expect.objectContaining({from:'en',to:initialTarget}))
@@ -273,15 +282,32 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(state.drawerVisible).toBe(false);expect(document.querySelector('.drawer-content')).toBeNull();expect(commands()).toHaveLength(0);
     expect(send.mock.calls.some(call=>['getPageTranslationFontState','setPageTranslationFont'].includes(call[1].type))).toBe(false);
   });
-  it('Aa 保存失败保持已确认偏好，同按钮重试真实后台保存后清除错误',async()=>{
+  it.each(['notice','font'] as const)('Aa 保存失败显示可读提示，使用 %s 重试并在真实后台保存后清除',async source=>{
     localized=true;await mount();const {sender,messages,records}=await attachPersistence();
-    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure')).mockRejectedValueOnce(Error('synthetic retry failure'));
     const entry=()=>button('page-font-entry');await eventOf(entry())();await drain();
     expect(entry().getAttribute('aria-pressed')).toBe('false');expect(entry().getAttribute('data-font-state')).toBe('error');
-    expect(entry().hasAttribute('disabled')).toBe(false);expect(button('page-font-error')).toBeNull();
+    expect(entry().hasAttribute('disabled')).toBe(false);
     expect(entry().getAttribute('aria-description')).toContain(zhCNMessages['popup.pageFont.changeError']);
-    await eventOf(entry())();await drain();expect(entry().getAttribute('aria-pressed')).toBe('true');expect(button('page-font-error')).toBeNull();
+    const notice=()=>button('page-font-error');const retry=()=>button('page-font-retry');
+    expect(notice().querySelector('[role="alert"]')?.textContent).toContain(zhCNMessages['popup.pageFont.changeError']);
+    expect(retry().textContent).toBe(zhCNMessages['popup.pageFont.retry']);
+    expect(retry().getAttribute('aria-label')).toBe(zhCNMessages['popup.pageFont.retryAction']);
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('false');expect(notice()).not.toBeNull();
+    if(source==='notice')expect(document.activeElement).toBe(entry());
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('true');expect(notice()).toBeNull();
     expect(messages).toHaveLength(1);expect(messages[0].config).toEqual({browserDefaultTranslationFont:true});expect(records.get('local:config')).toMatchObject({browserDefaultTranslationFont:true});
+  });
+  it('字体重试等待时保留临时焦点，不抢回用户主动移走的焦点',async()=>{
+    localized=true;await mount();const gate=deferred<void>(),{sender}=await attachPersistence([gate]);
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    await eventOf(button('page-font-entry'))();await drain();
+    const pending=eventOf(button('page-font-retry'))();await drain();
+    expect(document.activeElement).toBe(document.querySelector('.translation-tools'));
+    const outside=document.querySelector('.settings-button') as HTMLElement;outside.focus();gate.resolve();await pending;await drain();
+    expect(document.activeElement).toBe(outside);expect(button('page-font-error')).toBeNull();
   });
   it('Aa 接受其他页面的全局配置同步，导航和重开不重置选择也不额外保存',async()=>{
     await mount();const {store,sender,messages}=await attachPersistence();const saves=patches.mock.calls.length;

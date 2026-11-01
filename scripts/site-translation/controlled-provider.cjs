@@ -93,9 +93,17 @@ function readControlledPageEvidenceInPage(options) {
   const cnnArticle = ['http:', 'https:'].includes(globalThis.location?.protocol) &&
     ['www.cnn.com', 'edition.cnn.com'].includes(globalThis.location?.hostname) &&
     /^\/20[\s\S]*\/[\s\S]*$/u.test(globalThis.location?.pathname || '');
+  // 与 amazon-shopping 的主机、* 路径 glob 及排除路径一致；价格和评分仍须逐项配对，不能省略损坏的原文骨架。
+  const amazonPath = globalThis.location?.pathname || '';
+  const amazonShopping = ['http:', 'https:'].includes(globalThis.location?.protocol) &&
+    ['www.amazon.com', 'www.amazon.co.uk', 'www.amazon.de', 'www.amazon.co.jp'].includes(
+      (globalThis.location?.hostname || '').toLowerCase().replace(/\.$/u, '')) &&
+    /^(?:\/dp\/[\s\S]*|\/[\s\S]*\/dp\/[\s\S]*|\/gp\/product\/[\s\S]*|\/gp\/customer-reviews\/[\s\S]*)$/u.test(amazonPath) &&
+    !/^\/(?:login|signin|signup|account|settings|checkout|auth)(?:\/|$)/u.test(amazonPath);
+  const amazonProtected = amazonShopping ? '.a-price,#acrPopover' : '';
   // The production GitHub adapter explicitly protects these custom time elements without role=timer.
   const siteProtected = globalThis.location?.hostname === 'github.com' ? 'relative-time,time-ago,local-time'
-    : cnnArticle ? '.byline__name,.timestamp__time-since,figcaption.image_large-elevate__credit,figcaption.image-elevate__credit' : '';
+    : cnnArticle ? '.byline__name,.timestamp__time-since,figcaption.image_large-elevate__credit,figcaption.image-elevate__credit' : amazonProtected;
   // 与生产 GitHub 原生 issue 身份组件一致；依赖连接中的 live 上下文匹配 main/timeline，
   // 只配对保留的标签/文本/href/linkHref 骨架，不省略源、译文或 Markdown 内同名正文。
   const githubMetadataProtected = globalThis.location?.hostname === 'github.com' ? [
@@ -260,7 +268,8 @@ function readControlledPageEvidenceInPage(options) {
       const requireElement = Boolean(gitlabLabelProtected && sourceContexts.get(node)?.matches(gitlabLabelProtected));
       const marker = requireElement ? gitlabMarkers.get(sourceContexts.get(node)) : undefined;
       if (requireElement && !marker) throw new Error('GitLab native label marker unavailable');
-      protections.push({tag: node.localName, text: node.matches(formulaSelector) ? visibleFormulaText(node) : node.textContent, href: node.getAttribute('href'), linkHref: sourceContexts.get(node)?.closest('a[href]')?.getAttribute('href') ?? null, formula: node.matches(formulaSelector), ...(requireElement ? {requireElement: true, marker} : {})});
+      const elementOnly = Boolean(amazonProtected && node.matches(amazonProtected));
+      protections.push({tag: node.localName, text: node.matches(formulaSelector) ? visibleFormulaText(node) : node.textContent, href: node.getAttribute('href'), linkHref: sourceContexts.get(node)?.closest('a[href]')?.getAttribute('href') ?? null, formula: node.matches(formulaSelector), ...(requireElement ? {requireElement: true, marker} : {}), ...(elementOnly ? {elementOnly: true} : {})});
       if (requireElement) node.replaceWith(document.createTextNode(marker)); else node.remove();
     }
     const protectedMatches = [];
@@ -270,7 +279,7 @@ function readControlledPageEvidenceInPage(options) {
     let lastGitlabLabelPosition = -1;
     const outputLink = node => node.closest('a[href]')?.getAttribute('href') ?? owner.closest('a[href]')?.getAttribute('href') ?? null;
     for (const part of protections) {
-      let matched = !part.text.trim();
+      let matched = !part.text.trim() && !part.elementOnly;
       for (const node of translated.querySelectorAll(part.tag)) {
         if ((part.formula ? visibleFormulaText(node) : node.textContent) === part.text && node.getAttribute('href') === part.href && outputLink(node) === part.linkHref) {
           const position = outputOrder.get(node);
@@ -283,7 +292,7 @@ function readControlledPageEvidenceInPage(options) {
       // Sanitization unwraps custom elements such as <relative-time role=timer>.
       // Only an entire unchanged Text node may match the observed protected subtree;
       // never remove an arbitrary substring or exempt an unmarked prose/date node.
-      if (!matched && !part.requireElement && part.href === null && !part.formula) {
+      if (!matched && !part.requireElement && !part.elementOnly && part.href === null && !part.formula) {
         const walk = document.createTreeWalker(translated, 4);
         while (walk.nextNode()) {
           if (walk.currentNode.nodeValue === part.text && outputLink(walk.currentNode.parentElement) === part.linkHref) {walk.currentNode.remove(); matched = true; break;}

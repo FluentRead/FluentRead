@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ko-KR.json';
 import selfHelpText from './self-help/ko-KR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesKoreanMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const koKRMessages = {
     "settings.requestLimits.globalTitle": "요청 제한",
     "settings.requestLimits.globalHelp": "개별 설정이 없는 서비스와 모델은 이 제한을 공유합니다.",
     ...aiRequestTimeoutMessages["ko-KR"],
+    ...selectionDictionaryMessages["ko-KR"],
     ...sectionTranslationRulesKoreanMessages,
     "settings.requestLimits.retryIntervals": "재시도 간격",
     "settings.requestLimits.apiKeyRecovery": "실패한 Key 쿨다운",
@@ -579,7 +581,7 @@ export const koKRMessages = {
     "popup.pageFont.loading": "글꼴 설정을 읽는 중…",
     "popup.pageFont.unavailable": "지금은 번역문 글꼴을 변경할 수 없습니다.",
     "popup.pageFont.readError": "글꼴 설정을 읽지 못했습니다. 다시 시도해 주세요.",
-    "popup.pageFont.changeError": "글꼴 설정을 저장하지 못했습니다. 다시 시도해 주세요.",
+    "popup.pageFont.changeError": "글꼴 설정을 저장하지 못했습니다.",
     "popup.pageFont.retry": "다시 시도",
     "popup.quickSettings.appearanceDescription": "이중 언어 모드는 원문과 번역문을 함께 표시하고, 번역문 전용 모드는 번역 결과만 표시합니다.",
     "popup.quickSettings.hoverSettings": "마우스 오버 번역 설정",
@@ -1748,6 +1750,12 @@ export const koKRMessages = {
     "glossary.builtin.financeDescription": "재무제표, 가치 평가 지표, 주식 시장.",
     "glossary.builtin.research": "학술 연구",
     "glossary.builtin.researchDescription": "연구 방법, 통계, 학술 논문.",
+    'glossary.builtin.hardware': "컴퓨터 하드웨어",
+    'glossary.builtin.hardwareDescription': "프로세서, 메모리, 칩과 회로 용어",
+    'glossary.builtin.networking': "네트워크와 클라우드",
+    'glossary.builtin.networkingDescription': "네트워크 프로토콜, 클라우드 인프라와 배포 용어",
+    'glossary.builtin.mathematics': "수학",
+    'glossary.builtin.mathematicsDescription': "선형대수, 미적분, 확률과 최적화 용어",
     "glossary.builtin.products": "제품명 유지",
     "glossary.builtin.productsDescription": "일반적인 개발 도구 및 AI 제품명을 원문으로 유지합니다. 대소문자를 구분합니다.",
     "glossary.builtin.englishChinese": "영어 → 중국어 간체",

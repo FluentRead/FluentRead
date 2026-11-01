@@ -1,10 +1,11 @@
 /**
  * @file src/features/selection-translation/services/wordDictionary.ts
  * 文件职责：实现划词英文词典的本地优先查询、在线限时补充、数据清洗、发音选择和缓存，让已有释义及时返回。
- * 主要内容：支持 ECDICT 内置及可选词库与五种在线词典，本地释义直接返回，在线来源并发查询并共用截止时间；清理剩余请求，缓存确定结果，区分未命中与网络不可用。
+ * 主要内容：支持 ECDICT 内置及可选词库与五种在线词典，默认本地优先、在线并发，也可只查询指定来源；缓存和在途请求按来源隔离，共用截止时间并清理剩余请求，区分未命中与网络不可用。
  * 模块边界：本服务只获取和规范化词典数据，不渲染词卡、不翻译释义或加入词书；后台 wordLookupHandler 编排翻译，SelectionTranslator.vue 展示，HTTP 统一经过 platform/runtimeFetch。
  */
 import {describePartOfSpeech} from '@/src/core/language/partOfSpeech';
+import {normalizeWordDictionarySource, type WordDictionaryProviderId, type WordDictionarySourceSetting} from '@/src/core/config/selectionDictionary';
 import {readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, createRuntimeAbortContext, runtimeFetch} from '@/src/platform/http/runtime';
 import {canCacheOptionalEcdict, downloadFullEcdict, readCachedFullEcdict, type EcdictCompactRow} from './ecdictAsset';
@@ -12,7 +13,7 @@ import {normalizeEnglishWord} from './wordNormalization';
 
 export {isSingleEnglishWord, normalizeEnglishWord} from './wordNormalization';
 
-export type WordDictionaryProviderId = 'ecdict-local' | 'youdao-web' | 'free-dictionary' | 'wiktapi' | 'wiktionary-rest' | 'datamuse';
+export type {WordDictionaryProviderId} from '@/src/core/config/selectionDictionary';
 
 export interface WordPronunciation {
     text?: string;
@@ -802,7 +803,7 @@ export interface WordDictionaryLookupOptions {
 }
 
 export interface WordDictionaryLookup {
-    lookup(value: string): Promise<WordCardData | null>;
+    lookup(value: string, source?: WordDictionarySourceSetting): Promise<WordCardData | null>;
     clearCache(): void;
 }
 
@@ -811,7 +812,7 @@ const DEFAULT_WORD_LOOKUP_CACHE_SIZE = 80;
 /**
  * 创建可注入 provider 的词典查询服务。
  * 本地释义立即返回，在线来源并发竞争首份释义，整次查询最多等待 2.5 秒。
- * 确定结果（包括所有来源正常返回的未命中）会缓存；网络失败不写入负缓存，同词查询共享请求。
+ * 指定来源时只请求该词典；确定结果（包括所选来源正常返回的未命中）会缓存；网络失败不写入负缓存，同来源同词查询共享请求。
  */
 export function createWordDictionaryLookup(options: WordDictionaryLookupOptions = {}): WordDictionaryLookup {
     const providers = options.providers ? [...options.providers] : createDefaultWordDictionaryProviders();
@@ -830,7 +831,8 @@ export function createWordDictionaryLookup(options: WordDictionaryLookupOptions 
         return result;
     };
 
-    const performLookup = (normalizedWord: string): Promise<WordCardData | null> => new Promise((resolve, reject) => {
+    const performLookup = (normalizedWord: string, source: WordDictionarySourceSetting): Promise<WordCardData | null> => new Promise((resolve, reject) => {
+        const selectedProviders = source === 'auto' ? providers : providers.filter(provider => provider.id === source);
         const controller = new AbortController();
         let merged: WordCardData | null = null;
         let settled = false;
@@ -857,29 +859,31 @@ export function createWordDictionaryLookup(options: WordDictionaryLookupOptions 
             }
         };
         void (async () => {
-            for (const provider of providers.filter(item => item.id === 'ecdict-local')) {
+            for (const provider of selectedProviders.filter(item => item.id === 'ecdict-local')) {
                 await query(provider);
                 if (settled) return;
             }
-            await Promise.all(providers.filter(item => item.id !== 'ecdict-local').map(query));
+            await Promise.all(selectedProviders.filter(item => item.id !== 'ecdict-local').map(query));
             finish(failed);
         })();
     });
 
     return {
-        async lookup(value) {
+        async lookup(value, source) {
             const normalizedWord = normalizeEnglishWord(value);
             if (!normalizedWord) return null;
-            if (resultCache.has(normalizedWord)) return resultCache.get(normalizedWord) ?? null;
-            const activeLookup = inFlight.get(normalizedWord);
+            const dictionarySource = normalizeWordDictionarySource(source);
+            const cacheKey = `${dictionarySource}:${normalizedWord}`;
+            if (resultCache.has(cacheKey)) return resultCache.get(cacheKey) ?? null;
+            const activeLookup = inFlight.get(cacheKey);
             if (activeLookup) return activeLookup;
 
-            const pending = performLookup(normalizedWord);
-            inFlight.set(normalizedWord, pending);
+            const pending = performLookup(normalizedWord, dictionarySource);
+            inFlight.set(cacheKey, pending);
             try {
-                return cacheResult(normalizedWord, await pending);
+                return cacheResult(cacheKey, await pending);
             } finally {
-                inFlight.delete(normalizedWord);
+                inFlight.delete(cacheKey);
             }
         },
         clearCache() {
@@ -890,9 +894,9 @@ export function createWordDictionaryLookup(options: WordDictionaryLookupOptions 
 
 const defaultWordDictionaryLookup = createWordDictionaryLookup();
 
-/** 使用默认开放数据 provider 查询一个英语单词。 */
-export function lookupWord(value: string): Promise<WordCardData | null> {
-    return defaultWordDictionaryLookup.lookup(value);
+/** 按配置来源查询英语单词，缺省时保持本地优先的自动策略。 */
+export function lookupWord(value: string, source?: WordDictionarySourceSetting): Promise<WordCardData | null> {
+    return defaultWordDictionaryLookup.lookup(value, source);
 }
 
 /** 清理默认查询实例的正/负结果缓存，不会中断已经发出的请求。 */

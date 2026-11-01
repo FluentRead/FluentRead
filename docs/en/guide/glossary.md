@@ -12,6 +12,10 @@ Set consistent translations for names, products, and technical terms in machine 
 
 You can also add a **Built-in glossary** as an editable copy. Adding it neither enables the master switch nor overwrites your edits. Existing copies do not update automatically when the built-in list changes.
 
+The catalog includes **AI and machine learning, software development, finance and financial reports, academic research, computer hardware, networking and cloud, mathematics**, and **product names kept in the original language**. Domain glossaries apply to English → Simplified Chinese; the product-name glossary applies across languages. Preview these starting translations and adjust them after adding a copy.
+
+To keep a particular word untranslated, add it as an entry and leave its translation blank. For example, enter `FluentRead` as the source with no translation, then enable the master switch. Surrounding text is still translated. Set case sensitivity or a website scope when needed.
+
 Glossary settings save automatically; entry edits require **Save**. Switching glossaries keeps drafts within the current page, but save them before closing it.
 
 ## Set the scope

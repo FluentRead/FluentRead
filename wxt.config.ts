@@ -17,9 +17,9 @@ import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
-import type {InlineConfig} from 'vite';
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
 import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
+import type {InlineConfig} from 'vite';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));

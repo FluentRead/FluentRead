@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/textReader.ts
  * 文件职责：提供图片翻译的可访问文字阅读面板，让小图与长译文也能完整阅读、核对原文和复制。
- * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落和保留原文导致未绘制的提示，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；面板固定在视口内并继承扩展自己的深浅色变量。
+ * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落和保留原文导致未绘制的提示，提供仅译文/原文对照、当前操作独占的复制反馈、关闭和局部 Escape；关闭时沿完整 Shadow DOM 焦点链确认所有权；面板固定在视口内并继承扩展自己的深浅色变量。
  * 模块边界：仅操作所属 Shadow DOM，不发送识别或翻译请求、不访问配置；宿主定位与生命周期由图片 runtime 管理，调用者提供本次结果和本地化函数。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -25,7 +25,7 @@ export const IMAGE_READER_CSS = `
 @media(max-width:480px) {.fr-image-reader{right:12px;top:12px;max-height:calc(100dvh - 24px)}}
 `;
 
-export function createImageTextReader(localize: (source: string) => string, onClose: () => void) {
+export function createImageTextReader(localize: (source: string) => string, onClose: (ownedFocus: boolean) => void) {
     const element = document.createElement('section');
     element.className = 'fr-image-reader';
     element.hidden = true;
@@ -100,18 +100,35 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         refreshLanguage();
     };
     const closeReader = () => {
+        const doc = element.ownerDocument;
+        let root = element.getRootNode() as Document | ShadowRoot;
+        const active = root.activeElement;
+        let ownedFocus = !element.hidden && !!active && element.contains(active);
+        // 封闭或嵌套 ShadowRoot 可能仍保留内部活动元素；只有整条链都属于面板才归还焦点。
+        while (ownedFocus && root !== doc) {
+            const host = (root as ShadowRoot).host;
+            root = host.getRootNode() as Document | ShadowRoot;
+            ownedFocus = root.activeElement === host;
+        }
         element.hidden = true;
         revision += 1;
         clearTimeout(feedbackTimer);
-        onClose();
+        onClose(ownedFocus);
     };
     const handleClick = async (event: MouseEvent) => {
         if (!event.isTrusted || disposed) return;
         event.stopPropagation();
         if (event.target === close) closeReader();
-        if (event.target === compare) { comparing = !comparing; render(); }
+        if (event.target === compare) {
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            comparing = !comparing;
+            render();
+        }
         if (event.target !== copy) return;
-        const owner = revision;
+        const owner = ++revision;
+        clearTimeout(feedbackTimer);
+        feedback.textContent = localize('本地 OCR · 请核对名称和数字');
         const text = lines.map(line => {
             const value = comparing && line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text) ? `${line.sourceText}\n${line.text}` : line.sourceText !== undefined && !hasDistinctTranslation(line.sourceText, line.text) ? line.sourceText : line.text;
             return line.numericUncertain ? `${value}\n${localize('数字识别可能有误，请对照原图')}` : value;
@@ -122,7 +139,9 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         if (disposed || owner !== revision || element.hidden) return;
         feedback.textContent = localize(message);
         clearTimeout(feedbackTimer);
-        feedbackTimer = setTimeout(refreshLanguage, 2500);
+        feedbackTimer = setTimeout(() => {
+            if (!disposed && owner === revision && !element.hidden) refreshLanguage();
+        }, 2500);
     };
     const isolate = (event: Event) => event.stopPropagation();
     const handleKeydown = (event: KeyboardEvent) => {
@@ -136,7 +155,14 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     return {
         element, refreshLanguage,
         setLines(next: ImageReaderLine[]) {revision += 1; clearTimeout(feedbackTimer); lines = next.map(line => ({...line})); render();},
-        open() {element.hidden = false; element.focus({preventScroll: true});},
+        open(takeFocus = true) {
+            // 外层也可直接隐藏面板；新展示周期不能接收之前复制操作的迟到反馈。
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            refreshLanguage();
+            element.hidden = false;
+            if (takeFocus) element.focus({preventScroll: true});
+        },
         close: closeReader,
         dispose() {
             disposed = true;

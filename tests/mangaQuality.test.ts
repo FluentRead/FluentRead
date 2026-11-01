@@ -23,12 +23,43 @@ describe('漫画整段识别与噪声边界', () => {
     it('通用漫画识别拒绝无效尺寸、越界框和短异文噪声，保留合法单字、长英文与竖排字号', () => {
         const box = {x0: 20, y0: 20, x1: 100, y1: 40};
         for (const [width, height] of [[0, 20], [20, NaN], [10.5, 20]]) expect(groupMangaOcrLines([], 'ru', width, height)).toEqual([]);
-        const noisy = ['', '--', 'a!', 'N', 'ㅁ2', 'ㅋㅋ'].map(text => ({text, bbox: box}));
+        const noisy = ['', '--', 'a!', 'N', 'ㅁ2'].map(text => ({text, bbox: box}));
         expect(groupMangaOcrLines(noisy, 'ko', 400, 300)).toEqual([]);
         expect(groupMangaOcrLines([{text: 'Я', bbox: box}], 'ru', 400, 300)[0].text).toBe('Я');
         expect(groupMangaOcrLines([{text: 'HELLO', bbox: box}], 'ko', 400, 300)[0].text).toBe('HELLO');
         expect(groupMangaOcrLines([{text: '通用', bbox: {x0: -5, y0: -5, x1: 10, y1: 60}, vertical: true}], 'auto', 400, 300)[0]).toMatchObject({fontSize: 10, vertical: true});
         for (const bbox of [{...box, x0: NaN}, {...box, x0: 401}, {...box, y0: 301}, {...box, x1: 0}]) expect(groupMangaOcrLines([{text: 'слово', bbox}], 'ru', 400, 300)).toEqual([]);
+    });
+    it('韩文 OCR 保留分解音节、连续兼容及扩展字母，不改原文或源框', () => {
+        const bbox = {x0: 20, y0: 20, x1: 100, y1: 40};
+        const texts = ['안녕하세요'.normalize('NFD'), 'ㅋㅋㅋ', 'ㅇㅋ', '\uA960\uD7B0', '안녕하세요'];
+        for (const source of ['ko', ' KO_kr ']) for (const text of texts) {
+            const input = [{text, bbox: {...bbox}}], original = structuredClone(input);
+            const result = groupMangaOcrLines(input, source, 400, 300);
+            expect(result).toMatchObject([{text, bbox, fontSize: 20, sourceBoxes: [bbox]}]);
+            result[0].sourceBoxes![0].x0 = 1;
+            expect(input).toEqual(original);
+        }
+        for (const text of ['ㅁ2', 'ㅁ〮', 'ㅁ㉠', '\u115F\u1160', '\u3164\uFFA0', 'abc', '漢', '😀'])
+            expect(groupMangaOcrLines([{text, bbox}], 'ko', 400, 300)).toEqual([]);
+        expect(groupMangaOcrLines([{text:'HELLO',bbox}], 'ko',400,300)[0].text).toBe('HELLO');
+    });
+    it('韩文分解文字跨行与预组音节保持一致，原编码和源框不被改写', () => {
+        const first = '나는'.normalize('NFD'), second = '학생이다'.normalize('NFD');
+        const lines = [{text:first,bbox:{x0:20,y0:20,x1:100,y1:40}}, {text:second,bbox:{x0:20,y0:44,x1:100,y1:64}}];
+        expect(groupMangaOcrLines(lines,'ko',400,300).map(row=>row.text)).toEqual([`${first}${second}`]);
+        const composed = lines.map(line => ({...line, text: line.text.normalize('NFC')}));
+        expect(groupMangaOcrLines(composed,'ko',400,300)[0].text).toBe((first + second).normalize('NFC'));
+        expect(groupMangaOcrLines(lines,'ko',400,300)[0].sourceBoxes).toEqual(lines.map(line=>line.bbox));
+        expect(groupMangaOcrLines([{text:'안녕 Hi',bbox:lines[0].bbox}], 'ko',400,300)[0].text).toBe('안녕 Hi');
+    });
+    it('英文源语言一致过滤预组、分解、兼容和扩展韩文，保留英文与数字', () => {
+        for (const source of ['en','en-US']) {
+            for (const text of ['Hi한','Hi'+'한'.normalize('NFD'),'Hiㅋㅋ','Hi\uA960','Hi\uD7B0'])
+                expect(groupMangaText([item(text)],source,400,300)).toEqual([]);
+            expect(groupMangaText([item('Hello')],source,400,300).map(row=>row.text)).toEqual(['Hello']);
+            expect(groupMangaText([item('42')],source,400,300).map(row=>row.text)).toEqual(['42']);
+        }
     });
     it('日文页排除绘画上误识别的短拉丁片段，保留日文对白和完整拉丁词', () => {
         const fragments=[item('A'),item('HU'),item('B ou'),item('Q')];
@@ -59,6 +90,70 @@ describe('漫画整段识别与噪声边界', () => {
         expect(groupMangaText([item('そう。',20,20),item('ですね！',20,44)],'ja',400,300)[0].text).toBe('そう。ですね！');
         expect(groupMangaOcrLines([{text:'原来',bbox:{x0:20,y0:20,x1:100,y1:40}},{text:'如此。',bbox:{x0:20,y0:44,x1:100,y1:64}}],'zh',400,300)[0].text).toBe('原来如此。');
         expect(groupMangaText([item('Hello',20,20),item('again',20,44)],'en',400,300)[0].text).toBe('Hello again');
+    });
+    it.each([
+        ['扩展 B 两侧', '你好𠀀', '𠀁世界', '你好𠀀𠀁世界'],
+        ['基本区到扩展 B', '你好', '𠀁世界', '你好𠀁世界'],
+        ['扩展 G 到基本区', '你好𰀀', '世界', '你好𰀀世界'],
+        ['全角句号到扩展 B', '你好。', '𠀁世界', '你好。𠀁世界'],
+        ['补充平面汉字后接 IVS', '你好𠀀\u{E0100}', '𠀁世界', '你好𠀀\u{E0100}𠀁世界'],
+        ['基本区汉字后接 IVS', '你好字\u{E0101}', '𠀁世界', '你好字\u{E0101}𠀁世界'],
+        ['emoji 变体不当作东亚文字', 'hello☕\uFE0F', '𠀁世界', 'hello☕\uFE0F 𠀁世界'],
+        ['半角假名到补充假名', 'ｶﾅ', '𛀁𛀂', 'ｶﾅ𛀁𛀂'],
+        ['半角浊音到补充假名', 'ｶﾞ', '𛀁𛀂', 'ｶﾞ𛀁𛀂'],
+        ['分解浊音', 'それか\u3099', 'なです', 'それか\u3099なです'],
+        ['分解半浊音', 'それは\u309A', 'なです', 'それは\u309Aなです'],
+        ['扩展 B 到拉丁词', '你好𠀀', 'again', '你好𠀀 again'],
+        ['拉丁词到扩展 B', 'again', '𠀁世界', 'again 𠀁世界'],
+        ['扩展 B 到 emoji 和拉丁词', '你好𠀀', '😀again', '你好𠀀 😀again'],
+        ['emoji 和拉丁词到扩展 B', 'again😀', '𠀁世界', 'again😀 𠀁世界'],
+        ['半角长音', 'ｶｰ', 'ﾄﾞ文字', 'ｶｰﾄﾞ文字'],
+        ['表情变体', '秘密㊙\uFE0F', '文字', '秘密㊙\uFE0F 文字'],
+        ['标准句号变体', '案内。\uFE00', '文字', '案内。\uFE00文字'],
+        ['标准逗号变体', '案内、\uFE01', '文字', '案内、\uFE01文字'],
+        ['非标准标点选择符保守分隔', '案内。\uFE0E', '文字', '案内。\uFE0E 文字'],
+        ['英文及连字符', 'some-', 'thing', 'some-thing'],
+        ['英文常规空格', 'Hello', 'again', 'Hello again'],
+    ])('漫画跨行边界按完整 Unicode 码点处理（%s）', (_label, first, second, expected) => {
+        const items = [item(first,20,20), item(second,20,44)];
+        const ocr = items.map(({text,box}) => ({text,bbox:{x0:box.x,y0:box.y,x1:box.x+box.width,y1:box.y+box.height}}));
+        for (const context of ['page', 'bubble'] as const) {
+            for (const protectNumeric of [false, true]) {
+                const result = groupMangaText(items, 'zh', 400, 300, context, protectNumeric);
+                expect(result.map(region=>region.text)).toEqual([expected]);
+                expect(result[0].sourceBoxes).toEqual(ocr.map(line=>line.bbox));
+            }
+        }
+        const result = groupMangaOcrLines(ocr, 'zh', 400, 300);
+        expect(result.map(region=>region.text)).toEqual([expected]);
+        expect(result[0].sourceBoxes).toEqual(ocr.map(line=>line.bbox));
+    });
+    it('日文源语言保留补充平面汉字，同时继续过滤短拉丁噪声', () => {
+        for (const source of ['ja', 'jpn']) {
+            expect(groupMangaText([item('𠀀𠀁')],source,400,300).map(region=>region.text)).toEqual(['𠀀𠀁']);
+            expect(groupMangaText([item('𰀀字')],source,400,300).map(region=>region.text)).toEqual(['𰀀字']);
+            expect(groupMangaText([item('A𠀀')],source,400,300).map(region=>region.text)).toEqual(['A𠀀']);
+            expect(groupMangaText([item('ｶﾅ')],source,400,300).map(region=>region.text)).toEqual(['ｶﾅ']);
+            expect(groupMangaText([item('𛀁𛀂')],source,400,300).map(region=>region.text)).toEqual(['𛀁𛀂']);
+            expect(groupMangaText([item('HU')],source,400,300)).toEqual([]);
+        }
+    });
+    it('通用 OCR 的扩展汉字行也保留完整码点并连写', () => {
+        const lines = [
+            {text:'你好𠀀', bbox:{x0:20,y0:20,x1:100,y1:40}},
+            {text:'𠀁世界', bbox:{x0:20,y0:44,x1:100,y1:64}},
+        ];
+        const result=groupMangaOcrLines(lines,'ja',400,300);
+        expect(result.map(region=>region.text)).toEqual(['你好𠀀𠀁世界']);
+        expect(result[0].sourceBoxes).toEqual(lines.map(line=>line.bbox));
+    });
+    it('英文源语言对基本区与补充平面汉字一致过滤，保留英文和数字例外', () => {
+        for (const source of ['en', 'en-US']) {
+            for (const text of ['Hi漢', 'Hi𠀀', 'Hi𰀀', 'Hiｶ', 'Hi𛀁']) expect(groupMangaText([item(text)],source,400,300)).toEqual([]);
+            expect(groupMangaText([item('Hello')],source,400,300).map(region=>region.text)).toEqual(['Hello']);
+            expect(groupMangaText([item('I')],source,400,300).map(region=>region.text)).toEqual(['I']);
+            expect(groupMangaText([item('42')],source,400,300).map(region=>region.text)).toEqual(['42']);
+        }
     });
     it('不同字号标题和正文、横排和竖排不被合并', () => {
         const result = groupMangaText([item('TITLE', 20, 20, 100, 50), item('body', 20, 65, 80, 20),

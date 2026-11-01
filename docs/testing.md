@@ -1340,6 +1340,14 @@ CI 或本地报告必须分别说明：确定性回归、隔离浏览器回归�
 
 ## 图片翻译完整流程
 
+### 漫画顺序与文字边界的离线回归
+
+`mangaReader` 与 `imageTranslationRuntime` 用确定性 DOM、布局帧和请求 gate 检查混合 IMG／Canvas／背景图片的顺序、重复或非法序号的稳定回退，以及布局变化通知到下一帧之间不启动过期任务。显式重试和开关仍读取最新布局，取消、暂停、释放与迟到结果的所有权断言保留。该范围不下载或加载识别模型，不证明公开漫画站点的真实 OCR 质量。
+
+`imageOcrNormalization`、`mangaQuality` 和 `imageTranslationRendering` 保留韩文 Jamo、补充平面汉字及 IVS、半角浊音、组合字符与 emoji 的完整原文，并检查现代字素分割和缺少 `Intl.Segmenter` 时的窄框排版。后者只在确定安全的空格两侧分词，复杂无空白词组保持整体；英语组合字符、法语、俄语、泰语与老挝语的多词段落另检查字号，不能以整段缩字代替换行。纯 ASCII 与普通东亚文字仍保留原快路径。
+
+回退使用固定 Unicode 17.0.0 的 Extend／SpacingMark／ZWJ／Prepend 区间，测试读取仓库内的官方原始属性文件独立核对，不在 CI 访问网络。运行 `node scripts/generate-image-grapheme-space-data.mjs --check` 校验离线生成与输入 SHA-256；来源、版本和许可见 `public/third-party-notices/image-grapheme-space-NOTICE.md`。该表只支持 ASCII 空格的局部边界判断，不是完整 UAX #29 分割器，也不声称恢复模型漏识别的文字。
+
 ### 漫画质量场景与模型复用
 
 漫画专项和图片专项的 `--x-lightbox` 模式默认复用主仓库旁 `workspace-data/model-cache/` 中的公开 PaddleOCR／LaMa 文件。可用 `--model-cache-dir <目录>` 或 `FLUENTREAD_TEST_MODEL_CACHE_DIR` 指定位置。每次使用都按生产清单检查长度与 SHA-256，缺失或损坏才下载；并发测试共享逐文件锁。文件通过原有导入入口放入全新的临时浏览器，不复用日常 profile。报告记录每个文件的命中来源、下载数及导入状态。普通图片只准备 OCR，漫画按需包含修补模型；模型下载、来源故障和离线导入专项保留各自原有路径，不用缓存掩盖这些行为。Tesseract 语言包不在这份共享权重缓存内。

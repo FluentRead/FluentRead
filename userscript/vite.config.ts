@@ -319,9 +319,11 @@ export function bundledLibraryNotices(moduleIds: readonly string[]): string {
         const repository = typeof manifest.repository === 'string'
             ? manifest.repository
             : manifest.repository?.url;
-        const licenseText = licenseFile
-            ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
-            : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
+        const licenseText = manifest.name === 'franc-min'
+            ? fs.readFileSync(resolve(root, 'public/third-party-notices/franc-min-MIT.txt'), 'utf8').trim()
+            : licenseFile
+                ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
+                : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
         if (licenseText.includes('*/')) throw new Error(`Unsafe bundled library license comment: ${manifest.name}`);
         const heading = `${manifest.name} ${manifest.version} — ${manifest.license}`;
         const headings = licenseGroups.get(licenseText);

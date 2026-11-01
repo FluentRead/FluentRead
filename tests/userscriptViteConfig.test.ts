@@ -398,7 +398,7 @@ describe('userscript bundled library notices', () => {
         const packages = ['@vue/reactivity', '@vue/runtime-core', '@vue/runtime-dom', '@vue/shared']
             .map(name => ({moduleId: realpathSync(fromDom.resolve(name)),
                 packageRoot: resolve(realpathSync(fromDom.resolve(`${name}/package.json`)), '..')}));
-        for (const name of ['@ctrl/tinycolor', 'pako']) {
+        for (const name of ['@ctrl/tinycolor', 'pako', 'franc-min']) {
             const packageRoot = realpathSync(resolve(root, 'node_modules', name));
             packages.push({moduleId: realpathSync(createRequire(resolve(root, 'package.json')).resolve(name)), packageRoot});
         }
@@ -406,9 +406,10 @@ describe('userscript bundled library notices', () => {
             const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
             const file = readdirSync(packageRoot).find(name => /^LICEN[CS]E(?:[.-].*)?$/iu.test(name))!;
             return {moduleId, heading: `${manifest.name} ${manifest.version} — ${manifest.license}`,
-                body: readFileSync(resolve(packageRoot, file), 'utf8').trim()};
+                body: readFileSync(manifest.name === 'franc-min'
+                    ? resolve(root, 'public/third-party-notices/franc-min-MIT.txt') : resolve(packageRoot, file), 'utf8').trim()};
         });
-        const shared = originals.slice(0, 4), tinycolor = originals[4], pako = originals[5];
+        const shared = originals.slice(0, 4), tinycolor = originals[4], pako = originals[5], franc = originals[6];
         expect(shared.every(notice => notice.body === shared[0].body)).toBe(true);
         // 相同 MIT 授权正文不能掩盖不同的完整版权文本。
         expect(tinycolor.body).toContain('Permission is hereby granted');
@@ -421,9 +422,11 @@ describe('userscript bundled library notices', () => {
         expect(result).toBe([
             `/*\n${tinycolor.heading}\n${tinycolor.body}\n*/`,
             `/*\n${shared.map(notice => notice.heading).join('\n')}\n${shared[0].body}\n*/`,
+            `/*\n${franc.heading}\n${franc.body}\n*/`,
             `/*\n${pako.heading}\n${pako.body}\n*/`,
         ].join('\n'));
         for (const notice of originals) expect(result.split(notice.heading)).toHaveLength(2);
+        expect(franc.body.split('\n').filter(line => line.startsWith('Copyright'))).toHaveLength(4);
         expect(bundledLibraryNotices([...ids].reverse())).toBe(result);
         expect(bundledLibraryNotices([`\0${ids[0]}`, resolve(root, 'src/app/content/runtime.ts')])).toBe('');
     });
@@ -478,19 +481,21 @@ describe('userscript bundled library notices', () => {
                 realpathSync(resolve(root, 'node_modules/pako')),
                 realpathSync(resolve(root, 'node_modules/.pnpm/lodash-es@4.17.21/node_modules/lodash-es')),
                 realpathSync(resolve(root, 'node_modules/.pnpm/node-fetch-native@1.6.7/node_modules/node-fetch-native')),
+                realpathSync(resolve(root, 'node_modules/franc-min')),
             ].map(packageRoot => {
                 const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
                 const file = readdirSync(packageRoot).find(name => /^LICEN[CS]E(?:[.-].*)?$/iu.test(name))!;
                 return {moduleId: require.resolve(resolve(packageRoot, 'package.json')),
                     heading: `${manifest.name} ${manifest.version} — ${manifest.license}`,
-                    body: readFileSync(resolve(packageRoot, file), 'utf8').trim()};
+                    body: readFileSync(manifest.name === 'franc-min'
+                        ? resolve(root, 'public/third-party-notices/franc-min-MIT.txt') : resolve(packageRoot, file), 'utf8').trim()};
             });
             const license = readFileSync(resolve(root, 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
             const terms = license.slice(license.indexOf('Permission is hereby granted')).trim();
             const result = standaloneNotices(packages.map(item => item.moduleId));
             const marker = '[Shared MIT terms below]';
             const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
-            const restored = normalize(result.replaceAll(marker, terms));
+            const restored = normalize(result.replaceAll(marker, terms).replaceAll('[Shared single-quoted MIT terms below]', terms.replace(/"/gu, "'")));
             for (const notice of packages) {
                 expect(result.split(notice.heading)).toHaveLength(2);
                 expect(restored).toContain(normalize(notice.body));

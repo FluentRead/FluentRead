@@ -1322,7 +1322,7 @@
     "notes": "公开官方 profile：正文与简介按首次配置正文集合冻结，逐节点完成翻译/恢复/再次翻译；hover另取普通正文和带提及链接正文。作者、handle、时间和整个计数操作行、资料顶部账号及关注/帖子计数必须保留；作者选择器明确排除 postText 中的提及。转发身份组件使用精确结构的 optional dynamic guard，未出现不算该边界已验收。页面未登录，没有实际编辑器样本，optional editor guard 不算编辑器已验收。契约登记不代表实站通过，结果见对应运行产物；不代表无限滚动、登录信息流或私信验收。"
   },
   "amazon-echo-dot-product": {
-    "url": "https://www.amazon.com/dp/B09B8V1LZ3",
+    "url": "https://www.amazon.com/dp/B09B8V1LZ3?language=en_US&th=1",
     "fullPageScope": "finite-page",
     "hoverSelector": "#feature-bullets li",
     "hoverTargets": [
@@ -1438,7 +1438,7 @@
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation",
-    "notes": "2026-10-25 公开商品 DOM：主标题1、功能介绍6、content-grid p83/h2 11/h3 14、tech p42；逐个跟踪所有符合条件的节点，minInitial只是结构门槛。2026-11-01同一ASIN原生页面去掉language/variant query，固定使用其稳定 /dp/B09B8V1LZ3 URL；technical-description的英文sourceIncludes仍验证页面正文。该次 #availability 明示商品无法配送到当前地址，两个购买按钮原生缺席；仅这两个按钮使用optional dynamic保护，未出现不算购物控件或购买交互已验收。有限滚动到18,001px稳定底部；价格、评分和出现的购物控件须保持原文，不执行购买/加购/登录。本次无 figcaption、评论正文及可见评论用户名，不宣称覆盖这些区域。规格说明参与翻译，数字/型号是否跳过由真实候选完成记录核验；controlled provider不提供翻译质量证据。"
+    "notes": "2026-10-25 公开商品 DOM：主标题1、功能介绍6、content-grid p83/h2 11/h3 14、tech p42；逐个跟踪所有符合条件的节点，minInitial只是结构门槛。保留原固定英文/variant查询 language=en_US&th=1；2026-11-01无query入口复跑原生转到?th=1且详情正文缺失，不能视为等价入口，technical-description的英文sourceIncludes继续验证正文。保留query的该次 #availability 明示商品无法配送到当前地址，两个购买按钮原生缺席；仅这两个按钮使用optional dynamic保护，未出现不算购物控件或购买交互已验收。有限滚动到18,001px稳定底部；价格、评分和出现的购物控件须保持原文，不执行购买/加购/登录。本次无 figcaption、评论正文及可见评论用户名，不宣称覆盖这些区域。规格说明参与翻译，数字/型号是否跳过由真实候选完成记录核验；controlled provider不提供翻译质量证据。"
   },
   "steam-dota2-product": {
     "url": "https://store.steampowered.com/app/570/Dota_2/?l=english",

@@ -3973,10 +3973,10 @@ describe('real-site translation matrix gates', () => {
 
   it('keeps the Amazon product ASIN and mandatory price, rating and search boundaries when purchasing is unavailable', () => {
     const config = cases['amazon-echo-dot-product'];
-    expect(config.url).toBe('https://www.amazon.com/dp/B09B8V1LZ3');
+    expect(config.url).toBe('https://www.amazon.com/dp/B09B8V1LZ3?language=en_US&th=1');
     const url = new URL(config.url);
     expect(url.pathname).toBe('/dp/B09B8V1LZ3');
-    expect(url.search).toBe('');
+    expect([...url.searchParams]).toEqual([['language', 'en_US'], ['th', '1']]);
     expect(config.hoverTargets.find(target => target.name === 'technical-description')?.sourceIncludes).toEqual(['Dual-band Wi-Fi']);
     expect(config.optionalForbiddenSelectors).toEqual(['#add-to-cart-button', '#buy-now-button']);
     expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, [], config.optionalForbiddenSelectors))

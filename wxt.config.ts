@@ -138,7 +138,7 @@ export function extendRemoteConfigBuildConfig(
     entrypoints: readonly {type: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
-    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page']);
+    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }

@@ -1,7 +1,7 @@
 /**
  * @file src/app/popup/popup.css
  * 文件职责：定义桌面宽度随皮肤和界面语言、独立扩展标签页与 Firefox Android 固定容器限制画布不超过视口，高度由内容撑开且最高 560px 的浏览器 Popup 视觉系统与交互状态，包括亮暗主题、服务选择、功能卡、设置抽屉、通知和响应式细节；Safari 触摸独立 Popup 的快捷入口以两列换行布局适配宿主。
- * 主要内容：包括翻译卡片右下角紧凑显示模式与全局译文字体入口同行的工具布局，保持网站规则和卡片高度，两个按钮共用紧凑提示，字体图标两态保持相同尺寸；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；Safari 触摸独立 Popup 的快捷入口使用 flex 换行，卡片宽度与皮肤局部间距共享变量，奇数末项保留半宽；整页遮罩持续拦截背景，内部抽屉跟随可见视口并保留内部滚动，服务搜索在触屏使用 16px 字号避免自动缩放，名称使用 14px、辅助文字使用 12px，正常高度说明自然换行，窄列表按自身宽度改为单列以避免名称孤字折行，极矮视口保留省略并收紧项内留白；触摸设备的主画布、快捷和服务抽屉采用 46px 命中预算，为原生 sheet 缩放留余量，网站规则文字使用 12px 并自然换行，开关保留紧凑胶囊视觉，桌面沿用原有布局；以白色窄版画布、浅灰控件和品牌色强调翻译、局部及站点控制；两个操作以 42px 高度紧凑同排，主按钮弹性伸展并用短标题合并快捷键，辅助按钮以上方图标和下方文字收拢；网站规则不再绘制外层框，独立按钮沿用指示点展示保存状态并尊重减少动画偏好；保留版本与赞赏码的原位放大、服务及模型摘要、两列入口、完整开源胶囊与开关优先的快捷抽屉和必要的内部滚动。
+ * 主要内容：包括翻译卡片右下角紧凑显示模式与全局译文字体入口同行的工具布局，保持网站规则和卡片高度，两个按钮共用紧凑提示，字体图标两态保持相同尺寸；字体保存失败时以居中的短提示和独立重试按钮呈现，长文案可自然换行；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；Safari 触摸独立 Popup 的快捷入口使用 flex 换行，卡片宽度与皮肤局部间距共享变量，奇数末项保留半宽；整页遮罩持续拦截背景，内部抽屉跟随可见视口并保留内部滚动，服务搜索在触屏使用 16px 字号避免自动缩放，名称使用 14px、辅助文字使用 12px，正常高度说明自然换行，窄列表按自身宽度改为单列以避免名称孤字折行，极矮视口保留省略并收紧项内留白；触摸设备的主画布、快捷和服务抽屉采用 46px 命中预算，为原生 sheet 缩放留余量，网站规则文字使用 12px 并自然换行，开关保留紧凑胶囊视觉，桌面沿用原有布局；以白色窄版画布、浅灰控件和品牌色强调翻译、局部及站点控制；两个操作以 42px 高度紧凑同排，主按钮弹性伸展并用短标题合并快捷键，辅助按钮以上方图标和下方文字收拢；网站规则不再绘制外层框，独立按钮沿用指示点展示保存状态并尊重减少动画偏好；保留版本与赞赏码的原位放大、服务及模型摘要、两列入口、完整开源胶囊与开关优先的快捷抽屉和必要的内部滚动。
  * 模块边界：样式只对应 PopupApp 的 DOM 和受控第三方组件，不决定配置值、能力可用性或消息行为；跨页面 token 在 src/ui/styles，Options/文档页各自维护页面样式。
  * 极矮视口：服务选择的返回、搜索、清除与关闭复用原节点并排，隐藏装饰留白而不缩小操作区，输入状态与整页遮罩保持；触屏语言选择使用独立 portal 标记，46px 控件与 16px 输入避免继续沿用桌面紧凑尺寸，列表随可见高度收缩并给关闭入口让位。
  * 品牌触屏：coarse 指针或已确认的 Firefox Android Popup 为官网链接提供居中的 46px 命中区，内部图标保持 32px，桌面链接仍随 32px 图标紧凑排布，不使用外扩重叠区域。
@@ -840,6 +840,13 @@ footer button { font-weight: 500; color: var(--muted); }
 .display-mode-button { display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 24px; padding: 2px; border: 1px solid transparent; border-radius: 6px; color: var(--brand-strong); background: var(--surface-soft); cursor: pointer; }
 .page-font-entry { flex: none; }
 .page-font-entry.is-browser-default { border-color: var(--brand); background: var(--brand-soft); }
+.page-font-error { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px 8px; margin-top: 8px; padding: 5px 8px; border-radius: 8px; color: var(--fr-danger); background: var(--fr-danger-soft); font-size: 12px; line-height: 1.4; text-align: center; }
+.page-font-error-copy { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 0; }
+.page-font-error-copy svg { width: 14px; height: 14px; flex: none; }
+.page-font-error-copy span { min-width: 0; overflow-wrap: anywhere; }
+.page-font-retry { flex: none; min-height: 24px; padding: 2px 8px; border: 1px solid currentColor; border-radius: 6px; color: inherit; background: transparent; font-weight: 700; cursor: pointer; }
+.page-font-retry:hover { background: var(--surface); }
+.page-font-retry:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .translation-tool-tooltip.el-popper { max-width: min(240px, calc(100vw - 24px)); padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: 0 3px 10px rgba(23, 32, 51, .1); overflow-wrap: anywhere; }
 .translation-tool-tooltip-copy { display: flex; flex-direction: column; gap: 2px; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .translation-tool-tooltip-copy small { color: var(--muted); font-size: 10px; }
@@ -912,6 +919,7 @@ footer button { font-weight: 500; color: var(--muted); }
   /* 新单屏引导与自助诊断在 Popup 内沿用相同触摸预算，桌面仍保留紧凑状态入口。 */
   :root .popup-shell .language-onboarding :is(.onboarding-language-option, .onboarding-confirm),
   :root .popup-shell .fluentread-diagnostic button,
+  :root .popup-shell .page-font-retry,
   :root .popup-startup-recovery button { min-width: 46px; min-height: 46px; height: auto; }
   :root .popup-shell .fluentread-diagnostic { flex-basis: 46px; width: 46px; height: 46px; }
   :root .popup-shell .fluentread-diagnostic .diagnostic-close { flex-basis: 46px; }
@@ -1008,6 +1016,7 @@ footer button { font-weight: 500; color: var(--muted); }
   background: var(--surface-soft); color: var(--ink); font-size: 16px; cursor: pointer;
 }
 :root[data-fluentread-android-popup] .popup-shell .display-mode-button { width: 46px; height: 46px; flex-shrink: 0; }
+:root[data-fluentread-android-popup] .popup-shell .page-font-retry { min-width: 46px; min-height: 46px; }
 :root[data-fluentread-android-popup] .popup-shell .display-mode-slot.with-page-font { flex-basis: max(98px, var(--popup-secondary-action-width)); width: max(98px, var(--popup-secondary-action-width)); }
 /* 阅读外观沿用页面 token 和抽屉控件，不将网页字体选择混入扩展界面设置。 */
 .reading-appearance-entry { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; text-align: left; }

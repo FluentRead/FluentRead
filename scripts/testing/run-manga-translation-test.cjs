@@ -39,6 +39,10 @@ const offlineModels = arg('offline-models-dir',null);
 const preloadModels = arg('preload-models-dir',null);
 const modelCacheDir = path.resolve(arg('model-cache-dir',defaultImageTranslationModelCacheDirectory()));
 const baseline = process.argv.includes('--baseline');
+// 仅约束缓存助手的下载，不能替代浏览器全 target 网络隔离。
+const noCacheDownload = process.argv.includes('--model-cache-no-download');
+if(noCacheDownload)assert.ok(!preloadModels&&!offlineModels&&!blockedOfficial&&!blockedAll&&!baseline,
+    '--model-cache-no-download requires the shared model cache; it does not apply to other model-source modes');
 const readingPauseMs=Number(arg('reading-pause-ms','0'));
 const skipFirstCancel=process.argv.includes('--skip-first-cancel');
 const readAheadTest=process.argv.includes('--prefetch-pages');
@@ -1861,7 +1865,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         if(useModelCache){
             const needsPaddle=(qualityFixtures?.map(fixture=>fixture.sourceLanguage)||[sourceLanguage]).some(language=>!['ru','ko'].includes(language));
             const kinds=ordinaryImageQuality?['ocr']:needsPaddle?['ocr','inpaint']:['inpaint'];
-            preparedModels=await ensureImageTranslationModelFiles({directory:modelCacheDir,kinds,sourceDirectories:[modelCacheDir]});
+            preparedModels=await ensureImageTranslationModelFiles({directory:modelCacheDir,kinds,sourceDirectories:[modelCacheDir],allowNetworkDownload:!noCacheDownload});
             report.modelCache=preparedModels;
         }
         const files=preparedModels?.files||readImageTranslationModelManifest().map(asset=>({...asset,path:path.join(preloadModels,asset.filename)}));

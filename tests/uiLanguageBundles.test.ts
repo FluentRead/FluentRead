@@ -7,14 +7,19 @@ type BundlesModule = typeof import('./helpers/uiLanguageBundles');
 type LoaderModule = typeof import('@/src/platform/i18n/uiLanguageBundles');
 
 // 注册表是模块级状态；每个用例重新加载模块，保证“未加载语言”与“已加载语言”互不污染。
-async function loadModules(): Promise<{i18n: I18nModule; bundles: BundlesModule; loader: LoaderModule}> {
+async function loadRuntimeModules(): Promise<{i18n: I18nModule; loader: LoaderModule}> {
     vi.resetModules();
-    const [i18n, bundles, loader] = await Promise.all([
+    const [i18n, loader] = await Promise.all([
         import('@/src/core/i18n'),
-        import('./helpers/uiLanguageBundles'),
         import('@/src/platform/i18n/uiLanguageBundles'),
     ]);
-    return {i18n, bundles, loader};
+    return {i18n, loader};
+}
+
+async function loadModules(): Promise<{i18n: I18nModule; bundles: BundlesModule; loader: LoaderModule}> {
+    const runtime = await loadRuntimeModules();
+    const bundles = await import('./helpers/uiLanguageBundles');
+    return {...runtime, bundles};
 }
 
 function jsonResponse(body: unknown, ok = true, status = 200) {
@@ -168,7 +173,7 @@ describe('界面语言注册表', () => {
 
 describe('界面语言资源按需加载', () => {
     it('中文和已注册语言不发请求；并发请求同一语言只读取一次并注册', async () => {
-        const {i18n, loader} = await loadModules();
+        const {i18n, loader} = await loadRuntimeModules();
         let release!: () => void;
         const gate = new Promise<void>((resolve) => { release = resolve; });
         const fetch = vi.fn(async () => {
@@ -206,7 +211,7 @@ describe('界面语言资源按需加载', () => {
         ['缺少旧文案表', () => jsonResponse({messages: {}})],
         ['非对象响应', () => jsonResponse(null)],
     ])('%s时回退中文、报告警告，并允许下一次重新读取', async (_label, response) => {
-        const {i18n, loader} = await loadModules();
+        const {i18n, loader} = await loadRuntimeModules();
         const fetch = vi.fn(async () => response());
         const warn = vi.fn();
         const ensure = loader.createUiLanguageBundleLoader({resolveUrl: (path) => path, fetch, warn});
@@ -219,7 +224,7 @@ describe('界面语言资源按需加载', () => {
     });
 
     it('地址解析同步抛错也降级为失败结果，而不是让页面启动流程中断', async () => {
-        const {loader} = await loadModules();
+        const {loader} = await loadRuntimeModules();
         const warn = vi.fn();
         const ensure = loader.createUiLanguageBundleLoader({
             resolveUrl: () => { throw new Error('runtime gone'); },
@@ -237,25 +242,25 @@ describe('界面语言资源按需加载', () => {
         vi.stubGlobal('fetch', fetch);
 
         vi.stubGlobal('browser', {runtime: {getURL: (path: string) => `moz-extension://id/${path}`}});
-        let {i18n, loader} = await loadModules();
+        let {i18n, loader} = await loadRuntimeModules();
         await expect(loader.ensureUiLanguageBundle('es-ES')).resolves.toBe(true);
         expect(fetch).toHaveBeenLastCalledWith('moz-extension://id/i18n/es-ES.json');
         expect(i18n.translate('common.brand', 'es-ES')).toBe('Marca');
 
         vi.stubGlobal('browser', undefined);
         vi.stubGlobal('chrome', {runtime: {getURL: (path: string) => `chrome-extension://id/${path}`}});
-        ({i18n, loader} = await loadModules());
+        ({i18n, loader} = await loadRuntimeModules());
         await expect(loader.ensureUiLanguageBundle('ja-JP')).resolves.toBe(true);
         expect(fetch).toHaveBeenLastCalledWith('chrome-extension://id/i18n/ja-JP.json');
 
         vi.stubGlobal('chrome', {runtime: {}});
-        ({loader} = await loadModules());
+        ({loader} = await loadRuntimeModules());
         await expect(loader.ensureUiLanguageBundle('fr-FR')).resolves.toBe(false);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('UI language bundle unavailable'), expect.any(Error));
     });
 
     it('非响应式 UI 立即渲染一次，资源未注册时加载成功后补渲染，失败或已注册时不重复', async () => {
-        const {i18n, loader} = await loadModules();
+        const {i18n, loader} = await loadRuntimeModules();
         const render = vi.fn();
         let resolveLoad!: (loaded: boolean) => void;
         const ensure = vi.fn(() => new Promise<boolean>((resolve) => { resolveLoad = resolve; }));

@@ -579,7 +579,7 @@ export const esESMessages = {
     "popup.pageFont.loading": "Leyendo la configuración de fuente…",
     "popup.pageFont.unavailable": "No se puede cambiar la fuente de traducción ahora.",
     "popup.pageFont.readError": "No se pudo leer la configuración de fuente. Vuelve a intentarlo.",
-    "popup.pageFont.changeError": "No se pudo guardar la configuración de fuente. Vuelve a intentarlo.",
+    "popup.pageFont.changeError": "No se pudo guardar la fuente.",
     "popup.pageFont.retry": "Reintentar",
     "popup.quickSettings.appearanceDescription": "El modo bilingüe muestra el original y la traducción; el modo de solo traducción muestra únicamente el texto traducido.",
     "popup.quickSettings.hoverSettings": "Ajustes de traducción al pasar el cursor",

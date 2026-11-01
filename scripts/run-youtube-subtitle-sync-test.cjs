@@ -18,6 +18,9 @@ const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-
 const playwrightRoot = arg('playwright-root');
 if (!helperPath || !playwrightRoot) throw new Error('Explicit focus-safe helper and Playwright runtime are required');
 const helper = require(path.resolve(helperPath));
+const {createRuntimeDiagnostics} = require(path.resolve(arg('runtime-diagnostics-helper',
+  path.join(os.homedir(), '.codex/skills/fluentread-browser-translation-test/scripts/runtime-diagnostics.cjs'))));
+const diagnostics = createRuntimeDiagnostics();
 const {chromium} = createRequire(path.join(playwrightRoot, 'youtube-sync-proof.cjs'))('playwright');
 fs.mkdirSync(artifacts, {recursive: true});
 const mediaFile = path.join(artifacts, 'fixture.mp4');
@@ -58,9 +61,11 @@ let launchAttempted = false;
   });
   guardBrowserClose(session, profileDir);
   const {context} = session;
+  await diagnostics.start(context);
   Object.assign(report, {launchMode: session.launchMode, focusPolicy: session.focusPolicy, windowPlacement: session.windowPlacement});
   const worker = context.serviceWorkers().find(candidate => candidate.url().endsWith('/background.js'))
     || await context.waitForEvent('serviceworker', {predicate: candidate => candidate.url().endsWith('/background.js')});
+  diagnostics.setExtensionId(new URL(worker.url()).host);
   await worker.evaluate(mapping => {
     const originalFetch = globalThis.fetch;
     globalThis.fixturePending = [];
@@ -77,6 +82,7 @@ let launchAttempted = false;
     };
   }, translations);
   const control = await helper.newPageWithoutForeground(context);
+  await diagnostics.attachPage(control, 'config-popup');
   await control.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
   let sequence = 0;
   const patchConfig = async patch => {
@@ -99,12 +105,14 @@ let launchAttempted = false;
     </style></head><body><h1>字幕全屏与时间同步回归</h1><div id="movie_player" class="html5-video-player"><video class="html5-main-video" muted src="data:video/mp4;base64,${fs.readFileSync(mediaFile).toString('base64')}"></video><div id="ytp-caption-window-container"><span class="ytp-caption-segment"></span></div><div class="ytp-right-controls"><button id="fullscreen">全屏</button><button aria-label="Settings">设置</button></div></div>
     <script>document.getElementById('fullscreen').onclick=()=>document.documentElement.requestFullscreen();</script></body></html>`}));
   page = await helper.newPageWithoutForeground(context);
+  await diagnostics.attachPage(page, 'youtube-caption-page');
   page.on('pageerror', error => report.errors.push(error.message));
   await page.goto(url);
   await helper.activateExtensionTabWithoutForeground({serviceWorkers: () => [worker]}, page);
   await page.locator('#fluent-read-video-subtitle-button').waitFor();
   await page.waitForFunction(() => document.querySelector('video').readyState >= 2);
   const setCaption = async (time, text) => {
+    diagnostics.setPhase(`caption-${time}`);
     await page.evaluate(({time, text}) => {
       document.querySelector('.ytp-caption-segment').textContent = text;
       document.querySelector('video').currentTime = time;
@@ -128,6 +136,23 @@ let launchAttempted = false;
   await waitTranslation(translations['Sea otters have strong teeth.']);
   const first = await sample();
   check('Whole native cue uses one bilingual panel', first.original === first.native && first.nativeVisibility === 'hidden', first);
+  await page.evaluate(() => {
+    window.fixtureNativeFrames = {samples: 0, visibleFrames: 0, failures: [], running: true};
+    const sample = () => {
+      const result = window.fixtureNativeFrames;
+      if (!result.running) return;
+      const native = document.querySelector('#movie_player #ytp-caption-window-container .ytp-caption-segment');
+      if (native?.textContent) {
+        result.samples++;
+        if (getComputedStyle(native).visibility !== 'hidden') {
+          result.visibleFrames++;
+          if (result.failures.length < 60) result.failures.push({time: document.querySelector('video').currentTime, text: native.textContent});
+        }
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await page.locator('#fluent-read-video-subtitle-button').click();
   await page.evaluate(() => window.fixtureMenu = document.querySelector('#fluent-read-video-subtitle-menu'));
   // Enter fullscreen without an outside click, as with YouTube's F shortcut.
@@ -171,6 +196,7 @@ let launchAttempted = false;
   await page.waitForTimeout(80);
   const stale = await sample();
   check('A late native DOM update never reveals the next unrelated cue or retains its previous translation', stale.translation === '' && stale.original === '', stale);
+  check('An expired native cue stays hidden while the next DOM update is pending', stale.nativeVisibility === 'hidden', stale);
   await setCaption(1.2, 'They open the shell.');
   await waitTranslation(translations['They open the shell.']);
   await setCaption(2.2, 'Sea otters have strong teeth.');
@@ -213,6 +239,16 @@ let launchAttempted = false;
   const nativeRequest = await worker.evaluate(() => globalThis.fixtureRequestTimes.find(r => r.source === 'Another native sentence.'));
   check('Untracked captions dispatch within 220 ms instead of the former 360 ms stability wait', nativeRequest.at - requestStarted < 220,
     {dispatchMs: nativeRequest.at - requestStarted});
+  const replaced = await page.evaluate(() => {
+    const previous = document.querySelector('#ytp-caption-window-container');
+    const next = document.createElement('div'); next.id = previous.id;
+    next.innerHTML = '<div class="captions-text"><span class="ytp-caption-segment">Another native sentence.</span></div>';
+    previous.replaceWith(next);
+    // Force style resolution before MutationObserver/polling can rebind the new container.
+    return {native: next.textContent, visibility: getComputedStyle(next.querySelector('.ytp-caption-segment')).visibility};
+  });
+  check('A replaced native caption container is hidden immediately, before observer rebinding', replaced.visibility === 'hidden', replaced);
+  await page.waitForTimeout(1100);
   await setCaption(16.2, "They serve drinks. I thought");
   await waitTranslation("译文：I thought I'd try out this beer.");
   check('Rolling captions select the current prefix while the previous full cue still overlaps', (await sample()).original === "I thought I'd try out this beer.", await sample());
@@ -277,6 +313,7 @@ let launchAttempted = false;
   await setCaption(1.2, 'They open the shell.');
   await waitTranslation(translations['Sea otters have strong teeth.']);
   const reopened = await helper.newPageWithoutForeground(context);
+  await diagnostics.attachPage(reopened, 'youtube-second-playback-page');
   await reopened.goto(url);
   await reopened.locator('#fluent-read-video-subtitle-button').waitFor();
   await reopened.waitForFunction(() => document.querySelector('video').readyState >= 2);
@@ -307,14 +344,43 @@ let launchAttempted = false;
   await waitTranslation('译文：Cached native replay.');
   await page.locator('#movie_player').click({position: {x: 20, y: 20}});
   await page.screenshot({path: path.join(artifacts, 'bilingual.png')});
+  report.nativeCaptionFrames = await page.evaluate(() => {
+    window.fixtureNativeFrames.running = false;
+    return window.fixtureNativeFrames;
+  });
+  check('Animation-frame sampling finds no visible native caption during cue gaps, seeks or container replacement',
+    report.nativeCaptionFrames.samples > 0 && report.nativeCaptionFrames.visibleFrames === 0, report.nativeCaptionFrames);
+  const unrelated = await page.evaluate(() => {
+    const container = document.createElement('div'); container.className = 'ytp-caption-window-container';
+    container.innerHTML = '<span class="ytp-caption-segment">Unselected player caption.</span>';
+    document.body.appendChild(container);
+    const visibility = getComputedStyle(container.firstElementChild).visibility;
+    container.remove(); return visibility;
+  });
+  check('Native captions outside the selected player keep their visibility', unrelated === 'visible', unrelated);
   await patchConfig({videoSubtitleDisplayMode: 'original-only'});
   await page.waitForTimeout(150);
   check('Original-only restores native captions', (await sample()).nativeVisibility === 'visible');
+  for (const mode of ['bilingual', 'translation-only']) {
+    diagnostics.setPhase(`mode-restoration-${mode}`);
+    await patchConfig({videoTranslationEnabled: true, videoSubtitleVisible: true, videoSubtitleDisplayMode: mode});
+    await waitTranslation('译文：Cached native replay.');
+    check(`${mode} suppresses native captions after re-enabling`, (await sample()).nativeVisibility === 'hidden');
+    await patchConfig({videoTranslationEnabled: false});
+    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-button'));
+    check(`Disabling video translation from ${mode} restores native captions`, (await sample()).nativeVisibility === 'visible');
+  }
+  await patchConfig({videoTranslationEnabled: true, videoSubtitleVisible: false});
+  await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button'));
+  check('Temporarily hidden subtitles also suppress native captions', (await sample()).nativeVisibility === 'hidden');
   await patchConfig({on: false});
   await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-layer'));
   check('Disabling removes menu, layer and native hiding', !await page.locator('#fluent-read-video-subtitle-menu').count()
     && await page.locator('.ytp-caption-segment').evaluate(e => getComputedStyle(e).visibility === 'visible'));
   report.requests = await worker.evaluate(() => globalThis.fixtureRequests);
+  diagnostics.setPhase('disabled-cleanup');
+  await diagnostics.flush();
+  diagnostics.assertClean();
   report.success = report.checks.every(c => c.pass) && report.errors.length === 0;
   assert.equal(report.success, true, JSON.stringify(report.checks.filter(c => !c.pass)));
 })().catch(error => {primaryError = error; report.failure = error.stack; process.exitCode = 1;}).finally(async () => {
@@ -324,6 +390,12 @@ let launchAttempted = false;
   };
   let browserClosed = false;
   await cleanup(async () => {if (page) fs.writeFileSync(path.join(artifacts, 'last.html'), await page.content().catch(() => ''));});
+  await cleanup(async () => {
+    await diagnostics.flush();
+    report.runtimeDiagnostics = diagnostics.snapshot();
+    fs.writeFileSync(path.join(artifacts, 'runtime-diagnostics.json'), JSON.stringify(report.runtimeDiagnostics, null, 2));
+  });
+  await cleanup(() => diagnostics.stop());
   await cleanup(async () => {
     if (session) {await session.close(); browserClosed = true;}
   });

@@ -3227,9 +3227,19 @@ describe("全文翻译可见性锚点", () => {
         it('aborts a pending reply translation and rejects its late response when protection forms', async () => {
             const {link, owner} = setup('readArticle');
             const pending = deferred<string[]>();
-            runtime.requests.mockImplementation(origins => origins.some(origin => origin.includes('Reply to this comment'))
-                ? pending.promise : Promise.resolve(origins.map(origin => `译:${origin}`)));
-            autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(51); await waitForRequestCount(1);
+            const replyRequest = vi.fn();
+            runtime.requests.mockImplementation(origins => {
+                if (origins.some(origin => origin.includes('Reply to this comment'))) {
+                    replyRequest(); return pending.promise;
+                }
+                return Promise.resolve(origins.map(origin => `译:${origin}`));
+            });
+            autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(51);
+            // 正文可能独立成批；只等待并核对需要撤销的回复请求。
+            for (let attempt = 0; attempt < 20 && replyRequest.mock.calls.length < 1; attempt += 1) {
+                await Promise.resolve(); await vi.advanceTimersByTimeAsync(1);
+            }
+            expect(replyRequest).toHaveBeenCalledOnce();
             const state = getTranslationState(owner)!;
             expect(state.phase).toBe('loading');
             changeAction(link, 'replyToComment');

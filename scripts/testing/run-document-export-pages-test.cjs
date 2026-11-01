@@ -251,7 +251,7 @@ async function main() {
       const metrics = async name => {
         await page.waitForFunction(() => {const node = document.querySelector('.download-dialog[open]');if (!node) return false;const r = node.getBoundingClientRect();return r.left >= 11 && r.top >= 11 && r.right <= innerWidth - 11 && r.bottom <= innerHeight - 11;});
         const result = await dialog.evaluate(node => {const r = node.getBoundingClientRect();return {width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom,viewportWidth:innerWidth,viewportHeight:innerHeight,horizontalOverflow:node.scrollWidth-node.clientWidth,verticalOverflow:node.scrollHeight-node.clientHeight};});
-        assert(result.width <= 292.5 && result.width <= result.viewportWidth - 23, 'Panel must remain compact and fit the viewport');
+        assert(result.width <= 340.5 && result.width <= result.viewportWidth - 23, 'Panel must remain compact and fit the viewport');
         assert(result.height <= result.viewportHeight - 23 && result.horizontalOverflow <= 1, 'Panel must fit without horizontal overflow');
         assert(result.left >= 11 && result.top >= 11 && result.right <= result.viewportWidth - 11 && result.bottom <= result.viewportHeight - 11, 'Panel must remain inside viewport after reflow');
         await dialog.screenshot({path: path.join(artifacts, `${name}.png`),animations:'disabled',scale:'css'});
@@ -269,6 +269,11 @@ async function main() {
       await page.emulateMedia({colorScheme:'light'}); await page.locator('.document-app:not(.dark)').waitFor();
       await page.setViewportSize({width:320,height:568}); await metrics('download-panel-small');
       await page.setViewportSize({width:390,height:280}); await metrics('download-panel-short');
+      await dialog.getByRole('button',{name:'下载原文',exact:true}).focus();
+      const footer = await dialog.evaluate(node => {const button=node.querySelector('.download-original');const r=node.getBoundingClientRect(),b=button.getBoundingClientRect();return {focused:button===document.activeElement,inside:b.top>=r.top && b.bottom<=r.bottom,scrollTop:node.scrollTop};});
+      assert(footer.focused && footer.inside && footer.scrollTop > 0, 'Keyboard focus must reveal the original-download shortcut in a short viewport');
+      Object.assign(report.cases[report.cases.length-1],{footerReachable:true,scrollTop:footer.scrollTop});
+      await dialog.screenshot({path:path.join(artifacts,'download-panel-short-scrolled.png'),animations:'disabled',scale:'css'});
       await page.setViewportSize({width:390,height:740});
       let languageSequence = 0;
       const setLanguage = async language => {

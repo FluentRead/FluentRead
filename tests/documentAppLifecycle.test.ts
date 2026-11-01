@@ -422,7 +422,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(hostText(taskNotices()[0])).toContain('设置已更改');
         expect(state.translatedSegments).toEqual(['译 Original']);
         expect(ports.batch).toHaveBeenCalledOnce();
-        expect(taskButton('下载文件 ↓').props.disabled).toBe(false);
+        expect(taskButton('下载').props.disabled).toBe(false);
     });
 
     it.each(['credentials', 'config-save', 'translation-failure'] as const)('keeps import cancellation independent of an existing %s notice and preserves the reviewed document', async condition => {
@@ -481,7 +481,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.batch).toHaveBeenCalledOnce();
         expect(ports.batch.mock.calls[0][2].useCache).toBeUndefined();
         state.editSegment(0, '人工校订保留到确认'); await flush();
-        expect(taskButton('下载文件 ↓').props.disabled).toBe(false);
+        expect(taskButton('下载').props.disabled).toBe(false);
         expect(taskButton('重新翻译').props.disabled).toBe(false);
 
         await taskButton('重新翻译').props.onClick(); await flush();
@@ -519,7 +519,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.translatedSegments).toEqual(['第二次译文']);
         expect(state.confirmedTranslationIds).toEqual([]);
         expect(taskButton('重新翻译').props.disabled).toBe(false);
-        expect(taskButton('下载文件 ↓').props.disabled).toBe(false);
+        expect(taskButton('下载').props.disabled).toBe(false);
     });
 
     it.each(['service', 'model'])('retranslates a completed PDF with the new %s through the toolbar confirmation', async change => {
@@ -546,7 +546,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             modelOverride: change === 'service' ? 'deepseek-chat' : 'gpt-5', useCache: false,
         });
         expect(taskButton('重新翻译').props.disabled).toBe(false);
-        expect(taskButton('下载文件 ↓').props.disabled).toBe(false);
+        expect(taskButton('下载').props.disabled).toBe(false);
         expect(primaryTaskAction()).toBe('download');
     });
 
@@ -627,7 +627,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         await flush(); await state.openHistory({id}); await flush();
         expect(state.translationComplete).toBe(true);
         expect(state.translatedSegments).toEqual(['历史完整译文']);
-        expect(taskButton('下载文件 ↓').props.disabled).toBe(false);
+        expect(taskButton('下载').props.disabled).toBe(false);
         expect(taskButton('重新翻译').props.disabled).toBe(false);
         expect(ports.batch).not.toHaveBeenCalled();
         const restoredRevision = state.editRevision;
@@ -1060,7 +1060,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(hostText(root)).toContain('下载原文');
         state.language = 'en-US'; await flush();
         expect(hostText(root)).toContain('Download original');
-        expect(hostText(root)).toContain('Keeps the original file without translation or edits.');
+        expect(walkHost(root).find(entry => entry.props.class === 'download-original')!.props.title).toBe('Keeps the original file without translation or edits.');
     });
     it.each(['pdf', 'epub', 'docx', 'html', 'md', 'txt', 'json', 'srt', 'vtt', 'ass', 'ssa', 'lrc'])('downloads the exact original %s file before translation without another read or export', async extension => {
         const bytes = readFileSync(`examples/document-translation/sample.${extension}`);
@@ -1192,7 +1192,6 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(revokeUrl).toHaveBeenCalledWith(url);
         expect(state.originalDownloadSource).toBeNull();
         expect(state.originalDownloadError).toBe('');
-        expect(state.originalDownloadNotice).toBe('');
         const replacement = new File(['Replacement'], 'second.txt');
         await state.loadFiles([replacement]);
         state.downloadOriginalDocument();
@@ -1487,11 +1486,9 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     it('chooses the PDF export layout in the dialog without changing the reading presentation', async () => {
         await state.loadFiles([file('independent-layout.pdf')]); state.editSegment(0, '完整校订');
         state.openDownload(); await flush();
-        const options = walkHost(root).find(entry => entry.type === 'details' && entry.props.class === 'download-options')!;
-        expect(options.props.open).toBe(false);
-        expect(walkHost(root).filter(entry => entry.type === 'button' && entry.props.class === 'translate-document-button' && hostText(entry).includes('下载'))).toHaveLength(1);
-        const select = walkHost(root).find(entry => entry.type === 'select' && entry.props['aria-label'] === getDocumentDownloadCopy('zh-CN').layoutLabel)!;
-        select.props.onChange({target: {value: 'readable'}}); await flush();
+        expect(walkHost(root).filter(entry => entry.props.class === 'download-version')).toHaveLength(2);
+        const choice = walkHost(root).find(entry => entry.props.role === 'radio' && hostText(entry) === getDocumentDownloadCopy('zh-CN').layoutReadable)!;
+        choice.props.onClick(); await flush();
         expect(state.pdfPresentation).toBe('layout'); expect(state.downloadPdfPresentation).toBe('readable');
         const encode = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'result.pdf', mimeType: 'application/pdf'});
         await state.downloadDocument(); await flush();
@@ -1505,16 +1502,16 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         state.downloadError = 'Input document to PDFDocument.load is encrypted.'; await flush();
         const failure = walkHost(root).find(entry => entry.props.class === 'download-failure')!;
         const alert = walkHost(failure).find(entry => entry.props.role === 'alert')!;
-        expect(hostText(alert)).toBe(getDocumentDownloadCopy('zh-CN').protectedFailed);
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('zh-CN').failedTitle + getDocumentDownloadCopy('zh-CN').protectedFailed);
         const details = walkHost(failure).find(entry => entry.type === 'details')!;
         expect(details.props.open).toBeUndefined(); expect(hostText(details)).toContain(state.downloadError);
         expect(walkHost(root).find(entry => entry.type === 'button' && hostText(entry) === '下载原文')!.props.disabled).toBe(false);
         expect(state.translatedSegments).toEqual(['保留校订']);
         state.language = 'en-US'; await flush();
-        expect(hostText(alert)).toBe(getDocumentDownloadCopy('en-US').protectedFailed);
+        expect(hostText(alert)).toBe(getDocumentDownloadCopy('en-US').failedTitle + getDocumentDownloadCopy('en-US').protectedFailed);
     });
 
-    it.each(['layout', 'readable'] as const)('downloads the selected %s PDF presentation with matching dialog guidance', async presentation => {
+    it.each(['layout', 'readable'] as const)('downloads the selected %s PDF presentation after choosing a version', async presentation => {
         await state.loadFiles([file('presentation.pdf')]);
         state.editSegment(0, '可复制的实际校订文字');
         if (presentation === 'readable') state.pdfPresentation = presentation;
@@ -1522,18 +1519,12 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const walk = (entry: HostNode): HostNode[] => [entry, ...entry.children.flatMap(walk)];
         const text = (entry: HostNode): string => (entry.text || '') + entry.children.map(text).join('');
         const dialog = walk(root).find(entry => entry.type === 'dialog' && entry.props['aria-labelledby'] === 'download-document-heading')!;
-        const summary = walk(dialog).find(entry => entry.props.class === 'pdf-export-summary')!;
-        expect(summary.props['data-pdf-export-presentation']).toBe(presentation);
-        expect(text(dialog)).toContain(presentation === 'readable' ? 'document.pdfReading.exportReadableHint' : 'document.pdfReading.exportHint');
-        if (presentation === 'readable') {
-            expect(text(dialog)).toContain('document.pdfReading.exportReadableBilingualHint');
-            expect(text(summary)).toContain('document.pdfReading.exportReadablePageHint');
-            expect(text(dialog)).not.toContain('document.pdfReading.exportPageCount');
-            expect(text(dialog)).not.toContain('document.pdfReading.exportHint');
-            expect(walk(summary).some(entry => String(entry.props.class).includes('pdf-export-page-pair'))).toBe(false);
-        } else expect(text(summary)).toContain(getDocumentDownloadCopy('zh-CN').pageCount.replace('{count}', String(state.pdfExportPageCount)));
+        const selected = walk(dialog).find(entry => entry.props.role === 'radio' && entry.props['aria-checked'] === true)!;
+        expect(text(selected)).toBe(getDocumentDownloadCopy('zh-CN')[presentation === 'layout' ? 'layoutOriginal' : 'layoutReadable']);
+        expect(walk(dialog).some(entry => entry.type === 'pre')).toBe(false);
+        expect(text(dialog)).not.toContain('presentation.pdf');
         const download = vi.spyOn(binaryService, 'createDocumentDownload').mockResolvedValueOnce({data: new Uint8Array([1]), fileName: 'presentation.pdf', mimeType: 'application/pdf'});
-        await state.downloadDocument(); await flush();
+        await state.requestDownload('bilingual'); await flush();
         expect(download).toHaveBeenCalledWith(state.parsedDocument, ['可复制的实际校订文字'], 'bilingual', expect.objectContaining({pdfPresentation: presentation}));
     });
 

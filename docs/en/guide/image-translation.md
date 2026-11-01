@@ -17,6 +17,8 @@ Choose **Cancel** to stop processing; downloaded resources remain available. The
 
 Press **Escape** inside the text panel to close it and return to an available entry. Focus stays elsewhere if you have already moved to another page control. Copy feedback follows the current view and latest operation; if copying fails, select the text and copy it manually.
 
+Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
+
 The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.
@@ -27,7 +29,7 @@ PaddleOCR automatically enhances recognition contrast for some colored text on l
 2. Click the manga button. If resources are missing, confirm preparation; choosing Later or closing the prompt starts no download.
 3. Visible pages translate first. Scroll to translate more pages, click the manga button again to show originals and pause, and click again to resume.
 
-After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Numbers identify the current visible candidates, not chapter page numbers.
+After starting, expand the controls next to the manga button and choose **View manga text**. Select a visible page or long-image segment to read, compare, or copy its completed text. Click the entry again to close it. Mixed images, canvases, and background images follow document order. Numbers identify the current visible candidates, not chapter page numbers.
 
 The panel reads existing results without starting recognition or translation. It reports when a page is still processing, a result has been released, or content is too large to display; return to the page and check again. A long-image segment may include text from adjacent segments. Canvas text comes from the latest completed translation snapshot and may not reflect later changes to the canvas.
 

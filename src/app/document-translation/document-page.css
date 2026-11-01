@@ -1,7 +1,7 @@
 /**
  * @file src/app/document-translation/document-page.css
- * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读；下载弹窗默认突出文件与唯一主操作，选项、预览和错误详情按需展开，工具栏消息与持续警告不遮挡正文。
- * 主要内容：让数字进度完整可见，保留零进度和完成进度条，失败后的续译提示保持紧凑单行且仅按需展开技术详情；声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载预览和响应式断点；材料保存按钮在各格式工具栏中保持紧凑宽度，窄屏独立排布并避免覆盖阅读控件。
+ * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读；下载面板在工具栏旁以小幅版式示意选择双语或仅译文，排版细项默认收起，在选择之后提供单一品牌下载按钮，不重复文件名，未完成时才确认一次，错误详情按需展开，工具栏消息与持续警告不遮挡正文。
+ * 主要内容：让数字进度完整可见，保留零进度和完成进度条，失败后的续译提示保持紧凑单行且仅按需展开技术详情；声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载动作与状态和响应式断点；材料保存按钮在各格式工具栏中保持紧凑宽度，窄屏独立排布并避免覆盖阅读控件。
  * 模块边界：样式仅服务 DocumentApp 的 class 结构，不解析文档、不控制翻译状态，也不覆盖 content 宿主页面；跨页面基础视觉 token 仍由 src/ui/styles/tokens.css 管理。
  */
 @import "../../ui/styles/feedback.css";
@@ -308,52 +308,67 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .sample-buttons button:disabled { opacity: .55; cursor: wait; }
 .batch-toolbar .batch-toggle { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; border-color: transparent; background: transparent; cursor: pointer; }
 .batch-toggle span { color: var(--brand); font-size: 18px; }
-.download-dialog { box-sizing: border-box; width: min(400px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 20px; overflow-y: auto; border-radius: var(--fr-menu-radius, 14px); box-shadow: var(--fr-menu-shadow, 0 12px 36px #10182820); }
-.download-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-.download-heading h2 { margin: 0; font-size: 16px; font-weight: 650; }
-.download-heading button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; }
-.download-heading button:hover { background: var(--surface-soft); color: var(--ink); }
-.download-file-identity { display: flex; align-items: center; gap: 11px; min-width: 0; margin-bottom: 12px; }
-.download-file-identity > svg { flex: none; width: 24px; height: 28px; color: var(--muted); }
-.download-file-identity > div { flex: 1; min-width: 0; }
-.download-file-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 550; }
-.download-file-identity p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.download-options { margin-top: 10px; }
-.download-options > summary { width: fit-content; padding: 4px 0; color: var(--muted); font-size: 12px; cursor: pointer; }
-.download-options[open] > summary { margin-bottom: 8px; }
-.download-setting-row { display: flex; align-items: center; gap: 12px; min-height: 34px; margin: 8px 0; }
-.download-setting-row > span { flex: 0 0 58px; color: var(--muted); font-size: 11px; }
-.download-setting-row select { flex: 1; min-width: 0; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: var(--fr-control-radius, 9px); color: var(--ink); background: var(--surface); font: inherit; font-size: 12px; }
-.download-dialog .export-options { flex: 1; flex-wrap: nowrap; min-height: 34px; }
-.download-dialog .export-options button { flex: 1; min-width: 0; padding: 5px 8px; font-size: 11px; }
-.download-dialog .export-file-name { flex: 1; min-width: 0; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
-.download-file-row { align-items: baseline; }
-.download-dialog .download-help { margin: 12px 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
-.download-dialog .dialog-actions { display: block; margin-top: 16px; }
-.download-dialog .dialog-actions .translate-document-button { width: 100%; min-height: 38px; height: 38px; border-radius: var(--fr-control-radius, 9px); font-size: 13px; font-weight: 600; }
-.download-secondary-actions { display: flex; justify-content: center; gap: 20px; margin-top: 8px; }
-.download-secondary-actions button { min-height: 28px; padding: 2px 0; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
-.download-secondary-actions button:hover:not(:disabled) { color: var(--brand-strong); }
-.download-secondary-actions button:disabled { opacity: .5; cursor: not-allowed; }
-.download-failure { margin-top: 12px; padding: 9px 10px; border-radius: 8px; background: var(--fr-danger-soft, #fff0f3); }
-.download-failure .notice { margin: 0; color: var(--fr-danger, #b1435e); font-size: 12px; line-height: 1.6; }
-.download-failure details { margin-top: 5px; }
-.download-failure summary, .export-preview summary { color: var(--muted); font-size: 11px; cursor: pointer; }
-.download-failure pre { max-height: 90px; margin: 8px 0 0; overflow: auto; color: var(--muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
-.export-preview { margin-top: 10px; }
-.export-preview pre { max-height: 120px; overflow-y: auto; margin: 8px 0 0; padding: 8px; border-radius: 8px; background: var(--surface-soft); color: var(--ink); font: 11px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.download-dialog { position: fixed; box-sizing: border-box; width: min(360px, calc(100% - 24px)); max-height: calc(100dvh - 24px); margin: 0; padding: 22px; overflow-y: auto; border-radius: var(--fr-menu-radius, 14px); box-shadow: var(--fr-menu-shadow, 0 12px 36px #10182820); }
+.download-dialog::backdrop { background: transparent; backdrop-filter: none; }
+.download-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.download-heading h2 { margin: 0; color: var(--ink); font-size: 16px; font-weight: 650; }
+.download-heading button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.download-heading button:hover:not(:disabled) { background: var(--brand-soft); color: var(--brand-strong); }
+.download-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.download-version { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; padding: 16px 10px 14px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); text-align: center; line-height: 1.5; overflow-wrap: anywhere; cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.download-version:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); background: var(--surface-soft); }
+.download-version[data-selected="true"] { border-color: var(--brand); background: color-mix(in srgb, var(--brand-soft) 42%, var(--surface)); }
+.download-version:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 3px; }
+.download-version input { appearance: none; position: absolute; top: 10px; right: 10px; width: 14px; height: 14px; margin: 0; border: 1px solid var(--muted); border-radius: 50%; background: var(--surface); cursor: pointer; }
+.download-version input:checked { border: 4px solid var(--brand); }
+.download-version input:focus-visible { outline: none; }
+.download-versions:disabled .download-version { opacity: .55; cursor: not-allowed; }
+.download-version-title { font-size: 13px; font-weight: 600; }
+.download-version-hint { color: var(--muted); font-size: 11px; font-weight: 400; }
+.download-miniature { display: grid; place-items: center; width: 100%; height: 72px; margin-bottom: 7px; }
+.download-miniature-page { display: flex; gap: 9px; width: 49px; height: 62px; padding: 12px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); box-shadow: 0 3px 7px #1018280a; }
+.download-version[data-mode="bilingual"] .download-miniature-page { width: 94px; }
+.download-miniature-source, .download-miniature-translation { flex: 1; min-width: 0; background: repeating-linear-gradient(to bottom, currentColor 0 2px, transparent 2px 8px); clip-path: polygon(0 0, 100% 0, 100% 80%, 65% 80%, 65% 100%, 0 100%); }
+.download-miniature-source { color: color-mix(in srgb, var(--muted) 34%, transparent); }
+.download-miniature-translation { color: color-mix(in srgb, var(--brand) 54%, transparent); }
+.download-miniature[data-presentation="readable"] .download-miniature-page { width: 49px; flex-direction: column; gap: 5px; }
+.download-miniature[data-presentation="readable"] .download-miniature-source, .download-miniature[data-presentation="readable"] .download-miniature-translation { min-height: 0; }
+.download-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+.download-layout { margin: 16px 0 0; }
+.download-layout > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; color: var(--muted); font-size: 12px; line-height: 1.5; list-style: none; cursor: pointer; }
+.download-layout > summary::-webkit-details-marker { display: none; }
+.download-layout > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+.download-layout-value { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--ink); text-align: right; }
+.download-layout[open] > summary .fr-ui-icon { transform: rotate(180deg); }
+.download-layout-control { width: 100%; min-width: 0; margin-top: 8px; }
+.download-layout-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.download-submit { display: block; width: 100%; min-height: 44px; margin-top: 18px; padding: 11px 14px; border: 0; border-radius: var(--fr-control-radius, 9px); color: #fff; background: linear-gradient(135deg, #f35482, #e93267); box-shadow: 0 4px 10px #e9326714; font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer; }
+.download-submit:hover:enabled { filter: brightness(1.04); box-shadow: 0 5px 14px #e9326724; }
+.download-original-row { margin-top: 12px; text-align: center; }
+.download-original { min-height: 28px; padding: 3px 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.download-original:hover:not(:disabled) { color: var(--brand-strong); }
+.download-confirmation, .download-dialog .export-progress { padding: 16px; border-radius: 12px; background: var(--surface-soft); }
+.download-confirmation h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.download-dialog .notice, .download-dialog .export-progress p { margin: 8px; font-size: 12px; line-height: 1.6; }
+.download-confirmation .notice, .download-dialog .export-progress p { margin: 0; color: var(--muted); }
+.download-dialog .dialog-actions { gap: 8px; margin-top: 14px; }
+.download-dialog .dialog-actions button { min-width: 0; min-height: 38px; height: auto; padding: 8px 12px; border-radius: 8px; font-size: 12px; }
+.download-dialog .download-help { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.download-cancel { margin-top: 10px; padding: 4px 0; border: 0; background: transparent; color: var(--brand-strong); font-size: 12px; cursor: pointer; }
+.download-failure { margin-top: 16px; padding: 14px; border-radius: 10px; background: var(--surface-soft); }
+.download-failure .notice { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.download-failure strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.download-failure details { margin-top: 10px; }
+.download-failure summary { color: var(--muted); font-size: 11px; cursor: pointer; }
+.download-failure pre { max-height: 100px; margin: 8px 0 0; overflow: auto; color: var(--muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .document-batch-translation { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; font-size: 12px; cursor: pointer; }
 .document-batch-translation input { flex: none; margin-top: 3px; }
 .document-batch-translation strong, .document-batch-translation small { display: block; }
 .document-batch-translation small { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.pdf-export-summary { margin: 10px 0 0; padding-top: 8px; border-top: 1px solid var(--line); }
-.document-dialog .pdf-export-summary p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.document-dialog .pdf-export-summary p + p { margin-top: 3px; }
 .export-progress progress { display: block; width: 100%; height: 6px; margin: 10px 0 0; border: 0; border-radius: 3px; overflow: hidden; accent-color: var(--brand); }
 .export-progress progress::-webkit-progress-bar { border-radius: 3px; background: var(--line); }
 .export-progress progress::-webkit-progress-value { border-radius: 3px; background: var(--brand); }
 .export-progress progress::-moz-progress-bar { border-radius: 3px; background: var(--brand); }
-.export-options button:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 760px) {
   .document-samples { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
   .sample-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -363,8 +378,6 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .batch-toolbar > span { flex: 1; }
   .batch-toolbar label { flex: 1; }
   .batch-files { max-height: 170px; }
-  .download-dialog { padding: 20px; }
-  .export-preview pre { max-height: 140px; }
 }
 
 /* 阅读是文档页的中心；设置和文件管理按需打开，避免重复说明挤占正文。 */
@@ -810,3 +823,5 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .docx-document-reader.bilingual .docx-source, .docx-document-reader.bilingual .docx-translation { margin: 0; }
   .docx-document-reader.bilingual .docx-role-paragraph .docx-translation, .docx-document-reader.bilingual .docx-role-list-item .docx-translation { font-weight: 500; }
 }
+
+.document-taskbar .download-button { display: inline-flex; align-items: center; gap: 6px; }

@@ -18,7 +18,7 @@ const owners = [
     ['src/core/glossary/builtins.ts', 'BUILTIN_GLOSSARIES'],
     ['src/core/config/videoSubtitleAppearance.ts', 'VIDEO_SUBTITLE_SKINS'],
     ['src/features/settings/model/chromeTranslationPreparation.ts', 'TEST_SAMPLES'],
-    ['src/features/settings/model/navigation.ts', 'settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS'],
+    ['src/features/settings/model/navigation.ts', 'settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS', 'UI_LANGUAGE_SEARCH_ALIASES'],
     ['src/core/config/translationLoadingStyle.ts', 'translationLoadingStyleOptions'],
     ['src/core/config/freeTranslation.ts', 'FREE_TRANSLATION_PROVIDERS'],
     ['src/core/language/catalog.ts', 'translationLanguageOptions'],

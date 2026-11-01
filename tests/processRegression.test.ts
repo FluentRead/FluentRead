@@ -10,6 +10,7 @@ import {resolve} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
 
 const nativeGroups = [
+  {name: 'test group selection', files: ['tests/testGroupSelection.test.mjs'], arguments: []},
   {name: 'release packaging and publication', files: [
     'tests/releaseBundle.test.mjs',
     'tests/releaseManifest.test.mjs',

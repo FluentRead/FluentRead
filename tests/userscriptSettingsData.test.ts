@@ -31,6 +31,7 @@ const tables = [
     ['src/core/config/selectionPreview.ts', 'learningPreviewAnswers'],
     ['src/ui/translationLoadingIndicator.ts', 'HOST_IMPORTANT_STYLES'],
     ['src/features/settings/model/navigation.ts', 'STATIC_NAVIGATION_GROUPS'],
+    ['src/features/settings/model/navigation.ts', 'UI_LANGUAGE_SEARCH_ALIASES'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {

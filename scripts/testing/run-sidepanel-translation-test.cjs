@@ -23,6 +23,10 @@ fs.mkdirSync(artifactsDir, {recursive: true});
 const SOURCE = 'Copied text can be translated while you keep reading the current page.';
 const TRANSLATION = '复制的文本可以在继续阅读当前网页时翻译。';
 const service = 'custom:sidepanel-fixture';
+const fixtures = Array.from({length: 16}, (_, index) => ({id: index === 0 ? service : `custom:sidepanel-fixture-${index + 1}`,
+    name: index === 0 ? '侧栏测试服务' : index === 15 ? '测试服务 16 · 学术长文与技术文档对照' : `测试服务 ${index + 1}`,
+    model: index === 0 ? 'fixture-model' : `fixture-model-${String(index + 1).padStart(2, '0')}`,
+    translation: index === 0 ? TRANSLATION : index === 1 ? '继续阅读当前页面，同时翻译复制的文本。' : '阅读当前网页时，也能直接翻译复制的文字。'}));
 const report = {ok: false, artifact: 'production', extensionDir, cases: [], screenshots: [], nativeDiagnostics: [], requests: [], aborts: 0,
     browserPath,
     evidenceBoundary: 'Native Chromium side panel from an actual extension-page click; production translation client, broker and local HTTP provider. Clipboard writes use a controlled port to preserve the user clipboard. No online provider, Firefox runtime or native toolbar-popup claim.',
@@ -42,7 +46,7 @@ const server = http.createServer(async (request, response) => {
     if (failNext) {failNext = false;response.writeHead(400, {'content-type': 'application/json'});response.end(JSON.stringify({error: {message: 'sidepanel fixture rejected this request'}}));return;}
     if (holdNext) {holdNext = false;await new Promise(resolve => {releaseHeld = resolve;});}
     response.setHeader('content-type', 'application/json');response.end(JSON.stringify({id: 'sidepanel-fixture', object: 'chat.completion', model: body.model,
-        choices: [{index: 0, message: {role: 'assistant', content: TRANSLATION}, finish_reason: 'stop'}]}));
+        choices: [{index: 0, message: {role: 'assistant', content: fixtures.find(item => item.model === body.model)?.translation || TRANSLATION}, finish_reason: 'stop'}]}));
 });
 async function page(url) {const result = await newPageWithoutForeground(context, 30000);await diagnostics.attachPage(result);await result.goto(url, {waitUntil: 'domcontentloaded'});return result;}
 async function readConfig() {const result = await control.evaluate(() => chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'}));assert(result.success);return result.value;}
@@ -89,8 +93,8 @@ async function nativeClick(selector) {
     await native.send('Input.dispatchMouseEvent', {type: 'mousePressed', button: 'left', clickCount: 1, ...point});
     await native.send('Input.dispatchMouseEvent', {type: 'mouseReleased', button: 'left', clickCount: 1, ...point});
 }
-async function input(text) {
-    await native.evaluate(() => {const node = document.querySelector('textarea');node.focus();node.value = '';node.dispatchEvent(new Event('input', {bubbles: true}));});
+async function input(text, selector = 'textarea') {
+    await native.evaluate(selector => {const node = document.querySelector(selector);node.focus();node.value = '';node.dispatchEvent(new Event('input', {bubbles: true}));}, selector);
     await native.send('Input.insertText', {text});
 }
 async function screenshot(name) {
@@ -132,8 +136,9 @@ async function main() {
         await until(async () => (await readConfig())?.service, 'configuration');const initial = await readConfig();
         await patch({on: true, uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, theme: 'light', interfaceSkin: 'default', animations: false,
             service, translationCenterServices: [service], translationCenterSourceLanguage: 'en', translationCenterTargetLanguage: 'zh-Hans', translationCenterLayout: 'grid',
-            model: {...initial.model, [service]: 'fixture-model'}, token: {[service]: 'synthetic-local-fixture'}, user_role: {...initial.user_role, [service]: 'SOURCE_BEGIN{{origin}}SOURCE_END'},
-            customOpenAIProviders: [{id: service, name: '侧栏测试服务', endpoint: providerUrl + '/v1/chat/completions', models: ['fixture-model']}],
+            model: {...initial.model, ...Object.fromEntries(fixtures.map(item => [item.id, item.model]))}, token: Object.fromEntries(fixtures.map(item => [item.id, 'synthetic-local-fixture'])),
+            user_role: {...initial.user_role, ...Object.fromEntries(fixtures.map(item => [item.id, 'SOURCE_BEGIN{{origin}}SOURCE_END']))},
+            customOpenAIProviders: fixtures.map(item => ({id: item.id, name: item.name, endpoint: providerUrl + '/v1/chat/completions', models: [item.model]})),
             autoTranslate: false, disableFloatingBall: true, selectionTranslatorMode: 'disabled', enableAIContext: false, enableAIMultiSegment: false, glossaryEnabled: false});
         const content = await page(providerUrl + '/article');
         const sourceTab = await control.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url), content.url());
@@ -172,13 +177,47 @@ async function main() {
         failNext = true;await nativeClick('.translate-primary-button');await until(() => native.evaluate(() => Boolean(document.querySelector('.translation-result-error'))), 'failure visible');
         await nativeClick('.translation-result-error button');await until(() => native.evaluate(() => document.querySelector('.translation-result-card')?.dataset.status === 'success'), 'retry after failure');
         report.cases.push({name: 'stop, late response isolation, failure and retry', passed: true});
+        report.phase = 'multi-service';diagnostics.setPhase(report.phase);
+        await patch({translationCenterServices: [service, fixtures[1].id]});
+        await until(() => native.evaluate(() => document.querySelector('.service-picker-count')?.textContent === '2'), 'shared comparison selection');
+        await nativeClick('.add-service-button');await input(fixtures[15].model, '.service-picker-search input');
+        await until(() => native.evaluate(() => document.querySelectorAll('.service-picker-option').length === 1), 'search a model among sixteen configured providers');
+        await nativeClick('.service-picker-option');
+        const compared = [fixtures[0], fixtures[1], fixtures[15]];
+        await until(async () => JSON.stringify((await readConfig()).translationCenterServices) === JSON.stringify(compared.map(item => item.id)), 'multi-selection persists');
+        assert.equal(await native.evaluate(() => document.querySelector('.service-picker-option').getAttribute('aria-pressed')), 'true');
+        await nativeClick('.service-picker-close');assert.equal(await native.evaluate(() => document.querySelector('textarea').value), SOURCE);
+        const compareStart = report.requests.length;await nativeClick('.translate-primary-button');
+        await until(() => native.evaluate(expected => expected.every(item => document.querySelector(`[data-service="${item.id}"] .translation-result-content p`)?.textContent === item.translation), compared), 'three attributed translations');
+        assert.deepEqual(report.requests.slice(compareStart).map(item => item.model).sort(), compared.map(item => item.model).sort());
+        assert.equal(await native.evaluate(() => document.querySelector('.sidepanel-header h1').textContent), '翻译中心');
+        const attribution = await native.evaluate(() => [...document.querySelectorAll('.translation-result-card')].map(card => ({
+            service: card.dataset.service, name: card.querySelector('.translation-result-service-name strong').textContent,
+            model: card.querySelector('.translation-result-service-name small').textContent,
+        })));
+        assert.deepEqual(attribution, compared.map(item => ({service: item.id, name: item.name, model: item.model})));
+        await nativeClick(`[data-service="${fixtures[15].id}"] .translation-result-content footer button`);
+        assert.equal(await native.evaluate(() => window.__copiedText), fixtures[15].translation);
+        await native.evaluate(() => {document.querySelector('.translation-center').scrollTop = 0;});
+        await geometry('native sidebar multi-service comparison');await screenshot('native-sidebar-multi-translated');
+        // 设置页读取同一份选择；重开页面也不能把侧栏多选截断成一个服务。
+        const settings = await page(`${origin}/options.html#settings-translation-center`);
+        await settings.locator('.translation-center:not(.is-sidebar) .translation-result-card').first().waitFor();
+        assert.deepEqual(await settings.locator('.translation-result-card').evaluateAll(cards => cards.map(card => card.dataset.service)), compared.map(item => item.id));
+        await settings.reload();await settings.locator('.translation-center:not(.is-sidebar) .translation-result-card').first().waitFor();
+        assert.deepEqual(await settings.locator('.translation-result-card').evaluateAll(cards => cards.map(card => card.dataset.service)), compared.map(item => item.id));
+        await settings.close();
+        report.cases.push({name: 'sixteen configured services, searchable multi-select, three attributed results and settings-page persistence', providers: fixtures.length, selected: compared.length, attribution, passed: true});
         await nativeClick('.add-service-button');await until(() => native.evaluate(() => Boolean(document.querySelector('.service-picker-popover'))), 'service menu');
+        const serviceScroll = await native.evaluate(() => {const groups = document.querySelector('.service-picker-groups');return {height: groups.clientHeight, scrollHeight: groups.scrollHeight};});
+        assert(serviceScroll.scrollHeight > serviceScroll.height);report.serviceScroll = serviceScroll;
         await geometry('native sidebar service menu');await screenshot('native-sidebar-services');await nativeClick('.service-picker-close');
         await native.send('Emulation.setDeviceMetricsOverride', {width: 320, height: 480, deviceScaleFactor: 1, mobile: false});
         await geometry('native sidebar emulated 320x480');await nativeClick('.add-service-button');
         const menu = await native.evaluate(() => {const r = document.querySelector('.service-picker-popover').getBoundingClientRect();return {top: r.top, bottom: r.bottom, height: innerHeight};});
         assert(menu.top >= 0 && menu.bottom <= menu.height);await screenshot('native-sidebar-narrow-services');await nativeClick('.service-picker-close');
         await native.send('Emulation.clearDeviceMetricsOverride');
+        await patch({translationCenterServices: [service]});await until(() => native.evaluate(() => !document.querySelector('.service-picker-count')), 'restore single service for lifecycle check');
         await patch({theme: 'dark'});await until(() => native.evaluate(() => document.documentElement.classList.contains('dark')), 'dark theme');await screenshot('native-sidebar-dark');
         report.phase = 'close-reopen';diagnostics.setPhase(report.phase);holdNext = true;const closing = report.requests.length;
         await nativeClick('.translate-primary-button');await until(() => report.requests.length > closing, 'closing provider request');

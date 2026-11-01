@@ -42,7 +42,7 @@ export async function mountTranslationSidepanel(selector: string): Promise<void>
             preparedLanguage = language;preparedFont = font;
         } while (preparedLanguage !== config.uiLanguage || preparedFont !== config.interfaceFont);
         app = createApp(SidepanelApp);
-        app.use(createUiI18nPlugin({documentRoot: document.body, documentTitleKey: 'sidepanel.title'}));
+        app.use(createUiI18nPlugin({documentRoot: document.body, documentTitleKey: '翻译中心'}));
         app.onUnmount(() => window.removeEventListener('pagehide', exit));
         app.mount(selector);
     } catch (error) {

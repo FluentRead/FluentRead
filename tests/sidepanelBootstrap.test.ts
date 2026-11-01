@@ -31,7 +31,7 @@ describe('translation sidepanel bootstrap ownership', () => {
     it('prepares shared resources, mounts the page and unmounts only once on page exit', async () => {
         await mountTranslationSidepanel('#app');
         expect(ports.bundle).toHaveBeenCalledWith('zh-CN');expect(ports.font).toHaveBeenCalledWith('system');
-        expect(ports.plugin).toHaveBeenCalledWith({documentRoot: document.body, documentTitleKey: 'sidepanel.title'});
+        expect(ports.plugin).toHaveBeenCalledWith({documentRoot: document.body, documentTitleKey: '翻译中心'});
         expect(ports.mount).toHaveBeenCalledWith('#app');
         window.dispatchEvent(new Event('pagehide'));window.dispatchEvent(new Event('pagehide'));
         expect(ports.unmount).toHaveBeenCalledOnce();

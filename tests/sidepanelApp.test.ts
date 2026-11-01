@@ -38,6 +38,7 @@ afterEach(() => {app.unmount();vi.unstubAllGlobals();});
 
 describe('translation sidepanel app composition', () => {
     it('shares the compact translation surface and opens normal or service-specific settings', async () => {
+        expect(host.querySelector('.sidepanel-header h1')!.textContent).toBe('翻译中心');
         expect(host.querySelector('.center-port')!.getAttribute('data-surface')).toBe('sidebar');
         await click('.sidepanel-header button');expect(ports.settings).toHaveBeenCalledOnce();
         await click('.configure-service');expect(ports.createTab).toHaveBeenCalledWith({url: 'chrome-extension://fixture/options.html?service=custom%3Atest+with+spaces#settings-services'});

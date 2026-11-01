@@ -7,7 +7,7 @@
 <template>
   <main class="sidepanel-shell">
     <header class="sidepanel-header">
-      <h1>{{ t('sidepanel.title') }}</h1>
+      <h1>{{ translateLegacy('翻译中心') }}</h1>
       <button type="button" :aria-label="translateLegacy('打开完整设置')" :title="translateLegacy('打开完整设置')" @click="openSettings()"><UiIcon name="sliders" /></button>
     </header>
     <p v-if="navigationError" class="sidepanel-error" role="alert">{{ t('sidepanel.settingsError') }}</p>

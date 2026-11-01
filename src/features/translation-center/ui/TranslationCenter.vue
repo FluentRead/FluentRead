@@ -1,7 +1,7 @@
 <!--
  * @file src/features/translation-center/ui/TranslationCenter.vue
  * 文件职责：提供以输入和多服务对照为中心的翻译工作台，清晰展示凭据、请求进度和旧结果。
- * 主要内容：设置页与原生侧边栏共用输入、服务和请求会话；侧边栏以语言、输入与译文为主体，首次只选一个服务，移除计数、重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；为服务对比保留完整结果，相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
+ * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话；侧边栏用紧凑按钮显示服务或已选数量，完整保留多服务对比与模型标识，移除重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
  * 模块边界：不实现 provider 协议、不保存原文和译文、不更改网页默认服务；翻译复用 app client 的服务超时配置，设置导航交给外层，卸载时释放自有页面监听器和请求。
  -->
 <template>
@@ -26,8 +26,8 @@
       <section class="translation-results-panel" :aria-label="ct('results')">
         <div class="translation-panel-heading results-heading">
           <div v-if="surface !== 'sidebar'"><h3 id="translation-results-title">{{ ct('results') }} <span class="result-count">{{ cards.length }}</span></h3><p class="results-help">{{ ct('selectionHint') }}</p></div>
-          <div v-if="surface === 'sidebar'" class="sidebar-service-summary" :title="cards.length === 1 ? serviceModel(cards[0].service) : undefined"><span data-i18n-ignore>{{ cards.length === 1 ? serviceLabel(cards[0].service) : ct('results') }}</span></div><button v-if="surface === 'sidebar' && cards.length === 1 && cards[0].status === 'success'" class="text-button sidebar-copy-button" type="button" @click="copyResult(cards[0])">{{ ct(copiedService === cards[0].service ? 'copied' : 'copy') }}</button><div ref="servicePicker" class="translation-center-service-picker">
-            <button ref="servicePickerTrigger" class="add-service-button" type="button" :aria-label="ct('manage')" :title="ct('manage')" :aria-expanded="servicePickerOpen" aria-controls="translation-service-picker" aria-haspopup="dialog" @click="toggleServicePicker"><UiIcon :name="surface === 'sidebar' ? 'sliders' : 'plus'" :size="16" /><span v-if="surface !== 'sidebar'">{{ ct('manage') }}</span></button>
+          <button v-if="surface === 'sidebar' && cards.length === 1 && cards[0].status === 'success'" class="text-button sidebar-copy-button" type="button" @click="copyResult(cards[0])">{{ ct(copiedService === cards[0].service ? 'copied' : 'copy') }}</button><div ref="servicePicker" class="translation-center-service-picker">
+            <button ref="servicePickerTrigger" class="add-service-button" type="button" :aria-label="ct('manage')" :title="ct('manage')" :aria-expanded="servicePickerOpen" aria-controls="translation-service-picker" aria-haspopup="dialog" @click="toggleServicePicker"><UiIcon :name="surface === 'sidebar' ? 'sliders' : 'plus'" :size="16" /><span class="service-picker-label" data-i18n-ignore>{{ surface === 'sidebar' && cards.length === 1 ? serviceLabel(cards[0].service) : ct('manage') }}</span><span v-if="surface === 'sidebar' && cards.length > 1" class="service-picker-count">{{ cards.length }}</span><UiIcon v-if="surface === 'sidebar'" name="chevron-down" :size="13" /></button>
             <div v-if="servicePickerOpen" id="translation-service-picker" class="service-picker-popover" role="dialog" :aria-label="ct('manageTitle')" @keydown.esc.stop.prevent="closePicker(true)">
               <header class="service-picker-header"><div><strong>{{ ct('manageTitle') }}</strong><p v-if="surface !== 'sidebar'">{{ ct('manageHint') }}</p></div><button class="service-picker-close icon-button" type="button" :aria-label="ct('close')" @click="closePicker(true)"><UiIcon name="close" :size="16" /></button></header>
               <label class="service-picker-search"><UiIcon name="search" :size="17" /><input ref="serviceSearch" v-model.trim="serviceSearchQuery" type="search" :placeholder="ct('search')" :aria-label="ct('search')" /></label>
@@ -44,7 +44,7 @@
         <div v-if="staleCount" class="results-stale-notice" role="status"><UiIcon name="info" :size="16" />{{ ct(surface === 'sidebar' ? 'stale' : 'staleHint') }}</div>
         <div class="translation-result-list" :class="{'is-grid': surface !== 'sidebar' && resultLayout === 'grid'}">
           <article v-for="card in visibleCards" :key="card.service" class="translation-result-card" :data-service="card.service" :data-status="card.status" :data-stale="isStale(card)" :class="{'is-dragging': draggingService === card.service, 'is-drag-over': dragOverService === card.service}">
-            <header v-if="surface !== 'sidebar' || cards.length > 1" class="translation-result-card-header"><div class="translation-result-service-name"><button v-if="surface !== 'sidebar'" class="drag-handle icon-button" type="button" :aria-label="ct('reorder', {service: serviceLabel(card.service)})" :title="ct('reorderHint')" @pointerdown.prevent.stop="startPointerDrag(card.service, $event)" @keydown.alt.arrow-up.prevent="moveCard(card.service, -1)" @keydown.alt.arrow-down.prevent="moveCard(card.service, 1)"><UiIcon name="grip" :size="15" /></button><ServiceIcon v-if="surface !== 'sidebar'" :service="card.service" :label="serviceLabel(card.service)" size="medium" /><div><strong data-i18n-ignore>{{ serviceLabel(card.service) }}</strong><small data-i18n-ignore>{{ serviceModel(card.service) || serviceCategory(card.service) }}</small></div></div><div class="translation-result-card-actions"><span v-if="surface !== 'sidebar'" class="result-state" :class="cardStatus(card)">{{ ct(cardStatus(card)) }}</span><button class="remove-service-button icon-button" type="button" :aria-label="ct('remove', {service: serviceLabel(card.service)})" :disabled="cards.length <= 1" @click="removeService(card.service)"><UiIcon name="close" :size="15" /></button></div></header>
+            <header v-if="surface !== 'sidebar' || cards.length > 1" class="translation-result-card-header"><div class="translation-result-service-name"><button v-if="surface !== 'sidebar'" class="drag-handle icon-button" type="button" :aria-label="ct('reorder', {service: serviceLabel(card.service)})" :title="ct('reorderHint')" @pointerdown.prevent.stop="startPointerDrag(card.service, $event)" @keydown.alt.arrow-up.prevent="moveCard(card.service, -1)" @keydown.alt.arrow-down.prevent="moveCard(card.service, 1)"><UiIcon name="grip" :size="15" /></button><ServiceIcon v-if="surface !== 'sidebar'" :service="card.service" :label="serviceLabel(card.service)" size="medium" /><div><strong data-i18n-ignore :title="serviceLabel(card.service)">{{ serviceLabel(card.service) }}</strong><small v-if="surface !== 'sidebar' || cardModel(card)" data-i18n-ignore :title="cardModel(card)">{{ cardModel(card) || serviceCategory(card.service) }}</small></div></div><div class="translation-result-card-actions"><span v-if="surface !== 'sidebar'" class="result-state" :class="cardStatus(card)">{{ ct(cardStatus(card)) }}</span><button class="remove-service-button icon-button" type="button" :aria-label="ct('remove', {service: serviceLabel(card.service)})" :disabled="cards.length <= 1" @click="removeService(card.service)"><UiIcon name="close" :size="15" /></button></div></header>
             <div v-if="card.status === 'loading'" class="translation-result-placeholder loading-placeholder" role="status"><span class="loading-bars" aria-hidden="true"><i /><i /><i /></span>{{ ct('loading') }}<button v-if="surface !== 'sidebar' || cards.length > 1" class="text-button" type="button" @click="session.stopService(card.service)">{{ ct('stop') }}</button></div>
             <div v-else-if="card.status === 'success'" class="translation-result-content"><p data-i18n-ignore>{{ card.result }}</p><footer v-if="surface !== 'sidebar' || cards.length > 1"><span v-if="surface !== 'sidebar'">{{ languageLabel(card.input!.sourceLanguage) + ' → ' + languageLabel(card.input!.targetLanguage) }} {{ card.input!.model ? ' · ' + card.input!.model : '' }} · {{ card.duration.toLocaleString() }} ms</span><div><button v-if="isStale(card)" class="text-button" type="button" :disabled="!canTranslate || !!credentialWarning(card.service)" @click="retryService(card.service)">{{ ct('refresh') }}</button><button class="text-button" type="button" @click="copyResult(card)">{{ ct(copiedService === card.service ? 'copied' : 'copy') }}</button></div></footer></div>
             <div v-else-if="credentialWarning(card.service)" class="translation-result-placeholder needs-configuration"><p>{{ translateLegacy(credentialWarning(card.service)!) }}</p><button class="text-button" type="button" @click="configureService(card.service)">{{ ct('configure') }}<UiIcon name="external" :size="13" /></button></div>
@@ -172,6 +172,8 @@ function serviceCategory(service: string): string {
     : ct(servicesType.isCloudVendor(service) ? 'cloud' : servicesType.isMachine(service) ? 'machine' : 'ai');
 }
 function serviceLabel(service: string): string {return serviceOptions.value.find(item => item.value === service)?.label || service;}
+// 旧译文始终标识发起请求时的模型，避免连接配置变化后归属被新模型覆盖。
+function cardModel(card: ComparisonCard): string {return card.input ? card.input.model : serviceModel(card.service);}
 function languageLabel(value: string): string {
   if (value === 'auto') return translateLegacy('自动检测');
   const option = targetLanguageOptions.value.find(item => item.value === value);
@@ -249,7 +251,7 @@ function hydrateTranslationCenterConfig(nextConfig = config): void {
   const available = new Set(serviceOptions.value.map(item => item.value));
   const storedOrder = [...new Set(nextConfig.translationCenterServices.filter(service => available.has(service)))];
   // 空配置是首次使用，只选免密钥服务和用户已配置的网页默认服务。
-  const defaults = [...new Set([nextConfig.service, 'freeTranslation', 'google'])].filter(service => available.has(service) && !credentialWarning(service)).slice(0, props.surface === 'sidebar' ? 1 : 3);
+  const defaults = [...new Set([nextConfig.service, 'freeTranslation', 'google'])].filter(service => available.has(service) && !credentialWarning(service)).slice(0, 3);
   const nextOrder = storedOrder.length ? storedOrder : defaults;
   if (!draggingService.value && !pendingSave.has('services') && !failedSave.has('services') && !sameOrder(getCurrentServiceOrder(), nextOrder)) session.syncServices(nextOrder);
   const storedSource = nextConfig.translationCenterSourceLanguage || nextConfig.from || 'auto';
@@ -363,16 +365,21 @@ onUnmounted(() => {disposed = true; session.dispose(); endCardDrag(); unsubscrib
 .is-sidebar .translation-input-footer p { margin-top: 8px; }
 .is-sidebar .translate-primary-button, .is-sidebar .translate-stop-button { min-height: 32px; padding: 6px 10px; }
 .is-sidebar .results-heading { align-items: center; gap: 8px; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
-.is-sidebar .sidebar-service-summary { flex: 1; min-width: 0; color: var(--muted); font-size: 12px; }
-.is-sidebar .sidebar-service-summary > span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.is-sidebar .sidebar-copy-button { flex: none; white-space: nowrap; }
-.is-sidebar .add-service-button { width: 28px; min-height: 28px; justify-content: center; padding: 0; border: 0; color: var(--muted); }
+.is-sidebar .translation-center-service-picker { flex: 1; min-width: 0; }
+.is-sidebar .sidebar-copy-button { order: 1; flex: none; white-space: nowrap; }
+.is-sidebar .add-service-button { max-width: 100%; min-width: 0; min-height: 28px; padding: 3px 0; border: 0; color: var(--muted); }
+.is-sidebar .add-service-button > .fr-ui-icon { flex: none; }
+.is-sidebar .service-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.is-sidebar .service-picker-count { flex: none; padding: 0 5px; border-radius: 4px; background: var(--surface-soft); font-size: 11px; }
 .is-sidebar .results-controls { justify-content: flex-end; padding: 0 0 8px; }
 .is-sidebar .translation-result-list { flex: none; overflow: visible; padding: 0; gap: 8px; }
 .is-sidebar .translation-result-card { border: 0; border-radius: 0; background: transparent; }
 .is-sidebar .translation-result-card + .translation-result-card { padding-top: 8px; border-top: 1px solid var(--line); }
 .is-sidebar .translation-result-card-header { padding: 0; }
-.is-sidebar .translation-result-service-name small { display: none; }
+.is-sidebar .translation-result-service-name { flex: 1; }
+.is-sidebar .translation-result-service-name > div { display: flex; align-items: baseline; gap: 6px; width: 100%; }
+.is-sidebar .translation-result-service-name strong { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-sidebar .translation-result-service-name small { min-width: 0; max-width: none; flex: 1; margin-top: 0; }
 .is-sidebar .translation-result-placeholder { min-height: 64px; padding: 12px; }
 .is-sidebar .translation-result-content { padding: 4px 0 0; }
 .is-sidebar .translation-result-content p { margin-bottom: 6px; }

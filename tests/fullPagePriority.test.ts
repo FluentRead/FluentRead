@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
+import * as fullPagePriority from '@/src/features/full-page-translation/content/fullPagePriority';
 import {
     compareFullPageCandidatePriority,
     scoreFullPageCandidatePriority,
@@ -167,6 +168,53 @@ function withGlobalWindow<T>(value: unknown, callback: () => T): T {
 }
 
 describe('全文翻译候选队列', () => {
+    it('大队列只启动少量候选时保持线性规划比较量和原有优先顺序', () => {
+        const {document} = parseHTML('<html><body></body></html>');
+        const queue = state();
+        queue.scrollDirection = 'forward';
+        const count = 4096, expected = [];
+        let geometryReads = 0;
+        for (let index = 0; index < count; index += 1) {
+            const element = document.createElement('p'), top = ((index * 7919) % count) * 50 - 500;
+            document.body.append(element);
+            Object.defineProperty(element, 'getBoundingClientRect', {value: () => {geometryReads += 1; return {top, bottom: top + 30};}});
+            const queuedAt = (index * 17) % 1000;
+            queueFullPageCandidate(queue, element, candidate(element), `source-${index}`, queuedAt);
+            expected.push({key: element, priority: priority({rect: {top, bottom: top + 30},
+                direction: 'forward', queuedAt, now: 10000, sequence: index + 1})});
+        }
+        expected.sort((left, right) => compareFullPageCandidatePriority(left.priority, right.priority));
+        const comparisons = vi.spyOn(fullPagePriority, 'compareFullPageCandidatePriority');
+        try {
+            const plan = createFullPageDispatchPlan(queue, {now: 10000, viewportHeight: 600,
+                isEligible: () => true, resolveSource: () => ''});
+            const selected = [];
+            for (let index = 0; index < 8; index += 1) {
+                const entry = plan.next()!;
+                selected.push(entry.key);
+                removeFullPagePending(queue, entry.key, entry.candidate);
+                queue.foregroundDispatchesSinceBackground += 1;
+            }
+            expect(selected).toEqual(expected.slice(0, 8).map(entry => entry.key));
+            expect(geometryReads).toBe(count);
+            expect(comparisons.mock.calls.length).toBeLessThan(count * 5);
+        } finally {comparisons.mockRestore();}
+    });
+    it('优先级和序号完全相同时保留入队顺序，包括超龄后台公平派发', () => {
+        const {document} = parseHTML('<html><body><p></p><p></p><p></p><p></p></body></html>');
+        const queue = state(), elements = [...document.querySelectorAll<HTMLElement>('p')];
+        elements.forEach(element => {
+            setRect(element, 2000);
+            queueFullPageCandidate(queue, element, candidate(element), 'same source', 0);
+            queue.pendingMetadata.get(element)!.sequence = 1;
+        });
+        queue.foregroundDispatchesSinceBackground = 8;
+        const plan = createFullPageDispatchPlan(queue, {now: 9000, viewportHeight: 600,
+            isEligible: () => true, resolveSource: () => ''});
+        expect(plan.next()?.key).toBe(elements[0]);
+        expect(plan.next()?.key).toBe(elements[0]);
+        expect(collectPlan(queue, plan).map(entry => entry.key)).toEqual(elements);
+    });
     it('滚动派发只选择可见候选，超龄后台配额与近屏预取都不能抢占', () => {
         const {document} = parseHTML('<html><body><p id="visible"></p><p id="near"></p><p id="background"></p></body></html>');
         const elements = [...document.querySelectorAll<HTMLElement>('p')];

@@ -87,6 +87,10 @@ describe('OPFS material backup target',()=>{
     it('rejects an invalid filename before acquiring a lock',async()=>{
         const f=fixture();await expect(createMaterialBackupOpfsTarget('',f.platform)).rejects.toThrow('参数无效');expect(f.platform.acquire).not.toHaveBeenCalled();
     });
+    it.each([{id:'../unsafe',now:1700000000000},{id:'a'.repeat(32),now:NaN},{id:'a'.repeat(32),now:999999999999},{id:'a'.repeat(32),now:10000000000000}])('rejects an unsafe temporary-file identity before acquiring a lock: %o',async({id,now})=>{
+        const f=fixture();f.platform.randomId=()=>id;f.platform.now=()=>now;
+        await expect(createMaterialBackupOpfsTarget('backup.json',f.platform)).rejects.toThrow('参数无效');expect(f.platform.acquire).not.toHaveBeenCalled();
+    });
     it('rejects an invalid start timeout and repeated or concurrent commit',async()=>{
         const f=fixture();await expect(createMaterialBackupOpfsTarget('backup.json',f.platform,{startTimeoutMs:0})).rejects.toThrow('启动时限无效');
         const target=await createMaterialBackupOpfsTarget('backup.json',f.platform),work=target.commit(new AbortController().signal);await tick();

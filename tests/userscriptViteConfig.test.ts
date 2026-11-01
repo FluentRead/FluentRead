@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugin';
 import * as originalAppearance from '@/src/core/config/interfaceAppearance';
-import {readFileSync, readdirSync, realpathSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
+import fs, {readFileSync, readdirSync, realpathSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {tmpdir} from 'node:os';
 import {createHash, createHmac, createCipheriv} from 'node:crypto';
@@ -15,6 +15,7 @@ import {ungzip} from 'pako';
 import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from '@/userscript/buildGzip';
 import {unpackLanguageUpdates, unpackUiLanguageBundle} from '@/userscript/languageData';
 import {decodeUserscriptData} from '@/userscript/dataEncoding';
+import {encodeUserscriptDataCompact} from '@/userscript/buildDataEncoding';
 import {zhCNMessages, UI_LANGUAGE_BUNDLES, userscriptMessages, currentUserscriptLanguageBundle, createUserscriptLanguageUpdate} from '@/userscript/languageBundles';
 import {zhCNMessages as extensionChinese} from '@/src/core/i18n/messages/zh-CN';
 import {UI_LANGUAGE_BUNDLES as extensionBundles} from '@/src/core/i18n/bundles';
@@ -203,10 +204,8 @@ describe('userscript build gzip portability', () => {
             .rejects.toThrow('message worker failed');
     });
     it('compresses large standalone data reproducibly without changing the parent process error listeners', async () => {
-        // Exercise two real five-iteration workers above the production 64 KiB gate,
-        // without compressing a needlessly large repeated fixture under instrumentation.
-        const input = Buffer.from('CSS 数据与离线目录🙂\0\n'.repeat(3_000));
-        expect(input.byteLength).toBeGreaterThanOrEqual(65_536);
+        const input = Buffer.concat([Buffer.from('统计模型数据🙂\0\n'), Buffer.from(JSON.stringify(lockedFrancData))]);
+        expect(input.byteLength).toBeGreaterThan(65_536);
         const before = Buffer.from(input);
         const uncaught = process.listeners('uncaughtException');
         const unhandled = process.listeners('unhandledRejection');
@@ -215,10 +214,14 @@ describe('userscript build gzip portability', () => {
         expect(first).toEqual(second);
         expect(first.byteLength).toBeLessThanOrEqual(gzipUserscriptBuildData(input).byteLength);
         expect(gunzipSync(first)).toEqual(before);
+        const embedded = encodeUserscriptDataCompact(first);
+        expect(Buffer.from(decodeUserscriptData(embedded))).toEqual(first);
+        expect(inflateBundledFrancData(decodeUserscriptData(embedded))).toBe(before.toString('utf8'));
         expect(input).toEqual(before);
         expect(process.listeners('uncaughtException')).toEqual(uncaught);
         expect(process.listeners('unhandledRejection')).toEqual(unhandled);
-    });
+        // 真实模型经过两次隔离的构建压缩，保留独立于生产 60 秒超时的有限测试预算。
+    }, 15_000);
 
     it('rejects worker startup, exit and invalid gzip while falling back for larger results', async () => {
         const root = mkdtempSync(resolve(tmpdir(), 'fluentread-zopfli-worker-'));
@@ -401,7 +404,7 @@ describe('userscript bundled library notices', () => {
         const packages = ['@vue/reactivity', '@vue/runtime-core', '@vue/runtime-dom', '@vue/shared']
             .map(name => ({moduleId: realpathSync(fromDom.resolve(name)),
                 packageRoot: resolve(realpathSync(fromDom.resolve(`${name}/package.json`)), '..')}));
-        for (const name of ['@ctrl/tinycolor', 'pako']) {
+        for (const name of ['@ctrl/tinycolor', 'pako', 'franc-min']) {
             const packageRoot = realpathSync(resolve(root, 'node_modules', name));
             packages.push({moduleId: realpathSync(createRequire(resolve(root, 'package.json')).resolve(name)), packageRoot});
         }
@@ -409,9 +412,10 @@ describe('userscript bundled library notices', () => {
             const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
             const file = readdirSync(packageRoot).find(name => /^LICEN[CS]E(?:[.-].*)?$/iu.test(name))!;
             return {moduleId, heading: `${manifest.name} ${manifest.version} — ${manifest.license}`,
-                body: readFileSync(resolve(packageRoot, file), 'utf8').trim()};
+                body: readFileSync(manifest.name === 'franc-min'
+                    ? resolve(root, 'public/third-party-notices/franc-min-MIT.txt') : resolve(packageRoot, file), 'utf8').trim()};
         });
-        const shared = originals.slice(0, 4), tinycolor = originals[4], pako = originals[5];
+        const shared = originals.slice(0, 4), tinycolor = originals[4], pako = originals[5], franc = originals[6];
         expect(shared.every(notice => notice.body === shared[0].body)).toBe(true);
         // 相同 MIT 授权正文不能掩盖不同的完整版权文本。
         expect(tinycolor.body).toContain('Permission is hereby granted');
@@ -424,9 +428,11 @@ describe('userscript bundled library notices', () => {
         expect(result).toBe([
             `/*\n${tinycolor.heading}\n${tinycolor.body}\n*/`,
             `/*\n${shared.map(notice => notice.heading).join('\n')}\n${shared[0].body}\n*/`,
+            `/*\n${franc.heading}\n${franc.body}\n*/`,
             `/*\n${pako.heading}\n${pako.body}\n*/`,
         ].join('\n'));
         for (const notice of originals) expect(result.split(notice.heading)).toHaveLength(2);
+        expect(franc.body.split('\n').filter(line => line.startsWith('Copyright'))).toHaveLength(4);
         expect(bundledLibraryNotices([...ids].reverse())).toBe(result);
         expect(bundledLibraryNotices([`\0${ids[0]}`, resolve(root, 'src/app/content/runtime.ts')])).toBe('');
     });
@@ -481,19 +487,21 @@ describe('userscript bundled library notices', () => {
                 realpathSync(resolve(root, 'node_modules/pako')),
                 realpathSync(resolve(root, 'node_modules/.pnpm/lodash-es@4.17.21/node_modules/lodash-es')),
                 realpathSync(resolve(root, 'node_modules/.pnpm/node-fetch-native@1.6.7/node_modules/node-fetch-native')),
+                realpathSync(resolve(root, 'node_modules/franc-min')),
             ].map(packageRoot => {
                 const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8'));
                 const file = readdirSync(packageRoot).find(name => /^LICEN[CS]E(?:[.-].*)?$/iu.test(name))!;
                 return {moduleId: require.resolve(resolve(packageRoot, 'package.json')),
                     heading: `${manifest.name} ${manifest.version} — ${manifest.license}`,
-                    body: readFileSync(resolve(packageRoot, file), 'utf8').trim()};
+                    body: readFileSync(manifest.name === 'franc-min'
+                        ? resolve(root, 'public/third-party-notices/franc-min-MIT.txt') : resolve(packageRoot, file), 'utf8').trim()};
             });
             const license = readFileSync(resolve(root, 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
             const terms = license.slice(license.indexOf('Permission is hereby granted')).trim();
             const result = standaloneNotices(packages.map(item => item.moduleId));
             const marker = '[Shared MIT terms below]';
             const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
-            const restored = normalize(result.replaceAll(marker, terms));
+            const restored = normalize(result.replaceAll(marker, terms).replaceAll('[Shared single-quoted MIT terms below]', terms.replace(/"/gu, "'")));
             for (const notice of packages) {
                 expect(result.split(notice.heading)).toHaveLength(2);
                 expect(restored).toContain(normalize(notice.body));
@@ -1004,7 +1012,21 @@ describe('userscript browser shim injection', () => {
         vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '1');
         vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
         vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
+        let pinnedRead: {mockRestore(): void} | undefined;
         try {
+            const resourcePath = resolve(process.cwd(), 'userscript/resources/fluentread-data.v1.js');
+            const data = runInNewContext(readFileSync(resourcePath, 'utf8'), {}, {timeout: 5000});
+            const current = Object.fromEntries(Object.entries(zhCNMessages).filter(([key]) => !key.startsWith('document.') && !key.startsWith('translationStats.')));
+            const changedKey = 'settings.floatingBall.hoverDelayHelp';
+            const addedKey = Object.keys(current).find(key => key !== changedKey && data.zhCNMessages[key] === current[key])!;
+            expect(addedKey).toBeTruthy();
+            data.zhCNMessages = {...data.zhCNMessages, [changedKey]: 'Pinned stale Chinese fixture'};
+            delete data.zhCNMessages[addedKey];
+            const before = JSON.stringify(data), staleSource = `globalThis.__FLUENTREAD_USERSCRIPT_DATA__=${before};`;
+            const nativeRead = fs.readFileSync;
+            // 固定旧文案与缺失键，不依赖当前已提交资源碰巧落后于源码。
+            pinnedRead = vi.spyOn(fs, 'readFileSync').mockImplementation(((file, options) =>
+                file === resourcePath ? staleSource : nativeRead(file, options)) as typeof readFileSync);
             vi.resetModules();
             const {createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
             const {transformWithEsbuild} = await import('vite');
@@ -1014,18 +1036,17 @@ describe('userscript browser shim injection', () => {
             const id = await Reflect.apply(resolveId, {}, ['./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')]);
             const source = await Reflect.apply(load, {}, [id]);
             const compiled = await transformWithEsbuild(source, 'pinned-chinese.js', {format: 'cjs', target: 'es2018'});
-            const data = runInNewContext(readFileSync(resolve(process.cwd(), 'userscript/resources/fluentread-data.v1.js'), 'utf8'), {}, {timeout: 5000});
-            const before = JSON.stringify(data);
             const realm = {module: {exports: {} as {zhCNMessages: Record<string, string>}}, __FLUENTREAD_USERSCRIPT_DATA__: data,
                 Uint8Array, atob, require: () => ({inflateWithPako: (bytes: Uint8Array) => ungzip(bytes, {to: 'string'})})};
             runInNewContext(compiled.code, realm, {timeout: 5000});
             const result = realm.module.exports.zhCNMessages;
-            const current = Object.fromEntries(Object.entries(zhCNMessages).filter(([key]) => !key.startsWith('document.') && !key.startsWith('translationStats.')));
             for (const [key, value] of Object.entries(current)) expect(result[key]).toBe(value);
             expect(result['settings.floatingBall.hoverDelayHelp']).toBeTruthy();
             expect(Object.keys(result).some(key => result[key] !== data.zhCNMessages[key])).toBe(true);
+            expect(data.zhCNMessages[changedKey]).toBe('Pinned stale Chinese fixture');
+            expect(data.zhCNMessages).not.toHaveProperty(addedKey);
             expect(JSON.stringify(data)).toBe(before);
-        } finally {vi.unstubAllEnvs();vi.resetModules();}
+        } finally {pinnedRead?.mockRestore();vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
     it('embeds the English bundle without the extension document and full-options statistics keys and preserves every other field', () => {
@@ -2155,9 +2176,9 @@ describe('standalone About images at explicit use boundaries', () => {
     const createPlugin = (enabled = true, fixtureRoot = root) => createUserscriptAboutImagesCompressionPlugin(fixtureRoot, enabled) as unknown as {
         name: string; load(id: string): string | null;
     };
-    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false, generatedSource?: string) {
+    async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false) {
         const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, standalone) as unknown as {load(id: string): string | Promise<string>};
-        const source = generatedSource ?? await plugin.load(helperId);
+        const source = await plugin.load(helperId);
         const {transformWithEsbuild} = await import('vite');
         const compiled = await transformWithEsbuild(source, 'about-images-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as {getSupportImageUrl(normal: string): string; getContactImageUrl(): string}};
@@ -2181,25 +2202,21 @@ describe('standalone About images at explicit use boundaries', () => {
     }
 
     it('restores both actual standalone images exactly and never enlarges the compact gzip', async () => {
-        const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, true) as unknown as {
-            load(id: string): Promise<string>;
-        };
-        const source = await plugin.load(helperId);
-        const bytes = encodedDataBytes(source);
+        const h = await loadAccessors(undefined, true);
+        const bytes = encodedDataBytes(h.source);
         expect(bytes).toHaveLength(2);
         for (const [index, kind] of (['support', 'contact'] as const).entries()) {
             const input = Buffer.from(expectedUrl(kind));
             expect(gunzipSync(bytes[index])).toEqual(input);
             expect(bytes[index].length).toBeLessThanOrEqual(gzipUserscriptBuildData(input, 9, true).length);
         }
-        // Execute the exact generated source already checked above, without compressing both images twice.
-        const h = await loadAccessors(undefined, true, source);
         expect(h.decoder).not.toHaveBeenCalled(); expect(h.decode).not.toHaveBeenCalled();
         assertImage(h.api.getSupportImageUrl('normal'), 'support');
         assertImage(h.api.getContactImageUrl(), 'contact');
         h.api.getSupportImageUrl('normal'); h.api.getContactImageUrl();
         expect(h.decoder).toHaveBeenCalledTimes(2); expect(h.decode).toHaveBeenCalledTimes(2);
-    });
+        // 两张真实图片各经过一次构建压缩，保留独立于全局与生产超时的有限测试预算。
+    }, 15_000);
 
     it('propagates an isolated standalone image compressor failure', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-about-worker-failure-'));

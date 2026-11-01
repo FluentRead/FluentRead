@@ -1,8 +1,8 @@
 /**
  * @file src/features/vocabulary/materialBackupSave.ts
  * 文件职责：为经完整性校验的材料备份提供可取消的本地保存目标。
- * 主要内容：在用户动作中同步调用文件选择器并逐块写入，或在缺少选择器时将完整备份分块缓存后交给下载器；保存、仅发起下载和失败分别返回不同结果。
- * 模块边界：不打开浏览器端口、不校验文件摘要或声称下载已完成；调用方须先校验完整传输，下载器须如实报告状态；内存缓存随文件大小增长，浏览器下载兼容性由接线和验收决定。
+ * 主要内容：在用户动作中同步调用文件选择器并逐块写入；回退仅缓冲有限字节，超额后迁移到落盘目标，保存、仅发起下载和失败分别返回不同结果。
+ * 模块边界：不打开浏览器端口、不校验文件摘要或声称下载已完成；调用方须先校验完整传输，落盘与下载的兼容性及终态由平台适配器负责。
  */
 import {MaterialError} from './materialModel';
 import {assertMaterialBackupSafeCount} from './materialBackupSafeCount';
@@ -19,16 +19,21 @@ export interface MaterialBackupSavePlatform {
     pick?: (options:{suggestedName:string; types:Array<{description:string;accept:Record<string,string[]>}>}) => Promise<{createWritable():Promise<MaterialBackupWritable>}>;
     /** 仅有完成证明时才返回 saved，返回后不再持有 parts；调用方负责浏览器内存与下载兼容性。 */
     downloadBuffered?: (name:string, parts:readonly Uint8Array[], signal:AbortSignal) => Promise<MaterialBackupSaveState>;
+    /** 缓冲预算用尽后创建落盘目标；不限制整份备份的字节数。 */
+    spill?: (name:string) => Promise<MaterialBackupSaveTarget>;
 }
 export interface MaterialBackupSaveTarget {
-    write(chunk:Uint8Array):Promise<void>;
+    /** 批量迁移在各次原子写入前复验信号；已经开始的写入仍须结算。 */
+    write(chunk:Uint8Array,signal?:AbortSignal):Promise<void>;
     commit(signal:AbortSignal):Promise<MaterialBackupSaveState>;
     abort(reason?:unknown):Promise<void>;
 }
 export type MaterialBackupConsumer = (consume:(chunk:Uint8Array)=>Promise<void>,signal:AbortSignal)=>Promise<void>;
+/** 限制应用持有的原始字节，不作为整份备份或浏览器总内存上限。 */
+export const MATERIAL_BACKUP_BUFFER_BYTES = 8 * 1024 * 1024;
 
 function cancelled():DOMException {return new DOMException('材料导出已取消','AbortError');}
-function check(signal:AbortSignal):void {if (signal.aborted) throw cancelled();}
+function check(signal?:AbortSignal,locallyCancelled=false):void {if (locallyCancelled || signal?.aborted) throw cancelled();}
 function removeAbortListener(signal:AbortSignal|undefined, listener:()=>void):void {
     try {signal?.removeEventListener('abort',listener);} catch {/* Preserve the operation result. */}
 }
@@ -85,12 +90,41 @@ export async function chooseMaterialBackupTarget(name:string, platform:MaterialB
     }
     if (!platform.downloadBuffered) throw new MaterialError('storage-error','当前浏览器无法保存材料备份');
     const download = platform.downloadBuffered, parts:Uint8Array[] = [];
-    let size = 0, finished = false, current:Uint8Array|undefined, used = 0;
+    let size = 0, finished = false, writing = false, current:Uint8Array|undefined, used = 0;
+    let disk:MaterialBackupSaveTarget|undefined;
+    let pending:Promise<void>|undefined;
+    let writeFailed=false,writeFailure:unknown;
     const release = () => {parts.length = 0;current = undefined;used = 0;size = 0;};
     return {
-        async write(chunk) {
+        async write(chunk,signal) {
             if (finished) throw new MaterialError('storage-error','材料备份保存已结束');
-            assertMaterialBackupSafeCount(size + chunk.byteLength,'材料备份超出当前保存容量限制');
+            if (writing) throw new MaterialError('storage-error','材料备份写入尚未结束');
+            if (writeFailed) throw writeFailure;
+            check(signal);
+            const nextSize = size + chunk.byteLength;
+            assertMaterialBackupSafeCount(nextSize,'材料备份超出当前保存容量限制');
+            if (disk || size + chunk.byteLength > MATERIAL_BACKUP_BUFFER_BYTES) {
+                if (!disk && !platform.spill) throw Object.assign(new MaterialError('limit-exceeded','当前浏览器无法为大备份创建临时文件。请使用支持直接保存或私有文件存储的浏览器重试，原材料未更改。'),{name:'MaterialBackupBufferCapacityError'});
+                writing = true;
+                const work = Promise.resolve().then(async()=>{
+                    check(signal,finished);
+                    if (!disk) {
+                        disk = await platform.spill!(name);
+                        check(signal,finished);
+                        for (const part of parts) {check(signal,finished);await disk.write(part,signal);}
+                        if (current && used) {check(signal,finished);await disk.write(current.subarray(0,used),signal);}
+                        release();
+                    }
+                    check(signal,finished);
+                    await disk.write(chunk,signal);
+                });
+                pending = work;
+                try {await work;size = nextSize;}
+                catch(error){writeFailed=true;writeFailure=error;}
+                finally {writing = false;pending = undefined;}
+                if(writeFailed)throw writeFailure;
+                return;
+            }
             for (let offset = 0; offset < chunk.byteLength;) {
                 current ??= new Uint8Array(64 * 1024);
                 const length = Math.min(current.length-used,chunk.byteLength-offset);
@@ -101,16 +135,19 @@ export async function chooseMaterialBackupTarget(name:string, platform:MaterialB
         },
         async commit(signal) {
             if (finished) throw new MaterialError('storage-error','材料备份保存已结束');
+            if (writing) throw new MaterialError('storage-error','材料备份写入尚未结束');
+            if (writeFailed) throw writeFailure;
             finished = true;
             try {
                 check(signal);
+                if (disk) return await disk.commit(signal);
                 if (current && used) parts.push(current.subarray(0,used));
                 const state = await download(name,parts,signal);
                 if (state !== 'saved' && state !== 'initiated') throw new MaterialError('storage-error','材料备份下载状态无效');
                 return state;
             } finally {release();}
         },
-        async abort() {finished = true;release();},
+        async abort(reason) {finished = true;try {await pending?.catch(()=>{});await disk?.abort(reason);} finally {release();}},
     };
 }
 
@@ -132,7 +169,7 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         if (!(chunk instanceof Uint8Array) || chunk.byteLength === 0 || chunk.byteLength > MATERIAL_READ_FRAME_BYTES
             || !Number.isSafeInteger(bytes + chunk.byteLength)) return reject(new MaterialError('invalid-input','材料备份分片无效'));
         const copy = chunk.slice();
-        const work = Promise.resolve().then(async()=>{check(controller.signal);await target.write(copy);check(controller.signal);bytes += copy.byteLength;});
+        const work = Promise.resolve().then(async()=>{check(controller.signal);await target.write(copy,controller.signal);check(controller.signal);bytes += copy.byteLength;});
         pending = work;
         void work.then(()=>{if(pending===work)pending=undefined;},error=>{
             if(!controller.signal.aborted && !writeFailedBeforeCancel){writeFailedBeforeCancel=true;writeFailure=error;}

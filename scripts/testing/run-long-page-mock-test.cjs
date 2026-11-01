@@ -18,6 +18,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {createRequire} = require('node:module');
 const {guardBrowserClose} = require('./owned-browser-close.cjs');
+const {controlledProviderRuntime} = require('../site-translation/controlled-provider.cjs');
 const {buildLongPageFixture} = require('./long-page-mock-fixtures.cjs');
 const {assertFreshProductionExtension, waitForTranslationIdle} = require('../run-site-translation-test.cjs');
 const root = path.resolve(__dirname, '../..');
@@ -25,7 +26,7 @@ const owned = '.fluent-read-bilingual-content';
 
 function parseArgs(argv) {
   const args = {focusSafeHelper: path.join(__dirname, 'focus-safe-browser.cjs'), units: 60, samples: 5, providerDelay: 40};
-  const accepted = new Set(['extension-dir', 'playwright-root', 'focus-safe-helper', 'artifacts-dir', 'browser-path', 'case', 'units', 'samples', 'provider-delay']);
+  const accepted = new Set(['extension-dir', 'production-root', 'playwright-root', 'focus-safe-helper', 'artifacts-dir', 'browser-path', 'case', 'units', 'samples', 'provider-delay']);
   for (let index = 0; index < argv.length; index++) {
     const flag = argv[index];
     assert.ok(flag.startsWith('--') && accepted.has(flag.slice(2)), `Unknown argument ${flag}`);
@@ -41,13 +42,57 @@ function parseArgs(argv) {
   assert.ok(Number.isInteger(args.samples) && args.samples >= 3 && args.samples <= 9, '--samples must be 3..9');
   assert.ok(Number.isInteger(args.providerDelay) && args.providerDelay >= 0 && args.providerDelay <= 500, '--provider-delay must be 0..500');
   if (args.case) assert.ok(['discussion', 'article', 'research'].includes(args.case), `Unknown case ${args.case}`);
+  if (args.productionRoot) args.productionRoot = path.resolve(args.productionRoot);
   return args;
+}
+
+// Serialized into the isolated worker after the shared, source-bound codec is installed.
+// Keep fixture markers readable while encoding prose instead of returning an English echo.
+function installLongPageMockTransport(delay) {
+  const translate = globalThis.fetch;
+  globalThis.__longMockRequests = [];
+  globalThis.__longMockStage = 'setup';
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input?.url || input));
+    if (url.hostname !== 'edge.microsoft.com' || url.pathname !== '/translate/translatetext') throw Error(`Long-page mock forbids external provider ${url.origin}${url.pathname}`);
+    const texts = JSON.parse(init?.body ?? await input.clone().text());
+    const request = {stage: globalThis.__longMockStage, at: Date.now(), texts, characters: texts.reduce((total, text) => total + String(text).length, 0)};
+    globalThis.__longMockRequests.push(request);
+    await new Promise(resolve => setTimeout(resolve, delay));
+    const response = await translate(input, init);
+    const rows = await response.json();
+    request.finishedAt = Date.now();
+    rows.forEach((row, index) => {
+      const token = texts[index].match(/LPM-[A-Z]+-\d{3}-(?:\d+|opening)/u)?.[0] || 'overview';
+      row.translations[0].text = `长页译文 ${token}。${row.translations[0].text}`;
+    });
+    return new Response(JSON.stringify(rows), {status: response.status, headers: {'content-type': 'application/json'}});
+  };
 }
 
 function quantile(values, probability) {
   if (!values.length) return null;
   const sorted = [...values].sort((left, right) => left - right);
   return sorted[Math.ceil((sorted.length - 1) * probability)];
+}
+
+// Revealing every offscreen block changes upstream estimates. Compare the
+// target's own layout against its source, while retaining raw viewport positions.
+function assertResizeGeometryEquivalent(measurement, label) {
+  const {optimized, visibleControl} = measurement;
+  const keys = ['height', 'wrapperWidth', 'left', 'top', 'sourceLeft', 'sourceTop'];
+  for (const geometry of [optimized, visibleControl]) {
+    assert.ok(geometry && keys.every(key => Number.isFinite(geometry[key])), `${label}: incomplete resize geometry`);
+  }
+  for (const [key, before, after] of [
+    ['height', optimized.height, visibleControl.height],
+    ['wrapperWidth', optimized.wrapperWidth, visibleControl.wrapperWidth],
+    ['source-relative-left', optimized.left - optimized.sourceLeft, visibleControl.left - visibleControl.sourceLeft],
+    ['source-relative-top', optimized.top - optimized.sourceTop, visibleControl.top - visibleControl.sourceTop],
+  ]) {
+    assert.ok(Math.abs(before - after) <= .5,
+      `${label}: visible geometry retained an obsolete intrinsic size after resize/font change (${key})`);
+  }
 }
 
 // Main-world observations neither import product internals nor introduce a runtime debug API.
@@ -137,13 +182,13 @@ function wrapperSnapshot() {
 }
 
 async function main(args) {
-  assertFreshProductionExtension(args.extensionDir, root);
+  assertFreshProductionExtension(args.extensionDir, args.productionRoot || root);
   const helper = require(args.focusSafeHelper);
   const {chromium} = createRequire(path.join(args.playwrightRoot, 'long-page-test.cjs'))('playwright');
   const specs = (args.case ? [args.case] : ['discussion', 'article', 'research']).map(kind => buildLongPageFixture(kind, args.units));
   fs.mkdirSync(args.artifactsDir, {recursive: true});
   const report = {
-    scope: 'mock-long-page-rendering', platform: process.platform,
+    scope: 'mock-long-page-rendering', platform: process.platform, productionRoot: args.productionRoot || root,
     limitations: ['HTML research document, not PDF reader', 'CDP accessibility tree, not OS screen-reader acceptance', 'Print media/layout, not a physical printer', 'Same-DOM fixture-authored CSS override control, not an older extension or Windows performance', 'rAF wall time includes deliberate scroll pacing and automation; not translation latency', 'Other machine/global-queue jobs can affect durations; no isolated idle-machine claim'],
     machine: {architecture: process.arch, cpuCount: os.cpus().length, loadAverageAtStart: os.loadavg()},
     provider: {name: 'deterministic-microsoft', delayMs: args.providerDelay},
@@ -179,23 +224,8 @@ async function main(args) {
     await context.addInitScript(installHostObservation);
     const installedWorkers = new WeakMap();
     const installWorker = worker => {
-      if (!installedWorkers.has(worker)) installedWorkers.set(worker, worker.evaluate(delay => {
-        globalThis.__longMockRequests = [];
-        globalThis.__longMockStage = 'setup';
-        globalThis.fetch = async (input, init) => {
-          const url = new URL(String(input?.url || input));
-          if (url.hostname !== 'edge.microsoft.com' || url.pathname !== '/translate/translatetext') throw Error(`Long-page mock forbids external provider ${url.origin}${url.pathname}`);
-          const texts = JSON.parse(init?.body ?? await input.text());
-          const request = {stage: globalThis.__longMockStage, at: Date.now(), texts, characters: texts.reduce((total, text) => total + String(text).length, 0)};
-          globalThis.__longMockRequests.push(request);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          request.finishedAt = Date.now();
-          return new Response(JSON.stringify(texts.map(text => {
-            const token = String(text).match(/LPM-[A-Z]+-\d{3}-(?:\d+|opening)/u)?.[0] || 'overview';
-            return {translations: [{text: `长页译文 ${token}。这段中文解释观察结果和实验边界，读者可以继续查看相关材料。${text}`} ]};
-          })), {headers: {'content-type': 'application/json'}});
-        };
-      }, args.providerDelay));
+      if (!installedWorkers.has(worker)) installedWorkers.set(worker,
+        worker.evaluate(controlledProviderRuntime, true).then(() => worker.evaluate(installLongPageMockTransport, args.providerDelay)));
       return installedWorkers.get(worker);
     };
     context.on('serviceworker', worker => { void installWorker(worker).catch(error => report.errors.push(error.message)); });
@@ -434,7 +464,9 @@ async function main(args) {
           const originalControl = document.documentElement.getAttribute('data-long-render-control');
           const read = () => {
             const rect = wrapper.getBoundingClientRect();
+            const sourceRect = source.getBoundingClientRect();
             return {height: rect.height, wrapperWidth: rect.width, left: rect.left, top: rect.top,
+              sourceLeft: sourceRect.left, sourceTop: sourceRect.top, scrollY, documentTop: rect.top + scrollY,
               visible: wrapper.checkVisibility({contentVisibilityAuto: true}), intrinsicBlockSize: getComputedStyle(wrapper).containIntrinsicBlockSize};
           };
           const optimized = read();
@@ -448,11 +480,10 @@ async function main(args) {
           return {width: innerWidth, fontSize: getComputedStyle(document.body).fontSize, optimized, visibleControl,
             integrity: {sameNodeDuringControl, sameInnerHtmlDuringControl, exactOuterHtmlAfterRestore: wrapper.outerHTML === originalHtml}};
         }, farIndex);
+        result.resizeChecks.push(measurement); save();
         assert.ok(measurement.optimized.visible && measurement.optimized.height > 0 && measurement.optimized.wrapperWidth > 0);
         assert.ok(Object.values(measurement.integrity).every(Boolean), `${spec.id}: resize control rebuilt or changed the translated DOM`);
-        for (const key of ['height', 'wrapperWidth', 'left', 'top']) assert.ok(Math.abs(measurement.optimized[key] - measurement.visibleControl[key]) <= .5,
-          `${spec.id}: visible geometry retained an obsolete intrinsic size after resize/font change (${key})`);
-        result.resizeChecks.push(measurement);
+        assertResizeGeometryEquivalent(measurement, spec.id);
         save(); await assertSources(false);
       }
       await page.setViewportSize({width: 1280, height: 900});
@@ -641,6 +672,8 @@ async function main(args) {
       if (last) last.guardAttributeChanges = await page.evaluate(() => window.__longMock?.guardAttributeChanges || []).catch(() => []);
       await page.screenshot({path: path.join(args.artifactsDir, 'failure.png'), caret: 'initial'}).catch(() => {});
       await page.content().then(html => fs.writeFileSync(path.join(args.artifactsDir, 'failure.html'), html)).catch(() => {});
+      const worker = session?.context.serviceWorkers()[0];
+      if (worker) report.requestsOnFailure = await worker.evaluate(() => globalThis.__longMockRequests || []).catch(() => []);
     }
     throw error;
   } finally {
@@ -665,5 +698,5 @@ async function main(args) {
   return report;
 }
 
-module.exports = {buildLongPageFixture, parseArgs, quantile};
+module.exports = {buildLongPageFixture, parseArgs, quantile, installLongPageMockTransport, assertResizeGeometryEquivalent};
 if (require.main === module) main(parseArgs(process.argv.slice(2))).catch(error => { console.error(error); process.exitCode = 1; });

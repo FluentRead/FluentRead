@@ -49,6 +49,7 @@ export default defineConfig({
         resolve(__dirname, 'src/app/popup/PopupApp.vue'),
         resolve(__dirname, 'src/app/options/OptionsApp.vue'),
         resolve(__dirname, 'src/features/settings/ui/SitePreferencesSettings.vue'),
+        resolve(__dirname, 'src/features/settings/ui/SiteRulePreview.vue'),
         resolve(__dirname, 'src/features/self-help/ui/DiagnosticNotice.vue'),
         resolve(__dirname, 'src/features/translation-center/ui/TranslationCenter.vue'),
         resolve(__dirname, 'src/features/settings/ui/SettingsSections.vue'),

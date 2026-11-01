@@ -200,10 +200,10 @@
               :persistent="false" :show-arrow="false" :disabled="!popupContext.active.value || drawerVisible" placement="top-end" effect="light" popper-class="translation-tool-tooltip">
               <template #content><span class="translation-tool-tooltip-copy" data-testid="display-mode-tooltip">{{ displayModeButton.label }}</span></template>
               <button class="display-mode-button" type="button" data-testid="popup-display-mode"
-                :data-display-mode="config.display === 1 ? 'bilingual' : 'translation-only'"
-                :aria-label="t('popup.displayMode.translationOnly')" :aria-pressed="config.display === 1" :aria-description="displayModeButton.disabled ? displayModeButton.label : undefined"
+                :data-display-mode="currentPageDisplay === 1 ? 'bilingual' : 'translation-only'"
+                :aria-label="t('popup.displayMode.translationOnly')" :aria-pressed="currentPageDisplay === 1" :aria-description="displayModeButton.disabled ? displayModeButton.label : undefined"
                 :disabled="displayModeButton.disabled" :onClick="displayModeButton.toggle">
-                <svg v-if="config.display === 1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <svg v-if="currentPageDisplay === 1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M9.5 17h-5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2H12a2 2 0 0 1 2 2v3M5.5 12.5l2-5.5 2 5.5M6.2 10.5h2.6"/>
                   <rect x="9.5" y="8" width="12" height="13" rx="2"/>
                   <path d="M15.5 10.5v2M12.5 12.5h6M13.3 12.5c.4 2.5 2.3 4.5 5.2 5.5M17.7 12.5c-.4 2.5-2.3 4.5-5.2 5.5"/>
@@ -396,10 +396,11 @@
 
       <div v-else class="drawer-content">
         <div class="choice-block">
-          <label>翻译模式</label>
+          <label>{{ translateLegacy('全局翻译模式') }}</label>
           <div class="chips two" role="group" aria-label="翻译模式">
             <button v-for="item in drawerDisplayModes" :key="item.value" type="button" :class="{ selected: config.display === item.value }" :aria-pressed="config.display === item.value" :disabled="item.disabled" :onClick="item.choose">{{ item.label }}</button>
           </div>
+          <p v-if="currentSiteTranslationOnly" class="drawer-help">{{ translateLegacy('此网站已设为仅译文，可在网站偏好中修改') }} <button type="button" :onClick="popupActions.siteSettings">{{ translateLegacy('网站偏好') }}</button></p>
         </div>
       </div>
 
@@ -463,6 +464,7 @@ import {
   type PopupQuickFeatureId,
 } from '@/src/core/config/interfaceAppearance';
 import { resolveAIContextPresentation } from '@/src/ui/view-model/aiContext';
+import {resolveSiteTranslationDisplay} from '@/src/core/site-rules/domain';
 import {createPopupPageActions, type PopupPageState, type PopupSiteRulePatch} from './pageActions';
 import {createPopupTabSource} from './sourceTab';
 import {createPopupPageFontActions, type PopupPageFontState} from './pageFontActions';
@@ -528,6 +530,8 @@ const activeDrawer = ref<DrawerName>('hover');
 const pageState = reactive<PopupPageState>({tabId: null, url: '', domain: '', translated: false, busy: false, savingRule: false});
 const {busy: translating, translated: pageTranslated, tabId: currentTabId, domain: currentSiteDomain} = toRefs(pageState);
 const currentPdfSource = computed(() => getPdfSourceUrl(pageState.url));
+const currentSiteTranslationOnly = computed(() => Boolean(pageState.domain && config.value.translationOnlyDomains?.includes(pageState.domain)));
+const currentPageDisplay = computed(() => resolveSiteTranslationDisplay(config.value, pageState.url));
 const pageTranslationLabel = computed(() => t(currentPdfSource.value ? 'document.pdfReading.openReader' : pageTranslated.value ? 'popup.restoreCurrentPage' : 'popup.translateCurrentPage'));
 const clearingCache = ref(false);
 const donationVisible = ref(false);
@@ -744,7 +748,7 @@ const selectionSummary = computed(() => config.value.selectionTranslatorMode ===
   ? '已关闭' : config.value.selectionTranslatorTrigger === 'contextMenu'
     ? t('selectionTrigger.contextMenu')
     : options.selectionTranslatorTriggers.find(item => item.value === config.value.selectionTranslatorTrigger)?.label || '显示图标');
-const displaySummary = computed(() => config.value.display === 1 ? `双语 · ${styleLabel.value}` : '仅显示译文');
+const displaySummary = computed(() => currentPageDisplay.value === 1 ? `双语 · ${styleLabel.value}` : '仅显示译文');
 const imageTranslationSummary = computed(() => !browserCapabilities.imageTranslation
   ? '当前浏览器不可用'
   : config.value.selectionAreaEnabled ? areaHotkeyDisplayName.value : config.value.disableImageTranslator ? '已关闭' : '悬停图片');
@@ -959,17 +963,17 @@ const donationActions = computed(() => {
 const popupActions = computed(() => {
   const current = popupContext.capture();
   const bind = (run: () => void | Promise<void>) => () => {if (current()) return run()};
-  return {settings: bind(() => openOptions()), serviceSettings: bind(() => openOptions('settings-services', undefined, config.value.service)),
+  return {settings: bind(() => openOptions()), siteSettings: bind(() => openOptions('settings-sites')), serviceSettings: bind(() => openOptions('settings-services', undefined, config.value.service)),
     services: bind(() => openDrawer('services')), cache: bind(clearCache)};
 });
 // 快捷模式属于整个弹窗；服务、显示模式或在途操作变化会淘汰旧按钮回调。
 const displayModeContext = useSettingsActionContext(() => popupContext.active.value,
-  () => [config.value, config.value.on, config.value.service, config.value.display, translating.value, pageState.savingRule]);
+  () => [config.value, config.value.on, config.value.service, config.value.display, currentSiteTranslationOnly.value, pageState.url, translating.value, pageState.savingRule]);
 const displayModeButton = computed(() => {
   const current = displayModeContext.capture(), next = config.value.display === 1 ? 0 : 1;
   const googleOnly = config.value.service === 'google' && next === 0;
-  const disabled = !config.value.on || translating.value || pageState.savingRule || googleOnly;
-  return {disabled, label: t(googleOnly ? 'popup.displayMode.googleBilingualOnly'
+  const disabled = !config.value.on || translating.value || pageState.savingRule || googleOnly || currentSiteTranslationOnly.value;
+  return {disabled, label: currentSiteTranslationOnly.value ? translateLegacy('此网站已设为仅译文，可在网站偏好中修改') : t(googleOnly ? 'popup.displayMode.googleBilingualOnly'
     : config.value.display === 1 ? 'popup.displayMode.bilingual' : 'popup.displayMode.translationOnly'),
     toggle: () => {if (current() && !disabled) config.value.display = next}};
 });

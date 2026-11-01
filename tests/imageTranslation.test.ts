@@ -256,3 +256,84 @@ describe('图片翻译 OCR 工具', () => {
         expect(result[centre + 3]).toBe(255);
     });
 });
+
+describe('漫画数字证据：OCR 规范化', () => {
+    const bbox={x0:10,y0:10,x1:80,y1:30};
+    const normalized=(text:string, words:Array<{text:string;confidence?:number;bbox:typeof bbox}>,confidence?:number) =>
+        normalizeOcrLines([{paragraphs:[{lines:[{text,bbox,words,...(confidence===undefined?{}:{confidence})}]}]}],true);
+    it('仅按原始显式词置信记录，不改变普通 OCR 返回结构',()=>{
+        const blocks=[{paragraphs:[{lines:[{text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:97}]}]}]}];
+        expect(normalizeOcrLines(blocks)).toEqual([{text:'12:34',bbox}]);
+        expect(normalizeOcrLines(blocks,true)).toEqual([{text:'12:34',bbox,numericConfidence:97}]);
+    });
+    it.each([undefined,NaN,Infinity,-1,101])('缺失或无效词置信 %s 不创建数字证据',confidence=>{
+        const result=normalized('12:34',[{text:'12:34',bbox,confidence}]);
+        if(result.length) expect(result[0]).not.toHaveProperty('numericConfidence');
+    });
+    it('同一行多个词采用最低可靠度，显式行级置信更低时也不能抬高',()=>{
+        const words=[{text:'₩',bbox:{x0:10,y0:10,x1:20,y1:30},confidence:97},{text:'12,000',bbox:{x0:21,y0:10,x1:80,y1:30},confidence:91}];
+        expect(normalized('₩12,000',words)[0]).toMatchObject({text:'₩12,000',numericConfidence:91});
+        expect(normalizeOcrLines([{paragraphs:[{lines:[{text:'₩12,000',bbox,words}]}]}],false)[0].text).toBe('₩ 12,000');
+        expect(normalized('₩12,000',words,89)[0]).toMatchObject({numericConfidence:89});
+        expect(normalized('₩12,000',[words[0],{...words[1],confidence:undefined}])[0]).not.toHaveProperty('numericConfidence');
+    });
+    it('低置信词、坏框或行文字与词序不一致均不能把残片升级成可信数字',()=>{
+        const a={text:'12',bbox:{x0:10,y0:10,x1:25,y1:30},confidence:97};
+        for(const b of [{text:'.34',bbox:{x0:26,y0:10,x1:80,y1:30},confidence:24},{text:'.34',bbox:{x0:26,y0:10,x1:26,y1:30},confidence:97}]) {
+            const line=normalized('12.34',[a,b]);expect(line.every(value=>!('numericConfidence' in value))).toBe(true);
+        }
+        expect(normalized('12.34',[a])[0]).not.toHaveProperty('numericConfidence');
+    });
+    it('没有词对象时只接受显式有效行置信，不将缺失值默认为证据',()=>{
+        const lines=[{text:'09:15',bbox,words:[],confidence:93},{text:'09:16',bbox:{...bbox,y0:40,y1:60},words:[]}];
+        const result=normalizeOcrLines([{paragraphs:[{lines}]}],true);
+        expect(result[0]).toMatchObject({numericConfidence:93});expect(result[1]).not.toHaveProperty('numericConfidence');
+    });
+    it('完全重叠重复结果只要任何副本没有可信证据就不能升级，顺序不影响',()=>{
+        const high={text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:97}]};
+        const unknown={text:'12:34',bbox,words:[{text:'12:34',bbox}]};
+        for(const lines of [[high,unknown],[unknown,high]]) {
+            const result=normalizeOcrLines([{paragraphs:[{lines}]}],true);
+            expect(result).toHaveLength(1);expect(result[0]).not.toHaveProperty('numericConfidence');
+        }
+    });
+    it('同文重叠数字保守并入全部检测框且与输入顺序无关',()=>{
+        const first={text:'12:34',bbox,words:[{text:'12:34',bbox,confidence:97}]};
+        const shifted={x0:11,y0:10,x1:81,y1:30};
+        const second={text:'12:34',bbox:shifted,words:[{text:'12:34',bbox:shifted,confidence:94}]};
+        for(const lines of [[first,second],[second,first]]){
+            const result=normalizeOcrLines([{paragraphs:[{lines}]}],true);
+            expect(result).toMatchObject([{bbox:{x0:10,y0:10,x1:81,y1:30},numericConfidence:94}]);
+            expect(normalizeOcrLines([{paragraphs:[{lines}]}])[0].bbox).toEqual(lines[0].bbox);
+        }
+    });
+    it('重复数字有一份低于阈值时按较低分数保守保留',()=>{
+        const make=(confidence:number)=>({text:'12:34',bbox,words:[{text:'12:34',bbox,confidence}]});
+        for(const lines of [[make(94),make(80)],[make(80),make(94)]])
+            expect(normalizeOcrLines([{paragraphs:[{lines}]}],true)).toMatchObject([{numericConfidence:80}]);
+    });
+    it('漫画视图不把相邻独立数字拼成未经识别的新数字',()=>{
+        const a={text:'12',bbox:{x0:70,y0:10,x1:90,y1:70},baseline:{x0:80,y0:10,x1:81,y1:70},words:[{text:'12',bbox:{x0:70,y0:10,x1:90,y1:70},confidence:98}]};
+        const b={text:'34',bbox:{x0:45,y0:10,x1:65,y1:70},baseline:{x0:55,y0:10,x1:56,y1:70},words:[{text:'34',bbox:{x0:45,y0:10,x1:65,y1:70},confidence:99}]};
+        const result=normalizeOcrLines([{paragraphs:[{lines:[a,b]}]}],true);
+        expect(result).toHaveLength(2);expect(result.map(row=>row.text)).toEqual(['12','34']);
+        expect(normalizeOcrLines([{paragraphs:[{lines:[a,b]}]}])).toHaveLength(1);
+    });
+    it('不同顺序与缺失置信的竖排文字都不吸收独立数字',()=>{
+        const make=(text:string,x:number,confidence?:number)=>{const bbox={x0:x,y0:10,x1:x+20,y1:70};return {text,bbox,baseline:{x0:x+10,y0:10,x1:x+11,y1:70},words:[{text,bbox,confidence}]};};
+        const number=make('12:34',70,98),label=make('你好',45),confident=make('世界',20,98);
+        for(const lines of [[number,label,confident],[confident,label,number]]){
+            const result=normalizeOcrLines([{paragraphs:[{lines}]}],true);
+            expect(result.find(row=>row.text==='12:34')).toMatchObject({numericConfidence:98});
+        }
+    });
+    it('数字经符号桥接也不能与竖排对白合列',()=>{
+        const make=(text:string,x:number,confidence:number)=>{const bbox={x0:x,y0:10,x1:x+20,y1:70};return {text,bbox,baseline:{x0:x+10,y0:10,x1:x+11,y1:70},words:[{text,bbox,confidence}]};};
+        const a=make('12:34',100,98),b=make('1',75,98),c=make('你好',50,98);
+        for(const lines of [[a,b,c],[c,b,a],[b,a,c]]){
+            const result=normalizeOcrLines([{paragraphs:[{lines}]}],true);
+            expect(result.find(row=>row.text==='12:34')).toMatchObject({numericConfidence:98});
+            expect(result.some(row=>row.text.includes('12:34')&&row.text.includes('你好'))).toBe(false);
+        }
+    });
+});

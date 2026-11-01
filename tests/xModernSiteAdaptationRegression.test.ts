@@ -353,9 +353,12 @@ describe('X modern public DOM functional regression', () => {
         const quoteBody = quoteShell.querySelector('div[dir="auto"]')!;
         const negatives = [main, main.closest('article')!, quoteShell, quoteShell.querySelector('article')!, quoteBody,
             ...document.querySelectorAll('button, [role="button"], article a, aside a, aside h2, aside p')];
+        const engagementControls = [...document.querySelectorAll('article .x-engagement-button')];
         expect(quoteShell).toBeTruthy();
+        expect(engagementControls.length).toBeGreaterThan(0);
         for (const element of negatives) {
-            expect(adapter.decide(element, context).kind, element.outerHTML.slice(0,150)).toBe('pass');
+            expect(adapter.decide(element, context).kind, element.outerHTML.slice(0,150))
+                .toBe(engagementControls.includes(element) ? 'prune-subtree' : 'pass');
             expect(adapted().resolve(element)?.element).not.toBe(bio);
         }
         const before = document.documentElement.outerHTML;

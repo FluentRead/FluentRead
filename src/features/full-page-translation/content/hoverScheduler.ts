@@ -11,6 +11,7 @@ export type HoverTranslationInvocation = PageTranslationConfigOverrides & {
     scope?: TranslationScope;
     delayMs?: number;
     continuous?: boolean;
+    inputSource?: 'mouse-shortcut';
 };
 
 interface PendingHoverTranslation {
@@ -34,6 +35,11 @@ interface HoverTranslationSchedulerPorts {
     checkConfig: (snapshot: FullPageTranslationConfigSnapshot) => boolean;
     noteGesture: () => void;
     translate: (candidate: TranslationCandidate, snapshot: FullPageTranslationConfigSnapshot, continuous: boolean) => void;
+    /** 可选的在途重挂观察只关联本次悬浮意图，不取消已派发的普通请求。 */
+    cancelTracked?: () => void;
+    dispatchTracked?: (candidate: TranslationCandidate, snapshot: FullPageTranslationConfigSnapshot,
+        continuous: boolean, x: number, y: number, scope: TranslationScope, overrides: PageTranslationConfigOverrides,
+        inputSource?: 'mouse-shortcut', canCommit?: () => boolean) => void;
 }
 
 /** 宿主相同仍可能是不同内联段或视觉文字块；延迟不能跨越这种候选变化。 */
@@ -63,15 +69,20 @@ export class HoverTranslationScheduler {
 
     constructor(private readonly ports: HoverTranslationSchedulerPorts) {}
 
-    cancel(): void {
+    private clearPending(): void {
         if (!this.pending) return;
         clearTimeout(this.pending.timer);
         this.pending = undefined;
     }
 
+    cancel(): void {
+        this.ports.cancelTracked?.();
+        this.clearPending();
+    }
+
     handle(mouseX: number, mouseY: number, invocation: HoverTranslationInvocation = {}): void {
         if (this.ports.isAvailable?.() === false) { this.cancel(); return; }
-        const {delayMs = 0, continuous = false, scope = this.ports.currentScope(), ...overrides} = invocation;
+        const {delayMs = 0, continuous = false, scope = this.ports.currentScope(), inputSource, ...overrides} = invocation;
         if (continuous) this.ports.noteGesture();
         const candidate = delayMs > 0 ? this.ports.resolveCandidate(mouseX, mouseY, scope) : undefined;
         if (candidate === null) { this.cancel(); return; }
@@ -83,7 +94,7 @@ export class HoverTranslationScheduler {
             previous.mouseY = mouseY;
             return;
         }
-        this.cancel();
+        this.clearPending();
         const snapshot = this.ports.captureConfig(overrides);
         if (!this.ports.checkConfig(snapshot)) return;
         const canCommit = this.ports.captureCommitGuard?.();
@@ -96,7 +107,9 @@ export class HoverTranslationScheduler {
                 this.pending = undefined;
                 if (this.ports.isAvailable?.() === false || canCommit?.() === false) return;
                 if (!current || candidate && !isSameHoverTranslationCandidate(candidate, current)) return;
-                this.ports.translate(current, snapshot, continuous);
+                if (this.ports.dispatchTracked) this.ports.dispatchTracked(current, snapshot, continuous,
+                    pending.mouseX, pending.mouseY, scope, overrides, inputSource, canCommit);
+                else this.ports.translate(current, snapshot, continuous);
             }, delayMs)};
         this.pending = pending;
     }

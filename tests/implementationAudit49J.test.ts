@@ -620,7 +620,25 @@ exports.queryMacFrontmostApplication=async()=>({pid:process.pid,name:'controlled
     const preload = join(root, 'preload.cjs');
     writeFileSync(preload, String.raw`
 const Module = require('node:module'); const original = Module._extensions['.js'];
-Module._extensions['.js']=(mod,file)=>{if(file===process.argv[1])console.log('ORIGINAL_CLI_LOADED',file);return original(mod,file);};
+Module._extensions['.js']=(mod,file)=>{
+ if(file===process.argv[1]){
+  console.log('ORIGINAL_CLI_LOADED',file);
+  // The site CLI reads process.platform directly. Give only that consumer a
+  // controlled OS value while preserving native platform/ownership in every
+  // dependency and in the parent-owned process. Its source and callbacks run
+  // unchanged; only the lexical external process port is substituted.
+  if(file.endsWith('/run-site-translation-test.cjs')&&process.env.AUDIT_PORT_MODE.startsWith('scan-')){
+   const actualCompile=mod._compile, consumerPlatform=process.env.AUDIT_PORT_MODE==='scan-site-platform-block'?'unsupported-fixture-platform':'darwin';
+   console.log('CONTROLLED_SITE_PLATFORM_PORT',JSON.stringify({hostPlatform:process.platform,consumerPlatform}));
+   mod._compile=function(source,filename){
+    const newline=source.indexOf('\n');if(!source.startsWith('#!')||newline<0)throw Error('controlled site CLI entry format changed');
+    const binding='const process = new Proxy(globalThis.process, {get(target, key) {return key === "platform" ? '+JSON.stringify(consumerPlatform)+' : Reflect.get(target, key, target);}});\n';
+    return actualCompile.call(this,source.slice(0,newline+1)+binding+source.slice(newline+1),filename);
+   };
+  }
+ }
+ return original(mod,file);
+};
 // Only the selected CLI's OS capability is a controlled external port. Its
 // production macOS gate still runs; dependencies retain the host OS module and
 // real process.platform, including Linux /proc start identity and native ps.
@@ -1082,6 +1100,9 @@ describe('audit49 J continuation3 complete manual cleanup consumers', () => {
             if (script === 'scripts/run-ai-context-ui-test.cjs') {
                 expect(result.stdout).toContain(`CONTROLLED_MACOS_PLATFORM_PORT ${JSON.stringify({hostPlatform: process.platform, consumerPlatform: 'darwin'})}`);
             }
+            if (script === 'scripts/run-site-translation-test.cjs') {
+                expect(result.stdout).toContain(`CONTROLLED_SITE_PLATFORM_PORT ${JSON.stringify({hostPlatform: process.platform, consumerPlatform: 'darwin'})}`);
+            }
             expect(result.stdout, `${script} ${mode} acquired external port`).toContain('PUBLIC_LAUNCH_REACHED');
             expect(result.timedOut, `${script} ${mode} finite consumer`).toBe(false);
             if (mode !== 'scan-partial') expect(result.stdout, `${script} ${mode} closes acquired browser\n${result.stderr}`).toContain('SESSION_CLOSE');
@@ -1093,7 +1114,7 @@ describe('audit49 J continuation3 complete manual cleanup consumers', () => {
             if (mode === 'scan-report') expect(observation.ownerStates[0]).toMatchObject({gone: true, timerCleared: true, fdClosed: true});
             else if (mode === 'scan-report-close') expect(observation.ownerStates[0]).toMatchObject({gone: true, profileExists: true, timerCleared: true, fdClosed: true});
             else expect(observation.ownerStates[0]).toMatchObject({gone: false, profileExists: true});
-            if (script === 'scripts/testing/run-changing-source-test.cjs') {
+            if (script === 'scripts/testing/run-changing-source-test.cjs' || script === 'scripts/run-site-translation-test.cjs') {
               for (const marker of ['FOCUS_OBSERVER_COMPILE_PORT', 'FOCUS_OBSERVER_ACQUIRED', 'FOCUS_OBSERVER_READY', 'FOCUS_OBSERVER_STOP_REQUESTED', 'FOCUS_OBSERVER_CLOSED', 'FOCUS_OBSERVER_CLEANUP']) {
                 expect(result.stdout.split(marker), `${script} ${mode} ${marker} once`).toHaveLength(2);
               }
@@ -1104,6 +1125,34 @@ describe('audit49 J continuation3 complete manual cleanup consumers', () => {
             for (const observation of observations) await observation.cleanup();
         }
     }, 60000);
+    it('site translation refuses an unsupported platform before acquiring an observer or browser', async () => {
+        const observation = await portCLI('scripts/run-site-translation-test.cjs', 'scan-site-platform-block');
+        try {
+            const {result} = observation;
+            expect(result.stdout).toContain(`CONTROLLED_SITE_PLATFORM_PORT ${JSON.stringify({hostPlatform: process.platform, consumerPlatform: 'unsupported-fixture-platform'})}`);
+            expect(result.stdout).not.toContain('FOCUS_OBSERVER_COMPILE_PORT');
+            expect(result.stdout).not.toContain('PUBLIC_LAUNCH_REACHED');
+            expect(result.stderr).toContain('后台焦点事件监控目前只支持 macOS');
+            expect(result.timedOut).toBe(false);
+            expect(result.code).toBe(86);
+            expect(observation.ownerStates).toEqual([]);
+            expect(observation.profiles).toEqual([]);
+        } finally {await observation.cleanup();}
+    }, 20000);
+    it('site translation stops before browser launch when its focus observer cannot start', async () => {
+        const observation = await portCLI('scripts/run-site-translation-test.cjs', 'scan-focus-ready-failure');
+        try {
+            const {result} = observation;
+            expect(result.stdout).toContain('FOCUS_OBSERVER_COMPILE_PORT');
+            expect(result.stdout).toContain('FOCUS_OBSERVER_CLEANUP');
+            expect(result.stdout).not.toContain('PUBLIC_LAUNCH_REACHED');
+            expect(result.stderr).toContain('controlled focus compile failure');
+            expect(result.timedOut).toBe(false);
+            expect(result.code).toBe(86);
+            expect(observation.ownerStates).toEqual([]);
+            expect(observation.profiles).toEqual([]);
+        } finally {await observation.cleanup();}
+    }, 20000);
     it('changing-source focus readiness failure releases both fixtures without launching a browser actor', async () => {
         const observation = await portCLI('scripts/testing/run-changing-source-test.cjs', 'scan-focus-ready-failure');
         try {

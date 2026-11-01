@@ -1,4 +1,4 @@
-import type {RuntimeFetch} from '@/src/platform/http/runtime';
+import type {RuntimeFetch, RuntimeFetchPolicy} from '@/src/platform/http/runtime';
 import {readDoubaoGuestRequest} from '@/src/platform/http/doubaoGuest';
 import {getUserscriptFunction} from './api';
 
@@ -22,7 +22,7 @@ export function parseResponseHeaders(rawHeaders = ''): Headers {
 // Fetch 规范禁止这些状态携带响应体，即使脚本管理器给出空 responseText。
 const NULL_BODY_STATUSES = new Set([204, 205, 304]);
 
-function responseFromUserscript(response: UserscriptXmlHttpResponse): Response {
+function responseFromUserscript(response: UserscriptXmlHttpResponse, policy?: RuntimeFetchPolicy): Response {
     // GM 请求只承接 HTTP(S)。status 0 或缺失表示管理器没有取得有效 HTTP 响应，
     // 不能伪装成 200，否则翻译调度会把网络失败计为成功并吞掉后备/重试。
     const status = response.status;
@@ -31,12 +31,24 @@ function responseFromUserscript(response: UserscriptXmlHttpResponse): Response {
     }
     // Via 只明确支持 responseText，未声明桌面脚本管理器提供的可选
     // responseType/anonymous 扩展，因此以文本作为可移植基线。
-    const body = NULL_BODY_STATUSES.has(status) ? null : response.responseText ?? String(response.response || '');
+    let body = NULL_BODY_STATUSES.has(status) ? null : response.responseText ?? String(response.response || '');
+    const headers = parseResponseHeaders(response.responseHeaders);
+    const limit = policy?.errorBodyLimit;
+    // 管理器已缓冲 responseText；先限制非成功正文，避免 Response 再复制任意长字符串。
+    // UTF-8 字节数不会小于 UTF-16 单元数，故仅对长度不超限的字符串做有界编码。
+    if (body !== null && (status < 200 || status >= 300) && limit
+        && Number.isSafeInteger(limit.maxBytes) && limit.maxBytes >= 0
+        && (body.length > limit.maxBytes || new TextEncoder().encode(body).byteLength > limit.maxBytes)) {
+        body = limit.replacement;
+        headers.delete('content-length');
+        headers.delete('content-encoding');
+        headers.set('content-type', 'application/json');
+    }
     const statusText = /^[\t\x20-\x7e\x80-\xff]*$/u.test(response.statusText || '') ? response.statusText || '' : '';
     return new Response(body as BodyInit | null, {
         status,
         statusText,
-        headers: parseResponseHeaders(response.responseHeaders),
+        headers,
     });
 }
 
@@ -143,7 +155,7 @@ function supportsAnonymousDoubao(): boolean {
 }
 
 /** 以旧式或现代 GM 请求 API 实现兼容 fetch 的传输层。 */
-export const userscriptFetch: RuntimeFetch = async (input, init) => {
+export const userscriptFetch: RuntimeFetch = async (input, init, policy) => {
     const gmRequest = getUserscriptFunction('GM_xmlhttpRequest', 'xmlHttpRequest');
     const url = input instanceof Request ? input.url : input instanceof URL ? input.href : String(input);
     const native = !gmRequest || shouldUseNativeFetch(url);
@@ -203,7 +215,7 @@ export const userscriptFetch: RuntimeFetch = async (input, init) => {
                     // 完成门先关闭再构造 Response；构造失败必须 reject，否则调用方与后续 abort 都无法结算。
                     finish(() => {
                         try {
-                            resolve(responseFromUserscript(response));
+                            resolve(responseFromUserscript(response, policy));
                         } catch (error) {
                             reject(error);
                         }
@@ -228,7 +240,7 @@ export const userscriptFetch: RuntimeFetch = async (input, init) => {
                 result.then(
                     (response: UserscriptXmlHttpResponse) => finish(() => {
                         try {
-                            resolve(responseFromUserscript(response));
+                            resolve(responseFromUserscript(response, policy));
                         } catch (error) {
                             reject(error);
                         }

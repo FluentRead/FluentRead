@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
+import {encodeImageCanvas,encodeReadingImageCanvas,readingImageEncodingBusy} from '@/src/features/image-translation/services/imageEncoding';
 
 const readers: Reader[] = [];
 class Reader {
@@ -20,6 +20,31 @@ function canvas() {
 beforeEach(()=>{vi.useFakeTimers();readers.length=0;vi.stubGlobal('FileReader',Reader);});
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 describe('图片与 OCR 共用异步无损编码',()=>{
+    it('物理编码回调重复或观察者抛错不会重复完成，正常结果仍可读取',async()=>{
+        const image=canvas(),physical=vi.fn(()=>{throw Error('observer failed');});
+        const result=encodeImageCanvas(image.canvas,undefined,{timeoutMs:30000,message:'timeout',onPhysicalSettled:physical});
+        image.encoded();readers[0].complete('ok');expect(await result).toBe('ok');image.encoded();
+        expect(physical).toHaveBeenCalledOnce();expect(readers).toHaveLength(1);expect(vi.getTimerCount()).toBe(0);
+    });
+    it.each(['abort','timeout'] as const)('阅读编码 %s 后等待立即结束，但真实回调前无法再次编码或绕过重挂',async action=>{
+        const image=canvas(),signal=new AbortController(),result=encodeReadingImageCanvas(image.canvas,signal.signal);
+        const stopped=expect(result).rejects.toBeInstanceOf(Error);
+        if(action==='abort')signal.abort();else await vi.advanceTimersByTimeAsync(30_000);
+        await stopped;expect(readingImageEncodingBusy()).toBe(true);
+        for(let i=0;i<3;i++){
+            const next=canvas();await expect(encodeReadingImageCanvas(next.canvas,new AbortController().signal)).rejects.toMatchObject({code:'READING_ENCODER_BUSY'});
+            expect(next.toBlob).not.toHaveBeenCalled();
+        }
+        image.encoded();expect(readers).toHaveLength(0);expect(readingImageEncodingBusy()).toBe(false);
+        const next=canvas(),retry=encodeReadingImageCanvas(next.canvas,new AbortController().signal);next.encoded();readers[0].complete('ok');
+        expect(await retry).toBe('ok');expect(readingImageEncodingBusy()).toBe(false);
+    });
+    it('阅读编码同步失败和预取消均不占用物理槽',async()=>{
+        const image=canvas(),signal=new AbortController();signal.abort();
+        await expect(encodeReadingImageCanvas(image.canvas,signal.signal)).rejects.toMatchObject({name:'AbortError'});expect(readingImageEncodingBusy()).toBe(false);
+        image.toBlob.mockImplementation(()=>{throw new Error('failed');});
+        await expect(encodeReadingImageCanvas(image.canvas,new AbortController().signal)).rejects.toThrow('failed');expect(readingImageEncodingBusy()).toBe(false);
+    });
     it.each(['blob','reader'])('调用者的 %s 编码预算与超时文案在开始时冻结',async phase=>{
         const image=canvas(),budget={timeoutMs:100,message:'图片读取超时'};
         const outcome=encodeImageCanvas(image.canvas,undefined,budget).then(result=>({result}),error=>({error}));

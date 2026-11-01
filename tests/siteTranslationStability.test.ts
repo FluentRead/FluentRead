@@ -311,6 +311,15 @@ describe('live page controlled stability probe evidence', () => {
     expect(Object.keys(window).filter(name => name.startsWith('__fluentReadNativeComment_'))).toEqual([]);
   });
 
+  it('focus loss after collapse prevents later expansion and finally restore input', async () => {
+    let reads = 0;
+    const failure = Object.assign(new Error('focus lost'), {code: 'FOCUS_SAFETY_VIOLATION'});
+    await expect(runNativeCommentToggle({page: nativeCommentPage(), artifactsDir: output,
+      checkFocus: () => {if (++reads >= 3) throw failure;}})).rejects.toBe(failure);
+    expect(document.querySelector('.comtr')!.classList.contains('coll')).toBe(true);
+    expect(JSON.parse(readFileSync(join(output, 'native-comment-toggle.json'), 'utf8')).ok).toBe(false);
+  });
+
   it('rejects synthetic comment clicks and restores the native expansion before releasing its listener', async () => {
     await expect(runNativeCommentToggle({page: nativeCommentPage(false), artifactsDir: output})).rejects.toThrow('not a trusted click');
     const report = JSON.parse(readFileSync(join(output, 'native-comment-toggle.json'), 'utf8'));

@@ -32,7 +32,8 @@ import {anchorSentenceAnalysis} from '../sentenceAnalysis';
 import {computed, h} from 'vue';
 import {readingAnswerBlocks, readingAnswerSpans} from '../answerFormat';
 import {useUiI18n} from '@/src/ui/i18n';
-const props = withDefaults(defineProps<{text: string; compact?: boolean; sourceText?: string; evidenceSources?: readonly ReadingEvidenceSource[]; locateEvidence?: ReadingEvidenceAnchor['locate']; evidenceState?: ReadingEvidenceLocation}>(), {compact: true, sourceText: '', evidenceSources: () => []});
+// 显式函数类型让 Vue 正确生成运行时校验，同时继续从锚点接口推导参数和返回类型。
+const props = withDefaults(defineProps<{text: string; compact?: boolean; sourceText?: string; evidenceSources?: readonly ReadingEvidenceSource[]; locateEvidence?: (...args: Parameters<ReadingEvidenceAnchor['locate']>) => ReturnType<ReadingEvidenceAnchor['locate']>; evidenceState?: ReadingEvidenceLocation}>(), {compact: true, sourceText: '', evidenceSources: () => []});
 const {translateLegacy, t} = useUiI18n();
 const blocks = computed(() => readingAnswerBlocks(props.text));
 const annotations = computed(() => blocks.value.map(block => block.kind === 'table' && [...block.headers, ...block.rows.flat()].some(cell => cell.includes('[[cite:'))

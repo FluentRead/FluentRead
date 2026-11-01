@@ -15,6 +15,7 @@ import {
 } from '@/src/core/translation/public';
 import {createTranslationCore} from './helpers/translationCore';
 import {appendBilingualTranslation, materializeCandidate} from '@/src/features/full-page-translation/content/renderer';
+import {isTranslationStateCandidateCurrent} from '@/src/features/full-page-translation/content/translationStability';
 import {
     beginTranslation,
     getTranslationState,
@@ -66,6 +67,79 @@ function commitBilingual(owner: HTMLElement, core = createTranslationCore(), syn
 }
 
 describe('双语快照展示保护', () => {
+    it('invalidates an earlier partial engagement owner when its missing action is mounted', () => {
+        const {document} = page('');
+        vi.stubGlobal('location', {href: 'https://x.com/NASA/status/1571977394151383042'});
+        document.body.innerHTML = `<main><article><div id="engagement" style="display:block">
+            <div data-engagement-action="retweet"><button><span>1万</span></button></div>
+            <div data-engagement-action="like"><button><span>2.2万</span></button></div>
+            <div><div data-engagement-action="bookmark"><button><span>430</span></button></div></div>
+        </div></article></main>`;
+        const core = createTranslationCore({url: new URL('https://x.com/NASA/status/1571977394151383042')});
+        const bar = document.getElementById('engagement') as HTMLElement;
+        const candidate = core.discover(document).find(item => item.element === bar || bar.contains(item.element));
+        expect(candidate).toBeDefined();
+        const owner = candidate!.element as HTMLElement;
+        const {state} = commitBilingual(owner, core);
+        expect(isTranslationStateCandidateCurrent(owner, state)).toBe(true);
+        const reply = document.createElement('div');
+        reply.setAttribute('data-engagement-action', 'reply');
+        reply.innerHTML = '<a href="/compose/post"><span>318</span></a>';
+        bar.insertBefore(reply, bar.firstChild);
+        expect(isTranslationStateCandidateCurrent(owner, state)).toBe(false);
+        expect(restoreTranslation(owner)).toBe(true);
+        expect(bar.contains(reply)).toBe(true);
+        expect(bar.querySelector('.fluent-read-bilingual-content')).toBeNull();
+        expect(bar.textContent).toContain('318');
+    });
+
+    it('preserves the X engagement bar while translating and restoring neighboring post prose', () => {
+        const {document} = page('');
+        document.body.innerHTML = `<main><article id="post">
+            <div id="body" data-testid="tweetText">The Moon shines above our planet.</div>
+            <p id="nearby">The neighboring explanation remains readable.</p>
+            <div id="engagement">
+                <div data-engagement-action="reply"><a id="reply" href="/compose/post"><span>318</span></a></div>
+                <div data-engagement-action="retweet"><button><span>1万</span></button></div>
+                <div data-engagement-action="like"><button><span>2.2万</span></button></div>
+                <div><div data-engagement-action="bookmark"><button><span>430</span></button></div></div>
+            </div>
+        </article></main>`;
+        const core = createTranslationCore({url: new URL('https://x.com/NASA/status/1571977394151383042')});
+        const bar = document.getElementById('engagement')!;
+        const reply = document.getElementById('reply')!;
+        let original = document.body.innerHTML;
+        let originalBar = bar.outerHTML;
+        const originalText = reply.firstChild!.firstChild!;
+        const likeCount = bar.querySelector('[data-engagement-action="like"] span')!.firstChild as Text;
+        for (let cycle = 0; cycle < 2; cycle += 1) {
+            const candidates = core.discover(document);
+            expect(candidates.some(candidate => candidate.element === bar || bar.contains(candidate.element))).toBe(false);
+            const rendered: HTMLElement[] = [];
+            const payloads: string[] = [];
+            for (const candidate of candidates) {
+                const materialized = materializeCandidate(candidate, false)!;
+                const {sources} = commitBilingual(materialized.node, core, materialized.synthetic);
+                rendered.push(materialized.node);
+                payloads.push(...sources);
+            }
+            expect(payloads.join(' ')).toContain('The Moon shines above our planet.');
+            expect(payloads.join(' ')).toContain('The neighboring explanation remains readable.');
+            expect(payloads.join(' ')).not.toMatch(/318|1万|2\.[23]万|430/u);
+            if (cycle === 0) {
+                likeCount.data = '2.3万';
+                original = original.replace('2.2万', '2.3万');
+                originalBar = originalBar.replace('2.2万', '2.3万');
+            }
+            expect(bar.outerHTML).toBe(originalBar);
+            expect(bar.querySelector('[data-engagement-action="like"] span')!.firstChild).toBe(likeCount);
+            expect(reply.firstChild!.firstChild).toBe(originalText);
+            for (const owner of rendered.reverse()) expect(restoreTranslation(owner)).toBe(true);
+            expect(document.body.innerHTML).toBe(original);
+            expect(reply.firstChild!.firstChild).toBe(originalText);
+        }
+    });
+
     it('omits GitHub pull-list author metadata from an ancestor translation without changing the original', () => {
         const {document} = page('');
         document.body.innerHTML = `<main><ul data-listview-component="items-list"><li>

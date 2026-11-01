@@ -181,6 +181,8 @@ export interface TranslationState {
     kind: TranslationTargetKind;
     phase: TranslationPhase;
     generation: number;
+    /** 仅布局观察器清理已脱离的 loading owner 时记录，不能视为用户恢复。 */
+    layoutDetachedDiscard?: true;
     sourceText: string;
     /** 创建请求时可见的文本槽节点身份，早于任何实时替换。 */
     sourceTextNodes?: readonly Text[];
@@ -1454,6 +1456,7 @@ function scheduleTranslationLayoutRefresh(owner: HTMLElement): void {
         // 从当前检查点起，在所有 MutationObserver 回调之后执行；这样全文观察器可以先
         // 注销自己的索引，再由独立悬浮翻译释放共享状态。
         if (!owner.isConnected) {
+            if (state.phase === 'loading' && !state.controller.signal.aborted) state.layoutDetachedDiscard = true;
             discardTranslation(owner, state);
             return;
         }
@@ -1650,7 +1653,10 @@ function liveSharedTranslationLayoutOverride(
         // 丢弃前一个 owner 会同步触发 abort 监听；宿主可能在回调中重新接入后续节点。
         if (owner.isConnected) return;
         const state = states.get(owner);
-        if (state) discardTranslation(owner, state);
+        if (state) {
+            if (state.phase === 'loading' && !state.controller.signal.aborted) state.layoutDetachedDiscard = true;
+            discardTranslation(owner, state);
+        }
     });
     override = sharedLayoutOverrides.get(element);
     if (!override) return undefined;

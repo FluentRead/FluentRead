@@ -189,8 +189,14 @@ describe('options UI composition architecture', () => {
     expect(optionsApp).toContain('defineAsyncComponent(() => import(\'@/src/features/settings/ui/SettingsSections.vue\'))')
     expect(optionsApp).toContain('defineAsyncComponent(() => import(\'@/src/features/settings/ui/LearningCenter.vue\'))')
     expect(optionsEntry).toContain('await configReady')
-    expect(optionsEntry).toContain('ensureUiLanguageBundle(config.uiLanguage)')
-    expect(optionsEntry).toContain('prepareInterfaceFont(config.interfaceFont)')
+    // Startup captures both configuration values for the same preparation round,
+    // awaits the selected resources and rechecks them before mounting. Detailed
+    // timing, exit and hydration behavior is exercised in popupBootstrap.test.ts.
+    expect(optionsEntry).toMatch(/const language = config\.uiLanguage,\s*font = config\.interfaceFont/u)
+    expect(optionsEntry).toContain('language === preparedLanguage ? undefined : ensureUiLanguageBundle(language)')
+    expect(optionsEntry).toContain('font === preparedFont ? undefined : prepareInterfaceFont(font)')
+    expect(optionsEntry).toMatch(/await Promise\.all\(\[[\s\S]*?ensureUiLanguageBundle\(language\)[\s\S]*?prepareInterfaceFont\(font\)[\s\S]*?\]\)/u)
+    expect(optionsEntry).toMatch(/\} while \(preparedLanguage !== config\.uiLanguage \|\| preparedFont !== config\.interfaceFont\)[\s\S]*?app\.mount\(selector\)/u)
     expect(optionsEntry).not.toContain('element-plus/dist/index.css')
     expect(sections).toContain('const visitedSections = ref(new Set<string>())')
     expect(sections).toContain('const hasVisitedSection = (section: string): boolean => visitedSections.value.has(section)')

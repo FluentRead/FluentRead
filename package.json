@@ -144,6 +144,9 @@
       "vite": "5.4.19",
       "react": "18.3.1",
       "react-dom": "18.3.1"
+    },
+    "patchedDependencies": {
+      "ppu-paddle-ocr@6.6.0": "patches/ppu-paddle-ocr@6.6.0.patch"
     }
   },
   "packageManager": "pnpm@9.12.1+sha1.7084e7df42ee1d221994c2c2599277a2a937f050"

@@ -1092,7 +1092,7 @@ describe('content composition root 的真实页面入口联动', () => {
         key(doc.body, 'mouseover', {clientX: 30, clientY: 40});
         key(page, 'keydown', {key: 'Alt', code: 'AltLeft', altKey: true});
         key(page, 'keyup', {key: 'Alt', code: 'AltLeft'});
-        expect(features.handleTranslation).toHaveBeenCalledWith(30, 40);
+        expect(features.handleTranslation).toHaveBeenCalledWith(30, 40, {inputSource: 'mouse-shortcut'});
         const event = key(doc.body, 'keydown', {key: 'h', code: 'KeyH', altKey: true}); expect(event.defaultPrevented).toBe(true);
         vi.advanceTimersByTime(180); await settle();
         expect(send).toHaveBeenCalledWith(expect.objectContaining({type: 'SCORE_INFORMATION_HIGHLIGHT', text: 'The extraordinary algorithm preserves original paragraphs and inline links.'}));

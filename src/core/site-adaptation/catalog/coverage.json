@@ -235,6 +235,13 @@
       "liveVerification": "not-performed"
     },
     {
+      "id": "microsoft-learn-translator-v3-parameters",
+      "category": "documentation",
+      "verification": "site-fixture",
+      "fixture": "tests/microsoftLearnParameterTokens.test.ts",
+      "liveVerification": "not-performed"
+    },
+    {
       "id": "apple-docs",
       "category": "documentation",
       "verification": "semantic-fixture",

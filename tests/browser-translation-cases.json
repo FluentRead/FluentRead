@@ -2125,6 +2125,7 @@
       "main article span + span > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > span.text-secondary.line-clamp-1:not([dir=\"auto\"] *)",
       "main article a[data-base-ui-tooltip-trigger][href*=\"/status/\"]",
       "main article [data-engagement-action]",
+      "main article div:has(> [data-engagement-action=\"reply\"]):has(> [data-engagement-action=\"retweet\"]):has(> [data-engagement-action=\"like\"])",
       ":is(main article button[data-slot=\"xds-menu-trigger\"], main article [role=\"button\"][data-base-ui-click-trigger], main article button.cursor-pointer.bg-transparent):not(main article div.aspect-video:has(> video) button[data-slot=\"xds-menu-trigger\"]:has(svg[data-icon=\"icon-settings-stroke\"]))",
       "nav",
       "main article div.aspect-video:has(> video) button[data-slot=\"xds-menu-trigger\"]:has(svg[data-icon=\"icon-settings-stroke\"])"
@@ -2134,6 +2135,7 @@
       "main article span + span > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > span.text-secondary.line-clamp-1:not([dir=\"auto\"] *)",
       "main article a[data-base-ui-tooltip-trigger][href*=\"/status/\"]",
       "main article [data-engagement-action]",
+      "main article div:has(> [data-engagement-action=\"reply\"]):has(> [data-engagement-action=\"retweet\"]):has(> [data-engagement-action=\"like\"])",
       ":is(main article button[data-slot=\"xds-menu-trigger\"], main article [role=\"button\"][data-base-ui-click-trigger], main article button.cursor-pointer.bg-transparent):not(main article div.aspect-video:has(> video) button[data-slot=\"xds-menu-trigger\"]:has(svg[data-icon=\"icon-settings-stroke\"]))",
       "nav"
     ],

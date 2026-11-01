@@ -227,8 +227,6 @@ const BUILD_ONLY_SRC_ALLOWLIST = new Set([
     'src/platform/storage/remoteConfigStorageRuntime.ts',
     // 翻译节点标记绑定页面 DOM 与通知 UI；交互由 indicators 功能测试验证，纯错误分类进入 strict coverage。
     'src/features/full-page-translation/ui/translationIndicators.ts',
-    // options composition root 只注册 Element Plus 组件、图标、全局样式并挂载 Vue；由组件契约与双浏览器构建验证。
-    'src/app/options/index.ts',
     // popup composition root 等待配置就绪再注册 Vue/Element Plus 并挂载；由 popup 契约、逐帧启动回归和双浏览器构建验证。
     'src/app/popup/index.ts',
     // 抽屉入口只重导出 Element Plus 组件和 CSS；由 popup 启动/抽屉浏览器回归与双浏览器构建验证。
@@ -359,7 +357,7 @@ describe('repository verification ownership', () => {
         expect(unowned).toEqual([]);
     });
 
-    it('src 中每个可执行非组装模块都进入四维 100% 覆盖率边界', () => {
+    it('src 中每个未豁免的可执行模块都进入四维 100% 覆盖率边界', () => {
         const uncovered = auditedFiles.filter((path) => path.startsWith('src/')
             && path.endsWith('.ts')
             && !isCoverageExemptSrcModule(path)
@@ -452,7 +450,7 @@ describe('repository verification ownership', () => {
         expect(auditVueOwners(input)).toEqual([expect.stringContaining('不能重新冻结修改后的组件或新增组件')]);
     });
 
-    it('覆盖率清单不能引用不存在的源码或把组装根伪装成业务覆盖', () => {
+    it('覆盖率清单只包含存在且未被豁免的可执行源码', () => {
         const audited = new Set(auditedFiles);
         const invalid = [...strictCoverage].filter((path) => !audited.has(path)
             || isCoverageExemptSrcModule(path));

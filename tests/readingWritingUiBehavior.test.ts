@@ -14,6 +14,8 @@ import WritingStyleEditor from '@/src/features/writing-assistant/ui/WritingStyle
 import SpeechFollowText from '@/src/features/selection-translation/ui/SpeechFollowText.vue';
 import SentenceAnalysis from '@/src/features/reading-assistant/ui/SentenceAnalysis.vue';
 import ReadingEvidence from '@/src/features/reading-assistant/ui/ReadingEvidence.vue';
+import ReadingAnswer from '@/src/features/reading-assistant/ui/ReadingAnswer.vue';
+import {buildReadingEvidence} from '@/src/core/harness/evidence';
 import SavedExplanation from '@/src/features/vocabulary/ui/SavedExplanation.vue';
 import CollectionEntry from '@/src/features/vocabulary/ui/CollectionEntry.vue';
 import type {VocabularyEntry} from '@/src/features/vocabulary/learningModel';
@@ -111,6 +113,57 @@ describe('writing choice and language controls',()=>{
 });
 
 describe('reading source evidence and progress',()=>{
+  it('renders rich answer blocks safely and retains evidence inside a grammar table',async()=>{
+    const sourceText='Practice helps.';const sources=buildReadingEvidence(sourceText,'');const locate=vi.fn(()=> 'located' as const);
+    const text=[
+      '# Overview','', '### Details','', '> **Important** context','',
+      '```html','<script>alert(1)</script>','```','',
+      '3. first item','4. second item','', '- unordered item','',
+      '[[external]] Background. [[cite:invented|Unverified text.]]','',
+      '| Text | POS | Role | Meaning |','| --- | --- | --- | --- |',
+      '| Practice | noun | subject | Practice |',
+      `| helps | verb | predicate | Useful [[cite:${sources[0].id}|Practice helps.]] |`,
+    ].join('\n');
+    const ui=mount(ReadingAnswer,{text,sourceText,evidenceSources:sources,locateEvidence:locate});await flush();
+    expect(ui.host.querySelector('h3')?.textContent).toBe('Overview');
+    expect(ui.host.querySelector('h4')?.textContent).toBe('Details');
+    expect(ui.host.querySelector('blockquote strong')?.textContent).toBe('Important');
+    expect(ui.host.querySelector('pre code')?.textContent).toBe('<script>alert(1)</script>');
+    expect(ui.host.querySelector('script')).toBeNull();
+    expect(ui.host.querySelector('ol')?.getAttribute('start')).toBe('3');
+    expect([...ui.host.querySelectorAll('ol li')].map(item=>item.textContent)).toEqual(['first item','second item']);
+    expect(ui.host.querySelector('ul li')?.textContent).toBe('unordered item');
+    expect(ui.host.textContent).toContain('reading.evidence.external');
+    expect(ui.host.querySelector('[data-evidence-state="unverified"]')?.textContent).toContain('Unverified text.');
+    expect(ui.host.querySelector('.fr-reading-structure')).toBeNull();
+    const citation=ui.host.querySelector('td button[data-reading-evidence]')!;expect(citation).toBeTruthy();
+    await click(citation);expect(locate).toHaveBeenCalledWith({quote:sourceText,sourceText,kind:'selection',sourceOffset:0});
+  });
+  it('promotes the first grounded grammar table and retains a second one in the original answer flow',async()=>{
+    const table='| Text | POS | Role | Meaning |\n| --- | --- | --- | --- |\n| Cats | noun | subject | 猫 |\n| chase | verb | predicate | 追赶 |\n| mice | noun | object | 老鼠 |';
+    const ui=mount(ReadingAnswer,{text:`### First\n${table}\n\nIntervening explanation.\n\n### Second\n${table}`,sourceText:'Cats chase mice.'});await flush();
+    expect(ui.host.querySelector('.fr-reading-structure h3')?.textContent).toBe('结构分析');
+    const analyses=ui.host.querySelectorAll('.fr-sentence-analysis');expect(analyses).toHaveLength(2);
+    expect(ui.host.textContent!.indexOf('Intervening explanation.')).toBeLessThan(ui.host.textContent!.lastIndexOf('Cats'));
+    expect(ui.host.querySelectorAll('table')).toHaveLength(0);
+  });
+  it('accepts the optional locator without Vue prop warnings and forwards citation clicks',async()=>{
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    const sourceText='Practice helps.'; const sources=buildReadingEvidence(sourceText,'');
+    const locate=vi.fn(()=> 'located' as const);
+    const ui=mount(ReadingAnswer,{text:`It helps. [[cite:${sources[0].id}|Practice helps.]]`,sourceText,evidenceSources:sources,locateEvidence:locate});
+    await flush();
+    const evidence=ui.host.querySelector('button[data-reading-evidence]')!;
+    expect(evidence).toBeTruthy();
+    await click(evidence);
+    expect(locate).toHaveBeenCalledOnce();
+    expect(locate).toHaveBeenCalledWith({quote:sourceText,sourceText,kind:'selection',sourceOffset:0});
+    expect(evidence.getAttribute('data-evidence-state')).toBe('located');
+    ui.props.locateEvidence=undefined;await flush();await click(evidence);
+    expect(locate).toHaveBeenCalledTimes(1);
+    expect(evidence.getAttribute('data-evidence-state')).toBe('unavailable');
+    expect(warn.mock.calls.flat().join(' ')).not.toContain('Invalid prop: type check failed for prop "locateEvidence"');
+  });
   it('preserves exact text and offsets while showing estimated and boundary word highlights',async()=>{
     const ui=mount(SpeechFollowText,{text:'  Hello, world!',offset:5,progress:null});expect(ui.host.textContent).toBe('  Hello, world!');expect(ui.host.querySelector('.fr-speech-current')).toBeNull();
     ui.props.progress={start:7,end:12,estimated:true};await flush();expect(ui.host.querySelector('.fr-speech-current')?.textContent).toBe('Hello');expect(ui.host.querySelector('.fr-speech-current')?.getAttribute('title')).toContain('估算');
@@ -141,7 +194,7 @@ describe('saved explanation',()=>{
     const entry:VocabularyEntry={id:'saved-art',term:'art',normalizedTerm:'art',identityKey:'en:art',sourceLanguage:'en',kind:'expression',
       translations:{'zh-cn':{text:'艺术',updatedAt:1}},contexts:[],note:'Original',phonetic:'',partOfSpeech:'',createdAt:1,updatedAt:1,lastSeenAt:1,
       encounterCount:1,masteryLevel:0,status:'new',nextReviewAt:1,lastReviewedAt:null,reviewCount:0,lapseCount:0,schemaVersion:1};
-    const updated=vi.fn(),study=vi.fn(),remove=vi.fn();const ui=mount(CollectionEntry,{entry,translation:'艺术',playing:false,busy:false,status:'New',review:'Now',onUpdated:updated,onStudy:study,onRemove:remove});
+    const updated=vi.fn(),study=vi.fn(),remove=vi.fn();const ui=mount(CollectionEntry,{entry,translation:'艺术',playing:false,speechPhase:'idle',busy:false,status:'New',review:'Now',onUpdated:updated,onStudy:study,onRemove:remove});
     const focus=vi.spyOn(win.HTMLElement.prototype,'focus');
     const menu=ui.host.querySelector('details')!;menu.open=true;
     await click(button(ui.host,'编辑解释'));

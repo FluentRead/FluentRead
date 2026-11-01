@@ -31,6 +31,9 @@ const multilingual = process.argv.includes('--multilingual');
 const harFixture = process.argv.includes('--har-fixture');
 const unchangedFixture = process.argv.includes('--unchanged-fixture');
 const modelCacheDir = arg('model-cache-dir', process.env.FLUENTREAD_TEST_MODEL_CACHE_DIR);
+// 此开关只控制共享缓存助手，不限制浏览器或 Tesseract 的网络。
+const noCacheDownload = process.argv.includes('--model-cache-no-download');
+if (noCacheDownload && !xLightbox) throw new Error('--model-cache-no-download requires --x-lightbox and controls only the shared model cache');
 if (unchangedFixture && liveTranslation) throw new Error('--unchanged-fixture requires deterministic transport');
 const paragraphImage = arg('paragraph-image', null);
 const denseParagraphs = process.argv.includes('--dense-paragraphs');
@@ -435,7 +438,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         await input.waitFor({state: 'attached'});
         // 浏览器与导入入口就绪后才准备模型；启动失败不产生无用下载。
         const modelCache = await require('./image-model-cache.cjs').ensureImageTranslationModelFiles({
-            directory: modelCacheDir, kinds: ['ocr'],
+            directory: modelCacheDir, kinds: ['ocr'], allowNetworkDownload: !noCacheDownload,
             sourceDirectories: [modelCacheDir || require('./image-model-cache.cjs').defaultImageTranslationModelCacheDirectory()],
         });
         report.modelCache = {directory: modelCache.directory, networkDownloads: modelCache.networkDownloads,

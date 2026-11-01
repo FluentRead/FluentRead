@@ -1,7 +1,7 @@
 /**
  * @file src/features/floating-ball/content/runtime.ts
  * 文件职责：协调悬浮球组件在网页中的创建、恢复位置、显隐、全屏避让、高级外观同步、权威翻译状态同步和卸载，并向组件注入全文翻译、漫画连续翻译切换与打开扩展快捷面板的动作。
- * 主要内容：维护单例 Shadow UI 与迟到挂载 requestId，宿主被站点移除后先释放旧实例再允许重建；管理站点名单、全屏显隐、展示配置、全文与漫画状态订阅，并将拖动坐标作为同一配置补丁保存；卸载入口只释放自身 UI，不恢复独立的全文会话。
+ * 主要内容：维护单例 Shadow UI 与迟到挂载 requestId；管理站点、全屏、配置及全文/漫画状态订阅，并将可信文字入口转发到漫画已有面板；拖动坐标作为同一补丁保存，卸载释放订阅但不恢复全文会话。
  * 模块边界：运行时只拥有挂载和桥接职责，不实现拖拽视觉、外观归一化或全文翻译算法；FloatingBall.vue 负责交互，core/config 负责字段归一化，full-page feature 提供翻译动作，配置持久化通过 services/config 完成。
  */
 import FloatingBall from '@/src/features/floating-ball/ui/FloatingBall.vue';
@@ -10,7 +10,7 @@ import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config
 import type {Config} from '@/src/core/config/model';
 import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
 import {reactive} from 'vue';
-import {subscribeMangaTranslation, openMangaEntry, type MangaTranslationStatus} from '@/src/features/image-translation/public';
+import {subscribeMangaTranslation, openMangaEntry, openMangaReading, subscribeMangaReading, type MangaTranslationStatus} from '@/src/features/image-translation/public';
 import browser from 'webextension-polyfill';
 import {
   autoTranslateEnglishPage,
@@ -49,6 +49,7 @@ let unsubscribePresentationConfig: (() => void) | null = null;
 let floatingBallPresentation: FloatingBallPresentation | null = null;
 let removeFullscreenListener: (() => void) | null = null;
 let unsubscribeMangaTranslation: (() => void) | null = null;
+let unsubscribeMangaReading: (() => void) | null = null;
 let anchoredPopup: ReturnType<typeof createAnchoredPopup> | null = null;
 const MOUNT_WAIT_NOTICE = 'floating-ball-mount-wait';
 let removeMountWaitVisibility: (() => void) | null = null;
@@ -190,6 +191,9 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   let mangaStopped = false;
   const stopManga = () => {if (!mangaStopped) {mangaStopped = true; unsubscribeManga();}};
   unsubscribeMangaTranslation = stopManga;
+  const mangaReadingState = reactive({open:false});
+  const stopReading = subscribeMangaReading(open => {mangaReadingState.open = open;});
+  unsubscribeMangaReading = stopReading;
 
   unfinishedMounts += 1;
   let creation: ReturnType<typeof createVueShadowUi>;
@@ -206,7 +210,9 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
       initialTranslationStatus: getTranslationToolbarStatus(),
       presentation,
       manga,
+      mangaReadingState,
       onMangaToggle: (event: MouseEvent) => { if (event.isTrusted) openMangaEntry(); },
+      onMangaReading: (event: MouseEvent) => {if(event.isTrusted)openMangaReading(event);},
       onSettingsClick: (event: MouseEvent) => openPopup(event),
       // 两个坐标字段必须一起提交，避免连续拖动或跨页面保存时只留下其中一个。
       onPositionChanged: (newPosition: 'left' | 'right', verticalPosition: number) => {
@@ -280,7 +286,9 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
   }).finally(() => {
     if (!floatingBallUi || requestId !== mountRequestId) {
       stopManga();
+      stopReading();
       if (unsubscribeMangaTranslation === stopManga) unsubscribeMangaTranslation = null;
+      if (unsubscribeMangaReading === stopReading) unsubscribeMangaReading = null;
     }
     if (requestId === mountRequestId) mountingPromise = null;
     finishMountAttempt();
@@ -314,6 +322,8 @@ export function unmountFloatingBall() {
   }
   unsubscribeMangaTranslation?.();
   unsubscribeMangaTranslation = null;
+  unsubscribeMangaReading?.();
+  unsubscribeMangaReading = null;
   unsubscribeFullPageTranslationProgress?.();
   unsubscribeFullPageTranslationProgress = null;
   unsubscribeTranslationToolbarStatus?.();

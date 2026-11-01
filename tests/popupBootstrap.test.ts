@@ -71,6 +71,55 @@ describe('Options startup lifecycle', () => {
         const listener=add.mock.calls.find(([type])=>type==='pagehide')?.[1];expect(listener).toBeTypeOf('function');
         expect(remove).toHaveBeenCalledWith('pagehide',listener);pageTransition('pagehide',false);expect(ports.mount).toHaveBeenCalledOnce();
     });
+    it.each(['language','font'] as const)('waits for the latest %s when configuration changes during asset preparation', async asset => {
+        const old=deferred(), latest=deferred();const loader=asset==='language'?ports.ensureBundle:ports.font;
+        loader.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+        const {mountOptionsApp}=await optionsEntry();const pending=mountOptionsApp('#settings');
+        await vi.waitFor(()=>expect(loader).toHaveBeenCalledOnce());
+        if(asset==='language')ports.config.uiLanguage='ja-JP';else ports.config.interfaceFont='inter';
+        old.resolve();await vi.waitFor(()=>expect(loader).toHaveBeenCalledTimes(2));
+        expect(loader).toHaveBeenLastCalledWith(asset==='language'?'ja-JP':'inter');expect(ports.createApp).not.toHaveBeenCalled();
+        expect(asset==='language'?ports.font:ports.ensureBundle).toHaveBeenCalledOnce();
+        latest.resolve();await pending;expect(ports.mount).toHaveBeenCalledOnce();
+    });
+    it('rechecks both assets on repeated changes and stops on page exit during the new request', async () => {
+        const first=deferred(), second=deferred();ports.ensureBundle.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const remove=vi.spyOn(window,'removeEventListener');const {mountOptionsApp}=await optionsEntry();const pending=mountOptionsApp('#settings');
+        await vi.waitFor(()=>expect(ports.ensureBundle).toHaveBeenCalledOnce());
+        ports.config.uiLanguage='ja-JP';ports.config.interfaceFont='inter';first.resolve();
+        await vi.waitFor(()=>expect(ports.ensureBundle).toHaveBeenCalledTimes(2));
+        expect(ports.font.mock.calls.map(([font])=>font)).toEqual(['system','inter']);
+        ports.config.uiLanguage='fr-FR';pageTransition('pagehide',false);second.resolve();await pending;
+        expect(ports.ensureBundle).toHaveBeenCalledTimes(2);expect(ports.createApp).not.toHaveBeenCalled();
+        expect(remove).toHaveBeenCalledWith('pagehide',expect.any(Function));
+    });
+    it('waits for each latest configuration when it changes again during a subsequent asset load', async () => {
+        const first=deferred(), second=deferred(), third=deferred();ports.ensureBundle.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise).mockReturnValueOnce(third.promise);
+        const {mountOptionsApp}=await optionsEntry();const pending=mountOptionsApp('#settings');
+        await vi.waitFor(()=>expect(ports.ensureBundle).toHaveBeenCalledOnce());ports.config.uiLanguage='ja-JP';first.resolve();
+        await vi.waitFor(()=>expect(ports.ensureBundle).toHaveBeenCalledTimes(2));ports.config.uiLanguage='fr-FR';second.resolve();
+        await vi.waitFor(()=>expect(ports.ensureBundle).toHaveBeenCalledTimes(3));expect(ports.createApp).not.toHaveBeenCalled();
+        third.resolve();await pending;expect(ports.ensureBundle.mock.calls.map(([language])=>language)).toEqual(['en-US','ja-JP','fr-FR']);
+        expect(ports.font).toHaveBeenCalledOnce();expect(ports.mount).toHaveBeenCalledOnce();
+    });
+    it('prepares the original font again when selection changes back during another font request', async () => {
+        const initial=deferred(), other=deferred(), restored=deferred();
+        ports.font.mockReturnValueOnce(initial.promise).mockReturnValueOnce(other.promise).mockReturnValueOnce(restored.promise);
+        const {mountOptionsApp}=await optionsEntry();const pending=mountOptionsApp('#settings');
+        await vi.waitFor(()=>expect(ports.font).toHaveBeenCalledOnce());ports.config.interfaceFont='inter';initial.resolve();
+        await vi.waitFor(()=>expect(ports.font).toHaveBeenCalledTimes(2));ports.config.interfaceFont='system';other.resolve();
+        await vi.waitFor(()=>expect(ports.font).toHaveBeenCalledTimes(3));expect(ports.createApp).not.toHaveBeenCalled();
+        restored.resolve();await pending;expect(ports.font.mock.calls.map(([font])=>font)).toEqual(['system','inter','system']);
+        expect(ports.ensureBundle).toHaveBeenCalledOnce();expect(ports.mount).toHaveBeenCalledOnce();
+    });
+    it('rejects blocked hydration after a newly requested asset finishes', async () => {
+        const first=deferred(), second=deferred();ports.font.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const remove=vi.spyOn(window,'removeEventListener');const {mountOptionsApp}=await optionsEntry();const pending=mountOptionsApp('#settings');
+        const outcome=expect(pending).rejects.toThrow('Options configuration is not ready');
+        await vi.waitFor(()=>expect(ports.font).toHaveBeenCalledOnce());ports.config.interfaceFont='inter';first.resolve();
+        await vi.waitFor(()=>expect(ports.font).toHaveBeenCalledTimes(2));ports.hydration='blocked';second.resolve();await outcome;
+        expect(ports.createApp).not.toHaveBeenCalled();expect(remove).toHaveBeenCalledWith('pagehide',expect.any(Function));
+    });
     it.each(['loading','blocked'] as const)('rejects resolved configuration with %s hydration before preparing assets', async hydration => {
         ports.hydration=hydration;const remove=vi.spyOn(window,'removeEventListener');const {mountOptionsApp}=await optionsEntry();
         await expect(mountOptionsApp('#settings')).rejects.toThrow('Options configuration is not ready');

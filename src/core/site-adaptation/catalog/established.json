@@ -322,7 +322,9 @@
       "[data-testid=\"tweetTextarea_0\"]",
       "[data-testid=\"DMComposerTextInput\"]",
       "[data-testid=\"User-Name\"]",
-      "[data-testid=\"UserName\"]"
+      "[data-testid=\"UserName\"]",
+      "main article div:has(> video) > [data-slot=\"xds-context-menu-trigger\"] span:has(> span > .x-avatar > img[alt^=\"@\"]) > div > span > div.text-white.line-clamp-1:not([dir=\"auto\"]):not([dir=\"auto\"] *)",
+      "main article div:has(> [data-engagement-action=\"reply\"]):has(> [data-engagement-action=\"retweet\"]):has(> [data-engagement-action=\"like\"])"
     ],
     "watchIgnore": [
       "main article span:has(+ span > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > span.text-secondary.line-clamp-1) > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > div.text-body.font-bold.line-clamp-1:not([dir=\"auto\"] *)"

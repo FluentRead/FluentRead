@@ -1,7 +1,7 @@
 /**
  * @file src/app/options/index.ts
  * 文件职责：创建 Options Vue 应用并集中注册页面所需的 Element Plus 组件、图标与样式，向 WXT 入口暴露稳定挂载函数。
- * 主要内容：维护显式组件和图标清单，载入 Element Plus、settings-page 及共享 token 样式，分别传递自有 UI 扫描根与扩展 document 元信息权限；配置与界面资源就绪后分别复验安全水合状态，再创建 OptionsApp、逐项注册并挂载到给定 selector；启动期间页面退出则终止迟到挂载，所有结束路径释放临时监听。
+ * 主要内容：维护显式组件和图标清单，载入 Element Plus、settings-page 及共享 token 样式，分别传递自有 UI 扫描根与扩展 document 元信息权限；配置与界面资源就绪后复验安全水合状态和最新语言、字体，再创建 OptionsApp、逐项注册并挂载到给定 selector；启动期间页面退出则终止迟到挂载，所有结束路径释放临时监听。
  * 模块边界：此文件只做 UI 依赖装配，不实现导航、设置保存或业务组件；OptionsApp 管理页面状态，各 feature 负责配置和词汇逻辑，WXT 入口决定启动时机。
  */
 import { createApp, type App, type Component } from 'vue'
@@ -122,12 +122,20 @@ export async function mountOptionsApp(selector: string): Promise<void> {
     await configReady
     if (exited) return
     if (getConfigHydrationStatus() !== 'ready') throw new Error('Options configuration is not ready')
-    await Promise.all([
-      ensureUiLanguageBundle(config.uiLanguage),
-      prepareInterfaceFont(config.interfaceFont),
-    ])
-    if (exited) return
-    if (getConfigHydrationStatus() !== 'ready') throw new Error('Options configuration is not ready')
+    let preparedLanguage: typeof config.uiLanguage | undefined
+    let preparedFont: typeof config.interfaceFont | undefined
+    do {
+      const language = config.uiLanguage, font = config.interfaceFont
+      await Promise.all([
+        language === preparedLanguage ? undefined : ensureUiLanguageBundle(language),
+        font === preparedFont ? undefined : prepareInterfaceFont(font),
+      ])
+      if (exited) return
+      if (getConfigHydrationStatus() !== 'ready') throw new Error('Options configuration is not ready')
+      preparedLanguage = language
+      preparedFont = font
+      // 资源加载期间配置可能来自其他页面；只补齐变化的资源后再显示首帧。
+    } while (preparedLanguage !== config.uiLanguage || preparedFont !== config.interfaceFont)
     const app = createApp(OptionsApp)
     installOptionsApp(app)
     app.mount(selector)

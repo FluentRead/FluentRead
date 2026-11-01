@@ -1,12 +1,13 @@
 /**
  * @file src/core/site-adaptation/compiler.ts
  * 文件职责：将网站适配 JSON 编译为既有候选引擎使用的适配器，并组合内置与用户规则。
- * 主要内容：展开单层模板、匹配域名和路径并执行自定义整条覆盖；内置 Mastodon 发现应用外壳正文，man7 授予手册准备能力，BBC 保护纯署名图注，Facebook 核验帖子 IDREF 标签、中文回复摘要及计数/排序控件；用户覆盖与停用会撤销内置能力。
+ * 主要内容：展开单层模板、匹配域名和路径并执行自定义整条覆盖；内置 Mastodon 发现应用外壳正文，man7 授予手册准备能力，BBC 保护纯署名图注，Facebook 核验帖子控件，X 保护 GIF 播放器标签；用户覆盖与停用会撤销内置能力。
  * 模块边界：仅匹配 URL 与声明内容边界，不注入脚本或样式，不监听页面生命周期。
  */
 
 import {isLiteralLabel, isLiteralToken} from './literalLabel';
 import {withBbcCreditCaptionProtection} from './bbcCreditCaption';
+import {withXGifLabelProtection} from './xGifLabel';
 import {withFacebookPublicPostDialogLabelProtection} from './facebookPublicPostDialogLabel';
 import {withFacebookPublicPostReplySummaryProtection} from './facebookPublicPostReplySummary';
 import {withFacebookPublicPostControlsProtection} from './facebookPublicPostControls';
@@ -205,6 +206,8 @@ export function composeSiteAdapters(builtinPack: SiteRulePack, settings: SiteAda
     if (manpage) manpage.preformattedProse = 'manpage';
     const bbc = adapters.get('bbc-news');
     if (bbc) adapters.set('bbc-news', withBbcCreditCaptionProtection(bbc));
+    const x = adapters.get('x');
+    if (x) adapters.set('x', withXGifLabelProtection(x));
     const facebook = adapters.get('facebook-public-post');
     if (facebook) adapters.set('facebook-public-post', withFacebookPublicPostControlsProtection(
         withFacebookPublicPostReplySummaryProtection(withFacebookPublicPostDialogLabelProtection(facebook))));

@@ -224,7 +224,7 @@ function readFacebookCaptionSnapshotInPage() {
   return {parts, links, metadataLinks, canonical: [...document.querySelectorAll('link[rel="canonical"][href]')].map(node => node.getAttribute('href'))};
 }
 
-async function prepareFacebookPublicPost(page, expectedUrl, timeout) {
+async function prepareFacebookPublicPost(page, expectedUrl, timeout, checkFocus = () => {}) {
   if (!isSupportedFacebookPublicPostUrl(expectedUrl)) throw new Error('Facebook preparation requires an exact HTTPS www.facebook.com public post URL');
   if (!Number.isFinite(timeout) || timeout <= 0) throw new Error('Facebook preparation requires a positive bounded timeout');
   const deadline = Date.now() + timeout;
@@ -253,7 +253,7 @@ async function prepareFacebookPublicPost(page, expectedUrl, timeout) {
       if (current.action !== 'dismiss') throw new Error('Facebook native promotion changed before click; no click sent');
       const clickTimeout = remaining();
       stage = 'native-close'; nativeClickAttempts = 1;
-      await page.locator(FACEBOOK_PUBLIC_POST_SELECTORS.close).click({timeout: clickTimeout});
+      checkFocus(); await page.locator(FACEBOOK_PUBLIC_POST_SELECTORS.close).click({timeout: clickTimeout});
       nativeClicks = 1;
       if (page.url() !== expectedUrl) throw new Error('Facebook URL changed after normal native dismissal');
       stage = 'post-close-readiness';

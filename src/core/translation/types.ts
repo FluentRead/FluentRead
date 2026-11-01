@@ -55,6 +55,8 @@ export interface TranslationSiteAdapter {
     observedAttributes?: readonly string[] | null;
     /** 内置站点策略可补充已核实的应用外壳正文；仍须经过引擎的显式目标与局部保护检查。 */
     discoverApplicationShellTargets?(root: Node, context: AdapterContext): Iterable<Element>;
+    /** 仅内置规则声明的局部 childList 依赖；返回仍连接的精确发现根，不能扩大到整页。 */
+    childListRescanRoot?(mutation: MutationRecord, context: AdapterContext): Element | null;
     matches(url: URL): boolean;
     decide(element: Element, context: AdapterContext): AdapterDecision;
     shouldStayOriginal?(element: Element, context: AdapterContext): boolean;

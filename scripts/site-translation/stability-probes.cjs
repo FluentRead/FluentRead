@@ -152,7 +152,7 @@ function assertStableSnapshot(snapshot, {phase, translated = true, quiet = false
 }
 
 /** 第二轮完成后运行；成功结束时全文已停止且已移除测试追加内容。 */
-async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir, toggleFull, observeMs = 1200, syntheticRoute = false}) {
+async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir, toggleFull, observeMs = 1200, syntheticRoute = false, checkFocus = () => {}}) {
   assert.equal(typeof toggleFull, 'function', 'toggleFull is required');
   assert.ok(Number.isFinite(observeMs) && observeMs >= 500 && observeMs <= 60000, 'observeMs must be between 500 and 60000');
   const key = `__fluentReadStability_${randomUUID().replaceAll('-', '')}`;
@@ -163,10 +163,10 @@ async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir
     fs.mkdirSync(artifactsDir, {recursive: true});
     fs.writeFileSync(path.join(artifactsDir, 'stability-probes.json'), JSON.stringify(report, null, 2));
   }};
-  const command = (method, value) => page.evaluate(({key, method, value}) => {
+  const command = (method, value) => {checkFocus(); return page.evaluate(({key, method, value}) => {
     if (!window[key]) throw new Error('Stability probe state is missing');
     return window[key][method](value);
-  }, {key, method, value});
+  }, {key, method, value});};
   const waitTranslated = () => page.waitForFunction(key => {
     const state = window[key]?.snapshot();
     return state && [state.owner, ...state.additions].every(node => node.connected && node.wrappers.length === 1 &&
@@ -185,7 +185,7 @@ async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir
   let routeChanged = false;
   let originalUrl;
   try {
-    report.initial = await page.evaluate(installStabilityProbeInPage, {key, selector}); installed = true;
+    checkFocus(); report.initial = await page.evaluate(installStabilityProbeInPage, {key, selector}); installed = true;
     const initial = await command('snapshot');
     await command('reset'); await page.waitForTimeout(observeMs);
     await capture('quiet', {quiet: true, previousWrapperIds: initial.owner.wrappers.map(wrapper => wrapper.id)});
@@ -200,12 +200,12 @@ async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir
     await waitTranslated(); await capture('dynamic-append');
     if (syntheticRoute) {
       originalUrl = page.url();
-      await page.evaluate(() => {const url = new URL(location.href); url.searchParams.set('__fluentread_stability_probe', 'route'); history.pushState(history.state, '', url.href);});
+      checkFocus(); await page.evaluate(() => {const url = new URL(location.href); url.searchParams.set('__fluentread_stability_probe', 'route'); history.pushState(history.state, '', url.href);});
       routeChanged = true;
       await page.waitForTimeout(observeMs);
       await command('append', 'synthetic-route'); await waitTranslated();
       await capture('synthetic-route-append');
-      await page.evaluate(url => history.replaceState(history.state, '', url), originalUrl); routeChanged = false;
+      checkFocus(); await page.evaluate(url => history.replaceState(history.state, '', url), originalUrl); routeChanged = false;
     }
     await toggleFull(page); await waitRestored(); await capture('restore', {translated: false});
     await toggleFull(page); await waitTranslated(); await capture('retranslate');
@@ -219,10 +219,11 @@ async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir
     error.stabilityReport = report;
     throw error;
   } finally {
-    if (routeChanged) await page.evaluate(url => history.replaceState(history.state, '', url), originalUrl).catch(error => {
+    let focusAllowed = true; try {checkFocus();} catch {focusAllowed = false; report.ok = false;}
+    if (focusAllowed && routeChanged) await page.evaluate(url => history.replaceState(history.state, '', url), originalUrl).catch(error => {
       report.routeCleanupError = String(error); report.ok = false;
     });
-    if (installed) await command('dispose').then(() => {report.probeResourcesReleased = true;}, error => {
+    if (focusAllowed && installed) await Promise.resolve().then(() => command('dispose')).then(() => {report.probeResourcesReleased = true;}, error => {
       report.cleanupError = String(error); report.ok = false;
     });
     persist();
@@ -235,7 +236,7 @@ async function runStabilityProbes({page, selector, timeout = 60000, artifactsDir
  * HN 真实控件合同来自公开 item?id=8863 与 hn.js 的 collstate：
  * tr.comtr.coll + .comment.noshow；必须通过可信 click 触发，绝不直接改 class。
  */
-async function runNativeCommentToggle({page, timeout = 60000, artifactsDir, observeMs = 600}) {
+async function runNativeCommentToggle({page, timeout = 60000, artifactsDir, observeMs = 600, checkFocus = () => {}}) {
   const key = `__fluentReadNativeComment_${randomUUID().replaceAll('-', '')}`;
   const report = {ok: false, scope: 'native-hacker-news-comment-collapse-expand', steps: []};
   const persist = () => {if (artifactsDir) {
@@ -279,8 +280,8 @@ async function runNativeCommentToggle({page, timeout = 60000, artifactsDir, obse
     }, key);
     installed = true;
     trigger = page.locator(report.initial.triggerSelector);
-    await trigger.scrollIntoViewIfNeeded({timeout});
-    await trigger.click({timeout});
+    checkFocus(); await trigger.scrollIntoViewIfNeeded({timeout});
+    checkFocus(); await trigger.click({timeout});
     await page.waitForFunction(key => {
       const current = window[key].snapshot(); return current.collapsed && current.hiddenClass && current.display === 'none';
     }, key, {timeout});
@@ -291,7 +292,7 @@ async function runNativeCommentToggle({page, timeout = 60000, artifactsDir, obse
     assert.equal(collapsed.clicks.length, 1, 'HN collapse did not receive exactly one click');
     assert.equal(collapsed.clicks[0].trusted, true, 'HN collapse was not a trusted click');
     if (artifactsDir) await page.screenshot({path: path.join(artifactsDir, 'native-comment-collapsed.png'), fullPage: false});
-    await trigger.click({timeout});
+    checkFocus(); await trigger.click({timeout});
     await page.waitForFunction(({key, expected}) => {
       const current = window[key].snapshot();
       return !current.collapsed && !current.hiddenClass && current.display !== 'none' && current.wrapperCount === expected && !current.pending;
@@ -314,10 +315,11 @@ async function runNativeCommentToggle({page, timeout = 60000, artifactsDir, obse
   } catch (error) {
     report.error = error.stack || String(error); error.nativeCommentReport = report; throw error;
   } finally {
-    if (installed) {
+    let focusAllowed = true; try {checkFocus();} catch {focusAllowed = false; report.ok = false;}
+    if (focusAllowed && installed) {
       const collapsed = await page.evaluate(key => window[key]?.snapshot().collapsed, key).catch(() => false);
-      if (collapsed) await trigger.click({timeout}).catch(error => {report.restoreError = String(error); report.ok = false;});
-      await page.evaluate(key => window[key]?.dispose(), key).then(() => {report.probeResourcesReleased = true;}, error => {
+      if (collapsed) await Promise.resolve().then(() => {checkFocus(); return trigger.click({timeout});}).catch(error => {report.restoreError = String(error); report.ok = false;});
+      await Promise.resolve().then(() => {checkFocus(); return page.evaluate(key => window[key]?.dispose(), key);}).then(() => {report.probeResourcesReleased = true;}, error => {
         report.cleanupError = String(error); report.ok = false;
       });
     }

@@ -4,7 +4,7 @@
 /**
  * @file scripts/testing/run-document-export-pages-test.cjs
  * 文件职责：在生产扩展与第二屏临时 Edge 中，验证文档页实际导出按钮的 PDF 页数与完整性。
- * 主要内容：真实导入 PDF、人工校订和下载，PDF.js 独立重开及逐页渲染；--outline-only 限定目录与目标页，--dialog-only 限定默认主操作、折叠选项、排版选择、原文下载、错误与重试，不运行其它分页场景。
+ * 主要内容：真实导入 PDF、人工校订和下载，PDF.js 独立重开及逐页渲染；--outline-only 限定目录与目标页，--dialog-only 限定可视化版本选择与单一下载动作、未完成确认、排版选择、原文下载、主题与窄屏、错误与重试，不运行其它分页场景。
  * 模块边界：只写本轮临时 profile 的人工校订和真实仓库字体缓存，不调用或模拟翻译供应商，不操作用户浏览器。
  */
 const assert = require('node:assert/strict');
@@ -160,12 +160,13 @@ async function main() {
     const download = async (name, kind, mode, entries, expectedPages) => {
       await presentation(kind); await page.locator('.taskbar-actions .download-button').click();
       const dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
-      const options = dialog.locator('.download-options');
-      if (!await options.evaluate(node => node.open)) await options.locator(':scope > summary').click();
-      await dialog.locator('.export-options button').nth(mode === 'bilingual' ? 0 : 1).click();
-      const partial = dialog.locator('.partial-export input'); if (await partial.isVisible()) await partial.check();
-      await shot(`${name}-download-dialog`);
-      const [item] = await Promise.all([page.waitForEvent('download', {timeout: 120000}), dialog.locator('.dialog-actions .translate-document-button').click()]);
+      await dialog.getByRole('radio', {name: mode === 'bilingual' ? '双语对照' : '仅译文', exact: true}).check();
+      await shot(`${name}-download-panel`);
+      const [item] = await Promise.all([page.waitForEvent('download', {timeout: 120000}), (async () => {
+        await dialog.locator('.download-submit').click();
+        const confirmation = dialog.locator('.download-confirmation');
+        if (await confirmation.isVisible()) await confirmation.getByRole('button', {name: '下载当前结果', exact: true}).click();
+      })()]);
       const file = path.join(artifacts, `${name}.pdf`); await item.saveAs(file); assert.equal(await item.failure(), null);
       const task = pdfjs.getDocument({data: new Uint8Array(fs.readFileSync(file)), isEvalSupported: false, useWorkerFetch: false, verbosity: 0,
         standardFontDataUrl: path.join(packages, 'pdfjs-dist/standard_fonts') + path.sep});
@@ -206,29 +207,50 @@ async function main() {
       return result;
     };
     if (dialogOnly) {
-      report.scope = 'Compact download dialog, independent layout choice, original bytes, partial confirmation, protected-file error and retry';
+      report.scope = 'Visual version selection before a single download action, partial confirmation, progressive PDF layout, exact original bytes, anchored light/dark and narrow panel, failure and retry';
       const rows = await importPdf(short);
       await correct(rows.slice(0, 1), () => '首段校订保留。', 'partial-dialog');
       await page.locator('.taskbar-actions .download-button').click();
       let dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
-      assert(await dialog.locator('.dialog-actions .translate-document-button').isDisabled());
-      assert.equal(await dialog.locator('.download-options').evaluate(node => node.open), false);
-      await dialog.locator('.download-options > summary').click();
-      const layoutSelect = dialog.getByRole('combobox', {name: 'PDF 排版', exact: true});
-      await layoutSelect.selectOption('readable');
+      assert.equal(await dialog.locator('.download-version').count(), 2);
+      assert.equal(await dialog.locator('.download-submit').count(), 1);
+      assert.equal(await dialog.locator('.download-layout').evaluate(node => node.open), false);
+      await dialog.getByRole('radio', {name:'双语对照',exact:true}).focus();
+      await page.keyboard.press('ArrowRight');
+      assert.equal(await dialog.getByRole('radio', {name:'仅译文',exact:true}).isChecked(), true);
+      assert.equal(await dialog.locator('.download-confirmation').count(), 0, 'Choosing a version must not start a download');
+      assert.equal(await dialog.locator('pre,.download-file-identity,.download-options').count(), 0);
+      await dialog.screenshot({path:path.join(artifacts,'download-panel-preview.png'),animations:'disabled',scale:'css'});
+      await dialog.locator('.download-layout > summary').click();
+      const layoutGroup = dialog.getByRole('radiogroup', {name: 'PDF 排版', exact: true});
+      await layoutGroup.getByRole('radio', {name: '保留原版', exact: true}).focus();
+      await page.keyboard.press('ArrowRight');
+      await page.waitForFunction(() => document.querySelector('.download-layout [role=radio][aria-checked=true]')?.textContent.trim() === '重新排版');
       assert.equal(await page.locator('[data-document-reader="pdf"]').getAttribute('data-pdf-presentation'), 'layout');
-      assert.equal(await dialog.locator('.pdf-export-summary').getAttribute('data-pdf-export-presentation'), 'readable');
-      await dialog.screenshot({path: path.join(artifacts, 'partial-download-dialog.png')});
-      await dialog.getByRole('button', {name: '关闭下载窗口', exact: true}).click();
+      await dialog.locator('.download-submit').click();
+      await dialog.locator('.download-confirmation').waitFor();
+      assert.equal(await dialog.locator('input[type=checkbox]').count(), 0);
+      assert.equal(await dialog.locator('button:focus').textContent(), '返回');
+      await dialog.screenshot({path: path.join(artifacts, 'partial-download-confirmation.png')});
+      await dialog.getByRole('button', {name: '返回', exact: true}).click();
+      assert((await dialog.locator('.download-layout-value').textContent()).includes('重新排版'));
+      assert.equal(await dialog.getByRole('radio', {name:'仅译文',exact:true}).isChecked(), true);
+      await page.keyboard.press('Escape'); await dialog.waitFor({state:'hidden'});
+      await page.waitForFunction(() => document.querySelector('.download-button')?.getAttribute('aria-expanded') === 'false');
+      assert.equal(await page.locator('.download-button').evaluate(node => node === document.activeElement), true);
       await page.locator('.taskbar-actions .download-button').click(); await dialog.waitFor();
-      assert.equal(await dialog.locator('.download-options').evaluate(node => node.open), false);
-      assert.equal(await dialog.getByRole('combobox', {name: 'PDF 排版', exact: true}).count(), 0);
-      assert.equal(await dialog.locator('select').inputValue(), 'layout');
-      assert.equal(await dialog.locator('.partial-export input').isChecked(), false);
+      assert.equal(await dialog.locator('.download-confirmation').count(), 0);
+      assert((await dialog.locator('.download-layout-value').textContent()).includes('保留原版'));
+      assert.equal(await dialog.locator('.download-layout').evaluate(node => node.open), false);
       const original = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', {name: '下载原文', exact: true}).click()]);
       const originalPath = path.join(artifacts, 'exact-original.pdf'); await original[0].saveAs(originalPath);
       assert(fs.readFileSync(originalPath).equals(short.bytes), 'Original shortcut must keep exact source bytes');
-      report.cases.push({name: 'partial-confirmation-independent-layout-original-bytes', ok: true});
+      await dialog.waitFor({state:'hidden'});
+      await page.locator('.taskbar-actions .download-button').click(); await dialog.waitFor();
+      await page.mouse.click(16, 400); await dialog.waitFor({state:'hidden'});
+      report.cases.push({name: 'partial-confirmation-independent-layout-original-bytes-escape-outside-click', ok: true});
+      const shortEntries = await correct(rows, row => `第${row.id + 1}段校订保留。`, 'complete-dialog');
+      await download('download-panel-direct-bilingual', 'layout', 'bilingual', shortEntries, 1);
       await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
       await diagnostics.attachPage(page, 'download-dialog-protected');
       await page.goto(`${origin}/document.html`); await page.locator('.file-drop-zone').waitFor();
@@ -236,30 +258,69 @@ async function main() {
       const protectedRows = await importPdf(input);
       const entries = await correct(protectedRows, row => `第${row.id + 1}段校订内容保留。`, 'protected-dialog');
       await page.locator('.taskbar-actions .download-button').click(); dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
-      await dialog.locator('.download-options > summary').click();
-      await dialog.locator('.export-options button').first().click();
-      await dialog.locator('.download-options > summary').click();
       const metrics = async name => {
-        const result = await dialog.evaluate(node => {const r = node.getBoundingClientRect();return {width:r.width,height:r.height,viewportWidth:innerWidth,horizontalOverflow:node.scrollWidth-node.clientWidth};});
-        assert(result.width <= 400.5 && result.width <= result.viewportWidth - 31, 'Dialog width must remain compact and fit the viewport');
-        assert(result.height <= 480 && result.horizontalOverflow <= 1, 'Dialog must remain compact without horizontal overflow');
-        await dialog.screenshot({path: path.join(artifacts, `${name}.png`)});
+        await page.waitForFunction(() => {const node = document.querySelector('.download-dialog[open]');if (!node) return false;const r = node.getBoundingClientRect();return r.left >= 11 && r.top >= 11 && r.right <= innerWidth - 11 && r.bottom <= innerHeight - 11;});
+        const result = await dialog.evaluate(node => {const r = node.getBoundingClientRect();return {width:r.width,height:r.height,left:r.left,top:r.top,right:r.right,bottom:r.bottom,viewportWidth:innerWidth,viewportHeight:innerHeight,horizontalOverflow:node.scrollWidth-node.clientWidth,verticalOverflow:node.scrollHeight-node.clientHeight};});
+        assert(result.width <= 360.5 && result.width <= result.viewportWidth - 23, 'Panel must remain compact and fit the viewport');
+        assert(result.height <= result.viewportHeight - 23 && result.horizontalOverflow <= 1, 'Panel must fit without horizontal overflow');
+        assert(result.left >= 11 && result.top >= 11 && result.right <= result.viewportWidth - 11 && result.bottom <= result.viewportHeight - 11, 'Panel must remain inside viewport after reflow');
+        await dialog.screenshot({path: path.join(artifacts, `${name}.png`),animations:'disabled',scale:'css'});
         report.cases.push({name, ok:true, ...result});
       };
-      await metrics('download-dialog-desktop');
-      await dialog.locator('.dialog-actions .translate-document-button').click();
+      await metrics('download-panel-light');
+      await dialog.locator('.download-layout > summary').click();
+      await metrics('download-panel-layout-expanded');
+      await dialog.locator('.download-layout > summary').click();
+      await page.screenshot({path:path.join(artifacts,'download-panel-context.png')});
+      const backdrop = await dialog.evaluate(node => ({color:getComputedStyle(node,'::backdrop').backgroundColor,filter:getComputedStyle(node,'::backdrop').backdropFilter}));
+      assert.equal(backdrop.color,'rgba(0, 0, 0, 0)'); assert.equal(backdrop.filter,'none');
+      report.backdrop=backdrop;
+      await page.emulateMedia({colorScheme:'dark'}); await page.locator('.document-app.dark').waitFor();
+      assert.notEqual(await dialog.evaluate(node=>getComputedStyle(node).backgroundColor),'rgb(255, 255, 255)');
+      await metrics('download-panel-dark');
+      await page.setViewportSize({width:390,height:740}); await metrics('download-panel-dark-narrow');
+      await page.emulateMedia({colorScheme:'light'}); await page.locator('.document-app:not(.dark)').waitFor();
+      await page.setViewportSize({width:320,height:568}); await metrics('download-panel-small');
+      await page.setViewportSize({width:390,height:280}); await metrics('download-panel-short');
+      await dialog.getByRole('button',{name:'下载原文',exact:true}).focus();
+      const footer = await dialog.evaluate(node => {const button=node.querySelector('.download-original');const r=node.getBoundingClientRect(),b=button.getBoundingClientRect();return {focused:button===document.activeElement,inside:b.top>=r.top && b.bottom<=r.bottom,scrollTop:node.scrollTop};});
+      assert(footer.focused && footer.inside && footer.scrollTop > 0, 'Keyboard focus must reveal the original-download shortcut in a short viewport');
+      Object.assign(report.cases[report.cases.length-1],{footerReachable:true,scrollTop:footer.scrollTop});
+      await dialog.screenshot({path:path.join(artifacts,'download-panel-short-scrolled.png'),animations:'disabled',scale:'css'});
+      await page.setViewportSize({width:390,height:740});
+      let languageSequence = 0;
+      const setLanguage = async language => {
+        await page.evaluate(async ({language, sequence}) => {
+          const read = await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});
+          const config = typeof read.value === 'string' ? JSON.parse(read.value) : read.value;
+          const result = await chrome.runtime.sendMessage({type:'persistConfig',mode:'replace',config:{...config,uiLanguage:language,uiLanguageSetupCompleted:true},clientId:'download-panel-language',sequence,baseRevision:config.__fluentConfigRevision || 0});
+          if (!result.success) throw new Error(result.error);
+        }, {language, sequence: ++languageSequence});
+      };
+      await setLanguage('en-US');
+      await dialog.getByRole('button',{name:'Download bilingual file',exact:true}).waitFor();
+      await metrics('download-panel-english');
+      await setLanguage('fr-FR');
+      await dialog.getByRole('button',{name:'Télécharger le fichier bilingue',exact:true}).waitFor();
+      await metrics('download-panel-french');
+      await setLanguage('zh-CN');
+      await dialog.getByRole('button',{name:'下载双语文件',exact:true}).waitFor();
+      await page.setViewportSize({width:1440,height:960});
+      await dialog.locator('.download-submit').click();
       const failure = dialog.locator('.download-failure'); await failure.waitFor();
-      assert((await failure.getByRole('alert').textContent()).includes('此文件受保护'));
+      assert((await failure.getByRole('alert').textContent()).includes('原文件受保护'));
       assert(!(await failure.getByRole('alert').textContent()).includes('PDFDocument'));
       assert.equal(await failure.locator('details').evaluate(node => node.open), false);
       assert.equal(await failure.locator('pre').isVisible(), false);
-      await metrics('download-dialog-error-collapsed');
+      assert.equal(await dialog.getByRole('button',{name:'重试下载',exact:true}).isEnabled(),true);
+      await metrics('download-panel-error');
       await failure.locator('summary').click(); assert((await failure.locator('pre').textContent()).includes('PDFDocument.load'));
+      await metrics('download-panel-error-details');
       await failure.locator('summary').click();
-      await page.setViewportSize({width:390,height:740}); await metrics('download-dialog-narrow-error');
+      await page.setViewportSize({width:390,height:740}); await metrics('download-panel-narrow-error');
       await page.setViewportSize({width:1440,height:960});
       await dialog.getByRole('button', {name:'关闭下载窗口',exact:true}).click();
-      await download('download-dialog-protected-retry', 'layout', 'translated', entries, 2);
+      await download('download-panel-direct-translated-retry', 'layout', 'translated', entries, 2);
     } else if (outlineOnly) {
       report.scope = encryptedInput ? 'Protected PDF translated download with detected-heading outline fallback' : 'PDF native and detected chapter outlines through actual download buttons';
       for (const native of encryptedInput ? [false] : [true, false]) {

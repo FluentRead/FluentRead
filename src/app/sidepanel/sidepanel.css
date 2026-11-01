@@ -1,0 +1,61 @@
+/**
+ * @file src/app/sidepanel/sidepanel.css
+ * 文件职责：定义原生翻译侧边栏的自适应外壳、紧凑工作台与主题。
+ * 主要内容：使用共享 token 和界面字体，固定紧凑标题并将剩余高度交给可滚动的翻译工作台；浅色、深色和服务菜单消费同一组语义变量；侧栏输入、服务菜单和结果布局仅随原生入口打包，避免进入 userscript 的设置页。
+ * 模块边界：这里只管理扩展自有文档，不匹配宿主网页；只为 sidepanel-shell 内的 translation-center 展示变体覆写布局，不改变设置页和 userscript 的样式。
+ */
+@import '../../ui/styles/tokens.css';
+
+/* Edge 原生侧栏可自动反转页面颜色；only 让浅色与深色都遵守扩展自己的主题。 */
+:root { color-scheme: only light; font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; font-synthesis: none; color: var(--ink); background: var(--surface-soft); --el-color-primary: var(--brand); }
+:root.dark { color-scheme: only dark; --brand: #ff6f9a; --brand-strong: #ff8aab; --brand-soft: #ef477629; --ink: #f4f5f8; --muted: #b7bdc9; --line: #363a45; --surface: #252830; --surface-soft: #20232a; }
+:root { --el-text-color-primary: var(--ink); --el-text-color-regular: var(--ink); --el-text-color-placeholder: var(--muted); --el-bg-color: var(--surface); --el-bg-color-overlay: var(--surface); --el-fill-color-blank: var(--surface); --el-fill-color-light: var(--surface-soft); --el-border-color: var(--line); --el-border-color-light: var(--line); }
+* { box-sizing: border-box; }
+html, body, #app { width: 100%; height: 100%; min-width: 0; margin: 0; }
+body { overflow: hidden; }
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+.sidepanel-shell { display: flex; flex-direction: column; height: 100dvh; min-height: 0; color: var(--ink); background: var(--surface-soft); }
+.sidepanel-header { display: flex; flex: none; align-items: center; gap: 8px; min-height: 36px; padding: 4px 12px; background: var(--surface); }
+.sidepanel-header h1 { flex: 1; min-width: 0; margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+.sidepanel-header button { display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; color: var(--muted); background: transparent; cursor: pointer; }
+.sidepanel-header button:hover { color: var(--ink); background: var(--surface-soft); }
+.sidepanel-header button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.sidepanel-error { margin: 8px 12px 0; color: var(--fr-danger); font-size: 12px; line-height: 1.6; }
+
+/* 原生面板高度由浏览器决定；单一滚动区让短窗口仍能到达输入、停止与全部结果。 */
+.sidepanel-shell .translation-center.is-sidebar { flex: 1; height: auto; padding: 10px 12px; gap: 8px; overflow-y: auto; scrollbar-width: thin; background: var(--surface); }
+.sidepanel-shell .translation-center.is-sidebar .translation-center-layout { display: flex; flex-direction: column; flex: none; gap: 12px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-input-panel, .sidepanel-shell .translation-center.is-sidebar .translation-results-panel { min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.sidepanel-shell .translation-center.is-sidebar .translation-center-toolbar { margin: 0 0 8px; gap: 6px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-editor, .sidepanel-shell .translation-center.is-sidebar .translation-editor textarea { min-height: 128px; height: 144px; flex: none; }
+.sidepanel-shell .translation-center.is-sidebar .translation-editor textarea { padding: 10px 36px 10px 12px; line-height: 1.7; }
+.sidepanel-shell .translation-center.is-sidebar .sidebar-clear-button { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-input-meta { margin: 6px 0; }
+.sidepanel-shell .translation-center.is-sidebar .translation-input-footer { padding-top: 6px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-input-footer p { margin-top: 8px; }
+.sidepanel-shell .translation-center.is-sidebar .translate-primary-button, .sidepanel-shell .translation-center.is-sidebar .translate-stop-button { min-height: 32px; padding: 6px 10px; }
+.sidepanel-shell .translation-center.is-sidebar .results-heading { align-items: center; gap: 8px; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+.sidepanel-shell .translation-center.is-sidebar .translation-center-service-picker { flex: 1; min-width: 0; }
+.sidepanel-shell .translation-center.is-sidebar .sidebar-copy-button { order: 1; flex: none; white-space: nowrap; }
+.sidepanel-shell .translation-center.is-sidebar .add-service-button { max-width: 100%; min-width: 0; min-height: 28px; padding: 3px 0; border: 0; color: var(--muted); }
+.sidepanel-shell .translation-center.is-sidebar .add-service-button > .fr-ui-icon { flex: none; }
+.sidepanel-shell .translation-center.is-sidebar .service-picker-label { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sidepanel-shell .translation-center.is-sidebar .service-picker-count { flex: none; padding: 0 5px; border-radius: 4px; background: var(--surface-soft); font-size: 11px; }
+.sidepanel-shell .translation-center.is-sidebar .results-controls { justify-content: flex-end; padding: 0 0 8px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-list { flex: none; overflow: visible; padding: 0; gap: 8px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-card { border: 0; border-radius: 0; background: transparent; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-card + .translation-result-card { padding-top: 8px; border-top: 1px solid var(--line); }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-card-header { padding: 0; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-service-name { flex: 1; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-service-name > div { display: flex; align-items: baseline; gap: 6px; width: 100%; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-service-name strong { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-service-name small { min-width: 0; max-width: none; flex: 1; margin-top: 0; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-placeholder { min-height: 64px; padding: 12px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-content { padding: 4px 0 0; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-content p { margin-bottom: 6px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-result-content footer { overflow-wrap: anywhere; }
+.sidepanel-shell .translation-center.is-sidebar .card-connection-footer { padding: 6px 12px 8px; }
+/* 服务菜单脱离内容滚动区，短面板里搜索与关闭始终可达。 */
+.sidepanel-shell .translation-center.is-sidebar .service-picker-popover { position: fixed; inset: 44px 10px auto; width: auto; max-width: none; max-height: calc(100dvh - 56px); padding: 12px; }
+.sidepanel-shell .translation-center.is-sidebar .service-picker-header { align-items: center; margin-bottom: 8px; }

@@ -387,6 +387,7 @@ export default defineConfig({
                 'src/shared/onnx/modelResidency.ts',
                 'src/core/tts/speechProgress.ts',
                 'src/features/image-translation/services/mangaBubbles.ts',
+                'src/features/image-translation/services/mangaViewWordBoundary.ts',
                 'src/features/image-translation/services/mangaOcrAssets.ts',
                 'src/features/image-translation/services/mangaOnnxFields.ts',
                 'src/features/image-translation/services/mangaRecognitionShapes.ts',

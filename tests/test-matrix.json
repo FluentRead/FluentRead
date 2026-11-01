@@ -648,6 +648,8 @@
       "tests/mangaAlphaProtection.test.ts",
       "tests/mangaBackground.test.ts",
       "tests/mangaBubbles.test.ts",
+      "tests/mangaViewWordBoundary.test.ts",
+      "tests/imageParagraphs.test.ts",
       "tests/mangaCanvas.test.ts",
       "tests/mangaCompositor.test.ts",
       "tests/mangaDetectionFailure.test.ts",

@@ -17,6 +17,26 @@ import {remoteConfigStorageBuildPlugin, createExtensionManifest, extendRemoteCon
 
 const PROJECT_ROOT = resolve(__dirname, '..');
 
+describe('native translation sidepanel artifact contract', () => {
+    it.each(['Chrome', 'Firefox'])('%s validates its own final native panel declaration', async browser => {
+        const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
+        const manifest = browser === 'Chrome' ? {side_panel: {default_path: 'sidepanel.html'}, permissions: ['sidePanel']}
+            : {sidebar_action: {default_panel: 'sidepanel.html', open_at_install: false}, permissions: []};
+        expect(() => verifyTranslationSidepanelManifest(manifest, ['sidepanel.html'], browser)).not.toThrow();
+        expect(() => verifyTranslationSidepanelManifest(manifest, [], browser)).toThrow('缺少');
+        const wrongPermission = {...manifest, permissions: browser === 'Chrome' ? ['sidePanel', 'sidePanel'] : ['sidePanel']};
+        expect(() => verifyTranslationSidepanelManifest(wrongPermission, ['sidepanel.html'], browser)).toThrow('权限');
+        for (const web_accessible_resources of [['sidepanel.html'], [{resources: ['sidepanel.html'], matches: ['<all_urls>']}]]) {
+            expect(() => verifyTranslationSidepanelManifest({...manifest, web_accessible_resources}, ['sidepanel.html'], browser)).toThrow('不得向网页公开');
+        }
+    });
+    it('rejects a missing Chrome declaration and Firefox installation-time opening', async () => {
+        const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
+        expect(() => verifyTranslationSidepanelManifest({permissions: ['sidePanel']}, ['sidepanel.html'], 'Chrome')).toThrow('清单');
+        expect(() => verifyTranslationSidepanelManifest({sidebar_action: {default_panel: 'sidepanel.html', open_at_install: true}}, ['sidepanel.html'], 'Firefox')).toThrow('安装');
+    });
+});
+
 describe('stable public content UI resources', () => {
     const uiFiles = [
         'icon/32.png', 'icon/48.png', 'icon/128.png',
@@ -1376,7 +1396,7 @@ describe('extension manifest capability contract', () => {
         extendRemoteConfigBuildConfig([{type: 'content-script'}], emptyPlugins);
         expect(emptyPlugins.plugins).toHaveLength(1);
 
-        for (const group of [[{type: 'popup'}], [{type: 'options'}], [{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}]]) {
+        for (const group of [[{type: 'popup'}], [{type: 'options'}], [{type: 'sidepanel'}], [{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}, {type: 'sidepanel'}]]) {
             const config: {plugins?: unknown[]} = {plugins: []};
             extendRemoteConfigBuildConfig(group, config);
             expect(config.plugins).toHaveLength(1);

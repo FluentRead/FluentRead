@@ -48,7 +48,7 @@ beforeEach(async () => {
   configReady = Promise.resolve();
   await mountCenter();
 });
-async function mountCenter(): Promise<void> {
+async function mountCenter(surface: 'settings' | 'sidebar' = 'settings'): Promise<void> {
   const document = globalThis.document;
   const renderer = vue.createRenderer<any, any>({
     createElement: (tag, namespace) => vue.markRaw(namespace === 'svg' ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag)),
@@ -65,7 +65,7 @@ async function mountCenter(): Promise<void> {
     },
   });
   host = document.createElement('div'); document.body.appendChild(host);
-  const app = renderer.createApp(TranslationCenter, {'onConfigure-service': (service: string) => emit('configure-service', service)});
+  const app = renderer.createApp(TranslationCenter, {surface, 'onConfigure-service': (service: string) => emit('configure-service', service), 'onConfigure-general': () => emit('configure-general')});
   app.mount(host); state = (app as any)._instance.setupState;
   unmount = () => {app.unmount(); host.remove();};
   for (let i = 0; i < 4; i++) {await Promise.resolve(); await vue.nextTick();}
@@ -73,6 +73,83 @@ async function mountCenter(): Promise<void> {
 afterEach(() => {close(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('translation center product workflow', () => {
+  it('uses a compact single column in the sidebar without changing saved comparison layout', async () => {
+    close();config.translationCenterLayout = 'grid';config.translationCenterServices = ['google'];await mountCenter('sidebar');
+    expect(host.querySelector('.is-sidebar')).not.toBeNull();expect(host.querySelector('.results-layout-control')).toBeNull();
+    expect(host.querySelector('.translation-result-list.is-grid')).toBeNull();expect(state.resultLayout).toBe('grid');
+    expect(requestPatch).not.toHaveBeenCalled();
+    expect(state.cards).toHaveLength(1);expect(host.querySelector('.translation-input-meta')).toBeNull();expect(host.querySelector('#translation-input-help')).toBeNull();
+    expect(host.querySelector('.translation-result-card')).toBeNull();
+    state.sourceText = 'A copied paragraph';state.runTranslation();await vi.waitFor(() => expect(state.successfulCards).toHaveLength(1));
+    expect(translateText.mock.calls[0][0]).toBe('A copied paragraph');
+    await vue.nextTick();host.querySelector<HTMLButtonElement>('.sidebar-copy-button')!.click();await vue.nextTick();expect(copy).toHaveBeenCalledWith('translated');
+    copy.mockRejectedValueOnce(new Error('clipboard unavailable'));await state.copyText('translated', state.cards[0].service);await vue.nextTick();
+    expect(host.querySelector('.translation-center-feedback')?.textContent).toBe(state.ct('copyError'));
+    config.on = false;subscription(config);await vue.nextTick();
+    host.querySelector<HTMLButtonElement>('.translation-paused button')!.click();expect(emit).toHaveBeenCalledWith('configure-general');
+    expect(host.querySelector('.translation-paused a')).toBeNull();
+    expect(state.sourceText).toBe('A copied paragraph');
+    state.sourceLanguage = 'fr';state.persistTranslationCenterConfig('source');
+    await vi.waitFor(() => expect(state.saveState).toBe('saved'));await vue.nextTick();expect(host.querySelector('.save-status')).toBeNull();
+  });
+  it('shares first-use comparison defaults between the settings page and sidebar', async () => {
+    const defaults = state.cards.map((card: any) => card.service);
+    close();await mountCenter('sidebar');
+    expect(state.cards.map((card: any) => card.service)).toEqual(defaults);
+    expect(defaults).toEqual(['freeTranslation', 'google']);expect(requestPatch).not.toHaveBeenCalled();
+  });
+  it('retains a long saved comparison list and searches, toggles and copies each provider with its model identity', async () => {
+    close();
+    const providers = Array.from({length: 16}, (_, index) => ({id: `custom:team-${index + 1}`, name: `Team service ${index + 1}`,
+      endpoint: 'https://fixture.invalid/v1', models: [`unique-team-model-${index + 1}`]}));
+    config.customOpenAIProviders = providers;config.translationCenterServices = providers.map(provider => provider.id);
+    for (const provider of providers) {config.token[provider.id] = 'synthetic-fixture';config.model[provider.id] = provider.models[0];}
+    await mountCenter('sidebar');
+    expect(state.cards.map((card: any) => card.service)).toEqual(config.translationCenterServices);
+    expect(host.querySelector('.service-picker-count')?.textContent).toBe('16');expect(host.querySelector('.translation-result-card')).toBeNull();
+    expect(requestPatch).not.toHaveBeenCalled();requestPatch.mockImplementation(async patch => {Object.assign(config, patch);});await state.toggleServicePicker();
+    state.serviceSearchQuery = 'unique-team-model-16';await vue.nextTick();
+    const option = host.querySelector<HTMLButtonElement>('.service-picker-option')!;
+    expect(host.querySelectorAll('.service-picker-option')).toHaveLength(1);expect(option.getAttribute('aria-pressed')).toBe('true');
+    option.click();await vue.nextTick();expect(host.querySelector('.service-picker-count')?.textContent).toBe('15');
+    expect(requestPatch.mock.calls.at(-1)![0].translationCenterServices).not.toContain('custom:team-16');
+    option.click();await vue.nextTick();expect(host.querySelector('.service-picker-count')?.textContent).toBe('16');
+    await vi.waitFor(() => expect(requestPatch.mock.calls.at(-1)![0].translationCenterServices).toEqual(providers.map(provider => provider.id)));
+    state.closePicker(false);translateText.mockImplementation((_text: string, _title: string, options: any) => Promise.resolve(`Result from ${options.serviceOverride}`));
+    state.sourceText = 'One paragraph for all selected providers';state.runTranslation();
+    await vi.waitFor(() => expect(state.successfulCards).toHaveLength(16));await vue.nextTick();
+    expect(host.querySelectorAll('.translation-result-card-header')).toHaveLength(16);
+    expect(host.querySelector('[data-service="custom:team-16"] .translation-result-service-name small')?.textContent).toBe('unique-team-model-16');
+    host.querySelector<HTMLButtonElement>('[data-service="custom:team-16"] .translation-result-content footer button')!.click();
+    await vue.nextTick();expect(copy).toHaveBeenCalledWith('Result from custom:team-16');
+    config.model['custom:team-16'] = 'next-model';subscription(config);await vue.nextTick();
+    expect(state.staleCount).toBe(1);
+    expect(host.querySelector('[data-service="custom:team-16"] .translation-result-service-name small')?.textContent).toBe('unique-team-model-16');
+  });
+  it('keeps compact sidebar errors and optional comparisons actionable without restoring secondary metadata', async () => {
+    close();await mountCenter('sidebar');state.addService('openai');await vue.nextTick();
+    expect(host.querySelector('.needs-configuration')).not.toBeNull();expect(host.querySelector('.drag-handle')).toBeNull();
+    state.addService('google');state.sourceText = 'Original';state.runTranslation();
+    await vi.waitFor(() => expect(state.successfulCards).toHaveLength(2));await vue.nextTick();
+    expect(host.querySelectorAll('.translation-result-card-header')).toHaveLength(3);
+    expect(host.querySelectorAll('.translation-result-content footer > span')).toHaveLength(0);
+    expect(host.querySelectorAll('.card-connection-footer')).toHaveLength(0);
+    await state.toggleServicePicker();await vue.nextTick();expect(host.querySelector('.service-picker-footer')).toBeNull();
+    expect(host.querySelector('.service-picker-header p')).toBeNull();state.closePicker(false);
+    requestPatch.mockRejectedValueOnce(new Error('save unavailable'));state.sourceLanguage = 'fr';state.persistTranslationCenterConfig('source');
+    await vi.waitFor(() => expect(state.saveState).toBe('error'));await vue.nextTick();
+    host.querySelector<HTMLButtonElement>('.translation-center-intro button')!.click();await vi.waitFor(() => expect(state.saveState).toBe('saved'));
+    await vue.nextTick();host.querySelector<HTMLButtonElement>('.sidebar-clear-button')!.click();await vue.nextTick();expect(state.sourceText).toBe('');
+  });
+  it('stops a hidden native sidebar before Chromium can freeze it, keeping the pasted input for a retry', async () => {
+    close();await mountCenter('sidebar');const pending = deferred();translateText.mockReturnValueOnce(pending.promise);
+    state.sourceText = 'Copied text';state.runTranslation();await vue.nextTick();
+    const signal = translateText.mock.calls[0][2].signal as AbortSignal;expect(signal.aborted).toBe(false);
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'visible'});document.dispatchEvent(new document.defaultView!.Event('visibilitychange'));expect(signal.aborted).toBe(false);
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'hidden'});document.dispatchEvent(new document.defaultView!.Event('visibilitychange'));expect(signal.aborted).toBe(true);
+    expect(state.sourceText).toBe('Copied text');pending.resolve('late');await vue.nextTick();expect(state.cards[0].status).toBe('cancelled');
+  });
+
   it.each(['empty result', 'empty error'])('renders a useful error and retry control for %s', async result => {
     if (result === 'empty result') translateText.mockResolvedValueOnce('   '); else translateText.mockRejectedValueOnce(new Error(''));
     state.sourceText = 'Original'; state.retryService('google'); await vi.waitFor(() => expect(state.cards[1].status).toBe('error')); await vue.nextTick();

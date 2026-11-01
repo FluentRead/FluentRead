@@ -25,6 +25,10 @@ export default defineConfig({
                 'src/features/reading-appearance/content.ts',
                 'src/app/popup/readingAppearanceActions.ts',
 
+                'src/platform/browser/translationSidepanel.ts',
+                'src/app/sidepanel/index.ts',
+                'src/app/sidepanel/SidepanelApp.vue',
+                'userscript/translationCenterPlugin.ts',
                 'src/features/vocabulary/materialBackupReader.ts',
                 'src/features/vocabulary/materialBackupJson.ts',
                 'src/features/vocabulary/materialBackupRestore.ts',

@@ -6,6 +6,7 @@
  * 极矮视口：服务选择的返回、搜索、清除与关闭复用原节点并排，隐藏装饰留白而不缩小操作区，输入状态与整页遮罩保持；触屏语言选择使用独立 portal 标记，46px 控件与 16px 输入避免继续沿用桌面紧凑尺寸，列表随可见高度收缩并给关闭入口让位。
  * 品牌触屏：coarse 指针或已确认的 Firefox Android Popup 为官网链接提供居中的 46px 命中区，内部图标保持 32px，桌面链接仍随 32px 图标紧凑排布，不使用外扩重叠区域。
  * 快捷层级：悬停和划词标题与开关共用一行并保留独立关闭按钮，说明只承载实际作用范围；圈选快捷键集中在示意中，服务摘要不保留数量徽标的空间。
+ * 侧边栏入口：在翻译主操作下提供一行紧凑文本按钮，展示原生侧栏图标与打开反馈，沿用同一主题与焦点样式。
  */
 @import "../../ui/styles/feedback.css";
 /* Popup 页面样式跟随 app 页面边界，避免 WXT 入口目录继续承载实现。 */
@@ -68,6 +69,11 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 /* 工具栏 popup 的 viewport 也由页面撑开；用 100dvh 限高会把首次打开锁在启动占位的矮高度。 */
 .popup-shell { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
 .popup-content { position: relative; z-index: 1; }
+.sidebar-translation-entry { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 30px; margin-top: 7px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 12px; text-align: left; cursor: pointer; }
+.sidebar-translation-entry svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
+.sidebar-translation-entry > span:first-of-type { flex: 1; }
+.sidebar-translation-entry:hover:not(:disabled) { color: var(--brand-strong); border-color: var(--brand); }
+.sidebar-translation-entry:disabled { opacity: .5; cursor: not-allowed; }
 .popup-shell.language-onboarding-shell { overflow-x: hidden; }
 /* 首启引导直接铺满弹窗；各界面风格都会给 .popup-shell 设置留白，这里统一清除，避免弹窗里再套一层边框。 */
 .popup-shell.language-onboarding-shell { padding: 0 !important; }

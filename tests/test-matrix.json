@@ -36,6 +36,7 @@
       "tests/userscriptMetadata.test.ts",
       "tests/userscriptPrivacy.test.ts",
       "tests/userscriptViteConfig.test.ts",
+      "tests/userscriptTranslationCenterBuild.test.ts",
       "tests/deeplxRuntimeBuild.test.ts",
       "tests/freeTranslationSettings.test.ts",
       "tests/writingBackground.test.ts",
@@ -855,7 +856,10 @@
       "tests/readingAppearanceRuntime.test.ts",
       "tests/readingAppearanceContent.test.ts",
       "tests/popupReadingAppearance.test.ts",
-      "tests/readingAppearanceComposition.test.ts"
+      "tests/readingAppearanceComposition.test.ts",
+      "tests/translationSidepanel.test.ts",
+      "tests/sidepanelBootstrap.test.ts",
+      "tests/sidepanelApp.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

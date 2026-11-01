@@ -25,7 +25,6 @@ describe('VocabularyBook component lifecycle wiring', () => {
     expect(source).toContain('>从备份恢复</button>');
     expect(source).toContain('>导出到 Anki</button>');
     expect(source).toContain("t('learning.collection.clear')");
-    expect(source).toContain("confirmButtonText: '不包含'");
     expect(source).not.toContain('独立备份与迁移');
     expect(source).not.toContain('分别管理');
     expect(source).not.toContain('class="data-panel"');

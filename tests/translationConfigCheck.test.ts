@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
         model: {} as Record<string, string>,
         customModel: {} as Record<string, string>,
         display: 1,
+        translationOnlyDomains: [] as string[],
     },
     sendErrorMessage: vi.fn(),
 }));
@@ -29,6 +30,7 @@ describe('translation configuration guard', () => {
         mocks.config.model = {};
         mocks.config.customModel = {};
         mocks.config.display = 1;
+        mocks.config.translationOnlyDomains = [];
         mocks.sendErrorMessage.mockReset();
         notifyFullPageTranslationState(false);
     });
@@ -64,6 +66,17 @@ describe('translation configuration guard', () => {
 
         expect(checkConfig()).toBe(false);
         expect(mocks.sendErrorMessage).toHaveBeenCalledWith('「谷歌翻译」仅支持双语模式，请切换翻译服务');
+    });
+
+    it('网站仅译文在请求前执行相同服务限制，显式单次显示方案仍优先', () => {
+        vi.stubGlobal('location', {href: 'https://docs.example.com/a'});
+        try {
+            mocks.config.translationOnlyDomains = ['example.com']; mocks.config.service = 'google';
+            expect(checkConfig()).toBe(false);
+            expect(checkConfig({displayMode: 'bilingual'})).toBe(true);
+            mocks.config.service = 'plain'; expect(checkConfig()).toBe(true);
+            expect(mocks.config.display).toBe(1);
+        } finally {vi.unstubAllGlobals();}
     });
 
     it('快捷方案按本次服务、模型和显示方式校验，不被全局默认值误拦截', () => {

@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesJapaneseMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const jaJPMessages = {
     "settings.requestLimits.globalTitle": "リクエスト制限",
     "settings.requestLimits.globalHelp": "個別設定のないサービスとモデルは、この制限を共有します。",
     ...aiRequestTimeoutMessages["ja-JP"],
+    ...selectionDictionaryMessages["ja-JP"],
     ...sectionTranslationRulesJapaneseMessages,
     "settings.requestLimits.retryIntervals": "再試行の間隔",
     "settings.requestLimits.apiKeyRecovery": "失敗した Key のクールダウン",
@@ -1748,6 +1750,12 @@ export const jaJPMessages = {
     "glossary.builtin.financeDescription": "財務諸表、評価指標、株式市場。",
     "glossary.builtin.research": "学術研究",
     "glossary.builtin.researchDescription": "研究手法、統計、学術論文。",
+    'glossary.builtin.hardware': "コンピューターハードウェア",
+    'glossary.builtin.hardwareDescription': "プロセッサー、メモリー、チップ、回路の用語",
+    'glossary.builtin.networking': "ネットワークとクラウド",
+    'glossary.builtin.networkingDescription': "ネットワークプロトコル、クラウド基盤、デプロイの用語",
+    'glossary.builtin.mathematics': "数学",
+    'glossary.builtin.mathematicsDescription': "線形代数、微積分、確率、最適化の用語",
     "glossary.builtin.products": "製品名を保持",
     "glossary.builtin.productsDescription": "一般的な開発ツールや AI 製品名を原文で保持します。大文字・小文字を区別します。",
     "glossary.builtin.englishChinese": "英語 → 簡体字中国語",

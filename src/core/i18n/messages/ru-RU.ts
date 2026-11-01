@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ru-RU.json';
 import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesRussianMessages} from './sectionTranslationRulesRussian';
 import {sectionTranslationRulesLegacyText} from './sectionTranslationRulesLegacy';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -547,6 +548,7 @@ export const ruRUMessages = {
     "settings.requestLimits.globalTitle": "Ограничения запросов",
     "settings.requestLimits.globalHelp": "Сервисы и модели без отдельных настроек используют эти общие ограничения.",
     ...aiRequestTimeoutMessages["ru-RU"],
+    ...selectionDictionaryMessages["ru-RU"],
     ...sectionTranslationRulesRussianMessages,
     "settings.requestLimits.retryIntervals": "Интервалы повторов",
     "settings.requestLimits.apiKeyRecovery": "Пауза неисправного API Key",
@@ -1748,6 +1750,12 @@ export const ruRUMessages = {
     "glossary.builtin.financeDescription": "Финансовая отчётность, показатели оценки и фондовые рынки.",
     "glossary.builtin.research": "Научные исследования",
     "glossary.builtin.researchDescription": "Методы исследований, статистика и научные статьи.",
+    'glossary.builtin.hardware': "Компьютерное оборудование",
+    'glossary.builtin.hardwareDescription': "Процессоры, память, микросхемы и схемы",
+    'glossary.builtin.networking': "Сети и облака",
+    'glossary.builtin.networkingDescription': "Сетевые протоколы, облачная инфраструктура и развёртывание",
+    'glossary.builtin.mathematics': "Математика",
+    'glossary.builtin.mathematicsDescription': "Линейная алгебра, анализ, вероятность и оптимизация",
     "glossary.builtin.products": "Сохранять названия продуктов",
     "glossary.builtin.productsDescription": "Сохраняет названия популярных инструментов разработки и продуктов ИИ. С учётом регистра.",
     "glossary.builtin.englishChinese": "Английский → Китайский упрощённый",

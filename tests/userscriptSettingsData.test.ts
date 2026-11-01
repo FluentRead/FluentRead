@@ -48,10 +48,10 @@ function initializer(code: string, name: string): string {
     throw new Error(`Missing fixture initializer ${name}`);
 }
 
-function value(expression: string): unknown {
+function value(expression: string, extra: Record<string, unknown> = {}): unknown {
     const javascript = ts.transpileModule(`globalThis.result = ${expression};`, {compilerOptions: {target: ts.ScriptTarget.ES2018}}).outputText;
     const context = {result: undefined as unknown, Uint8Array, atob,
-        __fluentreadInflateSettingsData: inflateWithPako, __fluentreadDecodeSettingsData: decodeUserscriptData};
+        __fluentreadInflateSettingsData: inflateWithPako, __fluentreadDecodeSettingsData: decodeUserscriptData, ...extra};
     runInNewContext(javascript, context, {timeout: 1000});
     return context.result;
 }
@@ -68,9 +68,15 @@ describe('standalone static settings data representation', () => {
         expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before)), undefined, true));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
+        const originalAst = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
         let restored = transformed;
-        for (const [owner, table] of tables) {
-            if (owner === path) restored = restored.replace(`/* @__PURE__ */ ${initializer(transformed, table)}`, initializer(source, table));
+        for (const statement of originalAst.statements.filter(ts.isVariableStatement)) {
+            for (const declaration of statement.declarationList.declarations) {
+                if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
+                const before = declaration.initializer.getText(originalAst);
+                const after = initializer(transformed, declaration.name.text);
+                if (before !== after) restored = restored.replace(`/* @__PURE__ */ ${after}`, before);
+            }
         }
         expect(restored.replace(/import \{inflateWithPako as __fluentreadInflateSettingsData\} from '@\/userscript\/pakoRuntime';\n/u, '')
             .replace(/import \{decodeUserscriptData as __fluentreadDecodeSettingsData\} from '@\/userscript\/dataEncoding';\n/u, '')).toBe(source);
@@ -96,15 +102,28 @@ describe('standalone static settings data representation', () => {
                 return {...actual, gzipLargeStandaloneUserscriptData: async (data: Uint8Array) => actual.gzipUserscriptBuildData(data)};
             });
             const {default: configuration} = await import('@/userscript/vite.config');
-            const config = configuration as {plugins: Array<{name?: string; transform?: unknown}>};
+            const config = configuration as {plugins: Array<{name?: string; transform?: unknown; resolveId?: unknown; load?: unknown}>};
             const plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
             const run = plugin.transform as (code: string, id: string) => {code: string} | null;
             const path = resolve(root, 'src/core/config/catalog.ts');
             const original = readFileSync(path, 'utf8');
             const result = run(original, path);
             if (!enabled) expect(result).toBeNull();
-            else for (const name of ['multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']) {
-                expect(JSON.stringify(value(initializer(result!.code, name)))).toBe(JSON.stringify(value(initializer(original, name))));
+            else {
+                const resolveId = plugin.resolveId as (id: string) => string | undefined;
+                const virtualId = resolveId('virtual:fluentread-standalone-settings-data');
+                expect(virtualId).toBeTypeOf('string');
+                const load = plugin.load as (id: string) => Promise<string>;
+                const module = await load.call({addWatchFile: () => {}}, virtualId!);
+                const group = {decodeUserscriptData, inflateWithPako,
+                    getSettingsData: undefined as undefined | ((index: number) => unknown)};
+                runInNewContext(module.replace(/^import .*;\n/gmu, '')
+                    .replace('export function getSettingsData', 'globalThis.getSettingsData = function'), group, {timeout: 1000});
+                expect(group.getSettingsData).toBeTypeOf('function');
+                for (const name of ['multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']) {
+                    expect(JSON.stringify(value(initializer(result!.code, name), {__fluentreadGetSettingsData: group.getSettingsData})))
+                        .toBe(JSON.stringify(value(initializer(original, name))));
+                }
             }
         } finally {
             vi.doUnmock('@/userscript/buildGzip');

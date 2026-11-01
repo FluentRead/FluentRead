@@ -61,7 +61,9 @@ Press **Escape** or click another page control to close. The old selection does 
 
 ## Dictionary and card controls
 
-The 3,000 built-in common English entries need no download. Other words can use the online dictionary while FluentRead downloads and verifies the complete dictionary, about 3.9 MB, for later local lookup. Common entries and the online dictionary remain available if the download fails. The dictionary download URL does not include the queried word.
+Choose a source in **Selection translation → Translation card → Dictionary source**. **Default (automatic)** uses the local dictionary first, then online sources when needed. You can also select ECDICT, Youdao, Free Dictionary API, Wiktionary, WiktApi, or Datamuse. ECDICT is available in the browser extension. A selected source is queried on its own; if it has no entry, the ordinary translation remains available and you can retry the dictionary. Changing the source refreshes an open English word card while keeping its ordinary translation.
+
+The default strategy and ECDICT source include 3,000 common English entries with no extra download. A missing entry starts a background download of the verified complete dictionary, about 3.9 MB, for later local lookup; the default strategy also queries online sources. Common entries remain available if the download fails. The dictionary download URL does not include the queried word.
 
 Dictionary word classes describe possible uses, not necessarily a word's role in the current sentence. For a Chinese or English target language, enable bidirectional selection translation to reverse direction based on the selected text.
 

@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import {listSitePreferences, previewSitePreferences, updateSitePreference} from '@/src/features/settings/model/sitePreferences';
 import {createSiteRuleText, siteRuleTextRows} from '@/src/core/i18n/messages/siteRules';
+import {normalizeConfig} from '@/src/core/config/model';
+import {prepareConfigForExport, prepareConfigForImport} from '@/src/core/config/transfer';
 
 import {
     getSiteBaseDomain,
@@ -12,6 +14,7 @@ import {
     normalizeDisabledExtensionDomains,
     normalizeFloatingBallDisabledDomains,
     shouldAutoTranslatePage,
+    resolveSiteTranslationDisplay,
 } from '@/src/features/site-rules/domain';
 
 const parserCalls = vi.hoisted(() => ({domain: 0, parse: 0}));
@@ -276,8 +279,8 @@ describe('统一网站偏好与生效解释', () => {
         const source = config();
         const rows = listSitePreferences(source);
         expect(rows).toEqual([
-            {domain: 'example.com', alwaysTranslate: true, extensionDisabled: true, floatingBallHidden: true},
-            {domain: 'other.test', alwaysTranslate: false, extensionDisabled: false, floatingBallHidden: true},
+            {domain: 'example.com', alwaysTranslate: true, extensionDisabled: true, floatingBallHidden: true, translationOnly: false},
+            {domain: 'other.test', alwaysTranslate: false, extensionDisabled: false, floatingBallHidden: true, translationOnly: false},
         ]);
         expect(source.alwaysTranslateDomains).toHaveLength(2);
     });
@@ -285,9 +288,10 @@ describe('统一网站偏好与生效解释', () => {
         const source = config(); const snapshot = structuredClone(source);
         const row = listSitePreferences(source)[0]!;
         const removed = updateSitePreference(source, 'https://news.example.com/a', null)!;
-        expect(removed).toEqual({alwaysTranslateDomains: [], disabledExtensionDomains: [], floatingBallDisabledDomains: ['other.test']});
+        expect(removed).toEqual({alwaysTranslateDomains: [], disabledExtensionDomains: [], floatingBallDisabledDomains: ['other.test'], translationOnlyDomains: []});
         expect(updateSitePreference(removed, row.domain, row)).toEqual({
             alwaysTranslateDomains: ['example.com'], disabledExtensionDomains: ['example.com'], floatingBallDisabledDomains: ['other.test', 'example.com'],
+            translationOnlyDomains: [],
         });
         expect(updateSitePreference(source, 'co.uk', row)).toBeNull();
         expect(source).toEqual(snapshot);
@@ -314,5 +318,46 @@ describe('统一网站偏好与生效解释', () => {
         expect(previewSitePreferences('file:///private/tmp/a.html', config())).toBeNull();
         expect(previewSitePreferences('https://co.uk/', {...config(), autoTranslate: true})).toMatchObject({domain: null, translation: 'global'});
         expect(previewSitePreferences('http://127.0.0.1/a', config())).toMatchObject({domain: '127.0.0.1', translation: 'manual'});
+    });
+});
+
+describe('按网站关闭双语对照', () => {
+    it('仅命中主域及子域的网站使用仅译文，其他网站沿用全局模式，不改变源配置', () => {
+        const config = {display: 1, translationOnlyDomains: ['https://docs.example.com/article', 'team.github.io']};
+        const before = structuredClone(config);
+        for (const input of ['https://example.com/', new URL('http://news.example.com:8080/a')]) {
+            expect(resolveSiteTranslationDisplay(config, input)).toBe(0);
+        }
+        for (const url of ['https://example.com.evil.test/', 'https://other.github.io/', 'file:///example.com', 'bad url']) {
+            expect(resolveSiteTranslationDisplay(config, url)).toBe(1);
+        }
+        expect(resolveSiteTranslationDisplay(config, 'https://docs.team.github.io/a')).toBe(0);
+        expect(resolveSiteTranslationDisplay({display: 0, translationOnlyDomains: ['example.com']}, 'https://other.test')).toBe(0);
+        for (const translationOnlyDomains of [undefined, []]) {
+            parserCalls.domain = 0;
+            expect(resolveSiteTranslationDisplay({display: 1, translationOnlyDomains}, 'https://example.com')).toBe(1);
+            expect(parserCalls.domain).toBe(0);
+        }
+        expect(config).toEqual(before);
+    });
+    it('单独添加仅译文偏好可预览、删除和撤销，且不会开启自动翻译或禁用其他能力', () => {
+        const config = normalizeConfig({display: 1, autoTranslate: false, disableFloatingBall: false});
+        const row = {alwaysTranslate: false, extensionDisabled: false, floatingBallHidden: false, translationOnly: true};
+        const patch = updateSitePreference(config, 'https://docs.example.com/a', row)!;
+        expect(listSitePreferences(patch)).toEqual([{domain: 'example.com', ...row}]);
+        const next = {...config, ...patch};
+        expect(previewSitePreferences('https://example.com/a', next)).toMatchObject({display: 'single', translation: 'manual', extension: 'enabled', floatingBall: 'visible'});
+        expect(previewSitePreferences('https://another.test/a', next)).toMatchObject({display: 'bilingual', translation: 'manual'});
+        expect(previewSitePreferences('https://another.test/a', {...next, display: 0})).toMatchObject({display: 'single'});
+        expect(previewSitePreferences('https://another.test/a', {...next, display: undefined})).toMatchObject({display: 'bilingual'});
+        expect(updateSitePreference(next, 'example.com', null)?.translationOnlyDomains).toEqual([]);
+        expect(next.display).toBe(1); expect(config.translationOnlyDomains).toEqual([]);
+    });
+    it('旧配置默认空名单，网址归并与完整备份往返保留站点偏好及全局显示', () => {
+        expect(normalizeConfig({}).translationOnlyDomains).toEqual([]);
+        const config = normalizeConfig({display: 1, translationOnlyDomains: ['https://docs.example.com/a', 'example.com', 'co.uk', 2]});
+        expect(config.translationOnlyDomains).toEqual(['example.com']);
+        const restored = prepareConfigForImport(JSON.parse(JSON.stringify(prepareConfigForExport(config))), normalizeConfig({}));
+        expect(restored.translationOnlyDomains).toEqual(['example.com']); expect(restored.display).toBe(1);
     });
 });

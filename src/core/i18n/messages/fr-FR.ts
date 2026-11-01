@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/fr-FR.json';
 import selfHelpText from './self-help/fr-FR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesFrenchMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const frFRMessages = {
     "settings.requestLimits.globalTitle": "Limites de requêtes",
     "settings.requestLimits.globalHelp": "Les services et modèles sans réglages spécifiques partagent ces limites.",
     ...aiRequestTimeoutMessages["fr-FR"],
+    ...selectionDictionaryMessages["fr-FR"],
     ...sectionTranslationRulesFrenchMessages,
     "settings.requestLimits.retryIntervals": "Délais de nouvelle tentative",
     "settings.requestLimits.apiKeyRecovery": "Refroidissement de la clé en échec",
@@ -1748,6 +1750,12 @@ export const frFRMessages = {
     "glossary.builtin.financeDescription": "États financiers, indicateurs de valorisation et marchés boursiers.",
     "glossary.builtin.research": "Recherche universitaire",
     "glossary.builtin.researchDescription": "Méthodes de recherche, statistiques et articles scientifiques.",
+    'glossary.builtin.hardware': "Matériel informatique",
+    'glossary.builtin.hardwareDescription': "Processeurs, mémoire, puces et circuits",
+    'glossary.builtin.networking': "Réseaux et cloud",
+    'glossary.builtin.networkingDescription': "Protocoles réseau, infrastructure cloud et déploiement",
+    'glossary.builtin.mathematics': "Mathématiques",
+    'glossary.builtin.mathematicsDescription': "Algèbre linéaire, calcul, probabilités et optimisation",
     "glossary.builtin.products": "Conserver les noms de produits",
     "glossary.builtin.productsDescription": "Conserve les noms courants d’outils de développement et de produits d’IA. Sensible à la casse.",
     "glossary.builtin.englishChinese": "Anglais → Chinois simplifié",

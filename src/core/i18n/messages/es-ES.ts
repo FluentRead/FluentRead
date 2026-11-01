@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesSpanishMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -547,6 +548,7 @@ export const esESMessages = {
     "settings.requestLimits.globalTitle": "Límites de solicitudes",
     "settings.requestLimits.globalHelp": "Los servicios y modelos sin ajustes propios comparten estos límites.",
     ...aiRequestTimeoutMessages["es-ES"],
+    ...selectionDictionaryMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",
     "settings.requestLimits.apiKeyRecovery": "Enfriamiento de la API key fallida",
@@ -1748,6 +1750,12 @@ export const esESMessages = {
     "glossary.builtin.financeDescription": "Estados financieros, métricas de valoración y mercados bursátiles.",
     "glossary.builtin.research": "Investigación académica",
     "glossary.builtin.researchDescription": "Métodos de investigación, estadística y artículos académicos.",
+    'glossary.builtin.hardware': "Hardware informático",
+    'glossary.builtin.hardwareDescription': "Procesadores, memoria, chips y circuitos",
+    'glossary.builtin.networking': "Redes y nube",
+    'glossary.builtin.networkingDescription': "Protocolos de red, infraestructura en la nube y despliegue",
+    'glossary.builtin.mathematics': "Matemáticas",
+    'glossary.builtin.mathematicsDescription': "Álgebra lineal, cálculo, probabilidad y optimización",
     "glossary.builtin.products": "Conservar nombres de productos",
     "glossary.builtin.productsDescription": "Conserva los nombres habituales de herramientas de desarrollo y productos de IA. Distingue mayúsculas.",
     "glossary.builtin.englishChinese": "Inglés → Chino simplificado",

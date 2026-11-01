@@ -50,8 +50,14 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         [normalizePath(resolve(root, 'src/core/config/interfaceAppearance.ts')), {names: ['interfaceSkinOptions', 'interfaceFontOptions', ...(fullOptions ? ['popupModuleOptions', 'popupQuickFeatureOptions'] : [])], appearance: true}],
     ]);
     if (fullOptions) {
+        targets.set(normalizePath(resolve(root, 'src/core/config/translationAppearance.ts')), {
+            names: ['TRANSLATION_STYLE_PRESETS', 'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES'],
+        });
         targets.set(normalizePath(resolve(root, 'src/core/harness/promptLocales.ts')), {names: ['HARNESS_TRANSLATED_PROMPTS']});
-        targets.set(normalizePath(resolve(root, 'src/core/config/catalog.ts')), {names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']});
+        targets.set(normalizePath(resolve(root, 'src/core/config/catalog.ts')), {
+            names: ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels', 'currentModelIds', 'cloudCredentialLabels'],
+        });
+        targets.set(normalizePath(resolve(root, 'src/core/config/featureServices.ts')), {names: ['featureServiceDefinitions']});
         targets.set(normalizePath(resolve(root, 'src/core/glossary/builtins.ts')), {names: ['BUILTIN_GLOSSARIES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/videoSubtitleAppearance.ts')), {names: ['VIDEO_SUBTITLE_SKINS']});
         targets.set(normalizePath(resolve(root, 'src/features/settings/model/chromeTranslationPreparation.ts')), {names: ['TEST_SAMPLES']});
@@ -77,15 +83,20 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         targets.set(normalizePath(resolve(root, 'src/features/image-translation/ocrLanguages.ts')), {names: ['IMAGE_OCR_LANGUAGE_PACKS']});
         targets.set(normalizePath(resolve(root, 'src/core/config/selectionPreview.ts')), {names: ['learningPreviewAnswers']});
         targets.set(normalizePath(resolve(root, 'src/ui/translationLoadingIndicator.ts')), {names: ['HOST_IMPORTANT_STYLES']});
+        targets.set(normalizePath(resolve(root, 'src/core/config/localTts.ts')), {names: ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']});
     }
     // 这些表已被完整设置页使用；其余表仍独立压缩，避免把可裁剪的数据重新引入。
     // 仅 standalone 合并，首次消费时同步还原并缓存 JSON 文本；每个声明独立解析，保持 query 模块的对象隔离。
     const groupedNames = new Set([
         'TRANSLATION_STYLE_PRESETS', 'interfaceSkinOptions', 'interfaceFontOptions',
+        'TRANSLATION_STYLE_LEGACY_GROUPS', 'TRANSLATION_STYLE_CATEGORIES',
         'HARNESS_TRANSLATED_PROMPTS', 'localizedTargetLanguageLabels', 'BUILTIN_GLOSSARIES',
+        'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels',
+        'currentModelIds', 'cloudCredentialLabels', 'featureServiceDefinitions',
         'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets',
         'translationLoadingStyleOptions', 'FREE_TRANSLATION_PROVIDERS', 'translationLanguageOptions',
         'PARTS', 'SENTENCE_HIGHLIGHT_STYLES', 'SELECTION_TTS_VOICE_OPTIONS',
+        'LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS',
     ]);
     const groupEnabled = enabled && fullOptions && groupStandalone;
     const groupValues: Json[] = [];

@@ -338,6 +338,8 @@
       "tests/imageOcrNormalization.test.ts",
       "tests/ocrDualViewDifferential.test.ts",
       "tests/imageTranslationRendering.test.ts",
+      "tests/imageMatteRepair.test.ts",
+      "tests/imageMattePage.test.ts",
       "tests/imageTranslationInpainting.test.ts",
       "tests/videoTranscriptionCacheClient.test.ts",
       "tests/xCaptionSource.test.ts",
@@ -527,7 +529,10 @@
       "tests/areaRuntimeComposition.test.ts",
       "tests/francRuntimeBuild.test.ts",
       "tests/longPageMockTransport.test.ts",
-      "tests/compactExtensionZip.test.ts"
+      "tests/compactExtensionZip.test.ts",
+      "tests/imageDetectionEvidence.test.ts",
+      "tests/imageDetectionSnapshot.test.ts",
+      "tests/imageMattePageOwnership.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -867,7 +872,8 @@
       "tests/aiMultiSegmentSettingsLifecycle.test.ts",
       "tests/translationSidepanel.test.ts",
       "tests/sidepanelBootstrap.test.ts",
-      "tests/sidepanelApp.test.ts"
+      "tests/sidepanelApp.test.ts",
+      "tests/imageMatteAvailability.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

@@ -8,10 +8,11 @@
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericInformation,numericProtection} from './mangaNumeric';
 import {createMangaViewWordBoundaryConsumer,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
+import type {ImageDetectionFrame} from './imageDetectionEvidence';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
-export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[]}
+export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[];imageDetectionFrames?:ImageDetectionFrame[]}
 
 export function findMangaBubbles(pixels:Uint8ClampedArray,width:number,height:number):Box[]{
     return findMangaBubbleLayout(pixels,width,height).recognition;

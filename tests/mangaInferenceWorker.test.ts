@@ -66,6 +66,35 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('漫画推理 Worker 消息处理器', () => {
+    it('普通图片可请求真实检测侧车，仅转移owned bit bytes，不把模型Float32概率张量转移',async()=>{
+        const bits=new Uint8Array([1,2]),originalProbability=new Float32Array([.9,.1]);
+        ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{pageWidth:4,pageHeight:4,x:0,y:0,width:4,height:4,bits}]});
+        const result=await send({requestId:44,type:'recognize',image:'image',imageDetectionEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        const [,transfer]=scope.postMessage.mock.calls.find(([message])=>message===result)!;
+        expect(transfer).toEqual([bits.buffer]);expect(transfer).not.toContain(originalProbability.buffer);
+    });
+    it('侧车重复buffer只转移一次，非ArrayBuffer不列transfer，正常消息仍不含新flag',async()=>{
+        const bits=new Uint8Array([1]),shared=new Uint8Array(new SharedArrayBuffer(1));
+        const geometry={pageWidth:1,pageHeight:1,x:0,y:0,width:1,height:1};
+        ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{...geometry,bits},{...geometry,bits},{...geometry,bits:shared}]});
+        const result=await send({requestId:45,type:'recognize',image:'image'});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([bits.buffer]);
+    });
+    it('不同侧车view共享同一ArrayBuffer时保留各自内容与边界，并且只转移底层buffer一次',async()=>{
+        const buffer=new ArrayBuffer(3),first=new Uint8Array(buffer,0,1),last=new Uint8Array(buffer,2,1);
+        first[0]=1;last[0]=2;
+        const geometry={pageWidth:2,pageHeight:1,y:0,width:1,height:1};
+        const frames=[{...geometry,x:0,bits:first},{...geometry,x:1,bits:last}],page={results:[],imageDetectionFrames:frames};
+        ocr.recognize.mockResolvedValue(page);
+        const result=await send({requestId:46,type:'recognize',image:'image',imageDetectionEvidence:true});
+        expect(result).toEqual({requestId:46,success:true,result:page});
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([buffer]);
+        expect(frames.map(frame=>({offset:frame.bits.byteOffset,length:frame.bits.byteLength,value:frame.bits[0]})))
+            .toEqual([{offset:0,length:1,value:1},{offset:2,length:1,value:2}]);
+        expect(ocr.recognize).toHaveBeenCalledOnce();
+    });
     it('拒绝空消息、不安全 ID 和未知操作，合法消息仍能执行', async () => {
         for (const data of [undefined, null, {}, {requestId: NaN, type: 'prepare-ocr'}, {requestId: 1.5, type: 'prepare-ocr'}, {requestId: Number.MAX_SAFE_INTEGER + 1, type: 'prepare-ocr'}, {requestId: '1', type: 'prepare-ocr'}, {requestId: 1, type: 'unknown'}]) {
             scope.onmessage!({data} as MessageEvent<MangaInferenceMessage>);

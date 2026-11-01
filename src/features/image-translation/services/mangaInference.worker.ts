@@ -21,7 +21,20 @@ export function startMangaInferenceWorker(): void {
         return result;
     }) as typeof create;
     const scope = self as unknown as {postMessage(message: MangaInferenceResponse, transfer: Transferable[]): void};
-    const post = (response: MangaInferenceResponse) => scope.postMessage(response, response.result instanceof Float32Array && response.result.buffer instanceof ArrayBuffer ? [response.result.buffer] : []);
+    const post = (response: MangaInferenceResponse) => {
+        const transfer:Transferable[]=[],result=response.result;
+        if(result instanceof Float32Array){if(result.buffer instanceof ArrayBuffer)transfer.push(result.buffer);}
+        else {
+            const frames=result?.imageDetectionFrames;
+            if(frames?.length){
+                const seen=new Set<ArrayBuffer>();
+                for(const frame of frames)if(frame.bits.buffer instanceof ArrayBuffer&&!seen.has(frame.bits.buffer)){
+                    seen.add(frame.bits.buffer);transfer.push(frame.bits.buffer);
+                }
+            }
+        }
+        scope.postMessage(response,transfer);
+    };
     async function handle(message: MangaInferenceMessage) {
         const requestId = message.requestId;
         try {
@@ -32,7 +45,7 @@ export function startMangaInferenceWorker(): void {
             else if (message.type === 'dispose-inpaint') { await painter?.release(); painter = undefined; }
             else if (message.type === 'prepare-ocr' || message.type === 'recognize') {
                 ocr ??= await createBrowserMangaOcr(undefined, progress);
-                if (message.type === 'recognize') { progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box'}); }
+                if (message.type === 'recognize') { progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box',...(message.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{})}); }
             } else {
                 painter ??= await createBrowserMangaInpainter(undefined, (percent, initializing) => progress(initializing ? 'initializing' : 'preparing', percent));
                 if (message.type === 'inpaint') { progress('recognizing'); result = await painter.run(message.patch!); }

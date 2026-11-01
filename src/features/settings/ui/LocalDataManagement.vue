@@ -1,6 +1,6 @@
 <!--
 @file src/features/settings/ui/LocalDataManagement.vue
-文件职责：在备份与恢复页提供唯一的 FluentRead 数据迁移入口。
+文件职责：在备份与恢复页提供唯一的 FluentRead 数据迁移入口，以明确的导出选项和简短的恢复摘要引导操作，完整差异按需展开。
 主要内容：将设置、单词本和模型用量导出为一份版本化备份，确认期随页面活跃归属失效；已接受并开始读取的导出继续下载，迟到提示与焦点归还仍核对归属。文件导入和粘贴 JSON 的输入、预览、确认及关闭事件绑定本次活跃对话框，旧确认不能接受新预览；已确认导入继续完成各领域写入并消费旧预览，只允许本次打开的对话框关闭回调清理和归还焦点，避免迟到结果影响新视图。
 模块边界：组件只编排 runtime 协议和文件交互；各领域仓库继续拥有校验与合并规则，Anki 与清空等单词本操作留在单词本页。
 -->
@@ -36,6 +36,7 @@
       @update:model-value="restoreSourceActions.setVisible"
       title="从备份恢复"
       width="min(600px, calc(100vw - 32px))"
+      class="local-data-restore-dialog"
       data-testid="restore-source-dialog"
       :close-on-click-modal="!busy"
       :close-on-press-escape="!busy"
@@ -43,13 +44,14 @@
       @closed="clearRestoreSource"
     >
       <div class="restore-file-choice">
+        <UiIcon name="history" :size="28" />
         <div>
           <strong>选择备份文件</strong>
           <small>{{ t('settings.backup.restoreHint') }}</small>
         </div>
         <el-button type="primary" :disabled="busy" @click="restoreSourceActions.chooseFile">选择文件</el-button>
       </div>
-      <details class="legacy-paste">
+      <details class="legacy-paste fr-dialog-disclosure">
         <summary>粘贴旧版配置 JSON</summary>
         <p>如果你以前使用“导出配置”复制了 JSON，可以直接粘贴在这里</p>
         <el-input
@@ -70,7 +72,8 @@
       :model-value="importPreviewVisible"
       @update:model-value="importPreviewActions.setVisible"
       title="导入前确认"
-      width="min(720px, calc(100vw - 32px))"
+      width="min(600px, calc(100vw - 32px))"
+      class="local-data-import-dialog"
       destroy-on-close
       :close-on-click-modal="!busy"
       :close-on-press-escape="!busy"
@@ -105,14 +108,14 @@
           </article>
         </div>
 
-        <section v-if="importSummary.configIncluded" class="config-import-preview" aria-labelledby="migration-config-preview-title">
-          <header>
+        <details v-if="importSummary.configIncluded" class="config-import-preview fr-dialog-disclosure" aria-labelledby="migration-config-preview-title">
+          <summary>
             <div>
               <span>设置差异</span>
               <strong id="migration-config-preview-title">导入后会发生什么</strong>
             </div>
             <b>{{ configChangeCount }} 项需确认</b>
-          </header>
+          </summary>
           <div v-if="configPreviewDiff.groups.length || credentialPreviewChanges.length" class="config-change-list">
             <section v-for="group in configPreviewDiff.groups" :key="group.id" class="config-change-group">
               <h4>{{ group.label }}<span>{{ group.changes.length }}</span></h4>
@@ -132,7 +135,7 @@
             </section>
           </div>
           <p v-else class="config-same">普通设置和凭据与当前状态相同</p>
-        </section>
+        </details>
 
         <p class="import-boundary">
           {{ importBoundary }}
@@ -150,6 +153,7 @@
 import {downloadTextFile as downloadFile} from '@/src/shared/dom/downloadTextFile';
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import {computed, nextTick, ref, shallowRef, useTemplateRef} from 'vue';
+import {confirmExport} from '@/src/ui/confirmExport';
 import {Download, Upload} from '@element-plus/icons-vue';
 import {ElMessage, ElMessageBox} from 'element-plus';
 import browser from 'webextension-polyfill';
@@ -316,21 +320,9 @@ async function exportCompleteBackup(event?: MouseEvent): Promise<void> {
 }
 
 async function chooseBackupContext(): Promise<boolean | null> {
-  try {
-    await ElMessageBox.confirm(
-      '网页片段、页面标题和来源网址可能包含浏览隐私，默认不纳入单词收藏的备份',
-      '是否包含单词上下文？',
-      {
-        confirmButtonText: '不包含并导出',
-        cancelButtonText: '包含并导出',
-        distinguishCancelAndClose: true,
-        type: 'warning',
-      },
-    );
-    return false;
-  } catch (action) {
-    return action === 'cancel' ? true : null;
-  }
+  return confirmExport({title: translateLegacy('导出备份'), description: t('settings.backup.fileDescription'),
+    option: t('settings.backup.includeContext'), cancel: t('common.cancel'),
+    optionDescription: translateLegacy('网页片段、页面标题和来源网址可能包含浏览隐私，默认不纳入单词收藏的备份')});
 }
 
 function openRestoreSource(event: MouseEvent): void {
@@ -553,14 +545,16 @@ function formatFileSize(size: number): string {
 .transfer-icon { display: grid; flex: none; width: 36px; height: 36px; place-items: center; border-radius: 11px; color: var(--brand-strong); background: var(--brand-soft); font-size: 16px; font-weight: 800; }
 .transfer-copy { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
 .transfer-copy strong { color: var(--ink); font-size: 12.5px; }
-.transfer-copy small, .import-boundary { color: var(--muted); font-size: 10.5px; line-height: 1.55; }
+.transfer-copy small { color: var(--muted); font-size: 10.5px; line-height: 1.55; }
+.import-boundary { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .transfer-actions { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 7px; }
 .transfer-actions :deep(.el-button) { margin-left: 0; }
 .transfer-actions :deep(svg) { width: 14px; margin-right: 5px; }
-.restore-file-choice { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
+.restore-file-choice { display: flex; align-items: center; flex-direction: column; gap: 14px; padding: 24px 18px; border: 1px dashed var(--line); border-radius: 12px; background: var(--surface-soft); text-align: center; }
+.restore-file-choice > .fr-ui-icon { color: var(--brand); }
 .restore-file-choice > div { display: flex; min-width: 0; flex-direction: column; gap: 4px; }
-.restore-file-choice strong { color: var(--ink); font-size: 12px; }
-.restore-file-choice small, .legacy-paste p { color: var(--muted); font-size: 10px; line-height: 1.55; }
+.restore-file-choice strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+.restore-file-choice small, .legacy-paste p { color: var(--muted); font-size: 12px; line-height: 1.7; }
 .legacy-paste { margin-top: 12px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); }
 .legacy-paste summary { padding: 12px 14px; color: var(--ink); cursor: pointer; font-size: 10.5px; font-weight: 700; }
 .legacy-paste p { margin: 0; padding: 0 14px 10px; }
@@ -569,36 +563,35 @@ function formatFileSize(size: number): string {
 .import-file-summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
 .import-file-summary > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
 .import-file-summary span, .import-file-summary small { color: var(--muted); font-size: 10px; }
-.import-file-summary strong { overflow: hidden; color: var(--ink); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.import-section-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.import-section-grid article { display: flex; min-height: 108px; padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface); flex-direction: column; }
+.import-file-summary strong { color: var(--ink); font-size: 13px; overflow-wrap: anywhere; }
+.import-section-grid { display: grid; gap: 0; margin-top: 18px; }
+.import-section-grid article { display: grid; grid-template-columns: 110px minmax(0, 1fr); column-gap: 18px; row-gap: 4px; padding: 14px 0; border-bottom: 1px solid var(--line); background: var(--surface); }
 .import-section-grid article.muted { opacity: .55; }
-.import-section-grid span { color: var(--muted); font-size: 9.5px; font-weight: 700; }
-.import-section-grid strong { margin: 8px 0 5px; color: var(--ink); font-size: 14px; }
-.import-section-grid small { color: var(--muted); font-size: 9px; line-height: 1.45; }
+.import-section-grid span { color: var(--muted); font-size: 13px; }
+.import-section-grid strong { color: var(--ink); font-size: 13px; font-weight: 600; }
+.import-section-grid small { grid-column: 2; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .import-boundary { margin: 12px 2px 0; }
 .config-import-preview { margin-top: 14px; padding: 13px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
-.config-import-preview > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.config-import-preview > header > div { display: flex; flex-direction: column; gap: 3px; }
-.config-import-preview > header span { color: var(--muted); font-size: 9.5px; }
-.config-import-preview > header strong { color: var(--ink); font-size: 12px; }
-.config-import-preview > header b { padding: 5px 9px; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 9.5px; }
+.config-import-preview > summary > div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.config-import-preview > summary span { display: none; }
+.config-import-preview > summary strong { color: var(--ink); font-size: 12px; font-weight: 500; }
+.config-import-preview > summary b { margin-inline-start: auto; color: var(--muted); font-size: 12px; font-weight: 400; }
 .config-change-list { display: grid; gap: 11px; max-height: 34vh; margin-top: 12px; padding-right: 3px; overflow-y: auto; }
 .config-change-group { overflow: hidden; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
-.config-change-group h4 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 9px 10px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 10.5px; }
+.config-change-group h4 { display: flex; align-items: center; gap: 6px; margin: 0; padding: 11px 12px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 13px; }
 .config-change-group h4 span { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 8.5px; }
 .config-change-group article { display: grid; grid-template-columns: minmax(110px, .65fr) repeat(2, minmax(0, 1fr)); gap: 10px; padding: 9px 10px; border-bottom: 1px solid var(--line); }
 .config-change-group article:last-child { border-bottom: 0; }
-.config-change-group article > strong { align-self: center; color: var(--ink); font-size: 9.5px; }
+.config-change-group article > strong { align-self: center; color: var(--ink); font-size: 12px; }
 .config-change-group article div { min-width: 0; }
-.config-change-group article span { color: var(--muted); font-size: 8.5px; }
-.config-change-group article p { margin: 2px 0 0; overflow-wrap: anywhere; color: var(--muted); font-size: 9px; line-height: 1.4; }
+.config-change-group article span { color: var(--muted); font-size: 11px; }
+.config-change-group article p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .config-same { margin: 12px 0 0; color: var(--muted); font-size: 10px; }
 
 @media (max-width: 820px) {
   .transfer-row { align-items: flex-start; flex-direction: column; }
   .transfer-actions { width: 100%; }
-  .restore-file-choice { align-items: flex-start; flex-direction: column; }
+  .restore-file-choice { align-items: center; }
   .import-section-grid { grid-template-columns: 1fr; }
   .config-change-group article { grid-template-columns: 1fr; gap: 5px; }
 }

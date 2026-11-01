@@ -63,6 +63,10 @@ With model vision enabled, edit or restore the recognition prompt to preserve ta
 
 </details>
 
+## Recover from an error
+
+The card highlights the next action: prepare a missing OCR language pack, reselect an area with no recognized text, check service settings, or retry using the same capture. **Other actions** keeps the alternative controls available. Expand **View details** for the original error. Closing the card cancels the pending request.
+
 ## Related guides
 
 - [Image translation](/en/guide/image-translation)

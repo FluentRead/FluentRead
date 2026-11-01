@@ -20,7 +20,7 @@ Save the settings and learning data you need before changing browsers, moving de
 
 Full backups are unencrypted JSON and can contain API keys, service credentials, saved source text, and source information. Keep them private and do not attach them to public reports. Older configuration JSON and backups remain importable; missing newer settings are filled using compatibility rules.
 
-Leaving before export confirmation cancels that confirmation; file generation already started still finishes downloading. Leaving while an import file is being read requires selecting it again on return. A confirmed restoration continues to completion.
+The **Include vocabulary context** option is off by default. Select it if needed, then choose **Export backup**. **Cancel** and closing the dialog export nothing. Leaving before confirmation cancels that confirmation; file generation already started still finishes downloading. Leaving while an import file is being read requires selecting it again on return. A confirmed restoration continues to completion. The restore preview starts with a short data summary; expand the settings differences when needed.
 
 For learning cards alone, you can also [export to Anki](/en/guide/vocabulary-book#data-and-migration) from the learning center.
 

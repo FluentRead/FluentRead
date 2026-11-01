@@ -218,12 +218,29 @@ describe('图片翻译流程优化',()=>{
         expect(ui.button.parentElement!.parentElement).toBe(ui.element);ui.dispose();
     });
 
+    it.each([
+        {options: {prepare: true, modelSettings: true, serviceSettings: true}, primary: 'fr-image-prepare'},
+        {options: {modelSettings: true, serviceSettings: true}, primary: 'fr-image-model-settings'},
+        {options: {serviceSettings: true}, primary: 'fr-image-service-settings'},
+        {options: {}, primary: 'fluent-read-image-translation-button'},
+    ])('只突出当前恢复操作 $primary，其余动作按需展开并在恢复加载后归位', ({options, primary}) => {
+        const {document}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+        const ui=createImageControls({onAction(){},onPrepare(){}});
+        ui.update('error','需要恢复',options);
+        const row=ui.feedback.querySelector('.fr-image-actions')!,more=ui.feedback.querySelector<HTMLDetailsElement>('.fr-image-more')!;
+        const visible=Array.from(row.children).filter(n=>n.tagName==='BUTTON'&&!(n as HTMLButtonElement).hidden);
+        expect(visible.map(n=>n.className)).toEqual([primary]);expect(more.open).toBe(false);
+        more.open=true;ui.refreshLanguage();expect(more.open).toBe(true);
+        ui.update('loading','正在识别');expect(more.hidden).toBe(true);expect(ui.button.parentElement).toBe(row);
+        expect(row.parentElement).toBe(ui.element);expect(row.firstElementChild).toBe(ui.button);ui.dispose();
+    });
+
     it('漫画错误恢复保留详情、键盘和设置入口，拒绝合成动作且不触发宿主翻页快捷键', () => {
         const {document,window} = parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
         const onAction=vi.fn(),onDismiss=vi.fn(),onSettings=vi.fn();
         const ui=createImageControls({onAction,onDismiss,onSettings,onPrepare(){}});document.body.append(ui.feedback,ui.element);
         ui.update('error','翻译服务暂时不可用',{quiet:true,modelSettings:true,serviceSettings:true,errorDetails:'精确错误详情'});
-        const details=ui.feedback.querySelector<HTMLDetailsElement>('details')!;
+        const details=ui.feedback.querySelector<HTMLDetailsElement>('.fr-image-error-details')!;
         expect(details.hidden).toBe(false);expect(details.textContent).toContain('精确错误详情');expect(details.open).toBe(false);
         const hostInput=vi.fn();
         for(const type of ['click','pointerdown','keydown','keyup','wheel']) {
@@ -247,12 +264,12 @@ describe('图片翻译流程优化',()=>{
         const action=vi.fn(),ui=createImageControls({onAction:action,onPrepare(){}});
         const longDetail=Array.from({length:80},(_,index)=>`Failure ${index}: the source request could not be completed.`).join('\n');
         ui.update('error','翻译服务暂时不可用',{quiet,serviceSettings:true,errorDetails:longDetail});
-        const details=ui.feedback.querySelector<HTMLDetailsElement>('details')!,row=ui.button.parentElement!;
+        const details=ui.feedback.querySelector<HTMLDetailsElement>('.fr-image-error-details')!,row=ui.feedback.querySelector('.fr-image-actions')!;
         const recoveryBeforeDetails=()=>expect(Array.from(ui.feedback.children).indexOf(row))
             .toBeLessThan(Array.from(ui.feedback.children).indexOf(details));
         recoveryBeforeDetails();details.open=true;ui.refreshLanguage();
         expect(details.open).toBe(true);expect(details.querySelector('p')!.textContent).toBe(longDetail);
-        expect(ui.button.parentElement).toBe(row);expect(ui.dismiss.parentElement).toBe(row);expect(row.parentElement).toBe(ui.feedback);
+        expect(ui.button.closest('.fr-image-more')).not.toBeNull();expect(ui.dismiss.parentElement).toBe(ui.button.parentElement);expect(row.parentElement).toBe(ui.feedback);
         recoveryBeforeDetails();
         ui.update('loading','正在翻译文字…',{quiet});expect(details.hidden).toBe(true);expect(details.open).toBe(false);
         expect(row.parentElement).toBe(ui.element);
@@ -268,7 +285,7 @@ describe('图片翻译流程优化',()=>{
         const text=ui.status.querySelector<HTMLSpanElement>('span:last-child')!;
         expect(text.textContent).toBe(message);expect(text.title).toBe(message);
         language='en-US';ui.refreshLanguage();expect(text.textContent).toBe(translateLegacyText(message,language));expect(text.title).toBe(text.textContent);
-        expect(ui.feedback.querySelector('details')!.textContent).toContain('原始错误详情');
+        expect(ui.feedback.querySelector('.fr-image-error-details')!.textContent).toContain('原始错误详情');
         ui.update('loading','正在识别图片文字…',{quiet:true});expect(text.title).toBe('');ui.dispose();
     });
 
@@ -434,10 +451,10 @@ describe('图片翻译流程优化',()=>{
         expect(ui.spinner.getAttribute('aria-hidden')).toBe('true');
         ui.update('loading','正在识别文字',{animations:false});expect(ui.spinner.dataset.animated).toBe('true');
         click(ui.button,false);expect(onAction).not.toHaveBeenCalled();click(ui.button,true);expect(onAction).toHaveBeenCalledOnce();
-        ui.update('error','首次使用需准备识别语言包，下载后自动继续',{prepare:true});const buttons=ui.feedback.querySelectorAll('button');expect(buttons).toHaveLength(6);expect(buttons[1].hidden).toBe(false);expect(buttons[1].textContent).toBe('下载语言包并翻译');expect(buttons[1].className).toBe('fr-image-prepare');expect(buttons[0].textContent).toBe('关闭');expect(ui.element.dataset.preparation).toBe('true');expect(ui.feedback.querySelector('.fr-image-actions')).not.toBeNull();click(buttons[1],true);expect(onPrepare).toHaveBeenCalledOnce();click(buttons[0],true);expect(onDismiss).toHaveBeenCalledOnce();
+        ui.update('error','首次使用需准备识别语言包，下载后自动继续',{prepare:true});const buttons=ui.feedback.querySelectorAll('button');expect(buttons).toHaveLength(6);const prepare=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-prepare')!;expect(prepare.hidden).toBe(false);expect(prepare.textContent).toBe('下载语言包并翻译');expect(ui.button.textContent).toBe('关闭');expect(ui.element.dataset.preparation).toBe('true');expect(ui.feedback.querySelector('.fr-image-actions')).not.toBeNull();click(prepare,true);expect(onPrepare).toHaveBeenCalledOnce();click(ui.button,true);expect(onDismiss).toHaveBeenCalledOnce();
         expect(ui.feedback.hidden).toBe(false);
         ui.update('error','图片翻译失败：网络错误');expect(ui.dismiss.hidden).toBe(false);click(ui.dismiss,true);expect(onDismiss).toHaveBeenCalledTimes(2);
-        ui.setLines([{text:'完整译文 <script>不执行</script>'}]);ui.update('translated','已翻译');expect(ui.status.hidden).toBe(true);click(buttons[2],true);expect(buttons[2].getAttribute('aria-expanded')).toBe('true');expect(ui.element.querySelector('script')).toBeNull();expect(onInspect).toHaveBeenCalledOnce();
+        ui.setLines([{text:'完整译文 <script>不执行</script>'}]);ui.update('translated','已翻译');expect(ui.status.hidden).toBe(true);const inspect=ui.element.querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;click(inspect,true);expect(inspect.getAttribute('aria-expanded')).toBe('true');expect(ui.element.querySelector('script')).toBeNull();expect(onInspect).toHaveBeenCalledOnce();
         expect(ui.feedback.hidden).toBe(true);
         ui.element.dispatchEvent(new window.Event('wheel',{bubbles:true}));ui.update('idle','翻译图片');ui.setLines([]);ui.dispose();click(ui.button,true);expect(onAction).toHaveBeenCalledOnce();expect(ui.element.isConnected).toBe(false);
         const optional=createImageControls({onAction,onPrepare});optional.setLines([{text:'x'}]);optional.update('translated','完成');click(optional.element.querySelectorAll('button')[2],true);optional.dispose();
@@ -703,7 +720,7 @@ describe('图片控件界面语言', () => {
         const controls = createImageControls({onAction() {}, onPrepare() {}, translate: source => translateLegacyText(source, language)});
         controls.update('error', '没有识别到圈选区域文字', {prepare: true});
         expect(controls.status.textContent).toBe('No text was recognized in the selected region.');
-        expect(controls.feedback.querySelectorAll('button')[1].textContent).toBe('Download language pack and translate');
+        expect(controls.feedback.querySelector('.fr-image-prepare')!.textContent).toBe('Download language pack and translate');
         controls.setLines([{text: '原文'}]);
         controls.update('translated', '翻译完成');
         const details = controls.element.querySelector('pre')!;

@@ -32,7 +32,7 @@ Preview runs locally even with the master switch off; actual translation respect
 
 ## Import, export, and backup
 
-Choose **Import glossary** for a CSV, TSV, or JSON file, or paste its contents. Check the preview before confirming. Import creates a new glossary without replacing existing ones. Files support UTF-8, BOM-marked UTF-16, and common GB18030 encodings.
+Open **Import glossaries**, then choose **Select file** or **Paste text**. Expand **File format** to change CSV, TSV, or JSON. Review the first three entries and import counts; expand **View all entries** for the rest, then choose **Confirm import**. Each method keeps its own draft when you switch. If saving fails, the dialog shows the error and keeps your input for another attempt. Import creates a new glossary without replacing existing ones. Files support UTF-8, BOM-marked UTF-16, and common GB18030 encodings.
 
 Export in **Glossary settings**. JSON retains all settings; CSV and TSV suit spreadsheet editing. Configuration backups also include glossaries.
 

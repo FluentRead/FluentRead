@@ -299,7 +299,7 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect(book.panel.actionBusy).toBe(true);
     await book.panel.setMastered(book.entry); const duplicate = book.panel[action]();
     expect(book.messages.filter(message=>message.action && !['list','listUndo'].includes(String(message.action)))).toEqual([]);
-    // close 和 cancel 对 Anki 含义不同，用 close 代表用户取消导出。
+    // 关闭与取消都放弃导出，不再把取消当作另一种导出选项。
     confirmation.resolve(Promise.reject('close')); await pending; await duplicate;
     expect(book.panel.actionBusy).toBe(false); expect(book.stored()).toHaveLength(1);
   });
@@ -455,7 +455,11 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect(book.panel.actionBusy).toBe(false); expect(attempts).toBe(2);
   });
   it.each([false,true])('exports Anki with explanation and the chosen context privacy (%s)', async includeContext => {
-    const book = await mountBook(async () => {if (includeContext) throw 'cancel';});
+    const book = await mountBook(async message => {
+      const option = (message as any).children[1].children[0];
+      expect(option.props.checked).toBe(false);
+      option.props.onChange({target: {checked: includeContext}});
+    });
     await book.panel.exportAnki();
     expect(book.panel.actionBusy).toBe(false); expect(book.download).toHaveBeenCalledTimes(1);
     const body = await (book.download.mock.calls[0][0] as Blob).text();
@@ -464,6 +468,13 @@ describe('VocabularyBook asynchronous action ownership', () => {
     expect(body.includes('We study art.')).toBe(includeContext);
     expect(body.includes('https://example.test/private-reading')).toBe(includeContext);
     expect(book.messages.find(message => message.action === 'exportData')?.options).toEqual({includePrivateContext:includeContext});
+  });
+  it.each(['cancel', 'close'])('does not export Anki when the user chooses %s', async action => {
+    const book = await mountBook(async () => {throw action;});
+    await book.panel.exportAnki();
+    expect(book.download).not.toHaveBeenCalled();
+    expect(book.messages.some(message => message.action === 'exportData')).toBe(false);
+    expect(book.panel.actionBusy).toBe(false);
   });
   it('reserves a large import during confirmation and does not read it on cancellation', async () => {
     const confirmation = deferred<unknown>(); const book = await mountBook(() => confirmation.promise);

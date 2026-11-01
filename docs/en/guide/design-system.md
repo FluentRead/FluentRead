@@ -45,6 +45,7 @@ Open the address shown in the terminal, usually `http://127.0.0.1:6006`. Example
 - Reuse `SettingsGroup`, `SettingsItem`, and `SettingsDisclosure` from `src/features/settings/ui/components/`. Use shared colors and spacing from `src/ui/styles/tokens.css`.
 - Keep common settings expanded. Secondary settings can collapse, with setup and failure states visible in the summary. Retain drafts when collapsed; callers still manage requests and saving.
 - Keep titles and explanations together, with one primary button per action area. Put technical details in help.
+- Task dialogs and confirmations share `src/ui/styles/dialogs.css`: scroll the content inside the window, keep footer actions reachable, and reveal formats or full differences on demand. Cancel always cancels; it never submits an alternative choice.
 - Use `settings-controls.css` and an `fr-settings-controls` container for standalone settings controls to retain switch sizes, touch areas, and keyboard focus styles.
 - Check dark themes, narrow screens, long text, keyboard focus, and drafts after reopening. Allow primary text to wrap and avoid distracting animations or filters.
 

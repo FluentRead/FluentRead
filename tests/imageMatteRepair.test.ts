@@ -26,6 +26,29 @@ function composite(bg:Color,fg:Color,t:number,canvas=false):Color {
 }
 afterEach(()=>vi.unstubAllGlobals());
 
+describe('真实Canvas半值读回的共同颜色域',()=>{
+    // 字面值来自固定两景首轮Chrome ImageData捕获；作者PNG只作独立对照。
+    // Native raw SHA b307d8c9.../b1590808...，不在CI读取外部证据文件。
+    const samples=[
+        {name:'Bridge Latin',bg:[255,255,248,224],fg:[18,28,34,255],native:[142,148,147,238],authored:[143,148,147,238]},
+        {name:'Bridge Japanese',bg:[248,255,250,208],fg:[18,28,34,255],native:[178,187,185,220],authored:[179,187,185,220]},
+        {name:'Tidal caption',bg:[48,104,124,224],fg:[255,255,255,255],native:[150,178,187,238],authored:[150,178,188,238]},
+    ] as const;
+    it.each(samples)('$name的作者值与实际相邻读回均保留同一背景前景',sample=>{
+        for(const pixel of [sample.authored,sample.native]){
+            const p=fixture(sample.bg,sample.fg);dot(p,23,20,pixel);const before=p.slice();
+            const plan=planImageMatteRepair(p,48,48,box);
+            expect(plan).toBeDefined();expect(plan!.background).toEqual(sample.bg);
+            expect(value(plan!,23,20)).toBe(1);expect(p).toEqual(before);
+        }
+    });
+    it('不在精确半值逆像内的色差仍拒绝，不增加通用逐通道容差',()=>{
+        const sample=samples[0],p=fixture(sample.bg,sample.fg);
+        dot(p,23,20,[141,148,147,238]);const before=p.slice();
+        expect(planImageMatteRepair(p,48,48,box)).toBeUndefined();expect(p).toEqual(before);
+    });
+});
+
 describe('共同foreground端点的有界AA裙边',()=>{
     it.each([.01,.9])('实际SDK量化会保留的coarse p=%s平台不能凭dense检测吞掉灰牌',probability=>{
         const p=page([255,255,255,255],64,48),source={x0:18,y0:14,x1:46,y1:34};

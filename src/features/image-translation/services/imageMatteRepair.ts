@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageMatteRepair.ts
  * 文件职责：在原文字框的八像素观察域内证明一致RGBA静区、完整墨迹与外部图案的几何分离。
- * 主要内容：最多八个实际像素色仅提出背景候选，逐像素真实检测支持、完整静区闭环及整项共享的背景与墨色端点才允许通过；同alpha但RGB不同的AA仍属墨迹；颜色作者字节和Canvas逆量化域采用同一下闭上开舍入规则，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；缺证据、穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
+ * 主要内容：最多八个实际像素色仅提出背景候选，逐像素真实检测支持、完整静区闭环及整项共享的背景与墨色端点才允许通过；同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；缺证据、穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
  * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；实际同帧DB支持由调用方验证并提供查询，不能从本mask反造支持。结果不证明语义分割；调用方须在首次原图上预付共享预算、完成全页冲突和完整译字预检后才应用mask，不能覆盖OCR框或扩大原文保护权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -38,11 +38,12 @@ function packed(pixels:Uint8ClampedArray,offset:number):number {
     return (pixels[offset]|pixels[offset+1]<<8|pixels[offset+2]<<16|pixels[offset+3]<<24)>>>0;
 }
 
-/** 双重Canvas量化的整数逆像；round-half-up的上界严格排除，原作者字节也在候选域内。 */
+/** Canvas量化的整数逆像；半值读回可落在相邻字节，原作者字节也在候选域内。 */
 function sourceChannelRange(color:number,alpha:number):number {
     if(alpha===255)return color|(color<<8);
     const first=Math.max(0,Math.ceil((color-.5)*alpha/255));
-    const last=Math.min(alpha,Math.ceil((color+.5)*alpha/255)-1);
+    // 仅数学上恰为半整数的读回边界新增一个可能值，不能扩成逐通道±1容差。
+    const last=Math.min(alpha,Math.floor((color+.5)*alpha/255));
     if(first>last)return color|(color<<8);
     const low=Math.max(0,Math.min(color,Math.ceil((first-.5)*255/alpha)));
     const high=Math.min(255,Math.max(color,Math.ceil((last+.5)*255/alpha)-1));

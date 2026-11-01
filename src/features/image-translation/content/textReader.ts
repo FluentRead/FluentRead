@@ -1,13 +1,13 @@
 /**
  * @file src/features/image-translation/content/textReader.ts
  * 文件职责：提供图片翻译的可访问文字阅读面板，让小图与长译文也能完整阅读、核对原文和复制。
- * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落和数字保护导致未绘制的提示，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；面板固定在视口内并继承扩展自己的深浅色变量。
+ * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落和保留原文导致未绘制的提示，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；面板固定在视口内并继承扩展自己的深浅色变量。
  * 模块边界：仅操作所属 Shadow DOM，不发送识别或翻译请求、不访问配置；宿主定位与生命周期由图片 runtime 管理，调用者提供本次结果和本地化函数。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 export interface ImageReaderLine {text: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true}
 export const IMAGE_READER_CSS = `
-.fr-image-reader {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#737c8f;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;position:fixed;right:16px;top:16px;width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 12px 40px #17203326;pointer-events:auto;z-index:3;color:var(--fr-image-ink);font:13px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.fr-image-reader {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#667085;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;position:fixed;right:16px;top:16px;width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 12px 40px #17203326;pointer-events:auto;z-index:3;color:var(--fr-image-ink);font:13px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .fr-image-reader[hidden] {display:none!important;}
 .fr-image-reader[data-theme=dark] {--fr-image-ink:#ece5ef;--fr-image-muted:#c1b1c5;--fr-image-line:#49404c;--fr-image-surface:#2b2630;--fr-image-brand-soft:#413548;--fr-image-brand:#ffa7ca;}
 .fr-image-reader header {display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;padding:10px 12px;border-bottom:1px solid var(--fr-image-line);}
@@ -90,7 +90,7 @@ export function createImageTextReader(localize: (source: string) => string, onCl
             if (line.renderSkipped) {
                 const note = document.createElement('p');
                 note.className = 'fr-image-reader-note';
-                note.setAttribute('data-message', '为保护数字，此译文未绘制到图片');
+                note.setAttribute('data-message', '为保留原文，此译文未绘制到图片');
                 article.append(note);
             }
             body.append(article);

@@ -35,7 +35,7 @@
             <pre v-if="compare && line.sourceText !== undefined && line.sourceText !== line.text" class="fr-manga-reading-source" dir="auto">{{ line.sourceText }}</pre>
             <pre dir="auto">{{ line.text }}</pre>
             <p v-if="line.numericUncertain" class="fr-manga-reading-context">{{ t('数字识别可能有误，请对照原图') }}</p>
-            <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保护数字，此译文未绘制到图片') }}</p>
+            <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保留原文，此译文未绘制到图片') }}</p>
           </article>
         </div>
         <footer><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t('复制全部') }}</button></footer>

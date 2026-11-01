@@ -37,7 +37,7 @@ describe('图片文字独立阅读面板', () => {
     it('数字附近无法绘制时在对应译文显示原因，复制仍只包含文字', async () => {
         reader.setLines([{sourceText:'Close',text:'近',renderSkipped:true},{sourceText:'90%',text:'90%'}]);
         reader.open();
-        expect(body().querySelector('.fr-image-reader-note')?.textContent).toBe('为保护数字，此译文未绘制到图片');
+        expect(body().querySelector('.fr-image-reader-note')?.textContent).toBe('为保留原文，此译文未绘制到图片');
         expect(body().querySelectorAll('.fr-image-reader-note')).toHaveLength(1);
         event(copy());await Promise.resolve();
         expect(writeText).toHaveBeenLastCalledWith('近\n\n90%');

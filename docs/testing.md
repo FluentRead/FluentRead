@@ -24,6 +24,22 @@ node scripts/testing/run-sidepanel-translation-test.cjs \
 
 版本标签触发的安装包发布、全部交付目标、完整测试门禁及手动演练见 [自动发布安装包](./maintainers/releases.md)。发布脚本的 Node 夹具由 `processRegression.test.ts` 登记，覆盖版本一致性、缺失/损坏产物、附件摘要、草稿恢复和公开 Release 禁止覆盖等行为。
 
+## 编译与构建缓存
+
+本地开发推荐 Node 22.12 以上的 22.x 版本，与 CI 的 Node 22 保持一致。切换后分别检查 `node --version` 和 `pnpm exec node --version`，避免交互式 shell 与 pnpm 的 PATH 使用不同的 Node。旧 Node 20 下 WXT 的 `ora` → `cli-spinners` 动画依赖会产生 JSON 模块实验性告警；不通过 `--no-warnings` 隐藏它。
+
+`pnpm compile` 继续校验固定语言资源并检查完整的 Vue/TypeScript 项目，增量信息写入各工作树自己的 `.wxt/cache/extension.tsbuildinfo`，不缩小 include 范围或放宽诊断。可以删除这个文件强制重建缓存，或运行 `pnpm exec vue-tsc --noEmit` 单独比较编译器的非增量耗时；类型错误仍须使本次命令失败。其他集成的类型检查不共用此缓存路径。
+
+完整项目在 Node 默认约 4 GiB 旧生代预算下可能发生 OOM。编译入口在可见总内存至少 16 GiB、且 Node 报告的内存约束没有更小时，只为编译子进程默认设置 6 GiB 旧生代上限；显式 `NODE_OPTIONS` 堆设置保持原值。小内存或已知受限环境不自动提高预算，可见总量不保证当前空闲量或隐藏容器限制。资源锁、信号转发与真实退出码仍由原 runner 处理；CI 在调用前继续执行原有可用内存门禁。
+
+独立用户脚本的大型静态资源压缩结果存于 `.wxt/cache/userscript-gzip/`。原文、压缩实现、worker 或锁文件变化均重新压缩；读取时核对摘要及有界解压后的完整内容。损坏缓存保留告警后重建；真实 I/O 或压缩器错误继续失败。同进程相同输入共用在途任务，缓存与返回值不共享可变缓冲区。`FLUENTREAD_BUILD_CACHE=0 pnpm build:userscript:standalone` 可用于无缓存对照，也可删除该目录；这些构建数据不进入 Firefox 源码包或发布安装包。
+
+Vite 构建不再为日志重复计算整份产物的 gzip 大小；扩展与两个用户脚本的实际体积门禁保持原样。扩展页面把 Vue 运行时、域名算法与自有公共配置分别打包，不改变内容脚本、后台 IIFE 或模块 Worker 的输出模式。第三方字体引擎与语音依赖仍可能超过 Vite 的默认 500 kB 提示线；必须保留告警并审查实际依赖，不能据此认定整个构建无告警。
+
+`Extension quality` 在准备 WXT 类型后恢复上述两种缓存；缓存键包含操作系统、Node 22、锁文件、包配置、根类型配置与本次提交。相同配置的后继提交可恢复上一次成功 job 的缓存，类型检查仍按当前文件图及内容失效，压缩缓存仍逐条校验输入，不复用安装包或测试通过状态。
+
+比较构建性能时固定源码、Node、锁文件及压缩参数，分别报告首次与缓存命中耗时。资源锁排队时间与实际命令耗时分开记录；通过完整产物摘要比较或必要的浏览器验收验证优化没有丢失资源与功能。
+
 ## 运行时错误与告警
 
 功能断言与运行时诊断共同决定测试结果。日常测试、针对性回归和正式发版回归均须检查选定范围内 FluentRead 自身的错误与告警；发现后定位根因、修复并重跑相关用例。译文出现、界面可用或构建成功不能代替这项检查，也不因此扩大为无关功能的全量回归。
@@ -1028,6 +1044,10 @@ issue #1017 的 `reddit-profile.html` 同样依据报告的 DOM 结构独立编�
 ```bash
 pnpm exec vitest run tests/glossary.test.ts tests/builtinGlossaries.test.ts tests/glossaryConfig.test.ts tests/glossarySettingsComponent.test.ts tests/translationGlossaryIntegration.test.ts tests/imageGlossaryContext.test.ts
 ```
+
+仅验证导入弹窗和圈选失败恢复时，可使用 `scripts/testing/run-import-recovery-ui-test.cjs`，显式传入 `--suite glossary` 或 `--suite area`，以及 `--artifacts-dir` 和 `--runtime-diagnostics-helper`。前者验证文件与粘贴草稿、三条预览、警告确认、持久化和响应式；后者用真实截图及本机 HTTP 夹具验证错误主动作和恢复，不证明线上模型质量或语言包公网下载。两者都使用第二屏后台临时 Edge，并保存运行时错误、告警与采集缺口。
+
+统一弹窗和其他翻译失败提示使用 `scripts/testing/run-dialog-recovery-ui-test.cjs`，显式指定 `--suite backup`、`--suite dialogs` 或 `--suite translation`，并传入相同的产物、证据目录和诊断参数。分别覆盖原生下载与取消、恢复摘要和持久化，WebDAV/历史/敏感配置/服务弹窗，以及划词重试和图片缺包提示。网络只用本机夹具；划词的故意鉴权失败保留原始诊断，按本次用例、精确消息和次数标记预期。
 
 仅修改术语库管理界面时，使用 `--suite ui` 运行专项，不进入网页或文档翻译链路：
 

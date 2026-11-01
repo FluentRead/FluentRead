@@ -45,6 +45,7 @@ pnpm storybook
 - 设置卡片复用 `SettingsGroup`、`SettingsItem`、`SettingsDisclosure`，位于 `src/features/settings/ui/components/`。颜色和密度使用 `src/ui/styles/tokens.css` 中的共享变量。
 - 常用设置保持展开，次要设置可以折叠；待配置、失败等影响使用的状态留在折叠摘要中。折叠时保留草稿，请求与保存仍由调用方管理。
 - 标题说明集中在同一区域，一个操作区使用一个主按钮。技术说明放进帮助入口。
+- 任务弹窗和操作确认共用 `src/ui/styles/dialogs.css`：正文在窗口内滚动，底部操作始终可达，格式、完整差异等次要信息按需展开。取消按钮只取消，不承载另一种提交方式。
 - 独立设置控件使用 `settings-controls.css` 和 `fr-settings-controls` 容器，复用开关尺寸、触摸区域和键盘焦点样式。
 - 检查深色、窄屏、长文案、键盘焦点，以及展开后再次收起的草稿状态；主要文案允许换行，避免增加影响阅读的动画或滤镜。
 

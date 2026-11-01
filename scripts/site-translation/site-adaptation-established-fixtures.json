@@ -1,5 +1,50 @@
 [
   {
+    "id": "topic-tag-metadata",
+    "url": "https://community.openai.com/hot",
+    "html": "<main id=\"reading\"><h2 id=\"title\">How can ChatGPT help readers follow a discussion?</h2><ul class=\"discourse-tags\" id=\"tags\" aria-label=\"Tags\"><li><a class=\"discourse-tag simple\" href=\"/tag/chatgpt/16\">chatgpt</a><span class=\"discourse-tags__tag-separator\">,</span></li><li><a class=\"discourse-tag simple\" href=\"/tag/rate-limit/77\">rate-limit</a></li></ul><a class=\"discourse-tag\" id=\"standalone\" href=\"/tag/plugin-development/20\">plugin-development</a><div class=\"cooked\"><p id=\"body\">This readable discussion explains a topic with enough context for translation.</p><p id=\"mixed\">This paragraph refers to <a class=\"discourse-tag\" id=\"inline\" href=\"/tag/image-generation/42\">image-generation</a> while the surrounding explanation remains readable.</p></div></main>",
+    "required": ["#title", "#body", "#mixed"],
+    "forbidden": ["#tags", "#standalone", "#inline"],
+    "restoreSelectors": ["#reading"],
+    "sourceAssertions": {
+      "required": ["How can ChatGPT help readers", "This readable discussion explains a topic", "surrounding explanation remains readable"],
+      "forbidden": ["chatgpt", "rate-limit", "plugin-development", "image-generation"]
+    },
+    "dynamic": {
+      "appendHtml": [{
+        "selector": "#reading",
+        "html": "<h2 id=\"dynamic-title\">A newly loaded topic should still translate during the active session.</h2><ul class=\"discourse-tags\" id=\"dynamic-tags\"><li><a class=\"discourse-tag\" href=\"/tag/creative/23\">creative</a></li></ul>",
+        "required": ["#dynamic-title"],
+        "forbidden": ["#dynamic-tags"],
+        "sourceIncludes": ["A newly loaded topic should still translate"],
+        "sourceExcludes": ["creative"]
+      }],
+      "remountSelector": "#reading"
+    },
+    "variants": [{
+      "name": "blog-and-question-tags",
+      "url": "https://tag-metadata.example.test/article",
+      "required": ["#title", "#body", "#mixed"],
+      "forbidden": ["#tags", "#standalone", "#inline"],
+      "html": "<main id=\"reading\"><h2 id=\"title\">A readable article about keeping topic labels stable</h2><p id=\"body\">The explanation remains available while metadata links stay original.</p><p id=\"mixed\">A discussion about <a id=\"inline\" rel=\"category TAG nofollow\" href=\"/topics/machine-learning\">machine-learning</a> should preserve its tag link.</p><ul class=\"tags\" id=\"tags\"><li><a href=\"/topics/deep-learning\">deep-learning</a></li></ul><a class=\"post-tag s-tag\" id=\"standalone\" href=\"/questions/tagged/data-science\">data-science</a></main>",
+      "sourceAssertions": {
+        "required": ["A readable article about keeping topic labels stable", "The explanation remains available", "should preserve its tag link"],
+        "forbidden": ["machine-learning", "deep-learning", "data-science"]
+      },
+      "dynamic": {
+        "appendHtml": [{
+          "selector": "#reading",
+          "html": "<p id=\"dynamic-title\">A new article paragraph remains available during the active session.</p><a class=\"tag\" id=\"dynamic-tags\" href=\"/topics/neural-networks\">neural-networks</a>",
+          "required": ["#dynamic-title"],
+          "forbidden": ["#dynamic-tags"],
+          "sourceIncludes": ["A new article paragraph remains available"],
+          "sourceExcludes": ["neural-networks"]
+        }],
+        "remountSelector": "#reading"
+      }
+    }]
+  },
+  {
     "id": "github",
     "url": "https://github.com/example/project/issues/1",
     "html": "<nav id=\"navigation\">Navigation controls remain unchanged</nav><main><article class=\"markdown-body\"><p id=\"body1\">This readable paragraph describes a useful feature with enough context for translation.<code id=\"protected\">ORIGINAL_CODE</code></p><p id=\"body2\">A second independent paragraph explains how this page keeps its source content stable.</p></article><span data-testid=\"created-at\" id=\"metadata\">Created yesterday</span></main>",

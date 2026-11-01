@@ -634,12 +634,13 @@ async function exportCompleteBackupViaOptionsUi(optionsPage, marker, timeout, ar
   await optionsPage.locator('button[data-section="settings-data"]').click();
   await optionsPage.getByRole('button', { name: '导出备份', exact: true }).click();
   const contextDialog = optionsPage.locator('.el-message-box');
-  await contextDialog.getByText('是否包含单词上下文？', { exact: true }).waitFor({ state: 'visible', timeout });
+  await contextDialog.getByRole('checkbox', { name: /包含单词上下文/u }).waitFor({ state: 'visible', timeout });
+  if (await contextDialog.getByRole('checkbox').isChecked()) throw new Error('完整备份的上下文选项必须默认关闭');
   const screenshotPath = path.join(artifactsDir, 'privacy-backup-context-dialog.png');
   await optionsPage.screenshot({ path: screenshotPath, fullPage: true });
   const [download] = await Promise.all([
     optionsPage.waitForEvent('download', { timeout }),
-    contextDialog.getByRole('button', { name: '不包含并导出', exact: true }).click(),
+    contextDialog.getByRole('button', { name: '导出备份', exact: true }).click(),
   ]);
   const suggestedFilename = download.suggestedFilename();
   if (!/^fluentread-backup-\d{4}-\d{2}-\d{2}\.json$/u.test(suggestedFilename)) {

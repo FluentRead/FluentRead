@@ -158,7 +158,7 @@ export function groupModuleWorkers(groups: EntrypointGroup[]): void {
 
 /** 页面共用的框架与域名数据独立成块，避免与中文目录及配置合成一个超大公共块。 */
 export function configureExtensionUiChunks(entrypoints: readonly {type: string}[], config: InlineConfig): void {
-    const pages = new Set(['popup', 'options', 'unlisted-page']);
+    const pages = new Set(['popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every(entrypoint => pages.has(entrypoint.type)) || config.build?.lib) return;
     const build = config.build ??= {};
     const rollup = build.rollupOptions ??= {};

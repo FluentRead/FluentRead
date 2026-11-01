@@ -1411,7 +1411,7 @@ describe('extension manifest capability contract', () => {
 
     it('只为扩展页面拆分 Vue 与域名算法，不覆盖显式分包配置', () => {
         const config: InlineConfig = {};
-        configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}], config);
+        configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}, {type: 'sidepanel'}], config);
         const output = config.build!.rollupOptions!.output!;
         expect(Array.isArray(output)).toBe(false);
         const choose = (output as {manualChunks: (id: string) => string | undefined}).manualChunks;

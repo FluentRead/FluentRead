@@ -1,0 +1,21 @@
+<!doctype html>
+<!--
+  @file entrypoints/sidepanel/index.html
+  文件职责：提供原生翻译侧边栏的最小 HTML 外壳。
+  主要内容：由 WXT 0.20.18 为 Chrome/Edge 生成 side_panel，为 Firefox 生成 sidebar_action，安装时不主动展开面板。
+  模块边界：不内联业务或读取剪贴板；翻译、配置与页面生命周期交给 app 组合根。
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="color-scheme" content="only light" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="wxt.include" content="['chrome', 'edge', 'firefox']" />
+    <meta name="manifest.open_at_install" content="false" />
+    <title>FluentRead</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

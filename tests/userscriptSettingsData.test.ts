@@ -171,7 +171,13 @@ describe('standalone static settings data representation', () => {
     it('leaves partially used catalogs visible to standard tree shaking while compressing its complete style table', () => {
         const plugin = createUserscriptSettingsDataPlugin(root, true, false);
         const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-        for (const [path, name] of tables.slice(0, 2)) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        // Appearance registries are intentionally transformed in ordinary mode too;
+        // feeding their guarded owner a partial object is not a tree-shaking fixture.
+        for (const [path, name] of tables.filter(([path]) => ![
+            'src/core/config/translationAppearance.ts', 'src/core/config/interfaceAppearance.ts',
+        ].includes(path))) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        const appearancePath = resolve(root, 'src/core/config/interfaceAppearance.ts');
+        expect(run(readFileSync(appearancePath, 'utf8'), appearancePath)?.code).toContain('JSON.parse');
         expect(run('const TRANSLATION_STYLE_PRESETS = [];', resolve(root, tables[2][0]))?.code).toContain('JSON.parse');
     });
 

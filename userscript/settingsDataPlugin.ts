@@ -84,6 +84,9 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         targets.set(normalizePath(resolve(root, 'src/core/config/selectionPreview.ts')), {names: ['learningPreviewAnswers']});
         targets.set(normalizePath(resolve(root, 'src/ui/translationLoadingIndicator.ts')), {names: ['HOST_IMPORTANT_STYLES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/localTts.ts')), {names: ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']});
+        targets.set(normalizePath(resolve(root, 'src/features/full-page-translation/ui/translationIndicators.ts')), {names: ['iconPaths']});
+        targets.set(normalizePath(resolve(root, 'src/providers/translation/aliyun-translation.ts')), {names: ['aliyunErrorHints']});
+        targets.set(normalizePath(resolve(root, 'src/core/i18n/language.ts')), {names: ['localizedUiLanguageLabels']});
     }
     // 这些表已被完整设置页使用；其余表仍独立压缩，避免把可裁剪的数据重新引入。
     // 仅 standalone 合并，首次消费时同步还原并缓存 JSON 文本；每个声明独立解析，保持 query 模块的对象隔离。

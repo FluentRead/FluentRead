@@ -862,12 +862,13 @@ describe('userscript browser shim injection', () => {
         const readerDialogKeys = ['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].map(name => `document.pdfReading.${name}`);
         const safariPermissionKeys = Object.keys(extension).filter(key => key.startsWith('safari.freePool.'));
         expect(safariPermissionKeys).toHaveLength(8);
+        const sidepanelKeys = ['title', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
         const pageFontKeys = Object.keys(extension).filter(key => key.startsWith('popup.pageFont.'));
         const expectedPageFontKeys = ['title', 'original', 'browserDefault', 'hostAction', 'browserAction', 'changing', 'retryAction',
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);
         expect([...pageFontKeys].sort()).toEqual([...expectedPageFontKeys].sort());
         expect(Object.keys(projected).filter(key => key.startsWith('popup.pageFont.'))).toEqual([]);
-        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...pageFontKeys]) {
+        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...pageFontKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
@@ -886,7 +887,7 @@ describe('userscript browser shim injection', () => {
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
-            && !safariPermissionKeys.includes(key) && !pageFontKeys.includes(key)
+            && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key)
             && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);

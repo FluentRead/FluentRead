@@ -36,6 +36,7 @@
       "tests/userscriptMetadata.test.ts",
       "tests/userscriptPrivacy.test.ts",
       "tests/userscriptViteConfig.test.ts",
+      "tests/userscriptTranslationCenterBuild.test.ts",
       "tests/deeplxRuntimeBuild.test.ts",
       "tests/freeTranslationSettings.test.ts",
       "tests/writingBackground.test.ts",
@@ -241,6 +242,7 @@
       "tests/translationCache.test.ts",
       "tests/translationBroker.test.ts",
       "tests/microsoftTransport.test.ts",
+      "tests/providerResponseIntegrity.test.ts",
       "tests/nativeBatch.test.ts",
       "tests/nativeBatchConfig.test.ts",
       "tests/translationConfigCheck.test.ts",
@@ -852,7 +854,10 @@
       "tests/zoteroFontCache.test.ts",
       "tests/clickSelection.test.ts",
       "tests/clickSelectionSettingsLifecycle.test.ts",
-      "tests/aiMultiSegmentSettingsLifecycle.test.ts"
+      "tests/aiMultiSegmentSettingsLifecycle.test.ts",
+      "tests/translationSidepanel.test.ts",
+      "tests/sidepanelBootstrap.test.ts",
+      "tests/sidepanelApp.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

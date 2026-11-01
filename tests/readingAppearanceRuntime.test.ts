@@ -18,6 +18,20 @@ function setup() {
         changeUrl: (value: string) => {href = value;}, navigate: (value: string) => {href = value; runtime.routeChanged();}, disable: () => {enabled = false; runtime.sync();}};
 }
 describe('reading appearance configuration', () => {
+    it('preserves independent remembered font and translation-only site preferences together', () => {
+        const defaults = new Config();
+        expect(defaults.readingAppearanceSites).toEqual({});
+        expect(defaults.translationOnlyDomains).toEqual([]);
+        const config = normalizeConfig({
+            readingAppearanceSites: {'example.com': 'system'},
+            translationOnlyDomains: ['example.com'],
+        });
+        expect(config.readingAppearanceSites).toEqual({'example.com': 'system'});
+        expect(config.translationOnlyDomains).toEqual(['example.com']);
+        const restored = normalizeConfig(JSON.parse(JSON.stringify(config)));
+        expect(restored.readingAppearanceSites).toEqual(config.readingAppearanceSites);
+        expect(restored.translationOnlyDomains).toEqual(config.translationOnlyDomains);
+    });
     it('defaults to no remembered websites and safely normalizes imported preferences', () => {
         expect(new Config().readingAppearanceSites).toEqual({});
         for (const value of [null, 1, [], 'system']) expect(normalizeReadingAppearanceSites(value)).toEqual({});

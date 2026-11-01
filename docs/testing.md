@@ -63,6 +63,17 @@ node scripts/testing/run-cache-clear-recovery-test.cjs \
 
 ## 术语库排队保存
 
+网站仅译文与新增内置词库的生产扩展专项：
+
+```bash
+node scripts/testing/run-site-display-mode-test.cjs \
+  --extension-dir .output/chrome-mv3 --playwright-root <捆绑 Node 包目录> \
+  --runtime-diagnostics <扩展 UI 测试技能>/scripts/runtime-diagnostics.cjs \
+  --artifacts-dir <证据目录>
+```
+
+该专项只使用临时 Edge profile 与本地确定性服务，验证网站偏好保存重开、已有及迟到译文切换、动态正文、跨站继承、恢复重译、八套内置词库目录、新词搜索与副本持久化。页面导航前附着运行时采集；报告保留首次后台附着前等采集缺口，不能据此宣称真实供应商或 Firefox 验收。
+
 运行 `pnpm test tests/glossarySettingsComponent.test.ts tests/configApplication.test.ts` 验证术语库操作的真实 SFC 与配置传输边界。新建、内置库添加、排序和导入捕获用户操作，在组件保存队列执行时合并共享 store 的最新列表；排序携带库 ID，按当前顺序移动一格，导入固定已确认内容并重新检查容量。覆盖排队期间的外部增删、同 ID 与同名、无写入的 no-op、隐藏及组件卸载、容量恢复、旧回执对新选择/新导入草稿的保护，以及确认框与延迟焦点的草稿归属。
 
 `configApplication` 的 glossary list CAS 用例让两个独立 application 通过真实客户端及持久化 handler 交互；发送期间修改同一数组字段应拒绝、回读最新值且只发送一次，无关字段变化则正常确认。这不证明跨设备或真实浏览器关闭的持久化：组件卸载后共享 store 仍运行，整个页面销毁会终止尚未交给配置客户端的本地任务。实现边界及证据入口见[术语库排队保存与草稿归属](maintainers/glossary-save-concurrency-20261024.md)。

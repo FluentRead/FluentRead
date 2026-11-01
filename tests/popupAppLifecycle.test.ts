@@ -142,6 +142,15 @@ async function focusedServiceSearchAtCompact(scrollTop = 22, naturalTop = 92) {
 }
 function growServiceViewport(height=263){Object.assign(viewport,{height});viewport.dispatchEvent(new win.Event('resize'));flushViewport()}
 describe('实际 Popup 缓存模板与页面操作',()=>{
+  it('网站仅译文优先展示且禁用全局快捷切换，外部移除与换站后重新沿用全局模式',async()=>{
+    config.service='bing';config.translationOnlyDomains=['example.com'];await mount();const mode=()=>document.querySelector('[data-testid="popup-display-mode"]')!;
+    expect(mode().getAttribute('data-display-mode')).toBe('translation-only');expect(mode().hasAttribute('disabled')).toBe(true);
+    expect(mode().getAttribute('aria-description')).toContain('网站偏好');eventOf(mode())();expect(state.config.display).toBe(1);
+    state.config.translationOnlyDomains=[];await drain();expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+    const old=eventOf(mode());state.config.translationOnlyDomains=['example.com'];await drain();old();expect(state.config.display).toBe(1);
+    getTab.mockResolvedValue([{id:8,windowId:3,url:'https://another.test/a'}]);tabEvent('onActivated',{tabId:8,windowId:3});await drain();
+    expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+  })
   it('源与目标语言控件只保存对应字段，抽屉遮罩关闭释放所属视口订阅',async()=>{
     await mount();patches.mockClear();const initialTarget=state.config.to
     eventOf(document.querySelector('[aria-label="源语言"]')!,'onUpdate:modelValue')('en');await drain();expect(state.config.from).toBe('en');expect(state.config.to).toBe(initialTarget);expect(patches).toHaveBeenLastCalledWith(expect.objectContaining({from:'en',to:initialTarget}))

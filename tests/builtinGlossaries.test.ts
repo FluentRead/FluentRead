@@ -21,10 +21,10 @@ function add(id = 'ai-en-zh-hans', libraries: GlossaryLibrary[] = []): GlossaryL
 }
 
 describe('离线内置术语词库', () => {
-    it('提供五套真实且唯一的规范词表，全部通过既有配置边界并有中英文说明', () => {
-        expect(BUILTIN_GLOSSARIES).toHaveLength(5);
-        expect(new Set(BUILTIN_GLOSSARIES.map(preset => preset.id)).size).toBe(5);
-        expect(BUILTIN_GLOSSARIES.map(preset => preset.terms.length)).toEqual([65, 60, 50, 40, 30]);
+    it('提供八套真实且唯一的规范词表，全部通过既有配置边界并有七语说明', () => {
+        expect(BUILTIN_GLOSSARIES).toHaveLength(8);
+        expect(new Set(BUILTIN_GLOSSARIES.map(preset => preset.id)).size).toBe(8);
+        expect(BUILTIN_GLOSSARIES.map(preset => preset.terms.length)).toEqual([65, 60, 50, 40, 30, 30, 30, 30]);
         for (const preset of BUILTIN_GLOSSARIES) {
             const library = add(preset.id);
             expect(normalizeGlossaryLibraries([library])).toEqual([library]);
@@ -37,6 +37,20 @@ describe('离线内置术语词库', () => {
                 }
             }
         }
+    });
+
+    it.each([
+        ['hardware-en-zh-hans', 'Memory bandwidth and cache coherence matter.', '内存带宽 and 缓存一致性 matter.'],
+        ['networking-en-zh-hans', 'Cloud computing uses object storage.', '云计算 uses 对象存储.'],
+        ['mathematics-en-zh-hans', 'Linear algebra uses matrix multiplication.', '线性代数 uses 矩阵乘法.'],
+    ])('新增 %s 沿真实匹配与保护链路采用完整短语，仅在指定语言范围生效', (id, text, restored) => {
+        const library = add(id);
+        const context = {text, sourceLanguage: 'en', targetLanguage: 'zh-CN'};
+        const packet = protectGlossaryText(text, resolveGlossaryEntries([library], context).terms);
+        expect(packet.tokens).toHaveLength(2); expect(packet.restore(packet.text)).toBe(restored);
+        expect(resolveGlossaryEntries([library], {...context, targetLanguage: 'ja'}).terms).toEqual([]);
+        expect(resolveGlossaryEntries([library], {...context, sourceLanguage: 'fr'}).terms).toEqual([]);
+        library.enabled = false; expect(resolveGlossaryEntries([library], context).terms).toEqual([]);
     });
 
     it('仅追加可编辑副本，保留原顺序和独立对象，不修改目录或用户数据', () => {

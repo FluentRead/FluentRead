@@ -171,6 +171,7 @@ describe('AI 模型编号列表', () => {
             services.fireworks,
             services.deepinfra,
             services.perplexity,
+            services.runcrate,
             services.ollama,
             services.custom,
         ]);
@@ -188,6 +189,7 @@ describe('AI 模型编号列表', () => {
             services.fireworks,
             services.deepinfra,
             services.perplexity,
+            services.runcrate,
             services.ollama,
             services.custom,
         ]);

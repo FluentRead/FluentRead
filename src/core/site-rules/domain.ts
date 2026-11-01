@@ -2,7 +2,7 @@
  * @file src/core/site-rules/domain.ts
  *
  * 文件职责：实现站点规则所需的域名规范化、eTLD+1 匹配和自动翻译决策，统一处理 URL、主机名与配置列表。
- * 主要内容：基于 tldts 解析基础域，清洗网站名单并计算自动翻译状态；页面私有 matcher 按名单内容变化重建索引，复用最近地址的基础域，避免每次路由重新解析整份名单，同时保留原纯函数和非法输入边界。
+ * 主要内容：基于 tldts 解析基础域，清洗网站名单并计算自动翻译及网站仅译文偏好；页面私有 matcher 按名单内容变化重建索引，复用最近地址的基础域，避免每次路由重新解析整份名单，同时保留原纯函数和非法输入边界。
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
@@ -152,6 +152,18 @@ export function isFloatingBallDisabledOnSite(
     domains: unknown,
 ): boolean {
     return isSiteInDomainList(input, domains);
+}
+
+/** 解析网站译文显示偏好所需的全局模式与仅译文名单。 */
+export interface SiteTranslationDisplayConfig {
+    display: number;
+    translationOnlyDomains?: readonly string[];
+}
+
+/** 网站仅译文优先于全局显示偏好；空名单不解析网址，且不改写持久配置。 */
+export function resolveSiteTranslationDisplay(config: SiteTranslationDisplayConfig, input: string | URL): number {
+    return config.translationOnlyDomains?.length && isSiteInDomainList(input, config.translationOnlyDomains)
+        ? 0 : config.display;
 }
 
 export function shouldAutoTranslatePage(

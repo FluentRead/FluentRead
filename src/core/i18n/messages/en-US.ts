@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/en-US.json';
 import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesEnglishMessages} from './sectionTranslationRules';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -548,6 +549,7 @@ export const enUSMessages = {
     "settings.requestLimits.globalTitle": "Request limits",
     "settings.requestLimits.globalHelp": "Services and models without custom settings share these limits.",
     ...aiRequestTimeoutMessages["en-US"],
+    ...selectionDictionaryMessages["en-US"],
     ...sectionTranslationRulesEnglishMessages,
     "settings.requestLimits.retryIntervals": "Retry intervals",
     "settings.requestLimits.apiKeyRecovery": "Failed key cooldown",
@@ -934,6 +936,12 @@ export const enUSMessages = {
     'glossary.builtin.financeDescription': 'Financial statements, valuation metrics, and equity markets.',
     'glossary.builtin.research': 'Academic research',
     'glossary.builtin.researchDescription': 'Research methods, statistics, and academic papers.',
+    'glossary.builtin.hardware': "Computer hardware",
+    'glossary.builtin.hardwareDescription': "Processors, memory, chips and circuits",
+    'glossary.builtin.networking': "Networking and cloud",
+    'glossary.builtin.networkingDescription': "Network protocols, cloud infrastructure and deployment",
+    'glossary.builtin.mathematics': "Mathematics",
+    'glossary.builtin.mathematicsDescription': "Linear algebra, calculus, probability and optimization",
     'glossary.builtin.products': 'Keep product names',
     'glossary.builtin.productsDescription': 'Keep common development tool and AI product names unchanged. Case sensitive.',
     'glossary.builtin.englishChinese': 'English → Simplified Chinese',

@@ -1,6 +1,6 @@
 <!--
  * @file src/features/settings/ui/SitePreferencesSettings.vue
- * 文件职责：在同一张紧凑偏好卡中管理全局自动翻译与网站的三项偏好。
+ * 文件职责：在同一张紧凑偏好卡中管理全局自动翻译与网站的自动翻译、禁用、悬浮球及仅译文偏好。
  * 主要内容：使用统一的下拉选择器保持控件与菜单风格一致；独立标题分隔栏与下方自动翻译开关，提供域名归并预览、添加校验、搜索、单站编辑、删除撤销及后台确认反馈；网站名单变化时只归一化排序一次，搜索复用已有行。
  * 模块边界：复用既有配置数组及异步补丁端口，不创建新配置格式、不读取当前标签页，不宣称尚未确认的保存成功。
  -->
@@ -15,7 +15,7 @@
       <p v-if="!settings.on" class="rule-notice">{{ tr('插件已关闭，网站偏好仍会保存，重新开启插件后生效') }}</p>
       <form class="preference-add" @submit.prevent="addSite">
         <label class="rule-field"><span>{{ tr('域名或完整网址') }}</span><input v-model="input" type="text" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://docs.example.com/article" :disabled="saving" :title="tr('包含主域及所有子域；路径、参数和端口不进入偏好')" :aria-invalid="Boolean(error)" aria-describedby="site-preference-feedback" @input="error = ''" /></label>
-        <label class="rule-field"><span>{{ tr('初始偏好') }}</span><UiSelect :aria-label="tr('初始偏好')" v-model="initialPreference" :disabled="saving"><el-option value="always" :label="tr('始终翻译')" /><el-option value="disabled" :label="tr('禁用扩展')" /><el-option value="hidden" :label="tr('隐藏悬浮球')" /></UiSelect></label>
+        <label class="rule-field"><span>{{ tr('初始偏好') }}</span><UiSelect :aria-label="tr('初始偏好')" v-model="initialPreference" :disabled="saving"><el-option value="always" :label="tr('始终翻译')" /><el-option value="disabled" :label="tr('禁用扩展')" /><el-option value="hidden" :label="tr('隐藏悬浮球')" /><el-option value="single" :label="tr('仅显示译文')" /></UiSelect></label>
         <button type="submit" class="rule-primary" :disabled="saving">{{ tr('添加网站') }}</button>
       </form>
       <p v-if="normalized" class="rule-hint" data-domain-preview><span>{{ tr('将保存为') }} </span><strong data-i18n-ignore>{{ normalized }}</strong></p>
@@ -23,11 +23,12 @@
       <label v-if="rows.length" class="rule-field preference-search"><span class="sr-only">{{ tr('搜索网站偏好') }}</span><input v-model="search" type="search" :aria-label="tr('搜索网站偏好')" :placeholder="tr('搜索域名')" /></label>
       <div v-if="visibleRows.length" class="preference-list" role="list" :aria-label="tr('网站偏好')">
         <article v-for="row in visibleRows" :key="row.domain" role="listitem" class="preference-row" :data-site-preference="row.domain">
-          <div class="preference-domain"><UiIcon name="globe" :size="18" /><div><strong data-i18n-ignore>{{ row.domain }}</strong><template v-if="settings.on"><small v-if="row.extensionDisabled && (row.alwaysTranslate || row.floatingBallHidden)">{{ tr('已禁用扩展，其他偏好暂不生效') }}</small><template v-else-if="!row.extensionDisabled"><small v-if="settings.autoTranslate && !row.alwaysTranslate">{{ tr('自动翻译 · 全局开启') }}</small><small v-if="settings.disableFloatingBall && !row.floatingBallHidden">{{ tr('悬浮球') }} · {{ tr('已隐藏 · 全局设置') }}</small></template></template></div></div>
+          <div class="preference-domain"><UiIcon name="globe" :size="18" /><div><strong data-i18n-ignore>{{ row.domain }}</strong><template v-if="settings.on"><small v-if="row.extensionDisabled && (row.alwaysTranslate || row.floatingBallHidden || row.translationOnly)">{{ tr('已禁用扩展，其他偏好暂不生效') }}</small><template v-else-if="!row.extensionDisabled"><small v-if="settings.autoTranslate && !row.alwaysTranslate">{{ tr('自动翻译 · 全局开启') }}</small><small v-if="settings.disableFloatingBall && !row.floatingBallHidden">{{ tr('悬浮球') }} · {{ tr('已隐藏 · 全局设置') }}</small></template></template></div></div>
           <div class="preference-options">
             <label><input type="checkbox" :checked="row.alwaysTranslate" :disabled="saving" :aria-label="`${tr('始终翻译')} ${row.domain}`" @change="change(row, 'alwaysTranslate', $event)" />{{ tr('始终翻译') }}</label>
             <label :title="tr('禁用扩展优先于自动翻译；关闭插件后所有偏好仍保留')"><input type="checkbox" :checked="row.extensionDisabled" :disabled="saving" :aria-label="`${tr('禁用扩展')} ${row.domain}`" @change="change(row, 'extensionDisabled', $event)" />{{ tr('禁用扩展') }}</label>
             <label :title="tr('只隐藏悬浮球时，其他功能仍可用')"><input type="checkbox" :checked="row.floatingBallHidden" :disabled="saving" :aria-label="`${tr('隐藏悬浮球')} ${row.domain}`" @change="change(row, 'floatingBallHidden', $event)" />{{ tr('隐藏悬浮球') }}</label>
+            <label :title="tr('仅此网站使用仅译文，其他网站沿用全局显示模式；谷歌翻译仅支持双语')"><input type="checkbox" :checked="row.translationOnly" :disabled="saving" :aria-label="`${tr('仅显示译文')} ${row.domain}`" @change="change(row, 'translationOnly', $event)" />{{ tr('仅显示译文') }}</label>
             <button type="button" :disabled="saving" :aria-label="`${tr('移除网站偏好')} ${row.domain}`" @click="remove(row)">{{ tr('移除') }}</button>
           </div>
         </article>
@@ -77,13 +78,13 @@ async function addSite() {
   const domain = normalized.value;
   if (!domain) { error.value = '请输入有效的域名或 HTTP(S) 网址'; return; }
   const existing = rows.value.find(row => row.domain === domain);
-  const field = initialPreference.value === 'disabled' ? 'extensionDisabled' : initialPreference.value === 'hidden' ? 'floatingBallHidden' : 'alwaysTranslate';
+  const field = initialPreference.value === 'disabled' ? 'extensionDisabled' : initialPreference.value === 'hidden' ? 'floatingBallHidden' : initialPreference.value === 'single' ? 'translationOnly' : 'alwaysTranslate';
   if (existing?.[field]) { error.value = '该网站已有此偏好，可在下方直接调整'; search.value = domain; return; }
-  const row = {...existing, alwaysTranslate: existing?.alwaysTranslate ?? false, extensionDisabled: existing?.extensionDisabled ?? false, floatingBallHidden: existing?.floatingBallHidden ?? false, [field]: true};
+  const row = {...existing, alwaysTranslate: existing?.alwaysTranslate ?? false, extensionDisabled: existing?.extensionDisabled ?? false, floatingBallHidden: existing?.floatingBallHidden ?? false, translationOnly: existing?.translationOnly ?? false, [field]: true};
   const patch = updateSitePreference(props.settings, domain, row)!;
   if (await commit(patch)) { input.value = ''; search.value = ''; }
 }
-function change(row: SitePreferenceRow, field: 'alwaysTranslate' | 'extensionDisabled' | 'floatingBallHidden', event: Event) {
+function change(row: SitePreferenceRow, field: 'alwaysTranslate' | 'extensionDisabled' | 'floatingBallHidden' | 'translationOnly', event: Event) {
   const patch = updateSitePreference(props.settings, row.domain, {...row, [field]: (event.target as HTMLInputElement).checked});
   if (patch) void commit(patch);
 }
@@ -97,7 +98,8 @@ async function undoRemove() {
   const current = rows.value.find(row => row.domain === removed.value!.domain);
   const row = {...removed.value, alwaysTranslate: removed.value.alwaysTranslate || current?.alwaysTranslate === true,
     extensionDisabled: removed.value.extensionDisabled || current?.extensionDisabled === true,
-    floatingBallHidden: removed.value.floatingBallHidden || current?.floatingBallHidden === true};
+    floatingBallHidden: removed.value.floatingBallHidden || current?.floatingBallHidden === true,
+    translationOnly: removed.value.translationOnly || current?.translationOnly === true};
   if (await commit(updateSitePreference(props.settings, row.domain, row)!)) removed.value = null;
 }
 </script>

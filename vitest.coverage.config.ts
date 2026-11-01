@@ -68,6 +68,8 @@ export default defineConfig({
                 'src/core/config/aiMultiSegment.ts',
                 'src/features/settings/ui/AiMultiSegmentSettings.vue',
                 'src/core/config/clickSelection.ts',
+                'src/core/config/selectionDictionary.ts',
+                'src/core/i18n/messages/selectionDictionary.ts',
                 'src/shared/dom/pointerSelectionSession.ts',
                 'src/features/selection-translation/content/clickSelection.ts',
                 'src/features/settings/ui/ClickSelectionSettings.vue',

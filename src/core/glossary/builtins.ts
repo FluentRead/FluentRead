@@ -1,7 +1,7 @@
 /**
  * @file src/core/glossary/builtins.ts
  * 文件职责：提供随扩展离线分发的领域术语起步词库，并安全地添加为用户可编辑副本。
- * 主要内容：独立整理 AI、开发、财报、学术与产品名词对；目录记录版本与语言，添加时检查重复来源和容量，保留已有词库顺序及用户修改。
+ * 主要内容：独立整理 AI、开发、财报、学术、硬件、网络与云计算、数学及产品名词对；目录记录版本与语言，添加时检查重复来源和容量，保留已有词库顺序及用户修改。
  * 模块边界：纯静态数据和副本创建，不读取配置、不下载远程词表、不自动启用总开关；不复制第三方词库的数据。
  */
 import {createGlossaryLibrary, GLOSSARY_LIMITS, type GlossaryLibrary} from './model';
@@ -125,6 +125,68 @@ export const BUILTIN_GLOSSARIES: readonly BuiltinGlossary[] = [
             ['cross-validation', '交叉验证'], ['multiple comparisons', '多重比较'], ['false positive', '假阳性'],
             ['false negative', '假阴性'], ['causal inference', '因果推断'], ['data availability', '数据可用性'],
             ['conflict of interest', '利益冲突'],
+        ],
+    },
+    {
+        id: 'hardware-en-zh-hans', version: 1, nameKey: 'glossary.builtin.hardware', descriptionKey: 'glossary.builtin.hardwareDescription',
+        sourceLanguage: 'en', targetLanguage: 'zh-hans', caseSensitive: false,
+        terms: [
+            ['central processing unit', '中央处理器'], ['graphics processing unit', '图形处理器'],
+            ['integrated circuit', '集成电路'], ['instruction set', '指令集'],
+            ['microarchitecture', '微架构'], ['clock frequency', '时钟频率'],
+            ['clock cycle', '时钟周期'], ['branch prediction', '分支预测'],
+            ['out-of-order execution', '乱序执行'], ['instruction pipeline', '指令流水线'],
+            ['cache line', '缓存行'], ['cache coherence', '缓存一致性'],
+            ['memory bandwidth', '内存带宽'], ['memory latency', '内存延迟'],
+            ['random access memory', '随机存取存储器'], ['read-only memory', '只读存储器'],
+            ['solid-state drive', '固态硬盘'], ['hard disk drive', '机械硬盘'],
+            ['printed circuit board', '印刷电路板'], ['power consumption', '功耗'],
+            ['thermal design power', '热设计功耗'], ['heat sink', '散热器'],
+            ['semiconductor', '半导体'], ['transistor', '晶体管'],
+            ['logic gate', '逻辑门'], ['field-programmable gate array', '现场可编程门阵列'],
+            ['application-specific integrated circuit', '专用集成电路'], ['system on a chip', '片上系统'],
+            ['die size', '芯片面积'], ['process node', '制程节点'],
+        ],
+    },
+    {
+        id: 'networking-en-zh-hans', version: 1, nameKey: 'glossary.builtin.networking', descriptionKey: 'glossary.builtin.networkingDescription',
+        sourceLanguage: 'en', targetLanguage: 'zh-hans', caseSensitive: false,
+        terms: [
+            ['cloud computing', '云计算'], ['cloud storage', '云存储'],
+            ['virtual machine', '虚拟机'], ['container orchestration', '容器编排'],
+            ['serverless computing', '无服务器计算'], ['edge computing', '边缘计算'],
+            ['content delivery network', '内容分发网络'], ['domain name system', '域名系统'],
+            ['transmission control protocol', '传输控制协议'], ['user datagram protocol', '用户数据报协议'],
+            ['transport layer security', '传输层安全协议'], ['network address translation', '网络地址转换'],
+            ['virtual private network', '虚拟专用网络'], ['virtual private cloud', '虚拟私有云'],
+            ['subnet mask', '子网掩码'], ['routing table', '路由表'],
+            ['packet loss', '丢包'], ['round-trip time', '往返时间'],
+            ['congestion control', '拥塞控制'], ['flow control', '流量控制'],
+            ['reverse proxy', '反向代理'], ['forward proxy', '正向代理'],
+            ['service discovery', '服务发现'], ['service mesh', '服务网格'],
+            ['availability zone', '可用区'], ['fault tolerance', '容错'],
+            ['horizontal scaling', '水平扩展'], ['vertical scaling', '垂直扩展'],
+            ['infrastructure as code', '基础设施即代码'], ['object storage', '对象存储'],
+        ],
+    },
+    {
+        id: 'mathematics-en-zh-hans', version: 1, nameKey: 'glossary.builtin.mathematics', descriptionKey: 'glossary.builtin.mathematicsDescription',
+        sourceLanguage: 'en', targetLanguage: 'zh-hans', caseSensitive: false,
+        terms: [
+            ['linear algebra', '线性代数'], ['eigenvalue', '特征值'], ['eigenvector', '特征向量'],
+            ['singular value decomposition', '奇异值分解'], ['matrix multiplication', '矩阵乘法'],
+            ['dot product', '点积'], ['cross product', '叉积'], ['vector space', '向量空间'],
+            ['orthogonal projection', '正交投影'], ['partial derivative', '偏导数'],
+            ['chain rule', '链式法则'], ['definite integral', '定积分'],
+            ['differential equation', '微分方程'], ['probability distribution', '概率分布'],
+            ['conditional probability', '条件概率'], ['random variable', '随机变量'],
+            ['expected value', '期望值'], ['covariance matrix', '协方差矩阵'],
+            ['normal distribution', '正态分布'], ['Bayes theorem', '贝叶斯定理'],
+            ['law of large numbers', '大数定律'], ['central limit theorem', '中心极限定理'],
+            ['maximum likelihood estimation', '最大似然估计'], ['least squares', '最小二乘法'],
+            ['convex optimization', '凸优化'], ['objective function', '目标函数'],
+            ['Lagrange multiplier', '拉格朗日乘子'], ['numerical stability', '数值稳定性'],
+            ['floating-point arithmetic', '浮点运算'], ['Fourier transform', '傅里叶变换'],
         ],
     },
     {

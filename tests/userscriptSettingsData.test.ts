@@ -106,7 +106,7 @@ describe('standalone static settings data representation', () => {
     it('leaves partially used catalogs visible to standard tree shaking while compressing its complete style table', () => {
         const plugin = createUserscriptSettingsDataPlugin(root, true, false);
         const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-        for (const [path, name] of tables.slice(0, 2)) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        for (const [path, name] of [...tables.slice(0, 2), ...tables.slice(3)]) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
         expect(run('const TRANSLATION_STYLE_PRESETS = [];', resolve(root, tables[2][0]))?.code).toContain('JSON.parse');
     });
 

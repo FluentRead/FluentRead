@@ -2,7 +2,7 @@
  * @file src/app/selection/page.ts
  * 文件职责：在扩展独立窗口中领取原生 PDF 右键选区，并以真实本页 Range 复用既有划词翻译卡片。
  * 主要内容：等待配置水合、消费一次性令牌、显示紧凑只读来源，严格限定唯一原文节点及其文本身份；卡片继续使用现有翻译、词典、复制和朗读链路，观察自有卡片根的直接子节点，在已显示卡片自行收起时关闭结果窗口，关闭或离开页面时取消组件请求并释放选区。
- * 模块边界：不下载或解析 PDF、不修改来源页面、不放宽普通网页选区规则；后台负责令牌与窗口身份，当前页面只把已领取文本适配成自有 DOM 选区。
+ * 模块边界：不下载或解析 PDF、不修改来源页面、不放宽普通网页选区规则；后台负责令牌与窗口身份，当前页面只把已领取文本适配成自有 DOM 选区，并以独立定时器回收已启动但未领取的结果页；不保证脚本未加载或页面冻结时的墙钟期限。
  */
 import {createApp, nextTick, type Component} from 'vue';
 import browser from 'webextension-polyfill';
@@ -13,6 +13,8 @@ import {isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
 import {createUiI18nPlugin} from '@/src/ui/i18n';
 import {observeNativePdfSelectionCard} from './cardVisibility';
 import './selection-page.css';
+
+export const NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS = 60_000;
 
 export interface NativePdfSelectionPayload {text: string; sourceUrl: string; title: string}
 export type NativePdfSelectionAdapter = NonNullable<InstanceType<typeof SelectionTranslator>['$props']['selectionAdapter']>;
@@ -97,6 +99,12 @@ export function mountNativePdfSelectionApp(selector: string, dependencies: Nativ
     const tooLong = new URLSearchParams(window.location.hash.replace(/^#/u, '')).get('error') === 'too-long';
     if (window.location.hash) window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
     let disposed = false;
+    let receivedPayload = false;
+    let claimTimer: ReturnType<typeof setTimeout> | undefined;
+    const cancelClaimTimer = () => {
+        if (claimTimer !== undefined) clearTimeout(claimTimer);
+        claimTimer = undefined;
+    };
     let card: NativePdfSelectionCard | null = null;
     let cardHost: HTMLElement | null = null;
     let sourceUrl: string | null = null;
@@ -115,6 +123,7 @@ export function mountNativePdfSelectionApp(selector: string, dependencies: Nativ
     const dispose = () => {
         if (disposed) return;
         disposed = true;
+        cancelClaimTimer();
         window.removeEventListener('pagehide', dispose);
         document.removeEventListener('pointerdown', keepSourcePassive, true);
         document.removeEventListener('pointerup', keepSourcePassive, true);
@@ -133,6 +142,11 @@ export function mountNativePdfSelectionApp(selector: string, dependencies: Nativ
     const keepSourcePassive = (event: Event) => {
         if (card && cardHost && !cardHost.contains(event.target as Node)) {event.preventDefault(); event.stopImmediatePropagation();}
     };
+    // 页面定时器独立于 MV3 后台；配置水合或 claim 卡住时也能退出。
+    // 不存正文或票据；已交付后的卡片生命周期仍由现有逻辑管理。
+    if (token && !tooLong) claimTimer = setTimeout(() => {
+        if (!receivedPayload) close();
+    }, NATIVE_PDF_SELECTION_PAGE_TIMEOUT_MS);
     showMessage('正在打开划词翻译…');
     window.addEventListener('pagehide', dispose);
     document.addEventListener('pointerdown', keepSourcePassive, true);
@@ -149,6 +163,8 @@ export function mountNativePdfSelectionApp(selector: string, dependencies: Nativ
             const payload = parseNativePdfSelectionPayload(await dependencies.claim(token));
             if (disposed) return;
             if (!payload) {showMessage('选区已失效，请返回 PDF 重新选中文字并右键翻译。'); return;}
+            receivedPayload = true;
+            cancelClaimTimer();
             if (!dependencies.enabled(payload.sourceUrl)) {showMessage('此页面的划词翻译已关闭，请启用后重新选择文字。'); return;}
             const heading = document.createElement('header'); heading.className = 'native-pdf-selection-source'; heading.setAttribute('data-i18n-ignore', '');
             const origin = document.createElement('small'); origin.textContent = payload.title || new URL(payload.sourceUrl).hostname; origin.title = payload.sourceUrl;

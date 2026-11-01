@@ -12,6 +12,10 @@ Set consistent translations for names, products, and technical terms in machine 
 
 You can also add a **Built-in glossary** as an editable copy. Adding it neither enables the master switch nor overwrites your edits. Existing copies do not update automatically when the built-in list changes.
 
+The catalog includes **AI and machine learning, software development, finance and financial reports, academic research, computer hardware, networking and cloud, mathematics**, and **product names kept in the original language**. Domain glossaries apply to English → Simplified Chinese; the product-name glossary applies across languages. Preview these starting translations and adjust them after adding a copy.
+
+To keep a particular word untranslated, add it as an entry and leave its translation blank. For example, enter `FluentRead` as the source with no translation, then enable the master switch. Surrounding text is still translated. Set case sensitivity or a website scope when needed.
+
 Glossary settings save automatically; entry edits require **Save**. Switching glossaries keeps drafts within the current page, but save them before closing it.
 
 ## Set the scope
@@ -28,7 +32,7 @@ Preview runs locally even with the master switch off; actual translation respect
 
 ## Import, export, and backup
 
-Choose **Import glossary** for a CSV, TSV, or JSON file, or paste its contents. Check the preview before confirming. Import creates a new glossary without replacing existing ones. Files support UTF-8, BOM-marked UTF-16, and common GB18030 encodings.
+Open **Import glossaries**, then choose **Select file** or **Paste text**. Expand **File format** to change CSV, TSV, or JSON. Review the first three entries and import counts; expand **View all entries** for the rest, then choose **Confirm import**. Each method keeps its own draft when you switch. If saving fails, the dialog shows the error and keeps your input for another attempt. Import creates a new glossary without replacing existing ones. Files support UTF-8, BOM-marked UTF-16, and common GB18030 encodings.
 
 Export in **Glossary settings**. JSON retains all settings; CSV and TSV suit spreadsheet editing. Configuration backups also include glossaries.
 

@@ -31,9 +31,11 @@ Changing languages, glossary settings, or some connection parameters requires a 
 ## Edit and download
 
 1. Open proofreading, search for a sentence or filter untranslated passages, and edit the translation directly.
-2. Choose **Download file**, select bilingual or translation-only output, check the filename and preview, and download. Your edits are included.
+2. Open **Download**, choose **Bilingual** or **Translation only**, then use the download button below. Your edits are included.
 
-The download defaults to your current bilingual or translated reading view; you can change it in the dialog. Partial downloads require confirmation. Passages without a translation, including cleared translations, retain their source text. Changing settings alone does not retranslate the file; downloads use the results currently kept.
+The selected version is independent of the reading view. Partial downloads require confirmation. Passages without a translation, including cleared translations, retain their source text. Changing settings alone does not retranslate the file; downloads use the results currently kept.
+
+The panel opens beside the toolbar. PDF versions include a small layout illustration. Expand **PDF layout** to choose **Original** or **Reflow** without changing the reading view. If generation fails, your translation and edits are kept. Use **Retry download**, or expand **Technical details** to inspect the cause.
 
 **Download original** saves the opened source file without translating it first. You can cancel and retry ePub, DOCX, PDF, or batch ZIP generation without losing translations or edits.
 

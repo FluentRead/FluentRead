@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/zh-CN.json';
 import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
 import {aiRequestTimeoutChineseMessages} from './aiRequestTimeout';
+import {selectionDictionaryChineseMessages} from './selectionDictionary';
 import {sectionTranslationRulesChineseMessages} from './sectionTranslationRules';
 import {pdfReadingChineseMessages} from './pdfReading';
 import {informationHighlightChineseMessages} from './informationHighlight';
@@ -29,6 +30,9 @@ import {personalCorrectionChineseMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const zhCNMessages = {
+    "settings.backup.includeContext": "包含单词上下文",
+    "feedback.serviceHint": "检查所选服务的连接或模型配置后再试。",
+    "feedback.retryHint": "稍后重试，原文和当前选区会继续保留。",
     ...countForms['zh-CN'],
     ...personalCorrectionChineseMessages,
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",
@@ -62,6 +66,10 @@ export const zhCNMessages = {
     "translationCenter.endpointMissing": "请先填写自定义服务的接口地址。",
     "translationCenter.modelMissing": "请先选择或填写一个模型。",
     "translationCenter.noReady": "请先配置至少一个服务，再开始翻译。",
+    'sidepanel.title': '侧边栏翻译',
+    'sidepanel.openError': '无法打开侧边栏，请重试或从浏览器侧边栏菜单打开流畅阅读。',
+    'sidepanel.settingsError': '无法打开设置，请重试。',
+    'sidepanel.startupError': '翻译面板加载失败，请重新加载。',
     "translationCenter.intro": "同一段原文，多种译法。选择服务，找到更合适的表达。",
     "translationCenter.input": "待翻译文本",
     "translationCenter.source": "源语言",
@@ -543,6 +551,7 @@ export const zhCNMessages = {
     "settings.requestLimits.globalTitle": "请求限制",
     "settings.requestLimits.globalHelp": "未单独设置的服务和模型共用这些限制",
     ...aiRequestTimeoutChineseMessages,
+    ...selectionDictionaryChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",
     "settings.requestLimits.apiKeyRecovery": "失败 Key 冷却时间",
@@ -575,7 +584,7 @@ export const zhCNMessages = {
     "popup.pageFont.loading": "正在读取字体设置…",
     "popup.pageFont.unavailable": "暂时无法调整译文字体。",
     "popup.pageFont.readError": "未能读取字体设置，请重试。",
-    "popup.pageFont.changeError": "未能保存字体设置，请重试。",
+    "popup.pageFont.changeError": "字体设置保存失败",
     "popup.pageFont.retry": "重试",
     "popup.quickSettings.appearanceDescription": "双语模式同时显示原文与译文；仅译文模式只显示翻译结果。",
     "popup.quickSettings.hoverSettings": "悬停翻译设置",
@@ -929,6 +938,12 @@ export const zhCNMessages = {
     'glossary.builtin.financeDescription': "财务报表、估值指标与股票市场常用译法",
     'glossary.builtin.research': '学术论文',
     'glossary.builtin.researchDescription': "研究方法、统计分析与论文阅读术语",
+    'glossary.builtin.hardware': "计算机硬件",
+    'glossary.builtin.hardwareDescription': "处理器、存储、芯片与电路常用术语",
+    'glossary.builtin.networking': "网络与云计算",
+    'glossary.builtin.networkingDescription': "网络协议、云基础设施与分布式部署术语",
+    'glossary.builtin.mathematics': "数学",
+    'glossary.builtin.mathematicsDescription': "线性代数、微积分、概率与优化术语",
     'glossary.builtin.products': '产品名保留原文',
     'glossary.builtin.productsDescription': "保留常见开发工具与 AI 产品名称，区分大小写",
     'glossary.builtin.englishChinese': '英语 → 简体中文',
@@ -985,6 +1000,26 @@ export const zhCNMessages = {
     'glossary.noMatches': "没有命中词条；请检查原文、语言、网站范围和词库开关",
     'glossary.conflicts': "存在多个译法",
     'glossary.conflict': "{source}：采用「{kept}」，忽略「{ignored}」",
+    "glossary.importPaste": "粘贴内容",
+    "glossary.importChoose": "选择术语文件",
+    "glossary.importReplace": "更换文件",
+    "glossary.importReading": "正在读取…",
+    "glossary.importFileHint": "CSV、TSV 或 JSON，最大 2 MB",
+    "glossary.importReview": "导入预览",
+    "glossary.importMore": "查看全部词条",
+    "glossary.importPreserves": "新增词库，保留现有内容。",
+    "area.error.languages.title": "需要准备识别语言包",
+    "area.error.languages.hint": "准备完成后会继续翻译刚才的选区。",
+    "area.error.capture.title": "暂时无法读取选区",
+    "area.error.capture.hint": "请确认当前网页可见，再重试截图。",
+    "area.error.empty.title": "没有识别到文字",
+    "area.error.empty.hint": "试着圈选更清晰、文字更完整的区域。",
+    "area.error.settings.title": "需要检查翻译服务",
+    "area.error.settings.hint": "检查所选服务的连接或模型配置后再试。",
+    "area.error.retry.title": "这次翻译没有完成",
+    "area.error.retry.hint": "选区已保留，可以直接重试。",
+    "area.error.more": "其他操作",
+    "area.error.details": "查看详细原因",
     'glossary.importHelp': "支持导入 CSV、TSV 和 JSON，确认前可逐条检查；导入会新增词库，不覆盖现有数据",
     'glossary.file': "选择文件",
     'glossary.format': "文件格式",

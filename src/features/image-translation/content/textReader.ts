@@ -1,13 +1,13 @@
 /**
  * @file src/features/image-translation/content/textReader.ts
  * 文件职责：提供图片翻译的可访问文字阅读面板，让小图与长译文也能完整阅读、核对原文和复制。
- * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落，提供仅译文/原文对照、复制反馈、关闭和局部 Escape；面板固定在视口内并继承扩展自己的深浅色变量。
+ * 主要内容：相同译文保留原文且不重复展示；以安全 textContent 渲染对照段落和保留原文导致未绘制的提示，提供仅译文/原文对照、当前操作独占的复制反馈、关闭和局部 Escape；关闭时沿完整 Shadow DOM 焦点链确认所有权；面板固定在视口内并继承扩展自己的深浅色变量。
  * 模块边界：仅操作所属 Shadow DOM，不发送识别或翻译请求、不访问配置；宿主定位与生命周期由图片 runtime 管理，调用者提供本次结果和本地化函数。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
-export interface ImageReaderLine {text: string; sourceText?: string}
+export interface ImageReaderLine {text: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true}
 export const IMAGE_READER_CSS = `
-.fr-image-reader {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#737c8f;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;position:fixed;right:16px;top:16px;width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 12px 40px #17203326;pointer-events:auto;z-index:3;color:var(--fr-image-ink);font:13px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.fr-image-reader {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#667085;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;position:fixed;right:16px;top:16px;width:min(400px,calc(100vw - 24px));max-height:calc(100dvh - 32px);display:flex;flex-direction:column;box-sizing:border-box;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 12px 40px #17203326;pointer-events:auto;z-index:3;color:var(--fr-image-ink);font:13px/1.6 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
 .fr-image-reader[hidden] {display:none!important;}
 .fr-image-reader[data-theme=dark] {--fr-image-ink:#ece5ef;--fr-image-muted:#c1b1c5;--fr-image-line:#49404c;--fr-image-surface:#2b2630;--fr-image-brand-soft:#413548;--fr-image-brand:#ffa7ca;}
 .fr-image-reader header {display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;padding:10px 12px;border-bottom:1px solid var(--fr-image-line);}
@@ -20,11 +20,12 @@ export const IMAGE_READER_CSS = `
 .fr-image-reader article + article {border-top:1px solid var(--fr-image-line);}
 .fr-image-reader pre {margin:0;font:inherit;font-size:14px;white-space:pre-wrap;overflow-wrap:anywhere;}
 .fr-image-reader .fr-image-reader-source {color:var(--fr-image-muted);font-size:12px;margin-bottom:6px;}
+.fr-image-reader .fr-image-reader-note {color:var(--fr-image-muted);font-size:12px;margin:6px 0 0;}
 .fr-image-reader footer {display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;padding:8px 12px;border-top:1px solid var(--fr-image-line);color:var(--fr-image-muted);font-size:11px;}
 @media(max-width:480px) {.fr-image-reader{right:12px;top:12px;max-height:calc(100dvh - 24px)}}
 `;
 
-export function createImageTextReader(localize: (source: string) => string, onClose: () => void) {
+export function createImageTextReader(localize: (source: string) => string, onClose: (ownedFocus: boolean) => void) {
     const element = document.createElement('section');
     element.className = 'fr-image-reader';
     element.hidden = true;
@@ -62,6 +63,7 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         close.title = localize('关闭');
         copy.textContent = localize(comparing ? '复制对照' : '复制译文');
         feedback.textContent = localize('本地 OCR · 请核对名称和数字');
+        body.querySelectorAll('.fr-image-reader-note').forEach(note => {note.textContent = localize(note.getAttribute('data-message')!);});
     };
     const render = () => {
         body.replaceChildren();
@@ -79,6 +81,18 @@ export function createImageTextReader(localize: (source: string) => string, onCl
             translated.dir = 'auto';
             translated.textContent = !changed && line.sourceText !== undefined ? line.sourceText : line.text;
             article.append(translated);
+            if (line.numericUncertain) {
+                const note = document.createElement('p');
+                note.className = 'fr-image-reader-note';
+                note.setAttribute('data-message', '数字识别可能有误，请对照原图');
+                article.append(note);
+            }
+            if (line.renderSkipped) {
+                const note = document.createElement('p');
+                note.className = 'fr-image-reader-note';
+                note.setAttribute('data-message', '为保留原文，此译文未绘制到图片');
+                article.append(note);
+            }
             body.append(article);
         }
         compare.hidden = !lines.some(line => line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text));
@@ -86,26 +100,48 @@ export function createImageTextReader(localize: (source: string) => string, onCl
         refreshLanguage();
     };
     const closeReader = () => {
+        const doc = element.ownerDocument;
+        let root = element.getRootNode() as Document | ShadowRoot;
+        const active = root.activeElement;
+        let ownedFocus = !element.hidden && !!active && element.contains(active);
+        // 封闭或嵌套 ShadowRoot 可能仍保留内部活动元素；只有整条链都属于面板才归还焦点。
+        while (ownedFocus && root !== doc) {
+            const host = (root as ShadowRoot).host;
+            root = host.getRootNode() as Document | ShadowRoot;
+            ownedFocus = root.activeElement === host;
+        }
         element.hidden = true;
         revision += 1;
         clearTimeout(feedbackTimer);
-        onClose();
+        onClose(ownedFocus);
     };
     const handleClick = async (event: MouseEvent) => {
         if (!event.isTrusted || disposed) return;
         event.stopPropagation();
         if (event.target === close) closeReader();
-        if (event.target === compare) { comparing = !comparing; render(); }
+        if (event.target === compare) {
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            comparing = !comparing;
+            render();
+        }
         if (event.target !== copy) return;
-        const owner = revision;
-        const text = lines.map(line => comparing && line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text) ? `${line.sourceText}\n${line.text}` : line.sourceText !== undefined && !hasDistinctTranslation(line.sourceText, line.text) ? line.sourceText : line.text).join('\n\n');
+        const owner = ++revision;
+        clearTimeout(feedbackTimer);
+        feedback.textContent = localize('本地 OCR · 请核对名称和数字');
+        const text = lines.map(line => {
+            const value = comparing && line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text) ? `${line.sourceText}\n${line.text}` : line.sourceText !== undefined && !hasDistinctTranslation(line.sourceText, line.text) ? line.sourceText : line.text;
+            return line.numericUncertain ? `${value}\n${localize('数字识别可能有误，请对照原图')}` : value;
+        }).join('\n\n');
         let message = '已复制';
         try { await navigator.clipboard.writeText(text); }
         catch { message = '复制失败，请选中文字后手动复制'; }
         if (disposed || owner !== revision || element.hidden) return;
         feedback.textContent = localize(message);
         clearTimeout(feedbackTimer);
-        feedbackTimer = setTimeout(refreshLanguage, 2500);
+        feedbackTimer = setTimeout(() => {
+            if (!disposed && owner === revision && !element.hidden) refreshLanguage();
+        }, 2500);
     };
     const isolate = (event: Event) => event.stopPropagation();
     const handleKeydown = (event: KeyboardEvent) => {
@@ -119,7 +155,14 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     return {
         element, refreshLanguage,
         setLines(next: ImageReaderLine[]) {revision += 1; clearTimeout(feedbackTimer); lines = next.map(line => ({...line})); render();},
-        open() {element.hidden = false; element.focus({preventScroll: true});},
+        open(takeFocus = true) {
+            // 外层也可直接隐藏面板；新展示周期不能接收之前复制操作的迟到反馈。
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            refreshLanguage();
+            element.hidden = false;
+            if (takeFocus) element.focus({preventScroll: true});
+        },
         close: closeReader,
         dispose() {
             disposed = true;

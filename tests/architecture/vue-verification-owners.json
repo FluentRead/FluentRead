@@ -102,6 +102,13 @@
       ],
       "scenario": "实际模型下载、删除与错误恢复"
     },
+    "src/features/image-translation/ui/MangaReadingPanel.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/mangaReadingPanel.test.ts"
+      ],
+      "scenario": "实际 Vue 漫画目标选择、分页、复制竞争、取消与焦点"
+    },
     "src/features/image-translation/ui/MangaSettings.vue": {
       "kind": "behavior",
       "tests": [
@@ -331,10 +338,9 @@
       "scenario": "实际SFC高级规则表单、JSON导入导出、保存失败重试、旧草稿冲突和目录导航"
     },
     "src/features/settings/ui/SiteRulePreview.vue": {
-      "kind": "frozen-debt",
-      "sourceSha256": "2bde92413b15a4781456e43b291c215628fba2b169002e05755ed2d2186562eb",
-      "reason": "通过紧凑网址表单检查已保存的网站偏好与正文规则，检查前不展示结果占位。 当前尚未登记可确认的自动组件行为消费者；不把父组件mock或源码契约算作该组件行为证明。",
-      "exitCriteria": "修改此文件前，以真实SFC执行对应事件/异步/取消场景并登记消费者，或纳入正式逐文件严格覆盖；不得刷新冻结hash延续豁免。"
+      "kind": "behavior",
+      "tests": ["tests/sitePreferencesLifecycle.test.ts"],
+      "scenario": "真实SFC检查网址、解释网站与全局显示优先级、响应外部偏好、提示过期输入、显示适配范围并发出规则检查事件"
     },
     "src/features/settings/ui/TranslationCacheSettings.vue": {
       "kind": "behavior",

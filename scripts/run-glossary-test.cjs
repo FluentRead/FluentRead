@@ -301,7 +301,8 @@ async function main() {
       assert.equal(await ui.getByRole('cell', {name: '大语言模型', exact: true}).count(), 1, '排序保留正在编辑的词库');
       await priority.locator(':scope > summary').click();
       await toolbarAction('导入术语库');
-      await importDialog.getByLabel('或粘贴文件内容').fill('source,target,tgt_lng\ncomponent,组件,zh-CN');
+      await importDialog.getByRole('radio', {name:'粘贴内容',exact:true}).check();
+      await importDialog.getByRole('textbox', {name:'粘贴内容',exact:true}).fill('source,target,tgt_lng\ncomponent,组件,zh-CN');
       await importDialog.getByRole('button', {name: '确认导入', exact: true}).click();
       await importDialog.waitFor({state: 'hidden'});
       await waitConfig(config => config.glossaryLibraries.length === 3);
@@ -474,7 +475,8 @@ async function main() {
     await showSection('我的术语库');
     await toolbarAction('导入术语库');
     const dialog = options.getByRole('dialog', {name: '导入术语库'});
-    await dialog.getByLabel('或粘贴文件内容').fill('source,target,tgt_lng\nunused_private_term,未命中隐私词,zh-CN\nagent,通用智能体,zh-CN');
+    await dialog.getByRole('radio', {name:'粘贴内容',exact:true}).check();
+    await dialog.getByRole('textbox', {name:'粘贴内容',exact:true}).fill('source,target,tgt_lng\nunused_private_term,未命中隐私词,zh-CN\nagent,通用智能体,zh-CN');
     await dialog.getByRole('button', {name: '确认导入', exact: true}).click();
     await dialog.waitFor({state: 'hidden'});
     await waitConfig(config => config.glossaryLibraries.length === 2);

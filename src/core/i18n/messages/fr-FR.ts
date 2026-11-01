@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/fr-FR.json';
 import selfHelpText from './self-help/fr-FR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesFrenchMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -33,6 +34,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const frFRMessages = {
+    "settings.backup.includeContext": "Inclure le contexte du vocabulaire",
+    "feedback.serviceHint": "Vérifiez la connexion ou le modèle du service choisi, puis réessayez.",
+    "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",
     ...countForms['fr-FR'],
     ...personalCorrectionMessages['fr-FR'],
     "document.config.loadFailed": "Impossible de charger les paramètres. Rechargez la page et réessayez.",
@@ -66,6 +70,10 @@ export const frFRMessages = {
     "translationCenter.endpointMissing": "Renseignez d’abord l’adresse du service personnalisé.",
     "translationCenter.modelMissing": "Choisissez ou saisissez d’abord un modèle.",
     "translationCenter.noReady": "Configurez au moins un service pour traduire.",
+    'sidepanel.title': 'Traduction dans le panneau latéral',
+    'sidepanel.openError': 'Impossible d’ouvrir le panneau latéral. Réessayez ou ouvrez FluentRead depuis le menu latéral du navigateur.',
+    'sidepanel.settingsError': 'Impossible d’ouvrir les réglages. Réessayez.',
+    'sidepanel.startupError': 'Impossible de charger le panneau de traduction. Rechargez la page.',
     "translationCenter.intro": "Un texte, plusieurs traductions. Choisissez et comparez.",
     "translationCenter.input": "Texte à traduire",
     "translationCenter.source": "Langue source",
@@ -547,6 +555,7 @@ export const frFRMessages = {
     "settings.requestLimits.globalTitle": "Limites de requêtes",
     "settings.requestLimits.globalHelp": "Les services et modèles sans réglages spécifiques partagent ces limites.",
     ...aiRequestTimeoutMessages["fr-FR"],
+    ...selectionDictionaryMessages["fr-FR"],
     ...sectionTranslationRulesFrenchMessages,
     "settings.requestLimits.retryIntervals": "Délais de nouvelle tentative",
     "settings.requestLimits.apiKeyRecovery": "Refroidissement de la clé en échec",
@@ -579,7 +588,7 @@ export const frFRMessages = {
     "popup.pageFont.loading": "Lecture du réglage de police…",
     "popup.pageFont.unavailable": "Impossible de modifier la police de traduction pour le moment.",
     "popup.pageFont.readError": "Impossible de lire le réglage de police. Réessayez.",
-    "popup.pageFont.changeError": "Impossible d’enregistrer le réglage de police. Réessayez.",
+    "popup.pageFont.changeError": "Impossible d’enregistrer la police.",
     "popup.pageFont.retry": "Réessayer",
     "popup.quickSettings.appearanceDescription": "Le mode bilingue affiche le texte original et sa traduction ; l’autre mode affiche uniquement la traduction.",
     "popup.quickSettings.hoverSettings": "Réglages de traduction au survol",
@@ -1749,6 +1758,12 @@ export const frFRMessages = {
     "glossary.builtin.financeDescription": "États financiers, indicateurs de valorisation et marchés boursiers.",
     "glossary.builtin.research": "Recherche universitaire",
     "glossary.builtin.researchDescription": "Méthodes de recherche, statistiques et articles scientifiques.",
+    'glossary.builtin.hardware': "Matériel informatique",
+    'glossary.builtin.hardwareDescription': "Processeurs, mémoire, puces et circuits",
+    'glossary.builtin.networking': "Réseaux et cloud",
+    'glossary.builtin.networkingDescription': "Protocoles réseau, infrastructure cloud et déploiement",
+    'glossary.builtin.mathematics': "Mathématiques",
+    'glossary.builtin.mathematicsDescription': "Algèbre linéaire, calcul, probabilités et optimisation",
     "glossary.builtin.products": "Conserver les noms de produits",
     "glossary.builtin.productsDescription": "Conserve les noms courants d’outils de développement et de produits d’IA. Sensible à la casse.",
     "glossary.builtin.englishChinese": "Anglais → Chinois simplifié",
@@ -1784,6 +1799,26 @@ export const frFRMessages = {
     "glossary.previewDisabled": "L’interrupteur général est désactivé. L’aperçu fonctionne, mais les règles ne seront pas appliquées à la traduction.",
     "glossary.noMatches": "Aucun terme trouvé. Vérifiez le texte, les langues, les sites et les interrupteurs des glossaires.",
     "glossary.conflict": "{source} : utiliser « {kept} » ; ignorer « {ignored} ».",
+    "glossary.importPaste": "Coller du texte",
+    "glossary.importChoose": "Choisir un fichier",
+    "glossary.importReplace": "Changer de fichier",
+    "glossary.importReading": "Lecture…",
+    "glossary.importFileHint": "CSV, TSV ou JSON, 2 Mo maximum",
+    "glossary.importReview": "Aperçu de l’import",
+    "glossary.importMore": "Voir toutes les entrées",
+    "glossary.importPreserves": "Ajoute des glossaires sans remplacer les entrées existantes.",
+    "area.error.languages.title": "Un pack de langue OCR est nécessaire",
+    "area.error.languages.hint": "Une fois prêt, la traduction reprendra sur la zone sélectionnée.",
+    "area.error.capture.title": "Impossible de capturer la zone",
+    "area.error.capture.hint": "Vérifiez que cette page est visible, puis réessayez la capture.",
+    "area.error.empty.title": "Aucun texte reconnu",
+    "area.error.empty.hint": "Sélectionnez une zone plus nette avec un texte complet.",
+    "area.error.settings.title": "Vérifiez le service de traduction",
+    "area.error.settings.hint": "Vérifiez la connexion ou le modèle du service choisi, puis réessayez.",
+    "area.error.retry.title": "La traduction n’a pas abouti",
+    "area.error.retry.hint": "La zone sélectionnée est conservée. Vous pouvez réessayer.",
+    "area.error.more": "Autres actions",
+    "area.error.details": "Voir les détails",
     "glossary.importHelp": "Accepte CSV, TSV et JSON. Ajoute des glossaires sans remplacer les données existantes. Vérifiez chaque entrée avant de confirmer.",
     "glossary.file": "Choisir un fichier",
     "glossary.format": "Format du fichier",

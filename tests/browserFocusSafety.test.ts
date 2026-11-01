@@ -953,7 +953,8 @@ describe('browser regression focus safety', () => {
         expect(privacySource).toContain('baseRevision');
         expect(privacySource).toContain('exportCompleteBackupViaOptionsUi');
         expect(privacySource).toContain("name: '导出备份'");
-        expect(privacySource).toContain("name: '不包含并导出'");
+        expect(privacySource).toContain("name: /包含单词上下文/u");
+        expect(privacySource).toContain("getByRole('checkbox').isChecked()");
         expect(privacySource).toContain("waitForEvent('download'");
         expect(privacySource).toContain('includesPrivateVocabularyContext');
         expect(privacySource).toContain(

@@ -268,7 +268,7 @@ function createAiModelSelection(): HTMLButtonElement {
         'data-action': 'select-ai-model', role: 'menuitem',
         'aria-controls': 'fluent-read-video-model-prompt', 'aria-expanded': 'false',
     });
-    // 运行时确认 X 本地能力和配置状态后才显示，其他平台不引入空入口。
+    // 运行时确认当前平台的本地音源能力和配置状态后才显示，不为不支持的页面引入空入口。
     button.hidden = true;
     button.append(createTextElement('span', 'fluent-read-video-menu-label', ''), createIcon('next'));
     return button;

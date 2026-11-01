@@ -10,6 +10,7 @@ const EXPECTED_PROVIDER_FILES = [
     'registry.ts',
     'chatgpt-plan.ts',
     'ai-sdk/boundedErrorResponse.ts',
+    'ai-sdk/chatCompletionRequest.ts',
     'ai-sdk/endpoints.ts',
     'ai-sdk/errors.ts',
     'ai-sdk/openai-compatible.ts',

@@ -314,3 +314,157 @@ describe('漫画局部气泡识别边界',()=>{
         }
     });
 });
+
+
+describe('冲突识别不得删掉数字保护证据',()=>{
+    const number={text:'12:34',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const text={text:'HELLO',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const box={x0:40,y0:40,x1:250,y1:180};
+    it('局部正文与整页数字重叠时漫画与图片均保留两种证据',()=>{
+        const page={results:[number],bubbles:[{bbox:box,results:[text]}]};
+        expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+        expect(collectMangaRegions(page,'en',400,400,'image').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+    });
+    it.each([false,true])('跨气泡局部正文与数字冲突时按任意顺序保留：%s',numericFirst=>{
+        const other={x0:30,y0:30,x1:260,y1:200};
+        const choices=numericFirst?[number,text]:[text,number];
+        const page={results:[],bubbles:[{bbox:box,results:[choices[0]]},{bbox:other,results:[choices[1]]}]};
+        expect(collectMangaRegions(page,'en',400,400,'manga').map(row=>row.text)).toEqual(expect.arrayContaining(['12:34','HELLO']));
+    });
+});
+
+describe('重复的数值物理保护',()=>{
+    it.each(['manga','image'] as const)('%s 完整覆盖时不添加重复框，部分覆盖和不同位置仍保留',profile=>{
+        const number={text:'90%',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+        const identical={...number,confidence:.8};
+        const partial={...identical,box:{x:75,y:80,width:110,height:20}};
+        const far={...identical,box:{x:240,y:80,width:100,height:20}};
+        const group=(numericEvidence:typeof number[])=>collectMangaRegions({results:[number],numericEvidence},'en',400,400,profile);
+        expect(group([identical]).filter(region=>region.guardOnly)).toEqual([]);
+        expect(group([partial]).filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:75,y0:80,x1:185,y1:100}]);
+        expect(group([far]).filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:240,y0:80,x1:340,y1:100}]);
+    });
+});
+
+describe('疑似数字物理框边界',()=>{
+    const number={text:'90%',confidence:.8,box:{x:10,y:10,width:20,height:10}};
+    it.each([{x:NaN},{width:0},{height:-1}])('非法疑似数值框明确报错 %j',change=>{
+        expect(()=>collectMangaRegions({results:[{...number,box:{...number.box,...change}}]},'en',100,100,'image'))
+            .toThrow('保护位置无效');
+    });
+    it('图外框无像素需保护，相同物理框只保留一次',()=>{
+        const outside={...number,box:{x:200,y:200,width:10,height:10}};
+        const regions=collectMangaRegions({results:[outside,number,number]},'en',100,100,'image');
+        expect(regions.filter(region=>region.guardOnly).map(region=>region.bbox)).toEqual([{x0:10,y0:10,x1:30,y1:20}]);
+    });
+    it('非相同但完整覆盖的可信数字框可以保护原物理框',()=>{
+        const readable={...number,confidence:.99,box:{x:9,y:9,width:22,height:12}};
+        expect(collectMangaRegions({results:[readable],numericEvidence:[number]},'en',100,100,'manga').filter(region=>region.guardOnly)).toEqual([]);
+    });
+    it('过多不同疑似框时明确报错而不输出部分结果',()=>{
+        const many=Array.from({length:4097},(_,i)=>({...number,box:{x:i,y:10,width:.5,height:1}}));
+        expect(()=>collectMangaRegions({results:[],numericEvidence:many},'en',5000,100,'image')).toThrow('保护区域过于复杂');
+    });
+    it('候选框过多而不能完整证明包含关系时继续保留未证明框',()=>{
+        const readable=Array.from({length:1001},(_,i)=>({...number,confidence:.99,box:{x:i*2,y:10,width:1,height:1}}));
+        const uncertain=Array.from({length:1001},(_,i)=>({...number,box:{x:i*2,y:40,width:1,height:1}}));
+        const result=collectMangaRegions({results:readable,numericEvidence:uncertain},'en',5000,100,'image');
+        expect(result.filter(region=>region.guardOnly)).toHaveLength(1001);
+        expect(result.filter(region=>!region.guardOnly).every(region=>region.numericUncertain)).toBe(true);
+    });
+});
+
+
+it('同文不同框数字候选的全部物理覆盖都必须保留',()=>{
+    const broad={text:'12:34',confidence:.99,box:{x:80,y:80,width:100,height:20}};
+    const narrow={...broad,box:{...broad.box,width:51}};
+    const page={results:[broad],bubbles:[{bbox:{x0:40,y0:40,x1:250,y1:180},results:[narrow]}]};
+    const result=collectMangaRegions(page,'en',400,400,'manga');
+    expect(result.filter(row=>row.text==='12:34')).toHaveLength(1);
+    expect(result[0].bbox).toEqual({x0:80,y0:80,x1:180,y1:100});
+});
+
+
+it('数字去重比较预算耗尽时仍保留后续物理框',()=>{
+    const results=Array.from({length:1500},(_,index)=>({text:String(1000+index),confidence:.99,box:{x:(index%40)*20,y:Math.floor(index/40)*20,width:8,height:8}}));
+    const regions=collectMangaRegions({results},'en',1000,1000,'manga');
+    expect(regions).toHaveLength(results.length);expect(regions.some(region=>region.text==='2499')).toBe(true);
+    expect(regions.every(region=>region.numericUncertain)).toBe(true);
+});
+
+describe('数字结果的歧义提示',()=>{
+    it.each(['manga','image'] as const)('在 %s 标记两个方向的重叠不同数值，合并同值且不误标近邻',profile=>{
+        const bubble=box(40,40,240,150);
+        for(const [first,second] of [['08:45','12:34'],['12:34','08:45']]){
+            const lines=collectMangaRegions({results:[text(first,80,80,100,20)],bubbles:[{bbox:bubble,results:[text(second,82,80,100,20)]}]},'en',400,400,profile);
+            expect(lines.map(line=>line.text).sort()).toEqual([first,second].sort());
+            expect(lines.every(line=>line.numericUncertain===true)).toBe(true);
+        }
+        const same=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:bubble,results:[text('08:45',82,80,100,20)]}]},'en',400,400,profile);
+        expect(same).toHaveLength(1);expect(same[0].numericUncertain).toBeUndefined();
+        for(const [first,second] of [['USD   100','USD 100'],['USD 100','USD   100']]){
+            const sameSpaced=collectMangaRegions({results:[text(first,80,80,100,20)],bubbles:[{bbox:bubble,results:[text(second,82,80,100,20)]}]},'en',400,400,profile);
+            expect(sameSpaced).toHaveLength(1);expect(sameSpaced[0].numericUncertain).toBeUndefined();
+            expect([first,second]).toContain(sameSpaced[0].text);
+        }
+        const separate=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:bubble,results:[text('12:34',80,105,100,20)]}]},'en',400,400,profile);
+        expect(separate).toHaveLength(2);expect(separate.every(line=>!line.numericUncertain)).toBe(true);
+    });
+    it('多个数值证据共框时对合并的同值和不同值均提示核对',()=>{
+        const a=text('08:45',80,80,100,20),b=text('12:34',80,80,100,20);
+        const lines=collectMangaRegions({results:[a,b,a],numericEvidence:[a]},'en',400,400,'image');
+        expect(lines.map(item=>item.text)).toEqual(['08:45','12:34']);
+        expect(lines.every(item=>item.numericUncertain)).toBe(true);
+    });
+    it.each(['manga','image'] as const)('在 %s 区分数值证据的可信度与文本',profile=>{
+        const number=text('08:45',80,80,100,20);
+        const run=(evidence:typeof number[])=>collectMangaRegions({results:[number],numericEvidence:evidence},'en',400,400,profile);
+        expect(run([number])[0].numericUncertain).toBeUndefined();
+        const spaced=text('USD   100',80,80,100,20);
+        expect(collectMangaRegions({results:[spaced],numericEvidence:[spaced]},'en',400,400,profile)[0].numericUncertain).toBeUndefined();
+        expect(run([{...number,text:'12:34'}])[0].numericUncertain).toBe(true);
+        expect(run([{...number,confidence:.3}])[0].numericUncertain).toBe(true);
+        expect(run([number,{...number,text:'12:34'}])[0].numericUncertain).toBe(true);
+    });
+    it.each(['manga','image'] as const)('在 %s 对低置信重叠数字保留原图并标记可信数字需核对',profile=>{
+        const lines=collectMangaRegions({results:[text('08:45',80,80,100,20)],bubbles:[{bbox:box(40,40,240,150),results:[{...text('12:34',80,80,100,20),confidence:.3}]}]},'en',400,400,profile);
+        expect(lines).toHaveLength(1);expect(lines[0]).toMatchObject({text:'08:45',numericUncertain:true});
+    });
+    it.each(['manga','image'] as const)('在 %s 对覆盖或精确匹配的证据继续检查其他相交数值',profile=>{
+        // 第三个框恰好贴在精确证据右边，不能因边界接触而误报。
+        const before=text('40%',1,10,5,20),left=text('90%',10,10,100,20),right=text('80%',90,10,100,20),far=text('60%',110,10,20,20);
+        for(const [guard,retained] of [
+            [{...text('70%',95,12,10,12),confidence:.3},0],
+            [{...text('70%',10,10,100,20),confidence:.3},0],
+            [{...text('70%',95,5,10,30),confidence:.3},1],
+        ] as const){
+            for(const results of [[before,left,right,far],[far,right,left,before]]){
+                const lines=collectMangaRegions({results,numericEvidence:[guard]},'en',400,100,profile);
+                expect(lines.filter(line=>line.guardOnly)).toHaveLength(retained);
+                expect(lines.find(line=>line.text==='90%')?.numericUncertain).toBe(true);
+                expect(lines.find(line=>line.text==='80%')?.numericUncertain).toBe(true);
+                expect(lines.find(line=>line.text==='60%')?.numericUncertain).toBeUndefined();
+                expect(lines.find(line=>line.text==='40%')?.numericUncertain).toBeUndefined();
+            }
+        }
+    });
+    it.each(['manga','image'] as const)('在 %s 模式只忽略百分号前空白',profile=>{
+        for(const [first,second,uncertain] of [
+            ['90%','90 %',false],['90％','90   ％',false],['90%','80 %',true],
+            ['$1000','$1 000',true],
+        ] as const){
+            const lines=collectMangaRegions({results:[text(first,10,10,100,20),text(second,15,10,100,20)]},'en',300,100,profile);
+            expect(lines.every(line=>line.numericUncertain === (uncertain?true:undefined))).toBe(true);
+            expect(lines).toHaveLength(uncertain?2:1);
+        }
+    });
+    it('精确框仍有超过比较预算的候选时全部提示核对并保留未完成检查的保护框',()=>{
+        // x 相同但 y 分离，精确匹配不能跳过同列其他数值；最后一个 guard 超过一百万次比较。
+        const results=Array.from({length:1001},(_,index)=>text('90%',10,10+index*2,1,1));
+        const numericEvidence=results.map(item=>({...item,confidence:.3}));
+        const lines=collectMangaRegions({results,numericEvidence},'en',100,2500,'image');
+        expect(lines.filter(line=>!line.guardOnly)).toHaveLength(1001);
+        expect(lines.filter(line=>!line.guardOnly).every(line=>line.numericUncertain)).toBe(true);
+        expect(lines.some(line=>line.guardOnly)).toBe(true);
+    });
+});

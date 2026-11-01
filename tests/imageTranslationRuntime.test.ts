@@ -23,10 +23,11 @@ vi.mock('@/src/services/config/store', async () => {
 });
 import {createImageTranslationFailure} from '@/src/features/image-translation/failure';
 import {config as settings} from '@/src/services/config/store';
-import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, toggleMangaTranslation, subscribeMangaTranslation} from '@/src/features/image-translation/content';
+import {mountImageTranslator, unmountImageTranslator, toggleContextMenuImage, toggleMangaTranslation, subscribeMangaTranslation, getMangaReadingCandidates, readMangaReadingCandidate, observeMangaReadingCandidate, registerMangaReadingOverlayHost} from '@/src/features/image-translation/content';
 import type {MangaTranslationStatus} from '@/src/features/image-translation/content/mangaSession';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import * as controlsModule from '@/src/features/image-translation/content/controls';
+import {registerMangaReadingOpener} from '@/src/features/image-translation/content/runtime';
 
 // 本文件断言非中文界面文案；扩展运行时按需加载，测试中一次注册全部语言资源包。
 registerAllUiLanguageBundles();
@@ -227,6 +228,63 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator();while (restoreAnimationPorts.length) restoreAnimationPorts.pop()!(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
+    it.each([false,true])('普通Paddle保留原图结果在同状态重复触发时直接复用，缓存=%s',async cache=>{
+        settings.useCache=cache;settings.imageTranslationOcrEngine='paddle';
+        const create=controlsModule.createImageControls;
+        const port=vi.spyOn(controlsModule,'createImageControls').mockImplementation(actions=>create(actions));
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();const actions=port.mock.calls[0][0];
+        for(let index=0;index<3;index++){actions.onPrepare();await flush();}
+        expect(client.translate).toHaveBeenCalledOnce();expect(client.prepare).not.toHaveBeenCalled();
+        expect(env.button().dataset.phase).toBe('translated');expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+        env.image.src='https://example.test/new-source.png';env.dispatch(env.image,'load');actions.onPrepare();await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);
+    });
+
+    it('大尺寸原图全部保留时不加载缩放译图，提示可阅读且缓存恢复不重译', async () => {
+        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();Object.defineProperties(env.image,{naturalWidth:{value:6000,configurable:true},naturalHeight:{value:4000,configurable:true}});
+        env.hover();env.click();await flush();
+        expect(env.button().dataset.phase).toBe('translated');expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');expect(env.decoded).toHaveLength(0);
+        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;expect(warning).toBeTruthy();
+        env.dispatch(warning,'click');const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
+        expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('为保留原文，此译文未绘制到图片');
+        env.click();expect(env.image.style.opacity).not.toBe('0');env.click();await flush();
+        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it('关闭缓存时保留原图的结果可恢复且再次翻译不会复用旧结果',async()=>{
+        settings.useCache=false;
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();expect(env.button().dataset.phase).toBe('translated');
+        env.click();expect(env.image.style.opacity).not.toBe('0');env.click();await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');
+    });
+    it('普通图片所有文字均未变化时仍提供触屏可达的文字入口',async()=>{
+        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'KEEP',sourceText:'KEEP',bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();env.dispatch(env.image,'pointerout');
+        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+        expect(warning).toBeTruthy();expect(warning.textContent).toBe('ℹ');expect(warning.title).toContain('已识别文字，原图未改动');expect(warning.getAttribute('aria-label')).toContain('查看图片文字');
+        env.dispatch(warning,'click',true,{pointerType:'touch'});const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
+        expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('KEEP');
+        env.dispatch(warning,'click',true,{pointerType:'touch'});expect(reader.hidden).toBe(false);expect(env.image.style.opacity).not.toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it('保留原图的缓存遇到同 URL 重载或语言变化仍失效',async()=>{
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();env.click();
+        env.dispatch(env.image,'pointerout');vi.advanceTimersByTime(200);env.dispatch(env.image,'load');env.hover();env.click();await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);expect(env.image.style.opacity).not.toBe('0');
+        env.click();settings.to='fr';env.click();await flush();expect(client.translate).toHaveBeenCalledTimes(3);
+        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+    });
+    it('保留原图的结果在取消后迟到时不显示提示或文字',async()=>{
+        const noPaint={image:'',imageUnchanged:true as const,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true as const,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]};
+        const pending=deferred<typeof noPaint>();client.translate.mockReturnValueOnce(pending.promise);
+        const env=setup();env.hover();env.click();await flush();env.click();
+        pending.resolve(noPaint);await flush();
+        expect(env.button().dataset.phase).toBe('idle');expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+        expect(env.roots[0].querySelector('.fr-image-warning-button')).toBeNull();
+    });
     it('打开宿主大图后撤下被遮挡的缩略译图与文字面板，关闭后复用同一译图', async () => {
         const env = setup(); env.hover(); env.click(); await flush();
         const bitmap = env.bitmap()!;
@@ -349,6 +407,16 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(firstReader.textContent).toContain('完整译文');
     });
 
+    it('阅读入口替换后旧卸载不能撤销新入口，当前入口撤销后不再响应提示',()=>{
+        const create=controlsModule.createImageControls;
+        const port=vi.spyOn(controlsModule,'createImageControls').mockImplementation(actions=>create(actions));
+        const env=setup();env.hover();const warning=port.mock.calls[0][0].onWarning!;
+        const event={isTrusted:true} as MouseEvent,old=vi.fn(()=>true),current=vi.fn(()=>true);
+        warning(event);expect(old).not.toHaveBeenCalled();
+        const stopOld=registerMangaReadingOpener(old);warning(event);expect(old).toHaveBeenCalledWith(event);
+        const stopCurrent=registerMangaReadingOpener(current);stopOld();warning(event);expect(current).toHaveBeenCalledOnce();
+        stopCurrent();warning(event);expect(current).toHaveBeenCalledOnce();
+    });
     it('迟到控件回调在卸载后不能重建状态、启动识别或读取器', async () => {
         const create = controlsModule.createImageControls;
         const port = vi.spyOn(controlsModule, 'createImageControls').mockImplementation(actions => create(actions));
@@ -1496,6 +1564,120 @@ describe('视频预览不自动显示图片翻译', () => {
         env.image.className = 'zao-image'; env.parent.className = 'zao-image-container';
         return env;
     }
+    it('同屏排队图片显示处理中，完成后可读取且不额外启动翻译', async () => {
+        const env=readerPage(),first=deferred<typeof result>(),secondResult=deferred<typeof result>();
+        const second=addSecondHoverImage(env,()=>({left:20,right:420,top:260,bottom:460,width:400,height:200} as DOMRect));
+        second.className='zao-image';
+        Object.assign(document,{elementsFromPoint:(_x:number,y:number)=>[y<250?env.image:second,env.parent,document.body]});
+        client.translate.mockReturnValueOnce(first.promise).mockReturnValueOnce(secondResult.promise);
+        mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();expect(list.status).toBe('ready');if(list.status!=='ready')throw Error('no candidates');
+        expect(list.items).toHaveLength(2);expect(client.translate).toHaveBeenCalledTimes(1);
+        const token=list.items[1].token,signal=new AbortController().signal;
+        expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'pending'});
+        expect(client.translate).toHaveBeenCalledTimes(1);
+        const cancelled=new AbortController();cancelled.abort();
+        expect(await readMangaReadingCandidate(token,cancelled.signal)).toEqual({status:'cancelled'});
+        first.resolve(result);await flush();expect(client.translate).toHaveBeenCalledTimes(2);
+        expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'pending'});
+        secondResult.resolve(result);await flush();
+        expect(await readMangaReadingCandidate(token,signal)).toMatchObject({status:'ready',lines:[{text:'完整译文'}]});
+        expect(client.translate).toHaveBeenCalledTimes(2);
+    });
+    it.each(['source','removed','hidden','route','close','unmount'] as const)('排队图片在 %s 后不能继续报告处理中',async change=>{
+        const env=readerPage(),first=deferred<typeof result>();
+        const second=addSecondHoverImage(env,()=>({left:20,right:420,top:260,bottom:460,width:400,height:200} as DOMRect));second.className='zao-image';
+        Object.assign(document,{elementsFromPoint:(_x:number,y:number)=>[y<250?env.image:second,env.parent,document.body]});
+        client.translate.mockReturnValueOnce(first.promise);
+        mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready')throw Error('no candidates');
+        const token=list.items[1].token,signal=new AbortController().signal;
+        expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'pending'});
+        if(change==='source')second.src='https://example.test/changed.png';
+        if(change==='removed')second.remove();
+        if(change==='hidden')env.extraStyles.set(second,{display:'none',visibility:'visible',opacity:'1'});
+        if(change==='route')Object.assign(env.windowObject,{location:{href:'https://mangaplus.shueisha.co.jp/viewer/changed'}});
+        if(change==='close')toggleMangaTranslation();
+        if(change==='unmount')unmountImageTranslator();
+        expect((await readMangaReadingCandidate(token,signal)).status).toBe(change==='unmount'?'unavailable':'stale');
+        first.resolve(result);await flush();
+    });
+    it('排队页开始失败后返回错误状态',async()=>{
+        const env=readerPage(),first=deferred<typeof result>(),secondResult=deferred<typeof result>();
+        const second=addSecondHoverImage(env,()=>({left:20,right:420,top:260,bottom:460,width:400,height:200} as DOMRect));second.className='zao-image';
+        Object.assign(document,{elementsFromPoint:(_x:number,y:number)=>[y<250?env.image:second,env.parent,document.body]});
+        client.translate.mockReturnValueOnce(first.promise).mockReturnValueOnce(secondResult.promise);
+        mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready')throw Error('no candidates');
+        const token=list.items[1].token,signal=new AbortController().signal;
+        first.resolve(result);await flush();secondResult.reject(new Error('translation failed'));await flush();
+        expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'error'});
+    });
+    it('按需读取已显示图片，换源后拒绝旧令牌且不启动翻译', async () => {
+        const env=readerPage();Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        mountImageTranslator();expect(toggleMangaTranslation()).toBe(true);await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();expect(list.status).toBe('ready');
+        if(list.status!=='ready')throw new Error('no candidates');
+        expect(list.items).toHaveLength(1);expect(list.items[0].kind).toBe('image');
+        const calls=client.translate.mock.calls.length;
+        expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'完整译文'}]});
+        const invalid=vi.fn(),stop=observeMangaReadingCandidate(list.items[0].token,invalid);expect(stop).toBeTypeOf('function');
+        for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        expect(invalid).not.toHaveBeenCalled();
+        env.image.src='https://example.test/changed.png';
+        expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        env.runFrames();
+        expect(invalid).toHaveBeenCalledOnce();stop!();
+        expect(client.translate).toHaveBeenCalledTimes(calls);
+    });
+    it.each(['scroll','route','configuration','unmount'] as const)('按需图片令牌在 %s 后失效，重挂不能复活旧身份',async change=>{
+        const env=readerPage();settings.useCache=false;Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        const token=list.items[0].token;
+        if(change==='scroll')for(const [name,listener] of env.windowObject.addEventListener.mock.calls)if(name==='scroll')(listener as EventListener)(new Event('scroll'));
+        if(change==='route')Object.assign(env.windowObject,{location:{href:'https://mangaplus.shueisha.co.jp/viewer/999'}});
+        if(change==='configuration'){settings.to='en';await flush();}
+        if(change==='unmount'){unmountImageTranslator();mountImageTranslator();toggleMangaTranslation();await flush();}
+        expect((await readMangaReadingCandidate(token,new AbortController().signal)).status).not.toBe('ready');
+    });
+    it('按需遮挡只忽略扩展持有的面板，不相信网页伪造标记',async()=>{
+        const env=readerPage(),owned=document.createElement('aside'),fake=document.createElement('aside');
+        fake.setAttribute('data-fluent-read-ui','');document.body.append(owned,fake);
+        let front=owned;Object.assign(document,{elementsFromPoint:()=>[front,env.image,env.parent,document.body]});
+        const release=registerMangaReadingOverlayHost(owned);mountImageTranslator();toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const releaseCurrent=registerMangaReadingOverlayHost(owned);release();
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        front=fake;expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'stale'});
+        releaseCurrent();owned.remove();fake.remove();
+    });
+    it('网页预置伪造标记的兄弟层变为前景时关闭已读快照',async()=>{
+        const env=readerPage(),fake=document.createElement('aside');fake.setAttribute('data-fluent-read-ui','');document.body.append(fake);
+        let covered=false;Object.assign(document,{elementsFromPoint:()=>covered?[fake,env.image,env.parent,document.body]:[env.image,env.parent,document.body]});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const invalid=vi.fn(),release=observeMangaReadingCandidate(list.items[0].token,invalid);expect(release).toBeTypeOf('function');
+        const reader=env.observers.find(observer=>observer.observe.mock.calls[0]?.[1]?.attributeFilter?.includes('data-manga-reader'))!;
+        covered=true;reader.callback([{target:fake,type:'attributes',attributeName:'style'} as unknown as MutationRecord],{} as MutationObserver);
+        env.runFrames();expect(invalid).toHaveBeenCalledOnce();release!();fake.remove();
+    });
+    it.each(['hide','source'] as const)('网页标记祖先后 %s 仍立即关闭已读快照',async change=>{
+        const env=readerPage();Object.assign(document,{elementsFromPoint:()=>[env.image,env.parent,document.body]});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing image');
+        expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        const invalid=vi.fn(),release=observeMangaReadingCandidate(list.items[0].token,invalid);expect(release).toBeTypeOf('function');
+        env.parent.setAttribute('data-fluent-read-ui','');
+        if(change==='hide')env.extraStyles.set(env.parent,{display:'none',visibility:'visible',opacity:'1'});
+        else env.image.src='https://example.test/changed.png';
+        const reader=env.observers.find(observer=>observer.observe.mock.calls[0]?.[1]?.attributeFilter?.includes('data-manga-reader'))!;
+        reader.callback([{target:change==='hide'?env.parent:env.image,type:'attributes',attributeName:change==='hide'?'style':'src'} as unknown as MutationRecord],{} as MutationObserver);
+        expect(invalid).toHaveBeenCalledOnce();release!();
+    });
     function cacheChapter(env: ReturnType<typeof readerPage>, count: number) {
         let current = 0, nearby = -1;
         const rect = (index: number) => ({left:20,right:420,top:current===index?40:nearby===index?900:5000,
@@ -1530,6 +1712,61 @@ describe('视频预览不自动显示图片翻译', () => {
         vi.stubGlobal('createImageBitmap', vi.fn(async () => ({width: 10, height: 20, close: vi.fn()})));
         return {...env, page, interaction};
     }
+    it.each(['canvas','background','segment'] as const)('漫画 %s 处理中可按需查看状态，来源改变后失效',async surface=>{
+        const env=surface==='canvas'?canvasChapter():readerPage(), pending=deferred<typeof result>();
+        vi.stubGlobal('DOMRect',class {constructor(public x:number,public y:number,public width:number,public height:number){}get left(){return this.x;}get top(){return this.y;}get right(){return this.x+this.width;}get bottom(){return this.y+this.height;}});
+        let changeSource:()=>void;
+        if(surface==='canvas') {
+            const canvas=document.createElement('canvas');canvas.width=400;canvas.height=200;
+            canvas.getBoundingClientRect=()=>({left:20,right:420,top:260,bottom:460,width:400,height:200} as DOMRect);
+            const container=document.createElement('div');container.className='image-container';container.append(canvas);
+            const bullet=document.createElement('div');bullet.className='bullet-screen';const interaction=document.createElement('div');interaction.className='bullet-container';bullet.append(interaction);container.append(bullet);
+            env.parent.querySelector('.view-container')!.append(container);
+            Object.assign(document,{elementFromPoint:(_x:number,y:number)=>y<250?(env as ReturnType<typeof canvasChapter>).interaction:interaction});
+            changeSource=()=>{canvas.width=401;};
+        } else if(surface==='background') {
+            Object.assign(env.windowObject,{location:{href:'https://comic.pixiv.net/viewer/stories/123',origin:'https://comic.pixiv.net'}});
+            env.image.remove();const page=document.createElement('div');page.id='page-1';page.style.backgroundImage='url("blob:https://comic.pixiv.net/waiting")';page.getBoundingClientRect=env.image.getBoundingClientRect;env.parent.append(page);
+            env.extraStyles.set(page,{display:'block',visibility:'visible',opacity:'1',backgroundImage:page.style.backgroundImage,backgroundSize:'contain',backgroundRepeat:'no-repeat',backgroundOrigin:'padding-box',backgroundPosition:'50% 50%'});
+            const second=document.createElement('div');second.id='page-2';second.style.backgroundImage='url("blob:https://comic.pixiv.net/waiting2")';second.getBoundingClientRect=()=>({left:20,right:420,top:260,bottom:460,width:400,height:200} as DOMRect);env.parent.append(second);
+            env.extraStyles.set(second,{display:'block',visibility:'visible',opacity:'1',backgroundImage:second.style.backgroundImage,backgroundSize:'contain',backgroundRepeat:'no-repeat',backgroundOrigin:'padding-box',backgroundPosition:'50% 50%'});
+            Object.assign(document,{elementFromPoint:(_x:number,y:number)=>y<250?page:second});
+            toggleMangaTranslation();await flush();env.runFrames();await flush();
+            changeSource=()=>{second.style.backgroundImage='url("blob:https://comic.pixiv.net/changed")';};
+        } else {
+            Object.defineProperty(env.image,'naturalHeight',{value:6000});env.setRect({left:20,top:-1800,width:400,height:6000,right:420,bottom:4200});
+            Object.assign(env.imageStyle,{paddingTop:'0px',paddingRight:'0px',paddingBottom:'0px',paddingLeft:'0px',borderTopWidth:'0px',borderRightWidth:'0px',borderBottomWidth:'0px',borderLeftWidth:'0px',objectFit:'fill'});
+            Object.assign(document,{elementFromPoint:()=>env.image});
+            changeSource=()=>{env.image.src='https://example.test/changed.png';};
+        }
+        client.translate.mockReturnValueOnce(pending.promise);
+        expect(toggleMangaTranslation()).toBe(true);await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready')throw Error('no candidates');
+        const matching=list.items.filter(candidate=>candidate.kind===surface);expect(matching).toHaveLength(2);
+        const item=matching[1];
+        const token=item!.token,signal=new AbortController().signal,count=client.translate.mock.calls.length;
+        expect(count).toBe(1);expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'pending'});
+        expect(client.translate).toHaveBeenCalledTimes(count);
+        changeSource();expect(await readMangaReadingCandidate(token,signal)).toEqual({status:'stale'});
+        pending.resolve(result);await flush();
+    });
+    it('取消后的原生编码迟迟不回调，重挂也不能开始下一次读取',async()=>{
+        const env=canvasChapter();client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[]}});
+        toggleMangaTranslation();await flush();env.runFrames();await flush();
+        let list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing canvas');
+        env.setAutoEncode(false);const abort=new AbortController(),pending=readMangaReadingCandidate(list.items[0].token,abort.signal);
+        try {
+            await flush();expect(env.pendingPng).toHaveLength(1);abort.abort();expect(await pending).toEqual({status:'cancelled'});
+            for(let attempt=0;attempt<3;attempt++){
+                unmountImageTranslator();mountImageTranslator();env.setAutoEncode(true);toggleMangaTranslation();await flush();env.runFrames();await flush();
+                list=getMangaReadingCandidates();if(list.status!=='ready'||!list.items.length)throw Error('missing remounted canvas');
+                expect(await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).toEqual({status:'unavailable'});
+                expect(env.pendingPng).toHaveLength(1);
+            }
+            env.pendingPng[0](new Blob(['late']));await flush();
+            expect((await readMangaReadingCandidate(list.items[0].token,new AbortController().signal)).status).toBe('ready');
+        } finally {abort.abort();env.pendingPng[0]?.(new Blob(['cleanup']));}
+    });
     it('完整入口把画布准备、阶段进度、交互遮罩和缓存复用接到同一漫画会话', async () => {
         const env = canvasChapter(), statuses: MangaTranslationStatus[] = [];
         const stop = subscribeMangaTranslation(status => statuses.push(status));
@@ -1544,6 +1781,10 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(statuses).toContainEqual(expect.objectContaining({stage: 'recognizing', progress: 50}));
         const surface = env.roots.at(-1)!.querySelector('canvas')!;
         expect(surface.style.display).toBe('block'); expect(env.page.width).toBe(400);
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing canvas');
+        expect(candidates.items[0].kind).toBe('canvas');
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'完整译文'}]});
         toggleMangaTranslation(); await flush(); expect(surface.style.display).toBe('none');
         toggleMangaTranslation(); await flush(); expect(surface.style.display).toBe('block'); expect(client.translate).toHaveBeenCalledOnce();
         Object.assign(document, {elementFromPoint: () => document.createElement('aside')});
@@ -1557,7 +1798,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const stop = subscribeMangaTranslation(status => statuses.push(status));
         settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
         client.prepare.mockReturnValue(prepared.promise);
-        toggleMangaTranslation(); await flush(); expect(client.prepare).toHaveBeenCalledOnce();
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); expect(client.prepare).toHaveBeenCalledOnce();
         const signal = client.prepare.mock.calls[0][1] as AbortSignal, progress = client.prepare.mock.calls[0][2];
         toggleMangaTranslation(); await flush(); const count = statuses.length;
         expect(signal.aborted).toBe(true); progress(99); prepared.resolve(); await flush();
@@ -1577,6 +1818,10 @@ describe('视频预览不自动显示图片翻译', () => {
         toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
         expect(toggleMangaTranslation()).toBe(true); await flush(); env.runFrames(); await flush();
         expect(client.translate).toHaveBeenCalledWith(expect.any(String), 'auto', 'Image fixture', expect.objectContaining({manga: true}));
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing background');
+        expect(candidates.items[0].kind).toBe('background');
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         toggleMangaTranslation(); await flush(); toggleMangaTranslation(); await flush(); expect(client.translate).toHaveBeenCalledOnce();
         expect(page.style.backgroundImage).toContain('blob:https://comic.pixiv.net/fixture');
         unmountImageTranslator(); expect(env.canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
@@ -1599,8 +1844,11 @@ describe('视频预览不自动显示图片翻译', () => {
         }
         client.translate.mockRejectedValueOnce(createImageTranslationFailure('provider error detail',{errorCode:'language'}));
         expect(toggleMangaTranslation()).toBe(true);await flush();env.runFrames();await flush();
+        const list=getMangaReadingCandidates();if(list.status!=='ready')throw Error('no candidates');
+        const candidate=list.items.find(item=>item.kind===surface);expect(candidate).toBeDefined();
+        expect(await readMangaReadingCandidate(candidate!.token,new AbortController().signal)).toEqual({status:'error'});
         const feedback=env.roots.at(-1)!.querySelector<HTMLElement>('.fr-image-feedback')!;
-        expect(feedback.hidden).toBe(false);expect(feedback.querySelector('details')!.textContent).toContain('provider error detail');
+        expect(feedback.hidden).toBe(false);expect(feedback.querySelector('.fr-image-error-details')!.textContent).toContain('provider error detail');
         expect(statuses.at(-1)).toMatchObject({errors:1,pending:false});
         env.dispatch(feedback.querySelector('.fr-image-model-settings')!,'click');await flush();
         expect(client.settings).toHaveBeenLastCalledWith({type:'openOptionsPage',section:'settings-services',service:'localTranslation'});
@@ -1623,7 +1871,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const env=readerPage();Object.assign(env.windowObject,{location:{href}});env.parent.innerHTML=markup;
         env.parent.querySelector('[data-target]')!.appendChild(env.image);env.image.className='reader-viewer-img';env.image.id='content_image_0';
         settings.from='auto';settings.imageTranslationMangaDownloadConfirmed=true;settings.imageTranslationOcrEngine='paddle';
-        toggleMangaTranslation();await flush();
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith(source,expect.any(AbortSignal),expect.any(Function));
         expect(client.translate).toHaveBeenCalledWith(expect.any(String),source,expect.any(String),expect.objectContaining({manga:true}));
         expect(settings.from).toBe('auto');expect(env.bitmap()).not.toBeNull();
@@ -1641,7 +1889,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const env=readerPage(),href='https://mangalib.me/ru/1--title/read/v22/c129';Object.assign(env.windowObject,{location:{href}});
         env.parent.innerHTML='<div data-reader-mode="vertical"><main data-reader-info-visible="true"><div><div data-page="1" data-target></div></div></main></div>';
         env.parent.querySelector('[data-target]')!.appendChild(env.image);settings.imageTranslationMangaDownloadConfirmed=true;
-        toggleMangaTranslation();await flush();expect(client.translate.mock.calls.at(-1)?.[1]).toBe('ru');
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(client.translate.mock.calls.at(-1)?.[1]).toBe('ru');
         settings.imageTranslationMangaSites=[{hostname:'mangalib.me',pathPrefix:'/ru/1--title/read/v22/c129',selector:'.zao-image'}];
         await flush();env.runFrames();await flush();
         expect(client.translate).toHaveBeenCalledTimes(2);expect(client.translate.mock.calls.at(-1)?.[1]).toBe('auto');
@@ -1654,15 +1902,20 @@ describe('视频预览不自动显示图片翻译', () => {
         Object.assign(env.imageStyle,{paddingTop:'0px',paddingRight:'0px',paddingBottom:'0px',paddingLeft:'0px',borderTopWidth:'0px',borderRightWidth:'0px',borderBottomWidth:'0px',borderLeftWidth:'0px',objectFit:'fill'});
         env.setRect({left:20,top:40,width:400,height:6000,right:420,bottom:6040});
         settings.from='auto';settings.imageTranslationMangaDownloadConfirmed=true;settings.imageTranslationMangaPrefetchPages=0;
-        client.translate.mockResolvedValue({...result,lines:[]});toggleMangaTranslation();await flush();
+        client.translate.mockResolvedValue({...result,lines:[]});toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith('ko',expect.any(AbortSignal),expect.any(Function));
         expect(client.translate).toHaveBeenCalledWith(expect.any(String),'ko',expect.any(String),expect.objectContaining({manga:true}));
         expect(settings.from).toBe('auto');expect(env.image.naturalHeight).toBe(6000);
+        Object.assign(document,{elementFromPoint:()=>env.image});env.runFrames();await flush();
+        const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');
+        if(candidates.status!=='ready')throw Error('missing segment');
+        expect(candidates.items[0]).toMatchObject({kind:'segment',segment:{top:0}});
+        expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         unmountImageTranslator();expect(env.image.style.opacity).not.toBe('0');
     });
     it.each(['ru', 'ko-KR'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {
         const env = readerPage();settings.from = source;settings.imageTranslationOcrEngine = 'paddle';settings.imageTranslationMangaDownloadConfirmed = true;
-        toggleMangaTranslation();await flush();
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith(source, expect.any(AbortSignal), expect.any(Function));
         expect(client.prepare.mock.invocationCallOrder[0]).toBeLessThan(client.translate.mock.invocationCallOrder[0]);
         expect(client.translate).toHaveBeenCalledWith(expect.any(String), source, expect.any(String), expect.objectContaining({manga: true}));
@@ -1670,10 +1923,18 @@ describe('视频预览不自动显示图片翻译', () => {
         toggleMangaTranslation();await flush();expect(env.bitmap()).not.toBeNull();
         expect(client.prepare).toHaveBeenCalledOnce();expect(client.translate).toHaveBeenCalledOnce();
     });
+    it('漫画配置变化后的刷新帧前不准备语言包，帧后按当前配置开始', async () => {
+        const env=readerPage();settings.from='ru';settings.imageTranslationMangaDownloadConfirmed=true;
+        expect(toggleMangaTranslation()).toBe(true);await flush();
+        expect(client.prepare).not.toHaveBeenCalled();expect(client.translate).not.toHaveBeenCalled();
+        env.runFrames();await flush();
+        expect(client.prepare).toHaveBeenCalledWith('ru',expect.any(AbortSignal),expect.any(Function));
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
     it('漫画未确认下载时不自动准备俄语包，失败保留原图与重试能力', async () => {
         const env = readerPage();settings.from = 'ru';client.translate.mockRejectedValueOnce(new Error('请先下载语言包'));
         const listener = vi.fn(), stop = subscribeMangaTranslation(listener);
-        toggleMangaTranslation();await flush();expect(client.prepare).not.toHaveBeenCalled();
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(client.prepare).not.toHaveBeenCalled();
         expect(env.bitmap()).toBeNull();expect(env.image.style.opacity).not.toBe('0');
         expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({errors: 1}));
         settings.imageTranslationMangaDownloadConfirmed = true;
@@ -1683,7 +1944,7 @@ describe('视频预览不自动显示图片翻译', () => {
     it.each(['pause', 'language', 'unmount'])('准备漫画语言包期间 %s 后不发起旧识别、不改原图', async action => {
         const env = readerPage();settings.from = 'ko';settings.imageTranslationMangaDownloadConfirmed = true;
         const wait = deferred<void>();client.prepare.mockReturnValueOnce(wait.promise);
-        toggleMangaTranslation();await flush();expect(client.prepare).toHaveBeenCalledOnce();expect(client.translate).not.toHaveBeenCalled();
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(client.prepare).toHaveBeenCalledOnce();expect(client.translate).not.toHaveBeenCalled();
         const signal = client.prepare.mock.calls[0][1] as AbortSignal;
         if (action === 'pause') toggleMangaTranslation();
         if (action === 'language') settings.from = 'ru';
@@ -1692,10 +1953,376 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(client.translate).not.toHaveBeenCalled();expect(env.bitmap()).toBeNull();expect(env.image.style.opacity).not.toBe('0');
         if (action !== 'language') expect(signal.aborted).toBe(true);
     });
+    it('漫画语言包下载失败后通过会话重试，失败与成功同步更新页面状态', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        client.prepare.mockRejectedValueOnce(new Error('download failed')).mockRejectedValueOnce(new Error('retry failed'));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        expect(statuses.at(-1)).toMatchObject({active: true, errors: 1, completed: 0, pending: false});
+        const prepare = env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement;
+        expect(prepare.hidden).toBe(false); env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+        expect(statuses.at(-1)).toMatchObject({active: true, errors: 1, completed: 0, pending: false});
+        expect(prepare.hidden).toBe(false); env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3); expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, errors: 0, completed: 1, pending: false});
+        stop();
+    });
+    it('漫画准备重试等待另一页任务完成后串行执行', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        const second = addSecondHoverImage(env, () => env.image.getBoundingClientRect()); second.className = 'zao-image';
+        const waiting = deferred<void>(); client.prepare.mockRejectedValueOnce(new Error('download failed')).mockReturnValueOnce(waiting.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        expect(statuses.at(-1)).toMatchObject({active: true, errors: 1, pending: true});
+        const prepare = Array.from(env.roots.at(-1)!.querySelectorAll('.fr-image-prepare')).find(button => !(button as HTMLButtonElement).hidden) as HTMLButtonElement;
+        expect(prepare).toBeTruthy(); env.dispatch(prepare, 'click'); await flush();
+        env.dispatch(prepare, 'click'); env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+        waiting.resolve(); await flush(); await flush(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3); expect(client.translate).toHaveBeenCalledTimes(2);
+        expect(statuses.at(-1)).toMatchObject({active: true, errors: 0, completed: 2, pending: false});
+        stop();
+    });
+    it('漫画准备重试排队后暂停不会启动旧页', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        const second = addSecondHoverImage(env, () => env.image.getBoundingClientRect()); second.className = 'zao-image';
+        const waiting = deferred<void>(); client.prepare.mockRejectedValueOnce(new Error('download failed')).mockReturnValueOnce(waiting.promise);
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        const signal = client.prepare.mock.calls[1][1] as AbortSignal;
+        const prepare = Array.from(env.roots.at(-1)!.querySelectorAll('.fr-image-prepare')).find(button => !(button as HTMLButtonElement).hidden) as HTMLButtonElement;
+        env.dispatch(prepare, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledTimes(2);
+        toggleMangaTranslation(); expect(signal.aborted).toBe(true); waiting.resolve(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+    });
+
+    it('漫画准备重试排队后切换语言，不再下载旧语言包', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        const second = addSecondHoverImage(env, () => env.image.getBoundingClientRect()); second.className = 'zao-image';
+        const waiting = deferred<void>(); client.prepare.mockRejectedValueOnce(new Error('download failed')).mockReturnValueOnce(waiting.promise);
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        const prepare = Array.from(env.roots.at(-1)!.querySelectorAll('.fr-image-prepare')).find(button => !(button as HTMLButtonElement).hidden) as HTMLButtonElement;
+        env.dispatch(prepare, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledTimes(2);
+        const signal = client.prepare.mock.calls[1][1] as AbortSignal;
+        settings.from = 'en'; await flush(); env.runFrames(); await flush();
+        waiting.resolve(); await flush(); await flush();
+        expect(signal.aborted).toBe(true); expect(client.prepare).toHaveBeenCalledTimes(2);
+        expect(client.translate).toHaveBeenCalled();
+        expect(client.translate.mock.calls.every(call => call[1] === 'en')).toBe(true);
+    });
+    it('漫画页面隐藏时拒绝准备重试，恢复可见后仍可重试', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('download failed')); toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        const prepare = env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement;
+        Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+        env.dispatch(prepare, 'click'); await flush(); expect(client.prepare).toHaveBeenCalledTimes(1);
+        expect(prepare.hidden).toBe(false);
+        Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+        env.dispatch(prepare, 'click'); await flush(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).not.toBeNull();
+    });
+    it('卸载后失效的漫画准备按钮不再发起请求', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('download failed')); toggleMangaTranslation(); await flush(); env.runFrames(); await flush();
+        const prepare = env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement;
+        unmountImageTranslator(); env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(1); expect(client.translate).not.toHaveBeenCalled();
+    });
+    it('漫画暂停后右键单页准备失败，下载按钮仍可恢复翻译', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed')).mockRejectedValueOnce(new Error('second download failed'));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); expect(client.prepare).toHaveBeenCalledTimes(1);
+        toggleMangaTranslation(); expect(statuses.at(-1)).toMatchObject({active: false});
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+        const prepare = env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement;
+        expect(prepare.hidden).toBe(false); env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3); expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).not.toBeNull(); expect(statuses.at(-1)).toMatchObject({active: false});
+        stop();
+    });
+    it('漫画暂停后右键准备失败，再切换识别语言时不下载旧语言包', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed')).mockRejectedValueOnce(new Error('second download failed'));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); toggleMangaTranslation();
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+        const prepare = env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement;
+        expect(prepare.hidden).toBe(false); settings.from = 'en'; await flush();
+        env.dispatch(prepare, 'click'); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).toHaveBeenCalledOnce();
+        expect(client.translate.mock.calls[0][1]).toBe('en'); expect(env.bitmap()).not.toBeNull();
+    });
+    it.each(['success', 'failure'] as const)('暂停后右键准备在途重开漫画会话，%s 与会话状态同步', async outcome => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); toggleMangaTranslation();
+        const pending = deferred<void>(); client.prepare.mockReturnValueOnce(pending.promise);
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(client.translate).not.toHaveBeenCalled();
+        toggleMangaTranslation(); await flush();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        if (outcome === 'success') pending.resolve(); else pending.reject(new Error('second download failed'));
+        await flush(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        expect(client.translate).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 0);
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: outcome === 'success' ? 0 : 1, completed: outcome === 'success' ? 1 : 0});
+        if (outcome === 'success') expect(env.bitmap()).not.toBeNull();
+        else expect((env.roots.at(-1)!.querySelector('.fr-image-prepare') as HTMLButtonElement).hidden).toBe(false);
+        stop();
+    });
+    async function queuedPausedManga() {
+        const env = readerPage();settings.from = 'ru';settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();toggleMangaTranslation();
+        const old = deferred<void>();client.prepare.mockReturnValueOnce(old.promise);
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        toggleMangaTranslation();await flush();toggleMangaTranslation();
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        const feedback = env.roots.at(-1)!.querySelector('.fr-image-feedback') as HTMLElement;
+        return {env, old, feedback};
+    }
+    it('暂停后右键单页等待旧任务结束时展示可取消的排队反馈', async () => {
+        const {old, feedback} = await queuedPausedManga();
+        expect(feedback.hidden).toBe(false);
+        expect(feedback.textContent).toMatch(/等待|排队/);
+        expect(Array.from(feedback.querySelectorAll('button')).some(button => !button.hidden && /取消/.test(button.textContent || ''))).toBe(true);
+        old.resolve();await flush();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it.each(['resolve', 'reject'] as const)('取消暂停单页排队，旧任务迟到 %s 不启动待处理任务', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const cancel = Array.from(feedback.querySelectorAll('button')).find(button => !button.hidden && /取消/.test(button.textContent || ''));
+        expect(cancel).toBeTruthy();env.dispatch(cancel!, 'click');await flush();
+        expect(feedback.hidden).toBe(true);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();env.runFrames();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+        expect(env.bitmap()).toBeNull();
+    });
+    it.each(['resolve', 'reject'] as const)('取消排队后再次右键，旧任务迟到 %s 只启动新等待一次', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const cancel = Array.from(feedback.querySelectorAll('button')).find(button => !button.hidden && /取消/.test(button.textContent || ''));
+        expect(cancel).toBeTruthy();env.dispatch(cancel!, 'click');await flush();
+        const next = deferred<void>();client.prepare.mockReturnValueOnce(next.promise);
+        env.dispatch(env.image, 'contextmenu');expect(toggleContextMenuImage(env.image.src)).toBe(true);await flush();
+        expect(feedback.hidden).toBe(false);expect(feedback.textContent).toMatch(/等待|排队/);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).not.toHaveBeenCalled();
+        next.resolve();await flush();await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.bitmap()).not.toBeNull();
+    });
+    it.each([['source', 'resolve'], ['source', 'reject'], ['config', 'resolve'], ['config', 'reject'], ['unmount', 'resolve'], ['unmount', 'reject']] as const)(
+        '暂停单页排队期间 %s，旧任务迟到 %s 不启动待处理任务', async (change, late) => {
+            const {env, old} = await queuedPausedManga();
+            if (change === 'source') {env.image.src = 'https://example.test/changed-page.png';env.notify();env.runFrames();}
+            if (change === 'config') settings.from = 'en';
+            if (change === 'unmount') unmountImageTranslator();
+            await flush();
+            if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+            await flush();await flush();env.runFrames();await flush();
+            expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+            expect(env.bitmap()).toBeNull();
+        });
+    it.each(['resolve', 'reject'] as const)('暂停单页排队后来源先变化而布局帧未运行，旧任务迟到 %s 也清除等待提示', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        expect(feedback.hidden).toBe(false);env.image.src = 'https://example.test/changed-before-layout.png';
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2);expect(client.translate).not.toHaveBeenCalled();
+        expect(feedback.hidden).toBe(true);expect(env.bitmap()).toBeNull();
+    });
+    it.each(['resolve', 'reject'] as const)('暂停单页排队后重开漫画，旧任务迟到 %s 只启动会话拥有的任务', async late => {
+        const {env, old, feedback} = await queuedPausedManga();
+        const next = deferred<void>();client.prepare.mockReturnValueOnce(next.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation();await flush();expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        expect(client.prepare).toHaveBeenCalledTimes(2);
+        if (late === 'resolve') old.resolve();else old.reject(new Error('late failure'));
+        await flush();await flush();env.runFrames();await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3);expect(client.translate).not.toHaveBeenCalled();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        expect(feedback.textContent).not.toMatch(/排队/);
+        next.resolve();await flush();await flush();expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).not.toBeNull();stop();
+    });
+    it('接管右键准备后暂停取消，旧任务迟到不清除新的单页任务', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); toggleMangaTranslation();
+        const old = deferred<void>(), current = deferred<void>();
+        let inFlight = 0, maximum = 0;
+        const track = (promise: Promise<void>) => {inFlight++; maximum = Math.max(maximum, inFlight);return promise.finally(() => {inFlight--;});};
+        client.prepare.mockImplementationOnce(() => track(old.promise)).mockImplementationOnce(() => track(current.promise));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        const oldSignal = client.prepare.mock.calls[1][1] as AbortSignal;
+        toggleMangaTranslation(); await flush(); expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        toggleMangaTranslation(); expect(oldSignal.aborted).toBe(true);
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(inFlight).toBe(1);
+        old.resolve(); await flush(); await flush(); expect(client.translate).not.toHaveBeenCalled();
+        expect(client.prepare).toHaveBeenCalledTimes(3); expect(maximum).toBe(1);
+        toggleMangaTranslation(); await flush();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        expect(client.prepare).toHaveBeenCalledTimes(3);
+        current.resolve(); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledOnce(); expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
+    it('接管的准备忽略取消时，暂停重开须等待旧请求结束再启动新任务', async () => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); toggleMangaTranslation();
+        const old = deferred<void>(), next = deferred<void>();
+        let inFlight = 0, maximum = 0;
+        const track = (promise: Promise<void>) => {inFlight++; maximum = Math.max(maximum, inFlight);return promise.finally(() => {inFlight--;});};
+        client.prepare.mockImplementationOnce(() => track(old.promise)).mockImplementationOnce(() => track(next.promise));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        const signal = client.prepare.mock.calls[1][1] as AbortSignal;
+        toggleMangaTranslation(); await flush(); expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        toggleMangaTranslation(); expect(signal.aborted).toBe(true); toggleMangaTranslation(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(2); expect(inFlight).toBe(1);
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        old.resolve(); await flush(); await flush();
+        expect(client.prepare).toHaveBeenCalledTimes(3); expect(maximum).toBe(1);
+        expect(client.translate).not.toHaveBeenCalled();
+        next.resolve(); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledOnce(); expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
+    it.each(['resolve', 'reject'] as const)('普通单图在途时开启漫画取消旧请求，迟到 %s 不覆盖漫画结果', async late => {
+        const env = readerPage(); settings.from = 'en';
+        const old = deferred<typeof result>(), current = deferred<typeof result>();
+        let inFlight = 0, maximum = 0;
+        const track = (promise: Promise<typeof result>) => {inFlight++; maximum = Math.max(maximum, inFlight);return promise.finally(() => {inFlight--;});};
+        client.translate.mockImplementationOnce(() => track(old.promise)).mockImplementationOnce(() => track(current.promise));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        expect(client.translate).toHaveBeenCalledOnce();
+        const firstOptions = client.translate.mock.calls[0][3], oldSignal = firstOptions.signal as AbortSignal;
+        expect(firstOptions.manga).toBeUndefined();
+        toggleMangaTranslation(); await flush();
+        expect(oldSignal.aborted).toBe(true); expect(client.translate).toHaveBeenCalledOnce(); expect(inFlight).toBe(1);
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        if (late === 'resolve') old.resolve(result); else old.reject(new Error('late ordinary image failure'));
+        await flush(); await flush(); expect(client.translate).toHaveBeenCalledOnce();
+        env.runFrames(); await flush(); await flush(); expect(client.translate).toHaveBeenCalledTimes(2); expect(maximum).toBe(1);
+        expect(client.translate.mock.calls[1][3].manga).toBe(true);
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        current.resolve(result); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2); expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
+    it.each(['hidden', 'scroll'] as const)('普通单图交接等待期间进入 %s，旧任务结束后仍等待可调度', async pause => {
+        const env = readerPage(); settings.from = 'en';
+        const old = deferred<typeof result>(), current = deferred<typeof result>(); client.translate.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        const signal = client.translate.mock.calls[0][3].signal as AbortSignal;
+        toggleMangaTranslation(); await flush(); expect(signal.aborted).toBe(true);
+        if (pause === 'hidden') {
+            Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+            document.dispatchEvent(new document.defaultView!.Event('visibilitychange'));
+        } else for (const [name, callback] of env.windowObject.addEventListener.mock.calls) {
+            if (name === 'scroll') (callback as EventListener)(new Event('scroll'));
+        }
+        env.runFrames(); await flush(); old.resolve(result); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledOnce(); expect(env.bitmap()).toBeNull();
+        if (pause === 'hidden') {
+            Object.defineProperty(document, 'hidden', {configurable: true, value: false});
+            document.dispatchEvent(new document.defaultView!.Event('visibilitychange'));
+        } else vi.advanceTimersByTime(180);
+        env.runFrames(); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2); expect(client.translate.mock.calls[1][3].manga).toBe(true);
+        current.resolve(result); await flush(); await flush(); expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
+    it.each(['source', 'route'] as const)('交接等待结束后发现帧之前改变 %s，不使用旧页面身份', async change => {
+        const env = readerPage(); settings.from = 'en';
+        const old = deferred<typeof result>(), current = deferred<typeof result>(); client.translate.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        toggleMangaTranslation(); await flush();
+        old.resolve(result); await flush(); await flush();
+        expect(client.translate).toHaveBeenCalledOnce(); expect(env.bitmap()).toBeNull();
+        if (change === 'source') {env.image.src = 'https://example.test/new-page.png'; env.notify();}
+        else {
+            (env.windowObject as typeof env.windowObject & {location: {href: string}}).location.href = 'https://mangaplus.shueisha.co.jp/viewer/1024051';
+            document.dispatchEvent(new document.defaultView!.Event('fluentread-route-change'));
+        }
+        env.runFrames(); await flush(); await flush();
+        if (change === 'route') {
+            expect(client.translate).toHaveBeenCalledOnce(); expect(env.bitmap()).toBeNull();
+            expect(statuses.at(-1)).toMatchObject({active: false, pending: false});
+        } else {
+            expect(env.image.src).toBe('https://example.test/new-page.png');
+            expect(client.translate).toHaveBeenCalledTimes(2); expect(client.translate.mock.calls[1][3].manga).toBe(true);
+            current.resolve(result); await flush(); await flush(); expect(env.bitmap()).not.toBeNull();
+            expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        }
+        stop();
+    });
+    it.each(['resolve', 'reject'] as const)('交接等待期间卸载重挂载，旧任务迟到 %s 不触发新 reader', async late => {
+        const env = readerPage(); settings.from = 'en';
+        const old = deferred<typeof result>(), current = deferred<typeof result>(); client.translate.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        toggleMangaTranslation(); await flush(); expect(client.translate).toHaveBeenCalledOnce();
+        unmountImageTranslator(); mountImageTranslator(); toggleMangaTranslation(); await flush();
+        expect(client.translate).toHaveBeenCalledTimes(2);
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        env.windowObject.requestAnimationFrame.mockClear();
+        if (late === 'resolve') old.resolve(result); else old.reject(new Error('late ordinary image failure'));
+        await flush(); await flush();
+        expect(env.windowObject.requestAnimationFrame).not.toHaveBeenCalled();
+        expect(client.translate).toHaveBeenCalledTimes(2); expect(env.bitmap()).toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: true, errors: 0, completed: 0});
+        current.resolve(result); await flush(); await flush(); expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
+    it.each([['source', 'resolve'], ['source', 'reject'], ['language', 'resolve'], ['language', 'reject']] as const)('接管的准备在途时改变 %s，旧请求迟到 %s 不覆盖新页面', async (change, late) => {
+        const env = readerPage(); settings.from = 'ru'; settings.imageTranslationMangaDownloadConfirmed = true;
+        client.prepare.mockRejectedValueOnce(new Error('first download failed'));
+        const statuses: MangaTranslationStatus[] = [], stop = subscribeMangaTranslation(status => statuses.push(status));
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); toggleMangaTranslation();
+        const pending = deferred<void>(); client.prepare.mockReturnValueOnce(pending.promise);
+        env.dispatch(env.image, 'contextmenu'); expect(toggleContextMenuImage(env.image.src)).toBe(true); await flush();
+        const oldSignal = client.prepare.mock.calls[1][1] as AbortSignal;
+        toggleMangaTranslation(); await flush(); expect(statuses.at(-1)).toMatchObject({active: true, pending: true});
+        if (change === 'source') {env.image.src = 'https://example.test/new-page.png'; env.notify(); env.runFrames();}
+        else settings.from = 'en';
+        await flush(); expect(oldSignal.aborted).toBe(true);
+        expect(client.translate).not.toHaveBeenCalled();
+        if (late === 'resolve') pending.resolve(); else pending.reject(new Error('old preparation failed'));
+        await flush(); env.runFrames(); await flush();
+        if (change === 'language') {
+            expect(client.prepare).toHaveBeenCalledTimes(2);
+            expect(client.translate).toHaveBeenCalledOnce(); expect(client.translate.mock.calls[0][1]).toBe('en');
+        } else {
+            expect(env.image.src).toBe('https://example.test/new-page.png');
+            expect(client.prepare).toHaveBeenCalledTimes(3); expect(client.translate).toHaveBeenCalledOnce();
+        }
+        expect(env.bitmap()).not.toBeNull();
+        expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
+        stop();
+    });
     it('漫画语言包准备失败后暂停再开可以重试，已确认状态不丢失', async () => {
         const env = readerPage();settings.from = 'ru';settings.imageTranslationMangaDownloadConfirmed = true;
         client.prepare.mockRejectedValueOnce(new Error('download failed'));
-        toggleMangaTranslation();await flush();expect(client.translate).not.toHaveBeenCalled();expect(env.bitmap()).toBeNull();
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(client.translate).not.toHaveBeenCalled();expect(env.bitmap()).toBeNull();
         toggleMangaTranslation();await flush();toggleMangaTranslation();await flush();
         expect(client.prepare).toHaveBeenCalledTimes(2);expect(env.bitmap()).not.toBeNull();
     });
@@ -1722,7 +2349,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const chapter = cacheChapter(env, 10), decode = vi.fn(async () => ({width: 10, height: 20, close: vi.fn()}));
         vi.stubGlobal('createImageBitmap', decode);
         client.translate.mockResolvedValue({...result, image: '', mangaPatches: {width: 400, height: 200, patches: [{x: 0, y: 0, width: 10, height: 20, image: 'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
         decode.mockRejectedValueOnce(failure); const count = decode.mock.calls.length;
         await chapter.visit(9, 0); expect(decode).toHaveBeenCalledTimes(count + 1);
         for (let index = 0; index < 3; index++) {await chapter.visit(9, 0);}
@@ -1808,7 +2435,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const env=readerPage();settings.imageTranslationMangaPrefetchPages=0;settings.imageTranslationMangaCachePages=1;
         const chapter=cacheChapter(env,7),decode=vi.fn().mockImplementation(async()=>({width:10,height:20,close:vi.fn()}));vi.stubGlobal('createImageBitmap',decode);
         client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[{x:0,y:0,width:10,height:20,image:'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation();await flush();expect(env.bitmap()?.tagName).toBe('CANVAS');expect(env.decoded).toHaveLength(0);
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(env.bitmap()?.tagName).toBe('CANVAS');expect(env.decoded).toHaveLength(0);
         await chapter.visit(3);await chapter.visit(6);expect(client.translate).toHaveBeenCalledTimes(3);
         const before=decode.mock.calls.length;await chapter.visit(0);expect(decode).toHaveBeenCalledTimes(before+1);expect(client.translate).toHaveBeenCalledTimes(3);
         expect(env.bitmap()?.tagName).toBe('CANVAS');expect(chapter.pages[0].style.opacity).toBe('0');
@@ -1820,7 +2447,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const translated={...result,image:'',mangaPatches:{width:400,height:200,patches:[{x:0,y:0,width:10,height:20,image:'data:image/png;base64,AQID'}]}};
         const next=deferred<typeof translated>(),third=deferred<typeof translated>();
         client.translate.mockResolvedValueOnce(translated).mockReturnValueOnce(next.promise).mockReturnValueOnce(third.promise);
-        settings.imageTranslationMangaPrefetchPages=3;toggleMangaTranslation();await flush();
+        settings.imageTranslationMangaPrefetchPages=3;toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(chapter.pages[0].style.opacity).toBe('0');
         next.resolve(translated);await flush();
         const displayed=env.roots.at(-1)!.querySelector('.fluent-read-image-translation-bitmap');
@@ -1834,7 +2461,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const env=readerPage();settings.imageTranslationMangaPrefetchPages=0;settings.imageTranslationMangaCachePages=2;
         const chapter=cacheChapter(env,10),decode=vi.fn().mockImplementation(async()=>({width:10,height:20,close:vi.fn()}));vi.stubGlobal('createImageBitmap',decode);
         client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[{x:0,y:0,width:10,height:20,image:'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation();await flush();await chapter.visit(3);await chapter.visit(6);await chapter.visit(9);
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();await chapter.visit(3);await chapter.visit(6);await chapter.visit(9);
         const before=decode.mock.calls.length;await chapter.visit(9,0);expect(decode).toHaveBeenCalledTimes(before+1);expect(chapter.pages[0].style.opacity).not.toBe('0');
         await chapter.visit(0);expect(decode).toHaveBeenCalledTimes(before+1);expect(client.translate).toHaveBeenCalledTimes(4);expect(chapter.pages[0].style.opacity).toBe('0');
     });
@@ -1843,7 +2470,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const chapter = cacheChapter(env, 10), decode = vi.fn(async () => ({width: 10, height: 20, close: vi.fn()}));
         vi.stubGlobal('createImageBitmap', decode);
         client.translate.mockResolvedValue({...result, image: '', mangaPatches: {width: 400, height: 200, patches: [{x: 0, y: 0, width: 10, height: 20, image: 'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
         const pending = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>(); decode.mockReturnValueOnce(pending.promise);
         chapter.near(0); await flush(); const before = decode.mock.calls.length;
         chapter.near(-1); const returned = chapter.arrive(0); await returned;
@@ -1859,7 +2486,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const chapter = cacheChapter(env, 10), decode = vi.fn(async () => ({width: 10, height: 20, close: vi.fn()}));
         vi.stubGlobal('createImageBitmap', decode);
         client.translate.mockResolvedValue({...result, image: '', mangaPatches: {width: 400, height: 200, patches: [{x: 0, y: 0, width: 10, height: 20, image: 'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
+        toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
         const old = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>(), current = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>();
         decode.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
         chapter.near(0); await flush(); const before = decode.mock.calls.length;
@@ -1875,7 +2502,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const env=readerPage();settings.imageTranslationMangaPrefetchPages=0;settings.imageTranslationMangaCachePages=2;
         const chapter=cacheChapter(env,10),decode=vi.fn().mockImplementation(async()=>({width:10,height:20,close:vi.fn()}));vi.stubGlobal('createImageBitmap',decode);
         client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[{x:0,y:0,width:10,height:20,image:'data:image/png;base64,AQID'}]}});
-        toggleMangaTranslation();await flush();await chapter.visit(3);await chapter.visit(6);await chapter.visit(9);
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();await chapter.visit(3);await chapter.visit(6);await chapter.visit(9);
         const pending=deferred<{width:number;height:number;close:ReturnType<typeof vi.fn>}>();decode.mockReturnValueOnce(pending.promise);
         chapter.near(0);await flush();
         if(change==='pause')toggleMangaTranslation();
@@ -1942,7 +2569,7 @@ describe('视频预览不自动显示图片翻译', () => {
         let secondTop=1000;
         const second=addSecondHoverImage(env,()=>({left:20,right:420,top:secondTop,bottom:secondTop+200,width:400,height:200}) as DOMRect);second.className='zao-image';
         const scroll=()=>{for(const [name,callback] of env.windowObject.addEventListener.mock.calls) if(name==='scroll') (callback as EventListener)(new Event('scroll'));env.runFrames();};
-        toggleMangaTranslation();await flush();expect(env.image.style.opacity).toBe('0');
+        toggleMangaTranslation();await flush(); env.runFrames(); await flush();expect(env.image.style.opacity).toBe('0');
         const pending=deferred<typeof result>();client.translate.mockReturnValueOnce(pending.promise);
         const decodedBeforeScroll=env.decoded.length;
         env.setRect({left:20,right:420,top:-300,bottom:-100,width:400,height:200});secondTop=40;scroll();await flush();
@@ -2051,7 +2678,7 @@ describe('视频预览不自动显示图片翻译', () => {
     it('一次开启、原图暂停、重新开启复用已解码结果，即使持久缓存关闭', async () => {
         const env = readerPage(); settings.useCache = false;
         const listener = vi.fn(); const stop = subscribeMangaTranslation(listener);
-        expect(toggleMangaTranslation()).toBe(true); await flush();
+        expect(toggleMangaTranslation()).toBe(true); await flush(); env.runFrames(); await flush();
         expect(client.translate).toHaveBeenCalledTimes(1); expect(env.bitmap()).not.toBeNull();
         expect(env.image.style.opacity).toBe('0');
         toggleMangaTranslation(); await flush();

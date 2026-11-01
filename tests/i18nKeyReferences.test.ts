@@ -7,6 +7,7 @@ import {zhCNMessages} from '@/src/core/i18n/messages/zh-CN';
 import {UI_LANGUAGE_OPTIONS} from '@/src/core/i18n/language';
 import {UI_LANGUAGE_BUNDLES} from '@/src/core/i18n/bundles';
 import {personalCorrectionMessages} from '@/src/core/i18n/messages/personalCorrections';
+import {selectionDictionaryMessages} from '@/src/core/i18n/messages/selectionDictionary';
 
 describe('稳定 i18n key 的生产调用契约', () => {
     it('真实源码的可枚举 key 均存在，字面参数完整', () => {
@@ -21,7 +22,7 @@ describe('稳定 i18n key 的生产调用契约', () => {
             const settings = JSON.parse(readFileSync(join(process.cwd(), 'src/core/i18n/messages/settings-copy', language + '.json'), 'utf8'))
                 .messages as Record<string, string>;
             expect(Object.keys(settings).length).toBeGreaterThan(100);
-            for (const source of [settings, personalCorrectionMessages[language]]) {
+            for (const source of [settings, personalCorrectionMessages[language], selectionDictionaryMessages[language]]) {
                 for (const [key, value] of Object.entries(source)) expect(final[key], `${language}: ${key}`).toBe(value);
             }
         }

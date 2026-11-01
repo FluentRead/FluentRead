@@ -1,5 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {setMaxListeners} from 'node:events';
+import {parseHTML} from 'linkedom';
 import {matchesConfiguredHotkey} from '@/src/core/hotkey';
 import {
     matchesPressedHotkeyParts,
@@ -15,6 +16,7 @@ class FakeTarget {
     animationFrames = new Map<number, FrameRequestCallback>();
     nextFrame = 1;
     hidden = false;
+    activeElement: Element | null = null;
     location = {href: 'https://fixture.test/article'};
 
     addEventListener(type: string, listener: Listener, options?: AddEventListenerOptions): void {
@@ -114,6 +116,113 @@ function mountHarness(overrides: Partial<HoverTranslationContentDependencies> = 
 
 afterEach(() => {
     vi.useRealTimers();
+});
+
+describe('悬浮快捷键让行网页输入（#1163）', () => {
+    const backquote = {key: '`', code: 'Backquote'};
+
+    it.each([
+        '<input id="typing">',
+        '<textarea id="typing"></textarea>',
+        '<select id="typing"><option>English</option></select>',
+        '<div contenteditable="true"><span id="typing">Text</span></div>',
+        '<div contenteditable="plaintext-only" id="typing"></div>',
+        '<div role="textbox" id="typing"></div>',
+        '<div role="searchbox" id="typing"></div>',
+    ])('波浪号预设不拦截编辑区路径 %s，退出编辑后下一次手势恢复', markup => {
+        const {document} = parseHTML(`<html><body>${markup}</body></html>`);
+        const {deps, windowTarget} = mountHarness({navigator: {platform: 'Win32'} as Navigator});
+        deps.config.hotkey = '`';
+        const composedPath = () => [document.getElementById('typing')!];
+        const down = trustedEvent({...backquote, composedPath});
+        const up = trustedEvent({...backquote, composedPath});
+        windowTarget.emit('keydown', down);
+        windowTarget.emit('keyup', up);
+        for (const event of [down, up]) {
+            expect(event.preventDefault).not.toHaveBeenCalled();
+            expect(event.stopPropagation).not.toHaveBeenCalled();
+        }
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        expect(deps.cancelPendingHoverTranslation).not.toHaveBeenCalled();
+
+        // 输入时未建立手势，焦点离开后迟到的释放不能借用旧按下事件。
+        windowTarget.emit('keyup', trustedEvent(backquote));
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        windowTarget.emit('keydown', trustedEvent(backquote));
+        windowTarget.emit('keyup', trustedEvent(backquote));
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        expect(deps.handleTranslation).toHaveBeenCalledWith(0, 0, {inputSource: 'mouse-shortcut'});
+    });
+
+    it.each(['input', 'open-shadow', 'closed-shadow'])('释放前焦点进入 %s 时取消旧手势并放行 keyup', kind => {
+        const {document} = parseHTML('<html><body><input id="input"><typing-editor id="host"></typing-editor></body></html>');
+        const {deps, documentTarget, windowTarget} = mountHarness();
+        deps.config.hotkey = '`';
+        windowTarget.emit('keydown', trustedEvent(backquote));
+        const host = document.getElementById('host')!;
+        if (kind === 'open-shadow') {
+            const shadow = host.attachShadow({mode: 'open'});
+            const input = document.createElement('input');
+            shadow.append(input);
+            Object.defineProperty(shadow, 'activeElement', {value: input});
+        }
+        documentTarget.activeElement = document.getElementById(kind === 'input' ? 'input' : 'host');
+        const up = trustedEvent(backquote);
+        windowTarget.emit('keyup', up);
+        expect(up.preventDefault).not.toHaveBeenCalled();
+        expect(up.stopPropagation).not.toHaveBeenCalled();
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        expect(deps.cancelPendingHoverTranslation).toHaveBeenCalledOnce();
+    });
+
+    it.each([{isComposing: true}, {keyCode: 229}])('输入法组合事件 %j 不通过物理键回退占用波浪号', composition => {
+        const {deps, windowTarget} = mountHarness();
+        deps.config.hotkey = '`';
+        for (const type of ['keydown', 'keyup']) {
+            const event = trustedEvent({...backquote, key: 'Dead', ...composition});
+            windowTarget.emit(type, event);
+            expect(event.preventDefault).not.toHaveBeenCalled();
+            expect(event.stopPropagation).not.toHaveBeenCalled();
+        }
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+    });
+
+    it.each(['focusin', 'compositionstart'])('%s 撤销连续悬浮的待执行帧；松键不补发，下一轮仍可触发', type => {
+        const {deps, documentTarget, windowTarget} = mountHarness();
+        deps.config.hotkey = '`';
+        windowTarget.emit('keydown', trustedEvent(backquote));
+        documentTarget.emit('mousemove', trustedEvent({clientX: 10, clientY: 20}));
+        documentTarget.emit('mousemove', trustedEvent({clientX: 30, clientY: 40}));
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        documentTarget.emit(type, trustedEvent());
+        expect(deps.cancelPendingHoverTranslation).toHaveBeenCalledOnce();
+        expect(windowTarget.animationFrames.size).toBe(0);
+        windowTarget.flushAnimationFrame();
+        windowTarget.emit('keyup', trustedEvent(backquote));
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        windowTarget.emit('keydown', trustedEvent(backquote));
+        windowTarget.emit('keyup', trustedEvent(backquote));
+        expect(deps.handleTranslation).toHaveBeenCalledTimes(2);
+        expect(deps.handleTranslation).toHaveBeenLastCalledWith(30, 40, {inputSource: 'mouse-shortcut'});
+    });
+
+    it('自定义 Shift+~ 在输入框中保留按键与传播，移出后仍执行单次悬浮翻译', () => {
+        const {document} = parseHTML('<html><body><input></body></html>');
+        const {deps, documentTarget, windowTarget} = mountHarness();
+        Object.assign(deps.config, {hotkey: 'custom', customHotkey: 'Shift+~'});
+        documentTarget.activeElement = document.querySelector('input');
+        const down = trustedEvent({key: '~', code: 'Backquote', shiftKey: true});
+        windowTarget.emit('keydown', down);
+        expect(down.preventDefault).not.toHaveBeenCalled();
+        expect(down.stopPropagation).not.toHaveBeenCalled();
+        documentTarget.activeElement = null;
+        windowTarget.emit('keyup', trustedEvent({key: '`', code: 'Backquote'}));
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        windowTarget.emit('keydown', trustedEvent({key: '~', code: 'Backquote', shiftKey: true}));
+        windowTarget.emit('keyup', trustedEvent({key: '`', code: 'Backquote'}));
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        expect(deps.handleTranslation).toHaveBeenCalledWith(0, 0, {inputSource: 'mouse-shortcut'});
+    });
 });
 
 describe('hover translation content feature', () => {

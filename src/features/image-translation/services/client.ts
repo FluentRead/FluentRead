@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/client.ts
  * 文件职责：封装网页与扩展页面调用图片翻译后台的 runtime 消息，统一支持跨域图片读取与整图翻译两种可取消客户端操作。
- * 主要内容：提供 fetchImageInExtension 与 translateImageInExtension，生成跨页面安全请求标识，固定开始时的取消信号、进度回调与登记端口，清理异常不阻止结束等待；传播超时与本地模型失败原因，订阅当前任务真实阶段和百分比，并在消息断线时按共享截止时间恢复一次；语言准备的状态预读有独立短上限，不能阻塞正式下载。
+ * 主要内容：提供 fetchImageInExtension 与 translateImageInExtension，生成跨页面安全请求标识，固定开始时的取消信号、进度回调与登记端口，清理异常不阻止结束等待；校验并传播普通图片保留宿主原图状态，传播超时与本地模型失败原因，订阅当前任务真实阶段和百分比，并在消息断线时按共享截止时间恢复一次；语言准备的状态预读有独立短上限，不能阻塞正式下载。
  * 模块边界：客户端不读取图片像素、不直接访问网络或 Offscreen；跨域 URL 只作为受控消息交给 background，再由 Offscreen 校验和读取，页面 UI 由 content/runtime 决定。
  */
 import {createImageTranslationFailure} from '../failure';
@@ -14,12 +14,15 @@ import {watchDownloadProgress} from '@/src/platform/storage/downloadProgress';
 
 interface ImageTranslationLine extends OcrLine {
     sourceText?: string;
+    renderSkipped?: true;
+    numericUncertain?: true;
     backgroundColor: string;
 }
 
 interface ImageTranslationResponse {
     success: boolean;
     image?: string;
+    imageUnchanged?: unknown;
     mangaPatches?: unknown;
     lines?: ImageTranslationLine[];
     error?: string;
@@ -189,7 +192,7 @@ export async function translateImageInExtension(
     sourceLanguage: string,
     title: string,
     options: ImageExtensionOperationOptions = {},
-): Promise<{ image: string; lines: ImageTranslationLine[]; mangaPatches?: MangaPatchPacket }> {
+): Promise<{ image: string; lines: ImageTranslationLine[]; imageUnchanged?: true; mangaPatches?: MangaPatchPacket }> {
     const message = {
         type: 'fluentReadImageTranslate',
         image,
@@ -210,10 +213,14 @@ export async function translateImageInExtension(
             const response = await sendCancellableImageOperation<ImageTranslationResponse>(
                 message, {...options, requestId, timeoutMs: remainingMs}, '图片翻译超时',
             );
-            if (!response?.success || (!response.image && !(options.manga && response.mangaPatches !== undefined)) || !Array.isArray(response.lines)) {
+            const unchanged = response?.imageUnchanged === true && !options.manga && response.image === '' && response.mangaPatches === undefined;
+            if (!response?.success || (response.imageUnchanged !== undefined && !unchanged)
+                || (!response.image && !unchanged && !(options.manga && response.mangaPatches !== undefined)) || !Array.isArray(response.lines)
+                || (unchanged && response.lines.length === 0)) {
                 throw createImageTranslationFailure(response?.error || '图片翻译服务不可用', response);
             }
             return {image: response.image || '', lines: response.lines,
+                ...(unchanged ? {imageUnchanged: true as const} : {}),
                 ...(options.manga && response.mangaPatches !== undefined ? {mangaPatches: parseMangaPatchPacket(response.mangaPatches)} : {})};
         } catch (error) {
             if (isContextInvalidatedError(error)) throw normalizeTranslationTransportError(error);

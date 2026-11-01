@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {resolve} from 'node:path';
 import {defineConfig, type Plugin} from 'vite';
+import {francRuntimeBuildPlugin} from '../scripts/testing/franc-runtime-build';
 
 const root = resolve(__dirname, '..');
 
@@ -27,8 +28,11 @@ function includeVendorLicenses(): Plugin {
                 const licenseFile = fs.readdirSync(packageRoot).find((name) => /^LICEN[CS]E(?:[.-].*)?$/iu.test(name));
                 const repository = typeof manifest.repository === 'string'
                     ? manifest.repository : manifest.repository?.url;
-                const licenseText = licenseFile
-                    ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim().replace(/[ \t]+$/gmu, '')
+                const licensePath = manifest.name === 'franc-min'
+                    ? resolve(root, 'public/third-party-notices/franc-min-MIT.txt')
+                    : licenseFile ? resolve(packageRoot, licenseFile) : undefined;
+                const licenseText = licensePath
+                    ? fs.readFileSync(licensePath, 'utf8').trim().replace(/[ \t]+$/gmu, '')
                     : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
                 if (licenseText.includes('*/')) throw new Error(`Unsafe userscript vendor license comment: ${manifest.name}`);
                 return `/*\n${manifest.name} ${manifest.version} — ${manifest.license}\n${licenseText}\n*/`;
@@ -42,7 +46,7 @@ function includeVendorLicenses(): Plugin {
 export default defineConfig({
     root,
     publicDir: false,
-    plugins: [includeVendorLicenses()],
+    plugins: [francRuntimeBuildPlugin(), includeVendorLicenses()],
     build: {
         outDir: resolve(root, '.output/userscript-vendor'),
         emptyOutDir: true,

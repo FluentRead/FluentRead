@@ -17,6 +17,9 @@ import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
+import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
+import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
+import type {InlineConfig} from 'vite';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -138,7 +141,7 @@ export function extendRemoteConfigBuildConfig(
     entrypoints: readonly {type: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
-    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page']);
+    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }
@@ -155,6 +158,24 @@ export function groupModuleWorkers(groups: EntrypointGroup[]): void {
     groups.splice(index, 0, workers);
 }
 
+/** 页面共用的框架与域名数据独立成块，避免与中文目录及配置合成一个超大公共块。 */
+export function configureExtensionUiChunks(entrypoints: readonly {type: string}[], config: InlineConfig): void {
+    const pages = new Set(['popup', 'options', 'unlisted-page', 'sidepanel']);
+    if (entrypoints.length === 0 || !entrypoints.every(entrypoint => pages.has(entrypoint.type)) || config.build?.lib) return;
+    const build = config.build ??= {};
+    const rollup = build.rollupOptions ??= {};
+    const output = rollup.output ??= {};
+    for (const target of Array.isArray(output) ? output : [output]) {
+        if (target.manualChunks !== undefined) continue;
+        target.manualChunks = (source: string) => {
+            const id = source.replaceAll('\\', '/');
+            if (/\/node_modules\/(?:@vue\/(?:reactivity|runtime-core|runtime-dom|shared)|vue)\//u.test(id)) return 'vue-runtime';
+            if (/\/node_modules\/(?:tldts|tldts-core)\//u.test(id)) return 'domain-parser';
+            return undefined;
+        };
+    }
+}
+
 /** 根据编译目标能力生成权限，避免 Firefox/MV2 产物声明不可用的 Offscreen API。 */
 export function createExtensionManifest(
     env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>,
@@ -166,6 +187,8 @@ export function createExtensionManifest(
         key: process.env.WXT_EXTENSION_KEY?.trim() || GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY,
     } : {};
     const firefoxManifest = env.browser === 'firefox' ? {
+        // 大型材料备份需要在用户主动导出时观察下载终态；安装时不请求此权限。
+        optional_permissions: ['downloads'],
         browser_specific_settings: {
             gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
@@ -281,9 +304,13 @@ export default defineConfig({
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
-            build: env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' : false} : undefined,
+            build: {
+                // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
+                reportCompressedSize: false,
+                ...(env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' as const : false} : {}),
+            },
             define: {
                 'process.env.VUE_APP_VERSION': JSON.stringify(packageJson.version),
             },
@@ -319,6 +346,8 @@ export default defineConfig({
         },
         'zip:extension:done': async (wxt, zipPath) => {
             await finalizeExtensionZip(wxt.config.browser, zipPath);
+            const compact = await compactExtensionZip(zipPath, __dirname);
+            wxt.logger.info(`WASM ZIP compression saved ${compact.savedBytes.toLocaleString('en-US')} bytes`);
         },
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';
@@ -334,6 +363,7 @@ export default defineConfig({
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。
             if (entrypoints.every(entrypoint => entrypoint.type === 'unlisted-script')) {
                 viteConfig.build = {...viteConfig.build, modulePreload: false};

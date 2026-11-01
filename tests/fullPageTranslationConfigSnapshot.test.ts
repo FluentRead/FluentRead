@@ -12,6 +12,7 @@ const fixture = vi.hoisted(() => ({config: {
     from: 'en', to: 'zh-Hans', glossaryEnabled: true, glossaryLibraries: [] as GlossaryLibrary[],
     excludedLanguages: ['de'], useCache: true, enableAIContext: false, enableAIMultiSegment: false,
     nativeBatchTranslationEnabled: {}, display: 1, style: 0,
+    translationOnlyDomains: [] as string[],
     longParagraphLineBreakEnabled: false, translationBeforeOriginal: false,
     compositeTranslationProviders: [] as CompositeTranslationProvider[], customBody: {} as Record<string, string>,
 }}));
@@ -26,6 +27,7 @@ let generation = 0;
 beforeEach(() => {
     Object.assign(fixture.config, {service: 'microsoft', from: 'en', to: 'zh-Hans', glossaryEnabled: true,
         excludedLanguages: ['de'], useCache: true, display: 1, longParagraphLineBreakEnabled: false,
+        translationOnlyDomains: [],
         translationBeforeOriginal: false, enableAIMultiSegment: false, enableAIContext: false,
         compositeTranslationProviders: [], customBody: {},
         glossaryLibraries: [{id: `library-${generation++}`, name: '技术', enabled: true,
@@ -39,6 +41,16 @@ beforeEach(() => {
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('网页翻译配置捕获与词库摘要复用', () => {
+    it('按当前网址冻结网站显示模式，其他网站继承全局且单次快捷方案覆盖仍有效', () => {
+        vi.stubGlobal('location', {href: 'https://docs.example.com/article'});
+        fixture.config.translationOnlyDomains = ['example.com'];
+        const saved = captureFullPageTranslationConfig();
+        expect(saved.displayMode).toBe('single'); expect(saved.displayModeOverridden).toBeUndefined();
+        expect(captureFullPageTranslationConfig({displayMode: 'bilingual'})).toMatchObject({displayMode: 'bilingual', displayModeOverridden: true});
+        location.href = 'https://another.test/article';
+        expect(captureFullPageTranslationConfig().displayMode).toBe('bilingual');
+        expect(saved.displayMode).toBe('single'); expect(fixture.config.display).toBe(1);
+    });
     it('真实快捷方案的默认显示继承可随全局切换，只有显式方案产生显示冻结标记', () => {
         const profile = createQuickTranslationProfile('full-page', []);
         const settings = {...fixture.config, fullPageTranslationMode: 'viewport' as const, translationScope: 'content' as const};

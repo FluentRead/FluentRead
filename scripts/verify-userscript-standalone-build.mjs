@@ -30,12 +30,12 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// Fixed main 56f77c323 measures 3,609,418 bytes. The Facebook compatibility
-// boundaries at be21971fe add 7,902 bytes after sharing their adapter/DOM helpers,
-// measuring 3,617,320 bytes with the same locked data and build configuration.
+// Fixed main 9b0ad8ba7 measures 3,613,561 bytes. The glossary/area UI and
+// shared task dialogs at 4f9aa47be add 9,168 bytes, measuring 3,622,729 with
+// the same locked dependencies, Node 20.11.1, and build configuration.
 // Retain the previously measured 1,825-byte Ubuntu/Node 22 allowance and round
-// 3,619,145 up to the next 1 KB. This is an explicit feature budget update;
+// 3,624,554 up to the next 1 KB. This is an explicit feature budget update;
 // the regular Greasy Fork artifact keeps its separate 2 MB limit.
-const maxBytes = 3_620_000;
+const maxBytes = 3_625_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

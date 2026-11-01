@@ -9,11 +9,13 @@ import {defineConfig, normalizePath, transformWithEsbuild, type Plugin} from 'vi
 import {createUserscriptMetadata} from './metadata';
 import {createUserscriptCharacterDataCompressionPlugin} from './characterDataPlugin';
 import {createUserscriptFrancDataCompressionPlugin} from './francDataPlugin';
+import {francRuntimeBuildPlugin} from '../scripts/testing/franc-runtime-build';
 import {createUserscriptTldtsDataCompressionPlugin} from './tldtsDataPlugin';
 import {createUserscriptInlineCssCompressionPlugin} from './inlineCssPlugin';
 import {createUserscriptAboutImagesCompressionPlugin} from './aboutImagesPlugin';
 import {createUserscriptServiceBrandIconsCompressionPlugin} from './serviceBrandIconsPlugin';
 import {createUserscriptSettingsDataPlugin} from './settingsDataPlugin';
+import {createUserscriptTranslationCenterPlugin} from './translationCenterPlugin';
 import {packKeyColumn, packLanguageUpdates, packMessageCatalog, packUiLanguageBundle} from './languageData';
 import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from './buildGzip';
 import {encodeUserscriptDataCompact, encodeUserscriptData} from './buildDataEncoding';
@@ -153,7 +155,7 @@ const compressedCatalogPrefix = '\0fluentread-userscript-site-catalog:';
 const externalChineseMessagesId = '\0fluentread-userscript-zh-cn.js';
 
 /** 只压缩站点规则与中文文案数据；产品逻辑仍留在可审查的 userscript 主文件中。 */
-export function createUserscriptCatalogCompressionPlugin(): Plugin {
+export function createUserscriptCatalogCompressionPlugin(compressStandalone = gzipLargeStandaloneUserscriptData): Plugin {
     return {
         name: 'compress-userscript-site-catalog',
         enforce: 'pre',
@@ -192,7 +194,7 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                         : 'export const zhCNMessages = JSON.parse(inflateWithPako(bytes));',
                     ].join('\n');
                 };
-                return bundleLibraries ? gzipStandaloneUiMessages(input).then(emit)
+                return bundleLibraries ? gzipStandaloneUiMessages(input, compressStandalone).then(emit)
                     : emit(gzipUserscriptBuildData(input));
             }
             if (!id.startsWith(compressedCatalogPrefix)) return null;
@@ -236,9 +238,9 @@ export function createUserscriptCatalogCompressionPlugin(): Plugin {
                 'export default JSON.parse(inflateWithPako(bytes));',
                 ].join('\n');
             };
-            // 仅独立版的大目录使用构建期 worker；较大结果保留现有紧凑 gzip。
-            return bundleLibraries && basename(sourcePath) === 'websites.json'
-                ? gzipLargeStandaloneUserscriptData(data, root).then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline))
+            // 独立版站点目录使用构建期 worker；较大结果保留现有紧凑 gzip。
+            return bundleLibraries
+                ? gzipLargeStandaloneUserscriptData(data, root, 0).then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline))
                 : emit(baseline);
         },
     };
@@ -257,11 +259,26 @@ export const compatibilityPreludeEnd = '/* FluentRead userscript compatibility p
 export const executionGuardStart = '/* FluentRead userscript execution guard:start */';
 export const executionGuardEnd = '/* FluentRead userscript execution guard:end */';
 
+/** 独立版仅在后续存在完整相同的 MIT 正文时共享图标授权；否则保留完整原文。 */
+function serviceIconsNoticeForBundle(thirdPartyNotices: string): string {
+    if (!bundleLibraries) return sharedMitNotice;
+    const start = 'Permission is hereby granted';
+    const iconStart = serviceIconsLicense.indexOf(start), canonicalStart = tinycolorLicense.indexOf(start);
+    if (iconStart < 0 || canonicalStart < 0) return serviceIconsNotice;
+    const terms = tinycolorLicense.slice(canonicalStart).trim();
+    const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
+    const sharedBlock = `/*\nShared MIT permission and warranty terms for the references above:\n${terms}\n*/`;
+    if (normalize(serviceIconsLicense.slice(iconStart)) !== normalize(terms) || !thirdPartyNotices.includes(sharedBlock)) {
+        return serviceIconsNotice;
+    }
+    return `/*\n${serviceIconsLicense.slice(0, iconStart).trimEnd()}\n\n[Shared MIT terms below]\n*/`;
+}
+
 export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string, thirdPartyNotices = ''): string {
     return [
         metadata,
         unicodeNotice,
-        bundleLibraries ? serviceIconsNotice : sharedMitNotice,
+        serviceIconsNoticeForBundle(thirdPartyNotices),
         ...(thirdPartyNotices ? [thirdPartyNotices] : []),
         executionGuardStart,
         'if (!globalThis.__fluentReadUserscriptBootstrapped) {',
@@ -303,28 +320,37 @@ export function bundledLibraryNotices(moduleIds: readonly string[]): string {
         const repository = typeof manifest.repository === 'string'
             ? manifest.repository
             : manifest.repository?.url;
-        const licenseText = licenseFile
-            ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
-            : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
+        const licenseText = manifest.name === 'franc-min'
+            ? fs.readFileSync(resolve(root, 'public/third-party-notices/franc-min-MIT.txt'), 'utf8').trim()
+            : licenseFile
+                ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
+                : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
         if (licenseText.includes('*/')) throw new Error(`Unsafe bundled library license comment: ${manifest.name}`);
         const heading = `${manifest.name} ${manifest.version} — ${manifest.license}`;
         const headings = licenseGroups.get(licenseText);
         if (headings) headings.push(heading);
         else licenseGroups.set(licenseText, [heading]);
     }
-    const notices = [...licenseGroups].map(([licenseText, headings]) =>
+    let notices = [...licenseGroups].map(([licenseText, headings]) =>
         `/*\n${headings.join('\n')}\n${licenseText}\n*/`).join('\n');
     if (!bundleLibraries) return notices;
-    // 完整独立版还包含不同版权及内嵌子依赖的同一 MIT 正文。仅匹配现有许可文件的完整
-    // 授权与免责文字，允许换行/空白差异；每个版权、来源和前后附加条款保留在原位置。
+    // 完整独立版还包含不同版权及内嵌子依赖的同一 MIT 正文。分别共享双引号与单引号的
+    // 完整版本，仅允许换行/空白差异；每个版权、来源和前后附加条款保留在原位置。
     const permissionStart = tinycolorLicense.indexOf('Permission is hereby granted');
     if (permissionStart < 0) throw new Error('Canonical bundled MIT permission terms are missing');
     const terms = tinycolorLicense.slice(permissionStart).trim();
-    const escapedWords = terms.split(/\s+/u).map(word => word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
-    const repeatedTerms = new RegExp(escapedWords.join('\\s+'), 'gu');
-    if ([...notices.matchAll(repeatedTerms)].length < 2) return notices;
-    return notices.replace(repeatedTerms, '[Shared MIT terms below]')
-        + `\n/*\nShared MIT permission and warranty terms for the references above:\n${terms}\n*/`;
+    const variants = [
+        {terms, marker: '[Shared MIT terms below]', title: 'Shared MIT permission and warranty terms for the references above:'},
+        {terms: terms.replace(/"/gu, "'"), marker: '[Shared single-quoted MIT terms below]',
+            title: 'Shared single-quoted MIT permission and warranty terms for the references above:'},
+    ];
+    for (const variant of variants) {
+        const escapedWords = variant.terms.split(/\s+/u).map(word => word.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&'));
+        const repeatedTerms = new RegExp(escapedWords.join('\\s+'), 'gu');
+        if ([...notices.matchAll(repeatedTerms)].length < 2) continue;
+        notices = notices.replace(repeatedTerms, variant.marker) + `\n/*\n${variant.title}\n${variant.terms}\n*/`;
+    }
+    return notices;
 }
 
 // Via 等旧内核可能缺少共享核心使用的基础方法；在单文件入口最前方注入小型兼容层。
@@ -650,7 +676,7 @@ export const userscriptAliases = [
 export default defineConfig({
     root,
     publicDir: false,
-    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
+    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptTranslationCenterPlugin(root), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), francRuntimeBuildPlugin(), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
     resolve: {
         alias: userscriptAliases,
     },
@@ -670,6 +696,8 @@ export default defineConfig({
         outDir: resolve(root, bundleLibraries ? '.output/userscript-standalone'
             : greasyForkSource ? '.output/userscript-greasyfork' : '.output/userscript'),
         emptyOutDir: true,
+        // 发布体积由两个 verifier 检查，不重复压缩整份脚本来生成日志统计。
+        reportCompressedSize: false,
         target: 'es2018',
         minify: greasyForkSource ? false : 'esbuild',
         // 锁定的 CommonJS 26 默认 auto 会因条件 require 的分析时机改变 MD5 初始化包装。

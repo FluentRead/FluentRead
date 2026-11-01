@@ -216,6 +216,44 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
         await chrome.runtime.sendMessage({type:'UNRELATED',requestId:'host'});
         expect(results).toHaveLength(limit);
     });
+
+    it.each(['promise','callback'] as const)('真实observer的%s端口区分普通原图保留、失败与正常位图',async port=>{
+        let observer='';
+        const visit=(node:ts.Node)=>{
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst)==='worker.evaluate'&&node.arguments[0]?.getText(runnerAst).startsWith('({live,trace,traceLayout,layoutTraceLimit})=>'))observer=node.arguments[0].getText(runnerAst);
+            ts.forEachChild(node,visit);
+        };
+        visit(runnerAst);expect(observer).not.toBe('');
+        const line={text:'完整译文',sourceText:'complete original source',bbox:box(10,10,90,30),fontSize:20,renderSkipped:true};
+        const baseline={success:true,image:'data:image/png;base64,translated',lines:[line]};
+        let response:any=baseline;
+        const messages:unknown[]=[];
+        const chrome={runtime:{sendMessage:(message:unknown,callback?:Function)=>{messages.push(message);if(callback){callback(response);return;}return Promise.resolve(response);},onMessage:{addListener:()=>undefined}}};
+        const sandbox:any={chrome,fetch:()=>{throw new Error('Layout observer replay must not fetch');}};
+        runInNewContext(`(${observer})`,sandbox)({live:false,trace:false,traceLayout:true,layoutTraceLimit:20});
+        const cases=[
+            {response:{success:true,image:'',imageUnchanged:true,lines:[line]},manga:false,expected:true},
+            {response:{success:true,image:'',imageUnchanged:true,lines:[{...line,renderSkipped:undefined}]},manga:undefined,expected:true},
+            {response:{success:false,image:'',imageUnchanged:true,lines:[line]},manga:false,expected:false},
+            {response:{image:'',imageUnchanged:true,lines:[line]},manga:false,expected:false},
+            {response:baseline,manga:false,expected:false},
+            {response:{...baseline,imageUnchanged:false},manga:false,expected:false},
+            {response:{...baseline,imageUnchanged:'true'},manga:false,expected:false},
+            {response:{success:true,image:'data:image/png;base64,source',lines:[]},manga:false,expected:false},
+            {response:{success:true,image:'',lines:[line],mangaPatches:{patches:[]}},manga:true,expected:true},
+        ];
+        for(const [index,item] of cases.entries()){
+            response=item.response;const before=JSON.stringify(response);
+            const message={type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',requestId:String(index),manga:item.manga,image:'data:image/png;base64,source'};
+            if(port==='promise')expect(await chrome.runtime.sendMessage(message)).toBe(response);
+            else{let observed:unknown;expect(chrome.runtime.sendMessage(message,(value:unknown)=>{observed=value;})).toBeUndefined();expect(observed).toBe(response);}
+            expect(messages.at(-1)).toBe(message);expect(JSON.stringify(response)).toBe(before);
+            const captured=sandbox.__mangaTest.layoutResults.at(-1);
+            expect(captured.requestId).toBe(String(index));expect(captured.noBitmap).toBe(item.expected);
+            expect(captured.lines.map((value:any)=>value.sourceText)).toEqual(response.lines.map((value:any)=>value.sourceText));
+            expect(captured.lines.map((value:any)=>value.text)).toEqual(response.lines.map((value:any)=>value.text));
+        }
+    });
 });
 
 describe('漫画 source truth、重复锚点与负场景质量门禁',()=>{

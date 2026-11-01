@@ -220,9 +220,14 @@ function serializeTemplatePayload(
     preferenceModel = model,
 ): string {
     const {current, imageInput} = request;
-    return JSON.stringify(imageInput
+    const finalized = imageInput
         ? finalizeVisionPayload(payload, current, service, model, protocol, thinkingOverride)
-        : finalizeThinkingPayload(payload, current, service, model, protocol, thinkingOverride, preferenceModel));
+        : finalizeThinkingPayload(payload, current, service, model, protocol, thinkingOverride, preferenceModel);
+    if (protocol === 'deepseek-responses' || protocol === 'claude-messages') {
+        finalized.stream = false;
+        delete finalized.stream_options;
+    }
+    return JSON.stringify(finalized);
 }
 
 /** 各协议共用冻结配置的译文提示词语义；供应商函数只决定消息容器和协议字段。 */

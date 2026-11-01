@@ -341,18 +341,15 @@ describe('document batch page lifecycle', () => {
     expect(state.parsedDocument).toBe(null);
   });
 
-  it('opens subtitle export in the reading mode and downloads the reviewed translation', async () => {
+  it('downloads the explicitly chosen subtitle version and preserves reading state', async () => {
     await state.loadFiles([file('episode.srt', '1\n00:00:01,000 --> 00:00:03,000\nHello there.\n')]);
     state.editSegment(0, '校订后的字幕');
     state.previewMode = 'translated';
     // 本套件只运行 setup；模拟真实 dialog 的 @close="downloadOpen = false" 事件。
     state.downloadDialog = {showModal: vi.fn(), close: vi.fn(() => {state.downloadOpen = false;})};
     state.openDownload();
-    expect(state.outputMode).toBe('translated');
-    expect(state.downloadFileName).toBe('episode.translated.srt');
-    expect(state.downloadPreview).toContain('校订后的字幕');
-    expect(state.downloadPreview).not.toContain('Hello there.');
-    await state.downloadDocument();
+    await state.requestDownload('translated');
+    expect(state.previewMode).toBe('translated');
     expect(download).toHaveBeenCalledWith(state.parsedDocument, ['校订后的字幕'], 'translated', {
       pdfPresentation: 'layout', signal: expect.any(AbortSignal), onPdfProgress: expect.any(Function), onArchiveProgress: expect.any(Function),
     });
@@ -362,7 +359,7 @@ describe('document batch page lifecycle', () => {
     expect(state.downloadOpen).toBe(false);
     state.previewMode = 'bilingual';
     state.openDownload();
-    expect(state.outputMode).toBe('bilingual');
+    expect(state.outputMode).toBe('translated');
     state.downloadDialog.close();
     state.previewMode = 'source';
     state.outputMode = 'translated';
@@ -426,7 +423,7 @@ describe('document batch page lifecycle', () => {
     expect(state.sidebarOpen).toBe(true); expect(state.sidebarTab).toBe('files');
     state.selectDocument(state.documentQueue[0]);
     expect(state.translatedSegments).toEqual(['第一份校订']);
-    expect(state.downloadPreview).toBe('');
+    expect(state.downloadOpen).toBe(false);
   });
 
   it('shows a failed settings save and prevents a late older failure replacing a newer success', async () => {

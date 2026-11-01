@@ -138,7 +138,7 @@ function find(predicate: (node: Host) => boolean, within = root): Host {
 }
 const labelled = (label: string, within = root) => find(node => node.props['aria-label'] === label, within);
 const dialog = (heading: string) => find(node => node.tag === 'dialog' && node.props['aria-labelledby'] === heading);
-const button = (label: string, within = root) => find(node => node.tag === 'button' && textOf(node) === label, within);
+const button = (label: string, within = root) => find(node => node.tag === 'button' && (textOf(node) === label || node.props['aria-label'] === label), within);
 const taskbar = () => find(node => node.props['aria-label'] === '当前文档与翻译任务');
 const translateButton = () => find(node => node.tag === 'button' && String(node.props.class).includes('translate-document-button'), taskbar());
 const editor = () => labelled('全量译文校订');
@@ -182,7 +182,7 @@ function broadcast(patch: Partial<Config>) {
     ports.observer!(next);
 }
 async function downloadReady() {
-    await fire(button('下载文件 ↓'), 'click');
+    await fire(button('下载'), 'click');
     return dialog('download-document-heading');
 }
 beforeEach(async () => {
@@ -239,7 +239,7 @@ describe('document user actions: configuration consumers', () => {
         await fire(translateButton(), 'click');
         await vi.waitFor(() => expect(ports.single).toHaveBeenCalledTimes(2));
         expect(ports.batch).not.toHaveBeenCalled();
-        await vi.waitFor(() => expect(button('下载文件 ↓', taskbar()).props.disabled).toBe(false));
+        await vi.waitFor(() => expect(button('下载', taskbar()).props.disabled).toBe(false));
         await selectFile('batch-second.txt');
         expect(localToggle().checked).toBe(true);
         await fire(translateButton(), 'click');
@@ -412,12 +412,13 @@ describe('document user actions: download consumers', () => {
         await importFiles(file('episode.srt', '1\n00:00:01,000 --> 00:00:02,000\nFirst\n\n2\n00:00:03,000 --> 00:00:04,000\nSecond\n'));
         await edit(0, '第一段校订');
         const download = await downloadReady();
-        const submit = button('下载双语文件', download);
-        expect(submit.props.disabled).toBe(true);
-        await fire(find(node => node.tag === 'input' && node.type === 'checkbox', download), 'change', {checked: true});
-        await fire(button('仅译文', download), 'click');
-        expect(button('下载译文文件', download).props.disabled).toBe(false);
         await fire(button('下载译文文件', download), 'click');
+        expect(ports.download).not.toHaveBeenCalled();
+        expect(blobs).toHaveLength(0);
+        await fire(button('返回', download), 'click');
+        expect(button('下载双语文件', download).props.disabled).toBe(false);
+        await fire(button('下载译文文件', download), 'click');
+        await fire(button('下载当前结果', download), 'click');
         await vi.waitFor(() => expect(blobs).toHaveLength(1));
         const content = await blobs[0].text();
         expect(content).toContain('00:00:01,000 --> 00:00:02,000\n第一段校订');
@@ -426,25 +427,30 @@ describe('document user actions: download consumers', () => {
         expect(anchors[0].download).toBe('episode.translated.srt');
         expect(anchors[0].click).toHaveBeenCalledOnce();
         expect(download.open).toBe(false);
-        await fire(button('下载文件 ↓'), 'click');
-        expect(find(node => node.tag === 'input' && node.type === 'checkbox', download).checked).toBe(false);
-        expect(button('下载双语文件', download).props.disabled).toBe(true);
+        await fire(button('下载'), 'click');
+        await fire(button('下载双语文件', download), 'click');
+        expect(ports.download).toHaveBeenCalledOnce();
+        expect(button('下载当前结果', download).props.disabled).toBe(false);
     });
 
-    it('preserves the translated reading choice on download and keeps the previous output choice when reading source', async () => {
+    it('downloads either version directly without changing the reading mode', async () => {
         await importFiles(file('reading.txt')); await edit(0, '校订');
         await fire(button('阅读'), 'click');
         await fire(button('译文', labelled('阅读方式')), 'click');
         const download = await downloadReady();
-        expect(textOf(download)).toContain('reading.translated.txt');
-        expect(textOf(find(node => node.tag === 'pre', download))).toBe('校订');
-        await fire(find(node => node.tag === 'button' && node.props['aria-label'] === '关闭下载窗口', download), 'click');
-        await fire(button('原文', labelled('阅读方式')), 'click');
-        await fire(button('下载文件 ↓'), 'click');
-        expect(textOf(download)).toContain('reading.translated.txt');
-        await fire(button('双语对照', download), 'click');
-        expect(textOf(find(node => node.tag === 'pre', download))).toContain('Original text.');
-        expect(textOf(find(node => node.tag === 'pre', download))).toContain('校订');
+        expect(textOf(download)).not.toContain('reading.txt');
+        await fire(button('下载双语文件', download), 'click');
+        await vi.waitFor(() => expect(blobs).toHaveLength(1));
+        expect(await blobs[0].text()).toContain('Original text.');
+        expect(await blobs[0].text()).toContain('校订');
+        expect(anchors[0].download).toBe('reading.bilingual.txt');
+        expect(button('译文', labelled('阅读方式')).props['aria-pressed']).toBe(true);
+        await downloadReady();
+        await fire(button('下载译文文件', download), 'click');
+        await vi.waitFor(() => expect(blobs).toHaveLength(2));
+        expect(await blobs[1].text()).toBe('校订');
+        expect(anchors[1].download).toBe('reading.translated.txt');
+        expect(button('译文', labelled('阅读方式')).props['aria-pressed']).toBe(true);
     });
 
     it('blocks Escape during export, discards late progress and bytes after cancel, then hands off exactly one retry URL', async () => {
@@ -681,7 +687,9 @@ describe('document user actions: real editor events and parent consumers', () =>
         expect(textOf(taskbar())).toContain('翻译完成');
         await fire(button('阅读'), 'click');
         const download = await downloadReady();
-        expect(textOf(find(node => node.tag === 'pre', download))).toContain('Second reviewed');
+        await fire(button('下载译文文件', download), 'click');
+        await vi.waitFor(() => expect(blobs).toHaveLength(1));
+        expect(await blobs[0].text()).toContain('Second reviewed');
     });
 
     it('clears search, pending filter, page and editing focus on parent document switch, then restores only the first file translations', async () => {

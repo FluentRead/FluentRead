@@ -3,7 +3,7 @@
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
  主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
  OCR 续译：混合 PDF 补入扫描段落时，按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。
- 下载窗口：默认只展示输出文件、当前版本和唯一下载主操作，内容、独立的 PDF 排版、完整文件名与说明收进更多选项；原文下载使用文字入口，失败提示与技术详情分层，导出排版不改写阅读器。
+ 下载面板：紧邻工具栏直接提供双语、仅译文两种下载动作，PDF 排版独立于阅读视图，原文件单列；不重复文件名或堆叠预览、装饰图标，未完成的译文才进入一次明确确认，生成与失败可取消或重试。
  材料接入：按原文件内容指纹加入本机学习工作区，恢复文档页码与章节，重解析后只按唯一原句重新匹配位置；原文件记录缺失时重新选择并核对指纹，不把同名文件误认作原件。
  模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，草稿共享设置编辑会话并保留文档字段与模型映射的原子补丁，运行时适配由本目录 runtime 注入。
 -->
@@ -173,7 +173,7 @@
             </div>
             <div class="toolbar-primary-actions" :data-primary-action="downloadIsPrimary ? 'download' : 'translate'">
             <button class="ghost-button toolbar-settings-toggle" type="button" :title="translationSettingsSummary" @click="openDocumentSettings">{{ translateLegacy('翻译设置') }}</button>
-            <button class="download-button" type="button" :disabled="!originalDownloadSource && (!hasTranslation || queueBusy)" @click="openDownload">下载文件 ↓</button>
+            <button ref="downloadButton" class="download-button" type="button" aria-haspopup="dialog" aria-controls="document-download-panel" :aria-expanded="downloadOpen" :disabled="!originalDownloadSource && (!hasTranslation || queueBusy)" @click="openDownload">{{ downloadCopy.download }}<UiIcon name="chevron-down" :size="14" /></button>
             <div class="translation-actions">
               <button v-if="translating" class="ghost-button pause-button" type="button" @click="pauseTranslation"><i class="spinner dark-spinner" aria-hidden="true" />暂停翻译</button>
               <button v-else-if="parsedDocument.segments.length || needsOcr" class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning)" @click="requestTranslation">{{ translationActionLabel }}</button>
@@ -410,36 +410,26 @@
       <p>{{ pendingAction === 'remove' ? t('document.batch.removeWarning') : pendingAction === 'reset' ? (documentQueue.length > 1 ? t('document.batch.clearWarning') : t(historyAvailable ? 'document.changeDocument.historyHint' : 'document.changeDocument.downloadHint')) : '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。' }}</p>
       <div class="dialog-actions"><button class="ghost-button" type="button" autofocus @click="confirmDialog?.close()">返回文档</button><button class="translate-document-button" type="button" @click="confirmAction">{{ pendingAction === 'remove' ? t('document.batch.remove') : pendingAction === 'reset' ? (documentQueue.length > 1 ? t('document.batch.clear') : '打开新文件') : '重新翻译' }}</button></div>
     </dialog>
-    <dialog ref="downloadDialog" class="document-dialog download-dialog" aria-labelledby="download-document-heading" :aria-busy="preparingDownload" @close="downloadOpen = false" @cancel="preparingDownload && $event.preventDefault()">
-      <header class="download-heading"><h2 id="download-document-heading">{{ downloadCopy.title }}</h2><button type="button" :aria-label="downloadCopy.close" :disabled="preparingDownload" @click="downloadDialog?.close()">×</button></header>
-      <div class="download-file-identity">
-        <svg viewBox="0 0 24 28" fill="none" aria-hidden="true"><path d="M5 1.5h9l5.5 5.5v18H5zM14 1.5V7h5.5M8.5 12h7M8.5 16h7M8.5 20h4" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
-        <div><strong class="download-file-title" data-i18n-ignore :title="hasTranslation ? downloadFileName : originalDownloadSource?.fileName">{{ hasTranslation ? downloadFileName : originalDownloadSource?.fileName }}</strong><p v-if="hasTranslation">{{ translateLegacy(outputMode === 'bilingual' ? '双语对照' : '仅译文') }}<template v-if="isPdfDocument"> · {{ t(pdfReadableExport ? 'document.pdfReading.readablePresentation' : 'document.pdfReading.layoutPresentation') }}</template></p><p v-else>{{ downloadCopy.originalHint }}</p></div>
-      </div>
-      <p v-if="originalDownloadNotice" class="notice" role="status">{{ originalDownloadNotice }}</p>
-      <details v-if="hasTranslation" class="download-options" :open="downloadOptionsOpen" @toggle="downloadOptionsOpen = ($event.target as HTMLDetailsElement).open">
-        <summary>{{ downloadCopy.moreOptions }}</summary>
-        <div class="download-setting-row"><span>{{ downloadCopy.contentLabel }}</span><div class="mode-buttons export-options" role="group" :aria-label="downloadCopy.contentLabel">
-          <button type="button" :disabled="queueBusy" :aria-pressed="outputMode === 'bilingual'" :class="{ selected: outputMode === 'bilingual' }" @click="outputMode = 'bilingual'">双语对照</button>
-          <button type="button" :disabled="queueBusy" :aria-pressed="outputMode === 'translated'" :class="{ selected: outputMode === 'translated' }" @click="outputMode = 'translated'">仅译文</button>
-        </div></div>
-        <label v-if="isPdfDocument" class="download-setting-row"><span>{{ downloadCopy.layoutLabel }}</span><select :value="downloadPdfPresentation" :disabled="queueBusy" :aria-label="downloadCopy.layoutLabel" @change="downloadPdfPresentation = ($event.target as HTMLSelectElement).value as PdfReadingPresentation"><option value="layout">{{ t('document.pdfReading.layoutPresentation') }}</option><option value="readable">{{ t('document.pdfReading.readablePresentation') }}</option></select></label>
-        <div class="download-setting-row download-file-row"><span>{{ downloadCopy.fileLabel }}</span><p class="export-file-name" data-i18n-ignore>{{ downloadFileName }}</p></div>
-        <section v-if="downloadOpen && isPdfDocument" class="pdf-export-summary" :data-pdf-export-presentation="downloadPdfPresentation">
-          <p><span v-if="outputMode === 'bilingual'">{{ t(pdfReadableExport ? 'document.pdfReading.exportReadableBilingualHint' : 'document.pdfReading.exportBilingualHint') }} · </span>{{ pdfReadableExport ? t('document.pdfReading.exportReadablePageHint') : downloadCopy.pageCount.replace('{count}', String(pdfExportPageCount)) }}</p>
-          <p>{{ t(pdfReadableExport ? 'document.pdfReading.exportReadableHint' : 'document.pdfReading.exportHint') }}</p>
-        </section>
-        <details v-else-if="downloadOpen" class="export-preview"><summary>{{ downloadCopy.previewLabel }}</summary><pre data-i18n-ignore>{{ downloadPreview }}</pre></details>
-        <p v-if="isSubtitleDocument" class="export-note">保留字幕序号和时间轴。仅译文替换字幕文字，双语在同一时间段内保留原文和译文。</p>
-      </details>
-      <p v-if="!hasTranslation" class="download-help">{{ downloadCopy.translationRequired }}</p>
-      <p v-if="hasTranslation && !translationComplete" class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
-      <label v-if="hasTranslation && !translationComplete" class="partial-export"><input v-model="partialExportAcknowledged" type="checkbox" :disabled="queueBusy" />我已了解，下载当前结果</label>
+    <dialog id="document-download-panel" ref="downloadDialog" class="document-dialog download-dialog" :style="downloadPosition" aria-labelledby="download-document-heading" :aria-busy="preparingDownload" @click="closeDownloadOnBackdrop" @close="downloadOpen = false" @cancel="preparingDownload && $event.preventDefault()">
+      <header class="download-heading"><h2 id="download-document-heading">{{ downloadCopy.title }}</h2><button type="button" :aria-label="downloadCopy.close" :disabled="preparingDownload" @click="downloadDialog?.close()"><UiIcon name="close" :size="16" /></button></header>
+      <div v-if="preparingDownload" class="export-progress"><p role="status" aria-live="polite">{{ downloadProgress || downloadCopy.preparing }}</p><progress v-if="downloadPdfProgress" :value="downloadPdfProgress.phase === 'rendering' ? downloadPdfProgress.completedPages : undefined" :max="downloadPdfProgress.totalPages || 1" :aria-label="downloadProgress || downloadCopy.preparing" /><button class="download-cancel" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button></div>
+      <section v-else-if="pendingDownloadMode" class="download-confirmation">
+        <h3>{{ pendingDownloadMode === 'bilingual' ? downloadCopy.bilingual : downloadCopy.translated }}</h3>
+        <p class="notice warning">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
+        <div class="dialog-actions"><button class="ghost-button" type="button" @click="backToDownloadChoices">{{ downloadCopy.back }}</button><button class="translate-document-button" type="button" :disabled="queueBusy" @click="confirmPartialDownload">{{ downloadCopy.confirm }}</button></div>
+      </section>
+      <template v-else>
+        <div class="download-versions">
+          <button class="download-version" type="button" :disabled="!hasTranslation || queueBusy" autofocus :aria-label="downloadCopy.bilingualAction" @click="requestDownload('bilingual')"><strong>{{ downloadCopy.bilingual }}</strong><small>{{ downloadCopy.bilingualHint }}</small></button>
+          <button class="download-version" type="button" :disabled="!hasTranslation || queueBusy" :aria-label="downloadCopy.translatedAction" @click="requestDownload('translated')"><strong>{{ downloadCopy.translated }}</strong><small>{{ downloadCopy.translatedHint }}</small></button>
+        </div>
+        <p v-if="!hasTranslation" class="download-help">{{ downloadCopy.translationRequired }}</p>
+        <label v-if="hasTranslation && isPdfDocument" class="download-layout"><span>{{ downloadCopy.layoutLabel }}</span><select :value="downloadPdfPresentation" :disabled="queueBusy" :aria-label="downloadCopy.layoutLabel" @change="downloadPdfPresentation = ($event.target as HTMLSelectElement).value as PdfReadingPresentation"><option value="layout">{{ downloadCopy.layoutOriginal }}</option><option value="readable">{{ downloadCopy.layoutReadable }}</option></select></label>
+      </template>
       <p v-if="hasTranslation && settingsChanged" class="notice warning">设置已更改，本次下载仍是当前保留的译文。</p>
-      <div v-if="downloadProgress" class="export-progress"><p class="notice" role="status" aria-live="polite">{{ downloadProgress }}</p><progress v-if="downloadPdfProgress" :value="downloadPdfProgress.phase === 'rendering' ? downloadPdfProgress.completedPages : undefined" :max="downloadPdfProgress.totalPages || 1" :aria-label="downloadProgress" /></div>
-      <div v-for="(failure, index) in [originalDownloadError, downloadError].filter(Boolean)" :key="index" class="download-failure"><p class="notice error" role="alert">{{ getDocumentDownloadErrorCopy(language, failure) }}</p><details><summary>{{ downloadCopy.details }}</summary><pre data-i18n-ignore>{{ failure }}</pre></details></div>
-      <div class="dialog-actions"><button v-if="hasTranslation" class="translate-document-button" type="button" :disabled="queueBusy || (!translationComplete && !partialExportAcknowledged)" @click="downloadDocument">{{ preparingDownload ? '正在生成文件…' : `下载${outputMode === 'bilingual' ? '双语' : '译文'}文件` }}</button><button v-else class="translate-document-button" type="button" :disabled="!originalDownloadSource" @click="downloadOriginalDocument">{{ downloadCopy.original }}</button></div>
-      <div v-if="hasTranslation" class="download-secondary-actions"><button v-if="preparingDownload" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button><button class="download-original" type="button" :disabled="!originalDownloadSource" :title="downloadCopy.originalHint" @click="downloadOriginalDocument">{{ downloadCopy.original }}</button></div>
+      <p v-if="!preparingDownload && downloadProgress" class="notice" role="status">{{ downloadProgress }}</p>
+      <div v-for="(failure, index) in [originalDownloadError, downloadError].filter(Boolean)" :key="index" class="download-failure"><p class="notice error" role="alert">{{ getDocumentDownloadErrorCopy(language, failure) }}</p><details @toggle="positionDownloadPanel"><summary>{{ downloadCopy.details }}</summary><pre data-i18n-ignore>{{ failure }}</pre></details></div>
+      <footer class="download-original-row"><button class="download-original" type="button" :disabled="!originalDownloadSource" :title="downloadCopy.originalHint" @click="downloadOriginalDocument">{{ downloadCopy.original }}</button></footer>
     </dialog>
     <footer v-if="!parsedDocument && !restoring" class="document-footer">
       <span>让语言更近，让世界更大。</span>
@@ -485,7 +475,6 @@ import {
   createPdfPageRecognizer,
   documentRetryBackoff,
   generateDocumentArchive,
-  createDocumentDownloadName,
   createDocumentImportWorkflow,
   createDocumentRecognitionWorkflow,
   createDocumentExportWorkflow,
@@ -499,7 +488,6 @@ import {
   formatDocumentReaderText,
   getDocumentAcceptAttribute,
   getDocumentEmptyReaderHint,
-  getDocumentExportPreview,
   getDocumentMimeType,
   getDocxPartLabel as docxPartLabel,
   getCustomOpenAIProvider,
@@ -540,6 +528,7 @@ import {
   ElSelect,
 } from '@/src/app/document-translation';
 import {getDocumentDownloadCopy, getDocumentDownloadErrorCopy} from './downloadCopy';
+import UiIcon from '@/src/ui/components/UiIcon.vue';
 
 const READER_PAGE_SIZE = 80;
 
@@ -614,9 +603,11 @@ const readerPage = ref(1);
 const settledTranslations = ref<string[]>([]);
 const confirmDialog = ref<HTMLDialogElement | null>(null);
 const downloadDialog = ref<HTMLDialogElement | null>(null);
+const downloadButton = ref<HTMLButtonElement | null>(null);
 const downloadOpen = ref(false);
 const downloadPdfPresentation = ref<PdfReadingPresentation>('layout');
-const downloadOptionsOpen = ref(false);
+const downloadPosition = ref<{left: string; top: string}>();
+const pendingDownloadMode = ref<DocumentRenderMode | null>(null);
 const queueExpanded = ref(false);
 const documentSettingsDialog = ref<HTMLDialogElement | null>(null);
 const configSaveError = ref('');
@@ -626,7 +617,6 @@ const partialExportAcknowledged = ref(false);
 const downloadError = ref('');
 const downloadNotice = ref('');
 const originalDownloadError = ref('');
-const originalDownloadNotice = ref('');
 const readingModes = [{value: 'source', label: '原文'}, {value: 'bilingual', label: '双语'}, {value: 'translated', label: '译文'}] as const;
 const isDragging = ref(false);
 const translating = ref(false);
@@ -684,7 +674,6 @@ function activateDocument(item: DocumentQueueItem): void {
   settledTranslations.value = [...item.translations];
   downloadNotice.value = '';
   originalDownloadError.value = '';
-  originalDownloadNotice.value = '';
   readerPage.value = 1;
   readerTab.value = 'read';
   epubChapterIndex.value = 0;
@@ -1079,7 +1068,6 @@ const translationSettingsSummary = computed(() => {
   const service = serviceOptions.value.find(item => item.value === effectiveDocumentService.value)?.label || effectiveDocumentService.value;
   return `${translateLegacy(label(options.from, config.from))} → ${translateLegacy(label(options.to, config.to))} · ${service}`;
 });
-const downloadFileName = computed(() => parsedDocument.value ? createDocumentDownloadName(parsedDocument.value.fileName, outputMode.value) : '');
 type OriginalDocumentDownloadSource = {fileName: string; blob: File} | {fileName: string; bytes: Uint8Array; mimeType: string};
 const originalDownloadSource = computed<OriginalDocumentDownloadSource | null>(() => {
   const item = documentQueue.value.find(candidate => candidate.id === activeDocumentId.value);
@@ -1088,8 +1076,6 @@ const originalDownloadSource = computed<OriginalDocumentDownloadSource | null>((
   // 最近翻译恢复的是已保存原始字节；不从解析文本或 PDF 预览重新生成文件。
   return item.bytes ? {fileName: item.name, bytes: item.bytes, mimeType: item.mimeType || getDocumentMimeType(item.document.format)} : null;
 });
-const downloadPreview = computed(() => downloadOpen.value && parsedDocument.value
-  ? getDocumentExportPreview(parsedDocument.value, translatedSegments.value, outputMode.value) : '');
 const formatCards = [
   {code: 'PDF', label: '论文 / 资料', tone: 'coral'},
   {code: 'EPUB', label: '电子书', tone: 'teal'},
@@ -1252,8 +1238,6 @@ const statusLabel = computed(() => translating.value ? recognitionProgress.value
 const hasUnsavedWork = computed(() => translating.value || batchRunning.value || openingFile.value || editRevision.value > downloadedRevision.value
   || documentQueue.value.some(item => item.id !== activeDocumentId.value && item.revision > item.downloaded));
 const isPdfDocument = computed(() => parsedDocument.value?.binary?.kind === 'pdf');
-const pdfExportPageCount = computed(() => parsedDocument.value?.binary?.kind === 'pdf' ? parsedDocument.value.binary.pages.length : 0);
-const pdfReadableExport = computed(() => isPdfDocument.value && downloadPdfPresentation.value === 'readable');
 const isEpubDocument = computed(() => parsedDocument.value?.binary?.kind === 'epub');
 const isDocxDocument = computed(() => parsedDocument.value?.binary?.kind === 'docx');
 const isSubtitleDocument = computed(() => isSubtitleDocumentFormat(parsedDocument.value?.format));
@@ -1689,7 +1673,6 @@ function resetDocument(): void {
   settledTranslations.value = [];
   downloadNotice.value = '';
   originalDownloadError.value = '';
-  originalDownloadNotice.value = '';
   openingFile.value = false;
   preparingDownload.value = false;
   epubChapterIndex.value = 0;
@@ -1884,35 +1867,79 @@ function editSegment(index: number, value: string): void {
   scheduleHistorySave();
 }
 
+// 面板保持在下载入口旁；窄屏、展开错误和浏览器缩放后仍完整位于视口中。
+function positionDownloadPanel(): void {
+  const panel = downloadDialog.value, button = downloadButton.value;
+  if (!downloadOpen.value || !panel || !button?.getBoundingClientRect) return;
+  const anchor = button.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
+  downloadPosition.value = {
+    left: `${Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12))}px`,
+    top: `${anchor.bottom + 6 + height <= window.innerHeight - 12 ? anchor.bottom + 6 : Math.max(12, anchor.top - height - 6)}px`,
+  };
+}
+
+function closeDownloadOnBackdrop(event: MouseEvent): void {
+  const panel = downloadDialog.value;
+  if (!panel || event.target !== panel || preparingDownload.value) return;
+  const rect = panel.getBoundingClientRect();
+  if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) panel.close();
+}
+
+watch([downloadOpen, pendingDownloadMode, preparingDownload, downloadProgress, downloadError, originalDownloadError, hasTranslation, settingsChanged, language], () => {void nextTick(positionDownloadPanel);});
+watch(preparingDownload, busy => {void nextTick(() => {
+  if (downloadOpen.value) downloadDialog.value?.querySelector?.<HTMLButtonElement>(busy ? '.download-cancel' : pendingDownloadMode.value ? '.download-confirmation .ghost-button' : '.download-version:not(:disabled)')?.focus();
+});});
+
 function openDownload(): void {
   if (!parsedDocument.value || (!originalDownloadSource.value && (queueBusy.value || !hasTranslation.value))) return;
   if (downloadOpen.value) return;
-  // 从正在阅读的译文/双语模式进入下载时采用同一内容；原文阅读保留上次选择。
   // 生成过程中仍可打开窗口保存原文，不能重置当前导出的选择、确认或进度。
   if (!preparingDownload.value) {
-    if (previewMode.value !== 'source') outputMode.value = previewMode.value;
     downloadPdfPresentation.value = pdfPresentation.value;
-    downloadOptionsOpen.value = false;
+    pendingDownloadMode.value = null;
     partialExportAcknowledged.value = false;
     downloadError.value = '';
     downloadProgress.value = '';
     downloadPdfProgress.value = null;
   }
   originalDownloadError.value = '';
-  originalDownloadNotice.value = '';
   downloadOpen.value = true;
   downloadDialog.value?.showModal();
+  void nextTick(positionDownloadPanel);
+}
+
+async function requestDownload(mode: DocumentRenderMode): Promise<void> {
+  if (!hasTranslation.value || queueBusy.value) return;
+  outputMode.value = mode;
+  if (!translationComplete.value) {
+    pendingDownloadMode.value = mode;
+    await nextTick();
+    downloadDialog.value?.querySelector?.<HTMLButtonElement>('.download-confirmation .ghost-button')?.focus();
+    return;
+  }
+  await downloadDocument();
+}
+
+function backToDownloadChoices(): void {
+  pendingDownloadMode.value = null;
+  void nextTick(() => downloadDialog.value?.querySelector?.<HTMLButtonElement>('.download-version:not(:disabled)')?.focus());
+}
+
+async function confirmPartialDownload(): Promise<void> {
+  if (!pendingDownloadMode.value || queueBusy.value) return;
+  outputMode.value = pendingDownloadMode.value;
+  partialExportAcknowledged.value = true;
+  await downloadDocument();
 }
 
 function downloadOriginalDocument(): void {
   const source = originalDownloadSource.value;
   if (!source) return;
   originalDownloadError.value = '';
-  originalDownloadNotice.value = '';
   try {
     const blob = 'bytes' in source ? new Blob([source.bytes], {type: source.mimeType}) : source.blob;
     saveDownloadBlob(blob, source.fileName);
-    originalDownloadNotice.value = downloadCopy.value.originalDownloaded;
+    if (!preparingDownload.value) downloadDialog.value?.close();
   } catch (error) {
     originalDownloadError.value = error instanceof Error ? error.message : String(error);
   }
@@ -1950,6 +1977,7 @@ async function openSettings(): Promise<void> {
 }
 
 onMounted(() => {
+  window.addEventListener('resize', positionDownloadPanel);
   colorSchemeMedia.addEventListener?.('change', applyTheme);
   window.addEventListener('pagehide', resetDocument);
   window.addEventListener('beforeunload', guardBeforeUnload);
@@ -1966,6 +1994,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  window.removeEventListener('resize', positionDownloadPanel);
   disposed = true;
   materialEpoch++; clearTimeout(materialPositionTimer);
   configEditor.dispose();

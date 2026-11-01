@@ -71,13 +71,13 @@ jobs:
         run: node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-tests.mjs --report coverage/affected-plan/plan.json
       - name: Check extension and shared Vue types
         if: steps.affected.outputs.extension_changed == 'true'
-        run: pnpm compile
-      - name: Build Chrome and Firefox and verify generated manifests
+        run: node scripts/testing/run-ci-typecheck.mjs
+      - name: Build Chrome and Firefox archives and verify generated manifests
         if: steps.affected.outputs.extension_changed == 'true'
         run: |
-          pnpm build
-          pnpm build:firefox
-          pnpm verify:extension-manifests
+          pnpm zip
+          pnpm zip:firefox
+          pnpm verify:extension-manifests --require-chrome-archive --require-firefox-archives
       - name: Build and verify the userscript
         if: steps.affected.outputs.extension_changed == 'true'
         run: |
@@ -88,6 +88,15 @@ jobs:
         run: |
           pnpm build:userscript:standalone
           node scripts/verify-userscript-standalone-build.mjs
+      - name: Preserve verified extension archives
+        if: success() && steps.affected.outputs.extension_changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-extension-archives
+          path: .output/*.zip
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 7
       - name: Preserve affected test plan and coverage evidence
         if: always()
         uses: actions/upload-artifact@v4

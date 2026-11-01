@@ -88,7 +88,8 @@ jobs:
       - name: Audit and check types
         run: |
           pnpm test:audit
-          pnpm compile
+          node --test tests/ciTypeBudget.test.mjs
+          node scripts/testing/run-ci-typecheck.mjs
       - name: Test release packaging and publication contracts
         if: github.event_name == 'pull_request'
         run: node --test --test-concurrency=1 tests/release*.test.mjs

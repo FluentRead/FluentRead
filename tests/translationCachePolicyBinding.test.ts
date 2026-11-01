@@ -120,6 +120,34 @@ describe('持久缓存策略与配置生命周期', () => {
         expect(f.setLimits).toHaveBeenLastCalledWith({maxBytes: 5 * 1024 * 1024, maxEntries: 100});
     });
 
+    it('配置切回旧值时，旧维护失败不会替换同值的新维护', async () => {
+        const f = fixture();
+        await f.binding.ready;
+        const old = deferred(), current = deferred();
+        f.setLimits.mockImplementationOnce(() => old.promise)
+            .mockResolvedValueOnce(undefined)
+            .mockImplementationOnce(() => current.promise);
+        f.update({translationCacheMaxEntries: 300});
+        f.update({translationCacheMaxEntries: 100});
+        f.update({translationCacheMaxEntries: 300});
+        old.reject(new Error('old maintenance failed'));
+        await Promise.resolve();
+        await Promise.resolve();
+        let finished = false;
+        const management = f.binding.applyLatest().then(() => { finished = true; });
+        try {
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(f.setLimits).toHaveBeenCalledTimes(4);
+            expect(f.setLimits).toHaveBeenLastCalledWith({maxBytes: 5 * 1024 * 1024, maxEntries: 300});
+            expect(finished).toBe(false);
+        } finally {
+            current.resolve();
+            await management;
+        }
+        expect(finished).toBe(true);
+    });
+
     it('配置就绪失败被记录，翻译启动不被缓存附属维护阻断', async () => {
         const error = new Error('hydration failed');
         const f = fixture(Promise.reject(error));

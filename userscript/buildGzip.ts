@@ -2,7 +2,7 @@
  * @file userscript/buildGzip.ts
  * 文件职责：在 userscript 构建期统一编码静态资源，避免宿主 Node/zlib 编码器版本影响内嵌 gzip 字节。
  * 主要内容：复用锁定的 pako 2.1.0 和 level 9，比较多个 memLevel；独立版增加有限策略比较，较大数据可在构建期通过隔离 worker 使用 Zopfli，输出仍是标准 gzip。
- * 构建成本：每份静态数据增加三次有限压缩，独立版部分数据再比较四次，较大数据还需三次 Zopfli 迭代；运行时仍读取同一标准格式，不增加解码路径。
+ * 构建成本：每份静态数据增加三次有限压缩，独立版部分数据再比较四次，较大数据还需五次 Zopfli 迭代；运行时仍读取同一标准格式，不增加解码路径。
  * 模块边界：仅供构建配置与插件使用，不改变输入数据、运行时解压端口或产物大小上限；Zopfli 仅为构建依赖。
  */
 import {createRequire} from 'node:module';
@@ -32,10 +32,10 @@ export function gzipUserscriptBuildData(data: Uint8Array, filteredLevel?: 8 | 9,
     return Buffer.from(best);
 }
 
-/** 仅构建期的较大 standalone 数据使用 Zopfli；结果仍是可由现有 pako 解压的标准 gzip。 */
-export async function gzipLargeStandaloneUserscriptData(data: Uint8Array, root: string): Promise<Buffer> {
+/** 构建期按大小门槛选择 Zopfli；结果仍是可由现有 pako 解压的标准 gzip。 */
+export async function gzipLargeStandaloneUserscriptData(data: Uint8Array, root: string, minimumSize = 65_536): Promise<Buffer> {
     const baseline = gzipUserscriptBuildData(data);
-    if (data.byteLength < 65_536) return baseline;
+    if (data.byteLength < minimumSize) return baseline;
     // Zopfli 的 Emscripten 绑定会安装进程级异常监听；只在独立 worker 中载入，
     // 退出时清理整个上下文，避免影响 Vite、测试框架或其它构建插件的错误处理。
     const compact = await new Promise<Buffer>((resolveResult, reject) => {

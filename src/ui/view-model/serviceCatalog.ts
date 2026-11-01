@@ -67,6 +67,7 @@ const serviceWebsites = {
   cerebras: 'https://cloud.cerebras.ai/',
   deepinfra: 'https://deepinfra.com/dash',
   perplexity: 'https://www.perplexity.ai/account/api',
+  runcrate: 'https://www.runcrate.ai/dashboard/api-keys',
 } satisfies Record<keyof typeof services, string>
 
 /**

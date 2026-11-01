@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/zh-CN.json';
 import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
 import {aiRequestTimeoutChineseMessages} from './aiRequestTimeout';
+import {selectionDictionaryChineseMessages} from './selectionDictionary';
 import {sectionTranslationRulesChineseMessages} from './sectionTranslationRules';
 import {pdfReadingChineseMessages} from './pdfReading';
 import {informationHighlightChineseMessages} from './informationHighlight';
@@ -70,6 +71,10 @@ export const zhCNMessages = {
     "translationCenter.endpointMissing": "请先填写自定义服务的接口地址。",
     "translationCenter.modelMissing": "请先选择或填写一个模型。",
     "translationCenter.noReady": "请先配置至少一个服务，再开始翻译。",
+    'sidepanel.title': '侧边栏翻译',
+    'sidepanel.openError': '无法打开侧边栏，请重试或从浏览器侧边栏菜单打开流畅阅读。',
+    'sidepanel.settingsError': '无法打开设置，请重试。',
+    'sidepanel.startupError': '翻译面板加载失败，请重新加载。',
     "translationCenter.intro": "同一段原文，多种译法。选择服务，找到更合适的表达。",
     "translationCenter.input": "待翻译文本",
     "translationCenter.source": "源语言",
@@ -551,6 +556,7 @@ export const zhCNMessages = {
     "settings.requestLimits.globalTitle": "请求限制",
     "settings.requestLimits.globalHelp": "未单独设置的服务和模型共用这些限制",
     ...aiRequestTimeoutChineseMessages,
+    ...selectionDictionaryChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",
     "settings.requestLimits.apiKeyRecovery": "失败 Key 冷却时间",
@@ -583,7 +589,7 @@ export const zhCNMessages = {
     "popup.pageFont.loading": "正在读取字体设置…",
     "popup.pageFont.unavailable": "暂时无法调整译文字体。",
     "popup.pageFont.readError": "未能读取字体设置，请重试。",
-    "popup.pageFont.changeError": "未能保存字体设置，请重试。",
+    "popup.pageFont.changeError": "字体设置保存失败",
     "popup.pageFont.retry": "重试",
     "popup.quickSettings.appearanceDescription": "双语模式同时显示原文与译文；仅译文模式只显示翻译结果。",
     "popup.quickSettings.hoverSettings": "悬停翻译设置",
@@ -937,6 +943,12 @@ export const zhCNMessages = {
     'glossary.builtin.financeDescription': "财务报表、估值指标与股票市场常用译法",
     'glossary.builtin.research': '学术论文',
     'glossary.builtin.researchDescription': "研究方法、统计分析与论文阅读术语",
+    'glossary.builtin.hardware': "计算机硬件",
+    'glossary.builtin.hardwareDescription': "处理器、存储、芯片与电路常用术语",
+    'glossary.builtin.networking': "网络与云计算",
+    'glossary.builtin.networkingDescription': "网络协议、云基础设施与分布式部署术语",
+    'glossary.builtin.mathematics': "数学",
+    'glossary.builtin.mathematicsDescription': "线性代数、微积分、概率与优化术语",
     'glossary.builtin.products': '产品名保留原文',
     'glossary.builtin.productsDescription': "保留常见开发工具与 AI 产品名称，区分大小写",
     'glossary.builtin.englishChinese': '英语 → 简体中文',

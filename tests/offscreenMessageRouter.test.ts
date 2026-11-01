@@ -328,6 +328,12 @@ describe('Offscreen 消息静态路由', () => {
             .toEqual({success:false,error:'local language direction',errorCode:'language'});
     });
 
+    it('普通图片不绘制时透传原图保留标记和完整文字',async()=>{
+        const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
+        mocks.translateImage.mockResolvedValueOnce({image:'',imageUnchanged:true,lines} as never);
+        const result=await dispatch({type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',image:'data:image/png,x',sourceLanguage:'en'});
+        expect(result.response).toEqual({success:true,image:'',imageUnchanged:true,lines});
+    });
     it('图片翻译规范化缺省 title 并校验结果对象', async () => {
         await expect(dispatch({
             type: 'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN', requestId: 'image-translate-1',

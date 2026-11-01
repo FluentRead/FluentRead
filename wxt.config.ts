@@ -17,6 +17,8 @@ import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
+import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
+import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -138,7 +140,7 @@ export function extendRemoteConfigBuildConfig(
     entrypoints: readonly {type: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
-    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page']);
+    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }
@@ -166,6 +168,8 @@ export function createExtensionManifest(
         key: process.env.WXT_EXTENSION_KEY?.trim() || GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY,
     } : {};
     const firefoxManifest = env.browser === 'firefox' ? {
+        // 大型材料备份需要在用户主动导出时观察下载终态；安装时不请求此权限。
+        optional_permissions: ['downloads'],
         browser_specific_settings: {
             gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
@@ -281,7 +285,7 @@ export default defineConfig({
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
             build: env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' : false} : undefined,
             define: {
@@ -319,6 +323,8 @@ export default defineConfig({
         },
         'zip:extension:done': async (wxt, zipPath) => {
             await finalizeExtensionZip(wxt.config.browser, zipPath);
+            const compact = await compactExtensionZip(zipPath, __dirname);
+            wxt.logger.info(`WASM ZIP compression saved ${compact.savedBytes.toLocaleString('en-US')} bytes`);
         },
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';

@@ -3,11 +3,12 @@ import {parseHTML} from 'linkedom';
 import {createMangaImageSegments} from '@/src/features/image-translation/content/mangaImageSegments';
 import {composeMangaPage} from '@/src/features/image-translation/content/mangaCompositor';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
+import {createMangaReadingSnapshots} from '@/src/features/image-translation/content/mangaReadingSnapshots';
 vi.mock('@/src/features/image-translation/content/mangaCompositor', () => ({composeMangaPage: vi.fn()}));
 vi.mock('@/src/features/image-translation/services/imageEncoding', () => ({encodeImageCanvas: vi.fn()}));
 const flush = async () => {for (let i=0;i<20;i++) await Promise.resolve();};
 
-function fixture() {
+function fixture(lightCacheLimits?:{pages:number;bytes:number}) {
     vi.mocked(encodeImageCanvas).mockImplementation(async canvas=>`data:image/png;base64,${canvas.width}x${canvas.height}`);
     const {document}=parseHTML('<html><body><div id="reader"><img src="https://cdn.example/chapter.webp"></div></body></html>');
     const image=document.querySelector('img')! as {-readonly [K in keyof HTMLImageElement]: HTMLImageElement[K]};
@@ -36,13 +37,21 @@ function fixture() {
     const ports={enabled:vi.fn(()=>true),configurationIdentity:vi.fn(()=>'config'),cacheEnabled:vi.fn(()=>true),imageIdentity:vi.fn((img:HTMLImageElement)=>img.src),readSource:vi.fn().mockResolvedValue('data:image/webp;base64,source'),translate:vi.fn().mockResolvedValue({mangaPatches:{width:800,height:2560,patches:[{x:1,y:1,width:1,height:1,image:'data:image/png;base64,AQ=='}]},lines:[{text:'译文',bbox:{x0:1,y0:1,x1:2,y1:2},backgroundColor:'#fff'}]})};
     const composed:HTMLCanvasElement[]=[];
     vi.mocked(composeMangaPage).mockImplementation(async()=>{const c=document.createElement('canvas') as HTMLCanvasElement;c.width=800;c.height=2560;composed.push(c);return c;});
-    const runtime=createMangaImageSegments(ports);
+    const readingSnapshots=createMangaReadingSnapshots();
+    const runtime=createMangaImageSegments({...ports,readingSnapshots,lightCacheLimits});
     const segments=()=>runtime.prepare([image]).get(image)!;
-    return {document,image,rect,style,decoded,canvases,draws,ports,composed,runtime,segments,taint:()=>{taint=true;},missing:()=>{missing=true;},drawError:()=>{drawError=true;}};
+    return {document,image,rect,style,decoded,canvases,draws,ports,composed,runtime,segments,readingSnapshots,taint:()=>{taint=true;},missing:()=>{missing=true;},drawError:()=>{drawError=true;}};
 }
 afterEach(()=>{vi.restoreAllMocks();vi.resetAllMocks();vi.unstubAllGlobals();vi.useRealTimers();});
 
 describe('超长漫画图片的稳定分段与原始分辨率',()=>{
+    it('不同长图段挤出轻缓存时仍可读旧活动段，释放后回收文字',async()=>{
+        const f=fixture({pages:1,bytes:1024*1024}),segments=f.segments();f.rect.top=-1024;f.rect.bottom-=1024;
+        await f.runtime.translate(segments[1]);expect(f.readingSnapshots.stats().entries).toBe(0);
+        f.rect.top=-2048;await f.runtime.translate(segments[2]);expect(f.readingSnapshots.stats().entries).toBe(1);
+        f.rect.top=-1024;expect((await f.runtime.readLines(segments[1],new AbortController().signal)).status).toBe('ready');
+        expect(f.ports.translate).toHaveBeenCalledTimes(2);f.runtime.release(segments[1]);expect(f.readingSnapshots.stats().entries).toBe(0);f.runtime.dispose();
+    });
     it('覆盖首尾且保持自然宽度，每段有上下文；未进入队列不读取整图或创建画布',()=>{
         const f=fixture(),segments=f.segments();expect(segments).toHaveLength(8);
         expect(segments[0]).toMatchObject({top:0,height:2048,width:800,contextTop:0,contextHeight:2304});
@@ -51,6 +60,52 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         expect(f.runtime.prepare([f.image]).get(f.image)).toBe(segments);expect(f.canvases).toHaveLength(0);expect(f.ports.readSource).not.toHaveBeenCalled();
         const bounds=f.runtime.bounds(segments[1]);expect(bounds).toMatchObject({left:20,top:1024,width:400,height:1024});
         expect(f.runtime.pixels(segments[1])).toBe(800*2560);f.runtime.dispose();
+    });
+    it.each(['','fill'])('默认或 fill 的准备与身份检查不读取未使用的矩形：%s',fit=>{
+        const f=fixture();f.style.objectFit=fit;
+        const rect=vi.spyOn(f.image,'getBoundingClientRect'),segments=f.segments();
+        for(const segment of segments)expect(f.runtime.identity(segment)).not.toBeNull();
+        expect(rect).not.toHaveBeenCalled();
+        for(const segment of segments)f.runtime.bounds(segment);
+        expect(rect).toHaveBeenCalledTimes(segments.length);f.runtime.dispose();
+    });
+    it('contain 准备和每次身份检查仍核对实时宽高比',()=>{
+        const f=fixture();f.style.objectFit='contain';
+        const rect=vi.spyOn(f.image,'getBoundingClientRect'),segments=f.segments();
+        expect(rect).toHaveBeenCalledOnce();
+        expect(f.runtime.identity(segments[0])).not.toBeNull();f.runtime.bounds(segments[0]);
+        f.rect.height=100;
+        expect(f.runtime.identity(segments[1])).toBeNull();expect(rect).toHaveBeenCalledTimes(4);f.runtime.dispose();
+    });
+    it.each(['','fill','contain'])('只在实际使用几何的端口传播矩形异常：%s',fit=>{
+        const f=fixture();f.style.objectFit=fit;
+        const rect=vi.spyOn(f.image,'getBoundingClientRect').mockImplementation(()=>{throw new Error('layout failed');});
+        if(fit==='contain')expect(()=>f.segments()).toThrow('layout failed');
+        else {
+            const segment=f.segments()[0];expect(f.runtime.identity(segment)).not.toBeNull();
+            expect(rect).not.toHaveBeenCalled();expect(()=>f.runtime.bounds(segment)).toThrow('layout failed');
+        }
+        f.runtime.dispose();
+    });
+    it('objectFit 改变后重新校验，不缓存旧显示方式或宽高比',()=>{
+        const f=fixture(),segment=f.segments()[0],rect=vi.spyOn(f.image,'getBoundingClientRect');
+        f.style.objectFit='contain';f.rect.height=100;expect(f.runtime.identity(segment)).toBeNull();
+        f.rect.height=7872;expect(f.runtime.identity(segment)).not.toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        f.style.objectFit='cover';expect(f.runtime.identity(segment)).toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        f.style.objectFit='fill';expect(f.runtime.identity(segment)).not.toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        vi.stubGlobal('getComputedStyle',()=>{throw new Error('style failed');});
+        expect(()=>f.runtime.identity(segment)).toThrow('style failed');f.runtime.dispose();
+    });
+    it('身份端口同步改变几何或样式后，下一段仍读取新状态',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.imageIdentity.mockImplementationOnce(image=>{f.rect.top=-100;f.style.borderTopWidth='2px';return image.src;});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();expect(f.runtime.bounds(segments[0]).top).toBe(-100);
+        expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
+    });
+    it('配置端口同步换图后，下一段不再沿用旧来源',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.configurationIdentity.mockImplementationOnce(()=>{f.image.src='https://cdn.example/new';return 'config';});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
     });
     it('读取上下文而只覆盖核心段，滚动缩放保持定位，暂停和返页复用不改原图',async()=>{
         const f=fixture(),original=f.image.outerHTML,segment=f.segments()[1];
@@ -65,6 +120,15 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         f.runtime.release(segment);expect(output.width).toBe(0);await f.runtime.translate(segment);expect(f.ports.translate).toHaveBeenCalledOnce();
         expect(f.image.outerHTML).toBe(original);f.runtime.dispose();expect(f.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);
         expect(f.runtime.prepare([f.image]).size).toBe(0);expect(f.runtime.identity(segment)).toBeNull();
+    });
+    it('按需读取指定可见片段，不重新加载图片或翻译，换源后拒绝旧片段',async()=>{
+        const f=fixture(),segment=f.segments()[1];f.rect.top=-1024;f.rect.bottom-=1024;
+        await f.runtime.translate(segment);const reads=f.ports.readSource.mock.calls.length;
+        expect(f.runtime.readingVisible(segment)).toBe(true);
+        expect(await f.runtime.readLines(segment,new AbortController().signal)).toMatchObject({status:'ready',lines:[{text:'译文'}]});
+        expect(f.ports.readSource).toHaveBeenCalledTimes(reads);expect(f.ports.translate).toHaveBeenCalledOnce();
+        f.image.src='https://cdn.example/other.webp';
+        expect(await f.runtime.readLines(segment,new AbortController().signal)).toEqual({status:'stale'});f.runtime.dispose();
     });
     it('宽长图按像素预算减小段高，尾段不遗漏小于一行的像素',()=>{
         const f=fixture();f.image.naturalWidth=4096;f.image.naturalHeight=15001;

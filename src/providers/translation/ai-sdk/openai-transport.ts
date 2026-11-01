@@ -2,11 +2,12 @@
  * @file src/providers/translation/ai-sdk/openai-transport.ts
  *
  * 文件职责：组织 OpenAI 兼容翻译请求的共享准备、响应归一和生命周期，向扩展 SDK 与 standalone HTTP 执行器提供同一端口。
- * 主要内容：冻结请求级配置，解析服务 endpoint 与模型，构造 commonMsgTemplate，将固定 payload 交给执行端口；把真实 HTTP 请求和响应读取登记到后台并发租约，避免取消提前释放槽位；在自定义请求体合并后仅为官方 MiMo 端点兜底退役编号；统一清理推理内容、执行预算和归一错误。公开 translateOpenAICompatible 及请求、执行端口类型，不依赖任一具体执行器。
+ * 主要内容：冻结请求级配置，解析服务 endpoint 与模型，构造 commonMsgTemplate，将固定 payload 交给执行端口；把真实 HTTP 请求和响应读取登记到后台并发租约，避免取消提前释放槽位；在自定义请求体合并后仅为官方 MiMo 端点兜底退役编号；按实际 Chat 端点统一输出 token 上限，清理推理内容、执行预算和归一错误。公开 translateOpenAICompatible 及请求、执行端口类型，不依赖任一具体执行器。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
 import {stripTranslationReasoning as contentPostHandler} from '@/src/core/translation/prompts';
+import {normalizeChatCompletionRequest} from './chatCompletionRequest';
 import {commonMsgTemplate} from '@/src/services/translation/templates';
 import {services} from '@/src/core/config/catalog';
 import {isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
@@ -377,7 +378,7 @@ async function translateSingle(
 
   // 协议的 stream 标记由 SDK 管理。自定义请求体仍可替换 model/messages，并添加任意
   // OpenAI 兼容 provider 字段，但不能绕过解析器把 generateText 调用切换为 SSE。
-  const requestBody: Record<string, unknown> = {...payload, stream: false};
+  const requestBody = normalizeChatCompletionRequest(endpoint.endpoint, {...payload, stream: false});
   const abortContext = createRequestAbortContext(
     normalizedTimeout(request.requestTimeoutMs, current.aiRequestTimeoutMs),
     request.abortSignal,

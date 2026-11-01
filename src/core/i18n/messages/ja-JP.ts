@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesJapaneseMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -74,6 +75,10 @@ export const jaJPMessages = {
     "translationCenter.endpointMissing": "先にカスタムサービスの URL を設定してください。",
     "translationCenter.modelMissing": "先にモデルを選択・入力してください。",
     "translationCenter.noReady": "翻訳するには少なくとも一つのサービスを設定してください。",
+    'sidepanel.title': 'サイドバー翻訳',
+    'sidepanel.openError': 'サイドバーを開けませんでした。再試行するか、ブラウザーのサイドバーメニューから FluentRead を開いてください。',
+    'sidepanel.settingsError': '設定を開けませんでした。もう一度お試しください。',
+    'sidepanel.startupError': '翻訳パネルを読み込めませんでした。再読み込みしてください。',
     "translationCenter.intro": "同じ原文を複数のサービスで翻訳して比較します。",
     "translationCenter.input": "翻訳するテキスト",
     "translationCenter.source": "原文の言語",
@@ -555,6 +560,7 @@ export const jaJPMessages = {
     "settings.requestLimits.globalTitle": "リクエスト制限",
     "settings.requestLimits.globalHelp": "個別設定のないサービスとモデルは、この制限を共有します。",
     ...aiRequestTimeoutMessages["ja-JP"],
+    ...selectionDictionaryMessages["ja-JP"],
     ...sectionTranslationRulesJapaneseMessages,
     "settings.requestLimits.retryIntervals": "再試行の間隔",
     "settings.requestLimits.apiKeyRecovery": "失敗した Key のクールダウン",
@@ -587,7 +593,7 @@ export const jaJPMessages = {
     "popup.pageFont.loading": "フォント設定を読み込み中…",
     "popup.pageFont.unavailable": "現在、訳文のフォントを変更できません。",
     "popup.pageFont.readError": "フォント設定を読み込めませんでした。再試行してください。",
-    "popup.pageFont.changeError": "フォント設定を保存できませんでした。再試行してください。",
+    "popup.pageFont.changeError": "フォント設定を保存できませんでした。",
     "popup.pageFont.retry": "再試行",
     "popup.quickSettings.appearanceDescription": "二言語モードでは原文と訳文を両方表示し、訳文のみのモードでは翻訳結果だけを表示します。",
     "popup.quickSettings.hoverSettings": "ホバー翻訳の設定",
@@ -1756,6 +1762,12 @@ export const jaJPMessages = {
     "glossary.builtin.financeDescription": "財務諸表、評価指標、株式市場。",
     "glossary.builtin.research": "学術研究",
     "glossary.builtin.researchDescription": "研究手法、統計、学術論文。",
+    'glossary.builtin.hardware': "コンピューターハードウェア",
+    'glossary.builtin.hardwareDescription': "プロセッサー、メモリー、チップ、回路の用語",
+    'glossary.builtin.networking': "ネットワークとクラウド",
+    'glossary.builtin.networkingDescription': "ネットワークプロトコル、クラウド基盤、デプロイの用語",
+    'glossary.builtin.mathematics': "数学",
+    'glossary.builtin.mathematicsDescription': "線形代数、微積分、確率、最適化の用語",
     "glossary.builtin.products": "製品名を保持",
     "glossary.builtin.productsDescription": "一般的な開発ツールや AI 製品名を原文で保持します。大文字・小文字を区別します。",
     "glossary.builtin.englishChinese": "英語 → 簡体字中国語",

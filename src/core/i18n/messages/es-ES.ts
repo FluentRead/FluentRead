@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesSpanishMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -74,6 +75,10 @@ export const esESMessages = {
     "translationCenter.endpointMissing": "Primero configura la dirección del servicio personalizado.",
     "translationCenter.modelMissing": "Primero elige o introduce un modelo.",
     "translationCenter.noReady": "Configura al menos un servicio para traducir.",
+    'sidepanel.title': 'Traducción en la barra lateral',
+    'sidepanel.openError': 'No se pudo abrir la barra lateral. Reintenta o abre FluentRead desde el menú lateral del navegador.',
+    'sidepanel.settingsError': 'No se pudieron abrir los ajustes. Reintenta.',
+    'sidepanel.startupError': 'No se pudo cargar el panel de traducción. Vuelve a cargarlo.',
     "translationCenter.intro": "Un texto, varias traducciones. Elige servicios y compara.",
     "translationCenter.input": "Texto original",
     "translationCenter.source": "Idioma original",
@@ -555,6 +560,7 @@ export const esESMessages = {
     "settings.requestLimits.globalTitle": "Límites de solicitudes",
     "settings.requestLimits.globalHelp": "Los servicios y modelos sin ajustes propios comparten estos límites.",
     ...aiRequestTimeoutMessages["es-ES"],
+    ...selectionDictionaryMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",
     "settings.requestLimits.apiKeyRecovery": "Enfriamiento de la API key fallida",
@@ -587,7 +593,7 @@ export const esESMessages = {
     "popup.pageFont.loading": "Leyendo la configuración de fuente…",
     "popup.pageFont.unavailable": "No se puede cambiar la fuente de traducción ahora.",
     "popup.pageFont.readError": "No se pudo leer la configuración de fuente. Vuelve a intentarlo.",
-    "popup.pageFont.changeError": "No se pudo guardar la configuración de fuente. Vuelve a intentarlo.",
+    "popup.pageFont.changeError": "No se pudo guardar la fuente.",
     "popup.pageFont.retry": "Reintentar",
     "popup.quickSettings.appearanceDescription": "El modo bilingüe muestra el original y la traducción; el modo de solo traducción muestra únicamente el texto traducido.",
     "popup.quickSettings.hoverSettings": "Ajustes de traducción al pasar el cursor",
@@ -1756,6 +1762,12 @@ export const esESMessages = {
     "glossary.builtin.financeDescription": "Estados financieros, métricas de valoración y mercados bursátiles.",
     "glossary.builtin.research": "Investigación académica",
     "glossary.builtin.researchDescription": "Métodos de investigación, estadística y artículos académicos.",
+    'glossary.builtin.hardware': "Hardware informático",
+    'glossary.builtin.hardwareDescription': "Procesadores, memoria, chips y circuitos",
+    'glossary.builtin.networking': "Redes y nube",
+    'glossary.builtin.networkingDescription': "Protocolos de red, infraestructura en la nube y despliegue",
+    'glossary.builtin.mathematics': "Matemáticas",
+    'glossary.builtin.mathematicsDescription': "Álgebra lineal, cálculo, probabilidad y optimización",
     "glossary.builtin.products": "Conservar nombres de productos",
     "glossary.builtin.productsDescription": "Conserva los nombres habituales de herramientas de desarrollo y productos de IA. Distingue mayúsculas.",
     "glossary.builtin.englishChinese": "Inglés → Chino simplificado",

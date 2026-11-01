@@ -30,6 +30,8 @@ node scripts/testing/run-sidepanel-translation-test.cjs \
 
 `pnpm compile` 继续校验固定语言资源并检查完整的 Vue/TypeScript 项目，增量信息写入各工作树自己的 `.wxt/cache/extension.tsbuildinfo`，不缩小 include 范围或放宽诊断。可以删除这个文件强制重建缓存，或运行 `pnpm exec vue-tsc --noEmit` 单独比较编译器的非增量耗时；类型错误仍须使本次命令失败。其他集成的类型检查不共用此缓存路径。
 
+完整项目在 Node 默认约 4 GiB 旧生代预算下可能发生 OOM。编译入口在可见总内存至少 16 GiB、且 Node 报告的内存约束没有更小时，只为编译子进程默认设置 6 GiB 旧生代上限；显式 `NODE_OPTIONS` 堆设置保持原值。小内存或已知受限环境不自动提高预算，可见总量不保证当前空闲量或隐藏容器限制。资源锁、信号转发与真实退出码仍由原 runner 处理；CI 在调用前继续执行原有可用内存门禁。
+
 独立用户脚本的大型静态资源压缩结果存于 `.wxt/cache/userscript-gzip/`。原文、压缩实现、worker 或锁文件变化均重新压缩；读取时核对摘要及有界解压后的完整内容。损坏缓存保留告警后重建；真实 I/O 或压缩器错误继续失败。同进程相同输入共用在途任务，缓存与返回值不共享可变缓冲区。`FLUENTREAD_BUILD_CACHE=0 pnpm build:userscript:standalone` 可用于无缓存对照，也可删除该目录；这些构建数据不进入 Firefox 源码包或发布安装包。
 
 Vite 构建不再为日志重复计算整份产物的 gzip 大小；扩展与两个用户脚本的实际体积门禁保持原样。扩展页面把 Vue 运行时、域名算法与自有公共配置分别打包，不改变内容脚本、后台 IIFE 或模块 Worker 的输出模式。第三方字体引擎与语音依赖仍可能超过 Vite 的默认 500 kB 提示线；必须保留告警并审查实际依赖，不能据此认定整个构建无告警。

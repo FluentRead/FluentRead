@@ -61,6 +61,52 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         const bounds=f.runtime.bounds(segments[1]);expect(bounds).toMatchObject({left:20,top:1024,width:400,height:1024});
         expect(f.runtime.pixels(segments[1])).toBe(800*2560);f.runtime.dispose();
     });
+    it.each(['','fill'])('默认或 fill 的准备与身份检查不读取未使用的矩形：%s',fit=>{
+        const f=fixture();f.style.objectFit=fit;
+        const rect=vi.spyOn(f.image,'getBoundingClientRect'),segments=f.segments();
+        for(const segment of segments)expect(f.runtime.identity(segment)).not.toBeNull();
+        expect(rect).not.toHaveBeenCalled();
+        for(const segment of segments)f.runtime.bounds(segment);
+        expect(rect).toHaveBeenCalledTimes(segments.length);f.runtime.dispose();
+    });
+    it('contain 准备和每次身份检查仍核对实时宽高比',()=>{
+        const f=fixture();f.style.objectFit='contain';
+        const rect=vi.spyOn(f.image,'getBoundingClientRect'),segments=f.segments();
+        expect(rect).toHaveBeenCalledOnce();
+        expect(f.runtime.identity(segments[0])).not.toBeNull();f.runtime.bounds(segments[0]);
+        f.rect.height=100;
+        expect(f.runtime.identity(segments[1])).toBeNull();expect(rect).toHaveBeenCalledTimes(4);f.runtime.dispose();
+    });
+    it.each(['','fill','contain'])('只在实际使用几何的端口传播矩形异常：%s',fit=>{
+        const f=fixture();f.style.objectFit=fit;
+        const rect=vi.spyOn(f.image,'getBoundingClientRect').mockImplementation(()=>{throw new Error('layout failed');});
+        if(fit==='contain')expect(()=>f.segments()).toThrow('layout failed');
+        else {
+            const segment=f.segments()[0];expect(f.runtime.identity(segment)).not.toBeNull();
+            expect(rect).not.toHaveBeenCalled();expect(()=>f.runtime.bounds(segment)).toThrow('layout failed');
+        }
+        f.runtime.dispose();
+    });
+    it('objectFit 改变后重新校验，不缓存旧显示方式或宽高比',()=>{
+        const f=fixture(),segment=f.segments()[0],rect=vi.spyOn(f.image,'getBoundingClientRect');
+        f.style.objectFit='contain';f.rect.height=100;expect(f.runtime.identity(segment)).toBeNull();
+        f.rect.height=7872;expect(f.runtime.identity(segment)).not.toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        f.style.objectFit='cover';expect(f.runtime.identity(segment)).toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        f.style.objectFit='fill';expect(f.runtime.identity(segment)).not.toBeNull();expect(rect).toHaveBeenCalledTimes(2);
+        vi.stubGlobal('getComputedStyle',()=>{throw new Error('style failed');});
+        expect(()=>f.runtime.identity(segment)).toThrow('style failed');f.runtime.dispose();
+    });
+    it('身份端口同步改变几何或样式后，下一段仍读取新状态',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.imageIdentity.mockImplementationOnce(image=>{f.rect.top=-100;f.style.borderTopWidth='2px';return image.src;});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();expect(f.runtime.bounds(segments[0]).top).toBe(-100);
+        expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
+    });
+    it('配置端口同步换图后，下一段不再沿用旧来源',()=>{
+        const f=fixture(),segments=f.segments();
+        f.ports.configurationIdentity.mockImplementationOnce(()=>{f.image.src='https://cdn.example/new';return 'config';});
+        expect(f.runtime.identity(segments[0])).not.toBeNull();expect(f.runtime.identity(segments[1])).toBeNull();f.runtime.dispose();
+    });
     it('读取上下文而只覆盖核心段，滚动缩放保持定位，暂停和返页复用不改原图',async()=>{
         const f=fixture(),original=f.image.outerHTML,segment=f.segments()[1];
         f.rect.top=-1024;f.rect.bottom-=1024;await f.runtime.translate(segment);

@@ -15,6 +15,8 @@ Recognized text that remains unchanged, including brand names, target-language t
 
 Choose **Cancel** to stop processing; downloaded resources remain available. The text panel helps when a translation is long or the image is small. Controls hide when you leave the image and return when you hover over it.
 
+Press **Escape** inside the text panel to close it and return to an available entry. Focus stays elsewhere if you have already moved to another page control. Copy feedback follows the current view and latest operation; if copying fails, select the text and copy it manually.
+
 The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.

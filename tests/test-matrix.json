@@ -248,6 +248,7 @@
       "tests/translationConfigCheck.test.ts",
       "tests/translationFont.test.ts",
       "tests/translationCore.test.ts",
+      "tests/translationTagMetadata.test.ts",
       "tests/inlineCodeProtocol.test.ts",
       "tests/inlineCodeMarkers.test.ts",
       "tests/identicalTranslation.test.ts",

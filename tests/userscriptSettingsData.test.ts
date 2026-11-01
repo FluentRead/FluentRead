@@ -51,7 +51,17 @@ describe('standalone static settings data representation', () => {
         expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before)), undefined, true));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
-        expect(transformed.replace(initializer(transformed, name), initializer(source, name)).replace('/* @__PURE__ */ ', '').endsWith(source)).toBe(true);
+        const originalAst = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+        let restored = transformed;
+        for (const statement of originalAst.statements.filter(ts.isVariableStatement)) {
+            for (const declaration of statement.declarationList.declarations) {
+                if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
+                const before = declaration.initializer.getText(originalAst);
+                const after = initializer(transformed, declaration.name.text);
+                if (before !== after) restored = restored.replace(`/* @__PURE__ */ ${after}`, before);
+            }
+        }
+        expect(restored.endsWith(source)).toBe(true);
     });
 
     it('keeps the standard build style table in Base85 with identical gzip bytes and values', () => {

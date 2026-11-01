@@ -154,6 +154,7 @@ export function isFloatingBallDisabledOnSite(
     return isSiteInDomainList(input, domains);
 }
 
+/** 解析网站译文显示偏好所需的全局模式与仅译文名单。 */
 export interface SiteTranslationDisplayConfig {
     display: number;
     translationOnlyDomains?: readonly string[];

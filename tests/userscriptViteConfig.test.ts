@@ -548,7 +548,7 @@ describe('userscript bundled library notices', () => {
 });
 
 describe('standalone settings compression compatibility', () => {
-    it('keeps standard Base85 and standalone Base91 gzip data byte-identical', () => {
+    it('keeps shared preset gzip bytes identical while compressing the standalone style groups and categories', () => {
         const root = process.cwd(), id = resolve(root, 'src/core/config/translationAppearance.ts');
         const original = readFileSync(id, 'utf8');
         const transform = (full: boolean) => Reflect.apply(createUserscriptSettingsDataPlugin(root, true, full).transform as Function, {}, [original, id]) as {code:string};
@@ -556,7 +556,8 @@ describe('standalone settings compression compatibility', () => {
         expect(standard).toContain('~85:'); expect(standalone).toContain('~91:');
         const before = encodedDataBytes(standard, '__fluentreadDecodeSettingsData');
         const after = encodedDataBytes(standalone, '__fluentreadDecodeSettingsData');
-        expect(after.map(bytes=>Buffer.from(bytes))).toEqual(before.map(bytes=>Buffer.from(bytes)));
+        expect(before).toHaveLength(1); expect(after).toHaveLength(3);
+        expect(Buffer.from(after[2])).toEqual(Buffer.from(before[0]));
     });
 });
 
@@ -2784,6 +2785,7 @@ describe('userscript appearance registry data owner', () => {
 describe('standalone immutable glossary and UI catalogs', () => {
     const targets = [
         ['src/core/glossary/builtins.ts', ['BUILTIN_GLOSSARIES']],
+        ['src/core/config/catalog.ts', ['localizedTargetLanguageLabels', 'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']],
         ['src/core/config/videoSubtitleAppearance.ts', ['VIDEO_SUBTITLE_SKINS']],
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
@@ -2795,6 +2797,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/core/language/partOfSpeech.ts', ['PARTS']],
         ['src/core/config/sentenceHighlight.ts', ['SENTENCE_HIGHLIGHT_STYLES']],
         ['src/core/config/selectionTts.ts', ['SELECTION_TTS_VOICE_OPTIONS']],
+        ['src/core/config/localTts.ts', ['LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS']],
     ] as const;
     it.each(targets)('restores every ordered value from %s without changing the consumer functions', async (path, names) => {
         const root = process.cwd(), id = resolve(root, path), original = readFileSync(id, 'utf8');

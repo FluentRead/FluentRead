@@ -575,10 +575,22 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(canvases).toHaveLength(0);
     });
 
-    it('无文字明确失败，原样译文仍返回可复制原文且不分配 Canvas', async () => {
-        mocks.recognize.mockResolvedValueOnce([]);
-        await expect(translateImageInOffscreen('empty', 'en', '')).rejects.toThrow('没有识别到图片文字');
+    it.each(['tesseract','paddle'] as const)('普通图片 %s 真正空识别时保留原图，不翻译、修补、绘制或分配 Canvas，且释放源图', async engine => {
+        const recognize=engine==='paddle'?mocks.mangaRecognize:mocks.recognize;
+        recognize.mockResolvedValueOnce([]);
+        await expect(translateImageInOffscreen('empty', 'en', '',undefined,undefined,false,engine)).resolves.toEqual({image:'',imageUnchanged:true,lines:[]});
+        expect(recognize).toHaveBeenCalledOnce();
+        if(engine==='paddle') {
+            expect(recognize.mock.calls[0][7]).toBe('image');expect(mocks.recognize).not.toHaveBeenCalled();
+        } else expect(mocks.mangaRecognize).not.toHaveBeenCalled();
         expect(sendMessage).not.toHaveBeenCalled();
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.repair).not.toHaveBeenCalled();
+        expect(mocks.draw).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.encode).not.toHaveBeenCalled();
+        expect(canvases).toHaveLength(0);expect(images).toHaveLength(1);
+        expect(images[0].src).toBe('');expect(images[0].onload).toBeNull();expect(images[0].onerror).toBeNull();
+    });
+
+    it('原样译文仍返回可复制原文且不分配 Canvas', async () => {
         sendMessage.mockImplementation((_, callback) => callback({success: true, translations: ['Hello']}));
         await expect(translateImageInOffscreen('unchanged', 'en', '')).resolves.toEqual({image: '', imageUnchanged: true, lines: [{...lines[0], sourceText: 'Hello', backgroundColor: 'transparent'}]});
         expect(canvases).toHaveLength(0);

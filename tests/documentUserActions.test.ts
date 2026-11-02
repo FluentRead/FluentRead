@@ -735,6 +735,33 @@ describe('document user actions: real editor events and parent consumers', () =>
         expect(walk(editor()).find(node => node.props['data-segment-id'] === 1)).toBeUndefined();
     });
 
+    it('keeps proofreading text directions independent while searching and saving exact edits', async () => {
+        apps.pop()!.unmount();
+        const current = parseDocument('directions.txt', 'מחקר 2026 GPU\n\nEnglish source.');
+        const translations = ref(['中文译文。', 'ترجمة عربية.']);
+        const retained = [{source: 'مصدر قديم.', translation: 'Retained English correction.'}];
+        const update = vi.fn((index: number, value: string) => {translations.value[index] = value;});
+        mount({setup: () => () => h(DocumentSegmentEditor, {document: current, translations: translations.value,
+            retainedRevisions: retained, disabled: false, onUpdate: update})});
+        const source = find(node => node.props.class === 'document-source', find(node => node.props['data-segment-id'] === 0));
+        expect(source.props.dir).toBe('auto'); expect(textOf(source)).toBe(current.segments[0].source);
+        expect(textarea(0).props.dir).toBe('auto'); expect(textarea(0).value).toBe('中文译文。');
+        expect(textarea(1).props.dir).toBe('auto'); expect(textarea(1).value).toBe('ترجمة عربية.');
+        expect(search().props.dir).toBe('auto');
+        await fire(search(), 'input', {value: 'מחקר'});
+        expect(walk(editor()).filter(node => node.tag === 'textarea')).toHaveLength(1);
+        const exact = '  مراجعة GPU 2026.  ';
+        await fire(textarea(0), 'input', {value: exact});
+        expect(update).toHaveBeenLastCalledWith(0, exact); expect(textarea(0).value).toBe(exact);
+        const details = find(node => node.tag === 'details'); await fire(details, 'toggle', {open: true});
+        const oldText = walk(details).filter(node => ['document-source', 'document-translation'].includes(node.props.class));
+        expect(oldText.map(node => [node.props.dir, textOf(node)])).toEqual([
+            ['auto', retained[0].source], ['auto', retained[0].translation],
+        ]);
+        expect(editor().props.dir).toBeUndefined();
+        expect(walk(editor()).filter(node => node.props.class === 'segment-edit-columns').every(node => node.props.dir === undefined)).toBe(true);
+    });
+
     it('shows the original wording for whole-sentence segments and explains the markers only where a translation carries them', async () => {
         apps.pop()!.unmount();
         const current = parseDocument('note.md', 'Read the [setup guide](https://example.com/setup) first.\n\nPlain sentence.', {markdownSentences: true});

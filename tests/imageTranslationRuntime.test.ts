@@ -356,6 +356,26 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(client.translate).toHaveBeenCalledTimes(2);
     });
 
+    it.each(['source','configuration'] as const)('普通Paddle真正空识别显示中性说明并保留原图，恢复缓存零额外OCR且%s变化失效',async change=>{
+        settings.imageTranslationOcrEngine='paddle';
+        client.translate.mockResolvedValue({image:'',imageUnchanged:true,lines:[]});
+        const env=setup();env.hover();env.click();await flush();
+        const expectEmpty=()=>{
+            expect(env.button().dataset.phase).toBe('translated');
+            expect(env.roots[0].querySelector('.fr-image-status')!.textContent).toContain('未检测到文字，已保留原图');
+            expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();expect(env.decoded).toHaveLength(0);
+            expect(env.roots[0].querySelector('.fr-image-warning-button')).toBeNull();
+        };
+        expectEmpty();expect(client.translate).toHaveBeenCalledOnce();expect(client.prepare).not.toHaveBeenCalled();
+        env.click();expect(env.button().dataset.phase).toBe('idle');expect(env.image.style.opacity).not.toBe('0');
+        env.click();await flush();expectEmpty();expect(client.translate).toHaveBeenCalledOnce();
+        env.click();
+        if(change==='source') {env.image.src='https://example.test/empty-new-source.png';env.dispatch(env.image,'load');}
+        else {settings.to='fr';await flush();}
+        env.hover();env.click();await flush();expectEmpty();expect(client.translate).toHaveBeenCalledTimes(2);
+        expect(client.prepare).not.toHaveBeenCalled();
+    });
+
     it('大尺寸原图全部保留时不加载缩放译图，提示可阅读且缓存恢复不重译', async () => {
         client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
         const env=setup();Object.defineProperties(env.image,{naturalWidth:{value:6000,configurable:true},naturalHeight:{value:4000,configurable:true}});

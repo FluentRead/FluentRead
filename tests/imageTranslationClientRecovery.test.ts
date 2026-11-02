@@ -1,12 +1,14 @@
 /**
  * @file tests/imageTranslationClientRecovery.test.ts
  * 文件职责：验证图片翻译客户端在运行时消息通道短暂断开时的单次恢复协议。
- * 主要内容：覆盖断线响应重试、新 requestId、旧请求取消、共享截止时间、取消与进度隔离，以及不可重试错误；撤销或更换监听端口、注册失败和登记期间取消必须结束等待，兼容缺失 crypto 并拒绝不可用的图片读取响应。
- * 模块边界：本文件只测试 services/client 的消息客户端，不启动浏览器、不触碰 Offscreen 或 provider 实现。
+ * 主要内容：覆盖断线响应重试、新 requestId、旧请求取消、共享截止时间、取消与进度隔离，以及不可重试错误；撤销或更换监听端口、注册失败和登记期间取消必须结束等待，兼容缺失 crypto 并拒绝不可用的图片读取响应；串接真实客户端与后台适配器，验证空识别保留原图协议穿过两层校验。
+ * 模块边界：本文件测试 services/client 及其真实 Offscreen 适配器，消息 transport 受控，不启动浏览器、不执行 Offscreen OCR 或 provider。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {IMAGE_PROGRESS_MESSAGE_TYPE} from '@/src/features/image-translation/progress';
 import {fetchImageInExtension, sendCancellableImageOperation, translateImageInExtension} from '@/src/features/image-translation/services/client';
+import {createImageTranslationOffscreenAdapter} from '@/src/features/image-translation/background/offscreenAdapter';
+import type {OffscreenClient} from '@/src/platform/offscreen/client';
 
 const deferred = <T>() => {
     let resolve!: (value: T) => void;
@@ -51,14 +53,37 @@ describe('图片翻译客户端断线恢复', () => {
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:5,y1:5},backgroundColor:'transparent'}];
         sendMessage.mockResolvedValue({success:true,image:'',imageUnchanged:true,lines});
         await expect(translateImageInExtension('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines});
+        sendMessage.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
+        await expect(translateImageInExtension('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines:[]});
+        sendMessage.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
         await expect(translateImageInExtension('source','en','Page',{manga:true})).rejects.toThrow();
         for (const response of [
             {success:true,image:'data:image/png,encoded',imageUnchanged:true,lines},
             {success:true,image:'',imageUnchanged:false,lines},
             {success:true,image:'',imageUnchanged:'true',lines},
-            {success:true,image:'',imageUnchanged:true,lines:[]},
+            {success:true,image:'',lines:[]},
+            {success:'false',image:'',imageUnchanged:true,lines:[]},
+            {success:1,image:'',imageUnchanged:true,lines:[]},
             {success:true,image:'',imageUnchanged:true,lines,mangaPatches:{width:1,height:1,patches:[]}},
         ]) {sendMessage.mockResolvedValueOnce(response);await expect(translateImageInExtension('source','en','Page')).rejects.toThrow();}
+        expect(listeners.size).toBe(0);
+    });
+    it('真实client和真实Offscreen适配器接合后透传合法空识别，不生成错误或重试标记',async()=>{
+        const response={success:true,image:'',imageUnchanged:true,lines:[]};
+        const offscreenSend=vi.fn().mockResolvedValue(response);
+        const adapter=createImageTranslationOffscreenAdapter({send:offscreenSend} as unknown as OffscreenClient);
+        sendMessage.mockImplementation(async message=>{
+            expect(message.type).toBe('fluentReadImageTranslate');
+            return {success:true,...await adapter.translateImage(message.image,message.sourceLanguage,message.title)};
+        });
+        const result=await translateImageInExtension('source','en','Page',{requestId:'empty-wire'});
+        expect(result).toEqual({image:'',imageUnchanged:true,lines:[]});expect(result.lines).toBe(response.lines);
+        expect(sendMessage).toHaveBeenCalledOnce();expect(offscreenSend).toHaveBeenCalledOnce();
+        expect(offscreenSend).toHaveBeenCalledWith({type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',image:'source',sourceLanguage:'en',title:'Page'});
+        for(const success of ['false',1]) {
+            offscreenSend.mockResolvedValueOnce({...response,success});
+            await expect(translateImageInExtension('source','en','Page')).rejects.toThrow();
+        }
         expect(listeners.size).toBe(0);
     });
     it('仅普通保留原图且确有未绘制译文的响应透传缺CTD重试标记',async()=>{
@@ -68,7 +93,7 @@ describe('图片翻译客户端断线恢复', () => {
         await expect(translateImageInExtension('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
         for(const invalid of [
             {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
-            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[null,'bad',{}, {...lines[0],renderSkipped:'true'}]},
+            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[]},{...response,lines:[null,'bad',{}, {...lines[0],renderSkipped:'true'}]},
         ]){sendMessage.mockResolvedValueOnce(invalid);await expect(translateImageInExtension('source','en','Page')).rejects.toThrow();}
         sendMessage.mockResolvedValueOnce(response);await expect(translateImageInExtension('source','en','Page',{manga:true})).rejects.toThrow();
         expect(listeners.size).toBe(0);

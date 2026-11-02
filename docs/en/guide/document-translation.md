@@ -45,7 +45,9 @@ Documents, translations, and edits are stored in this browser. Continue after re
 
 ## PDF limits
 
-PDFs default to **Original layout**: bilingual pages appear side by side, translated paragraphs follow the source positions, and formulas, figures, and numeric table cells keep their original appearance. Hover over a long passage or use its expand button to read the full paragraph. Choose **Reflowed text** for complete paragraphs in a reading layout. The toolbar offers search across both texts and translation styling.
+PDFs default to **Original layout**: bilingual pages appear side by side, translated paragraphs follow the source positions, and formulas, figures, and numeric table cells keep their original appearance. Hover over a long passage or use the book button beside it to read the full paragraph. Choose **Reflowed text** for complete paragraphs in a reading layout. The toolbar offers search across both texts and translation styling.
+
+Proofreading, full-passage comparisons, outline titles, and search terms each follow their own text direction, while the source and translation columns keep their order.
 
 Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
 

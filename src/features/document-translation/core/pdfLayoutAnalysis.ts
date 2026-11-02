@@ -3,6 +3,7 @@
  * 文件职责：从 PDF 原始字形和绘图操作推导阅读顺序、段落与必须保留的公式、表格、插图区域。
  * 主要内容：在未旋转内容坐标中追踪绘图矩阵；按相邻行共同让出的竖带识别栏间距，松散的两端对齐行不被拆散；页眉页脚、数字/罗马数字/字母编号的标题、中英文题注与公式碎片分别归类，分栏由并排的正文段落确定、同栏内缩进不同的块按稳定基线组织阅读，字体顶边修正不打乱相邻栏的行序；图形在题注处断开，幻灯片内容框、段落底色和标题色带这类装文字的容器不算插图，原位重复描画的文字只读一次，表格碎横边先连接、按真实单元格及合并行边界切分并逐行阅读，含词语的单元格可以翻译；先按局部字形端点及父链关联上下标、避免跨表头基线吸附，以赋值、紧邻左花括号、多行值及同基线数学条件共同确认分段公式，保留其右侧条件和有几何/近邻证据的 TeX 大算符，已关联根号的下伸矩形覆盖相邻被开方字符，以同基线的冒号和纯符号箭头类型、或细线两端的数学节点及直接由数学节点支撑的正交短边确认独立数学标签，两端不复用支撑节点，有限 U 形返回箭头还须匹配同页已确认的类型函数名，先识别图表和独立公式，再按列与段落边界组织正文，仅对同段相邻行中以斜杠结束的 HTTP(S) 地址和含斜杠及数字的路径首词省去人工行间空格；重排保留列表符号并清理排版软连字符，保留逐行字形几何供阅读和导出使用。
  * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
+ * 章节标题：已有章节名的字距化样式须有同栏正文支持；仅构造分类键，不压缩原文字串，公式、表格和作者区仍受保护。
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
  * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
@@ -424,6 +425,13 @@ const textUnits = (text: string) => text.split(/\s+/u).filter(Boolean).length + 
 const looseSymbols = (text: string) => {const tokens = text.trim().split(/\s+/u); return tokens.length >= 3 && tokens.filter(token => /^[\p{Script=Latin}\d]$/u.test(token)).length >= tokens.length * 0.6;};
 /** 含有可读词语（至少三个连续字母或一个中日韩文字，数学函数名除外）的文字才值得翻译；根号横线在部分数学字体里被读成一串 ffi，不是词语。 */
 const readable = (text: string) => !/(?:ffi){3,}/u.test(text) && !looseSymbols(text) && (/\p{L}{3,}|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(text.replace(/\b(?:lim|min|max|log|exp|sin|cos|tan|arg|sup|inf)\b/giu, '')));
+const sectionTitle = /^(?:Abstract|References|Acknowledge?ments?|Appendix(?:\s+[A-Z])?(?:\.\s.*)?)$/iu;
+/** 仅识别已支持章节名的逐字母普通空格样式；压缩键不写回来源文字，双空格的词界也只供识别。 */
+function spacedSectionTitle(line: LayoutLine): boolean {
+    const text = line.runs.map(run => run.text).join(' ');
+    return text.length < 80 && /^[A-Za-z](?: +[A-Za-z]){3,}$/u.test(text)
+        && sectionTitle.test(text.split(/ {2,}/u).map(word => word.replace(/ /gu, '')).join(' '));
+}
 function mergedFigures(shapes: readonly PdfGraphicsShape[], width: number, height: number, container: (box: Rectangle) => boolean): Rectangle[] {
     const figures: Rectangle[] = [];
     for (const shape of shapes.filter(shape => shape.width >= 24 && shape.height >= 24 && (shape.kind !== 'path' || shape.width * shape.height >= 900))) {
@@ -453,10 +461,22 @@ function tableRegions(shapes: readonly PdfGraphicsShape[], width: number, figure
     }
     const wideRows = rows.filter(row => row.width >= width * .2).sort((a, b) => a.y - b.y);
     const groups: Rectangle[][] = [];
+    let verticalEdges: readonly PdfGraphicsShape[] | undefined;
     for (const row of wideRows) {
         const group = groups.find(group => {
             const last = group.at(-1)!;
-            return row.y - last.y <= 150 && Math.min(right(row), right(last)) - Math.max(row.x, last.x) >= Math.min(row.width, last.width) * 0.7;
+            if (row.y - last.y > 150 || Math.min(right(row), right(last)) - Math.max(row.x, last.x) < Math.min(row.width, last.width) * .7) return false;
+            if (Math.min(row.width, last.width) >= Math.max(row.width, last.width) * .7) return true;
+            // 不等宽的章节分隔线不能仅靠重叠并成表格；真正跨列的表头须有两条竖边连接上下横线。
+            verticalEdges ??= shapes.filter(shape => shape.kind === 'path' && shape.width <= 2 && shape.height >= 4);
+            let left = Infinity, farRight = -Infinity;
+            for (const edge of verticalEdges) {
+                if (edge.y > bottom(last) + 2 || bottom(edge) < row.y - 2
+                    || edge.x < Math.max(row.x, last.x) - 2 || right(edge) > Math.min(right(row), right(last)) + 2) continue;
+                left = Math.min(left, edge.x); farRight = Math.max(farRight, edge.x);
+                if (farRight - left >= 6) return true;
+            }
+            return false;
         });
         if (group) group.push(row); else groups.push([row]);
     }
@@ -913,6 +933,11 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         if (captionStart.test(line.text)) return 'caption';
         // 标题下方的作者署名字号常大于正文，但它是人名与单位标记，既不该翻译也不该出现在目录里。
         if (line.y < input.height * 0.45 && byline.test(line.text) && lines.some(above => above.baseline < line.baseline && above.fontSize > line.fontSize * 1.1)) return 'metadata';
+        // 字距化的 Abstract 等短标题不因单字母被当作公式；正文、位置与保护区共同约束，不能把字母枚举提升为章节。
+        if (spacedSectionTitle(line) && !mathLabels.has(line) && !authorGrid.includes(line) && !regions.some(region => coversLine(region, line))
+            && lines.some(near => near.baseline - line.baseline >= line.fontSize * .8 && near.baseline - line.baseline <= line.fontSize * 3.5
+                && near.fontSize >= line.fontSize * .65 && near.fontSize <= line.fontSize * 1.15
+                && near.x <= line.x + line.width / 2 && right(near) >= line.x + line.width / 2 && readable(near.text) && textUnits(near.text) >= 5)) return 'heading';
         // 没有可读词语的短行（求和号、上下标、极限记号）是公式的碎片，翻译只会破坏它。
         if (mathLabels.has(line) || !readable(line.text)) return 'formula';
         const numbered = line.fontSize >= font * 0.95 && line.text.length < 120;
@@ -923,7 +948,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const midParagraph = () => lines.some(near => near.baseline < line.baseline && line.baseline - near.baseline <= line.fontSize * 1.45 * loose
             && Math.abs(near.fontSize - line.fontSize) <= 0.6 && near.x <= line.x + 1 && right(near) >= right(line) - 2 && near.width >= line.width * 0.9 && !/[.!?:。！？：]$/u.test(near.text));
         if ((numbered && !/[-‐‑]$/u.test(line.text) && !midParagraph() && ((/^\d+(?:\.\d+)*\s+[A-Z]/u.test(line.text) && !(line.text.split(/\s+/u).length > 6 && listItem())) || (/^\d+(?:\.\d+)*\.\s+[A-Z]/u.test(line.text) && line.text.split(/\s+/u).length <= 9 && !/[.,;:]$/u.test(line.text) && !listItem())))
-            || (line.text.length < 80 && /^(?:Abstract|References|Acknowledge?ments?|Appendix(?:\s+[A-Z])?(?:\.\s.*)?)$/iu.test(line.text))
+            || (line.text.length < 80 && sectionTitle.test(line.text))
             // IEEE 等版式的章节用罗马数字或字母编号（“II. RELATED WORK”“A. Data Collection”），字号与正文相同；带有第二个姓名缩写的行是作者而不是标题。
             || (numbered && /^(?:[IVXLC]+|[A-Z])\.\s+[A-Z]/u.test(line.text) && line.text.split(/\s+/u).length <= 10 && !/[.,;:]$/u.test(line.text) && !/\s[A-Z]\.\s/u.test(line.text) && !midParagraph() && !listItem()) || (line.fontSize >= font * 1.32 && line.text.length < 100)) return 'heading';
         if (line.text.includes('@') || (line.y >= authorStart && line.y <= authorEnd && line.width < input.width * 0.35 && line.text.length < 100)) return 'metadata';

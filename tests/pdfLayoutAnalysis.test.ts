@@ -21,6 +21,97 @@ const atom = (text: string, x: number, baseline: number, width = text.length * 5
 const analyze = (atoms: PdfLayoutAtom[], graphics: Parameters<typeof analyzePdfPageLayout>[0]['graphics'] = [], width = 612, height = 792) => analyzePdfPageLayout({atoms, graphics, width, height});
 const ops = Object.fromEntries(['save', 'restore', 'transform', 'paintFormXObjectBegin', 'paintFormXObjectEnd', 'paintImageXObject', 'paintInlineImageXObject', 'paintImageMaskXObject', 'constructPath', 'stroke', 'closeStroke', 'fill', 'eoFill', 'fillStroke', 'eoFillStroke', 'closeFillStroke', 'closeEOFillStroke', 'endPath'].map((name, index) => [name, index + 1]));
 
+describe('letter-spaced supported section headings', () => {
+    // Smith & Levy (2013), Cognition128 pp302–319, doi:10.1016/j.cognition.2013.02.013, source PDF p1.
+    // Source SHA7c325f95f5b54bc529e9c8793d26651c306841c4d1c6b64303997db47a74df77; source p1 states Creative Commons Attribution License.
+    // The first case retains only three source atoms and all four relevant horizontal paths from the 89-atom/26-shape page; other prose is self-authored.
+    const original: PdfLayoutAtom = {text: 'a b s t r a c t', x: 200.1259, y: 265.0100742, width: 65.24148868999998,
+        height: 8.9663, fontFamily: 'serif', baseline: 270.08500000000004, fontSize: 8.9663};
+    const prose = (extra: Partial<PdfLayoutAtom> = {}): PdfLayoutAtom => ({...atom('This paragraph explains the study and its main result.', 200.0125, 289.7574, 307.3733, 7.1731), ...extra});
+
+    it('recovers the actual Smith-Levy abstract heading without rewriting its spaced source or glyph geometry', () => {
+        const input = [original,
+            {text: 'It is well known that real-time human language processing is highly incremental and con-', x: 200.0125, y: 284.0978241, width: 307.3733474899999, height: 7.1731, fontFamily: 'serif', baseline: 289.7574, fontSize: 7.1731},
+            {text: 'text-driven, and that the strength of a comprehender’s expectation for each word encoun-', x: 200.0125, y: 293.67893377, width: 307.40355095999985, height: 7.1731, fontFamily: 'serif', baseline: 299.33850967, fontSize: 7.1731}];
+        const graphics = [
+            {x: 41.159, y: 250.12925, width: 466.242, height: 0.22674999999998136, kind: 'path' as const},
+            {x: 41.159, y: 279.94919000000004, width: 133.228, height: 0.2268100000000004, kind: 'path' as const},
+            {x: 41.159, y: 334.26122, width: 133.228, height: 0.2267800000000193, kind: 'path' as const},
+            {x: 200.013, y: 279.89252000000005, width: 307.446, height: 0.2834799999999973, kind: 'path' as const},
+        ], before = structuredClone({input, graphics});
+        const result = analyze(input, graphics, 544.252, 742.677);
+        expect(result.blocks.find(block => block.source === original.text)).toMatchObject({kind: 'heading', preserveSource: false, lines: [{runs: [original]}]});
+        expect(result.blocks.flatMap(block => block.lines!.flatMap(line => line.runs!))).toEqual(input);
+        expect(result.preservedRegions.some(region => region.kind === 'table' && region.y < original.baseline && region.y + region.height > original.baseline)).toBe(false);
+        expect({input, graphics}).toEqual(before);
+    });
+
+    it.each(['connected', 'single edge', 'repeated edge', 'disconnected edges', 'outside edges'] as const)('joins unequal-width table rows only with two real connecting column edges: %s', mode => {
+        const graphics = [{kind: 'path' as const, x: 200, y: 100, width: 180, height: 0},
+            ...[160, 180].map(y => ({kind: 'path' as const, x: 50, y, width: 480, height: 0}))];
+        const xs = mode === 'single edge' ? [200] : mode === 'repeated edge' ? [200, 201] : mode === 'outside edges' ? [40, 550] : [200, 380];
+        graphics.push(...xs.map(x => ({kind: 'path' as const, x, y: mode === 'disconnected edges' ? 120 : 100, width: 0, height: mode === 'disconnected edges' ? 40 : 60})));
+        const result = analyze([atom('Merged group header', 210, 114, 160), atom('Lower table left label', 60, 174, 150), atom('Lower table right label', 300, 174, 180)], graphics);
+        expect(result.preservedRegions.find(region => region.kind === 'table')).toMatchObject({x: 50, width: 480, y: mode === 'connected' ? 99 : 159});
+        expect(result.blocks.find(block => block.source === 'Merged group header')?.kind === 'table').toBe(mode === 'connected');
+    });
+
+    it.each([336, 335.9])('preserves the inclusive .7 similar-width boundary without inventing column edges: %s', width => {
+        const graphics = [{kind: 'path' as const, x: 50, y: 100, width, height: 0}, ...[160, 180].map(y => ({kind: 'path' as const, x: 50, y, width: 480, height: 0}))];
+        const result = analyze([atom('Group header', 60, 114, 180), atom('Lower table label', 60, 174, 180)], graphics);
+        expect(result.preservedRegions.find(region => region.kind === 'table')?.y).toBe(width === 336 ? 99 : 159);
+        expect(result.blocks.find(block => block.source === 'Group header')?.kind === 'table').toBe(width === 336);
+    });
+
+    it.each(['A B S T R A C T', 'A b s t r a c t', 'r e f e r e n c e s', 'A C K N O W L E D G M E N T S', 'a c k n o w l e d g e m e n t s', 'A P P E N D I X', 'A P P E N D I X  A'])
+    ('recognizes the supported tracked section name %s while retaining its exact source runs', text => {
+        const title = {...original, text};
+        expect(analyze([title, prose()]).blocks.find(block => block.source === text.replace(/ +/gu, ' '))).toMatchObject({kind: 'heading', preserveSource: false, lines: [{runs: [title]}]});
+    });
+
+    it.each(['a r t i c l e i n f o', 'a b c d e f g h', 'A. B. S. T. R. A. C. T.', 'α β γ δ ε ζ η θ', 'a\u00a0b\u00a0s\u00a0t\u00a0r\u00a0a\u00a0c\u00a0t', 'A '.repeat(42) + 'A'])
+    ('does not promote unsupported letter lists, punctuation, policy metadata or other whitespace: %s', text => {
+        const result = analyze([{...original, text}, prose()]);
+        // Existing line whitespace normalization stays intact; original run text must remain unchanged.
+        expect(result.blocks.find(block => block.source === text.replace(/\s+/gu, ' '))).toMatchObject({kind: 'formula', preserveSource: true, lines: [{runs: [{text}]}]});
+    });
+
+    it.each(['missing', 'far below', 'other column', 'larger font', 'smaller font', 'symbols only', 'short words', 'above title'] as const)
+    ('requires supporting same-column prose rather than %s context', mode => {
+        const body = prose();
+        if (mode === 'far below') body.baseline = body.y = 500;
+        if (mode === 'other column') body.x = 400;
+        if (mode === 'larger font') body.fontSize = 20;
+        if (mode === 'smaller font') body.fontSize = 4;
+        if (mode === 'symbols only') body.text = 'a b c d e f g h';
+        if (mode === 'short words') body.text = 'Short explanation';
+        if (mode === 'above title') {body.baseline = 250; body.y = 240;}
+        expect(analyze([original, ...(mode === 'missing' ? [] : [body])]).blocks.find(block => block.source === original.text))
+            .toMatchObject({kind: 'formula', preserveSource: true});
+    });
+
+    it('keeps letter variables in a protected equation and genuine table cell instead of inferring a section', () => {
+        const title = atom('a b s t r a c t', 200, 100, 65);
+        const body = atom('This paragraph explains the notation in the following study.', 200, 130, 300);
+        expect(analyze([title, atom('x = y + z', 200, 112, 70), body]).blocks.find(block => block.source.includes(title.text)))
+            .toMatchObject({kind: 'formula', preserveSource: true});
+        const graphics = [{kind: 'path' as const, x: 190, y: 85, width: 0, height: 55}, {kind: 'path' as const, x: 550, y: 85, width: 0, height: 55},
+            ...[85, 115, 140].map(y => ({kind: 'path' as const, x: 190, y, width: 360, height: 0}))];
+        expect(analyze([title, body], graphics).blocks.find(block => block.source === title.text)).toMatchObject({kind: 'table', preserveSource: true});
+    });
+
+    it('keeps page furniture and author-grid initials preserved even when their letters spell a section name', () => {
+        const footer = atom('a b s t r a c t', 50, 20, 65);
+        expect(analyze([footer, atom('This paragraph explains the entire ordinary study in detail.', 50, 100, 300)]).blocks.find(block => block.source === footer.text))
+            .toMatchObject({kind: 'footer', preserveSource: true});
+        const initials = atom('A B S T R A C T', 50, 100, 100);
+        const result = analyze([initials, atom('Alice Example', 210, 100, 80), atom('Bob Example', 380, 100, 80),
+            atom('author@example.test', 50, 112, 100), atom('This paragraph explains the complete experimental study in detail.', 50, 130, 400)]);
+        expect(result.blocks.find(block => block.source === initials.text)).toMatchObject({preserveSource: true});
+        expect(result.blocks.find(block => block.source === initials.text)?.kind).not.toBe('heading');
+    });
+});
+
 // 本机公开 PDF 2608.25512v1 第10页，source SHA256 390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0；由实际 PDF.js/pdfTextAtoms 提取，未包含任何机器翻译结果。
 const pageTenMathGeometry = {
     width: 595.2756, height: 841.8898,

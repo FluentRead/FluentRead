@@ -205,18 +205,21 @@ describe('standalone manga reading panel prototype',()=>{
   });
   it('uses readable snapshot guidance colors in explicit and system dark themes',()=>{
     const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
-    expect(panel).toMatch(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
-    expect(panel).toMatch(/@media \(prefers-color-scheme:dark\)[\s\S]*\[data-theme=auto\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
+    expect(panel).toMatch(/\[data-theme=dark\] \{[^}]*--fr-reading-muted:#b8c0d0/);
+    expect(panel).toMatch(/@media \(prefers-color-scheme:dark\)[\s\S]*\[data-theme=auto\] \{[^}]*--fr-reading-muted:#b8c0d0/);
   });
   it('keeps source text and guidance readable against each panel background',()=>{
     const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
     const luminance=(hex:string)=>{const rgb=hex.match(/[\da-f]{2}/gi)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];};
     const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-    const source=panel.match(/\.fr-manga-reading-source \{color:#([\da-f]{6})\}/i)?.[1];
-    const context=panel.match(/\.fr-manga-reading-context \{[^}]*color:#([\da-f]{6})/i)?.[1];
-    const dark=panel.match(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#([\da-f]{6})\}/i)?.[1];
-    expect(source).toBeDefined();expect(context).toBeDefined();expect(dark).toBeDefined();
-    expect(contrast(source!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(context!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(dark!,'2b2630')).toBeGreaterThanOrEqual(4.5);
+    const light=panel.match(/\.fr-manga-reading \{([^}]+)\}/)![1],dark=panel.match(/\[data-theme=dark\] \{([^}]+)\}/)![1];
+    const color=(block:string,token:string)=>block.match(new RegExp(`--fr-reading-${token}:(?:var\\([^,]+,)?#([\\da-f]{6})`,'i'))![1];
+    for(const block of [light,dark]){
+      expect(contrast(color(block,'muted'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'ink'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'on-brand'),color(block,'brand'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'brand-ink'),color(block,'brand-soft'))).toBeGreaterThanOrEqual(4.5);
+    }
   });
   it('reports a list budget failure without listing or reading a partial selection',async()=>{
     const h=await mount();h.props.list.mockReturnValueOnce({status:'overBudget'} as any);await h.instance.open(trusted);await h.tick();

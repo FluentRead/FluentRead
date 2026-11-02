@@ -109,7 +109,7 @@ describe('image translation Offscreen adapter', () => {
         await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
         for(const invalid of [
             {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
-            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[null,'bad',{}, {renderSkipped:'true'}]},
+            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[]},{...response,lines:[null,'bad',{}, {renderSkipped:'true'}]},
         ]){send.mockResolvedValueOnce(invalid);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
         send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
     });
@@ -126,17 +126,21 @@ describe('image translation Offscreen adapter', () => {
             await expect(adapter.getMangaModelStatus()).rejects.toThrow('漫画识别模型状态读取失败');
         }
     });
-    it('仅普通图的非空文字结果可标记为保留宿主原图',async()=>{
+    it('普通图的未绘制文字或真正空识别可标记为保留宿主原图，其他消息形态仍拒绝',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
         send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
         await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines});
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines:[]});
         for (const response of [
             {success:true,image:'encoded',imageUnchanged:true,lines},
             {success:true,image:'',imageUnchanged:false,lines},
-            {success:true,image:'',imageUnchanged:true,lines:[]},
+            {success:false,image:'',imageUnchanged:true,lines:[]},
+            {success:'false',image:'',imageUnchanged:true,lines:[]},
+            {success:1,image:'',imageUnchanged:true,lines:[]},
             {success:true,image:'',imageUnchanged:true,lines,mangaPatches:{width:1,height:1,patches:[]}},
         ]) {send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
-        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
         await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
     });
     it('单图识别选择透传到 Offscreen，不把普通图片变成漫画模式', async () => {

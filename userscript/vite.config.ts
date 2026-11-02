@@ -9,6 +9,7 @@ import {defineConfig, normalizePath, transformWithEsbuild, type Plugin} from 'vi
 import {createUserscriptMetadata} from './metadata';
 import {createUserscriptCharacterDataCompressionPlugin} from './characterDataPlugin';
 import {createUserscriptFrancDataCompressionPlugin} from './francDataPlugin';
+import {francRuntimeBuildPlugin} from '../scripts/testing/franc-runtime-build';
 import {createUserscriptTldtsDataCompressionPlugin} from './tldtsDataPlugin';
 import {createUserscriptInlineCssCompressionPlugin} from './inlineCssPlugin';
 import {createUserscriptAboutImagesCompressionPlugin} from './aboutImagesPlugin';
@@ -319,9 +320,11 @@ export function bundledLibraryNotices(moduleIds: readonly string[]): string {
         const repository = typeof manifest.repository === 'string'
             ? manifest.repository
             : manifest.repository?.url;
-        const licenseText = licenseFile
-            ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
-            : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
+        const licenseText = manifest.name === 'franc-min'
+            ? fs.readFileSync(resolve(root, 'public/third-party-notices/franc-min-MIT.txt'), 'utf8').trim()
+            : licenseFile
+                ? fs.readFileSync(resolve(packageRoot, licenseFile), 'utf8').trim()
+                : `License source: ${repository || `https://www.npmjs.com/package/${manifest.name}/v/${manifest.version}`}`;
         if (licenseText.includes('*/')) throw new Error(`Unsafe bundled library license comment: ${manifest.name}`);
         const heading = `${manifest.name} ${manifest.version} — ${manifest.license}`;
         const headings = licenseGroups.get(licenseText);
@@ -673,7 +676,7 @@ export const userscriptAliases = [
 export default defineConfig({
     root,
     publicDir: false,
-    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptTranslationCenterPlugin(root), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
+    plugins: [...(!greasyForkSource ? [createStandaloneOpenAITransportPlugin()] : []), createUserscriptTranslationCenterPlugin(root), createUserscriptSettingsDataPlugin(root, !greasyForkSource, bundleLibraries, bundleLibraries), createDeepLXRuntimeBuildPlugin(root), francRuntimeBuildPlugin(), unwrapWxtEntrypoints(), createUserscriptCatalogCompressionPlugin(), createUserscriptCharacterDataCompressionPlugin(root, !greasyForkSource, bundleLibraries), createUserscriptFrancDataCompressionPlugin(root, !greasyForkSource, !greasyForkSource, bundleLibraries), createUserscriptTldtsDataCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource, bundleLibraries && !greasyForkSource), createUserscriptAboutImagesCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), createUserscriptServiceBrandIconsCompressionPlugin(root, bundleLibraries && !greasyForkSource, bundleLibraries), injectUserscriptBrowserShim(), vue(), bundleUserscriptCss(), createUserscriptInlineCssCompressionPlugin(root, !greasyForkSource, bundleLibraries)],
     resolve: {
         alias: userscriptAliases,
     },
@@ -693,6 +696,8 @@ export default defineConfig({
         outDir: resolve(root, bundleLibraries ? '.output/userscript-standalone'
             : greasyForkSource ? '.output/userscript-greasyfork' : '.output/userscript'),
         emptyOutDir: true,
+        // 发布体积由两个 verifier 检查，不重复压缩整份脚本来生成日志统计。
+        reportCompressedSize: false,
         target: 'es2018',
         minify: greasyForkSource ? false : 'esbuild',
         // 锁定的 CommonJS 26 默认 auto 会因条件 require 的分析时机改变 MD5 初始化包装。

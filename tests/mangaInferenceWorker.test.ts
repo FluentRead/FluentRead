@@ -11,11 +11,15 @@ const mocks = vi.hoisted(() => {
     const create = vi.fn();
     return {
         createOcr: vi.fn(), createPainter: vi.fn(), create, session: {create},
-        initialization: vi.fn(),
+        initialization: vi.fn(),loadSeg:vi.fn(),inputs:[] as Array<{type:string;data:Float32Array;dims:number[];dispose:ReturnType<typeof vi.fn>}>,
         realInitialization: undefined as typeof import('@/src/shared/onnx/resources')['paceLocalInitialization'] | undefined,
     };
 });
-vi.mock('onnxruntime-web/webgpu', () => ({InferenceSession: mocks.session}));
+vi.mock('onnxruntime-web/webgpu', () => ({InferenceSession: mocks.session,env:{wasm:{}},Tensor:class {
+    type:string;data:Float32Array;dims:number[];dispose=vi.fn();
+    constructor(type:string,data:Float32Array,dims:number[]){this.type=type;this.data=data;this.dims=dims;mocks.inputs.push(this);}
+}}));
+vi.mock('@/src/features/image-translation/services/mangaOcrAssets',()=>({loadMangaTextSegmentationAsset:mocks.loadSeg}));
 vi.mock('@/src/shared/onnx/resources', async importOriginal => {
     const resources = await importOriginal<typeof import('@/src/shared/onnx/resources')>();
     mocks.realInitialization = resources.paceLocalInitialization;
@@ -52,6 +56,7 @@ beforeEach(async () => {
     mocks.initialization.mockReset().mockImplementation(<T>(operation: () => Promise<T>) => operation());
     mocks.create.mockReset().mockResolvedValue({backend: 'fixture'});
     mocks.session.create = mocks.create;
+    mocks.loadSeg.mockReset().mockResolvedValue(undefined);mocks.inputs.length=0;
     ocr = {recognize: vi.fn().mockResolvedValue({results: []}), destroy: vi.fn().mockResolvedValue(undefined)};
     painter = {run: vi.fn().mockResolvedValue(new Float32Array([0.25])), release: vi.fn().mockResolvedValue(undefined)};
     mocks.createOcr.mockReset().mockResolvedValue(ocr);
@@ -60,12 +65,42 @@ beforeEach(async () => {
     vi.stubGlobal('self', scope);
     vi.stubGlobal('navigator', {hardwareConcurrency: 8, gpu: {requestAdapter: vi.fn()}});
     vi.stubGlobal('crossOriginIsolated', true);
+    vi.stubGlobal('chrome',{runtime:{getURL:(path:string)=>`chrome-extension://fixture${path}`}});
     const worker = await import('@/src/app/offscreen/mangaInferenceWorker');
     worker.startMangaInferenceWorkerApp();
 });
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('漫画推理 Worker 消息处理器', () => {
+    it('普通图片可请求真实检测侧车，仅转移owned bit bytes，不把模型Float32概率张量转移',async()=>{
+        const bits=new Uint8Array([1,2]),originalProbability=new Float32Array([.9,.1]);
+        ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{pageWidth:4,pageHeight:4,x:0,y:0,width:4,height:4,bits}]});
+        const result=await send({requestId:44,type:'recognize',image:'image',imageDetectionEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        const [,transfer]=scope.postMessage.mock.calls.find(([message])=>message===result)!;
+        expect(transfer).toEqual([bits.buffer]);expect(transfer).not.toContain(originalProbability.buffer);
+    });
+    it('侧车重复buffer只转移一次，非ArrayBuffer不列transfer，正常消息仍不含新flag',async()=>{
+        const bits=new Uint8Array([1]),shared=new Uint8Array(new SharedArrayBuffer(1));
+        const geometry={pageWidth:1,pageHeight:1,x:0,y:0,width:1,height:1};
+        ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{...geometry,bits},{...geometry,bits},{...geometry,bits:shared}]});
+        const result=await send({requestId:45,type:'recognize',image:'image'});
+        expect(ocr.recognize).toHaveBeenCalledWith('image',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([bits.buffer]);
+    });
+    it('不同侧车view共享同一ArrayBuffer时保留各自内容与边界，并且只转移底层buffer一次',async()=>{
+        const buffer=new ArrayBuffer(3),first=new Uint8Array(buffer,0,1),last=new Uint8Array(buffer,2,1);
+        first[0]=1;last[0]=2;
+        const geometry={pageWidth:2,pageHeight:1,y:0,width:1,height:1};
+        const frames=[{...geometry,x:0,bits:first},{...geometry,x:1,bits:last}],page={results:[],imageDetectionFrames:frames};
+        ocr.recognize.mockResolvedValue(page);
+        const result=await send({requestId:46,type:'recognize',image:'image',imageDetectionEvidence:true});
+        expect(result).toEqual({requestId:46,success:true,result:page});
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([buffer]);
+        expect(frames.map(frame=>({offset:frame.bits.byteOffset,length:frame.bits.byteLength,value:frame.bits[0]})))
+            .toEqual([{offset:0,length:1,value:1},{offset:2,length:1,value:2}]);
+        expect(ocr.recognize).toHaveBeenCalledOnce();
+    });
     it('拒绝空消息、不安全 ID 和未知操作，合法消息仍能执行', async () => {
         for (const data of [undefined, null, {}, {requestId: NaN, type: 'prepare-ocr'}, {requestId: 1.5, type: 'prepare-ocr'}, {requestId: Number.MAX_SAFE_INTEGER + 1, type: 'prepare-ocr'}, {requestId: '1', type: 'prepare-ocr'}, {requestId: 1, type: 'unknown'}]) {
             scope.onmessage!({data} as MessageEvent<MangaInferenceMessage>);
@@ -397,4 +432,112 @@ describe('ONNX Asyncify 初始化串行锁', () => {
         expect(terminal()).toEqual([{requestId: 1, success: false, error: 'bad session'}]);
         expect(await send({requestId: 2, type: 'prepare-ocr'})).toMatchObject({success: true});
     });
+});
+
+function segSession(){
+    const meta=(name:string,shape:number[])=>({name,isTensor:true,type:'float32',shape});
+    return {inputNames:['images'],outputNames:['blk','seg','det'],inputMetadata:[meta('images',[1,3,1024,1024])],
+        outputMetadata:[meta('blk',[1,64512,7]),meta('seg',[1,1,1024,1024]),meta('det',[1,2,1024,1024])],
+        run:vi.fn(),release:vi.fn(async()=>{})};
+}
+function segOutput(){
+    const output=(dims:number[])=>({type:'float32',dims,data:new Float32Array(dims.reduce((a,b)=>a*b,1)) as Float32Array,dispose:vi.fn()});
+    return {blk:output([1,64512,7]),seg:output([1,1,1024,1024]),det:output([1,2,1024,1024])};
+}
+async function prepareSeg(session=segSession()){
+    mocks.loadSeg.mockResolvedValue(new ArrayBuffer(3));mocks.create.mockResolvedValue(session);
+    expect(await send({type:'prepare-seg',requestId:100})).toMatchObject({success:true,result:true});return session;
+}
+
+describe('可选缓存 CTD Worker 端口',()=>{
+    it('缺失只报告 false，不创建会话或读取输入；缓存异常归为不可重试协议错误',async()=>{
+        expect(await send({type:'prepare-seg',requestId:100})).toEqual({requestId:100,success:true,result:false});
+        expect(mocks.create).not.toHaveBeenCalled();expect(mocks.inputs).toHaveLength(0);
+        expect(await send({type:'segment',requestId:101})).toMatchObject({success:false,errorKind:'protocol',error:'图片分割模型未导入'});
+        mocks.loadSeg.mockRejectedValueOnce(new Error('hash mismatch')).mockRejectedValueOnce('cache unavailable');
+        expect(await send({type:'prepare-seg',requestId:102})).toMatchObject({errorKind:'protocol',error:'hash mismatch'});
+        expect(await send({type:'prepare-seg',requestId:103})).toMatchObject({errorKind:'protocol',error:'cache unavailable'});
+    });
+    it('固定模型仅懒创建一次，RGB输入原buffer，seg用float32乘法截断并转移owned bytes，所有张量均释放',async()=>{
+        const session=await prepareSeg(),output=segOutput();
+        output.seg.data.set([0,1,.5,127.999/255,128/255,254.999/255]);session.run.mockResolvedValue(output);
+        const source=new Float32Array(3*1024*1024);source[0]=.75;
+        const result=await send({type:'segment',requestId:101,tensor:source});
+        const seg=result!.result as Uint8Array;
+        expect(Array.from(seg.subarray(0,6))).toEqual([0,255,127,127,128,254]);
+        expect(seg).toHaveLength(1024*1024);expect(seg.buffer).not.toBe(output.seg.data.buffer);
+        expect(session.run).toHaveBeenCalledWith({images:mocks.inputs[0]});
+        expect(mocks.inputs[0].data).toBe(source);expect(mocks.inputs[0].data[0]).toBe(.75);
+        expect(mocks.inputs[0].type).toBe('float32');expect(mocks.inputs[0].dims).toEqual([1,3,1024,1024]);
+        for(const value of [...Object.values(output),...mocks.inputs])expect(value.dispose).toHaveBeenCalledOnce();
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([seg.buffer]);
+        expect(mocks.create).toHaveBeenCalledOnce();expect(mocks.create.mock.calls[0][1]).toEqual({executionProviders:['webgpu','wasm'],graphOptimizationLevel:'all'});
+        await send({type:'dispose-seg',requestId:102});await send({type:'dispose-seg',requestId:103});
+        expect(session.release).toHaveBeenCalledOnce();await prepareSeg(session);expect(mocks.create).toHaveBeenCalledTimes(2);
+    });
+    it('CPU 请求沿原锁后端且使用同串行 create；非Chrome URL只指向同源内置runtime',async()=>{
+        vi.stubGlobal('chrome',undefined);Object.assign(scope,{location:{href:'moz-extension://fixture/mangaInferenceWorker.js'}});
+        mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));const session=segSession();mocks.create.mockResolvedValue(session);
+        expect(await send({type:'prepare-seg',requestId:100,cpu:true})).toMatchObject({result:true});
+        expect(mocks.create.mock.calls[0][1]).toEqual({executionProviders:['wasm'],graphOptimizationLevel:'all'});
+        expect((navigator as Navigator&{gpu?:unknown}).gpu).toBeUndefined();
+    });
+    it.each([
+        ['input names',(s:ReturnType<typeof segSession>)=>{s.inputNames=[];}],
+        ['output count',(s:ReturnType<typeof segSession>)=>{s.outputNames=[];}],
+        ['output order',(s:ReturnType<typeof segSession>)=>{s.outputNames.reverse();}],
+        ['input meta count',(s:ReturnType<typeof segSession>)=>{s.inputMetadata=[];}],
+        ['input meta name',(s:ReturnType<typeof segSession>)=>{s.inputMetadata[0].name='x';}],
+        ['input meta tensor',(s:ReturnType<typeof segSession>)=>{s.inputMetadata[0].isTensor=false;}],
+        ['input meta dtype',(s:ReturnType<typeof segSession>)=>{s.inputMetadata[0].type='uint8';}],
+        ['input meta rank',(s:ReturnType<typeof segSession>)=>{s.inputMetadata[0].shape=[];}],
+        ['input meta dims',(s:ReturnType<typeof segSession>)=>{s.inputMetadata[0].shape[2]=512;}],
+        ['output meta dims',(s:ReturnType<typeof segSession>)=>{s.outputMetadata[1].shape[1]=2;}],
+    ] as const)('%s 不匹配立即释放未知模型，无forward',async(_name,mutate)=>{
+        const session=segSession();mutate(session);mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));mocks.create.mockResolvedValue(session);
+        expect(await send({type:'prepare-seg',requestId:100})).toMatchObject({success:false,errorKind:'protocol'});
+        expect(session.release).toHaveBeenCalledOnce();expect(session.run).not.toHaveBeenCalled();
+    });
+    it.each(['absent','short','offset','shared','nan','negative','over'] as const)('%s输入不可推理，保持会话可重试',async fault=>{
+        const session=await prepareSeg();let input:Float32Array|undefined=new Float32Array(3*1024*1024);
+        if(fault==='absent')input=undefined;
+        if(fault==='short')input=new Float32Array(1);
+        if(fault==='offset')input=new Float32Array(new ArrayBuffer((3*1024*1024+1)*4),4);
+        if(fault==='shared')input=new Float32Array(new SharedArrayBuffer(3*1024*1024*4));
+        if(fault==='nan')input![0]=NaN;if(fault==='negative')input![0]=-.01;if(fault==='over')input![0]=1.01;
+        expect(await send({type:'segment',requestId:101,tensor:input})).toMatchObject({success:false,errorKind:'protocol'});
+        expect(session.run).not.toHaveBeenCalled();expect(mocks.inputs).toHaveLength(0);
+    });
+    it.each(['missing','extra','dtype','shape','data','length','nan','negative','over'] as const)('%s输出保留失败且释放unused blk/det和输入',async fault=>{
+        const session=await prepareSeg(),outputs=segOutput(),originals=Object.values(outputs);
+        if(fault==='missing')delete (outputs as Partial<typeof outputs>).seg;
+        if(fault==='extra')Object.assign(outputs,{other:{...outputs.seg,dispose:vi.fn()}});
+        if(fault==='dtype')outputs.seg.type='uint8';if(fault==='shape')outputs.seg.dims=[1,1,512,2048];
+        if(fault==='data')outputs.seg.data=new Uint8Array(1024*1024) as unknown as Float32Array;
+        if(fault==='length')outputs.seg.data=new Float32Array(2);
+        if(fault==='nan')outputs.seg.data[0]=NaN;if(fault==='negative')outputs.seg.data[0]=-.1;if(fault==='over')outputs.seg.data[0]=1.1;
+        session.run.mockResolvedValue(outputs);
+        expect(await send({type:'segment',requestId:101,tensor:new Float32Array(3*1024*1024)})).toMatchObject({success:false,errorKind:'protocol'});
+        expect(mocks.inputs[0].dispose).toHaveBeenCalledOnce();
+        for(const value of Object.values(outputs))expect(value.dispose).toHaveBeenCalledOnce();
+        if(fault==='missing')expect(originals[1].dispose).not.toHaveBeenCalled(); // ORT 未返回的对象不是 worker 所有。
+    });
+    it('run首因不被dispose故障覆盖，其他输出仍释放；成功后的清理故障也不可发布',async()=>{
+        const session=await prepareSeg(),source=new Float32Array(3*1024*1024);
+        session.run.mockRejectedValueOnce(new Error('native run'));
+        expect(await send({type:'segment',requestId:101,tensor:source})).toMatchObject({errorKind:'execution',error:'native run'});
+        expect(mocks.inputs[0].dispose).toHaveBeenCalledOnce();
+        const output=segOutput();output.seg.data[0]=NaN;output.blk.dispose.mockImplementationOnce(()=>{throw new Error('dispose secondary');});session.run.mockResolvedValueOnce(output);
+        expect(await send({type:'segment',requestId:102,tensor:source})).toMatchObject({errorKind:'protocol',error:'图片分割概率无效'});
+        expect(output.det.dispose).toHaveBeenCalledOnce();
+        const valid=segOutput();valid.blk.dispose.mockImplementationOnce(()=>{throw new Error('dispose primary');});session.run.mockResolvedValueOnce(valid);
+        expect(await send({type:'segment',requestId:103,tensor:source})).toMatchObject({errorKind:'execution',error:'dispose primary'});expect(valid.det.dispose).toHaveBeenCalledOnce();
+    });
+});
+
+it('缺失元数据必须协议拒绝；清理多故障也保留首个undefined并释放其余张量',async()=>{
+    const unknown=segSession();Object.assign(unknown,{inputMetadata:undefined});mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));mocks.create.mockResolvedValueOnce(unknown);
+    expect(await send({type:'prepare-seg',requestId:99})).toMatchObject({errorKind:'protocol'});expect(unknown.release).toHaveBeenCalledOnce();
+    const session=await prepareSeg(),output=segOutput();output.blk.dispose.mockImplementationOnce(()=>{throw undefined;});output.seg.dispose.mockImplementationOnce(()=>{throw new Error('secondary');});session.run.mockResolvedValue(output);
+    expect(await send({type:'segment',requestId:101,tensor:new Float32Array(3*1024*1024)})).toMatchObject({errorKind:'execution',error:'undefined'});expect(output.det.dispose).toHaveBeenCalledOnce();
 });

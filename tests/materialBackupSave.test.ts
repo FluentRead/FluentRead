@@ -8,7 +8,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {getEventListeners} from 'node:events';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
-import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, type MaterialBackupSaveTarget, type MaterialBackupWritable} from '@/src/features/vocabulary/materialBackupSave';
+import {chooseMaterialBackupTarget, saveMaterialBackup, waitForMaterialBackupTarget, MATERIAL_BACKUP_BUFFER_BYTES, type MaterialBackupSaveTarget, type MaterialBackupWritable} from '@/src/features/vocabulary/materialBackupSave';
 import {MATERIAL_INLINE_BACKUP_MAX_BYTES} from '@/src/features/vocabulary/materialProtocol';
 import {MATERIAL_READ_FRAME_BYTES} from '@/src/features/vocabulary/materialReadTransport';
 import * as backupSafeCount from '@/src/features/vocabulary/materialBackupSafeCount';
@@ -22,6 +22,64 @@ function writable() {
 function deferred<T>() {let resolve!:(value:T)=>void;let reject!:(error:unknown)=>void;const promise=new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 
 describe('material backup save targets', () => {
+    it('keeps the exact raw-byte budget in memory and starts no disk target',async()=>{
+        const spill=vi.fn(),download=vi.fn(async(_name:string,parts:readonly Uint8Array[])=>{expect(parts.reduce((sum,part)=>sum+part.length,0)).toBe(MATERIAL_BACKUP_BUFFER_BYTES);return 'initiated' as const;});
+        const target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:download,spill});
+        await target.write(new Uint8Array(MATERIAL_BACKUP_BUFFER_BYTES));
+        await expect(target.commit(new AbortController().signal)).resolves.toBe('initiated');
+        expect(spill).not.toHaveBeenCalled();expect(download).toHaveBeenCalledOnce();
+    });
+    it('fails explicitly instead of growing unsupported memory buffering or downloading a truncated backup',async()=>{
+        const download=vi.fn(async()=> 'initiated' as const),target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:download});
+        await target.write(new Uint8Array(MATERIAL_BACKUP_BUFFER_BYTES));
+        await expect(saveMaterialBackup(target,async consume=>{try{await consume(new Uint8Array([1]));}catch{/* The receiver cannot suppress a failed write. */}})).rejects.toMatchObject({name:'MaterialBackupBufferCapacityError',code:'limit-exceeded'});
+        expect(download).not.toHaveBeenCalled();await expect(target.write(new Uint8Array([2]))).rejects.toMatchObject({code:'storage-error'});
+    });
+    it('migrates a partial memory block in order and delegates subsequent writes and commit',async()=>{
+        let bytes=0,tail:number[]=[];
+        const disk:MaterialBackupSaveTarget={write:vi.fn(async chunk=>{bytes+=chunk.length;tail=[...tail,...chunk.subarray(-3)].slice(-3);}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:vi.fn(),spill:async()=>disk});
+        // Fill the budget without keeping a second test-owned copy of the entire payload.
+        const block=new Uint8Array(64*1024);for(let i=0;i<127;i++)await target.write(block);
+        await target.write(new Uint8Array(64*1024-1));await target.write(new Uint8Array([7,8]));await target.write(new Uint8Array([9]));
+        await expect(target.commit(new AbortController().signal)).resolves.toBe('saved');
+        expect(bytes).toBe(MATERIAL_BACKUP_BUFFER_BYTES+2);expect(tail).toEqual([7,8,9]);
+        expect(disk.commit).toHaveBeenCalledOnce();expect(disk.abort).not.toHaveBeenCalled();
+    });
+    it('waits for a late disk target before cancelling migration and cleaning it once',async()=>{
+        const gate=deferred<MaterialBackupSaveTarget>(),disk:MaterialBackupSaveTarget={write:vi.fn(async()=>{}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:vi.fn(),spill:()=>gate.promise});
+        await target.write(new Uint8Array(MATERIAL_BACKUP_BUFFER_BYTES));
+        const writing=target.write(new Uint8Array([1])).catch(error=>error);await Promise.resolve();
+        await expect(target.write(new Uint8Array([2]))).rejects.toThrow('写入尚未结束');
+        await expect(target.commit(new AbortController().signal)).rejects.toThrow('写入尚未结束');
+        let released=false;const stopping=target.abort().then(()=>{released=true;});await Promise.resolve();expect(released).toBe(false);
+        gate.resolve(disk);expect(await writing).toMatchObject({name:'AbortError'});await stopping;
+        expect(disk.write).not.toHaveBeenCalled();expect(disk.abort).toHaveBeenCalledOnce();
+    });
+    it.each(['during-flush','after-flush'] as const)('stops a synchronously cancelled migration without accepting its new frame: %s',async phase=>{
+        let writes=0,stopping:Promise<void>|undefined,target!:MaterialBackupSaveTarget;
+        const disk:MaterialBackupSaveTarget={write:async()=>{if(++writes===(phase==='during-flush'?1:MATERIAL_BACKUP_BUFFER_BYTES/(64*1024)))stopping=target.abort();},commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:vi.fn(),spill:async()=>disk});await target.write(new Uint8Array(MATERIAL_BACKUP_BUFFER_BYTES));
+        await expect(target.write(new Uint8Array([1]))).rejects.toMatchObject({name:'AbortError'});await stopping;
+        expect(writes).toBe(phase==='during-flush'?1:MATERIAL_BACKUP_BUFFER_BYTES/(64*1024));expect(disk.abort).toHaveBeenCalledOnce();expect(disk.commit).not.toHaveBeenCalled();
+    });
+    it('does not start a partial tail when a caller cancels during the final full-block migration write',async()=>{
+        const gate=deferred<void>(),started=deferred<void>(),bufferedFrames=Math.floor(MATERIAL_BACKUP_BUFFER_BYTES/MATERIAL_READ_FRAME_BYTES),fullParts=Math.floor(bufferedFrames*MATERIAL_READ_FRAME_BYTES/(64*1024)),controller=new AbortController();let writes=0;
+        const disk:MaterialBackupSaveTarget={write:vi.fn(async()=>{if(++writes===fullParts){started.resolve();await gate.promise;}}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:vi.fn(),spill:async()=>disk});
+        let stopped=false;const saving=saveMaterialBackup(target,async consume=>{const frame=new Uint8Array(MATERIAL_READ_FRAME_BYTES);for(let i=0;i<=bufferedFrames;i++)await consume(frame);},{signal:controller.signal}).then(()=>{throw Error('unexpected save');},error=>{stopped=true;return error;});
+        await started.promise;controller.abort();await Promise.resolve();expect(stopped).toBe(false);expect(disk.abort).not.toHaveBeenCalled();
+        gate.resolve();expect(await saving).toMatchObject({name:'AbortError'});
+        expect(disk.write).toHaveBeenCalledTimes(fullParts);expect(disk.abort).toHaveBeenCalledOnce();expect(disk.commit).not.toHaveBeenCalled();
+    });
+    it.each([undefined,Error('spool write failed')])('retains a disk write failure and forbids truncated commits: %s',async failure=>{
+        const disk:MaterialBackupSaveTarget={write:vi.fn(async()=>{throw failure;}),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const target=await chooseMaterialBackupTarget('budget.json',{downloadBuffered:vi.fn(),spill:async()=>disk});await target.write(new Uint8Array(MATERIAL_BACKUP_BUFFER_BYTES));
+        await expect(target.write(new Uint8Array([1]))).rejects.toBe(failure);
+        await expect(target.write(new Uint8Array([2]))).rejects.toBe(failure);await expect(target.commit(new AbortController().signal)).rejects.toBe(failure);
+        await target.abort(failure);expect(disk.abort).toHaveBeenCalledWith(failure);expect(disk.commit).not.toHaveBeenCalled();
+    });
     it('detaches the caller while a failed target is still releasing storage',async()=>{
         const caller=new AbortController(),failure=Error('receive failed');
         const cleanup=deferred<void>();let finished=false,activeSignal:AbortSignal|undefined;
@@ -178,11 +236,9 @@ describe('material backup save targets', () => {
     it('downloads more than 20 MiB without truncation, in coalesced chunks, only after receipt succeeds', async () => {
         const total=MATERIAL_INLINE_BACKUP_MAX_BYTES+137,expected=sha256.create(),received=deferred<void>(),receiveDone=deferred<void>();
         let actual='',observed=0,partSizes:number[]=[];
-        const download=vi.fn(async (_name:string,parts:readonly Uint8Array[])=>{
-            const digest=sha256.create();for(const part of parts){observed+=part.length;partSizes.push(part.length);digest.update(part);}
-            actual=bytesToHex(digest.digest());return 'initiated' as const;
-        });
-        const target=await chooseMaterialBackupTarget('large.json',{downloadBuffered:download});
+        const digest=sha256.create(),download=vi.fn(async()=> 'initiated' as const),abort=vi.fn(async()=>{});
+        const spill=vi.fn(async()=>({write:async(part:Uint8Array)=>{observed+=part.length;partSizes.push(part.length);digest.update(part);},commit:async()=>{actual=bytesToHex(digest.digest());return download();},abort}));
+        const target=await chooseMaterialBackupTarget('large.json',{downloadBuffered:download,spill});
         const result=saveMaterialBackup(target,async consume=>{
             let size=total,index=0;const chunk=new Uint8Array(MATERIAL_READ_FRAME_BYTES);
             while(size) {chunk.fill(index%251);const n=Math.min(size,chunk.length),part=chunk.subarray(0,n);expected.update(part);await consume(part);size-=n;index++;}
@@ -191,8 +247,9 @@ describe('material backup save targets', () => {
         await received.promise;expect(download).not.toHaveBeenCalled();
         receiveDone.resolve();await expect(result).resolves.toEqual({state:'initiated',bytes:total});
         expect(download).toHaveBeenCalledOnce();expect(observed).toBe(total);expect(actual).toBe(bytesToHex(expected.digest()));
-        expect(partSizes.slice(0,-1).every(size=>size===64*1024)).toBe(true);
-        expect(partSizes.at(-1)).toBe(total%(64*1024));
+        expect(spill).toHaveBeenCalledOnce();expect(abort).not.toHaveBeenCalled();
+        expect(partSizes.slice(0,Math.floor(MATERIAL_BACKUP_BUFFER_BYTES/(64*1024))-1).every(size=>size===64*1024)).toBe(true);
+        expect(partSizes.every(size=>size<=Math.max(64*1024,MATERIAL_READ_FRAME_BYTES))).toBe(true);
     });
     it('discards buffered data on cancellation or failed integrity without starting a download',async()=>{
         for(const reason of ['cancel','integrity'] as const){

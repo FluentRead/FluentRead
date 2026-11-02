@@ -14,6 +14,9 @@ const resources = [
     ['.output/userscript-vendor/fluentread-vendor.v1.js', `${resourceDir}/fluentread-vendor.v1.js`],
     ['.output/userscript-greasyfork/fluentread-data.v1.js', `${resourceDir}/fluentread-data.v1.js`],
 ];
+// 所有会改变 vendor 输出的本地源都必须存在于资源提交且保持一致。
+const vendorSources = ['userscript/vendorEntry.ts', 'userscript/vendor.vite.config.ts',
+    'scripts/testing/franc-runtime-build.ts', 'public/third-party-notices/franc-min-MIT.txt', 'pnpm-lock.yaml'];
 
 function run(command, args, extraEnv = {}) {
     const result = spawnSync(command, args, {
@@ -51,11 +54,10 @@ const buildEnv = {
 if (prepareResources) {
     run('pnpm', ['exec', 'vite', 'build', '--config', 'userscript/vendor.vite.config.ts']);
 } else {
-    for (const source of ['userscript/vendorEntry.ts', 'userscript/vendor.vite.config.ts', 'pnpm-lock.yaml']) {
+    for (const source of vendorSources) {
         gitOutput(['cat-file', '-e', `${commit}:${source}`]);
     }
-    run('git', ['diff', '--exit-code', commit, '--',
-        'userscript/vendorEntry.ts', 'userscript/vendor.vite.config.ts', 'pnpm-lock.yaml']);
+    run('git', ['diff', '--exit-code', commit, '--', ...vendorSources]);
     fs.mkdirSync(path.resolve(root, '.output/userscript-vendor'), {recursive: true});
     fs.copyFileSync(path.resolve(root, resources[0][1]), path.resolve(root, resources[0][0]));
 }

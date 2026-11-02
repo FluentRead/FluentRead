@@ -10,6 +10,7 @@ import {resolve} from 'node:path';
 import {afterEach, describe, expect, it} from 'vitest';
 
 const nativeGroups = [
+  {name: 'test group selection', files: ['tests/testGroupSelection.test.mjs'], arguments: []},
   {name: 'release packaging and publication', files: [
     'tests/releaseBundle.test.mjs',
     'tests/releaseManifest.test.mjs',
@@ -18,6 +19,7 @@ const nativeGroups = [
   ], arguments: ['--test-concurrency=1']},
   {name: 'agent bridge', files: ['tests/agentBridge.test.mjs'], arguments: []},
   {name: 'CI type budget', files: ['tests/ciTypeBudget.test.mjs'], arguments: []},
+  {name: 'typecheck command', files: ['tests/typecheckCommand.test.mjs'], arguments: []},
   {name: 'pinned userscript language resources', files: ['tests/pinnedUserscriptLanguagePreflight.test.mjs'], arguments: []},
   {name: 'focus-safe lifecycle', files: [
     'tests/focusSafeBrowserOrdinaryLifecycle.test.mjs',

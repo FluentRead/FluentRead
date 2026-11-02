@@ -1,5 +1,6 @@
 <!--
  * @file src/features/vocabulary/ui/VocabularyBook.vue
+ * 导出呈现：Anki 采用默认关闭的上下文选项和明确的导出按钮，取消或关闭均放弃导出，与完整备份保持一致。
  * 撤销归属：后台事务保存删除快照并保留 24 小时的恢复期限，页面只持票据；失败时提示未确认，不自动重放。
  * 文件职责：组织内容优先的学习收藏列表与主动复习，协调句子听读、解释保存、筛选与文件操作。
  * 主要内容：相同译文保留原文且不重复展示；把复习作为列表主操作，收藏开关与文件动作收进管理菜单；搜索与类型筛选合为一行，每条收藏直接提供学习入口；筛选排序独立于搜索输入，正文索引按需建立并限制文本字符总量，超预算词条继续完整匹配；界面文案订阅共享语言与资源修订，缓存期间首次加载的语言也能自动更新。配置、数据和朗读沿用已有消息协议，后台进度保持播放状态、结束或停止才释放，页面音频失败按在线与浏览器两级有限回退并合并重复错误通知；音频恢复后复验代次再解码，浏览器语音只接受当前话语的开始事件；收藏面板或文档隐藏时延后普通读取并停止到期扫描，恢复可见后串行读取，已接受的保存继续结算；确认开始即占用操作状态，等待、菜单让步及响应后校验生命周期，拒绝迟到请求、文件下载和已卸载界面更新。
@@ -164,6 +165,7 @@
 import {downloadTextFile as downloadFile} from '@/src/shared/dom/downloadTextFile';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import UiIcon from '@/src/ui/components/UiIcon.vue'
+import {confirmExport} from '@/src/ui/confirmExport';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {applyInterfaceTheme} from '@/src/ui/interfaceAppearance'
@@ -888,21 +890,9 @@ async function discardUndo(ticket: VocabularyUndoTicket): Promise<void> {
 }
 
 async function chooseAnkiContext(): Promise<boolean | null> {
-  try {
-    await ElMessageBox.confirm(
-      '默认不导出收藏时的网页片段和来源。这些内容可能包含浏览隐私。',
-      '导出到 Anki',
-      {
-        confirmButtonText: '不包含',
-        cancelButtonText: '包含上下文',
-        distinguishCancelAndClose: true,
-        type: 'warning',
-      },
-    );
-    return false;
-  } catch (action) {
-    return action === 'cancel' ? true : null;
-  }
+  return confirmExport({title: translateControlLabel('导出到 Anki'),
+    description: translateControlLabel('默认不导出收藏时的网页片段和来源。这些内容可能包含浏览隐私。'),
+    option: t('settings.backup.includeContext'), cancel: t('common.cancel')});
 }
 
 async function exportAnki(): Promise<void> {

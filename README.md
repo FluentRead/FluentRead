@@ -62,6 +62,8 @@ The project is currently funded mainly out of pocket, with tens of thousands of 
 
 Requirements: Node.js 20 or later and pnpm 9.
 
+Node.js 22.12 or later in the 22.x line is recommended, matching CI; `.nvmrc` selects Node 22. Check both `node --version` and `pnpm exec node --version` after switching. Older Node 20 releases can emit an experimental JSON-module warning from WXT's spinner dependency; using Node 22 avoids it without suppressing warnings. Type-check and userscript compression caches are described in [testing](./docs/testing.md#编译与构建缓存).
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev

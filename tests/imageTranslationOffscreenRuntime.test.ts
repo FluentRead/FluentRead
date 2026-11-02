@@ -3,6 +3,7 @@ import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult'
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import {recordMangaBubblePlacement,bindMangaBubblePlacements} from '@/src/features/image-translation/services/mangaBubblePlacement';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
+import type {ImageViewport} from '@/src/shared/image/types';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',async importOriginal=>({...await importOriginal<typeof import('@/src/features/image-translation/services/mangaAlphaProtection')>(),planMangaAlphaProtection:mocks.alphaProtection}));
@@ -1689,12 +1690,12 @@ it('普通图片绘字边界读取时变为无效几何，保守保留原图而�
 
 
 describe('漫画原文冲突后的纯白空处补绘',()=>{
-    function fixture(key='blank-placement'){
+    function fixture(key='blank-placement',targetOptions:Partial<MangaRegion>={}){
         const width=400,height=160,owner={x0:11,y0:11,x1:89,y1:129};
         const pixels=new Uint8ClampedArray(width*height*4).fill(255);
         const ink=(x0:number,y0:number,x1:number,y1:number)=>{for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)pixels.set([0,0,0,255],(y*width+x)*4);};
         ink(10,10,90,11);ink(10,129,90,130);ink(10,10,11,130);ink(89,10,90,130);ink(20,70,80,100);
-        const target:MangaRegion={text:'SOURCE TARGET',bbox:{x0:20,y0:70,x1:80,y1:100},fontSize:10,sourceBoxes:[{x0:20,y0:70,x1:80,y1:100}]};
+        const target:MangaRegion={text:'SOURCE TARGET',bbox:{x0:20,y0:70,x1:80,y1:100},fontSize:10,sourceBoxes:[{x0:20,y0:70,x1:80,y1:100}],...targetOptions};
         const retained:MangaRegion={text:'KEEP',bbox:{x0:20,y0:90,x1:80,y1:110},fontSize:20};
         const rows=[target,retained];
         recordMangaBubblePlacement(target,owner,width,height);bindMangaBubblePlacements(rows,key,width,height);
@@ -1704,7 +1705,7 @@ describe('漫画原文冲突后的纯白空处补绘',()=>{
         }));
         mocks.mangaRecognize.mockResolvedValueOnce(rows);mocks.repair.mockImplementation(async data=>data);
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['译文完整','KEEP']}:undefined));
-        return{width,height,pixels,owner,target,retained,rows,ink,run:(signal?:AbortSignal)=>translateImageInOffscreen(key,'en','Page',signal,key,true,'paddle')};
+        return{width,height,pixels,owner,target,retained,rows,ink,run:(signal?:AbortSignal,mangaViewport?:ImageViewport)=>translateImageInOffscreen(key,'en','Page',signal,key,true,'paddle',mangaViewport)};
     }
     it('完整译文另画在源纯白空处，不清原文、不启修补且阅读坐标不移动',async()=>{
         const f=fixture(),before=f.pixels.slice(),result=await f.run();
@@ -1814,4 +1815,55 @@ describe('漫画原文冲突后的纯白空处补绘',()=>{
         expect(result.lines[0].renderSkipped===true).toBe(sourceCount===8189);expect(result.lines[1].renderSkipped).toBe(true);
         expect(drawn.includes('完整第一')).toBe(sourceCount===8188);expect(mocks.repair).toHaveBeenCalledOnce();expect(mocks.mangaRecognize).toHaveBeenCalledOnce();
     });
+    it.each([{x:0,y:50,width:400,height:100},{x:15,y:50,width:100,height:80}])('分段核心 %j 不再裁断原本位于上方padding的补绘，改用完整可见空处',async viewport=>{
+        const f=fixture(`blank-viewport-${viewport.x}`),result=await f.run(undefined,viewport);
+        expect(result.lines[0].renderSkipped).toBeUndefined();expect(result.lines[0].bbox).toEqual(f.target.bbox);
+        expect(mocks.mangaDraw).toHaveBeenCalledOnce();const placed=mocks.mangaDraw.mock.calls[0][4][0] as MangaRegion;
+        expect(placed.bbox.x0).toBeGreaterThanOrEqual(viewport.x);expect(placed.bbox.y0).toBeGreaterThanOrEqual(viewport.y);
+        expect(placed.bbox.x1).toBeLessThanOrEqual(viewport.x+viewport.width);expect(placed.bbox.y1).toBeLessThanOrEqual(viewport.y+viewport.height);
+        expect(placed.bbox.y0).toBeGreaterThanOrEqual(51);expect(placed.text).toBe('译文完整');expect(placed.sourceBoxes).toEqual([]);
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaRecognize).toHaveBeenCalledOnce();
+    });
+    it('完整图像viewport与未分段路径同样保留原文并显示完整补绘',async()=>{
+        const f=fixture('blank-full-viewport'),result=await f.run(undefined,{x:0,y:0,width:f.width,height:f.height});
+        expect(result.lines[0].renderSkipped).toBeUndefined();expect(mocks.mangaDraw).toHaveBeenCalledOnce();expect(result.mangaPatches?.patches).toHaveLength(1);
+    });
+    it('没有独立sourceBoxes的有效源段也按整个bbox遵守可见核心',async()=>{
+        const f=fixture('blank-viewport-no-source-boxes',{sourceBoxes:undefined}),result=await f.run(undefined,{x:0,y:50,width:400,height:100});
+        expect(result.lines[0].renderSkipped).toBeUndefined();expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+        const placed=mocks.mangaDraw.mock.calls[0][4][0] as MangaRegion;expect(placed.bbox.y0).toBeGreaterThanOrEqual(50);expect(placed.bbox.y1).toBeLessThanOrEqual(150);
+    });
+    it.each([
+        {x:21,y:0,width:100,height:160},{x:0,y:71,width:400,height:89},
+        {x:0,y:0,width:79,height:160},{x:0,y:0,width:400,height:99},
+        {x:0,y:110,width:400,height:50},
+    ])('源段跨边界或只在padding时不能把全文搬进邻段核心 %j',async viewport=>{
+        const f=fixture(`blank-outside-core-${viewport.x}-${viewport.y}-${viewport.width}-${viewport.height}`),result=await f.run(undefined,viewport);
+        expect(result.lines[0]).toMatchObject({text:'译文完整',renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);
+        expect(canvases).toHaveLength(0);expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.repair).not.toHaveBeenCalled();
+    });
+    it('段落bbox在核心内但其中物理源框越界时仍保留完整阅读译文',async()=>{
+        const f=fixture('blank-physical-outside-core',{sourceBoxes:[{x0:20,y0:40,x1:80,y1:60},{x0:20,y0:70,x1:80,y1:100}]}),result=await f.run(undefined,{x:0,y:50,width:400,height:100});
+        expect(result.lines[0].renderSkipped).toBe(true);expect(result.mangaPatches?.patches).toEqual([]);expect(canvases).toHaveLength(0);
+    });
+    it.each([
+        null,false,0,'', 'invalid',[],{},
+        {x:.5,y:0,width:400,height:160},{x:-1,y:0,width:400,height:160},
+        {x:0,y:-1,width:400,height:160},{x:0,y:0,width:0,height:160},
+        {x:0,y:0,width:400,height:0},{x:0,y:0,width:401,height:160},
+        {x:0,y:0,width:400,height:161},
+    ])('明确提供的非法viewport %j 仅撤回补绘，不能退回全图权限',async viewport=>{
+        const f=fixture(`blank-malformed-core-${JSON.stringify(viewport)}`),result=await f.run(undefined,viewport as ImageViewport);
+        expect(result.lines[0]).toMatchObject({text:'译文完整',renderSkipped:true});expect(result.mangaPatches?.patches).toEqual([]);
+        expect(canvases).toHaveLength(0);expect(mocks.mangaDraw).not.toHaveBeenCalled();expect(mocks.repair).not.toHaveBeenCalled();
+    });
+    it('非法补绘viewport不影响原本可绘制的正常漫画段落',async()=>{
+        const f=fixture('blank-invalid-normal'),other:MangaRegion={text:'OTHER',bbox:{x0:120,y0:70,x1:170,y1:90},fontSize:10};f.rows.push(other);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['译文完整','KEEP','正常译文']}:undefined));
+        const result=await f.run(undefined,null as unknown as ImageViewport);
+        expect(result.lines[0].renderSkipped).toBe(true);expect(result.lines[2]).toMatchObject({text:'正常译文'});expect(result.lines[2].renderSkipped).toBeUndefined();
+        expect(mocks.repair).toHaveBeenCalledOnce();expect(mocks.repair.mock.calls[0][3]).toMatchObject([{text:'正常译文',bbox:other.bbox}]);
+        expect(mocks.mangaDraw).toHaveBeenCalledOnce();expect(mocks.mangaDraw.mock.calls[0][4]).toMatchObject([{text:'正常译文'}]);
+    });
+
 });

@@ -7,7 +7,7 @@ Read translations over a webpage image, or open its text panel to compare and co
 
 Recognized text that remains unchanged, including brand names, target-language text and missing translations, also participates in protection. If a neighboring translation would erase or draw over that text, FluentRead preserves it and offers the withheld translation in the text panel. When no translation can be safely drawn on an ordinary image, the page keeps its original image. This protection does not cover unrecognized text or unknown artwork.
 
-For manga, a complete translation can be placed in verified white space inside the same closed speech bubble, keeping the original text and artwork. Its text size stays at least as large as the recognized source text. If space is insufficient or the location cannot be confirmed, the complete translation remains available in the text panel. Placement reuses the current result without another OCR call, translation request or model download.
+For horizontal manga text affected by source protection, a complete translation can be placed in verified white space inside the same closed speech bubble, keeping the original text and artwork. Its text size stays at least as large as the recognized source text. Long-image segments only use placements that remain fully visible. If space is insufficient, text crosses a segment boundary, or the location cannot be confirmed, the complete translation remains available in the text panel. Placement reuses the current result without another OCR call, translation request or model download.
 
 ## Translate one image
 

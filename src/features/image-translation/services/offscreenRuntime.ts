@@ -5,12 +5,13 @@
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，从原 RGBA 构造独占输入，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 空识别：普通图片仅在 OCR 真正返回空数组时使用轻量原图保留协议，不分配译图画布；非空结果经保护或置信过滤后不可读仍报错，漫画维持既有空页协议。
- * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
+ * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {createImageTranslationFailure} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
 import { selectChangedTranslations, type OcrLine } from '@/src/features/image-translation/core';
+import type {ImageViewport} from '@/src/shared/image/types';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
 import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
 import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
@@ -361,6 +362,15 @@ async function renderImageMatteRescue(context:CanvasRenderingContext2D,canvas:HT
     } finally {discardImageMatteProposal(proposal);}
 }
 
+/** 显示窗口只收窄新增气泡补绘；非法值不应退回整图补绘权限，也不改变正常译文清字。 */
+function mangaPlacementBounds(viewport:ImageViewport|undefined,width:number,height:number):OcrLine['bbox']|null|undefined {
+    if(viewport===undefined)return;
+    if(!viewport||typeof viewport!=='object'||Array.isArray(viewport))return null;
+    const {x,y,width:w,height:h}=viewport;
+    if(![x,y,w,h].every(Number.isSafeInteger)||x<0||y<0||w<=0||h<=0||x+w>width||y+h>height)return null;
+    return {x0:x,y0:y,x1:x+w,y1:y+h};
+}
+
 async function prepareTranslatedImage(
     source: HTMLImageElement,
     lines: ImageTextRegion[],
@@ -370,6 +380,7 @@ async function prepareTranslatedImage(
     requestId?: string,
     support?:ImageDetectionSupport,
     placementImage?:string,
+    mangaViewport?:ImageViewport,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
@@ -437,11 +448,19 @@ async function prepareTranslatedImage(
     }
     throwIfImageOperationAborted(signal);
     const translatedLines = candidates.filter(candidate=>!skipped.has(candidate.index)).map(candidate=>candidate.translated);
+    const placementBounds=manga?mangaPlacementBounds(mangaViewport,width,height):undefined;
     // 不撤回原文保护。只有实际局部气泡、同源对象和尺寸仍有效的横排候选可尝试在空白处另画完整译文。
-    const blankCandidates=manga&&placementImage&&!protectionExhausted?candidates.flatMap(candidate=>{
+    const blankCandidates=manga&&placementImage&&!protectionExhausted&&placementBounds!==null?candidates.flatMap(candidate=>{
         if(!skipped.has(candidate.index)||candidate.original.vertical)return [];
         const owner=getMangaBubblePlacement(candidate.original as MangaRegion,placementImage,width,height);
-        return owner?[{candidate,owner}]:[];
+        if(!owner)return [];
+        if(placementBounds){
+            const within=(box:OcrLine['bbox'])=>box.x0>=placementBounds.x0&&box.y0>=placementBounds.y0
+                &&box.x1<=placementBounds.x1&&box.y1<=placementBounds.y1;
+            // padding 中的全文不能搬进邻段；跨可见边界的源段仍保留原有未绘制状态。
+            if(!within(candidate.original.bbox)||candidate.original.sourceBoxes?.some(box=>!within(box)))return [];
+        }
+        return [{candidate,owner}];
     }).slice(0,32):[];
     const readingLines = lines.flatMap((line, index) => line.guardOnly ? [] : [{...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
         ...(skipped.has(index) ? {renderSkipped: true as const} : {})}]);
@@ -471,6 +490,12 @@ async function prepareTranslatedImage(
                     if(obstacles.length>=8192){valid=false;return;}
                     seen.add(key);obstacles.push(b);
                 };
+                if(placementBounds){
+                    if(placementBounds.x0>0)add({x0:0,y0:0,x1:placementBounds.x0,y1:height});
+                    if(placementBounds.y0>0)add({x0:0,y0:0,x1:width,y1:placementBounds.y0});
+                    if(placementBounds.x1<width)add({x0:placementBounds.x1,y0:0,x1:width,y1:height});
+                    if(placementBounds.y1<height)add({x0:0,y0:placementBounds.y1,x1:width,y1:height});
+                }
                 // 保留所有源段、数值、源行清字余量与正常译文的范围；不能只排除这一次碰撞框。
                 for(const line of lines){
                     add(line.bbox,2);
@@ -596,6 +621,7 @@ export async function translateImageInOffscreen(
     requestId?: string,
     manga = false,
     ocrEngine: 'tesseract' | 'paddle' = 'tesseract',
+    mangaViewport?:ImageViewport,
 ): Promise<OffscreenImageTranslationResult> {
     // 提前验证输出预算，避免巨大输入完成 OCR 和付费翻译后才在生成译图时失败。
     const source = await loadImage(image, signal);
@@ -678,7 +704,7 @@ export async function translateImageInOffscreen(
         }
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, manga ? 'cleaning' : 'rendering');
-        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined);
+        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined,mangaViewport);
     } finally {
         source.src = '';
     }

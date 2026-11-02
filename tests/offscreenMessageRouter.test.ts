@@ -313,6 +313,14 @@ describe('Offscreen 消息静态路由', () => {
         expect(mocks.translateImage).not.toHaveBeenCalled();
     });
 
+    it.each([undefined,{x:8,y:12,width:100,height:90},null,0,false])('viewport只在第八参数透传，异常空值留给实际绘制端校验 %#',async mangaViewport=>{
+        await expect(dispatch({type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',image:'data:image/png,x',sourceLanguage:'en',
+            requestId:'viewport-router',mangaViewport})).resolves.toMatchObject({response:{success:true}});
+        expect(mocks.translateImage).toHaveBeenCalledOnce();
+        expect(mocks.translateImage).toHaveBeenCalledWith('data:image/png,x','en','',expect.any(AbortSignal),'viewport-router',false,'tesseract',...(mangaViewport===undefined?[]:[mangaViewport]));
+        expect(mocks.translateImage.mock.calls[0]).toHaveLength(mangaViewport===undefined?7:8);
+    });
+
     it('单图识别方式只能使用明确枚举，不接受任意引擎或隐式漫画模式', async () => {
         const message={type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',image:'data:image/png,x',sourceLanguage:'en',ocrEngine:'paddle'};
         await dispatch(message);

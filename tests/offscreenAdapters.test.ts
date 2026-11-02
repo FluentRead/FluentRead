@@ -102,6 +102,13 @@ describe('area translation Offscreen adapter', () => {
 
 describe('image translation Offscreen adapter', () => {
     const adapter = createImageTranslationOffscreenAdapter(client);
+    it.each([undefined,{x:4,y:5,width:90,height:40},null,0,false])('viewport随既有RPC原样发送，取消和超时选项不增加请求 %#',async mangaViewport=>{
+        send.mockResolvedValueOnce({success:true,image:'translated',lines:[]});const signal=new AbortController().signal;
+        await adapter.translateImage('data:image/png,x','en','Page',{manga:true,requestId:'viewport-adapter',signal,timeoutMs:5000,mangaViewport:mangaViewport as never});
+        expect(send).toHaveBeenCalledOnce();const [message,options]=send.mock.calls[0];
+        expect(Object.hasOwn(message,'mangaViewport')).toBe(mangaViewport!==undefined);expect(message.mangaViewport).toEqual(mangaViewport);
+        expect(options).toEqual({signal,timeoutMs:5000,cancelMessage:{type:OFFSCREEN_CANCEL_IMAGE_OPERATION_MESSAGE_TYPE,requestId:'viewport-adapter'}});
+    });
     it('validates the missing-segmentation retry marker only on an ordinary skipped unchanged result',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
         const response={success:true,image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines};

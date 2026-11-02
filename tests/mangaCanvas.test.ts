@@ -24,7 +24,7 @@ function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery'],
     Object.defineProperty(prototype, 'getAnimations', {configurable: true, value: () => []});
     restoreAnimationPorts.push(() => {if (animationPort) Object.defineProperty(prototype, 'getAnimations', animationPort);else Reflect.deleteProperty(prototype, 'getAnimations');});
     const create = document.createElement.bind(document);
-    const snapshots: HTMLCanvasElement[] = [], outputs: HTMLCanvasElement[] = [], roots: ShadowRoot[] = [];
+    const snapshots: HTMLCanvasElement[] = [], outputs: HTMLCanvasElement[] = [], roots: ShadowRoot[] = [], drawCalls:unknown[][]=[];
     // linkedom 缺少浏览器 CSSStyleDeclaration priority，保留其序列化并补齐原生单属性契约。
     const decorateStyle = (element: HTMLElement) => {
         const actual = element.style, priorities = new Map<string, string>();
@@ -48,7 +48,7 @@ function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery'],
             decorateStyle(canvas);
             let drawn: HTMLCanvasElement | null = null;
             canvas.getContext = vi.fn(() => missingCaptureContext && canvas.width > 8 ? null : {
-                drawImage: (source: HTMLCanvasElement) => {drawn = source;canvas.dataset.content = source.dataset.content || 'A';},
+                drawImage: (source: HTMLCanvasElement,...args:unknown[]) => {drawCalls.push([source,...args]);drawn = source;canvas.dataset.content = source.dataset.content || 'A';},
                 getImageData: () => {
                     if (drawn?.dataset.tainted === 'true') throw new DOMException('tainted', 'SecurityError');
                     return {data: new Uint8ClampedArray(256).fill(Number(drawn?.dataset.pixel ?? 1))};
@@ -75,7 +75,7 @@ function fixture(recovery?: Parameters<typeof createMangaCanvas>[0]['recovery'],
     compose.mockImplementation(async () => {const output = document.createElement('canvas') as HTMLCanvasElement;output.width = 400;output.height = 300;outputs.push(output);return output;});
     const ports = {enabled: vi.fn(() => true), configurationIdentity: vi.fn(() => 'config-1'), cacheEnabled: vi.fn(() => true), recovery, acceptsInteractionLayer:vi.fn((_canvas:HTMLCanvasElement,_hit:Element)=>false), translate: vi.fn().mockResolvedValue(result)};
     const runtime = createMangaCanvas({...ports, readingSnapshots,lightCacheLimits});
-    return {document, window, canvas, bounds, styles, hit, snapshots, outputs, roots, ports, runtime, readingSnapshots,
+    return {document, window, canvas, bounds, styles, hit, snapshots, outputs, roots, drawCalls, ports, runtime, readingSnapshots,
         missingContext: () => {missingCaptureContext = true;}};
 }
 
@@ -624,12 +624,45 @@ describe('公开可读漫画画布的任务与显示所有权', () => {
             capture: async (_element, target) => {target.width = 400;target.height = 300;},
             viewport: () => ({x: 0, y: 50, width: 400, height: 200})}});
         await source.translate(f.canvas);
+        expect(f.ports.translate).toHaveBeenCalledWith(expect.any(String),expect.any(AbortSignal),{x:0,y:50,width:400,height:200});
+        expect(f.drawCalls.at(-1)?.slice(1)).toEqual([0,50,400,200,0,0,400,200]);
         expect(anchor).toHaveBeenCalledWith(f.canvas);expect(f.outputs[0].width).toBe(0);
         source.release(f.canvas);await source.translate(f.canvas);
         expect(f.ports.translate).toHaveBeenCalledOnce();expect(compose).toHaveBeenCalledTimes(2);
         expect(source.reuse(f.canvas)).toBe(true);source.release(f.canvas);identity.mockReturnValue(null);
         await source.translate(f.canvas);expect(source.identity(f.canvas)).toBeNull();
-        expect(f.ports.translate).toHaveBeenCalledOnce();source.dispose();f.runtime.dispose();
+        expect(f.ports.translate).toHaveBeenCalledOnce();source.dispose();await source.translate(f.canvas);expect(f.ports.translate).toHaveBeenCalledOnce();f.runtime.dispose();
+    });
+
+    it.each([false,true])('没有viewport的宿主/注入载体（%s）仍精确使用旧两个翻译参数',async custom=>{
+        const f=fixture(),runtime=custom?createMangaCanvas({...f.ports,source:{identity:()=> 'plain-source',bounds:()=>f.bounds as DOMRect,
+            capture:async(_element,target)=>{target.width=400;target.height=300;}}}):f.runtime;
+        await runtime.translate(f.canvas);expect(f.ports.translate.mock.calls[0]).toHaveLength(2);runtime.dispose();if(custom)f.runtime.dispose();
+    });
+
+    it('viewport变化同时隔离活动译层、阅读身份和压缩缓存，改回仍复用原核心结果',async()=>{
+        const f=fixture(),viewport={x:0,y:50,width:400,height:200},query=vi.fn(()=>viewport);
+        const runtime=createMangaCanvas({...f.ports,readingSnapshots:f.readingSnapshots,source:{identity:()=> 'one-source',readingIdentity:()=> 'one-source',bounds:()=>f.bounds as DOMRect,
+            capture:async(_element,target)=>{target.width=400;target.height=300;},viewport:query}});
+        await runtime.translate(f.canvas);const firstIdentity=runtime.readingIdentity(f.canvas),request=f.ports.translate.mock.calls[0][2];
+        expect(request).toEqual({x:0,y:50,width:400,height:200});expect(request).not.toBe(viewport);expect(Object.isFrozen(request)).toBe(true);
+        viewport.y=75;expect(runtime.reuse(f.canvas)).toBe(false);expect(runtime.readingIdentity(f.canvas)).not.toBe(firstIdentity);
+        expect(await runtime.readLines(f.canvas,new AbortController().signal)).toEqual({status:'stale'});
+        await runtime.translate(f.canvas);expect(f.ports.translate).toHaveBeenCalledTimes(2);expect(f.ports.translate.mock.calls[1][2]).toEqual({x:0,y:75,width:400,height:200});
+        runtime.release(f.canvas);viewport.y=50;await runtime.translate(f.canvas);expect(f.ports.translate).toHaveBeenCalledTimes(2);expect(compose).toHaveBeenCalledTimes(3);
+        expect(f.drawCalls.at(-1)?.slice(1)).toEqual([0,50,400,200,0,0,400,200]);expect(request).toEqual({x:0,y:50,width:400,height:200});runtime.dispose();f.runtime.dispose();
+    });
+
+    it.each(['capture','translate'] as const)('viewport在%s等待中变化时拒绝迟到结果，不使用已变范围发布译层',async phase=>{
+        const f=fixture(),viewport={x:0,y:50,width:400,height:200},pending=deferred<void>(),translated=deferred<typeof result>();
+        const runtime=createMangaCanvas({...f.ports,source:{identity:()=> 'one-source',bounds:()=>f.bounds as DOMRect,
+            capture:async(_element,target)=>{target.width=400;target.height=300;if(phase==='capture')await pending.promise;},viewport:()=>viewport}});
+        if(phase==='translate')f.ports.translate.mockReturnValueOnce(translated.promise);
+        const task=runtime.translate(f.canvas);await flush();const request=f.ports.translate.mock.calls[0]?.[2];viewport.y=75;
+        pending.resolve();translated.resolve(result);await task;
+        if(phase==='capture')expect(f.ports.translate).not.toHaveBeenCalled();else expect(request).toEqual({x:0,y:50,width:400,height:200});
+        expect(compose).not.toHaveBeenCalled();expect(f.snapshots.every(canvas=>canvas.width===0||canvas===f.canvas)).toBe(true);
+        runtime.dispose();f.runtime.dispose();
     });
 
     it.each(['source', 'publication'])('异步编码%s阶段取消后不启动识别或发布译层', async phase => {

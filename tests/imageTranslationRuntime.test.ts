@@ -2039,7 +2039,7 @@ describe('视频预览不自动显示图片翻译', () => {
         settings.from='auto';settings.imageTranslationMangaDownloadConfirmed=true;settings.imageTranslationMangaPrefetchPages=0;
         client.translate.mockResolvedValue({...result,lines:[]});toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith('ko',expect.any(AbortSignal),expect.any(Function));
-        expect(client.translate).toHaveBeenCalledWith(expect.any(String),'ko',expect.any(String),expect.objectContaining({manga:true}));
+        expect(client.translate).toHaveBeenCalledWith(expect.any(String),'ko',expect.any(String),expect.objectContaining({manga:true,mangaViewport:{x:0,y:0,width:400,height:2048}}));
         expect(settings.from).toBe('auto');expect(env.image.naturalHeight).toBe(6000);
         Object.assign(document,{elementFromPoint:()=>env.image});env.runFrames();await flush();
         const candidates=getMangaReadingCandidates();expect(candidates.status).toBe('ready');

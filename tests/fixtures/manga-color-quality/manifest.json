@@ -1,0 +1,2823 @@
+{
+  "version": 1,
+  "generator": "generate-color-scenes.py",
+  "generatorSha256": "1ee1ff0a9644eee547c863559296b58580f45053880ec6f01be2e6bdb21a9dc7",
+  "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+  "sourceFrozenAtUtc": "2026-10-25 18:32:10 UTC",
+  "firstOcrStatus": "Not run; all eight retained independent of OCR success.",
+  "pillowVersion": "12.3.0",
+  "fonts": [
+    {
+      "key": "bold",
+      "sha256": "d72db21f9242aedd6b917d8549ad5921766b24d5f8d0becfda2ff4c620b3c2e0"
+    },
+    {
+      "key": "regular",
+      "sha256": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9"
+    },
+    {
+      "key": "cjk",
+      "sha256": "cf8cf2c882e1e344ac2e6207fe172657a30dc2c6e1ee65a9e29a7b582c4d4154"
+    },
+    {
+      "key": "zh",
+      "sha256": "ca1e9bf621f13ddc4800bfb74d0124571dfc25a1678a28d6e7dbcf39fad2504a"
+    }
+  ],
+  "scoring": {
+    "normalization": "Use unchanged shared normalizeOcrAnchor (NFKC, uppercase, Unicode letters/numbers). Full original source strings are anchors, not easy substrings.",
+    "positive": "Every full-source anchor must have exactly its declared occurrence count. No post-OCR correction or text substitution.",
+    "inventory": "Actual sourceText from all physical OCR lines must have no excess normalized character counts; this cannot substitute for anchor completeness.",
+    "paragraphs": "Each complete declared paragraphGroups sequence must equal a distinct complete actual normalized source paragraph. Wrong joins or splits fail separately from anchor detection.",
+    "negative": "Any actual physical OCR box intersecting a declared wordless region fails, even when all anchors are found. Whole wordless page must have zero actual text/lines.",
+    "standardPixels": "All protected opaque RGB points, source dimensions/attrs, original restoration and cache replay remain strict existing gates.",
+    "additionalRgba": "protectedRgbaProbes and protectedRgbaRegions carry full pre-OCR RGBA truth. A downstream suite must explicitly enforce them before claiming transparent hole/region preservation; legacy RGB-only probes are insufficient.",
+    "fairComparison": "Both candidate recognizers receive identical full PNG/source settings/cache. Keep all scene results and count failed anchors/groups/negatives. Do not tune images or select crops after OCR. No speed claim from this corpus."
+  },
+  "notes": [
+    "Eight original geometrically distinct color/alpha source diagnostics, 34 full-source anchors, one wordless scene.",
+    "Lossless source and original glyph RGBA are retained; antialiased text is source-over, not a replacement alpha write.",
+    "Only source geometry, glyph composition and truth constraints have been checked; no real OCR/translation/inpainting/browser claim.",
+    "The existing helper enforces full anchors/occurrences, excess source inventory, negative regions and exact independent paragraph groups. Additional RGBA region/probe assertions require an explicit downstream pixel oracle.",
+    "System-font files are exact-SHA local rendering dependencies and are not redistributed. No external artwork or implementation copied."
+  ],
+  "fixtures": [
+    {
+      "name": "harbor-same-red-channel-dialogue",
+      "file": "harbor-same-red-channel-dialogue.png",
+      "mime": "image/png",
+      "width": 1440,
+      "height": 1000,
+      "sourceLanguage": "en",
+      "scene": "Two speakers on opposite canal banks; nonendpoint R128 text and bubble fills, separate narration",
+      "imageMode": "RGBA",
+      "sha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+      "bytes": 55206,
+      "regions": [
+        {
+          "id": "left-a",
+          "text": "THE FERRY LEAVES AT DAWN.",
+          "anchor": "THE FERRY LEAVES AT DAWN.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 110,
+            "y0": 135,
+            "x1": 658,
+            "y1": 162
+          },
+          "vertical": false,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "paragraphId": "left",
+          "sourceStyle": {
+            "x": 110,
+            "y": 135,
+            "fontSize": 36,
+            "fontKey": "bold",
+            "fill": [
+              128,
+              28,
+              74,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/harbor-same-red-channel-dialogue.glyph-left-a.png",
+            "sha256": "87ffd21aedaaa37f9817b8fada6a1f91beed81c88eed9a383054113468a9a79f",
+            "rgbaSha256": "01e556fb30c6a6ce0ac92f1f85d615de1b8e9a7996ab21ac5628ba0a50a8e47b",
+            "alphaSha256": "67a83460d1c2b04d86706f945af2fc6a0bd80aa531f8250e6a99a0d0b7eebc76",
+            "width": 548,
+            "height": 27,
+            "placement": {
+              "x": 110,
+              "y": 135
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "left-b",
+          "text": "BRING THE BLUE MAP.",
+          "anchor": "BRING THE BLUE MAP.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 110,
+            "y0": 193,
+            "x1": 516,
+            "y1": 220
+          },
+          "vertical": false,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "paragraphId": "left",
+          "sourceStyle": {
+            "x": 110,
+            "y": 193,
+            "fontSize": 36,
+            "fontKey": "bold",
+            "fill": [
+              128,
+              28,
+              74,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/harbor-same-red-channel-dialogue.glyph-left-b.png",
+            "sha256": "5578a807172986cc82870716eaeb44e71b1e674186a2dad362576fd60e541507",
+            "rgbaSha256": "3925d9bb96dddb7cc10d717a6db1bbfb047e5150a9e1e045771b47ff6c3cdd41",
+            "alphaSha256": "64e4f92dc0f24ed8cbf64454944f19e55d597d4c0ecff0eb18fec06eba15fa18",
+            "width": 406,
+            "height": 27,
+            "placement": {
+              "x": 110,
+              "y": 193
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "right-a",
+          "text": "I WILL WAIT BY THE PIER.",
+          "anchor": "I WILL WAIT BY THE PIER.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 805,
+            "y0": 335,
+            "x1": 1236,
+            "y1": 360
+          },
+          "vertical": false,
+          "fontSize": 34,
+          "fontKey": "bold",
+          "paragraphId": "right",
+          "sourceStyle": {
+            "x": 805,
+            "y": 335,
+            "fontSize": 34,
+            "fontKey": "bold",
+            "fill": [
+              128,
+              239,
+              226,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/harbor-same-red-channel-dialogue.glyph-right-a.png",
+            "sha256": "051b9370680d284e41dfa69506ad642212f755d9f7e74080226e271f547d0e9c",
+            "rgbaSha256": "b268ed479b0edbb719dcc87a684a9cc4b3c63b71dc67f6290e5200fa07496701",
+            "alphaSha256": "e1762be7f0dea4af81abe4565a3aa8167f6768f8820b74bbfffa293d8c037def",
+            "width": 431,
+            "height": 25,
+            "placement": {
+              "x": 805,
+              "y": 335
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "right-b",
+          "text": "KEEP THE LANTERN LIT.",
+          "anchor": "KEEP THE LANTERN LIT.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 805,
+            "y0": 393,
+            "x1": 1217,
+            "y1": 418
+          },
+          "vertical": false,
+          "fontSize": 34,
+          "fontKey": "bold",
+          "paragraphId": "right",
+          "sourceStyle": {
+            "x": 805,
+            "y": 393,
+            "fontSize": 34,
+            "fontKey": "bold",
+            "fill": [
+              128,
+              239,
+              226,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/harbor-same-red-channel-dialogue.glyph-right-b.png",
+            "sha256": "eb6c4e7627f77ddd1b775678eb283c9911d3024130f44a99fef544ac8a396400",
+            "rgbaSha256": "6503c0fad4ac78ed49c0b3546c370754019650a506ef984d4dae00f45b8d9fd0",
+            "alphaSha256": "5d339aaef4cbd6113b21d5ecddba4ee2d81867e5f0fa539369c764efedf5f84f",
+            "width": 412,
+            "height": 25,
+            "placement": {
+              "x": 805,
+              "y": 393
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "narration",
+          "text": "A QUIET MORNING ON THE CANAL",
+          "anchor": "A QUIET MORNING ON THE CANAL",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 360,
+            "y0": 856,
+            "x1": 871,
+            "y1": 880
+          },
+          "vertical": false,
+          "fontSize": 30,
+          "fontKey": "bold",
+          "paragraphId": "caption",
+          "sourceStyle": {
+            "x": 360,
+            "y": 856,
+            "fontSize": 30,
+            "fontKey": "bold",
+            "fill": [
+              44,
+              45,
+              50,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/harbor-same-red-channel-dialogue.glyph-narration.png",
+            "sha256": "954bed0c2f2d6336f8f37d5e0cc5a10cb4608716a5cffe69155d16343cdc0aa8",
+            "rgbaSha256": "54c04c5d5129504c7dc2299f3ae668feb7d6be77e8ded673a067184495cf2d6d",
+            "alphaSha256": "238d8ad225a1e8138b3d5102d4b5a8ae61ac01fbbf76f308991c45f6dabe3d6f",
+            "width": 511,
+            "height": 24,
+            "placement": {
+              "x": 360,
+              "y": 856
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "THE FERRY LEAVES AT DAWN.",
+        "BRING THE BLUE MAP.",
+        "I WILL WAIT BY THE PIER.",
+        "KEEP THE LANTERN LIT.",
+        "A QUIET MORNING ON THE CANAL"
+      ],
+      "expectedAnchors": [
+        "THE FERRY LEAVES AT DAWN.",
+        "BRING THE BLUE MAP.",
+        "I WILL WAIT BY THE PIER.",
+        "KEEP THE LANTERN LIT.",
+        "A QUIET MORNING ON THE CANAL"
+      ],
+      "anchorOccurrences": {
+        "THE FERRY LEAVES AT DAWN.": 1,
+        "BRING THE BLUE MAP.": 1,
+        "I WILL WAIT BY THE PIER.": 1,
+        "KEEP THE LANTERN LIT.": 1,
+        "A QUIET MORNING ON THE CANAL": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 75,
+            "y0": 600,
+            "x1": 440,
+            "y1": 795
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 1000,
+            "y0": 650,
+            "x1": 1360,
+            "y1": 825
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 210,
+          "y": 706,
+          "rgb": [
+            191,
+            122,
+            93
+          ]
+        },
+        {
+          "x": 1180,
+          "y": 738,
+          "rgb": [
+            57,
+            59,
+            66
+          ]
+        },
+        {
+          "x": 30,
+          "y": 30,
+          "rgb": [
+            245,
+            226,
+            192
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/harbor-same-red-channel-dialogue.background.png",
+        "backgroundPngSha256": "69e3601cc036505f3f1fe2801feb473a0836d14e1afec8ac0e205bedf727b123",
+        "backgroundRgbaSha256": "ad6959a1c0e18f0aae6cb0ba72a9c788f637e2f466e6142ae7e47b8953a5bb11",
+        "sourceRgbaFile": "truth/harbor-same-red-channel-dialogue.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "33c15e8b2e2d7a6a587a86d9ae961087777fc4483d8a71c8e16c443d0a5034db",
+        "sourceRgbaSha256": "e533d0cb9d3d49be845b091edbaed81e344496e3a424cedcc4dcfec62ac3e3ee",
+        "sourceRgbaBytes": 5760000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "left-a",
+          "left-b"
+        ],
+        [
+          "right-a",
+          "right-b"
+        ],
+        [
+          "narration"
+        ]
+      ],
+      "colorRelations": [
+        {
+          "textIds": [
+            "left-a",
+            "left-b"
+          ],
+          "textRgba": [
+            128,
+            28,
+            74,
+            255
+          ],
+          "panelRgba": [
+            128,
+            218,
+            183,
+            255
+          ]
+        },
+        {
+          "textIds": [
+            "right-a",
+            "right-b"
+          ],
+          "textRgba": [
+            128,
+            239,
+            226,
+            255
+          ],
+          "panelRgba": [
+            128,
+            46,
+            93,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prism-platform-gradient-signs",
+      "file": "prism-platform-gradient-signs.png",
+      "mime": "image/png",
+      "width": 1600,
+      "height": 900,
+      "sourceLanguage": "en",
+      "scene": "Wide rail station with diagonal colored gradient sign, inverse night plaque and small detached route tag",
+      "imageMode": "RGBA",
+      "sha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+      "bytes": 70289,
+      "regions": [
+        {
+          "id": "main-a",
+          "text": "FOLLOW THE EASTERN TRACK",
+          "anchor": "FOLLOW THE EASTERN TRACK",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 181,
+            "y0": 130,
+            "x1": 1001,
+            "y1": 169
+          },
+          "vertical": false,
+          "fontSize": 53,
+          "fontKey": "bold",
+          "paragraphId": "main",
+          "sourceStyle": {
+            "x": 180,
+            "y": 130,
+            "fontSize": 53,
+            "fontKey": "bold",
+            "fill": [
+              245,
+              245,
+              250,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/prism-platform-gradient-signs.glyph-main-a.png",
+            "sha256": "579deaa5547b3d42d7f3a2c117348847b4ef90c49c99671b2e5fba76335c2299",
+            "rgbaSha256": "92524a2a4620b73546e5b30a8f51c77748a6240561445fe3d1ea7d840af48e09",
+            "alphaSha256": "493f407c673ac4c55594484e12a03b1f918f136e7ea0f26dadc7ac2163037b0f",
+            "width": 821,
+            "height": 39,
+            "placement": {
+              "x": 180,
+              "y": 130
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "main-b",
+          "text": "THE NEXT TRAIN IS ALMOST HERE",
+          "anchor": "THE NEXT TRAIN IS ALMOST HERE",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 180,
+            "y0": 205,
+            "x1": 896,
+            "y1": 236
+          },
+          "vertical": false,
+          "fontSize": 42,
+          "fontKey": "bold",
+          "paragraphId": "main",
+          "sourceStyle": {
+            "x": 180,
+            "y": 205,
+            "fontSize": 42,
+            "fontKey": "bold",
+            "fill": [
+              18,
+              26,
+              45,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/prism-platform-gradient-signs.glyph-main-b.png",
+            "sha256": "e7a68a9013c1032f38d311e92f501b3ee8c2f8bf1cde1c832106feddbd6665cd",
+            "rgbaSha256": "94fd7da78fe3607fbce96c10e0fa785bcd1e36ada83563dd4a9ef7e4fd6f44a2",
+            "alphaSha256": "7e14e1206669ba67b09021ef0e4d3d30dd1b0037d73e94bf9c8ba1725f25f749",
+            "width": 716,
+            "height": 31,
+            "placement": {
+              "x": 180,
+              "y": 205
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "night",
+          "text": "PLATFORM NINE IS OPEN",
+          "anchor": "PLATFORM NINE IS OPEN",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 830,
+            "y0": 480,
+            "x1": 1307,
+            "y1": 509
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "bold",
+          "paragraphId": "night",
+          "sourceStyle": {
+            "x": 830,
+            "y": 480,
+            "fontSize": 38,
+            "fontKey": "bold",
+            "fill": [
+              248,
+              215,
+              80,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/prism-platform-gradient-signs.glyph-night.png",
+            "sha256": "bc14e5b828a548ecb7e23523f31867e073cf5cfb5b5ce0a9b333b6d898429391",
+            "rgbaSha256": "4f58a28b41efd3abd6d52e3f56e479145c1dc30360ebbc8debe7e94862f6cfa5",
+            "alphaSha256": "e66cc4e6671aa876a90f518527126d5d6fc2efa39d1a4029541fef1d5436ad56",
+            "width": 477,
+            "height": 29,
+            "placement": {
+              "x": 830,
+              "y": 480
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "route",
+          "text": "ROUTE C4",
+          "anchor": "ROUTE C4",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 116,
+            "y0": 493,
+            "x1": 242,
+            "y1": 512
+          },
+          "vertical": false,
+          "fontSize": 25,
+          "fontKey": "bold",
+          "paragraphId": "route",
+          "sourceStyle": {
+            "x": 115,
+            "y": 493,
+            "fontSize": 25,
+            "fontKey": "bold",
+            "fill": [
+              60,
+              36,
+              85,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/prism-platform-gradient-signs.glyph-route.png",
+            "sha256": "6081c74c087bbee0c6c85fac15daa3538456b423d1a91d0798ab567c07e15feb",
+            "rgbaSha256": "2b28f4e897b223eccd6820cd313971d1ae6ea7a61dca2f0db4e981fce5ef461e",
+            "alphaSha256": "04ac032c6b4a8058f9e934dbabe1e5bf597ef6f7779c7f5bebea39943907c0d0",
+            "width": 127,
+            "height": 19,
+            "placement": {
+              "x": 115,
+              "y": 493
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "FOLLOW THE EASTERN TRACK",
+        "THE NEXT TRAIN IS ALMOST HERE",
+        "PLATFORM NINE IS OPEN",
+        "ROUTE C4"
+      ],
+      "expectedAnchors": [
+        "FOLLOW THE EASTERN TRACK",
+        "THE NEXT TRAIN IS ALMOST HERE",
+        "PLATFORM NINE IS OPEN",
+        "ROUTE C4"
+      ],
+      "anchorOccurrences": {
+        "FOLLOW THE EASTERN TRACK": 1,
+        "THE NEXT TRAIN IS ALMOST HERE": 1,
+        "PLATFORM NINE IS OPEN": 1,
+        "ROUTE C4": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 50,
+            "y0": 600,
+            "x1": 600,
+            "y1": 850
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 950,
+            "y0": 660,
+            "x1": 1540,
+            "y1": 855
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 120,
+          "y": 790,
+          "rgb": [
+            73,
+            110,
+            141
+          ]
+        },
+        {
+          "x": 1450,
+          "y": 730,
+          "rgb": [
+            119,
+            99,
+            155
+          ]
+        },
+        {
+          "x": 20,
+          "y": 20,
+          "rgb": [
+            164,
+            211,
+            228
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/prism-platform-gradient-signs.background.png",
+        "backgroundPngSha256": "31897694b732e30f1882df127eb82168dc096ddcc0698bd14ad7a651f3708b24",
+        "backgroundRgbaSha256": "c30d53fe4b6aaba98a51e0587dc7f6c7e0408d1c462e27966cdc66c1827b37c0",
+        "sourceRgbaFile": "truth/prism-platform-gradient-signs.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "66b053b4740ca00b1befea76132155bb23bf02bfcd49cbce7af4711966a1ac46",
+        "sourceRgbaSha256": "b71724e9b05741737cd511f1a458124c887af822b5fa174b52e6ab680d023d6b",
+        "sourceRgbaBytes": 5760000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "main-a",
+          "main-b"
+        ],
+        [
+          "night"
+        ],
+        [
+          "route"
+        ]
+      ]
+    },
+    {
+      "name": "rain-garden-vertical-ruby-sidebar",
+      "file": "rain-garden-vertical-ruby-sidebar.png",
+      "mime": "image/png",
+      "width": 1100,
+      "height": 1500,
+      "sourceLanguage": "auto",
+      "scene": "Tall garden comic with right-to-left vertical Japanese main columns, narrow ruby, and separate Chinese two-line narration",
+      "imageMode": "RGBA",
+      "sha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+      "bytes": 82935,
+      "regions": [
+        {
+          "id": "ja-right",
+          "text": "風の音を聞いて",
+          "anchor": "風の音を聞いて",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 832,
+            "y0": 150,
+            "x1": 876,
+            "y1": 450
+          },
+          "vertical": true,
+          "fontSize": 44,
+          "fontKey": "cjk",
+          "paragraphId": "ja",
+          "sourceStyle": {
+            "x": 832,
+            "y": 150,
+            "fontSize": 44,
+            "fontKey": "cjk",
+            "fill": [
+              137,
+              40,
+              90,
+              255
+            ],
+            "supersample": 2,
+            "vertical": true
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-ja-right.png",
+            "sha256": "4e6fb0db0059be94df94614987e5fb8f7b62460417163283a945564cd0c15e13",
+            "rgbaSha256": "b13a048cccffb5d4f6bc320110eeefeada0ae3e41753c2db435dd41c981db867",
+            "alphaSha256": "f197a4ee791a3dba8f1587c1966c67356a5a9e339495ce48fa2acf224729645d",
+            "width": 44,
+            "height": 306,
+            "placement": {
+              "x": 832,
+              "y": 150
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ja-left",
+          "text": "小道で待っている",
+          "anchor": "小道で待っている",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 720,
+            "y0": 150,
+            "x1": 764,
+            "y1": 497
+          },
+          "vertical": true,
+          "fontSize": 44,
+          "fontKey": "cjk",
+          "paragraphId": "ja",
+          "sourceStyle": {
+            "x": 720,
+            "y": 150,
+            "fontSize": 44,
+            "fontKey": "cjk",
+            "fill": [
+              137,
+              40,
+              90,
+              255
+            ],
+            "supersample": 2,
+            "vertical": true
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-ja-left.png",
+            "sha256": "a2a81b9f152b2ed8ea4b7e72d5148c6b45fb3c75e3e9509ab9b92866b385fd80",
+            "rgbaSha256": "c4534191d7f40d79171c389a9a57e911ae375efd37b969013b66558d26394a67",
+            "alphaSha256": "e5ef4f22da8adcbd6e440ad9dc1dd1ab998d683c8064b04ef88f86505e42c493",
+            "width": 44,
+            "height": 350,
+            "placement": {
+              "x": 720,
+              "y": 150
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ruby-right",
+          "text": "かぜ",
+          "anchor": "かぜ",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 890,
+            "y0": 154,
+            "x1": 908,
+            "y1": 189
+          },
+          "vertical": true,
+          "fontSize": 18,
+          "fontKey": "cjk",
+          "paragraphId": "ruby1",
+          "sourceStyle": {
+            "x": 890,
+            "y": 154,
+            "fontSize": 18,
+            "fontKey": "cjk",
+            "fill": [
+              55,
+              75,
+              85,
+              255
+            ],
+            "supersample": 2,
+            "vertical": true
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-ruby-right.png",
+            "sha256": "f1cff73371b71c9ec112a8ec43972e71d991b47719f06bfc452891aa47e765e2",
+            "rgbaSha256": "f150e1dca61b1442a65562be23516e1cd22941ea43ba95a4e78471651fbe44f3",
+            "alphaSha256": "27839ccf1825449bc4ed5ecf73a80d307253bbace4eef744d043c4bff3c2799e",
+            "width": 18,
+            "height": 35,
+            "placement": {
+              "x": 890,
+              "y": 154
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ruby-left",
+          "text": "こみち",
+          "anchor": "こみち",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 778,
+            "y0": 154,
+            "x1": 796,
+            "y1": 206
+          },
+          "vertical": true,
+          "fontSize": 18,
+          "fontKey": "cjk",
+          "paragraphId": "ruby2",
+          "sourceStyle": {
+            "x": 778,
+            "y": 154,
+            "fontSize": 18,
+            "fontKey": "cjk",
+            "fill": [
+              55,
+              75,
+              85,
+              255
+            ],
+            "supersample": 2,
+            "vertical": true
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-ruby-left.png",
+            "sha256": "0a1c60bbf4f2906593a1ff895ae305eafcbc82f63b95b108d80c066e195e1d3e",
+            "rgbaSha256": "af1bd18255f66ae67e56ea8744cacf6ffe829db72e06628678001225fc0e3237",
+            "alphaSha256": "d431835534352fd9c11ed7471fb712a1cfa601e070ed3a05b7332fd793bc9f3b",
+            "width": 18,
+            "height": 52,
+            "placement": {
+              "x": 778,
+              "y": 154
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "zh-a",
+          "text": "沿着花园的小路慢慢走。",
+          "anchor": "沿着花园的小路慢慢走。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 100,
+            "y0": 1015,
+            "x1": 497,
+            "y1": 1051
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "zh",
+          "paragraphId": "zh",
+          "sourceStyle": {
+            "x": 100,
+            "y": 1015,
+            "fontSize": 38,
+            "fontKey": "zh",
+            "fill": [
+              48,
+              73,
+              92,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-zh-a.png",
+            "sha256": "7ea2f212df012c0b7691ccbb64967e4c0f73b39aed32baec1ef4dd858cd0562d",
+            "rgbaSha256": "e2e942faef94026aa9f038bfa9a05abe067ab9adb2580a591202579a81151ec2",
+            "alphaSha256": "945d2cb79b035b13b62325c750799d751e55cefa110fdbc0b64a4f8607c1c6cc",
+            "width": 418,
+            "height": 36,
+            "placement": {
+              "x": 100,
+              "y": 1015
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "zh-b",
+          "text": "雨停以后，我们在桥边见。",
+          "anchor": "雨停以后，我们在桥边见。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 101,
+            "y0": 1082,
+            "x1": 535,
+            "y1": 1120
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "zh",
+          "paragraphId": "zh",
+          "sourceStyle": {
+            "x": 100,
+            "y": 1082,
+            "fontSize": 38,
+            "fontKey": "zh",
+            "fill": [
+              48,
+              73,
+              92,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/rain-garden-vertical-ruby-sidebar.glyph-zh-b.png",
+            "sha256": "9250faff35659319f1f446a560c3f1c6bb636958c91a32adb6585443f746bcb5",
+            "rgbaSha256": "1e1bca385c81e42243fccb62e6ece58cdd7361c2c66dc9ba10233083cac75edf",
+            "alphaSha256": "c830fc2581a16611230515c0cc574ebced6d9345974452916e15c9fe0c4fded8",
+            "width": 456,
+            "height": 38,
+            "placement": {
+              "x": 100,
+              "y": 1082
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "風の音を聞いて",
+        "小道で待っている",
+        "かぜ",
+        "こみち",
+        "沿着花园的小路慢慢走。",
+        "雨停以后，我们在桥边见。"
+      ],
+      "expectedAnchors": [
+        "風の音を聞いて",
+        "小道で待っている",
+        "かぜ",
+        "こみち",
+        "沿着花园的小路慢慢走。",
+        "雨停以后，我们在桥边见。"
+      ],
+      "anchorOccurrences": {
+        "風の音を聞いて": 1,
+        "小道で待っている": 1,
+        "かぜ": 1,
+        "こみち": 1,
+        "沿着花园的小路慢慢走。": 1,
+        "雨停以后，我们在桥边见。": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 90,
+            "y0": 180,
+            "x1": 520,
+            "y1": 650
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 90,
+            "y0": 1210,
+            "x1": 960,
+            "y1": 1430
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 290,
+          "y": 440,
+          "rgb": [
+            213,
+            230,
+            230
+          ]
+        },
+        {
+          "x": 500,
+          "y": 1340,
+          "rgb": [
+            108,
+            143,
+            122
+          ]
+        },
+        {
+          "x": 25,
+          "y": 25,
+          "rgb": [
+            223,
+            237,
+            238
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/rain-garden-vertical-ruby-sidebar.background.png",
+        "backgroundPngSha256": "6972067e2c346e2cd77a18b74dbc27b3dfa2a288b0e645d244aeaad1007b4bb0",
+        "backgroundRgbaSha256": "b1d3dc0497cfdb4478f43e6e1336df45b74a2c5c1ab4d8786ce29b345ee19df0",
+        "sourceRgbaFile": "truth/rain-garden-vertical-ruby-sidebar.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "895bb340eeb1fecb975aa088ed83d77343a83663e25d4bd4007c7e4044eadd67",
+        "sourceRgbaSha256": "90892c107cbd9d107b8db09672b70924a9195f14dce20ba81b4c5c0a06a16d84",
+        "sourceRgbaBytes": 6600000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "ja-right",
+          "ja-left"
+        ],
+        [
+          "ruby-right"
+        ],
+        [
+          "ruby-left"
+        ],
+        [
+          "zh-a",
+          "zh-b"
+        ]
+      ],
+      "colorRelations": [
+        {
+          "textIds": [
+            "ja-right",
+            "ja-left"
+          ],
+          "textRgba": [
+            137,
+            40,
+            90,
+            255
+          ],
+          "panelRgba": [
+            137,
+            224,
+            196,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "name": "chess-picnic-neighbor-inverse-bubbles",
+      "file": "chess-picnic-neighbor-inverse-bubbles.png",
+      "mime": "image/png",
+      "width": 1280,
+      "height": 1000,
+      "sourceLanguage": "en",
+      "scene": "Closely neighboring independently outlined black/white speech bubbles, left-to-right picnic composition and checkerboard art",
+      "imageMode": "RGBA",
+      "sha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+      "bytes": 47530,
+      "regions": [
+        {
+          "id": "white-a",
+          "text": "YOUR MOVE WAS CLEVER.",
+          "anchor": "YOUR MOVE WAS CLEVER.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 110,
+            "y0": 158,
+            "x1": 577,
+            "y1": 184
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "white",
+          "sourceStyle": {
+            "x": 110,
+            "y": 158,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              20,
+              20,
+              20,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/chess-picnic-neighbor-inverse-bubbles.glyph-white-a.png",
+            "sha256": "02f0dca66d99b266dd743c2a4d94a0b988f2835cca27703386a9aecfd0f74701",
+            "rgbaSha256": "48fc058cf33ec09f5606ace2b07300fb00846740ad99ba2e20f7e2e3d9e84ab3",
+            "alphaSha256": "e4839006bed852ca60182d19d7f085c8b958fb26c2b6eb01d9a25fd6c8e43a9a",
+            "width": 468,
+            "height": 26,
+            "placement": {
+              "x": 110,
+              "y": 158
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "white-b",
+          "text": "LET US TRY ONCE MORE.",
+          "anchor": "LET US TRY ONCE MORE.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 110,
+            "y0": 215,
+            "x1": 549,
+            "y1": 241
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "white",
+          "sourceStyle": {
+            "x": 110,
+            "y": 215,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              20,
+              20,
+              20,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/chess-picnic-neighbor-inverse-bubbles.glyph-white-b.png",
+            "sha256": "e2b512f2cb9715e787d9480192b5f4af84392a328f96a3b80aad4c6dd604537e",
+            "rgbaSha256": "b4e8f148e3b35eca8dc966a3874c43831392bb5099f0e58688b1d95157f8c400",
+            "alphaSha256": "616f56fa92f6c84b673e0aae9edc5d8cde2003d6905648d386ae6fbe74c9401e",
+            "width": 440,
+            "height": 26,
+            "placement": {
+              "x": 110,
+              "y": 215
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "black-a",
+          "text": "THE BOARD IS READY.",
+          "anchor": "THE BOARD IS READY.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 735,
+            "y0": 158,
+            "x1": 1128,
+            "y1": 184
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "black",
+          "sourceStyle": {
+            "x": 735,
+            "y": 158,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              239,
+              239,
+              239,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/chess-picnic-neighbor-inverse-bubbles.glyph-black-a.png",
+            "sha256": "e020c49da8c82af46cec0e4c6dec45a57ef6520bbf47c7efe5ca6524991d9f2b",
+            "rgbaSha256": "7c0f4b44adcd076a18f61f3c8d855dd6b0244a8e5adc37c90352188915239253",
+            "alphaSha256": "77a59b7d5c78bb86ae76c4e845bb60dda4773c0494c181e3e83db3291f39ed12",
+            "width": 394,
+            "height": 26,
+            "placement": {
+              "x": 735,
+              "y": 158
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "black-b",
+          "text": "I SAVED YOU A SEAT.",
+          "anchor": "I SAVED YOU A SEAT.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 735,
+            "y0": 215,
+            "x1": 1108,
+            "y1": 241
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "black",
+          "sourceStyle": {
+            "x": 735,
+            "y": 215,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              239,
+              239,
+              239,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/chess-picnic-neighbor-inverse-bubbles.glyph-black-b.png",
+            "sha256": "35c05457ca718b7bd2724856e1d0b424943607b8395fd138ca76bc35b68e0881",
+            "rgbaSha256": "8c1ca17a530f26904a36a9d05024f5942b81468e16776e267e51599e5a27bd85",
+            "alphaSha256": "7e2cc41b896ecf5ee3409271339719a7df9653738bd0248bda85d9e84e65ac06",
+            "width": 374,
+            "height": 26,
+            "placement": {
+              "x": 735,
+              "y": 215
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "YOUR MOVE WAS CLEVER.",
+        "LET US TRY ONCE MORE.",
+        "THE BOARD IS READY.",
+        "I SAVED YOU A SEAT."
+      ],
+      "expectedAnchors": [
+        "YOUR MOVE WAS CLEVER.",
+        "LET US TRY ONCE MORE.",
+        "THE BOARD IS READY.",
+        "I SAVED YOU A SEAT."
+      ],
+      "anchorOccurrences": {
+        "YOUR MOVE WAS CLEVER.": 1,
+        "LET US TRY ONCE MORE.": 1,
+        "THE BOARD IS READY.": 1,
+        "I SAVED YOU A SEAT.": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 130,
+            "y0": 550,
+            "x1": 600,
+            "y1": 900
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 790,
+            "y0": 570,
+            "x1": 1140,
+            "y1": 900
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 188,
+          "y": 628,
+          "rgb": [
+            239,
+            222,
+            180
+          ]
+        },
+        {
+          "x": 938,
+          "y": 736,
+          "rgb": [
+            240,
+            216,
+            165
+          ]
+        },
+        {
+          "x": 20,
+          "y": 20,
+          "rgb": [
+            218,
+            224,
+            197
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/chess-picnic-neighbor-inverse-bubbles.background.png",
+        "backgroundPngSha256": "6eda320e653caea04eb3f79711035e21c22198c8dcaf609c74a485e72c7cea29",
+        "backgroundRgbaSha256": "2047e3fd97b004460f98ad1dfbe29a7b8e383886864e47f77ade1c6cc1a3dff7",
+        "sourceRgbaFile": "truth/chess-picnic-neighbor-inverse-bubbles.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "e67fcec35910727cb901c2ea4cf9611acacfb9ab43c077725014a51049b55142",
+        "sourceRgbaSha256": "ea66a32161ad24cc883d3eb65d6b1c3aabf2d703c2087e73205ad3c3aec7063e",
+        "sourceRgbaBytes": 5120000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "white-a",
+          "white-b"
+        ],
+        [
+          "black-a",
+          "black-b"
+        ]
+      ]
+    },
+    {
+      "name": "lantern-market-oblique-bilingual-captions",
+      "file": "lantern-market-oblique-bilingual-captions.png",
+      "mime": "image/png",
+      "width": 1400,
+      "height": 1050,
+      "sourceLanguage": "auto",
+      "scene": "Oblique Chinese and Japanese caption slips, tiny ticket, separate upright dialogue over lantern-stall drawing",
+      "imageMode": "RGBA",
+      "sha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+      "bytes": 102240,
+      "regions": [
+        {
+          "id": "zh-caption",
+          "text": "等天晴以后再出发。",
+          "anchor": "等天晴以后再出发。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 107,
+            "y0": 93,
+            "x1": 472,
+            "y1": 179
+          },
+          "vertical": false,
+          "fontSize": 43,
+          "fontKey": "zh",
+          "paragraphId": "zh",
+          "sourceStyle": {
+            "x": 105,
+            "y": 85,
+            "fontSize": 43,
+            "fontKey": "zh",
+            "fill": [
+              102,
+              25,
+              67,
+              255
+            ],
+            "supersample": 2,
+            "rotation": 8,
+            "strokeWidth": 1,
+            "strokeFill": [
+              245,
+              220,
+              165,
+              255
+            ]
+          },
+          "glyphTruth": {
+            "file": "truth/lantern-market-oblique-bilingual-captions.glyph-zh-caption.png",
+            "sha256": "80f23289fa20226928e1dd802ebf3ff4dc76ae4b1e30cca78d70ef31a513427d",
+            "rgbaSha256": "38a08fec685ecbe60390174ed45ccaf11486cbd5e53e6dfc382c8b0bb13e62a3",
+            "alphaSha256": "7dc57df9850c70588662f37e5762f8952237d9bd98ab04939755f223942e5d09",
+            "width": 393,
+            "height": 97,
+            "placement": {
+              "x": 105,
+              "y": 85
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ja-caption",
+          "text": "雨あがりの市場へ",
+          "anchor": "雨あがりの市場へ",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 781,
+            "y0": 186,
+            "x1": 1090,
+            "y1": 280
+          },
+          "vertical": false,
+          "fontSize": 39,
+          "fontKey": "cjk",
+          "paragraphId": "ja",
+          "sourceStyle": {
+            "x": 780,
+            "y": 185,
+            "fontSize": 39,
+            "fontKey": "cjk",
+            "fill": [
+              65,
+              24,
+              113,
+              255
+            ],
+            "supersample": 2,
+            "rotation": -11,
+            "strokeWidth": 1,
+            "strokeFill": [
+              246,
+              229,
+              179,
+              255
+            ]
+          },
+          "glyphTruth": {
+            "file": "truth/lantern-market-oblique-bilingual-captions.glyph-ja-caption.png",
+            "sha256": "167b81e986954cf149da5581fb19642ba2d590f617512afd95f0dfc61e415179",
+            "rgbaSha256": "2c09d8f8965dbcd8df0c3c60228332a4c571ff70110c74e0c53248bd5e733d42",
+            "alphaSha256": "57d04ec8ec6a555b99ece8716da8a39bb82b9edf1993a88bb1dcd2b9b31dee12",
+            "width": 316,
+            "height": 100,
+            "placement": {
+              "x": 780,
+              "y": 185
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "dialogue-a",
+          "text": "THE LANTERNS ARE STILL WARM.",
+          "anchor": "THE LANTERNS ARE STILL WARM.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 145,
+            "y0": 715,
+            "x1": 739,
+            "y1": 741
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "dialogue",
+          "sourceStyle": {
+            "x": 145,
+            "y": 715,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              71,
+              41,
+              60,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/lantern-market-oblique-bilingual-captions.glyph-dialogue-a.png",
+            "sha256": "2bbb7439af6ac500655338d0c22e6d000530f6348dd01c86a0eddfac2f877ba1",
+            "rgbaSha256": "dcc616ecff7603e1159a728c61a1464ca9303cfbf13df2b342f8fa24029f0b7f",
+            "alphaSha256": "6b7c41ddbdaf168bb4b781940b41b7ba41b369ee6b00ba24e7adc46b34d2f4ee",
+            "width": 595,
+            "height": 26,
+            "placement": {
+              "x": 145,
+              "y": 715
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "dialogue-b",
+          "text": "LET US WALK HOME TOGETHER.",
+          "anchor": "LET US WALK HOME TOGETHER.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 145,
+            "y0": 772,
+            "x1": 713,
+            "y1": 798
+          },
+          "vertical": false,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "paragraphId": "dialogue",
+          "sourceStyle": {
+            "x": 145,
+            "y": 772,
+            "fontSize": 35,
+            "fontKey": "bold",
+            "fill": [
+              71,
+              41,
+              60,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/lantern-market-oblique-bilingual-captions.glyph-dialogue-b.png",
+            "sha256": "a40e7988591089d50ba4db361ed920acd74ae2cacbab592ee8e04b12479590d2",
+            "rgbaSha256": "b3df04ad82d374260a802c2d5e79097ac5f2caf956060752d740ca04f73de9a1",
+            "alphaSha256": "7740acfd5b9c0ac3d2ea75a039fc1064556b07a36da4f43b1fa55494e5b4a07c",
+            "width": 569,
+            "height": 26,
+            "placement": {
+              "x": 145,
+              "y": 772
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ticket",
+          "text": "ADMIT ONE 18:30",
+          "anchor": "ADMIT ONE 18:30",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 1011,
+            "y0": 868,
+            "x1": 1178,
+            "y1": 895
+          },
+          "vertical": false,
+          "fontSize": 20,
+          "fontKey": "regular",
+          "paragraphId": "ticket",
+          "sourceStyle": {
+            "x": 1010,
+            "y": 868,
+            "fontSize": 20,
+            "fontKey": "regular",
+            "fill": [
+              88,
+              70,
+              110,
+              255
+            ],
+            "supersample": 2,
+            "rotation": -4
+          },
+          "glyphTruth": {
+            "file": "truth/lantern-market-oblique-bilingual-captions.glyph-ticket.png",
+            "sha256": "036e00e9aadd1ca4381b2032a9b4e57ede78f01c14db58f148544ebb588fd094",
+            "rgbaSha256": "834de9687efed88ab457c4b578f40494a05ffe1d18d455d6d4b731751010fdd4",
+            "alphaSha256": "ed905f29a5f49b33379c72cc744ffa130aa22edf93aaef319804798fca7030e4",
+            "width": 169,
+            "height": 27,
+            "placement": {
+              "x": 1010,
+              "y": 868
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "等天晴以后再出发。",
+        "雨あがりの市場へ",
+        "THE LANTERNS ARE STILL WARM.",
+        "LET US WALK HOME TOGETHER.",
+        "ADMIT ONE 18:30"
+      ],
+      "expectedAnchors": [
+        "等天晴以后再出发。",
+        "雨あがりの市場へ",
+        "THE LANTERNS ARE STILL WARM.",
+        "LET US WALK HOME TOGETHER.",
+        "ADMIT ONE 18:30"
+      ],
+      "anchorOccurrences": {
+        "等天晴以后再出发。": 1,
+        "雨あがりの市場へ": 1,
+        "THE LANTERNS ARE STILL WARM.": 1,
+        "LET US WALK HOME TOGETHER.": 1,
+        "ADMIT ONE 18:30": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 80,
+            "y0": 380,
+            "x1": 600,
+            "y1": 620
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 960,
+            "y0": 430,
+            "x1": 1340,
+            "y1": 690
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 210,
+          "y": 490,
+          "rgb": [
+            226,
+            116,
+            107
+          ]
+        },
+        {
+          "x": 1180,
+          "y": 550,
+          "rgb": [
+            226,
+            116,
+            107
+          ]
+        },
+        {
+          "x": 20,
+          "y": 20,
+          "rgb": [
+            67,
+            86,
+            121
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/lantern-market-oblique-bilingual-captions.background.png",
+        "backgroundPngSha256": "b0fd74d45f5e5436ac46efad630802b2b1f6ef8ec2c57972ba97b1732c3f615a",
+        "backgroundRgbaSha256": "53e5f11c21a4f489a841052c14527ae8c65348d7727773faaca578b799baea59",
+        "sourceRgbaFile": "truth/lantern-market-oblique-bilingual-captions.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "edb813df1ed30e91b442f0f5ef21d99d2d7bc74be073dbf811d5a02f941a3ae4",
+        "sourceRgbaSha256": "ee412ed916f1c136a583b35f8116c479a34993ceb560dc260eb93c531a780717",
+        "sourceRgbaBytes": 5880000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "zh-caption"
+        ],
+        [
+          "ja-caption"
+        ],
+        [
+          "dialogue-a",
+          "dialogue-b"
+        ],
+        [
+          "ticket"
+        ]
+      ]
+    },
+    {
+      "name": "watercolor-ferry-translucent-notification",
+      "file": "watercolor-ferry-translucent-notification.png",
+      "mime": "image/png",
+      "width": 1200,
+      "height": 1000,
+      "sourceLanguage": "en",
+      "scene": "RGBA watercolor river postcard, translucent notification card across mottled wash, independent footer and opaque boat accents",
+      "imageMode": "RGBA",
+      "sha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+      "bytes": 108966,
+      "regions": [
+        {
+          "id": "notice-a",
+          "text": "THE RIVER IS CLEAR TODAY.",
+          "anchor": "THE RIVER IS CLEAR TODAY.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 175,
+            "y0": 210,
+            "x1": 720,
+            "y1": 239
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "bold",
+          "paragraphId": "notice",
+          "sourceStyle": {
+            "x": 175,
+            "y": 210,
+            "fontSize": 38,
+            "fontKey": "bold",
+            "fill": [
+              65,
+              38,
+              110,
+              212
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/watercolor-ferry-translucent-notification.glyph-notice-a.png",
+            "sha256": "3ed38087d6d10b6acf5f98e7a465354c70375c52816a60e2859e821958c98482",
+            "rgbaSha256": "3c8627b5c454ca8e30e966c94728f7bf7dd398da190d535bc627b59eb4c36d12",
+            "alphaSha256": "b79dda11b330156c3071452568be729e36c20fcebec0bfe20afb6c80475d4fce",
+            "width": 545,
+            "height": 29,
+            "placement": {
+              "x": 175,
+              "y": 210
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "notice-b",
+          "text": "PLEASE STEP ABOARD QUIETLY.",
+          "anchor": "PLEASE STEP ABOARD QUIETLY.",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 175,
+            "y0": 274,
+            "x1": 767,
+            "y1": 303
+          },
+          "vertical": false,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "paragraphId": "notice",
+          "sourceStyle": {
+            "x": 175,
+            "y": 274,
+            "fontSize": 36,
+            "fontKey": "bold",
+            "fill": [
+              65,
+              38,
+              110,
+              212
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/watercolor-ferry-translucent-notification.glyph-notice-b.png",
+            "sha256": "e6813868ed959dfb5a389f73fe339694eab44073da97dc18fb59f3bc655cb36e",
+            "rgbaSha256": "c84af6e3bbd1d5157183c2eea88a5576f9760c8beeabc4597a6aea7b68679544",
+            "alphaSha256": "6c1728cb3b3c206e87c91f6b26fa9f9c8cfe1c236018d9c85afaeee40437e20e",
+            "width": 592,
+            "height": 29,
+            "placement": {
+              "x": 175,
+              "y": 274
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "aside",
+          "text": "A SOFT BREEZE FROM THE WEST",
+          "anchor": "A SOFT BREEZE FROM THE WEST",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 155,
+            "y0": 515,
+            "x1": 654,
+            "y1": 538
+          },
+          "vertical": false,
+          "fontSize": 30,
+          "fontKey": "regular",
+          "paragraphId": "aside",
+          "sourceStyle": {
+            "x": 155,
+            "y": 515,
+            "fontSize": 30,
+            "fontKey": "regular",
+            "fill": [
+              44,
+              86,
+              112,
+              190
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/watercolor-ferry-translucent-notification.glyph-aside.png",
+            "sha256": "d9b19ce08730c31b0fc2bc679f9bca51eea91e9968c18d8a1dc6a5674100d619",
+            "rgbaSha256": "3d2ba9eab418defc3a0d37c598fe9068f54948e39591e460982aadbea9cfefca",
+            "alphaSha256": "a5c64de29d0d2905e185abfd9b209a0992b122e2480ba4f450fcb8be9b2e858b",
+            "width": 499,
+            "height": 23,
+            "placement": {
+              "x": 155,
+              "y": 515
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "footer",
+          "text": "POSTCARD FROM THE FERRY",
+          "anchor": "POSTCARD FROM THE FERRY",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 301,
+            "y0": 890,
+            "x1": 668,
+            "y1": 909
+          },
+          "vertical": false,
+          "fontSize": 25,
+          "fontKey": "regular",
+          "paragraphId": "footer",
+          "sourceStyle": {
+            "x": 300,
+            "y": 890,
+            "fontSize": 25,
+            "fontKey": "regular",
+            "fill": [
+              87,
+              55,
+              103,
+              220
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/watercolor-ferry-translucent-notification.glyph-footer.png",
+            "sha256": "022a2825d3bbae6c748ed8283e43730ef312c5bb739a5eb081af824521b9f298",
+            "rgbaSha256": "8f44da5f79df0570f5a4e296a6dcc6dd48005e09ad40acbfd806b54f44ba49cc",
+            "alphaSha256": "b9cad7f9b3432728c33b8d881f52b262587cd789791ab79630ccc75ae6bfa5a0",
+            "width": 368,
+            "height": 19,
+            "placement": {
+              "x": 300,
+              "y": 890
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "THE RIVER IS CLEAR TODAY.",
+        "PLEASE STEP ABOARD QUIETLY.",
+        "A SOFT BREEZE FROM THE WEST",
+        "POSTCARD FROM THE FERRY"
+      ],
+      "expectedAnchors": [
+        "THE RIVER IS CLEAR TODAY.",
+        "PLEASE STEP ABOARD QUIETLY.",
+        "A SOFT BREEZE FROM THE WEST",
+        "POSTCARD FROM THE FERRY"
+      ],
+      "anchorOccurrences": {
+        "THE RIVER IS CLEAR TODAY.": 1,
+        "PLEASE STEP ABOARD QUIETLY.": 1,
+        "A SOFT BREEZE FROM THE WEST": 1,
+        "POSTCARD FROM THE FERRY": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 90,
+            "y0": 630,
+            "x1": 490,
+            "y1": 840
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 760,
+            "y0": 590,
+            "x1": 1110,
+            "y1": 825
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 580,
+          "y": 790,
+          "rgb": [
+            101,
+            80,
+            113
+          ]
+        },
+        {
+          "x": 720,
+          "y": 745,
+          "rgb": [
+            237,
+            224,
+            182
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [
+        {
+          "x": 50,
+          "y": 50,
+          "rgba": [
+            171,
+            212,
+            220,
+            123
+          ]
+        },
+        {
+          "x": 200,
+          "y": 400,
+          "rgba": [
+            206,
+            226,
+            237,
+            68
+          ]
+        },
+        {
+          "x": 600,
+          "y": 100,
+          "rgba": [
+            206,
+            226,
+            237,
+            68
+          ]
+        }
+      ],
+      "protectedRgbaRegions": [],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/watercolor-ferry-translucent-notification.background.png",
+        "backgroundPngSha256": "ecc017632cbed97c75055cfe3caaca2e05f79419299216cd1cfa2ba4d97490c6",
+        "backgroundRgbaSha256": "3cc9f4fc6ee082f9d77f9937ae0689afb1903415c5b472e8eed47fceab4e65ad",
+        "sourceRgbaFile": "truth/watercolor-ferry-translucent-notification.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "136218cd09cd1d65d579559b9dc17853b500ac82cab3cdf5d7c51ffe36dac04d",
+        "sourceRgbaSha256": "6ba4595182775acb04c0bdfe7ee5b2d708e1ea2a4377d60070ba133509856a68",
+        "sourceRgbaBytes": 4800000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "notice-a",
+          "notice-b"
+        ],
+        [
+          "aside"
+        ],
+        [
+          "footer"
+        ]
+      ]
+    },
+    {
+      "name": "orbital-greenhouse-cutout-dialogue",
+      "file": "orbital-greenhouse-cutout-dialogue.png",
+      "mime": "image/png",
+      "width": 1400,
+      "height": 1100,
+      "sourceLanguage": "auto",
+      "scene": "Cut-out orbital greenhouse with transparent round holes next to panels, Chinese and Japanese dialogue plus detached micro label",
+      "imageMode": "RGBA",
+      "sha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+      "bytes": 95103,
+      "regions": [
+        {
+          "id": "zh-a",
+          "text": "新的叶子已经展开了。",
+          "anchor": "新的叶子已经展开了。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 150,
+            "y0": 142,
+            "x1": 518,
+            "y1": 179
+          },
+          "vertical": false,
+          "fontSize": 39,
+          "fontKey": "zh",
+          "paragraphId": "zh",
+          "sourceStyle": {
+            "x": 150,
+            "y": 142,
+            "fontSize": 39,
+            "fontKey": "zh",
+            "fill": [
+              112,
+              24,
+              74,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-zh-a.png",
+            "sha256": "4fbccf5c3f1c21657c254e6ef8b03b20530939ad881d365bd66c15bceb1df4a4",
+            "rgbaSha256": "5f21d72a56b881b4852debd28482392d27f81e6fbf6e5dee6b5a87f9be8a146c",
+            "alphaSha256": "cecc39cf7bd0c4d5b913e2b785faa40a4d69e6946cfef57c3af8edc3a8873178",
+            "width": 390,
+            "height": 37,
+            "placement": {
+              "x": 150,
+              "y": 142
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "zh-b",
+          "text": "把水送到靠窗的一排。",
+          "anchor": "把水送到靠窗的一排。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 150,
+            "y0": 205,
+            "x1": 518,
+            "y1": 242
+          },
+          "vertical": false,
+          "fontSize": 39,
+          "fontKey": "zh",
+          "paragraphId": "zh",
+          "sourceStyle": {
+            "x": 150,
+            "y": 205,
+            "fontSize": 39,
+            "fontKey": "zh",
+            "fill": [
+              112,
+              24,
+              74,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-zh-b.png",
+            "sha256": "4697de4dd214042f7aa74e933ac3eff766519b10313fc4514815a95b73fbceb4",
+            "rgbaSha256": "ab579313aaa7733f6d43ff61f0318172fa42687f0cd7d4eea6b2ca25bda90f10",
+            "alphaSha256": "0408554e22394bbc630de5768fc74c383cc4f1857599ddf017d8991d3389d71c",
+            "width": 390,
+            "height": 37,
+            "placement": {
+              "x": 150,
+              "y": 205
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ja-a",
+          "text": "ここなら星が見える。",
+          "anchor": "ここなら星が見える。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 804,
+            "y0": 450,
+            "x1": 1158,
+            "y1": 487
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "cjk",
+          "paragraphId": "ja",
+          "sourceStyle": {
+            "x": 800,
+            "y": 450,
+            "fontSize": 38,
+            "fontKey": "cjk",
+            "fill": [
+              112,
+              240,
+              211,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-ja-a.png",
+            "sha256": "d232989020740ce0e73d4e05c95094667e98863e3f732ea40b9f1c3628079c1c",
+            "rgbaSha256": "ff3bd41c2212b5dccf26c1350748230bf79922a143950811ea76368306e84c7a",
+            "alphaSha256": "72f5ab97016fdfae89e6c05640659d32faabd4b1aef2a40472c8c6fdf064da7d",
+            "width": 380,
+            "height": 37,
+            "placement": {
+              "x": 800,
+              "y": 450
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "ja-b",
+          "text": "明日も一緒に育てよう。",
+          "anchor": "明日も一緒に育てよう。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 801,
+            "y0": 512,
+            "x1": 1196,
+            "y1": 548
+          },
+          "vertical": false,
+          "fontSize": 38,
+          "fontKey": "cjk",
+          "paragraphId": "ja",
+          "sourceStyle": {
+            "x": 800,
+            "y": 512,
+            "fontSize": 38,
+            "fontKey": "cjk",
+            "fill": [
+              112,
+              240,
+              211,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-ja-b.png",
+            "sha256": "6b80a9ec5e8a7fa7e3d84ce7eddcc7066171a8c50359531fdd9d4811ad17d260",
+            "rgbaSha256": "c8ab1b1ac552b01f9a841cb034fa4b20cde929f5ca93c64722f9cde4a01a2be2",
+            "alphaSha256": "3cb2535a1b79b3d050b8709a60f636d90d8a83b9b834c343eb79886699da4ec5",
+            "width": 418,
+            "height": 36,
+            "placement": {
+              "x": 800,
+              "y": 512
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "small-a",
+          "text": "SECTION 04",
+          "anchor": "SECTION 04",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 125,
+            "y0": 858,
+            "x1": 259,
+            "y1": 876
+          },
+          "vertical": false,
+          "fontSize": 23,
+          "fontKey": "regular",
+          "paragraphId": "label",
+          "sourceStyle": {
+            "x": 125,
+            "y": 858,
+            "fontSize": 23,
+            "fontKey": "regular",
+            "fill": [
+              44,
+              50,
+              75,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-small-a.png",
+            "sha256": "0551ba8384a41c6e177eff0ea66d94b45d964184b188963982c79924f4a790e4",
+            "rgbaSha256": "25b0ed2fc6030644722cdf10460d51a3d69870455ead936cbfc3608469501c60",
+            "alphaSha256": "0495d23affe83720b6124c236d0eb1848681995e3f77be0b6550ca1ad5b6ed65",
+            "width": 135,
+            "height": 18,
+            "placement": {
+              "x": 125,
+              "y": 858
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        },
+        {
+          "id": "small-b",
+          "text": "窓を閉めてから戻る。",
+          "anchor": "窓を閉めてから戻る。",
+          "translation": "受控译文用于完整彩色漫画回归。",
+          "bbox": {
+            "x0": 500,
+            "y0": 970,
+            "x1": 784,
+            "y1": 999
+          },
+          "vertical": false,
+          "fontSize": 30,
+          "fontKey": "cjk",
+          "paragraphId": "footer",
+          "sourceStyle": {
+            "x": 500,
+            "y": 970,
+            "fontSize": 30,
+            "fontKey": "cjk",
+            "fill": [
+              45,
+              63,
+              83,
+              255
+            ],
+            "supersample": 2
+          },
+          "glyphTruth": {
+            "file": "truth/orbital-greenhouse-cutout-dialogue.glyph-small-b.png",
+            "sha256": "93746dfa4e522c0ff71782fd3aec5b4f1754ef2daabf1e71c6980454e8938cc6",
+            "rgbaSha256": "a5223bb80a9d0be10b5ceadae3aa4eb71de4aa92f8c6851a4c9137940ffce13b",
+            "alphaSha256": "8884f75bbfa8091a36726ead97771136ea1d42292260c2ece5d5b8c2d90774e2",
+            "width": 300,
+            "height": 29,
+            "placement": {
+              "x": 500,
+              "y": 970
+            },
+            "compositing": "Pillow Image.alpha_composite, source-over; antialias and stroke included"
+          }
+        }
+      ],
+      "expectedSource": [
+        "新的叶子已经展开了。",
+        "把水送到靠窗的一排。",
+        "ここなら星が見える。",
+        "明日も一緒に育てよう。",
+        "SECTION 04",
+        "窓を閉めてから戻る。"
+      ],
+      "expectedAnchors": [
+        "新的叶子已经展开了。",
+        "把水送到靠窗的一排。",
+        "ここなら星が見える。",
+        "明日も一緒に育てよう。",
+        "SECTION 04",
+        "窓を閉めてから戻る。"
+      ],
+      "anchorOccurrences": {
+        "新的叶子已经展开了。": 1,
+        "把水送到靠窗的一排。": 1,
+        "ここなら星が見える。": 1,
+        "明日も一緒に育てよう。": 1,
+        "SECTION 04": 1,
+        "窓を閉めてから戻る。": 1
+      },
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 100,
+            "y0": 420,
+            "x1": 590,
+            "y1": 730
+          }
+        },
+        {
+          "id": "wordless-art-2",
+          "bbox": {
+            "x0": 950,
+            "y0": 720,
+            "x1": 1300,
+            "y1": 920
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 340,
+          "y": 600,
+          "rgb": [
+            161,
+            207,
+            161
+          ]
+        },
+        {
+          "x": 1160,
+          "y": 825,
+          "rgb": [
+            161,
+            207,
+            161
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [
+        {
+          "x": 700,
+          "y": 210,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 700,
+          "y": 620,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 30,
+          "y": 30,
+          "rgba": [
+            131,
+            165,
+            176,
+            90
+          ]
+        }
+      ],
+      "protectedRgbaRegions": [
+        {
+          "id": "transparent-hole-1",
+          "bbox": {
+            "x0": 680,
+            "y0": 190,
+            "x1": 720,
+            "y1": 230
+          },
+          "rgbaSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "pixels": 1600,
+          "requirement": "Every source RGBA pixel remains exactly unchanged through repair/draw/composite."
+        },
+        {
+          "id": "transparent-hole-2",
+          "bbox": {
+            "x0": 680,
+            "y0": 600,
+            "x1": 720,
+            "y1": 640
+          },
+          "rgbaSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "pixels": 1600,
+          "requirement": "Every source RGBA pixel remains exactly unchanged through repair/draw/composite."
+        }
+      ],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/orbital-greenhouse-cutout-dialogue.background.png",
+        "backgroundPngSha256": "bdcfc7800953ac7ddb790fde7dcc0fcb31f663ff18eb3ae0216d5e4ba35440ed",
+        "backgroundRgbaSha256": "d9ed2c50b6262fb515783448441b96343ac49c8505fc107244d0f847f8cc4ab2",
+        "sourceRgbaFile": "truth/orbital-greenhouse-cutout-dialogue.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "aa2f2c124def41cefbe77664c8a53fb461cf435589badb7f339e1e0447b2a86d",
+        "sourceRgbaSha256": "9711976ae318aaa35cbc3dd107166a85dd603662b88108d99d40b8a9374347cd",
+        "sourceRgbaBytes": 6160000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "paragraphGroups": [
+        [
+          "zh-a",
+          "zh-b"
+        ],
+        [
+          "ja-a",
+          "ja-b"
+        ],
+        [
+          "small-a"
+        ],
+        [
+          "small-b"
+        ]
+      ],
+      "colorRelations": [
+        {
+          "textIds": [
+            "zh-a",
+            "zh-b"
+          ],
+          "textRgba": [
+            112,
+            24,
+            74,
+            255
+          ],
+          "panelRgba": [
+            112,
+            216,
+            181,
+            150
+          ]
+        },
+        {
+          "textIds": [
+            "ja-a",
+            "ja-b"
+          ],
+          "textRgba": [
+            112,
+            240,
+            211,
+            255
+          ],
+          "panelRgba": [
+            112,
+            44,
+            90,
+            180
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wordless-stained-glass-cutout-garden",
+      "file": "wordless-stained-glass-cutout-garden.png",
+      "mime": "image/png",
+      "width": 1200,
+      "height": 1000,
+      "sourceLanguage": "auto",
+      "scene": "Wordless curved stained-glass garden with adjacent opaque/transparent color fields and holes; no alphabetic symbols or numbers",
+      "imageMode": "RGBA",
+      "sha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+      "bytes": 29870,
+      "regions": [],
+      "expectedSource": [],
+      "expectedAnchors": [],
+      "anchorOccurrences": {},
+      "forbiddenRegions": [
+        {
+          "id": "wordless-art-1",
+          "bbox": {
+            "x0": 0,
+            "y0": 0,
+            "x1": 1200,
+            "y1": 1000
+          }
+        }
+      ],
+      "protectedProbes": [
+        {
+          "x": 240,
+          "y": 500,
+          "rgb": [
+            205,
+            212,
+            177
+          ]
+        },
+        {
+          "x": 960,
+          "y": 500,
+          "rgb": [
+            205,
+            212,
+            177
+          ]
+        }
+      ],
+      "protectedRgbaProbes": [
+        {
+          "x": 600,
+          "y": 500,
+          "rgba": [
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        {
+          "x": 60,
+          "y": 60,
+          "rgba": [
+            39,
+            57,
+            88,
+            150
+          ]
+        }
+      ],
+      "protectedRgbaRegions": [
+        {
+          "id": "transparent-hole-1",
+          "bbox": {
+            "x0": 580,
+            "y0": 480,
+            "x1": 620,
+            "y1": 520
+          },
+          "rgbaSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+          "pixels": 1600,
+          "requirement": "Every source RGBA pixel remains exactly unchanged through repair/draw/composite."
+        }
+      ],
+      "tileBoundaryCrossings": [],
+      "pixelTruth": {
+        "backgroundFile": "truth/wordless-stained-glass-cutout-garden.background.png",
+        "backgroundPngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+        "backgroundRgbaSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+        "sourceRgbaFile": "truth/wordless-stained-glass-cutout-garden.source-rgba.bin.gz",
+        "sourceRgbaCompressedSha256": "aeb1c358b2c6e317637160650ee23fb933cc1686e55d7fd99234c9fae234d802",
+        "sourceRgbaSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+        "sourceRgbaBytes": 4800000,
+        "format": "Row-major RGBA uint8, no padding; gzip mtime=0. Source reconstructs from background and ordered region glyph PNG source-over placements."
+      },
+      "provenance": {
+        "designSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+        "originalArtworkAndText": true,
+        "sourceDesignedBeforeAnyOcr": true,
+        "selectionByOcrResult": false,
+        "fontsBundled": false,
+        "oldFixturesUnmodified": true
+      },
+      "expectedNoText": true
+    }
+  ],
+  "artifactInventory": {
+    "truth/harbor-same-red-channel-dialogue.background.png": {
+      "sha256": "69e3601cc036505f3f1fe2801feb473a0836d14e1afec8ac0e205bedf727b123",
+      "bytes": 13149
+    },
+    "truth/harbor-same-red-channel-dialogue.glyph-left-a.png": {
+      "sha256": "87ffd21aedaaa37f9817b8fada6a1f91beed81c88eed9a383054113468a9a79f",
+      "bytes": 6659
+    },
+    "truth/harbor-same-red-channel-dialogue.glyph-left-b.png": {
+      "sha256": "5578a807172986cc82870716eaeb44e71b1e674186a2dad362576fd60e541507",
+      "bytes": 5348
+    },
+    "truth/harbor-same-red-channel-dialogue.glyph-right-a.png": {
+      "sha256": "051b9370680d284e41dfa69506ad642212f755d9f7e74080226e271f547d0e9c",
+      "bytes": 4237
+    },
+    "truth/harbor-same-red-channel-dialogue.glyph-right-b.png": {
+      "sha256": "eb6c4e7627f77ddd1b775678eb283c9911d3024130f44a99fef544ac8a396400",
+      "bytes": 3852
+    },
+    "truth/harbor-same-red-channel-dialogue.glyph-narration.png": {
+      "sha256": "954bed0c2f2d6336f8f37d5e0cc5a10cb4608716a5cffe69155d16343cdc0aa8",
+      "bytes": 8109
+    },
+    "harbor-same-red-channel-dialogue.png": {
+      "sha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+      "bytes": 55206
+    },
+    "truth/harbor-same-red-channel-dialogue.source-rgba.bin.gz": {
+      "sha256": "33c15e8b2e2d7a6a587a86d9ae961087777fc4483d8a71c8e16c443d0a5034db",
+      "bytes": 45231
+    },
+    "truth/prism-platform-gradient-signs.background.png": {
+      "sha256": "31897694b732e30f1882df127eb82168dc096ddcc0698bd14ad7a651f3708b24",
+      "bytes": 15130
+    },
+    "truth/prism-platform-gradient-signs.glyph-main-a.png": {
+      "sha256": "579deaa5547b3d42d7f3a2c117348847b4ef90c49c99671b2e5fba76335c2299",
+      "bytes": 13260
+    },
+    "truth/prism-platform-gradient-signs.glyph-main-b.png": {
+      "sha256": "e7a68a9013c1032f38d311e92f501b3ee8c2f8bf1cde1c832106feddbd6665cd",
+      "bytes": 10354
+    },
+    "truth/prism-platform-gradient-signs.glyph-night.png": {
+      "sha256": "bc14e5b828a548ecb7e23523f31867e073cf5cfb5b5ce0a9b333b6d898429391",
+      "bytes": 6608
+    },
+    "truth/prism-platform-gradient-signs.glyph-route.png": {
+      "sha256": "6081c74c087bbee0c6c85fac15daa3538456b423d1a91d0798ab567c07e15feb",
+      "bytes": 2166
+    },
+    "prism-platform-gradient-signs.png": {
+      "sha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+      "bytes": 70289
+    },
+    "truth/prism-platform-gradient-signs.source-rgba.bin.gz": {
+      "sha256": "66b053b4740ca00b1befea76132155bb23bf02bfcd49cbce7af4711966a1ac46",
+      "bytes": 71741
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.background.png": {
+      "sha256": "6972067e2c346e2cd77a18b74dbc27b3dfa2a288b0e645d244aeaad1007b4bb0",
+      "bytes": 20243
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-ja-right.png": {
+      "sha256": "4e6fb0db0059be94df94614987e5fb8f7b62460417163283a945564cd0c15e13",
+      "bytes": 8163
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-ja-left.png": {
+      "sha256": "a2a81b9f152b2ed8ea4b7e72d5148c6b45fb3c75e3e9509ab9b92866b385fd80",
+      "bytes": 8719
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-ruby-right.png": {
+      "sha256": "f1cff73371b71c9ec112a8ec43972e71d991b47719f06bfc452891aa47e765e2",
+      "bytes": 888
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-ruby-left.png": {
+      "sha256": "0a1c60bbf4f2906593a1ff895ae305eafcbc82f63b95b108d80c066e195e1d3e",
+      "bytes": 1190
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-zh-a.png": {
+      "sha256": "7ea2f212df012c0b7691ccbb64967e4c0f73b39aed32baec1ef4dd858cd0562d",
+      "bytes": 9172
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.glyph-zh-b.png": {
+      "sha256": "9250faff35659319f1f446a560c3f1c6bb636958c91a32adb6585443f746bcb5",
+      "bytes": 10227
+    },
+    "rain-garden-vertical-ruby-sidebar.png": {
+      "sha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+      "bytes": 82935
+    },
+    "truth/rain-garden-vertical-ruby-sidebar.source-rgba.bin.gz": {
+      "sha256": "895bb340eeb1fecb975aa088ed83d77343a83663e25d4bd4007c7e4044eadd67",
+      "bytes": 69872
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.background.png": {
+      "sha256": "6eda320e653caea04eb3f79711035e21c22198c8dcaf609c74a485e72c7cea29",
+      "bytes": 13746
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.glyph-white-a.png": {
+      "sha256": "02f0dca66d99b266dd743c2a4d94a0b988f2835cca27703386a9aecfd0f74701",
+      "bytes": 8503
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.glyph-white-b.png": {
+      "sha256": "e2b512f2cb9715e787d9480192b5f4af84392a328f96a3b80aad4c6dd604537e",
+      "bytes": 6278
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.glyph-black-a.png": {
+      "sha256": "e020c49da8c82af46cec0e4c6dec45a57ef6520bbf47c7efe5ca6524991d9f2b",
+      "bytes": 5828
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.glyph-black-b.png": {
+      "sha256": "35c05457ca718b7bd2724856e1d0b424943607b8395fd138ca76bc35b68e0881",
+      "bytes": 5752
+    },
+    "chess-picnic-neighbor-inverse-bubbles.png": {
+      "sha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+      "bytes": 47530
+    },
+    "truth/chess-picnic-neighbor-inverse-bubbles.source-rgba.bin.gz": {
+      "sha256": "e67fcec35910727cb901c2ea4cf9611acacfb9ab43c077725014a51049b55142",
+      "bytes": 43361
+    },
+    "truth/lantern-market-oblique-bilingual-captions.background.png": {
+      "sha256": "b0fd74d45f5e5436ac46efad630802b2b1f6ef8ec2c57972ba97b1732c3f615a",
+      "bytes": 15474
+    },
+    "truth/lantern-market-oblique-bilingual-captions.glyph-zh-caption.png": {
+      "sha256": "80f23289fa20226928e1dd802ebf3ff4dc76ae4b1e30cca78d70ef31a513427d",
+      "bytes": 37241
+    },
+    "truth/lantern-market-oblique-bilingual-captions.glyph-ja-caption.png": {
+      "sha256": "167b81e986954cf149da5581fb19642ba2d590f617512afd95f0dfc61e415179",
+      "bytes": 28266
+    },
+    "truth/lantern-market-oblique-bilingual-captions.glyph-dialogue-a.png": {
+      "sha256": "2bbb7439af6ac500655338d0c22e6d000530f6348dd01c86a0eddfac2f877ba1",
+      "bytes": 6398
+    },
+    "truth/lantern-market-oblique-bilingual-captions.glyph-dialogue-b.png": {
+      "sha256": "a40e7988591089d50ba4db361ed920acd74ae2cacbab592ee8e04b12479590d2",
+      "bytes": 8522
+    },
+    "truth/lantern-market-oblique-bilingual-captions.glyph-ticket.png": {
+      "sha256": "036e00e9aadd1ca4381b2032a9b4e57ede78f01c14db58f148544ebb588fd094",
+      "bytes": 3032
+    },
+    "lantern-market-oblique-bilingual-captions.png": {
+      "sha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+      "bytes": 102240
+    },
+    "truth/lantern-market-oblique-bilingual-captions.source-rgba.bin.gz": {
+      "sha256": "edb813df1ed30e91b442f0f5ef21d99d2d7bc74be073dbf811d5a02f941a3ae4",
+      "bytes": 91102
+    },
+    "truth/watercolor-ferry-translucent-notification.background.png": {
+      "sha256": "ecc017632cbed97c75055cfe3caaca2e05f79419299216cd1cfa2ba4d97490c6",
+      "bytes": 44007
+    },
+    "truth/watercolor-ferry-translucent-notification.glyph-notice-a.png": {
+      "sha256": "3ed38087d6d10b6acf5f98e7a465354c70375c52816a60e2859e821958c98482",
+      "bytes": 8240
+    },
+    "truth/watercolor-ferry-translucent-notification.glyph-notice-b.png": {
+      "sha256": "e6813868ed959dfb5a389f73fe339694eab44073da97dc18fb59f3bc655cb36e",
+      "bytes": 7798
+    },
+    "truth/watercolor-ferry-translucent-notification.glyph-aside.png": {
+      "sha256": "d9b19ce08730c31b0fc2bc679f9bca51eea91e9968c18d8a1dc6a5674100d619",
+      "bytes": 6836
+    },
+    "truth/watercolor-ferry-translucent-notification.glyph-footer.png": {
+      "sha256": "022a2825d3bbae6c748ed8283e43730ef312c5bb739a5eb081af824521b9f298",
+      "bytes": 4987
+    },
+    "watercolor-ferry-translucent-notification.png": {
+      "sha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+      "bytes": 108966
+    },
+    "truth/watercolor-ferry-translucent-notification.source-rgba.bin.gz": {
+      "sha256": "136218cd09cd1d65d579559b9dc17853b500ac82cab3cdf5d7c51ffe36dac04d",
+      "bytes": 86997
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.background.png": {
+      "sha256": "bdcfc7800953ac7ddb790fde7dcc0fcb31f663ff18eb3ae0216d5e4ba35440ed",
+      "bytes": 15896
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-zh-a.png": {
+      "sha256": "4fbccf5c3f1c21657c254e6ef8b03b20530939ad881d365bd66c15bceb1df4a4",
+      "bytes": 7955
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-zh-b.png": {
+      "sha256": "4697de4dd214042f7aa74e933ac3eff766519b10313fc4514815a95b73fbceb4",
+      "bytes": 8919
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-ja-a.png": {
+      "sha256": "d232989020740ce0e73d4e05c95094667e98863e3f732ea40b9f1c3628079c1c",
+      "bytes": 7842
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-ja-b.png": {
+      "sha256": "6b80a9ec5e8a7fa7e3d84ce7eddcc7066171a8c50359531fdd9d4811ad17d260",
+      "bytes": 7955
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-small-a.png": {
+      "sha256": "0551ba8384a41c6e177eff0ea66d94b45d964184b188963982c79924f4a790e4",
+      "bytes": 2472
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.glyph-small-b.png": {
+      "sha256": "93746dfa4e522c0ff71782fd3aec5b4f1754ef2daabf1e71c6980454e8938cc6",
+      "bytes": 6838
+    },
+    "orbital-greenhouse-cutout-dialogue.png": {
+      "sha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+      "bytes": 95103
+    },
+    "truth/orbital-greenhouse-cutout-dialogue.source-rgba.bin.gz": {
+      "sha256": "aa2f2c124def41cefbe77664c8a53fb461cf435589badb7f339e1e0447b2a86d",
+      "bytes": 78285
+    },
+    "truth/wordless-stained-glass-cutout-garden.background.png": {
+      "sha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+      "bytes": 29870
+    },
+    "wordless-stained-glass-cutout-garden.png": {
+      "sha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+      "bytes": 29870
+    },
+    "truth/wordless-stained-glass-cutout-garden.source-rgba.bin.gz": {
+      "sha256": "aeb1c358b2c6e317637160650ee23fb933cc1686e55d7fd99234c9fae234d802",
+      "bytes": 23641
+    }
+  }
+}

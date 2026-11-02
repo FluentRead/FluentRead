@@ -6160,6 +6160,8 @@ describe("全文翻译可见性锚点", () => {
         const inactiveSession = {active: false, translationSlotCache: new Map()};
         await translateTextSlots(['Inactive'], snapshot, undefined, undefined, inactiveSession);
         expect(inactiveSession.translationSlotCache.size).toBe(0);
+        expect(runtime.requestOptions.at(-1)).toMatchObject({useCache: true});
+        await translateTextSlots(['Cache disabled'], {...snapshot, useCache: false}, undefined, undefined, inactiveSession);
         expect(runtime.requestOptions.at(-1)).toMatchObject({useCache: false});
     });
 

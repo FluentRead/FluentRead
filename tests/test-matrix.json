@@ -491,6 +491,7 @@
       "tests/documentPdfLayoutParsing.test.ts",
       "tests/pdfSource.test.ts",
       "tests/pdfTextLayout.test.ts",
+      "tests/pdfFallbackBidi.test.ts",
       "tests/informationHighlightConfig.test.ts",
       "tests/informationHighlightPresentation.test.ts",
       "tests/informationHighlightArtifacts.test.ts",

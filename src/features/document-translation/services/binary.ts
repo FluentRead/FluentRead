@@ -5,6 +5,7 @@
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {pdfFallbackBidiLine} from '../core/pdfFallbackBidi';
 import type JSZip from 'jszip';
 import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
@@ -172,6 +173,8 @@ export interface PdfRasterPageResult {
 }
 /** 行左上角与实际绘制宽度使用未旋转的 PDF 点；对齐锚点已由光栅端口转换为左边缘。 */
 export interface PdfRasterTextItem {
+    /** 仅完整单行实际以该基方向测量并绘制时提供；服务仍独立核对完整目标身份。 */
+    direction?: 'ltr' | 'rtl';
     segmentIndex: number;
     text: string;
     x: number;
@@ -1312,31 +1315,32 @@ async function renderPdf(
     };
     // 光栅层已经承载真实字形；不可见层使用独立 ToUnicode 映射保全任何 Unicode，普通原版导出不必联网下载字体。
     // 这个 CID 字体只能用于 Invisible 模式；可见全文续页仍使用经过字形校验的真实开放字体。
-    let fallbackFont: ReturnType<typeof outputPdf.context.register> | undefined;
-    let fallbackUnicode: ReturnType<typeof outputPdf.context.register> | undefined;
-    const fallbackCharacters = new Map<string, number>();
-    const selectableFontNames = new WeakMap<ReturnType<typeof outputPdf.addPage>, ReturnType<ReturnType<typeof outputPdf.addPage>['node']['newFontDictionary']>>();
-    const fallbackText = (text: string) => {
-        if (!fallbackFont) {
-            fallbackUnicode = outputPdf.context.register(outputPdf.context.flateStream(''));
-            const descriptor = outputPdf.context.register(outputPdf.context.obj({Type: 'FontDescriptor', FontName: 'FluentReadSourceText',
+    type SelectableFont = {font: ReturnType<typeof outputPdf.context.register>; unicode: ReturnType<typeof outputPdf.context.register>;
+        characters: Map<string, number>; names: WeakMap<ReturnType<typeof outputPdf.addPage>, ReturnType<ReturnType<typeof outputPdf.addPage>['node']['newFontDictionary']>>};
+    const selectableFonts = new Map<boolean, SelectableFont>();
+    const fallbackText = (text: string, bidi = false) => {
+        let resource = selectableFonts.get(bidi);
+        if (!resource) {
+            const fontName = bidi ? 'FluentReadBidiSourceText' : 'FluentReadSourceText';
+            const unicode = outputPdf.context.register(outputPdf.context.flateStream(''));
+            const descriptor = outputPdf.context.register(outputPdf.context.obj({Type: 'FontDescriptor', FontName: fontName,
                 Flags: 4, FontBBox: [0, -200, 1000, 900], ItalicAngle: 0, Ascent: 900, Descent: -200, CapHeight: 700, StemV: 80}));
-            const descendant = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'CIDFontType2', BaseFont: 'FluentReadSourceText',
-                CIDSystemInfo: {Registry: PDFString.of('Adobe'), Ordering: PDFString.of('Identity'), Supplement: 0}, FontDescriptor: descriptor, CIDToGIDMap: 'Identity', DW: 1000}));
-            fallbackFont = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'Type0', BaseFont: 'FluentReadSourceText',
-                Encoding: 'Identity-H', DescendantFonts: [descendant], ToUnicode: fallbackUnicode}));
+            const descendant = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'CIDFontType2', BaseFont: fontName,
+                CIDSystemInfo: {Registry: PDFString.of('Adobe'), Ordering: PDFString.of('Identity'), Supplement: 0}, FontDescriptor: descriptor, CIDToGIDMap: 'Identity', DW: bidi ? 500 : 1000}));
+            const font = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'Type0', BaseFont: fontName,
+                Encoding: 'Identity-H', DescendantFonts: [descendant], ToUnicode: unicode}));
+            resource = {font, unicode, characters: new Map(), names: new WeakMap()}; selectableFonts.set(bidi, resource);
         }
         let hex = '';
         for (const character of text) {
-            let code = fallbackCharacters.get(character);
+            let code = resource.characters.get(character);
             if (code === undefined) {
-                if (fallbackCharacters.size >= 65_535) throw new Error('PDF 原文包含过多独立字形，无法保全搜索文字');
-                code = fallbackCharacters.size + 1;
-                fallbackCharacters.set(character, code);
+                if (resource.characters.size >= 65_535) throw new Error('PDF 原文包含过多独立字形，无法保全搜索文字');
+                code = resource.characters.size + 1; resource.characters.set(character, code);
             }
             hex += code.toString(16).padStart(4, '0');
         }
-        return PDFHexString.of(hex);
+        return {encoded: PDFHexString.of(hex), resource};
     };
     const validRasterTextItem = (item: PdfRasterTextItem, width: number, height: number) => typeof item.text === 'string' && Boolean(item.text.trim())
         && [item.x, item.y, item.width, item.fontSize].every(Number.isFinite) && item.width > 0 && item.fontSize > 0
@@ -1367,7 +1371,12 @@ async function renderPdf(
             if (!validRasterTextItem(item, contentWidth, contentHeight)) continue;
             const text = item.text.replace(/[\r\n\t]/gu, ' ');
             // CID 字形为 1pt 计量；分别缩放行宽和行高，避免极端字号先乘字符数而溢出。
-            const scale = item.width / Array.from(text).length;
+            const candidate = item.direction && paintedBySegment.get(item.segmentIndex)?.length === 1
+                ? pdfFallbackBidiLine(item.text, visibleTranslations[item.segmentIndex] ?? '') : undefined;
+            const baseScale = item.width / Array.from(text).length;
+            const bidi = candidate?.direction === item.direction && candidate && Number.isFinite(baseScale / candidate.advance) ? candidate : undefined;
+            // 新半 em 字宽与 X 轴逆缩放共同保留原有均匀槽起点及总 advance；不声称真实 Canvas 逐字形几何。
+            const scale = baseScale / (bidi?.advance ?? 1);
             const baseline = contentHeight - item.y - item.fontSize * 0.9;
             // 先将该行的真实左上角映射到旋转后的页，再沿行方向精确匹配光栅绘制宽度。
             const matrix = rotation === 90 ? [0, -scale, item.fontSize, 0, offsetX + baseline, pageData.height - item.x]
@@ -1376,9 +1385,9 @@ async function renderPdf(
                         : [scale, 0, 0, item.fontSize, offsetX + item.x, baseline];
             target.pushOperators(pushGraphicsState(), concatTransformationMatrix(...matrix as [number, number, number, number, number, number]),
                 setTextRenderingMode(TextRenderingMode.Invisible));
-            const encoded = fallbackText(text);
-            let name = selectableFontNames.get(target);
-            if (!name) {name = target.node.newFontDictionary('FluentReadSourceText', fallbackFont!); selectableFontNames.set(target, name);}
+            const {encoded, resource} = fallbackText(bidi?.visualText ?? text, Boolean(bidi));
+            let name = resource.names.get(target);
+            if (!name) {name = target.node.newFontDictionary(bidi ? 'FluentReadBidiSourceText' : 'FluentReadSourceText', resource.font); resource.names.set(target, name);}
             target.pushOperators(beginText(), setFontAndSize(name, 1), showText(encoded), endText());
             target.pushOperators(popGraphicsState());
             if (++processed % 32 === 0) {await yieldToBrowser(); options.signal?.throwIfAborted();}
@@ -1591,14 +1600,14 @@ async function renderPdf(
     options.signal?.throwIfAborted();
     outline.write();
     if (layoutPageLabels.length) outputPdf.catalog.set(PDFName.of('PageLabels'), outputPdf.context.obj({Nums: layoutPageLabels}));
-    if (fallbackUnicode) {
-        const pairs = [...fallbackCharacters].map(([character, code]) => `<${code.toString(16).padStart(4, '0')}> <${PDFHexString.fromText(character).asString().slice(4)}>`);
+    for (const [bidi, {unicode, characters}] of selectableFonts) {
+        const pairs = [...characters].map(([character, code]) => `<${code.toString(16).padStart(4, '0')}> <${PDFHexString.fromText(character).asString().slice(4)}>`);
         const groups: string[] = [];
         for (let index = 0; index < pairs.length; index += 100) {
             const chunk = pairs.slice(index, index + 100);
             groups.push(`${chunk.length} beginbfchar\n${chunk.join('\n')}\nendbfchar`);
         }
-        outputPdf.context.assign(fallbackUnicode, outputPdf.context.flateStream(`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /FluentReadSourceUnicode def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${groups.join('\n')}\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend`));
+        outputPdf.context.assign(unicode, outputPdf.context.flateStream(`/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /${bidi ? 'FluentReadBidiSourceUnicode' : 'FluentReadSourceUnicode'} def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n${groups.join('\n')}\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend`));
     }
     const bytes = await awaitDocumentRead(outputPdf.save({useObjectStreams: true, objectsPerTick: 20}), options.signal);
     options.signal?.throwIfAborted();

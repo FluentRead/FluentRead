@@ -89,6 +89,7 @@
     "@uzen/kokoro-js": "1.2.4",
     "@wllama/wllama": "3.6.1",
     "@wxt-dev/storage": "^1.0.1",
+    "bidi-js": "1.1.0",
     "ai": "6.0.264",
     "crypto-js": "^4.2.0",
     "defuddle": "^0.19.2",

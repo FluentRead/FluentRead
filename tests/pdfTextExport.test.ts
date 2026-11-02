@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import {inflateSync} from 'node:zlib';
-import {PDFDict, PDFDocument, PDFName, PDFRawStream} from 'pdf-lib';
+import {PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {TextItem} from 'pdfjs-dist/types/src/display/api';
@@ -14,6 +14,7 @@ import {createDocumentDownload, parseBinaryDocument, type PdfReadingRenderer, ty
 import {embedPdfReadingFont} from '@/src/features/document-translation/services/pdfReadingFont';
 import {renderPdfReadingPages} from '@/src/features/document-translation/ui/pdfPreview';
 import {paginatePdfReadingPlan, type PdfReadingOutputPage} from '@/src/features/document-translation/core/pdfTextLayout';
+import {pdfFallbackBidiLine} from '@/src/features/document-translation/core/pdfFallbackBidi';
 
 const fontBytes = new Uint8Array(readFileSync(new URL('../assets/pdf-fonts/FluentReadNotoSansSC-Regular.woff2', import.meta.url)));
 const textOnlyOptions = {pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: async () => fontBytes};
@@ -123,6 +124,47 @@ describe('visible Unicode PDF reading export', () => {
             page.cleanup();
         } finally {await task.destroy();}
         saveEvidence(`layout-selectable-rotation-${rotation}.pdf`, download.data as Uint8Array);
+    });
+
+    it.each([0, 90, 180, 270] as const)('encodes complete Canvas-bidi target identities with coherent half-em search metrics at %s', async rotation => {
+        const targets = ['מחקר 2026 משווה GPU A100 מול H100; השיפור 12.5% (ניסוי 3), וההסבר נשמר.',
+            'English שלום עולם sentence GPU A100 and H100 in 2026 (12.5%).'];
+        for (const target of targets) {
+            const document = await fixture(); if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+            const source = document.binary.pages[0]; source.rotation = rotation;
+            if (rotation === 90 || rotation === 270) {source.width = 800; source.height = 600;}
+            const translations = ['ASCII GPU A100 2026.', target], bidi = pdfFallbackBidiLine(target, target)!;
+            // Controlled port declares the exact complete paragraph actually painted in this direction.
+            // Real Canvas direction/ink remains a separate browser acceptance; the one-pixel image does not prove it.
+            const download = await createDocumentDownload(document, translations, 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+                textItems: translations.map((text, segmentIndex) => ({segmentIndex, text, x: 42, y: 50 + segmentIndex * 60, width: 312, fontSize: 14,
+                    ...(segmentIndex === 1 ? {direction: bidi.direction} : {})}))})});
+            const bytes = download.data as Uint8Array, task = getDocument({data: bytes.slice(), disableFontFace: true, isEvalSupported: false});
+            try {
+                const pdf = await task.promise, page = await pdf.getPage(1), items = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item);
+                const raw = items.map(item => item.str).join('');
+                expect(raw.split(target).length - 1).toBe(1); expect(raw.split(translations[0]).length - 1).toBe(1);
+                const whole = items.find(item => item.str === target); expect(whole).toBeDefined();
+                expect(whole!.width).toBeCloseTo(312, 8); expect(whole!.height).toBeCloseTo(14, 8);
+                page.cleanup();
+            } finally {await task.destroy();}
+            const output = await PDFDocument.load(bytes), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+            const widths = new Map(fonts.keys().map(key => {const font = fonts.lookup(key, PDFDict), descendant = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict);
+                return [font.get(PDFName.of('BaseFont'))?.toString(), descendant.get(PDFName.of('DW'))?.toString()];}));
+            expect(widths.get('/FluentReadSourceText')).toBe('1000'); expect(widths.get('/FluentReadBidiSourceText')).toBe('500');
+        }
+    });
+
+    it.each(['no direction', 'wrong direction', 'partial paragraph', 'two lines'] as const)('does not grant the new font without complete painted identity: %s', mode => {
+        return (async () => {
+            const document = await fixture(), target = 'שלום עולם GPU A100';
+            const item = {segmentIndex: 1, text: mode === 'partial paragraph' ? 'שלום' : target, x: 42, y: 110, width: 312, fontSize: 14,
+                ...(mode === 'no direction' ? {} : {direction: mode === 'wrong direction' ? 'ltr' as const : 'rtl' as const})};
+            const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+                textItems: mode === 'two lines' ? [item, {...item, y: 140}] : [item]})});
+            const output = await PDFDocument.load(download.data as Uint8Array), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+            expect(fonts.keys().map(key => fonts.lookup(key, PDFDict).get(PDFName.of('BaseFont'))?.toString())).not.toContain('/FluentReadBidiSourceText');
+        })();
     });
 
     it('preserves unpainted metadata, formula characters and untranslated blocks without indexing erased source text', async () => {

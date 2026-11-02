@@ -5,6 +5,12 @@ const runtime = vi.hoisted(() => ({
     slots: null as null | (() => Array<{node: Text; prefix: string; source: string; suffix: string}>),
 }));
 
+// 该 DOM 单元测试不启动扩展后台；保留真实默认配置，避免尝试读取不存在的浏览器存储。
+vi.mock('@/src/services/config/store', async () => {
+    const {Config} = await import('@/src/core/config/model');
+    return {config: new Config()};
+});
+
 vi.mock('@/src/core/translation/public', async (importOriginal) => {
     const actual = await importOriginal<typeof import('@/src/core/translation/public')>();
     return {

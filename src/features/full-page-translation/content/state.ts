@@ -118,7 +118,7 @@ export function inlineCodeReplaySourceIsCurrent(node: HTMLElement, state: Transl
             if (hosts.length) {
                 const record = hostSources.get(child as HTMLElement);
                 if (!record || child.nodeType !== 1 ||
-                    !(child as Element).matches('.fluent-read-single-slot[data-fr-translation-owned="true"][translate="no"]') ||
+                    !(child as Element).matches(OWNED_SINGLE_TEXT_SOURCE_SELECTOR) ||
                     child.childNodes.length !== 1 ||
                     child.firstChild !== record.source || record.source.data !== record.sourceValue ||
                     hosts[index / 2]?.host !== child) return false;
@@ -291,8 +291,10 @@ let bilingualLifecycleExternallyManaged: (() => boolean) | undefined;
  */
 let bilingualSkeletonRefreshHandler: ((owner: HTMLElement, state: TranslationState) => boolean) | undefined;
 const maxTranslationLayoutAncestorDepth = 16;
-const BILINGUAL_ARTIFACT_SELECTOR =
+export const BILINGUAL_ARTIFACT_SELECTOR =
     '.fluent-read-bilingual-content[data-fr-translation-owned="true"]';
+export const OWNED_SINGLE_TEXT_SOURCE_SELECTOR =
+    '.fluent-read-single-slot[data-fr-translation-owned="true"][translate="no"]';
 const SINGLE_TEXT_SLOT_SELECTOR = '.fluent-read-single-slot[data-fr-translation-owned="true"]';
 const MAX_BILINGUAL_ARTIFACT_REPAIRS_PER_WINDOW = 3;
 const SOURCE_STRUCTURE_ATTRIBUTES = [

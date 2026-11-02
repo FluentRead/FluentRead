@@ -798,8 +798,8 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     if(layout==='independent')config.popupModuleOrder=['siteRule','translation','quickFeatures','footer']
     await mount();runtimeEvent({type:'fullPageTranslationState',isTranslated:true,toolbarStatus:'error',documentToken:'popup-fixture-document',diagnostic:{code:'authentication'}},{id:'fixture-extension',url:'https://example.com/a',tab:{id:7,url:'https://example.com/a'},frameId:0});await drain()
     const translation=document.querySelector('[data-popup-module="translation"]')!,meta=translation.querySelector('.translation-meta')!,notice=document.querySelector('.fluentread-diagnostic')!
-    const tools=meta.querySelector('.translation-tools')!,mode=button('popup-display-mode')
-    expect(document.querySelectorAll('.fluentread-diagnostic')).toHaveLength(1);expect(notice.parentElement).toBe(tools);expect(mode.closest('.translation-tools')).toBe(tools);expect(notice.nextElementSibling?.contains(mode)).toBe(true);expect(notice.closest('[data-popup-module="translation"]')).toBe(translation);expectCollapsedDiagnostic()
+    const tools=meta.querySelector('.translation-tools')!,mode=button('popup-display-mode'),action=translation.querySelector('.translate-action')!
+    expect(document.querySelectorAll('.fluentread-diagnostic')).toHaveLength(1);expect(notice.parentElement).toBe(action);expect(meta.contains(notice)).toBe(false);expect(mode.closest('.translation-tools')).toBe(tools);expect(notice.closest('[data-popup-module="translation"]')).toBe(translation);expectCollapsedDiagnostic()
     expect(translation.querySelectorAll('[data-diagnostic-details-toggle]')).toHaveLength(1)
     const site=document.querySelector('[data-popup-module="siteRule"]')
     if(layout==='nested'){expect(site?.parentElement).toBe(meta);expect(site?.nextElementSibling).toBe(tools)}

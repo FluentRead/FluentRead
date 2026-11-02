@@ -642,8 +642,8 @@ async function main() {
       await page.waitForFunction(() => window.__fluentReadGmGet('local:config', null)
         .then((raw) => JSON.parse(raw || '{}').theme === 'dark'), undefined, {timeout: args.timeout});
       const unavailableSections = [
-        'settings-image-translation', 'settings-area-translation', 'settings-video',
-        'settings-writing', 'settings-translation-stats', 'settings-model-usage',
+        // 圈选与模型用量已合并进对应父页面，不再是独立导航按钮。
+        'settings-image-translation', 'settings-video', 'settings-writing', 'settings-translation-stats',
       ];
       const visitedSections = [];
       for (const id of [...unavailableSections, 'settings-vocabulary', 'settings-data', 'settings-about']) {
@@ -707,8 +707,11 @@ async function main() {
       await page.evaluate(() => {
         window.__fluentReadUserscriptSettingsShadow.querySelector('button[data-section="settings-services"]').click();
       });
-      await page.waitForFunction(() => window.__fluentReadUserscriptSettingsShadow
-        ?.querySelector('.settings-app h1')?.textContent?.includes('翻译服务'), undefined, {timeout: args.timeout});
+      await page.waitForFunction(() => {
+        const root = window.__fluentReadUserscriptSettingsShadow;
+        return root?.querySelector('button[data-section="settings-services"]')?.getAttribute('aria-current') === 'page'
+          && Boolean(root.querySelector('#settings-services'));
+      }, undefined, {timeout: args.timeout});
       if (await page.evaluate(() => location.hash) !== '#host-route') {
         throw new Error('页内设置导航改写了宿主网页路由');
       }
@@ -746,7 +749,8 @@ async function main() {
       if (narrow.appWidth > narrow.width + 2 || narrow.scrollWidth > narrow.width + 2) {
         throw new Error(`窄屏完整设置页横向溢出：${JSON.stringify(narrow)}`);
       }
-      const section = await page.evaluate(() => window.__fluentReadUserscriptSettingsShadow.querySelector('.settings-app h1')?.textContent?.trim());
+      const section = await page.evaluate(() => window.__fluentReadUserscriptSettingsShadow
+        .querySelector('button[data-section="settings-services"]')?.textContent?.trim());
       await page.evaluate(() => {
         const closeButton = window.__fluentReadUserscriptSettingsShadow.querySelector('button.userscript-settings-close');
         if (closeButton?.getAttribute('aria-label') !== '关闭') throw new Error('页内完整设置缺少可访问的关闭按钮');

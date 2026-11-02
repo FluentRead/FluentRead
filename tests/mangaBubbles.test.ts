@@ -1,9 +1,60 @@
 import {describe,expect,it} from 'vitest';
 import {findMangaBubbles,findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
+import {bindImageParagraphGapEvidence,getImageParagraphGapEvidence,produceImageParagraphGapProofs} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
+import {createMangaViewWordBoundaryBudget} from '@/src/features/image-translation/services/mangaViewWordBoundary';
 const image=(w:number,h:number)=>new Uint8ClampedArray(w*h*4);
 function rect(p:Uint8ClampedArray,w:number,x:number,y:number,width:number,height:number,color=[255,255,255,255]){for(let yy=y;yy<y+height;yy++)for(let xx=x;xx<x+width;xx++)p.set(color,(yy*w+xx)*4);}
 const text=(value:string,x:number,y:number,width=40,height=12)=>({text:value,confidence:.99,box:{x,y,width,height}});
 const box=(x:number,y:number,w=80,h=80)=>({x0:x,y0:y,x1:x+w,y1:y+h});
+
+describe('实际普通图片物理行的段落证明采用',()=>{
+    function fixture(){
+        const width=200,height=200,pixels=image(width,height);
+        rect(pixels,width,0,0,width,height,[24,44,68,255]);
+        const first=text('First complete line',40,40,90,14),second=text('Second complete line',40,74,90,14);
+        for(const item of [first,second])for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)
+            rect(pixels,width,x,item.box.y+3,3,8,[240,245,250,255]);
+        return{width,height,pixels,first,second};
+    }
+    it('全页端点被实际局部行替代后不能按相近位置转授续行',()=>{
+        const f=fixture(),local={...f.first,text:'Local complete line',box:{...f.first.box}};
+        const page={results:[f.first,f.second],bubbles:[{bbox:box(30,30,110,110),results:[local]}]};
+        const proofs=produceImageParagraphGapProofs(page,f.width,f.height,f.pixels);
+        const wholeOnly=proofs.filter(proof=>proof.previous===f.first);
+        expect(wholeOnly).toHaveLength(1);
+        const adopted=collectMangaRegions({...page,imageParagraphGapProofs:wholeOnly},'en',f.width,f.height,'image');
+        bindImageParagraphGapEvidence(adopted,'same',f.width,f.height);
+        expect(adopted.map(region=>region.text)).toEqual(['Local complete line','Second complete line']);
+        expect(getImageParagraphGapEvidence(adopted,'same',f.width,f.height)).toBeUndefined();
+    });
+    it('证明外逐项克隆或识别文本改变都不能继承原端点许可',()=>{
+        const f=fixture(),page={results:[f.first,f.second]},proofs=produceImageParagraphGapProofs(page,f.width,f.height,f.pixels);
+        expect(proofs).toHaveLength(1);
+        for(const results of [structuredClone(page.results),[{...f.first,text:'Changed complete line'},f.second]]){
+            const adopted=collectMangaRegions({results,imageParagraphGapProofs:proofs},'en',f.width,f.height,'image');
+            bindImageParagraphGapEvidence(adopted,'same',f.width,f.height);
+            expect(adopted).toHaveLength(2);expect(getImageParagraphGapEvidence(adopted,'same',f.width,f.height)).toBeUndefined();
+        }
+    });
+    it('词界选择产生的新物理行保留原文，却不继承原始端点的间距许可',()=>{
+        const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height);
+        const first=text('AB CD',40,40,33,18),local={...first,text:'ABCD',box:{...first.box}},second=text('Next line',40,80,33,18);
+        let x=42;for(const gap of [2,9,2,0]){rect(pixels,width,x,43,4,12,[20,20,20,255]);x+=4+gap;}
+        for(let dx=43;dx<70;dx+=8)rect(pixels,width,dx,83,3,12,[20,20,20,255]);
+        const bubble={bbox:box(30,30,80,90),results:[local]},page={results:[first,second],bubbles:[bubble]};
+        const gaps=produceImageParagraphGapProofs(page,width,height,pixels);expect(gaps.length).toBeGreaterThan(0);
+        const words=createMangaViewWordBoundaryBudget({width,height,read:roi=>{
+            const data=new Uint8ClampedArray(roi.width*roi.height*4);
+            for(let y=0;y<roi.height;y++)data.set(pixels.subarray(((roi.top+y)*width+roi.left)*4,((roi.top+y)*width+roi.left+roi.width)*4),y*roi.width*4);
+            return data;
+        }}).prove(first,local,bubble)!;expect(words).toBeDefined();
+        const adopted=collectMangaRegions({...page,imageParagraphGapProofs:gaps,wordBoundaryProofs:[words]},'en',width,height,'image');
+        expect(adopted.map(region=>region.text)).toEqual(['AB CD','Next line']);
+        bindImageParagraphGapEvidence(adopted,'same',width,height);
+        expect(getImageParagraphGapEvidence(adopted,'same',width,height)).toBeUndefined();
+    });
+});
+
 // 独立的逐像素四邻域 BFS 作为扫描行实现的拓扑 oracle，保留面积、排序和阈值语义。
 function referenceBubbles(pixels:Uint8ClampedArray,width:number,height:number){
     const white=Array.from({length:width*height},(_,index)=>{

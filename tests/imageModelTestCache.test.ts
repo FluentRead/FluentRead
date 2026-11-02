@@ -11,7 +11,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 import ts from 'typescript';
 const require = createRequire(import.meta.url);
-const {defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest, ensureImageTranslationModelFiles} = require('../scripts/testing/image-model-cache.cjs');
+const {defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest, ensureImageTranslationModelFiles, verifyCachedImageTranslationModelFiles} = require('../scripts/testing/image-model-cache.cjs');
 const helperFile = path.resolve('scripts/testing/image-model-cache.cjs');
 const folders: string[] = [];
 const names = ['det.onnx','rec.onnx','dict.txt','lama.onnx'];
@@ -37,6 +37,70 @@ const childRun = (code: string, options: {cwd?: string} = {}) => new Promise<str
 afterEach(async()=>{await Promise.all(folders.splice(0).map(folder=>fs.rm(folder,{recursive:true,force:true})));});
 
 describe('图片/漫画测试模型共享文件缓存',()=>{
+    it('CTD 只在显式可选清单出现，身份固定且默认 OCR/LaMa 清单不变',()=>{
+        expect(readImageTranslationModelManifest()).toHaveLength(4);
+        const assets=readImageTranslationModelManifest(undefined,{includeSeg:true});
+        expect(assets).toHaveLength(5);
+        expect(assets[4]).toMatchObject({key:'segmentation',kind:'seg',filename:'comictextdetector.pt.onnx',bytes:94669756,
+            sha256:'1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f'});
+        expect(()=>readImageTranslationModelManifest(undefined,{includeSeg:'true'})).toThrow('must be a boolean');
+    });
+
+    it('可选 CTD 拒绝联网模式及不存在的缓存，失败不创建目录或下载',async()=>{
+        const f=await fixture();
+        await expect(ensureImageTranslationModelFiles({...f,kinds:['seg']})).rejects.toThrow('network downloads disabled');
+        await expect(ensureImageTranslationModelFiles({directory:f.directory,kinds:['seg'],allowNetworkDownload:false,fetchImpl:f.fetchImpl}))
+            .rejects.toThrow('unavailable in offline cache');
+        expect(await allFiles(f.root)).toEqual([f.metadataFile]);
+        await expect(fs.stat(f.directory)).rejects.toMatchObject({code:'ENOENT'});
+        expect(f.fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('只读预检逐文件校验命中；损坏或缺失保留所有字节，不导入平面来源或创建锁',async()=>{
+        const f=await fixture(),asset={key:'segmentation',kind:'seg',filename:'small-protocol-fixture.onnx',bytes:bodies[0].length,sha256:sha(bodies[0])};
+        const folder=path.join(f.directory,asset.sha256),file=path.join(folder,asset.filename);
+        await fs.mkdir(folder,{recursive:true});await fs.writeFile(file,bodies[0]);
+        const before=await allFiles(f.directory);
+        const result=await verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset]});
+        expect(result).toMatchObject({networkDownloads:0,readOnly:true});expect(result.files[0].cache).toBe('hit');
+        expect(await allFiles(f.directory)).toEqual(before);
+        const damaged=Buffer.alloc(asset.bytes,7);await fs.writeFile(file,damaged);
+        await expect(verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset]})).rejects.toThrow('Invalid existing');
+        expect(await fs.readFile(file)).toEqual(damaged);expect(await allFiles(f.directory)).toEqual(before);
+        await fs.unlink(file);await fs.writeFile(path.join(f.directory,asset.filename),bodies[0]);
+        await expect(verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset]})).rejects.toThrow('unavailable in offline cache');
+        expect((await allFiles(f.directory)).some(file=>/\.partial-|\.lock$/.test(file))).toBe(false);
+        expect(f.fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it('只读预检拒绝符号链接目录/文件及取消，不触碰目标文件',async()=>{
+        const f=await fixture(),asset={filename:names[0],bytes:bodies[0].length,sha256:sha(bodies[0])},outside=path.join(f.root,'outside');
+        await fs.mkdir(outside);await fs.writeFile(path.join(outside,asset.filename),bodies[0]);await fs.mkdir(f.directory);
+        const folder=path.join(f.directory,asset.sha256);await fs.symlink(outside,folder);
+        await expect(verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset]})).rejects.toThrow('Invalid existing image model cache folder');
+        await fs.unlink(folder);await fs.mkdir(folder);await fs.symlink(path.join(outside,asset.filename),path.join(folder,asset.filename));
+        await expect(verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset]})).rejects.toThrow('Invalid existing image model cache file');
+        const controller=new AbortController();controller.abort();
+        await expect(verifyCachedImageTranslationModelFiles({directory:f.directory,assets:[asset],signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});
+        expect(await fs.readFile(path.join(outside,asset.filename))).toEqual(bodies[0]);
+    });
+
+    it('CTD 显式标志拒绝缺禁下载/其他来源；缺缓存在任何 browser/profile 之前失败',async()=>{
+        const f=await fixture(),playwright=path.join(f.root,'playwright');await fs.mkdir(playwright);
+        await fs.writeFile(path.join(playwright,'index.js'),'module.exports={chromium:{}};');
+        const helper=path.join(f.root,'focus-helper.cjs');await fs.writeFile(helper,'module.exports={launchFocusSafePersistentContext:()=>{throw Error("UNEXPECTED_BROWSER_LAUNCH")}};');
+        const script=path.resolve('scripts/testing/run-manga-translation-test.cjs');
+        const args=[process.execPath,script,'--playwright-root',f.root,'--focus-safe-helper',helper,'--preload-text-seg'];
+        await expect(childRun(`process.argv=${JSON.stringify(args)};require(${JSON.stringify(script)});`)).rejects.toThrow('requires --model-cache-no-download');
+        for(const conflict of [['--baseline'],['--preload-models-dir',f.root],['--offline-models-dir',f.root],['--blocked-official'],['--blocked-all-model-sources']]){
+            await expect(childRun(`process.argv=${JSON.stringify([...args,'--model-cache-no-download',...conflict])};require(${JSON.stringify(script)});`)).rejects.toThrow('requires the shared model cache');
+        }
+        const artifacts=path.join(f.root,'artifacts');
+        await expect(childRun(`process.argv=${JSON.stringify([...args,'--model-cache-no-download','--model-cache-dir',f.directory,'--artifacts-dir',artifacts])};require(${JSON.stringify(script)});`)).rejects.toThrow('unavailable in offline cache');
+        const report=JSON.parse(await fs.readFile(path.join(artifacts,'report.json'),'utf8'));
+        expect(report.profileRemoved).toBe(false);expect(report.failure).toContain('unavailable in offline cache');
+        expect(await allFiles(f.directory)).toEqual([]);
+    });
     it('从生产固定清单读取三个 OCR 文件和可选 LaMa，不复制版本或权威哈希',()=>{
         const assets=readImageTranslationModelManifest();
         expect(assets.map((asset:any)=>asset.kind)).toEqual(['ocr','ocr','ocr','inpaint']);

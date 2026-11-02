@@ -4,14 +4,17 @@
  * 主要内容：以扫描行四邻域填充亮色连通区域，按待处理行段增长轻量栈，不为整图预分配逐像素队列；最多二十四个小裁图参与局部识别，大型曲边浅底组件只提供保守内接区域且不增加推理；用上下边缘占比、行包络实心度、密度和面积界限排除大型矩形或多洞面板，行跨度数组按高度有界复用；同次扫描为大气泡记录最多一百二十八处内部独立浅色岛，超限撤回新增归属，仅排除完整落在岛内的物理框且不传输排除元数据；从已有原像素核对候选边缘浅底，成员绑定原 OCR 结果索引，角落与独立旁白维持原分组；按最小局部候选优先消除嵌套候选对同一物理行的重复，逐行以可靠局部识别替换重叠的全页结果，保留局部漏行与失败时的全页回退；漫画在最紧的所属气泡内合并局部及回退行并保留气泡外可靠旁白，普通图片保留物理行供独立段落策略处理；漫画与图片均保留冲突数字证据并合并重复数字保护框。
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  * 视图边界：原图 owner 可提供有界词界证明；只选择两个已观测原文中的一个并保留局部几何，实际去重接受后确认采用，并按每次分组的实际对象及唯一源框记录内部来历，与原 SDK 观测分离。缺失或失效证明沿用原局部优先规则，不从空白推造字符。
+ * 段落关系：普通图片只将本次实际采用的原始识别对象关联到物理行；词界改写、去重或数字合并后的替代对象不能继承关系。最终数组包含数值及保护框后才封存私有布局旁证，不向正文或阅读属性添加证明。
  */
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericInformation,numericProtection} from './mangaNumeric';
 import {createMangaViewWordBoundaryConsumer,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
+import type {ImageDetectionFrame} from './imageDetectionEvidence';
+import {createImageParagraphGapConsumer,type ImageParagraphGapProof} from './imageParagraphGapEvidence';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
-export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[]}
+export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[];imageDetectionFrames?:ImageDetectionFrame[];imageParagraphGapProofs?:ImageParagraphGapProof[]}
 
 export function findMangaBubbles(pixels:Uint8ClampedArray,width:number,height:number):Box[]{
     return findMangaBubbleLayout(pixels,width,height).recognition;
@@ -178,12 +181,19 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const remaining = page.results.filter(reliable).filter(item => !local.some(items => items.some(candidate => overlapsOcrLine(item, candidate) && !numericConflict(item,candidate))));
     if (profile === 'image') {
         // 普通截图不能套用漫画宽松气泡间距：保留可靠物理行，交给普通段落策略合并。
+        const paragraphGaps=createImageParagraphGapConsumer(page,width,height);
         const lines = [...remaining, ...local.flat()]
-            .flatMap(item => wordBoundaries.record(groupMangaText([item],language,width,height,context(item))
+            .flatMap(item => {
+                const physical=groupMangaText([item],language,width,height,context(item))
                 // 数字不能随普通正文合段，否则将来无法单独阻止翻译和保护原图。
-                .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line),[item]))
+                    .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line);
+                physical.forEach(line=>paragraphGaps.record(item,line));
+                return wordBoundaries.record(physical,[item]);
+            })
             .sort((a,b) => a.bbox.y0-b.bbox.y0 || a.bbox.x0-b.bbox.x0);
-        return appendUncoveredNumericGuards(mergeNumericRegions(lines),guards,guardEvidence);
+        const regions=appendUncoveredNumericGuards(mergeNumericRegions(lines),guards,guardEvidence);
+        paragraphGaps.seal(regions);
+        return regions;
     }
     const fallback = owners.map(() => [] as MangaOcrItem[]), outsideItems: MangaOcrItem[] = [];
     for (const item of remaining) {

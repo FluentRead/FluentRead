@@ -1347,13 +1347,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
     });
 
-    it('reparses a controlled version 22 tracked-Abstract cache, keeps corrections off the inserted heading and reuses version 23 after manual editing', async () => {
+    it.each(['table', 'formula'] as const)('reparses a controlled version 22 %s tracked-Abstract cache, keeps corrections off the inserted heading and reuses version 23 after manual editing', async previousKind => {
         const title = 'a b s t r a c t';
         const body = 'This ordinary abstract paragraph explains the study and its main result.';
         const stable = 'Another independently translated paragraph remains available for review.';
         const gate = deferred<void>();
         let pauseParse = false;
-        // Actual Smith-Levy p1 heading geometry; body strings are self-authored. Full original-PDF parsing is separately verified.
+        // Actual Smith-Levy p1 heading geometry and old table cell; body strings are self-authored. Formula is a compatibility snapshot, not the current-paper baseline.
         ports.pageProvider = async (_pageNumber, page) => {
             if (pauseParse) await gate.promise;
             return {...page,
@@ -1372,9 +1372,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         if (old.binary?.kind !== 'pdf') throw new Error('expected PDF');
         old.segments = old.segments.slice(1).map((segment, id) => ({...segment, id}));
         old.binary.pages[0].segmentIndexes = [0, 1];
+        const cellBounds = {x: 41.159, y: 249.12925, width: 466.30000000000007, height: 32.04675000000003};
         old.binary.pages[0].blocks = old.binary.pages[0].blocks.map(block => block.segmentIndex === 0
-            ? {...block, segmentIndex: -1, kind: 'formula', preserveSource: true, fontWeight: 400}
+            ? {...block, segmentIndex: -1, kind: previousKind, preserveSource: true, fontWeight: 400, ...(previousKind === 'table' ? {cellBounds} : {})}
             : {...block, segmentIndex: block.segmentIndex - 1});
+        if (previousKind === 'table') old.binary.pages[0].preservedRegions = [{id: 'table-1', kind: 'table', ...cellBounds, source: title}];
+        expect(old.binary.pages[0].blocks[0]).toMatchObject({source: title, segmentIndex: -1, kind: previousKind, preserveSource: true,
+            ...(previousKind === 'table' ? {cellBounds} : {})});
         const bytes = fresh.binary.bytes, id = await documentHistoryId(bytes), factory = new IDBFactory(), history = createDocumentHistory(factory);
         const previous = ['旧摘要正文人工校订', '其他段落人工校订'];
         const retained = [{source: 'Previously retained source.', translation: '既有独立校订'}];

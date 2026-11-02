@@ -461,10 +461,22 @@ function tableRegions(shapes: readonly PdfGraphicsShape[], width: number, figure
     }
     const wideRows = rows.filter(row => row.width >= width * .2).sort((a, b) => a.y - b.y);
     const groups: Rectangle[][] = [];
+    let verticalEdges: readonly PdfGraphicsShape[] | undefined;
     for (const row of wideRows) {
         const group = groups.find(group => {
             const last = group.at(-1)!;
-            return row.y - last.y <= 150 && Math.min(right(row), right(last)) - Math.max(row.x, last.x) >= Math.min(row.width, last.width) * 0.7;
+            if (row.y - last.y > 150 || Math.min(right(row), right(last)) - Math.max(row.x, last.x) < Math.min(row.width, last.width) * .7) return false;
+            if (Math.min(row.width, last.width) >= Math.max(row.width, last.width) * .7) return true;
+            // 不等宽的章节分隔线不能仅靠重叠并成表格；真正跨列的表头须有两条竖边连接上下横线。
+            verticalEdges ??= shapes.filter(shape => shape.kind === 'path' && shape.width <= 2 && shape.height >= 4);
+            let left = Infinity, farRight = -Infinity;
+            for (const edge of verticalEdges) {
+                if (edge.y > bottom(last) + 2 || bottom(edge) < row.y - 2
+                    || edge.x < Math.max(row.x, last.x) - 2 || right(edge) > Math.min(right(row), right(last)) + 2) continue;
+                left = Math.min(left, edge.x); farRight = Math.max(farRight, edge.x);
+                if (farRight - left >= 6) return true;
+            }
+            return false;
         });
         if (group) group.push(row); else groups.push([row]);
     }

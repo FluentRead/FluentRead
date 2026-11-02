@@ -24,17 +24,43 @@ const ops = Object.fromEntries(['save', 'restore', 'transform', 'paintFormXObjec
 describe('letter-spaced supported section headings', () => {
     // Smith & Levy (2013), Cognition128 pp302–319, doi:10.1016/j.cognition.2013.02.013, source PDF p1.
     // Source SHA7c325f95f5b54bc529e9c8793d26651c306841c4d1c6b64303997db47a74df77; source p1 states Creative Commons Attribution License.
-    // Only the short heading and factual glyph geometry are retained. Following prose is self-authored.
+    // The first case retains only three source atoms and all four relevant horizontal paths from the 89-atom/26-shape page; other prose is self-authored.
     const original: PdfLayoutAtom = {text: 'a b s t r a c t', x: 200.1259, y: 265.0100742, width: 65.24148868999998,
         height: 8.9663, fontFamily: 'serif', baseline: 270.08500000000004, fontSize: 8.9663};
     const prose = (extra: Partial<PdfLayoutAtom> = {}): PdfLayoutAtom => ({...atom('This paragraph explains the study and its main result.', 200.0125, 289.7574, 307.3733, 7.1731), ...extra});
 
     it('recovers the actual Smith-Levy abstract heading without rewriting its spaced source or glyph geometry', () => {
-        const input = [original, prose()], before = structuredClone(input);
-        const result = analyze(input);
+        const input = [original,
+            {text: 'It is well known that real-time human language processing is highly incremental and con-', x: 200.0125, y: 284.0978241, width: 307.3733474899999, height: 7.1731, fontFamily: 'serif', baseline: 289.7574, fontSize: 7.1731},
+            {text: 'text-driven, and that the strength of a comprehender’s expectation for each word encoun-', x: 200.0125, y: 293.67893377, width: 307.40355095999985, height: 7.1731, fontFamily: 'serif', baseline: 299.33850967, fontSize: 7.1731}];
+        const graphics = [
+            {x: 41.159, y: 250.12925, width: 466.242, height: 0.22674999999998136, kind: 'path' as const},
+            {x: 41.159, y: 279.94919000000004, width: 133.228, height: 0.2268100000000004, kind: 'path' as const},
+            {x: 41.159, y: 334.26122, width: 133.228, height: 0.2267800000000193, kind: 'path' as const},
+            {x: 200.013, y: 279.89252000000005, width: 307.446, height: 0.2834799999999973, kind: 'path' as const},
+        ], before = structuredClone({input, graphics});
+        const result = analyze(input, graphics, 544.252, 742.677);
         expect(result.blocks.find(block => block.source === original.text)).toMatchObject({kind: 'heading', preserveSource: false, lines: [{runs: [original]}]});
         expect(result.blocks.flatMap(block => block.lines!.flatMap(line => line.runs!))).toEqual(input);
-        expect(input).toEqual(before);
+        expect(result.preservedRegions.some(region => region.kind === 'table' && region.y < original.baseline && region.y + region.height > original.baseline)).toBe(false);
+        expect({input, graphics}).toEqual(before);
+    });
+
+    it.each(['connected', 'single edge', 'repeated edge', 'disconnected edges', 'outside edges'] as const)('joins unequal-width table rows only with two real connecting column edges: %s', mode => {
+        const graphics = [{kind: 'path' as const, x: 200, y: 100, width: 180, height: 0},
+            ...[160, 180].map(y => ({kind: 'path' as const, x: 50, y, width: 480, height: 0}))];
+        const xs = mode === 'single edge' ? [200] : mode === 'repeated edge' ? [200, 201] : mode === 'outside edges' ? [40, 550] : [200, 380];
+        graphics.push(...xs.map(x => ({kind: 'path' as const, x, y: mode === 'disconnected edges' ? 120 : 100, width: 0, height: mode === 'disconnected edges' ? 40 : 60})));
+        const result = analyze([atom('Merged group header', 210, 114, 160), atom('Lower table left label', 60, 174, 150), atom('Lower table right label', 300, 174, 180)], graphics);
+        expect(result.preservedRegions.find(region => region.kind === 'table')).toMatchObject({x: 50, width: 480, y: mode === 'connected' ? 99 : 159});
+        expect(result.blocks.find(block => block.source === 'Merged group header')?.kind === 'table').toBe(mode === 'connected');
+    });
+
+    it.each([336, 335.9])('preserves the inclusive .7 similar-width boundary without inventing column edges: %s', width => {
+        const graphics = [{kind: 'path' as const, x: 50, y: 100, width, height: 0}, ...[160, 180].map(y => ({kind: 'path' as const, x: 50, y, width: 480, height: 0}))];
+        const result = analyze([atom('Group header', 60, 114, 180), atom('Lower table label', 60, 174, 180)], graphics);
+        expect(result.preservedRegions.find(region => region.kind === 'table')?.y).toBe(width === 336 ? 99 : 159);
+        expect(result.blocks.find(block => block.source === 'Group header')?.kind === 'table').toBe(width === 336);
     });
 
     it.each(['A B S T R A C T', 'A b s t r a c t', 'r e f e r e n c e s', 'A C K N O W L E D G M E N T S', 'a c k n o w l e d g e m e n t s', 'A P P E N D I X', 'A P P E N D I X  A'])

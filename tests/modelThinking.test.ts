@@ -113,6 +113,8 @@ describe('模型 Thinking 协议映射', () => {
         ['gemini-3.7-flash', false, 'minimum', {thinkingLevel: 'low'}],
         ['gemini-3.8-flash', true, 'toggle', {thinkingLevel: 'medium'}],
         ['gemini-3.8-flash', false, 'minimum', {thinkingLevel: 'low'}],
+        ['gemini-4-argon', true, 'toggle', {thinkingLevel: 'medium'}],
+        ['gemini-4-argon', false, 'minimum', {thinkingLevel: 'low'}],
         ['gemini-3-flash', false, 'minimum', {thinkingLevel: 'minimal'}],
         ['gemini-3.1-flash-lite', true, 'toggle', {thinkingLevel: 'medium'}],
         ['gemini-3.5-flash', false, 'minimum', {thinkingLevel: 'minimal'}],
@@ -220,6 +222,36 @@ describe('模型 Thinking 协议映射', () => {
         });
         expect(apply('claude-messages', services.claude, 'claude-haiku-4-0', true))
             .toEqual({effect: 'unsupported', payload: {model: 'claude-haiku-4-0'}});
+    });
+
+    it('按 Claude 5.5 的不同能力生成有效的思考字段', () => {
+        expect(apply('claude-messages', services.claude, 'claude-opus-5-5', false))
+            .toMatchObject({effect: 'mandatory', payload: {thinking: {type: 'adaptive'}, output_config: {effort: 'low'}}});
+        expect(apply('claude-messages', services.claude, 'claude-opus-5-5', true).payload)
+            .toMatchObject({thinking: {type: 'adaptive'}});
+        expect(apply('claude-messages', services.claude, 'claude-sonnet-5-5', false).payload)
+            .toMatchObject({thinking: {type: 'between_tools'}});
+        expect(apply('claude-messages', services.claude, 'claude-sonnet-5-5', true).payload)
+            .toMatchObject({thinking: {type: 'adaptive'}});
+        expect(apply('claude-messages', services.claude, 'claude-haiku-5-5', false).payload)
+            .toMatchObject({thinking: {type: 'disabled'}});
+        expect(apply('claude-messages', services.claude, 'claude-haiku-5-5', true).payload)
+            .toMatchObject({thinking: {type: 'adaptive'}});
+    });
+
+    it('限制 GPT-6.1 Sol 的最低思考档，并支持 GPT-6 与豆包 2.1 的开关', () => {
+        expect(apply('openai-chat', services.openai, 'gpt-6.1-sol', false))
+            .toMatchObject({effect: 'minimum', payload: {reasoning_effort: 'low'}});
+        for (const model of ['gpt-6-sol', 'gpt-6-luna', 'gpt-6.1-terra']) {
+            expect(apply('openai-chat', services.openai, model, false).payload).toMatchObject({reasoning_effort: 'none'});
+            expect(apply('openai-chat', services.openai, model, true).payload).toMatchObject({reasoning_effort: 'low'});
+        }
+        for (const model of ['doubao-seed-2-1-lite-260915', 'doubao-seed-2-1-pro-260915', 'doubao-seed-2-1-turbo-260628', 'doubao-seed-evolving']) {
+            expect(apply('openai-chat', services.doubao, model, false).payload).toMatchObject({thinking: {type: 'disabled'}});
+            expect(apply('openai-chat', services.doubao, model, true).payload).toMatchObject({thinking: {type: 'enabled'}});
+        }
+        expect(apply('openai-chat', services.doubao, 'doubao-seed-unknown', false))
+            .toEqual({effect: 'unsupported', payload: {model: 'doubao-seed-unknown'}});
     });
 
     it('只给已确认的 OpenAI、OpenRouter 与 Kimi 模型添加兼容字段', () => {

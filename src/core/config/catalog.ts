@@ -400,7 +400,7 @@ export function resolveConfiguredModel(selectedModel?: string, customModel?: str
     return selectedModel === customModelString ? customModel || '' : selectedModel || '';
 }
 
-// 2026-09-12 核对官方目录；来源与选型依据见 docs/reports/model-catalog-20260912.md。
+// 2026-11-03 更新已核实的文本模型；旧版选型依据见 docs/reports/model-catalog-20260912.md。
 // 当前官方模型编号的单一来源，同时供列表和旧配置迁移使用。
 export const currentModelIds = {
     openai: "gpt-5.6-luna",
@@ -472,14 +472,14 @@ export const defaultModelIds = {
 
 export const models = new Map<string, Array<string>>([
     [services.chatgptPlan, []],
-    [services.openai, [defaultModelIds[services.openai], "gpt-5.4-nano", "gpt-6-astra", currentModelIds.openai, "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", customModelString]],
+    [services.openai, [defaultModelIds[services.openai], "gpt-5.4-nano", "gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-sol", "gpt-6-astra", currentModelIds.openai, "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5-mini", "gpt-5-nano", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", customModelString]],
     [services.azureOpenai, [defaultModelIds[services.azureOpenai], currentModelIds.openai, "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.5", "gpt-5.4-nano", "gpt-5-mini", "gpt-5-nano", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano", customModelString]],
-    [services.gemini, [defaultModelIds[services.gemini], "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro", customModelString]],
+    [services.gemini, [defaultModelIds[services.gemini], "gemini-4-argon", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro", customModelString]],
     [services.yiyan, [defaultModelIds[services.yiyan], currentModelIds.yiyan, "ernie-5.0-thinking-preview", "ernie-x1.1-preview", "ernie-4.5-turbo-128k", "ernie-4.5-21b-a3b", customModelString]],
-    [services.tongyi, [defaultModelIds[services.tongyi], "qwen3.7-flash", "qwen3.6-flash", "qwen3.8-max", currentModelIds.tongyiTokenPlan, "qwen3.7-max", "qwen3.7-plus", "qwen-mt-plus", "qwen-mt-turbo", "qwen-mt-flash", "qwen-mt-lite", "qwen-long-latest", customModelString]],
+    [services.tongyi, [defaultModelIds[services.tongyi], "qwen3.7-flash", "qwen3.6-flash", "qwen3.8-max", "qwen3.8-27b", "qwen3.8-2.4t-a95b", currentModelIds.tongyiTokenPlan, "qwen3.7-max", "qwen3.7-plus", "qwen-mt-plus", "qwen-mt-turbo", "qwen-mt-flash", "qwen-mt-lite", "qwen-long-latest", customModelString]],
     [services.zhipu, [defaultModelIds[services.zhipu], currentModelIds.zhipu, "glm-5.3-flash", "glm-5.2", "glm-5.1", "glm-5-turbo", "glm-5", "glm-4.7", customModelString]],
     [services.moonshot, [defaultModelIds[services.moonshot], currentModelIds.moonshot, "kimi-k2.7-code-highspeed", "kimi-k2.7-code", "kimi-k2.5", customModelString]],
-    [services.claude, [defaultModelIds[services.claude], "claude-fable-5-1", currentModelIds.claude, currentModelIds.claudeOpus, currentModelIds.claudeSonnet, "claude-opus-4-8", "claude-sonnet-4-6", customModelString]],
+    [services.claude, [defaultModelIds[services.claude], "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5", "claude-fable-5-1", currentModelIds.claude, currentModelIds.claudeOpus, currentModelIds.claudeSonnet, "claude-opus-4-8", "claude-sonnet-4-6", customModelString]],
     [services.custom, [defaultModelIds[services.custom], currentModelIds.openai, "gpt-5.6-sol", "gemini-3.6-flash", currentModelIds.claude, currentModelIds.deepseek, "gemma:7b", "llama2:7b", "mistral:7b", customModelString]],
     [services.infini, [defaultModelIds[services.infini], "deepseek-v4-pro", currentModelIds.infiniZhipu, "kimi-k2.7-code", currentModelIds.infiniGeneral, "qwen3.6-35b-a3b", customModelString]],
     [services.baichuan, [defaultModelIds[services.baichuan], "Baichuan-M3-Plus", "Baichuan4-Air", "Baichuan4-Turbo", "Baichuan4", customModelString]],
@@ -488,32 +488,33 @@ export const models = new Map<string, Array<string>>([
     [services.deepseek, [currentModelIds.deepseek, "deepseek-v4-pro", "deepseek-v4-flash", customModelString]],
     [services.minimax, [defaultModelIds[services.minimax], "MiniMax-M3.1-flash", "MiniMax-M3", currentModelIds.minimax, "MiniMax-M2.5", "MiniMax-M2.5-highspeed", customModelString]],
     [services.mimo, [defaultModelIds[services.mimo], currentModelIds.mimo, customModelString]],
-    [services.jieyue, [defaultModelIds[services.jieyue], "step-3.5-flash-2603", currentModelIds.jieyue, "step-3", "step-2", customModelString]],
+    [services.jieyue, [defaultModelIds[services.jieyue], "step-3.7-flash", "step-5-preview", "step-3.5-flash-2603", currentModelIds.jieyue, "step-3", "step-2", customModelString]],
     [services.huanYuan, [currentModelIds.huanYuan, customModelString]],
     [services.huanYuanTranslation, [defaultModelIds[services.huanYuanTranslation], "hunyuan-translation", customModelString]],
     [services.localTranslation, [...LOCAL_TRANSLATION_MODELS.map((model) => model.value), customModelString]],
     [services.newapi, [defaultModelIds[services.newapi], currentModelIds.openai, "gpt-5.6-sol", "gemini-3.6-flash", "gemini-3.5-flash-lite", currentModelIds.claude, currentModelIds.deepseek, "kimi-k2.7-code", customModelString]],
     [services.grok, [defaultModelIds[services.grok], "grok-4.6", currentModelIds.grok, customModelString]],
-    [services.doubao, ["doubao-seed-1-6-250615", DOUBAO_SEED_TRANSLATION_MODEL_ID, customModelString]],
+    [services.doubao, ["doubao-seed-1-6-250615", "doubao-seed-2-1-lite-260915", "doubao-seed-2-1-pro-260915", "doubao-seed-2-1-turbo-260628", "doubao-seed-evolving", DOUBAO_SEED_TRANSLATION_MODEL_ID, customModelString]],
 
     // 混合模型。
-    [services.siliconCloud, [defaultModelIds[services.siliconCloud], "deepseek-ai/DeepSeek-V4-Pro", "zai-org/GLM-5.2", "Qwen/Qwen3.6-27B", "Qwen/Qwen3.6-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "deepseek-ai/DeepSeek-R1", customModelString]],
+    [services.siliconCloud, [defaultModelIds[services.siliconCloud], "deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.8-27B", "deepseek-ai/DeepSeek-V4-Pro", "zai-org/GLM-5.2", "Qwen/Qwen3.6-27B", "Qwen/Qwen3.6-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "deepseek-ai/DeepSeek-R1", customModelString]],
 
-    [services.groq, [defaultModelIds[services.groq], currentModelIds.groqLarge, "qwen/qwen3.6-27b", customModelString]],
-    [services.openrouter, [defaultModelIds[services.openrouter], "google/gemini-3.6-flash", "deepseek/deepseek-v4.1-flash", "openai/gpt-5.4-mini", "openai/gpt-6-astra", "x-ai/grok-4.6", "openrouter/auto", "openai/gpt-5.6-luna", "openai/gpt-5.6-sol", "anthropic/claude-fable-5", "anthropic/claude-opus-5", "x-ai/grok-4.5", "deepseek/deepseek-v4-pro", "moonshotai/kimi-k3", "z-ai/glm-5.2", customModelString]],
+    // 旧 Qwen 仅对部分企业账户继续可用，保留以免破坏已保存的选择。
+    [services.groq, [defaultModelIds[services.groq], currentModelIds.groqLarge, "qwen/qwen3.8-27b", "qwen/qwen3.6-27b", customModelString]],
+    [services.openrouter, [defaultModelIds[services.openrouter], "qwen/qwen3.8-flash", "google/gemini-4-argon", "openai/gpt-6-luna", "openai/gpt-6.1-sol", "anthropic/claude-haiku-5.5", "anthropic/claude-sonnet-5.5", "anthropic/claude-opus-5.5", "stepfun/step-3.7-flash", "google/gemini-3.6-flash", "deepseek/deepseek-v4.1-flash", "openai/gpt-5.4-mini", "openai/gpt-6-astra", "x-ai/grok-4.6", "openrouter/auto", "openai/gpt-5.6-luna", "openai/gpt-5.6-sol", "anthropic/claude-fable-5", "anthropic/claude-opus-5", "x-ai/grok-4.5", "deepseek/deepseek-v4-pro", "moonshotai/kimi-k3", "z-ai/glm-5.2", customModelString]],
 
     // 支持的 OpenAI 兼容平台。列表只放各家稳定的公开编号，
     // 平台上新更快，用户可以随时用“自定义模型”补充。
-    [services.mistral, [defaultModelIds[services.mistral], "mistral-medium-latest", "mistral-large-latest", "magistral-small-latest", "open-mistral-nemo", customModelString]],
+    [services.mistral, [defaultModelIds[services.mistral], "mistral-large-4", "mistral-medium-latest", "mistral-large-latest", "magistral-small-latest", "open-mistral-nemo", customModelString]],
     [services.cohere, [defaultModelIds[services.cohere], "command-a-03-2025", "command-r7b-12-2024", "command-r-plus", customModelString]],
     [services.cerebras, [defaultModelIds[services.cerebras], currentModelIds.groqLarge, "qwen-3-32b", "llama-3.3-70b", customModelString]],
-    [services.togetherai, [defaultModelIds[services.togetherai], "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct-Turbo", customModelString]],
+    [services.togetherai, [defaultModelIds[services.togetherai], "Qwen/Qwen3.8-27B", "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct-Turbo", customModelString]],
     [services.fireworks, [defaultModelIds[services.fireworks], "accounts/fireworks/models/gpt-oss-120b", "accounts/fireworks/models/qwen3-30b-a3b", "accounts/fireworks/models/deepseek-v3p2", customModelString]],
-    [services.deepinfra, [defaultModelIds[services.deepinfra], "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct", customModelString]],
+    [services.deepinfra, [defaultModelIds[services.deepinfra], "Qwen/Qwen3.8-27B", "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct", customModelString]],
     [services.perplexity, [defaultModelIds[services.perplexity], "sonar-pro", "sonar-reasoning", customModelString]],
     [services.runcrate, [defaultModelIds[services.runcrate], "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash", "openai/gpt-oss-120b", customModelString]],
     [services.cloudgpu, [defaultModelIds[services.cloudgpu], "kimi-k3", "qwen3.6-35b", customModelString]],
-    [services.ollama, [defaultModelIds[services.ollama], "qwen3:8b", "gemma3:12b", "llama3.2:3b", "mistral:7b", customModelString]],
+    [services.ollama, [defaultModelIds[services.ollama], "qwen3.8:27b", "qwen3.8-flash-next:125b-a6b-q4_K_M", "qwen3.8-flash-next:125b-mlx", "qwen3:8b", "gemma3:12b", "llama3.2:3b", "mistral:7b", customModelString]],
 ]);
 
 // 每个需要模型选择的 AI 服务都把列表第一项作为开箱即用的默认模型。

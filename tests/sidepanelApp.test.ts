@@ -37,10 +37,12 @@ beforeEach(() => {
 afterEach(() => {app.unmount();vi.unstubAllGlobals();});
 
 describe('translation sidepanel app composition', () => {
-    it('shares the compact translation surface and opens normal or service-specific settings', async () => {
+    it('opens the settings translation center and preserves service-specific navigation', async () => {
         expect(host.querySelector('.sidepanel-header h1')!.textContent).toBe('翻译中心');
         expect(host.querySelector('.center-port')!.getAttribute('data-surface')).toBe('sidebar');
-        await click('.sidepanel-header button');expect(ports.settings).toHaveBeenCalledOnce();
+        expect(host.querySelector('.sidepanel-header button')!.getAttribute('aria-label')).toBe('sidepanel.openCenter');
+        await click('.sidepanel-header button');expect(ports.createTab).toHaveBeenCalledWith({url: 'chrome-extension://fixture/options.html#settings-translation-center'});
+        expect(ports.settings).not.toHaveBeenCalled();
         await click('.configure-service');expect(ports.createTab).toHaveBeenCalledWith({url: 'chrome-extension://fixture/options.html?service=custom%3Atest+with+spaces#settings-services'});
         await click('.configure-general');expect(ports.createTab).toHaveBeenLastCalledWith({url: 'chrome-extension://fixture/options.html#settings-general'});
     });
@@ -55,11 +57,11 @@ describe('translation sidepanel app composition', () => {
         const calls = ports.skin.mock.calls.length;ports.media.dispatchEvent(new Event('change'));expect(ports.skin).toHaveBeenCalledTimes(calls);
     });
     it('shows a navigation failure, permits retry and ignores a reply after unmount', async () => {
-        ports.settings.mockRejectedValueOnce(new Error('closed'));await click('.sidepanel-header button');expect(host.querySelector('[role="alert"]')).not.toBeNull();
+        ports.createTab.mockRejectedValueOnce(new Error('closed'));await click('.sidepanel-header button');expect(host.querySelector('[role="alert"]')).not.toBeNull();
         await click('.sidepanel-header button');expect(host.querySelector('[role="alert"]')).toBeNull();
         let fail!: (error: Error) => void;ports.createTab.mockReturnValueOnce(new Promise((_, reject) => {fail = reject;}));
         const oldSettings = host.querySelector<HTMLButtonElement>('.sidepanel-header button')!;
-        await click('.configure-service');app.unmount();app = {unmount() {}} as vue.App;oldSettings.click();expect(ports.settings).toHaveBeenCalledTimes(2);fail(new Error('late'));await Promise.resolve();
+        await click('.configure-service');app.unmount();app = {unmount() {}} as vue.App;oldSettings.click();expect(ports.createTab).toHaveBeenCalledTimes(3);fail(new Error('late'));await Promise.resolve();
         expect(host.textContent).toBe('');
     });
 });

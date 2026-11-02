@@ -67,6 +67,8 @@ export const zhCNMessages = {
     "translationCenter.modelMissing": "请先选择或填写一个模型。",
     "translationCenter.noReady": "请先配置至少一个服务，再开始翻译。",
     'sidepanel.title': '侧边栏翻译',
+    'sidepanel.openCenter': '在设置中打开翻译中心',
+    'sidepanel.keyboardHint': 'Enter 翻译 · Shift + Enter 换行',
     'sidepanel.openError': '无法打开侧边栏，请重试或从浏览器侧边栏菜单打开流畅阅读。',
     'sidepanel.settingsError': '无法打开设置，请重试。',
     'sidepanel.startupError': '翻译面板加载失败，请重新加载。',

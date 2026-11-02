@@ -72,6 +72,8 @@ export const enUSMessages = {
     "translationCenter.modelMissing": "Choose or enter a model first.",
     "translationCenter.noReady": "Configure at least one service to translate.",
     'sidepanel.title': 'Sidebar translation',
+    'sidepanel.openCenter': 'Open Translation Center in settings',
+    'sidepanel.keyboardHint': 'Enter to translate · Shift + Enter for a new line',
     'sidepanel.openError': 'Could not open the sidebar. Try again or open FluentRead from the browser sidebar menu.',
     'sidepanel.settingsError': 'Could not open settings. Try again.',
     'sidepanel.startupError': 'Could not load the translation panel. Please reload.',

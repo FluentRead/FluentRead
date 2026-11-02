@@ -71,6 +71,8 @@ export const ruRUMessages = {
     "translationCenter.modelMissing": "Сначала выберите или введите модель.",
     "translationCenter.noReady": "Настройте хотя бы один сервис для перевода.",
     'sidepanel.title': 'Перевод на боковой панели',
+    'sidepanel.openCenter': 'Открыть центр перевода в настройках',
+    'sidepanel.keyboardHint': 'Enter — перевод · Shift + Enter — новая строка',
     'sidepanel.openError': 'Не удалось открыть боковую панель. Повторите попытку или откройте FluentRead через меню боковой панели браузера.',
     'sidepanel.settingsError': 'Не удалось открыть настройки. Повторите попытку.',
     'sidepanel.startupError': 'Не удалось загрузить панель перевода. Перезагрузите страницу.',

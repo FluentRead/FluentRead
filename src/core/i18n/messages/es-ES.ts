@@ -71,6 +71,8 @@ export const esESMessages = {
     "translationCenter.modelMissing": "Primero elige o introduce un modelo.",
     "translationCenter.noReady": "Configura al menos un servicio para traducir.",
     'sidepanel.title': 'Traducción en la barra lateral',
+    'sidepanel.openCenter': 'Abrir el centro de traducción en ajustes',
+    'sidepanel.keyboardHint': 'Enter para traducir · Mayús + Enter para nueva línea',
     'sidepanel.openError': 'No se pudo abrir la barra lateral. Reintenta o abre FluentRead desde el menú lateral del navegador.',
     'sidepanel.settingsError': 'No se pudieron abrir los ajustes. Reintenta.',
     'sidepanel.startupError': 'No se pudo cargar el panel de traducción. Vuelve a cargarlo.',

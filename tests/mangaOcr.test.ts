@@ -2,14 +2,14 @@ vi.mock('@/src/shared/onnx/resources', async original => ({...await original<any
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const mocks = vi.hoisted(() => ({assets:vi.fn(),remove:vi.fn(),initialize:vi.fn(),recognize:vi.fn(),retryRecognition:vi.fn(),destroy:vi.fn(),options:vi.fn(),
     gpu:vi.fn(),cpuCreate:vi.fn(),sessions:[] as any[],detectors:[] as any[],recognitors:[] as any[],recognitionProcessor:vi.fn(),recognitionRun:vi.fn(),createProcessor:vi.fn(),inpaintDispose:vi.fn(),bitmapClose:vi.fn(),contexts:[] as any[],canvases:[] as any[],
-    workerPrepare:vi.fn(),workerRequest:vi.fn(),workerRelease:vi.fn(),workerDispose:vi.fn(),encode:vi.fn(),planDeskew:vi.fn(),trimDeskew:vi.fn(),pace:vi.fn((operation:()=>Promise<unknown>)=>operation()),
+    workerPrepare:vi.fn(),workerRequest:vi.fn(),workerRelease:vi.fn(),workerDispose:vi.fn(),encode:vi.fn(),planDeskew:vi.fn(),trimDeskew:vi.fn(),detectionRun:vi.fn(),pace:vi.fn((operation:()=>Promise<unknown>)=>operation()),
     wasm:{numThreads:0,wasmPaths:undefined as unknown,proxy:true}}));
 vi.mock('@/src/features/image-translation/services/mangaOcrAssets', async importOriginal => ({...await importOriginal<any>(),loadMangaOcrAssets:mocks.assets,removeMangaOcrAssets:mocks.remove}));
 vi.mock('onnxruntime-web/webgpu',()=>({env:{wasm:mocks.wasm},InferenceSession:{create:mocks.cpuCreate}}));
 vi.mock('@/src/shared/onnx/webgpu',()=>({probeWebGpu:mocks.gpu}));
 vi.mock('ppu-paddle-ocr/web',()=>({
     RecognitionService:class{platform={canvas:{createProcessor:(canvas:unknown)=>mocks.recognitionProcessor(canvas)}};constructor(public session:unknown,public options:unknown,public debugging:unknown){mocks.recognitors.push(this);}async run(...args:unknown[]){return mocks.recognitionRun.apply(this,args);}},
-    DetectionService:class{platform={canvas:{createProcessor:(canvas:unknown)=>mocks.createProcessor(canvas)}};constructor(public session:unknown,public options:unknown){mocks.detectors.push(this);}},
+    DetectionService:class{platform={canvas:{createProcessor:(canvas:unknown)=>mocks.createProcessor(canvas)}};constructor(public session:unknown,public options:unknown){mocks.detectors.push(this);}async run(...args:unknown[]){return mocks.detectionRun.apply(this,args);}},
     PaddleOcrService:class{constructor(public options:any){mocks.options(options)}recognitor={run:mocks.retryRecognition};detectionSession=mocks.sessions[0];recognitionSession=mocks.sessions[1];async initialize(){return mocks.initialize();}recognize=mocks.recognize;destroy=mocks.destroy;}
 }));
 vi.mock('@/src/features/image-translation/services/mangaInpainting',()=>({mangaInpaintingRuntime:{dispose:mocks.inpaintDispose}}));
@@ -21,18 +21,167 @@ import * as mangaOcrColor from '@/src/features/image-translation/services/mangaO
 import {planMangaOcrTiles, mergeMangaOcrTiles,collectMangaOcrTileNumericEvidence} from '@/src/features/image-translation/services/mangaOcrTiles';
 import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
 import {getMangaViewWordBoundaryProvenance} from '@/src/features/image-translation/services/mangaViewWordBoundary';
+import {getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
+import {getImageParagraphGapEvidence} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 // 原生会话端口仍用fake推理，feeds保持SDK真实固定输入域，不以空对象绕过门禁。
 const recognitionFeeds=()=>({x:{type:'float32',dims:[1,3,48,8]}});
 const opaquePixels=()=>{const pixels=new Uint8ClampedArray(200*200*4);for(let index=3;index<pixels.length;index+=4)pixels[index]=255;return pixels;};
 const response = {results:[{text:'Hello world',confidence:0.99,box:{x:10,y:10,width:100,height:20}}]};
 const deferred = <T,>() => {let resolve!:(v:T)=>void,reject!:(e:unknown)=>void;const promise=new Promise<T>((a,b)=>{resolve=a;reject=b});return {promise,resolve,reject}};
 const tick = async () => {for(let i=0;i<6;i++)await Promise.resolve()};
+beforeEach(()=>{mocks.detectionRun.mockReset().mockResolvedValue([]);});
+describe('同次原比例检测侧车生产与私有绑定',()=>{
+    function detectorFixture(transparent=true){
+        const probabilities=new Float32Array(224*224);probabilities[15*224+15]=.9;
+        const output:Record<string,{data:Float32Array|Uint8Array;dims:number[]}>={probability:{data:probabilities,dims:[1,1,224,224]}};
+        const feeds:{x?:{type:string;dims:number[]}}={x:{type:'float32',dims:[1,3,224,224]}};
+        const run=vi.fn(async()=>output),session={run,outputNames:['probability']};mocks.sessions=[session];
+        mocks.detectionRun.mockImplementation(async function(this:any){await this.session.run(feeds);return [];});
+        mocks.recognize.mockImplementation(async function(this:any,canvas:unknown){await this.detector.run(canvas);return response;});
+        if(transparent){
+            const original=vi.mocked(document.createElement).getMockImplementation()!;let first=true;
+            vi.mocked(document.createElement).mockImplementation(()=>{const canvas=original('canvas');if(first){first=false;const data=opaquePixels();data[3]=0;mocks.contexts.at(-1).getImageData.mockReturnValue({data});}return canvas;});
+        }
+        return {probabilities,output,run,session,feeds};
+    }
+    it('复用一次SDK推理原概率，只打包原比例内容，公开后处理与原文字保持',async()=>{
+        const fixture=detectorFixture(),port=await createBrowserMangaOcr();
+        const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.results).toEqual(response.results);expect(fixture.run).toHaveBeenCalledOnce();
+        expect(page.imageDetectionFrames).toHaveLength(1);const frame=page.imageDetectionFrames![0];
+        expect(frame).toMatchObject({pageWidth:200,pageHeight:200,x:0,y:0,width:200,height:200});
+        expect(frame.bits).toHaveLength(5000);expect(frame.bits[(15*200+15)>>3]&(1<<((15*200+15)&7))).not.toBe(0);
+        expect(fixture.probabilities).toHaveLength(224*224);expect(fixture.probabilities[15*224+15]).toBeCloseTo(.9);await port.destroy();
+    });
+    it('普通漫画不请求侧车，不复制检测张量或更改既有推理数量',async()=>{
+        const fixture=detectorFixture(),port=await createBrowserMangaOcr();
+        const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();expect(page.results).toEqual(response.results);await port.destroy();
+    });
+    it('完全不透明图像即使选择Paddle图片模式也不打包或复制侧车',async()=>{
+        const fixture=detectorFixture(false),port=await createBrowserMangaOcr();
+        const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();expect(page.results).toEqual(response.results);await port.destroy();
+    });
+    it('维度不符或检测中原Canvas变更都不产生可借用侧车',async()=>{
+        const fixture=detectorFixture();fixture.output.probability.dims=[1,1,192,224];
+        const port=await createBrowserMangaOcr();expect((await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true})).imageDetectionFrames).toBeUndefined();
+        fixture.output.probability.dims=[1,1,224,224];
+        mocks.detectionRun.mockImplementation(async function(this:any,canvas:any){canvas.width++;await this.session.run({x:{type:'float32',dims:[1,3,224,224]}});return [];});
+        expect((await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true})).imageDetectionFrames).toBeUndefined();await port.destroy();
+    });
+    it.each(['auto','missing',0] as const)('SDK公开检测选项没有可证明正数比例时仍识别，但不借检测侧车：%s',async limit=>{
+        const fixture=detectorFixture();
+        // 在SDK公开构造选项入口模拟auto/省略/无效数值；不触碰派生类私有缓存。
+        mocks.options.mockImplementationOnce(options=>{
+            if(limit==='missing')delete options.detection.maxSideLength;
+            else options.detection.maxSideLength=limit;
+        });
+        const port=await createBrowserMangaOcr(),page=await port.recognize('unknown resize',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.results).toEqual(response.results);expect(page.imageDetectionFrames).toBeUndefined();
+        expect(fixture.run).toHaveBeenCalledOnce();expect(fixture.probabilities[15*224+15]).toBeCloseTo(.9);await port.destroy();
+    });
+    it('明确缩小的SDK输入不冒充原比例帧，即使输入输出填充尺寸彼此相同',async()=>{
+        const fixture=detectorFixture();mocks.options.mockImplementationOnce(options=>{options.detection.maxSideLength=100;});
+        fixture.feeds.x!.dims=[1,3,128,128];fixture.output.probability={data:new Float32Array(128*128),dims:[1,1,128,128]};
+        const port=await createBrowserMangaOcr(),page=await port.recognize('scaled detector',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.results).toEqual(response.results);expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();await port.destroy();
+    });
+    it.each(['missing-x','input-rank','input-batch','input-channels','missing-output','output-rank','output-batch','output-channels','output-width','output-not-float32','changed-height','different-canvas'] as const)(
+        '公开推理端口无法证明同一原比例平面时不发布侧车且保留原SDK结果：%s',async mismatch=>{
+            const fixture=detectorFixture();
+            if(mismatch==='missing-x')delete fixture.feeds.x;
+            if(mismatch==='input-rank')fixture.feeds.x!.dims=[1,3,224];
+            if(mismatch==='input-batch')fixture.feeds.x!.dims[0]=2;
+            if(mismatch==='input-channels')fixture.feeds.x!.dims[1]=1;
+            if(mismatch==='missing-output')delete fixture.output.probability;
+            if(mismatch==='output-rank')fixture.output.probability.dims=[1,224,224];
+            if(mismatch==='output-batch')fixture.output.probability.dims[0]=2;
+            if(mismatch==='output-channels')fixture.output.probability.dims[1]=2;
+            if(mismatch==='output-width')fixture.output.probability.dims[3]=192;
+            if(mismatch==='output-not-float32')fixture.output.probability.data=new Uint8Array(224*224);
+            if(mismatch==='changed-height')mocks.detectionRun.mockImplementation(async function(this:any,canvas:any){canvas.height++;await this.session.run(fixture.feeds);return [];});
+            if(mismatch==='different-canvas')mocks.recognize.mockImplementation(async function(this:any,canvas:any){await this.detector.run({width:canvas.width,height:canvas.height});return response;});
+            const port=await createBrowserMangaOcr(),page=await port.recognize('unproven detector plane',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+            expect(page.results).toEqual(response.results);expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();
+            expect(fixture.probabilities[15*224+15]).toBeCloseTo(.9);await port.destroy();
+        },
+    );
+    it('session未声明首输出名时只读取SDK固定检测输出名，不执行第二次推理',async()=>{
+        const fixture=detectorFixture();fixture.session.outputNames=[];
+        fixture.output['sigmoid_0.tmp_0']=fixture.output.probability;delete fixture.output.probability;
+        const port=await createBrowserMangaOcr(),page=await port.recognize('default output name',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.results).toEqual(response.results);expect(page.imageDetectionFrames).toHaveLength(1);
+        expect(page.imageDetectionFrames![0].bits[(15*200+15)>>3]&(1<<((15*200+15)&7))).not.toBe(0);
+        expect(fixture.run).toHaveBeenCalledOnce();expect(fixture.run).toHaveBeenCalledWith(fixture.feeds);await port.destroy();
+    });
+    it('绑定实际regions数组与同图，不把bits混进文字、阅读或结构克隆',async()=>{
+        const bits=new Uint8Array(5000);bits[(15*200+15)>>3]|=1<<((15*200+15)&7);
+        const port={recognize:vi.fn(async(_image:string,_options:unknown)=>({...response,imageDetectionFrames:[{pageWidth:200,pageHeight:200,x:0,y:0,width:200,height:200,bits}]})),destroy:vi.fn()};
+        const runtime=createMangaOcrRuntime(async()=>port),regions=await runtime.recognize('same','en',200,200,undefined,undefined,undefined,'image');
+        const evidence=getImageDetectionEvidence(regions,'same',200,200)!;
+        expect(evidence.forBox({x0:14,y0:14,x1:16,y1:16},{left:6,top:6,width:18,height:18})!(15,15)).toBe(true);
+        expect(getImageDetectionEvidence([...regions],'same',200,200)).toBeUndefined();expect(getImageDetectionEvidence(regions,'other',200,200)).toBeUndefined();
+        expect(JSON.stringify(regions)).not.toMatch(/imageDetection|bits|core/u);
+        expect(port.recognize.mock.calls[0][1]).toMatchObject({imageDetectionEvidence:true});await runtime.dispose();
+    });
+});
 beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.contexts=[];mocks.canvases=[];mocks.sessions=[];mocks.detectors=[];mocks.recognitors=[];mocks.recognitionProcessor.mockReset();mocks.createProcessor.mockReset();mocks.gpu.mockResolvedValue({available:false,info:''});mocks.assets.mockResolvedValue({charactersDictionary:new ArrayBuffer(4)});mocks.initialize.mockResolvedValue(undefined);mocks.destroy.mockResolvedValue(undefined);mocks.remove.mockResolvedValue(undefined);mocks.inpaintDispose.mockResolvedValue(undefined);mocks.recognize.mockResolvedValue(response);vi.stubGlobal('GPUDevice',class{get adapterInfo(){return {};}});vi.stubGlobal('chrome',{runtime:{getURL:(p:string)=>'chrome-extension://test'+p}});vi.stubGlobal('fetch',vi.fn(async()=>new Response(new Uint8Array([1,2,3]))));
     mocks.recognitionRun.mockReset().mockImplementation((...args:unknown[])=>mocks.retryRecognition(...args));mocks.retryRecognition.mockReset().mockResolvedValue([]);mocks.planDeskew.mockReset().mockReturnValue(undefined);mocks.trimDeskew.mockReset().mockReturnValue(undefined);mocks.workerPrepare.mockReset().mockResolvedValue(undefined);mocks.workerRequest.mockReset().mockResolvedValue(response);mocks.workerRelease.mockReset().mockResolvedValue(undefined);mocks.encode.mockReset().mockResolvedValue('data:image/png;base64,rasterized');
     vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:200,height:200,close:mocks.bitmapClose})));
     vi.stubGlobal('document',{createElement:vi.fn(()=>{const ctx={drawImage:vi.fn(),fillRect:vi.fn(),putImageData:vi.fn(),translate:vi.fn(),rotate:vi.fn(),getImageData:vi.fn(()=>({data:opaquePixels()}))};const canvas={width:0,height:0,getContext:vi.fn(()=>ctx)};mocks.contexts.push(ctx);mocks.canvases.push(canvas);return canvas;})});
 });
 afterEach(async()=>{await mangaOcrRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks()});
+
+describe('普通图片的段落静区证明生产与实际结果绑定',()=>{
+    function paragraphFixture(alpha=255){
+        const pixels=new Uint8ClampedArray(200*200*4);
+        for(let index=0;index<pixels.length;index+=4)pixels.set([24,44,68,alpha],index);
+        const results=[{text:'First complete line',confidence:.99,box:{x:40,y:40,width:90,height:14}},
+            {text:'Second complete line',confidence:.99,box:{x:40,y:74,width:90,height:14}}];
+        for(const item of results)for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)
+            for(let y=item.box.y+3;y<item.box.y+11;y++)for(let dx=0;dx<3;dx++)pixels.set([240,245,250,255],(y*200+x+dx)*4);
+        const factory=vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementation(()=>{
+            const canvas=factory('canvas');mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});return canvas;
+        });
+        mocks.recognize.mockResolvedValue({results});
+        return{pixels,results,options:{flatten:true as const,noCache:true as const,strategy:'per-box' as const,imageDetectionEvidence:true as const}};
+    }
+    it.each([255,224])('alpha=%s复用既有整图读取，证明随结果graph克隆后只绑定实际数组和原图',async alpha=>{
+        const f=paragraphFixture(alpha),port=await createBrowserMangaOcr(),page=await port.recognize('source',f.options);
+        expect(page.imageParagraphGapProofs).toHaveLength(1);
+        expect(mocks.recognize).toHaveBeenCalledOnce();expect(mocks.canvases).toHaveLength(1);
+        expect(mocks.contexts.flatMap(context=>context.getImageData.mock.calls)).toEqual([[0,0,200,200]]);
+        expect(mocks.contexts[0].putImageData).toHaveBeenCalledTimes(alpha===255?0:1);
+        expect(page.results).toEqual(f.results);expect(page.results[0]).toBe(f.results[0]);expect(page.imageDetectionFrames).toBeUndefined();
+        const cloned=structuredClone(page);
+        // structured clone必须保留同一消息graph内部的原端点引用；不接受按坐标重建的替代对象。
+        expect(cloned.imageParagraphGapProofs![0].previous).toBe(cloned.results[0]);
+        expect(cloned.imageParagraphGapProofs![0].next).toBe(cloned.results[1]);
+        const runtime=createMangaOcrRuntime(async()=>({recognize:vi.fn(async()=>cloned),destroy:vi.fn()}));
+        const regions=await runtime.recognize('original-uri','en',200,200,undefined,undefined,undefined,'image');
+        const evidence=getImageParagraphGapEvidence(regions,'original-uri',200,200)!;
+        expect(evidence).toBeDefined();expect(evidence.successor(regions[0])).toBe(regions[1]);
+        expect(getImageParagraphGapEvidence([...regions],'original-uri',200,200)).toBeUndefined();
+        expect(getImageParagraphGapEvidence(regions,'different-uri',200,200)).toBeUndefined();
+        expect(getImageParagraphGapEvidence(regions,'original-uri',199,200)).toBeUndefined();
+        expect(getImageParagraphGapEvidence(structuredClone(regions),'original-uri',200,200)).toBeUndefined();
+        expect(JSON.stringify(regions)).not.toMatch(/imageParagraph|proof|pixels|Snapshot/iu);
+        expect(regions).toHaveLength(2);expect(regions.every(region=>region.sourceBoxes===undefined)).toBe(true);
+        await runtime.dispose();await port.destroy();
+    });
+    it('漫画请求不生产段落例外，不透明无候选图片也保持单次读取和原识别次数',async()=>{
+        const f=paragraphFixture(),port=await createBrowserMangaOcr();
+        const manga=await port.recognize('manga',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(manga.imageParagraphGapProofs).toBeUndefined();
+        mocks.recognize.mockResolvedValue({results:[f.results[0]]});
+        const image=await port.recognize('ordinary-no-pair',f.options);
+        expect(image.imageParagraphGapProofs).toBeUndefined();expect(mocks.recognize).toHaveBeenCalledTimes(2);
+        expect(mocks.contexts.flatMap(context=>context.getImageData.mock.calls)).toEqual([[0,0,200,200],[0,0,200,200]]);
+        expect(mocks.canvases).toHaveLength(2);await port.destroy();
+    });
+});
 
 it('方向复识别覆盖原数字时保留原始物理证据，避免重跑模型',async()=>{
     const source={text:'90%',confidence:.8,box:{x:30,y:20,width:20,height:100}};
@@ -892,6 +1041,16 @@ describe('漫画本地神经 OCR 会话',()=>{
         expect(mocks.workerRequest).toHaveBeenCalledWith({type:'recognize',image},controller.signal,progress);
         expect(mocks.encode).not.toHaveBeenCalled();expect(document.createElement).not.toHaveBeenCalled();
         expect(source.src).toBe(image);
+    });
+
+    it('普通图片profile向默认Worker传递侧车请求标志，漫画默认请求仍不加该标志',async()=>{
+        const image='data:image/png;base64,image-profile',controller=new AbortController(),progress=vi.fn();
+        expect(await mangaOcrRuntime.recognize(image,'en',200,200,controller.signal,progress,undefined,'image')).toHaveLength(1);
+        expect(mocks.workerRequest).toHaveBeenLastCalledWith({type:'recognize',image,imageDetectionEvidence:true},controller.signal,progress);
+        expect(mocks.encode).not.toHaveBeenCalled();expect(document.createElement).not.toHaveBeenCalled();
+        expect(await mangaOcrRuntime.recognize('default manga','en',200,200)).toHaveLength(1);
+        expect(mocks.workerRequest).toHaveBeenLastCalledWith({type:'recognize',image:'default manga'},undefined,undefined);
+        expect(mocks.workerPrepare).toHaveBeenCalledOnce();
     });
 
     it.each(['context','drawing','encoding'])('默认 Worker 的 SVG 栅格化失败不发送推理，释放画布并保留原错误和图片：%s',async failureStage=>{

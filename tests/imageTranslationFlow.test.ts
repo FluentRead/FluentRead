@@ -826,6 +826,30 @@ it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('普通图�
 });
 
 describe('普通图片提示入口的焦点与恢复', () => {
+    it.each(['loading','error'] as const)('已有结果在%s时保留主操作条文字入口，真实点击与Escape继续可达',phase=>{
+        const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+        const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);
+        ui.setLines([{text:'完整旧译文',sourceText:'SOURCE',renderSkipped:true}]);ui.update(phase,'状态检查',{retainedReading:true});
+        const inspect=document.querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;
+        expect(inspect.hidden).toBe(false);expect(inspect.closest('.fr-image-more')).toBeNull();expect(ui.element.hidden).toBe(false);
+        let active:Element=inspect;Object.defineProperty(document,'activeElement',{configurable:true,get:()=>active});
+        vi.spyOn(ui.reader,'focus').mockImplementation(()=>{active=ui.reader;});const focus=vi.spyOn(inspect,'focus').mockImplementation(()=>{active=inspect;});
+        const click=()=>{const event=new window.Event('click',{bubbles:true});Object.defineProperties(event,{isTrusted:{value:true},detail:{value:0}});inspect.dispatchEvent(event);};
+        click();expect(ui.reader.hidden).toBe(false);expect(ui.reader.textContent).toContain('完整旧译文');expect(active).toBe(ui.reader);
+        ui.update(phase,'仍在检查',{retainedReading:true});expect(ui.reader.hidden).toBe(false);
+        ui.setLines([{text:'完整旧译文更新'}]);expect(inspect.hidden).toBe(false);
+        const escape=new window.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperties(escape,{isTrusted:{value:true},key:{value:'Escape'}});ui.reader.dispatchEvent(escape);
+        expect(ui.reader.hidden).toBe(true);expect(focus).toHaveBeenCalledOnce();expect(active).toBe(inspect);
+        click();expect(ui.reader.hidden).toBe(false);ui.update(phase,'没有保留结果');expect(ui.reader.hidden).toBe(true);expect(inspect.hidden).toBe(true);
+        ui.setLines([]);ui.update(phase,'空结果',{retainedReading:true});expect(inspect.hidden).toBe(true);click();expect(ui.reader.hidden).toBe(true);
+        ui.dispose();
+    });
+    it('idle不能借保留结果选项打开隐藏阅读器',()=>{
+        const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+        const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);ui.setLines([{text:'旧译文'}]);ui.update('idle','翻译图片',{retainedReading:true});
+        const inspect=document.querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;expect(inspect.hidden).toBe(true);
+        const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:true});inspect.dispatchEvent(event);expect(ui.reader.hidden).toBe(true);ui.dispose();
+    });
     function fixture() {
         const {document,window}=parseHTML('<html><body><button id="outside">外部</button></body></html>');vi.stubGlobal('document',document);
         const onAction=vi.fn(),ui=createImageControls({onAction,onPrepare(){}});document.body.append(ui.element,ui.feedback);

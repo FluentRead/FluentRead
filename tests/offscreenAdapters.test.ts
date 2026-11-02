@@ -102,17 +102,45 @@ describe('area translation Offscreen adapter', () => {
 
 describe('image translation Offscreen adapter', () => {
     const adapter = createImageTranslationOffscreenAdapter(client);
-    it('仅普通图的非空文字结果可标记为保留宿主原图',async()=>{
+    it('validates the missing-segmentation retry marker only on an ordinary skipped unchanged result',async()=>{
+        const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
+        const response={success:true,image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines};
+        send.mockResolvedValueOnce(response);
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
+        for(const invalid of [
+            {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
+            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[]},{...response,lines:[null,'bad',{}, {renderSkipped:'true'}]},
+        ]){send.mockResolvedValueOnce(invalid);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
+        send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
+    });
+    it('preserves optional segmentation readiness, accepts older model statuses and rejects malformed optional fields',async()=>{
+        const base={success:true,ready:true,bytes:123,inpaintingReady:true};
+        for(const segmentationReady of [true,false]){
+            send.mockResolvedValueOnce({...base,segmentationReady});
+            await expect(adapter.getMangaModelStatus()).resolves.toEqual({ready:true,bytes:123,inpaintingReady:true,segmentationReady});
+        }
+        send.mockResolvedValueOnce(base);
+        expect(await adapter.getMangaModelStatus()).not.toHaveProperty('segmentationReady');
+        for(const segmentationReady of [null,0,'false',{}]){
+            send.mockResolvedValueOnce({...base,segmentationReady});
+            await expect(adapter.getMangaModelStatus()).rejects.toThrow('漫画识别模型状态读取失败');
+        }
+    });
+    it('普通图的未绘制文字或真正空识别可标记为保留宿主原图，其他消息形态仍拒绝',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
         send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
         await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines});
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,lines:[]});
         for (const response of [
             {success:true,image:'encoded',imageUnchanged:true,lines},
             {success:true,image:'',imageUnchanged:false,lines},
-            {success:true,image:'',imageUnchanged:true,lines:[]},
+            {success:false,image:'',imageUnchanged:true,lines:[]},
+            {success:'false',image:'',imageUnchanged:true,lines:[]},
+            {success:1,image:'',imageUnchanged:true,lines:[]},
             {success:true,image:'',imageUnchanged:true,lines,mangaPatches:{width:1,height:1,patches:[]}},
         ]) {send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
-        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});
+        send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines:[]});
         await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
     });
     it('单图识别选择透传到 Offscreen，不把普通图片变成漫画模式', async () => {

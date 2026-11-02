@@ -196,6 +196,32 @@ describe('trusted sender to real OpenAI SDK request body private model integrati
         await h.fallback.handle({origin: 'Same source'}, normal);
         expect(h.fetch).toHaveBeenCalledTimes(3);
     });
+    it.each([true, false])('deduplicates repeated private array sources without persistent cache, requested useCache=%s', async useCache => {
+        const h = harness();
+        const payload = {origin: ['First source', 'Second source', 'First source'], useCache,
+            serviceOverride: 'openai', modelOverride: 'normal-model'};
+        const sender = {sender: {tab: {incognito: true}}};
+        for (let round = 1; round <= 2; round += 1) {
+            await expect(h.fallback.handle(payload, sender)).resolves.toEqual(['译文', '译文', '译文']);
+            expectPrivateOutbound(h, round * 2);
+            expect(h.stats).toHaveBeenLastCalledWith(expect.objectContaining({serviceId: customId,
+                model: 'private-model', mode: 'batch', segmentCount: 3, cachedSegments: 0}), expect.anything());
+        }
+    });
+    it('preserves repeated private AI slots and their distinct contextual translations', async () => {
+        const h = harness();
+        const origin = ['First paragraph', 'Second paragraph', 'First paragraph'];
+        const translated = ['第一种语境', '第二段', '另一种语境'];
+        const packet = serializeTranslationSlots(origin);
+        h.fetch.mockImplementation(async (_url, init) => sdkResponse(JSON.parse(String(init?.body)).model,
+            rebuildTranslationSlots(packet, translated)!));
+        await expect(h.fallback.handle({origin, aiMultiSegment: true, useCache: true,
+            serviceOverride: 'openai', modelOverride: 'normal-model', sourceLanguage: 'en', targetLanguage: 'zh-CN'},
+        {sender: {tab: {incognito: true}}})).resolves.toEqual(translated);
+        expectPrivateOutbound(h, 1);
+        const messages = JSON.stringify(JSON.parse(String(h.fetch.mock.calls[0][1]?.body)).messages);
+        for (const marker of packet.starts) expect(messages).toContain(marker);
+    });
     it('routes every batch item through the private model and retains batch statistics', async () => {
         const h = harness();
         await expect(h.fallback.handle({origin: ['First source', 'Second source'], serviceOverride: 'openai', modelOverride: 'normal-model'},

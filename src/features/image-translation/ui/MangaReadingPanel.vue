@@ -1,7 +1,7 @@
 <!--
  * @file src/features/image-translation/ui/MangaReadingPanel.vue
  * 文件职责：提供用户主动打开的漫画可见目标选择和文字阅读面板。
- * 主要内容：以局部语义配色和紧凑控件显示完整文字和原文对照，以有界分页提供选择和复制，区分等待、过期及预算状态，关闭或失效时撤销在途读取。
+ * 主要内容：以局部语义配色和紧凑控件显示完整文字和原文对照，可在既有快照中筛选有实际译文但未绘制的条目；有界分页与当前部分复制跟随筛选，全文复制保留原顺序，切换复位内部滚动并清理过期反馈，关闭时撤销读取。
  * 模块边界：由漫画入口管理挂载与生命周期，仅使用注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果。
  -->
 <template>
@@ -25,12 +25,13 @@
       <div v-if="status !== 'ready'" class="fr-manga-reading-body"><p role="status">{{ message(status) }}</p></div>
       <template v-else>
         <div class="fr-manga-reading-tools">
+          <button v-if="skippedTranslations.length" type="button" :aria-pressed="skippedOnly" :title="skippedOnly ? t('查看全文') : undefined" @click="toggleSkipped">{{ t('未绘制译文') }} · {{ skippedTranslations.length }}</button>
           <button type="button" :aria-pressed="compare" @click="compare = !compare">{{ t('原文对照') }}</button>
           <span :aria-label="t('文字部分')">{{ pageIndex + 1 }} / {{ pages.length }}</span>
           <button ref="previousButton" type="button" :disabled="pageIndex === 0" @click="changePage(-1, $event)">{{ t('上一部分') }}</button>
           <button ref="nextButton" type="button" :disabled="pageIndex + 1 >= pages.length" @click="changePage(1, $event)">{{ t('下一部分') }}</button>
         </div>
-        <div class="fr-manga-reading-body" tabindex="0">
+        <div ref="readingBody" class="fr-manga-reading-body" tabindex="0">
           <article v-for="(line, index) in pages[pageIndex]" :key="index">
             <pre v-if="compare && line.sourceText !== undefined && line.sourceText !== line.text" class="fr-manga-reading-source" dir="auto">{{ line.sourceText }}</pre>
             <pre dir="auto">{{ line.text }}</pre>
@@ -38,13 +39,14 @@
             <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保留原文，此译文未绘制到图片') }}</p>
           </article>
         </div>
-        <footer><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t('复制全部') }}</button></footer>
+        <footer><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t(skippedOnly ? '复制全文' : '复制全部') }}</button></footer>
       </template>
     </template>
   </section>
 </template>
 <script setup lang="ts">
 import {computed, nextTick, onBeforeUnmount, ref, shallowRef, watch} from 'vue';
+import {selectChangedTranslations} from '../core';
 import type {MangaReadingCandidate, MangaReadingList, MangaReadingResult} from '../content/mangaReadingCoordinator';
 import type {MangaReadingLine} from '../content/mangaReadingSnapshots';
 const props = defineProps<{
@@ -57,18 +59,22 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{opened: []; closed: []}>();
 const t = (text: string) => props.translate(text);
-const opened = ref(false), panel = ref<HTMLElement | null>(null), items = shallowRef<MangaReadingCandidate[]>([]);
+const opened = ref(false), panel = ref<HTMLElement | null>(null), readingBody = ref<HTMLElement | null>(null), items = shallowRef<MangaReadingCandidate[]>([]);
 const candidateButtons = ref<HTMLButtonElement[]>([]), backButton = ref<HTMLButtonElement | null>(null), refreshButton = ref<HTMLButtonElement | null>(null), previousButton = ref<HTMLButtonElement | null>(null), nextButton = ref<HTMLButtonElement | null>(null);
-const selected = shallowRef<MangaReadingCandidate | null>(null), lines = shallowRef<MangaReadingLine[]>([]), pageIndex = ref(0), compare = ref(false), feedback = ref('');
+const selected = shallowRef<MangaReadingCandidate | null>(null), lines = shallowRef<MangaReadingLine[]>([]), pageIndex = ref(0), compare = ref(false), skippedOnly = ref(false), feedback = ref('');
 type Status = MangaReadingResult['status'] | 'loading' | 'noCandidates' | '';
 const status = ref<Status>('');
 let controller: AbortController | null = null, revision = 0, copyRevision = 0, focusRevision = 0, trigger: HTMLElement | null = null, disposed = false, stopObservation: (() => void) | undefined;
 const MAX_PAGE_CHARS = 16000, MAX_PAGE_LINES = 32, MAX_LINES = 512, MAX_TOTAL_CHARS = 524288;
-watch([compare, pageIndex], () => {copyRevision++;focusRevision++;feedback.value = '';}, {flush:'sync'});
+watch(skippedOnly, () => {pageIndex.value = 0;}, {flush:'sync'});
+watch([compare, pageIndex, skippedOnly], () => {copyRevision++;focusRevision++;feedback.value = '';}, {flush:'sync'});
+const skippedTranslations = computed(() => lines.value.filter(line => line.renderSkipped && line.sourceText !== undefined
+  && selectChangedTranslations([{text:line.sourceText,bbox:line.bbox}], [line.text]).length > 0));
+const visibleLines = computed(() => skippedOnly.value ? skippedTranslations.value : lines.value);
 // 按完整识别行分页；超长单行明确拒绝，避免分割文字或误称完整。
 const pages = computed(() => {
   const result: MangaReadingLine[][] = []; let page: MangaReadingLine[] = [], chars = 0;
-  for (const line of lines.value) {
+  for (const line of visibleLines.value) {
     const size = line.text.length + (line.sourceText?.length ?? 0);
     if (page.length && (page.length >= MAX_PAGE_LINES || chars + size > MAX_PAGE_CHARS)) {result.push(page);page = [];chars = 0;}
     page.push(line);chars += size;
@@ -85,7 +91,7 @@ function message(value: Status): string {
   const messages: Record<Status, string> = {'':'',ready:'',loading:'正在读取已有文字',pending:'当前页面正在处理',empty:'未检测到文字',error:'无法读取当前结果',unavailable:'当前结果不可用',stale:'页面已变化，请重新选择',cancelled:'读取已取消',overBudget:'内容过大，暂时无法完整显示',noCandidates:'当前没有可查看的页面'};
   return t(messages[value]);
 }
-function cancel() {revision++;copyRevision++;focusRevision++;controller?.abort();controller = null;stopObservation?.();stopObservation = undefined;feedback.value = '';}
+function cancel() {revision++;copyRevision++;focusRevision++;controller?.abort();controller = null;stopObservation?.();stopObservation = undefined;skippedOnly.value = false;pageIndex.value = 0;feedback.value = '';}
 function refresh() {
   if (!opened.value || disposed) return;
   cancel();selected.value = null;lines.value = [];pageIndex.value = 0;
@@ -158,6 +164,16 @@ function transferFocus(event: MouseEvent, owner: number, destination: () => HTML
 }
 function back(event: MouseEvent) {if (!opened.value) return;refresh();transferFocus(event, revision, () => candidateButtons.value[0] ?? refreshButton.value);}
 function refreshFromButton(event: MouseEvent) {if (!opened.value) return;refresh();transferFocus(event, revision, () => candidateButtons.value[0] ?? refreshButton.value);}
+function toggleSkipped(event: MouseEvent) {
+  if (!event.isTrusted || !opened.value || status.value !== 'ready' || !skippedTranslations.value.length) return;
+  skippedOnly.value = !skippedOnly.value;
+  const owner = revision, mode = skippedOnly.value;
+  void nextTick(() => {
+    if (!opened.value || disposed || owner !== revision || status.value !== 'ready' || skippedOnly.value !== mode || pageIndex.value !== 0) return;
+    if (readingBody.value) readingBody.value.scrollTop = 0;
+    if (panel.value) panel.value.scrollTop = 0;
+  });
+}
 function changePage(delta: number, event: MouseEvent) {
   const next = pageIndex.value + delta;
   if (!opened.value || status.value !== 'ready' || next < 0 || next >= pages.value.length) return;

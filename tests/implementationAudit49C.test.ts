@@ -1208,8 +1208,8 @@ describe('audit49C single-site preferences public preview', () => {
             elapsedMs: performance.now() - start, output: outputs, outputSHA256,
             }, null, 2));
         }
-        expect(outputs[0]).toEqual({url: 'https://docs.site7.com/article', domain: 'site7.com', extension: 'enabled', translation: 'site', floatingBall: 'hidden-site'});
-        expect(outputSHA256).toBe('0d6eb2f1949a7aee972ecce47af20ed2376dbe72847748e369ad8f09ecbd6829');
+        expect(outputs[0]).toEqual({url: 'https://docs.site7.com/article', domain: 'site7.com', extension: 'enabled', display: 'bilingual', translation: 'site', floatingBall: 'hidden-site'});
+        expect(outputSHA256).toBe('8ad77cb9c3128aac61b1a3ce74cf198faf00dc7bb4886c13126f5d3e20cc9fda');
         expect(comparisons).toBe(0);
     });
 });
@@ -1287,22 +1287,29 @@ describe('audit49C local backup confirmation ownership', () => {
         }};
     }
 
-    it.each(['confirm', 'cancel', 'close'] as const)('preserves the %s privacy choice with default-true active compatibility', async choice => {
+    it.each(['confirm', 'include', 'cancel', 'close'] as const)('requires an explicit export and preserves the %s context choice', async choice => {
         const f = await fixture(true);
         try {
-            if (choice !== 'confirm') ports.confirm.mockRejectedValueOnce(choice);
+            ports.confirm.mockImplementationOnce(async (message: {children: Array<{children: unknown}>}) => {
+                const option = message.children[1] as {children: Array<{props: {checked: boolean; onChange(event: unknown): void}}>};
+                const checkbox = option.children[0];
+                expect(checkbox.props.checked).toBe(false);
+                if (choice === 'include') checkbox.props.onChange({target: {checked: true}});
+                if (choice === 'cancel' || choice === 'close') throw choice;
+            });
             f.button().click(); await settle();
             expect(ports.confirm).toHaveBeenCalledOnce();
-            expect(ports.confirm.mock.calls[0][2]).toMatchObject({confirmButtonText: '不包含并导出', cancelButtonText: '包含并导出', distinguishCancelAndClose: true});
-            expect(f.create).toHaveBeenCalledTimes(choice === 'close' ? 0 : 1);
-            expect(f.download).toHaveBeenCalledTimes(choice === 'close' ? 0 : 1);
-            expect(ports.exportConfig).toHaveBeenCalledTimes(choice === 'close' ? 0 : 1);
-            if (choice === 'close') expect(ports.send).not.toHaveBeenCalled();
+            expect(ports.confirm.mock.calls[0][2]).toMatchObject({confirmButtonText: '导出备份', cancelButtonText: 'common.cancel', closeOnClickModal: false});
+            const cancelled = choice === 'cancel' || choice === 'close';
+            expect(f.create).toHaveBeenCalledTimes(cancelled ? 0 : 1);
+            expect(f.download).toHaveBeenCalledTimes(cancelled ? 0 : 1);
+            expect(ports.exportConfig).toHaveBeenCalledTimes(cancelled ? 0 : 1);
+            if (cancelled) expect(ports.send).not.toHaveBeenCalled();
             else {
                 expect(ports.send.mock.calls.map(([message]) => [message.type, message.action])).toEqual([[VOCABULARY_BOOK_MESSAGE, 'exportData'], ['modelUsage', 'export']]);
                 const backup = JSON.parse(await [...f.blobs.values()][0].text());
                 expect(backup).toMatchObject({format: 'fluentread-data-backup', version: 2, configCredentialMode: 'exact-replace',
-                    vocabulary: {includesPrivateContext: choice === 'cancel'}, modelUsage: {events: []}});
+                    vocabulary: {includesPrivateContext: choice === 'include'}, modelUsage: {events: []}});
                 expect(ports.messages).toHaveBeenCalledOnce(); expect(f.focus).toHaveBeenCalledOnce();
             }
             expect(f.button().disabled).toBe(false);

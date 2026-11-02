@@ -624,12 +624,13 @@ describe("全文翻译可见性锚点", () => {
         restoreOriginalContent();
         runtime.realCore = null;
         vi.clearAllTimers();
-        vi.useRealTimers();
         for (const [name, descriptor] of replacedGlobals) {
             if (descriptor) Object.defineProperty(globalThis, name, descriptor);
             else Reflect.deleteProperty(globalThis, name);
         }
         replacedGlobals.clear();
+        // 先恢复自定义全局，再卸载 fake timers，不能把旧 fake performance 装回真实时钟环境。
+        vi.useRealTimers();
     });
 
     it('可见性锚点跳过无法读取的布局盒，并优先找到开放 ShadowRoot 内的渲染盒', () => {
@@ -969,6 +970,8 @@ describe("全文翻译可见性锚点", () => {
             return {owner, shell, revoke};
         }
         it.each(['id', 'translate', 'move', 'disabled', 'override'])('rejects a slow result after %s revokes automatic permission before observer delivery', async change => {
+            // 本例验证撤销后的提交归属；发现预算必须与受控计时器共用时钟。
+            replaceGlobal('performance', {now: () => Date.now()});
             const {owner, revoke} = fixture(); const pending = deferred<string[]>();
             runtime.requests.mockReturnValueOnce(pending.promise); autoTranslateEnglishPage();
             await vi.advanceTimersByTimeAsync(60); await waitForRequestCount(1);
@@ -3223,17 +3226,25 @@ describe("全文翻译可见性锚点", () => {
             expect(body.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
         });
 
-        it('aborts a pending reply translation and rejects its late response when protection forms', async () => {
+        it.each([0, 150])('aborts a pending reply translation and rejects its late response when protection forms (request start %i ms)', async (requestStartDelay) => {
             const {link, owner, body} = setup('readArticle');
             const pending = deferred<string[]>();
-            runtime.requests.mockImplementation(origins => origins.some(origin => origin.includes('Reply to this comment'))
-                ? pending.promise : Promise.resolve(origins.map(origin => `译:${origin}`)));
-            autoTranslateEnglishPage();
+            const replyRequest = vi.fn();
+            runtime.requests.mockImplementation(async origins => {
+                if (origins.some(origin => origin.includes('Reply to this comment'))) {
+                    if (requestStartDelay) await new Promise<void>(resolve => setTimeout(resolve, requestStartDelay));
+                    replyRequest(); return pending.promise;
+                }
+                return origins.map(origin => `译:${origin}`);
+            });
             const replyRequests = () => runtime.requests.mock.calls.filter(([origins]) =>
                 origins.some(origin => origin.includes('Reply to this comment')));
-            for (let tick = 0; tick < 200 && (replyRequests().length === 0 || getTranslationState(owner)?.phase !== 'loading'); tick++) {
-                await vi.advanceTimersByTimeAsync(1);
-            }
+            autoTranslateEnglishPage();
+            // 准备和派发可跨多个切片；有界等待真实请求开始，再验证取消，不能把固定 71ms 当作已进入 pending。
+            await vi.waitFor(() => {
+                expect(replyRequest).toHaveBeenCalledOnce();
+                expect(getTranslationState(owner)?.phase).toBe('loading');
+            }, {timeout: 1_000, interval: 10});
             expect(replyRequests()).toHaveLength(1);
             const state = getTranslationState(owner)!;
             expect(state.phase).toBe('loading');
@@ -4755,6 +4766,8 @@ describe("全文翻译可见性锚点", () => {
 
     it.each(['NATIVE_BATCH_RESPONSE_INVALID', 'TRANSLATION_SLOT_RESPONSE_INVALID'])(
         '原生 broker 最终恢复失败 code=%s 时全文 runtime 保留原文并呈现失败状态', async code => {
+        // 固定本例的单批前提；跨时间片调度不应取决于 coverage 插桩耗时。
+        replaceGlobal('performance', {now: () => Date.now()});
         runtime.nativeBatchEnabled = true;
         runtime.config.display = 1;
         runtime.config.fullPageTranslationMode = 'all';

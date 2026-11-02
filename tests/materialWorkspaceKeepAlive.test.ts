@@ -1,3 +1,4 @@
+import {materialPageFixture} from './helpers/materialPageFixture';
 import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import {afterEach, describe, expect, it, vi} from 'vitest';
@@ -30,7 +31,14 @@ const record = (id = 'a'): MaterialRecord => ({
 vi.mock('@/src/features/vocabulary/materialClient', () => Object.fromEntries([
   'materialList', 'materialCapture', 'materialUpdate', 'materialArchive', 'materialRestore',
   'materialRemoveReference', 'materialClear', 'materialExport', 'materialImport', 'materialGeneration',
-].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.api[name](...args)])));
+  'workspaceMaterialCapture','workspaceMaterialUpdate','workspaceMaterialArchive','workspaceMaterialRestore','workspaceMaterialRemoveReference',
+].map(name => [name, (...args: unknown[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.api[name.replace('workspaceMaterial','material')](...args)])));
+vi.mock('@/src/features/vocabulary/materialPageClient', async () => ({
+  MaterialPageClientError: (await import('./helpers/materialPageFixture')).FixturePageError,
+  requestMaterialPage: (...args: any[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.pages.page(...args),
+  requestMaterialDetail: (...args: any[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.pages.detail(...args),
+  requestMaterialTopics: (...args: any[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.pages.topics(...args),
+}));
 vi.mock('webextension-polyfill', () => ({default: {get runtime() {return (globalThis as any).__fluentreadMaterialKeepAliveTest.browser.runtime;}}}));
 vi.mock('@/src/features/reading-assistant/public', () => ({
   getHarnessSession: (...args: unknown[]) => (globalThis as any).__fluentreadMaterialKeepAliveTest.getSession(...args),
@@ -83,7 +91,7 @@ async function mount(options: {
   const memories = vi.fn(options.memories || (async () => []));
   const addListener = vi.fn((listener: (message: unknown) => unknown) => listeners.add(listener));
   const removeListener = vi.fn((listener: (message: unknown) => unknown) => listeners.delete(listener));
-  (globalThis as any)[KEY] = {api, getSession, materialModule: options.materialGate?.promise, memories, browser: {runtime: {
+  (globalThis as any)[KEY] = {api, pages:materialPageFixture(api), getSession, materialModule: options.materialGate?.promise, memories, browser: {runtime: {
     getURL: (path: string) => `chrome-extension://fixture/${path}`,
     sendMessage: async () => ({success: true, data: null}), onMessage: {addListener, removeListener},
   }}};
@@ -170,7 +178,7 @@ describe('actual learning-center material pane under an outer KeepAlive', () => 
     expect(ui.errors).toEqual([]);
   });
 
-  it('reads once on mount and keeps a clean hidden round trip quiet', async () => {
+  it('reopens the released session after a clean hidden round trip', async () => {
     const ui = await mount(), owner = ui.panel;
     expect(ui.api.materialList).toHaveBeenCalledTimes(1);
     await ui.hide();
@@ -179,7 +187,7 @@ describe('actual learning-center material pane under an outer KeepAlive', () => 
     expect(ui.removeListener).not.toHaveBeenCalled();
     await ui.show();
     expect(ui.panel).toBe(owner);
-    expect(ui.api.materialList).toHaveBeenCalledTimes(1);
+    expect(ui.api.materialList).toHaveBeenCalledTimes(2);
     expect(ui.errors).toEqual([]);
   });
 
@@ -194,7 +202,7 @@ describe('actual learning-center material pane under an outer KeepAlive', () => 
     expect(ui.api.materialList).toHaveBeenCalledTimes(2);
     expect(ui.panel.materials.map((item: MaterialRecord) => item.title)).toEqual(['Changed while another settings page was open']);
     await ui.hide(); await ui.show();
-    expect(ui.api.materialList).toHaveBeenCalledTimes(2);
+    expect(ui.api.materialList).toHaveBeenCalledTimes(3);
     expect(ui.addListener).toHaveBeenCalledTimes(1);
   });
 
@@ -229,20 +237,21 @@ describe('actual learning-center material pane under an outer KeepAlive', () => 
   it('retains selection, filters, both page limits and independent cached drafts across hidden refresh', async () => {
     const items = Array.from({length: 35}, (_, index) => ({...record(String(index)), references: Array.from({length: 25}, (_, note) => ({kind: 'note' as const, id: `note-${note}`, note: `Thought ${note}`}))}));
     const ui = await mount({items});
-    ui.panel.query = 'Article'; ui.panel.topic = 'Design'; await ui.flush();
+    ui.panel.query = 'Article'; ui.panel.topic = 'Design'; await vi.waitFor(() => expect(ui.api.materialList).toHaveBeenCalledTimes(2)); await ui.flush();
     await click(ui, button(ui, '显示更多材料（30 / 35）'));
     await ui.panel.select('1'); ui.panel.note = 'Cached other note'; ui.panel.startEdit(); ui.panel.draft.title = 'Cached other title';
     await ui.panel.select('0'); ui.panel.editNote(items[0].references[0]); ui.panel.note = 'Active unfinished note'; ui.panel.startEdit(); ui.panel.draft.title = 'Active unfinished title';
     await ui.flush(); await click(ui, button(ui, '显示更多学习内容'));
-    const before = {selectedId: ui.panel.selectedId, query: ui.panel.query, topic: ui.panel.topic, materialLimit: ui.panel.materialLimit, referenceLimit: ui.panel.referenceLimit};
+    const before = {selectedId: ui.panel.selectedId, query: ui.panel.query, topic: ui.panel.topic, materials: ui.panel.materials.length, references: ui.panel.selected.references.length};
     await ui.hide(); ui.notify(5); await ui.show();
-    expect({selectedId: ui.panel.selectedId, query: ui.panel.query, topic: ui.panel.topic, materialLimit: ui.panel.materialLimit, referenceLimit: ui.panel.referenceLimit}).toEqual(before);
-    expect(before).toEqual({selectedId: '0', query: 'Article', topic: 'Design', materialLimit: 60, referenceLimit: 48});
+    await vi.waitFor(() => expect(ui.api.materialList).toHaveBeenCalledTimes(3)); await ui.flush();
+    expect({selectedId: ui.panel.selectedId, query: ui.panel.query, topic: ui.panel.topic, materials: ui.panel.materials.length, references: ui.panel.selected.references.length}).toEqual(before);
+    expect(before).toEqual({selectedId: '0', query: 'Article', topic: 'Design', materials: 35, references: 25});
     expect(ui.panel.note).toBe('Active unfinished note'); expect(ui.panel.editingNoteId).toBe('note-0');
     expect(ui.panel.editing).toBe(true); expect(ui.panel.draft.title).toBe('Active unfinished title');
     await ui.panel.select('1');
     expect(ui.panel.note).toBe('Cached other note'); expect(ui.panel.draft.title).toBe('Cached other title');
-    expect(ui.api.materialList).toHaveBeenCalledTimes(2);
+    expect(ui.api.materialList).toHaveBeenCalledTimes(3);
   });
 
   it.each(['resolve-hidden', 'resolve-after-resume'] as const)('isolates an obsolete pending list without a broadcast when it will %s', async when => {
@@ -314,10 +323,11 @@ describe('actual learning-center material pane under an outer KeepAlive', () => 
     if (when === 'ack-after-resume') {await ui.show(); expect(ui.api.materialList).toHaveBeenCalledTimes(1); expect(ui.panel.busy).toBe(true);}
     const saved = {...record(), title: 'Submitted title'};
     ui.setItems([saved, record('b')]); write.resolve(saved); await saving; await ui.flush();
-    expect(ui.panel.busy).toBe(false); expect(ui.panel.selected.title).toBe('Submitted title');
+    expect(ui.panel.busy).toBe(false);
     expect(ui.panel.feedback).toBe('材料已整理。'); expect(ui.panel.editing).toBe(true); expect(ui.panel.draft.title).toBe('A newer draft');
     if (when === 'ack-hidden') {expect(ui.api.materialList).toHaveBeenCalledTimes(1); await ui.show();}
     expect(ui.api.materialList).toHaveBeenCalledTimes(2);
+    expect(ui.panel.selected.title).toBe('Submitted title');
     expect(ui.panel.selectedId).toBe('a'); expect(ui.panel.draft.title).toBe('A newer draft');
     expect(ui.focus.mock.contexts.every(element => ui.document.body.contains(element as Node))).toBe(true);
   });

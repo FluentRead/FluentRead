@@ -1,3 +1,5 @@
+import {readFileSync} from 'node:fs';
+import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '@/src/features/image-translation/graphemeSpaceData';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
     drawTranslatedImageText,
@@ -21,6 +23,31 @@ function canvasContext() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
 describe('图片译文排版与绘制', () => {
+
+    it('Unicode17 空格阻断表逐标量对照独立官方属性 fixture，覆盖所有脚本', () => {
+        const fixture = readFileSync(new URL('./fixtures/unicode-17.0.0/GraphemeBreakProperty.txt', import.meta.url), 'utf8');
+        const expected = new Uint8Array(0x110000);
+        let extensionCount = 0, prependCount = 0;
+        for (const line of fixture.split('\n')) {
+            const row = /^([0-9A-F]+)(?:\.\.([0-9A-F]+))?\s*;\s*(Extend|SpacingMark|ZWJ|Prepend)\s*#/u.exec(line);
+            if (!row) continue;
+            const start = parseInt(row[1], 16), end = parseInt(row[2] || row[1], 16);
+            const flag = row[3] === 'Prepend' ? 2 : 1;
+            for (let point = start; point <= end; point++) expected[point] |= flag;
+            if (flag === 1) extensionCount += end - start + 1;
+            else prependCount += end - start + 1;
+        }
+        const mismatches: string[] = [];
+        for (let point = 0; point <= 0x10FFFF; point++) {
+            if (point >= 0xD800 && point <= 0xDFFF) continue;
+            if (isSpaceGraphemeExtension(point) !== !!(expected[point] & 1)
+                || isSpaceGraphemePrepend(point) !== !!(expected[point] & 2)) mismatches.push(point.toString(16));
+        }
+        expect(extensionCount).toBe(2619);
+        expect(prependCount).toBe(27);
+        expect(mismatches).toEqual([]);
+    });
+
     it('重复长段落减少测宽次数，完整单词换行后无需逐字测量', () => {
         const text = 'Translate each complete paragraph and keep the original reading order. '.repeat(30);
         const countedMeasure = vi.fn((value: string, size: number) => Array.from(value).length * size * 0.55);
@@ -62,6 +89,76 @@ describe('图片译文排版与绘制', () => {
         expect(layout.lines).toEqual([text]);
         expect(layout.fontSize).toBeGreaterThan(30);
         expect(layout.lineHeight).toBeLessThanOrEqual(100);
+    });
+
+    it.each(['𠀀', '𠀀\u{E0100}', '𛀁', '𛄠', 'ｶﾞ', 'ｶｰ', '가', '각', 'ㅋㅋ'])('扩展东亚字素 %s 不将紧邻的完整英文词拆开', eastAsian => {
+        const text = `${eastAsian}HELLO`;
+        const layout = layoutImageTranslationText(text, 5, 2.5, measure, 1);
+        expect(layout.lines).toEqual([eastAsian, 'HELLO']);
+        expect(layout.lines.join('')).toBe(text);
+    });
+
+    it('Unicode 词界不拆开组合字素、英文长词及原有空格和显式换行', () => {
+        const text = '𠀀\u{E0100} HELLO\nｶﾞWORLD 👨‍👩‍👧‍👦';
+        const layout = layoutImageTranslationText(text, 5, 10, measure, 1);
+        expect(layout.lines).toEqual(['𠀀\u{E0100}', 'HELLO', 'ｶﾞ', 'WORLD', '👨‍👩‍👧‍👦']);
+        expect(layout.lines.every(line => !/^[\uFF9E\uFF9F\p{Mark}]/u.test(line))).toBe(true);
+        expect(layoutImageTranslationText('𠀀ABCDEFGHIJ', 5, 4, measure, 1).lines).toEqual(['𠀀', 'ABCDE', 'FGHIJ']);
+        expect(layoutImageTranslationText('A B\nC', 20, 5, measure, 1).lines).toEqual(['A B', 'C']);
+    });
+
+    it('扩展汉字邻接 emoji ZWJ 时保持原始字素和完整文本', () => {
+        const text = '𠀀👨‍👩‍👧‍👦HELLO';
+        const layout = layoutImageTranslationText(text, 5, 4, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines.filter(line => line.includes('👨'))).toHaveLength(1);
+        expect(layout.lines.find(line => line.includes('👨'))).toContain('👨‍👩‍👧‍👦');
+        expect(layout.lines.every(line => !line.startsWith('\u200d') && !line.endsWith('\u200d'))).toBe(true);
+    });
+
+    it('扩展汉字末尾的连接符不从原字素分离', () => {
+        const text = '𠀀\u200d👨HELLO';
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe('𠀀\u200d');
+        expect(layout.lines.every(line => !line.startsWith('\u200d'))).toBe(true);
+    });
+
+    it('东亚符号组成的 emoji ZWJ 序列不在换行时拆散', () => {
+        for (const text of ['㊙️‍👨HELLO', 'x👩‍㊗️HELLO']) {
+            const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+            expect(layout.lines.join('')).toBe(text);
+            expect(layout.lines).toContain(text.startsWith('x') ? '👩‍㊗️' : '㊙️‍👨');
+        }
+        // 合成测宽模拟连接前后字形宽度变化，迫使排版在潜在词界处作换行决策。
+        const text = 'x👩‍㊗️HELLO';
+        const nonAdditive = (value: string, size: number) => (value === 'x👩‍' ? 1 : measure(value, 1)) * size;
+        const layout = layoutImageTranslationText(text, 1, 20, nonAdditive, 1);
+        expect(layout.lines).toContain('👩‍㊗️');
+        expect(layout.lines.join('')).toBe(text);
+    });
+
+    it('韩文音节与相邻 Jamo 不从同一字素中拆开', () => {
+        const text = '각HELLO';
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe('각');
+    });
+
+    it.each(['かﾞ', 'ｶﾞﾞ', '漢🏽', '㊗️🏽', '\u0600𠀀', '\u0d4e𠀀', '가', '각', '\u0600 '])('跨词界字素 %s 不在窄框中拆开', cluster => {
+        const text = `${cluster}HELLO`;
+        const layout = layoutImageTranslationText(text, 1, 20, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines[0]).toBe(cluster);
+    });
+
+    it('普通中日文与全角标点使用安全快路径，混合组合字符才校准词界', () => {
+        const split = vi.spyOn(Intl.Segmenter.prototype, 'segment');
+        const codepointMeasure = (value: string, size: number) => Array.from(value).length * size;
+        layoutImageTranslationText('𠀀HELLO，こんにちは！ｶｰ가', 100, 10, codepointMeasure, 1);
+        expect(split).not.toHaveBeenCalled();
+        layoutImageTranslationText('かﾞHELLO', 100, 10, codepointMeasure, 1);
+        expect(split).toHaveBeenCalledOnce();
     });
 
     it('长段落允许超过三行且全部保留，每一行和总高度均在 OCR 框内', () => {
@@ -121,13 +218,93 @@ describe('图片译文排版与绘制', () => {
         }
     });
 
-    it('旧环境缺少字素分割器时仍按完整 Unicode 码点换行', async () => {
+    it('旧环境缺少字素分割器时保留完整复杂词组并缩小字号', async () => {
         vi.stubGlobal('Intl', {Segmenter: undefined});
         const {layoutImageTranslationText: fallbackLayout} = await import('@/src/features/image-translation/services/rendering');
         const text = '😀'.repeat(10);
         const layout = fallbackLayout(text, 15, 30, (value, size) => Array.from(value).length * size);
         expect(layout.lines.join('')).toBe(text);
         expect(layout.lines.every(line => !line.includes('\ufffd'))).toBe(true);
+    });
+
+
+    it('组合标记跨空白词界也按真实字素边界合并', () => {
+        const text = 'x \u0301字HELLO';
+        const layout = layoutImageTranslationText(text, 1, 30, measure, 1);
+        expect(layout.lines.join('')).toBe(text);
+        expect(layout.lines).toContain(' \u0301');
+    });
+
+    it.each(['\u0e33', '\u0eb3'])('真实 SpacingMark %s 在空格后仍属于同一字素', spacingMark => {
+        const text = `a ${spacingMark}b`;
+        const layout = layoutImageTranslationText(text, 1, 30, measure, 1);
+        expect(layout.lines).toEqual(['a', ` ${spacingMark}`, 'b']);
+        expect(layout.lines.join('')).toBe(text);
+    });
+
+    it('无 Segmenter 时简单 ASCII、汉字和半角长音仍保留词界快路径', async () => {
+        vi.stubGlobal('Intl', {Segmenter: undefined});
+        const {layoutImageTranslationText: fallbackLayout} = await import('@/src/features/image-translation/services/rendering');
+        const codepointMeasure = (value: string, size: number) => Array.from(value).length * size;
+        for (const prefix of ['𠀀', '𛀁', 'ｶｰ', '가']) {
+            expect(fallbackLayout(prefix + 'HELLO', 5, 4, codepointMeasure, 1).lines).toEqual([prefix, 'HELLO']);
+        }
+        expect(fallbackLayout('abcdefghij', 5, 4, codepointMeasure, 1).lines).toEqual(['abcde', 'fghij']);
+        expect(fallbackLayout('A   B\nC', 20, 5, codepointMeasure, 1).lines).toEqual(['A B', 'C']);
+        expect(fallbackLayout('字'.repeat(10), 5, 4, codepointMeasure, 1).lines).toEqual(['字'.repeat(5), '字'.repeat(5)]);
+    });
+
+    it('无 Segmenter 的窄框保留复杂词组、IVS、Jamo、ZWJ 和空白后的 SpacingMark', async () => {
+        vi.stubGlobal('Intl', {Segmenter: undefined});
+        const {layoutImageTranslationText: fallbackLayout} = await import('@/src/features/image-translation/services/rendering');
+        const codepointMeasure = (value: string, size: number) => Array.from(value).length * size;
+        for (const text of ['e\u0301HELLO', '𠀀\u{E0100}HELLO', 'ｶﾞHELLO', '가HELLO', '각HELLO',
+            '👨‍👩‍👧‍👦HELLO', '漢🏽HELLO', '\u0600𠀀HELLO', 'x \u0301字HELLO', 'x \u0e33b', 'x \u0eb3b', 'x👩‍㊗️HELLO']) {
+            const layout = fallbackLayout(text, 1, 30, codepointMeasure, 1);
+            expect(layout.lines, text).toEqual([text]);
+            expect(layout.fontSize, text).toBeLessThan(1);
+            expect(codepointMeasure(text, layout.fontSize), text).toBeLessThanOrEqual(1);
+        }
+        // 不声称与现代排版等价：三个字素在 1 单位宽框内，现代路径字号 1，旧环境须降到约 1/3。
+        const text = 'e\u0301e\u0301e\u0301';
+        const native = layoutImageTranslationText(text, 1, 30, measure, 1);
+        const fallback = fallbackLayout(text, 1, 30, measure, 1);
+        expect(native.lines).toEqual(['e\u0301', 'e\u0301', 'e\u0301']);
+        expect(native.fontSize).toBe(1);
+        expect(fallback.lines).toEqual([text]);
+        expect(fallback.fontSize).toBeGreaterThan(0.32);
+        expect(fallback.fontSize).toBeLessThanOrEqual(1 / 3);
+        expect(fallbackLayout('e\u0301   words', 50, 10, measure, 1).lines).toEqual(['e\u0301 words']);
+        for (const prepend of ['\u0600', '\u{110BD}']) {
+            const layout = fallbackLayout(prepend + ' HELLO', 1, 30, measure, 1);
+            expect(layout.lines[0]).toBe(prepend + ' ');
+            expect(layout.lines.join('')).toBe(prepend + ' HELLO');
+        }
+        for (const text of ['x\uDC00 HELLO', '\uDC00 HELLO', '\uD800 HELLO']) {
+            expect(fallbackLayout(text, 100, 10, measure, 1).lines).toEqual([text]);
+        }
+        const normal = fallbackLayout('Read cafe\u0301 and de\u0301ja\u0300 vu words', 10, 20, measure, 1);
+        expect(normal.fontSize).toBe(1);
+        expect(normal.lines.length).toBeGreaterThan(1);
+        expect(normal.lines.join(' ').replace(/\s+/gu, ' ')).toBe('Read cafe\u0301 and de\u0301ja\u0300 vu words');
+    });
+
+    it.each([
+        'Read cafe\u0301 and de\u0301ja\u0300 vu words for the next page.',
+        'La traduction du cafe\u0301 est de\u0301ja\u0300 disponible avec les autres mots.',
+        'Это проверка перевода длинной страницы с несколькими словами.',
+        'นี่ คือ การทดสอบ ภาษาไทย หลาย คำ',
+        'ນີ້ ແມ່ນ ການທົດສອບ ຫຼາຍ ຄຳ',
+    ])('无 Segmenter 时多词段落保留正常空白换行与字号：%s', async text => {
+        vi.stubGlobal('Intl', {Segmenter: undefined});
+        const {layoutImageTranslationText: fallbackLayout} = await import('@/src/features/image-translation/services/rendering');
+        const native = layoutImageTranslationText(text, 12, 30, measure, 1);
+        const fallback = fallbackLayout(text, 12, 30, measure, 1);
+        expect(native.fontSize).toBe(1);
+        expect(fallback.fontSize).toBe(1);
+        expect(fallback.lines.length).toBeGreaterThan(1);
+        expect(fallback.lines.join(' ').replace(/\s+/gu, ' ')).toBe(text);
+        expect(fallback.lines.every(line => measure(line, 1) <= 12)).toBe(true);
     });
 
     it('真实字号绘制和裁剪限制在原区域内，绘制后恢复上下文状态', () => {
@@ -145,6 +322,17 @@ describe('图片译文排版与绘制', () => {
             expect(call[2]).toBeLessThanOrEqual(50);
         }
         expect(context.strokeText.mock.calls).toEqual(context.fillText.mock.calls);
+    });
+    it('孔避让已校验的prepared layout直接复用，绘字不再次度量或搜索字号',()=>{
+        const text='完整译文 Mixed words',width=100,height=40;
+        const direct=canvasContext();
+        drawTranslatedImageText(direct as unknown as CanvasRenderingContext2D,text,10,20,width,height,'rgb(240,240,240)',20,'left');
+        const prepared=layoutImageTranslationText(text,width-4,height-2,measure,20),reuse=canvasContext();
+        reuse.measureText.mockImplementation(()=>{throw new Error('prepared path must not search again');});
+        drawTranslatedImageText(reuse as unknown as CanvasRenderingContext2D,text,10,20,width,height,'rgb(240,240,240)',20,'left',prepared);
+        expect(reuse.measureText).not.toHaveBeenCalled();expect(reuse.fillText.mock.calls).toEqual(direct.fillText.mock.calls);
+        expect(reuse.strokeText.mock.calls).toEqual(direct.strokeText.mock.calls);expect(reuse.rect.mock.calls).toEqual(direct.rect.mock.calls);
+        expect(reuse.save).toHaveBeenCalledOnce();expect(reuse.restore).toHaveBeenCalledOnce();
     });
 
     it('无可绘文字和绘制异常都会释放 Canvas 状态', () => {

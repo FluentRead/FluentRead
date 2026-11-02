@@ -4,6 +4,8 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {canCacheOptionalEcdict, downloadFullEcdict, readCachedFullEcdict} from '@/src/features/selection-translation/services/ecdictAsset';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
+import {Config, normalizeConfig} from '@/src/core/config/model';
+import {WORD_DICTIONARY_SOURCE_OPTIONS, normalizeWordDictionarySource} from '@/src/core/config/selectionDictionary';
 import {
     clearWordDictionaryCache,
     createDefaultWordDictionaryProviders,
@@ -553,6 +555,83 @@ describe('word dictionary provider network adapters', () => {
 });
 
 describe('word dictionary lookup orchestration', () => {
+    it('keeps automatic lookup as the default and normalizes saved source selections', () => {
+        expect(new Config().selectionDictionarySource).toBe('auto');
+        expect(normalizeConfig({}).selectionDictionarySource).toBe('auto');
+        for (const {value} of WORD_DICTIONARY_SOURCE_OPTIONS) {
+            expect(normalizeWordDictionarySource(value)).toBe(value);
+            expect(normalizeConfig({selectionDictionarySource: value}).selectionDictionarySource).toBe(value);
+        }
+        for (const value of [undefined, null, '', 'future', 'https://dictionary.test', 1, {}, ['free-dictionary']]) {
+            expect(normalizeWordDictionarySource(value)).toBe('auto');
+            expect(normalizeConfig({selectionDictionarySource: value}).selectionDictionarySource).toBe('auto');
+        }
+        expect(createDefaultWordDictionaryProviders().map(item => item.id).sort())
+            .toEqual(WORD_DICTIONARY_SOURCE_OPTIONS.filter(item => item.value !== 'auto').map(item => item.value).sort());
+    });
+
+    it('queries only the selected source, including when a local definition exists', async () => {
+        const providers = WORD_DICTIONARY_SOURCE_OPTIONS.filter(item => item.value !== 'auto').map(({value: id}) => ({
+            id: id as WordDictionaryProviderId, lookup: vi.fn(async word => card(word, id as WordDictionaryProviderId)),
+        }));
+        const dictionary = createWordDictionaryLookup({providers});
+        for (const selected of providers) {
+            expect((await dictionary.lookup('same', selected.id))?.sources.map(item => item.id)).toEqual([selected.id]);
+            expect(selected.lookup).toHaveBeenCalledOnce();
+        }
+        expect((await dictionary.lookup('same'))?.sources.map(item => item.id)).toEqual(['ecdict-local']);
+        expect(providers.find(item => item.id === 'ecdict-local')!.lookup).toHaveBeenCalledTimes(2);
+        for (const selected of providers.filter(item => item.id !== 'ecdict-local')) expect(selected.lookup).toHaveBeenCalledOnce();
+    });
+
+    it('isolates misses and cached results by source and never falls back from a selected source', async () => {
+        const missing = vi.fn(async () => null);
+        const found = vi.fn(async word => card(word, 'wiktionary-rest'));
+        const dictionary = createWordDictionaryLookup({providers: [
+            {id: 'free-dictionary', lookup: missing}, {id: 'wiktionary-rest', lookup: found},
+        ]});
+        expect(await dictionary.lookup('same', 'free-dictionary')).toBeNull();
+        expect(found).not.toHaveBeenCalled();
+        expect((await dictionary.lookup('same', 'wiktionary-rest'))?.sources[0].id).toBe('wiktionary-rest');
+        expect(await dictionary.lookup('SAME', 'free-dictionary')).toBeNull();
+        expect((await dictionary.lookup('SAME', 'wiktionary-rest'))?.sources[0].id).toBe('wiktionary-rest');
+        expect(missing).toHaveBeenCalledOnce();expect(found).toHaveBeenCalledOnce();
+        dictionary.clearCache();
+        expect(await dictionary.lookup('same', 'free-dictionary')).toBeNull();
+        expect(missing).toHaveBeenCalledTimes(2);expect(found).toHaveBeenCalledOnce();
+    });
+
+    it('shares requests within a source while keeping simultaneous and late responses from other sources separate', async () => {
+        let release!: (value: WordCardData) => void;
+        const slow = vi.fn(() => new Promise<WordCardData>(resolve => {release = resolve;}));
+        const fast = vi.fn(async word => card(word, 'wiktionary-rest'));
+        const dictionary = createWordDictionaryLookup({providers: [
+            {id: 'free-dictionary', lookup: slow}, {id: 'wiktionary-rest', lookup: fast},
+        ]});
+        const first = dictionary.lookup('same', 'free-dictionary');
+        const duplicate = dictionary.lookup('SAME', 'free-dictionary');
+        const next = await dictionary.lookup('same', 'wiktionary-rest');
+        release(card('same'));
+        expect((await first)?.sources[0].id).toBe('free-dictionary');
+        expect(await duplicate).toEqual(await first);
+        expect(await dictionary.lookup('same', 'wiktionary-rest')).toBe(next);
+        expect(slow).toHaveBeenCalledOnce();expect(fast).toHaveBeenCalledOnce();
+    });
+
+    it('allows retrying a failed selected source without querying another dictionary', async () => {
+        const failure = new Error('source unavailable');
+        const selected = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(card('retry'));
+        const other = vi.fn(async () => card('retry', 'youdao-web'));
+        const warn = vi.fn();
+        const dictionary = createWordDictionaryLookup({providers: [
+            {id: 'free-dictionary', lookup: selected}, {id: 'youdao-web', lookup: other},
+        ], warn});
+        await expect(dictionary.lookup('retry', 'free-dictionary')).rejects.toThrow('词典查询暂时不可用');
+        expect((await dictionary.lookup('retry', 'free-dictionary'))?.sources[0].id).toBe('free-dictionary');
+        expect(warn).toHaveBeenCalledWith('[FluentRead] word provider free-dictionary unavailable', failure);
+        expect(selected).toHaveBeenCalledTimes(2);expect(other).not.toHaveBeenCalled();
+    });
+
     it('validates cache capacity', () => {
         expect(() => createWordDictionaryLookup({cacheSize: 0})).toThrow('词典缓存容量必须是正整数');
         expect(() => createWordDictionaryLookup({cacheSize: 1.5})).toThrow('词典缓存容量必须是正整数');

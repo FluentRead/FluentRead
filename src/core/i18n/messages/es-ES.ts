@@ -9,6 +9,7 @@ import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesSpanishMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -33,6 +34,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const esESMessages = {
+    "settings.backup.includeContext": "Incluir el contexto del vocabulario",
+    "feedback.serviceHint": "Revisa la conexión o el modelo del servicio seleccionado e inténtalo de nuevo.",
+    "feedback.retryHint": "Vuelve a intentarlo en un momento. Se conservarán el texto original y la selección.",
     ...countForms['es-ES'],
     ...personalCorrectionMessages['es-ES'],
     "document.config.loadFailed": "No se pudieron cargar los ajustes. Recarga la página e inténtalo de nuevo.",
@@ -66,6 +70,10 @@ export const esESMessages = {
     "translationCenter.endpointMissing": "Primero configura la dirección del servicio personalizado.",
     "translationCenter.modelMissing": "Primero elige o introduce un modelo.",
     "translationCenter.noReady": "Configura al menos un servicio para traducir.",
+    'sidepanel.title': 'Traducción en la barra lateral',
+    'sidepanel.openError': 'No se pudo abrir la barra lateral. Reintenta o abre FluentRead desde el menú lateral del navegador.',
+    'sidepanel.settingsError': 'No se pudieron abrir los ajustes. Reintenta.',
+    'sidepanel.startupError': 'No se pudo cargar el panel de traducción. Vuelve a cargarlo.',
     "translationCenter.intro": "Un texto, varias traducciones. Elige servicios y compara.",
     "translationCenter.input": "Texto original",
     "translationCenter.source": "Idioma original",
@@ -547,6 +555,7 @@ export const esESMessages = {
     "settings.requestLimits.globalTitle": "Límites de solicitudes",
     "settings.requestLimits.globalHelp": "Los servicios y modelos sin ajustes propios comparten estos límites.",
     ...aiRequestTimeoutMessages["es-ES"],
+    ...selectionDictionaryMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",
     "settings.requestLimits.apiKeyRecovery": "Enfriamiento de la API key fallida",
@@ -579,7 +588,7 @@ export const esESMessages = {
     "popup.pageFont.loading": "Leyendo la configuración de fuente…",
     "popup.pageFont.unavailable": "No se puede cambiar la fuente de traducción ahora.",
     "popup.pageFont.readError": "No se pudo leer la configuración de fuente. Vuelve a intentarlo.",
-    "popup.pageFont.changeError": "No se pudo guardar la configuración de fuente. Vuelve a intentarlo.",
+    "popup.pageFont.changeError": "No se pudo guardar la fuente.",
     "popup.pageFont.retry": "Reintentar",
     "popup.quickSettings.appearanceDescription": "El modo bilingüe muestra el original y la traducción; el modo de solo traducción muestra únicamente el texto traducido.",
     "popup.quickSettings.hoverSettings": "Ajustes de traducción al pasar el cursor",
@@ -1748,6 +1757,12 @@ export const esESMessages = {
     "glossary.builtin.financeDescription": "Estados financieros, métricas de valoración y mercados bursátiles.",
     "glossary.builtin.research": "Investigación académica",
     "glossary.builtin.researchDescription": "Métodos de investigación, estadística y artículos académicos.",
+    'glossary.builtin.hardware': "Hardware informático",
+    'glossary.builtin.hardwareDescription': "Procesadores, memoria, chips y circuitos",
+    'glossary.builtin.networking': "Redes y nube",
+    'glossary.builtin.networkingDescription': "Protocolos de red, infraestructura en la nube y despliegue",
+    'glossary.builtin.mathematics': "Matemáticas",
+    'glossary.builtin.mathematicsDescription': "Álgebra lineal, cálculo, probabilidad y optimización",
     "glossary.builtin.products": "Conservar nombres de productos",
     "glossary.builtin.productsDescription": "Conserva los nombres habituales de herramientas de desarrollo y productos de IA. Distingue mayúsculas.",
     "glossary.builtin.englishChinese": "Inglés → Chino simplificado",
@@ -1783,6 +1798,26 @@ export const esESMessages = {
     "glossary.previewDisabled": "El interruptor general está desactivado. Puedes previsualizar las reglas, pero no se aplicarán al traducir.",
     "glossary.noMatches": "No coinciden términos. Revisa texto, idiomas, sitios e interruptores de los glosarios.",
     "glossary.conflict": "{source}: usar «{kept}»; ignorar «{ignored}».",
+    "glossary.importPaste": "Pegar contenido",
+    "glossary.importChoose": "Elegir archivo",
+    "glossary.importReplace": "Cambiar archivo",
+    "glossary.importReading": "Leyendo…",
+    "glossary.importFileHint": "CSV, TSV o JSON, hasta 2 MB",
+    "glossary.importReview": "Vista previa de importación",
+    "glossary.importMore": "Ver todas las entradas",
+    "glossary.importPreserves": "Añade glosarios sin reemplazar las entradas existentes.",
+    "area.error.languages.title": "Se necesita un paquete de idioma OCR",
+    "area.error.languages.hint": "Cuando esté listo, se seguirá traduciendo el área seleccionada.",
+    "area.error.capture.title": "No se pudo capturar el área",
+    "area.error.capture.hint": "Comprueba que esta página está visible y repite la captura.",
+    "area.error.empty.title": "No se reconoció texto",
+    "area.error.empty.hint": "Prueba con un área más nítida y con el texto completo.",
+    "area.error.settings.title": "Revisa el servicio de traducción",
+    "area.error.settings.hint": "Revisa la conexión o el modelo del servicio y vuelve a intentarlo.",
+    "area.error.retry.title": "La traducción no se completó",
+    "area.error.retry.hint": "El área seleccionada se conserva. Puedes reintentarlo directamente.",
+    "area.error.more": "Otras acciones",
+    "area.error.details": "Ver detalles",
     "glossary.importHelp": "Admite CSV, TSV y JSON. Añade glosarios sin reemplazar datos existentes. Revisa cada entrada antes de confirmar.",
     "glossary.file": "Elegir archivo",
     "glossary.format": "Formato de archivo",

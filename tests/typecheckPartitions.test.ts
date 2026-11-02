@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {resolve, join} from 'node:path';
 import {spawn, spawnSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
-import {verifyTypecheckReceipts} from '../scripts/testing/run-typecheck.mjs';
+import {verifyTypecheckReceipts} from '../scripts/testing/run-typecheck-partitions.mjs';
 const temporary: string[] = [];
 const worker = resolve('scripts/testing/typecheck-part-worker.cjs');
 const native = resolve('node_modules/vue-tsc/bin/vue-tsc.js');
@@ -74,7 +74,7 @@ describe('complete Program diagnostic partition contracts', () => {
         const root = fixture(); save(root, 'Good.vue', '<script setup lang="ts">const count = 1;</script><template>{{ count }}</template>');
         const nativeResult = execute(native, root); expect(nativeResult.status, nativeResult.stdout).toBe(0);
         const temporaryRoot = join(root, 'temporary'); mkdirSync(temporaryRoot);
-        const moduleUrl = pathToFileURL(resolve('scripts/testing/run-typecheck.mjs')).href;
+        const moduleUrl = pathToFileURL(resolve('scripts/testing/run-typecheck-partitions.mjs')).href;
         const result = spawnSync(process.execPath, ['--input-type=module', '-e', `import {runTypecheck} from ${JSON.stringify(moduleUrl)}; await runTypecheck(process.argv[1]);`, join(root, 'tsconfig.json')],
             {cwd: process.cwd(), env: {...process.env, TMPDIR: temporaryRoot}, encoding: 'utf8', timeout: 60_000});
         expect(result.error).toBeUndefined(); expect(result.status, result.stdout + result.stderr).toBe(0);
@@ -83,7 +83,7 @@ describe('complete Program diagnostic partition contracts', () => {
     it('forwards parent interruption to its owned worker and does not report completion', async () => {
         const root = fixture(); save(root, 'Good.vue', '<script setup lang="ts">const count = 1;</script><template>{{ count }}</template>');
         const temporaryRoot = join(root, 'temporary'); mkdirSync(temporaryRoot);
-        const moduleUrl = pathToFileURL(resolve('scripts/testing/run-typecheck.mjs')).href;
+        const moduleUrl = pathToFileURL(resolve('scripts/testing/run-typecheck-partitions.mjs')).href;
         const child = spawn(process.execPath, ['--input-type=module', '-e', `import {runTypecheck} from ${JSON.stringify(moduleUrl)}; await runTypecheck(process.argv[1]);`, join(root, 'tsconfig.json')],
             {cwd: process.cwd(), env: {...process.env, TMPDIR: temporaryRoot}, stdio: ['ignore', 'pipe', 'pipe']});
         let output = '', sent = false;

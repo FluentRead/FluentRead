@@ -3,9 +3,11 @@
  * 文件职责：按固定上游版本加载并缓存本地漫画识别模型，不上传漫画图片。
  * 主要内容：固定模型版本、尺寸和 SHA-256，自动选择下载来源并在断流或损坏时切换已登记的备用来源，流式显示当前下载操作的进度，失败或取消后迟到的缓存响应立即释放未读正文，复制后取消不再摘要且不误删有效缓存；缓存已完成文件，支持校验后导入离线模型、读取状态与清除，历史来源偏好不再影响下载；删除会话期间暂缓新推理任务入队，普通识别与修补仍各自并行排队。
  * 模块边界：只处理模型数据文件，不加载远程代码、不执行 OCR、不读取用户配置；仅下载 Apache-2.0 模型数据；镜像与离线文件必须通过相同完整性校验，来源偏好不包含用户凭据。
+ * 会话副本：所有原文件完成 SHA 校验和原始缓存写入后，仅识别模型按固定形状配方生成一次内存副本；正常和 CPU 重载共用同一路径，优化失败不删除有效原缓存或重新下载，状态/离线导入仍表示原文件。
  */
 import {modelDownloadSources} from '@/src/platform/http/modelDownloads';
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
+import {optimizeVerifiedMangaRecognition} from './mangaRecognitionShapes';
 
 const ROOT = 'https://huggingface.co/snowfluke/ppu-paddle-ocr-models/resolve/bf1d5edb0335d3262be7caf13f766ba274b4cadd/';
 export const MANGA_OCR_CACHE = 'fluent-read-manga-ocr-v1';
@@ -159,6 +161,9 @@ export async function loadMangaOcrAssets(signal?: AbortSignal, onProgress?: (per
         completed += asset.bytes;
         report(Math.floor(completed * 100 / MANGA_OCR_MODEL_BYTES));
     }
+    // 脱离缓存损坏/下载回退的 catch：配方不匹配必须报告，不能误删已校验的原模型。
+    const recognition=MANGA_OCR_ASSETS[1];
+    model.recognition=optimizeVerifiedMangaRecognition(model.recognition,recognition,signal);
     return model;
 }
 

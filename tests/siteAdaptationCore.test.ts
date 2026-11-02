@@ -168,6 +168,31 @@ describe('Kagi News content-bearing buttons', () => {
     });
 });
 
+describe('OpenAI community topic list titles', () => {
+    it.each(['content', 'all'] as const)('keeps native topic titles translatable in %s scope while preserving their tags', scope => {
+        // Reduced from the live /hot DOM: a role=heading span owns status icons and a topic link.
+        const {document} = parseHTML(`<html><body><main><table class="topic-list"><tbody><tr class="topic-list-item"><td class="main-link topic-list-data">
+            <span id="title" class="link-top-line" role="heading" aria-level="2"><span class="topic-statuses"><svg></svg></span><a class="title raw-link raw-topic-link" href="/t/example/123">How can readers follow this discussion?</a></span>
+            <div class="link-bottom-line"><ul class="discourse-tags"><li><a id="tag" class="discourse-tag simple" href="/tag/rate-limit/77">rate-limit</a></li></ul></div>
+            </td></tr></tbody></table><div class="cooked"><p id="body">The readable discussion remains available for translation.</p></div></main></body></html>`);
+        const url = new URL('https://community.openai.com/hot');
+        const core = new TranslationCandidateCore({url, scope, adapters: compileSiteRulePack(builtinSiteRulePack)});
+        const title = document.getElementById('title')!;
+        const candidate = core.resolve(title.querySelector('a')!.firstChild);
+        expect(candidate).toMatchObject({element: title, adapterId: 'openai-community'});
+        const candidates = core.discover(document);
+        expect(candidates.some(candidate => candidate.element === title)).toBe(true);
+        expect(candidates.some(candidate => candidate.element.id === 'body')).toBe(true);
+        const source = candidates.map(candidate => extractTranslationTextFromNodes(candidate.nodes ?? [candidate.element], core.shouldStayOriginal)).join('\n');
+        expect(source).toContain('How can readers follow this discussion?');
+        expect(source).not.toContain('rate-limit');
+        expect(core.resolve(document.getElementById('tag')!.firstChild)).toBeNull();
+        const adapter = compileSiteRulePack(builtinSiteRulePack).find(adapter => adapter.id === 'openai-community')!;
+        expect(adapter.matches(new URL('https://community.openai.com.example.org/hot'))).toBe(false);
+        expect(adapter.matches(new URL('https://openai.com/hot'))).toBe(false);
+    });
+});
+
 function reject(value: unknown, expectedPath?: string) {
     const parsed = parseSiteRulePack(value);
     expect(parsed.ok).toBe(false);

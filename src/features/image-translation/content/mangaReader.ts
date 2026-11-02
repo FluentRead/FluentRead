@@ -1,18 +1,46 @@
 /**
  * @file src/features/image-translation/content/mangaReader.ts
  * 文件职责：把漫画站点的正文图片、超长图分段、可读画布、公开背景图和页面生命周期接入同一连续翻译会话。
- * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
+ * 主要内容：按站点规则发现正文，圈选页发布区域入口；已确认的 GANMA 路径内页码和 Mangahub 正整数查询页码不视为换章，其他查询参数仍参与章节身份，来源授权保留完整地址；已开启的同章哔哩哔哩会话在可见的原站加载提示期间保留等待，不识别空像素；滚动及可见性移动后短暂停留才启动新识别，隐藏事件同步关闭调度闸，正文混合载体线性合并为 DOM 页序，变动通知同步关闸并在布局刷新后排队；任务交接等待后重新发现再排队；已完成结果仍按实际位置立即交接，普通图片滚动通过可见性通知减少全量测量；画布显式开启和重试先隐藏旧译层并要求完整来源验证，自动布局保留轻量指纹；当前页优先的有界队列与附近页共享像素预算，换章、隐藏和卸载清理监听器与停留计时器。
  * 模块边界：只检查已展示正文，不抓取章节、不读取站点私有数据或绕过访问限制；图片与画布的读取、翻译、缓存和原图恢复通过注入端口复用图片运行时。
  */
 import {createMangaSession, type MangaTranslationStatus} from './mangaSession';
 import {normalizeMangaPrefetchPages, normalizeMangaCachePages, resolveMangaSite, type MangaSiteRule} from '@/src/core/config/manga';
 import {imageLoadTracker} from './imageLoads';
 import type {MangaImageSegment} from './mangaImageSegments';
-type MangaSurface = HTMLElement | MangaImageSegment;
+import {createMangaReadingCoordinator, type MangaReadingResult, type MangaReadingSource} from './mangaReadingCoordinator';
+export type MangaSurface = HTMLElement | MangaImageSegment;
 type MangaCandidate = {image: MangaSurface; identity: string; ready: boolean; visible: boolean; pixels: number};
 const isSegment = (surface: MangaSurface): surface is MangaImageSegment => 'image' in surface;
 const isCanvas = (surface: MangaSurface): surface is HTMLCanvasElement => !isSegment(surface) && surface.tagName === 'CANVAS';
 const isImage = (surface: MangaSurface): surface is HTMLImageElement => !isSegment(surface) && surface.tagName === 'IMG';
+const candidateElement = (candidate: MangaCandidate): HTMLElement => isSegment(candidate.image) ? candidate.image.image : candidate.image;
+
+/** 各选择器的结果已有 DOM 顺序；固定三路合并不新增扫描或全量排序。 */
+function mergeCandidateStreams(streams: MangaCandidate[][]): MangaCandidate[] {
+    const active = streams.filter(stream => stream.length > 0);
+    if (active.length === 0) return [];
+    if (active.length === 1) return active[0];
+    const positions = active.map(() => 0), merged: MangaCandidate[] = [];
+    while (true) {
+        let next = -1;
+        for (let i = 0; i < active.length; i++) {
+            const candidate = active[i][positions[i]];
+            if (!candidate) continue;
+            if (next < 0) {next = i;continue;}
+            const first = candidateElement(active[next][positions[next]]);
+            const other = candidateElement(candidate);
+            // 同节点分段、断开的节点和宿主重写异常保持发现次序，下一次变动再发现。
+            try {
+                const position = first.compareDocumentPosition(other);
+                if (!(position & 1) && (position & 2)) next = i;
+            } catch { /* 不让宿主 DOM 比较异常打断整个阅读器。 */ }
+        }
+        if (next < 0) return merged;
+        merged.push(active[next][positions[next]++]);
+    }
+}
+
 interface SurfacePorts<T> {
     identity: (surface: T) => string | null;
     translate: (surface: T) => Promise<void>;
@@ -35,7 +63,7 @@ export function createMangaReader(ports: {
     prefetchPages?: () => number;
     cachePages?: () => number;
     identity: (image: HTMLImageElement) => string;
-    translate: (image: HTMLImageElement) => Promise<void>;
+    translate: (image: HTMLImageElement) => Promise<void | 'deferred'>;
     reuse?: (image: HTMLImageElement) => boolean;
     warm?: (images: HTMLImageElement[]) => void;
     resetCache?: () => void;
@@ -43,6 +71,8 @@ export function createMangaReader(ports: {
     release: (image: HTMLImageElement) => void;
     failed: (image: HTMLImageElement) => boolean;
     changed: (status: MangaTranslationStatus) => void;
+    /** 按需读取端口只检查已有状态，不得启动发现、OCR、网络或模型。 */
+    reading?: {live:(source:MangaReadingSource<MangaSurface>,waiting:boolean)=>boolean;load:(source:MangaReadingSource<MangaSurface>,signal:AbortSignal)=>Promise<MangaReadingResult>;version?:(source:MangaReadingSource<MangaSurface>)=>object|undefined};
     canvas?: SurfacePorts<HTMLCanvasElement>;
     segments?: SurfacePorts<MangaImageSegment> & {
         prepare: (images: HTMLImageElement[]) => ReadonlyMap<HTMLImageElement, MangaImageSegment[]>;
@@ -58,6 +88,7 @@ export function createMangaReader(ports: {
     let disposed = false;
     let cacheRoute = '';
     let frame: number | null = null;
+    let readingFrame: number | null = null;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
     let settling = false;
     let needsScrollLayout = true;
@@ -70,6 +101,8 @@ export function createMangaReader(ports: {
     let discoverySelector: string | null = null;
     let areaFallback = false;
     let selectedCanvases: HTMLCanvasElement[] = [];
+    let readingHref='',readingPending=true,readingAllocated=false;
+    let opened:{source:MangaReadingSource<MangaSurface>;version:object;invalid:()=>void}|undefined;
     const decorate = (status: MangaTranslationStatus): MangaTranslationStatus => ({...status, pageCount: observed.size, areaFallback});
     const session = createMangaSession<MangaSurface>({
         translate: surface => isSegment(surface) ? ports.segments!.translate(surface) : isImage(surface) ? ports.translate(surface) : isCanvas(surface) ? ports.canvas!.translate(surface) : ports.background!.translate(surface),
@@ -79,6 +112,25 @@ export function createMangaReader(ports: {
         failed: surface => isSegment(surface) ? ports.segments!.failed(surface) : isImage(surface) ? ports.failed(surface) : isCanvas(surface) ? ports.canvas!.failed(surface) : ports.background!.failed(surface),
         changed: status => ports.changed(decorate(status)),
     });
+    const snapshotLive=(source:MangaReadingSource<MangaSurface>)=>!disposed&&!document.hidden&&session.status().active
+        && (window.location?.href||'about:blank')===readingHref && ports.reading?.live(source,!!session.readingWaiting(source.surface,source.identity))===true;
+    const reading=createMangaReadingCoordinator<MangaSurface>({
+        live: source => !readingPending&&snapshotLive(source),
+        load: (source,signal) => {
+            const waiting=session.readingWaiting(source.surface,source.identity);
+            return waiting ? Promise.resolve({status:waiting})
+                : ports.reading?.load(source,signal) ?? Promise.resolve({status:'unavailable'});
+        },
+    });
+    function checkOpened():void {
+        const current=opened;if(!current)return;
+        let valid=false;try{valid=snapshotLive(current.source)&&ports.reading?.version?.(current.source)===current.version;}catch{/* 保守失效 */}
+        if(!valid){opened=undefined;try{current.invalid();}catch{/* 不影响会话 */}}
+    }
+    function scheduleOpenedCheck():void {
+        if(opened&&frame===null&&readingFrame===null)readingFrame=window.requestAnimationFrame(()=>{readingFrame=null;checkOpened();});
+    }
+    function invalidateReading(check=true):void {readingPending=true;readingAllocated=false;reading.invalidate();if(check)checkOpened();}
     let intersection: IntersectionObserver | null = null;
     let mutation: MutationObserver | null = null;
 
@@ -86,9 +138,16 @@ export function createMangaReader(ports: {
         if (mutation) return;
         intersection = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(intersected);
         mutation = new MutationObserver(records => {
+            // 页面可伪造 UI 标记；选中目标或其祖先发生变更时仍必须直接检查当前快照。
+            let checked=false;
+            if(opened){const selected=isSegment(opened.source.surface)?opened.source.surface.image:opened.source.surface;
+                if(!selected.isConnected||records.some(record=>record.target instanceof Element
+                    && (record.target===selected||record.target.contains(selected)||selected.contains(record.target)))){checked=true;checkOpened();}}
             const content = records.filter(record => !(record.target instanceof Element && record.target.closest('[data-fluent-read-ui]')));
             if (content.some(record => record.type === 'childList' || record.attributeName !== 'style' || backgroundReader)) schedule();
             else if (content.length) scheduleLayout();
+            // 标记也可能由站点的兄弟遮罩伪造；不相信它，按帧只测量当前已选目标一次。
+            else if(records.length&&!checked)scheduleOpenedCheck();
         });
         mutation.observe(document.documentElement, {subtree: true, childList: true, attributes: true,
             attributeFilter: ['src', 'srcset', 'sizes', 'media', 'type', 'class', 'id', 'data-manga-reader', 'hidden', 'aria-hidden', 'width', 'height', 'style']});
@@ -198,7 +257,7 @@ export function createMangaReader(ports: {
                     && rect.right > 0 && rect.left < window.innerWidth && style.display !== 'none' && style.visibility !== 'hidden' && inViewport(element, rect);
             });} catch { /* 无效选择器不影响宿主页面。 */ }
         }
-        const candidates: MangaCandidate[] = [...images.flatMap<MangaCandidate>(image => {
+        const imageCandidates = images.flatMap<MangaCandidate>(image => {
             const rect = image.getBoundingClientRect();
             const style = getComputedStyle(image);
             // 明确阅读器内的正文允许可点击图片和 presentation 角色，不能复用普通悬浮图标的装饰图排除。
@@ -212,17 +271,20 @@ export function createMangaReader(ports: {
             });
             return [{image, identity: `${ports.identity(image)}:${imageLoadTracker.revision(image)}`, ready, visible: ready
                 && inViewport(image,rect), pixels: image.naturalWidth * image.naturalHeight}];
-        }), ...canvases.map(({canvas, identity}) => {
+        });
+        const canvasCandidates = canvases.map(({canvas, identity}) => {
             const rect = canvas.getBoundingClientRect(), style = getComputedStyle(canvas);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: canvas, identity: identity!, ready, visible: ready && inViewport(canvas, rect), pixels: canvas.width * canvas.height};
-        }), ...backgrounds.map(({element, identity}) => {
+        });
+        const backgroundCandidates = backgrounds.map(({element, identity}) => {
             const rect = ports.background!.bounds(element), style = getComputedStyle(element);
             const ready = rect.width >= 80 && rect.height >= 40 && style.display !== 'none'
                 && style.visibility !== 'hidden' && style.visibility !== 'collapse';
             return {image: element, identity: identity!, ready, visible: ready && inViewport(element, rect), pixels: ports.background!.pixels(element)};
-        })];
+        });
+        const candidates = mergeCandidateStreams([imageCandidates, canvasCandidates, backgroundCandidates]);
         // 原生 IO 会通知普通图片进出视口；分段在同一张长图内移动、画布和自定义选择器仍逐帧更新。
         needsScrollLayout = !intersection || custom || !!site?.generic || candidates.some(page => !isImage(page.image));
         const anchor = candidates.reduce((last, page, index) => page.visible ? index : last, -1);
@@ -257,7 +319,7 @@ export function createMangaReader(ports: {
             route, available: available && (!(site?.generic || site?.requireContent) || current.size > 0 || areaFallback || waiting),
             suspended: document.hidden,
             deferNewWork: settling,
-            pages: candidates.map(page => ({image: page.image, identity: page.identity,
+            pages: candidates.map((page,index) => ({image: page.image, identity: page.identity, ordinal:index+1,
                 visible: page.visible && !document.hidden, retain: nearby.has(page.image),
                 prefetch: upcoming.has(page.image) || (document.hidden && page.visible)})),
         });
@@ -279,11 +341,18 @@ export function createMangaReader(ports: {
         ports.canvas?.update();
         ports.background?.update();
         ports.segments?.update();
+        reading.invalidate();readingHref=window.location?.href||'about:blank';readingPending=false;readingAllocated=false;
+        checkOpened();
     }
 
-    function scheduleLayout(): void {
-        if (disposed || frame !== null) return;
+    function scheduleLayout(check=true): void {
+        invalidateReading(check);
+        if(readingFrame!==null){window.cancelAnimationFrame(readingFrame);readingFrame=null;}
+        if (disposed) return;
+        if (frame !== null) {session.deferScheduling();return;}
         if (!session.status().available && !mangaReaderSelector(window.location?.href || 'about:blank', ports.siteRules?.())) return;
+        // 通知与测量之间旧任务可能完成，先关闸，避免按旧页序启动下一页。
+        session.deferScheduling();
         frame = window.requestAnimationFrame(() => { frame = null; refresh(); });
     }
     function schedule(): void { discoveryDirty = true; scheduleLayout(); }
@@ -303,15 +372,19 @@ export function createMangaReader(ports: {
         return starting;
     }
     function scrolled(): void {
+        // 令牌同步失效，选中快照的测量则按帧合并，避免高频滚动重复采样画布。
+        invalidateReading(false);
         const starting = deferUntilSettled();
-        if (starting || needsScrollLayout) scheduleLayout();
+        if (starting || needsScrollLayout) scheduleLayout(false);
+        else scheduleOpenedCheck();
     }
     function intersected(): void {
         deferUntilSettled();
         // IO 只作变化通知，快返页仍以本帧实际位置复用位图，不能直接相信旧条目。
         scheduleLayout();
     }
-    function visibilityChanged(): void {cancelSettling();scheduleLayout();}
+    function visibilityChanged(): void {cancelSettling();if (document.hidden) session.deferScheduling();scheduleLayout();}
+    function resized():void {scheduleLayout();}
     function loaded(event: Event): void {
         const image = event.target as HTMLImageElement;
         if (observed.has(image)) imageLoadTracker.loaded(event);
@@ -321,17 +394,42 @@ export function createMangaReader(ports: {
     document.addEventListener('visibilitychange', visibilityChanged);
     document.addEventListener('fluentread-route-change', schedule);
     window.addEventListener('scroll', scrolled, true);
-    window.addEventListener('resize', scheduleLayout);
+    window.addEventListener('resize', resized);
     refresh();
     return {
         status: () => decorate(session.status()),
+        readingCandidates() {
+            if(!ports.reading||disposed||readingPending||document.hidden||!session.status().active)return {status:'unavailable' as const};
+            if(!readingAllocated){
+                // 完全按需复用会话已有保留页，不重新扫描宿主或预读文字。
+                const sources=session.readingPages().map(page=>({surface:page.image,identity:page.identity,ordinal:page.ordinal,
+                    kind:isSegment(page.image)?'segment' as const:isImage(page.image)?'image' as const:isCanvas(page.image)?'canvas' as const:'background' as const,
+                    ...(isSegment(page.image)?{segment:{top:page.image.top,height:page.image.height}}:{})}));
+                reading.update(sources);readingAllocated=true;
+            }
+            return reading.list();
+        },
+        readReadingCandidate(token:object,signal:AbortSignal) {return reading.read(token,signal);},
+        observeReadingCandidate(token:object,invalid:()=>void):(()=>void)|undefined {
+            const source=reading.source(token);if(!source||readingPending)return;
+            let version:object|undefined;try{if(snapshotLive(source))version=ports.reading?.version?.(source);}catch{return;}
+            if(!version)return;
+            if(opened){const previous=opened;opened=undefined;try{previous.invalid();}catch{/* 不影响会话 */}}
+            const current=opened={source,version,invalid};
+            return ()=>{if(opened===current)opened=undefined;};
+        },
+        deferForRefresh() { session.deferScheduling();schedule(); },
         schedule,
-        retry(image: MangaSurface) { cancelSettling();refresh();const retried = session.retry(image);if (retried && isCanvas(image)) ports.canvas?.invalidate?.(image);return retried; },
-        toggle() { cancelSettling();discoveryDirty = true; refresh(); if (areaFallback) return false; if (!session.status().active) selectedCanvases.forEach(canvas => ports.canvas?.invalidate?.(canvas));const toggled = session.toggle(); refresh(); return toggled; },
+        retry(image: MangaSurface) { cancelSettling();refresh();const retried = session.retry(image);if (retried && isCanvas(image)) ports.canvas?.invalidate?.(image);
+            if(retried&&opened?.source.surface===image){const current=opened;opened=undefined;try{current.invalid();}catch{/* 不影响重试 */}}return retried; },
+        toggle() { cancelSettling();discoveryDirty = true; refresh(); if (areaFallback) return false; if (!session.status().active) selectedCanvases.forEach(canvas => ports.canvas?.invalidate?.(canvas));const toggled = session.toggle(); checkOpened();refresh(); return toggled; },
         dispose() {
             disposed = true;
+            checkOpened();
+            reading.dispose();
             cancelSettling();
             if (frame !== null) window.cancelAnimationFrame(frame);
+            if (readingFrame !== null) window.cancelAnimationFrame(readingFrame);
             intersection?.disconnect();
             mutation?.disconnect();
             observed.clear();
@@ -345,7 +443,7 @@ export function createMangaReader(ports: {
             document.removeEventListener('visibilitychange', visibilityChanged);
             document.removeEventListener('fluentread-route-change', schedule);
             window.removeEventListener('scroll', scrolled, true);
-            window.removeEventListener('resize', scheduleLayout);
+            window.removeEventListener('resize', resized);
             areaFallback = false;
             session.dispose();
         },

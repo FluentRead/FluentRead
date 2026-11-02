@@ -1,30 +1,32 @@
 /**
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞的文字只显示于阅读面板；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页或预排版；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {createImageTranslationFailure} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
 import { selectChangedTranslations, type OcrLine } from '@/src/features/image-translation/core';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
-import { inpaintTextRegions } from './inpainting';
+import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
 import { recognizeImage } from './ocrRuntime';
-import { getImageTextBackgroundColor, drawTranslatedImageText } from './rendering';
+import { getImageTextBackgroundColor, drawTranslatedImageText,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
 import {mangaOcrRuntime} from './mangaOcr';
 import {drawMangaTranslations, sampleMangaBackgrounds} from './mangaRendering';
-import {planMangaAlphaProtection} from './mangaAlphaProtection';
+import {ImageAlphaProtectionUnavailableError,MangaAlphaProtectionLimitError,mangaAlphaClearRects,planMangaAlphaProtection,planMaskAlphaProtection} from './mangaAlphaProtection';
 import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
+import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
-import {mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
+import {mangaMaskBoxIntersects, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
-export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string };
+export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
 
 export interface OffscreenImageTranslationResult {
     image: string;
+    imageUnchanged?: true;
     mangaPatches?: MangaPatchPacket;
     lines: OffscreenImageTranslationLine[];
 }
@@ -204,6 +206,71 @@ export async function cropAreaInOffscreen(
     return {image: croppedImage, lines: []};
 }
 
+/** 单图译文裁剪框既决定绘制范围，也用于保护附近保留的原文。 */
+function imageDrawBounds(line: ImageTextRegion, width: number, height: number): OcrLine['bbox'] {
+    const sourceHeight = line.fontSize ?? line.bbox.y1 - line.bbox.y0;
+    const paddingX = line.vertical ? 3 : 2;
+    const paddingY = line.vertical ? 2 : Math.max(2, Math.round(sourceHeight * 0.18));
+    const left = Math.max(0, line.bbox.x0 - paddingX), top = Math.max(0, line.bbox.y0 - paddingY);
+    const drawWidth = Math.max(1, Math.min(width - left, line.bbox.x1 - line.bbox.x0 + paddingX * 2));
+    const drawHeight = Math.max(1, Math.min(height - top, line.bbox.y1 - line.bbox.y0 + paddingY * 2));
+    return {x0:left,y0:top,x1:left+drawWidth,y1:top+drawHeight};
+}
+
+/** 透明度证明覆盖修补的一像素采样上下文及绘字足迹；不扩张实际擦除或绘字范围。 */
+function imageAlphaSamplingAndWriteBoxes(line:ImageTextRegion,width:number,height:number):OcrLine['bbox'][] {
+    const draw=imageDrawBounds(line,width,height);
+    if(![draw.x0,draw.y0,draw.x1,draw.y1].every(Number.isFinite))throw new ImageAlphaProtectionUnavailableError();
+    const box={x0:Math.max(0,Math.min(width,Math.floor(draw.x0))),y0:Math.max(0,Math.min(height,Math.floor(draw.y0))),
+        x1:Math.max(0,Math.min(width,Math.ceil(draw.x1))),y1:Math.max(0,Math.min(height,Math.ceil(draw.y1)))};
+    if(box.x1<=box.x0||box.y1<=box.y0)throw new ImageAlphaProtectionUnavailableError();
+    // 完整包含的修补框外周只是写入并集内部，不能把内部孔误当成未知外部边界。
+    const repair=imageMaskBoxes(line,width,height).map(mask=>({x0:Math.max(0,mask.x0-1),y0:Math.max(0,mask.y0-1),
+        x1:Math.min(width,mask.x1+1),y1:Math.min(height,mask.y1+1)})).filter(mask=>
+        box.x0>mask.x0||box.y0>mask.y0||box.x1<mask.x1||box.y1<mask.y1);
+    return [...repair,box];
+}
+
+/** 验证透明重排的单个框；不能把非空矩形或完整元数据当作完整字形的证明。 */
+function prepareImageAlphaTextLayout(context:CanvasRenderingContext2D,text:string,bounds:OcrLine['bbox'],
+    maxFontSize:number,textAlign:'left'|'center'|'right'):ImageTranslationTextLayout|undefined {
+    const width=bounds.x1-bounds.x0,height=bounds.y1-bounds.y0;
+    const paddingX=Math.min(2,width*.03),paddingY=Math.min(1,height*.05);
+    const contentWidth=width-paddingX*2,contentHeight=height-paddingY*2;
+    context.save();
+    try {
+        const layout=layoutImageTranslationText(text,contentWidth,contentHeight,(line,size)=>{
+            context.font='400 '+size+'px '+IMAGE_TEXT_FONT;
+            return context.measureText(line).width;
+        },maxFontSize);
+        if(!layout.lines.length || !Number.isFinite(layout.fontSize) || layout.fontSize<=0
+            || !Number.isFinite(layout.lineHeight) || layout.lines.length*layout.lineHeight>contentHeight)return;
+        context.font='400 '+layout.fontSize+'px '+IMAGE_TEXT_FONT;
+        context.textAlign=textAlign;context.textBaseline='middle';
+        // 原描边半径另加一个像素保守抗锯齿余量；不通过时不尝试裁字或换小段发布。
+        const bleed=Math.max(.35,layout.fontSize*.06)/2+1;
+        const first=textAlign==='center'?(height-layout.lineHeight*layout.lines.length)/2+layout.lineHeight/2:paddingY+layout.lineHeight/2;
+        const x=textAlign==='left'?paddingX:textAlign==='right'?width-paddingX:width/2;
+        for(let index=0;index<layout.lines.length;index++){
+            if(!layout.lines[index].trim())continue;
+            const metrics=context.measureText(layout.lines[index]),y=first+index*layout.lineHeight;
+            if(![metrics.width,metrics.actualBoundingBoxLeft,metrics.actualBoundingBoxRight,metrics.actualBoundingBoxAscent,metrics.actualBoundingBoxDescent].every(Number.isFinite)
+                || metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight<=0 || metrics.actualBoundingBoxAscent+metrics.actualBoundingBoxDescent<=0
+                || metrics.width>contentWidth || x-metrics.actualBoundingBoxLeft-bleed<0
+                || x+metrics.actualBoundingBoxRight+bleed>width || y-metrics.actualBoundingBoxAscent-bleed<0
+                || y+metrics.actualBoundingBoxDescent+bleed>height)return;
+        }
+        return layout;
+    } finally {context.restore();}
+}
+
+/** 已知 alpha 准入失败仍返回完整文本，原子保留源位图；未知失败不使用此结果。 */
+function imageAlphaUnchanged(lines:OffscreenImageTranslationLine[]):OffscreenImageTranslationResult {
+    return {image:'',imageUnchanged:true,lines:lines.map(line=>({...line,
+        ...(line.text!==line.sourceText?{renderSkipped:true as const}:{}),
+    }))};
+}
+
 async function prepareTranslatedImage(
     source: HTMLImageElement,
     lines: ImageTextRegion[],
@@ -213,10 +280,71 @@ async function prepareTranslatedImage(
     requestId?: string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
-    const translatedLines = selectChangedTranslations(lines, translations);
-    const readingLines = lines.map((line, index) => ({...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent'}));
+    const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
+    const skipped = new Set<number>();
+    const candidates: Array<{index: number; original: ImageTextRegion; translated: ImageTextRegion}> = [];
+    const originals: ImageTextRegion[] = [];
+    lines.forEach((line,index) => {
+        const changed = line.guardOnly || numericProtection(line.text) ? [] : selectChangedTranslations([line], [translations[index]]);
+        if (changed.length) candidates.push({index,original:line,translated:changed[0]});
+        else originals.push(line);
+    });
+    if (candidates.length && originals.length) {
+        // 所有保留原文（含碰撞后未绘制的译文）都必须避开后续修补和排版。
+        const protectedBoxes: OcrLine['bbox'][] = [], seen = new Set<string>();
+        let work = 0, exhausted = false;
+        const validBox = (box:OcrLine['bbox'] | null | undefined): box is OcrLine['bbox'] => !!box && Number.isFinite(box.x0) && Number.isFinite(box.y0)
+            && Number.isFinite(box.x1) && Number.isFinite(box.y1) && box.x1>box.x0 && box.y1>box.y0;
+        const protect = async (line: ImageTextRegion) => {
+            const sources = line.sourceBoxes ?? [];
+            for (let index=-1;index<sources.length;index++) {
+                const box = index<0 ? line.bbox : sources[index];
+                if (++work > 1_000_000 || !validBox(box)) {exhausted = true;return;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                const rect = {x0:Math.max(0,Math.floor(box.x0)-2),y0:Math.max(0,Math.floor(box.y0)-2),
+                    x1:Math.min(width,Math.ceil(box.x1)+2),y1:Math.min(height,Math.ceil(box.y1)+2)};
+                if (rect.x1<=rect.x0 || rect.y1<=rect.y0) continue;
+                const key = `${rect.x0},${rect.y0},${rect.x1},${rect.y1}`;
+                if (!seen.has(key)) {
+                    if (protectedBoxes.length>=8192) {exhausted=true;return;}
+                    seen.add(key);protectedBoxes.push(rect);
+                }
+            }
+        };
+        for (const line of originals) {await protect(line);if (exhausted) break;}
+        // 对新保留的原文继续传播；只对尚未跳过的候选比较，达到预算时不绘制任何候选。
+        for (let cursor=0;cursor<protectedBoxes.length && !exhausted && skipped.size<candidates.length;cursor++) {
+            const protectedBox = protectedBoxes[cursor];
+            for (const candidate of candidates) {
+                if (++work>1_000_000) {exhausted=true;break;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                if (skipped.has(candidate.index)) continue;
+                const region = candidate.translated, box = region.bbox;
+                if (++work>1_000_000 || !validBox(box) || ((manga || region.fontSize !== undefined) && !Number.isFinite(region.fontSize))) {exhausted=true;break;}
+                if ((work & 32767)===0) await checkImageCancellation(signal);
+                const drawBox = manga ? box : imageDrawBounds(region,width,height);
+                if (!validBox(drawBox)) {exhausted=true;break;}
+                let hit = drawBox.x0<protectedBox.x1 && protectedBox.x0<drawBox.x1 && drawBox.y0<protectedBox.y1 && protectedBox.y0<drawBox.y1;
+                const sources = region.sourceBoxes;
+                for (let index=0;!hit && index<(sources?.length ?? 1);index++) {
+                    const source = sources ? sources[index] : box;
+                    if (++work>1_000_000 || !validBox(source)) {exhausted=true;break;}
+                    if ((work & 32767)===0) await checkImageCancellation(signal);
+                    hit=manga ? mangaMaskBoxIntersects(source,region.fontSize!,width,height,protectedBox)
+                        : imageMaskBoxIntersects(source,width,height,protectedBox);
+                }
+                if (hit) {skipped.add(candidate.index);await protect(candidate.original);}
+                if (exhausted) break;
+            }
+        }
+        if (exhausted) for (const candidate of candidates) skipped.add(candidate.index);
+    }
+    throwIfImageOperationAborted(signal);
+    const translatedLines = candidates.filter(candidate=>!skipped.has(candidate.index)).map(candidate=>candidate.translated);
+    const readingLines = lines.flatMap((line, index) => line.guardOnly ? [] : [{...line, sourceText: line.text, text: translations[index]?.trim() || line.text, backgroundColor: 'transparent',
+        ...(skipped.has(index) ? {renderSkipped: true as const} : {})}]);
     // 品牌名或已经是目标语言的文字仍可阅读/复制，不应把识别成功显示为错误。
-    if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: source.src, lines: readingLines};
+    if (translatedLines.length === 0) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: '', imageUnchanged: true, lines: readingLines};
     const canvas = document.createElement('canvas');
     try {
         canvas.width = source.naturalWidth || source.width;
@@ -252,42 +380,54 @@ async function prepareTranslatedImage(
             }
             return {image: '', mangaPatches: {width: canvas.width, height: canvas.height, patches}, lines: readingLines};
         }
-        // ImageData 仅归本次 Canvas 所有，直接修补以避免复制整图 RGBA 后再拷回。
-        const pixels = inpaintTextRegions(sourcePixels.data, canvas.width, canvas.height, translatedLines, true);
+        try {
+        // 先在原图上准入整个擦字/绘字足迹。undefined在严格模式下仅表示已确认无需保护。
+        const protection=planMaskAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines,imageAlphaSamplingAndWriteBoxes,{requireConfirmedTransparency:true});
+        const drawing=protection?new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout}>():undefined;
+        if(protection){
+            const budget={remaining:1_048_576};
+            for(const line of translatedLines){
+                throwIfImageOperationAborted(signal);
+                const original=imageDrawBounds(line,canvas.width,canvas.height),available=mangaAlphaClearRects(protection,original,budget);
+                let bounds:OcrLine['bbox']|undefined,area=0;
+                for(const candidate of available){const size=(candidate.x1-candidate.x0)*(candidate.y1-candidate.y0);if(size>area){bounds=candidate;area=size;}}
+                if(!bounds){await checkImageCancellation(signal);return imageAlphaUnchanged(readingLines);}
+                const changed=bounds.x0!==original.x0||bounds.y0!==original.y0||bounds.x1!==original.x1||bounds.y1!==original.y1;
+                const maxFontSize=line.vertical?Infinity:(line.fontSize??line.bbox.y1-line.bbox.y0)*1.2;
+                const prepared=changed?prepareImageAlphaTextLayout(context,line.text,bounds,maxFontSize,line.vertical?'center':line.textAlign??'left'):undefined;
+                if(changed&&!prepared){await checkImageCancellation(signal);return imageAlphaUnchanged(readingLines);}
+                drawing!.set(line,{bounds,prepared});
+            }
+        }
+        // 全文布局先全部通过才擦除；保护点不可写也不可当作已知背景，无法完整修补时撤回。
+        const pixels = protection ? inpaintTextRegions(sourcePixels.data, canvas.width, canvas.height, translatedLines, true, protection)
+            : inpaintTextRegions(sourcePixels.data, canvas.width, canvas.height, translatedLines, true);
         await checkImageCancellation(signal);
         context.putImageData(sourcePixels, 0, 0);
 
         const renderedLines = translatedLines.map(line => ({
             ...line,
             backgroundColor: getImageTextBackgroundColor(pixels, canvas.width, canvas.height, line.bbox),
+            drawing:drawing?.get(line),
         }));
-        renderedLines.forEach(line => {
+        for(const line of renderedLines){
             throwIfImageOperationAborted(signal);
-            // 使用源行字形高度而非段落总高留白，竖排继续保持最小边距。
             const sourceHeight = line.fontSize ?? line.bbox.y1 - line.bbox.y0;
-            const paddingX = line.vertical ? 3 : 2;
-            const paddingY = line.vertical ? 2 : Math.max(2, Math.round(sourceHeight * 0.18));
-            const left = Math.max(0, line.bbox.x0 - paddingX);
-            const top = Math.max(0, line.bbox.y0 - paddingY);
-            const width = Math.min(canvas.width - left, line.bbox.x1 - line.bbox.x0 + paddingX * 2);
-            const height = Math.min(canvas.height - top, line.bbox.y1 - line.bbox.y0 + paddingY * 2);
-            drawTranslatedImageText(
-                context,
-                line.text,
-                left,
-                top,
-                Math.max(1, width),
-                Math.max(1, height),
-                line.backgroundColor,
-                line.vertical ? Infinity : sourceHeight * 1.2,
-                line.vertical ? 'center' : line.textAlign ?? 'left',
-            );
-        });
-
+            const plan=line.drawing,bounds=plan?.bounds??imageDrawBounds(line,canvas.width,canvas.height);
+            if(plan?.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                line.backgroundColor,line.vertical?Infinity:sourceHeight*1.2,line.vertical?'center':line.textAlign??'left',plan.prepared);
+            else drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                line.backgroundColor,line.vertical?Infinity:sourceHeight*1.2,line.vertical?'center':line.textAlign??'left');
+        }
         await checkImageCancellation(signal);
         const image = await encodeImageCanvas(canvas, signal);
         throwIfImageOperationAborted(signal);
         return { image, lines: readingLines };
+        } catch(error) {
+            if(!(error instanceof MangaAlphaProtectionLimitError)&&!(error instanceof ImageAlphaProtectionUnavailableError))throw error;
+            await checkImageCancellation(signal);
+            return imageAlphaUnchanged(readingLines);
+        }
     } finally {
         canvas.width = 0;
         canvas.height = 0;
@@ -313,19 +453,72 @@ export async function translateImageInOffscreen(
             source.naturalHeight || source.height, signal,
             (stage, percent) => {if (!signal?.aborted) reportProgress(requestId, stage, percent);}, source, manga ? 'manga' : 'image') : await recognizeImage(image, sourceLanguage, signal, {
             decodedImage: source,
+            includeMangaNumericConfidence: true,
             onProgress: percent => { if (!signal?.aborted) reportProgress(requestId, 'recognizing', percent); },
         });
         throwIfImageOperationAborted(signal);
-        const lines = manga ? usePaddle ? recognized : groupMangaOcrLines(recognized, sourceLanguage,
-            source.naturalWidth || source.width, source.naturalHeight || source.height) : groupImageParagraphs(recognized);
-        if (lines.length === 0) {
+        const guards:ImageTextRegion[]=[],guardKeys=new Map<string,{text?:string;conflict?:true; bbox:OcrLine['bbox']}>();
+        const width=source.naturalWidth || source.width,height=source.naturalHeight || source.height;
+        const eligible=recognized.filter(line=>{
+            const numericConfidence='numericConfidence' in line ? line.numericConfidence : undefined;
+            const suspected=line.guardOnly || (!usePaddle && numericProtection(line.text)
+                && !(typeof numericConfidence==='number' && Number.isFinite(numericConfidence) && numericConfidence>=90 && numericConfidence<=100));
+            if(!suspected)return true;
+            const b=line.bbox;
+            if(!b||![b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)||b.x1<=b.x0||b.y1<=b.y0)
+                throw new Error('图片数字保护位置无效，已保留原图');
+            const bbox={x0:Math.max(0,b.x0),y0:Math.max(0,b.y0),x1:Math.min(width,b.x1),y1:Math.min(height,b.y1)};
+            if(bbox.x1<=bbox.x0||bbox.y1<=bbox.y0)return false;
+            const key=[bbox.x0,bbox.y0,bbox.x1,bbox.y1].join(',');
+            const evidence='numericGuardText' in line ? line.numericGuardText : line.text || undefined;
+            const text=evidence===undefined?undefined:numericEvidenceKey(evidence);
+            const conflict='numericGuardConflict' in line && line.numericGuardConflict === true;
+            const previous=guardKeys.get(key);
+            if(previous){if(conflict || previous.text!==text)previous.conflict=true;return false;}
+            if(guards.length>=4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+            guardKeys.set(key,{bbox,text,...(conflict?{conflict:true as const}:{})});guards.push({text:'',bbox,guardOnly:true});return false;
+        });
+        const readable:ImageTextRegion[] = manga ? usePaddle ? eligible : groupMangaOcrLines(eligible, sourceLanguage,
+            source.naturalWidth || source.width, source.naturalHeight || source.height)
+            : groupImageParagraphs(eligible.map(line => numericProtection(line.text) ? {...line,sourceBoxes:[line.bbox]} : line));
+        if (!usePaddle) {
+            // 原始数值证据仅用于本地提示，不进入阅读结果或翻译请求。
+            const numbers=readable.filter(line=>numericProtection(line.text)).map(line=>({line,key:numericEvidenceKey(line.text)}));
+            let comparisons=0,exhausted=false;
+            for(const guard of guardKeys.values()) {
+                const guardKey=guard.text;
+                for(const number of numbers) {
+                    const {line,key}=number;
+                    if(++comparisons>1_000_000){exhausted=true;break;}
+                    const a=guard.bbox,b=line.bbox;
+                    if(a.x0<b.x1 && b.x0<a.x1 && a.y0<b.y1 && b.y0<a.y1
+                        && (guard.conflict || guardKey!==key))
+                        line.numericUncertain=true;
+                }
+                if(exhausted)break;
+            }
+            // 原始同值框可能已被可信结果覆盖而省略，但其他可信结果仍可能与其冲突。
+            for(let i=0;!exhausted && i<numbers.length;i++) for(let j=i+1;j<numbers.length;j++) {
+                if(++comparisons>1_000_000){exhausted=true;break;}
+                const left=numbers[i],right=numbers[j],a=left.line.bbox,b=right.line.bbox;
+                if(a.x0<b.x1 && b.x0<a.x1 && a.y0<b.y1 && b.y0<a.y1
+                    && left.key!==right.key)
+                    left.line.numericUncertain=right.line.numericUncertain=true;
+            }
+            if(exhausted)numbers.forEach(({line})=>line.numericUncertain=true);
+        }
+        if (readable.length === 0) {
             if (manga) return {image,lines:[]};
             throw new Error('没有识别到图片文字');
         }
-        reportProgress(requestId, 'translating');
-        const translations = await translateImageTextsInExtension(
-            lines.map(line => line.text), title, requestId, signal,
-        );
+        const lines:ImageTextRegion[]=[...readable,...guards];
+        const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !line.guardOnly && !numericProtection(line.text));
+        const translations = lines.map(line => line.text);
+        if (translatable.length) {
+            reportProgress(requestId, 'translating');
+            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal);
+            translatable.forEach(({index}, position) => {translations[index] = translated[position] ?? lines[index].text;});
+        }
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, manga ? 'cleaning' : 'rendering');
         return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId);

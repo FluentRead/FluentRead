@@ -7,7 +7,7 @@
 import {createHash} from 'node:crypto';
 import {readFileSync, realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {gzipUserscriptBuildData} from './buildGzip';
+import {gzipLargeStandaloneUserscriptData, gzipUserscriptBuildData} from './buildGzip';
 import {encodeUserscriptDataCompact} from './buildDataEncoding';
 import {normalizePath, type Plugin} from 'vite';
 
@@ -49,24 +49,30 @@ export function createUserscriptServiceBrandIconsCompressionPlugin(root: string,
             const paths: unknown = JSON.parse(source.toString('utf8'));
             validateBrandPaths(paths);
             const serialized = JSON.stringify(paths);
-            const compressed = encodeUserscriptDataCompact(gzipUserscriptBuildData(Buffer.from(serialized, 'utf8'), 8, standalone));
+            const input = Buffer.from(serialized, 'utf8');
+            const baseline = gzipUserscriptBuildData(input, 8, standalone);
             const sourceSha256 = createHash('sha256').update(source).digest('hex');
-            return [
-                `/* Non-code Lobe Icons paths; original JSON sha256 ${sourceSha256}; existing MIT notice retained. */`,
-                "import {inflateWithPako} from '@/userscript/pakoRuntime';",
-                "import {decodeUserscriptData} from '@/userscript/dataEncoding';",
-                'const knownBrands = Object.create(null);',
-                `for (const service of ${JSON.stringify(Object.keys(paths))}) knownBrands[service] = true;`,
-                'let brandPaths;',
-                'export function getServiceBrandIcon(service) {',
-                '    if (brandPaths !== undefined) return Object.hasOwn(brandPaths, service) ? brandPaths[service] : undefined;',
-                '    if (!Object.hasOwn(knownBrands, service)) return undefined;',
-                `    const restored = JSON.parse(inflateWithPako(decodeUserscriptData(${JSON.stringify(compressed)})));`,
-                "    if (restored === null || typeof restored !== 'object' || Array.isArray(restored) || !Object.hasOwn(restored, service) || !Array.isArray(restored[service]) || restored[service].length === 0) throw new Error('Invalid restored service brand paths');",
-                '    brandPaths = restored;',
-                '    return restored[service];',
-                '}',
-            ].join('\n');
+            const emit = (bytes: Uint8Array) => {
+                const compressed = encodeUserscriptDataCompact(bytes);
+                return [
+                    `/* Non-code Lobe Icons paths; original JSON sha256 ${sourceSha256}; existing MIT notice retained. */`,
+                    "import {inflateWithPako} from '@/userscript/pakoRuntime';",
+                    "import {decodeUserscriptData} from '@/userscript/dataEncoding';",
+                    'const knownBrands = Object.create(null);',
+                    `for (const service of ${JSON.stringify(Object.keys(paths))}) knownBrands[service] = true;`,
+                    'let brandPaths;',
+                    'export function getServiceBrandIcon(service) {',
+                    '    if (brandPaths !== undefined) return Object.hasOwn(brandPaths, service) ? brandPaths[service] : undefined;',
+                    '    if (!Object.hasOwn(knownBrands, service)) return undefined;',
+                    `    const restored = JSON.parse(inflateWithPako(decodeUserscriptData(${JSON.stringify(compressed)})));`,
+                    "    if (restored === null || typeof restored !== 'object' || Array.isArray(restored) || !Object.hasOwn(restored, service) || !Array.isArray(restored[service]) || restored[service].length === 0) throw new Error('Invalid restored service brand paths');",
+                    '    brandPaths = restored;',
+                    '    return restored[service];',
+                    '}',
+                ].join('\n');
+            };
+            return standalone ? gzipLargeStandaloneUserscriptData(input, root, 0)
+                .then(candidate => emit(candidate.byteLength < baseline.byteLength ? candidate : baseline)) : emit(baseline);
         },
     };
 }

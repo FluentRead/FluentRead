@@ -1,11 +1,13 @@
 /**
  * @file src/features/settings/ui/settings-page.css
+ * 弹窗呈现：设置页统一引入自有任务弹窗与确认框样式，标题、正文滚动和底部主操作复用同一组品牌与皮肤变量。
  * 文件职责：定义 Options 设置应用的全局页面骨架与 Element Plus 外观覆盖，包括分组侧边栏与搜索、直接置顶的页内导航、滚动工作区、设置卡片和特殊全宽业务视图。
  * 主要内容：样式引入共享 token，将品牌名称与小字宣传语排列在固定尺寸图标右侧；关于页使用宽幅品牌介绍，下方以项目链接卡片、跨两列微信交流按钮、独立赞赏区和自适应二维码弹窗利用内容空间；配置桌面与窄屏响应式布局、焦点态、导航分组、顶部同页定位导航、数字输入的独立操作区、支持多语言换行的表单与操作控件、服务/翻译中心视图、深色主题及固定标签列和控件列；触屏编辑输入使用 16px，避免 Safari 聚焦搜索或配置字段时自动放大并裁切操作按钮。
  * 模块边界：该文件只作用于扩展设置页面的整体布局，不承载配置逻辑或 feature 内部组件细节；分区专属样式在 settings-sections.css，通用设计变量位于 src/ui/styles/tokens.css。
  */
 @import "../../../ui/styles/tokens.css";
 @import "../../../ui/styles/feedback.css";
+@import "../../../ui/styles/dialogs.css";
 @import "./components/settings-controls.css";
 
 :root {
@@ -595,22 +597,22 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 .settings-app .topbar .settings-page-tabs { flex: 1; margin: 0; }
 .settings-app .userscript-settings-close { margin-left: auto; width: 36px; height: 36px; flex-basis: 36px; border-radius: 8px; }
 /* 折叠标题保持清晰命中区域，用右侧箭头表达层级；常规设置不使用大面积强调色。 */
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary {
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary {
   display: flex; align-items: center; gap: 12px; list-style: none;
   min-height: 44px; padding: 11px 16px; border: 1px solid var(--line);
   border-radius: 8px; color: var(--ink); background: var(--surface);
   font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer;
 }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary::-webkit-details-marker { display: none; }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary::marker { content: ''; }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:not(:has(.advanced-chevron, .details-chevron, .credential-guide-chevron))::after {
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::-webkit-details-marker { display: none; }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::marker { content: ''; }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:not(:has(.advanced-chevron, .details-chevron, .credential-guide-chevron))::after {
   content: ''; width: 7px; height: 7px; flex: none; margin-left: auto;
   border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: rotate(-45deg);
 }
-.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content) > summary::after { transform: rotate(45deg); }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:hover { background: var(--surface-soft); }
-.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content) > summary { margin-bottom: 12px; }
+.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary::after { transform: rotate(45deg); }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:hover { background: var(--surface-soft); }
+.settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.settings-app .workspace .settings-card details[open]:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary { margin-bottom: 12px; }
 /* 设置分组内的折叠行与普通设置行齐平：不再画成嵌在分组里的独立圆角框。 */
 .settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings) > summary { padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px); border: 0; border-radius: 0; font-weight: 550; }
 .settings-app .workspace .settings-card .settings-group-body :is(.translation-cache-limits, .request-retry-settings)[open] > summary { margin-bottom: 0; border-bottom: 1px solid var(--line); }
@@ -625,7 +627,7 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
   .settings-app .sidebar .search-box { order: 3; flex-basis: 100%; margin: 0; }
   .settings-app .sidebar .search-box input { font-size: 12px; }
   .settings-app .topbar { margin-bottom: 16px; }
-  .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content) > summary { padding: 12px; }
+  .settings-app .workspace .settings-card details:not(.settings-disclosure, .fr-memory-content, .fr-dialog-disclosure) > summary { padding: 12px; }
 }
 
 .settings-app .settings-group-body > .feature-enable-card { margin: 0; }

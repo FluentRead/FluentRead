@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/en-US.json';
 import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesEnglishMessages} from './sectionTranslationRules';
 import {mimoRetirementLegacyText} from './mimoRetirement';
 import {pdfReadingMessages} from './pdfReading';
@@ -34,6 +35,9 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const enUSMessages = {
+    "settings.backup.includeContext": "Include vocabulary context",
+    "feedback.serviceHint": "Check the selected service’s connection or model settings, then try again.",
+    "feedback.retryHint": "Try again shortly. Your source text and selection will stay available.",
     ...countForms['en-US'],
     ...personalCorrectionMessages['en-US'],
     "document.config.loadFailed": "Could not load settings. Reload and try again.",
@@ -67,6 +71,10 @@ export const enUSMessages = {
     "translationCenter.endpointMissing": "Set the custom service endpoint first.",
     "translationCenter.modelMissing": "Choose or enter a model first.",
     "translationCenter.noReady": "Configure at least one service to translate.",
+    'sidepanel.title': 'Sidebar translation',
+    'sidepanel.openError': 'Could not open the sidebar. Try again or open FluentRead from the browser sidebar menu.',
+    'sidepanel.settingsError': 'Could not open settings. Try again.',
+    'sidepanel.startupError': 'Could not load the translation panel. Please reload.',
     "translationCenter.intro": "One text, different translations. Choose services and compare.",
     "translationCenter.input": "Source text",
     "translationCenter.source": "Source language",
@@ -548,6 +556,7 @@ export const enUSMessages = {
     "settings.requestLimits.globalTitle": "Request limits",
     "settings.requestLimits.globalHelp": "Services and models without custom settings share these limits.",
     ...aiRequestTimeoutMessages["en-US"],
+    ...selectionDictionaryMessages["en-US"],
     ...sectionTranslationRulesEnglishMessages,
     "settings.requestLimits.retryIntervals": "Retry intervals",
     "settings.requestLimits.apiKeyRecovery": "Failed key cooldown",
@@ -580,7 +589,7 @@ export const enUSMessages = {
     "popup.pageFont.loading": "Reading the font setting…",
     "popup.pageFont.unavailable": "Translation font cannot be changed right now.",
     "popup.pageFont.readError": "Could not read the font setting. Please retry.",
-    "popup.pageFont.changeError": "Could not save the font setting. Please retry.",
+    "popup.pageFont.changeError": "Could not save the font setting.",
     "popup.pageFont.retry": "Retry",
     "popup.quickSettings.appearanceDescription": "Bilingual mode shows the original and translation together; translation-only mode shows just the translated text.",
     "popup.quickSettings.hoverSettings": "Hover translation settings",
@@ -934,6 +943,12 @@ export const enUSMessages = {
     'glossary.builtin.financeDescription': 'Financial statements, valuation metrics, and equity markets.',
     'glossary.builtin.research': 'Academic research',
     'glossary.builtin.researchDescription': 'Research methods, statistics, and academic papers.',
+    'glossary.builtin.hardware': "Computer hardware",
+    'glossary.builtin.hardwareDescription': "Processors, memory, chips and circuits",
+    'glossary.builtin.networking': "Networking and cloud",
+    'glossary.builtin.networkingDescription': "Network protocols, cloud infrastructure and deployment",
+    'glossary.builtin.mathematics': "Mathematics",
+    'glossary.builtin.mathematicsDescription': "Linear algebra, calculus, probability and optimization",
     'glossary.builtin.products': 'Keep product names',
     'glossary.builtin.productsDescription': 'Keep common development tool and AI product names unchanged. Case sensitive.',
     'glossary.builtin.englishChinese': 'English → Simplified Chinese',
@@ -990,6 +1005,26 @@ export const enUSMessages = {
     'glossary.noMatches': "No terms matched. Check the text, languages, website scope, and glossary switches.",
     'glossary.conflicts': "Conflicting translations",
     'glossary.conflict': "{source}: use “{kept}”; ignore “{ignored}”.",
+    "glossary.importPaste": "Paste text",
+    "glossary.importChoose": "Choose a glossary file",
+    "glossary.importReplace": "Choose another file",
+    "glossary.importReading": "Reading file…",
+    "glossary.importFileHint": "CSV, TSV, or JSON, up to 2 MB",
+    "glossary.importReview": "Import preview",
+    "glossary.importMore": "View all entries",
+    "glossary.importPreserves": "Adds new glossaries. Keeps existing entries.",
+    "area.error.languages.title": "An OCR language pack is needed",
+    "area.error.languages.hint": "Once it is ready, translation will continue with your selected area.",
+    "area.error.capture.title": "Could not capture the area",
+    "area.error.capture.hint": "Make sure this webpage is visible, then try capturing it again.",
+    "area.error.empty.title": "No text was recognized",
+    "area.error.empty.hint": "Try selecting a clearer area with complete text.",
+    "area.error.settings.title": "Check the translation service",
+    "area.error.settings.hint": "Check the selected service connection or model settings, then retry.",
+    "area.error.retry.title": "Translation did not finish",
+    "area.error.retry.hint": "Your selected area is kept. You can retry directly.",
+    "area.error.more": "Other actions",
+    "area.error.details": "View details",
     'glossary.importHelp': "Supports CSV, TSV, and JSON. Import adds new glossaries without replacing existing data. Review every entry before confirming.",
     'glossary.file': "Choose a file",
     'glossary.format': "File format",

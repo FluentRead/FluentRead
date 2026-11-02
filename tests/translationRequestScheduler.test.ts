@@ -29,6 +29,84 @@ describe('translation request scheduler', () => {
         vi.useRealTimers();
     });
 
+    it('回收不再使用的模型 bucket，同时保留一分钟内的限速历史', async () => {
+        const limits = {maxConcurrentTranslations: 1, translationRequestsPerSecond: 0, translationRequestsPerMinute: 1};
+        const config: TranslationRequestSchedulerConfig = {
+            translationRequestsPerSecond: 0, translationRequestsPerMinute: 0,
+            modelRequestLimits: {svc: {old: {enabled: true, limits}}},
+        };
+        const identity = {service: 'svc', model: 'old'};
+        const key = JSON.stringify(['model', 'svc', 'old']);
+        const scheduler = createTranslationRequestScheduler(() => config);
+        const setSpy = vi.spyOn(Map.prototype, 'set');
+        let buckets!: Map<string, unknown>;
+        let first!: Promise<string>;
+        try {
+            first = scheduler.schedule(async () => 'first', {identity});
+            const index = setSpy.mock.calls.findIndex(([item, value]) => item === key
+                && value && Array.isArray((value as {starts?: unknown}).starts));
+            expect(index).toBeGreaterThanOrEqual(0);
+            buckets = setSpy.mock.contexts[index] as Map<string, unknown>;
+        } finally {
+            setSpy.mockRestore();
+        }
+        await first;
+        await flushMicrotasks();
+        vi.setSystemTime(59_999);
+        const abort = new AbortController();
+        const started = vi.fn(async () => 'second');
+        const pending = scheduler.schedule(started, {identity, signal: abort.signal});
+        void pending.catch(() => undefined);
+        try {
+            expect(started).not.toHaveBeenCalled();
+            expect(buckets.has(key)).toBe(true);
+        } finally {
+            abort.abort();
+        }
+        await expect(pending).rejects.toMatchObject({name: 'AbortError'});
+
+        config.modelRequestLimits = {};
+        vi.setSystemTime(60_000);
+        await scheduler.schedule(async () => 'other', {identity: {service: 'other'}});
+        await flushMicrotasks();
+        expect(buckets.has(key)).toBe(false);
+    });
+
+    it('清理空历史时仍保留未结束的模型并发槽', async () => {
+        const limits = {maxConcurrentTranslations: 1, translationRequestsPerSecond: 0, translationRequestsPerMinute: 0};
+        const config: TranslationRequestSchedulerConfig = {modelRequestLimits: {svc: {active: {enabled: true, limits}}}};
+        const scheduler = createTranslationRequestScheduler(() => config);
+        const identity = {service: 'svc', model: 'active'};
+        const key = JSON.stringify(['model', 'svc', 'active']);
+        const hold = deferred<void>();
+        const setSpy = vi.spyOn(Map.prototype, 'set');
+        let buckets!: Map<string, unknown>;
+        let first!: Promise<void>;
+        try {
+            try {
+                first = scheduler.schedule(async () => hold.promise, {identity, countRate: false});
+                const index = setSpy.mock.calls.findIndex(([item, value]) => item === key
+                    && value && Array.isArray((value as {starts?: unknown}).starts));
+                expect(index).toBeGreaterThanOrEqual(0);
+                buckets = setSpy.mock.contexts[index] as Map<string, unknown>;
+            } finally {
+                setSpy.mockRestore();
+            }
+            vi.setSystemTime(120_000);
+            const started = vi.fn(async () => undefined);
+            const second = scheduler.schedule(started, {identity, countRate: false});
+            expect(buckets.has(key)).toBe(true);
+            expect(started).not.toHaveBeenCalled();
+            hold.resolve();
+            await Promise.all([first, second]);
+            await flushMicrotasks();
+            expect(started).toHaveBeenCalledOnce();
+            expect(buckets.has(key)).toBe(false);
+        } finally {
+            hold.resolve();
+        }
+    });
+
     it('按配置限制并发请求并保持 FIFO', async () => {
         const config = {
             maxConcurrentTranslations: 2,

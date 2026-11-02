@@ -689,6 +689,7 @@ const {
   COVERAGE_PROTECTED_DESCENDANTS,
   COVERAGE_TRACKER_KEY,
   assertPageContract,
+  assertRequiredRestored,
   assertFreshProductionExtension,
   assertCoverageReport,
   assertCoverageRestoration,
@@ -751,6 +752,11 @@ const {
     forbiddenState: Array<Record<string, unknown> & {signatures: unknown[]}>;
     interactionState: Array<Record<string, unknown>>;
   }>;
+  assertRequiredRestored: (
+    page: {evaluate: (fn: (argument: unknown) => unknown, argument: unknown) => Promise<unknown>},
+    baseline: Record<string, unknown>,
+    phase: string,
+  ) => Promise<void>;
   evaluateProductionBuildFreshness: (input: {
     extensionDir: string;
     manifestMtimeMs: number;
@@ -3900,6 +3906,157 @@ describe('real-site translation matrix gates', () => {
     expect(cases['learnopengl-coordinate-systems'].interactionSelectors).toEqual([
       '#content a[href], #nav a[href]',
     ]);
+  });
+
+  it('requires Microsoft Learn technical labels while leaving descriptions and Authentication headers translatable', async () => {
+    const config = cases['microsoft-learn-translator-v3'];
+    const selectors = config.forbiddenSelectors.filter(selector => selector.includes('code-block-header-language') || selector.includes('table[aria-label='));
+    const {document, window} = parseHTML(`<html><body><main id="main">
+      <div data-code-block-header><span id="language" class="code-block-header-language">JSON</span><button>Copy</button></div>
+      <table aria-label="Required parameters"><tbody><tr><td id="parameter">api-version</td><td id="description">The requested API version.</td></tr></tbody></table>
+      <table aria-label="Response headers"><tbody><tr><td id="response">X-requestid</td><td>A generated request identifier.</td></tr></tbody></table>
+      <table aria-label="Handle profanity"><tbody><tr><td id="enum">Marked</td><td id="marker">Asterisk</td><td id="action">Replace profane words with asterisks.</td><td id="example">Readable example.</td></tr></tbody></table>
+      <table aria-label="Optional parameters"><tbody><tr><td id="authentication">Authentication headers</td><td>See authentication options.</td></tr></tbody></table>
+      <p><span id="ordinary-label" class="code-block-header-language">An ordinary explanation.</span></p>
+    </main></body></html>`);
+    expect(selectors).toHaveLength(4);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, []))
+      .toEqual(expect.arrayContaining(selectors));
+    expect(selectors.flatMap(selector => [...document.querySelectorAll(selector)].map(node => node.id)))
+      .toEqual(['language', 'parameter', 'response', 'enum', 'marker']);
+    for (const id of ['description', 'action', 'example', 'authentication', 'ordinary-label']) {
+      expect(document.querySelector(`#${id}`)!.matches(selectors.join(',')), id).toBe(false);
+    }
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], selectors, [], [], []);
+      document.querySelector('#authentication')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">身份验证标头</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'readable label')).resolves.toBeDefined();
+      for (const id of ['language', 'parameter', 'response', 'enum', 'marker']) {
+        const translated = document.createElement('span'); translated.className = 'fluent-read-bilingual-content';
+        translated.textContent = 'Unexpected technical translation'; document.querySelector(`#${id}`)!.append(translated);
+        await expect(assertPageContract(page, baseline, [], config.url, id)).rejects.toThrow('forbidden DOM 出现译文');
+        translated.remove();
+      }
+      await expect(assertPageContract(page, baseline, [], config.url, 'restored labels')).resolves.toBeDefined();
+    } finally {vi.unstubAllGlobals();}
+  });
+
+  it.each([
+    ['bluesky-official-profile', 'aria-pressed', `<div data-testid="feedItem-by-fixture"><div><div></div><div><div></div><div id="late-owner"></div></div></div><div data-testid="postText"><a id="body-link" href="/profile/example" role="link" aria-label="Profile" aria-pressed="false" data-no-underline="1"><svg></svg><div><div><div dir="auto">Readable mention</div></div></div></a></div></div>`,
+      '<a id="protected-action" href="/profile/example" role="link" aria-label="Reposted by Example" aria-pressed="false" data-no-underline="1"><svg></svg><div><div><div dir="auto">Reposted by Example</div></div></div></a>'],
+    ['linkedin-public-pulse-article', 'replyToComment', `<main><div class="comments"><section class="comment"><p class="comment__text"><a id="body-link" class="comment__reply" data-feed-action="replyToComment">Readable reply explanation.</a></p><div id="late-owner" class="comment__actions"></div></section></div></main>`,
+      '<a id="protected-action" class="comment__reply" data-feed-action="replyToComment">Reply</a>'],
+  ] as const)('observes optional %s metadata when it appears without protecting readable body links', async (caseName, marker, fixture, action) => {
+    const config = cases[caseName];
+    const selector = config.forbiddenSelectors.find(value => value.includes(marker))!;
+    expect(selector).toBeDefined();
+    expect(config.optionalForbiddenSelectors).toContain(selector);
+    expect(config.dynamicForbiddenSelectors).toContain(selector);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors,
+      'forbiddenMustExistSelectors' in config ? config.forbiddenMustExistSelectors : [], config.optionalForbiddenSelectors)).not.toContain(selector);
+    const {document, window} = parseHTML(`<html><body>${fixture}</body></html>`);
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], [selector], [], [selector], [selector]);
+      expect(baseline.forbiddenState[0]).toMatchObject({count: 0, optional: true, dynamic: true});
+      document.querySelector('#late-owner')!.innerHTML = action;
+      expect([...document.querySelectorAll(selector)].map(node => node.id)).toEqual(['protected-action']);
+      await expect(assertPageContract(page, baseline, [], config.url, 'late clean metadata')).resolves.toBeDefined();
+      expect(baseline.forbiddenState[0]).toMatchObject({count: 1});
+      document.querySelector('#body-link')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">Readable translation</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'readable body link')).resolves.toBeDefined();
+      document.querySelector('#protected-action')!.insertAdjacentHTML('beforeend', '<span class="fluent-read-bilingual-content">Unexpected metadata translation</span>');
+      await expect(assertPageContract(page, baseline, [], config.url, 'damaged metadata')).rejects.toThrow('forbidden DOM 出现译文');
+    } finally {vi.unstubAllGlobals();}
+  });
+
+  it('keeps the Amazon product ASIN and mandatory price, rating and search boundaries when purchasing is unavailable', () => {
+    const config = cases['amazon-echo-dot-product'];
+    expect(config.url).toBe('https://www.amazon.com/dp/B09B8V1LZ3?language=en_US&th=1');
+    const url = new URL(config.url);
+    expect(url.pathname).toBe('/dp/B09B8V1LZ3');
+    expect([...url.searchParams]).toEqual([['language', 'en_US'], ['th', '1']]);
+    expect(config.hoverTargets.find(target => target.name === 'technical-description')?.sourceIncludes).toEqual(['Dual-band Wi-Fi']);
+    expect(config.optionalForbiddenSelectors).toEqual(['#add-to-cart-button', '#buy-now-button']);
+    expect(resolveForbiddenMustExistSelectors(config.tier, config.forbiddenSelectors, [], config.optionalForbiddenSelectors))
+      .toEqual(['.a-price', '#acrPopover', '#acrCustomerReviewText', '#nav-search-bar-form']);
+    expect(config.requiredSelectors).toEqual(['h1#title', '#feature-bullets li', '#atfCenter14_feature_div .content-grid-block p',
+      '.content-grid-block h2', '.content-grid-block h3', '#tech p']);
+    expect(config.modes).toEqual(['hover', 'full']);
+  });
+
+  it.each(['new-banner', 'changed-stable-source', 'missing-stable-source', 'changed-stable-structure'])
+    ('keeps the Amazon restoration witness stable without reducing global paragraph coverage: %s', async variant => {
+      const config = cases['amazon-echo-dot-product'];
+      const selector = '#atfCenter14_feature_div .content-grid-block p';
+      const proseRule = config.coverageRules.find(rule => rule.name === 'product-detail-paragraphs')!;
+      expect(config.requiredSelectors).toContain(selector);
+      expect(proseRule).toMatchObject({selector: '.content-grid-block p', minInitial: 30, trackDynamic: true});
+      expect(config.hoverTargets.find(target => target.name === 'product-detail-paragraph')?.selector).toBe('.content-grid-block p');
+      const rest = Array.from({length: 30}, (_, index) => `<p>Independent product explanation ${index}.</p>`).join('');
+      const {document, window} = parseHTML(`<html><body><main><div id="atfCenter14_feature_div"><div class="content-grid-block"><p id="witness"><strong>We want you to know</strong></p></div></div><section class="content-grid-block">${rest}</section></main></body></html>`);
+      Object.defineProperty(window.HTMLElement.prototype, 'getBoundingClientRect', {configurable: true,
+        value: () => ({width: 400, height: 30, top: 0, left: 0, right: 400, bottom: 30})});
+      for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+        HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+        getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+      const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+      try {
+        const baseline = await capturePageContract(page, [selector], [], [], [], []);
+        expect(baseline.requiredState[0]).toMatchObject({sourceText: 'We want you to know'});
+        document.querySelector('main')!.insertAdjacentHTML('afterbegin', '<div class="content-grid-block"><p><strong>This device is designed for Alexa+</strong></p></div>');
+        expect(document.querySelector(proseRule.selector)!.textContent).toBe('This device is designed for Alexa+');
+        expect(document.querySelectorAll(proseRule.selector)).toHaveLength(32);
+        expect(document.querySelectorAll(selector)).toHaveLength(1);
+        expect([...document.querySelectorAll(proseRule.selector)].some(node => node.id === 'witness')).toBe(true);
+        const witness = document.querySelector('#witness')!;
+        if (variant === 'changed-stable-source') witness.querySelector('strong')!.textContent = 'A changed product notice.';
+        if (variant === 'missing-stable-source') witness.remove();
+        if (variant === 'changed-stable-structure') witness.innerHTML = '<em>We want you to know</em>';
+        const check = assertRequiredRestored(page, baseline, variant);
+        if (variant === 'new-banner') await expect(check).resolves.toBeUndefined();
+        else await expect(check).rejects.toThrow('未恢复原始文本/结构');
+      } finally {vi.unstubAllGlobals();}
+    });
+
+  it.each(['add-to-cart-button', 'buy-now-button'])('adopts an absent Amazon %s only when it appears clean and rejects translated purchase controls', async id => {
+    const config = cases['amazon-echo-dot-product'];
+    const {document, window} = parseHTML(`<html><body><main>
+      <h1 id="title">Echo Dot product title</h1><div id="availability">This item cannot be shipped to your selected delivery location.</div>
+      <span class="a-price">$49.99</span><span id="acrPopover">4.5 out of 5 stars</span><span id="acrCustomerReviewText">1,234 ratings</span>
+      <form id="nav-search-bar-form"><input type="search"></form><div id="purchase-controls"></div>
+      <ul id="feature-bullets"><li>Readable product description.</li></ul><div class="content-grid-block"><h2>Product details</h2><h3>Product features</h3><p>A detailed description.</p></div>
+      <section id="tech"><p>Dual-band Wi-Fi</p></section>
+    </main></body></html>`);
+    for (const [key, value] of Object.entries({window, document, location: {href: config.url}, Node: window.Node,
+      HTMLElement: window.HTMLElement, HTMLAnchorElement: window.HTMLAnchorElement,
+      getComputedStyle: () => ({display: 'block', visibility: 'visible'})})) vi.stubGlobal(key, value);
+    const page = {evaluate: async (fn: (argument: unknown) => unknown, argument: unknown) => fn(argument), url: () => config.url};
+    try {
+      const baseline = await capturePageContract(page, [], config.forbiddenSelectors, [], config.dynamicForbiddenSelectors, config.optionalForbiddenSelectors);
+      for (const selector of config.optionalForbiddenSelectors) {
+        expect(baseline.forbiddenState.find(state => state.selector === selector)).toMatchObject({count: 0, optional: true, dynamic: true});
+      }
+      await expect(assertPageContract(page, baseline, [], config.url, 'unavailable product')).resolves.toBeDefined();
+      const button = document.createElement('input'); button.id = id; button.type = 'submit';
+      const value = id === 'add-to-cart-button' ? 'Add to Cart' : 'Buy Now'; button.setAttribute('value', value);
+      document.querySelector('#purchase-controls')!.append(button);
+      await expect(assertPageContract(page, baseline, [], config.url, 'clean control appeared')).resolves.toBeDefined();
+      expect(baseline.forbiddenState.find(state => state.selector === `#${id}`)).toMatchObject({count: 1});
+      button.setAttribute('value', 'Unexpected translated control');
+      await expect(assertPageContract(page, baseline, [], config.url, 'translated value')).rejects.toThrow('动态 forbidden DOM 基线丢失');
+      button.setAttribute('value', value); button.setAttribute('data-fr-translation-owned', 'true');
+      await expect(assertPageContract(page, baseline, [], config.url, 'owned purchase control')).rejects.toThrow('forbidden DOM 出现译文');
+      button.removeAttribute('data-fr-translation-owned');
+      await expect(assertPageContract(page, baseline, [], config.url, 'restored purchase control')).resolves.toBeDefined();
+    } finally {vi.unstubAllGlobals();}
   });
 
   it.each([

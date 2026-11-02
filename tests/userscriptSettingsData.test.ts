@@ -5,7 +5,7 @@ import {inflateWithPako} from '@/userscript/pakoBundled';
 import {decodeUserscriptData} from '@/userscript/dataEncoding';
 import {gzipUserscriptBuildData} from '@/userscript/buildGzip';
 import ts from 'typescript';
-import {describe, expect, it} from 'vitest';
+import {afterAll, beforeAll, describe, expect, it, vi} from 'vitest';
 import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugin';
 
 const root = process.cwd();
@@ -13,6 +13,24 @@ const tables = [
     ['src/core/harness/promptLocales.ts', 'HARNESS_TRANSLATED_PROMPTS'],
     ['src/core/config/catalog.ts', 'localizedTargetLanguageLabels'],
     ['src/core/config/translationAppearance.ts', 'TRANSLATION_STYLE_PRESETS'],
+    ['src/core/config/catalog.ts', 'multilingualTargetLanguageLabels'],
+    ['src/core/config/catalog.ts', 'englishTargetLanguageLabels'],
+    ['src/core/config/interfaceAppearance.ts', 'interfaceSkinOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'interfaceFontOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'popupModuleOptions'],
+    ['src/core/config/interfaceAppearance.ts', 'popupQuickFeatureOptions'],
+    ['src/features/full-page-translation/ui/translationIndicators.ts', 'iconPaths'],
+    ['src/providers/translation/aliyun-translation.ts', 'aliyunErrorHints'],
+    ['src/core/i18n/language.ts', 'localizedUiLanguageLabels'],
+    ['src/features/reading-assistant/sentenceAnalysis.ts', 'ROLES'],
+    ['src/core/harness/promptDefaults.ts', 'GRAMMAR_CARD_FORMAT'],
+    ['src/services/diagnostics/index.ts', 'diagnosticUiKeys'],
+    ['src/core/language/codes.ts', 'LANGUAGE_ALIASES'],
+    ['src/core/language/codes.ts', 'DEFAULT_SCRIPTS'],
+    ['src/features/image-translation/ocrLanguages.ts', 'IMAGE_OCR_LANGUAGE_PACKS'],
+    ['src/core/config/selectionPreview.ts', 'learningPreviewAnswers'],
+    ['src/ui/translationLoadingIndicator.ts', 'HOST_IMPORTANT_STYLES'],
+    ['src/features/settings/model/navigation.ts', 'STATIC_NAVIGATION_GROUPS'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {
@@ -31,10 +49,10 @@ function initializer(code: string, name: string): string {
     throw new Error(`Missing fixture initializer ${name}`);
 }
 
-function value(expression: string): unknown {
+function value(expression: string, extra: Record<string, unknown> = {}): unknown {
     const javascript = ts.transpileModule(`globalThis.result = ${expression};`, {compilerOptions: {target: ts.ScriptTarget.ES2018}}).outputText;
     const context = {result: undefined as unknown, Uint8Array, atob,
-        __fluentreadInflateSettingsData: inflateWithPako, __fluentreadDecodeSettingsData: decodeUserscriptData};
+        __fluentreadInflateSettingsData: inflateWithPako, __fluentreadDecodeSettingsData: decodeUserscriptData, ...extra};
     runInNewContext(javascript, context, {timeout: 1000});
     return context.result;
 }
@@ -51,7 +69,74 @@ describe('standalone static settings data representation', () => {
         expect(Buffer.from(decodeUserscriptData(encoded))).toEqual(gzipUserscriptBuildData(Buffer.from(JSON.stringify(before)), undefined, true));
         expect(initializer(transformed, name)).not.toContain('eval');
         // Every other byte of the owning source stays in place; functions and declarations remain executable code.
-        expect(transformed.replace(initializer(transformed, name), initializer(source, name)).replace('/* @__PURE__ */ ', '').endsWith(source)).toBe(true);
+        const originalAst = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+        let restored = transformed;
+        for (const statement of originalAst.statements.filter(ts.isVariableStatement)) {
+            for (const declaration of statement.declarationList.declarations) {
+                if (!declaration.initializer || !ts.isIdentifier(declaration.name)) continue;
+                const before = declaration.initializer.getText(originalAst);
+                const after = initializer(transformed, declaration.name.text);
+                if (before !== after) restored = restored.replace(`/* @__PURE__ */ ${after}`, before);
+            }
+        }
+        expect(restored.replace(/import \{inflateWithPako as __fluentreadInflateSettingsData\} from '@\/userscript\/pakoRuntime';\n/u, '')
+            .replace(/import \{decodeUserscriptData as __fluentreadDecodeSettingsData\} from '@\/userscript\/dataEncoding';\n/u, '')).toBe(source);
+    });
+
+    describe.each([
+        ['ordinary', '0', '0', false],
+        ['standalone', '1', '0', true],
+        ['greasy-fork', '0', '1', false],
+        ['standalone-and-greasy', '1', '1', false],
+    ] as const)('actual %s Vite configuration', (_label, standalone, greasy, enabled) => {
+        let plugin: {transform?: unknown; resolveId?: unknown; load?: unknown};
+        let run: (code: string, id: string) => {code: string} | null;
+        // Configuration loading is bounded setup; assertions retain the default test budget.
+        beforeAll(async () => {
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', standalone);
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', greasy);
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
+            vi.resetModules();
+            // This case checks real settings-plugin registration and complete label data.
+            // Unrelated large UI-message worker compression has its own real-worker suite.
+            // Keep its lossless baseline here; the settings AST/codec remain the real ones.
+            vi.doMock('@/userscript/buildGzip', async original => {
+                const actual = await original<typeof import('@/userscript/buildGzip')>();
+                return {...actual, gzipLargeStandaloneUserscriptData: async (data: Uint8Array) => actual.gzipUserscriptBuildData(data)};
+            });
+            const {default: configuration} = await import('@/userscript/vite.config');
+            const config = configuration as {plugins: Array<{name?: string; transform?: unknown; resolveId?: unknown; load?: unknown}>};
+            plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
+            run = plugin.transform as typeof run;
+        });
+        afterAll(() => {
+            vi.doUnmock('@/userscript/buildGzip');
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        });
+        it('preserves full language labels and grouped runtime tables', async () => {
+            const path = resolve(root, 'src/core/config/catalog.ts');
+            const original = readFileSync(path, 'utf8');
+            const result = run(original, path);
+            if (!enabled) expect(result).toBeNull();
+            else {
+                const resolveId = plugin.resolveId as (id: string) => string | undefined;
+                const virtualId = resolveId('virtual:fluentread-standalone-settings-data');
+                expect(virtualId).toBeTypeOf('string');
+                const load = plugin.load as (id: string) => Promise<string>;
+                const module = await load.call({addWatchFile: () => {}}, virtualId!);
+                const group = {decodeUserscriptData, inflateWithPako,
+                    getSettingsData: undefined as undefined | ((index: number) => unknown)};
+                runInNewContext(module.replace(/^import .*;\n/gmu, '')
+                    .replace('export function getSettingsData', 'globalThis.getSettingsData = function'), group, {timeout: 1000});
+                expect(group.getSettingsData).toBeTypeOf('function');
+                for (const name of ['multilingualTargetLanguageLabels', 'englishTargetLanguageLabels']) {
+                    expect(JSON.stringify(value(initializer(result!.code, name), {__fluentreadGetSettingsData: group.getSettingsData})))
+                        .toBe(JSON.stringify(value(initializer(original, name))));
+                }
+            }
+        });
     });
 
     it('keeps the standard build style table in Base85 with identical gzip bytes and values', () => {
@@ -93,7 +178,20 @@ describe('standalone static settings data representation', () => {
     it('leaves partially used catalogs visible to standard tree shaking while compressing its complete style table', () => {
         const plugin = createUserscriptSettingsDataPlugin(root, true, false);
         const run = plugin.transform as (code: string, id: string) => {code: string} | null;
-        for (const [path, name] of tables.slice(0, 2)) expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        const appearancePath = 'src/core/config/interfaceAppearance.ts';
+        for (const [path, name] of [...tables.slice(0, 2), ...tables.slice(3)].filter(([path]) => path !== appearancePath)) {
+            expect(run(`const ${name} = {};`, resolve(root, path))).toBeNull();
+        }
+        // The ordinary build already owns the complete skin/font registries. Use their
+        // actual module to verify those round trips while popup-only catalogs stay literal.
+        const source = readFileSync(resolve(root, appearancePath), 'utf8');
+        const generated = run(source, resolve(root, appearancePath))!.code;
+        for (const name of ['interfaceSkinOptions', 'interfaceFontOptions']) {
+            expect(JSON.stringify(value(initializer(generated, name)))).toBe(JSON.stringify(value(initializer(source, name))));
+        }
+        for (const name of ['popupModuleOptions', 'popupQuickFeatureOptions']) {
+            expect(initializer(generated, name)).toBe(initializer(source, name));
+        }
         expect(run('const TRANSLATION_STYLE_PRESETS = [];', resolve(root, tables[2][0]))?.code).toContain('JSON.parse');
     });
 

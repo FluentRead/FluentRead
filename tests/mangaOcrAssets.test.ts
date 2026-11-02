@@ -2,6 +2,9 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {MANGA_INPAINT_ASSET, MANGA_OCR_ASSETS, MANGA_OCR_CACHE, MANGA_OCR_MODEL_BYTES,
     assertMangaOcrActive, loadMangaInpaintAsset, loadMangaOcrAssets, mangaOcrModelStatus, removeMangaOcrAssets, importMangaModel} from '@/src/features/image-translation/services/mangaOcrAssets';
 import {createVirtualModelResponsePort, virtualModelBuffer} from './helpers/virtualModelResponse';
+// 资源生命周期使用显式虚拟容量，不伪装为真实 ONNX；实际 wire 与固定配方由独立测试及外部字节 replay 验证。
+const shapes=vi.hoisted(()=>({optimize:vi.fn()}));
+vi.mock('@/src/features/image-translation/services/mangaRecognitionShapes',()=>({optimizeVerifiedMangaRecognition:shapes.optimize}));
 const allAssets=[...MANGA_OCR_ASSETS,MANGA_INPAINT_ASSET];
 const NativeResponse=globalThis.Response;
 // 虚拟容量与受控 digest 只验证容量、状态和缓存契约；标记 Response 端口不声称原生大模型复制，真实内容和完整 SHA-256 留给浏览器专项。
@@ -12,6 +15,7 @@ function deferred<T>() {let resolve!: (value:T) => void, reject!: (error:Error) 
 let preferences:{match:ReturnType<typeof vi.fn>;put:ReturnType<typeof vi.fn>};
 let cache:{match:ReturnType<typeof vi.fn>;put:ReturnType<typeof vi.fn>;delete:ReturnType<typeof vi.fn>};
 beforeEach(async()=>{
+    shapes.optimize.mockReset().mockImplementation((buffer:ArrayBuffer)=>buffer);
     vi.stubGlobal('Response',createVirtualModelResponsePort(NativeResponse));
     preferences={match:vi.fn(async()=>undefined),put:vi.fn(async()=>{})};
     cache={match:vi.fn(async()=>undefined),put:vi.fn(async()=>{}),delete:vi.fn(async()=>true)};
@@ -23,6 +27,23 @@ beforeEach(async()=>{
 afterEach(()=>{vi.useRealTimers();vi.unstubAllGlobals();});
 
 describe('漫画模型固定版本和完整性',()=>{
+    it('原文件全部校验和缓存完成后才生成会话副本，状态与离线原文件保持源版本',async()=>{
+        const derived=new ArrayBuffer(5),abort=new AbortController();
+        shapes.optimize.mockImplementation((original,asset,signal)=>{
+            expect(original.byteLength).toBe(MANGA_OCR_ASSETS[1].bytes);expect(asset).toBe(MANGA_OCR_ASSETS[1]);expect(signal).toBe(abort.signal);
+            expect(crypto.subtle.digest).toHaveBeenCalledTimes(3);expect(cache.put).toHaveBeenCalledTimes(3);return derived;
+        });
+        expect((await loadMangaOcrAssets(abort.signal)).recognition).toBe(derived);expect(shapes.optimize).toHaveBeenCalledOnce();
+        expect(fetch).toHaveBeenCalledTimes(3);expect(cache.delete).not.toHaveBeenCalled();
+        const cachedRecognition=cache.put.mock.calls.find(([url])=>url.endsWith(MANGA_OCR_ASSETS[1].path))![1] as Response;
+        expect((await cachedRecognition.arrayBuffer()).byteLength).toBe(MANGA_OCR_ASSETS[1].bytes);
+    });
+    it.each(['download','cache'])('形状配方失败不会把有效%s原文件当损坏重下或删除',async source=>{
+        if(source==='cache')cache.match.mockImplementation(async(url:string)=>response(MANGA_OCR_ASSETS.find(a=>url.endsWith(a.path))!.bytes));
+        const failure=new Error('shape recipe mismatch');shapes.optimize.mockImplementationOnce(()=>{throw failure;});
+        await expect(loadMangaOcrAssets()).rejects.toBe(failure);expect(cache.delete).not.toHaveBeenCalled();
+        expect(fetch).toHaveBeenCalledTimes(source==='cache'?0:3);expect(cache.put).toHaveBeenCalledTimes(source==='cache'?0:3);
+    });
     it.each(['ocr','inpaint'] as const)('缓存 match 迟到时 %s 释放未读正文，不复制、摘要、删缓存或请求网络',async kind=>{
         const abort=new AbortController(),entered=deferred<void>(),matched=deferred<Response>(),cancel=vi.fn(async()=>{});
         const cached=new NativeResponse(new ReadableStream({cancel}));

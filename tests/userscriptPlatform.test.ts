@@ -10,7 +10,7 @@ import {UNHANDLED_RUNTIME_MESSAGE, setPlatformMessageHandler, resetPlatformMessa
 import {parseHTML} from 'linkedom';
 
 const mocks = vi.hoisted(() => ({
-    config: {count: 0},
+    config: {count: 0, selectionDictionarySource: 'auto'},
     saveConfig: vi.fn(),
     incrementUserscriptConfigCount: vi.fn(),
     applyConfigHistoryAction: vi.fn(),
@@ -291,9 +291,11 @@ describe('userscript 平台消息适配', () => {
                 for(const input of [null,undefined,false,'unknown',42]) expect(await handler(input)).toBe(UNHANDLED_RUNTIME_MESSAGE);
                 expect(await handler({type:'openOptionsPage'})).toEqual({success:true});expect(open).toHaveBeenCalledOnce();
                 expect(await handler({type:'fullPageTranslationState'})).toEqual({success:true});
+                mocks.config.selectionDictionarySource='free-dictionary';
                 mocks.lookupWord.mockResolvedValueOnce({word:'sample'});expect(await handler({type:'selectionWordLookup',word:'sample'})).toMatchObject({success:true,data:{word:'sample'}});
+                expect(mocks.lookupWord).toHaveBeenLastCalledWith('sample','free-dictionary');
                 mocks.lookupWord.mockRejectedValueOnce('dictionary unavailable');expect(await handler({type:'selectionWordLookup'})).toEqual({success:false,error:'dictionary unavailable'});
-                expect(mocks.lookupWord).toHaveBeenLastCalledWith('');
+                expect(mocks.lookupWord).toHaveBeenLastCalledWith('', mocks.config.selectionDictionarySource);
                 for(const type of ['selectionTts','selectionTtsGoogle','selectionTtsStop','toggleSelectionAreaTranslator','toggleImageTranslator','fluentReadImageSynthetic','fluentReadAreaSynthetic']) expect(await handler({type})).toMatchObject({success:false});
                 expect(await handler({type:'clearTranslationCache'})).toEqual({success:true});expect(mocks.clearTranslationCache).toHaveBeenCalledOnce();
                 expect(await handler({type:'userscriptCacheMaintenance'})).toEqual({success:true});expect(mocks.cleanupTranslationCache).toHaveBeenCalledOnce();

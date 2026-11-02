@@ -114,8 +114,9 @@ async function downloadVerified(asset, file, {signal, fetchImpl, downloadTimeout
 
 /** kinds 仅列实际测试所需的 ocr/inpaint；sourceDirectories 是已下载公开模型的显式候选目录。 */
 async function ensureImageTranslationModelFiles({directory = defaultImageTranslationModelCacheDirectory(), kinds = ['ocr'], sourceDirectories = [], signal,
-    metadataFile, fetchImpl = globalThis.fetch, lockTimeoutMs = 300_000, downloadTimeoutMs = 300_000, pollMs = 100} = {}) {
+    metadataFile, fetchImpl = globalThis.fetch, allowNetworkDownload = true, lockTimeoutMs = 300_000, downloadTimeoutMs = 300_000, pollMs = 100} = {}) {
     if (!directory || !Array.isArray(kinds) || !kinds.length || kinds.some(kind => !['ocr', 'inpaint'].includes(kind))) throw new Error('Provide a model cache directory and required ocr/inpaint kinds');
+    if (typeof allowNetworkDownload !== 'boolean') throw new Error('allowNetworkDownload must be a boolean');
     if (![lockTimeoutMs, downloadTimeoutMs, pollMs].every(value => Number.isSafeInteger(value) && value > 0)) throw new Error('Model cache timeouts must be positive integers');
     const assets = readImageTranslationModelManifest(metadataFile).filter(asset => kinds.includes(asset.kind));
     signal?.throwIfAborted(); await fsp.mkdir(directory, {recursive: true});
@@ -130,10 +131,15 @@ async function ensureImageTranslationModelFiles({directory = defaultImageTransla
         const release = await acquireModelLock(lock, {signal, lockTimeoutMs, pollMs});
         const partial = file + `.partial-${randomUUID()}`;
         try {
-            // 进程被终止来不及执行 finally 的旧临时字节，不属于可复用的已验证缓存。
-            for (const entry of await fsp.readdir(folder)) if (entry.startsWith(asset.filename + '.partial-')) await fsp.rm(path.join(folder, entry), {force: true});
+            // 旧临时字节不属于已验证缓存；禁下载模式保留已有文件以便检查。
+            if (allowNetworkDownload) for (const entry of await fsp.readdir(folder)) if (entry.startsWith(asset.filename + '.partial-')) await fsp.rm(path.join(folder, entry), {force: true});
             let cache = 'hit';
             if (!await verifiedFile(file, asset, signal)) {
+                // 离线模式不覆盖现有损坏文件；调用者可先检查或手动处理。
+                if (!allowNetworkDownload) {
+                    try {await fsp.lstat(file); throw new Error(`Invalid existing image model cache file: ${asset.filename}`);}
+                    catch (error) {if (error.code !== 'ENOENT') throw error;}
+                }
                 let imported = false;
                 for (const source of sources) {
                     const candidate = path.join(source, asset.filename);
@@ -142,8 +148,15 @@ async function ensureImageTranslationModelFiles({directory = defaultImageTransla
                     if (!await verifiedFile(partial, asset, signal)) throw new Error(`Imported image model changed during copying: ${asset.filename}`);
                     imported = true; break;
                 }
-                if (!imported) {await downloadVerified(asset, partial, {signal, fetchImpl, downloadTimeoutMs}); networkDownloads++;}
-                signal?.throwIfAborted(); await fsp.rename(partial, file); cache = imported ? 'imported' : 'downloaded';
+                if (!imported) {
+                    if (!allowNetworkDownload) throw new Error(`Image model unavailable in offline cache: ${asset.filename}`);
+                    await downloadVerified(asset, partial, {signal, fetchImpl, downloadTimeoutMs}); networkDownloads++;
+                }
+                signal?.throwIfAborted();
+                // 不下载时不能覆盖检查后被其他进程创建的目标；同目录硬链接原子拒绝已有路径。
+                if (!allowNetworkDownload) {await fsp.link(partial, file); await fsp.unlink(partial);}
+                else await fsp.rename(partial, file);
+                cache = imported ? 'imported' : 'downloaded';
             }
             files.push({...asset, path: file, cache});
         } finally {try {await fsp.rm(partial, {force: true});} finally {await release();}}

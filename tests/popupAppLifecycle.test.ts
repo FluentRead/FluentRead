@@ -31,7 +31,7 @@ let locale:import('vue').Ref<string>,bundleRevision:import('vue').Ref<number>,lo
 const catalogs:Record<string,Readonly<Record<string,string>>>={'zh-CN':zhCNMessages,'en-US':enUSMessages}
 function permissionEvent(kind:'added'|'removed'){for(const listener of permissionEvents)listener(kind)}
 function permissionText(key:string,params:Record<string,unknown>={}){void bundleRevision.value;if(!localized)return key;const id=locale.value==='en-US'&&englishLoaded?'en-US':'zh-CN';let text=catalogs[id][key]||key;for(const[k,v]of Object.entries(params))text=text.replaceAll('{'+k+'}',String(v));return text}
-const close=vi.fn(),noticeFocus=vi.fn(),patches=vi.fn(),handoff=vi.fn(),getTab=vi.fn(),getSourceTab=vi.fn(),send=vi.fn(),createTab=vi.fn(),openOptions=vi.fn(),runtimeSend=vi.fn(),reloadTab=vi.fn()
+const close=vi.fn(),noticeFocus=vi.fn(),patches=vi.fn(),handoff=vi.fn(),getTab=vi.fn(),getSourceTab=vi.fn(),send=vi.fn(),createTab=vi.fn(),openOptions=vi.fn(),runtimeSend=vi.fn(),reloadTab=vi.fn(),openSidepanel=vi.fn()
 let config:Config,subscribe:(value:Config)=>void,tabEvents:Record<string,Set<(...args:any[])=>void>>,runtimeEvents:Set<(...args:any[])=>void>
 type ConfigStore = typeof import('@/src/services/config/store')
 type ConfigSender = NonNullable<Parameters<ConfigStore['requestConfigPatch']>[1]>
@@ -70,6 +70,7 @@ beforeEach(async()=>{
   getTab.mockResolvedValue([{id:7,windowId:3,url:'https://example.com/a'}]);send.mockImplementation(async(_id,message)=>message.type==='getFullPageTranslationState'?{isTranslated:false,documentToken:'popup-fixture-document'}:{status:'success',isTranslated:message.action==='fullPage',documentToken:'popup-fixture-document'});createTab.mockResolvedValue({id:8});openOptions.mockResolvedValue(undefined);runtimeSend.mockResolvedValue({success:true})
   getSourceTab.mockResolvedValue({id:7,windowId:3,url:'https://example.com/a'})
   fixture={capabilities:runtime.reactive({browser:'chrome',areaTranslation:true,imageTranslation:true}),ready:Promise.resolve(),darkMode:{matches:false,onchange:null}}
+  openSidepanel.mockReset().mockResolvedValue(undefined)
   vi.resetModules()
   vi.doMock('webextension-polyfill',()=>({default:{i18n:{getUILanguage:()=>fixture.browserLocale?.()},tabs:{query:getTab,get:getSourceTab,sendMessage:send,create:createTab,reload:reloadTab,
     ...Object.fromEntries(Object.entries(tabEvents).map(([name,set])=>[name,{addListener:(fn:any)=>set.add(fn),removeListener:(fn:any)=>set.delete(fn)}]))},
@@ -81,6 +82,7 @@ beforeEach(async()=>{
   vi.doMock('@/src/ui/interfaceAppearance',()=>({applyInterfaceFont(){},applyInterfaceSkin(){}}))
   vi.doMock('@/src/platform/browser/freeProviderPermissions',()=>({readFreePoolAccess:readAccess,requestFreeProviderAccess:requestAccess,subscribeFreeProviderAccessChanges:(fn:any)=>{permissionEvents.add(fn);return()=>permissionEvents.delete(fn)}}))
   vi.doMock('@/src/platform/browser/capabilities',()=>({browserCapabilities:fixture.capabilities}))
+  vi.doMock('@/src/platform/browser/translationSidepanel',()=>({canOpenTranslationSidepanel:()=>fixture.capabilities.sidepanel===true,openTranslationSidepanel:openSidepanel}))
   vi.doMock('@element-plus/icons-vue',()=>({Setting:{render:()=>null}}))
   // 动画和 Element Plus 定位属于展示端口；真实业务 SFC 由正常 Vite 模块加载并保留源码映射。
   vi.doMock('element-plus/es/components/tooltip/index',()=>({ElTooltip:{inheritAttrs:false,setup:(_:unknown,{slots,expose}:any)=>{expose({onClose(){},hide(){}});return()=>slots.default?.()}}}))
@@ -142,6 +144,27 @@ async function focusedServiceSearchAtCompact(scrollTop = 22, naturalTop = 92) {
 }
 function growServiceViewport(height=263){Object.assign(viewport,{height});viewport.dispatchEvent(new win.Event('resize'));flushViewport()}
 describe('实际 Popup 缓存模板与页面操作',()=>{
+  it('点击侧边栏入口在当前窗口内立即打开，等待期间去重，成功后关闭弹窗',async()=>{
+    fixture.capabilities.sidepanel=true;await mount();const pending=deferred<void>();openSidepanel.mockReturnValueOnce(pending.promise)
+    const entry=button('sidebar-translation');eventOf(entry)();expect(openSidepanel).toHaveBeenCalledWith(3)
+    eventOf(entry)();expect(openSidepanel).toHaveBeenCalledOnce();expect(close).not.toHaveBeenCalled()
+    pending.resolve();await drain();expect(close).toHaveBeenCalledOnce()
+  })
+  it('侧边栏原生调用失败保留重试入口，关闭后的旧点击与迟到失败不再反馈',async()=>{
+    fixture.capabilities.sidepanel=true;await mount();openSidepanel.mockRejectedValueOnce(new Error('gesture failed'))
+    await eventOf(button('sidebar-translation'))();await drain();expect(close).not.toHaveBeenCalled();expect(document.querySelector('.notice.error')?.textContent).toBe('sidepanel.openError')
+    const pending=deferred<void>();openSidepanel.mockReturnValueOnce(pending.promise);const old=eventOf(button('sidebar-translation'));old();shown.value=false;await drain()
+    const calls=openSidepanel.mock.calls.length;old();expect(openSidepanel).toHaveBeenCalledTimes(calls);pending.reject(new Error('late failure'));await drain();expect(close).not.toHaveBeenCalled()
+  })
+  it('网站仅译文优先展示且禁用全局快捷切换，外部移除与换站后重新沿用全局模式',async()=>{
+    config.service='bing';config.translationOnlyDomains=['example.com'];await mount();const mode=()=>document.querySelector('[data-testid="popup-display-mode"]')!;
+    expect(mode().getAttribute('data-display-mode')).toBe('translation-only');expect(mode().hasAttribute('disabled')).toBe(true);
+    expect(mode().getAttribute('aria-description')).toContain('网站偏好');eventOf(mode())();expect(state.config.display).toBe(1);
+    state.config.translationOnlyDomains=[];await drain();expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+    const old=eventOf(mode());state.config.translationOnlyDomains=['example.com'];await drain();old();expect(state.config.display).toBe(1);
+    getTab.mockResolvedValue([{id:8,windowId:3,url:'https://another.test/a'}]);tabEvent('onActivated',{tabId:8,windowId:3});await drain();
+    expect(mode().getAttribute('data-display-mode')).toBe('bilingual');expect(mode().hasAttribute('disabled')).toBe(false);
+  })
   it('源与目标语言控件只保存对应字段，抽屉遮罩关闭释放所属视口订阅',async()=>{
     await mount();patches.mockClear();const initialTarget=state.config.to
     eventOf(document.querySelector('[aria-label="源语言"]')!,'onUpdate:modelValue')('en');await drain();expect(state.config.from).toBe('en');expect(state.config.to).toBe(initialTarget);expect(patches).toHaveBeenLastCalledWith(expect.objectContaining({from:'en',to:initialTarget}))
@@ -273,15 +296,32 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(state.drawerVisible).toBe(false);expect(document.querySelector('.drawer-content')).toBeNull();expect(commands()).toHaveLength(0);
     expect(send.mock.calls.some(call=>['getPageTranslationFontState','setPageTranslationFont'].includes(call[1].type))).toBe(false);
   });
-  it('Aa 保存失败保持已确认偏好，同按钮重试真实后台保存后清除错误',async()=>{
+  it.each(['notice','font'] as const)('Aa 保存失败显示可读提示，使用 %s 重试并在真实后台保存后清除',async source=>{
     localized=true;await mount();const {sender,messages,records}=await attachPersistence();
-    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure')).mockRejectedValueOnce(Error('synthetic retry failure'));
     const entry=()=>button('page-font-entry');await eventOf(entry())();await drain();
     expect(entry().getAttribute('aria-pressed')).toBe('false');expect(entry().getAttribute('data-font-state')).toBe('error');
-    expect(entry().hasAttribute('disabled')).toBe(false);expect(button('page-font-error')).toBeNull();
+    expect(entry().hasAttribute('disabled')).toBe(false);
     expect(entry().getAttribute('aria-description')).toContain(zhCNMessages['popup.pageFont.changeError']);
-    await eventOf(entry())();await drain();expect(entry().getAttribute('aria-pressed')).toBe('true');expect(button('page-font-error')).toBeNull();
+    const notice=()=>button('page-font-error');const retry=()=>button('page-font-retry');
+    expect(notice().querySelector('[role="alert"]')?.textContent).toContain(zhCNMessages['popup.pageFont.changeError']);
+    expect(retry().textContent).toBe(zhCNMessages['popup.pageFont.retry']);
+    expect(retry().getAttribute('aria-label')).toBe(zhCNMessages['popup.pageFont.retryAction']);
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('false');expect(notice()).not.toBeNull();
+    if(source==='notice')expect(document.activeElement).toBe(entry());
+    await eventOf(source==='notice'?retry():entry())();await drain();
+    expect(entry().getAttribute('aria-pressed')).toBe('true');expect(notice()).toBeNull();
     expect(messages).toHaveLength(1);expect(messages[0].config).toEqual({browserDefaultTranslationFont:true});expect(records.get('local:config')).toMatchObject({browserDefaultTranslationFont:true});
+  });
+  it('字体重试等待时保留临时焦点，不抢回用户主动移走的焦点',async()=>{
+    localized=true;await mount();const gate=deferred<void>(),{sender}=await attachPersistence([gate]);
+    vi.mocked(sender).mockRejectedValueOnce(Error('synthetic background persistence failure'));
+    await eventOf(button('page-font-entry'))();await drain();
+    const pending=eventOf(button('page-font-retry'))();await drain();
+    expect(document.activeElement).toBe(document.querySelector('.translation-tools'));
+    const outside=document.querySelector('.settings-button') as HTMLElement;outside.focus();gate.resolve();await pending;await drain();
+    expect(document.activeElement).toBe(outside);expect(button('page-font-error')).toBeNull();
   });
   it('Aa 接受其他页面的全局配置同步，导航和重开不重置选择也不额外保存',async()=>{
     await mount();const {store,sender,messages}=await attachPersistence();const saves=patches.mock.calls.length;

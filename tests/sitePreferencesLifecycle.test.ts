@@ -28,6 +28,8 @@ vi.mock('element-plus', async () => {
 
 import {createApp, defineComponent, h, nextTick, reactive, type App} from 'vue';
 import SitePreferencesSettings from '@/src/features/settings/ui/SitePreferencesSettings.vue';
+import SiteRulePreview from '@/src/features/settings/ui/SiteRulePreview.vue';
+import type {SiteAdaptationSettings} from '@/src/core/site-adaptation/types';
 import type {SitePreferences, SitePreferenceLists} from '@/src/features/settings/model/sitePreferences';
 
 type Patch = Partial<SitePreferenceLists> & {autoTranslate?: boolean};
@@ -56,6 +58,24 @@ beforeEach(() => {vi.clearAllMocks();host = document.createElement('div');docume
 afterEach(() => {app?.unmount();app = undefined;host.remove();});
 
 describe('网站偏好真实 SFC 编辑与保存', () => {
+    it('真实预览表单解释站点显示优先级、过期输入和非法网址，并允许检查命中的正文规则', async () => {
+        const inspect = vi.fn();
+        const adaptation: SiteAdaptationSettings = {enabled: true, disabledRuleIds: [], custom: {version: 1, rules: [
+            {id: 'fixture-display', name: 'Fixture display scope', match: {hosts: ['example.com']}, mode: 'focus', content: [{css: ['article']}], allScopes: true},
+        ]}};
+        const props = reactive({settings: {...defaults(), display: 1, translationOnlyDomains: ['example.com']}, adaptation, scope: 'content' as 'content' | 'all', onInspectRule: inspect});
+        app = createApp({render: () => h(SiteRulePreview, props)}); app.mount(host); await settle();
+        expect(host.querySelector('.preview-states')).toBeNull();
+        await input('input[inputmode="url"]', 'https://example.com/article'); fire(get('form'), 'submit'); await settle();
+        expect(get('.preview-states').textContent).toContain('仅显示译文'); expect(host.textContent).toContain('限定范围：只翻译指定的正文区域');
+        await click('[data-preview-rule="fixture-display"] button'); expect(inspect).toHaveBeenCalledWith('fixture-display');
+        props.settings.translationOnlyDomains = []; await settle(); expect(get('.preview-states').textContent).toContain('双语对照');
+        props.settings.display = 0; await settle(); expect(get('.preview-states').textContent).toContain('仅显示译文');
+        props.settings.disabledExtensionDomains = ['example.com']; await settle(); expect(host.textContent).toContain('扩展功能未运行');
+        props.scope = 'all'; await settle(); expect(host.textContent).toContain('仅显式声明 allScopes');
+        await input('input[inputmode="url"]', 'https://another.test/'); expect(host.textContent).toContain('网址已修改，请重新检查');
+        await input('input[inputmode="url"]', 'not a URL'); fire(get('form'), 'submit'); await settle(); expect(get('[role="alert"]').textContent).toContain('请输入以 http:// 或 https://');
+    });
     it('只归一化一次网站集合，搜索复用已排序行并响应外部名单变化', async () => {
         const props = await mount({alwaysTranslateDomains: ['docs.example.com', 'second.net'], disabledExtensionDomains: ['example.com']});
         expect(host.querySelectorAll('[data-site-preference]')).toHaveLength(2);
@@ -70,17 +90,33 @@ describe('网站偏好真实 SFC 编辑与保存', () => {
         await input('input[type="search"]', '');expect(host.querySelectorAll('[data-site-preference]')).toHaveLength(3);
     });
 
-    it.each(['always', 'disabled', 'hidden'])('添加 %s 偏好只提交对应名单并规范网站作用域', async preference => {
+    it.each(['always', 'disabled', 'hidden', 'single'])('添加 %s 偏好只提交对应名单并规范网站作用域', async preference => {
         const props = await mount();
         expect(host.textContent).toContain('尚未添加网站偏好');
         await input('[data-select-port]', preference, 'change');
         await submit('https://docs.example.com/article?a=1');
-        const field = preference === 'always' ? 'alwaysTranslateDomains' : preference === 'disabled' ? 'disabledExtensionDomains' : 'floatingBallDisabledDomains';
+        const field = preference === 'always' ? 'alwaysTranslateDomains' : preference === 'disabled' ? 'disabledExtensionDomains' : preference === 'single' ? 'translationOnlyDomains' : 'floatingBallDisabledDomains';
         expect(props.savePreferences).toHaveBeenCalledOnce();
         expect(props.settings[field]).toEqual(['example.com']);
         expect(props.savePreferences.mock.calls[0][0]).not.toHaveProperty('on');
         expect(get<HTMLInputElement>('input[inputmode="url"]').value).toBe('');
         expect(host.textContent).toContain('网站偏好已保存');
+    });
+
+    it('仅译文保存失败保留行，重试与删除撤销保留其他页面新增的同站偏好', async () => {
+        const save = vi.fn().mockRejectedValueOnce(new Error('storage unavailable')).mockResolvedValue(undefined);
+        const props = await mount({translationOnlyDomains: ['example.com']}, save);
+        const box = get<HTMLInputElement>('input[aria-label="仅显示译文 example.com"]');
+        box.checked = false; fire(box, 'change'); await settle();
+        expect(props.settings.translationOnlyDomains).toEqual(['example.com']); expect(host.textContent).toContain('保存失败');
+        box.checked = false; fire(box, 'change'); await settle();
+        expect(props.settings.translationOnlyDomains).toEqual([]);
+        await input('[data-select-port]', 'single', 'change'); await submit('example.com');
+        await submit('example.com'); expect(host.textContent).toContain('该网站已有此偏好');
+        await click('[data-site-preference="example.com"] button');
+        props.settings.translationOnlyDomains = ['example.com']; props.settings.alwaysTranslateDomains = ['example.com']; await settle();
+        await click('.rule-actions button');
+        expect(props.settings.translationOnlyDomains).toEqual(['example.com']); expect(props.settings.alwaysTranslateDomains).toEqual(['example.com']);
     });
 
     it('拒绝无效网站与重复偏好，同时允许为已有网站补充另一偏好', async () => {

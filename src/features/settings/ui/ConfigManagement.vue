@@ -1,6 +1,6 @@
 <!--
 @file src/features/settings/ui/ConfigManagement.vue
-文件职责：提供备份与恢复页面的配置云备份、完整数据备份和设置历史。
+文件职责：提供备份与恢复页面的配置云备份、完整数据备份和设置历史；历史预览以适度宽度呈现差异，完整配置按需展开。
 主要内容：按页内分类切换完整备份入口与设置历史，仅在历史分区活跃时派生和渲染列表；列表每行只保留版本、一句概要和时间——单项修改给出“改前 → 改后”，多项修改只给数量，自动快照只给时间和与当前的差异数——具体修改在详情里区分当时的修改和恢复时的差异，并保留动态服务名称、多语言与安全恢复。恢复确认、取消后的焦点归还及回包保持页面和预览目标归属。
 模块边界：本组件拥有设置历史的预览与恢复，并向本机备份入口转交页面与备份分区的活跃归属；本机备份与导入由 LocalDataManagement 编排，配置云备份由独立 CloudConfigBackup 组件及后台服务负责。
 -->
@@ -90,7 +90,7 @@
       v-model="previewVisible"
       class="config-preview-dialog"
       :title="previewTitle"
-      width="min(880px, calc(100vw - 32px))"
+      width="min(680px, calc(100vw - 32px))"
       destroy-on-close
       @closed="clearPreview"
     >
@@ -124,7 +124,7 @@
         </div>
         <div v-else class="diff-empty">{{ previewMode === 'changes' ? t(displayDiff ? 'settings.history.noVisibleChanges' : 'settings.history.noPrevious') : t('settings.history.sameConfig') }}</div>
 
-        <details class="json-details">
+        <details class="json-details fr-dialog-disclosure">
           <summary>查看完整配置 JSON</summary>
           <pre>{{ previewJson }}</pre>
         </details>
@@ -534,8 +534,8 @@ async function confirmRestore(operation: RestoreOperation) {
 .version-empty { padding: 28px 16px; color: var(--muted); font-size: 11px; text-align: center; }
 .preview-summary { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-soft); }
 .preview-summary > div { display: flex; flex-direction: column; gap: 3px; }
-.preview-summary span { color: var(--muted); font-size: 10px; }
-.preview-summary strong { color: var(--ink); font-size: 12px; }
+.preview-summary span { color: var(--muted); font-size: 12px; }
+.preview-summary strong { color: var(--ink); font-size: 13px; }
 .preview-summary b { padding: 5px 9px; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 10px; }
 .preview-summary b.empty { color: #267260; background: #eaf8f4; }
 .diff-groups { display: grid; gap: 14px; max-height: 48vh; margin-top: 16px; padding-right: 4px; overflow-y: auto; }
@@ -544,10 +544,10 @@ async function confirmRestore(operation: RestoreOperation) {
 .diff-list { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; }
 .diff-item { display: grid; grid-template-columns: minmax(130px, .65fr) repeat(2, minmax(0, 1fr)); gap: 12px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
 .diff-item:last-child { border-bottom: 0; }
-.diff-item > strong { align-self: center; color: var(--ink); font-size: 10.5px; }
+.diff-item > strong { align-self: center; color: var(--ink); font-size: 12px; }
 .diff-item div { min-width: 0; }
-.diff-item span { color: var(--muted); font-size: 9px; }
-.diff-item p { margin: 3px 0 0; overflow-wrap: anywhere; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.diff-item span { color: var(--muted); font-size: 11px; }
+.diff-item p { margin: 4px 0 0; overflow-wrap: anywhere; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .diff-empty { margin-top: 16px; padding: 28px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); font-size: 11px; text-align: center; }
 .json-details { margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
 .json-details summary { padding: 11px 13px; color: var(--ink); cursor: pointer; font-size: 10.5px; font-weight: 700; }

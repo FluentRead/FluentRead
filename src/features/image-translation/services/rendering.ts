@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与字素换行；每次排版有界复用同字号测宽和字素分割，避免字号搜索中的重复工作，保留正文对齐及字号上限并隔离 Canvas 状态。
+ * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，避免字号搜索中的重复工作，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type {OcrLine} from '@/src/shared/image/types';
+import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
 
 /** 从 OCR 框外围采样主色，忽略透明像素且不遍历框内面积。 */
 export function getImageTextBackgroundColor(
@@ -79,13 +80,84 @@ export interface ImageTranslationTextLayout {
     lineHeight: number;
 }
 
-const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-const CJK_TOKENS = /\s+|[\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]\p{Mark}*|[^\s\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+// 补充平面汉字、假名与韩文 Jamo 要与英文分词，附着的组合标记和连接符仍属于前一字素。
+const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
+// 这些字符各自是完整字素：不含组合标记、连接符、韩文 Jamo、表情修饰符或 Prepend。
+const SIMPLE_IMAGE_TEXT = /^[\s\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7a3\uff01-\uff9d]*$/u;
+const IMAGE_TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
 const graphemeSegmenter = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : undefined;
 
+function isSimpleImageText(text: string): boolean {
+    return SIMPLE_IMAGE_TEXT.test(text) && !IMAGE_TEXT_EXTEND.test(text);
+}
+
 function graphemes(text: string): string[] {
-    return graphemeSegmenter ? Array.from(graphemeSegmenter.segment(text), part => part.segment) : Array.from(text);
+    if (graphemeSegmenter) return Array.from(graphemeSegmenter.segment(text), part => part.segment);
+    // 不模拟不完整的 UAX29：复杂词组保持整体，宁可缩小字号，也不拆开字素。
+    return isSimpleImageText(text) ? Array.from(text) : [text];
+}
+
+/** 缺少 Segmenter 时按固定 Unicode 17 属性，只在 ASCII 空格的安全两侧分开词组。 */
+function fallbackTokens(paragraph: string): Array<string | null> {
+    const words = paragraph.replace(/\s+/gu, ' ').split(' ');
+    const result: Array<string | null> = [];
+    let pending = words[0];
+    for (let index = 1; index < words.length; index += 1) {
+        const next = words[index];
+        if (!isSpaceGraphemeExtension(next.codePointAt(0)!)) {
+            // 只读末尾两个 UTF-16 单元，避免为查询 Prepend 展开整个词组。
+            const last = pending.charCodeAt(pending.length - 1), before = pending.charCodeAt(pending.length - 2);
+            const paired = last >= 0xDC00 && last <= 0xDFFF && before >= 0xD800 && before <= 0xDBFF;
+            const previous = pending.codePointAt(pending.length - (paired ? 2 : 1))!;
+            if (!isSpaceGraphemePrepend(previous)) {
+                if (isSimpleImageText(pending)) {
+                    for (const token of pending.match(CJK_TOKENS)!) result.push(token);
+                } else result.push(pending);
+                result.push(null);
+            } else {
+                // Prepend 与空格同属字素，保留在左词组；空格之后的真实边界仍可换行。
+                result.push(pending + ' ');
+            }
+            pending = next;
+        } else {
+            // 例如泰/老挝语 SpacingMark 不是 GC=Mark，不能用“非 Mark”推断空格后可断。
+            pending += ' ' + next;
+        }
+    }
+    if (isSimpleImageText(pending)) {
+        for (const token of pending.match(CJK_TOKENS)!) result.push(token);
+    } else {
+        result.push(pending);
+    }
+    return result;
+}
+
+function tokenize(paragraph: string): Array<string | null> {
+    if (!graphemeSegmenter && !isSimpleImageText(paragraph)) return fallbackTokens(paragraph);
+    const tokens = paragraph.match(CJK_TOKENS) || [];
+    // 正则词界（包括空白两侧）可能位于字素内，使用分割器的实际边界合并；空白仍按原规则归一化。
+    const mayCrossBoundary = tokens.length > 1 && graphemeSegmenter
+        && !isSimpleImageText(paragraph);
+    if (mayCrossBoundary && graphemeSegmenter) {
+        const iterator = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
+        const merged: string[] = [];
+        let offset = 0;
+        let end = 0;
+        let pending = '';
+        for (const token of tokens) {
+            offset += token.length;
+            while (end < offset) end += iterator.next().value!.segment.length;
+            pending += token;
+            if (offset === end) {
+                merged.push(pending);
+                pending = '';
+            }
+        }
+        return merged.map(token => /^\s+$/u.test(token) ? null : token);
+    }
+    return tokens.map(token => /^\s+$/u.test(token) ? null : token);
 }
 
 /** 保留单词、显式换行和混排空格；过长单词才按字素拆分，不截断译文。 */
@@ -101,7 +173,7 @@ export function layoutImageTranslationText(
         return { lines: [], fontSize: 0, lineHeight: 0 };
     }
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
-    const tokens = paragraphs.map(paragraph => paragraph.match(CJK_TOKENS) || []);
+    const tokens = paragraphs.map(tokenize);
     const segments = new Map<string, string[]>();
     let measuredSize = 0;
     const widths = new Map<string, number>();
@@ -125,7 +197,7 @@ export function layoutImageTranslationText(
             let current = '';
             let space = '';
             for (const token of paragraph) {
-                if (/^\s+$/u.test(token)) {
+                if (token === null) {
                     space = ' ';
                     continue;
                 }
@@ -195,13 +267,14 @@ export function drawTranslatedImageText(
     backgroundColor: string,
     maxFontSize = Infinity,
     textAlign: 'left' | 'center' | 'right' = 'center',
+    prepared?: ImageTranslationTextLayout,
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
     context.save();
     try {
         let measuredFont = 0;
-        const layout = layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2, (line, fontSize) => {
+        const layout = prepared ?? layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2, (line, fontSize) => {
             if (fontSize !== measuredFont) {
                 context.font = `400 ${fontSize}px ${IMAGE_TEXT_FONT}`;
                 measuredFont = fontSize;

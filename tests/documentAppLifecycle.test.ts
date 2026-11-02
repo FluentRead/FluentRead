@@ -180,7 +180,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes), parsed = parseDocument('race.txt', 'Source.');
         await history.save({id, name: 'race.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
-            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Original correction'], fingerprint: '', parsed, parsedVersion: 20});
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Original correction'], fingerprint: '', parsed, parsedVersion: 21});
         app.unmount();vi.stubGlobal('indexedDB', factory);
         root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;
         const secondRoot = node('root'), secondApp = renderer.createApp(DocumentApp);secondApp.mount(secondRoot);
@@ -207,7 +207,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
         const parsed = parseDocument('retry.txt', 'Source.');
         await history.save({id, name: 'retry.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
-            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Previous correction'], fingerprint: '', parsed, parsedVersion: 20});
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Previous correction'], fingerprint: '', parsed, parsedVersion: 21});
         const session = new Map<string, string>();
         app.unmount();vi.stubGlobal('indexedDB', factory);
         vi.stubGlobal('sessionStorage', {getItem: (key: string) => session.get(key) ?? null, setItem: (key: string, value: string) => session.set(key, value), removeItem: (key: string) => session.delete(key)});
@@ -292,7 +292,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         for (const [index, name] of ['first.txt', 'second.txt'].entries()) {
             const bytes = new TextEncoder().encode(`Original ${index}`), parsed = parseDocument(name, new TextDecoder().decode(bytes));
-            await history.save({id: await documentHistoryId(bytes), name, format: parsed.format, size: bytes.length, total: 1, completed: 0, updatedAt: index + 1, bytes, mimeType: 'text/plain', translations: [], fingerprint: '', parsed, parsedVersion: 20});
+            await history.save({id: await documentHistoryId(bytes), name, format: parsed.format, size: bytes.length, total: 1, completed: 0, updatedAt: index + 1, bytes, mimeType: 'text/plain', translations: [], fingerprint: '', parsed, parsedVersion: 21});
         }
         app.unmount(); vi.stubGlobal('indexedDB', factory); root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = app._instance.setupState;
         await vi.waitFor(() => expect(state.historyEntries).toHaveLength(2)); await flush();
@@ -621,7 +621,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         await history.save({id, name: parsed.fileName, format: 'pdf', size: bytes.length, total: parsed.segments.length,
             completed: parsed.segments.length, updatedAt: 1, bytes, mimeType: 'application/pdf', translations: ['历史完整译文'],
-            fingerprint: state.currentFingerprint, parsed, parsedVersion: 20});
+            fingerprint: state.currentFingerprint, parsed, parsedVersion: 21});
         app.unmount(); vi.stubGlobal('indexedDB', factory);
         root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = app._instance.setupState;
         await flush(); await state.openHistory({id}); await flush();
@@ -1121,7 +1121,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory();
         const history = createDocumentHistory(factory);
         await history.save({id, name: 'history.txt', format: parsed.format, size: bytes.length, total: parsed.segments.length,
-            completed: 0, updatedAt: 1, bytes, mimeType, translations: [], fingerprint: '', parsed, parsedVersion: 20});
+            completed: 0, updatedAt: 1, bytes, mimeType, translations: [], fingerprint: '', parsed, parsedVersion: 21});
         app.unmount();
         vi.stubGlobal('indexedDB', factory);
         root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = (app._instance as any).setupState;
@@ -1286,7 +1286,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(20);
+            expect(saved?.parsedVersion).toBe(21);
             expect(saved?.translations).toEqual(expectedTranslations);
             expect((saved?.parsed as any).segments.map((segment: any) => segment.source)).toEqual(expectedSources);
             expect(saved?.parsed).not.toHaveProperty('segmentOrigins');
@@ -1301,6 +1301,50 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.createRecognizer).not.toHaveBeenCalled();
         expect(ports.translate).not.toHaveBeenCalled();
         expect(ports.batch).not.toHaveBeenCalled();
+    });
+
+    it('reparses a version 20 overpainted source, preserves independent corrections and reuses the version 21 snapshot', async () => {
+        const items = [
+            {str: 'Results', transform: [10, 0, 0, 10, 45, 50], width: 35, height: 10, fontName: 'body', dir: 'ltr', hasEOL: false},
+            {str: 'Results', transform: [10.5, 0, 0, 10.5, 45, 50], width: 35, height: 10.5, fontName: 'body', dir: 'ltr', hasEOL: true},
+            {str: 'Stable paragraph.', transform: [10, 0, 0, 10, 5, 85], width: 80, height: 10, fontName: 'body', dir: 'ltr', hasEOL: true},
+        ], originalItems = structuredClone(items);
+        ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items,
+            styles: {body: {ascent: .8, descent: -.2, fontFamily: 'sans-serif'}}})});
+        const bytes = new TextEncoder().encode('%PDF-fixture'), id = await documentHistoryId(bytes);
+        const oldBlock = (segmentIndex: number, source: string, x: number, y: number, width: number, fontSize = 10): PdfDocumentPage['blocks'][number] => ({
+            segmentIndex, x, y, width, height: fontSize, fontSize, lineHeight: fontSize, lineCount: 1,
+            fontFamily: 'sans-serif', fontWeight: 400, textAlign: 'left', kind: 'text', lines: [{text: source, x, y, width, height: fontSize}],
+        });
+        // 固定旧20版快照：10/10.5字号的分桶错过同位重描，旧join产生ResultsResults；不从新解析构造旧原文。
+        const old: ParsedDocument = {fileName: 'overpaint.pdf', format: 'pdf', label: 'PDF', parts: [],
+            segments: [{id: 0, source: 'ResultsResults', contextLabel: '第 1 页', role: 'paragraph'}, {id: 1, source: 'Stable paragraph.', role: 'paragraph'}],
+            binary: {kind: 'pdf', bytes, pages: [{pageNumber: 1, width: 100, height: 100, segmentIndexes: [0, 1],
+                blocks: [oldBlock(0, 'ResultsResults', 45, 41.6, 35, 10.5), oldBlock(1, 'Stable paragraph.', 5, 77, 80)]}]}};
+        const translations = ['Old duplicate correction', 'Stable correction'], factory = new IDBFactory(), history = createDocumentHistory(factory);
+        await history.save({id, name: old.fileName, format: 'pdf', size: bytes.length, total: 2, completed: 2, updatedAt: 1,
+            bytes, mimeType: 'application/pdf', translations, fingerprint: '', parsed: old, parsedVersion: 20});
+        app.unmount(); vi.stubGlobal('indexedDB', factory);
+        vi.stubGlobal('File', class extends Blob {name: string; constructor(parts: BlobPart[], name: string, options?: BlobPropertyBag) {super(parts, options); this.name = name;}});
+        root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = (app._instance as any).setupState;
+        await flush(); const parse = vi.spyOn(binaryService, 'parseDocumentFile');
+        await state.openHistory({id}); await flush();
+        expect(parse).toHaveBeenCalledOnce(); expect(new Uint8Array(await parse.mock.calls[0][0].arrayBuffer())).toEqual(bytes);
+        expect(state.parsedDocument.segments.map((segment: {source: string}) => segment.source)).toEqual(['Results', 'Stable paragraph.']);
+        expect(state.translatedSegments).toEqual(['', 'Stable correction']);
+        const retained = [{source: 'ResultsResults', translation: translations[0], contextLabel: '第 1 页'}];
+        expect(state.documentQueue[0].retainedRevisions).toEqual(retained); expect(items).toEqual(originalItems);
+        state.editSegment(0, 'Current correction'); state.persistHistory();
+        await vi.waitFor(async () => {
+            const saved = await history.load(id);
+            expect(saved?.parsedVersion).toBe(21); expect(saved?.translations).toEqual(['Current correction', 'Stable correction']);
+            expect(saved?.retainedRevisions).toEqual(retained); expect(saved?.bytes).toEqual(bytes);
+        });
+        const blocks = structuredClone(state.parsedDocument.binary.pages[0].blocks);
+        state.resetDocument(); await flush(); await state.openHistory({id}); await flush();
+        expect(parse).toHaveBeenCalledOnce(); expect(state.translatedSegments).toEqual(['Current correction', 'Stable correction']);
+        expect(state.parsedDocument.binary.pages[0].blocks).toEqual(blocks); expect(state.documentQueue[0].retainedRevisions).toEqual(retained);
+        expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
     });
 
     it.each([15, 17, 19])('reparses version %i native PDF glyph bounds while preserving revisions and progress, then reuses the refreshed snapshot', async obsoleteVersion => {
@@ -1348,7 +1392,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             .toBeLessThan(old.binary.pages[0].blocks[0].lines![0].runs![0].y);
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(20);
+            expect(saved?.parsedVersion).toBe(21);
             expect(saved?.completed).toBe(1); expect(saved?.total).toBe(2);
             expect(saved?.translations).toEqual(translations);
             expect((saved?.parsed as typeof fresh).binary).toEqual(fresh.binary);
@@ -1397,7 +1441,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(hostText(retained)).not.toContain(conditionRetained.translation);
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(20);
+            expect(saved?.parsedVersion).toBe(21);
             expect(saved?.translations).toEqual(['保留正文校订']);
             expect(saved?.retainedRevisions).toEqual([previousRetained, conditionRetained]);
             expect(saved?.completed).toBe(1); expect(saved?.total).toBe(1);

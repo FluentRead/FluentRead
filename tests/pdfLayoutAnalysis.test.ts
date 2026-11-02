@@ -3,6 +3,7 @@ import openstaxNarrowFormulaColumns from './fixtures/pdf-openstax-page908-column
 import openstaxEnergyTable from './fixtures/pdf-openstax-page377-table.json';
 import openstaxDensityTable from './fixtures/pdf-openstax-page699-table.json';import openstaxSymbolAtoms from './fixtures/pdf-openstax-page70-symbols.json';
 import openstaxColumnAtoms from './fixtures/pdf-openstax-page105-columns.json';
+import openstaxListCallout from './fixtures/pdf-openstax-page24-callout.json';
 /**
  * @file tests/pdfLayoutAnalysis.test.ts
  * 文件职责：验证 PDF 阅读分析不会把分栏、表格、公式、上下标或插图误当作一个可覆盖的正文框。
@@ -1345,6 +1346,32 @@ describe('PDF layout analysis on real paper typography', () => {
         // 小插图里只有零星短标注：不够容器的任何一条。
         const small = analyze([atom('Axis', 120, 150, 20, 7), atom('Body text outside the figure stays body text for this page.', 60, 400, 400)], [{kind: 'image', x: 100, y: 100, width: 200, height: 150}]);
         expect(small.preservedRegions.some(region => region.kind === 'figure')).toBe(true);
+    });
+    it('keeps actual OpenStax learning-objective headings and sparse framed lists translatable', () => {
+        const result = analyzePdfPageLayout(openstaxListCallout as Parameters<typeof analyzePdfPageLayout>[0]);
+        expect(result.preservedRegions.filter(region => region.kind === 'figure')).toEqual([]);
+        expect(result.blocks.find(block => block.source === '1.2 | Units and Standards')).toMatchObject({kind: 'heading', preserveSource: false});
+        expect(result.blocks.find(block => block.source === 'Learning Objectives')).toMatchObject({kind: 'heading', preserveSource: false});
+        for (const source of ['Describe how SI base units are defined.', 'Describe how derived units are created from base units.', 'Express quantities given in SI units using metric prefixes.']) {
+            expect(result.blocks.find(block => block.source === source)).toMatchObject({kind: 'text', preserveSource: false, listMarker: '•'});
+        }
+    });
+    it('does not absorb numbered section headings with a vertical separator into a following figure', () => {
+        const result = analyze([atom('2.3 | Experimental Setup', 100, 80, 190, 14), atom('Axis', 130, 130, 20, 7),
+            atom('The ordinary body below the illustration establishes the smaller body font.', 60, 400, 420)],
+            [{kind: 'image', x: 100, y: 100, width: 260, height: 150}]);
+        expect(result.blocks.find(block => block.source === '2.3 | Experimental Setup')).toMatchObject({kind: 'heading', preserveSource: false});
+        expect(result.blocks.find(block => block.source === 'Axis')).toMatchObject({kind: 'figure-label', preserveSource: true});
+        expect(result.preservedRegions[0].y).toBe(100);
+    });
+    it.each(['missing heading', 'one bullet', 'small heading'] as const)('keeps sparse diagrams protected when a list container lacks %s evidence', mode => {
+        const fixture = structuredClone(openstaxListCallout);
+        if (mode === 'missing heading') fixture.atoms = fixture.atoms.filter(atom => atom.text !== 'Learning Objectives');
+        if (mode === 'one bullet') fixture.atoms = fixture.atoms.filter(atom => atom.y < 590 || atom.y > 620);
+        if (mode === 'small heading') fixture.atoms.find(atom => atom.text === 'Learning Objectives')!.fontSize = 9.5;
+        const result = analyzePdfPageLayout(fixture as Parameters<typeof analyzePdfPageLayout>[0]);
+        expect(result.preservedRegions.some(region => region.kind === 'figure')).toBe(true);
+        expect(result.blocks.find(block => block.source === '1.2 | Units and Standards')).toMatchObject({kind: 'heading', preserveSource: false});
     });
     it('reads text that is painted twice in place once, and counts CJK sentences inside figures as prose', () => {
         const doubled = pdfLayoutLines([atom('关系数据库标准语言', 190, 280, 252, 28), atom('SQL', 442, 280, 53, 28), atom('关系数据库标准语言', 190.1, 280, 252, 28), atom('SQL', 442.1, 280, 53, 28), atom('  ', 500, 280, 4, 28), atom('SQL', 600, 280, 53, 28)]);

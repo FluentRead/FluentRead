@@ -3,7 +3,10 @@ import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {inflateSync} from 'node:zlib';
 import {createMangaViewWordBoundaryBudget,createMangaViewWordBoundaryConsumer,getMangaViewWordBoundaryProvenance,hasMangaViewWordBoundaryDifference,type MangaViewWordBoundaryProof} from '@/src/features/image-translation/services/mangaViewWordBoundary';
-import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
+import {collectMangaRegions,findMangaBubbleLayout,type MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
+import {bindImageParagraphGapEvidence,getImageParagraphGapEvidence,produceImageParagraphGapProofs} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
+import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
+import {groupImageParagraphs} from '@/src/features/image-translation/paragraphs';
 
 function fixture(wholeText='AB CD',localText='ABCD',gaps=[2,9,2]){
     const width=700,height=220,data=new Uint8ClampedArray(width*height*4).fill(255),characters=wholeText.replaceAll(' ','').length;
@@ -18,6 +21,70 @@ function fixture(wholeText='AB CD',localText='ABCD',gaps=[2,9,2]){
 function consumer(f:ReturnType<typeof fixture>,proofs:MangaViewWordBoundaryProof[]|undefined){return createMangaViewWordBoundaryConsumer([f.whole],[f.bubble],proofs,f.width,f.height);}
 /** 仅在原始灰度像素上连接指定列；80/120不变，160才看见该抗锯齿连接。 */
 function grayBridge(f:ReturnType<typeof fixture>,from=46,to=48,value=139){for(let x=from;x<to;x++)f.set(x,35,value);}
+
+/** ee2eb580 native publicSDK call5整页/call7局部观测；原PNG可携带像素，不冒充Worker Canvas字节。 */
+function tidalConsumers(preferred:'local'|'whole'='local'){
+    const record=JSON.parse(readFileSync(new URL('./fixtures/image-paragraph-gap-source.json',import.meta.url),'utf8')).records.find((r:{scene:string})=>r.scene==='inverse-neighbor-tidal-balloons');
+    const {width,height}=record.source,source=new Uint8ClampedArray(inflateSync(Buffer.from(record.rgba.data,'base64')));
+    expect(createHash('sha256').update(source).digest('hex')).toBe(record.rgba.sha256);expect(record.source.nativeCanvasBytes).toBe(false);
+    const results=[
+        {text:'WE CAN CROSS NOW',confidence:.9895415306091309,box:{x:127,y:193,width:428,height:31}},
+        {text:'HOLD THE ROPE',confidence:.9901217818260193,box:{x:801,y:215,width:327,height:27}},
+        {text:'THE TIDE IS FALLING',confidence:.987309854281576,box:{x:129,y:264,width:413,height:28}},
+        {text:'IWILL GO FIRST',confidence:.9758801587990352,box:{x:800,y:285,width:319,height:27}},
+        {text:'The channel before sunrise.',confidence:.9933944741884867,box:{x:110,y:610,width:375,height:22}},
+        {text:'X',confidence:.954960286617279,box:{x:110,y:792,width:129,height:100}},
+        {text:'1',confidence:.7743129134178162,box:{x:605,y:741,width:166,height:135}},
+        {text:'X',confidence:.9084289073944092,box:{x:1049,y:800,width:49,height:64}},
+    ];
+    const pixels=source.slice();flattenOcrAlpha(pixels);const bbox=findMangaBubbleLayout(pixels,width,height).recognition[0];
+    expect(bbox).toEqual({x0:717,y0:132,x1:1334,y1:499});
+    const sx=1536/(bbox.x1-bbox.x0),sy=914/(bbox.y1-bbox.y0);
+    const local=[{text:'HOLD THE ROPE',confidence:.959563475388747,box:{x:209,y:206,width:812,height:71}},
+        {text:'I WILL GO FIRST',confidence:.9693169792493185,box:{x:204,y:379,width:797,height:74}}]
+        .map(item=>({...item,box:{x:bbox.x0+item.box.x/sx,y:bbox.y0+item.box.y/sy,width:item.box.width/sx,height:item.box.height/sy}}));
+    // 反例只互换两个已观测候选的空格视图，验证真正替换local文字仍不继承原对象布局权限。
+    if(preferred==='whole')[results[3].text,local[1].text]=[local[1].text,results[3].text];
+    const page:MangaOcrPage={results,bubbles:[{bbox,results:local}],numericEvidence:[results[6]]},before=JSON.stringify([results,page.bubbles]);
+    const read=vi.fn((roi:{left:number;top:number;width:number;height:number},max:number)=>{
+        expect(roi.width*roi.height).toBeLessThanOrEqual(max);const output=new Uint8ClampedArray(roi.width*roi.height*4);
+        for(let y=0;y<roi.height;y++)output.set(source.subarray(((roi.top+y)*width+roi.left)*4,((roi.top+y)*width+roi.left+roi.width)*4),y*roi.width*4);
+        return output;
+    });
+    const budget=createMangaViewWordBoundaryBudget({width,height,read}),proof=budget.prove(results[3],local[1],page.bubbles![0])!;
+    expect(proof).toMatchObject({preferred,boundaries:[1,5,7],pixels:11084});expect(budget.usage).toEqual({attempts:1,pixels:11084});
+    page.wordBoundaryProofs=[proof];page.imageParagraphGapProofs=produceImageParagraphGapProofs(page,width,height,pixels);
+    expect(page.imageParagraphGapProofs.some(p=>p.previous===local[0]&&p.next===local[1])).toBe(true);
+    const graph=structuredClone(page),regions=collectMangaRegions(graph,'en',width,height,'image');
+    bindImageParagraphGapEvidence(regions,'native-tidal-source',width,height);
+    const support=getImageParagraphGapEvidence(regions,'native-tidal-source',width,height),paragraphs=groupImageParagraphs(regions,support);
+    expect(JSON.stringify([results,page.bubbles])).toBe(before);expect(read).toHaveBeenCalledOnce();
+    return {regions,paragraphs,support,graph,record};
+}
+describe('词界选择与同帧段落证明共同消费真实Tidal原始graph',()=>{
+    it('原local词界胜出后仍将两行真实对白整段翻译，保留数值guard与双视图来历',()=>{
+        const f=tidalConsumers();
+        expect(f.paragraphs.filter(line=>!line.guardOnly).map(line=>line.text)).toEqual([
+            'WE CAN CROSS NOW THE TIDE IS FALLING','HOLD THE ROPE I WILL GO FIRST','The channel before sunrise.',
+        ]);
+        const right=f.paragraphs.find(line=>line.text==='HOLD THE ROPE I WILL GO FIRST')!;
+        expect(right.sourceBoxes).toEqual([f.record.observedPhysicalLines[1].bbox,f.record.observedPhysicalLines[3].bbox]);
+        const second=f.regions.find(line=>line.text==='I WILL GO FIRST')!;
+        expect(getMangaViewWordBoundaryProvenance(second)?.[0]).toMatchObject({textView:'local',geometryView:'local',whole:{text:'IWILL GO FIRST'},local:{text:'I WILL GO FIRST'}});
+        expect(f.regions.find(line=>line.guardOnly)?.bbox).toEqual({x0:605,y0:741,x1:771,y1:876});
+    });
+    it('whole词界真正替换local文字时保留原几何和来历，但撤回原local段落权限',()=>{
+        const f=tidalConsumers('whole'),first=f.regions.find(line=>line.text==='HOLD THE ROPE')!;
+        expect(f.support?.successor(first)).toBeUndefined();
+        expect(f.paragraphs.filter(line=>!line.guardOnly).map(line=>line.text)).toEqual([
+            'WE CAN CROSS NOW THE TIDE IS FALLING','HOLD THE ROPE','I WILL GO FIRST','The channel before sunrise.',
+        ]);
+        const second=f.regions.find(line=>line.text==='I WILL GO FIRST')!;
+        expect(second.bbox).toEqual(f.record.observedPhysicalLines[3].bbox);
+        expect(getMangaViewWordBoundaryProvenance(second)?.[0]).toMatchObject({textView:'whole',geometryView:'local',whole:{text:'I WILL GO FIRST'},local:{text:'IWILL GO FIRST'}});
+    });
+});
+
 describe('高阈值仅合并可归属的短词内抗锯齿间隔',()=>{
     it('可携带原PNG的1475px ROI选回已观测IT IS，原局部几何与双视图来历不变',()=>{
         const record=JSON.parse(readFileSync(new URL('./fixtures/manga-natural/station-journey-ink-itis-word-boundary-roi.json',import.meta.url),'utf8'));

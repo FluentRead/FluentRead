@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaViewWordBoundary.ts
  * 文件职责：以本页原像素核对两个已识别拉丁字行的空格边界，避免可靠局部视图无条件覆盖另一视图中受物理支持的边界。
- * 主要内容：限制同字符、高重叠横行与页级六十四次/两百万像素预算，借用有界原 ROI；仅不透明近灰墨浅底、低两层完整稳定字形及显著间隙可选择既有候选；高层抗锯齿仅可连合至多两像素的词内间隔，并须保留词隙与字符索引；证明绑定本页原对象、完整快照、尺寸和 ROI，融合只保留局部几何并采用选中文本的原置信度；实际去重采用后才确认融合对象，并在分组输入与输出源框唯一对应时用内部 WeakMap 保存双视图来历。
+ * 主要内容：限制同字符、高重叠横行与页级六十四次/两百万像素预算，借用有界原 ROI；仅不透明近灰墨浅底、低两层完整稳定字形及显著间隙可选择既有候选；高层抗锯齿仅可连合至多两像素的词内间隔，并须保留词隙与字符索引；证明绑定本页原对象、完整快照、尺寸和 ROI，局部候选原样胜出时复用其原对象以保留同帧布局证明，采用整页候选时保留局部几何并复制所选原文与置信度；实际去重采用后才确认选中对象，并在分组输入与输出源框唯一对应时用内部 WeakMap 保存双视图来历。
  * 模块边界：不运行模型、不修改字符、不合成第三种空格文本、不访问 Canvas；reader 由当前原图 owner 提供，未知纹理、无法核对字符归属的字形连接、多墨色、透明或失配均不提供证明。物理间隙不能保证语义词界，不能将证明作为字形擦除蒙版或通用语言分词。
  */
 import type {MangaOcrItem,MangaRegion} from './mangaRegions';
@@ -123,7 +123,7 @@ export function createMangaViewWordBoundaryConsumer(wholeItems:MangaOcrItem[],bu
             if(ambiguous.has(proof.local))continue;
             if(selected.has(proof.local)){selected.delete(proof.local);ambiguous.add(proof.local);continue;}
             const text=proof.preferred==='whole'?proof.wholeSnapshot:proof.localSnapshot;
-            selected.set(proof.local,{item:{...proof.local,text:text.text,confidence:text.confidence},proof});
+            selected.set(proof.local,{item:proof.preferred==='local'?proof.local:{...proof.local,text:text.text,confidence:text.confidence},proof});
         }
     }
     const choices=new Map([...selected.values()].map(choice=>[choice.item,choice]));

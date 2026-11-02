@@ -132,7 +132,11 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
             if (!record) {await ports.onHistoryMissing();return;}
             const snapshot = record.parsedVersion === ports.parsedVersion ? record.parsed as ParsedDocument | undefined : undefined;
             const file = new File([record.bytes], record.name, {type: record.mimeType});
-            if (!snapshot?.segments) {await readFiles([file], record.sourceUrl, operation);return;}
+            const pdf = snapshot?.binary?.kind === 'pdf' ? snapshot.binary : undefined;
+            // 解析版本相同仍不足以复用 PDF：快照必须属于当前记录的原始文件，否则从记录字节重新读取。
+            const invalidPdf = (record.format === 'pdf' || snapshot?.format === 'pdf' || pdf !== undefined) && (!pdf || !(pdf.bytes instanceof Uint8Array)
+                || pdf.bytes.length !== record.bytes.length || pdf.bytes !== record.bytes && pdf.bytes.some((byte, index) => byte !== record.bytes[index]));
+            if (!snapshot?.segments || invalidPdf) {await readFiles([file], record.sourceUrl, operation);return;}
             const task = ports.createTask(file, record.sourceUrl);
             Object.assign(task, {document: snapshot, historyId: record.id, historyVersion: result.version, bytes: record.bytes, mimeType: record.mimeType,
                 ...restoreDocumentHistoryRevisions(record, snapshot, ports.parsedVersion), fingerprint: record.fingerprint,

@@ -180,7 +180,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes), parsed = parseDocument('race.txt', 'Source.');
         await history.save({id, name: 'race.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
-            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Original correction'], fingerprint: '', parsed, parsedVersion: 21});
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Original correction'], fingerprint: '', parsed, parsedVersion: 22});
         app.unmount();vi.stubGlobal('indexedDB', factory);
         root = node('root');app = renderer.createApp(DocumentApp);app.mount(root);state = app._instance.setupState;
         const secondRoot = node('root'), secondApp = renderer.createApp(DocumentApp);secondApp.mount(secondRoot);
@@ -207,7 +207,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
         const parsed = parseDocument('retry.txt', 'Source.');
         await history.save({id, name: 'retry.txt', format: 'txt', size: bytes.length, total: 1, completed: 1,
-            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Previous correction'], fingerprint: '', parsed, parsedVersion: 21});
+            updatedAt: 1, bytes, mimeType: 'text/plain', translations: ['Previous correction'], fingerprint: '', parsed, parsedVersion: 22});
         const session = new Map<string, string>();
         app.unmount();vi.stubGlobal('indexedDB', factory);
         vi.stubGlobal('sessionStorage', {getItem: (key: string) => session.get(key) ?? null, setItem: (key: string, value: string) => session.set(key, value), removeItem: (key: string) => session.delete(key)});
@@ -292,7 +292,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         for (const [index, name] of ['first.txt', 'second.txt'].entries()) {
             const bytes = new TextEncoder().encode(`Original ${index}`), parsed = parseDocument(name, new TextDecoder().decode(bytes));
-            await history.save({id: await documentHistoryId(bytes), name, format: parsed.format, size: bytes.length, total: 1, completed: 0, updatedAt: index + 1, bytes, mimeType: 'text/plain', translations: [], fingerprint: '', parsed, parsedVersion: 21});
+            await history.save({id: await documentHistoryId(bytes), name, format: parsed.format, size: bytes.length, total: 1, completed: 0, updatedAt: index + 1, bytes, mimeType: 'text/plain', translations: [], fingerprint: '', parsed, parsedVersion: 22});
         }
         app.unmount(); vi.stubGlobal('indexedDB', factory); root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = app._instance.setupState;
         await vi.waitFor(() => expect(state.historyEntries).toHaveLength(2)); await flush();
@@ -621,7 +621,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         await history.save({id, name: parsed.fileName, format: 'pdf', size: bytes.length, total: parsed.segments.length,
             completed: parsed.segments.length, updatedAt: 1, bytes, mimeType: 'application/pdf', translations: ['历史完整译文'],
-            fingerprint: state.currentFingerprint, parsed, parsedVersion: 21});
+            fingerprint: state.currentFingerprint, parsed, parsedVersion: 22});
         app.unmount(); vi.stubGlobal('indexedDB', factory);
         root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = app._instance.setupState;
         await flush(); await state.openHistory({id}); await flush();
@@ -1121,7 +1121,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const factory = new IDBFactory();
         const history = createDocumentHistory(factory);
         await history.save({id, name: 'history.txt', format: parsed.format, size: bytes.length, total: parsed.segments.length,
-            completed: 0, updatedAt: 1, bytes, mimeType, translations: [], fingerprint: '', parsed, parsedVersion: 21});
+            completed: 0, updatedAt: 1, bytes, mimeType, translations: [], fingerprint: '', parsed, parsedVersion: 22});
         app.unmount();
         vi.stubGlobal('indexedDB', factory);
         root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = (app._instance as any).setupState;
@@ -1286,7 +1286,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(21);
+            expect(saved?.parsedVersion).toBe(22);
             expect(saved?.translations).toEqual(expectedTranslations);
             expect((saved?.parsed as any).segments.map((segment: any) => segment.source)).toEqual(expectedSources);
             expect(saved?.parsed).not.toHaveProperty('segmentOrigins');
@@ -1303,7 +1303,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.batch).not.toHaveBeenCalled();
     });
 
-    it('reparses a version 20 overpainted source, preserves independent corrections and reuses the version 21 snapshot', async () => {
+    it('reparses a version 20 overpainted source, preserves independent corrections and reuses the version 22 snapshot', async () => {
         const items = [
             {str: 'Results', transform: [10, 0, 0, 10, 45, 50], width: 35, height: 10, fontName: 'body', dir: 'ltr', hasEOL: false},
             {str: 'Results', transform: [10.5, 0, 0, 10.5, 45, 50], width: 35, height: 10.5, fontName: 'body', dir: 'ltr', hasEOL: true},
@@ -1337,13 +1337,81 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         state.editSegment(0, 'Current correction'); state.persistHistory();
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(21); expect(saved?.translations).toEqual(['Current correction', 'Stable correction']);
+            expect(saved?.parsedVersion).toBe(22); expect(saved?.translations).toEqual(['Current correction', 'Stable correction']);
             expect(saved?.retainedRevisions).toEqual(retained); expect(saved?.bytes).toEqual(bytes);
         });
         const blocks = structuredClone(state.parsedDocument.binary.pages[0].blocks);
         state.resetDocument(); await flush(); await state.openHistory({id}); await flush();
         expect(parse).toHaveBeenCalledOnce(); expect(state.translatedSegments).toEqual(['Current correction', 'Stable correction']);
         expect(state.parsedDocument.binary.pages[0].blocks).toEqual(blocks); expect(state.documentQueue[0].retainedRevisions).toEqual(retained);
+        expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
+    });
+
+    it.each(['separate', 'merged'] as const)('recovers %s prose hidden beside a formula in version 21, retains every correction and reuses version 22', async mode => {
+        const kept = 'The previously translated paragraph remains available.';
+        const recovered = 'The next paragraph introduces a displayed equation.';
+        ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({
+            items: [
+                {str: kept, transform: [12, 0, 0, 12, 5, 20], width: 80, height: 12, fontName: 'body'},
+                {str: recovered, transform: [12, 0, 0, 12, 5, 60], width: 80, height: 12, fontName: 'body'},
+            ], styles: {body: {ascent: .8, descent: -.2, fontFamily: 'serif'}},
+        })});
+        const fresh = await binaryService.parseDocumentFile(file('formula-neighbor.pdf'));
+        if (fresh.binary?.kind !== 'pdf') throw new Error('expected PDF');
+        expect(fresh.segments.map(segment => segment.source)).toEqual([kept, recovered]);
+        const previousBody = 'The previous paragraph continues here.';
+        if (mode === 'merged') {
+            const block = fresh.binary.pages[0].blocks[1], line = block.lines![0];
+            const first = {...line, text: previousBody, runs: line.runs?.map(run => ({...run, text: previousBody}))};
+            const second = {...line, y: line.y + 14, baseline: line.baseline! + 14,
+                runs: line.runs?.map(run => ({...run, y: run.y + 14, baseline: run.baseline! + 14}))};
+            fresh.segments[1].source = previousBody + ' ' + recovered;
+            fresh.binary.pages[0].blocks[1] = {...block, source: fresh.segments[1].source, height: block.height + 14, lines: [first, second], lineCount: 2};
+        }
+        const old = structuredClone(fresh);
+        if (old.binary?.kind !== 'pdf') throw new Error('expected PDF');
+        if (mode === 'separate') {
+            old.segments = [old.segments[0]];
+            old.binary.pages[0].segmentIndexes = [0];
+            old.binary.pages[0].blocks[1] = {...old.binary.pages[0].blocks[1], segmentIndex: -1, kind: 'formula', preserveSource: true};
+        } else {
+            old.segments[1].source = previousBody;
+            const block = old.binary.pages[0].blocks[1], [first, second] = block.lines!;
+            old.binary.pages[0].blocks[1] = {...block, source: previousBody, height: first.height, lines: [first], lineCount: 1};
+            old.binary.pages[0].blocks.push({...block, source: recovered, segmentIndex: -1, y: second.y, height: second.height,
+                lines: [second], lineCount: 1, kind: 'formula', preserveSource: true});
+        }
+        const bytes = fresh.binary.bytes, id = await documentHistoryId(bytes), factory = new IDBFactory(), history = createDocumentHistory(factory);
+        const correction = '保留已有人工校订';
+        const retained = {source: previousBody, translation: '保留合段前的校订'};
+        const priorTranslations = mode === 'merged' ? [correction, retained.translation] : [correction];
+        await history.save({id, name: 'formula-neighbor.pdf', format: 'pdf', size: bytes.length, total: old.segments.length, completed: old.segments.length,
+            updatedAt: 1, bytes, mimeType: 'application/pdf', translations: priorTranslations, fingerprint: '', parsed: old, parsedVersion: 21});
+        app.unmount(); vi.stubGlobal('indexedDB', factory);
+        vi.stubGlobal('File', class extends Blob {name: string; constructor(parts: BlobPart[], name: string, options?: BlobPropertyBag) {super(parts, options); this.name = name;}});
+        root = node('root'); app = renderer.createApp(DocumentApp); app.mount(root); state = (app._instance as any).setupState;
+        await flush();
+        const pending = deferred<typeof fresh>(), parse = vi.spyOn(binaryService, 'parseDocumentFile').mockReturnValueOnce(pending.promise);
+        const opening = state.openHistory({id});
+        await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
+        expect(new Uint8Array(await parse.mock.calls[0][0].arrayBuffer())).toEqual(bytes);
+        expect((await history.load(id))?.parsedVersion).toBe(21);
+        expect((await history.load(id))?.translations).toEqual(priorTranslations);
+        pending.resolve(fresh); await opening; await flush();
+        expect(state.parsedDocument.segments.map((segment: {source: string}) => segment.source)).toEqual(fresh.segments.map(segment => segment.source));
+        expect(state.translatedSegments).toEqual([correction, '']);
+        expect(state.completedSegments).toBe(1); expect(state.progress).toBe(50);
+        expect(state.documentQueue[0].retainedRevisions).toEqual(mode === 'merged' ? [retained] : []);
+        await vi.waitFor(async () => {
+            const saved = await history.load(id);
+            expect(saved?.parsedVersion).toBe(22); expect(saved?.translations).toEqual([correction, '']);
+            expect(saved?.total).toBe(2); expect(saved?.completed).toBe(1);
+            expect(saved?.retainedRevisions).toEqual(mode === 'merged' ? [retained] : []);
+        });
+        state.resetDocument(); await flush(); await state.openHistory({id}); await flush();
+        expect(parse).toHaveBeenCalledOnce(); expect(state.translatedSegments).toEqual([correction, '']);
+        expect(state.parsedDocument.binary.pages[0].blocks).toEqual(fresh.binary.pages[0].blocks);
+        expect(state.documentQueue[0].retainedRevisions).toEqual(mode === 'merged' ? [retained] : []);
         expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
     });
 
@@ -1392,7 +1460,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             .toBeLessThan(old.binary.pages[0].blocks[0].lines![0].runs![0].y);
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(21);
+            expect(saved?.parsedVersion).toBe(22);
             expect(saved?.completed).toBe(1); expect(saved?.total).toBe(2);
             expect(saved?.translations).toEqual(translations);
             expect((saved?.parsed as typeof fresh).binary).toEqual(fresh.binary);
@@ -1441,7 +1509,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(hostText(retained)).not.toContain(conditionRetained.translation);
         await vi.waitFor(async () => {
             const saved = await history.load(id);
-            expect(saved?.parsedVersion).toBe(21);
+            expect(saved?.parsedVersion).toBe(22);
             expect(saved?.translations).toEqual(['保留正文校订']);
             expect(saved?.retainedRevisions).toEqual([previousRetained, conditionRetained]);
             expect(saved?.completed).toBe(1); expect(saved?.total).toBe(1);

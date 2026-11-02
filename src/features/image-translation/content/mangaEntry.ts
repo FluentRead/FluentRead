@@ -8,6 +8,7 @@ import {reactive} from 'vue';
 import browser from 'webextension-polyfill';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createVueShadowUi, type VueShadowMount} from '@/src/platform/shadow-ui';
+import mangaEntryStyles from '../ui/manga-entry.css?inline';
 import type {ShadowRootContentScriptUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config/store';
 import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
@@ -66,7 +67,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
         if (cleanup === remove) {cleanup = undefined;if(canRead===allowed)canRead=undefined;publishReading(false);}
     };
     cleanup = remove;
-    pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed',
+    pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', css:mangaEntryStyles,
         props: {status, settings, page,reading,readingState,readManga:openMangaReading,
             readingChanged:(open:boolean)=>{if(request===owner && !removed){readingState.open=open;publishReading(open);}},
             startAreaTranslation: async () => config.on && config.imageTranslationMangaEnabled && status.available && status.areaFallback === true

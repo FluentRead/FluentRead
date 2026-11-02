@@ -104,7 +104,7 @@ type ImageTextTranslationRequest = ImageTextTranslationRequestBase & (
 
 export interface ImageTranslationBackgroundDependencies {
     readonly getImageOcrEngine?: () => 'tesseract' | 'paddle';
-    readonly getMangaModelStatus?: () => Promise<{ready: boolean; bytes: number; inpaintingReady: boolean}>;
+    readonly getMangaModelStatus?: () => Promise<{ready: boolean; bytes: number; inpaintingReady: boolean; segmentationReady?: boolean}>;
     readonly removeMangaModels?: () => Promise<void>;
     readonly assertLanguagesDownloaded: (sourceLanguage: string) => Promise<void>;
     readonly translateImage: (

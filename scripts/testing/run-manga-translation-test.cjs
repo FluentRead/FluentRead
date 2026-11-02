@@ -11,6 +11,7 @@ const assert = require('node:assert/strict');
 const {createHash} = require('node:crypto');
 const {execFileSync} = require('node:child_process');
 const {ensureImageTranslationModelFiles, defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest} = require('./image-model-cache.cjs');
+const {getMangaOrtModelCatalog, validateMangaOrtModelFiles} = require('./manga-ort-diagnostics.cjs');
 const {validateQualityFixtureExpectations,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes} = require('./manga-quality-corpus.cjs');
 function arg(name, fallback) {const index = process.argv.indexOf(`--${name}`); return index < 0 ? fallback : process.argv[index + 1];}
 let extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
@@ -41,6 +42,8 @@ const modelCacheDir = path.resolve(arg('model-cache-dir',defaultImageTranslation
 const baseline = process.argv.includes('--baseline');
 // 仅约束缓存助手的下载，不能替代浏览器全 target 网络隔离。
 const noCacheDownload = process.argv.includes('--model-cache-no-download');
+const preloadTextSeg = process.argv.includes('--preload-text-seg');
+if(preloadTextSeg)assert.ok(noCacheDownload,'--preload-text-seg requires --model-cache-no-download');
 if(noCacheDownload)assert.ok(!preloadModels&&!offlineModels&&!blockedOfficial&&!blockedAll&&!baseline,
     '--model-cache-no-download requires the shared model cache; it does not apply to other model-source modes');
 const readingPauseMs=Number(arg('reading-pause-ms','0'));
@@ -193,6 +196,20 @@ report.readerNextSelector=readerNextSelector;
 if(imageTurnKey)report.pagedImages={turnKey:imageTurnKey,initialTurns:imageInitialTurns,urlPolicy:imageStableUrl?'stable':'changes'};
 let launched, page, worker, cdp, popup, modelObserver, browserPid,loadedExtensionId,contentPixelContext,preparedModels;
 loadedExtensionId=startupExtensionId;
+
+async function prepareModelFilesForTest() {
+    const needsPaddle=(qualityFixtures?.map(fixture=>fixture.sourceLanguage)||[sourceLanguage]).some(language=>!['ru','ko'].includes(language));
+    const kinds=ordinaryImageQuality?['ocr']:needsPaddle?['ocr','inpaint']:['inpaint'];
+    if(preloadTextSeg){if(!kinds.includes('ocr'))kinds.push('ocr');kinds.push('seg');}
+    preparedModels=await ensureImageTranslationModelFiles({directory:modelCacheDir,kinds,sourceDirectories:[modelCacheDir],allowNetworkDownload:!noCacheDownload});
+    if(preloadTextSeg){
+        const catalog=getMangaOrtModelCatalog({includeSeg:true});
+        validateMangaOrtModelFiles(preparedModels.files,catalog);
+        report.textSegPreload={cachedOnly:true,readOnlyFileCache:true,sessionPrepared:false,modelCreationCatalog:catalog,
+            scope:'Catalog and cache identities only; actual creation requires the strict pre-start collector. Preload imports CacheStorage without prepare-seg or inference.'};
+    }
+    report.modelCache=preparedModels;
+}
 function focusGuard() {
     const current=JSON.parse(execFileSync('/usr/bin/osascript',['-l','JavaScript','-e',"ObjC.import('AppKit');const app=$.NSWorkspace.sharedWorkspace.frontmostApplication;JSON.stringify({pid:Number(app.processIdentifier),name:ObjC.unwrap(app.localizedName)});"],{encoding:'utf8'}));
     assert.notEqual(current.pid,browserPid,'Isolated test browser must stay behind the user app');
@@ -1711,6 +1728,8 @@ async function verifyReadAhead() {
     auditPageErrors();assert.deepEqual(report.errors,[]);assert.deepEqual(report.consoleErrors,[]);
 }
 (async()=>{
+    // 显式可选 CTD 在任何 profile、扩展副本或浏览器创建前验证；缺失/损坏不改缓存、不联网。
+    if(preloadTextSeg)await prepareModelFilesForTest();
 if (process.argv.includes('--worker-diagnostics')) {
     diagnosticFixture=fs.mkdtempSync('/private/tmp/fluentread-manga-diagnostics-');
     fs.cpSync(extensionDir,diagnosticFixture,{recursive:true});extensionDir=diagnosticFixture;
@@ -1865,23 +1884,20 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         const importInput=manager.locator('input[type=file]');
         await importInput.waitFor({state:'attached'});
         if(useModelCache){
-            const needsPaddle=(qualityFixtures?.map(fixture=>fixture.sourceLanguage)||[sourceLanguage]).some(language=>!['ru','ko'].includes(language));
-            const kinds=ordinaryImageQuality?['ocr']:needsPaddle?['ocr','inpaint']:['inpaint'];
-            preparedModels=await ensureImageTranslationModelFiles({directory:modelCacheDir,kinds,sourceDirectories:[modelCacheDir],allowNetworkDownload:!noCacheDownload});
-            report.modelCache=preparedModels;
+            if(!preparedModels)await prepareModelFilesForTest();
         }
         const files=preparedModels?.files||readImageTranslationModelManifest().map(asset=>({...asset,path:path.join(preloadModels,asset.filename)}));
         await importInput.setInputFiles(files.map(file=>file.path));
-        const requiredOcr=files.some(file=>file.kind==='ocr'),requiredInpaint=files.some(file=>file.kind==='inpaint');
+        const requiredOcr=files.some(file=>file.kind==='ocr'),requiredInpaint=files.some(file=>file.kind==='inpaint'),requiredSeg=files.some(file=>file.kind==='seg');
         const until=Date.now()+60000;let status;
         while(Date.now()<until){
             status=await modelSettings.evaluate(()=>chrome.runtime.sendMessage({type:'fluentReadMangaModelStatus'}));
-            if(status.success&&(!requiredOcr||status.ready)&&(!requiredInpaint||status.inpaintingReady))break;
+            if(status.success&&(!requiredOcr||status.ready)&&(!requiredInpaint||status.inpaintingReady)&&(!requiredSeg||status.segmentationReady))break;
             const failure=await manager.locator('[role=alert]').allTextContents();
             assert.ok(!failure.some(text=>text.trim()),`Model import failed: ${failure.join('; ')}`);
             await modelSettings.waitForTimeout(150);
         }
-        assert.ok(status?.success&&(!requiredOcr||status.ready)&&(!requiredInpaint||status.inpaintingReady),'Required imported resources are ready before leaving settings');
+        assert.ok(status?.success&&(!requiredOcr||status.ready)&&(!requiredInpaint||status.inpaintingReady)&&(!requiredSeg||status.segmentationReady),'Required imported resources are ready before leaving settings');
         report.preloadedModelStatus=status;
         const audit=async()=>{const cache=await caches.open('fluent-read-manga-ocr-v1');return Promise.all((await cache.keys()).map(async key=>{const response=await cache.match(key);const bytes=await response.arrayBuffer();return {url:key.url,status:response.status,bytes:bytes.byteLength,sha:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('')}}));};
         report.preloadedCacheOptions=await modelSettings.evaluate(audit);

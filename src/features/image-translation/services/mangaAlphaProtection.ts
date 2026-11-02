@@ -139,7 +139,7 @@ export function isMangaAlphaProtected(protection:MangaAlphaProtection|undefined,
 }
 
 /** 候选可互相重叠，但每个都不含保护区；只移除被另一候选完整包含者，不截断译文。 */
-export function mangaAlphaClearRects(protection:MangaAlphaProtection,box:Box,budget:MangaAlphaLayoutBudget={remaining:1_048_576}):Box[] {
+export function mangaAlphaClearRects(protection:Pick<MangaAlphaProtection,'rectangles'>,box:Box,budget:MangaAlphaLayoutBudget={remaining:1_048_576}):Box[] {
     let available=[box];
     for(const hole of protection.rectangles){
         if(--budget.remaining<0)throw exhausted();

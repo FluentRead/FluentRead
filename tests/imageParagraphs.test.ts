@@ -1,8 +1,65 @@
 import {describe, expect, it} from 'vitest';
-import {groupImageParagraphs, type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+import {groupImageParagraphs, type ImageTextRegion,type ImageParagraphContinuations} from '@/src/features/image-translation/paragraphs';
 function physical(text: string, top: number, size = 15, left = 30): ImageTextRegion {
     return {text, bbox: {x0: left, y0: top, x1: left + 120, y1: top + size}, fontSize: size};
 }
+
+describe('只豁免行距的受控布局能力端口',()=>{
+    // These ports test the grouping contract only. Production pixel evidence,
+    // adoption, graph identity and filtered guards have separate real consumers.
+    function capability(pairs:Array<[ImageTextRegion,ImageTextRegion]>,allow=true):ImageParagraphContinuations{
+        const successors=new Map(pairs);
+        return {successor:line=>successors.get(line),permits:(previous,next,members,bounds)=>{
+            expect(members.at(-1)).toBe(previous);expect(bounds.y0).toBe(members[0].bbox.y0);
+            return allow&&successors.get(previous)===next;
+        }};
+    }
+    it('只延长到实际指定后继，跨过另一列的交错y排序且保留逐物理行清字框',()=>{
+        const a=physical('LEFT FIRST',0,20),b=physical('LEFT SECOND',50,20),c=physical('RIGHT FIRST',49,20,300),d=physical('RIGHT SECOND',98,20,300);
+        expect(groupImageParagraphs([d,b,c,a])).toHaveLength(4);
+        const result=groupImageParagraphs([d,b,c,a],capability([[a,b],[c,d]]));
+        expect(result.map(line=>line.text)).toEqual(['LEFT FIRST LEFT SECOND','RIGHT FIRST RIGHT SECOND']);
+        expect(result[0].sourceBoxes).toEqual([a.bbox,b.bbox]);expect(result[1].sourceBoxes).toEqual([c.bbox,d.bbox]);
+    });
+    it('缺失、已使用、被过滤或clone后继不扩大原扫描边界',()=>{
+        const a=physical('FIRST',0,20),b=physical('SECOND',50,20);
+        for(const pairs of [[],[[a,a]],[[a,{...b}]],[[a,physical('FILTERED',48,20)]]] as Array<Array<[ImageTextRegion,ImageTextRegion]>>)
+            expect(groupImageParagraphs([a,b],capability(pairs))).toEqual([a,b]);
+        const outOfOrder=capability([[a,b]]);expect(groupImageParagraphs([a,physical('AFTER TARGET',60,20)],outOfOrder)).toHaveLength(2);
+    });
+    it('拒绝的关系保持两段；能力只可豁免gap，不绕过其他布局条件',()=>{
+        const a=physical('FIRST',0,20),b=physical('SECOND',50,20);
+        expect(groupImageParagraphs([a,b],capability([[a,b]],false))).toEqual([a,b]);
+        const invalid=[physical('LARGE',50,30),physical('2. ITEM',50,20),physical('OTHER COLUMN',50,20,300),
+            {...b,sourceBoxes:[b.bbox]},{...b,vertical:true as const},physical('OVERLAP',10,20),physical('SAME ROW',0,20,300)];
+        for(const next of invalid)expect(groupImageParagraphs([a,next],capability([[a,next]]))).toHaveLength(2);
+    });
+    it.each([false,true])('允许gap仍受完整段包络内其他物理文字遮挡%s',large=>{
+        const a=physical('FIRST',0,20),b=physical('SECOND',50,20),block=physical('CONTROL',30,5,80);
+        const far=large?Array.from({length:64},(_,i)=>physical('FAR'+i,1000+i*100,20,500)):[];
+        const result=groupImageParagraphs([a,b,block,...far],capability([[a,b]]));
+        expect(result).toContain(a);expect(result).toContain(b);expect(result).toHaveLength(3+far.length);
+    });
+    it('能力不传到竖排投影，完整两列的大间距仍按旧规则',()=>{
+        const right:ImageTextRegion={text:'右列',bbox:{x0:100,y0:20,x1:120,y1:140},vertical:true};
+        const left:ImageTextRegion={text:'左列',bbox:{x0:50,y0:20,x1:70,y1:140},vertical:true};
+        expect(groupImageParagraphs([right,left],capability([[right,left]]))).toHaveLength(2);
+    });
+    it.each(['cumulative alignment','list boundary'])('无效后继不延长扫描：%s',kind=>{
+        const a=physical('FIRST',0,20),b=physical('SECOND',50,20,45);
+        const c=physical(kind==='list boundary'?'2. ITEM':'THIRD',100,20,60);
+        const far=Array.from({length:15},(_,i)=>physical('FAR'+i,85+i,20,300));
+        const port=capability([[a,b],[b,c]]), original=port.successor;
+        let bLookups=0;
+        port.successor=line=>{if(line===b)bLookups++;return original(line);};
+        const result=groupImageParagraphs([a,b,...far,c],port);
+        expect(result[0].text).toBe('FIRST SECOND');
+        expect(result).toContain(c);
+        // Pairwise alignment can pass while the cumulative paragraph cannot.
+        // An invalid target must stop before scanning the unrelated labels.
+        expect(bLookups).toBe(1);
+    });
+});
 
 describe('源像素行距的缩放量化边界', () => {
     it('保存的自然漫画物理坐标不再因0.0167源像素拆段，不改原框或虚构逐框OCR文字', () => {

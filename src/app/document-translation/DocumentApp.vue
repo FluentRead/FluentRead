@@ -878,8 +878,8 @@ function scheduleHistorySave(): void {
 }
 // 刷新后回到正在阅读的文档：当前标签页记住它在本地历史里的标识，新开的标签页仍从首页开始。
 const SESSION_KEY = 'fluentread.document.open';
-/** 重描去重规则变化时递增：旧快照可能含重复正文，重解析后按唯一原文保留校订。 */
-const PARSED_VERSION = 21;
+/** 大算符归行规则变化时递增：旧快照可能漏掉相邻正文，重解析后按唯一原文保留校订。 */
+const PARSED_VERSION = 22;
 function rememberOpenDocument(id: string | undefined | null): void {
   try {
     if (id) globalThis.sessionStorage?.setItem(SESSION_KEY, id);

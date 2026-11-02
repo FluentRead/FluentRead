@@ -36,6 +36,16 @@ function mockProgressClient(sendMessage: ReturnType<typeof vi.fn>) {
 }
 
 describe('图片失败恢复和控件可见性', () => {
+    it.each([undefined,{x:2,y:3,width:100,height:50},null,0,false])('handler只透传viewport原值，普通图片模式与请求预算不变 %#',async mangaViewport=>{
+        const {dependencies,handler}=setup();
+        await expect(handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',
+            requestId:'viewport-handler',timeoutMs:5000,mangaViewport:mangaViewport as never})).resolves.toMatchObject({success:true});
+        expect(dependencies.translateImage).toHaveBeenCalledOnce();
+        const options=(dependencies.translateImage.mock.calls as unknown[][])[0][3] as Record<string,unknown>;
+        expect(options).toMatchObject({requestId:'viewport-handler',timeoutMs:5000,signal:expect.any(AbortSignal)});
+        expect(options).not.toHaveProperty('manga');expect(options).not.toHaveProperty('ocrEngine');
+        expect(Object.hasOwn(options,'mangaViewport')).toBe(mangaViewport!==undefined);expect(options.mangaViewport).toEqual(mangaViewport);
+    });
     it('模型入口定位到本地服务编辑区，拒绝无效服务与错误分区', async () => {
         const openSection=vi.fn(async()=>{}),openDefaultPage=vi.fn(async()=>{});
         const handler=createOpenOptionsPageHandler({openSection,openDefaultPage});

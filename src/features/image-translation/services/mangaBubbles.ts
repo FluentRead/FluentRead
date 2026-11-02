@@ -5,12 +5,14 @@
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  * 视图边界：原图 owner 可提供有界词界证明；只选择两个已观测原文中的一个并保留局部几何，实际去重接受后确认采用，并按每次分组的实际对象及唯一源框记录内部来历，与原 SDK 观测分离。缺失或失效证明沿用原局部优先规则，不从空白推造字符。
  * 段落关系：普通图片只将本次实际采用的原始识别对象关联到物理行；词界改写、去重或数字合并后的替代对象不能继承关系。最终数组包含数值及保护框后才封存私有布局旁证，不向正文或阅读属性添加证明。
+ * 气泡补绘：漫画段落仅私下记录实际局部气泡的搜索范围；该范围不是清字授权，后续仍需同源绑定并检查原图中的闭合组件与纯白空处。
  */
 import {groupMangaText,type MangaOcrItem,type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericInformation,numericProtection} from './mangaNumeric';
 import {createMangaViewWordBoundaryConsumer,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
 import type {ImageDetectionFrame} from './imageDetectionEvidence';
 import {createImageParagraphGapConsumer,type ImageParagraphGapProof} from './imageParagraphGapEvidence';
+import {recordMangaBubblePlacement} from './mangaBubblePlacement';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
@@ -202,7 +204,10 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     }
     const paragraphs=owners.map((_bubble,index)=>{
         const items=[...local[index],...fallback[index]];
-        return wordBoundaries.record(groupMangaText(items,language,width,height,'bubble',true),items);
+        const grouped=wordBoundaries.record(groupMangaText(items,language,width,height,'bubble',true),items);
+        // 只记录实际局部气泡的查找范围；它不授予清字权限，补绘仍需核对原图闭合组件和逐像素纯白。
+        if(index<bubbles.length)for(const region of grouped)recordMangaBubblePlacement(region,owners[index],width,height);
+        return grouped;
     });
     const outside=wordBoundaries.record(groupMangaText(outsideItems,language,width,height,'page',true),outsideItems);
     const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);

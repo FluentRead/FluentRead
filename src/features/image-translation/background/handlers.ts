@@ -2,9 +2,10 @@
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
  * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
- * 模块边界：本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
+ * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
 import {normalizeRemoteImageUrl} from '../services/remoteImage';
+import type {ImageViewport} from '@/src/shared/image/types';
 import {createImageTranslationFailure, imageTranslationFailureCode, imageTranslationFailureResponse} from '../failure';
 import {identifyTextLanguage} from '@/src/core/language/identify';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
@@ -36,6 +37,7 @@ export const IMAGE_OPERATION_TIMEOUT_MS = 180_000;
 
 export interface ImageTranslateMessage {
     manga?: unknown;
+    mangaViewport?: ImageViewport;
     type: typeof IMAGE_TRANSLATE_MESSAGE_TYPE;
     image?: unknown;
     sourceLanguage?: unknown;
@@ -135,6 +137,7 @@ export interface ImageOperationOptions {
     /** 仅由已复核的消息 sender 提供，不接受消息体自报来源。 */
     readonly documentUrl?: string;
     readonly manga?: true;
+    readonly mangaViewport?: ImageViewport;
     readonly requestId: string;
     readonly signal: AbortSignal;
     readonly timeoutMs: number;
@@ -507,7 +510,9 @@ export function createImageTranslationBackgroundHandlers(
                             };
                             options.signal.addEventListener('abort', clearProgressOwner, {once: true});
                             try {
-                                return await dependencies.translateImage(image, sourceLanguage, title, message.manga ? {...options, manga: true} : paddle ? {...options, ocrEngine: 'paddle'} : options);
+                                const scopedOptions=message.manga ? {...options, manga: true as const} : paddle ? {...options, ocrEngine: 'paddle' as const} : options;
+                                return await dependencies.translateImage(image, sourceLanguage, title,
+                                    message.mangaViewport !== undefined ? {...scopedOptions,mangaViewport:message.mangaViewport} : scopedOptions);
                             } finally {
                                 clearProgressOwner();
                                 options.signal.removeEventListener('abort', clearProgressOwner);

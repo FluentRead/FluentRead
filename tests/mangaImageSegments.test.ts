@@ -112,6 +112,8 @@ describe('超长漫画图片的稳定分段与原始分辨率',()=>{
         f.rect.top=-1024;f.rect.bottom-=1024;await f.runtime.translate(segment);
         expect(f.draws[0]).toEqual([f.image,0,1792,800,2560,0,0,800,2560]);
         expect(f.ports.translate.mock.calls[0][0]).toBe('data:image/png;base64,800x2560');
+        expect(f.ports.translate).toHaveBeenCalledWith('data:image/png;base64,800x2560',expect.any(AbortSignal),{x:0,y:256,width:800,height:2048});
+        expect(Object.isFrozen(f.ports.translate.mock.calls[0][2])).toBe(true);
         const output=f.canvases.at(-1)!;expect(output.width).toBe(800);expect(output.height).toBe(2048);expect(output.style.top).toBe('0px');
         expect(f.draws.at(-1)!.slice(1)).toEqual([0,256,800,2048,0,0,800,2048]);expect(f.composed[0].width).toBe(0);
         expect(f.document.getElementById('fluent-read-manga-segment-container')).not.toBeNull();

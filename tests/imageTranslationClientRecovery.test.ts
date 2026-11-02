@@ -9,6 +9,9 @@ import {IMAGE_PROGRESS_MESSAGE_TYPE} from '@/src/features/image-translation/prog
 import {fetchImageInExtension, sendCancellableImageOperation, translateImageInExtension} from '@/src/features/image-translation/services/client';
 import {createImageTranslationOffscreenAdapter} from '@/src/features/image-translation/background/offscreenAdapter';
 import type {OffscreenClient} from '@/src/platform/offscreen/client';
+import {createImageTranslationBackgroundHandlers} from '@/src/features/image-translation/background/handlers';
+import {createOffscreenMessageListener} from '@/src/app/offscreen/messageRouter';
+import type {ImageViewport} from '@/src/shared/image/types';
 
 const deferred = <T>() => {
     let resolve!: (value: T) => void;
@@ -38,6 +41,34 @@ describe('图片翻译客户端断线恢复', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.unstubAllGlobals();
+    });
+
+    it.each([undefined,{x:0,y:30,width:400,height:120},null,0,false,'',{}, {x:1,y:2,width:-1,height:3}])('真实client→handler→adapter→router完整透传可见范围或异常原值 %#',async mangaViewport=>{
+        const draw=vi.fn(async()=>({image:'translated',lines:[]}));
+        const router=createOffscreenMessageListener({translate:vi.fn(),ttsPlayer:{play:vi.fn(),stop:vi.fn(),seek:vi.fn()},
+            fetchImage:vi.fn(),translateImage:draw,translateArea:vi.fn(),downloadOcrLanguages:vi.fn()});
+        const offscreenSend=vi.fn(async message=>new Promise(resolve=>{
+            expect(router({...message,target:'offscreen'},{},resolve)).toBe(true);
+        }));
+        const adapter=createImageTranslationOffscreenAdapter({send:offscreenSend} as unknown as OffscreenClient);
+        const handlers=createImageTranslationBackgroundHandlers({assertLanguagesDownloaded:vi.fn(async()=>{}),
+            translateImage:adapter.translateImage,fetchImage:vi.fn(),getTranslationService:()=> 'google',supportsBatchTranslation:()=>false,
+            translateTexts:vi.fn(),downloadLanguages:vi.fn(),markLanguagesDownloaded:vi.fn()});
+        const handler=handlers.find(value=>value.type==='fluentReadImageTranslate')!;
+        sendMessage.mockImplementation(message=>handler.handle(message));
+        const controller=new AbortController();
+        await expect(translateImageInExtension('data:image/png,x','en','Page',{manga:true,requestId:'viewport-wire',signal:controller.signal,timeoutMs:5000,
+            mangaViewport:mangaViewport as ImageViewport})).resolves.toEqual({image:'translated',lines:[]});
+        expect(sendMessage).toHaveBeenCalledOnce();expect(offscreenSend).toHaveBeenCalledOnce();expect(draw).toHaveBeenCalledOnce();
+        expect(sendMessage.mock.calls[0][0]).toMatchObject({manga:true,requestId:'viewport-wire'});
+        const sent=offscreenSend.mock.calls[0][0],args=(draw.mock.calls as unknown[][])[0];
+        expect(sent.requestId).toBe('viewport-wire');expect(args.slice(0,3)).toEqual(['data:image/png,x','en','Page']);
+        expect(args[3]).toBeInstanceOf(AbortSignal);expect((args[3] as AbortSignal).aborted).toBe(false);
+        expect(args.slice(4)).toEqual(['viewport-wire',true,'tesseract',...(mangaViewport===undefined?[]:[mangaViewport])]);
+        expect(args).toHaveLength(mangaViewport===undefined?7:8);
+        expect(Object.hasOwn(sent,'mangaViewport')).toBe(mangaViewport!==undefined);
+        expect(Object.hasOwn(sendMessage.mock.calls[0][0],'mangaViewport')).toBe(mangaViewport!==undefined);
+        expect(sent.mangaViewport).toEqual(mangaViewport);expect(listeners.size).toBe(0);
     });
 
     it('漫画局部结果通过既有消息通道，普通图片不能误接受仅图块响应',async()=>{

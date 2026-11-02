@@ -84,9 +84,13 @@ function uniquePaintAtoms(atoms: readonly PdfLayoutAtom[]): PdfLayoutAtom[] {
     const near = (index: Map<string, PdfLayoutAtom[]>, x: number, baseline: number, slack: number, forward = slack, text = '') => {
         const result: PdfLayoutAtom[] = [];
         for (const cell of new Set([cellFor(slack - .05), cellFor(slack + .05)])) {
-            for (let column = Math.floor((x - slack) / cell); column <= Math.floor((x + forward) / cell); column++) {
-                for (let row = Math.floor((baseline - slack) / cell); row <= Math.floor((baseline + slack) / cell); row++) {
-                    for (const atom of index.get(`${cell}:${column}:${row}:${text}`) ?? []) result.push(atom);
+            const firstColumn = Math.floor((x - slack) / cell), lastColumn = Math.floor((x + forward) / cell);
+            const firstRow = Math.floor((baseline - slack) / cell), lastRow = Math.floor((baseline + slack) / cell);
+            // 超出安全整数的绝对桶号不能逐一递增；不确定的坐标不做去重，保全原文字项。
+            if (![firstColumn, lastColumn, firstRow, lastRow].every(Number.isSafeInteger)) continue;
+            for (let dx = 0; dx <= lastColumn - firstColumn; dx++) {
+                for (let dy = 0; dy <= lastRow - firstRow; dy++) {
+                    for (const atom of index.get(`${cell}:${firstColumn + dx}:${firstRow + dy}:${text}`) ?? []) result.push(atom);
                 }
             }
         }

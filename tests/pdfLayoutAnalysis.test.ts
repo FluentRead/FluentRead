@@ -1316,6 +1316,12 @@ describe('PDF layout analysis on real paper typography', () => {
         const large = atom('Results', 450000000, 100000000, 35000000, 10000000);
         expect(pdfLayoutLines([large, {...large}]).map(line => line.text)).toEqual(['Results']);
     });
+    it('preserves text instead of looping over unsafe absolute grid coordinates', () => {
+        for (const x of [2 ** 53, -(2 ** 53)]) {
+            const far = atom('Results', x, 100, 35);
+            expect(pdfLayoutLines([far, {...far}]).flatMap(line => line.runs)).toHaveLength(2);
+        }
+    });
     it('keeps loosely spaced word-processor paragraphs together and ends a paragraph at a line that does not reach the column edge', () => {
         const wide = '本课程是计算机大类基础课其作用是将大一新生对计算机已有的感性认识提升';
         const body = (text: string, x: number, baseline: number, width: number) => atom(text, x, baseline, width, 10.5);

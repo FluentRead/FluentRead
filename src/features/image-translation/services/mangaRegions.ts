@@ -39,14 +39,22 @@ function adjacent(left: MangaRegion, right: MangaRegion, lineGap: number, column
         && overlap >= Math.min(a[crossEnd] - a[crossStart], b[crossEnd] - b[crossStart]) * 0.5;
 }
 
+/** Paddle 的 spaceRecovery 可能在日文假名或汉字之间插入英文式空格；只归一化相邻日文字符，不碰拉丁词界。 */
+function normalizeMangaSourceText(sourceText:string, sourceLanguage:string):string {
+    if(numericInformation(sourceText))return sourceText;
+    const text=sourceText.replace(/\s+/gu,' ');
+    const japanese=/^(?:ja|jpn)(?:-|$)/iu.test(sourceLanguage)
+        ||/[\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}]/u.test(text);
+    return japanese?text.replace(/([\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}]) +(?=[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}])/gu,'$1'):text;
+}
+
 /** 源语言只用于排除明确不符的绘画噪声；自动检测保留两种书写系统。 */
 export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, width: number, height: number, context: 'page' | 'bubble' = 'page', protectNumeric = false): MangaRegion[] {
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0)) return [];
     const english = /^en(?:-|$)/i.test(sourceLanguage);
     const japanese = /^(?:ja|jpn)(?:-|$)/i.test(sourceLanguage);
     const lines: MangaRegion[] = items.flatMap(item => {
-        const sourceText=item.text.trim();
-        const text=numericInformation(sourceText) ? sourceText : sourceText.replace(/\s+/gu, ' ');
+        const text=normalizeMangaSourceText(item.text.trim(),sourceLanguage);
         const box = item.box;
         if (!Number.isFinite(item.confidence) || item.confidence < 0.65 || item.confidence > 1 || !text) return [];
         const numericSyntax=numericInformation(text);
@@ -81,8 +89,7 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0)) return [];
     const language = sourceLanguage.trim().replace(/_/gu, '-').toLowerCase().split('-')[0];
     const regions: MangaRegion[] = lines.flatMap(line => {
-        const sourceText=line.text.trim();
-        const text=numericInformation(sourceText) ? sourceText : sourceText.replace(/\s+/gu, ' ');
+        const text=normalizeMangaSourceText(line.text.trim(),language);
         const {x0, y0, x1, y1} = line.bbox;
         const numeric = typeof line.numericConfidence === 'number' && Number.isFinite(line.numericConfidence)
             && line.numericConfidence >= 90 && line.numericConfidence <= 100 && numericInformation(text);

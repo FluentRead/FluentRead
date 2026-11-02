@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/translationStability.ts
  * 文件职责：提供动态页面翻译的语义稳定性判断、轻量完成证据复验和实时文本槽重绑定，隔离 React/虚拟列表重建造成的生命周期噪声。
- * 主要内容：判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
+ * 主要内容：判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；仅译文复验读取本代精确来源槽，避免数字邻接文字时误判父节点为纯数值；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
  * 模块边界：本文件不读取配置、不监听 DOM、不执行 provider 请求；回退来源 HTML 比对只在惰性文档中复制，不激活来源资源；自动应用外壳候选和轻量完成证据必须重新认证原策略，runtime 通过回调提供当前来源与槽位快照。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -402,7 +402,12 @@ export function statefulSourceAndTextSlotsAreCurrent(
         const previousNodes = state.sourceTextNodes ?? [];
         if (state.singleTextSlotHosts.length !== previousNodes.length) return false;
         const core = getCurrentTranslationCore(state.scope);
-        const options = getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node);
+        // 数字旁的原文可能已移入本代译文槽。复验祖先时必须读取这些精确来源，
+        // 否则跳过槽后只剩数字，祖先会被误判成无需翻译的实时数值。
+        const options = {
+            ...getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+            sourceTextSlotHosts: new Set(state.singleTextSlotHosts.map(({host}) => host)),
+        };
         const protectionCache = createTranslationTextProtectionCache();
         // 合成段仅忽略自己的扩展身份，其宿主和自身真实的 hidden/notranslate
         // 仍保持权威；共享祖先缓存避免逐个槽反复遍历完整祖先链。
@@ -423,9 +428,11 @@ export function statefulSourceAndTextSlotsAreCurrent(
             return false;
         }
         // 已有槽保留原 Text，但新的正文可能通过 childList 或可见性变化加入。
-        // collector 跳过已渲染槽，只需拒绝任何不属于本代的新增可译 Text。
+        // 只放行本代登记的槽；其他新出现的可译 Text 仍使快照失效。
         const originalNodes = new Set(previousNodes);
-        return getCurrentTranslationStateTextNodes(node, state).every((text) => originalNodes.has(text));
+        return collectLiveTranslationTextSlots(node, core.shouldStayOriginal,
+            getTranslationStateProtectionBoundary(node, state), options)
+            .every(({node: text}) => originalNodes.has(text));
     }
 
     const currentNodes = getCurrentTranslationStateTextNodes(node, state);

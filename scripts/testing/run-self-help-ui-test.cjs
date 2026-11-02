@@ -60,6 +60,26 @@ async function assertCollapsedDiagnostic(page, code, label) {
  assert.ok(metrics.right<=metrics.viewport,'Status trigger stays inside popup');
  (result.collapsedDiagnosticLayouts ||= {})[label]=metrics;return notice;
 }
+// 测量真实布局，防止状态入口出现后挤换行或遮住主操作与网站规则。
+async function readDiagnosticMenuLayout(page) {
+ return page.evaluate(() => {
+  const selectors={hero:'.hero-card',main:'[data-testid="page-translation"]',label:'.translate-label',section:'[data-testid="section-translation"]',always:'[data-setting="always-translate-site"]',disable:'[data-setting="disable-extension-site"]',font:'[data-testid="page-font-entry"]',mode:'[data-testid="popup-display-mode"]',quick:'[data-popup-module="quickFeatures"]',trigger:'[data-diagnostic-details-toggle]'};
+  const rect=element=>{if(!element)return null;const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+  const boxes=Object.fromEntries(Object.entries(selectors).map(([key,selector])=>[key,rect(document.querySelector(selector))]));
+  const hits=Object.fromEntries(['main','section','always','disable','font','mode','trigger'].map(key=>{const r=boxes[key];return [key,Boolean(r&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest(selectors[key]))];}));
+  return {boxes,hits};
+ });
+}
+function assertDiagnosticMenuStable(before, after) {
+ for(const key of ['hero','main','section','always','disable','font','mode','quick']) {
+  assert.ok(before.boxes[key]&&after.boxes[key],key+' is present');
+  for(const dimension of ['x','y','width','height'])assert.ok(Math.abs(before.boxes[key][dimension]-after.boxes[key][dimension])<0.5,`${key} moved in ${dimension}`);
+ }
+ const {main,label,trigger}=after.boxes;
+ assert.ok(trigger.x>=main.x&&trigger.right<=main.right&&trigger.y>=main.y&&trigger.bottom<=main.bottom,'Diagnostic stays within its reserved action area');
+ assert.ok(label.right<=trigger.x||trigger.right<=label.x||label.bottom<=trigger.y||trigger.bottom<=label.y,'Diagnostic does not cover the action label');
+ assert.ok(Object.values(after.hits).every(Boolean),'Each control remains independently clickable');
+}
 async function openDiagnosticDetails(page, code) {
  const notice=diagnosticNotice(page,code),toggle=notice.locator('[data-diagnostic-details-toggle]');
  if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
@@ -159,8 +179,11 @@ async function previewDiagnostic(page, code) {
    mode = testMode;
    // A new document removes translation cache identity while keeping the same fixed source tab.
    await source.goto(base + '/article?case=' + testMode);
-   await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();await click('[data-testid="page-translation"]');
+   await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();
+   const menuBefore=await readDiagnosticMenuLayout(popup);await click('[data-testid="page-translation"]');
    await popup.locator(`[data-diagnostic-code="${expected}"]`).waitFor({timeout:30000});
+   const menuAfter=await readDiagnosticMenuLayout(popup);assertDiagnosticMenuStable(menuBefore,menuAfter);
+   (result.diagnosticMenuLayouts ||= {})[testMode]={before:menuBefore,after:menuAfter};
    await assertCollapsedDiagnostic(popup,expected,testMode);await shot(popup,'04-' + testMode);record('actual '+testMode+' error classified');
    if (testMode === 'auth') {
     await previewDiagnostic(popup,'authentication');

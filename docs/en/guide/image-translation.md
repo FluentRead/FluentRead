@@ -33,6 +33,8 @@ After starting, expand the controls next to the manga button and choose **View m
 
 The panel reads existing results without starting recognition or translation. It reports when a page is still processing, a result has been released, or content is too large to display; return to the page and check again. A long-image segment may include text from adjacent segments. Canvas text comes from the latest completed translation snapshot and may not reflect later changes to the canvas.
 
+When existing translations were withheld to protect the original, **Undrawn translations** shows their count. Click it to read those complete translations; click again to return to all text in its original order. Switching views reuses the current snapshot without recognition or translation requests. **Copy this section** copies the current filtered section; **Copy all text** still copies all text for the selected page. The image keeps the original text at those positions, such as English. This entry does not erase or redraw the image or fix missed OCR text.
+
 By default, FluentRead prepares the next **3 images** already loaded by the website. Choose **0–5** in settings; 0 translates visible pages only. More upcoming pages use more device resources and translation requests. It does not load an entire chapter or the next chapter for you.
 
 Failed pages keep their originals while other pages continue. Switch to originals and back to retry. Changing chapters, leaving the page, or disabling manga translation stops old work. Image translation and floating-button switches are independent of manga; adjust its separate entry under **Standalone manga button**.

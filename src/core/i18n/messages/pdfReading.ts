@@ -1,6 +1,6 @@
 /**
  * @file src/core/i18n/messages/pdfReading.ts
- * 文件职责：维护 PDF 在线导入、分页阅读、缩放、划词提示、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
+ * 文件职责：维护 PDF 在线导入、分页阅读、缩放、划词提示、提取文字异常提醒、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
  * 主要内容：提供简短的重试、更换服务、暂时中断和按需展开详情文案，按七种语言独立导出静态目录，让默认中文界面直接引用中文资源；保留七语汇总对象供构建期资源生成、userscript 与其他 locale 复用。
  * 模块边界：仅提供静态资源，不读取文档、网络或用户配置；运行时消费者按语言引用独立常量，避免把非当前语言文案打进默认目录。
  */
@@ -32,6 +32,7 @@ export const pdfReadingChineseMessages = {
     "document.pdfReading.scanned": "扫描件 · 开始翻译时先识别文字",
     "document.pdfReading.recognizing": "正在识别文字 {completed} / {total} 页",
     "document.pdfReading.ocrEmpty": "没有识别出文字，请确认页面清晰并已选择正确的源语言",
+    "document.pdfReading.sourceCharacterWarning": "此 PDF 的提取文字包含无法识别的字符，请对照原文校对。",
     "document.pdfReading.exportBilingualHint": "原文与译文左右对照",
     "document.pdfReading.waitingTranslation": "等待翻译…",
     "document.pdfReading.crossPageContext": "跨页上下文",
@@ -118,6 +119,7 @@ export const pdfReadingEnglishMessages = {
     "document.pdfReading.scanned": "Scanned · text is recognized when translation starts",
     "document.pdfReading.recognizing": "Recognizing text · page {completed} of {total}",
     "document.pdfReading.ocrEmpty": "No text was recognized. Check that the pages are legible and the source language is correct.",
+    "document.pdfReading.sourceCharacterWarning": "The text extracted from this PDF contains unrecognized characters. Please check it against the original.",
     "document.pdfReading.exportBilingualHint": "Original and translation side by side",
     "document.pdfReading.waitingTranslation": "Waiting for translation…",
     "document.pdfReading.crossPageContext": "Cross-page context",
@@ -204,6 +206,7 @@ export const pdfReadingJapaneseMessages = {
     "document.pdfReading.scanned": "スキャン文書 · 翻訳開始時に文字を認識します",
     "document.pdfReading.recognizing": "文字を認識中 {completed} / {total} ページ",
     "document.pdfReading.ocrEmpty": "文字を認識できませんでした。ページの鮮明さと原文の言語を確認してください。",
+    "document.pdfReading.sourceCharacterWarning": "この PDF から抽出したテキストに認識できない文字が含まれています。原文と照らし合わせて確認してください。",
     "document.pdfReading.exportBilingualHint": "原文と訳文を左右に表示",
     "document.pdfReading.waitingTranslation": "翻訳を待っています…",
     "document.pdfReading.crossPageContext": "前後ページの文脈",
@@ -290,6 +293,7 @@ export const pdfReadingKoreanMessages = {
     "document.pdfReading.scanned": "스캔 문서 · 번역을 시작하면 먼저 글자를 인식합니다",
     "document.pdfReading.recognizing": "글자 인식 중 {completed} / {total}쪽",
     "document.pdfReading.ocrEmpty": "인식된 글자가 없습니다. 페이지가 선명한지, 원문 언어가 맞는지 확인하세요.",
+    "document.pdfReading.sourceCharacterWarning": "이 PDF에서 추출한 텍스트에 인식할 수 없는 문자가 있습니다. 원문과 대조하여 확인해 주세요.",
     "document.pdfReading.exportBilingualHint": "원문과 번역을 좌우로 표시",
     "document.pdfReading.waitingTranslation": "번역 대기 중…",
     "document.pdfReading.crossPageContext": "페이지 간 문맥",
@@ -376,6 +380,7 @@ export const pdfReadingFrenchMessages = {
     "document.pdfReading.scanned": "Document numérisé · le texte est reconnu au lancement de la traduction",
     "document.pdfReading.recognizing": "Reconnaissance du texte · page {completed} sur {total}",
     "document.pdfReading.ocrEmpty": "Aucun texte reconnu. Vérifiez la lisibilité des pages et la langue source.",
+    "document.pdfReading.sourceCharacterWarning": "Le texte extrait de ce PDF contient des caractères non reconnus. Vérifiez-le en le comparant à l’original.",
     "document.pdfReading.exportBilingualHint": "Original et traduction côte à côte",
     "document.pdfReading.waitingTranslation": "En attente de traduction…",
     "document.pdfReading.crossPageContext": "Contexte entre pages",
@@ -462,6 +467,7 @@ export const pdfReadingSpanishMessages = {
     "document.pdfReading.scanned": "Documento escaneado · el texto se reconoce al iniciar la traducción",
     "document.pdfReading.recognizing": "Reconociendo texto · página {completed} de {total}",
     "document.pdfReading.ocrEmpty": "No se reconoció texto. Comprueba que las páginas sean legibles y el idioma de origen.",
+    "document.pdfReading.sourceCharacterWarning": "El texto extraído de este PDF contiene caracteres no reconocidos. Revísalo comparándolo con el original.",
     "document.pdfReading.exportBilingualHint": "Original y traducción lado a lado",
     "document.pdfReading.waitingTranslation": "Esperando la traducción…",
     "document.pdfReading.crossPageContext": "Contexto entre páginas",
@@ -548,6 +554,7 @@ export const pdfReadingRussianMessages = {
     "document.pdfReading.scanned": "Скан · текст распознаётся при запуске перевода",
     "document.pdfReading.recognizing": "Распознавание текста · страница {completed} из {total}",
     "document.pdfReading.ocrEmpty": "Текст не распознан. Проверьте чёткость страниц и исходный язык.",
+    "document.pdfReading.sourceCharacterWarning": "В тексте, извлечённом из этого PDF, есть нераспознанные символы. Сверьте его с оригиналом.",
     "document.pdfReading.exportBilingualHint": "Оригинал и перевод рядом",
     "document.pdfReading.waitingTranslation": "Ожидание перевода…",
     "document.pdfReading.crossPageContext": "Контекст между страницами",

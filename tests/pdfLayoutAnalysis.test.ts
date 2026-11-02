@@ -21,6 +21,71 @@ const atom = (text: string, x: number, baseline: number, width = text.length * 5
 const analyze = (atoms: PdfLayoutAtom[], graphics: Parameters<typeof analyzePdfPageLayout>[0]['graphics'] = [], width = 612, height = 792) => analyzePdfPageLayout({atoms, graphics, width, height});
 const ops = Object.fromEntries(['save', 'restore', 'transform', 'paintFormXObjectBegin', 'paintFormXObjectEnd', 'paintImageXObject', 'paintInlineImageXObject', 'paintImageMaskXObject', 'constructPath', 'stroke', 'closeStroke', 'fill', 'eoFill', 'fillStroke', 'eoFillStroke', 'closeFillStroke', 'closeEOFillStroke', 'endPath'].map((name, index) => [name, index + 1]));
 
+describe('letter-spaced supported section headings', () => {
+    // Smith & Levy (2013), Cognition128 pp302–319, doi:10.1016/j.cognition.2013.02.013, source PDF p1.
+    // Source SHA7c325f95f5b54bc529e9c8793d26651c306841c4d1c6b64303997db47a74df77; source p1 states Creative Commons Attribution License.
+    // Only the short heading and factual glyph geometry are retained. Following prose is self-authored.
+    const original: PdfLayoutAtom = {text: 'a b s t r a c t', x: 200.1259, y: 265.0100742, width: 65.24148868999998,
+        height: 8.9663, fontFamily: 'serif', baseline: 270.08500000000004, fontSize: 8.9663};
+    const prose = (extra: Partial<PdfLayoutAtom> = {}): PdfLayoutAtom => ({...atom('This paragraph explains the study and its main result.', 200.0125, 289.7574, 307.3733, 7.1731), ...extra});
+
+    it('recovers the actual Smith-Levy abstract heading without rewriting its spaced source or glyph geometry', () => {
+        const input = [original, prose()], before = structuredClone(input);
+        const result = analyze(input);
+        expect(result.blocks.find(block => block.source === original.text)).toMatchObject({kind: 'heading', preserveSource: false, lines: [{runs: [original]}]});
+        expect(result.blocks.flatMap(block => block.lines!.flatMap(line => line.runs!))).toEqual(input);
+        expect(input).toEqual(before);
+    });
+
+    it.each(['A B S T R A C T', 'A b s t r a c t', 'r e f e r e n c e s', 'A C K N O W L E D G M E N T S', 'a c k n o w l e d g e m e n t s', 'A P P E N D I X', 'A P P E N D I X  A'])
+    ('recognizes the supported tracked section name %s while retaining its exact source runs', text => {
+        const title = {...original, text};
+        expect(analyze([title, prose()]).blocks.find(block => block.source === text.replace(/ +/gu, ' '))).toMatchObject({kind: 'heading', preserveSource: false, lines: [{runs: [title]}]});
+    });
+
+    it.each(['a r t i c l e i n f o', 'a b c d e f g h', 'A. B. S. T. R. A. C. T.', 'α β γ δ ε ζ η θ', 'a\u00a0b\u00a0s\u00a0t\u00a0r\u00a0a\u00a0c\u00a0t', 'A '.repeat(42) + 'A'])
+    ('does not promote unsupported letter lists, punctuation, policy metadata or other whitespace: %s', text => {
+        const result = analyze([{...original, text}, prose()]);
+        // Existing line whitespace normalization stays intact; original run text must remain unchanged.
+        expect(result.blocks.find(block => block.source === text.replace(/\s+/gu, ' '))).toMatchObject({kind: 'formula', preserveSource: true, lines: [{runs: [{text}]}]});
+    });
+
+    it.each(['missing', 'far below', 'other column', 'larger font', 'smaller font', 'symbols only', 'short words', 'above title'] as const)
+    ('requires supporting same-column prose rather than %s context', mode => {
+        const body = prose();
+        if (mode === 'far below') body.baseline = body.y = 500;
+        if (mode === 'other column') body.x = 400;
+        if (mode === 'larger font') body.fontSize = 20;
+        if (mode === 'smaller font') body.fontSize = 4;
+        if (mode === 'symbols only') body.text = 'a b c d e f g h';
+        if (mode === 'short words') body.text = 'Short explanation';
+        if (mode === 'above title') {body.baseline = 250; body.y = 240;}
+        expect(analyze([original, ...(mode === 'missing' ? [] : [body])]).blocks.find(block => block.source === original.text))
+            .toMatchObject({kind: 'formula', preserveSource: true});
+    });
+
+    it('keeps letter variables in a protected equation and genuine table cell instead of inferring a section', () => {
+        const title = atom('a b s t r a c t', 200, 100, 65);
+        const body = atom('This paragraph explains the notation in the following study.', 200, 130, 300);
+        expect(analyze([title, atom('x = y + z', 200, 112, 70), body]).blocks.find(block => block.source.includes(title.text)))
+            .toMatchObject({kind: 'formula', preserveSource: true});
+        const graphics = [{kind: 'path' as const, x: 190, y: 85, width: 0, height: 55}, {kind: 'path' as const, x: 550, y: 85, width: 0, height: 55},
+            ...[85, 115, 140].map(y => ({kind: 'path' as const, x: 190, y, width: 360, height: 0}))];
+        expect(analyze([title, body], graphics).blocks.find(block => block.source === title.text)).toMatchObject({kind: 'table', preserveSource: true});
+    });
+
+    it('keeps page furniture and author-grid initials preserved even when their letters spell a section name', () => {
+        const footer = atom('a b s t r a c t', 50, 20, 65);
+        expect(analyze([footer, atom('This paragraph explains the entire ordinary study in detail.', 50, 100, 300)]).blocks.find(block => block.source === footer.text))
+            .toMatchObject({kind: 'footer', preserveSource: true});
+        const initials = atom('A B S T R A C T', 50, 100, 100);
+        const result = analyze([initials, atom('Alice Example', 210, 100, 80), atom('Bob Example', 380, 100, 80),
+            atom('author@example.test', 50, 112, 100), atom('This paragraph explains the complete experimental study in detail.', 50, 130, 400)]);
+        expect(result.blocks.find(block => block.source === initials.text)).toMatchObject({preserveSource: true});
+        expect(result.blocks.find(block => block.source === initials.text)?.kind).not.toBe('heading');
+    });
+});
+
 // 本机公开 PDF 2608.25512v1 第10页，source SHA256 390775dbc9debdcf2ed1b076eed013387ca057630be3cb594617b2b742e48cf0；由实际 PDF.js/pdfTextAtoms 提取，未包含任何机器翻译结果。
 const pageTenMathGeometry = {
     width: 595.2756, height: 841.8898,

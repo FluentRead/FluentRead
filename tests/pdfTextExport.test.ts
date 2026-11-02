@@ -167,6 +167,25 @@ describe('visible Unicode PDF reading export', () => {
         })();
     });
 
+    it('retains an already extractable complete line when canonical and stock paragraph bases disagree', async () => {
+        const target = 'א hello world';
+        // The first strong character is RTL, while pinned stock PDF.js selects LTR for this low RTL ratio.
+        // Both the old path and a declared complete Canvas line must retain the same full logical target.
+        for (const direction of [undefined, 'rtl'] as const) {
+            const document = await fixture();
+            const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+                textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14,
+                    ...(direction ? {direction} : {})}]})});
+            const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true, isEvalSupported: false});
+            try {
+                const pdf = await task.promise, page = await pdf.getPage(1);
+                const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
+                expect(raw.split(target).length - 1, `complete target with direction ${direction ?? 'legacy'}`).toBe(1);
+                page.cleanup();
+            } finally {await task.destroy();}
+        }
+    });
+
     it('preserves unpainted metadata, formula characters and untranslated blocks without indexing erased source text', async () => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');

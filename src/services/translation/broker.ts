@@ -387,6 +387,16 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         return `${cacheKey}:generation:${requestGeneration}:timeout:${normalizedTimeoutMs}ms`;
     }
 
+    /** 成功和失败均只撤销仍归属本请求的在途记录，不删除 clear 换代后登记的新请求。 */
+    function trackPending<T>(pending: Map<string, Promise<T>>, key: string, request: Promise<T>): Promise<T> {
+        pending.set(key, request);
+        const release = () => {
+            if (pending.get(key) === request) pending.delete(key);
+        };
+        void request.then(release, release);
+        return request;
+    }
+
     /** 同一冻结配置派生 transport 的实际 key 与 pending 的有效 key 集合；摘要不进入成功缓存身份。 */
     function quotaDigest(execution: TranslationRequestExecution, model: string, transport = false): string {
         const current = execution.config;
@@ -1024,49 +1034,41 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             }
             return recovered;
         }
-        if (!promptBasedAI) {
-            const finalized = Array.from(results, value => value ?? '');
-            for (let index = 0; index < finalized.length; index += 1) {
-                finalized[index] = await recoverInvalidResult(
-                    execution, {...message, origin: message.origin[index] ?? ''}, finalized[index],
-                    requestDeadline, context, pageContext,
-                );
-            }
-            return finalized;
-        }
-
-        for (let index = 0; index < results.length; index += 1) {
-            const origin = message.origin[index] ?? '';
-            const leakedPageContext = shouldRecoverPageContextLeak(
-                execution,
-                origin,
-                results[index] ?? '',
-                pageContext,
-                message.modelOverride,
-            );
-            if (!leakedPageContext) continue;
-            if (startWithoutPageContext) {
-                if (isDefiniteRecoveryPageContextLeak(
+        if (promptBasedAI) {
+            for (let index = 0; index < results.length; index += 1) {
+                const origin = message.origin[index] ?? '';
+                const leakedPageContext = shouldRecoverPageContextLeak(
                     execution,
                     origin,
                     results[index] ?? '',
                     pageContext,
                     message.modelOverride,
-                )) throw new AIContextRecoveryResponseError();
-                continue;
+                );
+                if (!leakedPageContext) continue;
+                if (startWithoutPageContext) {
+                    if (isDefiniteRecoveryPageContextLeak(
+                        execution,
+                        origin,
+                        results[index] ?? '',
+                        pageContext,
+                        message.modelOverride,
+                    )) throw new AIContextRecoveryResponseError();
+                    continue;
+                }
+                results[index] = await callSingleProviderWithoutPageContext(
+                    execution,
+                    {...message, origin},
+                    requestDeadline,
+                    pageContext,
+                );
             }
-            results[index] = await callSingleProviderWithoutPageContext(
-                execution,
-                {...message, origin},
-                requestDeadline,
-                pageContext,
-            );
         }
+        // 机器与 AI 数组共用逐项质量恢复；仅 AI 的无上下文重试清空提示上下文。
         const finalized = Array.from(results, value => value ?? '');
         for (let index = 0; index < finalized.length; index += 1) {
             finalized[index] = await recoverInvalidResult(
                 execution, {...message, origin: message.origin[index] ?? ''}, finalized[index] ?? '',
-                requestDeadline, startWithoutPageContext ? '' : context, pageContext,
+                requestDeadline, promptBasedAI && startWithoutPageContext ? '' : context, pageContext,
             );
         }
         return finalized;
@@ -1165,6 +1167,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (existing) return runWithinDeadline(() => existing, requestDeadline, execution.abortSignal);
 
         const request = (async () => {
+            const fallback: PageSummaryResult = {context: pageContext, summarized: false};
             try {
                 // 步骤 1：先读持久缓存，覆盖 MV3 service worker 重启后的重复摘要。
                 if (useCache) {
@@ -1174,8 +1177,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                         execution.abortSignal,
                     );
                     if (persisted !== null) {
-                        if (requestGeneration === cacheGeneration) cachePageSummary(key, {context: persisted, summarized: true});
-                        return {context: persisted, summarized: true};
+                        const cachedSummary: PageSummaryResult = {context: persisted, summarized: true};
+                        if (requestGeneration === cacheGeneration) cachePageSummary(key, cachedSummary);
+                        return cachedSummary;
                     }
                 }
 
@@ -1199,15 +1203,12 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     }, execution.config),
                 );
                 const summary = typeof result === 'string' ? result.trim().slice(0, PAGE_SUMMARY_LIMIT) : '';
-                if (!summary) {
-                    if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, {context: pageContext, summarized: false});
-                    return {context: pageContext, summarized: false};
-                }
-
-                const summarizedContext = `Page summary (AI-generated reference):\n${summary}`;
-                if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, {context: summarizedContext, summarized: true});
-                if (useCache) await persistCacheWrite(requestGeneration, key, summarizedContext);
-                return {context: summarizedContext, summarized: true};
+                const summarized: PageSummaryResult = summary
+                    ? {context: `Page summary (AI-generated reference):\n${summary}`, summarized: true}
+                    : fallback;
+                if (useCache && requestGeneration === cacheGeneration) cachePageSummary(key, summarized);
+                if (useCache && summarized.summarized) await persistCacheWrite(requestGeneration, key, summarized.context);
+                return summarized;
             } catch (error) {
                 if (execution.abortSignal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
                     throw error;
@@ -1217,18 +1218,13 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 if (!(error instanceof TranslationProviderDeadlineError)
                     && useCache
                     && requestGeneration === cacheGeneration) {
-                    cachePageSummary(key, {context: pageContext, summarized: false});
+                    cachePageSummary(key, fallback);
                 }
-                return {context: pageContext, summarized: false};
+                return fallback;
             }
         })();
 
-        pendingPageSummaries.set(pendingKey, request);
-        const releasePendingSummary = () => {
-            if (pendingPageSummaries.get(pendingKey) === request) pendingPageSummaries.delete(pendingKey);
-        };
-        void request.then(releasePendingSummary, releasePendingSummary);
-        return request;
+        return trackPending(pendingPageSummaries, pendingKey, request);
     }
 
     async function translateSingleWithCache(
@@ -1333,16 +1329,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             requestDeadline,
         );
 
-        pendingTranslations.set(pendingKey, request);
-        void request.then(
-            () => {
-                if (pendingTranslations.get(pendingKey) === request) pendingTranslations.delete(pendingKey);
-            },
-            () => {
-                if (pendingTranslations.get(pendingKey) === request) pendingTranslations.delete(pendingKey);
-            },
-        );
-        return request;
+        return trackPending(pendingTranslations, pendingKey, request);
     }
 
     async function translateBatchWithCache(
@@ -1511,16 +1498,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             requestDeadline,
         );
 
-        pendingBatches.set(pendingKey, request);
-        void request.then(
-            () => {
-                if (pendingBatches.get(pendingKey) === request) pendingBatches.delete(pendingKey);
-            },
-            () => {
-                if (pendingBatches.get(pendingKey) === request) pendingBatches.delete(pendingKey);
-            },
-        );
-        return request;
+        return trackPending(pendingBatches, pendingKey, request);
     }
 
     /** 免费翻译链等内部线路的尝试按上限收集；未注入统计端口时不保留任何观察。 */

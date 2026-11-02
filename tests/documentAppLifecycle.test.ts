@@ -133,6 +133,53 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('shows one localized nonmodal notice for actual PDF extracted controls without changing source, geometry or corrections', async () => {
+        ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items: [
+            {str: 'Known \u0003 source \u007f text.', transform: [12, 0, 0, 12, 5, 50], width: 80, height: 12, fontName: 'body'},
+        ], styles: {body: {ascent: .8, descent: -.2, fontFamily: 'serif'}}})});
+        await state.loadFiles([file('source-controls.pdf')]); await flush();
+        const document = state.parsedDocument, before = structuredClone({segments: document.segments, pages: document.binary.pages});
+        expect(document.segments[0].source).toBe('Known \u0003 source \u007f text.');
+        const notices = () => walkHost(root).filter(entry => entry.props['data-testid'] === 'document-pdf-source-warning');
+        expect(notices()).toHaveLength(1); expect(notices()[0].type).toBe('p'); expect(notices()[0].props.role).toBe('status');
+        expect(hostText(notices()[0])).toBe('document.pdfReading.sourceCharacterWarning');
+        state.editSegment(0, 'Reviewed correction'); state.pdfPresentation = 'readable'; await flush();
+        expect(notices()).toHaveLength(1); expect(state.translatedSegments[0]).toBe('Reviewed correction');
+        expect({segments: document.segments, pages: document.binary.pages}).toEqual(before);
+        expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
+    });
+
+    it.each(['\u0000', '\u0008', '\u000b', '\u000c', '\u000e', '\u001f'])('notices protected PDF source controls outside the active segment: %j', async control => {
+        await state.loadFiles([file('protected-source.pdf')]);
+        const original = state.parsedDocument, source = `Original ${control} glyph`;
+        state.parsedDocument = markRaw({...original, binary: {...original.binary, pages: original.binary.pages.map((page: PdfDocumentPage) => ({...page,
+            blocks: [...page.blocks, {...page.blocks[0], source, segmentIndex: -1, kind: 'formula', preserveSource: true}],
+        }))}});
+        await flush();
+        expect(walkHost(root).filter(entry => entry.props['data-testid'] === 'document-pdf-source-warning')).toHaveLength(1);
+        expect(state.parsedDocument.binary.pages[0].blocks.at(-1).source).toBe(source);
+    });
+
+    it('clears the PDF source notice on document switches, ignores translated controls and does not warn for ordinary whitespace or non-PDF sources', async () => {
+        await state.loadFiles([file('affected.pdf'), file('clean.pdf'), file('notes.txt', 'Notes \u0003 text.')]);
+        const [affected, clean, notes] = state.documentQueue;
+        // Older PDF snapshots can omit the optional block.source; the active segment still owns its original text.
+        for (const [task, source] of [[affected, 'Original \u0003 text.'], [clean, 'Known\tLatin\nעברית\r中文 😀\u00a0\u200d\u0301']] as const) {
+            const document = task.document;
+            task.document = markRaw({...document, segments: document.segments.map((segment: {id: number; source: string}) => ({...segment, source})),
+                binary: {...document.binary, pages: document.binary.pages.map((page: PdfDocumentPage) => ({...page, blocks: page.blocks.map(block => ({...block, source: undefined}))}))}});
+        }
+        const notices = () => walkHost(root).filter(entry => entry.props['data-testid'] === 'document-pdf-source-warning');
+        state.selectDocument(affected); await flush(); expect(notices()).toHaveLength(1);
+        state.selectDocument(clean); state.editSegment(0, 'Target \u0003 \u007f text.'); await flush(); expect(notices()).toHaveLength(0);
+        expect(state.translatedSegments[0]).toBe('Target \u0003 \u007f text.');
+        state.selectDocument(notes); await flush(); expect(state.parsedDocument.format).toBe('txt'); expect(notices()).toHaveLength(0);
+        state.selectDocument(affected); await flush(); expect(notices()).toHaveLength(1);
+        expect(state.parsedDocument.segments[0].source).toBe('Original \u0003 text.');
+        state.selectDocument(clean); await flush(); expect(notices()).toHaveLength(0); expect(state.translatedSegments[0]).toBe('Target \u0003 \u007f text.');
+        expect(ports.recognize).not.toHaveBeenCalled(); expect(ports.translate).not.toHaveBeenCalled(); expect(ports.batch).not.toHaveBeenCalled();
+    });
+
     it('keeps the last confirmed list on read or mutation failure and retries without losing stored data', async () => {
         const factory = new IDBFactory(), history = createDocumentHistory(factory);
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);

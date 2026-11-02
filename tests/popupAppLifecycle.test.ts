@@ -13,7 +13,6 @@ import {enUSMessages} from '@/src/core/i18n/messages/en-US'
 import {extractConfigCredentials, sanitizeConfigCredentials} from '@/src/core/config/credentials'
 import type {ConfigStoragePort} from '@/src/platform/storage/configStorage'
 import {createPopupTabSource} from '@/src/app/popup/sourceTab'
-import {getDiagnosticUiText} from '@/src/services/diagnostics'
 
 vi.mock('vue', async importOriginal => {
   const actual = await importOriginal<typeof import('vue')>();
@@ -146,7 +145,10 @@ function growServiceViewport(height=263){Object.assign(viewport,{height});viewpo
 describe('实际 Popup 缓存模板与页面操作',()=>{
   it('点击侧边栏入口在当前窗口内立即打开，等待期间去重，成功后关闭弹窗',async()=>{
     fixture.capabilities.sidepanel=true;await mount();const pending=deferred<void>();openSidepanel.mockReturnValueOnce(pending.promise)
-    const entry=button('sidebar-translation');eventOf(entry)();expect(openSidepanel).toHaveBeenCalledWith(3)
+    const entry=button('sidebar-translation');expect(entry.closest('.header-actions')).not.toBeNull();expect(entry.closest('.hero-card')).toBeNull()
+    const donation=document.querySelector('.donation-button')!;expect(donation.nextElementSibling).toBe(entry);expect(entry.nextElementSibling).toBe(document.querySelector('.settings-button'))
+    expect(donation.textContent?.trim()).toBe('');expect(donation.getAttribute('aria-label')).toBe('popup.donationTitle')
+    expect(entry.getAttribute('aria-label')).toBe('sidepanel.title');expect(entry.textContent?.trim()).toBe('');eventOf(entry)();expect(openSidepanel).toHaveBeenCalledWith(3)
     eventOf(entry)();expect(openSidepanel).toHaveBeenCalledOnce();expect(close).not.toHaveBeenCalled()
     pending.resolve();await drain();expect(close).toHaveBeenCalledOnce()
   })
@@ -685,7 +687,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     runtimeEvent({...failure,documentToken:'old-document-at-same-url'},sender);await drain();expect(document.querySelector('.fluentread-diagnostic')).toBeNull()
     runtimeEvent({...failure,documentToken:undefined},sender);await drain();expect(document.querySelector('.fluentread-diagnostic')).toBeNull()
     runtimeEvent({type:'fullPageTranslationState',isTranslated:true,toolbarStatus:'translated',documentToken:'popup-fixture-document'},sender);await drain()
-    expect(button('page-translation').getAttribute('aria-pressed')).toBe('true');expect(document.querySelector('.first-use-hint')!.textContent).toContain('译文已显示')
+    expect(button('page-translation').getAttribute('aria-pressed')).toBe('true');expect(document.querySelector('.first-use-hint')).toBeNull()
     runtimeEvent(failure,sender);await drain()
     const diagnostic=document.querySelector('.fluentread-diagnostic')!;expect(diagnostic.getAttribute('data-diagnostic-code')).toBe('authentication');expect(diagnostic.textContent).toContain('服务验证失败');expect(diagnostic.textContent).not.toContain('PRIVATE');expectCollapsedDiagnostic()
     shown.value=false;await drain();runtimeEvent({type:'fullPageTranslationState',isTranslated:false,toolbarStatus:'idle',documentToken:'popup-fixture-document'},sender);expect(state.pageTranslated).toBe(true)
@@ -814,14 +816,16 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     expect(commands().map(call=>[call[0],call[1].action])).toEqual([[7,'restore'],[7,'fullPage']]);expect(button('page-translation').getAttribute('aria-pressed')).toBe('true')
     expect(document.querySelector('.fluentread-diagnostic')).toBeNull();await eventOf(button('page-translation'))();await drain();expect(commands().at(-1)![1].action).toBe('restore')
   })
-  it('首次使用、翻译中和真实完成提示在实际模板中跟随七种界面语言切换',async()=>{
+  it('正常状态不显示额外提示行，翻译中在按钮内反馈进度',async()=>{
     await mount()
     const sender={id:'fixture-extension',url:'https://example.com/a',tab:{id:7,url:'https://example.com/a'},frameId:0}
     for(const locale of ['zh-CN','en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES']){
       state.config.uiLanguage=locale;await drain()
-      for(const [toolbarStatus,key]of [['idle','first-use-start'],['translating','first-use-translating'],['translated','first-use-ready']]as const){
+      for(const toolbarStatus of ['idle','translating','translated']as const){
         runtimeEvent({type:'fullPageTranslationState',isTranslated:toolbarStatus!=='idle',toolbarStatus,documentToken:'popup-fixture-document'},sender);await drain()
-        expect(document.querySelector('.first-use-hint')!.textContent).toBe(getDiagnosticUiText(key,locale))
+        expect(document.querySelector('.first-use-hint')).toBeNull()
+        expect(button('page-translation').getAttribute('aria-busy')).toBe(String(toolbarStatus==='translating'))
+        expect(Boolean(button('page-translation').querySelector('.spinner'))).toBe(toolbarStatus==='translating')
       }
     }
   })
@@ -863,7 +867,7 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     send.mockResolvedValueOnce(snapshot)
     const sender={id:'fixture-extension',url:'https://example.com/a',tab:{id:7,url:'https://example.com/a'},frameId:0}
     runtimeEvent({type:'fullPageTranslationState',isTranslated:true,toolbarStatus:'translating',documentToken:'late-ready-document'},sender);await drain()
-    expect(button('page-translation').getAttribute('aria-pressed')).toBe('true');expect(document.querySelector('.first-use-hint')!.textContent).toContain('译文已显示')
+    expect(button('page-translation').getAttribute('aria-pressed')).toBe('true');expect(document.querySelector('.first-use-hint')).toBeNull()
     expect(commands()).toHaveLength(0);expect(send).toHaveBeenLastCalledWith(7,{type:'getFullPageTranslationState'},{frameId:0})
   })
   it('局部等待期间锁定实际按钮，连续旧事件只发送一次并只关闭一次',async()=>{

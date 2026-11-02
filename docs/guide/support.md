@@ -19,6 +19,6 @@ import SupportOptions from '../.vitepress/theme/SupportOptions.vue'
 
 ## 个人赞赏
 
-也欢迎通过微信赞赏或 Ko-fi 自愿支持项目维护。
+也欢迎通过微信赞赏或 Ko-fi 自愿支持项目维护。点击插件弹窗顶部的咖啡图标，也可以打开赞赏选项。
 
 <SupportOptions />

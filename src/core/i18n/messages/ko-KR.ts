@@ -71,6 +71,8 @@ export const koKRMessages = {
     "translationCenter.modelMissing": "먼저 모델을 선택하거나 입력하세요.",
     "translationCenter.noReady": "번역하려면 하나 이상의 서비스를 설정하세요.",
     'sidepanel.title': '사이드바 번역',
+    'sidepanel.openCenter': '설정에서 번역 센터 열기',
+    'sidepanel.keyboardHint': 'Enter로 번역 · Shift + Enter로 줄 바꿈',
     'sidepanel.openError': '사이드바를 열 수 없습니다. 다시 시도하거나 브라우저 사이드바 메뉴에서 FluentRead를 여세요.',
     'sidepanel.settingsError': '설정을 열 수 없습니다. 다시 시도하세요.',
     'sidepanel.startupError': '번역 패널을 불러올 수 없습니다. 새로고침하세요.',

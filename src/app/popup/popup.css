@@ -6,7 +6,7 @@
  * 极矮视口：服务选择的返回、搜索、清除与关闭复用原节点并排，隐藏装饰留白而不缩小操作区，输入状态与整页遮罩保持；触屏语言选择使用独立 portal 标记，46px 控件与 16px 输入避免继续沿用桌面紧凑尺寸，列表随可见高度收缩并给关闭入口让位。
  * 品牌触屏：coarse 指针或已确认的 Firefox Android Popup 为官网链接提供居中的 46px 命中区，内部图标保持 32px，桌面链接仍随 32px 图标紧凑排布，不使用外扩重叠区域。
  * 快捷层级：悬停和划词标题与开关共用一行并保留独立关闭按钮，说明只承载实际作用范围；圈选快捷键集中在示意中，服务摘要不保留数量徽标的空间。
- * 侧边栏入口：在翻译主操作下提供一行紧凑文本按钮，展示原生侧栏图标与打开反馈，沿用同一主题与焦点样式。
+ * 顶部入口：赞赏与侧边栏使用紧凑图标及悬停提示，侧边栏不再占用翻译卡片的独立行，触屏仍保留命中面积。
  */
 @import "../../ui/styles/feedback.css";
 /* Popup 页面样式跟随 app 页面边界，避免 WXT 入口目录继续承载实现。 */
@@ -69,10 +69,9 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 /* 工具栏 popup 的 viewport 也由页面撑开；用 100dvh 限高会把首次打开锁在启动占位的矮高度。 */
 .popup-shell { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
 .popup-content { position: relative; z-index: 1; }
-.sidebar-translation-entry { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 30px; margin-top: 7px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 12px; text-align: left; cursor: pointer; }
-.sidebar-translation-entry svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
-.sidebar-translation-entry > span:first-of-type { flex: 1; }
-.sidebar-translation-entry:hover:not(:disabled) { color: var(--brand-strong); border-color: var(--brand); }
+.sidebar-translation-entry { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.sidebar-translation-entry svg { width: 18px; height: 18px; }
+.sidebar-translation-entry:hover:not(:disabled) { color: var(--brand-strong); border-color: rgba(239, 71, 118, .35); background: var(--brand-soft); }
 .sidebar-translation-entry:disabled { opacity: .5; cursor: not-allowed; }
 .popup-shell.language-onboarding-shell { overflow-x: hidden; }
 /* 首启引导直接铺满弹窗；各界面风格都会给 .popup-shell 设置留白，这里统一清除，避免弹窗里再套一层边框。 */
@@ -126,7 +125,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 .settings-button:hover { border-color: rgba(239, 71, 118, .35); color: var(--brand-strong); background: var(--brand-soft); }
 .settings-button svg { width: 17px; height: 17px; flex: none; }
 .donation-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 68px; height: 34px; padding: 0 10px;
+  display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; min-width: 34px; height: 34px; padding: 0;
   border: 1px solid rgba(215, 166, 47, .28); border-radius: 11px; color: #a16b12; background: #fff9e9; font-size: 11px; font-weight: 700; cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
 }
@@ -611,8 +610,8 @@ footer > button { justify-self: end; }
 .language-pair .fluentread-select .el-select__selected-item { font-size: 11px; font-weight: 650; }
 .select-row > .fluentread-select { width: 180px; flex: 0 1 58%; }
 
-/* 高频操作保持直达：版本、赞赏与设置同排，不隐藏按钮标签。 */
-.popup-header .donation-button { min-width: 58px; padding: 0 8px; }
+/* 高频操作保持直达：赞赏是紧凑图标，设置保留文字。 */
+:root[data-interface-skin] .popup-header .donation-button { width: 34px; min-width: 34px; height: 34px; padding: 0; }
 .popup-header .header-actions { gap: 7px; }
 .popup-header .settings-button { min-width: 32px; padding: 0 7px; }
 .hero-card { box-shadow: none; }
@@ -834,8 +833,6 @@ footer button { font-weight: 500; color: var(--muted); }
   min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
 }
 
-/* 首次操作与真实完成提示紧邻主操作，保持正文与主要功能可见。 */
-.first-use-hint { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .translation-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
 :root .popup-shell[data-interface-skin] .translation-meta > .site-rule-row[data-popup-module="siteRule"] { flex: 1; min-width: 0; margin-top: 0; }
 /* 显示模式常驻局部按钮下方；网站规则可换行，右侧工具独立对齐，不增加默认中文弹窗高度。 */

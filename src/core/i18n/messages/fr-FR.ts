@@ -71,6 +71,8 @@ export const frFRMessages = {
     "translationCenter.modelMissing": "Choisissez ou saisissez d’abord un modèle.",
     "translationCenter.noReady": "Configurez au moins un service pour traduire.",
     'sidepanel.title': 'Traduction dans le panneau latéral',
+    'sidepanel.openCenter': 'Ouvrir le centre de traduction dans les paramètres',
+    'sidepanel.keyboardHint': 'Entrée pour traduire · Maj + Entrée pour une nouvelle ligne',
     'sidepanel.openError': 'Impossible d’ouvrir le panneau latéral. Réessayez ou ouvrez FluentRead depuis le menu latéral du navigateur.',
     'sidepanel.settingsError': 'Impossible d’ouvrir les réglages. Réessayez.',
     'sidepanel.startupError': 'Impossible de charger le panneau de traduction. Rechargez la page.',

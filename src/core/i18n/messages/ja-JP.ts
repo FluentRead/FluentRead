@@ -71,6 +71,8 @@ export const jaJPMessages = {
     "translationCenter.modelMissing": "先にモデルを選択・入力してください。",
     "translationCenter.noReady": "翻訳するには少なくとも一つのサービスを設定してください。",
     'sidepanel.title': 'サイドバー翻訳',
+    'sidepanel.openCenter': '設定で翻訳センターを開く',
+    'sidepanel.keyboardHint': 'Enter で翻訳 · Shift + Enter で改行',
     'sidepanel.openError': 'サイドバーを開けませんでした。再試行するか、ブラウザーのサイドバーメニューから FluentRead を開いてください。',
     'sidepanel.settingsError': '設定を開けませんでした。もう一度お試しください。',
     'sidepanel.startupError': '翻訳パネルを読み込めませんでした。再読み込みしてください。',

@@ -98,6 +98,12 @@ async function input(text, selector = 'textarea') {
     await native.send('Input.insertText', {text});
 }
 async function screenshot(name) {
+    (report.themeState ||= {})[name] = await native.evaluate(async () => {
+        const root = document.documentElement, center = document.querySelector('.translation-center');
+        const response = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+        return {configTheme: response?.value?.theme, darkClass: root.classList.contains('dark'), colorScheme: getComputedStyle(root).colorScheme,
+            centerBackground: getComputedStyle(center).backgroundColor, systemPrefersDark: matchMedia('(prefers-color-scheme: dark)').matches};
+    });
     const result = await native.send('Page.captureScreenshot', {format: 'png'}), bytes = Buffer.from(result.data, 'base64');
     const file = path.join(artifactsDir, name + '.png');fs.writeFileSync(file, bytes);report.screenshots.push(file);
     if (name === 'native-sidebar-translated' || name === 'native-sidebar-dark') {
@@ -151,6 +157,35 @@ async function main() {
         popup = await newPageWithoutForeground(context, 30000);await diagnostics.attachPage(popup);
         await popup.addInitScript(() => {window.close = () => {window.__popupClosed = true;};});
         await popup.goto(`${origin}/popup.html?sourceTabId=${sourceTab.id}`);await popup.locator('.popup-shell[data-config-ready="true"]').waitFor();
+        for (const skin of ['default', 'minimal', 'compact']) {
+            await patch({interfaceSkin: skin});
+            await popup.locator(`.popup-shell[data-interface-skin="${skin}"]`).waitFor();
+            const layout = await popup.evaluate(() => {
+                const entry = document.querySelector('[data-testid="sidebar-translation"]');
+                const header = document.querySelector('.popup-header'), brand = header.querySelector('.brand');
+                const donation = header.querySelector('.donation-button'), settings = header.querySelector('.settings-button');
+                const rect = node => {const r = node.getBoundingClientRect();return {left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width};};
+                return {entry: rect(entry), header: rect(header), brand: rect(brand), donation: rect(donation), settings: rect(settings),
+                    withinHeader: header.contains(entry), inHero: Boolean(entry.closest('.hero-card')), text: entry.textContent.trim(),
+                    label: entry.getAttribute('aria-label'), donationText: donation.textContent.trim(), donationLabel: donation.getAttribute('aria-label'),
+                    hint: Boolean(document.querySelector('.first-use-hint')),
+                    viewport: innerWidth, scrollWidth: document.documentElement.scrollWidth};
+            });
+            assert(layout.withinHeader && !layout.inHero && !layout.text && !layout.hint && layout.label === '侧边栏翻译', JSON.stringify(layout));
+            assert(!layout.donationText && layout.donationLabel === '支持流畅阅读' && layout.donation.width <= 40, JSON.stringify(layout));
+            assert(layout.brand.right <= layout.donation.left + 1 && layout.donation.right <= layout.entry.left + 1 && layout.entry.right <= layout.settings.left + 1, JSON.stringify(layout));
+            assert(layout.settings.right <= layout.header.right + 1 && layout.entry.top >= layout.header.top && layout.entry.bottom <= layout.header.bottom + 1, JSON.stringify(layout));
+            assert(layout.scrollWidth <= layout.viewport + 1, JSON.stringify(layout));
+            report.cases.push({name: `compact popup entry: ${skin}`, layout, passed: true});
+        }
+        await patch({interfaceSkin: 'default'});await popup.locator('.popup-shell[data-interface-skin="default"]').waitFor();
+        await popup.locator('.donation-button').hover();
+        const donationTip = popup.locator('.translation-tool-tooltip:visible').filter({hasText: '支持流畅阅读'});await donationTip.waitFor();
+        await popup.locator('.donation-button').click();await popup.locator('.donation-overlay').waitFor();await popup.locator('.donation-close').click();
+        report.cases.push({name: 'donation icon tooltip and dialog', passed: true});
+        await popup.locator('[data-testid="sidebar-translation"]').hover();
+        const tip = popup.locator('.translation-tool-tooltip:visible').filter({hasText: '侧边栏翻译'});await tip.waitFor();assert.equal((await tip.innerText()).trim(), '侧边栏翻译');
+        const tipShot = path.join(artifactsDir, 'popup-sidebar-tooltip.png');await popup.locator('.popup-shell').screenshot({path: tipShot});report.screenshots.push(tipShot);
         const popupShot = path.join(artifactsDir, 'popup-sidebar-entry.png');await popup.locator('.popup-shell').screenshot({path: popupShot});report.screenshots.push(popupShot);
         report.phase = 'native-open';diagnostics.setPhase(report.phase);await openNative();await geometry('native sidebar initial');
         report.nativeLifecycle = await native.evaluate(async () => ({windowId: (await chrome.windows.getCurrent()).id, visible: document.visibilityState,
@@ -164,11 +199,32 @@ async function main() {
         assert(scheme.includes('light') && scheme.includes('only'));
         assert.equal(await popup.evaluate(() => window.__popupClosed), true);assert.equal((await readConfig()).translationCenterLayout, 'grid');
         await native.evaluate(() => {Object.defineProperty(navigator, 'clipboard', {value: {writeText: async text => {window.__copiedText = text;}}, configurable: true});});
-        await input(SOURCE);await nativeClick('.translate-primary-button');
+        const beforeKeyboard = report.requests.length;
+        await input('First line');
+        await native.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13, modifiers: 8});
+        await native.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, modifiers: 8});
+        assert.equal(await native.evaluate(() => document.querySelector('textarea').value), 'First line\n');
+        assert.equal(report.requests.length, beforeKeyboard);
+        await input(SOURCE);
+        await native.send('Input.dispatchKeyEvent', {type: 'keyDown', key: 'Enter', code: 'Enter', text: '\r', unmodifiedText: '\r', windowsVirtualKeyCode: 13});
+        await native.send('Input.dispatchKeyEvent', {type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13});
         await until(() => native.evaluate(text => document.querySelector('.translation-result-content p')?.textContent === text, TRANSLATION), 'native translation');
-        assert.equal(report.requests[0].source, SOURCE);await screenshot('native-sidebar-translated');
+        assert.equal(report.requests.length, beforeKeyboard + 1);
+        const hint = await native.evaluate(() => ({title: document.querySelector('textarea').title,
+            text: document.querySelector('#sidebar-input-help').textContent,
+            width: document.querySelector('#sidebar-input-help').getBoundingClientRect().width,
+            height: document.querySelector('#sidebar-input-help').getBoundingClientRect().height}));
+        assert(hint.title.includes('Shift + Enter') && hint.text.includes('Shift + Enter') && hint.width <= 1 && hint.height <= 1);
+        assert.equal(report.requests[0].source, SOURCE);
         await nativeClick('.sidebar-copy-button');assert.equal(await native.evaluate(() => window.__copiedText), TRANSLATION);
-        report.cases.push({name: 'native paste, translate and copy', passed: true});
+        report.cases.push({name: 'native Enter translation, Shift+Enter newline and copy', passed: true});
+        await nativeClick('.sidepanel-header button');
+        let openedSettings;await until(() => {openedSettings = context.pages().find(item => item.url().includes('/options.html#settings-translation-center'));return openedSettings;}, 'settings translation center');
+        await diagnostics.attachPage(openedSettings);await openedSettings.locator('.translation-center:not(.is-sidebar)').waitFor();
+        assert.equal(new URL(openedSettings.url()).hash, '#settings-translation-center');
+        await openedSettings.close();await control.evaluate(tabId => chrome.tabs.update(tabId, {active: true}), sourceTab.id);
+        report.cases.push({name: 'sidebar settings opens translation center', passed: true});
+        await screenshot('native-sidebar-translated');
         await activateExtensionTabWithoutForeground(context, control);await control.evaluate(tabId => chrome.tabs.update(tabId, {active: true}), sourceTab.id);
         assert.equal(await native.evaluate(() => document.querySelector('textarea').value), SOURCE);report.cases.push({name: 'tab switching preserves input and result', passed: true});
         report.phase = 'stop-retry';diagnostics.setPhase(report.phase);holdNext = true;const count = report.requests.length;

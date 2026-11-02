@@ -6,12 +6,12 @@
  -->
 <template>
   <section v-if="opened" ref="panel" class="fr-manga-reading" :data-theme="theme" role="dialog" :aria-label="t('漫画文字')" tabindex="-1" @keydown.stop="handleKeydown" @click.stop @pointerdown.stop @touchstart.passive.stop @touchmove.passive.stop @touchend.passive.stop @touchcancel.passive.stop @keyup.stop @wheel.stop>
-    <header>
+    <header class="fr-manga-reading-header">
       <strong>{{ t('漫画文字') }}</strong>
-      <button type="button" :aria-label="t('关闭文字面板')" @click="close">×</button>
+      <button class="fr-manga-reading-close" type="button" :aria-label="t('关闭文字面板')" @click="close">×</button>
     </header>
     <div v-if="!selected" class="fr-manga-reading-body">
-      <p>{{ t('选择当前可见的页面或片段') }}</p>
+      <p class="fr-manga-reading-intro">{{ t('选择当前可见的页面或片段') }}</p>
       <div v-if="items.length" class="fr-manga-reading-list">
         <button v-for="(item, index) in items" :key="index" ref="candidateButtons" type="button" @click="select(item, $event)">{{ label(item) }}</button>
       </div>
@@ -19,27 +19,36 @@
       <button v-if="status === 'stale' || status === 'unavailable' || status === 'noCandidates' || status === 'overBudget' || status === 'error'" ref="refreshButton" type="button" @click="refreshFromButton($event)">{{ t('重新查看可见页面') }}</button>
     </div>
     <template v-else>
-      <div class="fr-manga-reading-heading"><button ref="backButton" type="button" @click="back($event)">{{ t('选择其他页面') }}</button><span>{{ label(selected) }}</span></div>
+      <div class="fr-manga-reading-heading"><button ref="backButton" class="fr-manga-reading-back" type="button" @click="back($event)">{{ t('选择其他页面') }}</button><span>{{ label(selected) }}</span></div>
       <p v-if="selected.kind === 'segment'" class="fr-manga-reading-context">{{ t('此片段可能包含相邻片段的文字') }}</p>
       <p v-if="selected.kind === 'canvas'" class="fr-manga-reading-context">{{ t('画布文字来自最近完成的翻译快照，画面变化可能尚未同步') }}</p>
       <div v-if="status !== 'ready'" class="fr-manga-reading-body"><p role="status">{{ message(status) }}</p></div>
       <template v-else>
         <div class="fr-manga-reading-tools">
-          <button v-if="skippedTranslations.length" type="button" :aria-pressed="skippedOnly" :title="skippedOnly ? t('查看全文') : undefined" @click="toggleSkipped">{{ t('未绘制译文') }} · {{ skippedTranslations.length }}</button>
-          <button type="button" :aria-pressed="compare" @click="compare = !compare">{{ t('原文对照') }}</button>
-          <span :aria-label="t('文字部分')">{{ pageIndex + 1 }} / {{ pages.length }}</span>
-          <button ref="previousButton" type="button" :disabled="pageIndex === 0" @click="changePage(-1, $event)">{{ t('上一部分') }}</button>
-          <button ref="nextButton" type="button" :disabled="pageIndex + 1 >= pages.length" @click="changePage(1, $event)">{{ t('下一部分') }}</button>
+          <div class="fr-manga-reading-view-tools">
+            <button v-if="skippedTranslations.length" type="button" :aria-pressed="skippedOnly" :title="skippedOnly ? t('查看全文') : undefined" @click="toggleSkipped">{{ t('未绘制译文') }} · {{ skippedTranslations.length }}</button>
+            <button type="button" :aria-pressed="compare" @click="compare = !compare">{{ t('原文对照') }}</button>
+          </div>
+          <nav class="fr-manga-reading-pagination" :aria-label="t('文字部分')">
+            <button ref="previousButton" type="button" :aria-label="t('上一部分')" :disabled="pageIndex === 0" @click="changePage(-1, $event)">{{ t('上一部分') }}</button>
+            <span>{{ pageIndex + 1 }} / {{ pages.length }}</span>
+            <button ref="nextButton" type="button" :aria-label="t('下一部分')" :disabled="pageIndex + 1 >= pages.length" @click="changePage(1, $event)">{{ t('下一部分') }}</button>
+          </nav>
         </div>
         <div ref="readingBody" class="fr-manga-reading-body" tabindex="0">
-          <article v-for="(line, index) in pages[pageIndex]" :key="index">
-            <pre v-if="compare && line.sourceText !== undefined && line.sourceText !== line.text" class="fr-manga-reading-source" dir="auto">{{ line.sourceText }}</pre>
-            <pre dir="auto">{{ line.text }}</pre>
+          <article v-for="(line, index) in pages[pageIndex]" :key="index" :class="{'is-render-skipped': line.renderSkipped, 'is-original': line.sourceText !== undefined && line.sourceText === line.text}">
+            <div v-if="compare && line.sourceText !== undefined && line.sourceText !== line.text" class="fr-manga-reading-source" dir="auto">
+              <span>{{ t('原文') }}</span><pre dir="auto">{{ line.sourceText }}</pre>
+            </div>
+            <div class="fr-manga-reading-translation">
+              <div class="fr-manga-reading-line-label"><span>{{ line.sourceText !== undefined && line.sourceText === line.text ? t('原文') : t('译文') }}</span><span v-if="line.renderSkipped" class="fr-manga-reading-badge">{{ t('未绘制译文') }}</span></div>
+              <pre dir="auto">{{ line.text }}</pre>
+            </div>
             <p v-if="line.numericUncertain" class="fr-manga-reading-context">{{ t('数字识别可能有误，请对照原图') }}</p>
             <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保留原文，此译文未绘制到图片') }}</p>
           </article>
         </div>
-        <footer><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t(skippedOnly ? '复制全文' : '复制全部') }}</button></footer>
+        <footer class="fr-manga-reading-footer"><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><div class="fr-manga-reading-copy-actions"><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t(skippedOnly ? '复制全文' : '复制全部') }}</button></div></footer>
       </template>
     </template>
   </section>
@@ -221,63 +230,3 @@ function copyAll(event: MouseEvent) {if (event.isTrusted) void copyText(textFor(
 onBeforeUnmount(() => {disposed = true;cancel();trigger = null;lines.value = [];items.value = [];});
 defineExpose({open, close, invalidate});
 </script>
-<style scoped>
-.fr-manga-reading {
-  --fr-reading-surface:var(--fr-color-surface,#ffffff);--fr-reading-soft:var(--fr-color-surface-soft,#f7f8fb);
-  --fr-reading-ink:var(--fr-color-ink,#172033);--fr-reading-muted:var(--fr-color-muted,#667085);
-  --fr-reading-line:var(--fr-color-line,#e5e8ef);--fr-reading-brand:var(--fr-color-brand-strong,#dc315f);--fr-reading-brand-soft:var(--fr-color-brand-soft,#fff0f4);--fr-reading-on-brand:#ffffff;--fr-reading-brand-ink:#c92754;
-  position:fixed;right:16px;top:16px;width:min(388px,calc(100vw - 32px));max-height:min(640px,calc(100dvh - 32px));
-  display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;isolation:isolate;
-  background:var(--fr-reading-surface);color:var(--fr-reading-ink);border:1px solid var(--fr-reading-line);border-radius:14px;
-  box-shadow:0 8px 28px #1b24391f,0 2px 6px #1b24390a;font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  color-scheme:light;user-select:none;pointer-events:auto;z-index:2147483647;
-}
-.fr-manga-reading * {box-sizing:border-box}
-.fr-manga-reading button {appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;margin:0;padding:6px 10px;border:0;border-radius:8px;background:transparent;color:inherit;font:inherit;line-height:1.4;cursor:pointer}
-.fr-manga-reading button:hover:not(:disabled) {background:var(--fr-reading-soft)}
-.fr-manga-reading button:active:not(:disabled) {background:var(--fr-reading-brand-soft);color:var(--fr-reading-brand-ink)}
-.fr-manga-reading button:focus-visible,.fr-manga-reading-body:focus-visible {outline:2px solid var(--fr-reading-brand);outline-offset:-2px}
-.fr-manga-reading button:disabled {cursor:default;opacity:.38}
-.fr-manga-reading header {display:flex;align-items:center;gap:10px;flex:none;padding:10px 12px 10px 16px;border-bottom:1px solid var(--fr-reading-line)}
-.fr-manga-reading header strong {display:flex;align-items:center;gap:9px;flex:1;min-width:0;font-size:14px;font-weight:650;letter-spacing:.01em}
-.fr-manga-reading header strong::before {content:"";width:3px;height:15px;border-radius:3px;background:var(--fr-reading-brand)}
-.fr-manga-reading header>button {flex:none;width:30px;min-height:30px;padding:0;color:var(--fr-reading-muted);font-size:21px;line-height:1}
-.fr-manga-reading-body {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--fr-reading-line) transparent;padding:14px 16px 16px;user-select:text}
-.fr-manga-reading-body>p {margin:0 0 12px;color:var(--fr-reading-muted);font-size:12px}
-.fr-manga-reading-body>p[role=status] {margin:0;padding:18px 0;text-align:center}
-.fr-manga-reading-list {display:flex;flex-direction:column;gap:8px;user-select:none}
-.fr-manga-reading-list>button {justify-content:flex-start;gap:12px;width:100%;min-height:46px;padding:11px 13px;border:1px solid var(--fr-reading-line);border-radius:10px;background:var(--fr-reading-soft);text-align:left;font-weight:550;overflow-wrap:anywhere}
-.fr-manga-reading-list>button::after {content:"";flex:none;width:6px;height:6px;margin-left:auto;border-top:1.5px solid var(--fr-reading-muted);border-right:1.5px solid var(--fr-reading-muted);transform:rotate(45deg)}
-.fr-manga-reading-list>button:hover {border-color:var(--fr-reading-brand);background:var(--fr-reading-brand-soft);color:var(--fr-reading-brand-ink)}
-.fr-manga-reading-heading {display:flex;align-items:center;gap:8px;flex:none;padding:8px 12px;border-bottom:1px solid var(--fr-reading-line)}
-.fr-manga-reading-heading>button {color:var(--fr-reading-muted);font-size:12px}
-.fr-manga-reading-heading>span {flex:1;min-width:0;text-align:right;overflow-wrap:anywhere;color:var(--fr-reading-muted);font-size:12px}
-.fr-manga-reading-tools {display:flex;align-items:center;gap:4px;flex-wrap:wrap;flex:none;padding:8px 12px;background:var(--fr-reading-soft)}
-.fr-manga-reading-tools button {min-height:30px;padding:5px 8px;font-size:12px;color:var(--fr-reading-muted)}
-.fr-manga-reading-tools button[aria-pressed=true] {background:var(--fr-reading-brand-soft);color:var(--fr-reading-brand-ink);font-weight:550}
-.fr-manga-reading-tools>span {margin-left:auto;padding:0 4px;color:var(--fr-reading-muted);font-size:11px;font-variant-numeric:tabular-nums}
-.fr-manga-reading article {padding:12px 0}
-.fr-manga-reading article:first-child {padding-top:0}
-.fr-manga-reading article:last-child {padding-bottom:0}
-.fr-manga-reading article+article {border-top:1px solid var(--fr-reading-line)}
-.fr-manga-reading pre {margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:14px;line-height:1.8}
-.fr-manga-reading .fr-manga-reading-source {margin:0 0 8px;color:var(--fr-reading-muted);font-size:12px}
-.fr-manga-reading-context {margin:0;padding:8px 16px;color:var(--fr-reading-muted);font-size:11px;line-height:1.6}
-.fr-manga-reading article>.fr-manga-reading-context {margin-top:7px;padding:0;color:var(--fr-reading-muted)}
-.fr-manga-reading footer {display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:none;padding:12px 16px;border-top:1px solid var(--fr-reading-line)}
-.fr-manga-reading footer>span {flex-basis:100%;order:1;color:var(--fr-reading-muted);font-size:11px;line-height:1.5}
-.fr-manga-reading footer>button {font-size:12px;border:1px solid var(--fr-reading-line)}
-.fr-manga-reading footer>button:last-child {margin-left:auto;border-color:transparent;background:var(--fr-reading-brand);color:var(--fr-reading-on-brand);font-weight:550}
-.fr-manga-reading footer>button:last-child:is(:hover,:active):not(:disabled) {background:var(--fr-reading-brand);color:var(--fr-reading-on-brand);box-shadow:0 0 0 2px var(--fr-reading-brand-soft)}
-.fr-manga-reading[data-theme=dark] {--fr-reading-surface:#222731;--fr-reading-soft:#2b313e;--fr-reading-ink:#f1f3f8;--fr-reading-muted:#b8c0d0;--fr-reading-line:#404858;--fr-reading-brand:#ff8eae;--fr-reading-brand-soft:#44313d;--fr-reading-on-brand:#222731;--fr-reading-brand-ink:#ff8eae;color-scheme:dark;box-shadow:0 10px 32px #00000047}
-@media (prefers-color-scheme:dark) {
-  .fr-manga-reading[data-theme=auto] {--fr-reading-surface:#222731;--fr-reading-soft:#2b313e;--fr-reading-ink:#f1f3f8;--fr-reading-muted:#b8c0d0;--fr-reading-line:#404858;--fr-reading-brand:#ff8eae;--fr-reading-brand-soft:#44313d;--fr-reading-on-brand:#222731;--fr-reading-brand-ink:#ff8eae;color-scheme:dark;box-shadow:0 10px 32px #00000047}
-}
-@media (max-width:480px) {.fr-manga-reading {right:12px;top:12px;width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}}
-@media (max-height:420px) {
-  .fr-manga-reading {overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--fr-reading-line) transparent}
-  .fr-manga-reading header {position:sticky;top:0;z-index:1;background:var(--fr-reading-surface)}
-  .fr-manga-reading-body {flex:none;overflow:visible}
-}
-@media (forced-colors:active) {.fr-manga-reading button {border:1px solid ButtonText}.fr-manga-reading button:focus-visible {outline-color:Highlight}.fr-manga-reading header strong::before {background:Highlight}}
-</style>

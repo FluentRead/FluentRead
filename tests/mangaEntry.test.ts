@@ -1,4 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 import {parseHTML} from 'linkedom';
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +38,11 @@ describe('独立漫画入口所有权和配置端口', () => {
     it('读取面板沿用界面主题并只在复制操作时访问剪贴板', async () => {
         const writeText=vi.fn().mockResolvedValue(undefined);vi.stubGlobal('navigator',{clipboard:{writeText}});
         await mountMangaEntry({} as never);expect(props().reading.theme).toBe('auto');expect(writeText).not.toHaveBeenCalled();
+        expect(mocks.create.mock.calls[0][1]).toHaveProperty('styles');
+        const source=readFileSync(resolve('src/features/image-translation/content/mangaEntry.ts'),'utf8');
+        const styles=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
+        expect(source).toContain("manga-entry.css?inline");expect(source).toContain('styles:mangaEntryStyles');
+        expect(styles).toContain('.fr-manga-reading-copy-actions');expect(styles).toContain('@media (max-width: 480px)');
         mocks.config.theme='dark';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('dark');
         mocks.config.theme='light';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('light');
         await props().reading.copy('译文');expect(writeText).toHaveBeenCalledOnce();expect(writeText).toHaveBeenCalledWith('译文');

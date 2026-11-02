@@ -174,6 +174,7 @@ describe('Vue Shadow UI 平台适配器', () => {
       name: 'fixture-ui',
       hostId: 'fixture-host',
       component,
+      styles: '.fr-fixture-panel{font-size:14px}',
     });
 
     const [, options] = mocks.createShadowRootUi.mock.calls[0];
@@ -187,6 +188,7 @@ describe('Vue Shadow UI 平台适配器', () => {
       isolateEvents: ['keydown', 'keyup', 'keypress'],
     }));
     expect(options.css).toContain(':host');
+    expect(options.css).toContain('.fr-fixture-panel{font-size:14px}');
 
     const container = {nodeType: 1};
     const mounted = options.onMount(container);

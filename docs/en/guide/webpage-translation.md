@@ -65,6 +65,8 @@ Manage, disable, or delete up to 100 rules under **Section translation → Remem
 
 ## Continue after a failure
 
+If a notice icon appears on the popup's translation button, select it to see the reason and available recovery actions.
+
 Retry individual failed passages directly. With the full-page progress panel enabled, **Locate failed passage** and **Retry failed items** handle failures in the current session while keeping successful text and your reading position. Passages you have not scrolled to are not failures.
 
 A blocking dialog is translated first; closing it resumes the page. Restoring the original also cancels pending work, and old retry controls cannot restart it. A navigation that changes reading rules may restore the original first; start translation again on the new page.

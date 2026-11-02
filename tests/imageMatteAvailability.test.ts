@@ -7,11 +7,12 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 
-const mocks=vi.hoisted(()=>({recognize:vi.fn(),encode:vi.fn(),mangaRecognize:vi.fn(),repair:vi.fn()}));
+const mocks=vi.hoisted(()=>({recognize:vi.fn(),encode:vi.fn(),mangaRecognize:vi.fn(),repair:vi.fn(),prepareSeg:vi.fn(),segment:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/ocrRuntime',()=>({recognizeImage:mocks.recognize}));
 vi.mock('@/src/features/image-translation/services/mangaOcr',()=>({mangaOcrRuntime:{recognize:mocks.mangaRecognize}}));
 vi.mock('@/src/features/image-translation/services/mangaInpainting',()=>({mangaInpaintingRuntime:{repair:mocks.repair}}));
 vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeImageCanvas:mocks.encode}));
+vi.mock('@/src/features/image-translation/services/mangaInferenceClient',()=>({mangaInferenceClient:{prepareTextSegmentation:mocks.prepareSeg,segmentText:mocks.segment}}));
 import {translateImageInOffscreen} from '@/src/features/image-translation/services/offscreenRuntime';
 import * as imageInpainting from '@/src/features/image-translation/services/inpainting';
 import * as mattePage from '@/src/features/image-translation/services/imageMattePage';
@@ -203,6 +204,7 @@ async function detectionEvidence(regions:ImageTextRegion[],image:string,width:nu
 }
 beforeEach(()=>{
     vi.clearAllMocks();source=fixture();translations=['FULL TEXT'];canvases=[];images=[];encoded=[];fills=[];action=undefined;metrics='complete';glyphSupport=new Set<number>();detectorCore=MODEL_CORE;evidenceMode='valid';inputImage=STATIC_PNG;measureWidth=undefined;
+    mocks.prepareSeg.mockReset().mockResolvedValue(false);mocks.segment.mockReset();
     setRegions([{...originalLine}]);mocks.recognize.mockResolvedValue([]);mocks.mangaRecognize.mockImplementation(async(image:string)=>{const regions=recognized.map(r=>({...r,bbox:{...r.bbox},...(r.sourceBoxes?{sourceBoxes:r.sourceBoxes.map(b=>({...b}))}:{})}));await detectionEvidence(regions,image,source.width,source.height,detectorCore,evidenceMode);return regions;});
     mocks.encode.mockImplementation(async(canvas:PixelCanvas,signal?:AbortSignal)=>{
         action?.('encode',canvas);if(signal?.aborted)throw new DOMException('cancelled','AbortError');
@@ -213,6 +215,47 @@ beforeEach(()=>{
 });
 
 describe('RGBA救援全文预算和原始源相位边界',()=>{
+    it('真实DB已覆盖时不准备可选模型或分配分割张量',async()=>{
+        const f=install(fixture(224));expect((await translate()).image).toBeTruthy();completeGlyphs();checkFrame(f);
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
+    });
+    it('DB未覆盖但整页/全文已成立时才检查缓存，缺失时保留完整阅读结果',async()=>{
+        install(fixture(224));evidenceMode='empty';
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.lines[0].text).toBe('FULL TEXT');
+        expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).not.toHaveBeenCalled();
+        expect(canvases[0].context.measureText).toHaveBeenCalled();preserved();
+    });
+    it('可选受控模型的量化输出经真实局部投影和全页授权后，只上传已证明源墨而不擦外部图案',async()=>{
+        const f=install(fixture(224));evidenceMode='empty';mocks.prepareSeg.mockResolvedValue(true);
+        // This controlled runtime returns broad learned support, not an erasure
+        // mask. Real color/component/page gates must still preserve every art pixel.
+        mocks.segment.mockImplementation(async(factory:()=>Float32Array)=>{
+            expect(canvases[0].context.measureText).toHaveBeenCalled();expect(canvases[0].writes).toBe(0);
+            const tensor=factory();expect(tensor.length).toBe(3*1024*1024);expect(tensor.buffer.byteLength).toBe(12_582_912);
+            return new Uint8Array(1024*1024).fill(255);
+        });
+        expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).toHaveBeenCalledOnce();
+        completeGlyphs();checkFrame(f);expect(canvases[0].reads).toEqual([[0,0,f.width,f.height]]);
+        for(const rect of canvases[0].uploads)for(let y=rect.y0;y<rect.y1;y++)for(let x=rect.x0;x<rect.x1;x++)expect(f.ink.has(y*f.width+x)).toBe(true);
+    });
+    it('分割仍不能支持全部源墨时原子撤回，不发布部分译图',async()=>{
+        install(fixture(224));evidenceMode='empty';mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockResolvedValue(new Uint8Array(1024*1024));
+        expect((await translate()).imageUnchanged).toBe(true);expect(mocks.segment).toHaveBeenCalledOnce();preserved();
+    });
+    it.each(['prepare','segment']as const)('可选分割%s未知错误保留首因，不冒充未导入缓存',async stage=>{
+        install(fixture(224));evidenceMode='empty';const failure=new Error('segmentation '+stage);
+        if(stage==='prepare')mocks.prepareSeg.mockRejectedValue(failure);
+        else {mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockRejectedValue(failure);}
+        await expect(translate()).rejects.toBe(failure);preserved();
+    });
+    it.each(['prepare','input','result']as const)('可选分割%s阶段取消保持零上传并释放本次提案',async stage=>{
+        install(fixture(224));evidenceMode='empty';const controller=new AbortController();
+        mocks.prepareSeg.mockImplementation(async()=>{if(stage==='prepare')controller.abort();return true;});
+        mocks.segment.mockImplementation(async(factory:()=>Float32Array)=>{
+            if(stage==='input')controller.abort();factory();if(stage==='result')controller.abort();return new Uint8Array(1024*1024).fill(255);
+        });
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});preserved();
+    });
     it.each(['pre-layout','first-width','call-count']as const)('完整译文的%s预算不足时无像素发布，阅读文本不截断',async mode=>{
         install(fixture(224));
         const text=mode==='pre-layout'?'X'.repeat(4_194_305):mode==='first-width'?'X'.repeat(2_097_153):Array.from({length:12_000},(_,index)=>'W'+index.toString(36).padStart(4,'0')).join(' ');
@@ -221,6 +264,7 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         expect(result.imageUnchanged).toBe(true);expect(result.lines).toHaveLength(1);
         expect(result.lines[0].text.length).toBe(text.length);expect(result.lines[0].text===text).toBe(true);expect(result.lines[0].renderSkipped).toBe(true);
         expect(canvases[0].context.measureText).toHaveBeenCalledTimes(mode==='call-count'?8191:0);preserved();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
     });
     it('重复长组合字素的全文指标也预付字符工作，度量中途耗尽时整页保留完整阅读结果',async()=>{
         const f=install(fixture(224));f.line.fontSize=100;f.line.textAlign='center';setRegions([f.line]);
@@ -245,7 +289,7 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
     });
     it.each(['alpha-unavailable','unexpected']as const)('真实清字完成后%s首因不能将已改源像素送回matte救援',async mode=>{
         const f=install(fixture(224));for(const r of f.art)fill(f.pixels,f.width,r,f.matte);
-        const perform=imageInpainting.inpaintTextRegions,plan=vi.spyOn(mattePage,'planImageMattePage');
+        const perform=imageInpainting.inpaintTextRegions,plan=vi.spyOn(mattePage,'proposeImageMattePage');
         const failure=mode==='alpha-unavailable'?new ImageAlphaProtectionUnavailableError('after real inpaint'):new Error('after real inpaint');
         let changed=false;
         const repair=vi.spyOn(imageInpainting,'inpaintTextRegions').mockImplementation((...args:Parameters<typeof perform>)=>{
@@ -373,7 +417,7 @@ describe('完整RGBA matte救援只在已证源墨上写入，整页通过才发
         }
         setRegions([f.line]);const before=new Pixels(f.pixels),result=await translate();
         expect(result).toMatchObject({image:'',imageUnchanged:true,lines:[{sourceText:'SOURCE',text:'FULL TEXT',renderSkipped:true}]});
-        expect(f.pixels).toEqual(before);preserved();
+        expect(f.pixels).toEqual(before);preserved();expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
     });
     it('同页两处真实matte224/208各自取观测背景，不把某一alpha或颜色推广全页',async()=>{
         const f=pair();expect((await translate()).image).toBeTruthy();completeGlyphs('FULL TEXT FULL TEXT');

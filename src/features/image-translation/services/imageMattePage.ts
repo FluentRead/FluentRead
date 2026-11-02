@@ -1,11 +1,11 @@
 /**
  * @file src/features/image-translation/services/imageMattePage.ts
  * 文件职责：在普通图片的严格透明准入失败后，原子规划同一原始帧的完整 RGBA 墨迹修补。
- * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
- * 模块边界：纯数据规划和独占像素写入，不创建 Canvas、不运行模型、不修改 OCR；仅消费同帧局部 RGBA 证明，不能证明相连同色装饰的语义。调用方必须先完成所有完整译文字形预检，再一次性应用并上传。
+ * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；无权限提案只公开完整译文字形预检与模型投影需要的冻结几何，真实同帧支持逐点授权后才登记一次性写入计划。保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
+ * 模块边界：纯数据规划和独占像素写入，不创建 Canvas、不运行模型、不修改 OCR；仅消费同帧局部 RGBA 证明，不能证明相连同色装饰的语义。调用方必须在可选模型准备前完成所有完整译文字形预检，并保持原像素独占和同帧身份；失败授权不改候选或像素，取消时丢弃提案，授权成功后只能向原像素应用一次。
  */
 import type {ImageTextRegion} from '../paragraphs';
-import {imageMatteObservationBox,planImageMatteRepair,type ImageMatteRepair} from './imageMatteRepair';
+import {imageMatteObservationBox,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from './imageMatteRepair';
 import type {ImageDetectionSupport} from './imageDetectionEvidence';
 
 type Box=ImageTextRegion['bbox'];
@@ -18,8 +18,19 @@ export interface ImageMattePagePlan {
     /** 半开原图坐标，仅覆盖已经确认的墨迹，不能以包络代替这些上传授权。 */
     readonly uploads:readonly Readonly<Box>[];
 }
+declare const proposalIdentity:unique symbol;
+/** 提案只凭私有身份检索，不携带mask、原像素或apply权限。 */
+export interface ImageMatteProposal {readonly [proposalIdentity]:never}
+export interface ImageMatteProposalView {
+    readonly drawings:readonly ImageMattePageDrawing[];
+    readonly rectangles:readonly Readonly<Box>[];
+    readonly observations:readonly Readonly<{sourceBox:Readonly<Box>;left:number;top:number;width:number;height:number}>[];
+}
 interface Authority {pixels:Uint8ClampedArray;width:number;height:number;repairs:ImageMatteRepair[];applied:boolean}
+interface PageCandidate {plan:ImageMattePagePlan;authority:Authority}
+interface ProposalCandidate extends PageCandidate {view:ImageMatteProposalView}
 const authorities=new WeakMap<ImageMattePagePlan,Authority>();
+const proposals=new WeakMap<ImageMatteProposal,ProposalCandidate>();
 const MAX_PIXELS=1_048_576,MAX_CHECKS=1_048_576,MAX_ATTEMPTS=128,MAX_RUNS=65_536,MAX_RECTS=4096,MAX_RETAINED_BOXES=8192;
 const valid=(b:Box)=>[b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)&&b.x1>b.x0&&b.y1>b.y0;
 const overlap=(a:Box,b:Box)=>a.x0<b.x1&&b.x0<a.x1&&a.y0<b.y1&&b.y0<a.y1;
@@ -64,13 +75,13 @@ function rectangles(rows:Run[]):Readonly<Box>[]|undefined {
     return result.map(box=>Object.freeze(box));
 }
 
-/** 原框不变；所有局部证明和所有碰撞均使用尚未回写的同一原始 ImageData。 */
-export function planImageMattePage(
+/** 原框不变；两种入口共享所有预算、局部证明和全页碰撞，始终借读尚未回写的同一原始像素。 */
+function buildPageCandidate(
     pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
     drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,
-):ImageMattePagePlan|undefined {
+):PageCandidate|undefined {
     if(!(pixels instanceof Uint8ClampedArray)||![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=8192)
-        ||width*height>16_777_216||pixels.length<width*height*4||lines.length===0||lines.length>MAX_ATTEMPTS||!support)return;
+        ||width*height>16_777_216||pixels.length<width*height*4||lines.length===0||lines.length>MAX_ATTEMPTS)return;
     let remainingPixels=MAX_PIXELS,checks=MAX_CHECKS,attempts=0,retainedBoxes=0;
     const reserve=(amount:number)=>Number.isSafeInteger(amount)&&amount>0&&(remainingPixels-=amount)>=0;
     const repairs:ImageMatteRepair[]=[],drawings:ImageMattePageDrawing[]=[],artRows:Run[]=[],inkRows:Run[]=[];
@@ -97,8 +108,9 @@ export function planImageMattePage(
             attempts++;
             const observation=imageMatteObservationBox(width,height,source);
             if(!observation||!reserve(observation.width*observation.height))return;
-            const supportAt=support.forBox(source,observation);if(!supportAt)return;
-            const plan=planImageMatteRepair(pixels,width,height,source,supportAt,fitBudget);if(!plan)return;
+            const supportAt=support?.forBox(source,observation);if(support&&!supportAt)return;
+            const plan=support?planImageMatteRepair(pixels,width,height,source,supportAt!,fitBudget)
+                :planImageMatteCandidate(pixels,width,height,source,fitBudget);if(!plan)return;
             if(group.length&&!equal(group[0].background,plan.background))return;
             // 支持可超出原排版框；不同背景不能按应用顺序争用同一个原墨迹像素。
             for(const old of repairs){
@@ -152,9 +164,56 @@ export function planImageMattePage(
     }
     const uploads=rectangles(ink),holes=rectangles(art);if(!uploads||!holes)return;
     const result:ImageMattePagePlan={drawings:Object.freeze(drawings),rectangles:Object.freeze(holes),uploads:Object.freeze(uploads)};
-    authorities.set(result,{pixels,width,height,repairs,applied:false});
-    return Object.freeze(result);
+    return {plan:Object.freeze(result),authority:{pixels,width,height,repairs,applied:false}};
 }
+
+/** 旧入口仍要求真实支持；缺失时不运行候选，也不发布任何写入权限。 */
+export function planImageMattePage(
+    pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,
+):ImageMattePagePlan|undefined {
+    if(!support)return;
+    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds,support);if(!candidate)return;
+    authorities.set(candidate.plan,candidate.authority);
+    return candidate.plan;
+}
+
+/** 无模型支持的整页预提案；完整冲突检查完成后才公开布局几何，提案本身永远不可apply。 */
+export function proposeImageMattePage(
+    pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,
+):ImageMatteProposal|undefined {
+    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds);if(!candidate)return;
+    const view:ImageMatteProposalView=Object.freeze({drawings:candidate.plan.drawings,rectangles:candidate.plan.rectangles,
+        observations:Object.freeze(candidate.authority.repairs.map(repair=>Object.freeze({
+            sourceBox:Object.freeze({...repair.sourceBox}),left:repair.left,top:repair.top,width:repair.width,height:repair.height,
+        })))});
+    const proposal=Object.freeze({}) as ImageMatteProposal;
+    proposals.set(proposal,{...candidate,view});return proposal;
+}
+
+/** 仅用于完整译字预检及有界同帧投影；没有候选mask、上传授权或原像素引用。 */
+export function getImageMatteProposalDrawings(proposal:ImageMatteProposal):ImageMatteProposalView|undefined {
+    return proposals.get(proposal)?.view;
+}
+
+/** 每个候选墨迹点必须被真实支持接受；失败保持提案，可继续尝试另一同帧模型，不重扫原图。 */
+export function authorizeImageMatteProposal(proposal:ImageMatteProposal,support:ImageDetectionSupport):ImageMattePagePlan|undefined {
+    const candidate=proposals.get(proposal);if(!candidate||!support)return;
+    for(let i=0;i<candidate.authority.repairs.length;i++){
+        const repair=candidate.authority.repairs[i],observation=candidate.view.observations[i];
+        const supportAt=support.forBox(observation.sourceBox,observation);if(!supportAt)return;
+        for(let y=0;y<repair.height;y++)for(let x=0;x<repair.width;x++){
+            if(repair.mask[y*repair.width+x]&&supportAt(repair.left+x,repair.top+y)!==true)return;
+        }
+    }
+    // 同步支持回调也可能撤销或重入；失去提案所有权后不能重新发布旧授权。
+    if(proposals.get(proposal)!==candidate)return;
+    proposals.delete(proposal);authorities.set(candidate.plan,candidate.authority);return candidate.plan;
+}
+
+/** 页面、原帧或布局失效时撤销提案；不能撤回已经登记的计划，也不改变任何像素。 */
+export function discardImageMatteProposal(proposal:ImageMatteProposal):void {proposals.delete(proposal);}
 
 /** 只有原规划的独占像素可使用一次；不把支持包络当作擦字蒙版，也不采样任何外部图案。 */
 export function applyImageMattePage(pixels:Uint8ClampedArray,width:number,height:number,plan:ImageMattePagePlan):void {

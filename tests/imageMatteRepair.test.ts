@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {imageMatteObservationBox,planImageMatteRepair as proveRepair,type ImageMatteFitBudget} from '@/src/features/image-translation/services/imageMatteRepair';
+import {imageMatteObservationBox,planImageMatteCandidate,planImageMatteRepair as proveRepair,type ImageMatteFitBudget} from '@/src/features/image-translation/services/imageMatteRepair';
 import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -98,6 +98,24 @@ describe('共同foreground端点的有界AA裙边',()=>{
 });
 
 describe('完整RGBA静区与原矩形组件的有界观察',()=>{
+    it('显式无支持候选只做原几何/颜色证明，保留旧API缺支持拒绝和整页fit预算',()=>{
+        const p=fixture(),before=p.slice(),fit={remaining:22};
+        const candidate=planImageMatteCandidate(p,48,48,box,fit)!;
+        expect(candidate).toBeDefined();expect(candidate.background).toEqual(background);expect(fit.remaining).toBe(0);
+        expect(candidate.mask.reduce((sum,value)=>sum+value,0)).toBe(22);expect(p).toEqual(before);
+        expect(planImageMatteCandidate(p,48,48,box,fit)).toBeUndefined();expect(fit.remaining).toBe(-1);
+        expect(proveRepair(p,48,48,box,undefined as never,budget())).toBeUndefined();
+        expect(planImageMatteCandidate(p,48,48,box,undefined as never)).toBeUndefined();
+    });
+    it.each(['gray-card','mixed-rgba','wide-aa','island','hidden-rgb'] as const)('无支持候选仍拒绝旧%s否定控制，不能借候选模式放宽清字',kind=>{
+        const p=fixture([255,255,255,255],[0,0,0,255]);
+        if(kind==='gray-card'){rect(p,{x0:18,y0:18,x1:30,y1:30},[128,128,128,255]);rect(p,{x0:23,y0:21,x1:26,y1:27},[0,0,0,255]);}
+        if(kind==='mixed-rgba')dot(p,23,20,[150,100,140,255]);
+        if(kind==='wide-aa')for(let x=23;x<27;x++)dot(p,x,20,[128,128,128,255]);
+        if(kind==='island')dot(p,35,35,[0,0,0,255]);
+        if(kind==='hidden-rgb')dot(p,23,20,[17,53,191,0]);
+        const before=p.slice();expect(planImageMatteCandidate(p,48,48,box,budget())).toBeUndefined();expect(p).toEqual(before);
+    });
     it('真实检测端口与全页fit预算必需，缺失/非法值不尝试证明',()=>{
         const p=fixture(),support=vi.fn(()=>true);
         expect(proveRepair(p,48,48,box,undefined as unknown as typeof support,budget())).toBeUndefined();

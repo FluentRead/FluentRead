@@ -1,8 +1,8 @@
 /**
  * @file src/features/image-translation/services/imageMatteRepair.ts
  * 文件职责：在原文字框的八像素观察域内证明一致RGBA静区、完整墨迹与外部图案的几何分离。
- * 主要内容：最多八个实际像素色仅提出背景候选，逐像素真实检测支持、完整静区闭环及整项共享的背景与墨色端点才允许通过；同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；缺证据、穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
- * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；实际同帧DB支持由调用方验证并提供查询，不能从本mask反造支持。结果不证明语义分割；调用方须在首次原图上预付共享预算、完成全页冲突和完整译字预检后才应用mask，不能覆盖OCR框或扩大原文保护权限。
+ * 主要内容：最多八个实际像素色仅提出背景候选，完整静区闭环及整项共享的背景与墨色端点生成无写入权限的候选；旧准入API额外要求逐像素真实检测支持。同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
+ * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；真实同帧模型支持由调用方验证并提供查询，不能从本mask反造支持。候选不含应用权限，也不证明语义分割；页规划必须在首次原图上预付共享预算，完成全页冲突、完整译字预检和真实支持授权后才应用，不能覆盖OCR框或扩大原文保护权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -142,13 +142,13 @@ function observeMoat(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:B
 }
 
 function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
-    supportAt:(x:number,y:number)=>boolean,fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
     const {labels,background,supportBox}=observed,area=colors.length,bgAlpha=background>>>24;
     let peak=0,largest=0;
     for(let index=0;index<area;index++)if(labels[index]===2){
         const value=colors[index],alpha=value>>>24;
         if(alpha<bgAlpha||alpha===0)return;
-        if(supportAt(roi.left+index%roi.width,roi.top+Math.floor(index/roi.width))!==true)return;
+        if(supportAt&&supportAt(roi.left+index%roi.width,roi.top+Math.floor(index/roi.width))!==true)return;
         let distance=0;
         for(let channel=0;channel<4;channel++){
             const delta=channel===3?(alpha-bgAlpha)*255:((value>>>(channel*8))&255)*alpha-((background>>>(channel*8))&255)*bgAlpha;
@@ -209,10 +209,9 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         supportBox};
 }
 
-/** 固定H8/64Ki ROI，最多八候选的全像素工作；调用方必须累计ROI面积，不可每行重置预算。 */
-export function planImageMatteRepair(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
-    supportAt:(x:number,y:number)=>boolean,fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
-    if(typeof supportAt!=='function'||!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
+function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
+    fitBudget:ImageMatteFitBudget,supportAt?:((x:number,y:number)=>boolean)):ImageMatteRepair|undefined {
+    if(!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
     const box={x0:sourceBox.x0,y0:sourceBox.y0,x1:sourceBox.x1,y1:sourceBox.y1};
     const roi=imageMatteObservationBox(width,height,box);
     if(!roi||pixels.length<width*height*4)return;
@@ -233,4 +232,17 @@ export function planImageMatteRepair(pixels:Uint8ClampedArray,width:number,heigh
         if(candidate){if(result)return;result=candidate;}
     }
     return result?finish(colors,roi,box,result,supportAt,fitBudget):undefined;
+}
+
+/** 固定H8/64Ki ROI的只读候选，不查询模型且没有应用权限；页级调用方必须累计ROI及共同端点预算。 */
+export function planImageMatteCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
+    fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
+    return planCandidate(pixels,width,height,sourceBox,fitBudget);
+}
+
+/** 保留旧的真实支持准入；无支持不会降级为候选，也不能用候选反造模型支持。 */
+export function planImageMatteRepair(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
+    supportAt:(x:number,y:number)=>boolean,fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
+    if(typeof supportAt!=='function')return;
+    return planCandidate(pixels,width,height,sourceBox,fitBudget,supportAt);
 }

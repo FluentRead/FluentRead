@@ -7,9 +7,9 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import type {ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
 import type {ImageDetectionSupport} from '@/src/features/image-translation/services/imageDetectionEvidence';
-const ports=vi.hoisted(()=>({observe:vi.fn(),plan:vi.fn(),forBox:vi.fn()}));
-vi.mock('@/src/features/image-translation/services/imageMatteRepair',()=>({imageMatteObservationBox:ports.observe,planImageMatteRepair:ports.plan}));
-import {applyImageMattePage,planImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
+const ports=vi.hoisted(()=>({observe:vi.fn(),plan:vi.fn(),candidate:vi.fn(),forBox:vi.fn()}));
+vi.mock('@/src/features/image-translation/services/imageMatteRepair',()=>({imageMatteObservationBox:ports.observe,planImageMatteRepair:ports.plan,planImageMatteCandidate:ports.candidate}));
+import {applyImageMattePage,authorizeImageMatteProposal,discardImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage,type ImageMattePagePlan,type ImageMatteProposal} from '@/src/features/image-translation/services/imageMattePage';
 type Box=ImageTextRegion['bbox'];
 const matte=[230,220,210,224] as const;
 const line=(bbox:Box={x0:12,y0:12,x1:28,y1:28}):ImageTextRegion=>({text:'COMPLETE',bbox,fontSize:16});
@@ -47,7 +47,79 @@ beforeEach(()=>{
     vi.resetAllMocks();pixels=new Uint8ClampedArray(64*64*4);for(let i=0;i<pixels.length;i+=4)pixels.set(matte,i);
     ports.observe.mockImplementation((_w:number,_h:number,b:Box)=>{const p=local(b);return {left:p.left,top:p.top,width:p.width,height:p.height};});
     ports.plan.mockImplementation((_p:Uint8ClampedArray,_w:number,_h:number,b:Box)=>local(b));
+    ports.candidate.mockImplementation((_p:Uint8ClampedArray,_w:number,_h:number,b:Box)=>local(b));
     ports.forBox.mockReturnValue(()=>true);
+});
+describe('ImageMattePage：无权限提案与分阶段授权',()=>{
+    it('提案只公开冻结的布局/保护/观察几何，缺少真实支持前不能apply或伪造授权',()=>{
+        const l=line(),before=pixels.slice(),proposal=proposeImageMattePage(pixels,64,64,[l],[],draw)!;
+        expect(ports.plan).not.toHaveBeenCalled();expect(ports.forBox).not.toHaveBeenCalled();expect(ports.candidate).toHaveBeenCalledOnce();
+        expect(Object.keys(proposal)).toEqual([]);expect(Object.isFrozen(proposal)).toBe(true);
+        const view=getImageMatteProposalDrawings(proposal)!;
+        expect(Object.keys(view)).toEqual(['drawings','rectangles','observations']);
+        expect(view.drawings[0].line).toBe(l);expect(view.observations).toEqual([{sourceBox:l.bbox,left:4,top:4,width:32,height:32}]);
+        for(const value of [view,view.observations,view.observations[0],view.observations[0].sourceBox])expect(Object.isFrozen(value)).toBe(true);
+        expect(()=>applyImageMattePage(pixels,64,64,proposal as unknown as ImageMattePagePlan)).toThrow('已失效');
+        expect(()=>applyImageMattePage(pixels,64,64,view as unknown as ImageMattePagePlan)).toThrow('已失效');
+        const forged={...proposal} as ImageMatteProposal;
+        expect(getImageMatteProposalDrawings(forged)).toBeUndefined();expect(authorizeImageMatteProposal(forged,support)).toBeUndefined();
+        expect(authorizeImageMatteProposal(proposal,undefined as never)).toBeUndefined();expect(pixels).toEqual(before);
+    });
+    it('部分物理框失败不消耗提案或重扫颜色，之后所有真实墨点通过才原子登记一次性原owner权限',()=>{
+        const first=line(),second=line({x0:36,y0:12,x1:52,y1:28});paint(pixels,64,local(first.bbox));paint(pixels,64,local(second.bbox));
+        const before=pixels.slice(),proposal=proposeImageMattePage(pixels,64,64,[first,second],[],draw)!,view=getImageMatteProposalDrawings(proposal)!;
+        const queried: Array<[number,number]>=[],db={forBox:vi.fn((_b:Box)=>((x:number,y:number)=>{queried.push([x,y]);return x<38;}))};
+        expect(authorizeImageMatteProposal(proposal,db)).toBeUndefined();expect(db.forBox).toHaveBeenCalledTimes(2);
+        expect(queried).toEqual([[14,14],[15,14],[14,15],[15,15],[14,16],[15,16],[38,14]]);
+        expect(pixels).toEqual(before);expect(getImageMatteProposalDrawings(proposal)).toBe(view);
+        const points: Array<[number,number]>=[],ctd={forBox:vi.fn(()=>((x:number,y:number)=>{points.push([x,y]);return true;}))};
+        const plan=authorizeImageMatteProposal(proposal,ctd)!;
+        expect(plan).toBeDefined();expect(points).toHaveLength(12);expect(ports.candidate).toHaveBeenCalledTimes(2);
+        expect(plan.drawings).toBe(view.drawings);expect(plan.rectangles).toBe(view.rectangles);expect(pixels).toEqual(before);
+        expect(getImageMatteProposalDrawings(proposal)).toBeUndefined();expect(authorizeImageMatteProposal(proposal,ctd)).toBeUndefined();
+        expect(()=>applyImageMattePage(pixels.slice(),64,64,plan)).toThrow('已失效');
+        applyImageMattePage(pixels,64,64,plan);expect(pixels).toEqual(solid(64,64));
+        expect(()=>applyImageMattePage(pixels,64,64,plan)).toThrow('已失效');
+    });
+    it('缺完整观察支持或查询抛出首因均不破坏提案，显式discard及回调撤销禁止重新发布',()=>{
+        const proposal=proposeImageMattePage(pixels,64,64,[line()],[],draw)!,before=pixels.slice();
+        ports.forBox.mockReturnValueOnce(undefined);expect(authorizeImageMatteProposal(proposal,support)).toBeUndefined();
+        const failure=new Error('same-frame evidence expired');ports.forBox.mockImplementationOnce(()=>{throw failure;});
+        expect(()=>authorizeImageMatteProposal(proposal,support)).toThrow(failure);expect(getImageMatteProposalDrawings(proposal)).toBeDefined();
+        discardImageMatteProposal(proposal);discardImageMatteProposal(proposal);
+        expect(getImageMatteProposalDrawings(proposal)).toBeUndefined();expect(authorizeImageMatteProposal(proposal,support)).toBeUndefined();
+        const cancelled=proposeImageMattePage(pixels,64,64,[line()],[],draw)!;
+        const revoke={forBox:()=>()=>{discardImageMatteProposal(cancelled);return true;}};
+        expect(authorizeImageMatteProposal(cancelled,revoke)).toBeUndefined();expect(pixels).toEqual(before);
+    });
+    it('全部候选共享原1Mi观察与绘字预算及4Mi共同端点预算，任何失败不发布提案',()=>{
+        const l=line();l.sourceBoxes=[l.bbox,{...l.bbox}];let shared:{remaining:number}|undefined;
+        ports.candidate.mockImplementation((_p:unknown,_w:number,_h:number,b:Box,fit:{remaining:number})=>{
+            if(shared)expect(fit).toBe(shared);else shared=fit;
+            fit.remaining-=2_097_152;return fit.remaining>=0?local(b):undefined;
+        });
+        expect(proposeImageMattePage(pixels,64,64,[l],[],draw)).toBeDefined();expect(shared!.remaining).toBe(0);
+        l.sourceBoxes.push({...l.bbox});shared=undefined;
+        expect(proposeImageMattePage(pixels,64,64,[l],[],draw)).toBeUndefined();expect(shared!.remaining).toBe(-2_097_152);
+        ports.observe.mockReturnValue({left:0,top:0,width:1024,height:1024});ports.candidate.mockClear();
+        expect(proposeImageMattePage(pixels,64,64,[line()],[],draw)).toBeUndefined();expect(ports.candidate).not.toHaveBeenCalled();
+        expect(ports.forBox).not.toHaveBeenCalled();
+    });
+    it.each(['draw','retained','art','different-background'] as const)('支持免费提案在%s冲突处就拒绝，保留原完整保护语义',kind=>{
+        const first=line(),second=line({x0:36,y0:12,x1:52,y1:28});let lines=[first],retained:ImageTextRegion[]=[];
+        if(kind==='draw')lines=[first,line({x0:24,y0:12,x1:40,y1:28})];
+        if(kind==='retained')retained=[line({x0:29,y0:12,x1:32,y1:28})];
+        if(kind==='art')ports.candidate.mockImplementation((_p:unknown,_w:number,_h:number,b:Box)=>{const r=local(b);r.artMask[(14-r.top)*r.width+14-r.left]=1;return r;});
+        if(kind==='different-background'){
+            lines=[first,second];
+            ports.candidate.mockImplementation((_p:unknown,_w:number,_h:number,b:Box)=>{
+                const r=blankPlan(b,4,4,56,32);r.mask[10*56+10]=1;r.supportBox={x0:14,y0:14,x1:15,y1:15};
+                if(b.x0>30)r.background=[0,0,0,255];return r;
+            });
+        }
+        const before=pixels.slice();expect(proposeImageMattePage(pixels,64,64,lines,retained,draw)).toBeUndefined();
+        expect(ports.forBox).not.toHaveBeenCalled();expect(pixels).toEqual(before);
+    });
 });
 describe('ImageMattePage：全页授权与上传',()=>{
     it('缺失same-frame support或任一physical box无完整halo时不申请局部修补',()=>{

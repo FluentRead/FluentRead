@@ -102,6 +102,19 @@ describe('area translation Offscreen adapter', () => {
 
 describe('image translation Offscreen adapter', () => {
     const adapter = createImageTranslationOffscreenAdapter(client);
+    it('preserves optional segmentation readiness, accepts older model statuses and rejects malformed optional fields',async()=>{
+        const base={success:true,ready:true,bytes:123,inpaintingReady:true};
+        for(const segmentationReady of [true,false]){
+            send.mockResolvedValueOnce({...base,segmentationReady});
+            await expect(adapter.getMangaModelStatus()).resolves.toEqual({ready:true,bytes:123,inpaintingReady:true,segmentationReady});
+        }
+        send.mockResolvedValueOnce(base);
+        expect(await adapter.getMangaModelStatus()).not.toHaveProperty('segmentationReady');
+        for(const segmentationReady of [null,0,'false',{}]){
+            send.mockResolvedValueOnce({...base,segmentationReady});
+            await expect(adapter.getMangaModelStatus()).rejects.toThrow('漫画识别模型状态读取失败');
+        }
+    });
     it('仅普通图的非空文字结果可标记为保留宿主原图',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
         send.mockResolvedValueOnce({success:true,image:'',imageUnchanged:true,lines});

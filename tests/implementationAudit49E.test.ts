@@ -53,6 +53,8 @@ import {IMAGE_OCR_LANGUAGE_STATE_KEY} from '@/src/features/image-translation/ocr
 import ImageOcrSettings from '@/src/features/image-translation/ui/ImageOcrSettings.vue';
 import MangaSettings from '@/src/features/image-translation/ui/MangaSettings.vue';
 import MangaModelSettings from '@/src/features/image-translation/ui/MangaModelSettings.vue';
+import {MANGA_OCR_CACHE,MANGA_TEXT_SEGMENTATION_ASSET} from '@/src/features/image-translation/services/mangaOcrAssets';
+import {createVirtualModelResponsePort,virtualModelBuffer} from './helpers/virtualModelResponse';
 import {Config} from '@/src/core/config/model';
 
 const explicitEvidence = process.env.AUDIT_E_EVIDENCE;
@@ -268,6 +270,93 @@ describe('audit 49 E actual translation and cache entries', () => {
 });
 
 describe('audit 49 E real Vue client model settings', () => {
+    it('keeps optional segmentation within management and independent from the main OCR readiness', async () => {
+        vi.useFakeTimers();const first=deferred<unknown>();ports.message.mockReturnValueOnce(first.promise);
+        const {container,props}=await mount(MangaModelSettings,{imageRecognition:true,showInpainting:false});
+        const optional=()=>container.querySelector<HTMLElement>('[data-testid="manga-optional-segmentation"]')!;
+        expect(optional().closest('details')?.open).toBe(false);
+        expect(optional().textContent).toContain('正在检查');
+        expect(optional().textContent).toContain('约 90 MB · 仅离线导入');
+        expect(optional().querySelector('code')!.textContent).toBe('comictextdetector.pt.onnx');
+        first.resolve({success:true,ready:true,inpaintingReady:false,bytes:30});await settle();
+        expect(optional().textContent).toContain('未导入');
+        expect(container.querySelector('.manga-resource-list')!.textContent).toContain('已就绪');
+        expect(container.querySelector('.manga-resource-list')!.textContent).not.toContain('精确文字分割');
+        ports.message.mockResolvedValue({success:true,ready:false,inpaintingReady:false,segmentationReady:true,bytes:94});
+        await vi.advanceTimersByTimeAsync(1500);await settle();
+        expect(optional().querySelector('.ready')!.textContent).toBe('已就绪');
+        expect(container.querySelector('.manga-resource-list')!.textContent).toContain('未下载');
+        props.imageRecognition=false;await settle();expect(optional()).toBeNull();
+        expect(container.querySelector('header small')!.textContent).toContain('用于漫画翻译');
+    });
+    it('persists the optional offline import through the real file control and restores its status after remount',async()=>{
+        vi.useFakeTimers();
+        const asset=MANGA_TEXT_SEGMENTATION_ASSET,buffer=virtualModelBuffer(asset.bytes),cache=new Map<string,Response>();
+        // File bytes, hash and Response are explicit capacity ports; the production importer,
+        // cache URL/write and real component state run. This does not validate model contents.
+        vi.stubGlobal('Response',createVirtualModelResponsePort(Response));
+        vi.stubGlobal('crypto',{subtle:{digest:vi.fn(async()=>Uint8Array.from(asset.sha256.match(/../gu)!,part=>parseInt(part,16)).buffer)}});
+        vi.stubGlobal('caches',{open:async(name:string)=>{expect(name).toBe(MANGA_OCR_CACHE);return{put:async(key:string,response:Response)=>{cache.set(key,response);}};}});
+        ports.message.mockImplementation(async()=>({success:true,ready:true,inpaintingReady:false,segmentationReady:cache.has(asset.url),bytes:cache.has(asset.url)?asset.bytes:0}));
+        const first=await mount(MangaModelSettings);
+        const input=first.container.querySelector<HTMLInputElement>('input[type="file"]')!;
+        expect(input.getAttribute('accept')).toBe('.onnx,.txt');
+        Object.defineProperty(input,'files',{configurable:true,value:[{name:asset.file,size:asset.bytes,arrayBuffer:async()=>buffer}]});
+        input.dispatchEvent(new Event('change'));await settle();
+        expect(await cache.get(asset.url)!.arrayBuffer()).toBe(buffer);
+        expect(first.container.querySelector('[data-testid="manga-optional-segmentation"] .ready')!.textContent).toBe('已就绪');
+        expect(input.value).toBe('');expect(fetch).not.toHaveBeenCalled();
+        first.app.unmount();apps.delete(first.app);await settle();expect(vi.getTimerCount()).toBe(0);
+        const second=await mount(MangaModelSettings);
+        expect(second.container.querySelector('[data-testid="manga-optional-segmentation"] .ready')!.textContent).toBe('已就绪');
+        second.app.unmount();apps.delete(second.app);await settle();expect(vi.getTimerCount()).toBe(0);
+    });
+    it('does not restart model polling when the pending status completes after unmount',async()=>{
+        vi.useFakeTimers();const pending=deferred<unknown>();ports.message.mockReturnValueOnce(pending.promise);
+        const {app}=await mount(MangaModelSettings);app.unmount();apps.delete(app);
+        pending.resolve({success:true,ready:true,inpaintingReady:true,segmentationReady:true,bytes:100});await settle();
+        expect(vi.getTimerCount()).toBe(0);expect(ports.message).toHaveBeenCalledOnce();
+    });
+    it('pauses hidden model polling and renders verifying, paused and failed download snapshots',async()=>{
+        vi.useFakeTimers();(document as any).visibilityState='hidden';
+        const {container}=await mount(MangaModelSettings);
+        expect(ports.message).not.toHaveBeenCalled();await vi.advanceTimersByTimeAsync(1500);expect(ports.message).not.toHaveBeenCalled();
+        (document as any).visibilityState='visible';
+        for(const [phase,label,delay]of [['verifying','正在校验漫画模型',1500],['paused','漫画模型下载已暂停',500],['error','漫画模型下载未完成',1500],[undefined,'正在下载漫画模型',1500]]as const){
+            ports.message.mockResolvedValue({success:true,ready:false,inpaintingReady:false,bytes:0,download:{phase,file:'model.onnx',loaded:1,total:2}});
+            await vi.advanceTimersByTimeAsync(delay);await settle();
+            expect(container.querySelector('.manga-model-progress strong')!.textContent).toBe(label);
+            expect(!!container.querySelector('progress')).toBe(phase==='verifying');
+        }
+    });
+    it('recovers empty and failed model responses without exposing their underlying diagnostics',async()=>{
+        vi.useFakeTimers();ports.message.mockResolvedValueOnce(undefined);
+        const {container}=await mount(MangaModelSettings);
+        expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型状态读取失败');
+        for(const response of [{success:false},{success:false,error:'https://model.invalid/private'}]){
+            ports.message.mockResolvedValueOnce(response);await vi.advanceTimersByTimeAsync(1500);await settle();
+            expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型状态读取失败');
+        }
+        ports.message.mockResolvedValue({success:true,ready:true,inpaintingReady:true,bytes:1});await vi.advanceTimersByTimeAsync(1500);await settle();
+        expect(container.querySelector('[role="alert"]')).toBeNull();
+        const remove=[...container.querySelectorAll<HTMLButtonElement>('button')].find(button=>button.textContent==='清除已下载资源')!;
+        for(const response of [undefined,{success:false}]){
+            ports.message.mockResolvedValueOnce(response);remove.click();await settle();
+            expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型清除失败');
+        }
+    });
+    it('handles a cancelled file picker and sanitizes non-validation import failures',async()=>{
+        vi.useFakeTimers();const {container}=await mount(MangaModelSettings);
+        const input=container.querySelector<HTMLInputElement>('input[type="file"]')!;
+        Object.defineProperty(input,'files',{configurable:true,value:null});input.dispatchEvent(new Event('change'));await settle();
+        expect(container.querySelector('[role="alert"]')).toBeNull();
+        for(const failure of ['https://model.invalid/private',new Error('private storage error')]){
+            Object.defineProperty(input,'files',{configurable:true,value:[{name:MANGA_TEXT_SEGMENTATION_ASSET.file,size:MANGA_TEXT_SEGMENTATION_ASSET.bytes,arrayBuffer:async()=>{throw failure;}}]});
+            input.dispatchEvent(new Event('change'));await settle();
+            expect(container.querySelector('[role="alert"]')!.textContent).toBe('漫画识别模型导入失败，请重试');
+            expect(container.querySelector('details')!.open).toBe(true);
+        }
+    });
     it('shows real download progress while keeping source controls and resource links out of the menu', async () => {
         vi.useFakeTimers(); entries.set('https://fluent-read.invalid/manga-model-source',new Response('mirror'));
         ports.message.mockResolvedValue({success:true,ready:false,bytes:0,source:'mirror',download:{phase:'downloading',file:'model.onnx',loaded:1048576,total:2097152,source:'hf-mirror.com'}});

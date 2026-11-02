@@ -1,11 +1,14 @@
 /**
  * @file src/core/i18n/messages/manga.ts
  * 文件职责：提供漫画入口、首次资源说明和图片共享识别设置的产品文案，避免新增界面在非中文语言下显示中文。
- * 主要内容：英文完整回退目录与各语言核心操作文案；当前资源用途与准备状态优先展示，备用识别、语言包及下载管理采用简短入口。
+ * 主要内容：英文完整回退目录与各语言核心操作文案；当前资源用途与准备状态优先展示，备用识别、可选文字分割的离线导入、语言包及下载管理采用简短入口。
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 const rows: Array<readonly [string, string, string, string, string, string, string]> = [
+  ['精确文字分割（可选）','Precise text segmentation (optional)','精密な文字分割（任意）','정밀 텍스트 분할(선택 사항)','Segmentation précise du texte (facultative)','Точное выделение текста (необязательно)','Segmentación precisa del texto (opcional)'],
+  ['约 90 MB · 仅离线导入','About 90 MB · Offline import only','約 90 MB · オフライン取り込みのみ','약 90 MB · 오프라인 가져오기만 가능','Environ 90 Mo · Importation hors ligne uniquement','Около 90 МБ · Только импорт из файла','Unos 90 MB · Solo importación sin conexión'],
+  ['未导入','Not imported','未取り込み','가져오지 않음','Non importé','Не импортировано','Sin importar'],
   ['为保留原文，此译文未绘制到图片','This translation was not drawn to preserve the original text','原文を残すため、この翻訳は画像に描画されていません','원문을 보존하기 위해 이 번역을 이미지에 표시하지 않았습니다','Cette traduction ne figure pas sur l’image afin de préserver le texte original','Этот перевод не нанесён, чтобы сохранить оригинальный текст','Esta traducción no se dibujó para conservar el texto original'],
   ['部分译文未绘制，请查看图片文字','Some translations were not drawn; view image text','一部の翻訳は描画されていません。画像の文字を確認してください','일부 번역이 표시되지 않았습니다. 이미지 텍스트를 확인하세요','Certaines traductions ne figurent pas sur l’image ; consultez son texte','Некоторые переводы не нанесены; откройте текст изображения','Algunas traducciones no se dibujaron; consulta el texto de la imagen'],
   ['查看图片文字','View image text','画像の文字を見る','이미지 텍스트 보기','Voir le texte de l’image','Посмотреть текст изображения','Ver texto de la imagen'],

@@ -294,6 +294,23 @@ describe('自定义请求体注入 thinking 字段（issue #213）', () => {
 });
 
 describe('模型级 Thinking 请求集成', () => {
+    it('为新模型序列化各自支持的默认思考参数', () => {
+        const current = currentConfigSnapshot();
+        const request = {origin: 'hello', current};
+        expect(JSON.parse(commonMsgTemplate({...request, serviceOverride: services.openai, modelOverride: 'gpt-6.1-sol'})))
+            .toMatchObject({model: 'gpt-6.1-sol', reasoning_effort: 'low'});
+        expect(JSON.parse(commonMsgTemplate({...request, serviceOverride: services.doubao, modelOverride: 'doubao-seed-2-1-lite-260915'})))
+            .toMatchObject({model: 'doubao-seed-2-1-lite-260915', thinking: {type: 'disabled'}});
+        expect(JSON.parse(claudeMsgTemplate({...request, serviceOverride: services.claude, modelOverride: 'claude-sonnet-5-5'})))
+            .toMatchObject({model: 'claude-sonnet-5-5', thinking: {type: 'between_tools'}});
+        expect(JSON.parse(claudeMsgTemplate({...request, serviceOverride: services.claude, modelOverride: 'claude-opus-5-5'})))
+            .toMatchObject({model: 'claude-opus-5-5', thinking: {type: 'adaptive'}, output_config: {effort: 'low'}});
+        expect(JSON.parse(geminiMsgTemplate({...request, serviceOverride: services.gemini, modelOverride: 'gemini-4-argon'})))
+            .toMatchObject({generationConfig: {thinkingConfig: {thinkingLevel: 'low'}}});
+        expect(JSON.parse(tongyiMsgTemplate({...request, serviceOverride: services.tongyi, modelOverride: 'qwen3.8-flash'})))
+            .toMatchObject({model: 'qwen3.8-flash', enable_thinking: false});
+    });
+
     it('按服务和实际模型读取偏好，并允许请求级快照显式覆盖', () => {
         mockConfig.modelThinking = {openai: {'gpt-5.6-luna': true}};
         expect(JSON.parse(commonMsgTemplate({origin: 'hello', current: currentConfigSnapshot()})).reasoning_effort).toBe('low');

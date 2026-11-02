@@ -19,6 +19,7 @@ import type {TranslationConfigSource, TranslationProvider} from '@/src/services/
 import type {TranslateOptions} from '@/src/services/translation/client';
 import {translateTextSlots, type FullPageTranslationConfigSnapshot,
     type FullPageTranslationSessionCache} from '@/src/features/full-page-translation/content/translationRequest';
+import {createFullPageRequestSessionState, disposeFullPageRequestSession} from '@/src/features/full-page-translation/content/requestSession';
 
 const ports = vi.hoisted(() => ({single: vi.fn(), batch: vi.fn()}));
 const ownedChromeEnvironments = new Set<ChromeTranslationEnvironment>();
@@ -798,6 +799,59 @@ describe('frontend 区分原生数组、机器逐槽与 AI 槽协议的会话边
         expect(ports.single).not.toHaveBeenCalled();
         expect(h.provider.mock.calls[0]![0].origin).toEqual([first, second]);
         expect(h.provider.mock.calls[0]![0].validateTranslationSlots).not.toBe(true);
+    });
+
+    it.each([true, false])('全文单个原生批次去重重复句子，并沿用缓存设置 %s', async useCache => {
+        const h = createHarness({service: 'deepL'});
+        connectFrontend(h);
+        h.provider.mockResolvedValueOnce(translated.slice(0, 2));
+        const sources = [first, second, first, second];
+        await expect(translateTextSlots(sources, {...snapshot, service: 'deepL', useCache}))
+            .resolves.toEqual([translated[0], translated[1], translated[0], translated[1]]);
+        expect(h.provider).toHaveBeenCalledOnce();
+        expect(h.provider.mock.calls[0]![0].origin).toEqual([first, second]);
+        expect(ports.batch.mock.calls[0]![2].useCache).toBe(useCache);
+        expect(h.cacheSet).toHaveBeenCalledTimes(useCache ? 2 : 0);
+    });
+
+    it.each([true, false])('全文不同位置的 40 个相同句子共享首次请求，缓存=%s', async useCache => {
+        const h = createHarness({service: 'deepL'});
+        connectFrontend(h);
+        const session = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        h.provider.mockResolvedValue([translated[0]]);
+        try {
+            const results = await Promise.all(Array.from({length: 40}, () => translateTextSlots(
+                [first], {...snapshot, service: 'deepL', useCache}, undefined, undefined, session,
+            )));
+            expect(results).toEqual(Array.from({length: 40}, () => [translated[0]]));
+            expect(h.provider).toHaveBeenCalledOnce();
+            expect(h.provider.mock.calls[0]![0].origin).toEqual([first]);
+        } finally {
+            disposeFullPageRequestSession(session, new Error('test complete'));
+        }
+    });
+
+    it('全文分批出现的重复句子与恢复后新会话复用已完成译文', async () => {
+        const h = createHarness({service: 'deepL'});
+        connectFrontend(h);
+        const invocation = {...snapshot, service: 'deepL'};
+        const session = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        const restarted = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        h.provider.mockResolvedValueOnce(translated.slice(0, 2)).mockResolvedValueOnce([translated[2]]);
+        try {
+            await expect(translateTextSlots([first, second], invocation, undefined, undefined, session))
+                .resolves.toEqual(translated.slice(0, 2));
+            await expect(translateTextSlots([second, third], invocation, undefined, undefined, session))
+                .resolves.toEqual(translated.slice(1));
+            expect(h.provider.mock.calls.map(([message]) => message.origin)).toEqual([[first, second], [third]]);
+            disposeFullPageRequestSession(session, new Error('restore original'));
+            await expect(translateTextSlots([third, first, second], invocation, undefined, undefined, restarted))
+                .resolves.toEqual([translated[2], translated[0], translated[1]]);
+            expect(h.provider).toHaveBeenCalledTimes(2);
+        } finally {
+            disposeFullPageRequestSession(session, new Error('test complete'));
+            disposeFullPageRequestSession(restarted, new Error('test complete'));
+        }
     });
 
     it('serialized single 向 client 透传 validateTranslationSlots=true', async () => {

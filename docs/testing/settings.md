@@ -58,7 +58,7 @@ node scripts/run-userscript-smoke-test.cjs \
   --artifacts-dir /private/tmp/fluentread-userscript-webkit
 ```
 
-仓库独立版把扩展的完整 Options 页面挂在全视口 closed ShadowRoot，使用 `--suite options` 验证页内回退、设置保存、下拉菜单和主题隔离、六个扩展专属分区与右键菜单、Popup 布局只显示不可用提示，以及宿主 hash 不变。页内回退会暂时隐藏悬浮球，显示可访问的关闭按钮，关闭后恢复悬浮球；浏览器断言还检查跨分区导航和切换到 390px 窄屏后悬浮球保持隐藏。窄屏截图与浏览器断言同时覆盖这一路径。`--suite options-route` 验证独立设置标签页不启动网页翻译运行时。精简版仍使用小面板。完整设置页的真实 Violentmonkey 检查在下面的管理器命令中加入 `--settings-mode full`，还会验证设置标签页关闭、重开悬浮球后源网页在焦点刷新时同步变化，重载保持设置且不覆盖已有主题。
+仓库独立版把扩展的完整 Options 页面挂在全视口 closed ShadowRoot，使用 `--suite options` 验证页内回退、设置保存、下拉菜单和主题隔离、扩展专属设置页面与右键菜单、Popup 布局只显示不可用提示，以及宿主 hash 不变。圈选和模型用量已分别合并到图片翻译与翻译统计页面，因此按现有父页面检查不可用提示。页内回退会暂时隐藏悬浮球，显示可访问的关闭按钮，关闭后恢复悬浮球；浏览器断言还检查跨分区导航和切换到 390px 窄屏后悬浮球保持隐藏。窄屏截图与浏览器断言同时覆盖这一路径。`--suite options-route` 验证独立设置标签页不启动网页翻译运行时。精简版仍使用小面板。完整设置页的真实 Violentmonkey 检查在下面的管理器命令中加入 `--settings-mode full`，还会验证设置标签页关闭、重开悬浮球后源网页在焦点刷新时同步变化，重载保持设置且不覆盖已有主题。
 
 真实脚本管理器回归使用 `pnpm test:userscript:manager`。默认把最终 `.user.js` 作为文件安装到临时 profile 的 Violentmonkey MV3；`--install-mode url` 从本机 HTTP 地址安装同一构建产物，经过脚本管理器确认页并等待已安装列表出现脚本版本，更接近公开脚本链接的安装流程。两种模式都在后台可见且不抢焦点的独立浏览器中检查声明的 `@require`（独立版为零个）、页面注入、桌面和 390px 截图、设置面板、可信 Control 悬浮翻译 `[1,0,1,0]`（相邻段落不变）、Alt+T 全文翻译 `[1,0,1]`（两段正文均完成）、原文与宿主全局保护。测试页在脚本执行前注册异版本 Dexie `4.4.4`，验证启动、悬浮翻译和刷新后都保留该实例；随后在真实管理器中保存关闭悬浮球、刷新确认配置保留、重新开启并检查当前页同步，最后断言控制台无卸载错误。报告保存 `evidence.json`。运行前需提供 Chromium 可执行文件、解压后的 Violentmonkey 2.49.0 扩展、Playwright 包目录与 focus-safe helper；翻译仍访问当前默认服务，精简版安装还会访问 jsDelivr，不能代替 Safari Userscripts 或 Via 真机验证：
 

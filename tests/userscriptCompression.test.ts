@@ -5,13 +5,70 @@ import {encodeUserscriptData} from '@/userscript/buildDataEncoding';
 import {inflateWithPako as inflateWithBundledPako} from '@/userscript/pakoBundled';
 import {inflateBytesWithPako as inflateBytesWithBundledPako, decodeUtf8WithPako as decodeUtf8WithBundledPako} from '@/userscript/pakoBundled';
 
+/** 模拟 Safari Userscripts 中解压流在读取阶段异步拒绝，而不是模拟真实隔离世界。 */
+class RejectingDecompressionStream {
+    readonly readable: ReadableStream<Uint8Array>;
+    readonly writable: WritableStream<Uint8Array>;
+
+    constructor() {
+        const stream = new TransformStream<Uint8Array, Uint8Array>({
+            transform() {throw new TypeError('Invalid type should be ArrayBuffer');},
+        });
+        this.readable = stream.readable;
+        this.writable = stream.writable;
+    }
+}
+
 describe('userscript compressed assets', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it('inflates real gzip data with the browser stream API', async () => {
         const source = 'FluentRead 样式和 English settings';
         const encoded = gzipSync(source).toString('base64');
+        const ungzip = vi.fn();
+        vi.stubGlobal('pako', {ungzip});
         await expect(inflateGzipBase64(encoded)).resolves.toBe(source);
+        expect(ungzip).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        {encoding: 'Base64', encode: (bytes: Buffer) => bytes.toString('base64')},
+        {encoding: 'ASCII85', encode: (bytes: Buffer) => encodeUserscriptData(bytes)},
+    ])('falls back to pako when the stream asynchronously rejects $encoding data', async ({encode}) => {
+        const source = 'FluentRead 样式和设置 🦦';
+        const ungzip = vi.fn(inflateWithBundledPako);
+        vi.stubGlobal('DecompressionStream', RejectingDecompressionStream);
+        vi.stubGlobal('pako', {ungzip});
+
+        await expect(inflateGzipBase64(encode(gzipSync(source)))).resolves.toBe(source);
+        expect(ungzip).toHaveBeenCalledOnce();
+    });
+
+    it('falls back to pako when constructing the stream throws', async () => {
+        const ungzip = vi.fn(inflateWithBundledPako);
+        vi.stubGlobal('DecompressionStream', class {constructor() {throw new TypeError('stream unavailable');}});
+        vi.stubGlobal('pako', {ungzip});
+
+        await expect(inflateGzipBase64(gzipSync('constructor recovery').toString('base64'))).resolves.toBe('constructor recovery');
+        expect(ungzip).toHaveBeenCalledOnce();
+    });
+
+    it('keeps fallback gzip errors visible and can decode a later valid asset', async () => {
+        const corrupted = gzipSync('damaged');
+        corrupted[corrupted.length - 8] ^= 1;
+        vi.stubGlobal('DecompressionStream', RejectingDecompressionStream);
+        vi.stubGlobal('pako', {ungzip: inflateWithBundledPako});
+
+        await expect(inflateGzipBase64(corrupted.toString('base64'))).rejects.toBe('incorrect data check');
+        await expect(inflateGzipBase64(gzipSync('recovered').toString('base64'))).resolves.toBe('recovered');
+    });
+
+    it('reports a missing pako dependency when stream decompression fails', async () => {
+        vi.stubGlobal('DecompressionStream', RejectingDecompressionStream);
+        vi.stubGlobal('pako', undefined);
+
+        await expect(inflateGzipBase64(gzipSync('unavailable').toString('base64')))
+            .rejects.toThrow('当前浏览器缺少 gzip 解压能力');
     });
 
     it('uses the preloaded pako global when an older browser lacks DecompressionStream', async () => {

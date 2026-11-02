@@ -45,7 +45,7 @@ export function createPdfReaderBidiBuildPlugin(repositoryRoot: string) {
         name: 'fluentread-pinned-pdfjs-bidi',
         enforce: 'pre' as const,
         resolveId: (id: string) => id === PDF_READER_BIDI_ID ? RESOLVED_ID : null,
-        load(id: string) {
+        load: (id: string) => {
             if (id !== RESOLVED_ID) return null;
             const packageRoot = resolve(repositoryRoot, 'node_modules/pdfjs-dist');
             const manifest = JSON.parse(readFileSync(resolve(packageRoot, 'package.json'), 'utf8')) as {version?: string};

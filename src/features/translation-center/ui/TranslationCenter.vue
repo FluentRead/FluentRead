@@ -21,7 +21,7 @@
         <p v-if="!translationEnabled" class="input-notice translation-paused" role="status">{{ t('popup.heroDisabled') }} · <button v-if="surface === 'sidebar'" class="text-button" type="button" @click="emit('configure-general')">{{ translateLegacy('通用设置') }}</button><a v-else href="#settings-general">{{ translateLegacy('通用设置') }}</a></p>
         <p v-if="sameLanguage" class="input-notice" role="status">{{ ct('sameLanguage') }}</p>
         <p v-if="!readyCards.length && surface !== 'sidebar'" class="input-notice" role="status">{{ ct('noReady') }}</p>
-        <div class="translation-input-footer"><button v-if="isRunning" class="translate-stop-button" type="button" @click="session.stop()"><UiIcon name="close" :size="16" />{{ ct('stop') }}</button><button v-else class="translate-primary-button" type="button" :disabled="!canTranslate || !readyCards.length" @click="runTranslation"><UiIcon name="translate" :size="17" />{{ ct(state.run ? 'again' : 'start') }}<kbd v-if="surface !== 'sidebar'">{{ shortcutLabel }}</kbd></button><p v-if="surface === 'sidebar'" id="sidebar-input-help" class="sidebar-keyboard-hint">{{ t('sidepanel.keyboardHint') }}</p><p v-else id="translation-input-help">{{ ct('privacy') }}</p></div>
+        <div class="translation-input-footer"><button v-if="isRunning" class="translate-stop-button" type="button" @click="session.stop()"><UiIcon name="close" :size="16" />{{ ct('stop') }}</button><button v-else class="translate-primary-button" type="button" :disabled="!canTranslate || !readyCards.length" @click="runTranslation"><UiIcon name="translate" :size="17" />{{ ct(state.run ? 'again' : 'start') }}<kbd v-if="surface !== 'sidebar'">{{ shortcutLabel }}</kbd></button><p v-if="surface === 'sidebar'" id="sidebar-input-help" class="sidebar-keyboard-hint">{{ t('sidepanel.keyboardHint') }}</p><p v-if="surface !== 'sidebar'" id="translation-input-help">{{ ct('privacy') }}</p></div>
       </section>
       <section class="translation-results-panel" :aria-label="ct('results')">
         <div class="translation-panel-heading results-heading">
@@ -269,17 +269,18 @@ function swapLanguages(): void {if (sourceLanguage.value !== 'auto') {[sourceLan
 function setLayout(layout: 'list' | 'grid') {resultLayout.value = layout; persistTranslationCenterConfig('layout');}
 function useExample() {sourceText.value = 'Good design makes complex things feel simple.'; sourceEditor.value?.focus();}
 function clearSource() {session.stop(); sourceText.value = ''; feedback.value = ''; sourceEditor.value?.focus();}
-function runTranslation() {if (canTranslate.value && readyCards.value.length && !isRunning.value) void session.run(readyCards.value.map(card => card.service), currentInput);}
+function runTranslation() {if (canTranslate.value && !isRunning.value) void session.run(readyCards.value.map(card => card.service), currentInput);}
 function retryService(service: string) {if (canTranslate.value && !credentialWarning(service)) void session.run([service], currentInput);}
 function retryIncomplete() {if (canTranslate.value) void session.run(incompleteCards.value.map(card => card.service), currentInput);}
 function handleEditorKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
-  const shortcut = event.ctrlKey || event.metaKey;
-  const sidebarEnter = props.surface === 'sidebar' && !event.shiftKey && !event.altKey;
-  if (shortcut || sidebarEnter) {
-    event.preventDefault();
-    if (!event.repeat) runTranslation();
+  if (props.surface !== 'sidebar') {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {event.preventDefault(); runTranslation();}
+    return;
   }
+  if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+  if (!event.ctrlKey && !event.metaKey && (event.shiftKey || event.altKey)) return;
+  event.preventDefault();
+  if (!event.repeat) runTranslation();
 }
 async function toggleServicePicker() {if (servicePickerOpen.value) {closePicker(true); return;} servicePickerOpen.value = true; await nextTick(); serviceSearch.value?.focus();}
 function closePicker(restoreFocus: boolean) {servicePickerOpen.value = false; serviceSearchQuery.value = ''; if (restoreFocus) servicePickerTrigger.value?.focus();}

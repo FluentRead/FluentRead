@@ -1895,6 +1895,54 @@ describe('translation broker', () => {
         expect(mocks.service).not.toHaveBeenCalled();
     });
 
+    it.each(['google', 'freeTranslation'])('%s 批次关闭缓存后仍只翻译一份重复原文，保留空白及原位置', async service => {
+        mocks.config.service = service;
+        const first = 'The first sentence needs translation.';
+        const second = 'The second sentence needs translation.';
+        mocks.service.mockResolvedValue(['第一句译文。', '第二句译文。']);
+        const request = {origin: [first, '', first, second, ' \t', second, first], useCache: false};
+
+        await expect(translateWithCache(request)).resolves.toEqual([
+            '第一句译文。', '', '第一句译文。', '第二句译文。', ' \t', '第二句译文。', '第一句译文。',
+        ]);
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0].origin).toEqual([first, second]);
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+
+    it('关闭缓存和原生合批后逐条执行也只翻译一份重复原文', async () => {
+        mocks.config.service = 'google';
+        mocks.config.useCache = false;
+        mocks.config.nativeBatchTranslationEnabled = {google: false};
+        mocks.service.mockImplementation(async ({origin}: {origin: string}) => `${origin}译文`);
+
+        await expect(translateWithCache({origin: ['Alpha', 'Beta', 'Alpha', 'Beta']}))
+            .resolves.toEqual(['Alpha译文', 'Beta译文', 'Alpha译文', 'Beta译文']);
+        expect(mocks.service.mock.calls.map(([message]) => message.origin)).toEqual(['Alpha', 'Beta']);
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+
+    it('无缓存去重只合并完全相同的原文，不合并大小写或空白不同的文本', async () => {
+        mocks.service.mockImplementation(async ({origin}: {origin: string[]}) => origin.map(text => `${text}译文`));
+        const sources = ['Open source', 'open source', 'Open source ', 'Open source'];
+        await expect(translateWithCache({origin: sources, useCache: false}))
+            .resolves.toEqual(sources.map(text => `${text}译文`));
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(sources.slice(0, 3));
+    });
+
+    it('无缓存 AI 多段仍保留重复原文的独立槽位与邻段语义', async () => {
+        mocks.config.service = 'ai';
+        const sources = ['The same sentence.', 'A different sentence.', 'The same sentence.'];
+        const packet = serializeTranslationSlots(sources);
+        const outputs = ['第一处译文。', '中间译文。', '第三处译文。'];
+        mocks.service.mockResolvedValue(outputs.map((output, index) => `${packet.starts[index]}${output}${packet.ends[index]}`).join('\n'));
+        await expect(translateWithCache({origin: sources, useCache: false, aiMultiSegment: true})).resolves.toEqual(outputs);
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0].origin).toBe(packet.payload);
+    });
+
     it('persists unchanged batch items so ambiguous target-language text is not translated again', async () => {
         mocks.service.mockResolvedValueOnce(['中文', '英文译文']);
 

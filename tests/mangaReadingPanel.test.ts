@@ -52,6 +52,7 @@ describe('standalone manga reading panel prototype',()=>{
     const h=await mount();await h.instance.open(trusted);const button=h.get(n=>n.tag==='button' && n.text.startsWith(({image:'图片',canvas:'画布',background:'背景图片',segment:'长图片段'} as const)[item.kind]))!;
     button.props.onClick({isTrusted:false});expect(h.props.read).not.toHaveBeenCalled();button.props.onClick(trusted);await h.tick();
     expect(h.props.read.mock.calls[0][0]).toBe(item.token);expect(h.panel.status).toBe('ready');expect(h.get(n=>n.tag==='pre'&&n.text==='译文')).toBeDefined();
+    expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeDefined();
     expect(h.get(n=>n.text==='此片段可能包含相邻片段的文字') !== undefined).toBe(item.kind==='segment');
     expect(h.get(n=>n.text==='画布文字来自最近完成的翻译快照，画面变化可能尚未同步') !== undefined).toBe(item.kind==='canvas');
   });
@@ -252,23 +253,23 @@ describe('standalone manga reading panel prototype',()=>{
     }
   });
   it('uses a layer above the image translation root without assuming the shadow host creates a stacking context',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
     const overlay=readFileSync(resolve('src/features/image-translation/content/runtime.ts'),'utf8');
-    const panelLayer=Number(panel.match(/\.fr-manga-reading \{[^}]*z-index:(\d+)/)?.[1]);
+    const panelLayer=Number(panel.match(/\.fr-manga-reading \{[^}]*z-index:\s*(\d+)/)?.[1]);
     const imageLayer=Number(overlay.match(/z-index: (\d+) !important/)?.[1]);
     expect(panelLayer).toBeGreaterThan(imageLayer);
   });
   it('uses readable snapshot guidance colors in explicit and system dark themes',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
-    expect(panel).toMatch(/\[data-theme=dark\] \{[^}]*--fr-reading-muted:#b8c0d0/);
-    expect(panel).toMatch(/@media \(prefers-color-scheme:dark\)[\s\S]*\[data-theme=auto\] \{[^}]*--fr-reading-muted:#b8c0d0/);
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
+    expect(panel).toMatch(/\.fr-manga-reading\[data-theme="dark"\] \{[^}]*--fr-manga-muted: #b8c0d0/);
+    expect(panel).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]*\.fr-manga-reading\[data-theme="auto"\] \{[^}]*--fr-manga-muted: #b8c0d0/);
   });
   it('keeps source text and guidance readable against each panel background',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
     const luminance=(hex:string)=>{const rgb=hex.match(/[\da-f]{2}/gi)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];};
     const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-    const light=panel.match(/\.fr-manga-reading \{([^}]+)\}/)![1],dark=panel.match(/\[data-theme=dark\] \{([^}]+)\}/)![1];
-    const color=(block:string,token:string)=>block.match(new RegExp(`--fr-reading-${token}:(?:var\\([^,]+,)?#([\\da-f]{6})`,'i'))![1];
+    const light=panel.match(/\.fr-manga-reading,\s*\.fr-manga-entry,[\s\S]*?\{([^}]+)\}/)![1],dark=panel.match(/\.fr-manga-reading\[data-theme="dark"\] \{([^}]+)\}/)![1];
+    const color=(block:string,token:string)=>block.match(new RegExp(`--fr-manga-${token}:\\s*(?:var\\([^,]+,\\s*)?#([\\da-f]{6})`,'i'))![1];
     for(const block of [light,dark]){
       expect(contrast(color(block,'muted'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color(block,'ink'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);

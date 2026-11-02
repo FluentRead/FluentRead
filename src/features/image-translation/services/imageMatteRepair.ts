@@ -19,6 +19,8 @@ export interface ImageMatteRepair extends ImageMatteObservationBox {
     sourceBox:Box;
     supportBox:Box;
 }
+/** 仅为布局观察提供静区与完整墨迹范围；没有修补mask或擦除权限。 */
+export interface ImageMatteGeometry extends ImageMatteObservationBox {background:Rgba;supportBox:Box}
 const HORIZON=8,MAX_PIXELS=65_536,MAX_ENDPOINTS=64;
 
 /** 与实际读取完全相同的零扫描几何；调用方在尝试规划前按width*height收费。 */
@@ -209,9 +211,7 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         supportBox};
 }
 
-function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
-    fitBudget:ImageMatteFitBudget,supportAt?:((x:number,y:number)=>boolean)):ImageMatteRepair|undefined {
-    if(!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
+function observeCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box) {
     const box={x0:sourceBox.x0,y0:sourceBox.y0,x1:sourceBox.x1,y1:sourceBox.y1};
     const roi=imageMatteObservationBox(width,height,box);
     if(!roi||pixels.length<width*height*4)return;
@@ -231,7 +231,22 @@ function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourc
         const candidate=observeMoat(colors,roi,box,background);
         if(candidate){if(result)return;result=candidate;}
     }
-    return result?finish(colors,roi,box,result,supportAt,fitBudget):undefined;
+    return result?{colors,roi,box,result}:undefined;
+}
+
+/** H8原像素的唯一静区几何；不要求共同墨色端点，不授权修补或绘字。 */
+export function observeImageMatteGeometry(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box):ImageMatteGeometry|undefined {
+    const observation=observeCandidate(pixels,width,height,sourceBox);
+    if(!observation)return;
+    const {roi,result}=observation,background=result.background;
+    return {...roi,background:[background&255,(background>>>8)&255,(background>>>16)&255,background>>>24],supportBox:{...result.supportBox}};
+}
+
+function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
+    fitBudget:ImageMatteFitBudget,supportAt?:((x:number,y:number)=>boolean)):ImageMatteRepair|undefined {
+    if(!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
+    const observation=observeCandidate(pixels,width,height,sourceBox);
+    return observation?finish(observation.colors,observation.roi,observation.box,observation.result,supportAt,fitBudget):undefined;
 }
 
 /** 固定H8/64Ki ROI的只读候选，不查询模型且没有应用权限；页级调用方必须累计ROI及共同端点预算。 */

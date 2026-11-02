@@ -17,6 +17,9 @@ import {translateImageInOffscreen} from '@/src/features/image-translation/servic
 import * as imageInpainting from '@/src/features/image-translation/services/inpainting';
 import * as mattePage from '@/src/features/image-translation/services/imageMattePage';
 import {ImageAlphaProtectionUnavailableError} from '@/src/features/image-translation/services/mangaAlphaProtection';
+import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
+import {collectMangaRegions,type MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
+import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
 
 const Pixels=Uint8ClampedArray;
 // Actual static128x80 transparent PNG bytes exercise the source-format identity
@@ -215,15 +218,54 @@ beforeEach(()=>{
 });
 
 describe('RGBA救援全文预算和原始源相位边界',()=>{
+    it.each([false,true])('真实像素续行证据在翻译前合段，已过滤的数字guard仍可阻断%s',async guarded=>{
+        const f=fixture(224),width=f.width,height=160,pixels=new Pixels(width*height*4);
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);
+        for(const r of f.art)fill(f.pixels,width,r,f.matte);
+        for(const dy of [0,60])for(let y=0;y<f.height;y++)for(let x=0;x<width;x++)pixels.set(f.pixels.subarray((y*width+x)*4,(y*width+x+1)*4),((y+dy)*width+x)*4);
+        source={width,height,pixels};
+        mocks.mangaRecognize.mockImplementation(async()=>{
+            const page:MangaOcrPage={results:[
+                {text:'FIRST',confidence:.9,box:{x:28,y:24,width:72,height:28}},
+                {text:'SECOND',confidence:.9,box:{x:28,y:84,width:72,height:28}},
+            ]};
+            const ocrPixels=pixels.slice();flattenOcrAlpha(ocrPixels);page.imageParagraphGapProofs=produceImageParagraphGapProofs(page,width,height,ocrPixels);
+            expect(page.imageParagraphGapProofs).toHaveLength(1);
+            const clone=structuredClone(page),regions=collectMangaRegions(clone,'en',width,height,'image');
+            if(guarded){
+                // Explicit low-confidence physical guard: invisible here, but it
+                // must remain a blocker after the offscreen translation filter.
+                regions.push({text:'',bbox:{x0:62,y0:64,x1:70,y1:70},fontSize:6,guardOnly:true,numericUncertain:true});
+                const consumer=createImageParagraphGapConsumer(clone,width,height);
+                for(let i=0;i<2;i++)consumer.record(clone.results[i],regions[i]);consumer.seal(regions);
+            }
+            bindImageParagraphGapEvidence(regions,inputImage,width,height);return regions;
+        });
+        const sent:string[][]=[];
+        vi.stubGlobal('chrome',{runtime:{sendMessage:(message:{type:string;texts?:string[]},callback:(value?:unknown)=>void)=>{
+            if(message.type==='fluentReadImageTranslateTexts'){sent.push(message.texts!);callback({success:true,translations:message.texts!.map(()=> 'FULL TEXT')});}
+            else callback(undefined);
+        }}});
+        const result=await translate();
+        expect(sent).toEqual(guarded?[['FIRST','SECOND']]:[['FIRST SECOND']]);
+        expect(result.lines.map(line=>line.sourceText)).toEqual(guarded?['FIRST','SECOND']:['FIRST SECOND']);
+        if(!guarded)expect(result.lines[0]).toMatchObject({sourceBoxes:[{x0:28,y0:24,x1:100,y1:52},{x0:28,y0:84,x1:100,y1:112}]});
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();released();
+    });
     it('真实DB已覆盖时不准备可选模型或分配分割张量',async()=>{
         const f=install(fixture(224));expect((await translate()).image).toBeTruthy();completeGlyphs();checkFrame(f);
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
     });
     it('DB未覆盖但整页/全文已成立时才检查缓存，缺失时保留完整阅读结果',async()=>{
         install(fixture(224));evidenceMode='empty';
-        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.lines[0].text).toBe('FULL TEXT');
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.retryWhenSegmentationReady).toBe(true);expect(result.lines[0].text).toBe('FULL TEXT');
         expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).not.toHaveBeenCalled();
         expect(canvases[0].context.measureText).toHaveBeenCalled();preserved();
+    });
+    it.each(['before-return','after-return'])('缺CTD准备返回false时%s取消仍优先，不发布迟到重试标记',async stage=>{
+        install(fixture(224));evidenceMode='empty';const controller=new AbortController();
+        mocks.prepareSeg.mockImplementation(async()=>{if(stage==='before-return')controller.abort();else setTimeout(()=>controller.abort(),0);return false;});
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});preserved();released();
     });
     it('可选受控模型的量化输出经真实局部投影和全页授权后，只上传已证明源墨而不擦外部图案',async()=>{
         const f=install(fixture(224));evidenceMode='empty';mocks.prepareSeg.mockResolvedValue(true);
@@ -240,7 +282,7 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
     });
     it('分割仍不能支持全部源墨时原子撤回，不发布部分译图',async()=>{
         install(fixture(224));evidenceMode='empty';mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockResolvedValue(new Uint8Array(1024*1024));
-        expect((await translate()).imageUnchanged).toBe(true);expect(mocks.segment).toHaveBeenCalledOnce();preserved();
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result).not.toHaveProperty('retryWhenSegmentationReady');expect(mocks.segment).toHaveBeenCalledOnce();preserved();
     });
     it.each(['prepare','segment']as const)('可选分割%s未知错误保留首因，不冒充未导入缓存',async stage=>{
         install(fixture(224));evidenceMode='empty';const failure=new Error('segmentation '+stage);
@@ -265,6 +307,7 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         expect(result.lines[0].text.length).toBe(text.length);expect(result.lines[0].text===text).toBe(true);expect(result.lines[0].renderSkipped).toBe(true);
         expect(canvases[0].context.measureText).toHaveBeenCalledTimes(mode==='call-count'?8191:0);preserved();
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
+        expect(result).not.toHaveProperty('retryWhenSegmentationReady');
     });
     it('重复长组合字素的全文指标也预付字符工作，度量中途耗尽时整页保留完整阅读结果',async()=>{
         const f=install(fixture(224));f.line.fontSize=100;f.line.textAlign='center';setRegions([f.line]);

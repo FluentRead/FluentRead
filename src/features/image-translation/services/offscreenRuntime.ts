@@ -2,7 +2,8 @@
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞的文字只显示于阅读面板；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页或预排版；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
- * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，从原 RGBA 构造独占输入，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型。
+ * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，从原 RGBA 构造独占输入，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
+ * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  */
 import {createImageTranslationFailure} from '../failure';
@@ -12,6 +13,7 @@ import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitio
 import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
 import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
 import {getImageDetectionEvidence,type ImageDetectionSupport} from './imageDetectionEvidence';
+import {getImageParagraphGapEvidence} from './imageParagraphGapEvidence';
 import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import {createImageTextSegmentationInput,createImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
@@ -33,6 +35,7 @@ export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string;
 export interface OffscreenImageTranslationResult {
     image: string;
     imageUnchanged?: true;
+    retryWhenSegmentationReady?: true;
     mangaPatches?: MangaPatchPacket;
     lines: OffscreenImageTranslationLine[];
 }
@@ -315,7 +318,12 @@ async function renderImageMatteRescue(context:CanvasRenderingContext2D,canvas:HT
     await checkImageCancellation(signal);
     if(!plan){
         // 无缓存时不下载、不构造张量；所有颜色、归属与完整字形均已通过才准备可选会话。
-        if(!await mangaInferenceClient.prepareTextSegmentation(signal))return;
+        const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
+        if(!ready){
+            // 缺资源也是异步结果；保留外层撤回前的让出与取消检查，不能发布迟到的可重试结果。
+            await checkImageCancellation(signal);
+            return {...imageAlphaUnchanged(reading),retryWhenSegmentationReady:true};
+        }
         throwIfImageOperationAborted(signal);
         const seg=await mangaInferenceClient.segmentText(()=>{
             throwIfImageOperationAborted(signal);
@@ -567,7 +575,8 @@ export async function translateImageInOffscreen(
         });
         const readable:ImageTextRegion[] = manga ? usePaddle ? eligible : groupMangaOcrLines(eligible, sourceLanguage,
             source.naturalWidth || source.width, source.naturalHeight || source.height)
-            : groupImageParagraphs(eligible.map(line => numericProtection(line.text) ? {...line,sourceBoxes:[line.bbox]} : line));
+            : groupImageParagraphs(eligible.map(line => numericProtection(line.text) ? {...line,sourceBoxes:[line.bbox]} : line),
+                usePaddle?getImageParagraphGapEvidence(recognized,image,width,height):undefined);
         if (!usePaddle) {
             // 原始数值证据仅用于本地提示，不进入阅读结果或翻译请求。
             const numbers=readable.filter(line=>numericProtection(line.text)).map(line=>({line,key:numericEvidenceKey(line.text)}));

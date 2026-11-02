@@ -102,6 +102,17 @@ describe('area translation Offscreen adapter', () => {
 
 describe('image translation Offscreen adapter', () => {
     const adapter = createImageTranslationOffscreenAdapter(client);
+    it('validates the missing-segmentation retry marker only on an ordinary skipped unchanged result',async()=>{
+        const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
+        const response={success:true,image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines};
+        send.mockResolvedValueOnce(response);
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
+        for(const invalid of [
+            {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
+            {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[null,'bad',{}, {renderSkipped:'true'}]},
+        ]){send.mockResolvedValueOnce(invalid);await expect(adapter.translateImage('source','en','Page')).rejects.toThrow();}
+        send.mockResolvedValueOnce(response);await expect(adapter.translateImage('source','en','Page',{manga:true,requestId:'m',signal:new AbortController().signal,timeoutMs:1000})).rejects.toThrow();
+    });
     it('preserves optional segmentation readiness, accepts older model statuses and rejects malformed optional fields',async()=>{
         const base={success:true,ready:true,bytes:123,inpaintingReady:true};
         for(const segmentationReady of [true,false]){

@@ -28,11 +28,14 @@ import type {MangaTranslationStatus} from '@/src/features/image-translation/cont
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import * as controlsModule from '@/src/features/image-translation/content/controls';
 import {registerMangaReadingOpener} from '@/src/features/image-translation/content/runtime';
+import {importMangaModel,MANGA_OCR_CACHE,MANGA_TEXT_SEGMENTATION_ASSET} from '@/src/features/image-translation/services/mangaOcrAssets';
+import {createVirtualModelResponsePort,virtualModelBuffer} from './helpers/virtualModelResponse';
 
 // 本文件断言非中文界面文案；扩展运行时按需加载，测试中一次注册全部语言资源包。
 registerAllUiLanguageBundles();
 
 const result = {image: 'data:image/png;base64,translated', lines: [{text: '完整译文', bbox: {x0: 0, y0: 0, x1: 100, y1: 20}, backgroundColor: '#fff'}]};
+const segmentationFallback={image:'',imageUnchanged:true as const,retryWhenSegmentationReady:true as const,lines:[{text:'完整译文',sourceText:'SOURCE',renderSkipped:true as const,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]};
 const deferred = <T>() => {
     let resolve!: (value: T) => void;
     let reject!: (reason: unknown) => void;
@@ -228,6 +231,118 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator();while (restoreAnimationPorts.length) restoreAnimationPorts.pop()!(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
+    it('缺CTD回退缓存先零OCR复用，离线导入后同图显式操作才重入一次且成功位图不再探测',async()=>{
+        settings.imageTranslationOcrEngine='paddle';
+        const asset=MANGA_TEXT_SEGMENTATION_ASSET,cache=new Map<string,Response>(),network=vi.fn();
+        vi.stubGlobal('fetch',network);vi.stubGlobal('Response',createVirtualModelResponsePort(Response));
+        vi.stubGlobal('crypto',{subtle:{digest:vi.fn(async()=>Uint8Array.from(asset.sha256.match(/../gu)!,part=>parseInt(part,16)).buffer)}});
+        vi.stubGlobal('caches',{open:async(name:string)=>{expect(name).toBe(MANGA_OCR_CACHE);return{put:async(key:string,value:Response)=>{cache.set(key,value);}};}});
+        client.settings.mockImplementation(async()=>({success:true,ready:true,inpaintingReady:false,segmentationReady:cache.has(asset.url),bytes:cache.has(asset.url)?asset.bytes:0}));
+        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines:[{text:'完整译文',sourceText:'SOURCE',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const env=setup();env.hover();env.click();await flush();
+        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();expect(client.settings).not.toHaveBeenCalled();
+        env.click();env.click();await flush();expect(client.translate).toHaveBeenCalledOnce();
+        await importMangaModel({name:asset.file,size:asset.bytes,arrayBuffer:async()=>virtualModelBuffer(asset.bytes)} as File);
+        expect(cache.has(asset.url)).toBe(true);expect(client.translate).toHaveBeenCalledOnce();
+        env.click();env.click();await flush();expect(client.translate).toHaveBeenCalledTimes(2);
+        const bitmap=env.bitmap();expect(bitmap).toBeTruthy();expect(env.image.style.opacity).toBe('0');
+        expect(client.settings).toHaveBeenCalledWith({type:'fluentReadMangaModelStatus'});
+        expect(client.settings).toHaveBeenCalledTimes(2);env.click();env.click();await flush();
+        expect(env.bitmap()).toBe(bitmap);expect(client.translate).toHaveBeenCalledTimes(2);expect(client.settings).toHaveBeenCalledTimes(2);
+        expect(network).not.toHaveBeenCalled();
+    });
+    it.each(['bitmap','safe-fallback','unchanged-text'] as const)('可选资源不探测或失效已完成%s结果',async kind=>{
+        client.translate.mockResolvedValueOnce(kind==='bitmap'?result:kind==='safe-fallback'?{...segmentationFallback,retryWhenSegmentationReady:undefined}:{image:'',imageUnchanged:true,lines:[{...segmentationFallback.lines[0],text:'SOURCE',renderSkipped:undefined}]});
+        const env=setup();env.hover();env.click();await flush();const bitmap=env.bitmap();
+        env.click();env.click();await flush();expect(client.translate).toHaveBeenCalledOnce();expect(client.settings).not.toHaveBeenCalled();expect(env.bitmap()).toBe(bitmap);
+    });
+    it.each([false,true])('缺CTD当前结果的重复准备共用一次探测，缓存=%s',async useCache=>{
+        settings.useCache=useCache;settings.imageTranslationOcrEngine='paddle';client.translate.mockResolvedValue(segmentationFallback);
+        const create=controlsModule.createImageControls,port=vi.spyOn(controlsModule,'createImageControls').mockImplementation(actions=>create(actions));
+        const env=setup();env.hover();env.click();await flush();const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);
+        const actions=port.mock.calls[0][0];actions.onPrepare();actions.onPrepare();await flush();expect(client.settings).toHaveBeenCalledOnce();
+        pending.resolve({success:true,segmentationReady:false});await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.button().dataset.phase).toBe('translated');
+    });
+    it.each(['restore','source','language','title','unmount'] as const)('缺CTD探测在%s后迟到就绪不能重入旧图',async action=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);env.click();await flush();expect(client.settings).toHaveBeenCalledOnce();
+        expect(env.roots[0].querySelector('.fr-image-reader')!.textContent).toContain('完整译文');
+        if(action==='restore')env.click();
+        if(action==='source'){env.image.src='https://example.test/changed.png';env.notify();}
+        if(action==='language')settings.to='fr';
+        if(action==='title')document.title='Changed while probing';
+        if(action==='unmount')unmountImageTranslator();
+        pending.resolve({success:true,segmentationReady:true});await flush();
+        expect(client.translate).toHaveBeenCalledOnce();expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');
+    });
+    it.each([['ordinary','ready'],['ordinary','absent'],['ordinary','error'],['global','ready'],['global','absent'],['global','error']] as const)('缺CTD探测期间关闭%s后迟到%s不启动或重显普通图结果',async(mode,reply)=>{
+        settings.imageTranslationMangaEnabled=true;client.translate.mockResolvedValueOnce(segmentationFallback);
+        const env=setup();env.hover();env.click();await flush();env.click();
+        const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);env.click();await flush();
+        if(mode==='ordinary')settings.disableImageTranslator=true;else settings.on=false;
+        await flush();
+        if(reply==='error')pending.reject(new Error('late status failed'));else pending.resolve({success:true,segmentationReady:reply==='ready'});
+        await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();
+        expect(env.button().dataset.phase).toBe('idle');expect(env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!.hidden).toBe(true);
+        if(mode==='ordinary')settings.disableImageTranslator=false;else settings.on=true;
+        client.settings.mockResolvedValueOnce({success:true,segmentationReady:false});env.click();await flush();
+        expect(env.button().dataset.phase).toBe('translated');expect(client.translate).toHaveBeenCalledOnce();
+    });
+    it('缺CTD探测等待和失败时完整阅读入口可点击且面板可见，恢复原图后关闭',async()=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);env.click();await flush();
+        const inspect=()=>env.roots[0].querySelector<HTMLButtonElement>('[aria-label="查看完整译文"]')!;
+        const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
+        const assertReachable=()=>{
+            const button=inspect();expect(button.isConnected).toBe(true);expect(button.hidden).toBe(false);
+            for(let parent=button.parentElement;parent;parent=parent.parentElement){expect(parent.hidden).not.toBe(true);if(parent.tagName==='DETAILS')expect((parent as HTMLDetailsElement).open).toBe(true);}
+        };
+        assertReachable();env.dispatch(inspect(),'click');expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('完整译文');
+        pending.reject(new Error('disk status failed'));await flush();
+        expect(env.button().dataset.phase).toBe('error');assertReachable();expect(reader.hidden).toBe(false);
+        env.dispatch(inspect(),'click');expect(reader.hidden).toBe(true);env.dispatch(inspect(),'click');expect(reader.hidden).toBe(false);
+        client.settings.mockResolvedValueOnce({success:true,segmentationReady:false});env.click();await flush();
+        expect(env.button().dataset.phase).toBe('translated');env.click();expect(reader.hidden).toBe(true);expect(inspect().hidden).toBe(true);
+    });
+    it('缺CTD探测在关闭再启用后新动作拥有状态，旧就绪回复不抢占新检查',async()=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        const old=deferred<unknown>(),current=deferred<unknown>();client.settings.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+        env.click();await flush();settings.disableImageTranslator=true;await flush();settings.disableImageTranslator=false;
+        env.click();env.click();await flush();expect(client.settings).toHaveBeenCalledTimes(2);
+        old.resolve({success:true,segmentationReady:true});await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.button().dataset.phase).toBe('loading');
+        current.resolve({success:true,segmentationReady:false});await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.button().dataset.phase).toBe('translated');expect(env.bitmap()).toBeFalsy();
+    });
+    it.each(['reject','reject-value','response-error','empty-error','undefined','missing','malformed'] as const)('缺CTD探测%s保留首因和阅读译文，下一次显式重试仍可恢复缓存',async fault=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        if(fault==='reject')client.settings.mockRejectedValueOnce(new Error('disk status failed'));
+        else if(fault==='reject-value')client.settings.mockRejectedValueOnce('disk status failed');
+        else client.settings.mockResolvedValueOnce(fault==='response-error'?{success:false,error:'disk status failed'}:fault==='empty-error'?{success:false,error:''}:fault==='undefined'?undefined:fault==='missing'?{success:true}:{success:true,segmentationReady:'true'});
+        env.click();await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.button().dataset.phase).toBe('error');
+        expect(env.roots[0].querySelector('[role="status"]')!.textContent).toContain(fault==='reject'||fault==='reject-value'||fault==='response-error'?'disk status failed':fault==='empty-error'||fault==='undefined'?'状态读取失败':'状态无效');
+        expect(env.roots[0].querySelector('.fr-image-reader')!.textContent).toContain('完整译文');
+        client.settings.mockResolvedValueOnce({success:true,segmentationReady:false});env.click();await flush();
+        expect(env.button().dataset.phase).toBe('translated');expect(client.translate).toHaveBeenCalledOnce();expect(env.image.style.opacity).not.toBe('0');
+    });
+    it('缺CTD探测超时结束等待，迟到就绪不启动管线且可重试',async()=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);env.click();await flush();
+        await vi.advanceTimersByTimeAsync(15_000);expect(env.button().dataset.phase).toBe('error');
+        expect(env.roots[0].querySelector('[role="status"]')!.textContent).toContain('图片分割模型状态读取超时');
+        pending.resolve({success:true,segmentationReady:true});await flush();expect(client.translate).toHaveBeenCalledOnce();expect(env.bitmap()).toBeFalsy();
+        client.settings.mockResolvedValueOnce({success:true,segmentationReady:false});env.click();await flush();expect(env.button().dataset.phase).toBe('translated');
+    });
+    it('缺CTD探测等待中被其他图片挤出的结果重入缓存仍遵守六张上限',async()=>{
+        client.translate.mockResolvedValueOnce(segmentationFallback);const env=setup();env.hover();env.click();await flush();env.click();
+        const pending=deferred<unknown>();client.settings.mockReturnValueOnce(pending.promise);env.click();await flush();
+        const others:HTMLImageElement[]=[];
+        const toggle=(image:HTMLImageElement)=>{env.dispatch(image,'contextmenu');expect(toggleContextMenuImage(image.src)).toBe(true);};
+        for(let index=0;index<6;index++){
+            const image=addSecondHoverImage(env,env.image.getBoundingClientRect);image.src+=`?${index}`;others.push(image);
+            toggle(image);await flush();toggle(image);
+        }
+        expect(client.translate).toHaveBeenCalledTimes(7);pending.resolve({success:true,segmentationReady:false});await flush();
+        toggle(others[0]);await flush();expect(client.translate).toHaveBeenCalledTimes(8);
+    });
     it.each([false,true])('普通Paddle保留原图结果在同状态重复触发时直接复用，缓存=%s',async cache=>{
         settings.useCache=cache;settings.imageTranslationOcrEngine='paddle';
         const create=controlsModule.createImageControls;

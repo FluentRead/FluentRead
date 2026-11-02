@@ -1,5 +1,5 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
-import {imageMatteObservationBox,planImageMatteCandidate,planImageMatteRepair as proveRepair,type ImageMatteFitBudget} from '@/src/features/image-translation/services/imageMatteRepair';
+import {imageMatteObservationBox,observeImageMatteGeometry,planImageMatteCandidate,planImageMatteRepair as proveRepair,type ImageMatteFitBudget} from '@/src/features/image-translation/services/imageMatteRepair';
 import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -25,6 +25,18 @@ function composite(bg:Color,fg:Color,t:number,canvas=false):Color {
     out.push(a);return out as unknown as Color;
 }
 afterEach(()=>vi.unstubAllGlobals());
+
+describe('布局静区只读出口不授予修补权限',()=>{
+    it('唯一H8几何返回独立标量，没有mask也不运行共同端点fit',()=>{
+        const p=fixture([255,255,255,255],[0,0,0,255]);dot(p,23,20,[150,100,140,255]);const before=p.slice();
+        const geometry=observeImageMatteGeometry(p,48,48,box)!;expect(geometry).toEqual({left:8,top:8,width:32,height:32,background:[255,255,255,255],supportBox:{x0:20,y0:20,x1:28,y1:27}});
+        expect(geometry).not.toHaveProperty('mask');expect(planImageMatteCandidate(p,48,48,box,budget())).toBeUndefined();expect(p).toEqual(before);
+        geometry.supportBox.x0=0;expect(observeImageMatteGeometry(p,48,48,box)!.supportBox.x0).toBe(20);expect(box.x0).toBe(16);
+    });
+    it('缺失完整静区或非法ROI仍不提供几何观察',()=>{
+        const p=fixture();dot(p,35,35);expect(observeImageMatteGeometry(p,48,48,box)).toBeUndefined();expect(observeImageMatteGeometry(p,0,48,box)).toBeUndefined();
+    });
+});
 
 describe('真实Canvas半值读回的共同颜色域',()=>{
     // 字面值来自固定两景首轮Chrome ImageData捕获；作者PNG只作独立对照。

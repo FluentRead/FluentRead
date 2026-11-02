@@ -7,6 +7,7 @@
  * 模型形状：资源层仅在原文件完整校验与入库后生成固定识别图的内存副本，CPU 重载同样处理；本入口固定识别高度48，并在每次原生调用前核对正 batch、三通道和至少八像素宽度，不把未证明输入交给优化图。
  * 视图词界：所有局部框映回后，仅对同字符且空格边界不同的重叠拉丁行生成有界原像素证明；索引、比较和尝试均有限，保持最终页面与气泡对象引用，原文字、数字证据与几何不改；原图回读与已有方向和斜行预处理共用两百万像素余额，独立于既有识别颜色读回适配。
  * 普通图片旁证：复用既有透明度扫描，仅透明图片按需捕获同次检测原概率的有界位图；依锁定SDK及实际检测配置核对原比例帧和填充张量，不借放大气泡概率；自有位图只在Worker私有响应传输，按结果数组、原图和尺寸绑定后供修补查询，不进入文字、阅读或缓存。
+ * 段落间距：仅普通图片请求在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。关系随同一结果对象图传输，实际物理行采用并完成去重后才按原图及尺寸私有绑定，不授予擦除权限。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
@@ -27,6 +28,7 @@ import {MANGA_DESKEW_PIXEL_BUDGET,planMangaOcrDeskew,trimMangaOcrDeskew} from '.
 import {assertMangaRecognitionInput} from './mangaRecognitionShapes';
 import {createMangaViewWordBoundaryBudget,hasMangaViewWordBoundaryDifference,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
 import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,type ImageDetectionFrameSource} from './imageDetectionEvidence';
+import {bindImageParagraphGapEvidence,produceImageParagraphGapProofs} from './imageParagraphGapEvidence';
 
 interface MangaOcrPort {
     recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true}): Promise<MangaOcrPage>;
@@ -87,6 +89,7 @@ export function createMangaOcrRuntime(create: (signal?: AbortSignal, progress?: 
                         assertMangaOcrActive(signal);
                         const regions=collectMangaRegions(response, language, width, height, profile);
                         if(profile==='image'&&response.imageDetectionFrames)bindImageDetectionEvidence(regions,image,width,height,response.imageDetectionFrames);
+                        if(profile==='image')bindImageParagraphGapEvidence(regions,image,width,height);
                         return regions;
                     })().catch(async error => {
                         // 滚动取消只丢弃本页结果；端口仍可复用，由 Worker owner 看守原生推理收尾。
@@ -474,6 +477,10 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     if(frames?.length)finalPage.imageDetectionFrames=[...frames];
                     const wordBoundaryProofs=service.proveMangaWordBoundaries(finalPage,bubbles,canvas.width,canvas.height);
                     if(wordBoundaryProofs.length)finalPage.wordBoundaryProofs=wordBoundaryProofs;
+                    if(options.imageDetectionEvidence===true){
+                        const proofs=produceImageParagraphGapProofs(finalPage,canvas.width,canvas.height,pixels.data,()=>assertMangaOcrActive(options.signal));
+                        if(proofs.length)finalPage.imageParagraphGapProofs=proofs;
+                    }
                     return finalPage;
                 }finally{canvas.width=0;canvas.height=0;}
                 }finally{if ('close' in bitmap)bitmap.close();}

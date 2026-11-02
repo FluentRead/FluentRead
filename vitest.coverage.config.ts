@@ -252,6 +252,7 @@ export default defineConfig({
                 'src/core/i18n/messages/siteRules.ts',
                 'src/features/image-translation/services/mangaAlphaProtection.ts',
                 'src/features/image-translation/services/imageDetectionEvidence.ts',
+                'src/features/image-translation/services/imageParagraphGapEvidence.ts',
                 'src/features/image-translation/services/imageDetectionSnapshot.ts',
                 'src/features/image-translation/services/imageMattePage.ts',
                 'src/features/image-translation/services/imageMatteRepair.ts',

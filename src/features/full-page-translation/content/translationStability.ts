@@ -310,14 +310,13 @@ export function getCurrentTranslationStateSourceText(node: HTMLElement, state: T
 
 export function getCurrentTranslationStateTextNodes(
     node: HTMLElement, state: TranslationState, protectionCache?: TranslationTextProtectionCache,
-    protectionOptions?: TranslationTextProtectionOptions,
 ): Text[] {
     if (!isTranslationApplicationShellPolicyCurrent(node, state)) return [];
     return collectLiveTranslationTextSlots(
         node,
         getCurrentTranslationCore(state.scope).shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
-        protectionOptions ?? getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
         state.syntheticSegment || state.allowTopLevelApplicationShell === true ? undefined : protectionCache,
     ).map((slot) => slot.node);
 }
@@ -436,8 +435,9 @@ export function statefulSourceAndTextSlotsAreCurrent(
         // 已有槽保留原 Text，但新的正文可能通过 childList 或可见性变化加入。
         // 只放行本代登记的槽；其他新出现的可译 Text 仍使快照失效。
         const originalNodes = new Set(previousNodes);
-        return getCurrentTranslationStateTextNodes(node, state, undefined, options)
-            .every((text) => originalNodes.has(text));
+        return collectLiveTranslationTextSlots(node, core.shouldStayOriginal,
+            getTranslationStateProtectionBoundary(node, state), options)
+            .every(({node: text}) => originalNodes.has(text));
     }
 
     const currentNodes = getCurrentTranslationStateTextNodes(node, state);

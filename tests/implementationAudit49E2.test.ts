@@ -9,6 +9,8 @@ import * as ort from 'onnxruntime-web/webgpu';
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {createVirtualModelResponsePort, virtualModelBuffer} from './helpers/virtualModelResponse';
+// 本组显式虚拟容量不含真实 ONNX wire；仅控制纯模型变换端口，保留实际资源校验/入库/取消/删除生命周期。
+vi.mock('@/src/features/image-translation/services/mangaRecognitionShapes',async original=>({...await original<any>(),optimizeVerifiedMangaRecognition:(buffer:ArrayBuffer)=>buffer}));
 
 const sdk = vi.hoisted(() => ({sessions: [] as any[], detectors: [] as Array<{session: unknown; options: unknown}>, detectionSession: undefined as any, create: vi.fn(), initialize: vi.fn(), recognize: vi.fn(), destroy: vi.fn()}));
 vi.mock('onnxruntime-web/webgpu', () => ({env: {wasm: {}}, InferenceSession: {create: sdk.create}, Tensor: class {

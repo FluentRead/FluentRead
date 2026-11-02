@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/paragraphs.ts
  * 文件职责：将普通图片的 OCR 物理行恢复成可整段翻译与回填的文本区域。
- * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
+ * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文，续行与扫描早停共用完整源像素间距，避免缩放还原的亚像素差异拆开相邻行；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
  * 模块边界：只处理原图坐标与识别文本，不运行 OCR、不调用翻译或 Canvas；漫画仍使用其气泡分组策略。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -52,6 +52,13 @@ function alignment(state: Metrics): ImageTextRegion['textAlign'] | undefined {
         return 'center';
     return undefined;
 }
+/** 比较完整源像素间距；ULP 项只稳定整数格边缘，不充当额外的物理行距。
+ * 修正量只取比较端点，早停采用较大行高时也不能改变同一间距的像素格。
+ */
+function beyondLineGap(previousEnd: number, nextStart: number, size: number): boolean {
+    const roundoff = 4 * Number.EPSILON * Math.max(1, Math.abs(previousEnd), Math.abs(nextStart));
+    return Math.floor(nextStart - previousEnd + roundoff) > Math.floor(size * 0.65 + roundoff);
+}
 function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextRegion): Metrics | undefined {
     if (next.vertical || next.sourceBoxes || listStart.test(next.text))
         return;
@@ -60,7 +67,7 @@ function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextReg
         return;
     const gap = next.bbox.y0 - previous.bbox.y1;
     // 只连接下一物理行；同一行的控件、明显段间空白和重叠识别不参与合段。
-    if (gap < -small * 0.15 || gap > small * 0.65
+    if (gap < -small * 0.15 || beyondLineGap(previous.bbox.y1, next.bbox.y0, small)
         || next.bbox.y0 - previous.bbox.y0 < small * 0.7)
         return;
     // 同行控件和不连续行先退出，不为无法合段的标签分配对齐统计对象。
@@ -153,7 +160,7 @@ function groupHorizontalParagraphs(input: ImageTextRegion[]): ImageTextRegion[] 
             for (let cursor = index + 1; cursor < lines.length; cursor++) {
                 const next = lines[cursor], previous = members[members.length - 1];
                 // 已按 y0 排序，超过当前段落最远行距后所有后续行都不可能连续。
-                if (next.bbox.y0 > previous.bbox.y1 + state.minHeight * 0.65)
+                if (beyondLineGap(previous.bbox.y1, next.bbox.y0, state.minHeight))
                     break;
                 if (used.has(next))
                     continue;

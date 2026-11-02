@@ -1,4 +1,4 @@
-/** 验证私有单行原型的身份、字素和空白拒绝边界；实际 stock PDF.js 回读属于独立导出验收。 */
+/** 验证私有基本希伯来/ASCII 单行原型的身份与 reader 兼容边界；真实回读另由导出测试验收。 */
 import {afterEach, describe, expect, it, vi} from 'vitest';
 const fault = vi.hoisted(() => ({kind: ''}));
 vi.mock('bidi-js', async original => {
@@ -26,12 +26,13 @@ vi.mock('bidi-js', async original => {
     }};
 });
 import {pdfFallbackBidiLine, withPdfFallbackBidiDirection} from '@/src/features/document-translation/core/pdfFallbackBidi';
-afterEach(() => {fault.kind = ''; vi.unstubAllGlobals();});
+afterEach(() => {fault.kind = '';});
 
 describe('bounded complete-line fallback bidi', () => {
     const rtl = 'מחקר 2026 משווה GPU A100 מול H100; השיפור 12.5% (ניסוי 3), וההסבר נשמר.';
     const ltr = 'English שלום עולם sentence GPU A100 and H100 in 2026 (12.5%).';
-    it.each([['שלום', 'rtl', 'םולש'], ['English שלום עולם GPU', 'ltr', 'English םלוע םולש GPU']] as const)
+    it.each([['שלום', 'rtl', 'םולש'], ['א aa', 'rtl', 'aa א'],
+        ['English explanation שלום עולם GPU', 'ltr', 'English explanation םלוע םולש GPU']] as const)
     ('uses the public UBA visual ordering for %s without changing Unicode identities', (source, direction, visualText) => {
         expect(pdfFallbackBidiLine(source, source)).toMatchObject({direction, visualText, advance: .5});
     });
@@ -48,21 +49,21 @@ describe('bounded complete-line fallback bidi', () => {
     });
     it.each(['', 'ASCII GPU A100 12.5%.', '中文 Ω ∑', ' שלום', 'שלום ', 'שלום  עולם', 'שלום\tעולם', 'שלום\u00a0עולם',
         'שלום\nעולם', 'שלום\r\nעולם', 'שלום\u2003עולם', 'שָלום', 'שלום\u200d', 'שלום\ufe0f', 'שלום😀', 'שלום\ud800', 'שלום\u0003',
-        'שלום 가', 'שלום 각', 'שלום'.repeat(2049)])
+        'שלום 가', 'שלום 각', 'שלום Ω', 'שלום مرحبا', 'שלום ױ', 'א <>', 'שלום <GPU>', 'שלום'.repeat(2049)])
     ('keeps unsupported or ordinary source on the legacy path: %j', source => {
         expect(pdfFallbackBidiLine(source, source)).toBeUndefined();
     });
     it('accepts the bounded UTF16 limit without truncating any occurrence', () => {
-        const source = 'שלום' + 'A'.repeat(8188);
+        const source = 'A'.repeat(8188) + 'שלום';
         expect(pdfFallbackBidiLine(source, source)?.visualIndices).toHaveLength(8192);
     });
     it('does not borrow a full paragraph identity for one wrapped or clipped line', () => {
         expect(pdfFallbackBidiLine('שלום', 'שלום עולם')).toBeUndefined();
         expect(pdfFallbackBidiLine('שלום…', 'שלום עולם')).toBeUndefined();
     });
-    it('declines without the native complete-grapheme boundary API', () => {
-        vi.stubGlobal('Intl', {...Intl, Segmenter: undefined});
-        expect(pdfFallbackBidiLine('שלום', 'שלום')).toBeUndefined();
+    it.each(['א hello world', 'English שלום שלום שלום שלום'])
+    ('declines when the canonical first-strong paragraph base disagrees with pinned stock reader: %s', source => {
+        expect(pdfFallbackBidiLine(source, source)).toBeUndefined();
     });
     it.each(['paragraphs', 'missing', 'sparse paragraph', 'start', 'end', 'level', 'length', 'duplicate', 'negative', 'outside', 'fraction'])
     ('fails closed if the opaque UBA result loses occurrence integrity: %s', kind => {

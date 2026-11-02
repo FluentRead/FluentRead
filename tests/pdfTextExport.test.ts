@@ -155,16 +155,48 @@ describe('visible Unicode PDF reading export', () => {
         }
     });
 
-    it.each(['no direction', 'wrong direction', 'partial paragraph', 'two lines', 'incompatible reader base'] as const)('does not grant the new font without complete painted identity: %s', mode => {
+    it.each(['no direction', 'wrong direction', 'partial paragraph', 'two lines', 'incompatible reader base', 'unowned segment'] as const)('does not grant the new font without complete painted identity: %s', mode => {
         return (async () => {
             const document = await fixture(), target = mode === 'incompatible reader base' ? 'English שלום שלום שלום שלום' : 'שלום עולם GPU A100';
-            const item = {segmentIndex: 1, text: mode === 'partial paragraph' ? 'שלום' : target, x: 42, y: 110, width: 312, fontSize: 14,
+            const item = {segmentIndex: mode === 'unowned segment' ? 99 : 1, text: mode === 'partial paragraph' ? 'שלום' : target, x: 42, y: 110, width: 312, fontSize: 14,
                 ...(mode === 'no direction' ? {} : {direction: mode === 'wrong direction' || mode === 'incompatible reader base' ? 'ltr' as const : 'rtl' as const})};
             const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: mode === 'two lines' ? [item, {...item, y: 140}] : [item]})});
             const output = await PDFDocument.load(download.data as Uint8Array), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
             expect(fonts.keys().map(key => fonts.lookup(key, PDFDict).get(PDFName.of('BaseFont'))?.toString())).not.toContain('/FluentReadBidiSourceText');
         })();
+    });
+
+    it.each([[8e307, true], [1e308, false]] as const)('keeps finite search transforms when half-em scaling would overflow at width %s', async (width, admitsBidi) => {
+        const document = await fixture(); if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        // A finite numerical port boundary, not a Canvas/viewer page-size claim. No huge page is rendered or read by PDF.js.
+        document.binary.pages[0].width = 1.2e308;
+        const download = await createDocumentDownload(document, ['', 'א'], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+            textItems: [{segmentIndex: 1, text: 'א', x: 42, y: 110, width, fontSize: 14, direction: 'rtl'}]})});
+        const warning = vi.spyOn(console, 'warn');
+        let output: PDFDocument;
+        try {
+            output = await PDFDocument.load(download.data as Uint8Array);
+            // pdf-lib reports the two extreme page boxes; preserve those diagnostics and assert their precise scope.
+            expect(warning.mock.calls).toHaveLength(2);
+            expect(warning.mock.calls.every(([message]) => typeof message === 'string'
+                && message.startsWith('Parsed number that is too large for some PDF readers:') && message.endsWith(', not capping.'))).toBe(true);
+        } finally {warning.mockRestore();}
+        const page = output.getPage(0);
+        const fonts = page.node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+        const entries = fonts.keys().map(key => fonts.lookup(key, PDFDict));
+        expect(entries.some(font => font.get(PDFName.of('BaseFont'))?.toString() === '/FluentReadBidiSourceText')).toBe(admitsBidi);
+        const font = entries.find(font => font.get(PDFName.of('BaseFont'))?.toString() === (admitsBidi ? '/FluentReadBidiSourceText' : '/FluentReadSourceText'))!;
+        const descendant = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict);
+        expect(descendant.get(PDFName.of('DW'))?.toString()).toBe(admitsBidi ? '500' : '1000');
+        expect(inflateSync(font.lookup(PDFName.of('ToUnicode'), PDFRawStream).getContents()).toString()).toMatch(/<05d0>/iu);
+        const contents = page.node.Contents();
+        const streams = contents instanceof PDFArray ? contents.asArray().map(ref => output.context.lookup(ref, PDFRawStream)) : [contents as PDFRawStream];
+        const operators = streams.map(stream => inflateSync(stream.getContents()).toString()).join('\n');
+        const matrices = [...operators.matchAll(/^(.+) cm$/gmu)].map(match => match[1].trim().split(/\s+/u).map(Number));
+        expect(matrices.length).toBeGreaterThan(0);
+        expect(matrices.every(matrix => matrix.length === 6 && matrix.every(Number.isFinite))).toBe(true);
+        expect(operators).not.toMatch(/Infinity|NaN/u);
     });
 
     it('retains an already extractable complete line when canonical and stock paragraph bases disagree', async () => {

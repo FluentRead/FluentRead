@@ -174,7 +174,7 @@ describe('Vue Shadow UI 平台适配器', () => {
       name: 'fixture-ui',
       hostId: 'fixture-host',
       component,
-      styles: '.fr-fixture-panel{font-size:14px}',
+      css: '.fr-fixture-panel{font-size:14px}',
     });
 
     const [, options] = mocks.createShadowRootUi.mock.calls[0];

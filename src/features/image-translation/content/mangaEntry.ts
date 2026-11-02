@@ -67,7 +67,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
         if (cleanup === remove) {cleanup = undefined;if(canRead===allowed)canRead=undefined;publishReading(false);}
     };
     cleanup = remove;
-    pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', styles:mangaEntryStyles,
+    pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', css:mangaEntryStyles,
         props: {status, settings, page,reading,readingState,readManga:openMangaReading,
             readingChanged:(open:boolean)=>{if(request===owner && !removed){readingState.open=open;publishReading(open);}},
             startAreaTranslation: async () => config.on && config.imageTranslationMangaEnabled && status.available && status.areaFallback === true

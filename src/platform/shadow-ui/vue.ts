@@ -27,7 +27,7 @@ export interface VueShadowUiOptions {
   zIndex?: number;
   mode?: 'open' | 'closed';
   /** 追加到当前 ShadowRoot 的 feature 样式；避免把 SFC 样式错误注入宿主页的 document。 */
-  styles?: string;
+  css?: string;
   /** 将当前 app 与本次挂载的自有容器交给调用方注册插件和组件；默认只安装基础 i18n。 */
   configureApp?: (app: VueApp, container: HTMLElement) => void;
   /** 让 Shadow UI 承载一个独立的全视口页面，而不是零尺寸浮层。 */
@@ -113,7 +113,7 @@ export async function createVueShadowUi(
     scopeRoot: options.viewport,
     inheritStyles: false,
     isolateEvents: ['keydown', 'keyup', 'keypress'],
-    css: `${buildShadowFoundation(Boolean(options.viewport))}\n${options.styles ?? ''}`,
+    css: buildShadowFoundation(options.viewport) + (options.css || ''),
     onMount(container) {
       const props = typeof options.props === 'function' ? options.props(container) : options.props ?? {};
       const app = createApp(options.component, props);

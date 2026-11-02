@@ -202,6 +202,8 @@ describe('visible Unicode PDF reading export', () => {
                 expect(raw.split(target).length - 1, `complete target with direction ${direction ?? 'legacy'}`).toBe(1);
                 page.cleanup();
             } finally {await task.destroy();}
+            const output = await PDFDocument.load(download.data as Uint8Array), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+            expect(fonts.keys().map(key => fonts.lookup(key, PDFDict).get(PDFName.of('BaseFont'))?.toString())).not.toContain('/FluentReadBidiSourceText');
         }
     });
 

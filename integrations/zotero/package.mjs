@@ -67,7 +67,7 @@ async function copyDependencyLicenses(noticesDir) {
         for (const dependency of Object.keys(pkg.dependencies ?? {})) await visit(dependency, dependencyResolver);
     }
     const rootResolver = createRequire(import.meta.url);
-    for (const name of ['vue', 'pdf-lib', '@pdf-lib/fontkit', 'jszip', 'saxes', '@noble/hashes']) await visit(name, rootResolver);
+    for (const name of ['vue', 'pdf-lib', '@pdf-lib/fontkit', 'jszip', 'saxes', '@noble/hashes', 'bidi-js']) await visit(name, rootResolver);
 }
 
 async function assemble() {
@@ -88,7 +88,7 @@ async function assemble() {
     await mkdir(noticesDir, {recursive: true});
     await copyDependencyLicenses(noticesDir);
     const fontNotices = join(repositoryDir, 'public/third-party-notices');
-    for (const file of (await readdir(fontNotices)).filter(file => file.startsWith('pdf-reading-font-'))) {
+    for (const file of (await readdir(fontNotices)).filter(file => file.startsWith('pdf-reading-font-') || file === 'pdf-fallback-bidi-NOTICE.txt')) {
         await copyFile(join(fontNotices, file), join(noticesDir, file));
     }
     await writeFile(join(outputDir, 'THIRD-PARTY-NOTICES.md'), [
@@ -97,6 +97,7 @@ async function assemble() {
         'Bundled dependencies retain their licenses in licenses/ and content/pdfjs/LICENSE.',
         '- Vue: MIT, https://github.com/vuejs/core',
         '- PDF.js: Apache-2.0, https://github.com/mozilla/pdf.js; CMap and standard-font licenses accompany those files.',
+        '- bidi-js 1.1.0: MIT, https://github.com/lojjic/bidi-js; the unchanged PDF.js bidi kernel is statically extracted at build time.',
         '- pdf-lib and fontkit: MIT, https://github.com/Hopding/pdf-lib and https://github.com/Hopding/fontkit',
         '- JSZip: MIT or GPL-3.0, https://github.com/Stuk/jszip',
         '- pako: MIT and Zlib, https://github.com/nodeca/pako',

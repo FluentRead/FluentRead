@@ -8,6 +8,7 @@
  * 返回的半 em advance 只描述既有均匀搜索槽，不证明 Canvas 真实字形边界；实际阅读器验收仍独立进行。
  */
 import bidiFactory from 'bidi-js';
+import {projectPdfReaderBidi} from 'virtual:fluentread-pdfjs-bidi';
 
 export interface PdfFallbackBidiLine {
     readonly direction: 'ltr' | 'rtl';
@@ -20,16 +21,12 @@ let engine: ReturnType<typeof bidiFactory> | undefined;
 export function pdfFallbackBidiLine(text: string, paragraph: string): PdfFallbackBidiLine | undefined {
     if (!text || text !== paragraph || text.length > 8192 || /[^\x20-\x7e\u05d0-\u05ea]/u.test(text)
         || /[<>]|^ | $| {2}/u.test(text)) return;
-    // 此字符集均为单码元单字素。锁定 reader 将基本希伯来字母全部归 R，其余 ASCII 分类已定义。
-    // 它按 R 占比而不是 first-strong 选基方向；拒绝不一致情形，绝不自行反转单词。
-    const hebrewCount = text.match(/[\u05d0-\u05ea]/gu)?.length ?? 0;
-    if (!hebrewCount) return;
-    const readerLevel = hebrewCount / text.length < .3 && text.length > 4 ? 0 : 1;
+    // 此精确字符集均为单码元单字素；普通 ASCII 继续走旧资源，不为其构造 UBA 索引。
+    if (!/[\u05d0-\u05ea]/u.test(text)) return;
     const bidi = engine ??= bidiFactory();
     const levels = bidi.getEmbeddingLevels(text), paragraphInfo = levels.paragraphs[0];
     if (levels.paragraphs.length !== 1 || !paragraphInfo || paragraphInfo.start !== 0 || paragraphInfo.end !== text.length - 1
         || (paragraphInfo.level !== 0 && paragraphInfo.level !== 1)) return;
-    if (paragraphInfo.level !== readerLevel) return;
     const order = bidi.getReorderedIndices(text, levels);
     if (order.length !== text.length) return;
     const seen = new Set<number>();
@@ -38,8 +35,12 @@ export function pdfFallbackBidiLine(text: string, paragraph: string): PdfFallbac
         seen.add(index);
     }
     const indices = Object.freeze([...order]);
-    return Object.freeze({direction: paragraphInfo.level ? 'rtl' : 'ltr',
-        visualIndices: indices, visualText: indices.map(index => text[index]).join(''), advance: .5});
+    const visualText = indices.map(index => text[index]).join('');
+    // 同基方向仍可能以不同方式解析数字/标点；只以锁定 reader 的真实算法逐字闭合授能力。
+    const direction = paragraphInfo.level ? 'rtl' : 'ltr', reader = projectPdfReaderBidi(visualText);
+    if (!reader || reader.str !== text || reader.dir !== direction) return;
+    return Object.freeze({direction,
+        visualIndices: indices, visualText, advance: .5});
 }
 
 /** 测量与绘制显式共享方向，退出或失败都恢复前一个 Canvas 状态；普通路径无需调用。 */

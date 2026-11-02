@@ -26,6 +26,7 @@ vi.mock('bidi-js', async original => {
     }};
 });
 import {pdfFallbackBidiLine, withPdfFallbackBidiDirection} from '@/src/features/document-translation/core/pdfFallbackBidi';
+import {projectPdfReaderBidi} from 'virtual:fluentread-pdfjs-bidi';
 afterEach(() => {fault.kind = '';});
 
 describe('bounded complete-line fallback bidi', () => {
@@ -63,6 +64,15 @@ describe('bounded complete-line fallback bidi', () => {
     });
     it.each(['א hello world', 'English שלום שלום שלום שלום'])
     ('declines when the canonical first-strong paragraph base disagrees with pinned stock reader: %s', source => {
+        expect(pdfFallbackBidiLine(source, source)).toBeUndefined();
+    });
+    it.each(['English א 2026', 'מחקר 2026 GPU'])
+    ('declines matching bases when the actual reader projection still changes the complete logical target: %s', source => {
+        expect(pdfFallbackBidiLine(source, source)).toBeUndefined();
+    });
+    it('declines symmetric text when unchanged projected characters hide a conflicting paragraph direction', () => {
+        const source = 'א aaaaaaaa א';
+        expect(projectPdfReaderBidi(source)).toEqual({str: source, dir: 'ltr'});
         expect(pdfFallbackBidiLine(source, source)).toBeUndefined();
     });
     it.each(['paragraphs', 'missing', 'sparse paragraph', 'start', 'end', 'level', 'length', 'duplicate', 'negative', 'outside', 'fraction'])

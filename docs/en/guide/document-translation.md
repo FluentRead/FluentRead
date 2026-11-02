@@ -51,6 +51,8 @@ Proofreading, full-passage comparisons, outline titles, and search terms each fo
 
 Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
 
+If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.
+
 You can select, copy, and translate original-page text. Selection uses your separate selection translation service; the whole document uses the document service. In the browser's own PDF viewer, select text and choose **Translate selected text** from the context menu to open a separate result window. Enable selection translation and its context-menu entry first. The limit is 4096 characters per selection.
 
 <details class="guide-details">

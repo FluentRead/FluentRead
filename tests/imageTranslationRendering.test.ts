@@ -323,6 +323,17 @@ describe('图片译文排版与绘制', () => {
         }
         expect(context.strokeText.mock.calls).toEqual(context.fillText.mock.calls);
     });
+    it('孔避让已校验的prepared layout直接复用，绘字不再次度量或搜索字号',()=>{
+        const text='完整译文 Mixed words',width=100,height=40;
+        const direct=canvasContext();
+        drawTranslatedImageText(direct as unknown as CanvasRenderingContext2D,text,10,20,width,height,'rgb(240,240,240)',20,'left');
+        const prepared=layoutImageTranslationText(text,width-4,height-2,measure,20),reuse=canvasContext();
+        reuse.measureText.mockImplementation(()=>{throw new Error('prepared path must not search again');});
+        drawTranslatedImageText(reuse as unknown as CanvasRenderingContext2D,text,10,20,width,height,'rgb(240,240,240)',20,'left',prepared);
+        expect(reuse.measureText).not.toHaveBeenCalled();expect(reuse.fillText.mock.calls).toEqual(direct.fillText.mock.calls);
+        expect(reuse.strokeText.mock.calls).toEqual(direct.strokeText.mock.calls);expect(reuse.rect.mock.calls).toEqual(direct.rect.mock.calls);
+        expect(reuse.save).toHaveBeenCalledOnce();expect(reuse.restore).toHaveBeenCalledOnce();
+    });
 
     it('无可绘文字和绘制异常都会释放 Canvas 状态', () => {
         const empty = canvasContext();

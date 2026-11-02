@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaAlphaProtection.ts
- * 文件职责：在漫画原始像素上冻结保守低透明度保护区，供修补与完整译文排版共享。
- * 主要内容：仅完整外周 alpha 一致的文字蒙版提供阈值；扫描其并集并合并重叠行段，保留 alpha 更低的全部 RGBA，限制源像素、外周、事件、行段与裁剪复杂度；按保护区切分原框内连续可用矩形，不推断字形或删除内容。
+ * 文件职责：在原始像素上冻结保守低透明度保护区，供图片及漫画修补与完整译文排版共享。
+ * 主要内容：仅完整外周 alpha 一致的调用方范围提供阈值；漫画包装保留原字号余量与策略，普通图显式提供修补采样上下文及绘字并集；严格模式对未确认外周或触边范围仅接纳全不透明像素，未知透明在写入前撤回；有界并集只扫描一次并合并重叠行段；保护行段供修补排除写入和背景采样；按保护区切分原框内连续可用矩形，不推断字形或删除内容。
  * 模块边界：纯数据算法，不创建画布、不复制整页 RGBA、不运行模型；保护信号不等同文字分割，异常碎片显式失败，由调用方保留原图。
  */
 import type {MangaRegion} from './mangaRegions';
@@ -23,18 +23,38 @@ export interface MangaAlphaLayoutBudget {remaining:number}
 // 源并集逐行只扫描一次，受16MP尺寸上限约束；此额外预算只计算外周采样和区间事件。
 const MAX_PIXELS = 16_777_216, MAX_BOXES = 8192, MAX_WORK = 8_388_608;
 const MAX_RUNS = 65_536, MAX_RECTS = 4096, MAX_LAYOUT_RECTS = 64;
-const exhausted = () => new Error('漫画透明图案过于复杂，已保留原图');
+export class MangaAlphaProtectionLimitError extends Error {}
+/** 普通图写入范围含无法确认的透明度，必须在擦除前保留整幅原图。 */
+export class ImageAlphaProtectionUnavailableError extends Error {}
+export interface MaskAlphaProtectionOptions {requireConfirmedTransparency?:boolean}
+const exhausted = () => new MangaAlphaProtectionLimitError('漫画透明图案过于复杂，已保留原图');
 
 /** 原始坐标扫描；既不依赖模型降采样命中，也不把局部不透明采样当成整页证明。 */
 export function planMangaAlphaProtection(pixels: Uint8ClampedArray, width: number, height: number, regions: MangaRegion[]): MangaAlphaProtection | undefined {
-    if (![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=8192) || width*height>MAX_PIXELS || pixels.length<width*height*4) return;
+    return planMaskAlphaProtection(pixels,width,height,regions,mangaMaskBoxes);
+}
+
+/** 共用保护并集算法，但蒙版由调用方原有几何提供，不能给普通图额外增加漫画余量。 */
+export function planMaskAlphaProtection<T extends {bbox:Box;sourceBoxes?:Box[]}>(
+    pixels: Uint8ClampedArray, width: number, height: number, regions: T[],
+    maskBoxes: (region:T,width:number,height:number)=>Box[],
+    options:MaskAlphaProtectionOptions = {},
+): MangaAlphaProtection | undefined {
+    if (![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=8192) || width*height>MAX_PIXELS || pixels.length<width*height*4) {
+        if(options.requireConfirmedTransparency)throw new ImageAlphaProtectionUnavailableError();
+        return;
+    }
     const unique = new Map<string, Box & {alpha:number}>();
     const alphaCache = new Map<string, number | undefined>();
-    let work = 0, boxCount = 0;
+    let work = 0, boxCount = 0, footprintCount = 0;
     for (const region of regions) {
         boxCount += region.sourceBoxes?.length ?? 1;
         if (boxCount>MAX_BOXES) throw exhausted();
-        const boxes = mangaMaskBoxes(region,width,height);
+        const boxes = maskBoxes(region,width,height);
+        footprintCount += options.requireConfirmedTransparency ? boxes.length : 0;
+        if (footprintCount>MAX_BOXES) throw exhausted();
+        if(options.requireConfirmedTransparency && boxes.some(box=>![box.x0,box.y0,box.x1,box.y1].every(Number.isSafeInteger)
+            ||box.x0<0||box.y0<0||box.x1>width||box.y1>height||box.x1<=box.x0||box.y1<=box.y0))throw new ImageAlphaProtectionUnavailableError();
         let alpha: number | undefined, valid = boxes.length>0;
         for (const box of boxes) {
             if (![box.x0,box.y0,box.x1,box.y1].every(Number.isSafeInteger) || box.x0<=0 || box.y0<=0 || box.x1>=width || box.y1>=height || box.x1<=box.x0 || box.y1<=box.y0) {valid=false;break;}
@@ -52,7 +72,9 @@ export function planMangaAlphaProtection(pixels: Uint8ClampedArray, width: numbe
             if(value===undefined || (alpha!==undefined&&alpha!==value)){valid=false;break;}
             alpha=value;
         }
-        if(valid&&alpha!==undefined&&alpha>0)for(const box of boxes)unique.set(`${box.x0},${box.y0},${box.x1},${box.y1},${alpha}`,{...box,alpha});
+        // 256 不是源alpha：它要求未确认的写入并集全部不透明；扫描仍与普通保护共用一次有界并集。
+        const threshold=valid&&alpha!==undefined ? alpha : options.requireConfirmedTransparency ? 256 : undefined;
+        if(threshold!==undefined&&threshold>0)for(const box of boxes)unique.set(`${box.x0},${box.y0},${box.x1},${box.y1},${threshold}`,{...box,alpha:threshold});
     }
     if(!unique.size)return;
     const events = new Map<number, Array<{box:Box & {alpha:number};add:boolean}>>();
@@ -65,7 +87,7 @@ export function planMangaAlphaProtection(pixels: Uint8ClampedArray, width: numbe
         for(const event of events.get(y0)!){if(event.add)active.add(event.box);else active.delete(event.box);}
         work+=active.size*2;if(work>MAX_WORK)throw exhausted();
         const xs=Array.from(active).flatMap(b=>[{x:b.x0,alpha:b.alpha,add:1},{x:b.x1,alpha:b.alpha,add:-1}]).sort((a,b)=>a.x-b.x);
-        const levels=new Uint16Array(256),spans:Array<{x0:number;x1:number;alpha:number}>=[];
+        const levels=new Uint16Array(257),spans:Array<{x0:number;x1:number;alpha:number}>=[];
         let maximum=0,last=0;
         for(let i=0;i<xs.length;){
             const x=xs[i].x;if(maximum>0&&x>last)spans.push({x0:last,x1:x,alpha:maximum});
@@ -78,7 +100,11 @@ export function planMangaAlphaProtection(pixels: Uint8ClampedArray, width: numbe
             for(const span of spans){
                 if(start>=0&&span.x0!==end)flush();
                 for(let x=span.x0;x<span.x1;x++){
-                    if(pixels[(y*width+x)*4+3]<span.alpha){if(start<0)start=x;end=x+1;}
+                    const alpha=pixels[(y*width+x)*4+3];
+                    if(span.alpha===256){
+                        if(alpha!==255)throw new ImageAlphaProtectionUnavailableError();
+                        flush();
+                    }else if(alpha<span.alpha){if(start<0)start=x;end=x+1;}
                     else flush();
                 }
             }
@@ -113,7 +139,7 @@ export function isMangaAlphaProtected(protection:MangaAlphaProtection|undefined,
 }
 
 /** 候选可互相重叠，但每个都不含保护区；只移除被另一候选完整包含者，不截断译文。 */
-export function mangaAlphaClearRects(protection:MangaAlphaProtection,box:Box,budget:MangaAlphaLayoutBudget={remaining:1_048_576}):Box[] {
+export function mangaAlphaClearRects(protection:Pick<MangaAlphaProtection,'rectangles'>,box:Box,budget:MangaAlphaLayoutBudget={remaining:1_048_576}):Box[] {
     let available=[box];
     for(const hole of protection.rectangles){
         if(--budget.remaining<0)throw exhausted();

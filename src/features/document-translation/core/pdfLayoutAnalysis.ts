@@ -2,8 +2,9 @@
  * @file src/features/document-translation/core/pdfLayoutAnalysis.ts
  * 文件职责：从 PDF 原始字形和绘图操作推导阅读顺序、段落与必须保留的公式、表格、插图区域。
  * 主要内容：在未旋转内容坐标中追踪绘图矩阵；按相邻行共同让出的竖带识别栏间距，松散的两端对齐行不被拆散；页眉页脚、数字/罗马数字/字母编号的标题、中英文题注与公式碎片分别归类，分栏由并排的正文段落确定、同栏内缩进不同的块按稳定基线组织阅读，字体顶边修正不打乱相邻栏的行序；图形在题注处断开，幻灯片内容框、段落底色和标题色带这类装文字的容器不算插图，原位重复描画的文字只读一次，表格碎横边先连接、按真实单元格及合并行边界切分并逐行阅读，含词语的单元格可以翻译；先按局部字形端点及父链关联上下标、避免跨表头基线吸附，以赋值、紧邻左花括号、多行值及同基线数学条件共同确认分段公式，保留其右侧条件和有几何/近邻证据的 TeX 大算符，已关联根号的下伸矩形覆盖相邻被开方字符，以同基线的冒号和纯符号箭头类型、或细线两端的数学节点及直接由数学节点支撑的正交短边确认独立数学标签，两端不复用支撑节点，有限 U 形返回箭头还须匹配同页已确认的类型函数名，先识别图表和独立公式，再按列与段落边界组织正文，仅对同段相邻行中以斜杠结束的 HTTP(S) 地址和含斜杠及数字的路径首词省去人工行间空格；重排保留列表符号并清理排版软连字符，保留逐行字形几何供阅读和导出使用。
- * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，分式单位由横线两侧字形与数学上下文确认。
+ * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
+ * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
  */
 import type {PdfDocumentBlock, PdfDocumentLine, PdfDocumentRun, PdfPreservedRegion} from './document';
@@ -16,6 +17,7 @@ export interface PdfGraphicsOperators {fnArray: readonly number[]; argsArray: re
 export interface PdfLayoutBlock extends Omit<PdfDocumentBlock, 'segmentIndex'> {source: string}
 interface LayoutLine extends PdfDocumentLine {baseline: number; fontSize: number; fontFamily: string; runs: PdfLayoutAtom[]}
 const identity = [1, 0, 0, 1, 0, 0];
+const largeOperator = /^[∫∬∭∮∯∰∑∏⋃⋂]$/u;
 const median = (values: number[]) => {const sorted = [...values].sort((a, b) => a - b); return sorted[Math.floor(sorted.length / 2)] || 10;};
 const right = (box: Rectangle) => box.x + box.width;
 const bottom = (box: Rectangle) => box.y + box.height;
@@ -74,25 +76,122 @@ function joinRuns(runs: readonly PdfLayoutAtom[]): string {
     return text.replace(/\s+/gu, ' ').trim();
 }
 
-/** 基线而非字形顶边决定同一行，上下标仍保留自己的矩形和文字。 */
-export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers: readonly Rectangle[] = []): LayoutLine[] {
-    const rows: Array<{runs: PdfLayoutAtom[]; font: number; baseline: number; samples: number; first: number}> = [];
-    const rowMembership = new Map<PdfLayoutAtom, (typeof rows)[number]>();
-    // 幻灯片常把同一段文字在原位再画一遍来加粗或做阴影；同一位置的同一段文字只算一次，否则译文会收到重复的原文。
+/** 同位重描可以换字体或拆成不同文字项；完整文字和两端几何均相符时才去除。 */
+function uniquePaintAtoms(atoms: readonly PdfLayoutAtom[]): PdfLayoutAtom[] {
+    // 同级网格使用固定物理距离；跨级查询覆盖字号容差，巨大字体的邻域也保持有限桶数。
+    const cellFor = (slack: number) => 2 ** Math.floor(Math.log2(Math.max(1, slack)));
+    const metrics = new Map(atoms.map(atom => [atom, {fontSize: atom.fontSize, baseline: atom.baseline}]));
+    const compact = new Map(atoms.map(atom => [atom, atom.text.replace(/\s/gu, '')]));
+    const near = (index: Map<string, PdfLayoutAtom[]>, x: number, baseline: number, slack: number, forward = slack, text = '') => {
+        const result: PdfLayoutAtom[] = [];
+        for (const cell of new Set([cellFor(slack - .05), cellFor(slack + .05)])) {
+            const firstColumn = Math.floor((x - slack) / cell), lastColumn = Math.floor((x + forward) / cell);
+            const firstRow = Math.floor((baseline - slack) / cell), lastRow = Math.floor((baseline + slack) / cell);
+            // 超出安全整数的绝对桶号不能逐一递增；不确定的坐标不做去重，保全原文字项。
+            if (![firstColumn, lastColumn, firstRow, lastRow].every(Number.isSafeInteger)) continue;
+            for (let dx = 0; dx <= lastColumn - firstColumn; dx++) {
+                for (let dy = 0; dy <= lastRow - firstRow; dy++) {
+                    for (const atom of index.get(`${cell}:${firstColumn + dx}:${firstRow + dy}:${text}`) ?? []) result.push(atom);
+                }
+            }
+        }
+        return result;
+    };
+    const add = (index: Map<string, PdfLayoutAtom[]>, atom: PdfLayoutAtom, text = '') => {
+        const metric = metrics.get(atom)!, cell = cellFor(Math.max(1, metric.fontSize * .1));
+        const key = `${cell}:${Math.floor(atom.x / cell)}:${Math.floor(metric.baseline / cell)}:${text}`, bucket = index.get(key);
+        if (bucket) bucket.push(atom); else index.set(key, [atom]);
+    };
+    const slackFor = (atom: PdfLayoutAtom) => Math.max(1, metrics.get(atom)!.fontSize * .1);
+    const sameBaseline = (a: PdfLayoutAtom, b: PdfLayoutAtom, slack: number) => {
+        const first = metrics.get(a)!, next = metrics.get(b)!;
+        return Math.abs(first.baseline - next.baseline) <= slack && Math.abs(first.fontSize - next.fontSize) <= .5;
+    };
+    const sameDrawing = (index: Map<string, PdfLayoutAtom[]>, atom: PdfLayoutAtom, text: string) => {
+        const slack = slackFor(atom);
+        return near(index, atom.x, metrics.get(atom)!.baseline, slack, slack, text).some(other =>
+            Math.abs(other.x - atom.x) <= Math.min(slack, atom.width / 2, other.width / 2) && Math.abs(other.width - atom.width) <= slack
+            && sameBaseline(atom, other, slack));
+    };
     const drawn = new Map<string, PdfLayoutAtom[]>();
     const unique = atoms.filter(atom => {
-        if (!atom.text.trim()) return true;
-        const slack = Math.max(1, atom.fontSize * 0.1);
-        const column = Math.round(atom.x / slack), row = Math.round(atom.baseline / slack);
-        // 按位置分桶后只看相邻的桶，同一行里成百上千个相同的字也不会两两比较。
-        for (let dx = -1; dx <= 1; dx += 1) for (let dy = -1; dy <= 1; dy += 1) {
-            if (drawn.get(`${column + dx}:${row + dy}:${atom.text}`)?.some(other => Math.abs(other.x - atom.x) <= Math.min(slack, atom.width / 2) && Math.abs(other.baseline - atom.baseline) <= slack && Math.abs(other.fontSize - atom.fontSize) <= 0.5)) return false;
-        }
-        const key = `${column}:${row}:${atom.text}`;
-        const bucket = drawn.get(key);
-        if (bucket) bucket.push(atom); else drawn.set(key, [atom]);
+        const text = compact.get(atom)!;
+        if (!text) return true;
+        if (sameDrawing(drawn, atom, text)) return false;
+        add(drawn, atom, text);
         return true;
     });
+    // 两次绘制都可能拆成不同片段，完全没有“整句”文字项。只把按绘制顺序物理连续的片段
+    // 组成分析用候选；输出仍保留原字形对象，候选自身的片段绝不能被自己当作重描删除。
+    const composites = new Map<PdfLayoutAtom, PdfLayoutAtom[]>();
+    let pieces: PdfLayoutAtom[] = [];
+    const finish = () => {
+        if (pieces.length > 1) {
+            const first = pieces[0], bounds = pieces.slice(1).reduce<Rectangle>(union, first);
+            const candidate = {...first, ...bounds, text: joinRuns(pieces)};
+            composites.set(candidate, pieces);
+            metrics.set(candidate, metrics.get(first)!);
+            compact.set(candidate, candidate.text.replace(/\s/gu, ''));
+        }
+        pieces = [];
+    };
+    for (const atom of unique) {
+        if (!compact.get(atom)) {finish(); continue;}
+        const first = pieces[0], last = pieces.at(-1);
+        if (last && (!sameBaseline(first, atom, slackFor(first)) || atom.x <= last.x
+            || atom.x < right(last) - Math.min(slackFor(first), last.width * .25) || atom.x - right(last) > metrics.get(first)!.fontSize * .6)) finish();
+        pieces.push(atom);
+    }
+    finish();
+    const starts = new Map<string, PdfLayoutAtom[]>(), compositeDrawn = new Map<string, PdfLayoutAtom[]>(), removed = new Set<PdfLayoutAtom>();
+    for (const [candidate, parts] of composites) {
+        const text = compact.get(candidate)!;
+        if (sameDrawing(compositeDrawn, candidate, text)) parts.forEach(part => removed.add(part));
+        else add(compositeDrawn, candidate, text);
+    }
+    unique.forEach(atom => {if (compact.get(atom) && !removed.has(atom)) add(starts, atom);});
+    // 先考察宽项，使“整句 + 若干不同字体片段”的保留结果不依赖 PDF 绘制顺序。
+    for (const whole of [...unique].sort((a, b) => b.width - a.width)) {
+        const text = compact.get(whole)!;
+        if (removed.has(whole) || text.length < 2 || whole.width <= 0) continue;
+        const slack = slackFor(whole), visited = new Map<PdfLayoutAtom, Set<number>>();
+        interface ChainState {offset: number; end: number; part?: PdfLayoutAtom; previous?: ChainState}
+        const pending: ChainState[] = [{offset: 0, end: whole.x}];
+        while (pending.length) {
+            const current = pending.pop()!, {offset, end} = current;
+            if (offset === text.length) {
+                if (Math.abs(end - right(whole)) > slack) continue;
+                for (let state: ChainState | undefined = current; state?.part; state = state.previous) removed.add(state.part);
+                break;
+            }
+            const candidates = near(starts, end, metrics.get(whole)!.baseline, slack, offset ? metrics.get(whole)!.fontSize * .6 : slack).filter(part => {
+                const value = compact.get(part)!;
+                return !(part === whole || removed.has(part) || value.length >= text.length || !text.startsWith(value, offset)
+                    || part.width <= 0 || !sameBaseline(whole, part, slack) || part.x < end - slack
+                    || part.x > end + (offset ? metrics.get(whole)!.fontSize * .6 : slack) || right(part) <= end || right(part) > right(whole) + slack
+                    || visited.get(part)?.has(offset));
+            });
+            const closest = candidates.reduce((distance, part) => Math.min(distance, Math.abs(part.x - end)), Infinity);
+            for (const part of candidates) {
+                // 连续绘制必须接上最近的同字串片段；不能跳过邻近的相同字形再用远处字形拼出重复文字。
+                if (Math.abs(part.x - end) > closest + Math.min(slack, part.width * .25)) continue;
+                const positions = visited.get(part) ?? new Set<number>(); positions.add(offset); visited.set(part, positions);
+                pending.push({offset: offset + compact.get(part)!.length, end: right(part), part, previous: current});
+            }
+        }
+    }
+    return unique.filter(atom => !removed.has(atom));
+}
+
+/** 基线而非字形顶边决定同一行，上下标仍保留自己的矩形和文字。 */
+export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers: readonly Rectangle[] = [], horizontalCellDividers: readonly Rectangle[] = []): LayoutLine[] {
+    // 行内根号等细笔画不覆盖整行高度，不能当作单元格分隔线。
+    const divided = (start: number, end: number, baseline: number, font: number) => verticalDividers.some(divider => divider.height >= font && divider.x >= start - 0.5 && right(divider) <= end + 0.5
+        && baseline >= divider.y - 2 && baseline <= bottom(divider) + 2);
+
+    const rows: Array<{runs: PdfLayoutAtom[]; font: number; baseline: number; samples: number; first: number}> = [];
+    const rowMembership = new Map<PdfLayoutAtom, (typeof rows)[number]>();
+    const unique = uniquePaintAtoms(atoms);
     // TeX 根号字形的基线可能抬高到上一行；被开方字形紧贴根号右端，按它的基线归行。
     const associated = unique.map(atom => {
         // 向量箭头、单位向量帽号与主字形重叠且位于其上方，先归到主字形基线。
@@ -115,6 +214,7 @@ export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers
     // 不能借用其它表格列的居中基线，把“×10”的上标归到上一行表头。
     const layoutFont = (atom: PdfLayoutAtom) => atom.layoutFontSize ?? atom.fontSize;
     const groupingBases = new Map<PdfLayoutAtom, PdfLayoutAtom>();
+    const confirmedRoots = new Set<PdfLayoutAtom>();
     const largestFont = associated.reduce((size, atom) => Math.max(size, layoutFont(atom)), 0);
     const endpoints = new Map<string, PdfLayoutAtom[]>();
     const proseStarts = new Map<string, PdfLayoutAtom[]>();
@@ -152,8 +252,33 @@ export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers
             .sort((a, b) => Math.abs(a.y + a.height / 2 - center) - Math.abs(b.y + b.height / 2 - center))[0];
         if (base) groupingBases.set(atom, base);
     }
+    // TeX 大算符的提取基线可能靠近上一行正文；实际字框需伸入下方主体，并有同单元格的紧邻关系符与右侧数学字形。
+    // 只改分组依据，源字框与提取基线保留；行内正文中的同类符号仍使用自己的基线。
+    for (const atom of associated) {
+        if (!largeOperator.test(atom.text) || groupingBases.has(atom)) continue;
+        const size = layoutFont(atom), nearby = localBases(atom);
+        if (inlineProse(atom, nearby)) continue;
+        const below = {...atom, baseline: atom.baseline + size};
+        const bases = localBases(below).filter(other => /^[=≔≈≃≅≡≤≥≠]$/u.test(other.text)
+            && other.x < atom.x && atom.x - right(other) >= -size * .15 && atom.x - right(other) <= size * .6
+            && Math.abs(layoutFont(other) - size) <= size * .15
+            && other.baseline - atom.baseline > size * .6 && other.baseline - atom.baseline <= size * 1.8
+            && bottom(atom) > other.y && atom.y < bottom(other) && !divided(right(other), atom.x, other.baseline, size)
+            && !horizontalCellDividers.some(divider => divider.x <= atom.x + atom.width / 2 && right(divider) >= atom.x + atom.width / 2
+                && divider.y > atom.baseline + .5 && bottom(divider) < other.baseline - .5));
+        const base = bases.find(other => localBases({...atom, baseline: other.baseline}, right(atom) + size).some(peer => peer !== atom
+            && peer.x >= right(atom) && peer.x - right(atom) <= size * 2
+            && Math.abs(peer.baseline - other.baseline) <= size * .2 && Math.abs(layoutFont(peer) - size) <= size * .15
+            && /^(?:[\p{Sm}()[\]{}|]|\p{L}\p{M}*)$/u.test(peer.text) && !divided(right(atom), peer.x, other.baseline, size)));
+        if (base) {
+            // 关系符与右侧主体共同确认真实公式基线；撤销其先前可能借大算符中心建立的临时关联，避免相互指向。
+            groupingBases.delete(base);
+            confirmedRoots.add(base);
+            groupingBases.set(atom, base);
+        }
+    }
     for (const atom of [...associated].sort((a, b) => layoutFont(b) - layoutFont(a))) {
-        if (groupingBases.has(atom) || layoutFont(atom) > largestFont * 0.8 || atom.text.length > 24) continue;
+        if (groupingBases.has(atom) || confirmedRoots.has(atom) || layoutFont(atom) > largestFont * 0.8 || atom.text.length > 24) continue;
         const nearby = localBases(atom);
         const bases = nearby.filter(other => other.x < atom.x && layoutFont(atom) <= layoutFont(other) * 0.8
             && (atom.text.length <= 5 && atom.width <= layoutFont(other) * 2
@@ -170,7 +295,7 @@ export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers
     };
     // 同一上标可由多个字形及其嵌套下标组成；已确认的局部基行沿紧邻脚标延续，不能留下半个脚标成为另一行。
     for (const atom of [...associated].sort((a, b) => a.x - b.x)) {
-        if (groupingBases.has(atom) || layoutFont(atom) > largestFont * 0.8 || atom.text.length > 5) continue;
+        if (groupingBases.has(atom) || confirmedRoots.has(atom) || layoutFont(atom) > largestFont * 0.8 || atom.text.length > 5) continue;
         const nearby = localBases(atom);
         const peer = nearby.find(other => other.x < atom.x && groupingBases.has(other) && layoutFont(atom) <= layoutFont(groupingRoot(other)) * 0.8
             && Math.abs(atom.x - right(other)) <= Math.max(layoutFont(atom), layoutFont(other)) * 0.5
@@ -202,9 +327,6 @@ export function pdfLayoutLines(atoms: readonly PdfLayoutAtom[], verticalDividers
     const ordered = rows.map(row => [...row.runs].sort((a, b) => a.x - b.x));
     const clearAt = (row: readonly PdfLayoutAtom[], x: number) => !row.some(run => run.x < x + 1.5 && right(run) > x - 1.5);
     const adjacent = (at: number, from: number, font: number) => Boolean(rows[at]) && Math.abs(rows[at].baseline - rows[from].baseline) <= font * 2.2;
-    // 行内根号等细笔画不覆盖整行高度，不能当作单元格分隔线。
-    const divided = (start: number, end: number, baseline: number, font: number) => verticalDividers.some(divider => divider.height >= font && divider.x >= start - 0.5 && right(divider) <= end + 0.5
-        && baseline >= divider.y - 2 && baseline <= bottom(divider) + 2);
     /**
      * 真实栏间距会被相邻行在同一竖带上共同让出：1 表示某一侧连续两行（或该侧仅有的一行）留白，0 表示上下邻行都占用，-1 表示至少一侧没有邻行可供比较。
      * 松散对齐的词间距即使偶尔与一行邻行对齐，也难以连续两行落在同一竖带。
@@ -569,7 +691,27 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             && Math.abs(diagonal.x - right(shape)) <= .5 && Math.abs(bottom(diagonal) - bottom(shape)) <= .5
             && nearPaths(pathStarts, right(diagonal), diagonal.y).some(top => top.width >= diagonal.width * 2
                 && Math.abs(top.x - right(diagonal)) <= .5 && Math.abs(top.y - diagonal.y) <= .5)))), ...tableDividers];
-    const rawLines = pdfLayoutLines(input.atoms, verticalDividers);
+    // 只有两端均有跨线竖边支撑的横线才限制单元格行；孤立分数线、根号横笔与装饰线不能成为行边界。
+    let horizontalCellDividers: Rectangle[] = [];
+    if (input.atoms.some(atom => largeOperator.test(atom.text))) {
+        const starts = new Map<number, Rectangle[]>(), ends = new Map<number, Rectangle[]>();
+        const addEdge = (index: Map<number, Rectangle[]>, x: number, edge: Rectangle) => {
+            const key = Math.floor(x), bucket = index.get(key);
+            if (bucket) bucket.push(edge); else index.set(key, [edge]);
+        };
+        for (const edge of verticalDividers) {addEdge(starts, edge.x, edge); addEdge(ends, right(edge), edge);}
+        const supported = (index: Map<number, Rectangle[]>, x: number, rule: Rectangle, end: boolean) => {
+            const column = Math.floor(x);
+            for (let offset = -2; offset <= 2; offset++) for (const edge of index.get(column + offset) ?? []) {
+                const at = end ? right(edge) : edge.x;
+                if (Math.abs(at - x) <= 2 && edge.y < rule.y - 2 && bottom(edge) > bottom(rule) + 2) return true;
+            }
+            return false;
+        };
+        horizontalCellDividers = input.graphics.filter(shape => shape.kind === 'path' && shape.width >= 6 && shape.height <= 2
+            && supported(starts, shape.x, shape, false) && supported(ends, right(shape), shape, true));
+    }
+    const rawLines = pdfLayoutLines(input.atoms, verticalDividers, horizontalCellDividers);
     const bulletGlyph = (line: LayoutLine) => line.runs.length > 1 ? line.runs[0].text.trim() : '';
     const letterBullet = (line: LayoutLine) => {
         const [mark, next] = line.runs;

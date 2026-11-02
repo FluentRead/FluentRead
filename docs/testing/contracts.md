@@ -8,6 +8,8 @@
 
 `pnpm compile` 继续校验固定语言资源并检查完整的 Vue/TypeScript 项目，增量信息写入各工作树自己的 `.wxt/cache/extension.tsbuildinfo`，不缩小 include 范围或放宽诊断。可以删除这个文件强制重建缓存，或运行 `pnpm exec vue-tsc --noEmit` 单独比较编译器的非增量耗时；类型错误仍须使本次命令失败。其他集成的类型检查不共用此缓存路径。
 
+`node --test tests/typecheckCommand.test.mjs` 使用独立临时项目和缓存，验证首次检查成功后新增的 TypeScript 与 Vue 类型错误均会使真实编译命令失败，修复后重新通过。`aiSdkOpenAICompatible` 同时对扩展 SDK 和独立脚本验证 CloudGPU 默认端点、显式代理、模型与服务独立凭据；这些受控传输断言不代表线上服务或账户验收。
+
 完整项目在 Node 默认约 4 GiB 旧生代预算下可能发生 OOM。编译入口在可见总内存至少 16 GiB、且 Node 报告的内存约束没有更小时，只为编译子进程默认设置 6 GiB 旧生代上限；显式 `NODE_OPTIONS` 堆设置保持原值。小内存或已知受限环境不自动提高预算，可见总量不保证当前空闲量或隐藏容器限制。资源锁、信号转发与真实退出码仍由原 runner 处理；CI 在调用前继续执行原有可用内存门禁。
 
 独立用户脚本的大型静态资源压缩结果存于 `.wxt/cache/userscript-gzip/`。原文、压缩实现、worker 或锁文件变化均重新压缩；读取时核对摘要及有界解压后的完整内容。损坏缓存保留告警后重建；真实 I/O 或压缩器错误继续失败。同进程相同输入共用在途任务，缓存与返回值不共享可变缓冲区。`FLUENTREAD_BUILD_CACHE=0 pnpm build:userscript:standalone` 可用于无缓存对照，也可删除该目录；这些构建数据不进入 Firefox 源码包或发布安装包。

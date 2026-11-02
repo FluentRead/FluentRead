@@ -273,6 +273,26 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
   });
 
 
+  it.each([
+    ['', 'https://cloudgpu.app/v1/chat/completions'],
+    ['https://gateway.example/v1/chat/completions', 'https://gateway.example/v1/chat/completions'],
+  ])('CloudGPU keeps its own credentials and model, including an explicit proxy %s', async (proxy, endpoint) => {
+    mockConfig.service = services.cloudgpu;
+    mockConfig.model = {[services.cloudgpu]: 'deepseek-v4.1-flash', [services.openai]: 'other-model'};
+    mockConfig.token = {[services.cloudgpu]: 'fixture-cloudgpu-only', [services.openai]: 'fixture-openai-only'};
+    mockConfig.proxy = {[services.cloudgpu]: proxy};
+    const fetchMock = vi.fn().mockImplementation(async () => successResponse('已验证服务路由'));
+    setRuntimeFetch(fetchMock);
+
+    await expect(translateWithOpenAICompatibleAiSdk(withProviderSnapshot({origin: 'hello'}, mockConfig)))
+      .resolves.toBe('已验证服务路由');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(endpoint);
+    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fixture-cloudgpu-only');
+    expect(JSON.parse(String(init.body))).toMatchObject({model: 'deepseek-v4.1-flash', stream: false});
+  });
+
   it('preserves custom top-level fields while keeping the SDK-owned stream mode', async () => {
     mockConfig.custom = 'http://127.0.0.1:11434/non-standard-generate';
     mockConfig.customBody[services.custom] = JSON.stringify({

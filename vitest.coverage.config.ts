@@ -609,6 +609,7 @@ export default defineConfig({
                 'src/features/document-translation/services/pdfOcr.ts',
                 'src/features/document-translation/core/pdfLayoutAnalysis.ts',
                 'src/features/document-translation/core/pdfTextLayout.ts',
+                'src/features/document-translation/core/pdfFallbackBidi.ts',
                 'src/features/document-translation/services/pdfSource.ts',
                 'src/app/document-translation/selectionRuntime.ts',
                 'src/app/document-translation/downloadCopy.ts',

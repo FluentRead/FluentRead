@@ -5,6 +5,7 @@
  * 模块边界：这里负责视觉光栅化而不决定片段翻译或文件结构；PDF 文本块来自 binary 服务，静态地址来自 pdfResources 应用端口，领域类型来自 core，Canvas/PDF.js 仅应在文档 UI 环境调用，不能进入通用纯算法层。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {pdfFallbackBidiLine, withPdfFallbackBidiDirection} from '../core/pdfFallbackBidi';
 import {getPdfResources} from '../services/pdfResources';
 import type {PDFDocumentProxy, PDFPageProxy} from 'pdfjs-dist/legacy/build/pdf.mjs';
 
@@ -362,6 +363,7 @@ function* paintPdfTranslationSteps(
             fontSize: number;
             lines: string[];
             lineHeight: number;
+            direction?: 'ltr' | 'rtl';
         };
 
         const layout: MeasuredBlock[] = [];
@@ -370,12 +372,20 @@ function* paintPdfTranslationSteps(
             const family = familyForBlock(painted.block);
             const maxWidth = Math.max(1, painted.width * 0.985);
             const scale = Math.min(scaleX, scaleY);
-            const fit = fitPdfBlockText({
+            const fitting = () => fitPdfBlockText({
                 text: painted.translation, width: maxWidth, height: painted.height,
                 fontSize: painted.block.fontSize * scale,
                 lineHeight: (painted.block.lineCount <= 1 ? painted.block.fontSize : painted.block.lineHeight) * scale,
                 minFontSize: Math.max(6 * scale, painted.block.fontSize * scale * 0.5), weight: painted.block.fontWeight,
             }, (text, size, weight) => {context.font = `${weight} ${size}px ${family}`; return context.measureText(text).width;});
+            let fit = fitting(), direction: 'ltr' | 'rtl' | undefined;
+            if (!fit.overflow && fit.lines.length === 1) {
+                const bidi = pdfFallbackBidiLine(fit.lines[0], painted.translation);
+                if (bidi) {
+                    const directed = withPdfFallbackBidiDirection(context, bidi.direction, fitting);
+                    if (!directed.overflow && directed.lines.length === 1 && directed.lines[0] === painted.translation) {fit = directed; direction = bidi.direction;}
+                }
+            }
             let lines = fit.lines;
             if (fit.overflow) {
                 overflowNotes.push({segmentIndex: painted.block.segmentIndex, text: painted.translation,
@@ -392,7 +402,7 @@ function* paintPdfTranslationSteps(
                 }
                 lines[lines.length - 1] = characters.slice(0, low).join('') + '…';
             }
-            layout.push({...painted, fontSize: fit.fontSize, lines, lineHeight: fit.lineHeight});
+            layout.push({...painted, fontSize: fit.fontSize, lines, lineHeight: fit.lineHeight, ...(direction ? {direction} : {})});
             if (layout.length % 8 === 0) yield;
         }
 
@@ -418,7 +428,7 @@ function* paintPdfTranslationSteps(
         }
 
         // 步骤 3：在裁剪后的原坐标区域中绘制译文，保证多栏与图文混排不串位。
-        for (const [index, {block, x, y, width, height, foreground, fontSize, lines, lineHeight}] of layout.entries()) {
+        for (const [index, {block, x, y, width, height, foreground, fontSize, lines, lineHeight, direction}] of layout.entries()) {
             input.signal?.throwIfAborted();
             const family = familyForBlock(block);
             const maxWidth = Math.max(1, width * 0.985);
@@ -429,6 +439,7 @@ function* paintPdfTranslationSteps(
                 context.clip();
                 context.fillStyle = foreground;
                 context.textBaseline = 'top';
+                if (direction) context.direction = direction;
                 context.textAlign = block.textAlign;
                 context.font = `${block.fontWeight} ${fontSize}px ${family}`;
                 const textX = block.textAlign === 'center' ? x + width / 2 : block.textAlign === 'right' ? x + width : x;
@@ -439,7 +450,7 @@ function* paintPdfTranslationSteps(
                         const measuredWidth = Math.min(context.measureText(line).width, maxWidth);
                         const left = block.textAlign === 'center' ? textX - measuredWidth / 2 : block.textAlign === 'right' ? textX - measuredWidth : textX;
                         textItems.push({segmentIndex: block.segmentIndex, text: line, x: left / scaleX, y: textY / scaleY,
-                            width: measuredWidth / scaleX, fontSize: fontSize / Math.min(scaleX, scaleY)});
+                            width: measuredWidth / scaleX, fontSize: fontSize / Math.min(scaleX, scaleY), ...(direction ? {direction} : {})});
                     }
                     textY += lineHeight;
                 });
@@ -535,6 +546,8 @@ export const rasterizePdfReadingPages: PdfReadingRasterizer = async function* (i
             context.font = `${font.weight} ${font.size}px ${family}`;
             return context.measureText(text).width;
         });
+        const lineCounts = new Map<number, number>();
+        for (const page of pages) for (const item of page.items) if (item.kind === 'text') lineCounts.set(item.segmentIndex, (lineCounts.get(item.segmentIndex) ?? 0) + 1);
         if (pages.some(page => page.items.some(item => item.kind === 'region'))) {
             // 外部自定义 renderer 也可能因缺字进入内建回退；回退自身必须持有并释放源文档，不能依赖组合根的默认租约。
             sourceLease = acquirePdfDocument(input.sourceBytes);
@@ -556,9 +569,13 @@ export const rasterizePdfReadingPages: PdfReadingRasterizer = async function* (i
                 for (const item of page.items) {
                     if (item.kind === 'text') {
                         context.font = `${item.font.weight} ${item.font.size}px ${family}`;
-                        context.fillText(item.text, item.x, item.y);
+                        const candidate = lineCounts.get(item.segmentIndex) === 1 ? pdfFallbackBidiLine(item.text, input.translations[item.segmentIndex] ?? '') : undefined;
+                        const measured = candidate ? withPdfFallbackBidiDirection(context, candidate.direction, () => context.measureText(item.text).width) : undefined;
+                        const bidi = candidate && measured !== undefined && Number.isFinite(measured) && measured <= item.width ? candidate : undefined;
+                        const paint = () => {context.fillText(item.text, item.x, item.y); return context.measureText(item.text).width;};
+                        const width = bidi ? withPdfFallbackBidiDirection(context, bidi.direction, paint) : paint();
                         textItems.push({segmentIndex: item.segmentIndex, text: item.text,
-                            x: item.x, y: item.y, width: context.measureText(item.text).width, fontSize: item.font.size});
+                            x: item.x, y: item.y, width, fontSize: item.font.size, ...(bidi ? {direction: bidi.direction} : {})});
                     } else if (source) {
                         paintPdfReadingRegion(context, source, item, input);
                     }

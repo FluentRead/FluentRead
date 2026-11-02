@@ -47,8 +47,6 @@ Documents, translations, and edits are stored in this browser. Continue after re
 
 PDFs default to **Original layout**: bilingual pages appear side by side, translated paragraphs follow the source positions, and formulas, figures, and numeric table cells keep their original appearance. Hover over a long passage or use its expand button to read the full paragraph. Choose **Reflowed text** for complete paragraphs in a reading layout. The toolbar offers search across both texts and translation styling.
 
-Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.
-
 Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
 
 You can select, copy, and translate original-page text. Selection uses your separate selection translation service; the whole document uses the document service. In the browser's own PDF viewer, select text and choose **Translate selected text** from the context menu to open a separate result window. Enable selection translation and its context-menu entry first. The limit is 4096 characters per selection.
@@ -59,6 +57,8 @@ You can select, copy, and translate original-page text. Selection uses your sepa
 Original-layout downloads keep the source-page order. Bilingual output places each source page beside its translation; translation-only output keeps translated pages. Long passages retain a full PDF comment and continue on extra text pages after their matching source page, so the exported file can have more pages. Translated text can be searched, selected, and copied.
 
 Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
+
+Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.
 
 After a PDF is parsed again, edits are restored only when the source text and position can be identified safely. Other edits remain available to read and copy under retained revisions in proofreading. Clearly connected page fragments offer an optional cross-page context view; source passages and edits are not merged automatically.
 

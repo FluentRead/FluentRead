@@ -877,7 +877,7 @@ describe('userscript browser shim injection', () => {
         const readerDialogKeys = ['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].map(name => `document.pdfReading.${name}`);
         const safariPermissionKeys = Object.keys(extension).filter(key => key.startsWith('safari.freePool.'));
         expect(safariPermissionKeys).toHaveLength(8);
-        const sidepanelKeys = ['title', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
+        const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
         const pageFontKeys = Object.keys(extension).filter(key => key.startsWith('popup.pageFont.'));
         const expectedPageFontKeys = ['title', 'original', 'browserDefault', 'hostAction', 'browserAction', 'changing', 'retryAction',
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);

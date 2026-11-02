@@ -189,10 +189,15 @@ describe('visible Unicode PDF reading export', () => {
         const font = entries.find(font => font.get(PDFName.of('BaseFont'))?.toString() === (admitsBidi ? '/FluentReadBidiSourceText' : '/FluentReadSourceText'))!;
         const descendant = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict);
         expect(descendant.get(PDFName.of('DW'))?.toString()).toBe(admitsBidi ? '500' : '1000');
-        expect(inflateSync(font.lookup(PDFName.of('ToUnicode'), PDFRawStream).getContents()).toString()).toMatch(/<05d0>/iu);
+        const unicode = font.lookup(PDFName.of('ToUnicode'));
+        expect(unicode).toBeInstanceOf(PDFRawStream);
+        expect(inflateSync((unicode as PDFRawStream).getContents()).toString()).toMatch(/<05d0>/iu);
         const contents = page.node.Contents();
-        const streams = contents instanceof PDFArray ? contents.asArray().map(ref => output.context.lookup(ref, PDFRawStream)) : [contents as PDFRawStream];
-        const operators = streams.map(stream => inflateSync(stream.getContents()).toString()).join('\n');
+        const streams = contents instanceof PDFArray ? contents.asArray().map(ref => output.context.lookup(ref)) : [contents];
+        const operators = streams.map(stream => {
+            expect(stream).toBeInstanceOf(PDFRawStream);
+            return inflateSync((stream as PDFRawStream).getContents()).toString();
+        }).join('\n');
         const matrices = [...operators.matchAll(/^(.+) cm$/gmu)].map(match => match[1].trim().split(/\s+/u).map(Number));
         expect(matrices.length).toBeGreaterThan(0);
         expect(matrices.every(matrix => matrix.length === 6 && matrix.every(Number.isFinite))).toBe(true);

@@ -64,7 +64,7 @@ Identical text painted again in place for bold or shadow effects is counted once
 
 Explanatory text above a formula is separated from raised integral and summation symbols so it is not skipped as part of the formula. Table boundaries and original-page glyphs remain unchanged.
 
-Letter-spaced section names such as Abstract and References are recognized with supporting body text below. Partly overlapping section rules of different widths do not by themselves form a table; connected tables remain preserved. Original letter spacing is retained; the source is not rewritten as an unspaced word.
+Letter-spaced section names such as Abstract and References are identified with supporting body text and kept separate from nearby tables. Original letter spacing is preserved.
 
 After a PDF is parsed again, edits are restored only when the source text and position can be identified safely. Other edits remain available to read and copy under retained revisions in proofreading. Clearly connected page fragments offer an optional cross-page context view; source passages and edits are not merged automatically.
 

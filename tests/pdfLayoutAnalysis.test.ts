@@ -1260,6 +1260,68 @@ describe('PDF layout analysis on real paper typography', () => {
         const prose = analyze([atom('这是一句写在插图范围里面的完整中文说明', 60, 120, 200, 8), atom('A', 70, 200, 5, 5), atom('B', 140, 200, 5, 5), atom('C', 210, 200, 5, 5), atom('D', 280, 200, 5, 5), atom('Body text below the figure is long enough to set the page body size here.', 60, 500, 420), atom('More body text follows so that the median body font stays at ten points.', 60, 512, 420)], [{kind: 'image', x: 40, y: 100, width: 300, height: 200}]);
         expect(prose.blocks.find(block => block.source.startsWith('这是一句'))).toMatchObject({kind: 'text', preserveSource: false});
     });
+    it('recognizes overprinted paper text across font-dependent bucket boundaries and different run segmentation', () => {
+        const whole = atom('Results', 450, 100, 35, 10);
+        const sized = atom('Results', 450, 100, 35, 10.5);
+        expect(pdfLayoutLines([whole, sized]).map(line => line.text)).toEqual(['Results']);
+        expect(pdfLayoutLines([atom('Results', 450, 100, 70, 19.9), atom('Results', 450, 100, 70, 20.1)])
+            .map(line => line.text)).toEqual(['Results']);
+        const split = [atom('Res', 450.2, 100.1, 15), {...atom('ults', 465.2, 100.1, 20), fontFamily: 'serif'}];
+        for (const values of [[whole, ...split], [...split, whole]]) {
+            const before = structuredClone(values);
+            expect(pdfLayoutLines(values).map(line => line.text)).toEqual(['Results']);
+            expect(pdfLayoutLines(values).flatMap(line => line.runs)).toEqual([whole]);
+            expect(analyze(values).blocks.map(block => block.source)).toEqual(['Results']);
+            expect(values).toEqual(before);
+        }
+        const differentlySplit = [atom('R', 450, 100, 5), {...atom('esults', 455, 100, 30), fontFamily: 'serif'}];
+        for (const values of [[...split, ...differentlySplit], [...differentlySplit, ...split]]) {
+            expect(pdfLayoutLines(values).map(line => line.text)).toEqual(['Results']);
+        }
+        const phrase = atom('A careful result', 54, 140, 78);
+        expect(pdfLayoutLines([phrase, atom('A', 54, 140, 5), atom('careful', 62, 140, 34), atom('result', 99, 140, 33)])
+            .map(line => line.text)).toEqual(['A careful result']);
+    });
+    it('requires complete coincident text and geometry before discarding a differently segmented drawing', () => {
+        const source = atom('Results', 450, 100, 35);
+        // 只重叠部分文字、同起点却横向拉伸、邻近的重复短词、同框不同字符都必须保留。
+        const cases = [
+            [source, atom('Res', 450, 100, 15)],
+            [source, atom('Results', 450, 100, 70)],
+            [source, atom('Results', 487, 100, 35)],
+            [source, atom('Res', 450, 100, 15), atom('ultx', 465, 100, 20)],
+            [source, atom('Res', 450, 100, 15), atom('ults', 470, 100, 20)],
+            [source, atom('Res', 450, 100, 15), atom('ults', 465, 100, 15)],
+            [source, atom('Res', 450, 100, 15, 10.6), atom('ults', 465, 100, 20, 10.6)],
+            [atom('Res', 450, 100, 15), atom('ults', 465, 100, 20), atom('R', 487, 100, 5), atom('esults', 492, 100, 30)],
+            [atom('Res', 450, 100, 15), atom('ults', 465, 100, 20), atom('R', 450, 100, 5), atom('esultx', 455, 100, 30)],
+            [atom('x', 54, 200, 5), atom('x', 59, 200, 5), atom('x', 64, 200, 5)],
+            // 两种前缀分段在同一字形汇合，错误后缀不能因重复搜索而被当作完整重描。
+            [atom('abcdef', 0, 240, 30), atom('ab', 0, 240, 10), atom('c', 10, 240, 5),
+                atom('a', 0, 240, 5), atom('bc', 5, 240, 10), atom('d', 15, 240, 5), atom('ex', 20, 240, 10)],
+        ];
+        for (const values of cases) {
+            expect(pdfLayoutLines(values).flatMap(line => line.runs)).toHaveLength(values.length);
+        }
+    });
+    it('checks a long glyph-by-glyph overprint without recursion and preserves the entire drawing after a final mismatch', () => {
+        const count = 12000;
+        const whole = atom('a'.repeat(count), 0, 100, count * 2);
+        const letters = Array.from({length: count}, (_, index) => atom('a', index * 2, 100, 2));
+        expect(pdfLayoutLines([whole, ...letters]).flatMap(line => line.runs)).toHaveLength(1);
+        const mismatch = [...letters.slice(0, -1), {...letters.at(-1)!, text: 'b'}];
+        expect(pdfLayoutLines([whole, ...mismatch]).flatMap(line => line.runs)).toHaveLength(count + 1);
+    });
+    it('bounds duplicate lookup neighborhoods for extremely scaled PDF text matrices', () => {
+        const large = atom('Results', 450000000, 100000000, 35000000, 10000000);
+        expect(pdfLayoutLines([large, {...large}]).map(line => line.text)).toEqual(['Results']);
+    });
+    it('preserves text instead of looping over unsafe absolute grid coordinates', () => {
+        for (const x of [2 ** 53, -(2 ** 53)]) {
+            const far = atom('Results', x, 100, 35);
+            expect(pdfLayoutLines([far, {...far}]).flatMap(line => line.runs)).toHaveLength(2);
+        }
+    });
     it('keeps loosely spaced word-processor paragraphs together and ends a paragraph at a line that does not reach the column edge', () => {
         const wide = '本课程是计算机大类基础课其作用是将大一新生对计算机已有的感性认识提升';
         const body = (text: string, x: number, baseline: number, width: number) => atom(text, x, baseline, width, 10.5);

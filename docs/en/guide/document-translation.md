@@ -60,6 +60,8 @@ Original-layout downloads keep the source-page order. Bilingual output places ea
 
 Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
 
+Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.
+
 After a PDF is parsed again, edits are restored only when the source text and position can be identified safely. Other edits remain available to read and copy under retained revisions in proofreading. Clearly connected page fragments offer an optional cross-page context view; source passages and edits are not merged automatically.
 
 </details>

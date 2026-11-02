@@ -971,7 +971,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     const newTableRow = (last: LayoutLine, line: LayoutLine, region: PdfPreservedRegion) => {
         // 只有当前格内部、其它列的横界才证明它跨了多行；表头线作为本格顶边不能证明正文跨行。
         if (sameGridCell(last, line, region)) {
-            const cell = cellBounds({lines: [last], kind: 'table', region, bounds: last})!;
+            const cell = singleLineCellBounds(last, region)!;
             if (tableEdges.get(region)!.rules.some(shape => shape.height <= 2 && shape.width >= 6
                 && shape.y > cell.y + 1 && bottom(shape) < bottom(cell) - 1
                 && (shape.x >= right(cell) - 2 || right(shape) <= cell.x + 2))) return false;
@@ -1030,9 +1030,18 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const endY = rowEdges.find(edge => edge > last.baseline) ?? bottom(region);
         return {x, y, width: Math.max(1, endX - x), height: Math.max(1, endY - y)};
     };
+    // 归段期间行与区域均不变；只在本次分析内按对象身份复用单行边界，多行块仍独立计算。
+    let singleLineCells: Map<PdfPreservedRegion, Map<LayoutLine, Rectangle | undefined>> | undefined;
+    const singleLineCellBounds = (line: LayoutLine, region: PdfPreservedRegion): Rectangle | undefined => {
+        const regions = singleLineCells ??= new Map();
+        let cells = regions.get(region);
+        if (!cells) {cells = new Map(); regions.set(region, cells);}
+        if (!cells.has(line)) cells.set(line, cellBounds({lines: [line], kind: 'table', region, bounds: line}));
+        return cells.get(line);
+    };
     const sameGridCell = (last: LayoutLine, line: LayoutLine, region: PdfPreservedRegion) => {
-        const first = cellBounds({lines: [last], kind: 'table', region, bounds: last});
-        const next = cellBounds({lines: [line], kind: 'table', region, bounds: line});
+        const first = singleLineCellBounds(last, region);
+        const next = singleLineCellBounds(line, region);
         return !!first && !!next && tableEdges.get(region)!.rules.some(shape => shape.width <= 2 && shape.height >= 4)
             && first.x === next.x && first.y === next.y && first.width === next.width && first.height === next.height;
     };

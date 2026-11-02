@@ -919,6 +919,8 @@ export default defineConfig({
                 'src/features/local-translation/background/handlers.ts',
                 'src/features/video-subtitle/content/backgroundClient.ts',
                 'src/features/document-translation/services/importWorkflow.ts',
+                'src/features/document-translation/services/pdfSourceOcrSuggestion.ts',
+                'src/features/document-translation/services/pdfSourceRecoveryWorkflow.ts',
                 'src/features/document-translation/services/recognitionWorkflow.ts',
                 'src/features/document-translation/services/exportWorkflow.ts',
                 'src/core/config/mutations.ts',

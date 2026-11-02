@@ -536,7 +536,9 @@
       "tests/imageDetectionEvidence.test.ts",
       "tests/imageParagraphGapEvidence.test.ts",
       "tests/imageDetectionSnapshot.test.ts",
-      "tests/imageMattePageOwnership.test.ts"
+      "tests/imageMattePageOwnership.test.ts",
+      "tests/pdfSourceOcrSuggestion.test.ts",
+      "tests/pdfSourceRecoveryWorkflow.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

@@ -4,6 +4,7 @@
  * 主要内容：在未旋转内容坐标中追踪绘图矩阵；按相邻行共同让出的竖带识别栏间距，松散的两端对齐行不被拆散；页眉页脚、数字/罗马数字/字母编号的标题、中英文题注与公式碎片分别归类，分栏由并排的正文段落确定、同栏内缩进不同的块按稳定基线组织阅读，字体顶边修正不打乱相邻栏的行序；图形在题注处断开，幻灯片内容框、段落底色和标题色带这类装文字的容器不算插图，原位重复描画的文字只读一次，表格碎横边先连接、按真实单元格及合并行边界切分并逐行阅读，含词语的单元格可以翻译；先按局部字形端点及父链关联上下标、避免跨表头基线吸附，以赋值、紧邻左花括号、多行值及同基线数学条件共同确认分段公式，保留其右侧条件和有几何/近邻证据的 TeX 大算符，已关联根号的下伸矩形覆盖相邻被开方字符，以同基线的冒号和纯符号箭头类型、或细线两端的数学节点及直接由数学节点支撑的正交短边确认独立数学标签，两端不复用支撑节点，有限 U 形返回箭头还须匹配同页已确认的类型函数名，先识别图表和独立公式，再按列与段落边界组织正文，仅对同段相邻行中以斜杠结束的 HTTP(S) 地址和含斜杠及数字的路径首词省去人工行间空格；重排保留列表符号并清理排版软连字符，保留逐行字形几何供阅读和导出使用。
  * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
  * 章节标题：已有章节名的字距化样式须有同栏正文支持；仅构造分类键，不压缩原文字串，公式、表格和作者区仍受保护。
+ * 提示框边界：宽框内的正文项目列表与框顶大标题共同确认文字容器，编号后的竖分隔符不让章节标题吸附到插图。
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
  * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
@@ -806,6 +807,12 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         // 摘要/提示的浅底框常保留较大内边距，文字面积不足三成，但框内仍有接近整行的完整句子。
         if (box.width >= input.width * 0.45 && box.height <= font * 7
             && inside.some(line => textUnits(line.text) >= 12 && line.width >= box.width * 0.6)) return true;
+        // 教材的学习目标列表可有大片留白；宽框、正文项目和框顶大标题共同证明这是文字容器。
+        const listLines = inside.filter(line => bulleted.has(line) && line.fontSize >= font * .85 && textUnits(line.text) >= 4);
+        if (box.width >= input.width * .45 && listLines.length >= 2
+            && inside.filter(line => textUnits(line.text) >= 4).length >= inside.length * .6
+            && inside.some(line => !bulleted.has(line) && line.fontSize >= font * 1.2 && line.y <= box.y + font * 2.5
+                && listLines.every(item => item.y >= bottom(line)))) return true;
         // 单个大字号标签不足以把整张图变成文字容器（嵌入图有时仍带被裁掉的标题文字层）。
         return area >= input.width * input.height * 0.35 && (inside.length >= 3 && median(inside.map(line => line.fontSize)) >= 12 || inside.filter(line => textUnits(line.text) >= 6).length >= inside.length / 2);
     };
@@ -835,7 +842,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const labels = lines.filter(line => bottom(line) <= figure.y && figure.y - line.baseline <= Math.max(font, line.fontSize) * 2.5
             && (Math.abs(line.x + line.width / 2 - figure.x - figure.width / 2) <= font * 2 || Math.abs(line.x - figure.x) <= font * 0.25)
             && line.height <= Math.max(font, line.fontSize) * 1.7 && line.width < input.width * .45 && line.text.length <= 80
-            && !/^(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+\p{Lu}/u.test(line.text)
+            && !/^(?:\d+(?:\.\d+)*\.?|[IVXLC]+\.|[A-Z]\.)\s+(?:[|｜]\s*)?\p{Lu}/u.test(line.text)
             && !/^(?:Figure|Table)\s+\d/iu.test(line.text) && !/[.!?。！？]$/u.test(line.text) && !/[=∑∫√∈]/u.test(line.text));
         labels.sort((a, b) => b.baseline - a.baseline);
         if (labels.length) figures[index] = union(figure, labels[0]);

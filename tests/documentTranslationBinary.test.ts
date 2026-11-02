@@ -696,12 +696,15 @@ describe('binary document translation formats', () => {
 
     it('拒绝解压后单项过大的 ePub/DOCX 压缩包', async () => {
         const zip = new JSZip();
-        zip.file('oversized.txt', 'x'.repeat(24 * 1024 * 1024 + 1));
-        const bytes = await zip.generateAsync({type: 'uint8array', compression: 'DEFLATE'});
+        // 保留真实的 24 MiB + 1 字节内容；字节输入与低压缩级别减少单 worker 覆盖率 CI 的夹具构造成本。
+        zip.file('oversized.txt', new Uint8Array(24 * 1024 * 1024 + 1).fill(0x78));
+        const bytes = await zip.generateAsync({type: 'uint8array', compression: 'DEFLATE', compressionOptions: {level: 1}});
+        expect(bytes.byteLength).toBeLessThan(getDocumentMaxBytes('oversized.epub'));
+        expect(bytes.byteLength).toBeLessThan(getDocumentMaxBytes('oversized.docx'));
 
         await expect(parseBinaryDocument('oversized.epub', bytes)).rejects.toThrow('单个内容项过大');
         await expect(parseBinaryDocument('oversized.docx', bytes)).rejects.toThrow('单个内容项过大');
-    });
+    }, 15_000);
 });
 
 it('全页译文相同的双语 PDF 保留左右对照尺寸并跳过光栅重绘', async () => {

@@ -64,6 +64,14 @@ function fixture(language: UiLanguage) {
 }
 
 describe('content UI localization boundaries', () => {
+    it('localizes optional segmentation import details in all six non-Chinese UI bundles',()=>{
+        for(const {value:language} of UI_LANGUAGE_OPTIONS.filter(({value})=>value!=='zh-CN')){
+            for(const source of ['精确文字分割（可选）','约 90 MB · 仅离线导入','未导入']){
+                const value=translateLegacyText(source,language);
+                expect(value,language+': '+source).not.toBe(source);expect(value.trim()).not.toBe('');
+            }
+        }
+    });
     it('localizes real writing inheritance options across seven languages without translating custom service names', async () => {
         const ui = fixture('zh-CN');
         const config = Vue.reactive(new Config());

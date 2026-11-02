@@ -1,7 +1,8 @@
 /**
  * @file src/features/image-translation/paragraphs.ts
  * 文件职责：将普通图片的 OCR 物理行恢复成可整段翻译与回填的文本区域。
- * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
+ * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文，续行与扫描早停共用完整源像素间距，避免缩放还原的亚像素差异拆开相邻行；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
+ * 可选续行：只为私有同帧布局证据指定的当前真实后继延长扫描和豁免大行距，完整段成员、数字与其他物理遮挡仍须通过；缺失、失效、已使用或被过滤的目标沿用旧早停，竖排投影不继承此能力。
  * 模块边界：只处理原图坐标与识别文本，不运行 OCR、不调用翻译或 Canvas；漫画仍使用其气泡分组策略。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -14,6 +15,11 @@ export interface ImageTextRegion extends OcrLine {
     /** 典型源行字形高度，用于限制译文字号；不是合并段落的总高度。 */
     fontSize?: number;
     textAlign?: 'left' | 'center' | 'right';
+}
+/** 当前源行的私有像素布局证据，只能豁免行距；不能更改方向、字号、对齐、列表、遮挡或擦除框。 */
+export interface ImageParagraphContinuations {
+    successor(previous:ImageTextRegion):ImageTextRegion|undefined;
+    permits(previous:ImageTextRegion,next:ImageTextRegion,members:readonly ImageTextRegion[],bounds:OcrLine['bbox']):boolean;
 }
 const height = (line: ImageTextRegion) => line.fontSize ?? line.bbox.y1 - line.bbox.y0;
 const listStart = /^(?:[•●▪‣]|\d+[.)、]\s*|[-–—]\s|[A-Za-z][.)]\s)/u;
@@ -52,7 +58,14 @@ function alignment(state: Metrics): ImageTextRegion['textAlign'] | undefined {
         return 'center';
     return undefined;
 }
-function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextRegion): Metrics | undefined {
+/** 比较完整源像素间距；ULP 项只稳定整数格边缘，不充当额外的物理行距。
+ * 修正量只取比较端点，早停采用较大行高时也不能改变同一间距的像素格。
+ */
+function beyondLineGap(previousEnd: number, nextStart: number, size: number): boolean {
+    const roundoff = 4 * Number.EPSILON * Math.max(1, Math.abs(previousEnd), Math.abs(nextStart));
+    return Math.floor(nextStart - previousEnd + roundoff) > Math.floor(size * 0.65 + roundoff);
+}
+function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextRegion,permitGap?:()=>boolean): Metrics | undefined {
     if (next.vertical || next.sourceBoxes || listStart.test(next.text))
         return;
     const size = height(next), small = Math.min(state.minHeight, size);
@@ -60,7 +73,7 @@ function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextReg
         return;
     const gap = next.bbox.y0 - previous.bbox.y1;
     // 只连接下一物理行；同一行的控件、明显段间空白和重叠识别不参与合段。
-    if (gap < -small * 0.15 || gap > small * 0.65
+    if (gap < -small * 0.15 || (beyondLineGap(previous.bbox.y1, next.bbox.y0, small)&&!permitGap?.())
         || next.bbox.y0 - previous.bbox.y0 < small * 0.7)
         return;
     // 同行控件和不连续行先退出，不为无法合段的标签分配对齐统计对象。
@@ -135,8 +148,9 @@ function createObstructionIndex(lines: ImageTextRegion[]) {
 }
 
 /** 未合并区域保持原契约；合并区域只扩大排版范围，擦除仍使用逐行源框。 */
-function groupHorizontalParagraphs(input: ImageTextRegion[]): ImageTextRegion[] {
+function groupHorizontalParagraphs(input: ImageTextRegion[],continuations?:ImageParagraphContinuations): ImageTextRegion[] {
     const lines = [...input].sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+    const lineSet=continuations?new Set(lines):undefined;
     const used = new Set<ImageTextRegion>();
     const result: ImageTextRegion[] = [];
     let obstructionIndex: ReturnType<typeof createObstructionIndex> | undefined;
@@ -153,14 +167,22 @@ function groupHorizontalParagraphs(input: ImageTextRegion[]): ImageTextRegion[] 
             for (let cursor = index + 1; cursor < lines.length; cursor++) {
                 const next = lines[cursor], previous = members[members.length - 1];
                 // 已按 y0 排序，超过当前段落最远行距后所有后续行都不可能连续。
-                if (next.bbox.y0 > previous.bbox.y1 + state.minHeight * 0.65)
-                    break;
+                if (beyondLineGap(previous.bbox.y1, next.bbox.y0, state.minHeight)){
+                    const successor=continuations?.successor(previous);
+                    if(!successor||!lineSet!.has(successor)||used.has(successor)||next.bbox.y0>successor.bbox.y0
+                        ||!continues(previous,state,successor,()=>true))break;
+                }
                 if (used.has(next))
                     continue;
-                const proposed = continues(previous, state, next);
+                let candidateBox:OcrLine['bbox']|undefined;
+                const proposed = continues(previous,state,next,continuations?()=>{
+                    if(continuations.successor(previous)!==next)return false;
+                    candidateBox=union(bbox,next.bbox);
+                    return continuations.permits(previous,next,members,candidateBox);
+                }:undefined);
                 if (!proposed)
                     continue;
-                const candidateBox = union(bbox, next.bbox);
+                const mergedBox=candidateBox??union(bbox,next.bbox);
                 // 小图直接扫描；分散标签没有合段候选时不构建索引，避免额外分配。
                 if (!obstructionIndex && lines.length >= 64) {
                     obstructionIndex = createObstructionIndex(lines);
@@ -168,16 +190,16 @@ function groupHorizontalParagraphs(input: ImageTextRegion[]): ImageTextRegion[] 
                 }
                 obstructionIndex?.setIncluded(next, false);
                 // 合并矩形内存在其他栏、标签或识别片段时，不跨过它回填正文。
-                const obstructed = obstructionIndex ? obstructionIndex.intersects(candidateBox)
+                const obstructed = obstructionIndex ? obstructionIndex.intersects(mergedBox)
                     : lines.some(other => other !== next && !memberSet!.has(other)
-                    && other.bbox.x0 < candidateBox.x1 && other.bbox.x1 > candidateBox.x0
-                    && other.bbox.y0 < candidateBox.y1 && other.bbox.y1 > candidateBox.y0);
+                    && other.bbox.x0 < mergedBox.x1 && other.bbox.x1 > mergedBox.x0
+                    && other.bbox.y0 < mergedBox.y1 && other.bbox.y1 > mergedBox.y0);
                 if (obstructed) {
                     obstructionIndex?.setIncluded(next, true);
                     continue;
                 }
                 state = proposed;
-                bbox = candidateBox;
+                bbox = mergedBox;
                 used.add(next);
                 members.push(next);
                 memberSet?.add(next);
@@ -208,8 +230,8 @@ function restoreVerticalBox(box: OcrLine['bbox']): OcrLine['bbox'] {
 }
 
 /** 横排按行、东亚竖排按右到左的列整段翻译；不把另一方向或已合并区域当成续行。 */
-export function groupImageParagraphs(input: ImageTextRegion[]): ImageTextRegion[] {
-    const horizontal = groupHorizontalParagraphs(input);
+export function groupImageParagraphs(input: ImageTextRegion[],continuations?:ImageParagraphContinuations): ImageTextRegion[] {
+    const horizontal = groupHorizontalParagraphs(input,continuations);
     if (horizontal.filter(line => line.vertical && !line.sourceBoxes).length < 2) return horizontal;
     const originals = new Map<ImageTextRegion, ImageTextRegion>();
     const projected = horizontal.map(line => {

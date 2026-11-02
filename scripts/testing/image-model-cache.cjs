@@ -27,7 +27,8 @@ function defaultImageTranslationModelCacheDirectory({cwd, env = process.env} = {
     } catch {return path.join(path.resolve(invocationDirectory), '.cache', 'image-translation-models');}
 }
 
-function readImageTranslationModelManifest(metadataFile = path.resolve(__dirname, '../../src/features/image-translation/services/mangaOcrAssets.ts')) {
+function readImageTranslationModelManifest(metadataFile = path.resolve(__dirname, '../../src/features/image-translation/services/mangaOcrAssets.ts'), {includeSeg = false} = {}) {
+    if (typeof includeSeg !== 'boolean') throw new Error('includeSeg must be a boolean');
     const source = fs.readFileSync(metadataFile, 'utf8');
     const root = /const ROOT = '([^']+)'/.exec(source)?.[1];
     const cacheName = /export const MANGA_OCR_CACHE = '([^']+)'/.exec(source)?.[1];
@@ -41,6 +42,16 @@ function readImageTranslationModelManifest(metadataFile = path.resolve(__dirname
     }
     const assets = ocr.map(match => ({key: match[1], kind: 'ocr', filename: path.basename(match[2]), url: root + match[2], bytes: Number(match[3]), sha256: match[4], cacheName}));
     assets.push({key: 'inpainting', kind: 'inpaint', filename: path.basename(new URL(inpaint[1]).pathname), url: inpaint[1], bytes: Number(inpaint[2]), sha256: inpaint[3], cacheName});
+    // CTD 独立可选；不读取其文件、不加入默认三项 OCR 或默认预载清单。
+    if (includeSeg) {
+        const seg = /export const MANGA_TEXT_SEGMENTATION_ASSET = \{\s*file: '([^']+)',\s*url: '([^']+)',\s*bytes: (\d+), sha256: '([a-f0-9]{64})'/.exec(source);
+        if (!seg || seg[1] !== 'comictextdetector.pt.onnx' || Number(seg[3]) !== 94669756
+            || seg[4] !== '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f'
+            || seg[2] !== 'https://github.com/zyddnys/manga-image-translator/releases/download/beta-0.3/comictextdetector.pt.onnx') {
+            throw new Error(`Cannot parse pinned optional segmentation metadata: ${metadataFile}`);
+        }
+        assets.push({key: 'segmentation', kind: 'seg', filename: seg[1], url: seg[2], bytes: Number(seg[3]), sha256: seg[4], cacheName});
+    }
     if (assets.some(asset => new URL(asset.url).protocol !== 'https:' || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0
         || !asset.filename || asset.filename === '.' || asset.filename === '..')) throw new Error(`Invalid pinned image model metadata: ${metadataFile}`);
     return assets;
@@ -53,6 +64,41 @@ async function verifiedFile(file, asset, signal) {
     if (!stat.isFile() || stat.size !== asset.bytes) return false;
     const actual = await digestFile(file, signal);
     return actual.bytes === asset.bytes && actual.sha256 === asset.sha256;
+}
+
+/** 显式 CTD 预载只读取规范 sha/filename 路径；先完整验证，绝不建目录、锁、导入、修补或下载。 */
+async function verifyCachedImageTranslationModelFiles({directory, assets, signal} = {}) {
+    if (!directory || !Array.isArray(assets) || !assets.length || assets.some(asset => !asset
+        || !/^[a-f0-9]{64}$/.test(asset.sha256) || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0
+        || !asset.filename || path.basename(asset.filename) !== asset.filename || ['.', '..'].includes(asset.filename))) {
+        throw new Error('Provide a cache directory and pinned model assets');
+    }
+    signal?.throwIfAborted();
+    let root;
+    try {root = await fsp.realpath(directory);} catch (error) {
+        if (error.code === 'ENOENT') throw new Error('Image model unavailable in offline cache: cache directory');
+        throw error;
+    }
+    const files = [];
+    for (const asset of assets) {
+        signal?.throwIfAborted();
+        const folder = path.join(root, asset.sha256), file = path.join(folder, asset.filename);
+        let stat;
+        try {stat = await fsp.lstat(folder);} catch (error) {
+            if (error.code === 'ENOENT') throw new Error(`Image model unavailable in offline cache: ${asset.filename}`);
+            throw error;
+        }
+        if (!stat.isDirectory() || stat.isSymbolicLink()) throw new Error(`Invalid existing image model cache folder: ${asset.filename}`);
+        if (!await verifiedFile(file, asset, signal)) {
+            try {await fsp.lstat(file);} catch (error) {
+                if (error.code === 'ENOENT') throw new Error(`Image model unavailable in offline cache: ${asset.filename}`);
+                throw error;
+            }
+            throw new Error(`Invalid existing image model cache file: ${asset.filename}`);
+        }
+        files.push({...asset, path: file, cache: 'hit'});
+    }
+    return {directory: root, files, networkDownloads: 0, readOnly: true};
 }
 function processAlive(pid) {
     if (!Number.isSafeInteger(pid) || pid <= 0) return true;
@@ -112,13 +158,15 @@ async function downloadVerified(asset, file, {signal, fetchImpl, downloadTimeout
     } finally {clearTimeout(timeout); signal?.removeEventListener('abort', abort);}
 }
 
-/** kinds 仅列实际测试所需的 ocr/inpaint；sourceDirectories 是已下载公开模型的显式候选目录。 */
+/** kinds 默认仅 OCR；显式 seg 要求禁下载，并使本次所有资产走只读缓存预检。 */
 async function ensureImageTranslationModelFiles({directory = defaultImageTranslationModelCacheDirectory(), kinds = ['ocr'], sourceDirectories = [], signal,
     metadataFile, fetchImpl = globalThis.fetch, allowNetworkDownload = true, lockTimeoutMs = 300_000, downloadTimeoutMs = 300_000, pollMs = 100} = {}) {
-    if (!directory || !Array.isArray(kinds) || !kinds.length || kinds.some(kind => !['ocr', 'inpaint'].includes(kind))) throw new Error('Provide a model cache directory and required ocr/inpaint kinds');
+    if (!directory || !Array.isArray(kinds) || !kinds.length || kinds.some(kind => !['ocr', 'inpaint', 'seg'].includes(kind))) throw new Error('Provide a model cache directory and required ocr/inpaint/seg kinds');
     if (typeof allowNetworkDownload !== 'boolean') throw new Error('allowNetworkDownload must be a boolean');
     if (![lockTimeoutMs, downloadTimeoutMs, pollMs].every(value => Number.isSafeInteger(value) && value > 0)) throw new Error('Model cache timeouts must be positive integers');
-    const assets = readImageTranslationModelManifest(metadataFile).filter(asset => kinds.includes(asset.kind));
+    if (kinds.includes('seg') && allowNetworkDownload) throw new Error('Optional segmentation requires the existing cache with network downloads disabled');
+    const assets = readImageTranslationModelManifest(metadataFile, {includeSeg: kinds.includes('seg')}).filter(asset => kinds.includes(asset.kind));
+    if (kinds.includes('seg')) return verifyCachedImageTranslationModelFiles({directory, assets, signal});
     signal?.throwIfAborted(); await fsp.mkdir(directory, {recursive: true});
     const root = await fsp.realpath(directory), files = []; let networkDownloads = 0;
     // 固定根本身可保留之前导出的平面模型；全部来源复制后保留，不能删除已有文件。
@@ -164,4 +212,4 @@ async function ensureImageTranslationModelFiles({directory = defaultImageTransla
     return {directory: root, files, networkDownloads};
 }
 
-module.exports = {defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest, ensureImageTranslationModelFiles, digestFile};
+module.exports = {defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest, ensureImageTranslationModelFiles, verifyCachedImageTranslationModelFiles, digestFile};

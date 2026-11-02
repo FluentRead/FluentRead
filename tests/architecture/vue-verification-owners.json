@@ -95,13 +95,6 @@
       ],
       "scenario": "实际语言包按钮、下载状态与卸载后响应"
     },
-    "src/features/image-translation/ui/MangaModelSettings.vue": {
-      "kind": "behavior",
-      "tests": [
-        "tests/implementationAudit49E.test.ts"
-      ],
-      "scenario": "实际模型下载、删除与错误恢复"
-    },
     "src/features/image-translation/ui/MangaReadingPanel.vue": {
       "kind": "behavior",
       "tests": [

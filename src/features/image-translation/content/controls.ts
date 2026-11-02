@@ -2,7 +2,7 @@
  * @file src/features/image-translation/content/controls.ts
  * 失败层级：错误时仅突出语言准备、模型、服务或重试中的一个主操作，其余动作放入默认收起的原生详情；状态变化仍由同一操作条承接。
  * 文件职责：创建图片翻译的轻量操作条，支持单图反馈和不遮挡阅读的漫画模式，支持取消、重试和首次语言准备与模型/服务设置导航。
- * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
+ * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情；缺资源回退的已有译文在状态探测或失败时保留可见主入口和展开面板，普通加载与错误仍默认隐藏旧阅读器；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
@@ -163,10 +163,10 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     const reader = createImageTextReader(localize, ownedFocus => {
         inspect.setAttribute('aria-expanded', 'false');
         const trigger = readerTrigger;readerTrigger = null;
-        const canRead = phase === 'translated' && hasLines;
-        const canInspect = canRead && !inspect.hidden
+        const readable = canRead();
+        const canInspect = readable && !inspect.hidden
             && feedback.dataset.manga !== 'true' && inspect.isConnected;
-        const available = canRead && trigger === warningButton && !feedback.hidden && !warningButton.hidden && warningButton.isConnected
+        const available = readable && trigger === warningButton && !feedback.hidden && !warningButton.hidden && warningButton.isConnected
             ? warningButton : trigger && canInspect ? inspect : null;
         if (!disposed && ownedFocus && available) {
             // 文字入口与面板同属操作条；在 focus 前显示祖先，避免焦点留在已隐藏面板内。
@@ -186,9 +186,12 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     }
     let hasLines = false;
     let phase: ImageControlPhase = 'idle';
+    let retainedReading = false;
+    function canRead(): boolean { return hasLines && (phase === 'translated' || retainedReading); }
     let sourceMessage = '翻译图片';
     let progress: number | undefined;
     const openReader = (trigger: HTMLElement) => {
+        if (!canRead()) return;
         const takeFocus = mayFocusReader(trigger);
         readerTrigger = trigger;
         // warning 位于独立 feedback 中；隐藏的操作条会让浏览器忽略面板 focus。
@@ -285,8 +288,9 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
     row.append(...actionButtons, more);
     feedback.append(heading, status, progressBar, errorDetails);
     element.append(details, row);
-    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string} = {}) => {
+    const update = (next: ImageControlPhase, message: string, options: {prepare?: boolean; animations?: boolean; progress?: number; quiet?: boolean; warning?: boolean; warningAction?: boolean; queued?: boolean; modelSettings?: boolean; serviceSettings?: boolean; errorDetails?: string; retainedReading?: boolean} = {}) => {
         phase = next;
+        retainedReading = options.retainedReading === true && (next === 'loading' || next === 'error');
         element.dataset.phase = next;
         button.dataset.phase = next;
         feedback.dataset.phase = next;
@@ -323,21 +327,22 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         const actionsOwner = feedbackOwnsActions ? feedback : element;
         // 进度更新会频繁刷新状态；仅在状态容器变化时移动操作条，避免重挂载打断悬停与焦点。
         if (row.parentElement !== actionsOwner) actionsOwner.insertBefore(row, feedbackOwnsActions ? errorDetails : null);
-        inspect.hidden = next !== 'translated' || !hasLines;
+        inspect.hidden = !canRead();
         if (next === 'error') {
             const primary = !prepare.hidden ? prepare : !modelSettings.hidden ? modelSettings : !serviceSettings.hidden ? serviceSettings : button;
             for (const control of actionButtons) {
-                const owner = control === primary ? row : moreActions;
+                const owner = control === primary || (control === inspect && canRead()) ? row : moreActions;
                 if (control.parentElement !== owner) owner.append(control);
             }
             more.hidden = !actionButtons.some(control => control !== primary && !control.hidden);
             more.open = false;
             row.insertBefore(primary, more);
+            if (canRead()) row.insertBefore(inspect, more);
         } else {
             if (moreActions.childElementCount) for (const control of actionButtons) row.insertBefore(control, more);
             more.hidden = true;
         }
-        if (next !== 'translated') {
+        if (!canRead()) {
             details.hidden = true;
             readerTrigger = null;
             inspect.setAttribute('aria-expanded', 'false');
@@ -351,7 +356,7 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         setLines(lines: ImageReaderLine[]) {
             hasLines = lines.length > 0;
             reader.setLines(lines);
-            inspect.hidden = phase !== 'translated' || lines.length === 0;
+            inspect.hidden = !canRead();
         },
         dispose() {
             disposed = true;

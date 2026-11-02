@@ -5,8 +5,12 @@ import {decodeUserscriptData} from './dataEncoding';
 export async function inflateGzipBase64(base64: string): Promise<string> {
     const bytes = decodeUserscriptData(base64);
     if (typeof DecompressionStream === 'function') {
-        const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-        return new Response(stream).text();
+        try {
+            const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+            return await new Response(stream).text();
+        } catch {
+            // Safari Userscripts 的隔离世界会以 "Invalid type should be ArrayBuffer" 拒绝跨域块，改用 pako。
+        }
     }
     return inflateWithPako(bytes);
 }

@@ -91,6 +91,14 @@ describe('漫画整段识别与噪声边界', () => {
         expect(groupMangaOcrLines([{text:'原来',bbox:{x0:20,y0:20,x1:100,y1:40}},{text:'如此。',bbox:{x0:20,y0:44,x1:100,y1:64}}],'zh',400,300)[0].text).toBe('原来如此。');
         expect(groupMangaText([item('Hello',20,20),item('again',20,44)],'en',400,300)[0].text).toBe('Hello again');
     });
+    it('自动源语言下修复假名与汉字之间的 OCR 空格而保留拉丁词界', () => {
+        const source='雨あがり の市場へ';
+        expect(groupMangaText([item(source)],'auto',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        expect(groupMangaText([item(source)],'ja',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        expect(groupMangaOcrLines([{text:source,bbox:{x0:20,y0:20,x1:180,y1:40}}],'auto',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        const mixed='雨あがり POSTCARD FROMTHE FERRY';
+        expect(groupMangaText([item(mixed)],'auto',400,300).map(row=>row.text)).toEqual([mixed]);
+    });
     it.each([
         ['扩展 B 两侧', '你好𠀀', '𠀁世界', '你好𠀀𠀁世界'],
         ['基本区到扩展 B', '你好', '𠀁世界', '你好𠀁世界'],

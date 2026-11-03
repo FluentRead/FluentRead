@@ -318,6 +318,24 @@ describe('漫画局部气泡识别边界',()=>{
             {bbox:box(50,60,180,80),results:[text('short',70,80,25,12)]}]};
         expect(collectMangaRegions(distinct,'en',400,400,'image').map(line=>line.text)).toEqual(['First complete line','short','Last fallback line']);
     });
+    it('重叠间隔字母 OCR 碎片命中完整漫画原文时去除碎片，保留相似或远处正文',()=>{
+        const page6=[
+            text("HEY, ISN'T THAT GIL,",892,162,118,19),text('NEXT',894,189,111,17),
+            text('TH A T GI L',885,181,132,56),
+            text("YOU'RE RIGHT! IT'S BEEN A WHILE. LOOKS LIKE HE'S IN A GOOD MOOD...",145,194,145,130),
+            text('B R I N H T ITS',136,203,163,60),
+            text('…IN MOURNING CLOTHES NO LESS',241,803,139,106),
+            text('T H A T G I L',30,1100,132,18),
+        ];
+        const manga=collectMangaRegions({results:page6},'en',1200,1400,'manga').map(region=>region.text);
+        expect(manga).toEqual(["HEY, ISN'T THAT GIL, NEXT", "YOU'RE RIGHT! IT'S BEEN A WHILE. LOOKS LIKE HE'S IN A GOOD MOOD...",
+            '…IN MOURNING CLOTHES NO LESS','T H A T G I L']);
+        expect(collectMangaRegions({results:page6},'en',1200,1400,'image').map(region=>region.text)).toContain('TH A T GI L');
+
+        const overlappingRealLines=[text('I AM HERE',20,200,100,12),text('WE ARE HERE TODAY',20,200,100,36)];
+        expect(collectMangaRegions({results:overlappingRealLines},'en',200,300,'manga').map(region=>region.text))
+            .toEqual(['I AM HERE','WE ARE HERE TODAY']);
+    });
     it('外层局部补回内层漏行时归入最紧气泡，同一对白完整合段且邻近对白独立',()=>{
         const first=text('First complete line',70,80,150,12),last=text('Last recovered line',70,97,150,12);
         const neighbor=text('Another speaker',270,80,130,12);

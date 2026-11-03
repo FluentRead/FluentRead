@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageParagraphGapEvidence.ts
  * 文件职责：用同次图片 OCR 已读取的扁平化像素，为少量大行距物理行提供私有、可撤回的布局续行关系。
- * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
+ * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
  * 模块边界：不创建Canvas、不运行模型、不翻译或修改文字、不保留像素或擦除mask；缺失、歧义、预算不足及对象替换均回到原严格行距，静区布局不授权修补或绘字。普通图片可延迟给段落排版读取旁证；漫画可在结果收集时一次性消费旁证，仍需保留原始单行框。
  */
 import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
@@ -16,7 +16,10 @@ type RegionSnapshot={text:string;bbox:Box;fontSize?:number;vertical?:true;source
 export interface ImageParagraphGapProof {
     version:'image-paragraph-gap-v1';width:number;height:number;ordinal:number;pixels:number;
     /** 只给逐列恒定的平滑渐变或低对比平滑底色使用；普通平色证明不设置。 */
-    mode?:'column-profile'|'smooth-field';
+    /** flat-owner还要求精确平色间隙采样及同一封闭matte receipt。 */
+    mode?:'column-profile'|'smooth-field'|'flat-owner';
+    /** flat-owner只记录经像素核验的共同背景采样列，消费端核对其有界几何。 */
+    flatOwner?:{x:number;anchorY:number;targetY:number;runStart:number;runEnd:number};
     previous:MangaOcrItem;next:MangaOcrItem;previousSnapshot:Snapshot;nextSnapshot:Snapshot;
     previousGeometry:ImageMatteGeometry;nextGeometry:ImageMatteGeometry;
     /** 仅未知截断外部组件需要：完整封闭matte owner与真实收费的tile footprint，无像素或mask。 */
@@ -26,6 +29,8 @@ const VERSION='image-paragraph-gap-v1',MAX_PAIRS=128,MAX_PIXELS=1_048_576,MAX_RO
 /** Bound low-contrast translucent fields separately from exact opaque gradient profiles. */
 const SMOOTH_FIELD_MIN_SPREAD=16,SMOOTH_FIELD_MAX_SPREAD=24,SMOOTH_FIELD_MAX_RGB_STEP=8,SMOOTH_FIELD_MAX_RGB_DRIFT=20;
 const SMOOTH_FIELD_MAX_ALPHA_STEP=16,SMOOTH_FIELD_MAX_ALPHA_DRIFT=48,SMOOTH_FIELD_MAX_ALPHA_RANGE=64;
+/** Exclude antialias fringe that can extend just beyond OCR's tight physical line box. */
+const GAP_TEXT_CLEARANCE=3;
 /** OCR框缘可能贴近字形；放宽候选只增加像素复核机会，不单独授权合段。 */
 const MAX_PARAGRAPH_LINE_HEIGHT_RATIO=1.35;
 class ImageParagraphResourceError extends Error {}
@@ -114,11 +119,11 @@ function clearWindow(pixels:Uint8ClampedArray,width:number,box:Box,bg:number,sid
 
 /** 同帧原像素的有界水平间隙；上下各留2px隔离框缘墨迹，避免字形污染底色剖面。 */
 function pageGapEvidenceWindow(a:Box,b:Box,width:number,height:number):Box|undefined {
-    const box={x0:Math.floor(Math.min(a.x0,b.x0)),x1:Math.ceil(Math.max(a.x1,b.x1)),y0:Math.ceil(a.y1)+2,y1:Math.floor(b.y0)-2};
+    const box={x0:Math.floor(Math.min(a.x0,b.x0)),x1:Math.ceil(Math.max(a.x1,b.x1)),y0:Math.ceil(a.y1)+GAP_TEXT_CLEARANCE,y1:Math.floor(b.y0)-GAP_TEXT_CLEARANCE};
     return validBox(box,width,height)&&box.y1-box.y0>=2&&area(box)<=MAX_ROI?box:undefined;
 }
 /** 输入由pageGapEvidenceWindow限定：宽度不超过页宽，高度至少2px且已计入64KiB ROI预算。 */
-function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profile:Uint32Array,previousRow:Uint32Array,check:()=>void,reserveRows:()=>boolean):{mode:'column-profile'|'smooth-field';background:[number,number,number,number];pixels:number}|null|undefined {
+function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profile:Uint32Array,previousRow:Uint32Array,check:()=>void,reserveRows:()=>boolean):{mode:'column-profile'|'smooth-field'|'flat-owner';background:[number,number,number,number];pixels:number}|null|undefined {
     const w=box.x1-box.x0,h=box.y1-box.y0;
     const minimum=[255,255,255],maximum=[0,0,0];
     let profileStep=0,maxStep=0,maxDrift=0,profileAlphaStep=0,maxAlphaStep=0,maxAlphaDrift=0,minimumAlpha=255,maximumAlpha=0,exactProfile=true,opaque=true;
@@ -140,7 +145,8 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
     const columnCandidate=opaque&&initialSpread>=24&&profileStep<=2&&profileAlphaStep===0;
     const smoothFieldCandidate=initialSpread>=SMOOTH_FIELD_MIN_SPREAD&&initialSpread<=SMOOTH_FIELD_MAX_SPREAD
         &&maxStep<=SMOOTH_FIELD_MAX_RGB_STEP&&profileAlphaStep<=SMOOTH_FIELD_MAX_ALPHA_STEP;
-    if(!columnCandidate&&!smoothFieldCandidate)return;
+    const flatOwnerCandidate=initialSpread===0&&profileStep===0&&profileAlphaStep===0;
+    if(!columnCandidate&&!smoothFieldCandidate&&!flatOwnerCandidate)return;
     if(!reserveRows())return null;
     for(let y=1;y<h;y++){
         check();let rowStep=0,previousValue=0;
@@ -160,6 +166,8 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
         if(!exactProfile&&(maxStep>8||maxAlphaStep>16))return;
     }
     const value=profile[0];
+    if(flatOwnerCandidate&&exactProfile&&maxStep===0&&maxAlphaStep===0&&minimumAlpha===maximumAlpha)
+        return{mode:'flat-owner',background:[value&255,(value>>>8)&255,(value>>>16)&255,minimumAlpha],pixels:w*h};
     if(exactProfile&&initialSpread>=24&&profileStep<=2)return{mode:'column-profile',background:[value&255,(value>>>8)&255,(value>>>16)&255,255],pixels:w*h};
     if(smoothFieldCandidate&&maxDrift<=SMOOTH_FIELD_MAX_RGB_DRIFT&&maxStep<=SMOOTH_FIELD_MAX_RGB_STEP
         &&maxAlphaDrift<=SMOOTH_FIELD_MAX_ALPHA_DRIFT&&maxAlphaStep<=SMOOTH_FIELD_MAX_ALPHA_STEP
@@ -178,7 +186,7 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
     let workQueue:ReturnType<typeof createImageParagraphWorkQueue>|undefined;
     const borrowQueue=()=>{const queue=workQueue??=createImageParagraphWorkQueue();queue.clear();return queue;};
     const geometry=(key:number):ImageMatteObservationBox=>{const left=(key%columns)*side,top=Math.floor(key/columns)*side;return{left,top,width:Math.min(side,width-left),height:Math.min(side,height-top)};};
-    return (background:number,a:Box,b:Box)=>{
+    return (background:number,a:Box,b:Box,anchor?:{x:number;y:number},target?:{x:number;y:number})=>{
         const used=new Set<number>();let current:MatteOwner|undefined;
         function tileFor(x:number,y:number,ownerKeys?:Set<number>):Tile {
             const key=Math.floor(y/side)*columns+Math.floor(x/side);let tile=tiles.get(key);const g=tile?.geometry??geometry(key);
@@ -193,7 +201,8 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
         }
         const index=(tile:Tile,x:number,y:number)=>(y-tile.geometry.top)*tile.geometry.width+x-tile.geometry.left;
         function findOwner():MatteOwner|undefined {
-            const x=Math.floor(a.x0)-1,y=Math.floor(a.y0)-1,color=palette.get(background)!;
+            const x=anchor?.x??Math.floor(a.x0)-1,y=anchor?.y??Math.floor(a.y0)-1,color=palette.get(background)!;
+            if(!Number.isSafeInteger(x)||!Number.isSafeInteger(y)||x<0||y<0||x>=width||y>=height)return;
             const first=tileFor(x,y);
             const label=first.classes[index(first,x,y)],cached=owners.get(label);
             if(cached){for(const key of cached.keys){const g=geometry(key);if(!used.has(key)){if(!reserve(g.width*g.height))throw new ImageParagraphResourceError('图片段落观察预算已满');used.add(key);}}return cached.complete?cached:undefined;}
@@ -233,7 +242,9 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
         }
         function sameOwner():MatteOwner|undefined {
             const owner=current??findOwner();if(!owner)return;
-            const x=Math.floor(b.x0)-1,y=Math.floor(b.y0)-1,tile=tileFor(x,y);
+            const x=target?.x??Math.floor(b.x0)-1,y=target?.y??Math.floor(b.y0)-1;
+            if(!Number.isSafeInteger(x)||!Number.isSafeInteger(y)||x<0||y<0||x>=width||y>=height)return;
+            const tile=tileFor(x,y);
             if(owner.rectangle){
                 if(x<owner.box.x0||x>=owner.box.x1||y<owner.box.y0||y>=owner.box.y1)return;
                 for(let xx=owner.box.x0;xx<=x;xx++){const t=tileFor(xx,y),label=t.classes[index(t,xx,y)];if(label!==owner.color&&owners.get(label)?.color!==owner.color)return;}
@@ -280,12 +291,14 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
     if(!pageSize(width,height)||!(pixels instanceof Uint8ClampedArray)||pixels.length!==width*height*4||!all)return [];
     const physical=all.filter(item=>!!item?.box&&validBox(boxOf(item),width,height));
     const lines=physical.filter(item=>eligible(item,width,height)).sort((a,b)=>a.box.y-b.box.y||a.box.x-b.box.x),proofs:ImageParagraphGapProof[]=[];
-    const candidates:Array<Omit<ImageParagraphGapProof,'version'|'width'|'height'|'pixels'|'mode'|'topology'>&{endpointArea:number;windows:Box[]}>=[];
+    const candidates:Array<Omit<ImageParagraphGapProof,'version'|'width'|'height'|'pixels'|'topology'>&{
+        endpointArea:number;windows:Box[];precheckedGap?:Box;topologyBackground?:number
+    }> = [];
     const cache=new Map<MangaOcrItem,ImageMatteGeometry|undefined>();let attempts=0,charged=0,comparisons=0;
     let gapProfile:Uint32Array|undefined,gapPreviousRow:Uint32Array|undefined;
     const reserve=(count:number)=>{if(count>MAX_PIXELS-charged)return false;charged+=count;return true;};
     const proveSmoothGap=(previous:MangaOcrItem,next:MangaOcrItem,previousSnapshot:Snapshot,nextSnapshot:Snapshot,ordinal:number,
-        endpointArea:number,oa:ImageMatteObservationBox,ob:ImageMatteObservationBox):boolean|'budget'=>{
+        endpointArea:number,oa:ImageMatteObservationBox,ob:ImageMatteObservationBox,allowFlatOwner=true):boolean|'budget'=>{
         const a=boxOf(previous),b=boxOf(next),profileBox=pageGapEvidenceWindow(a,b,width,height);if(!profileBox)return false;
         const profileWidth=profileBox.x1-profileBox.x0;if(!reserve(profileWidth))return 'budget';
         gapProfile??=new Uint32Array(width);gapPreviousRow??=new Uint32Array(width);
@@ -293,6 +306,30 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         if(profile===null)return 'budget';if(!profile||!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot))return false;
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))return false;
+        if(profile.mode==='flat-owner'){
+            if(!allowFlatOwner)return false;
+            const anchorY=Math.floor(a.y0)-2,targetY=Math.floor(b.y0)-2,profileWidth=profileBox.x1-profileBox.x0;
+            if(anchorY<0||targetY<0||anchorY>=height||targetY>=height)return false;
+            if(!reserve(profileWidth*2))return 'budget';
+            const expected=(profile.background[0]|profile.background[1]<<8|profile.background[2]<<16|profile.background[3]<<24)>>>0;
+            let bestStart=-1,bestEnd=-1,runStart=-1;
+            for(let offset=0;offset<=profileWidth;offset++){
+                const x=profileBox.x0+offset,matched=offset<profileWidth&&gapProfile[offset]===expected
+                    &&packed(pixels,(anchorY*width+x)*4)===expected&&packed(pixels,(targetY*width+x)*4)===expected;
+                if(matched&&runStart<0)runStart=x;
+                if(!matched&&runStart>=0){const runEnd=x;if(runEnd-runStart>bestEnd-bestStart){bestStart=runStart;bestEnd=runEnd;}runStart=-1;}
+            }
+            if(bestEnd-bestStart<8)return false;
+            const flatOwner={x:Math.floor((bestStart+bestEnd)/2),anchorY,targetY,runStart:bestStart,runEnd:bestEnd};
+            const matteBackground:[number,number,number,number]=[profile.background[0],profile.background[1],profile.background[2],255];
+            const topologyBackground=(profile.background[0]|profile.background[1]<<8|profile.background[2]<<16|profile.background[3]<<24)>>>0;
+            const previousGeometry:ImageMatteGeometry={...oa,background:matteBackground,supportBox:{...a,y1:a.y1+GAP_TEXT_CLEARANCE}};
+            const nextGeometry:ImageMatteGeometry={...ob,background:matteBackground,supportBox:{...b,y0:b.y0-GAP_TEXT_CLEARANCE}};
+            const windows=[profileBox];
+            candidates.push({mode:'flat-owner',ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry,nextGeometry,endpointArea,windows,
+                precheckedGap:profileBox,flatOwner,topologyBackground});
+            return true;
+        }
         const previousGeometry:ImageMatteGeometry={...oa,background:profile.background,supportBox:{...a}};
         const nextGeometry:ImageMatteGeometry={...ob,background:profile.background,supportBox:{...b}};
         proofs.push({version:VERSION,mode:profile.mode,width,height,ordinal,pixels:endpointArea+area(profileBox),previous,next,previousSnapshot,nextSnapshot,previousGeometry,nextGeometry});
@@ -312,26 +349,40 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         if(ga&&gb&&windows){candidates.push({ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows});continue;}
         if(proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,oa,ob)==='budget')break enumerate;
     }
-    const backgrounds=[...new Set(candidates.map(c=>(c.previousGeometry.background[0]|c.previousGeometry.background[1]<<8|c.previousGeometry.background[2]<<16|255<<24)>>>0))];
+    const backgrounds=[...new Set(candidates.map(c=>c.topologyBackground??(c.previousGeometry.background[0]|c.previousGeometry.background[1]<<8|c.previousGeometry.background[2]<<16|255<<24)>>>0))];
     const topology=topologyPage(pixels,width,height,backgrounds,reserve,checkActive);
     for(const candidate of candidates){
         const {previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows,ordinal}=candidate,a=boxOf(previous),b=boxOf(next);
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))continue;
-        const extra=windows.reduce((sum,box)=>sum+area(box),0);if(!reserve(extra))break;
-        const background=(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|255<<24)>>>0;
-        const external=topology(background,a,b);
+        const extra=windows.reduce((sum,box)=>sum+area(box),0),prechecked=candidate.precheckedGap?area(candidate.precheckedGap):0;
+        if(prechecked>extra||!reserve(extra-prechecked))break;
+        const background=candidate.topologyBackground??(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|255<<24)>>>0;
+        const external=topology(background,a,b,candidate.flatOwner?{x:candidate.flatOwner.x,y:candidate.flatOwner.anchorY}:undefined,
+            candidate.flatOwner?{x:candidate.flatOwner.x,y:candidate.flatOwner.targetY}:undefined);
+        if(candidate.precheckedGap){
+            const anchor=candidate.flatOwner!;
+            external.outside(anchor.anchorY*width+anchor.x);
+            if(!external.receipt())continue;
+        }
         let clear=true;
-        try{clear=!windows.some((box,index)=>!clearWindow(pixels,width,box,background,index>0,checkActive,external.outside));}
+        try{for(const [index,box] of windows.entries())if(!candidate.precheckedGap||!sameBox(box,candidate.precheckedGap)){
+            const ok=clearWindow(pixels,width,box,background,index>0,checkActive,external.outside);
+            if(!ok){clear=false;break;}
+        }}
         catch(error){if(error instanceof ImageParagraphResourceError)continue;throw error;}
         if(!clear){
-            const status=proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,ga,gb);
+            if(candidate.precheckedGap)continue;
+            const status=proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,ga,gb,false);
             if(status==='budget')break;
             continue;
         }
         const receipt=external.receipt(),topologyCost=receipt?.tiles.reduce((sum,g)=>sum+g.width*g.height,0)??0;
+        if(candidate.precheckedGap&&!receipt)continue;
         if(!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot))continue;
-        proofs.push({version:VERSION,width,height,ordinal,pixels:endpointArea+extra+topologyCost,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,...(receipt?{topology:receipt}:{})});
+        proofs.push({version:VERSION,...(candidate.mode?{mode:candidate.mode}:{}),...(candidate.flatOwner?{flatOwner:candidate.flatOwner}:{}),width,height,ordinal,
+            pixels:endpointArea+extra+topologyCost+(candidate.flatOwner?2*(candidate.precheckedGap!.x1-candidate.precheckedGap!.x0):0),
+            previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,...(receipt?{topology:receipt}:{})});
     }
     return proofs;
 }
@@ -349,14 +400,21 @@ export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:nu
             const physical=all.filter(item=>!!item?.box&&validBox(boxOf(item),width,height));
             for(const proof of page.imageParagraphGapProofs){
                 const {previous,next}=proof;
-                if(proof.version!==VERSION||(proof.mode!==undefined&&proof.mode!=='column-profile'&&proof.mode!=='smooth-field')||proof.width!==width||proof.height!==height||!Number.isSafeInteger(proof.ordinal)||proof.ordinal<1||proof.ordinal>MAX_PAIRS||ordinals.has(proof.ordinal)
+                if(proof.version!==VERSION||(proof.mode!==undefined&&proof.mode!=='column-profile'&&proof.mode!=='smooth-field'&&proof.mode!=='flat-owner')||proof.width!==width||proof.height!==height||!Number.isSafeInteger(proof.ordinal)||proof.ordinal<1||proof.ordinal>MAX_PAIRS||ordinals.has(proof.ordinal)
                     ||!raw.has(previous)||!raw.has(next)||!sameItem(previous,proof.previousSnapshot)||!sameItem(next,proof.nextSnapshot)||!eligible(previous,width,height)||!eligible(next,width,height))continue;
                 ordinals.add(proof.ordinal);const a=boxOf(previous),b=boxOf(next),ga=proof.previousGeometry,gb=proof.nextGeometry;
                 if(!potential(a,b)||owner(previous,page)!==owner(next,page)||!validGeometry(ga,a,width,height)||!validGeometry(gb,b,width,height))continue;
-                const profileMode=proof.mode==='column-profile'||proof.mode==='smooth-field',profileWindow=profileMode?pageGapEvidenceWindow(a,b,width,height):undefined;
-                const windows=profileMode?(profileWindow?[profileWindow]:undefined):layout(a,b,ga,gb,physical,width,height);if(!windows)continue;
+                const profileMode=proof.mode==='column-profile'||proof.mode==='smooth-field',flatOwnerMode=proof.mode==='flat-owner';
+                const profileWindow=flatOwnerMode||profileMode?pageGapEvidenceWindow(a,b,width,height):undefined;
+                const windows=profileMode||flatOwnerMode?(profileWindow?[profileWindow]:undefined):layout(a,b,ga,gb,physical,width,height);if(!windows)continue;
+                if(flatOwnerMode){
+                    const flat=proof.flatOwner,anchorY=Math.floor(a.y0)-2,targetY=Math.floor(b.y0)-2;
+                    if(!flat||flat.anchorY!==anchorY||flat.targetY!==targetY||flat.runStart<profileWindow!.x0||flat.runEnd>profileWindow!.x1
+                        ||flat.runEnd-flat.runStart<8||flat.x!==Math.floor((flat.runStart+flat.runEnd)/2))continue;
+                }else if(proof.flatOwner!==undefined)continue;
                 const topologyCost=profileMode?(proof.topology===undefined?0:undefined):receiptPixels(proof.topology,width,height,a,b);if(topologyCost===undefined)continue;
-                const count=ga.width*ga.height+gb.width*gb.height+windows.reduce((sum,box)=>sum+area(box),0)+topologyCost;
+                const flatProbePixels=flatOwnerMode&&profileWindow?2*(profileWindow.x1-profileWindow.x0):0;
+                const count=ga.width*ga.height+gb.width*gb.height+windows.reduce((sum,box)=>sum+area(box),0)+topologyCost+flatProbePixels;
                 if(proof.pixels!==count||count>MAX_PIXELS-charged)continue;charged+=count;
                 const first=accepted.get(previous),second=accepted.get(next);
                 if(!first||!second||first===second||!snapshots.has(first)||!snapshots.has(second)||first.vertical||second.vertical||!singleSourceRegion(first)||!singleSourceRegion(second)

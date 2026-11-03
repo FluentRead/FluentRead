@@ -155,6 +155,39 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
         }
     });
 
+    it('生产 Paddle OCR 的彩色气泡行框仍能用同帧像素合并回完整段落',()=>{
+        const cases=[
+            {name:'harbor-same-red-channel-dialogue',sourceLanguage:'en',lines:[
+                {text:'THE FERRY LEAVES AT DAWN.',x0:111,y0:136,x1:657,y1:160},
+                {text:'BRING THE BLUE MAP.',x0:112,y0:194,x1:516,y1:218}],expected:'THE FERRY LEAVES AT DAWN. BRING THE BLUE MAP.',mode:'flat-owner'},
+            {name:'watercolor-ferry-translucent-notification',sourceLanguage:'en',lines:[
+                {text:'THE RIVER IS CLEAR TODAY.',x0:177,y0:212,x1:717,y1:236},
+                {text:'PLEASE STEP ABOARD QUIETLY.',x0:175,y0:276,x1:765,y1:299}],expected:'THE RIVER IS CLEAR TODAY. PLEASE STEP ABOARD QUIETLY.',mode:'smooth-field'},
+            {name:'orbital-greenhouse-cutout-dialogue',sourceLanguage:'auto',lines:[
+                {text:'新的叶子已经展开了。',x0:151,y0:145,x1:516,y1:176},
+                {text:'把水送到靠窗的一排。',x0:151,y0:208,x1:517,y1:239}],expected:'新的叶子已经展开了。把水送到靠窗的一排。',mode:'flat-owner'},
+            {name:'orbital-greenhouse-cutout-dialogue',sourceLanguage:'auto',lines:[
+                {text:'ここなら星が見える。',x0:803,y0:453,x1:1161,y1:487},
+                {text:'明日も一緒に育てよう。',x0:801,y0:514,x1:1194,y1:547}],expected:'ここなら星が見える。明日も一緒に育てよう。',mode:'flat-owner'},
+        ];
+        for(const sample of cases){
+            const fixture=manifest.fixtures.find((item:any)=>item.name===sample.name);
+            expect(fixture,sample.name).toBeDefined();
+            const pixels=new Uint8ClampedArray(gunzipSync(readFileSync(new URL(fixture.pixelTruth.sourceRgbaFile,fixtureRoot))));
+            const results=sample.lines.map(line=>({text:line.text,confidence:.99,
+                box:{x:line.x0,y:line.y0,width:line.x1-line.x0,height:line.y1-line.y0}}));
+            const page={results},proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
+            expect(proofs.map(proof=>proof.mode),sample.name).toEqual([sample.mode]);
+            const grouped=collectMangaRegions({...page,imageParagraphGapProofs:proofs},sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
+            expect(grouped.map(region=>region.text),`${sample.name}: ${sample.expected}`).toEqual([sample.expected]);
+            if(sample.mode==='flat-owner'){
+                const altered=pixels.slice(),box=proofs[0].flatOwner!;
+                altered[(Math.floor((proofs[0].previous.box.y+proofs[0].previous.box.height+proofs[0].next.box.y)/2)*fixture.width+box.x)*4]^=0xff;
+                expect(produceImageParagraphGapProofs(page,fixture.width,fixture.height,altered),`${sample.name}: changed gap pixel revokes proof`).toEqual([]);
+            }
+        }
+    });
+
     it('六类冻结透明场景只按同帧像素证明续接，不跨段误合并且像素变化会撤销证明',()=>{
         const bytes=readFileSync(new URL('manifest.json',alphaRoot)),alpha=JSON.parse(bytes.toString());
         expect(sha(bytes)).toBe('d5067fdf9438ff253c2124aaf665094f67ac5361847c56ccabfe806cded10060');
@@ -196,7 +229,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
         }
     });
 
-    it('14个已录制真实OCR场景按原图像素证明续行，恢复6项段落失败且不新增错误',()=>{
+    it('14个已录制真实OCR场景按原图像素证明续行，恢复11项段落失败且不新增错误',()=>{
         const recordBytes=readFileSync(new URL('recorded-v14.json',recordedRoot)),record=JSON.parse(recordBytes.toString());
         expect(sha(recordBytes)).toBe('937d02b27f85a1b4bd68bda5c664810e3d8c2a31cbcf1b10cd9a83e765f8ef16');
         expect(record).toMatchObject({version:1,provenance:{sceneCount:14,sourceStatus:'failed'}});expect(record.scenes).toHaveLength(14);
@@ -204,10 +237,15 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
         const fixtureByName=new Map([...manifest.fixtures,...alpha.fixtures].map((fixture:any)=>[fixture.name,fixture]));
         const alphaNames=new Set(alpha.fixtures.map((fixture:any)=>fixture.name));
         const resolvedPairs=[
+            ['harbor-same-red-channel-dialogue','THE FERRY LEAVES AT DAWN.','BRING THE BLUE MAP.'],
             ['harbor-same-red-channel-dialogue','IWILL WAIT BY THE PIER.','KEEP THE LANTERN LIT.'],
             ['prism-platform-gradient-signs','FOLLOW THE EASTERN TRACK','THE NEXT TRAIN IS ALMOST HERE'],
+            ['rain-garden-vertical-ruby-sidebar','沿着花园的小路慢慢走。','雨停以后，我们在桥边见。'],
             ['chess-picnic-neighbor-inverse-bubbles','THE BOARD IS READY.','I SAVED YOU A SEAT.'],
             ['lantern-market-oblique-bilingual-captions','THE LANTERNS ARE STILL WARM.','LET US WALK HOME TOGETHER.'],
+            ['watercolor-ferry-translucent-notification','THE RIVERIS CLEAR TODAY','PLEASE STEP ABOARD QUIETLY.'],
+            ['orbital-greenhouse-cutout-dialogue','新的叶子已经展开了。','把水送到靠窗的一排。'],
+            ['orbital-greenhouse-cutout-dialogue','ここなら星が見える。','明日も一緒に育てよう。'],
             ['same-tone-cabin-controls','KEEP THE CABIN CLOSED','THE CREW RETURNS AT DAWN'],
             ['inverse-neighbor-tidal-balloons','WE CAN CROSS NOW','THE TIDE IS FALLING'],
         ];
@@ -245,9 +283,9 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
                     `${scene.name}: a modified gap pixel revokes ${proof.previous.text} → ${proof.next.text}`).toBe(false);
             }
         }
-        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(13);
-        expect(baselineFailures-replayFailures).toBe(6);
         expect(observedPairs).toEqual(resolvedPairs);
+        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(8);
+        expect(baselineFailures-replayFailures).toBe(11);
     });
 
     const rewrite=(directory:string,mutate:(data:any)=>void)=>{

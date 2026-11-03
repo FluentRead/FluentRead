@@ -105,6 +105,8 @@ node scripts/testing/run-manga-translation-test.cjs \
   --artifacts-dir <证据目录>/manga-quality
 ```
 
+复现实站服务路径时可指定 `node --experimental-websocket scripts/testing/run-manga-translation-test.cjs ... --translation-service microsoft --image-translation-service microsoft --live-translation`。Node 20 需启用内置 WebSocket；该模式记录微软 `translatetext` 请求数量、状态和耗时，不记录请求正文。加 `--assert-no-render-skips --trace-layout` 可要求每个实测页面的真实 offscreen 结果都没有未绘制译文。模型导入会优先沿用 `--model-cache-dir` 的 SHA 校验文件，并通过 CDP 本地路径导入，避免把大型文件经过 Playwright 传输；加 `--model-cache-no-download` 后，缓存缺少或校验失败时直接报错、不下载模型。此参数只约束模型缓存助手，不阻止阅读器或翻译服务的其他网络请求。
+
 下列单图专项仍保留其独立入口与原有范围。
 
 漫画脚本的 `--error-recovery` 在真实 OCR 后注入限定的文字传输失败，验证紧凑边缘提示、可信单页重试、键盘展开错误详情、关闭提示、暂停清理、原画像素与缓存重显。默认使用 IMG；分别加 `--error-recovery-surface canvas`、`background` 或 `segments` 验证已适配的公开 DOM 形态，全部使用受控页面和生产适配器，不访问站点接口。此模式不能与真实站点或质量矩阵合用。失败响应和布局度量保留到报告，不能让不可见控件的脚本点击冒充用户可操作。

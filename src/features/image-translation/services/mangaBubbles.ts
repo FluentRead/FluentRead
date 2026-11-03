@@ -127,6 +127,56 @@ function overlapsOcrLine(item: MangaOcrItem, local: MangaOcrItem, minimum = .5):
     return overlap > 0 && overlap >= Math.max(a.width * a.height, b.width * b.height) * minimum;
 }
 
+/** Paddle 有时会把整句内部的宽字距字形再次识别成一条重叠碎片，随后触发正确译文的原文保护。 */
+function spacedLatinFragment(text:string):string|undefined {
+    const normalized=/^[\x00-\x7f]+$/u.test(text)?text:text.normalize('NFKC');
+    if(!/^[A-Za-z0-9\s.,!?;:'’"()\-…]+$/u.test(normalized))return;
+    const letters=(normalized.match(/[A-Za-z]/gu)??[]).length,spaces=(normalized.match(/\s/gu)??[]).length;
+    if(letters<6||spaces<Math.ceil((letters-1)*.4))return;
+    return normalized.replace(/[^A-Za-z0-9]/gu,'').toUpperCase();
+}
+
+/** 有界 LCS 只用于很少的间隔字母候选；近似相似度不足时保留源行。 */
+function subsequenceCoverage(shorter:string,longer:string):number {
+    if(!shorter||shorter.length>64||longer.length>192||shorter.length>longer.length)return 0;
+    let previous=new Uint8Array(shorter.length+1),current=new Uint8Array(shorter.length+1);
+    for(const character of longer){
+        current[0]=0;
+        for(let index=1;index<=shorter.length;index++)current[index]=character===shorter[index-1]
+            ?previous[index-1]+1:Math.max(previous[index],current[index-1]);
+        [previous,current]=[current,previous];
+    }
+    return previous[shorter.length]/shorter.length;
+}
+
+/** 仅丢弃与更完整原文高度重叠、且字符序列近似为其子串的字距噪声；预算耗尽时全部保留。 */
+function removeOverlappingSpacedEchoes(regions:MangaRegion[]):MangaRegion[] {
+    const fragments=regions.flatMap(region=>{
+        const compact=spacedLatinFragment(region.text);
+        return compact?[{region,compact}]:[];
+    });
+    if(!fragments.length)return regions;
+    const fragmentRegions=new Set(fragments.map(fragment=>fragment.region));
+    const candidates=regions.map(region=>({region,compact:fragmentRegions.has(region)?undefined
+        :region.text.normalize('NFKC').replace(/[^A-Za-z0-9]/gu,'').toUpperCase()}));
+    const removed=new Set<MangaRegion>();let comparisons=0;
+    for(const fragment of fragments){
+        if(removed.has(fragment.region))continue;
+        for(const candidate of candidates){
+            if(candidate.region===fragment.region||!candidate.compact)continue;
+            if(++comparisons>8192)return regions;
+            if(candidate.compact.length<fragment.compact.length+3||candidate.compact.length>192)continue;
+            const a=fragment.region.bbox,b=candidate.region.bbox;
+            const intersection=Math.max(0,Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0))
+                *Math.max(0,Math.min(a.y1,b.y1)-Math.max(a.y0,b.y0));
+            const smaller=Math.min((a.x1-a.x0)*(a.y1-a.y0),(b.x1-b.x0)*(b.y1-b.y0));
+            if(smaller<=0||intersection<smaller*.55)continue;
+            if(subsequenceCoverage(fragment.compact,candidate.compact)>=.75){removed.add(fragment.region);break;}
+        }
+    }
+    return removed.size?regions.filter(region=>!removed.has(region)):regions;
+}
+
 /** 不跨气泡拼句；局部识别本身才是替代证据，气泡几何或其他对白的存在不能删除可靠原文。 */
 export function collectMangaRegions(page:MangaOcrPage,language:string,width:number,height:number,profile: 'manga' | 'image' = 'manga',image?:string):MangaRegion[]{
     const bubbles=page.bubbles??[];
@@ -211,7 +261,8 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     });
     const outside=wordBoundaries.record(groupMangaText(outsideItems,language,width,height,'page',true),outsideItems);
     const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
-    const result=appendUncoveredNumericGuards(mergeNumericRegions(regions),guards,guardEvidence);
+    const echoesRemoved=profile==='manga'?removeOverlappingSpacedEchoes(regions):regions;
+    const result=appendUncoveredNumericGuards(mergeNumericRegions(echoesRemoved),guards,guardEvidence);
     const physicalRegions=new Map<MangaRegion,Box>();
     for(const item of outsideItems){
         const box={x0:item.box.x,y0:item.box.y,x1:item.box.x+item.box.width,y1:item.box.y+item.box.height};

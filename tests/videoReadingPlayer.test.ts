@@ -143,7 +143,7 @@ describe('播放器读音与原轨上下文所有权', () => {
     let reject!: (error: Error) => void; mocks.annotate.mockImplementationOnce(() => new Promise((_, no) => {reject = no;}));
     f.render(); await flush(); f.reading.syncMenu(f.menu, true, 'bilingual');
     expect(toggle.disabled).toBe(false); expect(toggle.getAttribute('aria-checked')).toBe('true'); expect(toggle.getAttribute('aria-label')).toBe('video.readingAnnotation.label');
-    expect(status.textContent).toBe('video.readingAnnotation.loading'); expect(retry.hidden).toBe(true);
+    expect(status.textContent).toBe(''); expect(status.hidden).toBe(true); expect(retry.hidden).toBe(true);
     reject(new Error('failed')); await flush(); f.reading.syncMenu(f.menu, true, 'bilingual');
     expect(status.textContent).toBe('video.readingAnnotation.error'); expect(retry.hidden).toBe(false);
     const bilingual = f.menu.querySelector<HTMLButtonElement>('[data-reading-bilingual]')!;
@@ -167,16 +167,21 @@ describe('播放器读音与原轨上下文所有权', () => {
     f.reading.syncMenu(f.document.createElement('div'), true, 'bilingual'); toggle.replaceChildren(); f.reading.syncMenu(f.menu, true, 'bilingual');
   });
 
-  it('开启后无适用语言或读音仅提示原因，空句和关闭清除提示且没有重试按钮', async () => {
+  it('换句时无适用语言、空结果和等待期间不插入提示，失败仍可重试', async () => {
     const f = fixture(), status = f.menu.querySelector<HTMLElement>('[data-reading-status]')!, retry = f.menu.querySelector<HTMLButtonElement>('[data-action="retry-reading-annotation"]')!;
     mocks.config.videoSubtitleAppearance.readingAnnotation = true;
     mocks.choose.mockReturnValue({languageCode: 'en'}); f.render('Hello'); await flush(); f.reading.syncMenu(f.menu, true, 'bilingual');
-    expect(f.reading.state.status).toBe('no-reading'); expect(status.textContent).toBe('video.readingAnnotation.noReading');
-    expect(status.hidden).toBe(false); expect(retry.hidden).toBe(true); expect(mocks.annotate).not.toHaveBeenCalled();
+    expect(f.reading.state.status).toBe('no-reading'); expect(status.textContent).toBe('');
+    expect(status.hidden).toBe(true); expect(retry.hidden).toBe(true); expect(mocks.annotate).not.toHaveBeenCalled();
     f.render(''); f.reading.syncMenu(f.menu, true, 'bilingual'); expect(status.hidden).toBe(true);
-    f.context.key = 'japanese-track'; mocks.choose.mockReturnValue({languageCode: 'ja'}); mocks.annotate.mockResolvedValueOnce(null);
+    f.context.key = 'japanese-track'; mocks.choose.mockReturnValue({languageCode: 'ja'});
+    let finish!: (value: null) => void;
+    mocks.annotate.mockImplementationOnce(() => new Promise(resolve => {finish = resolve;}));
     f.render(); await flush(); f.reading.syncMenu(f.menu, true, 'bilingual');
-    expect(status.textContent).toBe('video.readingAnnotation.noReading'); expect(retry.hidden).toBe(true); expect(mocks.annotate).toHaveBeenCalledOnce();
+    expect(f.reading.state.status).toBe('loading'); expect(status.hidden).toBe(true); expect(retry.hidden).toBe(true);
+    finish(null); await flush(); f.reading.syncMenu(f.menu, true, 'bilingual');
+    expect(f.reading.state.status).toBe('no-reading');
+    expect(status.textContent).toBe(''); expect(status.hidden).toBe(true); expect(retry.hidden).toBe(true); expect(mocks.annotate).toHaveBeenCalledOnce();
     f.render(); await flush(); expect(mocks.annotate).toHaveBeenCalledOnce();
     mocks.config.videoSubtitleAppearance.readingAnnotation = false; f.reading.syncConfig(mocks.config); f.reading.syncMenu(f.menu, true, 'bilingual');
     expect(status.hidden).toBe(true); expect(retry.hidden).toBe(true);

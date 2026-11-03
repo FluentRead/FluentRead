@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** 字幕菜单专项：生产扩展、第二屏后台 Edge、实际内容脚本；网页、媒体、轨道及翻译为确定性夹具。 */
+/** 字幕菜单专项：生产扩展、第二屏后台 Edge、实际内容脚本；YouTube/X 页面、媒体、字幕及翻译为确定性夹具。 */
 'use strict';
 
 const assert = require('node:assert/strict');
@@ -14,15 +14,17 @@ const {assertFreshProductionExtension} = require('../run-site-translation-test.c
 
 const arg = (name, fallback) => {const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1];};
 const suite = arg('suite', 'menu-ui');
-assert.ok(['menu-ui', 'subtitle-stability', 'subtitle-order'].includes(suite), `unknown suite: ${suite}`);
+assert.ok(['menu-ui', 'subtitle-stability', 'subtitle-order', 'reading-stability', 'x-reading-stability'].includes(suite), `unknown suite: ${suite}`);
+const xReadingStability = suite === 'x-reading-stability';
+const readingStability = suite === 'reading-stability' || xReadingStability;
 const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const artifactsDir = path.resolve(arg('artifacts-dir', path.join(os.tmpdir(), 'fluentread-video-menu-ui')));
 const runtimeRoot = arg('playwright-root', process.env.PLAYWRIGHT_ROOT);
 const helperPath = path.resolve(arg('focus-safe-helper', path.join(os.homedir(), '.codex/skills/fluentread-extension-ui-test/scripts/focus-safe-browser.cjs')));
 const diagnosticsPath = path.resolve(arg('runtime-diagnostics', path.join(path.dirname(helperPath), 'runtime-diagnostics.cjs')));
-const fixtureUrl = 'https://www.youtube.com/watch?v=fluentread-menu-ui';
+const fixtureUrl = xReadingStability ? 'https://x.com/fluentread/status/424242' : 'https://www.youtube.com/watch?v=fluentread-menu-ui';
 const trackUrl = 'https://www.youtube.com/api/timedtext?v=fluentread-menu-ui&lang=en';
-const firstSource = suite === 'subtitle-stability'
+const firstSource = readingStability ? '국립 한국어 같이 읽는' : suite === 'subtitle-stability'
   ? 'When the subtitle settings menu opens, the bilingual subtitles should keep their original position and wrapping instead of moving sideways to make room for the toolbar.'
   : 'Reading annotations help you follow along.';
 const firstTranslation = suite === 'subtitle-stability'
@@ -33,11 +35,24 @@ const cues = [
   {tStartMs: 2000, dDurationMs: 1800, segs: [{utf8: 'Subtitle downloads stay available in the menu.'}]},
 ];
 const timedtext = JSON.stringify({events: cues});
-const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FluentRead subtitle menu</title><script>var ytInitialPlayerResponse=${JSON.stringify({captions: {playerCaptionsTracklistRenderer: {captionTracks: [{baseUrl: trackUrl, languageCode: 'en', name: {simpleText: 'English'}}]}}})};</script></head>
+const playerResponse = readingStability ? {} : {captions: {playerCaptionsTracklistRenderer: {captionTracks: [{baseUrl: trackUrl, languageCode: 'en', name: {simpleText: 'English'}}]}}};
+const youtubeHtml = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>FluentRead subtitle menu</title><script>var ytInitialPlayerResponse=${JSON.stringify(playerResponse)};</script></head>
 <body style="margin:0;background:#eef1f5"><div id="movie_player" class="html5-video-player" style="position:relative;width:960px;height:540px;margin:24px;background:linear-gradient(130deg,#17333d,#0d1721);color:white">
 <p style="position:absolute;left:28px;top:18px;font:16px system-ui">FluentRead · Subtitle menu</p><video class="html5-main-video" muted style="position:absolute;inset:0;width:100%;height:100%;opacity:0"></video>
 <div id="ytp-caption-window-container" style="position:absolute;bottom:90px;left:5%;width:90%;text-align:center;font:26px system-ui"><span class="ytp-caption-segment">${firstSource}</span></div>
 <div class="ytp-right-controls" style="position:absolute;bottom:14px;right:20px;width:300px;height:40px"></div></div></body></html>`;
+const xHtml = `<!doctype html><html><head><meta charset="utf-8"><style>
+.fixture-controls{position:absolute;bottom:0;left:12px;right:12px;display:flex;align-items:center;height:44px;background:#222;color:#fff}
+.fixture-controls button{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;padding:0;border:0;background:transparent;color:#fff}
+.fixture-time{flex:1}.fixture-actions{display:flex;align-items:center;flex:none}</style></head><body style="margin:24px;background:#f3f5f9">
+<article><div data-testid="videoPlayer" style="position:relative;width:960px;height:540px;overflow:hidden"><video src="https://video.twimg.com/ext_tw_video/424242/pu/fixture.mp4" style="width:100%;height:100%" muted></video>
+<div class="fixture-controls"><button aria-label="Play">▶</button><span class="fixture-time">0:02 / 0:30</span><div class="fixture-actions"><button aria-label="Captions">▣</button><button aria-label="Volume">◖</button><button aria-label="Settings">⚙</button><button aria-label="Picture in picture">▣</button><button aria-label="Full screen">⛶</button></div></div></div></article></body></html>`;
+const html = xReadingStability ? xHtml : youtubeHtml;
+const readingPhases = [
+  ['latin-1', 'This line needs no annotation.', '', 3], ['korean-1', '안녕하세요', 'annyeonghaseyo', 6],
+  ['empty', '', '', 9], ['korean-2', firstSource, 'gungnip hangugeo gachi ingneun', 12],
+  ['latin-2', 'Another line needs no annotation.', '', 15], ['korean-3', '안녕하세요', 'annyeonghaseyo', 18],
+];
 
 let sequence = 0;
 async function readConfig(page) {
@@ -64,9 +79,72 @@ async function waitConfig(page, expected) {
   }
   throw Error(`reading preference not persisted: ${expected}`);
 }
+async function waitDisplayMode(page, expected) {
+  const deadline = Date.now() + 10000;
+  while (Date.now() < deadline) {
+    const config = await readConfig(page);
+    if (config.videoSubtitleDisplayMode === expected) return config;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw Error(`subtitle display mode not persisted: ${expected}`);
+}
 async function visible(locator, value = true) {
   await locator.waitFor({state: value ? 'visible' : 'hidden', timeout: 5000});
   assert.equal(await locator.isVisible(), value);
+}
+
+/** 用真实读音处理交替经历有读音、无需读音和空字幕，记录菜单每帧几何。 */
+async function runReadingStability({page, entry, diagnostics, result, checkFocus}) {
+  diagnostics.setPhase('reading-stability');
+  const menu = page.locator('#fluent-read-video-subtitle-menu');
+  const caption = page.locator('.ytp-caption-segment');
+  await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-reading')?.textContent === 'gungnip hangugeo gachi ingneun', null, {timeout: 30000});
+  await entry.click();
+  await visible(menu);
+  assert.equal(await menu.locator('[data-action="toggle-reading-annotation"]').getAttribute('aria-checked'), 'true');
+  const readGeometry = () => page.evaluate(() => {
+    const elements = ['#fluent-read-video-subtitle-menu', '.fluent-read-video-menu-mode-group', '.fluent-read-video-menu-order-setting'];
+    return elements.map(selector => {
+      const rect = document.querySelector(selector).getBoundingClientRect();
+      return {selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height};
+    });
+  });
+  const baseline = await readGeometry();
+  await page.evaluate(() => {
+    const selectors = ['#fluent-read-video-subtitle-menu', '.fluent-read-video-menu-mode-group', '.fluent-read-video-menu-order-setting'];
+    window.__readingStabilitySamples = [];
+    window.__readingStabilityTimer = setInterval(() => {
+      window.__readingStabilitySamples.push(selectors.map(selector => {
+        const rect = document.querySelector(selector).getBoundingClientRect();
+        return {selector, x: rect.x, y: rect.y, width: rect.width, height: rect.height};
+      }));
+    }, 20);
+  });
+  const phaseResults = [];
+  for (const [phase, source, reading, seconds] of readingPhases) {
+    checkFocus();
+    diagnostics.setPhase(`reading-stability-${phase}`);
+    if (xReadingStability) {
+      await page.locator('video').evaluate((video, time) => {video.currentTime = time;}, seconds);
+      await page.waitForFunction(expected => (document.querySelector('#fluent-read-video-subtitle-original')?.textContent || '') === expected, source, {timeout: 30000});
+    } else await caption.evaluate((element, text) => {element.textContent = text;}, source);
+    await page.waitForFunction(expected => (document.querySelector('#fluent-read-video-subtitle-reading')?.textContent || '') === expected, reading, {timeout: 30000});
+    await page.waitForTimeout(180);
+    phaseResults.push({phase, statusVisible: await menu.locator('[data-reading-status]').isVisible(),
+      retryVisible: await menu.locator('[data-action="retry-reading-annotation"]').isVisible(), geometry: await readGeometry()});
+  }
+  const samples = await page.evaluate(() => {clearInterval(window.__readingStabilityTimer); return window.__readingStabilitySamples;});
+  assert.ok(samples.length > 20, `Too few geometry samples: ${samples.length}`);
+  const changes = samples.flatMap((sample, sampleIndex) => sample.flatMap((item, index) => ['x', 'y', 'width', 'height']
+    .filter(field => Math.abs(item[field] - baseline[index][field]) > 1)
+    .map(field => ({sampleIndex, selector: item.selector, field, before: baseline[index][field], after: item[field]}))));
+  result.readingStability = {baseline, samples: samples.length, changes, phases: phaseResults, tolerancePx: 1};
+  fs.writeFileSync(path.join(artifactsDir, 'reading-stability-geometry.json'), JSON.stringify({baseline, samples, changes, phases: phaseResults}, null, 2));
+  await menu.screenshot({path: path.join(artifactsDir, 'reading-stability.png')});
+  result.screenshots.push('reading-stability.png');
+  assert.ok(phaseResults.every(phase => !phase.statusVisible && !phase.retryVisible), `Routine reading states must stay quiet: ${JSON.stringify(phaseResults)}`);
+  assert.deepEqual(changes, [], 'Reading state changes must not move or resize the menu');
+  result.cases.push({name: 'reading-status-transitions-keep-menu-geometry-stable', passed: true, samples: samples.length});
 }
 
 /** 只以真实生产内容脚本的布局结果判定，不在夹具中模拟字幕定位或触发应用事件。 */
@@ -336,10 +414,10 @@ async function main() {
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-video-menu-ui-'));
   const result = {ok: false, suite, sourceRevision: spawnSync('git', ['rev-parse', 'HEAD'], {encoding: 'utf8'}).stdout.trim(), extensionDir, artifactsDir, cases: [], screenshots: [], unexpectedNetwork: [],
     buildContentSha256: createHash('sha256').update(fs.readFileSync(path.join(extensionDir, 'content-scripts/content.js'))).digest('hex'),
-    scope: 'Production Edge content-script UI with deterministic YouTube/media/subtitle/Microsoft fixtures; no live provider, real website, Firefox or assistive-technology speech acceptance',
+    scope: `Production Edge content-script UI with deterministic ${xReadingStability ? 'X and cached AI subtitles' : 'YouTube'}, media, subtitle and Microsoft fixtures; no live provider, real website, Firefox or assistive-technology speech acceptance`,
     notRun: ['physical Firefox', 'live service quality', 'all reading engines', 'native mobile device'],
   };
-  let session, primaryError, background, browserClosed = false, launchStarted = false, focusMonitor, browserPid, focusError;
+  let session, page, primaryError, background, browserClosed = false, launchStarted = false, focusMonitor, browserPid, focusError;
   const checkFocus = () => {
     if (focusError || focusMonitor?.error) throw focusError || focusMonitor.error;
     assert.ok(!browserPid || !focusMonitor.events.some(event => event.pid === browserPid), 'owned Edge became foreground');
@@ -360,9 +438,8 @@ async function main() {
       headless: false, background: true, displayTarget: 'secondary', viewport: {width: 1280, height: 900},
       browserArgs: [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`, '--no-first-run', '--no-default-browser-check'],
     });
-    // Skill helper owns this exact mkdtemp profile and browser PID. Its close
-    // port does not implement the repository guard's transport/signal contract.
-    result.cleanupPolicy = 'skill-helper-exact-profile-and-captured-browser-pid';
+    // 启动 helper 拥有本次临时 profile 和浏览器；不接触其他浏览器进程。
+    result.cleanupPolicy = 'focus-safe-helper-exact-profile-and-captured-browser-pid';
     const context = session.context;
     const processSession = await context.browser().newBrowserCDPSession();
     try {
@@ -399,6 +476,13 @@ async function main() {
     await context.route('**/*', route => {
       const url = new URL(route.request().url());
       if (url.href === fixtureUrl) return route.fulfill({contentType: 'text/html', body: html});
+      if (xReadingStability && url.hostname === 'video.twimg.com') {
+        const bytes = fs.readFileSync(mediaPath), match = route.request().headers().range?.match(/^bytes=(\d+)-(\d*)$/);
+        if (!match) return route.fulfill({contentType: 'video/mp4', headers: {'accept-ranges': 'bytes'}, body: bytes});
+        const start = Number(match[1]), end = match[2] ? Math.min(Number(match[2]), bytes.length - 1) : bytes.length - 1;
+        return route.fulfill({status: 206, contentType: 'video/mp4', headers: {'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${bytes.length}`}, body: bytes.subarray(start, end + 1)});
+      }
+      if (xReadingStability && url.hostname === 'x.com' && url.pathname === '/favicon.ico') return route.fulfill({status: 204, body: ''});
       if (url.hostname === 'www.youtube.com' && url.pathname === '/favicon.ico') return route.fulfill({status: 204, body: ''});
       if (url.hostname === 'www.youtube.com' && url.pathname === '/api/timedtext') return route.fulfill({contentType: 'application/json', body: timedtext});
       if (['http:', 'https:'].includes(url.protocol)) {
@@ -412,19 +496,29 @@ async function main() {
     await control.goto(`chrome-extension://${extensionId}/popup.html`);
     await control.locator('.popup-shell[data-config-ready="true"]').waitFor({timeout: 15000});
     const initial = await readConfig(control);
-    await persist(control, {on: true, uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, theme: 'dark', from: 'en', to: 'zh-Hans',
+    await persist(control, {on: true, uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, theme: 'dark', from: readingStability ? 'ko' : 'en', to: 'zh-Hans',
       videoTranslationEnabled: true, videoService: 'microsoft', videoServiceDefaultMigrated: true, videoSubtitleVisible: true,
-      videoSubtitleDisplayMode: 'bilingual', videoSubtitleAppearance: {...initial.videoSubtitleAppearance, readingAnnotation: false}, useCache: false});
-    const page = await newPageWithoutForeground(context);
-    await diagnostics.attachPage(page, 'youtube-menu-content-script');
+      videoSubtitleDisplayMode: suite === 'reading-stability' ? 'original-only' : 'bilingual', videoSubtitleAppearance: {...initial.videoSubtitleAppearance, readingAnnotation: readingStability},
+      ...(xReadingStability ? {videoLocalModel: 'tiny', videoSourceLanguage: 'ko'} : {}), useCache: false});
+    if (xReadingStability) {
+      const cachedCues = [{startMs: 0, durationMs: 2000, text: firstSource}, ...readingPhases.filter(([, source]) => source)
+        .map(([, text, , seconds]) => ({startMs: seconds * 1000, durationMs: 2000, text}))];
+      const cached = await control.evaluate(cues => chrome.runtime.sendMessage({type: 'fluentReadSetVideoAiSubtitleCache',
+        source: {mediaId: '424242'}, model: 'tiny', sourceLanguage: 'ko', cues}), cachedCues);
+      assert.equal(cached?.cached, true, 'Seeded AI subtitle cache is required');
+    }
+    page = await newPageWithoutForeground(context);
+    await diagnostics.attachPage(page, xReadingStability ? 'x-menu-content-script' : 'youtube-menu-content-script');
     await page.setViewportSize({width: 1280, height: 900});
     diagnostics.setPhase('menu-initial');
     await page.goto(fixtureUrl);
     await activateExtensionTabWithoutForeground(context, page);
-    await page.locator('video').evaluate((video, src) => {video.src = src; video.load();}, `data:video/mp4;base64,${fs.readFileSync(mediaPath).toString('base64')}`);
+    if (!xReadingStability) await page.locator('video').evaluate((video, src) => {video.src = src; video.load();}, `data:video/mp4;base64,${fs.readFileSync(mediaPath).toString('base64')}`);
     const entry = page.locator('#fluent-read-video-subtitle-button');
     await entry.waitFor({timeout: 15000});
-    if (suite === 'subtitle-stability') {
+    if (readingStability) {
+      await runReadingStability({page, entry, diagnostics, result, checkFocus});
+    } else if (suite === 'subtitle-stability') {
       await runSubtitleStability({page, entry, diagnostics, result, checkFocus});
     } else if (suite === 'subtitle-order') {
       await runSubtitleOrder({page, entry, control, background, mediaSrc: `data:video/mp4;base64,${fs.readFileSync(mediaPath).toString('base64')}`, diagnostics, result, checkFocus});
@@ -678,7 +772,7 @@ async function main() {
     assert.equal(await toggle.getAttribute('aria-checked'), 'true');
     await menu.locator('[data-mode="translation-only"]').click();
     await page.waitForFunction(() => document.querySelector('[data-reading-status]')?.textContent?.includes('原文'));
-    const translationOnlyConfig = await readConfig(control);
+    const translationOnlyConfig = await waitDisplayMode(control, 'translation-only');
     assert.equal(translationOnlyConfig.videoSubtitleAppearance.readingAnnotation, true);
     assert.equal(translationOnlyConfig.videoSubtitleDisplayMode, 'translation-only', 'Reading preference must not automatically switch the display mode');
     const showOriginal = menu.locator('[data-reading-bilingual]');
@@ -690,7 +784,7 @@ async function main() {
     await showOriginal.click();
     await page.waitForFunction(() => document.querySelector('.fluent-read-video-menu-mode-group [data-mode="bilingual"]')?.getAttribute('aria-checked') === 'true'
       && document.querySelector('[data-reading-bilingual]')?.hidden === true);
-    const bilingualConfig = await readConfig(control);
+    const bilingualConfig = await waitDisplayMode(control, 'bilingual');
     assert.equal(bilingualConfig.videoSubtitleDisplayMode, 'bilingual');
     assert.equal(bilingualConfig.videoSubtitleAppearance.readingAnnotation, true);
     await visible(showOriginal, false);
@@ -786,6 +880,12 @@ async function main() {
   } catch (error) {
     primaryError = error;
     result.error = error.stack || String(error);
+    if (page && !page.isClosed()) {
+      try {
+        await page.screenshot({path: path.join(artifactsDir, 'failure.png')});
+        result.screenshots.push('failure.png');
+      } catch (screenshotError) {result.failureScreenshotError = screenshotError.stack || String(screenshotError);}
+    }
   } finally {
     await finalizeRun({diagnostics, result, artifactsDir, primaryError,
       cleanup: [{stage: 'owned-browser-close', action: async () => {
@@ -794,7 +894,8 @@ async function main() {
         else result.retainedProfileAfterUncertainLaunch = profileDir;
       }},
         {stage: 'focus-monitor-stop', action: async () => {if (focusMonitor) {await focusMonitor.stop(); result.focusEvents = {monitoring: 'native macOS application activation events', browserActivations: focusMonitor.events.filter(event => event.pid === browserPid).length, observerClosed: true};}}},
-        {stage: 'temporary-profile-remove', action: async () => {if (browserClosed) {fs.rmSync(profileDir, {recursive: true, force: true}); result.profileRemoved = true;}}}],
+        // 浏览器主进程退出后，子进程仍可能短暂写入自身 profile；只对本次目录有限重试，失败仍须报告。
+        {stage: 'temporary-profile-remove', action: async () => {if (browserClosed) {fs.rmSync(profileDir, {recursive: true, force: true, maxRetries: 10, retryDelay: 100}); result.profileRemoved = true;}}}],
       emitReport: () => {
         diagnostics.write(artifactsDir, result);
         console.log(JSON.stringify({ok: result.ok, error: result.error, cases: result.cases, runtimeCounts: result.runtimeDiagnostics?.counts, launchMode: result.launchMode, focusPolicy: result.focusPolicy, windowPlacement: result.windowPlacement, focusEvents: result.focusEvents, browserClosed: result.browserClosed, profileRemoved: result.profileRemoved, artifactsDir}, null, 2));

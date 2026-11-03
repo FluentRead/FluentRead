@@ -2,7 +2,7 @@
 /**
  * @file scripts/release/verify-edge.mjs
  * 校验独立 Edge MV3 发布目录与 ZIP 的清单、后台目标、界面资源及逐文件字节一致性。
- * 复用扩展已有的本地化与 frame 样式契约；不修改产物、不签名、不提交商店。
+ * 拒绝包内嵌套的 GZIP/ZIP 文件，复用已有本地化与 frame 样式契约；不修改产物、不签名、不提交商店。
  */
 import assert from 'node:assert/strict';
 import {lstat, readFile, readdir} from 'node:fs/promises';
@@ -13,6 +13,12 @@ import {verifyFrameUiStyles, verifyLocalizedExtensionMetadata} from '../testing/
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
 const marker = '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:edge:mv3__';
+const compressedSignatures = [
+  {format: 'GZIP', bytes: Buffer.from([0x1f, 0x8b, 0x08])},
+  ...[[0x03, 0x04], [0x05, 0x06], [0x07, 0x08]].map(suffix => ({
+    format: 'ZIP', bytes: Buffer.from([0x50, 0x4b, ...suffix]),
+  })),
+];
 
 function validRelativePath(value, directory = false) {
   if (typeof value !== 'string' || value.includes('\\') || value.includes('\0') || path.posix.isAbsolute(value)) return false;
@@ -73,6 +79,9 @@ export async function verifyEdgeArchive(zipBytes, directory, expectedManifest) {
   assert.deepEqual(JSON.parse(await manifestEntry.async('string')), expectedManifest, 'Edge ZIP 清单与已校验清单不一致');
   for (const name of files) {
     const archived = await archive.file(name).async('nodebuffer');
+    // 按文件内容识别，改扩展名不能让嵌套压缩包通过；外层安装 ZIP 的 DEFLATE 不受影响。
+    const compressed = compressedSignatures.find(signature => archived.subarray(0, signature.bytes.length).equals(signature.bytes));
+    assert(!compressed, `Edge 安装包不得包含嵌套压缩文件：${name} (${compressed?.format})`);
     const local = await readFile(path.join(directory, name));
     assert(archived.equals(local), `Edge ZIP 文件内容与构建目录不一致：${name}`);
   }

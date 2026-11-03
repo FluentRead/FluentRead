@@ -59,3 +59,27 @@ test('Edge release verification refuses symlinked files, directories and unsafe 
     ]) await assert.rejects(verifyEdgeArchive(await archive.generateAsync({type: 'nodebuffer', platform: 'UNIX'}), directory, {}), /ZIP/);
   } finally {await rm(root, {recursive: true, force: true});}
 });
+
+test('Edge rejects embedded compressed files by bytes while preserving the complete readable license', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'fluentread-edge-compressed-'));
+  try {
+    const manifest = {version: '0.0.40'};
+    const manifestBytes = JSON.stringify(manifest);
+    const filename = 'license.txt';
+    await writeFile(path.join(directory, 'manifest.json'), manifestBytes);
+    const gzip = await readFile(new URL('./fixtures/reading-annotation/koroman-upstream-LICENSE.txt.gz', import.meta.url));
+    const license = await readFile(new URL('../public/third-party-notices/reading-koroman-MIT.txt', import.meta.url));
+    const nestedZip = await new JSZip().file('LICENSE.txt', license).generateAsync({type: 'nodebuffer'});
+    const emptyZip = await new JSZip().generateAsync({type: 'nodebuffer'});
+    for (const bytes of [gzip, nestedZip, emptyZip]) {
+      await writeFile(path.join(directory, filename), bytes);
+      const archive = await new JSZip().file('manifest.json', manifestBytes).file(filename, bytes)
+        .generateAsync({type: 'nodebuffer', compression: 'DEFLATE'});
+      await assert.rejects(verifyEdgeArchive(archive, directory, manifest), /嵌套压缩文件：license\.txt \((?:GZIP|ZIP)\)/);
+    }
+    await writeFile(path.join(directory, filename), license);
+    const archive = await new JSZip().file('manifest.json', manifestBytes).file(filename, license)
+      .generateAsync({type: 'nodebuffer', compression: 'DEFLATE'});
+    assert.deepEqual(await verifyEdgeArchive(archive, directory, manifest), {files: 2});
+  } finally {await rm(directory, {recursive: true, force: true});}
+});

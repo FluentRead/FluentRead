@@ -2,7 +2,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {inflateSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
-import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence,getImageParagraphGapEvidence,createImageParagraphWorkQueue,type ImageParagraphGapProof} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
+import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence,getImageParagraphGapEvidence,consumeImageParagraphGapEvidence,createImageParagraphWorkQueue,type ImageParagraphGapProof} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
 import {observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
@@ -43,6 +43,14 @@ describe('已保存原像素的五组对白与独立控制标签',()=>{
     });
 });
 describe('原对象采用、私有绑定与完整段落阻挡',()=>{
+    it('漫画消费旁证只接受同图尺寸，并立即解除缓存绑定',()=>{
+        const f=basic(),value=adopt(f);
+        expect(consumeImageParagraphGapEvidence(value.regions,'other',f.width,f.height)).toBeUndefined();
+        expect(getImageParagraphGapEvidence(value.regions,'source',f.width,f.height)).toBeDefined();
+        expect(consumeImageParagraphGapEvidence(value.regions,'source',f.width,f.height)).toBeDefined();
+        expect(getImageParagraphGapEvidence(value.regions,'source',f.width,f.height)).toBeUndefined();
+        expect(consumeImageParagraphGapEvidence(value.regions,'source',f.width,f.height)).toBeUndefined();
+    });
     it('同一page graph clone保留endpoint引用；分离clone或未采用raw行没有权限',()=>{
         const f=basic(),proofs=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels);expect(proofs).toHaveLength(1);
         const graph=structuredClone({...f.page,imageParagraphGapProofs:proofs});expect(graph.imageParagraphGapProofs[0].previous).toBe(graph.results[0]);

@@ -1,0 +1,1049 @@
+{
+  "version": 1,
+  "frozenAtUtc": "2026-10-25 18:32:10 UTC",
+  "firstOcrStatus": "Not run or selected using any OCR result; design fixed before rendering/OCR.",
+  "license": "Original geometric artwork and original source dialogue; system fonts are local rendering dependencies, not copied/bundled. No external artwork or code copied.",
+  "pillowVersion": "12.3.0",
+  "fontFiles": [
+    {
+      "key": "bold",
+      "path": "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+      "sha256": "d72db21f9242aedd6b917d8549ad5921766b24d5f8d0becfda2ff4c620b3c2e0"
+    },
+    {
+      "key": "regular",
+      "path": "/System/Library/Fonts/Supplemental/Arial.ttf",
+      "sha256": "525979822591a3447cfc49d943d6f7683508e25543407871c0ed8fed05fd2bd9"
+    },
+    {
+      "key": "cjk",
+      "path": "/System/Library/Fonts/ヒラギノ角ゴシック W4.ttc",
+      "sha256": "cf8cf2c882e1e344ac2e6207fe172657a30dc2c6e1ee65a9e29a7b582c4d4154"
+    },
+    {
+      "key": "zh",
+      "path": "/System/Library/Fonts/Hiragino Sans GB.ttc",
+      "sha256": "ca1e9bf621f13ddc4800bfb74d0124571dfc25a1678a28d6e7dbcf39fad2504a"
+    }
+  ],
+  "resourceCaps": {
+    "sceneCount": 8,
+    "maxWidth": 1600,
+    "maxHeight": 1500,
+    "maxPixelsPerScene": 2400000,
+    "maxGlyphSupersampledPixels": 4000000,
+    "sequentialRendering": true,
+    "modelDownloads": 0
+  },
+  "scoring": {
+    "normalization": "Use unchanged shared normalizeOcrAnchor (NFKC, uppercase, Unicode letters/numbers). Full original source strings are anchors, not easy substrings.",
+    "positive": "Every full-source anchor must have exactly its declared occurrence count. No post-OCR correction or text substitution.",
+    "inventory": "Actual sourceText from all physical OCR lines must have no excess normalized character counts; this cannot substitute for anchor completeness.",
+    "paragraphs": "Each complete declared paragraphGroups sequence must equal a distinct complete actual normalized source paragraph. Wrong joins or splits fail separately from anchor detection.",
+    "negative": "Any actual physical OCR box intersecting a declared wordless region fails, even when all anchors are found. Whole wordless page must have zero actual text/lines.",
+    "standardPixels": "All protected opaque RGB points, source dimensions/attrs, original restoration and cache replay remain strict existing gates.",
+    "additionalRgba": "protectedRgbaProbes and protectedRgbaRegions carry full pre-OCR RGBA truth. A downstream suite must explicitly enforce them before claiming transparent hole/region preservation; legacy RGB-only probes are insufficient.",
+    "fairComparison": "Both candidate recognizers receive identical full PNG/source settings/cache. Keep all scene results and count failed anchors/groups/negatives. Do not tune images or select crops after OCR. No speed claim from this corpus."
+  },
+  "oldFixtureInventorySha256": "8a598697810841eb00845d4d15ed9901fec0af4694ab7a39f807c591cae65ee8",
+  "scenes": [
+    {
+      "name": "harbor-same-red-channel-dialogue",
+      "width": 1440,
+      "height": 1000,
+      "category": "Two speakers on opposite canal banks; nonendpoint R128 text and bubble fills, separate narration",
+      "sourceLanguage": "en",
+      "regions": [
+        {
+          "id": "left-a",
+          "text": "THE FERRY LEAVES AT DAWN.",
+          "x": 110,
+          "y": 135,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "fill": [
+            128,
+            28,
+            74,
+            255
+          ],
+          "paragraphId": "left",
+          "supersample": 2
+        },
+        {
+          "id": "left-b",
+          "text": "BRING THE BLUE MAP.",
+          "x": 110,
+          "y": 193,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "fill": [
+            128,
+            28,
+            74,
+            255
+          ],
+          "paragraphId": "left",
+          "supersample": 2
+        },
+        {
+          "id": "right-a",
+          "text": "I WILL WAIT BY THE PIER.",
+          "x": 805,
+          "y": 335,
+          "fontSize": 34,
+          "fontKey": "bold",
+          "fill": [
+            128,
+            239,
+            226,
+            255
+          ],
+          "paragraphId": "right",
+          "supersample": 2
+        },
+        {
+          "id": "right-b",
+          "text": "KEEP THE LANTERN LIT.",
+          "x": 805,
+          "y": 393,
+          "fontSize": 34,
+          "fontKey": "bold",
+          "fill": [
+            128,
+            239,
+            226,
+            255
+          ],
+          "paragraphId": "right",
+          "supersample": 2
+        },
+        {
+          "id": "narration",
+          "text": "A QUIET MORNING ON THE CANAL",
+          "x": 360,
+          "y": 856,
+          "fontSize": 30,
+          "fontKey": "bold",
+          "fill": [
+            44,
+            45,
+            50,
+            255
+          ],
+          "paragraphId": "caption",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 75,
+          "y0": 600,
+          "x1": 440,
+          "y1": 795
+        },
+        {
+          "x0": 1000,
+          "y0": 650,
+          "x1": 1360,
+          "y1": 825
+        }
+      ],
+      "protectedPoints": [
+        [
+          210,
+          706
+        ],
+        [
+          1180,
+          738
+        ],
+        [
+          30,
+          30
+        ]
+      ],
+      "protectedRgbaPoints": [],
+      "colorRelations": [
+        {
+          "textIds": [
+            "left-a",
+            "left-b"
+          ],
+          "textRgba": [
+            128,
+            28,
+            74,
+            255
+          ],
+          "panelRgba": [
+            128,
+            218,
+            183,
+            255
+          ]
+        },
+        {
+          "textIds": [
+            "right-a",
+            "right-b"
+          ],
+          "textRgba": [
+            128,
+            239,
+            226,
+            255
+          ],
+          "panelRgba": [
+            128,
+            46,
+            93,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "name": "prism-platform-gradient-signs",
+      "width": 1600,
+      "height": 900,
+      "category": "Wide rail station with diagonal colored gradient sign, inverse night plaque and small detached route tag",
+      "sourceLanguage": "en",
+      "regions": [
+        {
+          "id": "main-a",
+          "text": "FOLLOW THE EASTERN TRACK",
+          "x": 180,
+          "y": 130,
+          "fontSize": 53,
+          "fontKey": "bold",
+          "fill": [
+            245,
+            245,
+            250,
+            255
+          ],
+          "paragraphId": "main",
+          "supersample": 2
+        },
+        {
+          "id": "main-b",
+          "text": "THE NEXT TRAIN IS ALMOST HERE",
+          "x": 180,
+          "y": 205,
+          "fontSize": 42,
+          "fontKey": "bold",
+          "fill": [
+            18,
+            26,
+            45,
+            255
+          ],
+          "paragraphId": "main",
+          "supersample": 2
+        },
+        {
+          "id": "night",
+          "text": "PLATFORM NINE IS OPEN",
+          "x": 830,
+          "y": 480,
+          "fontSize": 38,
+          "fontKey": "bold",
+          "fill": [
+            248,
+            215,
+            80,
+            255
+          ],
+          "paragraphId": "night",
+          "supersample": 2
+        },
+        {
+          "id": "route",
+          "text": "ROUTE C4",
+          "x": 115,
+          "y": 493,
+          "fontSize": 25,
+          "fontKey": "bold",
+          "fill": [
+            60,
+            36,
+            85,
+            255
+          ],
+          "paragraphId": "route",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 50,
+          "y0": 600,
+          "x1": 600,
+          "y1": 850
+        },
+        {
+          "x0": 950,
+          "y0": 660,
+          "x1": 1540,
+          "y1": 855
+        }
+      ],
+      "protectedPoints": [
+        [
+          120,
+          790
+        ],
+        [
+          1450,
+          730
+        ],
+        [
+          20,
+          20
+        ]
+      ],
+      "protectedRgbaPoints": []
+    },
+    {
+      "name": "rain-garden-vertical-ruby-sidebar",
+      "width": 1100,
+      "height": 1500,
+      "category": "Tall garden comic with right-to-left vertical Japanese main columns, narrow ruby, and separate Chinese two-line narration",
+      "sourceLanguage": "auto",
+      "regions": [
+        {
+          "id": "ja-right",
+          "text": "風の音を聞いて",
+          "x": 832,
+          "y": 150,
+          "fontSize": 44,
+          "fontKey": "cjk",
+          "fill": [
+            137,
+            40,
+            90,
+            255
+          ],
+          "paragraphId": "ja",
+          "supersample": 2,
+          "vertical": true
+        },
+        {
+          "id": "ja-left",
+          "text": "小道で待っている",
+          "x": 720,
+          "y": 150,
+          "fontSize": 44,
+          "fontKey": "cjk",
+          "fill": [
+            137,
+            40,
+            90,
+            255
+          ],
+          "paragraphId": "ja",
+          "supersample": 2,
+          "vertical": true
+        },
+        {
+          "id": "ruby-right",
+          "text": "かぜ",
+          "x": 890,
+          "y": 154,
+          "fontSize": 18,
+          "fontKey": "cjk",
+          "fill": [
+            55,
+            75,
+            85,
+            255
+          ],
+          "paragraphId": "ruby1",
+          "supersample": 2,
+          "vertical": true
+        },
+        {
+          "id": "ruby-left",
+          "text": "こみち",
+          "x": 778,
+          "y": 154,
+          "fontSize": 18,
+          "fontKey": "cjk",
+          "fill": [
+            55,
+            75,
+            85,
+            255
+          ],
+          "paragraphId": "ruby2",
+          "supersample": 2,
+          "vertical": true
+        },
+        {
+          "id": "zh-a",
+          "text": "沿着花园的小路慢慢走。",
+          "x": 100,
+          "y": 1015,
+          "fontSize": 38,
+          "fontKey": "zh",
+          "fill": [
+            48,
+            73,
+            92,
+            255
+          ],
+          "paragraphId": "zh",
+          "supersample": 2
+        },
+        {
+          "id": "zh-b",
+          "text": "雨停以后，我们在桥边见。",
+          "x": 100,
+          "y": 1082,
+          "fontSize": 38,
+          "fontKey": "zh",
+          "fill": [
+            48,
+            73,
+            92,
+            255
+          ],
+          "paragraphId": "zh",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 90,
+          "y0": 180,
+          "x1": 520,
+          "y1": 650
+        },
+        {
+          "x0": 90,
+          "y0": 1210,
+          "x1": 960,
+          "y1": 1430
+        }
+      ],
+      "protectedPoints": [
+        [
+          290,
+          440
+        ],
+        [
+          500,
+          1340
+        ],
+        [
+          25,
+          25
+        ]
+      ],
+      "protectedRgbaPoints": [],
+      "colorRelations": [
+        {
+          "textIds": [
+            "ja-right",
+            "ja-left"
+          ],
+          "textRgba": [
+            137,
+            40,
+            90,
+            255
+          ],
+          "panelRgba": [
+            137,
+            224,
+            196,
+            255
+          ]
+        }
+      ]
+    },
+    {
+      "name": "chess-picnic-neighbor-inverse-bubbles",
+      "width": 1280,
+      "height": 1000,
+      "category": "Closely neighboring independently outlined black/white speech bubbles, left-to-right picnic composition and checkerboard art",
+      "sourceLanguage": "en",
+      "regions": [
+        {
+          "id": "white-a",
+          "text": "YOUR MOVE WAS CLEVER.",
+          "x": 110,
+          "y": 158,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            20,
+            20,
+            20,
+            255
+          ],
+          "paragraphId": "white",
+          "supersample": 2
+        },
+        {
+          "id": "white-b",
+          "text": "LET US TRY ONCE MORE.",
+          "x": 110,
+          "y": 215,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            20,
+            20,
+            20,
+            255
+          ],
+          "paragraphId": "white",
+          "supersample": 2
+        },
+        {
+          "id": "black-a",
+          "text": "THE BOARD IS READY.",
+          "x": 735,
+          "y": 158,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            239,
+            239,
+            239,
+            255
+          ],
+          "paragraphId": "black",
+          "supersample": 2
+        },
+        {
+          "id": "black-b",
+          "text": "I SAVED YOU A SEAT.",
+          "x": 735,
+          "y": 215,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            239,
+            239,
+            239,
+            255
+          ],
+          "paragraphId": "black",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 130,
+          "y0": 550,
+          "x1": 600,
+          "y1": 900
+        },
+        {
+          "x0": 790,
+          "y0": 570,
+          "x1": 1140,
+          "y1": 900
+        }
+      ],
+      "protectedPoints": [
+        [
+          188,
+          628
+        ],
+        [
+          938,
+          736
+        ],
+        [
+          20,
+          20
+        ]
+      ],
+      "protectedRgbaPoints": []
+    },
+    {
+      "name": "lantern-market-oblique-bilingual-captions",
+      "width": 1400,
+      "height": 1050,
+      "category": "Oblique Chinese and Japanese caption slips, tiny ticket, separate upright dialogue over lantern-stall drawing",
+      "sourceLanguage": "auto",
+      "regions": [
+        {
+          "id": "zh-caption",
+          "text": "等天晴以后再出发。",
+          "x": 105,
+          "y": 85,
+          "fontSize": 43,
+          "fontKey": "zh",
+          "fill": [
+            102,
+            25,
+            67,
+            255
+          ],
+          "paragraphId": "zh",
+          "supersample": 2,
+          "rotation": 8,
+          "strokeWidth": 1,
+          "strokeFill": [
+            245,
+            220,
+            165,
+            255
+          ]
+        },
+        {
+          "id": "ja-caption",
+          "text": "雨あがりの市場へ",
+          "x": 780,
+          "y": 185,
+          "fontSize": 39,
+          "fontKey": "cjk",
+          "fill": [
+            65,
+            24,
+            113,
+            255
+          ],
+          "paragraphId": "ja",
+          "supersample": 2,
+          "rotation": -11,
+          "strokeWidth": 1,
+          "strokeFill": [
+            246,
+            229,
+            179,
+            255
+          ]
+        },
+        {
+          "id": "dialogue-a",
+          "text": "THE LANTERNS ARE STILL WARM.",
+          "x": 145,
+          "y": 715,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            71,
+            41,
+            60,
+            255
+          ],
+          "paragraphId": "dialogue",
+          "supersample": 2
+        },
+        {
+          "id": "dialogue-b",
+          "text": "LET US WALK HOME TOGETHER.",
+          "x": 145,
+          "y": 772,
+          "fontSize": 35,
+          "fontKey": "bold",
+          "fill": [
+            71,
+            41,
+            60,
+            255
+          ],
+          "paragraphId": "dialogue",
+          "supersample": 2
+        },
+        {
+          "id": "ticket",
+          "text": "ADMIT ONE 18:30",
+          "x": 1010,
+          "y": 868,
+          "fontSize": 20,
+          "fontKey": "regular",
+          "fill": [
+            88,
+            70,
+            110,
+            255
+          ],
+          "paragraphId": "ticket",
+          "supersample": 2,
+          "rotation": -4
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 80,
+          "y0": 380,
+          "x1": 600,
+          "y1": 620
+        },
+        {
+          "x0": 960,
+          "y0": 430,
+          "x1": 1340,
+          "y1": 690
+        }
+      ],
+      "protectedPoints": [
+        [
+          210,
+          490
+        ],
+        [
+          1180,
+          550
+        ],
+        [
+          20,
+          20
+        ]
+      ],
+      "protectedRgbaPoints": []
+    },
+    {
+      "name": "watercolor-ferry-translucent-notification",
+      "width": 1200,
+      "height": 1000,
+      "category": "RGBA watercolor river postcard, translucent notification card across mottled wash, independent footer and opaque boat accents",
+      "sourceLanguage": "en",
+      "regions": [
+        {
+          "id": "notice-a",
+          "text": "THE RIVER IS CLEAR TODAY.",
+          "x": 175,
+          "y": 210,
+          "fontSize": 38,
+          "fontKey": "bold",
+          "fill": [
+            65,
+            38,
+            110,
+            212
+          ],
+          "paragraphId": "notice",
+          "supersample": 2
+        },
+        {
+          "id": "notice-b",
+          "text": "PLEASE STEP ABOARD QUIETLY.",
+          "x": 175,
+          "y": 274,
+          "fontSize": 36,
+          "fontKey": "bold",
+          "fill": [
+            65,
+            38,
+            110,
+            212
+          ],
+          "paragraphId": "notice",
+          "supersample": 2
+        },
+        {
+          "id": "aside",
+          "text": "A SOFT BREEZE FROM THE WEST",
+          "x": 155,
+          "y": 515,
+          "fontSize": 30,
+          "fontKey": "regular",
+          "fill": [
+            44,
+            86,
+            112,
+            190
+          ],
+          "paragraphId": "aside",
+          "supersample": 2
+        },
+        {
+          "id": "footer",
+          "text": "POSTCARD FROM THE FERRY",
+          "x": 300,
+          "y": 890,
+          "fontSize": 25,
+          "fontKey": "regular",
+          "fill": [
+            87,
+            55,
+            103,
+            220
+          ],
+          "paragraphId": "footer",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 90,
+          "y0": 630,
+          "x1": 490,
+          "y1": 840
+        },
+        {
+          "x0": 760,
+          "y0": 590,
+          "x1": 1110,
+          "y1": 825
+        }
+      ],
+      "protectedPoints": [
+        [
+          580,
+          790
+        ],
+        [
+          720,
+          745
+        ]
+      ],
+      "protectedRgbaPoints": [
+        [
+          50,
+          50
+        ],
+        [
+          200,
+          400
+        ],
+        [
+          600,
+          100
+        ]
+      ],
+      "alphaContract": "All text layers are true source-over glyph RGBA, not replacement alpha; watercolor wash and notification are nonopaque where no opaque art accent overlays them."
+    },
+    {
+      "name": "orbital-greenhouse-cutout-dialogue",
+      "width": 1400,
+      "height": 1100,
+      "category": "Cut-out orbital greenhouse with transparent round holes next to panels, Chinese and Japanese dialogue plus detached micro label",
+      "sourceLanguage": "auto",
+      "regions": [
+        {
+          "id": "zh-a",
+          "text": "新的叶子已经展开了。",
+          "x": 150,
+          "y": 142,
+          "fontSize": 39,
+          "fontKey": "zh",
+          "fill": [
+            112,
+            24,
+            74,
+            255
+          ],
+          "paragraphId": "zh",
+          "supersample": 2
+        },
+        {
+          "id": "zh-b",
+          "text": "把水送到靠窗的一排。",
+          "x": 150,
+          "y": 205,
+          "fontSize": 39,
+          "fontKey": "zh",
+          "fill": [
+            112,
+            24,
+            74,
+            255
+          ],
+          "paragraphId": "zh",
+          "supersample": 2
+        },
+        {
+          "id": "ja-a",
+          "text": "ここなら星が見える。",
+          "x": 800,
+          "y": 450,
+          "fontSize": 38,
+          "fontKey": "cjk",
+          "fill": [
+            112,
+            240,
+            211,
+            255
+          ],
+          "paragraphId": "ja",
+          "supersample": 2
+        },
+        {
+          "id": "ja-b",
+          "text": "明日も一緒に育てよう。",
+          "x": 800,
+          "y": 512,
+          "fontSize": 38,
+          "fontKey": "cjk",
+          "fill": [
+            112,
+            240,
+            211,
+            255
+          ],
+          "paragraphId": "ja",
+          "supersample": 2
+        },
+        {
+          "id": "small-a",
+          "text": "SECTION 04",
+          "x": 125,
+          "y": 858,
+          "fontSize": 23,
+          "fontKey": "regular",
+          "fill": [
+            44,
+            50,
+            75,
+            255
+          ],
+          "paragraphId": "label",
+          "supersample": 2
+        },
+        {
+          "id": "small-b",
+          "text": "窓を閉めてから戻る。",
+          "x": 500,
+          "y": 970,
+          "fontSize": 30,
+          "fontKey": "cjk",
+          "fill": [
+            45,
+            63,
+            83,
+            255
+          ],
+          "paragraphId": "footer",
+          "supersample": 2
+        }
+      ],
+      "negativeRegions": [
+        {
+          "x0": 100,
+          "y0": 420,
+          "x1": 590,
+          "y1": 730
+        },
+        {
+          "x0": 950,
+          "y0": 720,
+          "x1": 1300,
+          "y1": 920
+        }
+      ],
+      "protectedPoints": [
+        [
+          340,
+          600
+        ],
+        [
+          1160,
+          825
+        ]
+      ],
+      "protectedRgbaPoints": [
+        [
+          700,
+          210
+        ],
+        [
+          700,
+          620
+        ],
+        [
+          30,
+          30
+        ]
+      ],
+      "alphaContract": "Transparent holes contain no source glyph; exact RGBA preservation is a separate pixel gate, including when a detected paragraph bbox later spans the hole.",
+      "colorRelations": [
+        {
+          "textIds": [
+            "zh-a",
+            "zh-b"
+          ],
+          "textRgba": [
+            112,
+            24,
+            74,
+            255
+          ],
+          "panelRgba": [
+            112,
+            216,
+            181,
+            150
+          ]
+        },
+        {
+          "textIds": [
+            "ja-a",
+            "ja-b"
+          ],
+          "textRgba": [
+            112,
+            240,
+            211,
+            255
+          ],
+          "panelRgba": [
+            112,
+            44,
+            90,
+            180
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wordless-stained-glass-cutout-garden",
+      "width": 1200,
+      "height": 1000,
+      "category": "Wordless curved stained-glass garden with adjacent opaque/transparent color fields and holes; no alphabetic symbols or numbers",
+      "sourceLanguage": "auto",
+      "regions": [],
+      "negativeRegions": [
+        {
+          "x0": 0,
+          "y0": 0,
+          "x1": 1200,
+          "y1": 1000
+        }
+      ],
+      "protectedPoints": [
+        [
+          240,
+          500
+        ],
+        [
+          960,
+          500
+        ]
+      ],
+      "protectedRgbaPoints": [
+        [
+          600,
+          500
+        ],
+        [
+          60,
+          60
+        ]
+      ],
+      "expectedNoText": true
+    }
+  ],
+  "sourcePreflightRevision": {
+    "beforeAnyOcr": true,
+    "priorDesignSha256": "fc119440a3e175454cc5fbf152e13439b34f0a7a90db740125de2ce55673f546",
+    "reason": "Manual source inspection found missing Simplified Chinese glyphs in the Japanese system font; Chinese regions use installed same-SHA Hiragino Sans GB. Full text, placement, font sizes, groups, colors and score rules remain unchanged.",
+    "changedRegionFontKeys": [
+      "rain-garden-vertical-ruby-sidebar/zh-a",
+      "rain-garden-vertical-ruby-sidebar/zh-b",
+      "lantern-market-oblique-bilingual-captions/zh-caption",
+      "orbital-greenhouse-cutout-dialogue/zh-a",
+      "orbital-greenhouse-cutout-dialogue/zh-b"
+    ],
+    "rejectedSourceDirectory": "frozen-first",
+    "noOcrRun": true
+  }
+}

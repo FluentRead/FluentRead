@@ -36,6 +36,22 @@ describe('实际普通图片物理行的段落证明采用',()=>{
             expect(adopted).toHaveLength(2);expect(getImageParagraphGapEvidence(adopted,'same',f.width,f.height)).toBeUndefined();
         }
     });
+    it('漫画只按同帧静区证明合并整页远距物理行，并保留每个真实修补框',()=>{
+        const f=fixture(),separate=text('Separate caption',145,130,45,12),page={results:[f.first,f.second,separate]},before=structuredClone(page.results);
+        const proofs=produceImageParagraphGapProofs(page,f.width,f.height,f.pixels);
+        expect(proofs).toHaveLength(1);
+        expect(collectMangaRegions({...page,imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga')).toHaveLength(3);
+        const regions=collectMangaRegions({...page,imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga','same-source-image');
+        expect(regions).toHaveLength(2);
+        expect(regions[0]).toMatchObject({text:'First complete line Second complete line',sourceBoxes:[
+            {x0:40,y0:40,x1:130,y1:54},{x0:40,y0:74,x1:130,y1:88},
+        ]});
+        expect(regions[1]).toMatchObject({text:'Separate caption',sourceBoxes:[{x0:145,y0:130,x1:190,y1:142}]});
+        const invalid=proofs.map(proof=>({...proof,previousSnapshot:{...proof.previousSnapshot,text:'stale source'}}));
+        const unchanged=collectMangaRegions({...page,imageParagraphGapProofs:invalid},'en',f.width,f.height,'manga','same-source-image');
+        expect(unchanged).toHaveLength(3);expect(unchanged.map(region=>region.text)).toEqual(['First complete line','Second complete line','Separate caption']);
+        expect(page.results).toEqual(before);
+    });
     it('词界选择产生的新物理行保留原文，却不继承原始端点的间距许可',()=>{
         const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height);
         const first=text('AB CD',40,40,33,18),local={...first,text:'ABCD',box:{...first.box}},second=text('Next line',40,80,33,18);

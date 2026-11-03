@@ -7,7 +7,7 @@
  * 模型形状：资源层仅在原文件完整校验与入库后生成固定识别图的内存副本，CPU 重载同样处理；本入口固定识别高度48，并在每次原生调用前核对正 batch、三通道和至少八像素宽度，不把未证明输入交给优化图。
  * 视图词界：所有局部框映回后，仅对同字符且空格边界不同的重叠拉丁行生成有界原像素证明；索引、比较和尝试均有限，保持最终页面与气泡对象引用，原文字、数字证据与几何不改；原图回读与已有方向和斜行预处理共用两百万像素余额，独立于既有识别颜色读回适配。
  * 普通图片旁证：复用既有透明度扫描，仅透明图片按需捕获同次检测原概率的有界位图；依锁定SDK及实际检测配置核对原比例帧和填充张量，不借放大气泡概率；自有位图只在Worker私有响应传输，按结果数组、原图和尺寸绑定后供修补查询，不进入文字、阅读或缓存。
- * 段落间距：仅普通图片请求在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。关系随同一结果对象图传输，实际物理行采用并完成去重后才按原图及尺寸私有绑定，不授予擦除权限。
+ * 段落间距：普通图片与漫画均在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。漫画只请求轻量段落侧车，不开启普通图片检测帧；关系随同一结果对象图传输，漫画收集器只采用仍为单原框的整页物理行，不授予擦除权限。
  * 气泡补绘：仅漫画结果将收集阶段记录的局部气泡提示绑定到当前原图与尺寸，不向公开行属性附加坐标，也不增加 Worker 消息或模型调用；提示只供后续纯白空处复核。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
@@ -24,7 +24,9 @@ import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
 import {collectMangaOcrTileNumericEvidence,mergeMangaOcrTiles, planMangaOcrTiles, type MangaOcrTileResult} from './mangaOcrTiles';
 import {numericProtection} from './mangaNumeric';
-import {createMangaOcrColorAdapter,withMangaOcrColorRead} from './mangaOcrColor';
+import {withMangaOcrColorRead} from './mangaOcrColor';
+import {createMangaRecognitionInput} from './mangaRecognitionInput';
+import {createMangaRecognitionWhitespace} from './mangaRecognitionWhitespace';
 import {MANGA_DESKEW_PIXEL_BUDGET,planMangaOcrDeskew,trimMangaOcrDeskew} from './mangaOcrDeskew';
 import {assertMangaRecognitionInput} from './mangaRecognitionShapes';
 import {createMangaViewWordBoundaryBudget,hasMangaViewWordBoundaryDifference,type MangaViewWordBoundaryProof} from './mangaViewWordBoundary';
@@ -33,7 +35,7 @@ import {bindImageParagraphGapEvidence,produceImageParagraphGapProofs} from './im
 import {bindMangaBubblePlacements} from './mangaBubblePlacement';
 
 interface MangaOcrPort {
-    recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true}): Promise<MangaOcrPage>;
+    recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true}): Promise<MangaOcrPage>;
     destroy(): Promise<void>;
 }
 type Progress = MangaInferenceProgress;
@@ -87,9 +89,10 @@ export function createMangaOcrRuntime(create: (signal?: AbortSignal, progress?: 
                             service = await create(signal, progress);
                         }
                         assertMangaOcrActive(signal); progress?.('recognizing');
-                        const response = await service.recognize(image, {flatten: true, noCache: true, strategy: 'per-box',signal, decodedImage, progress,...(profile==='image'?{imageDetectionEvidence:true as const}:{})});
+                        const response = await service.recognize(image, {flatten: true, noCache: true, strategy: 'per-box',signal, decodedImage, progress,
+                            ...(profile==='image'?{imageDetectionEvidence:true as const}:{mangaParagraphGapEvidence:true as const})});
                         assertMangaOcrActive(signal);
-                        const regions=collectMangaRegions(response, language, width, height, profile);
+                        const regions=collectMangaRegions(response, language, width, height, profile,profile==='manga'?image:undefined);
                         if(profile==='manga')bindMangaBubblePlacements(regions,image,width,height);
                         if(profile==='image'&&response.imageDetectionFrames)bindImageDetectionEvidence(regions,image,width,height,response.imageDetectionFrames);
                         if(profile==='image')bindImageParagraphGapEvidence(regions,image,width,height);
@@ -132,30 +135,70 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
     const {PaddleOcrService,DetectionService,RecognitionService} = await import('ppu-paddle-ocr/web');
     const gpu=await probeWebGpu();
     let activeSignal=signal;
-    const colorAdapter=createMangaOcrColorAdapter();
+    const whitespace=createMangaRecognitionWhitespace();
+    const recognitionInput=createMangaRecognitionInput('bgr',whitespace),colorAdapter=recognitionInput.adapter;
     class MangaRecognition extends RecognitionService {
         private pendingColorReads=new Set<()=>void>();
         constructor(...args:ConstructorParameters<typeof RecognitionService>){
             super(...args);
+            // platform 为本 RecognitionService 新建；ort 本身是共享模块，只替换本 provider 的 facade。
+            const nativeOrt=this.platform.ort;
+            this.platform.ort={...nativeOrt,Tensor:new Proxy(nativeOrt.Tensor,{
+                construct(target,args,newTarget){
+                    try{
+                        const receipt=recognitionInput.patchInput(args),tensor=Reflect.construct(target,args,newTarget);
+                        try{if(receipt)whitespace.bindInput(tensor,receipt);return tensor;}
+                        catch(error){try{tensor.dispose();}catch{/* 尚未交给 SDK 的 Tensor 仍须释放，清理不能覆盖首因。 */}throw error;}
+                    }
+                    catch(error){recognitionInput.fail(error);throw error;}
+                },
+            })};
             const createProcessor=this.platform.canvas.createProcessor.bind(this.platform.canvas);
             this.platform.canvas.createProcessor=canvas=>{
                 const processor=createProcessor(canvas),resize=processor.resize.bind(processor);
                 processor.resize=options=>{
+                    try{
                     // 返回值才是 SDK 后续读取的处理器；不假定 resize 一定返回原对象。
                     const resized=resize(options),output=resized.toCanvas(),context=output.getContext('2d');
                     if(context){
                         const restore=withMangaOcrColorRead(context,output.width,output.height,colorAdapter,
-                            consumed=>this.pendingColorReads.delete(consumed));
+                            consumed=>this.pendingColorReads.delete(consumed),recognitionInput.fail);
                         if(restore)this.pendingColorReads.add(restore);
                     }
                     return resized;
+                    }catch(error){recognitionInput.fail(error);throw error;}
                 };
                 return processor;
             };
         }
         async run(...args:Parameters<InstanceType<typeof RecognitionService>['run']>){
-            try{return await super.run(...args);}
-            finally{for(const restore of this.pendingColorReads)restore();this.pendingColorReads.clear();}
+            const metadata=this.session.inputMetadata?.[0];
+            const batchDimension=metadata&&'shape' in metadata?metadata.shape[0]:undefined;
+            const requestedBatch=args[4]?.recBatchSize??this.options.recBatchSize??6;
+            let cropCount=0,finiteBoxes=true;
+            for(const box of args[1]){
+                if(box.width>0&&box.height>0)cropCount++;
+                if(!Number.isFinite(box.width)||!Number.isFinite(box.height))finiteBoxes=false;
+            }
+            const batchSize=typeof batchDimension==='number'&&!(batchDimension<0)?1:Math.max(1,requestedBatch);
+            const enabled=(args[3]??'per-line')==='per-box'&&!this.debugging.debug&&(this.options.imageHeight??48)===48&&finiteBoxes;
+            recognitionInput.beginRun({cropCount,batchSize,enabled});
+            let completed=false;
+            try{
+                const source=args[0],cap=this.options.maxCropSourceSideLength??2000;
+                whitespace.beginRun({boxes:args[1],batchSize,dictionary:args[2]??this.options.charactersDictionary??[],
+                    supportedPerBox:enabled&&(args[4]?.spaceRecovery??this.options.spaceRecovery??false),
+                    sourceRatioOne:'width' in source&&'height' in source&&Number.isFinite(source.width)&&Number.isFinite(source.height)
+                        &&source.width>0&&source.height>0&&Math.max(source.width,source.height)<=cap});
+                const result=await super.run(...args);completed=true;return whitespace.applyToSdkResults(result);
+            }
+            finally{
+                try{for(const restore of this.pendingColorReads)restore();}
+                finally{
+                    this.pendingColorReads.clear();
+                    try{recognitionInput.endRun(completed);}finally{whitespace.endRun();}
+                }
+            }
         }
     }
     let detectionBudget:ReturnType<typeof createImageDetectionEvidenceBudget>|undefined;
@@ -193,7 +236,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         private remainingRetries=4;
         private remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;
         private originalSource:{image:ImageBitmap|HTMLImageElement;width:number;height:number;identity?:{src:string;currentSrc:string}}|undefined;
-        beginMangaPage(): void {this.remainingRetries=4;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);}
+        beginMangaPage(): void {this.remainingRetries=4;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);}
         bindMangaSource(image:ImageBitmap|HTMLImageElement,width:number,height:number):void {
             this.originalSource={image,width,height,...('naturalWidth' in image?{identity:{src:image.src,currentSrc:image.currentSrc}}:{})};
         }
@@ -382,7 +425,15 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     session.run=(async(...args:Parameters<typeof run>)=>{
                         try{
                             if(key==='recognition')assertMangaRecognitionInput(args[0]);
-                            const result=await paceLocalInference(()=>{assertMangaOcrActive(activeSignal);return invoke(...args);});
+                            const result=await paceLocalInference(async()=>{
+                                assertMangaOcrActive(activeSignal);
+                                const output=await invoke(...args);
+                                if(key==='recognition'&&args[0]?.x&&output&&typeof output==='object'){
+                                    const first=Object.keys(output)[0];
+                                    if(first)whitespace.observeOutput(args[0].x,output[first]);
+                                }
+                                return output;
+                            });
                             if(key==='detection'&&detectionBudget&&activeDetectionFrame){
                                 const frame=activeDetectionFrame,input=args[0]?.x,output=result[session.outputNames[0]||'sigmoid_0.tmp_0'];
                                 if(frame.canvas.width===frame.width&&frame.canvas.height===frame.height&&input?.dims.length===4
@@ -392,7 +443,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             }
                             return result;
                         }
-                        catch(error){this.inferenceFailure??={error};throw error;}
+                        catch(error){this.inferenceFailure??={error};if(key==='recognition')recognitionInput.fail(error);throw error;}
                     }) as typeof session.run;
                 }
             }
@@ -480,18 +531,18 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     if(frames?.length)finalPage.imageDetectionFrames=[...frames];
                     const wordBoundaryProofs=service.proveMangaWordBoundaries(finalPage,bubbles,canvas.width,canvas.height);
                     if(wordBoundaryProofs.length)finalPage.wordBoundaryProofs=wordBoundaryProofs;
-                    if(options.imageDetectionEvidence===true){
+                    if(options.imageDetectionEvidence===true||options.mangaParagraphGapEvidence===true){
                         const proofs=produceImageParagraphGapProofs(finalPage,canvas.width,canvas.height,pixels.data,()=>assertMangaOcrActive(options.signal));
                         if(proofs.length)finalPage.imageParagraphGapProofs=proofs;
                     }
                     return finalPage;
                 }finally{canvas.width=0;canvas.height=0;}
                 }finally{if ('close' in bitmap)bitmap.close();}
-                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}
+                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{try{whitespace.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}}
             },
             destroy: () => service.destroy(),
         };
-    } catch (error) { colorAdapter.endPage();activeSignal=undefined;await Promise.resolve().then(()=>service.destroy()).catch(()=>undefined);throw error; }
+    } catch (error) { colorAdapter.endPage();whitespace.endPage();activeSignal=undefined;await Promise.resolve().then(()=>service.destroy()).catch(()=>undefined);throw error; }
 }
 
 function createOcrCanvas(): HTMLCanvasElement | OffscreenCanvas {
@@ -522,7 +573,9 @@ async function createWorkerMangaOcr(signal?: AbortSignal, progress?: Progress): 
                     canvas.height = 0;
                 }
             }
-            return mangaInferenceClient.request({type:'recognize', image: workerImage,...(options.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{})}, options.signal, options.progress);
+            return mangaInferenceClient.request({type:'recognize', image: workerImage,
+                ...(options.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{}),
+                ...(options.mangaParagraphGapEvidence===true?{mangaParagraphGapEvidence:true as const}:{})}, options.signal, options.progress);
         },
         destroy: () => mangaInferenceClient.release('ocr'),
     };

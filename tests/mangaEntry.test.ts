@@ -49,6 +49,8 @@ describe('独立漫画入口所有权和配置端口', () => {
         expect(styles).toContain('-webkit-font-smoothing: antialiased');
         expect(styles).toContain('--fr-manga-control-radius: var(--fr-control-radius, 9px)');
         expect(styles).toContain('var(--fr-color-brand-strong, #dc315f)');expect(styles).toContain('--fr-manga-warning-soft: var(--fr-warning-soft, #fff5df)');
+        expect(styles).toMatch(/\.fr-manga-reading\s*\{[^}]*width:\s*min\(420px, calc\(100vw - 32px\)\)/s);
+        expect(styles).toMatch(/\.fr-manga-reading button,[\s\S]*?appearance:\s*none;[\s\S]*?font:\s*inherit;/);
         mocks.config.theme='dark';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('dark');
         mocks.config.theme='light';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('light');
         await props().reading.copy('译文');expect(writeText).toHaveBeenCalledOnce();expect(writeText).toHaveBeenCalledWith('译文');

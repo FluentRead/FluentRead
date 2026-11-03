@@ -5,7 +5,11 @@
  * 模块边界：该纯函数不创建画布、不解码图片、不旋转坐标、不修改用于译图渲染的原图；调用方必须传入独占且完整的 RGBA 像素副本。
  */
 
-export function flattenOcrAlpha(pixels: Uint8ClampedArray): boolean {
+export interface OcrAlphaProfile {background:0|255|undefined;transparentPixels:number;totalPixels:number}
+
+/** Return contrast and alpha coverage for OCR input without modifying source pixels. */
+export function getOcrAlphaProfile(pixels: Uint8ClampedArray): OcrAlphaProfile {
+    if(pixels.length%4!==0)return{background:undefined,transparentPixels:0,totalPixels:0};
     let hasTransparency = false;
     for (let index = 3; index < pixels.length; index += 4) {
         if (pixels[index] !== 255) {
@@ -13,17 +17,27 @@ export function flattenOcrAlpha(pixels: Uint8ClampedArray): boolean {
             break;
         }
     }
-    if (!hasTransparency) return false;
+    if (!hasTransparency)return{background:undefined,transparentPixels:0,totalPixels:pixels.length/4};
 
-    let foregroundAlpha = 0;
-    let foregroundBrightness = 0;
+    let foregroundAlpha = 0,foregroundBrightness = 0,transparentPixels=0;
     for (let index = 0; index < pixels.length; index += 4) {
         const alpha = pixels[index + 3];
+        if(alpha<128)transparentPixels++;
         if (alpha === 0) continue;
         foregroundAlpha += alpha;
         foregroundBrightness += alpha * (0.2126 * pixels[index] + 0.7152 * pixels[index + 1] + 0.0722 * pixels[index + 2]);
     }
-    const background = foregroundAlpha > 0 && foregroundBrightness >= 128 * foregroundAlpha ? 0 : 255;
+    return{background:foregroundAlpha > 0 && foregroundBrightness >= 128 * foregroundAlpha ? 0 : 255,transparentPixels,totalPixels:pixels.length/4};
+}
+
+/** Return the contrast background for transparent OCR input without modifying the source pixels. */
+export function getOcrAlphaBackground(pixels: Uint8ClampedArray): 0|255|undefined {
+    return getOcrAlphaProfile(pixels).background;
+}
+
+export function flattenOcrAlpha(pixels: Uint8ClampedArray): boolean {
+    const background=getOcrAlphaBackground(pixels);
+    if(background===undefined)return false;
     for (let index = 0; index < pixels.length; index += 4) {
         const alpha = pixels[index + 3];
         if (alpha === 255) continue;

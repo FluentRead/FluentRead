@@ -157,6 +157,14 @@ describe('有界识别副本颜色对比', () => {
 describe('指定识别上下文的一次既有读回', () => {
     function ownedColor() {const owned = image();setPixel(owned, 3, 20, [255, 0, 0, 255]);return owned;}
 
+    it('首因通知只观察错误，通知自身抛异常也不能掩盖原生读回错误',()=>{
+        const failure=new Error('native read identity'),notification=new Error('notification');
+        const context={getImageData:()=>{throw failure;}},native=context.getImageData,adapter=createMangaOcrColorAdapter();adapter.beginPage();
+        const notify=vi.fn(()=>{throw notification;});withMangaOcrColorRead(context,8,48,adapter,undefined,notify);
+        try{context.getImageData();throw Error('expected native error');}catch(error){expect(error).toBe(failure);}
+        expect(context.getImageData).toBe(native);expect(notify).toHaveBeenCalledWith(failure);
+    });
+
     it('继承方法先恢复再原生读一次，不留 own 属性；缓存的 wrapper 再次调用也不再适配', () => {
         const source = ownedColor(), before = source.data.slice(), native = vi.fn(function(this: object, ..._args: unknown[]) {
             expect(Object.hasOwn(context, 'getImageData')).toBe(false);

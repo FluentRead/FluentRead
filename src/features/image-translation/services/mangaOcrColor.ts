@@ -1,13 +1,19 @@
 /**
  * @file src/features/image-translation/services/mangaOcrColor.ts
  * 文件职责：在原页有界预算内，为已经裁切并缩到四十八像素高的识别副本补足红通道缺失的颜色对比。
- * 主要内容：完整不透明边缘须共享零或二百五十五的红通道端点，按边缘亮度极值锚定整数亮度，仅增强端点对比；灰阶保持原值，失败、取消或超预算均回原处理。
+ * 主要内容：完整不透明边缘须共享零或二百五十五的红通道端点，按边缘亮度极值锚定整数亮度，仅增强端点对比；灰阶保持原值，失败、取消或超预算均回原处理；可与三通道输入共享同一页准入账本，一次读回只扣一次预算。
  * 模块边界：不检测文字、不猜原文、不访问模型或全局画布；只装饰指定上下文的一次既有读回并借用独占 ImageData，按原页重置预算，处理器与画布生命周期仍归调用方。
  */
 export const MANGA_OCR_COLOR_CROP_PIXELS = 262_144;
 export const MANGA_OCR_COLOR_PAGE_PIXELS = 2_000_000;
 
 export interface MangaOcrColorImage {readonly data: Uint8ClampedArray;}
+export interface MangaOcrColorAdmission {
+    beginPage(signal?: AbortSignal): void;
+    endPage(): void;
+    take(width: number, height: number): number | undefined;
+    current(page: number): boolean;
+}
 export interface MangaOcrColorAdapter {
     beginPage(signal?: AbortSignal): void;
     endPage(): void;
@@ -41,25 +47,39 @@ function borderAnchor(data: Uint8ClampedArray, width: number, height: number): {
     return {red, y: red === 255 ? maxY : minY};
 }
 
-/** 每个控制器只供同一串行识别服务使用；整页的切片、气泡与复识别共享一次 beginPage。 */
-export function createMangaOcrColorAdapter(): MangaOcrColorAdapter {
+/** 不保存像素；旧红通道增强与三通道输入二选一地消耗同一页预算。 */
+export function createMangaOcrColorAdmission(): MangaOcrColorAdmission {
     let generation = 0, active = false, remaining = 0, signal: AbortSignal | undefined;
     const current = (page: number) => active && page === generation && !signal?.aborted;
     return {
         beginPage(pageSignal) {generation += 1;active = true;remaining = MANGA_OCR_COLOR_PAGE_PIXELS;signal = pageSignal;},
         endPage() {generation += 1;active = false;remaining = 0;signal = undefined;},
-        transform<Image extends MangaOcrColorImage, Result>(width: number, height: number,
-            read: () => Image, replace: (image: Image) => Result): Result | undefined {
+        current,
+        take(width, height) {
             if (!current(generation) || !Number.isSafeInteger(width) || width <= 0 || height !== 48) return;
             const pixels = width * height;
             if (pixels > MANGA_OCR_COLOR_CROP_PIXELS || pixels > remaining) return;
-            // 在任何读回、校验或颜色变化前扣除；未命中、异常和取消也不退还本页已经请求的工作。
             remaining -= pixels;
-            const page = generation;
+            return generation;
+        },
+    };
+}
+
+/** 每个控制器只供同一串行识别服务使用；无参 API 保留独立的旧准入与输出。 */
+export function createMangaOcrColorAdapter(admission: MangaOcrColorAdmission = createMangaOcrColorAdmission()): MangaOcrColorAdapter {
+    return {
+        beginPage: admission.beginPage,
+        endPage: admission.endPage,
+        transform<Image extends MangaOcrColorImage, Result>(width: number, height: number,
+            read: () => Image, replace: (image: Image) => Result): Result | undefined {
+            // 在任何读回、校验或颜色变化前扣除；未命中、异常和取消也不退还本页已经请求的工作。
+            const page = admission.take(width, height);
+            if (page === undefined) return;
+            const pixels = width * height;
             try {
                 const image = read(), data = image.data;
                 if (!(data instanceof Uint8ClampedArray) || data.length !== pixels * 4) return;
-                if (!current(page)) return;
+                if (!admission.current(page)) return;
                 const anchor = borderAnchor(data, width, height);
                 if (anchor === undefined) return;
                 // 先验证透明度，不让后部的透明像素使前面的独占副本发生无用变更。
@@ -77,7 +97,7 @@ export function createMangaOcrColorAdapter(): MangaOcrColorAdapter {
                     const value = anchor.red === 255 ? Math.min(red, bounded) : Math.max(red, bounded);
                     if (value !== red) {data[offset] = value;changed = true;}
                 }
-                if (!changed || !current(page)) return;
+                if (!changed || !admission.current(page)) return;
                 return replace(image);
             } catch {
                 // 颜色增强是可选预处理；原生 resize/模型推理在调用方执行，其错误不能被此处吞掉。
@@ -95,6 +115,7 @@ export function createMangaOcrColorAdapter(): MangaOcrColorAdapter {
 export function withMangaOcrColorRead<Args extends unknown[], Image extends MangaOcrColorImage>(
     context: {getImageData(...args: Args): Image}, width: number, height: number, adapter: MangaOcrColorAdapter,
     onRestore?: (restore: () => void) => void,
+    onFailure?: (error: unknown) => void,
 ): (() => void) | undefined {
     const descriptor = Object.getOwnPropertyDescriptor(context, 'getImageData'), native = context.getImageData;
     let installed = false;
@@ -110,10 +131,16 @@ export function withMangaOcrColorRead<Args extends unknown[], Image extends Mang
     const read = function(this: typeof context, ...args: Args): Image {
         const first = installed;
         restore();
-        const image = native.apply(this, args);
-        if (!first || this !== context || args.length !== 4 || args[0] !== 0 || args[1] !== 0
-            || args[2] !== width || args[3] !== height || height !== 48) return image;
-        return adapter.transform(width, height, () => image, changed => changed) ?? image;
+        try {
+            const image = native.apply(this, args);
+            if (!first || this !== context || args.length !== 4 || args[0] !== 0 || args[1] !== 0
+                || args[2] !== width || args[3] !== height || height !== 48) return image;
+            return adapter.transform(width, height, () => image, changed => changed) ?? image;
+        } catch (error) {
+            // 只通知调用方保存首因；原生及适配器异常仍按同一对象向上传播。
+            try {onFailure?.(error);} catch { /* 通知错误不能覆盖原生首因。 */ }
+            throw error;
+        }
     };
     try {
         Object.defineProperty(context, 'getImageData', {value: read, configurable: descriptor?.configurable ?? true,

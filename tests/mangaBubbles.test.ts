@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {findMangaBubbles,findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
 import {bindImageParagraphGapEvidence,getImageParagraphGapEvidence,produceImageParagraphGapProofs} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 import {createMangaViewWordBoundaryBudget} from '@/src/features/image-translation/services/mangaViewWordBoundary';
+import {normalizeMangaSourceText} from '@/src/features/image-translation/services/mangaRegions';
 const image=(w:number,h:number)=>new Uint8ClampedArray(w*h*4);
 function rect(p:Uint8ClampedArray,w:number,x:number,y:number,width:number,height:number,color=[255,255,255,255]){for(let yy=y;yy<y+height;yy++)for(let xx=x;xx<x+width;xx++)p.set(color,(yy*w+xx)*4);}
 const text=(value:string,x:number,y:number,width=40,height=12)=>({text:value,confidence:.99,box:{x,y,width,height}});
@@ -36,6 +37,22 @@ describe('实际普通图片物理行的段落证明采用',()=>{
             expect(adopted).toHaveLength(2);expect(getImageParagraphGapEvidence(adopted,'same',f.width,f.height)).toBeUndefined();
         }
     });
+    it('漫画只按同帧静区证明合并整页远距物理行，并保留每个真实修补框',()=>{
+        const f=fixture(),separate=text('Separate caption',145,130,45,12),page={results:[f.first,f.second,separate]},before=structuredClone(page.results);
+        const proofs=produceImageParagraphGapProofs(page,f.width,f.height,f.pixels);
+        expect(proofs).toHaveLength(1);
+        expect(collectMangaRegions({...page,imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga')).toHaveLength(3);
+        const regions=collectMangaRegions({...page,imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga','same-source-image');
+        expect(regions).toHaveLength(2);
+        expect(regions[0]).toMatchObject({text:'First complete line Second complete line',sourceBoxes:[
+            {x0:40,y0:40,x1:130,y1:54},{x0:40,y0:74,x1:130,y1:88},
+        ]});
+        expect(regions[1]).toMatchObject({text:'Separate caption',sourceBoxes:[{x0:145,y0:130,x1:190,y1:142}]});
+        const invalid=proofs.map(proof=>({...proof,previousSnapshot:{...proof.previousSnapshot,text:'stale source'}}));
+        const unchanged=collectMangaRegions({...page,imageParagraphGapProofs:invalid},'en',f.width,f.height,'manga','same-source-image');
+        expect(unchanged).toHaveLength(3);expect(unchanged.map(region=>region.text)).toEqual(['First complete line','Second complete line','Separate caption']);
+        expect(page.results).toEqual(before);
+    });
     it('词界选择产生的新物理行保留原文，却不继承原始端点的间距许可',()=>{
         const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height);
         const first=text('AB CD',40,40,33,18),local={...first,text:'ABCD',box:{...first.box}},second=text('Next line',40,80,33,18);
@@ -52,6 +69,54 @@ describe('实际普通图片物理行的段落证明采用',()=>{
         expect(adopted.map(region=>region.text)).toEqual(['AB CD','Next line']);
         bindImageParagraphGapEvidence(adopted,'same',width,height);
         expect(getImageParagraphGapEvidence(adopted,'same',width,height)).toBeUndefined();
+    });
+});
+
+describe('漫画间隙证明端点映射的安全回退',()=>{
+    function fixture(){
+        const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height,[24,44,68,255]);
+        const first=text('First complete line',40,40,90,14),second=text('Second complete line',40,74,90,14);
+        for(const item of [first,second])for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)rect(pixels,width,x,item.box.y+3,3,8,[240,245,250,255]);
+        return{width,height,pixels,first,second};
+    }
+    it('foreign proof endpoints without a matching physical source region are ignored',()=>{
+        const f=fixture(),proofs=produceImageParagraphGapProofs({results:[f.first,f.second]},f.width,f.height,f.pixels);
+        expect(proofs).toHaveLength(1);
+        expect(collectMangaRegions({results:[],imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga')).toEqual([]);
+    });
+    it('a low-confidence bubble endpoint with a matching box has no physical line to record',()=>{
+        const f=fixture(),proof=produceImageParagraphGapProofs({results:[f.first,f.second]},f.width,f.height,f.pixels)[0]!;
+        const weak={...f.first,confidence:.5},page={results:[f.first,f.second],bubbles:[{bbox:box(170,170,20,20),results:[weak]}],
+            imageParagraphGapProofs:[{...proof,previous:weak,previousSnapshot:{text:weak.text,confidence:weak.confidence,box:{...weak.box}}}]};
+        expect(collectMangaRegions(page,'en',f.width,f.height,'manga').map(region=>region.text)).toEqual([f.first.text,f.second.text]);
+    });
+    it('a selected alternate-view line cannot inherit a source proof with different text',()=>{
+        const f=fixture(),proofs=produceImageParagraphGapProofs({results:[f.first,f.second]},f.width,f.height,f.pixels),
+            alternate={...f.first,text:'Alternate complete line'},page={results:[f.first,f.second],bubbles:[{bbox:box(170,170,20,20),results:[alternate]}],imageParagraphGapProofs:proofs};
+        expect(collectMangaRegions(page,'en',f.width,f.height,'manga').map(region=>region.text)).toEqual([alternate.text,f.second.text]);
+    });
+    it('same physical number box can retain conflicting numeric regions without overwriting map entries',()=>{
+        const f=fixture(),firstNumber={...f.first,text:'12:34'},secondNumber={...f.first,text:'13:45'},
+            proofs=produceImageParagraphGapProofs({results:[f.first,f.second]},f.width,f.height,f.pixels),
+            regions=collectMangaRegions({results:[f.first,f.second,firstNumber,secondNumber],imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga'),
+            numbers=regions.filter(region=>region.text==='12:34'||region.text==='13:45');
+        expect(numbers).toHaveLength(2);expect(numbers.every(region=>region.numericUncertain===true)).toBe(true);
+    });
+});
+
+describe('漫画 OCR 全大写行的孤立小写 i 误识别',()=>{
+    const read=(value:string)=>collectMangaRegions({results:[text(value,0,0,500,32)]},'en',600,80,'manga')[0]?.text;
+    it('修复位于常见英文词界的小写 i 插入，不改合法混合大小写品牌',()=>{
+        expect(read('THE iDOCK IS QUIET')).toBe('THE DOCK IS QUIET');
+        expect(read('KEEPiA LIGHT ON')).toBe('KEEP A LIGHT ON');
+        expect(read('THE iPhone IS READY')).toBe('THE iPhone IS READY');
+        expect(read('THE iOS BUILD')).toBe('THE iOS BUILD');
+        expect(read('MIXiT LATER')).toBe('MIXiT LATER');
+    });
+    it('孤立小写i缺少后续单词时保留原文',()=>{
+        expect(normalizeMangaSourceText('THE i','en')).toBe('THE i');
+        expect(normalizeMangaSourceText('KEEPi','en')).toBe('KEEPi');
+        expect(normalizeMangaSourceText('iDOCK IS QUIET','en')).toBe('iDOCK IS QUIET');
     });
 });
 
@@ -164,6 +229,14 @@ describe('漫画局部气泡识别边界',()=>{
         expect(result.map(region=>region.text)).toEqual(['本文の列','外の注釈']);
         expect(result.flatMap(region=>region.sourceBoxes)).toEqual([box(130,150,20,80),box(199,170,20,60)]);
         expect(items).toEqual(originalItems);expect(p.every((value,index)=>value===originalPixels[index])).toBe(true);
+    });
+    it('封闭浅色面板中的独立白色岛被记录为原图排除区域',()=>{
+        const width=160,height=140,p=image(width,height);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)p.set([0,0,0,255],(y*width+x)*4);
+        for(let y=25;y<105;y++)for(let x=30;x<130;x++)if(((x-80)/50)**2+((y-65)/40)**2<=1)p.set([255,255,255,255],(y*width+x)*4);
+        rect(p,width,75,60,10,10,[0,0,0,255]);rect(p,width,77,62,6,6);
+        const layout=findMangaBubbleLayout(p,width,height);
+        expect(layout.ownership).toHaveLength(1);expect(layout.ownership[0].exclusions).toEqual([box(77,62,6,6)]);
     });
     it('白卡跨内接框上沿或下沿时仍按原组件外接范围排除，不误并框内中心的旁白',()=>{
         for(const [cardTop,captionTop,bodyTop] of [[110,124,150],[220,230,220]]){
@@ -301,6 +374,57 @@ describe('漫画局部气泡识别边界',()=>{
         const distinct={results:[],bubbles:[{bbox:box(10,10,200,120),results:[firstLine,lastLine]},
             {bbox:box(50,60,180,80),results:[text('short',70,80,25,12)]}]};
         expect(collectMangaRegions(distinct,'en',400,400,'image').map(line=>line.text)).toEqual(['First complete line','short','Last fallback line']);
+    });
+    it('重叠间隔字母 OCR 碎片命中完整漫画原文时去除碎片，保留相似或远处正文',()=>{
+        const page6=[
+            text("HEY, ISN'T THAT GIL,",892,162,118,19),text('NEXT',894,189,111,17),
+            text('TH A T GI L',885,181,132,56),
+            text("YOU'RE RIGHT! IT'S BEEN A WHILE. LOOKS LIKE HE'S IN A GOOD MOOD...",145,194,145,130),
+            text('B R I N H T ITS',136,203,163,60),
+            text('…IN MOURNING CLOTHES NO LESS',241,803,139,106),
+            text('T H A T G I L',30,1100,132,18),
+        ];
+        const manga=collectMangaRegions({results:page6},'en',1200,1400,'manga').map(region=>region.text);
+        expect(manga).toEqual(["HEY, ISN'T THAT GIL, NEXT", "YOU'RE RIGHT! IT'S BEEN A WHILE. LOOKS LIKE HE'S IN A GOOD MOOD...",
+            '…IN MOURNING CLOTHES NO LESS','T H A T G I L']);
+        expect(collectMangaRegions({results:page6},'en',1200,1400,'image').map(region=>region.text)).toContain('TH A T GI L');
+
+        const overlappingRealLines=[text('I AM HERE',20,200,100,12),text('WE ARE HERE TODAY',20,200,100,36)];
+        expect(collectMangaRegions({results:overlappingRealLines},'en',200,300,'manga').map(region=>region.text))
+            .toEqual(['I AM HERE','WE ARE HERE TODAY']);
+    });
+    it('字距候选长度或相似度不足以及比较预算耗尽时都保留原文，普通图片不启用漫画过滤',()=>{
+        const fragment=text('A B C D E F',20,14,120,12),fragmentBubble=box(70,10,20,20);
+        const assertRetained=(candidate:any,candidateBubble:ReturnType<typeof box>)=>{
+            const page={results:[],bubbles:[{bbox:fragmentBubble,results:[fragment]},{bbox:candidateBubble,results:[candidate]}]};
+            const manga=collectMangaRegions(page,'en',420,100,'manga').map(region=>region.text);
+            expect(manga).toHaveLength(2);expect(manga).toContain(fragment.text);expect(manga).toContain(candidate.text);
+            expect(collectMangaRegions(page,'en',420,100,'image').map(region=>region.text)).toHaveLength(2);
+        };
+        // Compact source length 8 is too close to the 6-letter fragment (requires +3).
+        assertRetained(text('ABCDEFGH',68,14,120,12),box(120,10,16,20));
+        // 超过64字符的字距碎片不运行LCS，即使位置重叠也保留完整原文。
+        const longFragment=text('A '.repeat(65),20,14,120,12),longCandidate=text('A'.repeat(70),68,14,120,12);
+        const longPage={results:[],bubbles:[{bbox:fragmentBubble,results:[longFragment]},{bbox:box(120,10,16,20),results:[longCandidate]}]};
+        const longLines=collectMangaRegions(longPage,'en',420,100,'manga').map(region=>region.text);
+        expect(longLines).toHaveLength(2);expect(longLines).toContain(longFragment.text.trim());expect(longLines).toContain(longCandidate.text);
+        // A 193-letter candidate exceeds the bounded LCS input length.
+        assertRetained(text('A'.repeat(193),20,19,360,12),box(196,21,8,8));
+        // Sufficiently long but unrelated overlapping text is retained when LCS coverage is low.
+        assertRetained(text('ZZZZZZZZZZ',20,19,120,12),box(78,22,4,6));
+
+        const bubbles=[];
+        for(let index=0;index<100;index++){
+            const y=10+index*12;
+            bubbles.push({bbox:box(10,y,180,12),results:[text('A B C D E F',20,y,120,12)]});
+        }
+        for(let index=0;index<100;index++){
+            const y=1800+index*12;
+            bubbles.push({bbox:box(10,y,180,12),results:[text('ABCDEFGH',20,y,120,12)]});
+        }
+        const bounded=collectMangaRegions({results:[],bubbles},'en',220,3200,'manga');
+        expect(bounded).toHaveLength(200);
+        expect(bounded.filter(region=>region.text==='A B C D E F')).toHaveLength(100);
     });
     it('外层局部补回内层漏行时归入最紧气泡，同一对白完整合段且邻近对白独立',()=>{
         const first=text('First complete line',70,80,150,12),last=text('Last recovered line',70,97,150,12);

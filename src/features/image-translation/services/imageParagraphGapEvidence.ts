@@ -117,8 +117,9 @@ function pageGapEvidenceWindow(a:Box,b:Box,width:number,height:number):Box|undef
     const box={x0:Math.floor(Math.min(a.x0,b.x0)),x1:Math.ceil(Math.max(a.x1,b.x1)),y0:Math.ceil(a.y1)+2,y1:Math.floor(b.y0)-2};
     return validBox(box,width,height)&&box.y1-box.y0>=2&&area(box)<=MAX_ROI?box:undefined;
 }
+/** 输入由pageGapEvidenceWindow限定：宽度不超过页宽，高度至少2px且已计入64KiB ROI预算。 */
 function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profile:Uint32Array,previousRow:Uint32Array,check:()=>void,reserveRows:()=>boolean):{mode:'column-profile'|'smooth-field';background:[number,number,number,number];pixels:number}|null|undefined {
-    const w=box.x1-box.x0,h=box.y1-box.y0;if(w<2||h<2||w>profile.length||w>previousRow.length||area(box)>MAX_ROI)return;
+    const w=box.x1-box.x0,h=box.y1-box.y0;
     const minimum=[255,255,255],maximum=[0,0,0];
     let profileStep=0,maxStep=0,maxDrift=0,profileAlphaStep=0,maxAlphaStep=0,maxAlphaDrift=0,minimumAlpha=255,maximumAlpha=0,exactProfile=true,opaque=true;
     const update=(value:number)=>{
@@ -279,7 +280,7 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
     if(!pageSize(width,height)||!(pixels instanceof Uint8ClampedArray)||pixels.length!==width*height*4||!all)return [];
     const physical=all.filter(item=>!!item?.box&&validBox(boxOf(item),width,height));
     const lines=physical.filter(item=>eligible(item,width,height)).sort((a,b)=>a.box.y-b.box.y||a.box.x-b.box.x),proofs:ImageParagraphGapProof[]=[];
-    const candidates:Array<Omit<ImageParagraphGapProof,'version'|'width'|'height'|'pixels'>&{endpointArea:number;windows:Box[]}>=[];
+    const candidates:Array<Omit<ImageParagraphGapProof,'version'|'width'|'height'|'pixels'|'mode'|'topology'>&{endpointArea:number;windows:Box[]}>=[];
     const cache=new Map<MangaOcrItem,ImageMatteGeometry|undefined>();let attempts=0,charged=0,comparisons=0;
     let gapProfile:Uint32Array|undefined,gapPreviousRow:Uint32Array|undefined;
     const reserve=(count:number)=>{if(count>MAX_PIXELS-charged)return false;charged+=count;return true;};
@@ -311,17 +312,12 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         if(ga&&gb&&windows){candidates.push({ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows});continue;}
         if(proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,oa,ob)==='budget')break enumerate;
     }
-    const backgrounds=[...new Set(candidates.filter(c=>c.mode===undefined).map(c=>(c.previousGeometry.background[0]|c.previousGeometry.background[1]<<8|c.previousGeometry.background[2]<<16|255<<24)>>>0))];
+    const backgrounds=[...new Set(candidates.map(c=>(c.previousGeometry.background[0]|c.previousGeometry.background[1]<<8|c.previousGeometry.background[2]<<16|255<<24)>>>0))];
     const topology=topologyPage(pixels,width,height,backgrounds,reserve,checkActive);
     for(const candidate of candidates){
         const {previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows,ordinal}=candidate,a=boxOf(previous),b=boxOf(next);
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))continue;
-        if(candidate.mode==='column-profile'||candidate.mode==='smooth-field'){
-            if(!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot))continue;
-            proofs.push({version:VERSION,mode:candidate.mode,width,height,ordinal,pixels:endpointArea+windows.reduce((sum,box)=>sum+area(box),0),previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb});
-            continue;
-        }
         const extra=windows.reduce((sum,box)=>sum+area(box),0);if(!reserve(extra))break;
         const background=(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|255<<24)>>>0;
         const external=topology(background,a,b);

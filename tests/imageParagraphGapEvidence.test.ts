@@ -4,7 +4,7 @@ import {inflateSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence,getImageParagraphGapEvidence,consumeImageParagraphGapEvidence,createImageParagraphWorkQueue,type ImageParagraphGapProof} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
-import {observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
+import {imageMatteObservationBox,observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import type {MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
 type Box=ImageTextRegion['bbox'];
@@ -23,6 +23,94 @@ function adopt(f:Fixture,proofs=produceImageParagraphGapProofs(f.page,f.width,f.
     regions.forEach((line,index)=>consumer.record(f.page.results[index],line));regions.push(...extra);consumer.seal(regions);bindImageParagraphGapEvidence(regions,'source',f.width,f.height);
     return{regions,consumer,proofs,support:getImageParagraphGapEvidence(regions,'source',f.width,f.height)};
 }
+function smoothFieldFixture(){
+    const f=basic();
+    for(let y=56;y<72;y++)for(let x=40;x<130;x++){
+        const value=24+Math.round((x-40)*20/89);f.pixels.set([value,value+20,value+20,255],(y*f.width+x)*4);
+    }
+    return f;
+}
+describe('低对比平滑间隙证明的生产消费',()=>{
+    it('同帧平滑渐变通过profile窗口与无topology预算验证后才绑定',()=>{
+        const f=smoothFieldFixture();
+        const proofs=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels);
+        expect(proofs.map(proof=>proof.mode)).toEqual(['smooth-field']);expect(proofs[0].topology).toBeUndefined();
+        const accepted=adopt(f,proofs);
+        expect(accepted.support?.successor(accepted.regions[0])).toBe(accepted.regions[1]);
+        expect(accepted.support?.permits(accepted.regions[0],accepted.regions[1],[accepted.regions[0]],bounds(accepted.regions))).toBe(true);
+    });
+    it('profile proof的窗口过窄或夹带topology时拒绝消费',()=>{
+        const f=smoothFieldFixture(),base=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)[0],previous=f.page.results[0],next=f.page.results[1];
+        previous.box.height=4;next.box.y=47;next.box.height=4;
+        const geometry=(item:typeof previous)=>{const source={x0:item.box.x,y0:item.box.y,x1:item.box.x+item.box.width,y1:item.box.y+item.box.height};return {...imageMatteObservationBox(f.width,f.height,source)!,background:[24,44,68,255] as [number,number,number,number],supportBox:source};};
+        const tight={...base,previousSnapshot:{...base.previousSnapshot,box:{...previous.box}},nextSnapshot:{...base.nextSnapshot,box:{...next.box}},
+            previousGeometry:geometry(previous),nextGeometry:geometry(next)};
+        expect(adopt(f,[tight]).support).toBeUndefined();
+        const g=smoothFieldFixture(),proof=produceImageParagraphGapProofs(g.page,g.width,g.height,g.pixels)[0];
+        const withTopology={...proof,topology:{owner:{x0:40,y0:40,x1:130,y1:88},tiles:[]}};
+        expect(adopt(g,[withTopology]).support).toBeUndefined();
+    });
+    it.each([56,57])('RGBA alpha低于128时在profile首行或后续行拒绝：y=%s',y=>{
+        const f=smoothFieldFixture(),proofs=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels);
+        f.pixels[(y*f.width+40)*4+3]=0;
+        expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
+        expect(proofs.map(proof=>proof.mode)).toEqual(['smooth-field']);
+    });
+    it('超出64KiB的profile窗口在预扫描阶段拒绝',()=>{
+        const width=3100,height=80,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const page:MangaOcrPage={results:[{text:'FIRST WIDE LINE',confidence:.99,box:{x:30,y:5,width:3000,height:14}},{text:'SECOND WIDE LINE',confidence:.99,box:{x:30,y:54,width:3000,height:14}}]};
+        expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);
+    });
+    it('同一行距超过有界profile窗口时直接保留原段',()=>{
+        const width=2400,height=100,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const page:MangaOcrPage={results:[{text:'FIRST WIDE LINE',confidence:.99,box:{x:10,y:10,width:2160,height:14}},{text:'SECOND WIDE LINE',confidence:.99,box:{x:21,y:59,width:2160,height:14}}]};
+        expect(imageMatteObservationBox(width,height,{x0:10,y0:10,x1:2170,y1:24})?.width).toBe(2176);
+        expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);
+    });
+    it.each([{count:100,width:126},{count:101,width:125}])('累计页预算拒绝完整profile行而不分配超额工作：%j',({count,width:boxWidth})=>{
+        const width=3100,height=3250,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const results:MangaOcrPage['results']=[];
+        for(let index=0;index<count;index++){
+            const x=10+(index%4)*150,y=10+Math.floor(index/4)*100;
+            results.push({text:'DUMMY LINE',confidence:.99,box:{x,y,width:boxWidth,height:14}},{text:'DUMMY LINE',confidence:.99,box:{x,y:y+24,width:boxWidth,height:14}});
+        }
+        results.push({text:'TARGET LINE',confidence:.99,box:{x:50,y:3200,width:3000,height:14}},{text:'TARGET LINE',confidence:.99,box:{x:50,y:3224,width:3000,height:14}});
+        const page:MangaOcrPage={results};expect(observeImageMatteGeometry(pixels,width,height,{x0:10,y0:10,x1:10+boxWidth,y1:24})).toBeUndefined();expect(observeImageMatteGeometry(pixels,width,height,{x0:50,y0:3200,x1:3050,y1:3214})).toBeUndefined();
+        expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);
+    });
+    it('累计页预算在下一个profile首行前耗尽后停止枚举',()=>{
+        const width=3500,height=1300,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const results:MangaOcrPage['results']=[];
+        for(let index=0;index<8;index++){const boxWidth=index===0?2123:2122;
+            results.push({text:'DUMMY LINE',confidence:.99,box:{x:10,y:10+index*100,width:boxWidth,height:14}},{text:'DUMMY LINE',confidence:.99,box:{x:10,y:34+index*100,width:boxWidth,height:14}});
+        }
+        results.push({text:'TARGET LINE',confidence:.99,box:{x:50,y:1000,width:72,height:14}},{text:'TARGET LINE',confidence:.99,box:{x:50,y:1024,width:72,height:14}});
+        expect(produceImageParagraphGapProofs({results},width,height,pixels)).toEqual([]);
+    });
+    it('平滑间隙内有实际识别框时不生成跨框证明',()=>{
+        const width=3600,height=200,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const page:MangaOcrPage={results:[{text:'FIRST LINE',confidence:.99,box:{x:1750,y:40,width:90,height:14}},{text:'SECOND LINE',confidence:.99,box:{x:1750,y:74,width:90,height:14}},{text:'PHYSICAL NOISE',confidence:.99,box:{x:1780,y:60,width:5,height:4}}]};
+        for(const item of page.results.slice(0,2))for(let y=item.box.y+3;y<item.box.y+11;y++)for(let x=item.box.x+3;x<item.box.x+6;x++)pixels.set([230,240,250,255],(y*width+x)*4);
+        for(let y=56;y<72;y++)for(let x=1750;x<1840;x++){const value=24+Math.round((x-1750)*20/89);pixels.set([value,value+20,value+20,255],(y*width+x)*4);}
+        expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);
+    });
+    it('候选窗口预算耗尽当前平滑profile后继续保留原段',()=>{
+        const width=3500,height=1300,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
+        const results:MangaOcrPage['results']=[];
+        const boxes:Array<{x:number;y:number;width:number;height:number}>=Array.from({length:8},(_,index)=>[
+            {x:10,y:10+index*100,width:index===0?2123:2122,height:14},{x:10,y:34+index*100,width:index===0?2123:2122,height:14},
+        ]).flat();
+        for(const box of boxes)results.push({text:'DUMMY LINE',confidence:.99,box});
+        const first={x:1700,y:1000,width:41,height:14},next={x:1700,y:1024,width:41,height:14};
+        results.push({text:'TARGET LINE',confidence:.99,box:first},{text:'TARGET LINE',confidence:.99,box:next},
+            {text:'LEFT GUARD',confidence:.99,box:{x:1640,y:1000,width:41,height:14}},{text:'RIGHT GUARD',confidence:.99,box:{x:1760,y:1000,width:41,height:14}});
+        for(const box of [first,next])for(let y=box.y+3;y<box.y+box.height-3;y++)for(let x=box.x+1;x<box.x+box.width-1;x++)pixels.set([230,240,250,255],(y*width+x)*4);
+        for(let y=1016;y<1022;y++)for(let x=1700;x<1741;x++){const value=24+Math.round((x-1700)*20/40);pixels.set([value,value+20,value+20,255],(y*width+x)*4);}
+        expect(observeImageMatteGeometry(pixels,width,height,{x0:first.x,y0:first.y,x1:first.x+first.width,y1:first.y+first.height})).toBeDefined();
+        expect(observeImageMatteGeometry(pixels,width,height,{x0:next.x,y0:next.y,x1:next.x+next.width,y1:next.y+next.height})).toBeDefined();
+        expect(produceImageParagraphGapProofs({results},width,height,pixels)).toEqual([]);
+    });
+});
 describe('已保存原像素的五组对白与独立控制标签',()=>{
     const records: Array<{scene:string;source:{width:number;height:number;nativeCanvasBytes:boolean};rgba:{data:string;sha256:string};observedPhysicalLines:Array<{text:string;bbox:Box}>;expectedPairs:Array<[string,string]>;rejectedPairs:Array<[string,string]>}>=JSON.parse(readFileSync(new URL('./fixtures/image-paragraph-gap-source.json',import.meta.url),'utf8')).records;
     it.each(records)('$scene在flatten后只为真实几何目标提供续行，Cabin开关仍拒绝',(record)=>{

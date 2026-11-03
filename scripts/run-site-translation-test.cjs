@@ -2768,7 +2768,26 @@ async function toggleHover(page, target, targetConfig, expectedCount, timeout, a
   assertPageFocusAllowed(page); await target.scrollIntoViewIfNeeded();
   // viewport 内的原文仍可能被原生 sticky 标题遮住。先用原生滚动居中，
   // 再由下面原有的 TextRange / 实际命中 / 稳定期门禁决定能否发送手势。
-  assertPageFocusAllowed(page); await target.evaluate((node) => node.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'}));
+  assertPageFocusAllowed(page); await target.evaluate((node) => {
+    let source = node;
+    // 超长段落的译文会把整个 owner 撑高；居中 owner 可能只露出译文，导致第二次
+    // 手势找不到任何原文。先把仍保留的原生文字滚入视口，再照常复核 Range 与命中栈。
+    if (node.getBoundingClientRect().height > node.ownerDocument.defaultView.innerHeight) {
+      const excluded = '[data-fr-translation-owned="true"], .fluent-read-bilingual-content, ' +
+        '.fluent-read-loading, .fluent-read-retry-wrapper, [hidden], [aria-hidden="true"], [inert]';
+      const walker = document.createTreeWalker(node, 4);
+      let text;
+      while ((text = walker.nextNode())) {
+        const parent = text.parentElement;
+        if (parent && text.textContent?.trim() && !parent.closest(excluded) &&
+          [...parent.getClientRects()].some(rect => rect.width > 0 && rect.height > 0)) {
+          source = parent;
+          break;
+        }
+      }
+    }
+    source.scrollIntoView({block: 'center', inline: 'nearest', behavior: 'instant'});
+  });
   // 还原译文会改变布局，宿主也可能继续滚动或播放入场动画。固定等待后取外框
   // 坐标会落到空白容器；按键前等待真实原文行稳定并保持命中，按键只发送一次。
   const point = await waitForHoverPointer(page, targetConfig, timeout, prepareClickText);

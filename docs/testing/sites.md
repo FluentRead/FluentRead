@@ -14,6 +14,12 @@ man7 的 Linux 手册将自然语言正文、参数说明、终端会话和源�
 
 `pnpm test tests/issue146EmbeddedFrames.test.ts tests/supportedFrameEntrypoint.test.ts tests/qqMailFrameRuntime.test.ts tests/qqMailFrameSession.test.ts tests/extensionManifestContract.test.ts` 验证 URL 配对、命令授权、SPA 进入/退出、会话同步与清理。生产 Chrome 构建后运行 `node scripts/testing/run-huggingface-frame-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --artifacts-dir <证据目录>`，在第二屏临时 Edge 后台正常窗口验证翻译—恢复—再次翻译、frame 快捷键、动态正文、晚加载 frame、来源拒绝和唯一顶层浮球，并保存 DOM 与截图。网页响应与翻译传输受控；实站、在线供应商和 Firefox 运行证据须单独记录。
 
+## Englio 英语分级阅读
+
+Englio 的 `/article/*` 页面会把整篇英文正文放进一个 `p[data-article-start]`，再用大量 `span[data-word-pos]` 与分隔符实现划词。直接子节点超过通用扫描预算时，内置 `englio-article` 规则将这个带有原生标记的正文段落作为一个完整候选，供悬浮和全文翻译共用；不提高通用扫描上限，也不取消隐藏、可编辑或禁止翻译保护。该规则可通过网站适配设置关闭。
+
+`tests/siteAdaptationCore.test.ts` 中的 `Englio word-segmented article paragraphs` 用例覆盖超宽段落、首尾词命中、完整来源、节点保留、正文替换、保护标记以及域名/路径边界。生产 Chrome 构建后，使用 `scripts/run-site-translation-matrix.cjs --cases englio-article --mode both`，显式提供网络、focus-safe helper 与 runtime-diagnostics helper，验证实站完整正文与标题的翻译—恢复—再次翻译，并保留原生开关、导航和逐词 DOM。添加 `--controlled-provider` 验证确定性来源传输与 DOM 行为；在线翻译服务的可用性与翻译质量单独记录。Chrome/Edge 的结果不代表 Firefox 实机验收。
+
 ## 网站规则与连续导航
 
 `pnpm test tests/contentFeatureLifecycle.test.ts tests/contentRuntimeLifecycle.test.ts tests/fullPageVisibilityScheduling.test.ts tests/popupPageActionsOwnership.test.ts tests/popupAppLifecycle.test.ts tests/popupChildOwnership.test.ts tests/siteRules.test.ts` 覆盖始终翻译的新页面意图、普通锚点与 HashRouter、非必要 UI 挂载等待、跨路由取消重试、无需变更结果失效，以及规则写入前的标签页复验、后台确认、保存失败和禁用中断翻译。

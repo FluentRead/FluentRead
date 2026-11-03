@@ -21,6 +21,7 @@ vi.mock('@/src/services/config/store', () => ({config: mocks.config}));
 vi.mock('@/src/features/page-notice/public', () => ({sendErrorMessage: mocks.sendErrorMessage}));
 
 import {checkConfig} from '@/src/features/full-page-translation/content/configCheck';
+import {resolveTranslationPreflight} from '@/src/core/config/translationPreflight';
 import {getFullPageTranslationDiagnostic, notifyFullPageTranslationState} from '@/src/features/full-page-translation/content/stateNotification';
 
 describe('translation configuration guard', () => {
@@ -66,6 +67,20 @@ describe('translation configuration guard', () => {
 
         expect(checkConfig()).toBe(false);
         expect(mocks.sendErrorMessage).toHaveBeenCalledWith('「谷歌翻译」仅支持双语模式，请切换翻译服务');
+    });
+
+    it.each([
+        {savedDisplay: 0, displayMode: undefined, expected: {allowed: false, reason: 'unsupported-display'}},
+        {savedDisplay: 1, displayMode: undefined, expected: {allowed: true}},
+        {savedDisplay: 0, displayMode: 'bilingual', expected: {allowed: true}},
+        {savedDisplay: 1, displayMode: 'single', expected: {allowed: false, reason: 'unsupported-display'}},
+    ] as const)('纯预检按保存模式 $savedDisplay 和本次覆盖 $displayMode 判断谷歌支持范围', ({savedDisplay, displayMode, expected}) => {
+        mocks.config.service = 'google';
+        mocks.config.display = savedDisplay;
+
+        expect(resolveTranslationPreflight(mocks.config, displayMode ? {displayMode} : undefined)).toEqual(expected);
+        expect(mocks.config.display).toBe(savedDisplay);
+        expect(mocks.sendErrorMessage).not.toHaveBeenCalled();
     });
 
     it('网站仅译文在请求前执行相同服务限制，显式单次显示方案仍优先', () => {

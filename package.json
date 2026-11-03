@@ -32,7 +32,7 @@
     "safari:package": "node scripts/safari/package.mjs",
     "build:thunderbird": "pnpm build:firefox && node scripts/thunderbird/package.mjs",
     "zip": "node scripts/testing/run-resource-safe.mjs -- wxt zip",
-    "zip:edge": "node scripts/testing/run-resource-safe.mjs -- wxt zip -b edge",
+    "zip:edge": "node scripts/testing/run-resource-safe.mjs -- wxt zip -b edge && node scripts/release/verify-edge.mjs",
     "zip:firefox": "node scripts/testing/run-resource-safe.mjs -- wxt zip -b firefox",
     "compile": "node scripts/testing/verify-pinned-userscript-languages.mjs && node scripts/testing/run-typecheck.mjs",
     "test": "node scripts/testing/run-resource-safe.mjs -- vitest run",

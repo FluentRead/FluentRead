@@ -48,10 +48,11 @@ No subtitle is sent to the component authors or their services.
 [Exact npm source revision](https://github.com/gerosyab/koroman/tree/e529729b923f8a9d9acc62b2c9c0887b00e9bd88).
 The npm package omits LICENSE. The corresponding repository LICENSE contains
 unresolved merge markers around a complete MIT grant. The exact original is
-preserved byte-for-byte inside `reading-koroman-upstream-LICENSE.txt.gz`; the same complete grant
-with only conflict-marker lines and duplicate heading removed appears in
-`reading-koroman-MIT.txt`. Implementation code is used from the unmodified
-published package.
+preserved byte-for-byte in the source repository at
+`tests/fixtures/reading-annotation/koroman-upstream-LICENSE.txt.gz` and is not
+included in extension packages. The same complete grant with only conflict-marker
+lines and duplicate heading removed is distributed as `reading-koroman-MIT.txt`.
+Implementation code is used from the unmodified published package.
 
 ## Thai
 

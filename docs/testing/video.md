@@ -2,6 +2,10 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## 读音状态与菜单稳定性
+
+`videoReadingPlayer` 覆盖准备、无适用读音、失败重试及显示模式切换。生产 Chrome 构建后，运行 `node scripts/testing/run-video-menu-ui-test.cjs --suite reading-stability --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`；将 suite 改为 `x-reading-stability` 可测试 X 缓存 AI 字幕菜单。专项在第二屏临时 Edge 后台窗口使用受控页面、媒体与字幕，连续切换韩语、无需标注的文字和空字幕，采样菜单及控件几何并保存截图；不代表真实网站、真实 AI 转写、Firefox 或辅助技术实机验收。
+
 ## 视频双语上下顺序（issue #1073）
 
 播放器菜单和字幕外观设置共用 `videoSubtitleAppearance.bilingualOrder`，默认原文在上；切换只重排原文、读音和译文，读音始终紧跟原文，单语显示与字幕下载顺序保持各自语义。`videoSubtitleAppearance`、`videoSubtitleAppearanceSettingsLifecycle`、`videoUiI18n`、`videoSubtitleTrackPriorityRuntime`、`videoCaptionPlatformRuntime` 和 `videoNativeFullscreen` 覆盖归一化、持久化、即时更新、缓存/节点保留、单语和原生轨道选择。

@@ -326,10 +326,10 @@ async function main() {
     await persist(popup,{from:'en'});await setSource('This sentence already uses Latin letters.');
     await waitForReading(()=>!document.querySelector('#fluent-read-video-subtitle-reading')?.textContent);
     await page.locator('#fluent-read-video-subtitle-button').click();
-    await waitForReading(()=>document.querySelector('[data-reading-status]')?.textContent==='当前原文无需或不支持读音标注');
+    await waitForReading(()=>document.querySelector('[data-reading-status]')?.hidden===true);
     assert.equal(await toggle.getAttribute('aria-checked'),'true');
     await page.locator('#fluent-read-video-subtitle-button').click();
-    report.cases.push({name:'unsupported-source-explains-without-losing-preference',passed:true});
+    report.cases.push({name:'unsupported-source-stays-quiet-without-losing-preference',passed:true});
     await persist(popup,{from:'ja'});await setSource('私は学校へ行きます。');
     await waitForReading(()=>document.querySelector('#fluent-read-video-subtitle-reading')?.textContent==='watashi wa gakkō e ikimasu.');
     await persist(popup,{videoSubtitleDisplayMode:'translation-only'});

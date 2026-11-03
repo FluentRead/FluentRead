@@ -16,7 +16,7 @@ import {recordMangaBubblePlacement} from './mangaBubblePlacement';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
-export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[];imageDetectionFrames?:ImageDetectionFrame[];imageParagraphGapProofs?:ImageParagraphGapProof[]}
+export interface MangaOcrPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:MangaLayoutBubble[];wordBoundaryProofs?:MangaViewWordBoundaryProof[];imageDetectionFrames?:ImageDetectionFrame[];largeAlphaHoles?:true;imageParagraphGapProofs?:ImageParagraphGapProof[]}
 
 export function findMangaBubbles(pixels:Uint8ClampedArray,width:number,height:number):Box[]{
     return findMangaBubbleLayout(pixels,width,height).recognition;
@@ -180,7 +180,7 @@ function removeOverlappingSpacedEchoes(regions:MangaRegion[]):MangaRegion[] {
 /** 不跨气泡拼句；局部识别本身才是替代证据，气泡几何或其他对白的存在不能删除可靠原文。 */
 export function collectMangaRegions(page:MangaOcrPage,language:string,width:number,height:number,profile: 'manga' | 'image' = 'manga',image?:string):MangaRegion[]{
     const bubbles=page.bubbles??[];
-    const paragraphGaps=createImageParagraphGapConsumer(page,width,height);
+    const paragraphGaps=createImageParagraphGapConsumer(page,width,height,language);
     const wordBoundaries=createMangaViewWordBoundaryConsumer(page.results,bubbles,page.wordBoundaryProofs,width,height);
     const layouts=profile==='manga'?page.layoutBubbles??[]:[];
     const owners=[...bubbles.map(bubble=>bubble.bbox),...layouts.map(layout=>layout.bbox)];
@@ -264,16 +264,29 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     const echoesRemoved=profile==='manga'?removeOverlappingSpacedEchoes(regions):regions;
     const result=appendUncoveredNumericGuards(mergeNumericRegions(echoesRemoved),guards,guardEvidence);
     const physicalRegions=new Map<MangaRegion,Box>();
-    for(const item of outsideItems){
-        const box={x0:item.box.x,y0:item.box.y,x1:item.box.x+item.box.width,y1:item.box.y+item.box.height};
-        const region=outside.find(candidate=>candidate.sourceBoxes?.length===1&&sameBox(candidate.sourceBoxes[0],box));
-        if(region){paragraphGaps.record(item,region);physicalRegions.set(region,box);}
+    if(page.imageParagraphGapProofs?.length){
+        const byBox=new Map<string,MangaRegion[]>();
+        for(const region of result)if(region.sourceBoxes?.length===1&&sameBox(region.sourceBoxes[0],region.bbox)){
+            const box=region.bbox,key=[box.x0,box.y0,box.x1,box.y1].join(',');
+            const matches=byBox.get(key);if(matches)matches.push(region);else byBox.set(key,[region]);
+        }
+        const endpoints=new Set(page.imageParagraphGapProofs.flatMap(proof=>[proof.previous,proof.next]));
+        for(const item of endpoints){
+            const box={x0:item.box.x,y0:item.box.y,x1:item.box.x+item.box.width,y1:item.box.y+item.box.height};
+            const key=[box.x0,box.y0,box.x1,box.y1].join(','),candidates=byBox.get(key);
+            if(!candidates?.length)continue;
+            const [physical]=groupMangaText([item],language,width,height,context(item));if(!physical)continue;
+            const matches=candidates.filter(region=>region.text===physical.text&&region.fontSize===physical.fontSize&&region.vertical===physical.vertical);
+            if(matches.length!==1)continue;
+            paragraphGaps.record(item,matches[0]);physicalRegions.set(matches[0],box);
+        }
     }
     if(image&&page.imageParagraphGapProofs?.length&&physicalRegions.size){
         for(const region of physicalRegions.keys())delete region.sourceBoxes;
         try{
             paragraphGaps.seal(result);bindImageParagraphGapEvidence(result,image,width,height);
-            const grouped=mergeMangaParagraphContinuations(result,consumeImageParagraphGapEvidence(result,image,width,height));
+            const support=consumeImageParagraphGapEvidence(result,image,width,height);
+            const grouped=mergeMangaParagraphContinuations(result,support);
             for(const region of grouped)if(physicalRegions.has(region))region.sourceBoxes=[{...physicalRegions.get(region)!}];
             return grouped;
         }finally{

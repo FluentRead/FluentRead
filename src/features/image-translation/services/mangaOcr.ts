@@ -17,11 +17,11 @@ import {probeWebGpu} from '@/src/shared/onnx/webgpu';
 import {protectMangaSession} from './mangaSessionFallback';
 import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaOcrAssets, removeMangaOcrAssets, withMangaModelAdmission, withMangaModelRemoval} from './mangaOcrAssets';
-import type {MangaRegion} from './mangaRegions';
+import type {MangaOcrItem,MangaRegion} from './mangaRegions';
 import {findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions,type MangaOcrPage} from './mangaBubbles';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
-import {flattenOcrAlpha} from './ocrPixels';
+import {getOcrAlphaProfile} from './ocrPixels';
 import {collectMangaOcrTileNumericEvidence,mergeMangaOcrTiles, planMangaOcrTiles, type MangaOcrTileResult} from './mangaOcrTiles';
 import {numericProtection} from './mangaNumeric';
 import {withMangaOcrColorRead} from './mangaOcrColor';
@@ -61,6 +61,84 @@ export function shouldRotateMangaOcrRetry(item:{text:string;confidence:number;bo
         &&!/[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}\p{Script_Extensions=Hangul}]/u.test(item.text)
         &&[box.x,box.y,box.width,box.height].every(Number.isFinite)&&box.x>=0&&box.y>=0&&box.width>=1
         &&box.x+box.width<=width&&box.y+box.height<=height;
+}
+
+/** Huge, extremely tall Latin boxes are rescanned after a quarter turn so a false full-page box cannot erase artwork. */
+export function shouldRescanTallMangaLatin(item:{text:string;confidence:number;box:{x:number;y:number;width:number;height:number}},width:number,height:number):boolean {
+    if(!item||typeof item.text!=='string'||!item.box)return false;
+    const box=item.box,compact=item.text.normalize('NFKC').replace(/[^A-Za-z0-9]/gu,'');
+    return /^[A-Za-z0-9\s.,!?;:'’"()\-…]+$/u.test(item.text)&&Number.isFinite(item.confidence)&&item.confidence>=.65&&item.confidence<.9
+        &&compact.length>=4&&compact.length<=32
+        &&(compact.match(/[A-Za-z]/gu)?.length??0)>=4&&box.height>=Math.max(256,height*.55)&&box.height>=box.width*4
+        &&[box.x,box.y,box.width,box.height].every(Number.isFinite)&&box.x>=0&&box.y>=0&&box.width>=1
+        &&box.x+box.width<=width&&box.y+box.height<=height;
+}
+
+interface MangaRubyRescueCrop {crop:{x0:number;y0:number;x1:number;y1:number};side:{x0:number;y0:number;x1:number;y1:number};fontSize:number;inkPixels:number}
+const rubyKana=/^[\p{Script=Hiragana}\p{Script=Katakana}ー]{2,8}$/u;
+const MAX_MANGA_RUBY_CANDIDATES=128;
+/** Only high-contrast kana-like side gutters beside an existing vertical CJK line qualify for a bounded rescue OCR crop. */
+export function planMangaRubyRescueCrops(page:MangaOcrPage,width:number,height:number,pixels:Uint8ClampedArray,
+    knownItems:readonly MangaOcrItem[]=page.results,limit=2,candidateItems:readonly MangaOcrItem[]=page.results):MangaRubyRescueCrop[]{
+    if(!Number.isSafeInteger(limit)||limit<1||limit>2||!Number.isSafeInteger(width)||!Number.isSafeInteger(height)
+        ||width<=0||height<=0||pixels.length!==width*height*4||!Array.isArray(page.results)||page.results.length>4096||candidateItems.length>4096)return [];
+    const valid=(item:MangaOcrItem)=>!!item&&typeof item.text==='string'&&!!item.box
+        &&[item.box.x,item.box.y,item.box.width,item.box.height,item.confidence].every(Number.isFinite)
+        &&item.confidence>=.65&&item.confidence<=1&&item.box.x>=0&&item.box.y>=0&&item.box.width>0&&item.box.height>0
+        &&item.box.x+item.box.width<=width&&item.box.y+item.box.height<=height;
+    const vertical:MangaOcrItem[]=[],seen=new Set<string>();
+    for(const item of candidateItems){
+        if(!valid(item)||item.box.height<item.box.width*1.8
+            ||!/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(item.text)
+            ||Array.from(item.text.trim()).length<3||Array.from(item.text.trim()).length>96)continue;
+        const key=JSON.stringify([item.text,item.box.x,item.box.y,item.box.width,item.box.height]);if(seen.has(key))continue;seen.add(key);
+        vertical.push(item);
+    }
+    vertical.sort((a,b)=>b.box.x-a.box.x||a.box.y-b.box.y);
+    vertical.length=Math.min(vertical.length,MAX_MANGA_RUBY_CANDIDATES);
+    const plans:MangaRubyRescueCrop[]=[];
+    for(const main of vertical){
+        if(plans.length>=limit)break;
+        const glyphs=Array.from(main.text.trim()).length,fontSize=Math.min(main.box.width,main.box.height/glyphs);
+        if(!Number.isFinite(fontSize)||fontSize<12||fontSize>128)continue;
+        const y0=Math.max(0,Math.floor(main.box.y)-2),y1=Math.min(height,Math.ceil(main.box.y+Math.min(main.box.height,fontSize*3.5)));
+        const x0=Math.min(width,Math.ceil(main.box.x+main.box.width+2));let x1=Math.min(width,x0+Math.ceil(fontSize*1.8));
+        for(const other of knownItems){
+            if(other===main||!valid(other))continue;
+            const b=other.box;
+            if(b.x>x0&&b.x<x1&&b.y<y1&&b.y+b.height>y0)x1=Math.min(x1,Math.floor(b.x)-2);
+        }
+        const side={x0,y0,x1,y1};
+        if(x1-x0<Math.max(8,fontSize*.5)||y1-y0<fontSize*1.5||(x1-x0)*(y1-y0)>32_768)continue;
+        if(knownItems.some(item=>valid(item)&&rubyKana.test(item.text.trim())
+            &&Math.min(x1,item.box.x+item.box.width)>Math.max(x0,item.box.x)
+            &&Math.min(y1,item.box.y+item.box.height)>Math.max(y0,item.box.y)))continue;
+        const signature=`${x0},${y0},${x1},${y1}`;
+        if(plans.some(plan=>{
+            const overlap=Math.max(0,Math.min(plan.side.x1,x1)-Math.max(plan.side.x0,x0))
+                *Math.max(0,Math.min(plan.side.y1,y1)-Math.max(plan.side.y0,y0));
+            return signature===`${plan.side.x0},${plan.side.y0},${plan.side.x1},${plan.side.y1}`||overlap>=Math.min((plan.side.x1-plan.side.x0)*(plan.side.y1-plan.side.y0),(x1-x0)*(y1-y0))*.6;
+        }))continue;
+        const samples=[[x0,y0],[Math.floor((x0+x1-1)/2),y0],[x1-1,y0],[x0,Math.floor((y0+y1-1)/2)],
+            [x1-1,Math.floor((y0+y1-1)/2)],[x0,y1-1],[Math.floor((x0+x1-1)/2),y1-1],[x1-1,y1-1]];
+        const colors=[[],[],[]] as number[][];
+        for(const [x,y] of samples){const offset=(y*width+x)*4;if(pixels[offset+3]<128)continue;
+            for(let channel=0;channel<3;channel++)colors[channel].push(pixels[offset+channel]);}
+        if(colors.some(channel=>channel.length<4))continue;
+        const median=(values:number[])=>{values.sort((a,b)=>a-b);return values[Math.floor(values.length/2)];};
+        const background=colors.map(median);let inkPixels=0,left=x1,top=y1,right=x0,bottom=y0;
+        for(let y=y0+1;y<y1-1;y++)for(let x=x0+1;x<x1-1;x++){
+            const offset=(y*width+x)*4;if(pixels[offset+3]<128)continue;
+            const difference=Math.abs(pixels[offset]-background[0])+Math.abs(pixels[offset+1]-background[1])+Math.abs(pixels[offset+2]-background[2]);
+            if(difference<120)continue;
+            inkPixels++;left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);
+        }
+        if(inkPixels<14||right-left<3||bottom-top<6)continue;
+        const crop={...side};
+        if((crop.x1-crop.x0)*(crop.y1-crop.y0)>65_536)continue;
+        plans.push({crop,side,fontSize,inkPixels});
+    }
+    return plans.sort((a,b)=>b.inkPixels-a.inkPixels).slice(0,limit);
 }
 
 /** 单队列持有模型会话，取消排队请求不能终止其他页正在使用的模型。 */
@@ -234,9 +312,14 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         private checks:Array<()=>void>=[];
         private inferenceFailure: {error: unknown} | undefined;
         private remainingRetries=4;
+        private remainingRubyRescues=2;
         private remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;
         private originalSource:{image:ImageBitmap|HTMLImageElement;width:number;height:number;identity?:{src:string;currentSrc:string}}|undefined;
-        beginMangaPage(): void {this.remainingRetries=4;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);}
+        beginMangaPage(): void {this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);}
+        tryReserveMangaRubyRescue(sourcePixels:number):boolean {
+            if(this.remainingRubyRescues<=0||!Number.isSafeInteger(sourcePixels)||sourcePixels<=0||sourcePixels>this.remainingPreprocessingPixels)return false;
+            this.remainingRubyRescues--;this.remainingPreprocessingPixels-=sourcePixels;return true;
+        }
         bindMangaSource(image:ImageBitmap|HTMLImageElement,width:number,height:number):void {
             this.originalSource={image,width,height,...('naturalWidth' in image?{identity:{src:image.src,currentSrc:image.currentSrc}}:{})};
         }
@@ -317,6 +400,42 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     numericEvidence.push(item);
                 };
                 page.results.forEach(preserve);
+                const rotatedLatin=page.results.filter(item=>shouldRescanTallMangaLatin(item,canvas.width,canvas.height))
+                    .sort((a,b)=>b.box.height/b.box.width-a.box.height/a.box.width).slice(0,2);
+                for(const item of rotatedLatin){
+                    if(!this.remainingRetries)break;
+                    const box=item.box,sourceWidth=Math.max(1,Math.round(box.width)),sourceHeight=Math.max(1,Math.round(box.height)),sourcePixels=sourceWidth*sourceHeight;
+                    if(sourcePixels>this.remainingPreprocessingPixels)continue;
+                    this.remainingRetries--;this.remainingPreprocessingPixels-=sourcePixels;
+                    const rotated=createOcrCanvas();
+                    try{
+                        rotated.width=sourceHeight;rotated.height=sourceWidth;
+                        const ctx=rotated.getContext('2d',{willReadFrequently:true});if(!ctx)continue;
+                        ctx.translate(rotated.width,0);ctx.rotate(Math.PI/2);
+                        ctx.drawImage(canvas,box.x,box.y,box.width,box.height,0,0,sourceWidth,sourceHeight);
+                        assertMangaOcrActive(activeSignal);
+                        const rescanned=await this.recognize(rotated,options);
+                        assertMangaOcrActive(activeSignal);this.checkInferenceFailure();
+                        const compact=(text:string)=>text.normalize('NFKC').replace(/[^A-Za-z0-9]/gu,'').toUpperCase();
+                        const candidate=rescanned.results.filter(result=>{
+                            const text=result.text?.trim()??'',candidateCompact=compact(text);
+                            const candidateBox=result.box;
+                            if(!/^[A-Za-z0-9\s.,!?;:'’"()\-…]+$/u.test(text)||!Number.isFinite(result.confidence)
+                                ||result.confidence<.9||result.confidence<item.confidence+.15||candidateCompact.length<4||candidateCompact.length>32
+                                ||(candidateCompact.match(/[A-Za-z]/gu)?.length??0)<4
+                                ||!candidateBox||![candidateBox.x,candidateBox.y,candidateBox.width,candidateBox.height].every(Number.isFinite)
+                                ||candidateBox.width<=candidateBox.height*1.5||candidateBox.x<0||candidateBox.y<0
+                                ||candidateBox.x+candidateBox.width>rotated.width||candidateBox.y+candidateBox.height>rotated.height)return false;
+                            return candidateBox.width*candidateBox.height<=rotated.width*rotated.height*.4;
+                        }).sort((a,b)=>b.confidence-a.confidence)[0];
+                        if(candidate){
+                            const mapped={...candidate,box:{x:box.x+candidate.box.y,y:box.y+sourceHeight-candidate.box.x-candidate.box.width,
+                                width:candidate.box.height,height:candidate.box.width}};
+                            const index=page.results.indexOf(item);if(index>=0)page.results[index]=mapped;
+                            preserve(mapped);
+                        }
+                    }finally{rotated.width=0;rotated.height=0;}
+                }
                 // 批量裁切会把不同宽度补齐；只对已有低置信竖列有界复识别，不再运行检测或新增框。
                 const weak=page.results.filter(item=>item.confidence<.9&&item.box.height>item.box.width*1.8)
                     .sort((a,b)=>a.confidence-b.confidence).slice(0,this.remainingRetries);
@@ -460,6 +579,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 try {
                 assertMangaOcrActive(options.signal);
                 service.beginMangaPage();
+                let remainingRubyRescues=2;
                 detectionBudget=undefined;
                 const recognizeFrame=async(canvas:HTMLCanvasElement|OffscreenCanvas,frame:Omit<ImageDetectionFrameSource,'resizeRatio'>)=>{
                     detectionObservation={canvas,frame};
@@ -478,10 +598,16 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     const context=canvas.getContext('2d', {willReadFrequently: true});if(!context)throw new Error('浏览器不支持图片处理');
                     context.drawImage(bitmap,0,0);
                     const pixels=context.getImageData(0,0,canvas.width,canvas.height);
-                    // Paddle 的 RGB 张量忽略 alpha；只在识别像素上合成对比底色，
-                    // 后续重绘仍借用保留透明度的原图，不重复回读或复制整图。
-                    if(flattenOcrAlpha(pixels.data)){
-                        context.putImageData(pixels,0,0);
+                    // Paddle 的 RGB 张量忽略 alpha；只在识别 Canvas 后方合成对比底色，
+                    // 保留这次既有 RGBA 读回的原像素，供透明页段落旁证复用，不复制整图。
+                    const alphaProfile=getOcrAlphaProfile(pixels.data),alphaBackground=alphaProfile.background;
+                    if(alphaBackground!==undefined){
+                        const previousComposite=context.globalCompositeOperation;
+                        try{
+                            context.globalCompositeOperation='destination-over';
+                            context.fillStyle=alphaBackground===0?'#000':'#fff';
+                            context.fillRect(0,0,canvas.width,canvas.height);
+                        }finally{context.globalCompositeOperation=previousComposite;}
                         // 复用原有alpha扫描结果；整张不透明图片不捕获或复制任何新检测侧车。
                         if(options.imageDetectionEvidence===true)detectionBudget=createImageDetectionEvidenceBudget();
                     }
@@ -524,9 +650,50 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             bubbles.push({bbox,results:result.results.map(restore),...(result.numericEvidence?.length?{numericEvidence:result.numericEvidence.map(restore)}:{})});
                         }finally{crop.width=0;crop.height=0;}
                     }
+                    const knownItems=[...page.results,...bubbles.flatMap(bubble=>bubble.results)];
+                    const rubyRescues=planMangaRubyRescueCrops(page,width,height,pixels.data,knownItems,remainingRubyRescues,knownItems);
+                    for(const rescue of rubyRescues){
+                        assertMangaOcrActive(options.signal);
+                        const sourceWidth=rescue.crop.x1-rescue.crop.x0,sourceHeight=rescue.crop.y1-rescue.crop.y0,sourcePixels=sourceWidth*sourceHeight;
+                        if(!remainingRubyRescues||!service.tryReserveMangaRubyRescue(sourcePixels))break;
+                        remainingRubyRescues--;
+                        const crop=createOcrCanvas();
+                        try{
+                            const scale=Math.min(3,1536/Math.max(sourceWidth,sourceHeight));
+                            crop.width=Math.max(1,Math.round(sourceWidth*scale));crop.height=Math.max(1,Math.round(sourceHeight*scale));
+                            const ctx=crop.getContext('2d',{willReadFrequently:true});if(!ctx)continue;
+                            ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+                            ctx.drawImage(canvas,rescue.crop.x0,rescue.crop.y0,sourceWidth,sourceHeight,0,0,crop.width,crop.height);
+                            let recovered:MangaOcrPage;
+                            try{
+                                recovered=await service.recognizeManga(crop,sdkOptions);
+                                assertMangaOcrActive(options.signal);
+                            }catch(error){assertMangaOcrActive(options.signal);continue;}
+                            const sx=crop.width/sourceWidth,sy=crop.height/sourceHeight;
+                            for(const candidate of recovered.results){
+                                const text=candidate.text.trim();if(!rubyKana.test(text)||candidate.confidence<.8
+                                    ||![candidate.box.x,candidate.box.y,candidate.box.width,candidate.box.height].every(Number.isFinite)
+                                    ||candidate.box.width<=0||candidate.box.height<=candidate.box.width*1.2)continue;
+                                const box={x:rescue.crop.x0+candidate.box.x/sx,y:rescue.crop.y0+candidate.box.y/sy,
+                                    width:candidate.box.width/sx,height:candidate.box.height/sy};
+                                if(box.x<rescue.side.x0-1||box.y<rescue.side.y0-1||box.x+box.width>rescue.side.x1+1
+                                    ||box.y+box.height>rescue.side.y1+1||box.width>rescue.fontSize*1.05||box.height>rescue.fontSize*3.5)continue;
+                                const duplicate=knownItems.some(item=>{
+                                    if(typeof item.text!=='string'||!item.text.replace(/\s+/gu,'').includes(text))return false;
+                                    const other=item.box;if(!other||![other.x,other.y,other.width,other.height].every(Number.isFinite)||other.width<=0||other.height<=0)return false;
+                                    const intersection=Math.max(0,Math.min(box.x+box.width,other.x+other.width)-Math.max(box.x,other.x))
+                                        *Math.max(0,Math.min(box.y+box.height,other.y+other.height)-Math.max(box.y,other.y));
+                                    return intersection>=Math.min(box.width*box.height,other.width*other.height)*.4;
+                                });
+                                if(duplicate)continue;
+                                const restored={...candidate,text,box};page.results.push(restored);knownItems.push(restored);
+                            }
+                        }finally{crop.width=0;crop.height=0;}
+                    }
                     assertMangaOcrActive(options.signal);
                     const layoutBubbles=assignMangaLayoutBubbles(pixels.data,canvas.width,canvas.height,ownership,page.results);
-                    const finalPage:MangaOcrPage={results:page.results,bubbles,...(page.numericEvidence?.length?{numericEvidence:page.numericEvidence}:{}),...(layoutBubbles.length?{layoutBubbles}:{})};
+                    const hasLargeAlphaHoles=alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2;
+                    const finalPage:MangaOcrPage={results:page.results,bubbles,...(page.numericEvidence?.length?{numericEvidence:page.numericEvidence}:{}),...(layoutBubbles.length?{layoutBubbles}:{}),...(hasLargeAlphaHoles?{largeAlphaHoles:true as const}:{})};
                     const frames=detectionBudget?.frames();
                     if(frames?.length)finalPage.imageDetectionFrames=[...frames];
                     const wordBoundaryProofs=service.proveMangaWordBoundaries(finalPage,bubbles,canvas.width,canvas.height);
@@ -573,9 +740,10 @@ async function createWorkerMangaOcr(signal?: AbortSignal, progress?: Progress): 
                     canvas.height = 0;
                 }
             }
-            return mangaInferenceClient.request({type:'recognize', image: workerImage,
+            const result=await mangaInferenceClient.request<MangaOcrPage>({type:'recognize', image: workerImage,
                 ...(options.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{}),
                 ...(options.mangaParagraphGapEvidence===true?{mangaParagraphGapEvidence:true as const}:{})}, options.signal, options.progress);
+            return result;
         },
         destroy: () => mangaInferenceClient.release('ocr'),
     };

@@ -14,6 +14,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
 import {produceImageParagraphGapProofs} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
+import {flattenOcrAlpha,getOcrAlphaProfile} from '@/src/features/image-translation/services/ocrPixels';
 
 // 完整静态目录引用保留 PNG/gzip-only 变化的 affected 依赖，脚本也各自显式登记。
 const fixtureRoot=new URL('./fixtures/manga-color-quality/',import.meta.url);
@@ -180,10 +181,44 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             expect(proofs.map(proof=>proof.mode),sample.name).toEqual([sample.mode]);
             const grouped=collectMangaRegions({...page,imageParagraphGapProofs:proofs},sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
             expect(grouped.map(region=>region.text),`${sample.name}: ${sample.expected}`).toEqual([sample.expected]);
+            if(sample.name==='watercolor-ferry-translucent-notification'){
+                const bubbleResults=results.slice(0,2),bubblePage={results:bubbleResults,
+                    bubbles:[{bbox:{x0:140,y0:180,x1:820,y1:330},results:[]}]};
+                const flattenedPixels=pixels.slice();flattenOcrAlpha(flattenedPixels);
+                expect(produceImageParagraphGapProofs(bubblePage,fixture.width,fixture.height,flattenedPixels),
+                    `${sample.name}: the OCR composite is not source evidence`).toEqual([]);
+                const bubbleProofs=produceImageParagraphGapProofs(bubblePage,fixture.width,fixture.height,pixels);
+                expect(bubbleProofs.map(proof=>proof.mode)).toEqual(['smooth-field']);
+                const bubbleGrouped=collectMangaRegions({...bubblePage,imageParagraphGapProofs:bubbleProofs},sample.sourceLanguage,
+                    fixture.width,fixture.height,'manga',sample.name);
+                expect(bubbleGrouped.map(region=>region.text),`${sample.name}: proof also joins OCR rows owned by one notification bubble`)
+                    .toEqual([sample.expected]);
+            }
             if(sample.mode==='flat-owner'){
                 const altered=pixels.slice(),box=proofs[0].flatOwner!;
                 altered[(Math.floor((proofs[0].previous.box.y+proofs[0].previous.box.height+proofs[0].next.box.y)/2)*fixture.width+box.x)*4]^=0xff;
                 expect(produceImageParagraphGapProofs(page,fixture.width,fixture.height,altered),`${sample.name}: changed gap pixel revokes proof`).toEqual([]);
+                const proof=proofs[0],flat=proof.flatOwner!,baseline=collectMangaRegions(page,sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
+                const corrupt=[
+                    {...proof,flatOwner:undefined},
+                    {...proof,flatOwner:{...flat,anchorY:flat.anchorY+1}},
+                    {...proof,flatOwner:{...flat,targetY:flat.targetY+1}},
+                    {...proof,flatOwner:{...flat,runStart:-1}},
+                    {...proof,flatOwner:{...flat,runEnd:Number.MAX_SAFE_INTEGER}},
+                    {...proof,flatOwner:{...flat,runEnd:flat.runStart+7}},
+                    {...proof,flatOwner:{...flat,x:flat.x+1}},
+                    {...proof,topology:{owner:{x0:0,y0:0,x1:1,y1:1},tiles:[]}},
+                ];
+                for(const invalid of corrupt){
+                    const rejected=collectMangaRegions({...page,imageParagraphGapProofs:[invalid]},sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
+                    expect(rejected.map(region=>region.text),`${sample.name}: malformed gap proof cannot authorize joining`).toEqual(baseline.map(region=>region.text));
+                }
+            }
+            if(sample.mode==='smooth-field'){
+                const proof=proofs[0],baseline=collectMangaRegions(page,sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
+                const stray={...proof,flatOwner:{x:0,anchorY:0,targetY:0,runStart:0,runEnd:8}};
+                const rejected=collectMangaRegions({...page,imageParagraphGapProofs:[stray]},sample.sourceLanguage,fixture.width,fixture.height,'manga',sample.name);
+                expect(rejected.map(region=>region.text),`${sample.name}: non-flat proofs cannot carry flat-owner metadata`).toEqual(baseline.map(region=>region.text));
             }
         }
     });
@@ -196,12 +231,12 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             'same-tone-cabin-controls','inverse-neighbor-tidal-balloons','bound-atlas-rule-and-inset-card',
         ]);
         const expected:Record<string,{proofs:number;before:number;after:number}>= {
-            'transparent-lantern-bridge-balloons':{proofs:0,before:2,after:2},
-            'translucent-riverside-notice':{proofs:0,before:1,after:1},
-            'perforated-alpha-dock-note':{proofs:0,before:1,after:1},
+            'transparent-lantern-bridge-balloons':{proofs:1,before:2,after:1},
+            'translucent-riverside-notice':{proofs:1,before:1,after:0},
+            'perforated-alpha-dock-note':{proofs:1,before:1,after:0},
             'same-tone-cabin-controls':{proofs:1,before:1,after:0},
             'inverse-neighbor-tidal-balloons':{proofs:2,before:2,after:0},
-            'bound-atlas-rule-and-inset-card':{proofs:0,before:2,after:2},
+            'bound-atlas-rule-and-inset-card':{proofs:2,before:2,after:0},
         };
         for(const fixture of alpha.fixtures){
             const png=readFileSync(new URL(fixture.file,alphaRoot));expect(png.length,fixture.name).toBe(fixture.bytes);expect(sha(png),fixture.name).toBe(fixture.sha256);
@@ -209,7 +244,8 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             expect(sha(pixelBytes),fixture.name).toBe(fixture.decodedRgbaSha256);
             const results=fixture.regions.map((region:any)=>({text:region.text,confidence:.99,
                 box:{x:region.bbox.x0,y:region.bbox.y0,width:region.bbox.x1-region.bbox.x0,height:region.bbox.y1-region.bbox.y0}}));
-            const page={results},proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
+            const alphaProfile=getOcrAlphaProfile(pixels),page={results,...(alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2?{largeAlphaHoles:true as const}:{})};
+            const proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
             const baseline=collectMangaRegions(page,fixture.sourceLanguage,fixture.width,fixture.height,'manga');
             const actual=collectMangaRegions({...page,imageParagraphGapProofs:proofs},fixture.sourceLanguage,fixture.width,fixture.height,'manga',fixture.name);
             const before=evaluateQualityReadingOrder(fixture,baseline.map((line:any)=>line.text)).qualityFailures;
@@ -229,7 +265,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
         }
     });
 
-    it('14个已录制真实OCR场景按原图像素证明续行，恢复11项段落失败且不新增错误',()=>{
+    it('14个已录制真实OCR场景按原图像素证明续行，恢复16项段落失败且不新增错误',()=>{
         const recordBytes=readFileSync(new URL('recorded-v14.json',recordedRoot)),record=JSON.parse(recordBytes.toString());
         expect(sha(recordBytes)).toBe('937d02b27f85a1b4bd68bda5c664810e3d8c2a31cbcf1b10cd9a83e765f8ef16');
         expect(record).toMatchObject({version:1,provenance:{sceneCount:14,sourceStatus:'failed'}});expect(record.scenes).toHaveLength(14);
@@ -246,8 +282,13 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             ['watercolor-ferry-translucent-notification','THE RIVERIS CLEAR TODAY','PLEASE STEP ABOARD QUIETLY.'],
             ['orbital-greenhouse-cutout-dialogue','新的叶子已经展开了。','把水送到靠窗的一排。'],
             ['orbital-greenhouse-cutout-dialogue','ここなら星が見える。','明日も一緒に育てよう。'],
+            ['transparent-lantern-bridge-balloons','橋のそばで待っていて。','地図を持って戻るよ。'],
+            ['translucent-riverside-notice','The last ferry leaves at eight.','Please keep the riverside gate clear.'],
+            ['perforated-alpha-dock-note','THE iDOCK IS QUIET','KEEPiA LIGHT ON'],
             ['same-tone-cabin-controls','KEEP THE CABIN CLOSED','THE CREW RETURNS AT DAWN'],
             ['inverse-neighbor-tidal-balloons','WE CAN CROSS NOW','THE TIDE IS FALLING'],
+            ['bound-atlas-rule-and-inset-card','Turn toward the old lighthouse.','The narrow path follows the sea.'],
+            ['bound-atlas-rule-and-inset-card','Wait until the bells are quiet.','Then take the eastern stairs.'],
         ];
         let baselineFailures=0,replayFailures=0,recordedFailures=0;const observedPairs:string[][]=[];
         for(const scene of record.scenes){
@@ -263,14 +304,15 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             const results=scene.lines.filter((line:any)=>typeof line.text==='string'&&line.text.trim()).map((line:any)=>({
                 text:line.text,confidence:1,box:{x:line.bbox.x0,y:line.bbox.y0,width:line.bbox.x1-line.bbox.x0,height:line.bbox.y1-line.bbox.y0},
             }));
-            const page={results},proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
+            const alphaProfile=getOcrAlphaProfile(pixels),page={results,...(alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2?{largeAlphaHoles:true as const}:{})};
+            const proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
             const before=collectMangaRegions(page,fixture.sourceLanguage,fixture.width,fixture.height,'manga');
             const after=collectMangaRegions({...page,imageParagraphGapProofs:proofs},fixture.sourceLanguage,fixture.width,fixture.height,'manga',scene.name);
             const beforeFailures=evaluateQualityReadingOrder(fixture,before.map((line:any)=>line.text)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
             const afterFailures=evaluateQualityReadingOrder(fixture,after.map((line:any)=>line.text)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
             baselineFailures+=beforeFailures.length;replayFailures+=afterFailures.length;
             expect(afterFailures.length,`${scene.name} adds no paragraph failure`).toBeLessThanOrEqual(beforeFailures.length);
-            expect(characterKey(after.map((line:any)=>line.text).join('')),scene.name).toBe(characterKey(results.map((line:any)=>line.text).join('')));
+            expect(characterKey(after.map((line:any)=>line.text).join('')),scene.name).toBe(characterKey(before.map((line:any)=>line.text).join('')));
             for(const proof of proofs)for(const text of [proof.previous.text,proof.next.text]){
                 const source=scene.lines.find((line:any)=>line.text===text);expect(source,`${scene.name}: recorded line ${text}`).toBeDefined();
                 expect(source.sourceBoxes,`${scene.name}: proof endpoint is one original source box`).toEqual([source.bbox]);
@@ -284,8 +326,8 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             }
         }
         expect(observedPairs).toEqual(resolvedPairs);
-        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(8);
-        expect(baselineFailures-replayFailures).toBe(11);
+        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(3);
+        expect(baselineFailures-replayFailures).toBe(16);
     });
 
     const rewrite=(directory:string,mutate:(data:any)=>void)=>{

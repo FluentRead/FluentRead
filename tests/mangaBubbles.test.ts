@@ -71,6 +71,17 @@ describe('实际普通图片物理行的段落证明采用',()=>{
     });
 });
 
+describe('漫画 OCR 全大写行的孤立小写 i 误识别',()=>{
+    const read=(value:string)=>collectMangaRegions({results:[text(value,0,0,500,32)]},'en',600,80,'manga')[0]?.text;
+    it('修复位于常见英文词界的小写 i 插入，不改合法混合大小写品牌',()=>{
+        expect(read('THE iDOCK IS QUIET')).toBe('THE DOCK IS QUIET');
+        expect(read('KEEPiA LIGHT ON')).toBe('KEEP A LIGHT ON');
+        expect(read('THE iPhone IS READY')).toBe('THE iPhone IS READY');
+        expect(read('THE iOS BUILD')).toBe('THE iOS BUILD');
+        expect(read('MIXiT LATER')).toBe('MIXiT LATER');
+    });
+});
+
 // 独立的逐像素四邻域 BFS 作为扫描行实现的拓扑 oracle，保留面积、排序和阈值语义。
 function referenceBubbles(pixels:Uint8ClampedArray,width:number,height:number){
     const white=Array.from({length:width*height},(_,index)=>{
@@ -335,6 +346,34 @@ describe('漫画局部气泡识别边界',()=>{
         const overlappingRealLines=[text('I AM HERE',20,200,100,12),text('WE ARE HERE TODAY',20,200,100,36)];
         expect(collectMangaRegions({results:overlappingRealLines},'en',200,300,'manga').map(region=>region.text))
             .toEqual(['I AM HERE','WE ARE HERE TODAY']);
+    });
+    it('字距候选长度或相似度不足以及比较预算耗尽时都保留原文，普通图片不启用漫画过滤',()=>{
+        const fragment=text('A B C D E F',20,14,120,12),fragmentBubble=box(70,10,20,20);
+        const assertRetained=(candidate:any,candidateBubble:ReturnType<typeof box>)=>{
+            const page={results:[],bubbles:[{bbox:fragmentBubble,results:[fragment]},{bbox:candidateBubble,results:[candidate]}]};
+            const manga=collectMangaRegions(page,'en',420,100,'manga').map(region=>region.text);
+            expect(manga).toHaveLength(2);expect(manga).toContain(fragment.text);expect(manga).toContain(candidate.text);
+            expect(collectMangaRegions(page,'en',420,100,'image').map(region=>region.text)).toHaveLength(2);
+        };
+        // Compact source length 8 is too close to the 6-letter fragment (requires +3).
+        assertRetained(text('ABCDEFGH',68,14,120,12),box(120,10,16,20));
+        // A 193-letter candidate exceeds the bounded LCS input length.
+        assertRetained(text('A'.repeat(193),20,19,360,12),box(196,21,8,8));
+        // Sufficiently long but unrelated overlapping text is retained when LCS coverage is low.
+        assertRetained(text('ZZZZZZZZZZ',20,19,120,12),box(78,22,4,6));
+
+        const bubbles=[];
+        for(let index=0;index<100;index++){
+            const y=10+index*12;
+            bubbles.push({bbox:box(10,y,180,12),results:[text('A B C D E F',20,y,120,12)]});
+        }
+        for(let index=0;index<100;index++){
+            const y=1800+index*12;
+            bubbles.push({bbox:box(10,y,180,12),results:[text('ABCDEFGH',20,y,120,12)]});
+        }
+        const bounded=collectMangaRegions({results:[],bubbles},'en',220,3200,'manga');
+        expect(bounded).toHaveLength(200);
+        expect(bounded.filter(region=>region.text==='A B C D E F')).toHaveLength(100);
     });
     it('外层局部补回内层漏行时归入最紧气泡，同一对白完整合段且邻近对白独立',()=>{
         const first=text('First complete line',70,80,150,12),last=text('Last recovered line',70,97,150,12);

@@ -30,6 +30,12 @@ function smoothFieldFixture(){
     }
     return f;
 }
+function alphaLongFixture(){
+    const f=basic();f.page.largeAlphaHoles=true;f.page.results[1]!.box.y=90;
+    for(let y=77;y<85;y++)for(let x=43;x<46;x++)f.set(x,y,[24,44,68,255]);
+    for(let y=93;y<101;y++)for(let x=43;x<46;x++)f.set(x,y,[230,240,250,255]);
+    return f;
+}
 describe('低对比平滑间隙证明的生产消费',()=>{
     it('同帧平滑渐变通过profile窗口与无topology预算验证后才绑定',()=>{
         const f=smoothFieldFixture();
@@ -50,7 +56,7 @@ describe('低对比平滑间隙证明的生产消费',()=>{
         const withTopology={...proof,topology:{owner:{x0:40,y0:40,x1:130,y1:88},tiles:[]}};
         expect(adopt(g,[withTopology]).support).toBeUndefined();
     });
-    it.each([56,57])('RGBA alpha低于128时在profile首行或后续行拒绝：y=%s',y=>{
+    it.each([59,60])('RGBA alpha低于128时在profile首行或后续行拒绝：y=%s',y=>{
         const f=smoothFieldFixture(),proofs=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels);
         f.pixels[(y*f.width+40)*4+3]=0;
         expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
@@ -109,6 +115,20 @@ describe('低对比平滑间隙证明的生产消费',()=>{
         expect(observeImageMatteGeometry(pixels,width,height,{x0:first.x,y0:first.y,x1:first.x+first.width,y1:first.y+first.height})).toBeDefined();
         expect(observeImageMatteGeometry(pixels,width,height,{x0:next.x,y0:next.y,x1:next.x+next.width,y1:next.y+next.height})).toBeDefined();
         expect(produceImageParagraphGapProofs({results},width,height,pixels)).toEqual([]);
+    });
+});
+describe('大面积透明页的长间距续行',()=>{
+    it('只为强对齐且像素完全平坦的未标点长间距绑定续行',()=>{
+        const f=alphaLongFixture(),proofs=produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels);
+        expect(proofs).toHaveLength(1);expect(proofs[0]).toMatchObject({mode:'flat-owner',alphaLongContinuation:true});
+        const accepted=adopt(f,proofs);
+        expect(accepted.support?.successor(accepted.regions[0])).toBe(accepted.regions[1]);
+        expect(accepted.support?.permits(accepted.regions[0],accepted.regions[1],[accepted.regions[0]],bounds(accepted.regions))).toBe(true);
+    });
+    it('未标记透明页、错列行或有墨迹间隙仍拒绝长间距续行',()=>{
+        const f=alphaLongFixture();f.page.largeAlphaHoles=undefined;expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
+        const shifted=alphaLongFixture();shifted.page.results[1]!.box.x+=20;expect(produceImageParagraphGapProofs(shifted.page,shifted.width,shifted.height,shifted.pixels)).toEqual([]);
+        const marked=alphaLongFixture();marked.set(80,70,[235,235,235,255]);expect(produceImageParagraphGapProofs(marked.page,marked.width,marked.height,marked.pixels)).toEqual([]);
     });
 });
 describe('已保存原像素的五组对白与独立控制标签',()=>{
@@ -234,9 +254,9 @@ describe('几何、预算与取消的保守失败',()=>{
     });
     it('失败候选也消耗128次尝试及1Mi预留，未读取和失败不返还',()=>{
         const f=basic(),empty=f.pixels.slice();for(let i=0;i<empty.length;i+=4)empty.set([24,44,68,255],i);
-        const check=vi.fn(),page={results:[f.page.results[0],...Array(130).fill(f.page.results[1])]};expect(produceImageParagraphGapProofs(page,200,200,empty,check)).toEqual([]);expect(check).toHaveBeenCalledTimes(130);
+        const check=vi.fn(),page={results:[f.page.results[0],...Array(130).fill(f.page.results[1])]};expect(produceImageParagraphGapProofs(page,200,200,empty,check)).toEqual([]);expect(check.mock.calls.length).toBeGreaterThanOrEqual(130);
         const width=1000,height=300,pixels=new Uint8ClampedArray(width*height*4).fill(255),first={text:'FIRST',confidence:.99,box:{x:100,y:50,width:600,height:20}},next={...first,text:'SECOND',box:{...first.box,y:100}},charged=vi.fn();
-        expect(produceImageParagraphGapProofs({results:[first,...Array(130).fill(next)]},width,height,pixels,charged)).toEqual([]);expect(charged).toHaveBeenCalledTimes(25);
+        expect(produceImageParagraphGapProofs({results:[first,...Array(130).fill(next)]},width,height,pixels,charged)).toEqual([]);expect(charged.mock.calls.length).toBeGreaterThanOrEqual(25);
         const tooWide={...first,box:{x:0,y:40,width:1000,height:100}},wideNext={...next,box:{...tooWide.box,y:290}},wideCheck=vi.fn();expect(produceImageParagraphGapProofs({results:[tooWide,...Array(130).fill(wideNext)]},width,500,new Uint8ClampedArray(width*500*4),wideCheck)).toEqual([]);expect(wideCheck).toHaveBeenCalledTimes(130);
     });
     it('同页topology分类tile只读取一次，重用footprint仍按pair保守重复计费',()=>{

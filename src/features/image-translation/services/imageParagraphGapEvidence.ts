@@ -7,10 +7,11 @@
 import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
 import type {MangaOcrItem} from './mangaRegions';
 import {numericProtection} from './mangaNumeric';
+import {normalizeMangaSourceText} from './mangaRegions';
 import {imageMatteObservationBox,observeImageMatteGeometry,type ImageMatteGeometry,type ImageMatteObservationBox} from './imageMatteRepair';
 type Box=ImageTextRegion['bbox'];
 /** 只读取段落所需的物理行与归属；不反向依赖采用此证明的气泡消费者。 */
-interface ImageParagraphPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:Array<{bbox:Box}>;imageParagraphGapProofs?:ImageParagraphGapProof[]}
+interface ImageParagraphPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:Array<{bbox:Box}>;largeAlphaHoles?:true;imageParagraphGapProofs?:ImageParagraphGapProof[]}
 type Snapshot={text:string;confidence:number;box:MangaOcrItem['box']};
 type RegionSnapshot={text:string;bbox:Box;fontSize?:number;vertical?:true;sourceBoxes?:Box[];guardOnly?:true;numericUncertain?:true};
 export interface ImageParagraphGapProof {
@@ -20,6 +21,8 @@ export interface ImageParagraphGapProof {
     mode?:'column-profile'|'smooth-field'|'flat-owner';
     /** flat-owner只记录经像素核验的共同背景采样列，消费端核对其有界几何。 */
     flatOwner?:{x:number;anchorY:number;targetY:number;runStart:number;runEnd:number};
+    /** only permit a long, strongly aligned gap on a source page with substantial transparent canvas area. */
+    alphaLongContinuation?:true;
     previous:MangaOcrItem;next:MangaOcrItem;previousSnapshot:Snapshot;nextSnapshot:Snapshot;
     previousGeometry:ImageMatteGeometry;nextGeometry:ImageMatteGeometry;
     /** 仅未知截断外部组件需要：完整封闭matte owner与真实收费的tile footprint，无像素或mask。 */
@@ -27,10 +30,10 @@ export interface ImageParagraphGapProof {
 }
 const VERSION='image-paragraph-gap-v1',MAX_PAIRS=128,MAX_PIXELS=1_048_576,MAX_ROI=65_536,MAX_ITEMS=4096,MAX_COMPARISONS=32_768;
 /** Bound low-contrast translucent fields separately from exact opaque gradient profiles. */
-const SMOOTH_FIELD_MIN_SPREAD=16,SMOOTH_FIELD_MAX_SPREAD=24,SMOOTH_FIELD_MAX_RGB_STEP=8,SMOOTH_FIELD_MAX_RGB_DRIFT=20;
+const SMOOTH_FIELD_MIN_SPREAD=16,SMOOTH_FIELD_MAX_SPREAD=24,SMOOTH_FIELD_MAX_RGB_STEP=10,SMOOTH_FIELD_MAX_RGB_DRIFT=20;
 const SMOOTH_FIELD_MAX_ALPHA_STEP=16,SMOOTH_FIELD_MAX_ALPHA_DRIFT=48,SMOOTH_FIELD_MAX_ALPHA_RANGE=64;
 /** Exclude antialias fringe that can extend just beyond OCR's tight physical line box. */
-const GAP_TEXT_CLEARANCE=3;
+const GAP_TEXT_CLEARANCE=5;
 /** OCR框缘可能贴近字形；放宽候选只增加像素复核机会，不单独授权合段。 */
 const MAX_PARAGRAPH_LINE_HEIGHT_RATIO=1.35;
 class ImageParagraphResourceError extends Error {}
@@ -70,6 +73,12 @@ function potential(a:Box,b:Box,wide=true):boolean {
         &&Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0)>=Math.min(a.x1-a.x0,b.x1-b.x0)*.5
         &&Math.min(Math.abs(a.x0-b.x0),Math.abs(a.x1-b.x1),Math.abs(a.x0+a.x1-b.x0-b.x1)/2)<=small*.8;
 }
+/** Transparent canvas layouts can leave larger line gaps; require near-identical column geometry. */
+function alphaLongPotential(a:Box,b:Box):boolean {
+    const ah=a.y1-a.y0,bh=b.y1-b.y0,small=Math.min(ah,bh),gap=b.y0-a.y1,overlap=Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0);
+    return gap>small*2.5&&gap<=small*3.4&&Math.max(ah,bh)<=small*1.12
+        &&Math.abs(a.x0-b.x0)<=small*.15&&overlap>=Math.min(a.x1-a.x0,b.x1-b.x0)*.88;
+}
 function owner(item:MangaOcrItem,page:ImageParagraphPage):object|undefined {
     const b=boxOf(item),x=(b.x0+b.x1)/2,y=(b.y0+b.y1)/2;
     let selected:object|undefined,size=Infinity;
@@ -79,10 +88,10 @@ function owner(item:MangaOcrItem,page:ImageParagraphPage):object|undefined {
     }
     return selected;
 }
-function validGeometry(g:ImageMatteGeometry,source:Box,width:number,height:number):boolean {
+function validGeometry(g:ImageMatteGeometry,source:Box,width:number,height:number,allowTranslucent=false):boolean {
     const expected=imageMatteObservationBox(width,height,source);
     return !!g&&!!expected&&['left','top','width','height'].every(k=>g[k as keyof typeof expected]===expected[k as keyof typeof expected])
-        &&Array.isArray(g.background)&&g.background.length===4&&g.background.every(v=>Number.isSafeInteger(v)&&v>=0&&v<=255)&&g.background[3]===255
+        &&Array.isArray(g.background)&&g.background.length===4&&g.background.every(v=>Number.isSafeInteger(v)&&v>=0&&v<=255)&&(allowTranslucent||g.background[3]===255)
         &&!!g.supportBox&&validBox(g.supportBox,width,height)&&intersects(g.supportBox,source)
         &&g.supportBox.x0>=g.left&&g.supportBox.y0>=g.top&&g.supportBox.x1<=g.left+g.width&&g.supportBox.y1<=g.top+g.height;
 }
@@ -163,7 +172,7 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
             previousRow[x]=value;
         }
         maxStep=Math.max(maxStep,rowStep);
-        if(!exactProfile&&(maxStep>8||maxAlphaStep>16))return;
+        if(!exactProfile&&(maxStep>SMOOTH_FIELD_MAX_RGB_STEP||maxAlphaStep>SMOOTH_FIELD_MAX_ALPHA_STEP))return;
     }
     const value=profile[0];
     if(flatOwnerCandidate&&exactProfile&&maxStep===0&&maxAlphaStep===0&&minimumAlpha===maximumAlpha)
@@ -298,7 +307,7 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
     let gapProfile:Uint32Array|undefined,gapPreviousRow:Uint32Array|undefined;
     const reserve=(count:number)=>{if(count>MAX_PIXELS-charged)return false;charged+=count;return true;};
     const proveSmoothGap=(previous:MangaOcrItem,next:MangaOcrItem,previousSnapshot:Snapshot,nextSnapshot:Snapshot,ordinal:number,
-        endpointArea:number,oa:ImageMatteObservationBox,ob:ImageMatteObservationBox,allowFlatOwner=true):boolean|'budget'=>{
+        endpointArea:number,oa:ImageMatteObservationBox,ob:ImageMatteObservationBox,allowFlatOwner=true,alphaLongContinuation=false):boolean|'budget'=>{
         const a=boxOf(previous),b=boxOf(next),profileBox=pageGapEvidenceWindow(a,b,width,height);if(!profileBox)return false;
         const profileWidth=profileBox.x1-profileBox.x0;if(!reserve(profileWidth))return 'budget';
         gapProfile??=new Uint32Array(width);gapPreviousRow??=new Uint32Array(width);
@@ -307,7 +316,11 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))return false;
         if(profile.mode==='flat-owner'){
-            if(!allowFlatOwner)return false;
+            const previousOwner=owner(previous,page),nextOwner=owner(next,page),sameBubble=previousOwner!==undefined&&previousOwner===nextOwner;
+            const lineHeight=Math.min(a.y1-a.y0,b.y1-b.y0),lineGap=b.y0-a.y1;
+            const sentencePair=/[.!?。！？…]$/u.test(previous.text.trim())&&/[.!?。！？…]$/u.test(next.text.trim());
+            const gapQualifies=sameBubble?lineGap>lineHeight*1.5:sentencePair&&lineGap>lineHeight*.8||alphaLongContinuation&&page.largeAlphaHoles===true&&alphaLongPotential(a,b);
+            if(!allowFlatOwner||!gapQualifies)return false;
             const anchorY=Math.floor(a.y0)-2,targetY=Math.floor(b.y0)-2,profileWidth=profileBox.x1-profileBox.x0;
             if(anchorY<0||targetY<0||anchorY>=height||targetY>=height)return false;
             if(!reserve(profileWidth*2))return 'budget';
@@ -327,6 +340,7 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
             const nextGeometry:ImageMatteGeometry={...ob,background:matteBackground,supportBox:{...b,y0:b.y0-GAP_TEXT_CLEARANCE}};
             const windows=[profileBox];
             candidates.push({mode:'flat-owner',ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry,nextGeometry,endpointArea,windows,
+                ...(alphaLongContinuation?{alphaLongContinuation:true as const}:{}),
                 precheckedGap:profileBox,flatOwner,topologyBackground});
             return true;
         }
@@ -337,17 +351,18 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
     };
     enumerate:for(let i=0;i<lines.length;i++)for(let j=i+1;j<lines.length;j++){
         checkActive();const previous=lines[i],next=lines[j],a=boxOf(previous),b=boxOf(next);
-        if(b.y0>a.y1+(a.y1-a.y0)*2.5)break;
+        if(b.y0>a.y1+(a.y1-a.y0)*(page.largeAlphaHoles===true?3.4:2.5))break;
         if(++comparisons>MAX_COMPARISONS||attempts>=MAX_PAIRS)break enumerate;
-        if(!potential(a,b)||owner(previous,page)!==owner(next,page))continue;
+        const alphaLongContinuation=page.largeAlphaHoles===true&&alphaLongPotential(a,b);
+        if((!potential(a,b)&&!alphaLongContinuation)||owner(previous,page)!==owner(next,page))continue;
         const ordinal=++attempts,previousSnapshot=snapshot(previous),nextSnapshot=snapshot(next),oa=imageMatteObservationBox(width,height,a),ob=imageMatteObservationBox(width,height,b);
         if(!oa||!ob)continue;
         const endpointArea=oa.width*oa.height+ob.width*ob.height;
         if(endpointArea>MAX_PIXELS-charged)break enumerate;charged+=endpointArea;
         for(const item of [previous,next])if(!cache.has(item))cache.set(item,observeImageMatteGeometry(pixels,width,height,boxOf(item)));
         const ga=cache.get(previous),gb=cache.get(next),windows=ga&&gb?layout(a,b,ga,gb,physical,width,height):undefined;
-        if(ga&&gb&&windows){candidates.push({ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows});continue;}
-        if(proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,oa,ob)==='budget')break enumerate;
+        if(ga&&gb&&windows&&!alphaLongContinuation){candidates.push({ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows});continue;}
+        if(proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,oa,ob,true,alphaLongContinuation)==='budget')break enumerate;
     }
     const backgrounds=[...new Set(candidates.map(c=>c.topologyBackground??(c.previousGeometry.background[0]|c.previousGeometry.background[1]<<8|c.previousGeometry.background[2]<<16|255<<24)>>>0))];
     const topology=topologyPage(pixels,width,height,backgrounds,reserve,checkActive);
@@ -357,32 +372,33 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))continue;
         const extra=windows.reduce((sum,box)=>sum+area(box),0),prechecked=candidate.precheckedGap?area(candidate.precheckedGap):0;
         if(prechecked>extra||!reserve(extra-prechecked))break;
-        const background=candidate.topologyBackground??(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|255<<24)>>>0;
-        const external=topology(background,a,b,candidate.flatOwner?{x:candidate.flatOwner.x,y:candidate.flatOwner.anchorY}:undefined,
-            candidate.flatOwner?{x:candidate.flatOwner.x,y:candidate.flatOwner.targetY}:undefined);
+        const background=candidate.topologyBackground??(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|ga.background[3]<<24)>>>0;
+        const external=candidate.precheckedGap?undefined:topology(background,a,b);
+        let clear=true;
         if(candidate.precheckedGap){
             const anchor=candidate.flatOwner!;
-            external.outside(anchor.anchorY*width+anchor.x);
-            if(!external.receipt())continue;
+            clear=packed(pixels,(anchor.anchorY*width+anchor.x)*4)===(background>>>0)
+                &&packed(pixels,(anchor.targetY*width+anchor.x)*4)===(background>>>0);
+        }else{
+            try{
+                for(const [index,box] of windows.entries()){
+                    const ok=clearWindow(pixels,width,box,background,index>0,checkActive,external!.outside);
+                    if(!ok){clear=false;break;}
+                }
+            }
+            catch(error){if(error instanceof ImageParagraphResourceError)continue;throw error;}
         }
-        let clear=true;
-        try{for(const [index,box] of windows.entries())if(!candidate.precheckedGap||!sameBox(box,candidate.precheckedGap)){
-            const ok=clearWindow(pixels,width,box,background,index>0,checkActive,external.outside);
-            if(!ok){clear=false;break;}
-        }}
-        catch(error){if(error instanceof ImageParagraphResourceError)continue;throw error;}
         if(!clear){
             if(candidate.precheckedGap)continue;
-            const status=proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,ga,gb,false);
+            const status=proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,ga,gb);
             if(status==='budget')break;
             continue;
         }
-        const receipt=external.receipt(),topologyCost=receipt?.tiles.reduce((sum,g)=>sum+g.width*g.height,0)??0;
-        if(candidate.precheckedGap&&!receipt)continue;
+        const receipt=external?.receipt(),topologyCost=receipt?.tiles.reduce((sum,g)=>sum+g.width*g.height,0)??0;
         if(!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot))continue;
         proofs.push({version:VERSION,...(candidate.mode?{mode:candidate.mode}:{}),...(candidate.flatOwner?{flatOwner:candidate.flatOwner}:{}),width,height,ordinal,
             pixels:endpointArea+extra+topologyCost+(candidate.flatOwner?2*(candidate.precheckedGap!.x1-candidate.precheckedGap!.x0):0),
-            previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,...(receipt?{topology:receipt}:{})});
+            previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,...(candidate.alphaLongContinuation?{alphaLongContinuation:true as const}:{}),...(receipt?{topology:receipt}:{})});
     }
     return proofs;
 }
@@ -390,7 +406,7 @@ const regionSnapshot=(line:ImageTextRegion):RegionSnapshot=>({text:line.text,bbo
 function sameRegion(line:ImageTextRegion,s:RegionSnapshot):boolean {return line.text===s.text&&sameBox(line.bbox,s.bbox)&&line.fontSize===s.fontSize&&line.vertical===s.vertical&&line.guardOnly===s.guardOnly&&line.numericUncertain===s.numericUncertain&&line.sourceBoxes?.length===s.sourceBoxes?.length&&(!line.sourceBoxes||line.sourceBoxes.every((box,index)=>sameBox(box,s.sourceBoxes![index])));}
 
 /** raw graph身份在收集后不能靠bbox猜回；record仅接受实际被采用的单行，seal绑定最终含guard数组。 */
-export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:number,height:number) {
+export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:number,height:number,sourceLanguage='') {
     const all=itemsOf(page),raw=new Set(all),accepted=new Map<MangaOcrItem,ImageTextRegion|null>();
     return {
         record(item:MangaOcrItem,region:ImageTextRegion):void {if(raw.has(item))accepted.set(item,accepted.has(item)?null:region);},
@@ -403,8 +419,10 @@ export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:nu
                 if(proof.version!==VERSION||(proof.mode!==undefined&&proof.mode!=='column-profile'&&proof.mode!=='smooth-field'&&proof.mode!=='flat-owner')||proof.width!==width||proof.height!==height||!Number.isSafeInteger(proof.ordinal)||proof.ordinal<1||proof.ordinal>MAX_PAIRS||ordinals.has(proof.ordinal)
                     ||!raw.has(previous)||!raw.has(next)||!sameItem(previous,proof.previousSnapshot)||!sameItem(next,proof.nextSnapshot)||!eligible(previous,width,height)||!eligible(next,width,height))continue;
                 ordinals.add(proof.ordinal);const a=boxOf(previous),b=boxOf(next),ga=proof.previousGeometry,gb=proof.nextGeometry;
-                if(!potential(a,b)||owner(previous,page)!==owner(next,page)||!validGeometry(ga,a,width,height)||!validGeometry(gb,b,width,height))continue;
                 const profileMode=proof.mode==='column-profile'||proof.mode==='smooth-field',flatOwnerMode=proof.mode==='flat-owner';
+                const alphaLongContinuation=proof.alphaLongContinuation===true;
+                if(proof.alphaLongContinuation!==undefined&&!alphaLongContinuation||alphaLongContinuation&&(page.largeAlphaHoles!==true||!alphaLongPotential(a,b))
+                    ||(!potential(a,b)&&!alphaLongContinuation)||owner(previous,page)!==owner(next,page)||!validGeometry(ga,a,width,height,profileMode||flatOwnerMode)||!validGeometry(gb,b,width,height,profileMode||flatOwnerMode))continue;
                 const profileWindow=flatOwnerMode||profileMode?pageGapEvidenceWindow(a,b,width,height):undefined;
                 const windows=profileMode||flatOwnerMode?(profileWindow?[profileWindow]:undefined):layout(a,b,ga,gb,physical,width,height);if(!windows)continue;
                 if(flatOwnerMode){
@@ -412,13 +430,13 @@ export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:nu
                     if(!flat||flat.anchorY!==anchorY||flat.targetY!==targetY||flat.runStart<profileWindow!.x0||flat.runEnd>profileWindow!.x1
                         ||flat.runEnd-flat.runStart<8||flat.x!==Math.floor((flat.runStart+flat.runEnd)/2))continue;
                 }else if(proof.flatOwner!==undefined)continue;
-                const topologyCost=profileMode?(proof.topology===undefined?0:undefined):receiptPixels(proof.topology,width,height,a,b);if(topologyCost===undefined)continue;
+                const topologyCost=profileMode||flatOwnerMode?(proof.topology===undefined?0:undefined):receiptPixels(proof.topology,width,height,a,b);if(topologyCost===undefined)continue;
                 const flatProbePixels=flatOwnerMode&&profileWindow?2*(profileWindow.x1-profileWindow.x0):0;
                 const count=ga.width*ga.height+gb.width*gb.height+windows.reduce((sum,box)=>sum+area(box),0)+topologyCost+flatProbePixels;
                 if(proof.pixels!==count||count>MAX_PIXELS-charged)continue;charged+=count;
                 const first=accepted.get(previous),second=accepted.get(next);
                 if(!first||!second||first===second||!snapshots.has(first)||!snapshots.has(second)||first.vertical||second.vertical||!singleSourceRegion(first)||!singleSourceRegion(second)
-                    ||first.text!==previous.text.trim().replace(/\s+/gu,' ')||second.text!==next.text.trim().replace(/\s+/gu,' ')||!sameBox(first.bbox,a)||!sameBox(second.bbox,b)||first.fontSize!==previous.box.height||second.fontSize!==next.box.height)continue;
+                    ||first.text!==normalizeMangaSourceText(previous.text.trim(),sourceLanguage)||second.text!==normalizeMangaSourceText(next.text.trim(),sourceLanguage)||!sameBox(first.bbox,a)||!sameBox(second.bbox,b)||first.fontSize!==previous.box.height||second.fontSize!==next.box.height)continue;
                 let ambiguous=false;
                 for(const line of regions){
                     if(++comparisons>MAX_COMPARISONS)return;

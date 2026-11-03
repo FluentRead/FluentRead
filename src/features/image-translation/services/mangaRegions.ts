@@ -41,9 +41,17 @@ function adjacent(left: MangaRegion, right: MangaRegion, lineGap: number, column
 }
 
 /** Paddle 的 spaceRecovery 可能在日文假名或汉字之间插入英文式空格；只归一化相邻日文字符，不碰拉丁词界。 */
-function normalizeMangaSourceText(sourceText:string, sourceLanguage:string):string {
+function removeIsolatedLowercaseLatinI(sourceText:string):string {
+    if(!/^[\x00-\x7f]+$/u.test(sourceText)||!/[A-Z]/u.test(sourceText)||![...sourceText].every(char=>char==='i'||char===char.toUpperCase()))return sourceText;
+    const index=sourceText.indexOf('i');if(index<0||sourceText.lastIndexOf('i')!==index)return sourceText;
+    const before=sourceText.slice(0,index),after=sourceText.slice(index+1),previous=before.trimEnd().split(/\s+/u).at(-1)??'',next=after.trimStart().split(/\s+/u)[0]??'';
+    if(before.endsWith(' ')&&new Set(['THE','AND','OF','TO','IN','ON','AT','IS','A','AN']).has(previous)&&next.length>=3)return before+after;
+    if(!before.endsWith(' ')&&previous.length>=3&&next==='A')return `${before} ${after}`;
+    return sourceText;
+}
+export function normalizeMangaSourceText(sourceText:string, sourceLanguage:string):string {
     if(numericInformation(sourceText))return sourceText;
-    const text=sourceText.replace(/\s+/gu,' ');
+    const text=removeIsolatedLowercaseLatinI(sourceText.replace(/\s+/gu,' '));
     const japanese=/^(?:ja|jpn)(?:-|$)/iu.test(sourceLanguage)
         ||/[\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}]/u.test(text);
     return japanese?text.replace(/([\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}]) +(?=[\p{Script_Extensions=Han}\p{Script_Extensions=Hiragana}\p{Script_Extensions=Katakana}])/gu,'$1'):text;
@@ -164,7 +172,7 @@ export function mergeMangaParagraphContinuations(lines:MangaRegion[],continuatio
                 members.push(next);bounds=candidate;
             }
         }
-        const grouped=members.length>1?mergeMangaLines(members,2.5,0.8):members;
+        const grouped=members.length>1?mergeMangaLines(members,3.5,0.8):members;
         for(const member of members)used.add(member);
         result.push(...grouped);
     }

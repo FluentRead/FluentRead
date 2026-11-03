@@ -22,6 +22,7 @@ function focusedTrigger() {
   Object.assign(trigger,{ownerDocument:document,getRootNode:()=>document,matches:()=>false,getClientRects:()=>[{}]});active=trigger;return trigger;
 }
 function find(root:Node,predicate:(node:Node)=>boolean):Node|undefined {if(predicate(root))return root;for(const child of root.children){const result=find(child,predicate);if(result)return result;}}
+function textContent(value:Node):string {return value.text+value.children.map(textContent).join('');}
 function deferred<T>() {let resolve!:(value:T)=>void, reject!:(reason:unknown)=>void;const promise = new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 const trusted = {isTrusted:true} as MouseEvent;
 const line = (text:string,sourceText?:string):MangaReadingLine => ({text,bbox:{x0:0,y0:0,x1:10,y1:10},...(sourceText===undefined?{}:{sourceText})});
@@ -36,7 +37,7 @@ async function mount(theme:'light'|'dark' = 'light') {
   const renderer=vue.createRenderer<Node,Node>({patchProp:(value,key,_old,next)=>{value.props[key]=next;},insert:(value,parent,anchor)=>{remove(value);const index=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(index<0?parent.children.length:index,0,value);value.parent=parent;},remove,createElement:tag=>node(tag),createText:text=>node('#text',text),createComment:text=>node('#comment',text),setText:(value,text)=>{value.text=text;},setElementText:(value,text)=>{value.text=text;value.children=[];},parentNode:value=>value.parent,nextSibling:value=>value.parent?.children[value.parent.children.indexOf(value)+1]??null,querySelector:()=>null,setScopeId:()=>{},insertStaticContent:()=>{throw Error('unexpected static content');}});
   let instance:any, panel:any;const root=node('root');const app=renderer.createApp({setup:()=>()=>vue.h(component,{...props,ref:(value:any)=>{if(value){instance=value;panel=value.$.setupState;}}})});
   app.provide(vue.ssrContextKey,{modules:new Set()});app.mount(root);dispose=()=>app.unmount();await vue.nextTick();
-  const get=(predicate:(node:Node)=>boolean)=>find(root,predicate), button=(text:string)=>get(value=>value.tag==='button' && value.text===text);
+  const get=(predicate:(node:Node)=>boolean)=>find(root,predicate), button=(text:string)=>get(value=>value.tag==='button' && textContent(value)===text);
   const tick=async()=>{await vue.nextTick();await Promise.resolve();await vue.nextTick();};
   return {props,instance,panel,root,get,button,tick};
 }
@@ -52,7 +53,7 @@ describe('standalone manga reading panel prototype',()=>{
     const h=await mount();await h.instance.open(trusted);const button=h.get(n=>n.tag==='button' && n.text.startsWith(({image:'图片',canvas:'画布',background:'背景图片',segment:'长图片段'} as const)[item.kind]))!;
     button.props.onClick({isTrusted:false});expect(h.props.read).not.toHaveBeenCalled();button.props.onClick(trusted);await h.tick();
     expect(h.props.read.mock.calls[0][0]).toBe(item.token);expect(h.panel.status).toBe('ready');expect(h.get(n=>n.tag==='pre'&&n.text==='译文')).toBeDefined();
-    expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeDefined();
+    expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeUndefined();
     expect(h.get(n=>n.text==='此片段可能包含相邻片段的文字') !== undefined).toBe(item.kind==='segment');
     expect(h.get(n=>n.text==='画布文字来自最近完成的翻译快照，画面变化可能尚未同步') !== undefined).toBe(item.kind==='canvas');
   });
@@ -83,7 +84,7 @@ describe('standalone manga reading panel prototype',()=>{
     source.push({...line('STI LEI EX TRA','STI L E I EX T R A'),renderSkipped:true});const before=JSON.stringify(source);
     source.forEach(value=>{Object.freeze(value.bbox);Object.freeze(value);});Object.freeze(source);
     h.props.read.mockResolvedValueOnce({status:'ready',lines:source});await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
-    expect(h.panel.pages).toHaveLength(3);h.button('下一部分')!.props.onClick(trusted);h.button('下一部分')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(2);
+    expect(h.panel.pages).toHaveLength(3);expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeDefined();h.button('下一部分')!.props.onClick(trusted);h.button('下一部分')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(2);
     h.button('未绘制译文 · 35')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(0);expect(h.panel.pages).toHaveLength(2);
     const expected=source.filter((_,index)=>index<70&&index%2===0);expect(h.panel.pages.flat().map((value:MangaReadingLine)=>value.text)).toEqual(expected.map(value=>value.text));
     h.button('下一部分')!.props.onClick(trusted);await h.tick();h.button('复制当前部分')!.props.onClick(trusted);await h.tick();expect(h.props.copy.mock.calls[0][0]).toBe(expected.slice(32).map(value=>value.text).join('\n\n'));
@@ -143,7 +144,7 @@ describe('standalone manga reading panel prototype',()=>{
     first.resolve({status:'ready',lines:[line('旧')]});second.resolve({status:'ready',lines:[line('新')]});await h.tick();expect(h.get(n=>n.text==='旧')).toBeUndefined();expect(h.get(n=>n.text==='新')).toBeDefined();
   });
   it('compares and copies only from a trusted action, retaining failed-copy feedback and ignoring late results after close',async()=>{
-    const h=await mount();await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();h.button('原文对照')!.props.onClick();await h.tick();expect(h.get(n=>n.tag==='pre'&&n.text==='原文')).toBeDefined();
+    const h=await mount();await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();expect(h.get(n=>n.props.class==='fr-manga-reading-line-label')).toBeUndefined();h.button('原文对照')!.props.onClick();await h.tick();expect(h.get(n=>n.tag==='pre'&&n.text==='原文')).toBeDefined();expect(h.get(n=>n.tag==='span'&&textContent(n)==='译文')).toBeDefined();
     h.button('复制全部')!.props.onClick({isTrusted:false});expect(h.props.copy).not.toHaveBeenCalled();h.props.copy.mockRejectedValueOnce(Error('denied'));h.button('复制全部')!.props.onClick(trusted);await h.tick();expect(h.props.copy).toHaveBeenCalledWith('原文\n译文');expect(h.panel.feedback).toContain('复制失败');
     const wait=deferred<void>();h.props.copy.mockReturnValueOnce(wait.promise);h.button('复制全部')!.props.onClick(trusted);h.instance.close();wait.resolve();await h.tick();expect(h.panel.feedback).toBe('');
   });
@@ -275,6 +276,7 @@ describe('standalone manga reading panel prototype',()=>{
       expect(contrast(color(block,'ink'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color(block,'on-brand'),color(block,'brand'))).toBeGreaterThanOrEqual(4.5);
       expect(contrast(color(block,'brand-ink'),color(block,'brand-soft'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'warning'),color(block,'warning-soft'))).toBeGreaterThanOrEqual(4.5);
     }
   });
   it('reports a list budget failure without listing or reading a partial selection',async()=>{

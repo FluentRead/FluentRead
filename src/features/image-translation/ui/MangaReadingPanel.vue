@@ -1,14 +1,17 @@
 <!--
  * @file src/features/image-translation/ui/MangaReadingPanel.vue
  * 文件职责：提供用户主动打开的漫画可见目标选择和文字阅读面板。
- * 主要内容：以局部语义配色和紧凑控件显示完整文字和原文对照，可在既有快照中筛选有实际译文但未绘制的条目；有界分页与当前部分复制跟随筛选，全文复制保留原顺序，切换复位内部滚动并清理过期反馈，关闭时撤销读取。
+ * 主要内容：复用 FluentRead 品牌色与控件语义，配合漫画入口的线性图标显示完整文字和原文对照；可在既有快照中筛选有实际译文但未绘制的条目，有界分页与当前部分复制跟随筛选，全文复制保留原顺序，切换复位内部滚动并清理过期反馈，关闭时撤销读取。
  * 模块边界：由漫画入口管理挂载与生命周期，仅使用注入的只读候选、读取、复制及本地化端口，不扫描页面、不执行 OCR、不访问网络或保存结果。
  -->
 <template>
   <section v-if="opened" ref="panel" class="fr-manga-reading" :data-theme="theme" role="dialog" :aria-label="t('漫画文字')" tabindex="-1" @keydown.stop="handleKeydown" @click.stop @pointerdown.stop @touchstart.passive.stop @touchmove.passive.stop @touchend.passive.stop @touchcancel.passive.stop @keyup.stop @wheel.stop>
     <header class="fr-manga-reading-header">
+      <span class="fr-manga-reading-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 6c-3-2-6-2-9-1v14c3-1 6-1 9 1m0-14c3-2 6-2 9-1v14c-3-1-6-1-9 1V6Z" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.5 8.5h4v4h-2l-1.5 1v-1h-.5v-4Zm9.5.5h3m-3 3h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
       <strong>{{ t('漫画文字') }}</strong>
-      <button class="fr-manga-reading-close" type="button" :aria-label="t('关闭文字面板')" @click="close">×</button>
+      <button class="fr-manga-reading-close" type="button" :aria-label="t('关闭文字面板')" @click="close"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     </header>
     <div v-if="!selected" class="fr-manga-reading-body">
       <p class="fr-manga-reading-intro">{{ t('选择当前可见的页面或片段') }}</p>
@@ -19,7 +22,7 @@
       <button v-if="status === 'stale' || status === 'unavailable' || status === 'noCandidates' || status === 'overBudget' || status === 'error'" ref="refreshButton" type="button" @click="refreshFromButton($event)">{{ t('重新查看可见页面') }}</button>
     </div>
     <template v-else>
-      <div class="fr-manga-reading-heading"><button ref="backButton" class="fr-manga-reading-back" type="button" @click="back($event)">{{ t('选择其他页面') }}</button><span>{{ label(selected) }}</span></div>
+      <div class="fr-manga-reading-heading"><button ref="backButton" class="fr-manga-reading-back" type="button" @click="back($event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>{{ t('选择其他页面') }}</button><span>{{ label(selected) }}</span></div>
       <p v-if="selected.kind === 'segment'" class="fr-manga-reading-context">{{ t('此片段可能包含相邻片段的文字') }}</p>
       <p v-if="selected.kind === 'canvas'" class="fr-manga-reading-context">{{ t('画布文字来自最近完成的翻译快照，画面变化可能尚未同步') }}</p>
       <div v-if="status !== 'ready'" class="fr-manga-reading-body"><p role="status">{{ message(status) }}</p></div>
@@ -29,7 +32,7 @@
             <button v-if="skippedTranslations.length" type="button" :aria-pressed="skippedOnly" :title="skippedOnly ? t('查看全文') : undefined" @click="toggleSkipped">{{ t('未绘制译文') }} · {{ skippedTranslations.length }}</button>
             <button type="button" :aria-pressed="compare" @click="compare = !compare">{{ t('原文对照') }}</button>
           </div>
-          <nav class="fr-manga-reading-pagination" :aria-label="t('文字部分')">
+          <nav v-if="pages.length > 1" class="fr-manga-reading-pagination" :aria-label="t('文字部分')">
             <button ref="previousButton" type="button" :aria-label="t('上一部分')" :disabled="pageIndex === 0" @click="changePage(-1, $event)">{{ t('上一部分') }}</button>
             <span>{{ pageIndex + 1 }} / {{ pages.length }}</span>
             <button ref="nextButton" type="button" :aria-label="t('下一部分')" :disabled="pageIndex + 1 >= pages.length" @click="changePage(1, $event)">{{ t('下一部分') }}</button>
@@ -41,14 +44,14 @@
               <span>{{ t('原文') }}</span><pre dir="auto">{{ line.sourceText }}</pre>
             </div>
             <div class="fr-manga-reading-translation">
-              <div class="fr-manga-reading-line-label"><span>{{ line.sourceText !== undefined && line.sourceText === line.text ? t('原文') : t('译文') }}</span><span v-if="line.renderSkipped" class="fr-manga-reading-badge">{{ t('未绘制译文') }}</span></div>
+              <div v-if="compare || line.sourceText !== undefined && line.sourceText === line.text || line.renderSkipped" class="fr-manga-reading-line-label"><span v-if="line.sourceText !== undefined && line.sourceText === line.text">{{ t('原文') }}</span><span v-else-if="compare">{{ t('译文') }}</span><span v-if="line.renderSkipped" class="fr-manga-reading-badge">{{ t('未绘制译文') }}</span></div>
               <pre dir="auto">{{ line.text }}</pre>
             </div>
             <p v-if="line.numericUncertain" class="fr-manga-reading-context">{{ t('数字识别可能有误，请对照原图') }}</p>
             <p v-if="line.renderSkipped" class="fr-manga-reading-context">{{ t('为保留原文，此译文未绘制到图片') }}</p>
           </article>
         </div>
-        <footer class="fr-manga-reading-footer"><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><div class="fr-manga-reading-copy-actions"><button type="button" @click="copyPage">{{ t('复制当前部分') }}</button><button type="button" @click="copyAll">{{ t(skippedOnly ? '复制全文' : '复制全部') }}</button></div></footer>
+        <footer class="fr-manga-reading-footer"><span role="status">{{ feedback || t('本地 OCR · 请核对名称和数字') }}</span><div class="fr-manga-reading-copy-actions"><button type="button" @click="copyPage"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8.5h10.5v12H8zM5.5 16H4V4h11v2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>{{ t('复制当前部分') }}</button><button type="button" @click="copyAll"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M8 8.5h10.5v12H8zM5.5 16H4V4h11v2" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>{{ t(skippedOnly ? '复制全文' : '复制全部') }}</button></div></footer>
       </template>
     </template>
   </section>

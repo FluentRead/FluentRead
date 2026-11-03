@@ -40,9 +40,15 @@ describe('独立漫画入口所有权和配置端口', () => {
         await mountMangaEntry({} as never);expect(props().reading.theme).toBe('auto');expect(writeText).not.toHaveBeenCalled();
         expect(mocks.create.mock.calls[0][1]).toHaveProperty('css');
         const source=readFileSync(resolve('src/features/image-translation/content/mangaEntry.ts'),'utf8');
+        const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
         const styles=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
         expect(source).toContain("manga-entry.css?inline");expect(source).toContain('css:mangaEntryStyles');
         expect(styles).toContain('.fr-manga-reading-copy-actions');expect(styles).toContain('@media (max-width: 480px)');
+        expect(panel).toContain('class="fr-manga-reading-mark"');expect(panel).toContain('aria-hidden="true"');
+        expect(styles).toContain('--fr-color-muted: #737c8f');expect(styles).toContain('--fr-color-line: #e5e8ef');
+        expect(styles).toContain('-webkit-font-smoothing: antialiased');
+        expect(styles).toContain('--fr-manga-control-radius: var(--fr-control-radius, 9px)');
+        expect(styles).toContain('var(--fr-color-brand-strong, #dc315f)');expect(styles).toContain('--fr-manga-warning-soft: var(--fr-warning-soft, #fff5df)');
         mocks.config.theme='dark';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('dark');
         mocks.config.theme='light';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('light');
         await props().reading.copy('译文');expect(writeText).toHaveBeenCalledOnce();expect(writeText).toHaveBeenCalledWith('译文');

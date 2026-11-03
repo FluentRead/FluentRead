@@ -14,7 +14,7 @@
   <button v-if="standalone && status.active && !status.areaFallback && readManga" ref="readingLauncher" class="fr-manga-reading-launcher" :class="{'is-expanded': expanded || readingOpen || readingState?.open, 'is-touch': touchCapable}" type="button" :aria-label="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" :aria-expanded="!!(readingOpen || readingState?.open)" :title="t(readingOpen || readingState?.open ? '关闭漫画文字' : '查看漫画文字')" @mouseenter="reveal" @pointerdown="noteTouch" @mouseleave="retract" @focusin="reveal" @focusout="retract" @keydown.esc.stop="collapseLauncher" @click.stop="readManga($event)"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M6 5h12M6 9.5h12M6 14h12M6 18.5h8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /></svg></button>
   <MangaReadingPanel v-if="reading" ref="reader" :list="reading.list" :read="reading.read" :observe="reading.observe" :copy="reading.copy" :theme="reading.theme" :translate="t" @opened="readingChanged?.(true)" @closed="readingChanged?.(false)" />
   <aside v-if="visible" class="fr-manga-entry" role="dialog" :aria-label="t('漫画翻译')" @keydown.esc.stop="close">
-    <header><strong>{{ t('漫画翻译') }}</strong><button type="button" class="fr-manga-close" :aria-label="t('关闭')" @click="close">×</button></header>
+    <header><strong>{{ t('漫画翻译') }}</strong><button type="button" class="fr-manga-close" :aria-label="t('关闭')" @click="close"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></header>
     <template v-if="consent">
       <h3>{{ t('首次使用，先准备阅读资源') }}</h3>
       <p>{{ resourceDescription }}</p>

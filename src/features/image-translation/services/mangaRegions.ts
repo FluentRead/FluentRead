@@ -44,7 +44,7 @@ function adjacent(left: MangaRegion, right: MangaRegion, lineGap: number, column
 function removeIsolatedLowercaseLatinI(sourceText:string):string {
     if(!/^[\x00-\x7f]+$/u.test(sourceText)||!/[A-Z]/u.test(sourceText)||![...sourceText].every(char=>char==='i'||char===char.toUpperCase()))return sourceText;
     const index=sourceText.indexOf('i');if(index<0||sourceText.lastIndexOf('i')!==index)return sourceText;
-    const before=sourceText.slice(0,index),after=sourceText.slice(index+1),previous=before.trimEnd().split(/\s+/u).at(-1)??'',next=after.trimStart().split(/\s+/u)[0]??'';
+    const before=sourceText.slice(0,index),after=sourceText.slice(index+1),previous=before.trimEnd().split(/\s+/u).at(-1)!,next=after.trimStart().split(/\s+/u)[0]!;
     if(before.endsWith(' ')&&new Set(['THE','AND','OF','TO','IN','ON','AT','IS','A','AN']).has(previous)&&next.length>=3)return before+after;
     if(!before.endsWith(' ')&&previous.length>=3&&next==='A')return `${before} ${after}`;
     return sourceText;

@@ -135,7 +135,6 @@ export function planMangaRubyRescueCrops(page:MangaOcrPage,width:number,height:n
         }
         if(inkPixels<14||right-left<3||bottom-top<6)continue;
         const crop={...side};
-        if((crop.x1-crop.x0)*(crop.y1-crop.y0)>65_536)continue;
         plans.push({crop,side,fontSize,inkPixels});
     }
     return plans.sort((a,b)=>b.inkPixels-a.inkPixels).slice(0,limit);

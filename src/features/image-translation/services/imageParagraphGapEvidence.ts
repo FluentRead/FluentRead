@@ -188,6 +188,7 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
 type TopologyReceipt=NonNullable<ImageParagraphGapProof['topology']>;
 type Tile={geometry:ImageMatteObservationBox;classes:Uint8Array};
 type MatteOwner={id:number;color:number;box:Box;keys:Set<number>;complete:boolean;rectangle?:true};
+/** Only ordinary candidates with complete H8 matte geometry enter topology; that geometry guarantees an in-page pixel outside each source edge. */
 /** 按页借已有RGBA懒分类，每tile只读源一次；仅保留1byte分类/owner标签，不复制RGBA。 */
 function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgrounds:number[],reserve:(count:number)=>boolean,check:()=>void) {
     const side=32,columns=Math.ceil(width/side),palette=new Map(backgrounds.map((color,index)=>[color,index+1]));
@@ -195,7 +196,7 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
     let workQueue:ReturnType<typeof createImageParagraphWorkQueue>|undefined;
     const borrowQueue=()=>{const queue=workQueue??=createImageParagraphWorkQueue();queue.clear();return queue;};
     const geometry=(key:number):ImageMatteObservationBox=>{const left=(key%columns)*side,top=Math.floor(key/columns)*side;return{left,top,width:Math.min(side,width-left),height:Math.min(side,height-top)};};
-    return (background:number,a:Box,b:Box,anchor?:{x:number;y:number},target?:{x:number;y:number})=>{
+    return (background:number,a:Box,b:Box)=>{
         const used=new Set<number>();let current:MatteOwner|undefined;
         function tileFor(x:number,y:number,ownerKeys?:Set<number>):Tile {
             const key=Math.floor(y/side)*columns+Math.floor(x/side);let tile=tiles.get(key);const g=tile?.geometry??geometry(key);
@@ -210,8 +211,7 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
         }
         const index=(tile:Tile,x:number,y:number)=>(y-tile.geometry.top)*tile.geometry.width+x-tile.geometry.left;
         function findOwner():MatteOwner|undefined {
-            const x=anchor?.x??Math.floor(a.x0)-1,y=anchor?.y??Math.floor(a.y0)-1,color=palette.get(background)!;
-            if(!Number.isSafeInteger(x)||!Number.isSafeInteger(y)||x<0||y<0||x>=width||y>=height)return;
+            const x=Math.floor(a.x0)-1,y=Math.floor(a.y0)-1,color=palette.get(background)!;
             const first=tileFor(x,y);
             const label=first.classes[index(first,x,y)],cached=owners.get(label);
             if(cached){for(const key of cached.keys){const g=geometry(key);if(!used.has(key)){if(!reserve(g.width*g.height))throw new ImageParagraphResourceError('图片段落观察预算已满');used.add(key);}}return cached.complete?cached:undefined;}
@@ -251,8 +251,7 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
         }
         function sameOwner():MatteOwner|undefined {
             const owner=current??findOwner();if(!owner)return;
-            const x=target?.x??Math.floor(b.x0)-1,y=target?.y??Math.floor(b.y0)-1;
-            if(!Number.isSafeInteger(x)||!Number.isSafeInteger(y)||x<0||y<0||x>=width||y>=height)return;
+            const x=Math.floor(b.x0)-1,y=Math.floor(b.y0)-1;
             const tile=tileFor(x,y);
             if(owner.rectangle){
                 if(x<owner.box.x0||x>=owner.box.x1||y<owner.box.y0||y>=owner.box.y1)return;

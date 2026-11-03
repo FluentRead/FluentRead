@@ -343,15 +343,54 @@ describe('竖排漫画小注音的像素门控复识别',()=>{
         for(let y=45;y<61;y++)for(let x=111;x<119;x++)if((x+y)%3!==0)pixels.set([40,50,60,255],(y*200+x)*4);
         return pixels;
     };
+    async function runRuby(firstResults:any[],rescue?:{results:any[]}|Error,before?:(service:any)=>void,missingContext=false){
+        const factory=vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementation(()=>{
+            const canvas=factory('canvas') as HTMLCanvasElement;mocks.contexts.at(-1)!.getImageData.mockReturnValue({data:inked()});
+            if(missingContext){const getContext=vi.mocked(canvas.getContext).getMockImplementation()!;vi.mocked(canvas.getContext).mockImplementation((...args:any[])=>
+                canvas.width===108&&canvas.height===216?null:getContext(args[0] as any,args[1] as any));}
+            return canvas;
+        });
+        mocks.recognize.mockReset().mockImplementationOnce(function(this:any){before?.(this);return Promise.resolve({results:firstResults});});
+        if(rescue instanceof Error)mocks.recognize.mockRejectedValueOnce(rescue);
+        else if(rescue)mocks.recognize.mockResolvedValueOnce(rescue);
+        const port=await createBrowserMangaOcr(),decodedImage={width:200,height:200,close:mocks.bitmapClose};
+        const page=await port.recognize('ruby-cases',{flatten:true,noCache:true,strategy:'per-box',decodedImage:decodedImage as any});
+        await port.destroy();return{page,calls:mocks.recognize.mock.calls.length};
+    }
     it('仅在紧邻竖列的窄侧栏存在有界高对比字迹时生成小裁框',()=>{
         const page={results:[main]},pixels=inked(),plans=planMangaRubyRescueCrops(page,200,200,pixels);
         expect(plans).toHaveLength(1);expect(plans[0]).toMatchObject({crop:{x0:102,y0:38,x1:138,y1:110},side:{x0:102,y0:38,x1:138,y1:110}});
+        const partialAlpha=inked();for(const [x,y] of [[102,38],[119,38]])partialAlpha[(y*200+x)*4+3]=0;
+        partialAlpha[(50*200+120)*4+3]=0;expect(planMangaRubyRescueCrops(page,200,200,partialAlpha)).toHaveLength(1);
+        const insufficientAlpha=inked();for(const [x,y] of [[102,38],[119,38],[137,38],[102,73],[137,73]])insufficientAlpha[(y*200+x)*4+3]=0;
+        expect(planMangaRubyRescueCrops(page,200,200,insufficientAlpha)).toEqual([]);
         expect(planMangaRubyRescueCrops(page,200,200,new Uint8ClampedArray(200*200*4).map((_,index)=>index%4===0?100:index%4===1?200:index%4===2?150:255))).toEqual([]);
         expect(planMangaRubyRescueCrops({results:[main,{text:'こみち',confidence:.99,box:{x:111,y:45,width:6,height:15}}]},200,200,pixels)).toEqual([]);
+        expect(planMangaRubyRescueCrops({results:[main,{text:'こみち',confidence:.99,box:{x:111,y:150,width:6,height:15}}]},200,200,pixels)).toHaveLength(1);
+        const coveredRuby={text:'こみち',confidence:.99,box:{x:100,y:45,width:20,height:15}};
+        expect(planMangaRubyRescueCrops({results:[main,coveredRuby]},200,200,pixels,[main,coveredRuby],1,[main])).toEqual([]);
+        const existingRuby={text:'こみち',confidence:.99,box:{x:111,y:150,width:6,height:15}};
+        expect(planMangaRubyRescueCrops({results:[main,existingRuby]},200,200,pixels,[main,existingRuby],1,[main])).toHaveLength(1);
+        const other={text:'風の音を',confidence:.99,box:{x:20,y:40,width:20,height:100}};
+        expect(planMangaRubyRescueCrops({results:[main,other]},200,200,pixels,[main,other],1,[main,other])).toHaveLength(1);
         const combinedPixels=new Uint8ClampedArray(600*600*4);for(let offset=0;offset<combinedPixels.length;offset+=4)combinedPixels.set([100,200,150,255],offset);
         for(let y=45;y<66;y++)for(let x=250;x<265;x++)combinedPixels.set([40,50,60,255],(y*600+x)*4);
         const combined={text:'風の音を聞いて小道で待っている',confidence:.99,box:{x:80,y:40,width:160,height:350}};
         expect(planMangaRubyRescueCrops({results:[combined]},600,600,combinedPixels,[combined])).toHaveLength(1);
+    });
+    it('同一侧注的重复整列候选不会重复扫描，重叠侧栏保留墨迹更多的单个裁框',()=>{
+        const pixels=inked(),sameGeometry=[
+            {text:'風の音',confidence:.99,box:{x:80,y:40,width:20,height:100}},
+            {text:'風の音を',confidence:.99,box:{x:80,y:40,width:20,height:100}},
+        ];
+        expect(planMangaRubyRescueCrops({results:sameGeometry},200,200,pixels)).toHaveLength(1);
+        expect(planMangaRubyRescueCrops({results:[main,{...main}]},200,200,pixels)).toHaveLength(1);
+        const overlapping=[
+            {text:'風の音',confidence:.99,box:{x:80,y:40,width:20,height:100}},
+            {text:'風の音を',confidence:.99,box:{x:75,y:40,width:30,height:100}},
+        ];
+        expect(planMangaRubyRescueCrops({results:overlapping},200,200,pixels)).toHaveLength(1);
     });
     it('高密度竖排页限制候选扫描量，不为第129条之后的侧注逐像素扫描',()=>{
         const width=8192,height=100,pixels=new Uint8ClampedArray(width*height*4);
@@ -386,6 +425,25 @@ describe('竖排漫画小注音的像素门控复识别',()=>{
         const port=await createBrowserMangaOcr(),page=await port.recognize('ruby-overlap',{flatten:true,noCache:true,strategy:'per-box'});
         expect(mocks.recognize).toHaveBeenCalledTimes(2);expect(page.results.map(item=>item.text)).toEqual(['風の音','かぜ風']);
         expect(mocks.canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);await port.destroy();
+    });
+    it('救援失败、坏框和区域外候选均保留原页，服务预算不足时不再开新裁框',async()=>{
+        const covered={text:'かぜ風',confidence:.99,box:{x:95,y:45,width:35,height:30}};
+        const rejected=await runRuby([main,covered],new Error('ruby rescue failed'));
+        expect(rejected.calls).toBe(2);expect(rejected.page.results.map(item=>item.text)).toEqual(['風の音','かぜ風']);
+
+        const narrow=await runRuby([main],{results:[{text:'かぜ',confidence:.96,box:{x:27,y:21,width:18,height:15}}]});
+        expect(narrow.page.results.map(item=>item.text)).toEqual(['風の音']);
+        const outside=await runRuby([main],{results:[{text:'かぜ',confidence:.96,box:{x:100,y:21,width:18,height:45}}]});
+        expect(outside.page.results.map(item=>item.text)).toEqual(['風の音']);
+
+        const malformed={text:'かぜ',confidence:.99,box:{x:111,y:45,width:0,height:15}};
+        const kept=await runRuby([main,malformed],{results:[{text:'かぜ',confidence:.96,box:{x:27,y:21,width:18,height:45}}]});
+        expect(kept.page.results.map(item=>item.text)).toEqual(['風の音','かぜ','かぜ']);
+
+        const noContext=await runRuby([main],undefined,undefined,true);
+        expect(noContext.page.results.map(item=>item.text)).toEqual(['風の音']);
+        const spent=await runRuby([main],undefined,service=>{service.remainingRubyRescues=0;expect(service.tryReserveMangaRubyRescue(0)).toBe(false);});
+        expect(spent.calls).toBe(1);expect(spent.page.results.map(item=>item.text)).toEqual(['風の音']);
     });
 });
 
@@ -537,6 +595,22 @@ describe('漫画竖框的受限反向重试',()=>{
 });
 
 describe('跨页竖向拉丁OCR框的窄区复核',()=>{
+    const source={text:' O X I N',confidence:.654,box:{x:746,y:148,width:98,height:876}};
+    async function runTall(before?:(service:any)=>void){
+        const factory=vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementation(()=>{
+            const canvas=factory('canvas') as HTMLCanvasElement,context=mocks.contexts.at(-1)!;
+            context.getImageData.mockImplementation((_x:number,_y:number,width:number,height:number)=>{
+                const data=new Uint8ClampedArray(width*height*4);for(let offset=3;offset<data.length;offset+=4)data[offset]=255;return{data};
+            });
+            return canvas;
+        });
+        mocks.recognize.mockReset().mockImplementationOnce(function(this:any){before?.(this);return Promise.resolve({results:[source]});});
+        mocks.retryRecognition.mockReset().mockResolvedValue([]);
+        const bitmap={width:1100,height:1500,close:mocks.bitmapClose},port=await createBrowserMangaOcr();
+        const page=await port.recognize('tall-latin',{flatten:true,noCache:true,strategy:'per-box',decodedImage:bitmap as any});
+        const calls=mocks.recognize.mock.calls.length;await port.destroy();return{page,calls};
+    }
     it('只复核极高且覆盖大部分页面的拉丁框，不把正常竖排或混排文字重跑',()=>{
         const item={text:'IN D EX 0 0',confidence:.65,box:{x:746,y:148,width:98,height:876}};
         expect(shouldRescanTallMangaLatin(item,1100,1500)).toBe(true);
@@ -544,6 +618,7 @@ describe('跨页竖向拉丁OCR框的窄区复核',()=>{
         expect(shouldRescanTallMangaLatin({...item,confidence:.4},1100,1500)).toBe(false);
         expect(shouldRescanTallMangaLatin({...item,confidence:.95},1100,1500)).toBe(false);
         expect(shouldRescanTallMangaLatin({...item,box:{...item.box,height:500}},1100,1500)).toBe(false);
+        expect(shouldRescanTallMangaLatin({...item,text:'1234'},1100,1500)).toBe(false);
     });
     it('旋转后重新检测并映回狭窄源框，避免清理整片插画',async()=>{
         vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:1100,height:1500,close:mocks.bitmapClose})));
@@ -562,8 +637,39 @@ describe('跨页竖向拉丁OCR框的窄区复核',()=>{
         expect(mocks.recognize).toHaveBeenCalledTimes(2);
         expect(mocks.contexts[1].translate).toHaveBeenCalledWith(876,0);expect(mocks.contexts[1].rotate).toHaveBeenCalledWith(Math.PI/2);
         expect(page.results).toMatchObject([{text:'INDEX 09',box:{x:781,y:665,width:17,height:100}}]);
+        mocks.recognize.mockReset().mockResolvedValueOnce({results:[source]}).mockResolvedValueOnce({results:[
+            {text:undefined,confidence:.99,box:{x:0,y:0,width:80,height:10}},
+            {text:'1234',confidence:.99,box:{x:10,y:20,width:60,height:10}},
+            {text:'INDEX',confidence:.99,box:{x:870,y:10,width:20,height:10}},
+        ]});
+        const rejected=await port.recognize('rotated-invalid',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(mocks.recognize).toHaveBeenCalledTimes(2);expect(rejected.results).toEqual([source]);
         expect(mocks.canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
-        expect(mocks.bitmapClose).toHaveBeenCalledOnce();await port.destroy();
+        expect(mocks.bitmapClose).toHaveBeenCalledTimes(2);await port.destroy();
+    });
+    it('窄区复核尊重重试和像素预算，并拒绝空、数字和图外识别框',async()=>{
+        const noRetries=await runTall(service=>{service.remainingRetries=0;});
+        expect(noRetries.calls).toBe(1);expect(noRetries.page.results).toEqual([source]);
+        const noPixels=await runTall(service=>{service.remainingPreprocessingPixels=0;});
+        expect(noPixels.calls).toBe(1);expect(noPixels.page.results).toEqual([source]);
+    });
+    it('旋转裁框没有2D上下文时跳过复核并保留原OCR行',async()=>{
+        vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:1100,height:1500,close:mocks.bitmapClose})));
+        const factory=vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementation(()=>{
+            const canvas=factory('canvas') as HTMLCanvasElement,getContext=vi.mocked(canvas.getContext).getMockImplementation()!;
+            vi.mocked(canvas.getContext).mockImplementation((...args:any[])=>
+                canvas.width===876&&canvas.height===98?null:getContext(args[0] as any,args[1] as any));
+            const context=mocks.contexts.at(-1)!;
+            context.getImageData.mockImplementation((_x:number,_y:number,width:number,height:number)=>{
+                const data=new Uint8ClampedArray(width*height*4);for(let offset=3;offset<data.length;offset+=4)data[offset]=255;return{data};
+            });
+            return canvas;
+        });
+        mocks.recognize.mockResolvedValueOnce({results:[source]});mocks.retryRecognition.mockReset().mockResolvedValue([]);
+        const port=await createBrowserMangaOcr(),page=await port.recognize('tall-no-context',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(mocks.recognize).toHaveBeenCalledOnce();expect(page.results).toEqual([source]);
+        expect(mocks.canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);await port.destroy();
     });
 });
 

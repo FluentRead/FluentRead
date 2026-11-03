@@ -161,7 +161,6 @@ function removeOverlappingSpacedEchoes(regions:MangaRegion[]):MangaRegion[] {
         :region.text.normalize('NFKC').replace(/[^A-Za-z0-9]/gu,'').toUpperCase()}));
     const removed=new Set<MangaRegion>();let comparisons=0;
     for(const fragment of fragments){
-        if(removed.has(fragment.region))continue;
         for(const candidate of candidates){
             if(candidate.region===fragment.region||!candidate.compact)continue;
             if(++comparisons>8192)return regions;
@@ -261,7 +260,7 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
     });
     const outside=wordBoundaries.record(groupMangaText(outsideItems,language,width,height,'page',true),outsideItems);
     const regions = [...outside,...paragraphs.flat()].sort((a,b)=>a.bbox.y0-b.bbox.y0||b.bbox.x0-a.bbox.x0);
-    const echoesRemoved=profile==='manga'?removeOverlappingSpacedEchoes(regions):regions;
+    const echoesRemoved=removeOverlappingSpacedEchoes(regions);
     const result=appendUncoveredNumericGuards(mergeNumericRegions(echoesRemoved),guards,guardEvidence);
     const physicalRegions=new Map<MangaRegion,Box>();
     if(page.imageParagraphGapProofs?.length){

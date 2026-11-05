@@ -1,0 +1,13 @@
+FluentRead PDF fallback bidi compatibility
+
+PDF.js 4.10.38, Copyright 2024 Mozilla Foundation, Apache License 2.0.
+The unchanged pure src/core/bidi.js module is extracted at build time from the
+installed legacy/build/pdf.worker.mjs, with its complete original Apache notice.
+FluentRead adds only a static guarded export; the original algorithm is not edited.
+Source: https://github.com/mozilla/pdf.js/tree/v4.10.38
+Full license: pdfjs-bidi-Apache-2.0.txt
+
+bidi-js 1.1.0, Jason Johnston, MIT License; upstream advertises Unicode 13.0.0.
+Only its public embedding-level and reordered-index APIs produce candidate order.
+Source: https://github.com/lojjic/bidi-js
+Full license: bidi-js-MIT.txt

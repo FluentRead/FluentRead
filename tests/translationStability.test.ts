@@ -1129,6 +1129,35 @@ describe('observer epoch 的真实 owner/state 与独立只读边界', () => {
 
 
 describe('仅译文合成段原文搬移回归', () => {
+    it('数字旁的仅译文槽保持稳定，真实来源变化仍会使其失效', () => {
+        const {document} = parseHTML('<html><body><div class="count"><span>0</span> Comments</div></body></html>');
+        const owner = document.querySelector<HTMLElement>('.count')!;
+        const count = owner.firstElementChild!.firstChild as Text;
+        const source = owner.lastChild as Text;
+        const host = document.createElement('span');
+        host.className = 'fluent-read-single-slot';
+        host.setAttribute('data-fr-translation-owned', 'true');
+        host.setAttribute('translate', 'no');
+        owner.insertBefore(host, source);
+        host.appendChild(source);
+        const current = state({mode: 'single', phase: 'translated', sourceText: 'Comments',
+            sourceTextNodes: [source], singleTextSlotHosts: [{host, source, sourceValue: ' Comments'}]});
+
+        expect(statefulSourceAndTextSlotsAreCurrent(owner, current)).toBe(true);
+        expect(isOwnSingleTextSlotMove(childListRecord(owner, [], [source]), owner, current)).toBe(true);
+        count.data = '1';
+        expect(statefulSourceAndTextSlotsAreCurrent(owner, current)).toBe(true);
+        count.data = 'New';
+        expect(statefulSourceAndTextSlotsAreCurrent(owner, current)).toBe(false);
+        count.data = '1';
+        const added = document.createTextNode(' added by the page');
+        host.appendChild(added);
+        expect(statefulSourceAndTextSlotsAreCurrent(owner, current)).toBe(false);
+        added.remove();
+        source.data = ' Replies';
+        expect(statefulSourceAndTextSlotsAreCurrent(owner, current)).toBe(false);
+    });
+
     it('Latest 原父移除与槽内加入均属于自身操作，真实内容变动仍需重译', () => {
         const {document} = parseHTML('<html><body><div><span data-fr-translation-segment="true"><a href="/releases/latest"><span class="Label">Latest</span></a></span></div></body></html>');
         const owner = document.querySelector<HTMLElement>('[data-fr-translation-segment]')!;

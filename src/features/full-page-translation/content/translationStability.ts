@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/translationStability.ts
  * 文件职责：提供动态页面翻译的语义稳定性判断、轻量完成证据复验和实时文本槽重绑定，隔离 React/虚拟列表重建造成的生命周期噪声。
- * 主要内容：判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
+ * 主要内容：判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；仅译文复验读取本代精确来源槽，避免数字邻接文字时误判父节点为纯数值；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
  * 模块边界：本文件不读取配置、不监听 DOM、不执行 provider 请求；回退来源 HTML 比对只在惰性文档中复制，不激活来源资源；自动应用外壳候选和轻量完成证据必须重新认证原策略，runtime 通过回调提供当前来源与槽位快照。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -24,6 +24,8 @@ import {
     type TranslationTextSlot,
 } from '@/src/core/translation/public';
 import {
+    BILINGUAL_ARTIFACT_SELECTOR,
+    OWNED_SINGLE_TEXT_SOURCE_SELECTOR,
     getTranslationOverflowGenerationIdentity,
     getTranslationState,
     isTranslationApplicationShellPolicyCurrent,
@@ -203,6 +205,10 @@ export function getCandidateTranslationTextProtectionOptions(
     );
 }
 
+function sourceSlotHostSet(slots: NonNullable<TranslationState['singleTextSlotHosts']>): Set<Element> {
+    return new Set(slots.map(({host}) => host));
+}
+
 /** 已渲染 owner 的范围复验读取精确来源槽，其他站点与 DOM 保护边界保持有效。 */
 function getStatefulCandidateTextProtectionOptions(
     candidate: TranslationCandidate,
@@ -211,11 +217,11 @@ function getStatefulCandidateTextProtectionOptions(
     if (!state?.singleTextSlotHosts?.length ||
         !statefulSourceAndTextSlotsAreCurrent(candidate.element, state) ||
         !state.singleTextSlotHosts.every(({host, source}) => host.childNodes.length === 1 &&
-            host.firstChild === source && host.matches('.fluent-read-single-slot[data-fr-translation-owned="true"][translate="no"]'))) {
+            host.firstChild === source && host.matches(OWNED_SINGLE_TEXT_SOURCE_SELECTOR))) {
         return undefined;
     }
     return {
-        sourceTextSlotHosts: new Set(state.singleTextSlotHosts.map(({host}) => host)),
+        sourceTextSlotHosts: sourceSlotHostSet(state.singleTextSlotHosts),
         ...getCandidateTranslationTextProtectionOptions(candidate),
     };
 }
@@ -354,9 +360,7 @@ export function createCurrentTranslationStateSourceSnapshotBatch(): (
 function sourceHTMLWithoutDirectBilingualArtifacts(node: HTMLElement): string {
     const clone = cloneTranslationElementInert(node);
     Array.from(clone.children)
-        .filter((child) => child.matches(
-            '.fluent-read-bilingual-content[data-fr-translation-owned="true"]',
-        ))
+        .filter((child) => child.matches(BILINGUAL_ARTIFACT_SELECTOR))
         .forEach((child) => child.remove());
     return clone.innerHTML;
 }
@@ -398,11 +402,17 @@ export function statefulSourceAndTextSlotsAreCurrent(
         return true;
     }
 
-    if (state.singleTextSlotHosts) {
+    const slotHosts = state.singleTextSlotHosts;
+    if (slotHosts) {
         const previousNodes = state.sourceTextNodes ?? [];
-        if (state.singleTextSlotHosts.length !== previousNodes.length) return false;
+        if (slotHosts.length !== previousNodes.length) return false;
         const core = getCurrentTranslationCore(state.scope);
-        const options = getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node);
+        // 数字旁的原文可能已移入本代译文槽。复验祖先时必须读取这些精确来源，
+        // 否则跳过槽后只剩数字，祖先会被误判成无需翻译的实时数值。
+        const options = {
+            ...getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+            sourceTextSlotHosts: sourceSlotHostSet(slotHosts),
+        };
         const protectionCache = createTranslationTextProtectionCache();
         // 合成段仅忽略自己的扩展身份，其宿主和自身真实的 hidden/notranslate
         // 仍保持权威；共享祖先缓存避免逐个槽反复遍历完整祖先链。
@@ -416,16 +426,18 @@ export function statefulSourceAndTextSlotsAreCurrent(
                     core.shouldStayOriginal(node),
             });
         }
-        if (!state.singleTextSlotHosts.every(({host, source, sourceValue}, index) =>
+        if (!slotHosts.every(({host, source, sourceValue}, index) =>
             previousNodes[index] === source && host.parentNode !== null && node.contains(host) &&
             host.contains(source) && source.data === sourceValue && host.parentElement !== null &&
             !isTranslationTextElementProtected(host.parentElement, core.shouldStayOriginal, protectionCache, options))) {
             return false;
         }
         // 已有槽保留原 Text，但新的正文可能通过 childList 或可见性变化加入。
-        // collector 跳过已渲染槽，只需拒绝任何不属于本代的新增可译 Text。
+        // 只放行本代登记的槽；其他新出现的可译 Text 仍使快照失效。
         const originalNodes = new Set(previousNodes);
-        return getCurrentTranslationStateTextNodes(node, state).every((text) => originalNodes.has(text));
+        return collectLiveTranslationTextSlots(node, core.shouldStayOriginal,
+            getTranslationStateProtectionBoundary(node, state), options)
+            .every(({node: text}) => originalNodes.has(text));
     }
 
     const currentNodes = getCurrentTranslationStateTextNodes(node, state);
@@ -551,12 +563,12 @@ export function isTranslationArtifactCurrent(
     if (state.mode === 'bilingual') {
         const wrapper = state.bilingualContent;
         const directWrappers = Array.from(node.children).filter((child) =>
-            child.matches('.fluent-read-bilingual-content[data-fr-translation-owned="true"]'));
+            child.matches(BILINGUAL_ARTIFACT_SELECTOR));
         return Boolean(
             wrapper &&
             wrapper.parentNode === node &&
             wrapper.isConnected &&
-            wrapper.matches('.fluent-read-bilingual-content[data-fr-translation-owned="true"]') &&
+            wrapper.matches(BILINGUAL_ARTIFACT_SELECTOR) &&
             state.bilingualHTML !== undefined &&
             state.bilingualOuterHTML !== undefined &&
             (wrapper.innerHTML === state.bilingualHTML && wrapper.outerHTML === state.bilingualOuterHTML ||

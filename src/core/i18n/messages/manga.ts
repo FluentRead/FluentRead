@@ -1,7 +1,7 @@
 /**
  * @file src/core/i18n/messages/manga.ts
  * 文件职责：提供漫画入口、首次资源说明和图片共享识别设置的产品文案，避免新增界面在非中文语言下显示中文。
- * 主要内容：英文完整回退目录与各语言核心操作文案；当前资源用途与准备状态优先展示，备用识别、可选文字分割的离线导入、语言包及下载管理采用简短入口。
+ * 主要内容：英文完整回退目录与各语言核心操作文案，包含未绘制译文的快照筛选及全文复制；当前资源用途与准备状态优先展示，备用识别、可选文字分割的离线导入、语言包及下载管理采用简短入口。
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
@@ -29,6 +29,9 @@ const rows: Array<readonly [string, string, string, string, string, string, stri
   ['重新查看可见页面','Check visible pages again','表示中のページを再確認','보이는 페이지 다시 확인','Revoir les pages visibles','Проверить видимые страницы снова','Volver a ver las páginas visibles'],
   ['选择其他页面','Choose another page','別のページを選択','다른 페이지 선택','Choisir une autre page','Выбрать другую страницу','Elegir otra página'],
   ['原文对照','Compare original','原文を比較','원문 비교','Comparer l’original','Сравнить с оригиналом','Comparar con el original'],
+  ['未绘制译文','Undrawn translations','未描画の翻訳','표시되지 않은 번역','Traductions non affichées','Ненанесённые переводы','Traducciones sin dibujar'],
+  ['查看全文','View all text','全文を表示','전체 텍스트 보기','Voir tout le texte','Посмотреть весь текст','Ver todo el texto'],
+  ['复制全文','Copy all text','全文をコピー','전체 텍스트 복사','Copier tout le texte','Копировать весь текст','Copiar todo el texto'],
   ['文字部分','Text section','テキストの部分','텍스트 구간','Partie du texte','Часть текста','Parte del texto'],
   ['上一部分','Previous section','前の部分','이전 구간','Partie précédente','Предыдущая часть','Parte anterior'],
   ['下一部分','Next section','次の部分','다음 구간','Partie suivante','Следующая часть','Parte siguiente'],

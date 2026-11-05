@@ -60,6 +60,13 @@
   },
   "rules": [
     {
+      "id": "englio-article",
+      "category": "documentation",
+      "verification": "site-fixture",
+      "fixture": "tests/siteAdaptationCore.test.ts",
+      "liveVerification": "tests/browser-translation-cases.json#englio-article"
+    },
+    {
       "id": "dart",
       "category": "documentation",
       "verification": "site-fixture",

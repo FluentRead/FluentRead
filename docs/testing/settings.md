@@ -58,7 +58,7 @@ node scripts/run-userscript-smoke-test.cjs \
   --artifacts-dir /private/tmp/fluentread-userscript-webkit
 ```
 
-仓库独立版把扩展的完整 Options 页面挂在全视口 closed ShadowRoot，使用 `--suite options` 验证页内回退、设置保存、下拉菜单和主题隔离、六个扩展专属分区与右键菜单、Popup 布局只显示不可用提示，以及宿主 hash 不变。页内回退会暂时隐藏悬浮球，显示可访问的关闭按钮，关闭后恢复悬浮球；浏览器断言还检查跨分区导航和切换到 390px 窄屏后悬浮球保持隐藏。窄屏截图与浏览器断言同时覆盖这一路径。`--suite options-route` 验证独立设置标签页不启动网页翻译运行时。精简版仍使用小面板。完整设置页的真实 Violentmonkey 检查在下面的管理器命令中加入 `--settings-mode full`，还会验证设置标签页关闭、重开悬浮球后源网页在焦点刷新时同步变化，重载保持设置且不覆盖已有主题。
+仓库独立版把扩展的完整 Options 页面挂在全视口 closed ShadowRoot，使用 `--suite options` 验证页内回退、设置保存、下拉菜单和主题隔离、扩展专属设置页面与右键菜单、Popup 布局只显示不可用提示，以及宿主 hash 不变。圈选和模型用量已分别合并到图片翻译与翻译统计页面，因此按现有父页面检查不可用提示。页内回退会暂时隐藏悬浮球，显示可访问的关闭按钮，关闭后恢复悬浮球；浏览器断言还检查跨分区导航和切换到 390px 窄屏后悬浮球保持隐藏。窄屏截图与浏览器断言同时覆盖这一路径。`--suite options-route` 验证独立设置标签页不启动网页翻译运行时。精简版仍使用小面板。完整设置页的真实 Violentmonkey 检查在下面的管理器命令中加入 `--settings-mode full`，还会验证设置标签页关闭、重开悬浮球后源网页在焦点刷新时同步变化，重载保持设置且不覆盖已有主题。
 
 真实脚本管理器回归使用 `pnpm test:userscript:manager`。默认把最终 `.user.js` 作为文件安装到临时 profile 的 Violentmonkey MV3；`--install-mode url` 从本机 HTTP 地址安装同一构建产物，经过脚本管理器确认页并等待已安装列表出现脚本版本，更接近公开脚本链接的安装流程。两种模式都在后台可见且不抢焦点的独立浏览器中检查声明的 `@require`（独立版为零个）、页面注入、桌面和 390px 截图、设置面板、可信 Control 悬浮翻译 `[1,0,1,0]`（相邻段落不变）、Alt+T 全文翻译 `[1,0,1]`（两段正文均完成）、原文与宿主全局保护。测试页在脚本执行前注册异版本 Dexie `4.4.4`，验证启动、悬浮翻译和刷新后都保留该实例；随后在真实管理器中保存关闭悬浮球、刷新确认配置保留、重新开启并检查当前页同步，最后断言控制台无卸载错误。报告保存 `evidence.json`。运行前需提供 Chromium 可执行文件、解压后的 Violentmonkey 2.49.0 扩展、Playwright 包目录与 focus-safe helper；翻译仍访问当前默认服务，精简版安装还会访问 jsDelivr，不能代替 Safari Userscripts 或 Via 真机验证：
 
@@ -151,7 +151,11 @@ node scripts/testing/run-translation-stats-ui-test.cjs \
 
 ## 划词窗口拖动与缩放（issue #525）
 
-`node scripts/run-selection-trigger-test.cjs --geometry-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <浏览器测试技能>/scripts/focus-safe-browser.cjs --artifacts-dir /private/tmp/fluentread-selection-geometry` 使用临时 Edge profile 和第二屏后台窗口，检查顶部与内容空白处拖动、八个方向缩放、自动换行、正文选择、复制、滚动后位置保持、最小尺寸和视口边界，以及关闭、禁用、重新划词和迟到译文。截图涵盖放大、窄窗口和深色主题。页面及微软翻译响应为本地夹具，不代表真实供应商质量；窗口手势通过真实 CDP 输入执行。
+同一浏览器几何专项会双击英文单词，延迟返回受控词典和译文，检查选中行间距、整卡滚动、关闭按钮、八次稳定采样和视口放大后的恢复；`--zoom-only` 补验 50%、100%、200% 与预设缩放加载。
+
+自动卡片避让完整选区的回归见 `selectionTranslatorCore` 与 `selectionTranslatorLifecycle`：覆盖两侧都放不下时的限高、可见视口外的旧锚点、异步内容扩高与缩小、尺寸观察器合帧和卸载、视口变化时合帧重测换行后的完整 Range、视口变大后的限高释放，以及手动拖动后停止自动重定位。极矮视口或选区占满纵向空间、连关闭按钮都放不下时，沿用整卡滚动的可见性退化；正常视口中某一侧不足 140px 时也让整卡滚动，避免标题或正文被裁掉。真实几何与滚动须结合生产浏览器证据，不把受控 DOM 测试当作 CSS 布局验收。
+
+`node scripts/run-selection-trigger-test.cjs --geometry-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <浏览器测试技能>/scripts/focus-safe-browser.cjs --runtime-diagnostics <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir /private/tmp/fluentread-selection-geometry` 使用临时 Edge profile 和第二屏后台窗口，检查顶部与内容空白处拖动、八个方向缩放、自动换行、正文选择、复制、滚动后位置保持、最小尺寸和视口边界，以及关闭、禁用、重新划词和迟到译文。截图涵盖放大、窄窗口和深色主题。页面及微软翻译响应为本地夹具，不代表真实供应商质量；窗口手势通过真实 CDP 输入执行。
 
 ## 划词语音栏与正文布局
 

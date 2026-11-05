@@ -9,6 +9,7 @@ import {fileURLToPath} from 'node:url';
 import {defineConfig} from 'vite';
 import vue from '@vitejs/plugin-vue';
 import {createDeepLXRuntimeBuildPlugin} from '../../scripts/testing/deeplx-runtime-build';
+import {createPdfReaderBidiBuildPlugin} from '../../scripts/testing/pdfjs-bidi-build';
 
 const integrationDir = dirname(fileURLToPath(import.meta.url));
 const repositoryDir = resolve(integrationDir, '../..');
@@ -33,7 +34,7 @@ export default defineConfig(({mode}) => {
                 return id === '\0fluentread-zotero-local-pdf-worker'
                     ? 'export default "chrome://fluentread/content/pdfjs/pdf.worker.min.mjs";' : null;
             },
-        }, createDeepLXRuntimeBuildPlugin(repositoryDir), vue()],
+        }, createDeepLXRuntimeBuildPlugin(repositoryDir), createPdfReaderBidiBuildPlugin(repositoryDir), vue()],
         define: {
             'process.env.NODE_ENV': JSON.stringify('production'),
             __VUE_OPTIONS_API__: true,

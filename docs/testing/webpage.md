@@ -64,9 +64,15 @@ GitHub 仓库列表和 Issue 列表同时保留旧容器与当前结构的保护
 
 ## 划词行内代码与代码块（issue #704、#845）
 
-`tests/selectionTranslatorCore.test.ts` 覆盖行内代码与正文混排、部分代码选区、多段代码、公式、代码空白、代码块和交互边界，以及只翻译正文和批量失败处理。生产构建后运行 `node scripts/run-selection-trigger-test.cjs --inline-code-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir <证据目录>`，在临时 Edge profile 的后台可见窗口验证图标、直接弹出和快捷键，检查原文/译文代码节点、宿主 DOM 不变、正文混排请求不含代码、复制反馈及改选后的迟到响应保护。用户主动选择纯代码、`pre` 代码块或高亮代码中的文字时，可使用同样的划词入口翻译；正文夹带行内代码时仍保留代码原文。可编辑代码区域、按钮和显式禁止翻译区域仍排除。
+`tests/selectionTranslatorCore.test.ts` 覆盖行内代码与正文混排、部分代码选区、多段代码、公式、代码空白、代码块和交互边界，以及只翻译正文和批量失败处理。生产构建后运行 `node scripts/run-selection-trigger-test.cjs --inline-code-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir <证据目录>`，在临时 Edge profile 的后台可见窗口验证图标、直接弹出和快捷键，检查原文/译文代码节点、宿主 DOM 不变、正文混排请求不含代码、复制反馈及改选后的迟到响应保护。用户主动选择纯代码、`pre` 代码块或高亮代码中的文字时，可使用同样的划词入口翻译；正文夹带行内代码时仍保留代码原文。带有代码语义的节点、按钮和显式禁止翻译区域仍排除。
 
 网页与微软批量响应为本地确定性夹具；此专项不代表真实供应商翻译质量或 Zen/Firefox 扩展运行时验证。
+
+## 编辑器内显式选区（issue #1237）
+
+`tests/selectionTranslatorCore.test.ts` 验证选区完整位于同一局部 `contenteditable` 或文本框宿主时可显示划词入口，同时拒绝跨出编辑区的范围、原生输入控件、扩展 UI、隐藏内容和显式禁译区域。`tests/selectionTranslatorLifecycle.test.ts` 验证编辑器右键菜单复用同一宿主的已核验 Range，并拒绝右键目标与页面陈旧选区不匹配的情况；`tests/contentHotkeyRuntime.test.ts` 检查编辑器内选区也可作为划词快捷键候选。编辑器内选区只读取用户明确选中的文本，不从原生输入框值或浏览器提供的裸文本构造来源。
+
+生产构建后运行 `node scripts/run-selection-trigger-test.cjs --editable-selection-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <fluentread-browser-translation-test>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`，在隔离 Edge profile 中检查 contenteditable 选区入口与右键 Range 归属；浏览器窗口后台可见且不抢焦点。
 
 ## 同目标语言跳过与统一语言判断
 

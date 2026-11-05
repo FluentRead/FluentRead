@@ -1,4 +1,26 @@
 {
+  "englio-article": {
+    "url": "https://englio.ai/article/89a4209f-974a-4d66-ac21-939da26ed7a2",
+    "hoverSelector": "main p[data-article-start]:has(> span[data-word-pos])",
+    "hoverTargets": [
+      {"name": "article", "selector": "main p[data-article-start]:has(> span[data-word-pos])", "sourcePartition": {"excludeSelectors": []}},
+      {"name": "title", "selector": "main h1", "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "requiredSelectors": ["main h1", "main p[data-article-start]:has(> span[data-word-pos])"],
+    "coverageRules": [
+      {"name": "article-title", "selector": "main h1", "kind": "heading", "minInitial": 1, "sourcePartition": {"excludeSelectors": []}},
+      {"name": "complete-word-segmented-article", "selector": "main p[data-article-start]:has(> span[data-word-pos])", "kind": "content", "minInitial": 1, "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "forbiddenSelectors": ["main button[role='switch']", "main button[title='查看译文']", "header nav"],
+    "interactionSelectors": ["header a[href]", "main button[role='switch']"],
+    "modes": ["hover", "full"],
+    "tier": "required",
+    "fullPageScope": "finite-page",
+    "hoverHotkey": "Control",
+    "fullPageHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "notes": "Native article renders one paragraph containing 1,345 word spans and 1,345 separators. Require every source Text in that paragraph, its title, two translation/restoration cycles, and native switch/navigation preservation. The source lang=zh-CN describes the Chinese interface, not the English article. Controlled-provider runs verify complete source transport and DOM behavior; online translation quality is separate."
+  },
   "openai-community-hot": {
     "url": "https://community.openai.com/hot",
     "hoverSelector": ".topic-list-item .link-top-line",

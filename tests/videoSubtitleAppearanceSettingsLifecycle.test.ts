@@ -1,7 +1,7 @@
 /**
  * @file tests/videoSubtitleAppearanceSettingsLifecycle.test.ts
  * 文件职责：执行字幕外观设置的真实客户端 SFC、共享布局与控件事件，验证设置草稿和实时预览的一致性。
- * 主要内容：覆盖双语上下顺序、移动端/X 自动贴底、手动偏移、位置显隐、七语可见标签与 ARIA、字号归一化、皮肤/重置、显示模式、读音示例显隐、单语顺序禁用、显式恢复双语和父级草稿替换；读音示例使用固定演示数据，不加载转写引擎。
+ * 主要内容：覆盖双语上下顺序、移动端/X 自动贴底、手动偏移、位置显隐、七语可见标签与 ARIA、字号归一化、轮廓样式/颜色/粗细、背景显隐、皮肤/重置、显示模式、读音示例显隐、单语顺序禁用、显式恢复双语和父级草稿替换；读音示例使用固定演示数据，不加载转写引擎。
  * 模块边界：保留 Vue 模板、设置子组件、配置归一化及翻译字典；仅以 DOM 与 Element Plus UI ports 和受控语言上下文替代浏览器环境，不读取组件私有状态或复制产品事件。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -114,7 +114,7 @@ async function check(selector: string, checked: boolean): Promise<void> {
     input.checked = checked; event(input, 'change'); await settle();
 }
 async function click(selector: string): Promise<void> {event(control(selector), 'click'); await settle();}
-const autoSelector = '.subtitle-appearance-controls input[type="checkbox"]';
+const autoSelector = '.subtitle-auto-bottom-toggle input[type="checkbox"]';
 const offsetSelector = 'input[aria-label="字幕底部偏移"]';
 const previewSelector = '[data-video-subtitle-preview]';
 const readingSelector = '[data-video-subtitle-reading-annotation]';
@@ -276,6 +276,51 @@ describe('视频字幕外观设置实际客户端模板', () => {
         expect(props.config.videoSubtitleAppearance.fontScale).toBe(230);
         expect(control<HTMLInputElement>('input[type="number"]').value).toBe('230');
         expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-font-scale')).toBe('230%');
+    });
+
+    it('自定义轮廓样式、颜色和粗细同步更新预览，关闭背景时保留透明度设置', async () => {
+        await mount(normalizeConfig({videoSubtitleAppearance: {backgroundOpacity: 72}}));
+        const outlineStyle = 'select[aria-label="轮廓样式"]';
+        const outlineColor = 'input[type="color"][aria-label="轮廓颜色"]';
+        const outlineWidth = 'input[type="range"][aria-label="轮廓粗细"]';
+        const background = 'input[type="checkbox"][aria-label="显示字幕背景"]';
+        await change(outlineStyle, 'stroke');
+        await change(outlineColor, '#ff1020', 'input');
+        await change(outlineWidth, '2.3', 'input');
+        expect(props.config.videoSubtitleAppearance).toMatchObject({outlineStyle: 'stroke', outlineColor: '#ff1020', outlineWidth: 2.3});
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-text-stroke')).toBe('2.3px #ff1020');
+        await change(outlineStyle, 'shadow');
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-text-stroke')).toBe('0');
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-text-shadow')).toContain('2.3px 0px 0 #ff1020');
+        await change(outlineStyle, 'none');
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-text-shadow')).toBe('none');
+        expect(control<HTMLInputElement>(outlineColor).disabled).toBe(true);
+        await check(background, false);
+        expect(props.config.videoSubtitleAppearance).toMatchObject({backgroundVisible: false, backgroundOpacity: 72});
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-background')).toBe('transparent');
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-border')).toBe('transparent');
+        expect(control<HTMLInputElement>('input[aria-label="字幕背景透明度"]').disabled).toBe(true);
+        await check(background, true);
+        expect(control<HTMLElement>(previewSelector).style.getPropertyValue('--fluent-read-video-subtitle-background')).toBe('rgba(12, 15, 22, 0.72)');
+    });
+
+    it('轮廓和背景控件使用七种界面语言的标签', async () => {
+        await mount();
+        const cases: Array<[UiLanguage, string, string, string, string, string, string]> = [
+            ['zh-CN', '轮廓样式', '跟随皮肤', '描边', '多向阴影', '无', '显示字幕背景'],
+            ['en-US', 'Text outline', 'Match skin', 'Stroke', 'Multi-direction shadow', 'None', 'Show subtitle background'],
+            ['ja-JP', '文字の輪郭', 'スキンに合わせる', '縁取り', '多方向シャドウ', 'なし', '字幕の背景を表示'],
+            ['ko-KR', '글자 윤곽', '스킨 설정 따름', '외곽선', '다방향 그림자', '없음', '자막 배경 표시'],
+            ['fr-FR', 'Contour du texte', 'Suivre le style', 'Contour', 'Ombre multidirectionnelle', 'Aucun', 'Afficher le fond des sous-titres'],
+            ['ru-RU', 'Обводка текста', 'Как в теме', 'Обводка', 'Многонаправленная тень', 'Нет', 'Показывать фон субтитров'],
+            ['es-ES', 'Contorno del texto', 'Según el tema', 'Contorno', 'Sombra multidireccional', 'Ninguno', 'Mostrar fondo de subtítulos'],
+        ];
+        for (const [language, styleLabel, skin, stroke, shadow, none, backgroundLabel] of cases) {
+            locale.value = language; await settle();
+            const style = control<HTMLSelectElement>(`select[aria-label="${styleLabel}"]`);
+            expect([...style.querySelectorAll('option')].map(option => option.textContent)).toEqual([skin, stroke, shadow, none]);
+            expect(control<HTMLInputElement>(`input[type="checkbox"][aria-label="${backgroundLabel}"]`)).not.toBeNull();
+        }
     });
 
     it('读音开关显示明确的演示数据，仅译文与隐藏字幕时收起读音且保留偏好', async () => {

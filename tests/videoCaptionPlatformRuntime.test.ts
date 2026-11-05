@@ -92,6 +92,22 @@ describe('平台字幕双语顺序', () => {
     });
 });
 
+describe('平台字幕外观配置', () => {
+    it('把自定义字体描边和无背景变量应用到隔离的字幕面板', async () => {
+        const f = fixture('https://meet.google.com/abc-defg-hij', '<span data-caption-text>Hello from the platform caption.</span>');
+        Object.assign(f.config.videoSubtitleAppearance, {outlineStyle: 'stroke', outlineColor: '#ff1020', outlineWidth: 2.4, backgroundVisible: false});
+        f.start(); await vi.advanceTimersByTimeAsync(0);
+        const host = f.document.getElementById('fluent-read-platform-captions')!;
+        const css = f.shadow()!.querySelector('style')!.textContent!;
+        expect(host.style.getPropertyValue('--fluent-read-video-subtitle-text-stroke')).toBe('2.4px #ff1020');
+        expect(host.style.getPropertyValue('--fluent-read-video-subtitle-background')).toBe('transparent');
+        expect(host.style.getPropertyValue('--fluent-read-video-subtitle-border')).toBe('transparent');
+        expect(host.style.getPropertyValue('--fluent-read-video-subtitle-backdrop-filter')).toBe('none');
+        expect(css).toContain('.source,.translation{-webkit-text-stroke:var(--fluent-read-video-subtitle-text-stroke);paint-order:stroke fill}');
+        expect(css).toContain('.tools{display:flex;justify-content:center;gap:8px;margin-top:4px;opacity:.8;pointer-events:auto;text-shadow:none;-webkit-text-stroke:0}');
+    });
+});
+
 describe('平台字幕独立读音生命周期', () => {
     it('默认不计算，原文模式不等待翻译，当前句结果只适配一次并在仅译文时隐藏', async () => {
         let finish!: (value: {text: string; language: string; scheme: string}) => void;

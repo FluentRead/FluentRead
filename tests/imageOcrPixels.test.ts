@@ -1,7 +1,19 @@
 import {describe, expect, it} from 'vitest';
-import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
+import {flattenOcrAlpha,getOcrAlphaBackground,getOcrAlphaProfile} from '@/src/features/image-translation/services/ocrPixels';
 
 describe('OCR 独占像素的透明通道与文字对比', () => {
+    it('无效RGBA长度安全返回空coverage，按半透明阈值统计真实洞像素',()=>{
+        expect(getOcrAlphaProfile(new Uint8ClampedArray([1,2,3]))).toEqual({background:undefined,transparentPixels:0,totalPixels:0});
+        const pixels=new Uint8ClampedArray([255,255,255,0,20,20,20,127,240,240,240,128,240,240,240,255]);
+        expect(getOcrAlphaProfile(pixels)).toEqual({background:0,transparentPixels:2,totalPixels:4});
+    });
+    it('只读选择透明画布的对比底色，不改写可供旁证复用的原像素',()=>{
+        const dark=new Uint8ClampedArray([20,30,40,255,0,0,0,0]);
+        expect(getOcrAlphaBackground(dark)).toBe(255);expect(Array.from(dark)).toEqual([20,30,40,255,0,0,0,0]);
+        const light=new Uint8ClampedArray([240,240,240,255,0,0,0,0]);
+        expect(getOcrAlphaBackground(light)).toBe(0);expect(Array.from(light)).toEqual([240,240,240,255,0,0,0,0]);
+        expect(getOcrAlphaBackground(new Uint8ClampedArray([20,30,40,255]))).toBeUndefined();
+    });
     it('透明黑字合成白底，保留原始黑色文字', () => {
         const pixels = new Uint8ClampedArray([0, 0, 0, 255, 0, 0, 0, 0]);
         expect(flattenOcrAlpha(pixels)).toBe(true);

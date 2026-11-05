@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
-import {groupMangaText, groupMangaOcrLines, type MangaOcrItem} from '@/src/features/image-translation/services/mangaRegions';
+import {groupMangaText, groupMangaOcrLines, mergeMangaParagraphContinuations, type MangaOcrItem} from '@/src/features/image-translation/services/mangaRegions';
+import type {ImageParagraphContinuations} from '@/src/features/image-translation/paragraphs';
 import {drawMangaTranslations,mangaRegionBackground} from '@/src/features/image-translation/services/mangaRendering';
 import {layoutImageTranslationText} from '@/src/features/image-translation/services/rendering';
 import {numericEvidenceKey,numericInformation,numericProtection} from '@/src/features/image-translation/services/mangaNumeric';
@@ -81,6 +82,18 @@ describe('漫画整段识别与噪声边界', () => {
         expect(groupMangaText([first,{...next,box:{...next.box,y:283}}],'en',1000,1400,'bubble')).toHaveLength(2);
         expect(groupMangaText([item('First',40,40,60,8),item('Distant',40,80,60,8)],'en',400,400,'bubble')).toHaveLength(2);
     });
+    it('像素续行消费者保留单行、空输入与被拒绝的远距续行',()=>{
+        const single=groupMangaText([item('First line',20,20,80,14)],'en',200,200)[0];
+        const emptyProof:ImageParagraphContinuations={successor:()=>undefined,permits:()=>true};
+        expect(mergeMangaParagraphContinuations([],emptyProof)).toEqual([]);
+        expect(mergeMangaParagraphContinuations([single],emptyProof)).toEqual([single]);
+
+        const pair=groupMangaText([item('First line',20,20,80,14),item('Second line',20,54,80,14)],'en',200,200)
+            .map(({sourceBoxes:_sourceBoxes,...line})=>line);
+        const [first,next]=pair;
+        const denied:ImageParagraphContinuations={successor:previous=>previous===first?next:undefined,permits:()=>false};
+        expect(mergeMangaParagraphContinuations(pair,denied)).toHaveLength(2);
+    });
     it('同一行分词按从左到右排序，并按行合并完整对白', () => {
         const result = groupMangaText([item('world', 82, 19, 50), item('Hello', 20, 20, 55), item('again', 50, 44)], 'en', 300, 200);
         expect(result[0].text).toBe('Hello world again');
@@ -90,6 +103,14 @@ describe('漫画整段识别与噪声边界', () => {
         expect(groupMangaText([item('そう。',20,20),item('ですね！',20,44)],'ja',400,300)[0].text).toBe('そう。ですね！');
         expect(groupMangaOcrLines([{text:'原来',bbox:{x0:20,y0:20,x1:100,y1:40}},{text:'如此。',bbox:{x0:20,y0:44,x1:100,y1:64}}],'zh',400,300)[0].text).toBe('原来如此。');
         expect(groupMangaText([item('Hello',20,20),item('again',20,44)],'en',400,300)[0].text).toBe('Hello again');
+    });
+    it('自动源语言下修复假名与汉字之间的 OCR 空格而保留拉丁词界', () => {
+        const source='雨あがり の市場へ';
+        expect(groupMangaText([item(source)],'auto',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        expect(groupMangaText([item(source)],'ja',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        expect(groupMangaOcrLines([{text:source,bbox:{x0:20,y0:20,x1:180,y1:40}}],'auto',400,300).map(row=>row.text)).toEqual(['雨あがりの市場へ']);
+        const mixed='雨あがり POSTCARD FROMTHE FERRY';
+        expect(groupMangaText([item(mixed)],'auto',400,300).map(row=>row.text)).toEqual([mixed]);
     });
     it.each([
         ['扩展 B 两侧', '你好𠀀', '𠀁世界', '你好𠀀𠀁世界'],
@@ -170,6 +191,9 @@ describe('漫画整段识别与噪声边界', () => {
         const right=item('右の列',200,20,40,240),left=item('左の列',20,20,40,240);
         expect(groupMangaText([left,right],'ja',500,500,'bubble')[0].text).toBe('右の列左の列');
         expect(groupMangaText([left,right],'ja',500,500)).toHaveLength(2);
+        const pageRight=item('右の列',200,20,44,240),pageLeft=item('左の列',88,20,44,240);
+        expect(groupMangaText([pageLeft,pageRight],'ja',500,500).map(line=>line.text)).toEqual(['右の列左の列']);
+        expect(groupMangaText([item('遠い列',75,20,44,240),pageRight],'ja',500,500)).toHaveLength(2);
         for(const separate of [item('遠い列',201,20,40,240),item('低い列',200,150,40,240),item('小さな注音',200,20,20,100)]){
             expect(groupMangaText([left,separate],'ja',500,500,'bubble')).toHaveLength(2);
         }

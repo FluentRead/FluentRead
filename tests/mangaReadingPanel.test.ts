@@ -11,10 +11,10 @@ const vue = createRequire(import.meta.url)('vue') as typeof import('vue');
 let component: any, dispose: (() => void) | undefined;
 beforeAll(async () => {component = (await import('@/src/features/image-translation/ui/MangaReadingPanel.vue')).default;});
 afterEach(() => {dispose?.();dispose = undefined;});
-interface Node {tag:string; text:string; props:Record<string,any>;children:Node[];parent:Node|null;isConnected:boolean;focus:ReturnType<typeof vi.fn>;getRootNode:()=>{activeElement:Node|null};contains:(value:Node)=>boolean}
+interface Node {tag:string; text:string; props:Record<string,any>;children:Node[];parent:Node|null;isConnected:boolean;scrollTop:number;focus:ReturnType<typeof vi.fn>;getRootNode:()=>{activeElement:Node|null};contains:(value:Node)=>boolean}
 let active:Node|null = null;
 const node = (tag:string,text=''):Node => {
-  const value:Node = {tag,text,props:{},children:[],parent:null,isConnected:true,focus:vi.fn(() => {active = value;}),getRootNode:()=>({get activeElement(){return active;}}),contains:(child) => {for(let current:Node|null=child;current;current=current.parent)if(current===value)return true;return false;}};
+  const value:Node = {tag,text,props:{},children:[],parent:null,isConnected:true,scrollTop:0,focus:vi.fn(() => {active = value;}),getRootNode:()=>({get activeElement(){return active;}}),contains:(child) => {for(let current:Node|null=child;current;current=current.parent)if(current===value)return true;return false;}};
   return value;
 };
 function focusedTrigger() {
@@ -22,6 +22,7 @@ function focusedTrigger() {
   Object.assign(trigger,{ownerDocument:document,getRootNode:()=>document,matches:()=>false,getClientRects:()=>[{}]});active=trigger;return trigger;
 }
 function find(root:Node,predicate:(node:Node)=>boolean):Node|undefined {if(predicate(root))return root;for(const child of root.children){const result=find(child,predicate);if(result)return result;}}
+function textContent(value:Node):string {return value.text+value.children.map(textContent).join('');}
 function deferred<T>() {let resolve!:(value:T)=>void, reject!:(reason:unknown)=>void;const promise = new Promise<T>((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};}
 const trusted = {isTrusted:true} as MouseEvent;
 const line = (text:string,sourceText?:string):MangaReadingLine => ({text,bbox:{x0:0,y0:0,x1:10,y1:10},...(sourceText===undefined?{}:{sourceText})});
@@ -36,7 +37,7 @@ async function mount(theme:'light'|'dark' = 'light') {
   const renderer=vue.createRenderer<Node,Node>({patchProp:(value,key,_old,next)=>{value.props[key]=next;},insert:(value,parent,anchor)=>{remove(value);const index=anchor?parent.children.indexOf(anchor):-1;parent.children.splice(index<0?parent.children.length:index,0,value);value.parent=parent;},remove,createElement:tag=>node(tag),createText:text=>node('#text',text),createComment:text=>node('#comment',text),setText:(value,text)=>{value.text=text;},setElementText:(value,text)=>{value.text=text;value.children=[];},parentNode:value=>value.parent,nextSibling:value=>value.parent?.children[value.parent.children.indexOf(value)+1]??null,querySelector:()=>null,setScopeId:()=>{},insertStaticContent:()=>{throw Error('unexpected static content');}});
   let instance:any, panel:any;const root=node('root');const app=renderer.createApp({setup:()=>()=>vue.h(component,{...props,ref:(value:any)=>{if(value){instance=value;panel=value.$.setupState;}}})});
   app.provide(vue.ssrContextKey,{modules:new Set()});app.mount(root);dispose=()=>app.unmount();await vue.nextTick();
-  const get=(predicate:(node:Node)=>boolean)=>find(root,predicate), button=(text:string)=>get(value=>value.tag==='button' && value.text===text);
+  const get=(predicate:(node:Node)=>boolean)=>find(root,predicate), button=(text:string)=>get(value=>value.tag==='button' && textContent(value)===text);
   const tick=async()=>{await vue.nextTick();await Promise.resolve();await vue.nextTick();};
   return {props,instance,panel,root,get,button,tick};
 }
@@ -52,6 +53,7 @@ describe('standalone manga reading panel prototype',()=>{
     const h=await mount();await h.instance.open(trusted);const button=h.get(n=>n.tag==='button' && n.text.startsWith(({image:'图片',canvas:'画布',background:'背景图片',segment:'长图片段'} as const)[item.kind]))!;
     button.props.onClick({isTrusted:false});expect(h.props.read).not.toHaveBeenCalled();button.props.onClick(trusted);await h.tick();
     expect(h.props.read.mock.calls[0][0]).toBe(item.token);expect(h.panel.status).toBe('ready');expect(h.get(n=>n.tag==='pre'&&n.text==='译文')).toBeDefined();
+    expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeUndefined();
     expect(h.get(n=>n.text==='此片段可能包含相邻片段的文字') !== undefined).toBe(item.kind==='segment');
     expect(h.get(n=>n.text==='画布文字来自最近完成的翻译快照，画面变化可能尚未同步') !== undefined).toBe(item.kind==='canvas');
   });
@@ -66,6 +68,61 @@ describe('standalone manga reading panel prototype',()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文'),renderSkipped:true}]});
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
     expect(h.get(n=>n.text==='为保留原文，此译文未绘制到图片')).toBeDefined();
+  });
+  it('offers only withheld translations with an effective source-to-translation change',async()=>{
+    const h=await mount();const target={...line('再加上一点额外的服务，那就更好了！',"AND IT'DBEEVEN BETTERWITHA LITTLEEXTRA SERVICE!"),renderSkipped:true as const};
+    const unchanged=[{...line('没有来源'),renderSkipped:true as const},{...line('相同','相同'),renderSkipped:true as const},{...line('  ','SOURCE'),renderSkipped:true as const},{...line('STI LEI EX TRA','STI L E I EX T R A'),renderSkipped:true as const},{...line('Hello!','hello'),renderSkipped:true as const},line('已绘制译文','DRAWN')];
+    h.props.read.mockResolvedValueOnce({status:'ready',lines:[...unchanged,target]});
+    await h.instance.open(trusted);expect(h.button('未绘制译文 · 1')).toBeUndefined();h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    const filter=h.button('未绘制译文 · 1')!;expect(filter).toBeDefined();expect(filter.props['aria-pressed']).toBe(false);
+    filter.props.onClick({isTrusted:false});await h.tick();expect(h.panel.pages.flat()).toHaveLength(7);
+    filter.props.onClick(trusted);await h.tick();expect(h.panel.pages.flat().map((value:MangaReadingLine)=>value.text)).toEqual([target.text]);
+    expect(h.button('未绘制译文 · 1')!.props['aria-pressed']).toBe(true);expect(h.props.read).toHaveBeenCalledOnce();expect(h.props.observe).toHaveBeenCalledOnce();
+  });
+  it('filters complete pages in source order and keeps copy-all explicitly canonical without another read',async()=>{
+    const h=await mount();const source=Array.from({length:70},(_,index)=>({...line(`译文 ${index}`,`SOURCE ${index}`),...(index%2===0?{renderSkipped:true as const}:{})}));
+    source.push({...line('STI LEI EX TRA','STI L E I EX T R A'),renderSkipped:true});const before=JSON.stringify(source);
+    source.forEach(value=>{Object.freeze(value.bbox);Object.freeze(value);});Object.freeze(source);
+    h.props.read.mockResolvedValueOnce({status:'ready',lines:source});await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    expect(h.panel.pages).toHaveLength(3);expect(h.get(n=>n.tag==='nav'&&n.props['aria-label']==='文字部分')).toBeDefined();h.button('下一部分')!.props.onClick(trusted);h.button('下一部分')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(2);
+    h.button('未绘制译文 · 35')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(0);expect(h.panel.pages).toHaveLength(2);
+    const expected=source.filter((_,index)=>index<70&&index%2===0);expect(h.panel.pages.flat().map((value:MangaReadingLine)=>value.text)).toEqual(expected.map(value=>value.text));
+    h.button('下一部分')!.props.onClick(trusted);await h.tick();h.button('复制当前部分')!.props.onClick(trusted);await h.tick();expect(h.props.copy.mock.calls[0][0]).toBe(expected.slice(32).map(value=>value.text).join('\n\n'));
+    expect(h.button('复制全部')).toBeUndefined();h.button('复制全文')!.props.onClick(trusted);await h.tick();expect(h.props.copy.mock.calls[1][0]).toBe(source.map(value=>value.text).join('\n\n'));
+    h.button('未绘制译文 · 35')!.props.onClick(trusted);await h.tick();expect(h.panel.pageIndex).toBe(0);expect(h.panel.pages).toHaveLength(3);expect(h.panel.pages.flat().map((value:MangaReadingLine)=>value.text)).toEqual(source.map(value=>value.text));
+    expect(h.button('复制全部')).toBeDefined();expect(h.panel.feedback).toBe('');expect(JSON.stringify(source)).toBe(before);expect(h.props.read).toHaveBeenCalledOnce();expect(h.props.observe).toHaveBeenCalledOnce();
+  });
+  it('resets owned scroll positions in both filter directions when the first section remains long',async()=>{
+    const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('全文开头'),...Array.from({length:64},(_,index)=>({...line(`译文 ${index}`,`SOURCE ${index}`),renderSkipped:true as const}))]});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    const body=h.get(value=>value.props.class==='fr-manga-reading-body'&&value.props.tabindex==='0')!,panel=h.get(value=>value.props.role==='dialog')!,outside=node('outside');
+    outside.scrollTop=940;active=outside;
+    for(const filtered of [true,false]){
+      body.scrollTop=480;panel.scrollTop=120;h.button('未绘制译文 · 64')!.props.onClick(trusted);await h.tick();
+      expect(h.panel.skippedOnly).toBe(filtered);expect(h.panel.pages[0]).toHaveLength(32);expect(h.panel.pages[0][0].text).toBe(filtered?'译文 0':'全文开头');
+      expect(h.get(value=>value.props.class==='fr-manga-reading-body'&&value.props.tabindex==='0')).toBe(body);expect(body.scrollTop).toBe(0);expect(panel.scrollTop).toBe(0);
+      expect(outside.scrollTop).toBe(940);expect(active).toBe(outside);
+    }
+    expect(h.props.read).toHaveBeenCalledOnce();expect(h.props.observe).toHaveBeenCalledOnce();
+  });
+  it('does not apply a queued filter scroll reset after the panel closes',async()=>{
+    const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文','SOURCE'),renderSkipped:true}]});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();
+    const body=h.get(value=>value.props.class==='fr-manga-reading-body'&&value.props.tabindex==='0')!,panel=h.get(value=>value.props.role==='dialog')!;
+    body.scrollTop=480;panel.scrollTop=120;h.button('未绘制译文 · 1')!.props.onClick(trusted);h.instance.close();await h.tick();
+    expect(body.scrollTop).toBe(480);expect(panel.scrollTop).toBe(120);expect(h.get(value=>value.props.role==='dialog')).toBeUndefined();
+  });
+  it.each(['back','close','invalidate','unmount'] as const)('clears the withheld view and pending-copy ownership on %s',async action=>{
+    const h=await mount(),pending=deferred<void>(),stop=vi.fn();h.props.observe.mockReturnValueOnce(stop);
+    h.props.read.mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,index)=>({...line(`译文 ${index}`,`SOURCE ${index}`),renderSkipped:true}))});
+    await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();h.button('未绘制译文 · 40')!.props.onClick(trusted);await h.tick();h.button('下一部分')!.props.onClick(trusted);await h.tick();
+    h.props.copy.mockReturnValueOnce(pending.promise);h.button('复制全文')!.props.onClick(trusted);
+    if(action==='back')h.button('选择其他页面')!.props.onClick(trusted);else if(action==='unmount'){dispose?.();dispose=undefined;}else h.instance[action]();
+    pending.reject(Error('late old view'));await h.tick();expect(h.panel.skippedOnly).toBe(false);expect(h.panel.pageIndex).toBe(0);expect(h.panel.feedback).toBe('');expect(stop).toHaveBeenCalledOnce();
+    expect(h.get(n=>n.tag==='pre'&&n.text==='译文 0')).toBeUndefined();
+    if(action==='back'){
+      h.button('画布 2')!.props.onClick(trusted);await h.tick();expect(h.panel.skippedOnly).toBe(false);expect(h.panel.pages.flat().map((value:MangaReadingLine)=>value.text)).toEqual(['译文']);expect(h.button('未绘制译文 · 40')).toBeUndefined();expect(h.props.read).toHaveBeenCalledTimes(2);
+    }
   });
   it('rejects oversize content completely and paginates complete lines without truncation',async()=>{
     const h=await mount();h.props.read.mockResolvedValueOnce({status:'ready',lines:[line('x'.repeat(16001))]}).mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>line(`行 ${i}`))});
@@ -87,7 +144,7 @@ describe('standalone manga reading panel prototype',()=>{
     first.resolve({status:'ready',lines:[line('旧')]});second.resolve({status:'ready',lines:[line('新')]});await h.tick();expect(h.get(n=>n.text==='旧')).toBeUndefined();expect(h.get(n=>n.text==='新')).toBeDefined();
   });
   it('compares and copies only from a trusted action, retaining failed-copy feedback and ignoring late results after close',async()=>{
-    const h=await mount();await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();h.button('原文对照')!.props.onClick();await h.tick();expect(h.get(n=>n.tag==='pre'&&n.text==='原文')).toBeDefined();
+    const h=await mount();await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();expect(h.get(n=>n.props.class==='fr-manga-reading-line-label')).toBeUndefined();h.button('原文对照')!.props.onClick();await h.tick();expect(h.get(n=>n.tag==='pre'&&n.text==='原文')).toBeDefined();expect(h.get(n=>n.tag==='span'&&textContent(n)==='译文')).toBeDefined();
     h.button('复制全部')!.props.onClick({isTrusted:false});expect(h.props.copy).not.toHaveBeenCalled();h.props.copy.mockRejectedValueOnce(Error('denied'));h.button('复制全部')!.props.onClick(trusted);await h.tick();expect(h.props.copy).toHaveBeenCalledWith('原文\n译文');expect(h.panel.feedback).toContain('复制失败');
     const wait=deferred<void>();h.props.copy.mockReturnValueOnce(wait.promise);h.button('复制全部')!.props.onClick(trusted);h.instance.close();wait.resolve();await h.tick();expect(h.panel.feedback).toBe('');
   });
@@ -197,26 +254,30 @@ describe('standalone manga reading panel prototype',()=>{
     }
   });
   it('uses a layer above the image translation root without assuming the shadow host creates a stacking context',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
     const overlay=readFileSync(resolve('src/features/image-translation/content/runtime.ts'),'utf8');
-    const panelLayer=Number(panel.match(/\.fr-manga-reading \{[^}]*z-index:(\d+)/)?.[1]);
+    const panelLayer=Number(panel.match(/\.fr-manga-reading \{[^}]*z-index:\s*(\d+)/)?.[1]);
     const imageLayer=Number(overlay.match(/z-index: (\d+) !important/)?.[1]);
     expect(panelLayer).toBeGreaterThan(imageLayer);
   });
   it('uses readable snapshot guidance colors in explicit and system dark themes',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
-    expect(panel).toMatch(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
-    expect(panel).toMatch(/@media \(prefers-color-scheme:dark\)[\s\S]*\[data-theme=auto\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#c1b1c5\}/);
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
+    expect(panel).toMatch(/\.fr-manga-reading\[data-theme="dark"\] \{[^}]*--fr-manga-muted: #b8c0d0/);
+    expect(panel).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]*\.fr-manga-reading\[data-theme="auto"\] \{[^}]*--fr-manga-muted: #b8c0d0/);
   });
   it('keeps source text and guidance readable against each panel background',()=>{
-    const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+    const panel=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
     const luminance=(hex:string)=>{const rgb=hex.match(/[\da-f]{2}/gi)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4);return .2126*rgb[0]+.7152*rgb[1]+.0722*rgb[2];};
     const contrast=(a:string,b:string)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-    const source=panel.match(/\.fr-manga-reading-source \{color:#([\da-f]{6})\}/i)?.[1];
-    const context=panel.match(/\.fr-manga-reading-context \{[^}]*color:#([\da-f]{6})/i)?.[1];
-    const dark=panel.match(/\[data-theme=dark\] :is\(\.fr-manga-reading-source,\.fr-manga-reading-context\) \{color:#([\da-f]{6})\}/i)?.[1];
-    expect(source).toBeDefined();expect(context).toBeDefined();expect(dark).toBeDefined();
-    expect(contrast(source!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(context!,'ffffff')).toBeGreaterThanOrEqual(4.5);expect(contrast(dark!,'2b2630')).toBeGreaterThanOrEqual(4.5);
+    const light=panel.match(/\.fr-manga-reading,\s*\.fr-manga-entry,[\s\S]*?\{([^}]+)\}/)![1],dark=panel.match(/\.fr-manga-reading\[data-theme="dark"\] \{([^}]+)\}/)![1];
+    const color=(block:string,token:string)=>block.match(new RegExp(`--fr-manga-${token}:\\s*(?:var\\([^,]+,\\s*)?#([\\da-f]{6})`,'i'))![1];
+    for(const block of [light,dark]){
+      expect(contrast(color(block,'muted'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'ink'),color(block,'surface'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'on-brand'),color(block,'brand'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'brand-ink'),color(block,'brand-soft'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(color(block,'warning'),color(block,'warning-soft'))).toBeGreaterThanOrEqual(4.5);
+    }
   });
   it('reports a list budget failure without listing or reading a partial selection',async()=>{
     const h=await mount();h.props.list.mockReturnValueOnce({status:'overBudget'} as any);await h.instance.open(trusted);await h.tick();
@@ -296,10 +357,10 @@ describe('standalone manga reading panel prototype',()=>{
     h.button('画布 2')!.props.onClick(trusted);await h.tick();h.instance.close();expect(second).toHaveBeenCalledOnce();
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();dispose?.();dispose=undefined;expect(third).toHaveBeenCalledOnce();
   });
-  it.each(['compare','page'] as const)('clears and invalidates copy feedback when %s changes while copying',async mode=>{
-    const h=await mount(), pending=deferred<void>();h.props.read.mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>line(`译 ${i}`,`原 ${i}`))});h.props.copy.mockReturnValueOnce(pending.promise);
+  it.each(['compare','page','filter'] as const)('clears and invalidates copy feedback when %s changes while copying',async mode=>{
+    const h=await mount(), pending=deferred<void>();h.props.read.mockResolvedValueOnce({status:'ready',lines:Array.from({length:40},(_,i)=>({...line(`译 ${i}`,`原 ${i}`),renderSkipped:true}))});h.props.copy.mockReturnValueOnce(pending.promise);
     await h.instance.open(trusted);h.button('图片 1')!.props.onClick(trusted);await h.tick();h.button('复制全部')!.props.onClick(trusted);
-    h.button(mode==='compare'?'原文对照':'下一部分')!.props.onClick(trusted);pending.resolve();await h.tick();expect(h.panel.feedback).toBe('');
+    h.button(mode==='compare'?'原文对照':mode==='page'?'下一部分':'未绘制译文 · 40')!.props.onClick(trusted);pending.resolve();await h.tick();expect(h.panel.feedback).toBe('');
   });
   it.each(['light','dark'] as const)('uses the injected resolved %s theme',async theme=>{
     const h=await mount(theme);await h.instance.open(trusted);await h.tick();expect(h.get(n=>n.props.role==='dialog')?.props['data-theme']).toBe(theme);
@@ -315,5 +376,8 @@ describe('standalone manga reading panel prototype',()=>{
     registerAllUiLanguageBundles();const h=await mount();h.props.translate.mockImplementation(text=>translateLegacyText(text,language));
     await h.instance.open(trusted);await h.tick();expect(h.get(n=>n.props.role==='dialog')?.props['aria-label']).toBe(translateLegacyText('漫画文字',language));
     expect(h.button(`${translateLegacyText('图片',language)} 1`)).toBeDefined();expect(h.props.read).not.toHaveBeenCalled();
+    h.props.read.mockResolvedValueOnce({status:'ready',lines:[{...line('译文','SOURCE'),renderSkipped:true}]});h.button(`${translateLegacyText('图片',language)} 1`)!.props.onClick(trusted);await h.tick();
+    const filter=h.button(`${translateLegacyText('未绘制译文',language)} · 1`)!;expect(filter).toBeDefined();filter.props.onClick(trusted);await h.tick();
+    expect(h.button(`${translateLegacyText('未绘制译文',language)} · 1`)!.props.title).toBe(translateLegacyText('查看全文',language));expect(h.button(translateLegacyText('复制全文',language))).toBeDefined();
   });
 });

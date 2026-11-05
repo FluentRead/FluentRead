@@ -866,6 +866,18 @@ describe('userscript browser shim injection', () => {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
+        const subtitleAppearanceKeys = Object.keys(extension).filter(key => key.startsWith('video.appearance.'));
+        expect(subtitleAppearanceKeys).toHaveLength(8);
+        for (const key of subtitleAppearanceKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
+        const videoAsrKeys = Object.keys(extension).filter(key => key.startsWith('video.ai') || key.startsWith('video.model'));
+        expect(videoAsrKeys).toHaveLength(40);
+        for (const key of videoAsrKeys) {
+            expect(extension[key]).toBeTruthy();
+            expect(Object.hasOwn(projected, key)).toBe(false);
+        }
         for (const key of ['popup.compact.translate', 'popup.compact.restore', 'popup.displayMode.bilingual', 'popup.displayMode.translationOnly', 'popup.displayMode.googleBilingualOnly']) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
@@ -877,16 +889,21 @@ describe('userscript browser shim injection', () => {
         const readerDialogKeys = ['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].map(name => `document.pdfReading.${name}`);
         const safariPermissionKeys = Object.keys(extension).filter(key => key.startsWith('safari.freePool.'));
         expect(safariPermissionKeys).toHaveLength(8);
-        const sidepanelKeys = ['title', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
+        const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
+        const popupOnlyKeys = Object.keys(extension).filter(key => key.startsWith('popup.aiContext.status.') || key.startsWith('popup.aiContext.description.')
+            || key.startsWith('popup.quickSettings.') || key.startsWith('popup.quickTranslation.'));
         const pageFontKeys = Object.keys(extension).filter(key => key.startsWith('popup.pageFont.'));
         const expectedPageFontKeys = ['title', 'original', 'browserDefault', 'hostAction', 'browserAction', 'changing', 'retryAction',
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);
         expect([...pageFontKeys].sort()).toEqual([...expectedPageFontKeys].sort());
         expect(Object.keys(projected).filter(key => key.startsWith('popup.pageFont.'))).toEqual([]);
-        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...pageFontKeys]) {
+        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...pageFontKeys, ...popupOnlyKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
+        expect(Object.hasOwn(projected, 'popup.donationButton')).toBe(false);
+        expect(projected['popup.aiContext.how']).toBeTruthy();
+        expect(projected['popup.aiContext.settingsTitle']).toBeTruthy();
         expect(extension['document.config.loadFailed']).toBeTruthy();
         const readerRecoveryKeys = Object.keys(extension).filter(key => key.startsWith('document.config.') || key.startsWith('document.translationRecovery.')
             || key.startsWith('document.retainedRevisions.') || key.startsWith('document.translationProgress.'));
@@ -899,11 +916,11 @@ describe('userscript browser shim injection', () => {
         for (const key of extensionOnlyUndoKeys) expect(Object.hasOwn(projected,key)).toBe(false);
         const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !key.startsWith('informationHighlight.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
-            && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !readerRecoveryKeys.includes(key)
+            && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !videoAsrKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
-            && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key)
-            && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
+            && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)
+            && key !== 'popup.donationButton' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);
         expect(projected['contextMenu.translateSelection']).toBeTruthy();
@@ -1377,7 +1394,10 @@ describe('userscript browser shim injection', () => {
         const userscript = await compile('userscript');
         expect(userscript).not.toContain('VideoSubtitleAppearanceSettings.vue');
         expect(userscript).toMatch(/\bVideoSubtitleAppearanceSettings = null\b/u);
+        expect(userscript).not.toContain('VideoLocalModelSettings.vue');
+        expect(userscript).toMatch(/\bVideoLocalModelSettings = null\b/u);
         expect(await compile('chrome')).toContain('VideoSubtitleAppearanceSettings.vue');
+        expect(await compile('chrome')).toContain('VideoLocalModelSettings.vue');
     });
 
     it('阻止个人校订 UI 绕过 public 空适配器进入任意 userscript chunk', async () => {

@@ -1,10 +1,10 @@
 <!--
  @file src/app/popup/PopupApp.vue
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页，并为从划词抽屉打开的设置保留明确返回原网页的入口。
- 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；复用真实全文完成状态呈现首次翻译指引和就地自助诊断，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
+ 主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；全文翻译进度与完成状态由主按钮反馈，失败时在主操作内的预留区域呈现自助诊断入口，不挤动网站开关，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
  信息层级：服务摘要只保留当前服务与模型；悬停和划词的快捷开关与标题同排，独立快捷方案的作用范围仍明确说明，圈选快捷键只在操作示意中展示。
  缓存清理：每次清理拥有独立的可取消等待，失活或卸载释放旧等待，超时恢复按钮并提示结果未确认，后台确认清除但页面仍同步时展示中性状态；全局暂停不取消清理，旧回复不能覆盖新请求。
- 侧边栏入口：支持的浏览器提供直接粘贴文本翻译的原生面板，点击时同步调用 open 保留用户手势，成功后关闭弹窗；失败保留入口与重试提示，不把原文保存到配置。
+ 顶部入口：赞赏使用带提示的咖啡图标；支持的浏览器在其右侧提供带悬停和键盘提示的侧边栏图标，点击时同步调用 open 保留用户手势，成功后关闭弹窗；失败保留入口与重试提示，不把原文保存到配置。
  模块边界：组件编排 UI、浏览器导航事件与生命周期；页内面板通过授权来源固定发起网页，页面消息归属由 pageActions 管理，不实现翻译 provider、缓存存储或 content 挂载；公共配置由 services/config 管理；配置草稿复用共享编辑会话，保留 post 合并和关闭补丁交接。
 -->
 <!-- Popup 页面归 app 层所有；WXT 入口只负责调用挂载函数。 -->
@@ -67,10 +67,22 @@
         </div>
       </div>
       <div class="header-actions">
-        <button ref="donationTrigger" class="donation-button" type="button" :title="t('popup.donationTitle')" :aria-label="t('popup.donationTitle')" :onClick="donationActions.open">
-          <Coffee />
-          <span>{{ t('popup.donationButton') }}</span>
-        </button>
+        <ElTooltip :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="350" :hide-after="0"
+          :persistent="false" :show-arrow="false" :disabled="!popupContext.active.value || drawerVisible || donationVisible" placement="bottom" effect="light" popper-class="translation-tool-tooltip">
+          <template #content><span class="translation-tool-tooltip-copy">{{ t('popup.donationTitle') }}</span></template>
+          <button ref="donationTrigger" class="donation-button" type="button" :aria-label="t('popup.donationTitle')" :onClick="donationActions.open">
+            <Coffee />
+          </button>
+        </ElTooltip>
+        <ElTooltip v-if="sidepanelAvailable" :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="350" :hide-after="0"
+          :persistent="false" :show-arrow="false" :disabled="!popupContext.active.value || drawerVisible" placement="bottom" effect="light" popper-class="translation-tool-tooltip">
+          <template #content><span class="translation-tool-tooltip-copy">{{ t('sidepanel.title') }}</span></template>
+          <button class="sidebar-translation-entry" type="button" data-testid="sidebar-translation"
+            :aria-label="t('sidepanel.title')" :aria-busy="sidepanelOpening"
+            :disabled="sidepanelOpening || (browserCapabilities.browser !== 'firefox' && pageState.windowId === undefined)" :onClick="popupActions.sidebar">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13M5.5 8h4M5.5 11h4"/></svg>
+          </button>
+        </ElTooltip>
         <button class="settings-button" type="button" title="完整设置" aria-label="打开完整设置" :onClick="popupActions.settings">
           <Setting />
           <span>设置</span>
@@ -150,12 +162,12 @@
         {{ t('safari.freePool.policy') }} · {{ freePoolStatus }}
       </p>
 
-      <div class="translate-action">
+      <div class="translate-action" :class="{'has-section-translation': !isThunderbird && !currentPdfSource, 'is-translated': pageTranslated}">
         <button class="translate-button" :class="{ translated: pageTranslated }" type="button"
-          data-testid="page-translation" :aria-pressed="pageTranslated" :aria-busy="translating"
+          data-testid="page-translation" :aria-pressed="pageTranslated" :aria-busy="translationInProgress"
           :aria-label="pageTranslationLabel" :title="pageTranslationTitle"
           :disabled="!config.on || currentSiteExtensionDisabled || translating || pageState.savingRule || (!pageTranslated && !currentPdfSource && safariFreePool && (freePoolLoading || freePoolBusy))" :onClick="pageButtons.toggle">
-          <span v-if="translating" class="spinner" aria-hidden="true" />
+          <span v-if="translationInProgress" class="spinner" aria-hidden="true" />
           <span class="translate-label">{{ pageTranslationButtonLabel }}</span>
         </button>
         <button v-if="!isThunderbird && !currentPdfSource" class="section-translate-button" type="button" data-testid="section-translation"
@@ -164,19 +176,8 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15M10 10l7 2.6-3 1.1-1.1 3z" /></svg>
           <span>{{ t('popup.sectionTranslation') }}</span>
         </button>
+        <DiagnosticNotice v-if="pageDiagnostic" :diagnostic="pageDiagnostic" :language="config.uiLanguage" :busy="translating" :version="version" @action="diagnosticAction" />
       </div>
-
-      <button v-if="sidepanelAvailable" class="sidebar-translation-entry" type="button" data-testid="sidebar-translation"
-        :aria-busy="sidepanelOpening" :disabled="sidepanelOpening || (browserCapabilities.browser !== 'firefox' && pageState.windowId === undefined)" :onClick="popupActions.sidebar">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13M5.5 8h4M5.5 11h4"/></svg>
-        <span>{{ t('sidepanel.title') }}</span><span aria-hidden="true">›</span>
-      </button>
-
-      <template v-if="!pageDiagnostic">
-        <p v-if="pageResultStatus === 'translating'" class="first-use-hint" role="status" data-i18n-ignore>{{ diagnosticUi('first-use-translating') }}</p>
-        <p v-else-if="pageResultStatus === 'translated'" class="first-use-hint" role="status" data-i18n-ignore>{{ diagnosticUi('first-use-ready') }}</p>
-        <p v-else-if="config.count === 0 && config.on && !currentSiteExtensionDisabled && !credentialWarning" class="first-use-hint" data-testid="first-translation-hint" data-i18n-ignore>{{ diagnosticUi('first-use-start') }}</p>
-      </template>
 
       <div class="translation-meta">
         <PopupSiteRule
@@ -186,7 +187,6 @@
         :onSetExtensionDisabled="pageButtons.disabled"
         />
         <div :ref="setPageFontFocusAnchor" class="translation-tools" tabindex="-1">
-          <DiagnosticNotice v-if="pageDiagnostic" :diagnostic="pageDiagnostic" :language="config.uiLanguage" :busy="translating" :version="version" @action="diagnosticAction" />
           <span class="display-mode-slot" :class="{'with-page-font': pageFontEntryVisible}" data-i18n-ignore>
             <ElTooltip v-if="pageFontEntryVisible" :ref="setPageFontTooltip" :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="350" :hide-after="0"
               :persistent="false" :show-arrow="false" :disabled="!pageFontContext.active.value || drawerVisible" placement="top-end" effect="light" popper-class="translation-tool-tooltip page-font-tooltip">
@@ -561,6 +561,7 @@ const donationCard = shallowRef<HTMLElement | null>(null);
 const donationTrigger = shallowRef<HTMLButtonElement | null>(null);
 const pageDiagnostic = shallowRef<Diagnostic>();
 const pageResultStatus = ref<TranslationToolbarStatus>('idle');
+const translationInProgress = computed(() => translating.value || pageResultStatus.value === 'translating');
 function readPageResult(value: unknown) {
   const response = value as {isTranslated?: unknown; toolbarStatus?: unknown; diagnostic?: unknown} | undefined;
   pageResultStatus.value = normalizeTranslationToolbarStatus(response?.toolbarStatus);

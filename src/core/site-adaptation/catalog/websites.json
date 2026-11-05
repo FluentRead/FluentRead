@@ -1,5 +1,23 @@
 [
   {
+    "id": "englio-article",
+    "name": "Englio 英语分级阅读",
+    "match": {
+      "hosts": ["englio.ai"],
+      "paths": ["/article/*"]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": ["main p[data-article-start]:has(> span[data-word-pos])"],
+        "resolve": "closest",
+        "atomic": true
+      }
+    ],
+    "protect": ["code", "pre", "input", "textarea"],
+    "exclude": ["nav"]
+  },
+  {
     "id": "dart",
     "name": "Dart 文档导语",
     "match": {

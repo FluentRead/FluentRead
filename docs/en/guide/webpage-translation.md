@@ -18,6 +18,8 @@ If the font is hard to read, click **Aa** at the bottom right of the card to use
 
 Translation follows your reading position by default, including newly expanded comments and later-loaded text. Change the translation range in settings to process the whole page at once. Restoring the original ends the current session; choose another language or service and start again if needed.
 
+Identical paragraphs on the same page share results when their translation requests match. Ordinary batches send each repeated text once and return its translation to every original position. With translation caching enabled, later batches and translation after restoring the original can also reuse completed results. Different languages, services, or result-affecting context are handled separately, as are AI multi-segment slots that depend on neighboring text.
+
 Passages already in the target or an excluded language usually keep their source text. Results matching the source are not duplicated. Simplified and Traditional Chinese can still convert when their characters differ. Language detection can be wrong; check source-language and site settings for missing translations.
 
 <details class="guide-details">
@@ -62,6 +64,8 @@ On later matching pages, only remembered sections are handled. Dismiss a reminde
 Manage, disable, or delete up to 100 rules under **Section translation → Remembered sections**. A rule can use an independent profile. If that profile is missing, choose another or select **Follow default** before continuing.
 
 ## Continue after a failure
+
+If a notice icon appears on the popup's translation button, select it to see the reason and available recovery actions.
 
 Retry individual failed passages directly. With the full-page progress panel enabled, **Locate failed passage** and **Retry failed items** handle failures in the current session while keeping successful text and your reading position. Passages you have not scrolled to are not failures.
 

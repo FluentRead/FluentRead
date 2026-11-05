@@ -341,7 +341,7 @@ describe('popup feature visibility', () => {
         expect(popup).not.toContain('class="eyebrow features-eyebrow"');
         expect(popup).toContain('data-testid="popup-version"');
         expect(popup).toContain("browser.runtime.getManifest().version");
-        expect(popup).toContain("t('popup.donationButton')");
+        expect(popup).toContain(":aria-label=\"t('popup.donationTitle')\"");
         expect(source('src/app/popup/popup.css')).not.toContain('.opensource-link span { display: none; }');
         expect(popup).not.toContain("activeDrawer === 'video'");
         expect(popup).not.toContain("activeDrawer === 'area'");

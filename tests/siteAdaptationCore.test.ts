@@ -168,6 +168,79 @@ describe('Kagi News content-bearing buttons', () => {
     });
 });
 
+describe('Englio word-segmented article paragraphs', () => {
+    function fixture(href = 'https://englio.ai/article/example', settings = normalizeSiteAdaptationSettings(undefined)) {
+        const source = Array(140).fill('Readers follow the complete English article while learning new words.').join(' ');
+        const spans = source.split(' ').map((word, index) => `<span data-word-pos="${index}">${word}</span><span> </span>`).join('');
+        const {document} = parseHTML(`<html lang="zh-CN"><body><main>
+            <p data-article-start="0" id="article">${spans}</p>
+        </main></body></html>`);
+        const core = new TranslationCandidateCore({url: new URL(href), adapters: composeSiteAdapters(builtinSiteRulePack, settings)});
+        return {document, core, article: document.getElementById('article')!, source};
+    }
+
+    it('discovers the entire wide paragraph and resolves first and last words to the same owner', () => {
+        const {document, core, article, source} = fixture();
+        expect(article.childElementCount).toBeGreaterThan(2048);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['article']);
+        expect(core.inspect(article).candidate?.adapterId).toBe('englio-article');
+        for (const word of [article.firstElementChild!, article.children[article.children.length - 2]!]) {
+            expect(core.resolve(word.firstChild)?.element === article).toBe(true);
+            expect(core.discover(word).map(candidate => candidate.element.id)).toEqual(['article']);
+        }
+        const before = article.innerHTML;
+        const words = Array.from(article.children);
+        const snapshot = createTranslationSourceSnapshot(article);
+        expect(snapshot.slots.map(slot => slot.source).join(' ')).toBe(source);
+        expect(article.innerHTML).toBe(before);
+        expect(Array.from(article.children).every((word, index) => word === words[index])).toBe(true);
+    });
+
+    it('rereads replaced paragraphs and retains local protection within an accepted article', () => {
+        const {document, core, article} = fixture();
+        const fresh = article.cloneNode(true) as HTMLElement;
+        article.replaceWith(fresh);
+        expect(core.discover(fresh).map(candidate => candidate.adapterId)).toEqual(['englio-article']);
+        const protectedWord = fresh.querySelector('[data-word-pos="0"]')!;
+        protectedWord.setAttribute('translate', 'no');
+        expect(core.resolve(protectedWord.firstChild)?.element === fresh).toBe(true);
+        const snapshot = createTranslationSourceSnapshot(fresh);
+        expect(snapshot.slots[0]?.source).toBe('follow');
+        expect(snapshot.clone.textContent?.startsWith('Readers follow')).toBe(true);
+        expect(core.discover(document).some(candidate => candidate.element === fresh)).toBe(true);
+    });
+
+    it.each(['translate="no"', 'contenteditable="true"', 'hidden', 'class="notranslate"'])('does not bypass article protection: %s', attributes => {
+        const {document, core, article} = fixture();
+        const attribute = document.createElement('div');
+        attribute.innerHTML = `<section ${attributes}></section>`;
+        const section = attribute.firstElementChild!;
+        article.replaceWith(section); section.appendChild(article);
+        expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
+        expect(core.discover(document)).toEqual([]);
+    });
+
+    it.each(['https://example.test/article/example', 'https://englio.ai.evil.test/article/example', 'https://englio.ai/settings', 'https://englio.ai/articles'])('does not apply the exception outside Englio article URLs: %s', href => {
+        const {document, core, article} = fixture(href);
+        expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
+        expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
+    });
+
+    it.each([{enabled: false}, {disabledRuleIds: ['englio-article']}])('withdraws the exception through site-adaptation settings: %j', overrides => {
+        const {core, article} = fixture(undefined, {...normalizeSiteAdaptationSettings(undefined), ...overrides});
+        expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
+    });
+
+    it('requires both native paragraph and word markers', () => {
+        for (const remove of ['data-article-start', 'data-word-pos']) {
+            const {document, core, article} = fixture();
+            if (remove === 'data-article-start') article.removeAttribute(remove);
+            else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(remove));
+            expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
+        }
+    });
+});
+
 describe('OpenAI community topic list titles', () => {
     it.each(['content', 'all'] as const)('keeps native topic titles translatable in %s scope while preserving their tags', scope => {
         // Reduced from the live /hot DOM: a role=heading span owns status icons and a topic link.

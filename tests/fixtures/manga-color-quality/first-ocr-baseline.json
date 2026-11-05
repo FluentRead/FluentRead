@@ -1,0 +1,4473 @@
+{
+  "version": 1,
+  "scope": "First actual stock production manga OCR of these eight frozen sources, extracted without reordering from the first eight cases of a fourteen-scene run. Deterministic Google text transport is controlled; this is not a live-provider or all-green acceptance.",
+  "sourceBeforeAnyOcr": true,
+  "sourceManifestSha256": "3ceb90f8fc34d3b261898ae5045d4002873ca471dd7ff8e57e72dee6274b444f",
+  "sourceDesignSha256": "b24b2d1ee63ea1ad03e1770126410cea2f82b271c35fd14d0a4f15295cc68acf",
+  "productionHead": "172c713d5aed4fd11e00d35a17eea2ed9e7f7a5c",
+  "productionBuild": {
+    "inventorySha256": "77482255cc169e872d24beef8bf82c9558e0fa762deaceb4aad80164ac2db35a",
+    "files": 519,
+    "bytes": 63219593
+  },
+  "runner": {
+    "archivedExecutedSha256": "72220967eebe68602224b7788a13cc1c475b5f891d1ffaf6bd27c7e75d77c259",
+    "scope": "External response-driven translated-probe aggregation and native RGBA receipt wrapper. Production OCR/repair results and source RGB preconditions are unchanged. This wrapper is not included in the repository stock runner."
+  },
+  "sourceArtifacts": {
+    "iteration-v14/full-pipeline-runner/manga14-baseline/report.json": {
+      "sha256": "0498bbd241643fdff287a1477930b5d876bafcbdb23c8077e6f1a666b0ec1162",
+      "bytes": 356054
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/runtime-diagnostics.json": {
+      "sha256": "705219ff510792a13686ff2472af12757b3dfb94b10729919e4474790c745db2",
+      "bytes": 4995794
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/pixel-report.json": {
+      "sha256": "9fb269fd881e16f711a50bbec22128babfbfa74b22b5e12584ab3fedc38b26ea",
+      "bytes": 97432
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/pixel-receipts.json": {
+      "sha256": "952089948b4aff18228b5a26be9e26b1dde739308e89e34101d63678b8cfb4ae",
+      "bytes": 30110
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/manifest-executed.json": {
+      "sha256": "d009984c27243ddbd9ed4ddd1c510b7d6b48d38b2234987518e07747cbffc7b5",
+      "bytes": 121625
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/runner-executed.cjs": {
+      "sha256": "72220967eebe68602224b7788a13cc1c475b5f891d1ffaf6bd27c7e75d77c259",
+      "bytes": 225244
+    },
+    "iteration-v14/full-pipeline-runner/manga14-baseline/preflight.json": {
+      "sha256": "c04fe04f977ec54eb970e16717d497168d33a510eda0267b7fa57db2b37258c9",
+      "bytes": 7384
+    }
+  },
+  "qualitySummary": {
+    "completedScenes": 8,
+    "anchors": {
+      "total": 34,
+      "matched": 27,
+      "failed": 7
+    },
+    "strictScenes": {
+      "passed": 1,
+      "total": 8
+    },
+    "negativeRegions": {
+      "declared": 15,
+      "falsePositives": 0
+    },
+    "failures": [
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "ocr-anchor",
+        "anchor": "THE FERRY LEAVES AT DAWN.",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "ocr-anchor",
+        "anchor": "BRING THE BLUE MAP.",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "ocr-anchor",
+        "anchor": "I WILL WAIT BY THE PIER.",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "ocr-anchor",
+        "anchor": "KEEP THE LANTERN LIT.",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "paragraph-order",
+        "anchors": [
+          "THE FERRY LEAVES AT DAWN.",
+          "BRING THE BLUE MAP."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "type": "paragraph-order",
+        "anchors": [
+          "I WILL WAIT BY THE PIER.",
+          "KEEP THE LANTERN LIT."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "prism-platform-gradient-signs",
+        "type": "paragraph-order",
+        "anchors": [
+          "FOLLOW THE EASTERN TRACK",
+          "THE NEXT TRAIN IS ALMOST HERE"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "ocr-anchor",
+        "anchor": "風の音を聞いて",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "ocr-anchor",
+        "anchor": "小道で待っている",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "ocr-anchor",
+        "anchor": "かぜ",
+        "occurrences": 0,
+        "expectedOccurrences": 1,
+        "reason": "Actual production OCR does not contain the normalized expected anchor"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "paragraph-order",
+        "anchors": [
+          "風の音を聞いて",
+          "小道で待っている"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "paragraph-order",
+        "anchors": [
+          "かぜ"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "type": "paragraph-order",
+        "anchors": [
+          "沿着花园的小路慢慢走。",
+          "雨停以后，我们在桥边见。"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "chess-picnic-neighbor-inverse-bubbles",
+        "type": "paragraph-order",
+        "anchors": [
+          "THE BOARD IS READY.",
+          "I SAVED YOU A SEAT."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "lantern-market-oblique-bilingual-captions",
+        "type": "paragraph-order",
+        "anchors": [
+          "THE LANTERNS ARE STILL WARM.",
+          "LET US WALK HOME TOGETHER."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "watercolor-ferry-translucent-notification",
+        "type": "paragraph-order",
+        "anchors": [
+          "THE RIVER IS CLEAR TODAY.",
+          "PLEASE STEP ABOARD QUIETLY."
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "orbital-greenhouse-cutout-dialogue",
+        "type": "paragraph-order",
+        "anchors": [
+          "新的叶子已经展开了。",
+          "把水送到靠窗的一排。"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      },
+      {
+        "scene": "orbital-greenhouse-cutout-dialogue",
+        "type": "paragraph-order",
+        "anchors": [
+          "ここなら星が見える。",
+          "明日も一緒に育てよう。"
+        ],
+        "paragraphIndex": -1,
+        "found": false,
+        "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+      }
+    ]
+  },
+  "strictPass": false,
+  "scenes": [
+    {
+      "scene": "harbor-same-red-channel-dialogue",
+      "round": 0,
+      "expectedSource": [
+        "THE FERRY LEAVES AT DAWN.",
+        "BRING THE BLUE MAP.",
+        "I WILL WAIT BY THE PIER.",
+        "KEEP THE LANTERN LIT.",
+        "A QUIET MORNING ON THE CANAL"
+      ],
+      "texts": [
+        "A QUIET MORNING ON THE CANAL"
+      ],
+      "ocrLines": [
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "A QUIET MORNING ON THE CANAL",
+          "bbox": {
+            "x0": 357,
+            "y0": 856,
+            "x1": 872,
+            "y1": 878
+          },
+          "fontSize": 22,
+          "sourceBoxes": [
+            {
+              "x0": 357,
+              "y0": 856,
+              "x1": 872,
+              "y1": 878
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "THE FERRY LEAVES AT DAWN.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "BRING THE BLUE MAP.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "I WILL WAIT BY THE PIER.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "KEEP THE LANTERN LIT.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "A QUIET MORNING ON THE CANAL",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "T": 10,
+          "H": 5,
+          "E": 14,
+          "F": 1,
+          "R": 6,
+          "Y": 2,
+          "L": 7,
+          "A": 9,
+          "V": 1,
+          "S": 1,
+          "D": 1,
+          "W": 3,
+          "N": 8,
+          "B": 3,
+          "I": 8,
+          "G": 2,
+          "U": 2,
+          "M": 2,
+          "P": 3,
+          "K": 1,
+          "Q": 1,
+          "O": 2,
+          "C": 1
+        },
+        "actual": {
+          "A": 3,
+          "Q": 1,
+          "U": 1,
+          "I": 2,
+          "E": 2,
+          "T": 2,
+          "M": 1,
+          "O": 2,
+          "R": 1,
+          "N": 4,
+          "G": 1,
+          "H": 1,
+          "C": 1,
+          "L": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "ocr-anchor",
+          "anchor": "THE FERRY LEAVES AT DAWN.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "ocr-anchor",
+          "anchor": "BRING THE BLUE MAP.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "ocr-anchor",
+          "anchor": "I WILL WAIT BY THE PIER.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "ocr-anchor",
+          "anchor": "KEEP THE LANTERN LIT.",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "A QUIET MORNING ON THE CANAL"
+          ],
+          "paragraphIndex": 0,
+          "found": true
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1440,
+          "height": 1000,
+          "pixels": [
+            [
+              191,
+              122,
+              93,
+              255
+            ],
+            [
+              57,
+              59,
+              66,
+              255
+            ],
+            [
+              245,
+              226,
+              192,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1440,
+          "height": 1000,
+          "pixels": [
+            [
+              191,
+              122,
+              93,
+              255
+            ],
+            [
+              57,
+              59,
+              66,
+              255
+            ],
+            [
+              245,
+              226,
+              192,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "harbor-same-red-channel-dialogue-round-1-translated.png",
+        "bytes": 84031,
+        "sha256": "05e2a3f2aebe8d9c011f79fa276616947a07b93d96f968a5cad06d5b93f3681e"
+      }
+    },
+    {
+      "scene": "prism-platform-gradient-signs",
+      "round": 0,
+      "expectedSource": [
+        "FOLLOW THE EASTERN TRACK",
+        "THE NEXT TRAIN IS ALMOST HERE",
+        "PLATFORM NINE IS OPEN",
+        "ROUTE C4"
+      ],
+      "texts": [
+        "FOLLOWTHEEASTERNTRACK",
+        "THENEXTTRAINIS ALMOST HERE",
+        "PLATFORM NINE IS OPEN",
+        "ROUTEC4"
+      ],
+      "ocrLines": [
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "FOLLOWTHEEASTERNTRACK",
+          "bbox": {
+            "x0": 181,
+            "y0": 130,
+            "x1": 1003,
+            "y1": 167
+          },
+          "fontSize": 37,
+          "sourceBoxes": [
+            {
+              "x0": 181,
+              "y0": 130,
+              "x1": 1003,
+              "y1": 167
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "THENEXTTRAINIS ALMOST HERE",
+          "bbox": {
+            "x0": 179,
+            "y0": 205,
+            "x1": 894,
+            "y1": 233
+          },
+          "fontSize": 28,
+          "sourceBoxes": [
+            {
+              "x0": 179,
+              "y0": 205,
+              "x1": 894,
+              "y1": 233
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "PLATFORM NINE IS OPEN",
+          "bbox": {
+            "x0": 831,
+            "y0": 480,
+            "x1": 1306,
+            "y1": 507
+          },
+          "fontSize": 27,
+          "sourceBoxes": [
+            {
+              "x0": 831,
+              "y0": 480,
+              "x1": 1306,
+              "y1": 507
+            }
+          ]
+        },
+        {
+          "text": "ROUTEC4",
+          "sourceText": "ROUTEC4",
+          "bbox": {
+            "x0": 113,
+            "y0": 490,
+            "x1": 244,
+            "y1": 514
+          },
+          "fontSize": 24,
+          "sourceBoxes": [
+            {
+              "x0": 113,
+              "y0": 490,
+              "x1": 244,
+              "y1": 514
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "FOLLOW THE EASTERN TRACK",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "THE NEXT TRAIN IS ALMOST HERE",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "PLATFORM NINE IS OPEN",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "ROUTE C4",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "4": 1,
+          "F": 2,
+          "O": 6,
+          "L": 4,
+          "W": 1,
+          "T": 9,
+          "H": 3,
+          "E": 10,
+          "A": 5,
+          "S": 4,
+          "R": 6,
+          "N": 6,
+          "C": 2,
+          "K": 1,
+          "X": 1,
+          "I": 4,
+          "M": 2,
+          "P": 2,
+          "U": 1
+        },
+        "actual": {
+          "4": 1,
+          "F": 2,
+          "O": 6,
+          "L": 4,
+          "W": 1,
+          "T": 9,
+          "H": 3,
+          "E": 10,
+          "A": 5,
+          "S": 4,
+          "R": 6,
+          "N": 6,
+          "C": 2,
+          "K": 1,
+          "X": 1,
+          "I": 4,
+          "M": 2,
+          "P": 2,
+          "U": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "PLATFORM NINE IS OPEN"
+          ],
+          "paragraphIndex": 2,
+          "found": true
+        },
+        {
+          "anchors": [
+            "ROUTE C4"
+          ],
+          "paragraphIndex": 3,
+          "found": true
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1600,
+          "height": 900,
+          "pixels": [
+            [
+              73,
+              110,
+              141,
+              255
+            ],
+            [
+              119,
+              99,
+              155,
+              255
+            ],
+            [
+              164,
+              211,
+              228,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1600,
+          "height": 900,
+          "pixels": [
+            [
+              73,
+              110,
+              141,
+              255
+            ],
+            [
+              119,
+              99,
+              155,
+              255
+            ],
+            [
+              164,
+              211,
+              228,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "prism-platform-gradient-signs-round-1-translated.png",
+        "bytes": 173668,
+        "sha256": "986fb2c5a445bca58ea4c93e53bef7902b6fdf02eed279ecf5cdbd9ba78070df"
+      }
+    },
+    {
+      "scene": "rain-garden-vertical-ruby-sidebar",
+      "round": 0,
+      "expectedSource": [
+        "風の音を聞いて",
+        "小道で待っている",
+        "かぜ",
+        "こみち",
+        "沿着花园的小路慢慢走。",
+        "雨停以后，我们在桥边见。"
+      ],
+      "texts": [
+        "こみち",
+        "沿着花园的小路慢慢走。",
+        "雨停以后，我们在桥边见。"
+      ],
+      "ocrLines": [
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "こみち",
+          "bbox": {
+            "x0": 775,
+            "y0": 150,
+            "x1": 802,
+            "y1": 217
+          },
+          "fontSize": 27,
+          "sourceBoxes": [
+            {
+              "x0": 775,
+              "y0": 150,
+              "x1": 802,
+              "y1": 217
+            }
+          ],
+          "vertical": true
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "沿着花园的小路慢慢走。",
+          "bbox": {
+            "x0": 102,
+            "y0": 1017,
+            "x1": 498,
+            "y1": 1049
+          },
+          "fontSize": 32,
+          "sourceBoxes": [
+            {
+              "x0": 102,
+              "y0": 1017,
+              "x1": 498,
+              "y1": 1049
+            }
+          ]
+        },
+        {
+          "text": "雨停以后，我们在桥边见。",
+          "sourceText": "雨停以后，我们在桥边见。",
+          "bbox": {
+            "x0": 102,
+            "y0": 1084,
+            "x1": 534,
+            "y1": 1117
+          },
+          "fontSize": 33,
+          "sourceBoxes": [
+            {
+              "x0": 102,
+              "y0": 1084,
+              "x1": 534,
+              "y1": 1117
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "風の音を聞いて",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "小道で待っている",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "found": false
+        },
+        {
+          "anchor": "こみち",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "沿着花园的小路慢慢走。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "雨停以后，我们在桥边见。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "風": 1,
+          "の": 1,
+          "音": 1,
+          "を": 1,
+          "聞": 1,
+          "い": 2,
+          "て": 2,
+          "小": 2,
+          "道": 1,
+          "で": 1,
+          "待": 1,
+          "っ": 1,
+          "る": 1,
+          "か": 1,
+          "ぜ": 1,
+          "こ": 1,
+          "み": 1,
+          "ち": 1,
+          "沿": 1,
+          "着": 1,
+          "花": 1,
+          "园": 1,
+          "的": 1,
+          "路": 1,
+          "慢": 2,
+          "走": 1,
+          "雨": 1,
+          "停": 1,
+          "以": 1,
+          "后": 1,
+          "我": 1,
+          "们": 1,
+          "在": 1,
+          "桥": 1,
+          "边": 1,
+          "见": 1
+        },
+        "actual": {
+          "こ": 1,
+          "み": 1,
+          "ち": 1,
+          "沿": 1,
+          "着": 1,
+          "花": 1,
+          "园": 1,
+          "的": 1,
+          "小": 1,
+          "路": 1,
+          "慢": 2,
+          "走": 1,
+          "雨": 1,
+          "停": 1,
+          "以": 1,
+          "后": 1,
+          "我": 1,
+          "们": 1,
+          "在": 1,
+          "桥": 1,
+          "边": 1,
+          "见": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "ocr-anchor",
+          "anchor": "風の音を聞いて",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "ocr-anchor",
+          "anchor": "小道で待っている",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "ocr-anchor",
+          "anchor": "かぜ",
+          "occurrences": 0,
+          "expectedOccurrences": 1,
+          "reason": "Actual production OCR does not contain the normalized expected anchor"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "こみち"
+          ],
+          "paragraphIndex": 0,
+          "found": true
+        },
+        {
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1100,
+          "height": 1500,
+          "pixels": [
+            [
+              213,
+              230,
+              230,
+              255
+            ],
+            [
+              108,
+              143,
+              122,
+              255
+            ],
+            [
+              223,
+              237,
+              238,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1100,
+          "height": 1500,
+          "pixels": [
+            [
+              213,
+              230,
+              230,
+              255
+            ],
+            [
+              108,
+              143,
+              122,
+              255
+            ],
+            [
+              223,
+              237,
+              238,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "rain-garden-vertical-ruby-sidebar-round-1-translated.png",
+        "bytes": 133920,
+        "sha256": "9d1b7d6361d8e1b34d2924a23cc202ffeaf540923b28f6dd8acf61a94b37d431"
+      }
+    },
+    {
+      "scene": "chess-picnic-neighbor-inverse-bubbles",
+      "round": 0,
+      "expectedSource": [
+        "YOUR MOVE WAS CLEVER.",
+        "LET US TRY ONCE MORE.",
+        "THE BOARD IS READY.",
+        "I SAVED YOU A SEAT."
+      ],
+      "texts": [
+        "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+        "THE BOARD IS READY.",
+        "I SAVED YOU A SEAT."
+      ],
+      "ocrLines": [
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+          "bbox": {
+            "x0": 109.5234375,
+            "y0": 155.24539877300612,
+            "x1": 575.390625,
+            "y1": 242.11656441717793
+          },
+          "fontSize": 29.319018404907972,
+          "sourceBoxes": [
+            {
+              "x0": 110.609375,
+              "y0": 155.24539877300612,
+              "x1": 575.390625,
+              "y1": 184.5644171779141
+            },
+            {
+              "x0": 109.5234375,
+              "y0": 213.159509202454,
+              "x1": 549.328125,
+              "y1": 242.11656441717793
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "THE BOARD IS READY.",
+          "bbox": {
+            "x0": 737,
+            "y0": 158,
+            "x1": 1128,
+            "y1": 184
+          },
+          "fontSize": 26,
+          "sourceBoxes": [
+            {
+              "x0": 737,
+              "y0": 158,
+              "x1": 1128,
+              "y1": 184
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "I SAVED YOU A SEAT.",
+          "bbox": {
+            "x0": 733,
+            "y0": 213,
+            "x1": 1110,
+            "y1": 240
+          },
+          "fontSize": 27,
+          "sourceBoxes": [
+            {
+              "x0": 733,
+              "y0": 213,
+              "x1": 1110,
+              "y1": 240
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "YOUR MOVE WAS CLEVER.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "LET US TRY ONCE MORE.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "THE BOARD IS READY.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "I SAVED YOU A SEAT.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "Y": 4,
+          "O": 6,
+          "U": 3,
+          "R": 6,
+          "M": 2,
+          "V": 3,
+          "E": 10,
+          "W": 1,
+          "A": 6,
+          "S": 5,
+          "C": 2,
+          "L": 2,
+          "T": 4,
+          "N": 1,
+          "H": 1,
+          "B": 1,
+          "D": 3,
+          "I": 2
+        },
+        "actual": {
+          "Y": 4,
+          "O": 6,
+          "U": 3,
+          "R": 6,
+          "M": 2,
+          "V": 3,
+          "E": 10,
+          "W": 1,
+          "A": 6,
+          "S": 5,
+          "C": 2,
+          "L": 2,
+          "T": 4,
+          "N": 1,
+          "H": 1,
+          "B": 1,
+          "D": 3,
+          "I": 2
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "YOUR MOVE WAS CLEVER.",
+            "LET US TRY ONCE MORE."
+          ],
+          "paragraphIndex": 0,
+          "found": true
+        },
+        {
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1280,
+          "height": 1000,
+          "pixels": [
+            [
+              239,
+              222,
+              180,
+              255
+            ],
+            [
+              240,
+              216,
+              165,
+              255
+            ],
+            [
+              218,
+              224,
+              197,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1280,
+          "height": 1000,
+          "pixels": [
+            [
+              239,
+              222,
+              180,
+              255
+            ],
+            [
+              240,
+              216,
+              165,
+              255
+            ],
+            [
+              218,
+              224,
+              197,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "chess-picnic-neighbor-inverse-bubbles-round-1-translated.png",
+        "bytes": 75711,
+        "sha256": "98206a87d3ce473af6dbb07e89e8741f0ab799457c14b5b6f516f154f9888b01"
+      }
+    },
+    {
+      "scene": "lantern-market-oblique-bilingual-captions",
+      "round": 0,
+      "expectedSource": [
+        "等天晴以后再出发。",
+        "雨あがりの市場へ",
+        "THE LANTERNS ARE STILL WARM.",
+        "LET US WALK HOME TOGETHER.",
+        "ADMIT ONE 18:30"
+      ],
+      "texts": [
+        "等天晴以后再出发。",
+        "雨あがりの市場へ",
+        "THE LANTERNS ARE STILL WARM.",
+        "LET US WALK HOME TOGETHER.",
+        "ADMITONE18:30"
+      ],
+      "ocrLines": [
+        {
+          "text": "等天晴以后再出发。",
+          "sourceText": "等天晴以后再出发。",
+          "bbox": {
+            "x0": 98,
+            "y0": 95,
+            "x1": 481,
+            "y1": 177
+          },
+          "fontSize": 82,
+          "sourceBoxes": [
+            {
+              "x0": 98,
+              "y0": 95,
+              "x1": 481,
+              "y1": 177
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "雨あがりの市場へ",
+          "bbox": {
+            "x0": 776,
+            "y0": 189,
+            "x1": 1100,
+            "y1": 281
+          },
+          "fontSize": 92,
+          "sourceBoxes": [
+            {
+              "x0": 776,
+              "y0": 189,
+              "x1": 1100,
+              "y1": 281
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "THE LANTERNS ARE STILL WARM.",
+          "bbox": {
+            "x0": 145,
+            "y0": 714,
+            "x1": 740,
+            "y1": 739
+          },
+          "fontSize": 25,
+          "sourceBoxes": [
+            {
+              "x0": 145,
+              "y0": 714,
+              "x1": 740,
+              "y1": 739
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "LET US WALK HOME TOGETHER.",
+          "bbox": {
+            "x0": 145,
+            "y0": 772,
+            "x1": 714,
+            "y1": 797
+          },
+          "fontSize": 25,
+          "sourceBoxes": [
+            {
+              "x0": 145,
+              "y0": 772,
+              "x1": 714,
+              "y1": 797
+            }
+          ]
+        },
+        {
+          "text": "ADMITONE18:30",
+          "sourceText": "ADMITONE18:30",
+          "bbox": {
+            "x0": 1005,
+            "y0": 865,
+            "x1": 1185,
+            "y1": 899
+          },
+          "fontSize": 34,
+          "sourceBoxes": [
+            {
+              "x0": 1005,
+              "y0": 865,
+              "x1": 1185,
+              "y1": 899
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "等天晴以后再出发。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "雨あがりの市場へ",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "THE LANTERNS ARE STILL WARM.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "LET US WALK HOME TOGETHER.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "ADMIT ONE 18:30",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "0": 1,
+          "1": 1,
+          "3": 1,
+          "8": 1,
+          "等": 1,
+          "天": 1,
+          "晴": 1,
+          "以": 1,
+          "后": 1,
+          "再": 1,
+          "出": 1,
+          "发": 1,
+          "雨": 1,
+          "あ": 1,
+          "が": 1,
+          "り": 1,
+          "の": 1,
+          "市": 1,
+          "場": 1,
+          "へ": 1,
+          "T": 7,
+          "H": 3,
+          "E": 8,
+          "L": 5,
+          "A": 5,
+          "N": 3,
+          "R": 4,
+          "S": 3,
+          "I": 2,
+          "W": 2,
+          "M": 3,
+          "U": 1,
+          "K": 1,
+          "O": 3,
+          "G": 1,
+          "D": 1
+        },
+        "actual": {
+          "0": 1,
+          "1": 1,
+          "3": 1,
+          "8": 1,
+          "等": 1,
+          "天": 1,
+          "晴": 1,
+          "以": 1,
+          "后": 1,
+          "再": 1,
+          "出": 1,
+          "发": 1,
+          "雨": 1,
+          "あ": 1,
+          "が": 1,
+          "り": 1,
+          "の": 1,
+          "市": 1,
+          "場": 1,
+          "へ": 1,
+          "T": 7,
+          "H": 3,
+          "E": 8,
+          "L": 5,
+          "A": 5,
+          "N": 3,
+          "R": 4,
+          "S": 3,
+          "I": 2,
+          "W": 2,
+          "M": 3,
+          "U": 1,
+          "K": 1,
+          "O": 3,
+          "G": 1,
+          "D": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "等天晴以后再出发。"
+          ],
+          "paragraphIndex": 0,
+          "found": true
+        },
+        {
+          "anchors": [
+            "雨あがりの市場へ"
+          ],
+          "paragraphIndex": 1,
+          "found": true
+        },
+        {
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "ADMIT ONE 18:30"
+          ],
+          "paragraphIndex": 4,
+          "found": true
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1400,
+          "height": 1050,
+          "pixels": [
+            [
+              226,
+              116,
+              107,
+              255
+            ],
+            [
+              226,
+              116,
+              107,
+              255
+            ],
+            [
+              67,
+              86,
+              121,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1400,
+          "height": 1050,
+          "pixels": [
+            [
+              226,
+              116,
+              107,
+              255
+            ],
+            [
+              226,
+              116,
+              107,
+              255
+            ],
+            [
+              67,
+              86,
+              121,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "lantern-market-oblique-bilingual-captions-round-1-translated.png",
+        "bytes": 138178,
+        "sha256": "f3255a8c9da29fe2dc8cf42cd1de5d87d8b1ff79c296764a1f8e5f0fa3e69c5a"
+      }
+    },
+    {
+      "scene": "watercolor-ferry-translucent-notification",
+      "round": 0,
+      "expectedSource": [
+        "THE RIVER IS CLEAR TODAY.",
+        "PLEASE STEP ABOARD QUIETLY.",
+        "A SOFT BREEZE FROM THE WEST",
+        "POSTCARD FROM THE FERRY"
+      ],
+      "texts": [
+        "THE RIVERIS CLEAR TODAY",
+        "PLEASE STEP ABOARD QUIETLY.",
+        "ASOFT BREEZE FROMTHE WEST",
+        "POSTCARD FROM THE FERRY"
+      ],
+      "ocrLines": [
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "THE RIVERIS CLEAR TODAY",
+          "bbox": {
+            "x0": 177,
+            "y0": 212,
+            "x1": 717,
+            "y1": 236
+          },
+          "fontSize": 24,
+          "sourceBoxes": [
+            {
+              "x0": 177,
+              "y0": 212,
+              "x1": 717,
+              "y1": 236
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "PLEASE STEP ABOARD QUIETLY.",
+          "bbox": {
+            "x0": 175,
+            "y0": 276,
+            "x1": 765,
+            "y1": 299
+          },
+          "fontSize": 23,
+          "sourceBoxes": [
+            {
+              "x0": 175,
+              "y0": 276,
+              "x1": 765,
+              "y1": 299
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "ASOFT BREEZE FROMTHE WEST",
+          "bbox": {
+            "x0": 152,
+            "y0": 513,
+            "x1": 669,
+            "y1": 538
+          },
+          "fontSize": 25,
+          "sourceBoxes": [
+            {
+              "x0": 152,
+              "y0": 513,
+              "x1": 669,
+              "y1": 538
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "POSTCARD FROM THE FERRY",
+          "bbox": {
+            "x0": 301,
+            "y0": 891,
+            "x1": 667,
+            "y1": 907
+          },
+          "fontSize": 16,
+          "sourceBoxes": [
+            {
+              "x0": 301,
+              "y0": 891,
+              "x1": 667,
+              "y1": 907
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "THE RIVER IS CLEAR TODAY.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "PLEASE STEP ABOARD QUIETLY.",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "A SOFT BREEZE FROM THE WEST",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "POSTCARD FROM THE FERRY",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "T": 9,
+          "H": 3,
+          "E": 14,
+          "R": 10,
+          "I": 3,
+          "V": 1,
+          "S": 6,
+          "C": 2,
+          "L": 3,
+          "A": 7,
+          "O": 6,
+          "D": 3,
+          "Y": 3,
+          "P": 3,
+          "B": 2,
+          "Q": 1,
+          "U": 1,
+          "F": 4,
+          "Z": 1,
+          "M": 2,
+          "W": 1
+        },
+        "actual": {
+          "T": 9,
+          "H": 3,
+          "E": 14,
+          "R": 10,
+          "I": 3,
+          "V": 1,
+          "S": 6,
+          "C": 2,
+          "L": 3,
+          "A": 7,
+          "O": 6,
+          "D": 3,
+          "Y": 3,
+          "P": 3,
+          "B": 2,
+          "Q": 1,
+          "U": 1,
+          "F": 4,
+          "Z": 1,
+          "M": 2,
+          "W": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "A SOFT BREEZE FROM THE WEST"
+          ],
+          "paragraphIndex": 2,
+          "found": true
+        },
+        {
+          "anchors": [
+            "POSTCARD FROM THE FERRY"
+          ],
+          "paragraphIndex": 3,
+          "found": true
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1200,
+          "height": 1000,
+          "pixels": [
+            [
+              101,
+              80,
+              113,
+              255
+            ],
+            [
+              237,
+              224,
+              182,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1200,
+          "height": 1000,
+          "pixels": [
+            [
+              101,
+              80,
+              113,
+              255
+            ],
+            [
+              237,
+              224,
+              182,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "watercolor-ferry-translucent-notification-round-1-translated.png",
+        "bytes": 165961,
+        "sha256": "239d7f959a4a2dd8de51dc2938dd4a7924641f346adc0d0fad6b0ec3002ca9f5"
+      }
+    },
+    {
+      "scene": "orbital-greenhouse-cutout-dialogue",
+      "round": 0,
+      "expectedSource": [
+        "新的叶子已经展开了。",
+        "把水送到靠窗的一排。",
+        "ここなら星が見える。",
+        "明日も一緒に育てよう。",
+        "SECTION 04",
+        "窓を閉めてから戻る。"
+      ],
+      "texts": [
+        "新的叶子已经展开了。",
+        "把水送到靠窗的一排。",
+        "ここなら星が見える。",
+        "明日も一緒に育てよう。",
+        "SECTION 04",
+        "窓を閉めてから戻る。"
+      ],
+      "ocrLines": [
+        {
+          "text": "新的叶子已经展开了。",
+          "sourceText": "新的叶子已经展开了。",
+          "bbox": {
+            "x0": 151,
+            "y0": 145,
+            "x1": 516,
+            "y1": 176
+          },
+          "fontSize": 31,
+          "sourceBoxes": [
+            {
+              "x0": 151,
+              "y0": 145,
+              "x1": 516,
+              "y1": 176
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "把水送到靠窗的一排。",
+          "bbox": {
+            "x0": 151,
+            "y0": 208,
+            "x1": 517,
+            "y1": 239
+          },
+          "fontSize": 31,
+          "sourceBoxes": [
+            {
+              "x0": 151,
+              "y0": 208,
+              "x1": 517,
+              "y1": 239
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "ここなら星が見える。",
+          "bbox": {
+            "x0": 803,
+            "y0": 453,
+            "x1": 1161,
+            "y1": 487
+          },
+          "fontSize": 34,
+          "sourceBoxes": [
+            {
+              "x0": 803,
+              "y0": 453,
+              "x1": 1161,
+              "y1": 487
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "明日も一緒に育てよう。",
+          "bbox": {
+            "x0": 801,
+            "y0": 514,
+            "x1": 1194,
+            "y1": 547
+          },
+          "fontSize": 33,
+          "sourceBoxes": [
+            {
+              "x0": 801,
+              "y0": 514,
+              "x1": 1194,
+              "y1": 547
+            }
+          ]
+        },
+        {
+          "text": "SECTION 04",
+          "sourceText": "SECTION 04",
+          "bbox": {
+            "x0": 123,
+            "y0": 854,
+            "x1": 262,
+            "y1": 876
+          },
+          "fontSize": 22,
+          "sourceBoxes": [
+            {
+              "x0": 123,
+              "y0": 854,
+              "x1": 262,
+              "y1": 876
+            }
+          ]
+        },
+        {
+          "text": "流畅阅读：看懂每一页漫画",
+          "sourceText": "窓を閉めてから戻る。",
+          "bbox": {
+            "x0": 501,
+            "y0": 972,
+            "x1": 784,
+            "y1": 998
+          },
+          "fontSize": 26,
+          "sourceBoxes": [
+            {
+              "x0": 501,
+              "y0": 972,
+              "x1": 784,
+              "y1": 998
+            }
+          ]
+        }
+      ],
+      "observedNoBitmap": false,
+      "anchors": [
+        {
+          "anchor": "新的叶子已经展开了。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "把水送到靠窗的一排。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "ここなら星が見える。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "明日も一緒に育てよう。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "SECTION 04",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        },
+        {
+          "anchor": "窓を閉めてから戻る。",
+          "occurrences": 1,
+          "expectedOccurrences": 1,
+          "found": true
+        }
+      ],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {
+          "0": 1,
+          "4": 1,
+          "新": 1,
+          "的": 2,
+          "叶": 1,
+          "子": 1,
+          "已": 1,
+          "经": 1,
+          "展": 1,
+          "开": 1,
+          "了": 1,
+          "把": 1,
+          "水": 1,
+          "送": 1,
+          "到": 1,
+          "靠": 1,
+          "窗": 1,
+          "一": 2,
+          "排": 1,
+          "こ": 2,
+          "な": 1,
+          "ら": 2,
+          "星": 1,
+          "が": 1,
+          "見": 1,
+          "え": 1,
+          "る": 2,
+          "明": 1,
+          "日": 1,
+          "も": 1,
+          "緒": 1,
+          "に": 1,
+          "育": 1,
+          "て": 2,
+          "よ": 1,
+          "う": 1,
+          "S": 1,
+          "E": 1,
+          "C": 1,
+          "T": 1,
+          "I": 1,
+          "O": 1,
+          "N": 1,
+          "窓": 1,
+          "を": 1,
+          "閉": 1,
+          "め": 1,
+          "か": 1,
+          "戻": 1
+        },
+        "actual": {
+          "0": 1,
+          "4": 1,
+          "新": 1,
+          "的": 2,
+          "叶": 1,
+          "子": 1,
+          "已": 1,
+          "经": 1,
+          "展": 1,
+          "开": 1,
+          "了": 1,
+          "把": 1,
+          "水": 1,
+          "送": 1,
+          "到": 1,
+          "靠": 1,
+          "窗": 1,
+          "一": 2,
+          "排": 1,
+          "こ": 2,
+          "な": 1,
+          "ら": 2,
+          "星": 1,
+          "が": 1,
+          "見": 1,
+          "え": 1,
+          "る": 2,
+          "明": 1,
+          "日": 1,
+          "も": 1,
+          "緒": 1,
+          "に": 1,
+          "育": 1,
+          "て": 2,
+          "よ": 1,
+          "う": 1,
+          "S": 1,
+          "E": 1,
+          "C": 1,
+          "T": 1,
+          "I": 1,
+          "O": 1,
+          "N": 1,
+          "窓": 1,
+          "を": 1,
+          "閉": 1,
+          "め": 1,
+          "か": 1,
+          "戻": 1
+        },
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false,
+          "reason": "Each general group must match a complete normalized actual source paragraph in order, without borrowing text from other groups"
+        }
+      ],
+      "paragraphGroups": [
+        {
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1,
+          "found": false
+        },
+        {
+          "anchors": [
+            "SECTION 04"
+          ],
+          "paragraphIndex": 4,
+          "found": true
+        },
+        {
+          "anchors": [
+            "窓を閉めてから戻る。"
+          ],
+          "paragraphIndex": 5,
+          "found": true
+        }
+      ],
+      "protectedPixels": {
+        "source": {
+          "width": 1400,
+          "height": 1100,
+          "pixels": [
+            [
+              161,
+              207,
+              161,
+              255
+            ],
+            [
+              161,
+              207,
+              161,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1400,
+          "height": 1100,
+          "pixels": [
+            [
+              161,
+              207,
+              161,
+              255
+            ],
+            [
+              161,
+              207,
+              161,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "translatedPng": {
+        "file": "orbital-greenhouse-cutout-dialogue-round-1-translated.png",
+        "bytes": 182255,
+        "sha256": "08aecb09b843455a6b09dbf71f0b22b26515f0517775d27152017d70b7c33206"
+      }
+    },
+    {
+      "scene": "wordless-stained-glass-cutout-garden",
+      "round": 0,
+      "expectedSource": [],
+      "texts": [],
+      "ocrLines": [],
+      "observedNoBitmap": true,
+      "anchors": [],
+      "negativeDetections": [],
+      "sourceCharacterInventory": {
+        "expected": {},
+        "actual": {},
+        "excess": [],
+        "scope": "Normalized Unicode character counts detect additions; they do not prove complete recognition, text order, or artwork provenance"
+      },
+      "qualityFailures": [],
+      "protectedPixels": {
+        "source": {
+          "width": 1200,
+          "height": 1000,
+          "pixels": [
+            [
+              205,
+              212,
+              177,
+              255
+            ],
+            [
+              205,
+              212,
+              177,
+              255
+            ]
+          ]
+        },
+        "translated": {
+          "width": 1200,
+          "height": 1000,
+          "pixels": [
+            [
+              205,
+              212,
+              177,
+              255
+            ],
+            [
+              205,
+              212,
+              177,
+              255
+            ]
+          ]
+        }
+      },
+      "restoreAndRedisplay": {
+        "sourcePreserved": true,
+        "bitmapPreserved": true,
+        "additionalOcrOperations": 0,
+        "additionalTextRequests": 0
+      },
+      "wordlessPage": {
+        "noTextTransport": true,
+        "noBitmap": true,
+        "sourcePreserved": true
+      },
+      "translatedPng": {
+        "file": "wordless-stained-glass-cutout-garden-round-1-translated.png",
+        "bytes": 29870,
+        "sha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0"
+      }
+    }
+  ],
+  "pixelAcceptance": {
+    "scope": "Independent protected-pixel payload oracle; not OCR, presentation, cache or linguistic acceptance",
+    "planSha256": "b20fde0bd05c47d065ea833c491ca88b95578faa47e808604e6973ec0b3a1c64",
+    "suite": "new-eight-in-original-order",
+    "passed": false,
+    "rawTruthPassedScenes": 6,
+    "nativePreservationPassedScenes": 8,
+    "cases": [
+      {
+        "scene": "harbor-same-red-channel-dialogue",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+        "outputPngSha256": "05e2a3f2aebe8d9c011f79fa276616947a07b93d96f968a5cad06d5b93f3681e",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 706,
+            "source": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "output": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 738,
+            "source": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "output": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "output": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 0,
+          "rawRgbaSha256": "e533d0cb9d3d49be845b091edbaed81e344496e3a424cedcc4dcfec62ac3e3ee",
+          "nativeRgbaSha256": "e533d0cb9d3d49be845b091edbaed81e344496e3a424cedcc4dcfec62ac3e3ee",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 706,
+            "source": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "output": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 738,
+            "source": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "output": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "output": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 706,
+            "source": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "output": [
+              191,
+              122,
+              93,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 738,
+            "source": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "output": [
+              57,
+              59,
+              66,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "output": [
+              245,
+              226,
+              192,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 0,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": true
+      },
+      {
+        "scene": "prism-platform-gradient-signs",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+        "outputPngSha256": "986fb2c5a445bca58ea4c93e53bef7902b6fdf02eed279ecf5cdbd9ba78070df",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 120,
+            "y": 790,
+            "source": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "output": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1450,
+            "y": 730,
+            "source": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "output": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "output": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 0,
+          "rawRgbaSha256": "b71724e9b05741737cd511f1a458124c887af822b5fa174b52e6ab680d023d6b",
+          "nativeRgbaSha256": "b71724e9b05741737cd511f1a458124c887af822b5fa174b52e6ab680d023d6b",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 120,
+            "y": 790,
+            "source": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "output": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1450,
+            "y": 730,
+            "source": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "output": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "output": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 120,
+            "y": 790,
+            "source": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "output": [
+              73,
+              110,
+              141,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1450,
+            "y": 730,
+            "source": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "output": [
+              119,
+              99,
+              155,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "output": [
+              164,
+              211,
+              228,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 0,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": true
+      },
+      {
+        "scene": "rain-garden-vertical-ruby-sidebar",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+        "outputPngSha256": "9d1b7d6361d8e1b34d2924a23cc202ffeaf540923b28f6dd8acf61a94b37d431",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 290,
+            "y": 440,
+            "source": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "output": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 500,
+            "y": 1340,
+            "source": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "output": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 25,
+            "y": 25,
+            "source": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "output": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 0,
+          "rawRgbaSha256": "90892c107cbd9d107b8db09672b70924a9195f14dce20ba81b4c5c0a06a16d84",
+          "nativeRgbaSha256": "90892c107cbd9d107b8db09672b70924a9195f14dce20ba81b4c5c0a06a16d84",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 290,
+            "y": 440,
+            "source": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "output": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 500,
+            "y": 1340,
+            "source": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "output": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 25,
+            "y": 25,
+            "source": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "output": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 290,
+            "y": 440,
+            "source": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "output": [
+              213,
+              230,
+              230,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 500,
+            "y": 1340,
+            "source": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "output": [
+              108,
+              143,
+              122,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 25,
+            "y": 25,
+            "source": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "output": [
+              223,
+              237,
+              238,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 0,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": true
+      },
+      {
+        "scene": "chess-picnic-neighbor-inverse-bubbles",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+        "outputPngSha256": "98206a87d3ce473af6dbb07e89e8741f0ab799457c14b5b6f516f154f9888b01",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 188,
+            "y": 628,
+            "source": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "output": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 938,
+            "y": 736,
+            "source": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "output": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "output": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 0,
+          "rawRgbaSha256": "ea66a32161ad24cc883d3eb65d6b1c3aabf2d703c2087e73205ad3c3aec7063e",
+          "nativeRgbaSha256": "ea66a32161ad24cc883d3eb65d6b1c3aabf2d703c2087e73205ad3c3aec7063e",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 188,
+            "y": 628,
+            "source": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "output": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 938,
+            "y": 736,
+            "source": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "output": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "output": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 188,
+            "y": 628,
+            "source": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "output": [
+              239,
+              222,
+              180,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 938,
+            "y": 736,
+            "source": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "output": [
+              240,
+              216,
+              165,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "output": [
+              218,
+              224,
+              197,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 0,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": true
+      },
+      {
+        "scene": "lantern-market-oblique-bilingual-captions",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+        "outputPngSha256": "f3255a8c9da29fe2dc8cf42cd1de5d87d8b1ff79c296764a1f8e5f0fa3e69c5a",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 490,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 550,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "output": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 0,
+          "rawRgbaSha256": "ee412ed916f1c136a583b35f8116c479a34993ceb560dc260eb93c531a780717",
+          "nativeRgbaSha256": "ee412ed916f1c136a583b35f8116c479a34993ceb560dc260eb93c531a780717",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 490,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 550,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "output": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 210,
+            "y": 490,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1180,
+            "y": 550,
+            "source": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "output": [
+              226,
+              116,
+              107,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 2,
+            "x": 20,
+            "y": 20,
+            "source": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "output": [
+              67,
+              86,
+              121,
+              255
+            ],
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 0,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": true
+      },
+      {
+        "scene": "watercolor-ferry-translucent-notification",
+        "errors": [],
+        "rawTruthPassed": false,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+        "outputPngSha256": "239d7f959a4a2dd8de51dc2938dd4a7924641f346adc0d0fad6b0ec3002ca9f5",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 580,
+            "y": 790,
+            "source": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "output": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 720,
+            "y": 745,
+            "source": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "output": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 50,
+            "y": 50,
+            "source": [
+              171,
+              212,
+              220,
+              123
+            ],
+            "output": [
+              170,
+              211,
+              220,
+              123
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 200,
+            "y": 400,
+            "source": [
+              206,
+              226,
+              237,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 600,
+            "y": 100,
+            "source": [
+              206,
+              226,
+              237,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": false
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 948202,
+          "rawRgbaSha256": "6ba4595182775acb04c0bdfe7ee5b2d708e1ea2a4377d60070ba133509856a68",
+          "nativeRgbaSha256": "65d4336bc8f0e35cc16e08065359f6538dfddc65483aa6611cf735aa4c78886e",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 580,
+            "y": 790,
+            "source": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "output": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 720,
+            "y": 745,
+            "source": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "output": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 50,
+            "y": 50,
+            "source": [
+              170,
+              211,
+              220,
+              123
+            ],
+            "output": [
+              170,
+              211,
+              220,
+              123
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 200,
+            "y": 400,
+            "source": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 600,
+            "y": 100,
+            "source": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 580,
+            "y": 790,
+            "source": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "output": [
+              101,
+              80,
+              113,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 720,
+            "y": 745,
+            "source": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "output": [
+              237,
+              224,
+              182,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 50,
+            "y": 50,
+            "source": [
+              171,
+              212,
+              220,
+              123
+            ],
+            "output": [
+              170,
+              211,
+              220,
+              123
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 200,
+            "y": 400,
+            "source": [
+              206,
+              226,
+              237,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 600,
+            "y": 100,
+            "source": [
+              206,
+              226,
+              237,
+              68
+            ],
+            "output": [
+              206,
+              225,
+              236,
+              68
+            ],
+            "passed": false
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 12725,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": false
+      },
+      {
+        "scene": "orbital-greenhouse-cutout-dialogue",
+        "errors": [],
+        "rawTruthPassed": false,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+        "outputPngSha256": "08aecb09b843455a6b09dbf71f0b22b26515f0517775d27152017d70b7c33206",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 340,
+            "y": 600,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1160,
+            "y": 825,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 700,
+            "y": 210,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 700,
+            "y": 620,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              131,
+              165,
+              176,
+              90
+            ],
+            "output": [
+              130,
+              164,
+              176,
+              90
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 680,
+              "y0": 190,
+              "x1": 720,
+              "y1": 230
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 1,
+            "bbox": {
+              "x0": 680,
+              "y0": 600,
+              "x1": 720,
+              "y1": 640
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 1479224,
+          "rawRgbaSha256": "9711976ae318aaa35cbc3dd107166a85dd603662b88108d99d40b8a9374347cd",
+          "nativeRgbaSha256": "0ca1c65b95531349e0f9a03ff12f4ca594c4d4ef2f50e21de8d9d1371acd153e",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 340,
+            "y": 600,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1160,
+            "y": 825,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 700,
+            "y": 210,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 700,
+            "y": 620,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              130,
+              164,
+              176,
+              90
+            ],
+            "output": [
+              130,
+              164,
+              176,
+              90
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 680,
+              "y0": 190,
+              "x1": 720,
+              "y1": 230
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 1,
+            "bbox": {
+              "x0": 680,
+              "y0": 600,
+              "x1": 720,
+              "y1": 640
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 340,
+            "y": 600,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 1160,
+            "y": 825,
+            "source": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "output": [
+              161,
+              207,
+              161,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 700,
+            "y": 210,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 700,
+            "y": 620,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 2,
+            "x": 30,
+            "y": 30,
+            "source": [
+              131,
+              165,
+              176,
+              90
+            ],
+            "output": [
+              130,
+              164,
+              176,
+              90
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 680,
+              "y0": 190,
+              "x1": 720,
+              "y1": 230
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 1,
+            "bbox": {
+              "x0": 680,
+              "y0": 600,
+              "x1": 720,
+              "y1": 640
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 1164263,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "passed": false
+      },
+      {
+        "scene": "wordless-stained-glass-cutout-garden",
+        "errors": [],
+        "rawTruthPassed": true,
+        "nativePreservationPassed": true,
+        "sourcePngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+        "outputPngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+        "rawChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 240,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 960,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 600,
+            "y": 500,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 60,
+            "y": 60,
+            "source": [
+              39,
+              57,
+              88,
+              150
+            ],
+            "output": [
+              39,
+              57,
+              88,
+              150
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 580,
+              "y0": 480,
+              "x1": 620,
+              "y1": 520
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "complete-wordless-source",
+            "pixels": 1200000,
+            "sourceSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+            "outputSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+            "changedPixels": 0,
+            "passed": true
+          }
+        ],
+        "rawVsNativeSource": {
+          "changedPixels": 762948,
+          "rawRgbaSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+          "nativeRgbaSha256": "a61bbe563ee13a50aeb26a0fc70e75d6250aaaf1eaeee0a57f41a8b870429279",
+          "scope": "Decode/color/premultiply difference only, never counted as an output repair success"
+        },
+        "nativeChecks": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 240,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 960,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 600,
+            "y": 500,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 60,
+            "y": 60,
+            "source": [
+              39,
+              58,
+              88,
+              150
+            ],
+            "output": [
+              39,
+              58,
+              88,
+              150
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 580,
+              "y0": 480,
+              "x1": 620,
+              "y1": 520
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "complete-wordless-source",
+            "pixels": 1200000,
+            "sourceSha256": "a61bbe563ee13a50aeb26a0fc70e75d6250aaaf1eaeee0a57f41a8b870429279",
+            "outputSha256": "a61bbe563ee13a50aeb26a0fc70e75d6250aaaf1eaeee0a57f41a8b870429279",
+            "changedPixels": 0,
+            "passed": true
+          }
+        ],
+        "rawVsNativeSourceAtProtected": [
+          {
+            "kind": "rgb-probe",
+            "index": 0,
+            "x": 240,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "rgb-probe",
+            "index": 1,
+            "x": 960,
+            "y": 500,
+            "source": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "output": [
+              205,
+              212,
+              177,
+              255
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 0,
+            "x": 600,
+            "y": 500,
+            "source": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "output": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "passed": true
+          },
+          {
+            "kind": "protectedRgbaProbes",
+            "index": 1,
+            "x": 60,
+            "y": 60,
+            "source": [
+              39,
+              57,
+              88,
+              150
+            ],
+            "output": [
+              39,
+              58,
+              88,
+              150
+            ],
+            "passed": false
+          },
+          {
+            "kind": "protectedRgbaRegions",
+            "index": 0,
+            "bbox": {
+              "x0": 580,
+              "y0": 480,
+              "x1": 620,
+              "y1": 520
+            },
+            "pixels": 1600,
+            "sourceSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "outputSha256": "56a43ef88ddfcd0f56f7dd973312c0e73d62f59655c01d7b4e59aaa3be8b3fb6",
+            "changedPixels": 0,
+            "passed": true
+          },
+          {
+            "kind": "complete-wordless-source",
+            "pixels": 1200000,
+            "sourceSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+            "outputSha256": "a61bbe563ee13a50aeb26a0fc70e75d6250aaaf1eaeee0a57f41a8b870429279",
+            "changedPixels": 762948,
+            "passed": false
+          }
+        ],
+        "outputPngVsNativeOutput": {
+          "changedPixels": 762948,
+          "scope": "Raw output-PNG decode versus native readback; report separately, no tolerance"
+        },
+        "noBitmapEvidence": {
+          "successfulLayoutResponse": true,
+          "observedNoBitmap": true,
+          "noTranslatedSurface": true,
+          "originalVisible": true,
+          "sourceAttributesExact": true,
+          "requestId": "image-af621476-4ea1-4779-b0d9-70677cd00e79"
+        },
+        "passed": true
+      }
+    ],
+    "limitations": [
+      "Receipt timing/provenance requires the actual runner trace; JSON assertions alone are not browser proof.",
+      "Both exact raw truth and same-browser native preservation are reported; raw quantization failures remain failures.",
+      "Pixel equality does not prove OCR/text/paragraph/negative gates or source UI restore/cache/resource behavior.",
+      "Native readbacks here are test-only instrumentation and cannot be counted as production adapter work."
+    ]
+  },
+  "resourcesAndCleanup": {
+    "scope": "These model/runtime/cleanup fields belong to the full fourteen-scene invocation, not eight separately launched profiles.",
+    "modelCache": {
+      "files": [
+        {
+          "key": "detection",
+          "filename": "PP-OCRv6_small_det.onnx",
+          "bytes": 9880512,
+          "sha256": "d73e0058b7a8086bbd57f3d10b8bcd4ff95363f67e06e2762b5e814fe9c9410e",
+          "cache": "hit"
+        },
+        {
+          "key": "recognition",
+          "filename": "PP-OCRv6_small_rec.onnx",
+          "bytes": 21159378,
+          "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
+          "cache": "hit"
+        },
+        {
+          "key": "charactersDictionary",
+          "filename": "ppocrv6_dict.txt",
+          "bytes": 74948,
+          "sha256": "41557512862dfe31970cf22407742b629725461dd84c0d8771bde9c87c2202c8",
+          "cache": "hit"
+        },
+        {
+          "key": "inpainting",
+          "filename": "lama-manga-dynamic.onnx",
+          "bytes": 206291843,
+          "sha256": "de31ffa5ba26916b8ea35319f6c12151ff9654d4261bccf0583a69bb095315f9",
+          "cache": "hit"
+        }
+      ],
+      "networkDownloads": 0
+    },
+    "modelRequests": [],
+    "modelsPreloaded": true,
+    "modelRequestsAfterPreload": 0,
+    "standardPassed": true,
+    "offscreenAndWorkersPassed": false,
+    "offscreenAndWorkersCounts": {
+      "errors": 0,
+      "warnings": 1,
+      "rawErrors": 0,
+      "rawWarnings": 2,
+      "advisories": 0
+    },
+    "diagnosticsPassed": false,
+    "browserClosed": true,
+    "profileRemoved": true,
+    "cleanupErrors": [],
+    "diagnosticFinalizationErrors": []
+  },
+  "limitations": [
+    "Seven complete anchors are absent in the stock source OCR. All seven text scenes still have declared exact paragraph failures; only the wordless scene is strict green.",
+    "Raw PNG protected RGBA fails in two scenes at four translucent probes. Native decoded-source preservation passes all eight; decode/premultiply differences are recorded separately and are not repair successes.",
+    "The wordless case is manga-only with actual zero source text and noBitmap. It is not admitted to ordinary-image mode.",
+    "A unique ORT placement warning has two raw observations and remains blocking because functional quality failed. No claim of warning-free runtime.",
+    "The historical source manifest firstOcrStatus remains byte-for-byte the pre-OCR wording; this separate file records subsequent first observation.",
+    "No source text, PNG, box, paragraph, negative region or expected pixel was adjusted after OCR. This curation does not imply the current candidate or branch has passed these cases."
+  ]
+}

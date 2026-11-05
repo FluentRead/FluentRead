@@ -32,7 +32,7 @@ async function main() {
   const testRequire = createRequire(require.resolve('vitest/package.json'));
   const {createServer} = await import(pathToFileURL(path.join(path.dirname(testRequire.resolve('vite/package.json')), 'dist/node/index.js')).href);
   const hmrServer = require('node:http').createServer();
-  const server = await createServer({root: repository, configFile: false, server: {middlewareMode: true, hmr: {server: hmrServer}},
+  const server = await createServer({root: repository, configFile: path.join(__dirname, 'pdfjs-reader-audit.config.ts'), server: {middlewareMode: true, hmr: {server: hmrServer}},
     resolve: {alias: {'@': repository}}, optimizeDeps: {noDiscovery: true}});
   const report = {schema: 1, generatedAt: new Date().toISOString(), node: process.version,
     manifestSha256: sha(fs.readFileSync(manifestPath)), pipeline: ['PDF.js', 'pdfTextAtoms', 'analyzePdfPageLayout', 'pdfPageSegments', 'buildPdfReadingPlan'],

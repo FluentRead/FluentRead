@@ -1,8 +1,8 @@
 /**
  * @file src/platform/shadow-ui/vue.ts
  *
- * 文件职责：把 Vue 应用挂载到扩展创建的隔离 Shadow DOM，并注入跨 feature 共享的基础样式与事件隔离设置。
- * 主要内容：定义 VueShadowMount 与 VueShadowUiOptions，把独立浮层宿主挂到 html 以跨越软导航的 body 替换，创建隔离样式和 app，将当前自有容器交给装配 hook；异步创建前后检查扩展上下文，释放失败构建的 app 与 DOM，并按挂载归属返回由 WXT 管理的资源句柄。
+ * 文件职责：把 Vue 应用挂载到扩展创建的隔离 Shadow DOM，并注入跨 feature 基础样式与 feature 明确提供的局部样式。
+ * 主要内容：定义 VueShadowMount 与 VueShadowUiOptions，把独立浮层宿主挂到 html 以跨越软导航的 body 替换，组合基础样式和调用方 CSS 后再创建 app；将自有容器交给装配 hook；异步创建前后检查扩展上下文，释放失败构建的 app 与 DOM，并按挂载归属返回由 WXT 管理的资源句柄。
  * 模块边界：本文件属于 platform 基础设施边界，只封装浏览器、网络、存储上下文或 Shadow DOM 机制；不决定翻译业务策略，不直接实现 feature，业务层通过类型化端口消费这里的能力。
  */
 
@@ -26,6 +26,8 @@ export interface VueShadowUiOptions {
   props?: Record<string, unknown> | ((container: HTMLElement) => Record<string, unknown>);
   zIndex?: number;
   mode?: 'open' | 'closed';
+  /** 追加到当前 ShadowRoot 的 feature 样式；避免把 SFC 样式错误注入宿主页的 document。 */
+  css?: string;
   /** 将当前 app 与本次挂载的自有容器交给调用方注册插件和组件；默认只安装基础 i18n。 */
   configureApp?: (app: VueApp, container: HTMLElement) => void;
   /** 让 Shadow UI 承载一个独立的全视口页面，而不是零尺寸浮层。 */
@@ -111,7 +113,7 @@ export async function createVueShadowUi(
     scopeRoot: options.viewport,
     inheritStyles: false,
     isolateEvents: ['keydown', 'keyup', 'keypress'],
-    css: buildShadowFoundation(Boolean(options.viewport)),
+    css: buildShadowFoundation(options.viewport) + (options.css || ''),
     onMount(container) {
       const props = typeof options.props === 'function' ? options.props(container) : options.props ?? {};
       const app = createApp(options.component, props);

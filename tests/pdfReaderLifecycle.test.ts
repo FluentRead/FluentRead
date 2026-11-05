@@ -1504,6 +1504,34 @@ describe('PDF reader actual Vue component reading interaction', () => {
 
 
 describe('PDF full passage access', () => {
+    it('keeps RTL source, outline and search separate from the live full-passage translation direction', async () => {
+        const doc = model(), source = 'מחקר 2026 GPU', translation = 'English reviewed passage. '.repeat(80);
+        doc.segments[0].source = source;
+        if (doc.binary?.kind !== 'pdf') throw new Error('Expected PDF model');
+        doc.binary.pages[0].blocks[0].kind = 'heading';
+        const {root, currentTranslations} = mountReader(doc, 'bilingual', [translation]); await componentFlush();
+        click(root.querySelector('.pdf-outline-toggle')); await componentFlush();
+        const item = root.querySelector('.pdf-outline-item')!;
+        expect(item.querySelector('span')!.getAttribute('dir')).toBe('auto');
+        expect(item.querySelector('span')!.textContent).toBe(translation);
+        expect(item.querySelector('small')!.textContent).toBe('1'); expect(item.getAttribute('dir')).toBeNull();
+        click(root.querySelector('.pdf-outline-language button')); await componentFlush();
+        expect(item.querySelector('span')!.textContent).toBe(source);
+        click(root.querySelector('.pdf-search > button')); await componentFlush();
+        const search = root.querySelector<HTMLInputElement>('.pdf-search input')!;
+        expect(search.getAttribute('dir')).toBe('auto'); search.value = 'מחקר';
+        search.dispatchEvent(new document.defaultView!.Event('input')); await componentFlush();
+        expect(root.querySelector('.pdf-search-count')!.textContent).toBe('1 / 1');
+        click(root.querySelector('.pdf-full-passage-button')); await componentFlush();
+        const original = root.querySelector('.pdf-full-passage-source p')!, target = root.querySelector('.pdf-full-passage-translation')!;
+        expect([original.getAttribute('dir'), target.getAttribute('dir')]).toEqual(['auto', 'auto']);
+        expect(original.textContent).toBe(source); expect(target.textContent).toBe(translation);
+        currentTranslations.value = ['مراجعة عربية GPU 2026.']; await componentFlush();
+        expect(root.querySelector('.pdf-full-passage-translation')).toBe(target);
+        expect(target.textContent).toBe(currentTranslations.value[0]); expect(original.textContent).toBe(source);
+        expect(root.querySelector('.pdf-layout-viewer')!.getAttribute('dir')).toBeNull();
+    });
+
     it('opens a full corrected passage, updates live, and clears it on document replacement', async () => {
         const doc = model();
         const passage = 'Long corrected translation '.repeat(500);

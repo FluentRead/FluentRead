@@ -2,9 +2,17 @@
  * @file src/shared/image/types.ts
  *
  * 文件职责：定义 OCR 图像识别结果的共享数据结构，使 worker、offscreen 和图片翻译 feature 使用一致行级坐标契约。
- * 主要内容：OcrLine 描述识别文本及 bounding box 等字段，只承载跨层传输所需类型，不包含识别执行、图像解码或 UI 渲染逻辑。 可核对的公开符号包括 OcrLine。
+ * 主要内容：ImageViewport 与 OcrLine 描述可见范围、识别文本及 bounding box 等字段，只承载跨层传输所需类型，不包含识别执行、图像解码或 UI 渲染逻辑。 可核对的公开符号包括 OcrLine。
  * 模块边界：本文件属于 shared 小型公共层，仅提供无状态或低语义耦合的类型与工具；不读取 FluentRead 配置、不调用 provider、不注册入口或持有 feature 生命周期，使用者需自行处理业务政策。
  */
+
+/** 漫画原图中实际可见的像素范围；这里只定义传输形状，绘制端按真实图片尺寸校验。 */
+export interface ImageViewport {
+    readonly x: number;
+    readonly y: number;
+    readonly width: number;
+    readonly height: number;
+}
 
 /** OCR 识别出的单行文本及其原图像素坐标。 */
 export interface OcrLine {

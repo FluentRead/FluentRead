@@ -1,0 +1,1459 @@
+{
+  "version": 1,
+  "provenance": {
+    "sourceReportSha256": "4e03cdc9985cd65f955f5bdca4f91bf6a0bfada7c2092d588b3f32c38043fa7b",
+    "sourceInputManifestSha256": "d009984c27243ddbd9ed4ddd1c510b7d6b48d38b2234987518e07747cbffc7b5",
+    "sourceStatus": "failed",
+    "sceneCount": 14,
+    "confidence": "not captured in compact response; replays use synthetic confidence 1 solely to exercise eligible grouping inputs",
+    "scope": "Previously recorded production PaddleOCR sourceText and line geometry for original frozen color/alpha fixture pages. No model output tensors, bubble-owner metadata, current run, browser or translation service are implied."
+  },
+  "scenes": [
+    {
+      "name": "harbor-same-red-channel-dialogue",
+      "sourceLanguage": "en",
+      "width": 1440,
+      "height": 1000,
+      "sourcePngSha256": "e4ec2d8c2b44cf4e3c6c0b52a29f9d3b41d8be6be7b84dcde2d1a54dbcd04c1d",
+      "decodedRgbaSha256": "e533d0cb9d3d49be845b091edbaed81e344496e3a424cedcc4dcfec62ac3e3ee",
+      "recordedTexts": [
+        "THE FERRY LEAVES AT DAWN.",
+        "BRING THE BLUE MAP.",
+        "IWILL WAIT BY THE PIER.",
+        "KEEP THE LANTERN LIT.",
+        "A QUIET MORNING ON THE CANAL"
+      ],
+      "lines": [
+        {
+          "text": "THE FERRY LEAVES AT DAWN.",
+          "bbox": {
+            "x0": 111,
+            "y0": 136,
+            "x1": 657,
+            "y1": 160
+          },
+          "sourceBoxes": [
+            {
+              "x0": 111,
+              "y0": 136,
+              "x1": 657,
+              "y1": 160
+            }
+          ]
+        },
+        {
+          "text": "BRING THE BLUE MAP.",
+          "bbox": {
+            "x0": 112,
+            "y0": 194,
+            "x1": 516,
+            "y1": 218
+          },
+          "sourceBoxes": [
+            {
+              "x0": 112,
+              "y0": 194,
+              "x1": 516,
+              "y1": 218
+            }
+          ]
+        },
+        {
+          "text": "IWILL WAIT BY THE PIER.",
+          "bbox": {
+            "x0": 803,
+            "y0": 335,
+            "x1": 1236,
+            "y1": 359
+          },
+          "sourceBoxes": [
+            {
+              "x0": 803,
+              "y0": 335,
+              "x1": 1236,
+              "y1": 359
+            }
+          ]
+        },
+        {
+          "text": "KEEP THE LANTERN LIT.",
+          "bbox": {
+            "x0": 805,
+            "y0": 394,
+            "x1": 1217,
+            "y1": 416
+          },
+          "sourceBoxes": [
+            {
+              "x0": 805,
+              "y0": 394,
+              "x1": 1217,
+              "y1": 416
+            }
+          ]
+        },
+        {
+          "text": "A QUIET MORNING ON THE CANAL",
+          "bbox": {
+            "x0": 357,
+            "y0": 856,
+            "x1": 872,
+            "y1": 878
+          },
+          "sourceBoxes": [
+            {
+              "x0": 357,
+              "y0": 856,
+              "x1": 872,
+              "y1": 878
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE FERRY LEAVES AT DAWN.",
+            "BRING THE BLUE MAP."
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "I WILL WAIT BY THE PIER.",
+            "KEEP THE LANTERN LIT."
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "prism-platform-gradient-signs",
+      "sourceLanguage": "en",
+      "width": 1600,
+      "height": 900,
+      "sourcePngSha256": "3d02324e422c6adc2211ed02e324617cf96a836783eeffc7085b8bc3800f4b0a",
+      "decodedRgbaSha256": "b71724e9b05741737cd511f1a458124c887af822b5fa174b52e6ab680d023d6b",
+      "recordedTexts": [
+        "FOLLOW THE EASTERN TRACK",
+        "THE NEXT TRAIN IS ALMOST HERE",
+        "PLATFORM NINE IS OPEN",
+        "ROUTEC4"
+      ],
+      "lines": [
+        {
+          "text": "FOLLOW THE EASTERN TRACK",
+          "bbox": {
+            "x0": 181,
+            "y0": 130,
+            "x1": 1003,
+            "y1": 167
+          },
+          "sourceBoxes": [
+            {
+              "x0": 181,
+              "y0": 130,
+              "x1": 1003,
+              "y1": 167
+            }
+          ]
+        },
+        {
+          "text": "THE NEXT TRAIN IS ALMOST HERE",
+          "bbox": {
+            "x0": 179,
+            "y0": 205,
+            "x1": 894,
+            "y1": 233
+          },
+          "sourceBoxes": [
+            {
+              "x0": 179,
+              "y0": 205,
+              "x1": 894,
+              "y1": 233
+            }
+          ]
+        },
+        {
+          "text": "PLATFORM NINE IS OPEN",
+          "bbox": {
+            "x0": 831,
+            "y0": 480,
+            "x1": 1306,
+            "y1": 507
+          },
+          "sourceBoxes": [
+            {
+              "x0": 831,
+              "y0": 480,
+              "x1": 1306,
+              "y1": 507
+            }
+          ]
+        },
+        {
+          "text": "ROUTEC4",
+          "bbox": {
+            "x0": 113,
+            "y0": 490,
+            "x1": 244,
+            "y1": 514
+          },
+          "sourceBoxes": [
+            {
+              "x0": 113,
+              "y0": 490,
+              "x1": 244,
+              "y1": 514
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE EASTERN TRACK",
+            "THE NEXT TRAIN IS ALMOST HERE"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "rain-garden-vertical-ruby-sidebar",
+      "sourceLanguage": "auto",
+      "width": 1100,
+      "height": 1500,
+      "sourcePngSha256": "0e83ffc139235a80f7cc4b8450215dc1d69e7f94b35cfd6d76c506880329c961",
+      "decodedRgbaSha256": "90892c107cbd9d107b8db09672b70924a9195f14dce20ba81b4c5c0a06a16d84",
+      "recordedTexts": [
+        "風の音を聞いて",
+        "こみち",
+        "小道で待っている",
+        "沿着花园的小路慢慢走。",
+        "雨停以后，我们在桥边见。"
+      ],
+      "lines": [
+        {
+          "text": "風の音を聞いて",
+          "bbox": {
+            "x0": 830,
+            "y0": 149,
+            "x1": 880,
+            "y1": 452
+          },
+          "sourceBoxes": [
+            {
+              "x0": 830,
+              "y0": 149,
+              "x1": 880,
+              "y1": 452
+            }
+          ],
+          "vertical": true
+        },
+        {
+          "text": "こみち",
+          "bbox": {
+            "x0": 775,
+            "y0": 150,
+            "x1": 802,
+            "y1": 217
+          },
+          "sourceBoxes": [
+            {
+              "x0": 775,
+              "y0": 150,
+              "x1": 802,
+              "y1": 217
+            }
+          ],
+          "vertical": true
+        },
+        {
+          "text": "小道で待っている",
+          "bbox": {
+            "x0": 717,
+            "y0": 150,
+            "x1": 768,
+            "y1": 500
+          },
+          "sourceBoxes": [
+            {
+              "x0": 717,
+              "y0": 150,
+              "x1": 768,
+              "y1": 500
+            }
+          ],
+          "vertical": true
+        },
+        {
+          "text": "沿着花园的小路慢慢走。",
+          "bbox": {
+            "x0": 102,
+            "y0": 1017,
+            "x1": 498,
+            "y1": 1049
+          },
+          "sourceBoxes": [
+            {
+              "x0": 102,
+              "y0": 1017,
+              "x1": 498,
+              "y1": 1049
+            }
+          ]
+        },
+        {
+          "text": "雨停以后，我们在桥边见。",
+          "bbox": {
+            "x0": 102,
+            "y0": 1084,
+            "x1": 534,
+            "y1": 1117
+          },
+          "sourceBoxes": [
+            {
+              "x0": 102,
+              "y0": 1084,
+              "x1": 534,
+              "y1": 1117
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "風の音を聞いて",
+            "小道で待っている"
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "かぜ"
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "沿着花园的小路慢慢走。",
+            "雨停以后，我们在桥边见。"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "chess-picnic-neighbor-inverse-bubbles",
+      "sourceLanguage": "en",
+      "width": 1280,
+      "height": 1000,
+      "sourcePngSha256": "e34e68efb159a557bac3a35d1d763ddc6aae47de498faa0b42c86aa777635096",
+      "decodedRgbaSha256": "ea66a32161ad24cc883d3eb65d6b1c3aabf2d703c2087e73205ad3c3aec7063e",
+      "recordedTexts": [
+        "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+        "THE BOARD IS READY.",
+        "I SAVED YOU A SEAT."
+      ],
+      "lines": [
+        {
+          "text": "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+          "bbox": {
+            "x0": 109.5234375,
+            "y0": 155.24539877300612,
+            "x1": 575.390625,
+            "y1": 242.11656441717793
+          },
+          "sourceBoxes": [
+            {
+              "x0": 110.609375,
+              "y0": 155.24539877300612,
+              "x1": 575.390625,
+              "y1": 184.5644171779141
+            },
+            {
+              "x0": 109.5234375,
+              "y0": 213.159509202454,
+              "x1": 549.328125,
+              "y1": 242.11656441717793
+            }
+          ]
+        },
+        {
+          "text": "THE BOARD IS READY.",
+          "bbox": {
+            "x0": 737,
+            "y0": 158,
+            "x1": 1128,
+            "y1": 184
+          },
+          "sourceBoxes": [
+            {
+              "x0": 737,
+              "y0": 158,
+              "x1": 1128,
+              "y1": 184
+            }
+          ]
+        },
+        {
+          "text": "I SAVED YOU A SEAT.",
+          "bbox": {
+            "x0": 733,
+            "y0": 213,
+            "x1": 1110,
+            "y1": 240
+          },
+          "sourceBoxes": [
+            {
+              "x0": 733,
+              "y0": 213,
+              "x1": 1110,
+              "y1": 240
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE BOARD IS READY.",
+            "I SAVED YOU A SEAT."
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "lantern-market-oblique-bilingual-captions",
+      "sourceLanguage": "auto",
+      "width": 1400,
+      "height": 1050,
+      "sourcePngSha256": "ead8da29d5545e1e3dbd7553b74e6c93e1484adc0290e30c1c3e47147899f42d",
+      "decodedRgbaSha256": "ee412ed916f1c136a583b35f8116c479a34993ceb560dc260eb93c531a780717",
+      "recordedTexts": [
+        "等天晴以后再出发。",
+        "雨あがり の市場へ",
+        "THE LANTERNS ARE STILL WARM.",
+        "LET US WALK HOME TOGETHER.",
+        "ADMIT ONE 18:30"
+      ],
+      "lines": [
+        {
+          "text": "等天晴以后再出发。",
+          "bbox": {
+            "x0": 98,
+            "y0": 95,
+            "x1": 481,
+            "y1": 177
+          },
+          "sourceBoxes": [
+            {
+              "x0": 98,
+              "y0": 95,
+              "x1": 481,
+              "y1": 177
+            }
+          ]
+        },
+        {
+          "text": "雨あがり の市場へ",
+          "bbox": {
+            "x0": 776,
+            "y0": 189,
+            "x1": 1100,
+            "y1": 281
+          },
+          "sourceBoxes": [
+            {
+              "x0": 776,
+              "y0": 189,
+              "x1": 1100,
+              "y1": 281
+            }
+          ]
+        },
+        {
+          "text": "THE LANTERNS ARE STILL WARM.",
+          "bbox": {
+            "x0": 145,
+            "y0": 714,
+            "x1": 740,
+            "y1": 739
+          },
+          "sourceBoxes": [
+            {
+              "x0": 145,
+              "y0": 714,
+              "x1": 740,
+              "y1": 739
+            }
+          ]
+        },
+        {
+          "text": "LET US WALK HOME TOGETHER.",
+          "bbox": {
+            "x0": 145,
+            "y0": 772,
+            "x1": 714,
+            "y1": 797
+          },
+          "sourceBoxes": [
+            {
+              "x0": 145,
+              "y0": 772,
+              "x1": 714,
+              "y1": 797
+            }
+          ]
+        },
+        {
+          "text": "ADMIT ONE 18:30",
+          "bbox": {
+            "x0": 1005,
+            "y0": 865,
+            "x1": 1185,
+            "y1": 899
+          },
+          "sourceBoxes": [
+            {
+              "x0": 1005,
+              "y0": 865,
+              "x1": 1185,
+              "y1": 899
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE LANTERNS ARE STILL WARM.",
+            "LET US WALK HOME TOGETHER."
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "watercolor-ferry-translucent-notification",
+      "sourceLanguage": "en",
+      "width": 1200,
+      "height": 1000,
+      "sourcePngSha256": "cc67edb19e4f6705a4165efd2208ba2b90225174823da0d23552a03d11770134",
+      "decodedRgbaSha256": "6ba4595182775acb04c0bdfe7ee5b2d708e1ea2a4377d60070ba133509856a68",
+      "recordedTexts": [
+        "THE RIVERIS CLEAR TODAY",
+        "PLEASE STEP ABOARD QUIETLY.",
+        "A SOFT BREEZE FROM THE WEST",
+        "POSTCARD FROMTHE FERRY"
+      ],
+      "lines": [
+        {
+          "text": "THE RIVERIS CLEAR TODAY",
+          "bbox": {
+            "x0": 177,
+            "y0": 212,
+            "x1": 717,
+            "y1": 236
+          },
+          "sourceBoxes": [
+            {
+              "x0": 177,
+              "y0": 212,
+              "x1": 717,
+              "y1": 236
+            }
+          ]
+        },
+        {
+          "text": "PLEASE STEP ABOARD QUIETLY.",
+          "bbox": {
+            "x0": 175,
+            "y0": 276,
+            "x1": 765,
+            "y1": 299
+          },
+          "sourceBoxes": [
+            {
+              "x0": 175,
+              "y0": 276,
+              "x1": 765,
+              "y1": 299
+            }
+          ]
+        },
+        {
+          "text": "A SOFT BREEZE FROM THE WEST",
+          "bbox": {
+            "x0": 152,
+            "y0": 513,
+            "x1": 669,
+            "y1": 538
+          },
+          "sourceBoxes": [
+            {
+              "x0": 152,
+              "y0": 513,
+              "x1": 669,
+              "y1": 538
+            }
+          ]
+        },
+        {
+          "text": "POSTCARD FROMTHE FERRY",
+          "bbox": {
+            "x0": 301,
+            "y0": 891,
+            "x1": 667,
+            "y1": 907
+          },
+          "sourceBoxes": [
+            {
+              "x0": 301,
+              "y0": 891,
+              "x1": 667,
+              "y1": 907
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE RIVER IS CLEAR TODAY.",
+            "PLEASE STEP ABOARD QUIETLY."
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "orbital-greenhouse-cutout-dialogue",
+      "sourceLanguage": "auto",
+      "width": 1400,
+      "height": 1100,
+      "sourcePngSha256": "438e5c1c29cb2669a66fe855a934b0853ac7b9cafa6f32b26b02fdbabbdc8249",
+      "decodedRgbaSha256": "9711976ae318aaa35cbc3dd107166a85dd603662b88108d99d40b8a9374347cd",
+      "recordedTexts": [
+        "新的叶子已经展开了。",
+        "把水送到靠窗的一排。",
+        "ここなら星が見える。",
+        "明日も一緒に育てよう。",
+        "SECTION 04",
+        "窓を閉めてから戻る。"
+      ],
+      "lines": [
+        {
+          "text": "新的叶子已经展开了。",
+          "bbox": {
+            "x0": 151,
+            "y0": 145,
+            "x1": 516,
+            "y1": 176
+          },
+          "sourceBoxes": [
+            {
+              "x0": 151,
+              "y0": 145,
+              "x1": 516,
+              "y1": 176
+            }
+          ]
+        },
+        {
+          "text": "把水送到靠窗的一排。",
+          "bbox": {
+            "x0": 151,
+            "y0": 208,
+            "x1": 517,
+            "y1": 239
+          },
+          "sourceBoxes": [
+            {
+              "x0": 151,
+              "y0": 208,
+              "x1": 517,
+              "y1": 239
+            }
+          ]
+        },
+        {
+          "text": "ここなら星が見える。",
+          "bbox": {
+            "x0": 803,
+            "y0": 453,
+            "x1": 1161,
+            "y1": 487
+          },
+          "sourceBoxes": [
+            {
+              "x0": 803,
+              "y0": 453,
+              "x1": 1161,
+              "y1": 487
+            }
+          ]
+        },
+        {
+          "text": "明日も一緒に育てよう。",
+          "bbox": {
+            "x0": 801,
+            "y0": 514,
+            "x1": 1194,
+            "y1": 547
+          },
+          "sourceBoxes": [
+            {
+              "x0": 801,
+              "y0": 514,
+              "x1": 1194,
+              "y1": 547
+            }
+          ]
+        },
+        {
+          "text": "SECTION 04",
+          "bbox": {
+            "x0": 123,
+            "y0": 854,
+            "x1": 262,
+            "y1": 876
+          },
+          "sourceBoxes": [
+            {
+              "x0": 123,
+              "y0": 854,
+              "x1": 262,
+              "y1": 876
+            }
+          ]
+        },
+        {
+          "text": "窓を閉めてから戻る。",
+          "bbox": {
+            "x0": 501,
+            "y0": 972,
+            "x1": 784,
+            "y1": 998
+          },
+          "sourceBoxes": [
+            {
+              "x0": 501,
+              "y0": 972,
+              "x1": 784,
+              "y1": 998
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "新的叶子已经展开了。",
+            "把水送到靠窗的一排。"
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "ここなら星が見える。",
+            "明日も一緒に育てよう。"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "wordless-stained-glass-cutout-garden",
+      "sourceLanguage": "auto",
+      "width": 1200,
+      "height": 1000,
+      "sourcePngSha256": "41b58fc3a1482a0780dee2236ac36e28b100735948dbe94e548c0e1ac7f1c6a0",
+      "decodedRgbaSha256": "5323e90525046887cd58a7db2d7326ad8d70503dd1bc6c48a2c6129fbac32930",
+      "recordedTexts": [],
+      "lines": [],
+      "recordedParagraphFailures": []
+    },
+    {
+      "name": "transparent-lantern-bridge-balloons",
+      "sourceLanguage": "ja",
+      "width": 1200,
+      "height": 1000,
+      "sourcePngSha256": "fdce5d1a79f6dfe558abdbb1e3307ebcaccca09d7307a0b06a3aa6d621a4bc16",
+      "decodedRgbaSha256": "37963b85b5a147cf74e770d019962de54ff675b3bb556294315b1c4b85e167eb",
+      "recordedTexts": [
+        "FOLLOW THE LANTERNS",
+        "橋のそばで待っていて。",
+        "THE PATH IS STILL OPEN",
+        "地図を持って戻るよ。"
+      ],
+      "lines": [
+        {
+          "text": "FOLLOW THE LANTERNS",
+          "bbox": {
+            "x0": 106,
+            "y0": 174,
+            "x1": 505,
+            "y1": 198
+          },
+          "sourceBoxes": [
+            {
+              "x0": 106,
+              "y0": 174,
+              "x1": 505,
+              "y1": 198
+            }
+          ]
+        },
+        {
+          "text": "橋のそばで待っていて。",
+          "bbox": {
+            "x0": 666,
+            "y0": 233,
+            "x1": 977,
+            "y1": 260
+          },
+          "sourceBoxes": [
+            {
+              "x0": 666,
+              "y0": 233,
+              "x1": 977,
+              "y1": 260
+            }
+          ]
+        },
+        {
+          "text": "THE PATH IS STILL OPEN",
+          "bbox": {
+            "x0": 109,
+            "y0": 234,
+            "x1": 507,
+            "y1": 258
+          },
+          "sourceBoxes": [
+            {
+              "x0": 109,
+              "y0": 234,
+              "x1": 507,
+              "y1": 258
+            }
+          ]
+        },
+        {
+          "text": "地図を持って戻るよ。",
+          "bbox": {
+            "x0": 666,
+            "y0": 291,
+            "x1": 945,
+            "y1": 317
+          },
+          "sourceBoxes": [
+            {
+              "x0": 666,
+              "y0": 291,
+              "x1": 945,
+              "y1": 317
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "FOLLOW THE LANTERNS",
+            "THE PATH IS STILL OPEN"
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "橋のそばで待っていて。",
+            "地図を持って戻るよ。"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "translucent-riverside-notice",
+      "sourceLanguage": "en",
+      "width": 1400,
+      "height": 1000,
+      "sourcePngSha256": "941fe820142c24644e6d1d8a5085d38c9812c25edc85c57452cab6530360d1de",
+      "decodedRgbaSha256": "6d2da96e30f7cfabc28d4558f4c0a5471a29274399e8483e9cc84412007a25f2",
+      "recordedTexts": [
+        "RIVERSIDE NOTICE",
+        "The last ferry leaves at eight.",
+        "Please keep the riverside gate clear.",
+        "PLATFORM 3"
+      ],
+      "lines": [
+        {
+          "text": "RIVERSIDE NOTICE",
+          "bbox": {
+            "x0": 210,
+            "y0": 189,
+            "x1": 663,
+            "y1": 224
+          },
+          "sourceBoxes": [
+            {
+              "x0": 210,
+              "y0": 189,
+              "x1": 663,
+              "y1": 224
+            }
+          ]
+        },
+        {
+          "text": "The last ferry leaves at eight.",
+          "bbox": {
+            "x0": 210,
+            "y0": 328,
+            "x1": 671,
+            "y1": 361
+          },
+          "sourceBoxes": [
+            {
+              "x0": 210,
+              "y0": 328,
+              "x1": 671,
+              "y1": 361
+            }
+          ]
+        },
+        {
+          "text": "Please keep the riverside gate clear.",
+          "bbox": {
+            "x0": 210,
+            "y0": 393,
+            "x1": 794,
+            "y1": 425
+          },
+          "sourceBoxes": [
+            {
+              "x0": 210,
+              "y0": 393,
+              "x1": 794,
+              "y1": 425
+            }
+          ]
+        },
+        {
+          "text": "PLATFORM 3",
+          "bbox": {
+            "x0": 208,
+            "y0": 542,
+            "x1": 401,
+            "y1": 567
+          },
+          "sourceBoxes": [
+            {
+              "x0": 208,
+              "y0": 542,
+              "x1": 401,
+              "y1": 567
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "The last ferry leaves at eight.",
+            "Please keep the riverside gate clear."
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "perforated-alpha-dock-note",
+      "sourceLanguage": "en",
+      "width": 1200,
+      "height": 1000,
+      "sourcePngSha256": "7ee6fc9e7cb9199e33d22390780836c7203f7162067c028d9e7f0f94d0309fc9",
+      "decodedRgbaSha256": "950c0fa8eee4f7ddf5246267c8a965c517254f41ba628d66cab6daa8c44b7ee3",
+      "recordedTexts": [
+        "THE iDOCK IS QUIET",
+        "KEEPiA LIGHT ON",
+        "PORT 12"
+      ],
+      "lines": [
+        {
+          "text": "THE iDOCK IS QUIET",
+          "bbox": {
+            "x0": 242,
+            "y0": 226,
+            "x1": 654,
+            "y1": 254
+          },
+          "sourceBoxes": [
+            {
+              "x0": 242,
+              "y0": 226,
+              "x1": 654,
+              "y1": 254
+            }
+          ]
+        },
+        {
+          "text": "KEEPiA LIGHT ON",
+          "bbox": {
+            "x0": 243,
+            "y0": 336,
+            "x1": 606,
+            "y1": 363
+          },
+          "sourceBoxes": [
+            {
+              "x0": 243,
+              "y0": 336,
+              "x1": 606,
+              "y1": 363
+            }
+          ]
+        },
+        {
+          "text": "PORT 12",
+          "bbox": {
+            "x0": 240,
+            "y0": 564,
+            "x1": 365,
+            "y1": 588
+          },
+          "sourceBoxes": [
+            {
+              "x0": 240,
+              "y0": 564,
+              "x1": 365,
+              "y1": 588
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "THE DOCK IS QUIET",
+            "KEEP A LIGHT ON"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "same-tone-cabin-controls",
+      "sourceLanguage": "en",
+      "width": 1200,
+      "height": 1000,
+      "sourcePngSha256": "a936c32bd80d647928968850feec0dfaa0e3e9708633223cf325b8c5a17c9422",
+      "decodedRgbaSha256": "c72a87c8184f66a22470b52882bd82feb2ad728c36e93c2a22ef4b0e619e7e29",
+      "recordedTexts": [
+        "CABIN LIGHTS",
+        "KEEP THE CABIN CLOSED",
+        "RESERVE POWER",
+        "THE CREW RETURNS AT DAWN",
+        "CABIN 04"
+      ],
+      "lines": [
+        {
+          "text": "CABIN LIGHTS",
+          "bbox": {
+            "x0": 781,
+            "y0": 150,
+            "x1": 1014,
+            "y1": 172
+          },
+          "sourceBoxes": [
+            {
+              "x0": 781,
+              "y0": 150,
+              "x1": 1014,
+              "y1": 172
+            }
+          ]
+        },
+        {
+          "text": "KEEP THE CABIN CLOSED",
+          "bbox": {
+            "x0": 70,
+            "y0": 150,
+            "x1": 494,
+            "y1": 172
+          },
+          "sourceBoxes": [
+            {
+              "x0": 70,
+              "y0": 150,
+              "x1": 494,
+              "y1": 172
+            }
+          ]
+        },
+        {
+          "text": "RESERVE POWER",
+          "bbox": {
+            "x0": 781,
+            "y0": 220,
+            "x1": 1072,
+            "y1": 243
+          },
+          "sourceBoxes": [
+            {
+              "x0": 781,
+              "y0": 220,
+              "x1": 1072,
+              "y1": 243
+            }
+          ]
+        },
+        {
+          "text": "THE CREW RETURNS AT DAWN",
+          "bbox": {
+            "x0": 69,
+            "y0": 220,
+            "x1": 579,
+            "y1": 243
+          },
+          "sourceBoxes": [
+            {
+              "x0": 69,
+              "y0": 220,
+              "x1": 579,
+              "y1": 243
+            }
+          ]
+        },
+        {
+          "text": "CABIN 04",
+          "bbox": {
+            "x0": 69,
+            "y0": 440,
+            "x1": 207,
+            "y1": 462
+          },
+          "sourceBoxes": [
+            {
+              "x0": 69,
+              "y0": 440,
+              "x1": 207,
+              "y1": 462
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "KEEP THE CABIN CLOSED",
+            "THE CREW RETURNS AT DAWN"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "inverse-neighbor-tidal-balloons",
+      "sourceLanguage": "en",
+      "width": 1400,
+      "height": 1000,
+      "sourcePngSha256": "8cd55c1b36d7c92f6f8a241e64695fa455ac3289adccf379d6fce6889e227dfb",
+      "decodedRgbaSha256": "e3d48a00afa9f4683d54e2e2bc97f93a550f550ac87067e283c626a08d86d2da",
+      "recordedTexts": [
+        "WE CAN CROSS NOW",
+        "HOLD THE ROPE I WILL GO FIRST",
+        "THE TIDE IS FALLING",
+        "The channel before sunrise."
+      ],
+      "lines": [
+        {
+          "text": "WE CAN CROSS NOW",
+          "bbox": {
+            "x0": 127,
+            "y0": 193,
+            "x1": 555,
+            "y1": 224
+          },
+          "sourceBoxes": [
+            {
+              "x0": 127,
+              "y0": 193,
+              "x1": 555,
+              "y1": 224
+            }
+          ]
+        },
+        {
+          "text": "HOLD THE ROPE I WILL GO FIRST",
+          "bbox": {
+            "x0": 798.9453125,
+            "y0": 214.7155361050328,
+            "x1": 1127.1282552083333,
+            "y1": 313.8938730853391
+          },
+          "sourceBoxes": [
+            {
+              "x0": 800.9537760416666,
+              "y0": 214.7155361050328,
+              "x1": 1127.1282552083333,
+              "y1": 243.22428884026257
+            },
+            {
+              "x0": 798.9453125,
+              "y0": 284.18052516411376,
+              "x1": 1119.0944010416665,
+              "y1": 313.8938730853391
+            }
+          ]
+        },
+        {
+          "text": "THE TIDE IS FALLING",
+          "bbox": {
+            "x0": 129,
+            "y0": 264,
+            "x1": 542,
+            "y1": 292
+          },
+          "sourceBoxes": [
+            {
+              "x0": 129,
+              "y0": 264,
+              "x1": 542,
+              "y1": 292
+            }
+          ]
+        },
+        {
+          "text": "The channel before sunrise.",
+          "bbox": {
+            "x0": 110,
+            "y0": 610,
+            "x1": 485,
+            "y1": 632
+          },
+          "sourceBoxes": [
+            {
+              "x0": 110,
+              "y0": 610,
+              "x1": 485,
+              "y1": 632
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "WE CAN CROSS NOW",
+            "THE TIDE IS FALLING"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    },
+    {
+      "name": "bound-atlas-rule-and-inset-card",
+      "sourceLanguage": "en",
+      "width": 1600,
+      "height": 1100,
+      "sourcePngSha256": "f85c12942c8f681b03ba8e80afb6c52c373b76908d583099c30ca4cb69c39169",
+      "decodedRgbaSha256": "b6e7061ea653cb11633ff995d2253093ce94c452194098d99acb903d0fe3dafe",
+      "recordedTexts": [
+        "ATLAS OF THE INNER COAST",
+        "IN D EX 0 0",
+        "Turn toward the old lighthouse.",
+        "Wait until the bells are quiet.",
+        "The narrow path follows the sea.",
+        "Then take the eastern stairs.",
+        "MAP KEY",
+        "NORTH PIER"
+      ],
+      "lines": [
+        {
+          "text": "ATLAS OF THE INNER COAST",
+          "bbox": {
+            "x0": 359,
+            "y0": 100,
+            "x1": 1028,
+            "y1": 133
+          },
+          "sourceBoxes": [
+            {
+              "x0": 359,
+              "y0": 100,
+              "x1": 1028,
+              "y1": 133
+            }
+          ]
+        },
+        {
+          "text": "IN D EX 0 0",
+          "bbox": {
+            "x0": 746,
+            "y0": 148,
+            "x1": 844,
+            "y1": 1024
+          },
+          "sourceBoxes": [
+            {
+              "x0": 746,
+              "y0": 148,
+              "x1": 844,
+              "y1": 1024
+            }
+          ]
+        },
+        {
+          "text": "Turn toward the old lighthouse.",
+          "bbox": {
+            "x0": 138,
+            "y0": 298,
+            "x1": 589,
+            "y1": 326
+          },
+          "sourceBoxes": [
+            {
+              "x0": 138,
+              "y0": 298,
+              "x1": 589,
+              "y1": 326
+            }
+          ]
+        },
+        {
+          "text": "Wait until the bells are quiet.",
+          "bbox": {
+            "x0": 925,
+            "y0": 301,
+            "x1": 1329,
+            "y1": 324
+          },
+          "sourceBoxes": [
+            {
+              "x0": 925,
+              "y0": 301,
+              "x1": 1329,
+              "y1": 324
+            }
+          ]
+        },
+        {
+          "text": "The narrow path follows the sea.",
+          "bbox": {
+            "x0": 138,
+            "y0": 362,
+            "x1": 610,
+            "y1": 390
+          },
+          "sourceBoxes": [
+            {
+              "x0": 138,
+              "y0": 362,
+              "x1": 610,
+              "y1": 390
+            }
+          ]
+        },
+        {
+          "text": "Then take the eastern stairs.",
+          "bbox": {
+            "x0": 924,
+            "y0": 365,
+            "x1": 1336,
+            "y1": 388
+          },
+          "sourceBoxes": [
+            {
+              "x0": 924,
+              "y0": 365,
+              "x1": 1336,
+              "y1": 388
+            }
+          ]
+        },
+        {
+          "text": "MAP KEY",
+          "bbox": {
+            "x0": 139,
+            "y0": 465,
+            "x1": 281,
+            "y1": 488
+          },
+          "sourceBoxes": [
+            {
+              "x0": 139,
+              "y0": 465,
+              "x1": 281,
+              "y1": 488
+            }
+          ]
+        },
+        {
+          "text": "NORTH PIER",
+          "bbox": {
+            "x0": 1040.6666666666667,
+            "y0": 484.6666666666667,
+            "x1": 1224.3333333333335,
+            "y1": 507
+          },
+          "sourceBoxes": [
+            {
+              "x0": 1040.6666666666667,
+              "y0": 484.6666666666667,
+              "x1": 1224.3333333333335,
+              "y1": 507
+            }
+          ]
+        }
+      ],
+      "recordedParagraphFailures": [
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "Turn toward the old lighthouse.",
+            "The narrow path follows the sea."
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "Wait until the bells are quiet.",
+            "Then take the eastern stairs."
+          ],
+          "paragraphIndex": -1
+        },
+        {
+          "type": "paragraph-order",
+          "anchors": [
+            "INDEX 09"
+          ],
+          "paragraphIndex": -1
+        }
+      ]
+    }
+  ]
+}

@@ -5,6 +5,17 @@ import {resolve} from 'node:path';
 import * as ts from 'typescript';
 import { Config, normalizeConfig } from '@/src/core/config/model';
 import {GLOSSARY_LIMITS} from '@/src/core/glossary';
+describe('翻译服务启用状态配置', () => {
+    it('默认保留全部服务，导入时去重并约束标识，关闭默认服务时选择一个启用项', () => {
+        expect(new Config().disabledTranslationServices).toEqual([]);
+        const normalized = normalizeConfig({service: 'openai', disabledTranslationServices: ['openai', ' openai ', 'deeplx', '', null, 12, 'x'.repeat(129)]} as never);
+        expect(normalized.disabledTranslationServices).toEqual(['openai', 'deeplx']);
+        expect(normalized.service).not.toBe('openai');
+        expect(normalized.disabledTranslationServices).not.toContain(normalized.service);
+        expect(normalizeConfig(JSON.parse(JSON.stringify(normalized))).disabledTranslationServices).toEqual(normalized.disabledTranslationServices);
+    });
+});
+
 describe('浏览器默认译文字体配置', () => {
     it('浏览器默认译文字体默认关闭，仅严格布尔 true 开启，导入导出保留选择且不改原有外观', () => {
         expect(new Config().browserDefaultTranslationFont).toBe(false);

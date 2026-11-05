@@ -17,14 +17,15 @@ import {
 } from '@/src/core/config/compositeTranslation'
 import type { ServiceOption } from './serviceCatalog'
 import {filterAvailableTranslationServices} from '@/src/services/translation/capabilities'
+import {filterEnabledTranslationServices} from '@/src/core/config/serviceAvailability'
 
 export type CompositeTranslationDraft = Omit<CompositeTranslationProvider, 'id'>
 export type CompositeTranslationDraftErrors = Partial<Record<'name' | 'services' | 'timeoutMs', string>>
 export const MAX_COMPOSITE_SERVICE_NAME_LENGTH = 80
 
 export function getCompositeMemberOptions(config: Config): ServiceOption[] {
-  return filterAvailableTranslationServices(withCustomOpenAIServiceOptions(options.services, config.customOpenAIProviders)
-    .filter(option => !option.disabled && !isCompositeTranslationProviderId(option.value)))
+  return filterEnabledTranslationServices(filterAvailableTranslationServices(withCustomOpenAIServiceOptions(options.services, config.customOpenAIProviders)
+    .filter(option => !option.disabled && !isCompositeTranslationProviderId(option.value))), config.disabledTranslationServices)
 }
 
 export function createCompositeTranslationDraft(provider?: CompositeTranslationProvider): CompositeTranslationDraft {

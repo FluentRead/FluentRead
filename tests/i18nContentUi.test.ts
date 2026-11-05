@@ -16,6 +16,7 @@ import * as customOpenAI from '@/src/core/config/customOpenAI';
 import * as writing from '@/src/core/config/writing';
 import type {ReencounterState} from '@/src/features/vocabulary/content/reencounterState';
 import type {ReadingRequest, ReadingResponse} from '@/src/features/reading-assistant/types';
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 
 registerAllUiLanguageBundles();
 const apps: Vue.App[] = [];
@@ -83,6 +84,7 @@ describe('content UI localization boundaries', () => {
         const mounted = ui.mount('src/features/settings/ui/WritingSettings.vue', {config}, {
             '@/src/core/config/catalog': catalog, '@/src/core/config/harness': harness, '@/src/core/config/customOpenAI': customOpenAI,
             '@/src/core/config/writing': writing,
+            '@/src/core/config/serviceAvailability': {markDisabledTranslationServices},
             '@/src/core/config/writingReadiness': {resolveWritingReadiness: () => ({supported: true, message: '', issue: ''})},
             '@/src/services/translation/capabilities': {filterAvailableTranslationServices: (items: unknown[]) => items, getTranslationServiceUnavailableMessage: () => ''},
             '@/src/features/writing-assistant/ui/public': {WritingChoices: empty},

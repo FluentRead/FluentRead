@@ -3,6 +3,7 @@
  *
  * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
+ * 服务可用性：新增 disabledTranslationServices 持久化列表，默认空数组；导入时去重并约束标识长度。
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
@@ -18,6 +19,7 @@ import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE,
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
 import {normalizeShareCardPreferences, type ShareCardPreferences} from '@/src/core/config/shareCard';
+import {normalizeDisabledTranslationServices} from './serviceAvailability';
 import type {TranslationScope} from '@/src/core/translation/types';
 import {
     currentModelIds,
@@ -380,6 +382,7 @@ export class Config {
     activeTranslationStyleProfileId: string; // 当前选中的样式快照；外观可继续编辑，保存时再更新快照
     display: number = 1;
     service: string;
+    disabledTranslationServices: string[]; // 用户关闭的服务；关闭后停止新请求并从选择项中禁选
     hoverTranslationService: string; // 悬浮翻译服务，空值跟随默认网页服务
     selectionTranslationService: string; // 普通划词翻译服务，空值跟随默认网页服务
     imageTranslationService: string; // 图片 OCR 后的文字翻译服务，空值跟随默认网页服务
@@ -592,6 +595,7 @@ export class Config {
         this.hotkey = defaultOption.hotkey;
         this.hoverShortcutBeforeDisable = defaultOption.hotkey;
         this.service = defaultOption.service;
+        this.disabledTranslationServices = [];
         this.hoverTranslationService = '';
         this.selectionTranslationService = '';
         this.imageTranslationService = '';
@@ -1182,6 +1186,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.modelRequestLimits = withoutRetiredServiceEntries(normalizeModelRequestLimits(source.modelRequestLimits));
     normalized.apiKeyRecoveryMs = normalizeApiKeyRecoveryMs(source.apiKeyRecoveryMs);
     normalized.freeTranslationOrder = normalizeFreeTranslationOrder(source.freeTranslationOrder);
+    normalized.disabledTranslationServices = normalizeDisabledTranslationServices(source.disabledTranslationServices);
     // 旧配置首次升级默认开启 B站；标记写入后尊重用户后续的手动关闭。
     if (source.freeTranslationBilibiliDefaultApplied !== true) {
         const order = normalized.freeTranslationOrder.filter(id => id !== 'bilibiliFree');
@@ -1273,6 +1278,14 @@ export function normalizeConfig(value: unknown): Config {
 
     if (!isSupportedTranslationService(normalized.service, normalized.customOpenAIProviders, normalized.compositeTranslationProviders)) {
         normalized.service = defaultOption.service;
+    }
+    const disabledServices = new Set(normalized.disabledTranslationServices);
+    if (disabledServices.has(normalized.service)) {
+        const fallback = options.services.find(item => item.value !== 'machine' && item.value !== 'ai' && !item.disabled && !disabledServices.has(item.value))?.value
+            || normalized.customOpenAIProviders.find(provider => !disabledServices.has(provider.id))?.id
+            || normalized.compositeTranslationProviders.find(provider => !disabledServices.has(provider.id))?.id;
+        if (fallback) normalized.service = fallback;
+        else normalized.disabledTranslationServices = normalized.disabledTranslationServices.filter(service => service !== normalized.service);
     }
 
     if (!isSupportedTranslationService(normalized.documentService, normalized.customOpenAIProviders, normalized.compositeTranslationProviders)) {

@@ -93,6 +93,7 @@ const mocks = vi.hoisted(() => {
     const buildTranslationCacheKey = vi.fn((identity: unknown) => JSON.stringify(identity));
     const config = {
         service: 'mock',
+        disabledTranslationServices: [] as string[],
         maxConcurrentTranslations: 6,
         translationRequestsPerSecond: 0,
         translationRequestsPerMinute: 0,
@@ -280,6 +281,22 @@ describe('translation broker', () => {
             .rejects.toMatchObject({message: expect.stringContaining('尚未开放公开接入'), kind: 'bad-request', retryable: false});
         expect(mocks.cacheGet).not.toHaveBeenCalled(); expect(mocks.service).not.toHaveBeenCalled(); expect(mocks.planService).not.toHaveBeenCalled();
         expect(JSON.stringify(mocks.config)).toBe(before);
+    });
+    it('rejects a globally disabled service before cache lookup or provider dispatch', async () => {
+        mocks.config.disabledTranslationServices = ['mock'];
+        await expect(translateWithCache({origin: 'Source'})).rejects.toMatchObject({
+            message: '所选翻译服务已关闭，请到服务目录重新启用，或选择其他服务。',
+            kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED',
+        });
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.service).not.toHaveBeenCalled();
+    });
+    it('freezes and normalizes disabled service IDs in the provider config snapshot', () => {
+        const disabledTranslationServices = ['mock', 'mock'];
+        const snapshot = createTranslationProviderConfigSnapshot({...mocks.config, disabledTranslationServices});
+        disabledTranslationServices.push('google');
+        expect(snapshot.disabledTranslationServices).toEqual(['mock']);
+        expect(Object.isFrozen(snapshot.disabledTranslationServices)).toBe(true);
     });
     it('skips an unavailable saved ChatGPT composite member and can use the next existing provider', async () => {
         const current = new Config(); current.service = 'composite:saved'; current.model[services.chatgptPlan] = 'saved-account-model';
@@ -574,6 +591,7 @@ describe('translation broker', () => {
             .forEach(service => mocks.machineServices.add(service));
         Object.assign(mocks.config, {
             service: 'mock',
+            disabledTranslationServices: [],
             from: 'auto',
             to: 'zh-Hans',
             useCache: true,

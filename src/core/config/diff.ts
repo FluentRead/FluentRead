@@ -557,6 +557,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
 
     service: {group: 'general', label: '默认翻译服务', format: formatService},
     favoriteServices: {group: 'translationServices', label: '常用翻译服务', format: (value) => Array.isArray(value) ? formatArray(value, formatService) : formatValue(value)},
+    disabledTranslationServices: {group: 'translationServices', label: '已关闭翻译服务', format: (value) => Array.isArray(value) ? formatArray(value, formatService) : formatValue(value)},
     customOpenAIProviders: {group: 'translationServices', label: '自定义 OpenAI 服务', format: formatCustomOpenAIProviders},
     compositeTranslationProviders: {group: 'translationServices', label: '组合翻译服务', format: formatCompositeTranslationProviders},
     apiKeyRotationEnabled: {group: 'translationServices', label: '自动轮换', format: value => formatRecord(configRecord(value))},

@@ -51,6 +51,24 @@ function setup(members: string[] = [services.google, services.microsoft]) {
 afterEach(() => vi.useRealTimers());
 
 describe('组合翻译真实 broker 接入', () => {
+    it('跳过已关闭的组合成员并在其他成员上继续回退', async () => {
+        const h = setup([services.google, services.microsoft]);
+        h.config.disabledTranslationServices = [services.google];
+        await expect(h.broker.translateWithCache({origin: sourceText, useCache: false})).resolves.toBe(translatedText);
+        expect(h.providers.google).not.toHaveBeenCalled();
+        expect(h.providers.microsoft).toHaveBeenCalledOnce();
+        expect(h.recordRequest.mock.calls[0][0].routes).toEqual([services.microsoft]);
+    });
+
+    it('组合成员全部关闭时在 provider 调用前返回明确错误', async () => {
+        const h = setup([services.google, services.microsoft]);
+        h.config.disabledTranslationServices = [services.google, services.microsoft];
+        await expect(h.broker.translateWithCache({origin: sourceText, useCache: false}))
+            .rejects.toThrow('组合翻译的所有成员都已关闭');
+        expect(h.providers.google).not.toHaveBeenCalled();
+        expect(h.providers.microsoft).not.toHaveBeenCalled();
+    });
+
     it('图片组合的单条协议成员接受整批原样结果，沿用取消所有权且不换成员', async () => {
         const h = setup([services.claude, services.google]);
         h.config.token.claude = 'fixture-claude';

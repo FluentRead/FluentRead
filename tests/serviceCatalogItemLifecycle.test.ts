@@ -19,14 +19,14 @@ const dom = await vi.hoisted(async () => {
 
 import * as Vue from 'vue';
 import * as compositeTranslation from '@/src/core/config/compositeTranslation';
-import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
+import {translate, translateLegacyText, type TranslationParams, type UiLanguage} from '@/src/core/i18n';
 import type {ServiceOption} from '@/src/ui/view-model/serviceCatalog';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
 registerAllUiLanguageBundles();
 const locale = Vue.ref<UiLanguage>('zh-CN');
 const i18nPort = {useUiI18n: () => ({
-    t: (key: string) => translate(key, locale.value),
+    t: (key: string, params?: TranslationParams) => translate(key, locale.value, params),
     translateLegacy: (value: string) => translateLegacyText(value, locale.value),
 })};
 const ServiceIcon = Vue.defineComponent({props: ['service', 'label', 'size'],
@@ -58,22 +58,35 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
 
 type ItemProps = {
     item: ServiceOption; selected: boolean; isDefault: boolean; isConfigured: boolean;
-    isFavorite: boolean; compact: boolean; status: string;
+    isFavorite: boolean; compact: boolean; status: string; availabilityEnabled?: boolean; availabilityToggleDisabled?: boolean;
 };
 let app: Vue.App | undefined, root: HTMLElement;
 async function settle(): Promise<void> {await Vue.nextTick(); await Vue.nextTick();}
-async function mount(component: Vue.Component, props: Record<string, unknown>, onSelect?: (value: string) => void): Promise<void> {
+async function mount(component: Vue.Component, props: Record<string, unknown>, onSelect?: (value: string) => void,
+    onToggleAvailability?: (service: string, enabled: boolean) => void): Promise<void> {
     root = dom.document.createElement('div'); dom.document.body.append(root);
-    app = Vue.createApp({setup: () => () => Vue.h(component, {...props, ...(onSelect ? {onSelect} : {})})});
+    app = Vue.createApp({setup: () => () => Vue.h(component, {...props, ...(onSelect ? {onSelect} : {}), ...(onToggleAvailability ? {onToggleAvailability} : {})})});
+    app.component('el-tooltip', Vue.defineComponent({setup: (_props, {slots}) => () => Vue.h('span', {'data-tooltip-stub': ''}, slots.default?.())}));
+    app.component('el-switch', Vue.defineComponent({
+        inheritAttrs: false,
+        props: {modelValue: {type: Boolean, default: false}, disabled: {type: Boolean, default: false}},
+        emits: ['update:modelValue'],
+        setup: (switchProps, {attrs, emit}) => () => Vue.h('button', {
+            ...attrs, type: 'button', role: 'switch', 'aria-checked': String(switchProps.modelValue),
+            disabled: switchProps.disabled,
+            onClick: () => {if (!switchProps.disabled) emit('update:modelValue', !switchProps.modelValue)},
+        }),
+    }));
     app.mount(root); await settle();
 }
 async function mountItem(overrides: Partial<ItemProps> = {}) {
     const props = Vue.reactive<ItemProps>({item: {value: 'deeplx', label: 'DeepLX'}, selected: false,
-        isDefault: false, isConfigured: false, isFavorite: false, compact: true, status: '', ...overrides});
+        isDefault: false, isConfigured: false, isFavorite: false, compact: true, status: '', availabilityEnabled: true, availabilityToggleDisabled: false, ...overrides});
     const onSelect = vi.fn<(value: string) => void>();
+    const onToggleAvailability = vi.fn<(service: string, enabled: boolean) => void>();
     const component = loadClient('src/features/settings/ui/services/ServiceCatalogItem.vue');
-    await mount(component, props, onSelect);
-    return {props, onSelect};
+    await mount(component, props, onSelect, onToggleAvailability);
+    return {props, onSelect, onToggleAvailability};
 }
 function control<T extends Element = HTMLElement>(selector: string): T {
     const element = root.querySelector<T>(selector);
@@ -98,6 +111,19 @@ beforeEach(() => {locale.value = 'zh-CN'; dom.document.body.replaceChildren();})
 afterEach(() => {app?.unmount(); app = undefined; dom.document.body.replaceChildren();});
 
 describe('服务目录行实际客户端模板', () => {
+    it('渲染可访问的启用开关并发出带服务身份的新状态', async () => {
+        const {props, onToggleAvailability} = await mountItem({availabilityEnabled: false});
+        const toggle = control<HTMLButtonElement>('[data-service-availability="deeplx"]');
+        expect(toggle.getAttribute('role')).toBe('switch');
+        expect(toggle.getAttribute('aria-checked')).toBe('false');
+        expect(toggle.getAttribute('aria-label')).toBe('启用 DeepLX');
+        toggle.dispatchEvent(new dom.Event('click', {bubbles: true})); await settle();
+        expect(onToggleAvailability).toHaveBeenCalledOnce();
+        expect(onToggleAvailability).toHaveBeenCalledWith('deeplx', true);
+        props.availabilityToggleDisabled = true; await settle();
+        expect(toggle.disabled).toBe(true);
+    });
+
     it('完整名称、性质和默认标签共用名称行，点击只发出当前服务选择并保留输入', async () => {
         const label = '自定义的完整 DeepLX 服务名称 / Very long provider name';
         const {props, onSelect} = await mountItem({item: {value: 'deeplx', label},

@@ -222,7 +222,8 @@ const supportsAI = computed(() => servicesType.isUseAIContext(
   service.value,
   resolveConfiguredModel(props.config.model[service.value], props.config.customModel[service.value]),
 ));
-const unavailableMessage = computed(() => getTranslationServiceUnavailableMessage(service.value));
+const unavailableMessage = computed(() => props.config.disabledTranslationServices.includes(service.value)
+  ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(service.value));
 const savedServiceUnavailable = computed(() => props.config.areaTranslationService
   && !props.serviceOptions.some(item => item.value === props.config.areaTranslationService));
 

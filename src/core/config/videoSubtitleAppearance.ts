@@ -4,16 +4,17 @@
  * 主要内容：提供可扩展字幕皮肤、字体轮廓和背景显隐、字号/位置/行距/宽度等有界参数、双语上下顺序与默认关闭的逐字高亮、读音标注开关，并把配置转换为隔离 UI 可消费的 CSS 变量。
  * 模块边界：只处理纯配置数据，不读取播放器、DOM 或浏览器存储；持久化由 Config/store 负责，实际挂载由 content UI 负责。
  */
+import {TinyColor} from '@ctrl/tinycolor';
 
 export const VIDEO_SUBTITLE_SKINS = [
-    {id: 'classic', label: '经典', description: '保留当前黑色半透明字幕外观', background: '12, 15, 22', shadow: '0 2px 6px rgba(0,0,0,.24), 0 0 0 1px rgba(0,0,0,.08)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(2px)', border: 'rgba(255,255,255,.1)', textColor: '#ffffff', translationColor: '#ffe45c', backgroundOpacity: 56, textShadow: '0 1px 2px rgba(0,0,0,.72)', textStroke: '1px #000'},
-    {id: 'clean', label: '清爽', description: '更轻的背景和柔和边缘', background: '255, 255, 255', shadow: '0 2px 12px rgba(0,0,0,.16)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'rgba(0,0,0,.08)', textColor: '#1f2937', translationColor: '#0f766e', backgroundOpacity: 88, textShadow: 'none', textStroke: '0'},
-    {id: 'glass', label: '玻璃', description: '半透明毛玻璃效果', background: '20, 28, 40', shadow: '0 4px 18px rgba(0,0,0,.3)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(10px)', border: 'rgba(255,255,255,.18)', textColor: '#ffffff', translationColor: '#b9f6e8', backgroundOpacity: 62, textShadow: '0 1px 3px rgba(0,0,0,.6)', textStroke: '1px rgba(0,0,0,.4)'},
-    {id: 'contrast', label: '高对比', description: '适合复杂画面和户外视频', background: '0, 0, 0', shadow: '0 2px 0 rgba(0,0,0,.9)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: '#fff', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 92, textShadow: '0 2px 3px #000', textStroke: '2px #000'},
-    {id: 'paper', label: '纸张', description: '温暖的阅读感', background: '43, 35, 26', shadow: '0 2px 12px rgba(0,0,0,.3)', fontFamily: 'Georgia, serif', backdropFilter: 'none', border: 'rgba(255,225,190,.2)', textColor: '#fff7ed', translationColor: '#fed7aa', backgroundOpacity: 82, textShadow: '0 1px 2px rgba(35,20,10,.65)', textStroke: '1px rgba(35,20,10,.6)'},
-    {id: 'terminal', label: '终端', description: '紧凑的等宽字风格', background: '4, 20, 16', shadow: '0 2px 14px rgba(0,0,0,.42)', fontFamily: 'ui-monospace, monospace', backdropFilter: 'none', border: 'rgba(94,234,212,.25)', textColor: '#d1fae5', translationColor: '#5eead4', backgroundOpacity: 88, textShadow: '0 0 5px rgba(94,234,212,.4)', textStroke: '0'},
-    {id: 'neon', label: '霓虹', description: '更鲜明的科技感配色', background: '16, 8, 38', shadow: '0 2px 16px rgba(90,48,180,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(5px)', border: 'rgba(217,180,255,.35)', textColor: '#f5f3ff', translationColor: '#f0abfc', backgroundOpacity: 72, textShadow: '0 0 8px rgba(240,171,252,.65)', textStroke: '0'},
-    {id: 'minimal', label: '极简', description: '低干扰透明字幕', background: '0, 0, 0', shadow: '0 1px 6px rgba(0,0,0,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'transparent', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 0, textShadow: '0 1px 3px rgba(0,0,0,.9)', textStroke: '1px #000'},
+    {id: 'classic', label: '经典', description: '保留当前黑色半透明字幕外观', background: '12, 15, 22', shadow: '0 2px 6px rgba(0,0,0,.24), 0 0 0 1px rgba(0,0,0,.08)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(2px)', border: 'rgba(255,255,255,.1)', textColor: '#ffffff', translationColor: '#ffe45c', backgroundOpacity: 56, textShadow: '0 1px 2px rgba(0,0,0,.72)', textStroke: '1px #000', outlineColor: '#000000', outlineWidth: 1},
+    {id: 'clean', label: '清爽', description: '更轻的背景和柔和边缘', background: '255, 255, 255', shadow: '0 2px 12px rgba(0,0,0,.16)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'rgba(0,0,0,.08)', textColor: '#1f2937', translationColor: '#0f766e', backgroundOpacity: 88, textShadow: 'none', textStroke: '0', outlineColor: '#000000', outlineWidth: 1},
+    {id: 'glass', label: '玻璃', description: '半透明毛玻璃效果', background: '20, 28, 40', shadow: '0 4px 18px rgba(0,0,0,.3)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(10px)', border: 'rgba(255,255,255,.18)', textColor: '#ffffff', translationColor: '#b9f6e8', backgroundOpacity: 62, textShadow: '0 1px 3px rgba(0,0,0,.6)', textStroke: '1px rgba(0,0,0,.4)', outlineColor: '#00000066', outlineWidth: 1},
+    {id: 'contrast', label: '高对比', description: '适合复杂画面和户外视频', background: '0, 0, 0', shadow: '0 2px 0 rgba(0,0,0,.9)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: '#fff', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 92, textShadow: '0 2px 3px #000', textStroke: '2px #000', outlineColor: '#000000', outlineWidth: 2},
+    {id: 'paper', label: '纸张', description: '温暖的阅读感', background: '43, 35, 26', shadow: '0 2px 12px rgba(0,0,0,.3)', fontFamily: 'Georgia, serif', backdropFilter: 'none', border: 'rgba(255,225,190,.2)', textColor: '#fff7ed', translationColor: '#fed7aa', backgroundOpacity: 82, textShadow: '0 1px 2px rgba(35,20,10,.65)', textStroke: '1px rgba(35,20,10,.6)', outlineColor: '#23140a99', outlineWidth: 1},
+    {id: 'terminal', label: '终端', description: '紧凑的等宽字风格', background: '4, 20, 16', shadow: '0 2px 14px rgba(0,0,0,.42)', fontFamily: 'ui-monospace, monospace', backdropFilter: 'none', border: 'rgba(94,234,212,.25)', textColor: '#d1fae5', translationColor: '#5eead4', backgroundOpacity: 88, textShadow: '0 0 5px rgba(94,234,212,.4)', textStroke: '0', outlineColor: '#000000', outlineWidth: 1},
+    {id: 'neon', label: '霓虹', description: '更鲜明的科技感配色', background: '16, 8, 38', shadow: '0 2px 16px rgba(90,48,180,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'blur(5px)', border: 'rgba(217,180,255,.35)', textColor: '#f5f3ff', translationColor: '#f0abfc', backgroundOpacity: 72, textShadow: '0 0 8px rgba(240,171,252,.65)', textStroke: '0', outlineColor: '#000000', outlineWidth: 1},
+    {id: 'minimal', label: '极简', description: '低干扰透明字幕', background: '0, 0, 0', shadow: '0 1px 6px rgba(0,0,0,.5)', fontFamily: 'Arial, sans-serif', backdropFilter: 'none', border: 'transparent', textColor: '#ffffff', translationColor: '#ffffff', backgroundOpacity: 0, textShadow: '0 1px 3px rgba(0,0,0,.9)', textStroke: '1px #000', outlineColor: '#000000', outlineWidth: 1},
 ] as const;
 
 export type VideoSubtitleSkinId = typeof VIDEO_SUBTITLE_SKINS[number]['id'];
@@ -88,25 +89,9 @@ function normalizeColor(value: unknown, fallback: string): string {
 
 function normalizeOutlineColor(value: unknown, fallback: string): string {
     if (typeof value !== 'string') return fallback;
-    const color = value.trim();
-    if (/^#[\da-f]{6}(?:[\da-f]{2})?$/iu.test(color)) return color.toLowerCase();
-    const match = color.match(/^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(0|1|0?\.\d+))?\s*\)$/iu);
-    if (!match) return fallback;
-    const channels = match.slice(1, 4).map(Number);
-    const alpha = match[4] === undefined ? 1 : Number(match[4]);
-    // 正则只接收非负整数及 0..1 alpha；这里只需再限制 RGB 的上界。
-    if (channels.some((channel) => channel > 255)) return fallback;
-    const hex = channels.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('');
-    return `#${hex}${alpha < 1 ? Math.round(alpha * 255).toString(16).padStart(2, '0') : ''}`;
-}
-
-function getSkinOutlineDefaults(skin: typeof VIDEO_SUBTITLE_SKINS[number]): {color: string; width: number} {
-    const stroke = skin.textStroke.match(/^(\d+(?:\.\d+)?)px\s+(.+)$/iu);
-    if (!stroke) return {color: '#000000', width: 1};
-    return {
-        color: normalizeOutlineColor(stroke[2], '#000000'),
-        width: Math.max(VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.min, Number(stroke[1])),
-    };
+    // 与已有外观设置和颜色控件复用同一纯颜色库；只输出十六进制，不保留任意 CSS。
+    const color = new TinyColor(value.trim());
+    return color.isValid ? color.a === 1 ? color.toHexString() : color.toHex8String() : fallback;
 }
 
 export function normalizeVideoSubtitleAppearance(value: unknown): VideoSubtitleAppearance {
@@ -115,7 +100,7 @@ export function normalizeVideoSubtitleAppearance(value: unknown): VideoSubtitleA
         ? source.skin as VideoSubtitleSkinId
         : DEFAULT_VIDEO_SUBTITLE_APPEARANCE.skin;
     const skinPreset = VIDEO_SUBTITLE_SKINS.find((item) => item.id === skin)!;
-    const skinOutline = getSkinOutlineDefaults(skinPreset);
+    const outlineStyle = source.outlineStyle as VideoSubtitleOutlineStyle;
     const position: VideoSubtitlePosition = source.position === 'top' || source.position === 'center'
         ? source.position
         : 'bottom';
@@ -131,11 +116,9 @@ export function normalizeVideoSubtitleAppearance(value: unknown): VideoSubtitleA
         autoBottom: typeof source.autoBottom === 'boolean' ? source.autoBottom : bottomOffset === 10,
         backgroundVisible: typeof source.backgroundVisible === 'boolean' ? source.backgroundVisible : true,
         backgroundOpacity: normalizeNumber(source.backgroundOpacity, skinPreset.backgroundOpacity, 0, 95, 1),
-        outlineStyle: source.outlineStyle === 'stroke' || source.outlineStyle === 'shadow' || source.outlineStyle === 'none' || source.outlineStyle === 'skin'
-            ? source.outlineStyle
-            : 'skin',
-        outlineColor: normalizeOutlineColor(source.outlineColor, skinOutline.color),
-        outlineWidth: normalizeNumber(source.outlineWidth, skinOutline.width, VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.min,
+        outlineStyle: ['stroke', 'shadow', 'none'].includes(outlineStyle) ? outlineStyle : 'skin',
+        outlineColor: normalizeOutlineColor(source.outlineColor, skinPreset.outlineColor),
+        outlineWidth: normalizeNumber(source.outlineWidth, skinPreset.outlineWidth, VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.min,
             VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.max, VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.step),
         lineSpacing: normalizeNumber(source.lineSpacing, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.lineSpacing, 1, 2, 0.01),
         maxWidth: normalizeNumber(source.maxWidth, DEFAULT_VIDEO_SUBTITLE_APPEARANCE.maxWidth, 40, 100, 1),

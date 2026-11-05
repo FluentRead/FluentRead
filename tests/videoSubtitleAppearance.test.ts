@@ -119,15 +119,24 @@ describe('video subtitle appearance contract', () => {
     });
   });
 
-  it('轮廓颜色归一化透明 hex 与 RGB，拒绝越界通道和无效 CSS', () => {
+  it('轮廓颜色复用既有颜色库归一化透明值和越界通道，拒绝无效 CSS', () => {
     for (const [value, expected] of [
       [' #FF102080 ', '#ff102080'], ['rgb(255, 16, 32)', '#ff1020'],
       ['rgba(255, 16, 32, 1)', '#ff1020'], ['rgba(255, 16, 32, 0)', '#ff102000'],
-      ['rgba(256, 0, 0, .5)', '#000000'], ['rgba(-1, 0, 0, .5)', '#000000'],
+      ['rgba(256, 0, 0, .5)', '#ff000080'], ['rgba(-1, 0, 0, .5)', '#00000080'],
       ['rgba(0, 0, 0, 1.5)', '#000000'], ['url(https://example.test)', '#000000'],
+      ['#F08', '#ff0088'], ['red', '#ff0000'], ['transparent', '#00000000'],
     ]) expect(normalizeVideoSubtitleAppearance({outlineColor: value}).outlineColor).toBe(expected);
     const shadow = getVideoSubtitleAppearanceCssVars({skin: 'clean', outlineStyle: 'shadow'});
     expect(shadow['--fluent-read-video-subtitle-text-shadow'].split(', ')).toHaveLength(8);
+  });
+
+  it('各皮肤的默认轮廓数据保持既有颜色与粗细', () => {
+    for (const [skin, outlineColor, outlineWidth] of [
+      ['classic', '#000000', 1], ['clean', '#000000', 1], ['glass', '#00000066', 1],
+      ['contrast', '#000000', 2], ['paper', '#23140a99', 1], ['terminal', '#000000', 1],
+      ['neon', '#000000', 1], ['minimal', '#000000', 1],
+    ]) expect(normalizeVideoSubtitleAppearance({skin})).toMatchObject({outlineStyle: 'skin', outlineColor, outlineWidth});
   });
 
   it('双语顺序默认原文在上，合法值经配置保存保留，旧值和非法值回退且不改其他外观', () => {

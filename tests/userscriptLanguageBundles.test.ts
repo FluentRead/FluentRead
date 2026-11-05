@@ -21,6 +21,17 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('keeps subtitle appearance labels in all extension languages and omits the unsupported userscript controls', () => {
+        expect(extensionChinese['video.appearance.outlineStyle']).toBeTruthy();
+        expect(zhCNMessages).not.toHaveProperty('video.appearance.outlineStyle');
+        for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
+            const original = extensionBundles[language].messages;
+            const projected = currentUserscriptLanguageBundle(language).messages;
+            const keys = Object.keys(original).filter(key => key.startsWith('video.appearance.'));
+            expect(keys).toHaveLength(8);
+            for (const key of keys) {expect(original[key]).toBeTruthy(); expect(projected).not.toHaveProperty(key);}
+        }
+    });
     it('keeps the actual language-delta comparator reflexive and ordered across sorting implementations',()=>{
         const baseline={messages:{unchanged:'same'},legacyText:{},legacyPatterns:{early:[],late:[]}};
         const current={messages:{zeta:'Z',alpha:'A',middle:'M',unchanged:'same'},legacyText:{},legacyPatterns:{early:[],late:[]}};

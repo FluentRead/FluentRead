@@ -71,6 +71,7 @@ pnpm compile
 | <span id="popup-首次打开与语言引导"></span>Popup 首次打开与语言引导 | [查看](testing/popup.md#popup-首次打开与语言引导) |
 | <span id="popup-操作恢复与翻译服务-ui"></span>Popup 操作恢复与翻译服务 UI | [查看](testing/popup.md#popup-操作恢复与翻译服务-ui) |
 | <span id="划词行内代码与代码块-issue-704、-845"></span>划词行内代码与代码块（issue #704、#845） | [查看](testing/webpage.md#划词行内代码与代码块-issue-704、-845) |
+| <span id="编辑器内显式选区-issue-1237"></span>编辑器内显式选区（issue #1237） | [查看](testing/webpage.md#编辑器内显式选区-issue-1237) |
 | <span id="同目标语言跳过与统一语言判断"></span>同目标语言跳过与统一语言判断 | [查看](testing/webpage.md#同目标语言跳过与统一语言判断) |
 | <span id="冻结真实网页的完整扩展-a-b"></span>冻结真实网页的完整扩展 A/B | [查看](testing/webpage.md#冻结真实网页的完整扩展-a-b) |
 | <span id="原文回显与逐槽恢复"></span>原文回显与逐槽恢复 | [查看](testing/webpage.md#原文回显与逐槽恢复) |

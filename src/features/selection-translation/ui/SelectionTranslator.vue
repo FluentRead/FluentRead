@@ -1,7 +1,7 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
  * 失败呈现：无结果时以简短原因、下一步提示和一个主操作展示；当前鉴权错误优先配置服务，重试按需展开，已有结果仍保留行内提示。
- * 来源提交：翻译与词典异步结果交付前复核已克隆选区的正文、连接和适配器边界，不依赖原生高亮仍然存在；来源失效时撤销旧卡片，词书保存仍保留失联上下文回退。
+ * 来源提交：只允许完整位于同一局部编辑宿主的用户文本选区；右键目标与编辑宿主保持一致。翻译与词典异步结果交付前复核已克隆选区的正文、连接和适配器边界，不依赖原生高亮仍然存在；来源失效时撤销旧卡片，词书保存仍保留失联上下文回退。
  * 两点选取：默认关闭及文档适配器跳过快捷键冲突计算，快捷键开启单次起终点选择并放行开放 Shadow DOM 编辑区；复用原生选区与现有划词入口，完成后的首次选区读取保留同轮延迟滚动，随后恢复普通滚动收起，取消、编辑与卸载撤销首帧保护；短状态提示不捕获页面指针，未命中文字或起终点重合时说明可继续操作，配置变更和卸载释放控制器。
  * 通知布局：收藏与语音设置通知沿用安全可见视口订阅，触摸动作保留完整命中区；通知不增加独立监听或请求。
  * 极矮视口：同一卡片改为整卡滚动并收紧顶栏间距，保留输入与请求、手动几何和语音状态；Safari 键盘视口变化后仅在当前有限窗口内滚动卡片自身显露原聚焦输入，主动操作取消待处理显露；恢复尺寸后沿用原定位，不增加监听或计时器。
@@ -207,7 +207,7 @@ import { matchesConfiguredHotkey, matchesModifierOnlyHotkey, resolveConfiguredHo
 import {describePartOfSpeech} from '@/src/core/language/partOfSpeech';
 import type { WordCardData, WordPronunciation } from '@/src/features/selection-translation/services/wordDictionary';
 import { isSingleEnglishWord, normalizeEnglishWord } from '@/src/features/selection-translation/services/wordNormalization';
-import { calculateSelectionPopupPosition, chooseSelectionRect, getSelectionPresentationDelayRemaining, readSelectionParts, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
+import { calculateSelectionPopupPosition, chooseSelectionRect, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
 import {
   createSelectionTtsClientRequestId,
 } from '@/src/features/selection-translation/protocol';
@@ -590,7 +590,7 @@ function readSelectionSnapshot(): SelectionSnapshot | null {
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed || isExtensionSelection(selection)) return null;
     const range = selection.getRangeAt(0).cloneRange();
     if (!isSelectionRangeConnected(range)
-      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range))) return null;
+      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
     const nativeText = selection.toString();
     const sourceText = props.selectionAdapter?.extractText?.(range, nativeText) ?? nativeText;
     const parts = props.selectionAdapter?.normalizeText
@@ -2017,14 +2017,16 @@ function clearContextMenuSelection(): void {
 
 function isContextMenuInputTarget(target: EventTarget | null): boolean {
   let element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
-  if (element?.closest('input, textarea, select, button, [role="textbox"]')) return true;
-  // contenteditable=false 的正文岛仍可选择；以最近的明确编辑边界为准，不能从外层祖先猜测。
-  while (element) {
-    const editable = element.getAttribute('contenteditable');
-    if (editable !== null) return editable.trim().toLowerCase() !== 'false';
-    element = element.parentElement;
-  }
-  return false;
+  // 原生输入控件不提供可核验的 DOM Range，避免把页面旧选区误当成控件里的输入内容。
+  return Boolean(element?.closest('input, textarea, select, button'));
+}
+
+function rangeBelongsToContextMenuTarget(range: Range, target: EventTarget | null): boolean {
+  const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null;
+  const editableRoot = getEditableSelectionRoot(element);
+  if (!editableRoot) return true;
+  return getEditableSelectionRoot(range.startContainer) === editableRoot
+    && getEditableSelectionRoot(range.endContainer) === editableRoot;
 }
 
 function handleContextMenu(event: MouseEvent): void {
@@ -2035,6 +2037,13 @@ function handleContextMenu(event: MouseEvent): void {
   if (contextMenuSourceRejected) { cancelSelectionPresentation(); cancelTouchSelectionRead(); return; }
   // 移动端长按菜单与系统选区句柄共用同一次触摸。保留原生菜单，不冻结后续句柄调整。
   if (isTouchSelectionActive()) {
+    const current = readSelectionSnapshot();
+    if (current && !rangeBelongsToContextMenuTarget(current.range, event.target)) {
+      contextMenuSourceRejected = true;
+      cancelSelectionPresentation();
+      cancelTouchSelectionRead();
+      return;
+    }
     isSelecting = false;
     cancelSelectionPresentation();
     scheduleTouchSelectionRead();
@@ -2044,6 +2053,10 @@ function handleContextMenu(event: MouseEvent): void {
   cancelSelectionPresentation();
   const current = readSelectionSnapshot();
   if (!current) return;
+  if (!rangeBelongsToContextMenuTarget(current.range, event.target)) {
+    contextMenuSourceRejected = true;
+    return;
+  }
   contextMenuSelection = {snapshot: current, rangeText: current.range.toString()};
   isSelecting = false;
   cancelSelectionLoss();
@@ -2064,7 +2077,7 @@ function recoverContextMenuSelection(selectionText?: string): SelectionSnapshot 
     const {range} = captured.snapshot;
     // 快照跨菜单等待仍须属于当前文档、保有原文并再次通过敏感区域规则；裸 selectionText 永远不作为翻译来源。
     if (!isSelectionRangeConnected(range) || range.toString() !== captured.rangeText
-      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range))) return null;
+      || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
     return captured.snapshot;
   } catch {
     return null;
@@ -2639,7 +2652,7 @@ function restoreSelectionSource(): void {
   try {
     if (isSelectionRangeConnected(current.range)
       && (typeof current.rangeText !== 'string' || current.range.toString() === current.rangeText)
-      && (props.selectionAdapter ? props.selectionAdapter.acceptsRange(current.range) : !shouldIgnoreSelection(current.range))) return;
+      && (props.selectionAdapter ? props.selectionAdapter.acceptsRange(current.range) : !shouldIgnoreSelection(current.range, true))) return;
   } catch {
     // 已销毁的来源适配器与失效 Range 同样按来源丢失处理，不能阻断页面恢复。
   }

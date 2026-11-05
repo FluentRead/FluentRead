@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/hotkeyRuntime.ts
  * 文件职责：在宿主页面统一接管 FluentRead 的键盘与鼠标快捷手势，并按配置、站点禁用状态和冲突优先级路由到相应翻译动作。
- * 主要内容：复用 core 记录组合键并仲裁两点选取及划词优先级，将待回退的全文手势绑定主键/code 与全文、划词、悬浮快捷键身份；额外组合、不可用状态、失焦、中止和文档路由变化取消旧手势，同语言选区默认跳过，中英双向划词可保留反向候选。
+ * 主要内容：复用 core 记录组合键并仲裁两点选取及划词优先级，将待回退的全文手势绑定主键/code 与全文、划词、悬浮快捷键身份；额外组合、不可用状态、失焦、中止和文档路由变化取消旧手势，同语言选区默认跳过，中英双向划词可保留反向候选，编辑区快捷键只接受完整落在同一局部宿主内的用户选区。
  * 模块边界：这里判定并分派手势，不实现语言检测算法、翻译请求、UI 挂载或配置持久化；具体动作由注入/导入的 feature 公共函数完成。
  */
 import {config} from '@/src/services/config/store';
@@ -60,7 +60,7 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
         if (!text || text.length > 4096 || (shouldSkipChineseSelection(text, config.to) && !canReverse)
             || (shouldSkipTranslationForTarget(text, config.to) && !canReverse)) return false;
 
-        if (shouldIgnoreSelection(range)) return false;
+        if (shouldIgnoreSelection(range, true)) return false;
         if (Array.from(range.getClientRects()).some((rect) => rect.width > 0 || rect.height > 0)) return true;
         const bounds = range.getBoundingClientRect();
         return bounds.width > 0 || bounds.height > 0;

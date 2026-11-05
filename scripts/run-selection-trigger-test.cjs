@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
-// 使用临时 Edge profile 验证划词翻译的触发矩阵；--context-menu-only 只运行右键入口专项，
+// 使用临时 Edge profile 验证划词翻译的触发矩阵；--context-menu-only 只运行完整右键入口专项，
+// --editable-selection-only 只运行编辑区划词入口与右键选区专项，
 // --lifecycle-only 检查宿主节点恢复、启停、路由、失败重试与键盘/窄屏界面，要求 --runtime-diagnostics。
 // --document-shell-only 只验证 DeepSeek 类文档根禁译外壳下的划词入口与局部保护。
 // --click-selection-only 只验证按需两点选取；通过 --runtime-diagnostics 传入 CDP 诊断收集器。
@@ -41,6 +42,7 @@ function parseArgs(argv) {
     headed: argv.includes('--headed'),
     chineseOnly: argv.includes('--chinese-only'),
     contextMenuOnly: argv.includes('--context-menu-only'),
+    editableSelectionOnly: argv.includes('--editable-selection-only'),
     lifecycleOnly: argv.includes('--lifecycle-only'),
     documentShellOnly: argv.includes('--document-shell-only'),
     directionOnly: argv.includes('--direction-only'),
@@ -52,7 +54,8 @@ function parseArgs(argv) {
     clickSelectionStressOnly: argv.includes('--click-selection-stress-only'),
     runtimeDiagnostics: readArg(argv, 'runtime-diagnostics', ''),
   };
-  if ((args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly) && (!args.runtimeDiagnostics || !fs.existsSync(args.runtimeDiagnostics))) {
+  if ((args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly)
+    && (!args.runtimeDiagnostics || !fs.existsSync(args.runtimeDiagnostics))) {
     throw new Error('划词专项需要 --runtime-diagnostics <runtime-diagnostics.cjs> 以采集扩展隔离世界及后台诊断');
   }
   if (!args.playwrightRoot) throw new Error('必须传入 --playwright-root，或设置 PLAYWRIGHT_ROOT');
@@ -157,6 +160,24 @@ async function readStoredConfig(extensionPage) {
   const credentialFields = { ...credentials };
   delete credentialFields.schemaVersion;
   return { ...publicConfig, ...credentialFields };
+}
+
+function summarizeSelectionTestConfig(config) {
+  return {
+    on: config.on,
+    disableSelectionTranslator: config.disableSelectionTranslator,
+    selectionTranslatorMode: config.selectionTranslatorMode,
+    selectionTranslatorTrigger: config.selectionTranslatorTrigger,
+    selectionTranslatorDelay: config.selectionTranslatorDelay,
+    contextMenuEnabled: config.contextMenuEnabled,
+    contextMenuEntries: {
+      translateSelection: config.contextMenuEntries?.translateSelection,
+      translatePage: config.contextMenuEntries?.translatePage,
+    },
+    service: config.service,
+    from: config.from,
+    to: config.to,
+  };
 }
 
 function configPatchMatches(config, patch) {
@@ -1999,7 +2020,7 @@ async function main() {
     artifactsDir: args.artifactsDir,
     browser: 'Microsoft Edge',
     testScope: args.documentShellOnly ? 'document-shell-only' : args.clickSelectionStressOnly ? 'click-selection-scroll-race-only' : args.clickSelectionOnly ? 'click-selection-only' : args.lifecycleOnly ? 'selection-host-lifecycle-only'
-      : args.contextMenuOnly ? 'context-menu-only' : 'selection-trigger-filter-or-matrix',
+      : args.editableSelectionOnly ? 'editable-selection-only' : args.contextMenuOnly ? 'context-menu-only' : 'selection-trigger-filter-or-matrix',
     profileMode: 'temporary-isolated',
     windowMode: args.headed ? 'headed-dedicated-profile' : 'background-visible-no-focus',
     cases: [],
@@ -2058,7 +2079,7 @@ async function main() {
       'content-type': 'application/json; charset=utf-8',
     });
     const directionSuffix = args.directionOnly ? ` [to=${fixtureRequestUrl.searchParams.get('to') || ''}]` : '';
-    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly ? sources : [source]).map(text => ({ translations: [{ text: args.lifecycleOnly ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」` : `测试译文：${text}${directionSuffix}` }] }))));
+    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly || args.editableSelectionOnly ? sources : [source]).map(text => ({ translations: [{ text: args.lifecycleOnly ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」` : `测试译文：${text}${directionSuffix}` }] }))));
   });
   try {
     await new Promise((resolve, reject) => {
@@ -2090,7 +2111,7 @@ async function main() {
       context = browserSession.context;
       createIsolatedPage = () => focusSafe.newPageWithoutForeground(context);
       activateInputPage = page => focusSafe.activateExtensionTabWithoutForeground(context, page);
-      if (args.contextMenuOnly || args.lifecycleOnly || args.clickSelectionOnly || args.documentShellOnly) {
+      if (args.contextMenuOnly || args.editableSelectionOnly || args.lifecycleOnly || args.clickSelectionOnly || args.documentShellOnly) {
         const browserPid = await getGuardedBrowserPid(browserSession);
         result.ownedBrowserPid = browserPid;
         assertBackgroundFocus = async label => {
@@ -2117,7 +2138,7 @@ async function main() {
       result.focusPolicy = 'foreground-authorized';
       result.windowPlacement = { mode: 'headed-explicit-foreground', windowState: 'normal', viewport: { width: 1280, height: 900 } };
     }
-    if (args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly) {
+    if (args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly) {
       runtimeDiagnostics = require(path.resolve(args.runtimeDiagnostics)).createRuntimeDiagnostics();
       await runtimeDiagnostics.start(context);
     }
@@ -2612,7 +2633,7 @@ async function main() {
       return;
     }
 
-    if (args.contextMenuOnly) {
+    if (args.contextMenuOnly || args.editableSelectionOnly) {
       const saved = await readStoredConfig(popup);
       await patchStoredConfig(popup, {
         on: true,
@@ -2633,6 +2654,21 @@ async function main() {
       const drawer = await openSelectionDrawer(popup);
       const options = await openSelectionOptions(context, extensionId, result);
       const selectionUi = {popup, drawer, options, storagePage: popup};
+      await setSelectionTrigger(selectionUi, '显示图标');
+      await resetFixture(page);
+      await page.locator('#target').evaluate(target => target.setAttribute('contenteditable', 'true'));
+      const editableIndicatorSelection = await tripleClickTarget(page);
+      assert(editableIndicatorSelection.mouseDown?.isTrusted && editableIndicatorSelection.text === TARGET_TEXT,
+        `编辑器内原生三击选区错误：${JSON.stringify(editableIndicatorSelection)}`);
+      await waitForSelectionUi(page, {indicator: true, tooltip: false}, '编辑器内显示划词入口');
+      const editableIndicatorUi = await readSelectionUi(page);
+      assert(editableIndicatorUi.selectionText === TARGET_TEXT && translationRequestCount === 0,
+        `编辑器选区入口没有保留范围或提前请求翻译：${JSON.stringify({editableIndicatorUi, translationRequestCount})}`);
+      result.cases.push({id: 'context-menu.editable-selection-indicator', status: 'passed',
+        selection: editableIndicatorSelection, ui: editableIndicatorUi, requests: 0});
+      await closeSelectionUi(page);
+      await clearPageSelection(page);
+      await resetFixture(page);
       const triggerState = await setSelectionTrigger(selectionUi, '仅右键菜单');
       result.cases.push({id: 'context-menu.setting-and-popup-preview', status: 'passed', triggerState});
       const settingsScreenshot = path.join(args.artifactsDir, 'context-menu-setting.png');
@@ -2676,6 +2712,84 @@ async function main() {
       assert(!afterShortcut.indicator && !afterShortcut.tooltip && translationRequestCount === requestsBeforeShortcut,
         `仅右键菜单模式占用了 Ctrl 或发起了翻译：${JSON.stringify({afterShortcut, translationRequestCount, requestsBeforeShortcut})}`);
       result.cases.push({id: 'context-menu.selection-stays-quiet', status: 'passed', selected, requestsBeforeShortcut, ui: afterShortcut});
+
+      await closeSelectionUi(page);
+      await clearPageSelection(page);
+      await resetFixture(page);
+      await page.locator('#target').evaluate(target => target.setAttribute('contenteditable', 'true'));
+      const editableMenuSelection = await tripleClickTarget(page);
+      assert(editableMenuSelection.text === TARGET_TEXT, `编辑器内右键选区原文错误：${JSON.stringify(editableMenuSelection)}`);
+      const editableQuietUi = await readSelectionUi(page);
+      assert(editableQuietUi.selectionText === TARGET_TEXT && !editableQuietUi.indicator && !editableQuietUi.tooltip,
+        `仅右键模式在编辑器内自动显示划词入口：${JSON.stringify(editableQuietUi)}`);
+      const requestsBeforeEditableMenu = translationRequestCount;
+      await page.evaluate(() => {
+        const events = [];
+        const record = event => events.push({type: event.type, at: Date.now(), isTrusted: event.isTrusted,
+          key: event.key || '', button: Number.isInteger(event.button) ? event.button : null,
+          target: event.target instanceof Element ? `${event.target.tagName}#${event.target.id}` : String(event.target),
+          selectedText: window.getSelection()?.toString().trim() || ''});
+        globalThis.__fluentReadEditableMenuEvents = {events, record};
+        for (const type of ['contextmenu', 'keydown', 'keyup', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'selectionchange', 'click']) {
+          document.addEventListener(type, record, true);
+        }
+        window.addEventListener('blur', record, true);
+      });
+      const editableMenuGesture = await captureRightClickAndDropSelection(page, '#target', TARGET_TEXT);
+      await startSelectionUiTracking(page);
+      let editableMenuResponse;
+      let editableMenuTransitions = [];
+      let editableImmediateUi;
+      let editableMenuEvents = [];
+      try {
+        editableMenuResponse = await sendContextMenuTranslation(popup, 'selection', editableMenuGesture.selectedText);
+        await page.waitForTimeout(250);
+        editableImmediateUi = await readSelectionUi(page);
+        editableMenuEvents = await page.evaluate(() => {
+          const state = globalThis.__fluentReadEditableMenuEvents;
+          for (const type of ['contextmenu', 'keydown', 'keyup', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'selectionchange', 'click']) {
+            document.removeEventListener(type, state.record, true);
+          }
+          window.removeEventListener('blur', state.record, true);
+          delete globalThis.__fluentReadEditableMenuEvents;
+          return state.events;
+        });
+      } finally {
+        editableMenuTransitions = await stopSelectionUiTracking(page);
+      }
+      assert(editableMenuResponse?.status === 'success',
+        `编辑器内右键选区没有被内容脚本接受：${JSON.stringify(editableMenuResponse)}`);
+      await waitForSelectionUi(page, {tooltip: true, translation: true, resultPrefix: '测试译文：'}, '编辑器内右键翻译');
+      const editableTranslatedUi = await readSelectionUi(page);
+      assert(editableTranslatedUi.resultText.includes(TARGET_TEXT)
+        && translationRequestCount === requestsBeforeEditableMenu + 1,
+      `编辑器内右键没有翻译当前选区：${JSON.stringify({editableTranslatedUi, requestsBeforeEditableMenu, translationRequestCount})}`);
+      result.cases.push({id: 'context-menu.editable-selection-translation', status: 'passed',
+        selection: editableMenuSelection, gesture: editableMenuGesture, response: editableMenuResponse,
+        ui: editableTranslatedUi, immediateUi: editableImmediateUi,
+        requests: translationRequestCount - requestsBeforeEditableMenu,
+        transitions: editableMenuTransitions, events: editableMenuEvents});
+      if (args.editableSelectionOnly) {
+        await closeSelectionUi(page);
+        await clearPageSelection(page);
+        await runtimeDiagnostics?.flush();
+        if (runtimeDiagnostics) {
+          result.runtimeDiagnostics = runtimeDiagnostics.snapshot();
+          runtimeDiagnostics.assertClean();
+        }
+        result.finalConfig = summarizeSelectionTestConfig(await readStoredConfig(popup));
+        await assertBackgroundFocus('editable selection final state');
+        result.ok = result.cases.every(item => item.status === 'passed') && result.consoleErrors.length === 0;
+        assert(result.ok, `编辑器划词浏览器专项出现控制台错误：${JSON.stringify(result.consoleErrors)}`);
+        result.providerEvidence = 'Local Microsoft HTTP response fixture; trusted CDP triple-click/right-click in a contenteditable host, selection Range loss, and production context-menu message route. Isolated Edge background-visible run; no live-provider or Firefox-runtime claim.';
+        fs.writeFileSync(path.join(args.artifactsDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`);
+        process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+        return;
+      }
+      await closeSelectionUi(page);
+      await clearPageSelection(page);
+      await resetFixture(page);
+      await tripleClickTarget(page);
 
       translationResponseDelayMs = 2400;
       const gesture = await captureRightClickAndDropSelection(page, '#target', TARGET_TEXT);
@@ -2739,12 +2853,23 @@ async function main() {
       const failedGesture = await captureRightClickAndDropSelection(page, '#target', retryText);
       translationFailureResponses = 1;
       expectingProviderFailure = true;
+      const expectedFailureCheckpoint = runtimeDiagnostics?.checkpoint();
+      let expectedFailureDiagnostics = 0;
       const requestsBeforeFailure = translationRequestCount;
       const failedResponse = await sendContextMenuTranslation(popup, 'selection', failedGesture.selectedText);
       assert(failedResponse?.status === 'success', `失败夹具没有启动：${JSON.stringify(failedResponse)}`);
       await waitForSelectionUi(page, {tooltip: true, error: true, retryButton: true, loading: false}, '右键失败与可重试反馈');
       const failedUi = await readSelectionUi(page);
       assert(failedUi.errorText.includes('重试'), `失败反馈没有可执行的重试提示：${JSON.stringify(failedUi)}`);
+      if (runtimeDiagnostics) {
+        expectedFailureDiagnostics = runtimeDiagnostics.expectSince(expectedFailureCheckpoint, {
+          caseId: 'context-menu.failed-selection-retry',
+          surface: 'auto-page',
+          exactMessages: ['Selection translation error: Error: Controlled context-menu failure'],
+          level: 'error',
+          maxCount: 1,
+        });
+      }
       const failureScreenshot = path.join(args.artifactsDir, 'context-menu-selection-retry.png');
       await captureContextMenuScreenshot(page, failureScreenshot, 'context-menu retry screenshot');
       result.screenshots.push(failureScreenshot);
@@ -2756,7 +2881,7 @@ async function main() {
         `失败后未恰好重试一次：${JSON.stringify({retryUi, requestsBeforeFailure, translationRequestCount})}`);
       expectingProviderFailure = false;
       result.cases.push({id: 'context-menu.failed-selection-retry', status: 'passed', failedResponse, retryResponse,
-        failedUi, retryUi, requests: translationRequestCount - requestsBeforeFailure});
+        failedUi, retryUi, requests: translationRequestCount - requestsBeforeFailure, expectedFailureDiagnostics});
 
       // 仅有浏览器提供的 selectionText 不能翻译旧页面或可编辑区域中的文字。
       await closeSelectionUi(page);
@@ -2847,7 +2972,12 @@ async function main() {
         counts: [1, 0, 1, 0], staleNoticeResponse, rejectedSelectionResponse, disabledPageResponse,
         failureNoticeRetainedForRejectedActions: true, oldFailureNoticeClearedOnSuccess: true,
         translateResponse, restoreResponse, retranslateResponse, finalRestoreResponse});
-      result.finalConfig = await readStoredConfig(popup);
+      if (runtimeDiagnostics) {
+        await runtimeDiagnostics.flush();
+        result.runtimeDiagnostics = runtimeDiagnostics.snapshot();
+        runtimeDiagnostics.assertClean();
+      }
+      result.finalConfig = summarizeSelectionTestConfig(await readStoredConfig(popup));
       await assertBackgroundFocus('context-menu final state');
 
       result.ok = result.cases.every(item => item.status === 'passed') && result.consoleErrors.length === 0;
@@ -3970,7 +4100,7 @@ async function main() {
       result.cases.push({ id: `conflict.${conflictCase.label}.new-shortcut-after-release`, status: 'passed', ui: freshShortcutUi });
     }
 
-    result.finalConfig = await readStoredConfig(popup);
+    result.finalConfig = summarizeSelectionTestConfig(await readStoredConfig(popup));
     result.ok = result.cases.every(item => item.status === 'passed') && result.consoleErrors.length === 0;
     if (!result.ok) throw new Error(`划词浏览器回归未通过：${JSON.stringify({consoleErrors: result.consoleErrors})}`);
     fs.writeFileSync(path.join(args.artifactsDir, 'report.json'), `${JSON.stringify(result, null, 2)}\n`);

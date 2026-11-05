@@ -52,7 +52,7 @@ afterEach(() => vi.useRealTimers());
 
 describe('组合翻译真实 broker 接入', () => {
     it('所有供应商抛出空错误时仍返回明确失败，而不伪造成功或丢失路由记录', async () => {
-        const h = setup(); h.providers.google.mockRejectedValue(undefined); h.providers.microsoft.mockRejectedValue(undefined);
+        const h = setup(); vi.mocked(h.providers.google).mockRejectedValue(undefined); vi.mocked(h.providers.microsoft).mockRejectedValue(undefined);
         await expect(h.broker.translateWithCache({origin: sourceText, useCache: false})).rejects.toThrow('组合翻译没有可用的成员服务');
         expect(h.providers.google).toHaveBeenCalledOnce(); expect(h.providers.microsoft).toHaveBeenCalledOnce();
         expect(h.recordRequest.mock.calls[0][0].routes).toEqual([services.google, services.microsoft]);

@@ -5,6 +5,7 @@ import {
     calculateSelectionPopupPosition,
     chooseSelectionRect,
     getSelectionPresentationDelayRemaining,
+    getEditableSelectionRoot,
     isSameLanguage,
     isSelectionExcludedTagName,
     normalizeSelectionText,
@@ -329,6 +330,44 @@ describe('explicit selections inside editable text', () => {
         '<textarea>Input text.</textarea>',
     ])('keeps protected editor content out: %s', html => {
         expect(shouldIgnoreSelection(fixture(html).range, true)).toBe(true);
+    });
+
+    it('recognizes textbox descendants and retains native controls inside an editor', () => {
+        expect(shouldIgnoreSelection(fixture('<span role="textbox"><i>Editor text.</i></span>').range, true)).toBe(false);
+        const input = fixture('<span contenteditable="true"><button>Protected action</button></span>');
+        input.document.querySelector('button')!.getClientRects = () => [{width: 80, height: 20}] as unknown as DOMRectList;
+        expect(shouldIgnoreSelection(input.range, true)).toBe(true);
+        const crossing = fixture('Before <span role="textbox">Editor text.</span> after.');
+        crossing.document.querySelector('[role="textbox"]')!.getClientRects = () => [{width: 80, height: 20}] as unknown as DOMRectList;
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+    });
+
+    it('resolves inherited editability and stops at noneditable and document boundaries', () => {
+        expect(getEditableSelectionRoot(null)).toBeNull();
+        const {document} = fixture('Text');
+        expect(getEditableSelectionRoot(document)).toBeNull();
+        document.body.setAttribute('contenteditable', 'true');
+        expect(getEditableSelectionRoot(document.body)).toBeNull();
+        const parent = document.createElement('section');
+        Object.defineProperty(parent, 'isContentEditable', {value: false});
+        const editor = document.createElement('div');
+        Object.defineProperty(editor, 'isContentEditable', {value: true});
+        parent.append(editor);
+        expect(getEditableSelectionRoot(editor)).toBe(editor);
+        editor.remove();
+        expect(getEditableSelectionRoot(editor)).toBe(editor);
+        editor.setAttribute('contenteditable', 'false');
+        expect(getEditableSelectionRoot(editor)).toBeNull();
+        editor.innerHTML = '<span contenteditable="true">Local editor</span>';
+        expect(getEditableSelectionRoot(editor.firstChild)).toBe(editor.firstChild);
+    });
+
+    it.each(['missing', 'throws'] as const)('checks ancestry when an editor contains method %s', mode => {
+        const value = fixture('<span contenteditable="true"><i>Selected text.</i></span>');
+        Object.defineProperty(value.paragraph.firstChild, 'contains', {value: mode === 'missing' ? undefined
+            : () => {throw new Error('host contains unavailable');}});
+        const text = value.document.querySelector('i')!.firstChild!;
+        expect(shouldIgnoreSelection(mockRange(text, text, {commonAncestor: text}), true)).toBe(false);
     });
 });
 

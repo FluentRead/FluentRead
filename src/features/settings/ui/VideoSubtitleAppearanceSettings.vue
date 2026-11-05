@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoSubtitleAppearanceSettings.vue
  * 文件职责：提供视频字幕外观设置，并用同一套 CSS 变量展示隔离的实时预览。
- * 主要内容：左侧在等高预览区内用正常视频比例呈现字幕样式，滚动调整时保持预览可见；右侧选择显示内容、双语上下顺序、默认关闭的逐字高亮与读音标注、皮肤并按字号与位置、颜色与布局分组调整字幕。单语模式禁用顺序并保留选择，仅译文时可显式切回双语查看读音；读音预览只使用明确标记的固定日语示例，DOM 与视觉顺序同步且读音紧随原文；字号允许 80–500% 与整数自定义输入，支持恢复默认。
+ * 主要内容：左侧在等高预览区内用正常视频比例呈现字幕样式，滚动调整时保持预览可见；右侧选择显示内容、双语上下顺序、默认关闭的逐字高亮与读音标注、皮肤并按字号、位置、字体轮廓、背景、颜色与布局分组调整字幕。单语模式禁用顺序并保留选择，仅译文时可显式切回双语查看读音；读音预览只使用明确标记的固定日语示例，DOM 与视觉顺序同步且读音紧随原文；字号允许 80–500% 与整数自定义输入，支持恢复默认。
  * 模块边界：只编辑传入 Config 草稿；保存由 SettingsSections 统一处理，播放器实际应用由 content 层负责。
  -->
 <template>
@@ -79,9 +79,18 @@
           </div>
           <div class="subtitle-appearance-control-group">
             <strong>颜色与布局</strong>
+            <label><span>{{ t('video.appearance.outlineStyle') }}</span><UiSelect v-model="config.videoSubtitleAppearance.outlineStyle" :aria-label="t('video.appearance.outlineStyle')">
+              <ElOption value="skin" :label="t('video.appearance.outlineStyle.skin')" />
+              <ElOption value="stroke" :label="t('video.appearance.outlineStyle.stroke')" />
+              <ElOption value="shadow" :label="t('video.appearance.outlineStyle.shadow')" />
+              <ElOption value="none" :label="t('video.appearance.outlineStyle.none')" />
+            </UiSelect></label>
+            <label><span>{{ t('video.appearance.outlineColor') }}</span><ElColorPicker :model-value="config.videoSubtitleAppearance.outlineColor" :aria-label="t('video.appearance.outlineColor')" :disabled="!customOutlineAvailable" show-alpha color-format="hex" @update:model-value="value => { if (value) config.videoSubtitleAppearance.outlineColor = value }" /></label>
+            <label><span>{{ t('video.appearance.outlineWidth') }} <b>{{ config.videoSubtitleAppearance.outlineWidth }}px</b></span><input v-model.number="config.videoSubtitleAppearance.outlineWidth" type="range" :min="VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.min" :max="VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.max" :step="VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE.step" :aria-label="t('video.appearance.outlineWidth')" :disabled="!customOutlineAvailable" /></label>
+            <label class="subtitle-background-toggle"><span>{{ t('video.appearance.backgroundVisible') }}</span><input v-model="config.videoSubtitleAppearance.backgroundVisible" type="checkbox" :aria-label="t('video.appearance.backgroundVisible')" /></label>
             <label><span>原文颜色</span><ElColorPicker :model-value="config.videoSubtitleAppearance.textColor" aria-label="原文颜色" @update:model-value="value => { if (value) config.videoSubtitleAppearance.textColor = value }" /></label>
             <label><span>译文颜色</span><ElColorPicker :model-value="config.videoSubtitleAppearance.translationColor" aria-label="译文颜色" @update:model-value="value => { if (value) config.videoSubtitleAppearance.translationColor = value }" /></label>
-            <label><span>背景透明度 <b>{{ config.videoSubtitleAppearance.backgroundOpacity }}%</b></span><input v-model.number="config.videoSubtitleAppearance.backgroundOpacity" type="range" min="0" max="95" step="1" aria-label="字幕背景透明度" /></label>
+            <label><span>背景透明度 <b>{{ config.videoSubtitleAppearance.backgroundOpacity }}%</b></span><input v-model.number="config.videoSubtitleAppearance.backgroundOpacity" type="range" min="0" max="95" step="1" aria-label="字幕背景透明度" :disabled="!config.videoSubtitleAppearance.backgroundVisible" /></label>
             <label><span>行距 <b>{{ config.videoSubtitleAppearance.lineSpacing.toFixed(2) }}</b></span><input v-model.number="config.videoSubtitleAppearance.lineSpacing" type="range" min="1" max="2" step="0.01" aria-label="字幕行距" /></label>
             <label><span>最大宽度 <b>{{ config.videoSubtitleAppearance.maxWidth }}%</b></span><input v-model.number="config.videoSubtitleAppearance.maxWidth" type="range" min="40" max="100" step="1" aria-label="字幕最大宽度" /></label>
           </div>
@@ -105,6 +114,7 @@ import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {
   DEFAULT_VIDEO_SUBTITLE_APPEARANCE,
   VIDEO_SUBTITLE_FONT_SCALE_RANGE,
+  VIDEO_SUBTITLE_OUTLINE_WIDTH_RANGE,
   normalizeVideoSubtitleAppearance,
   getVideoSubtitleAppearanceCssVars,
   VIDEO_SUBTITLE_SKINS,
@@ -119,6 +129,7 @@ const props = defineProps<{config: Config}>();
 const config = computed(() => props.config);
 const displayModeOptions = [{value: 'bilingual', label: '双语'}, {value: 'translation-only', label: '仅译文'}, {value: 'original-only', label: '仅原文'}];
 const bilingualOrderOptions = computed(() => [{value: 'original-first', label: t('video.originalFirst')}, {value: 'translation-first', label: t('video.translationFirst')}]);
+const customOutlineAvailable = computed(() => config.value.videoSubtitleAppearance.outlineStyle === 'stroke' || config.value.videoSubtitleAppearance.outlineStyle === 'shadow');
 const subtitlesAvailable = computed(() => config.value.videoTranslationEnabled && config.value.videoSubtitleVisible);
 const orderAvailable = computed(() => subtitlesAvailable.value && config.value.videoSubtitleDisplayMode === 'bilingual');
 const readingAvailable = computed(() => subtitlesAvailable.value && browserCapabilities.extensionDom);
@@ -217,9 +228,9 @@ function skinSwatchStyle(skin: typeof VIDEO_SUBTITLE_SKINS[number]): Record<stri
 .subtitle-appearance-control-group > strong { color: var(--ink); font-size: 11px; }
 .subtitle-appearance-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
 .subtitle-appearance-controls label span { display: flex; justify-content: space-between; gap: 8px; }
-.subtitle-appearance-controls .subtitle-auto-bottom-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 40px; column-gap: 12px; cursor: pointer; }
-.subtitle-appearance-controls .subtitle-auto-bottom-toggle span { display: block; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
-.subtitle-appearance-controls .subtitle-auto-bottom-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: inherit; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle, .subtitle-appearance-controls .subtitle-background-toggle { grid-template-columns: minmax(0, 1fr) auto; align-items: center; min-height: 40px; column-gap: 12px; cursor: pointer; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle span, .subtitle-appearance-controls .subtitle-background-toggle span { display: block; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.subtitle-appearance-controls .subtitle-auto-bottom-toggle input, .subtitle-appearance-controls .subtitle-background-toggle input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: inherit; }
 .subtitle-appearance-controls b { color: var(--ink); font-weight: 650; }
 .subtitle-appearance-controls input[type="range"] { width: 100%; accent-color: var(--brand); }
 .subtitle-appearance-controls input[type="number"] { width: 100%; min-height: 30px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); background: var(--surface); }

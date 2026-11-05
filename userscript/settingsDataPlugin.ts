@@ -66,7 +66,7 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
             sharedLocale: {table: 'aiRequestTimeoutMessages', key: 'zh-CN', reference: 'aiRequestTimeoutChineseMessages'},
         });
         targets.set(normalizePath(resolve(root, 'src/core/config/driveSync.ts')), {names: ['VISIBLE_FIELDS']});
-        targets.set(normalizePath(resolve(root, 'src/features/settings/model/navigation.ts')), {names: ['settingsPagePanels', 'settingsSearchTargets']});
+        targets.set(normalizePath(resolve(root, 'src/features/settings/model/navigation.ts')), {names: ['settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS', 'UI_LANGUAGE_SEARCH_ALIASES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/translationLoadingStyle.ts')), {names: ['translationLoadingStyleOptions']});
         targets.set(normalizePath(resolve(root, 'src/core/config/freeTranslation.ts')), {names: ['FREE_TRANSLATION_PROVIDERS']});
         targets.set(normalizePath(resolve(root, 'src/core/language/catalog.ts')), {names: ['translationLanguageOptions']});
@@ -93,10 +93,13 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         'HARNESS_TRANSLATED_PROMPTS', 'localizedTargetLanguageLabels', 'BUILTIN_GLOSSARIES',
         'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels',
         'currentModelIds', 'cloudCredentialLabels', 'featureServiceDefinitions',
-        'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets',
+        'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS', 'UI_LANGUAGE_SEARCH_ALIASES',
         'translationLoadingStyleOptions', 'FREE_TRANSLATION_PROVIDERS', 'translationLanguageOptions',
         'PARTS', 'SENTENCE_HIGHLIGHT_STYLES', 'SELECTION_TTS_VOICE_OPTIONS',
         'LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS',
+        'iconPaths', 'HOST_IMPORTANT_STYLES', 'LANGUAGE_ALIASES', 'DEFAULT_SCRIPTS',
+        'ROLES', 'GRAMMAR_CARD_FORMAT', 'learningPreviewAnswers', 'IMAGE_OCR_LANGUAGE_PACKS',
+        'aliyunErrorHints', 'localizedUiLanguageLabels',
     ]);
     const groupEnabled = enabled && fullOptions && groupStandalone;
     const groupValues: Json[] = [];
@@ -123,6 +126,14 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
             groupValues.push(literal(matches[0].declaration.initializer, !target.appearance));
         }
       }
+      // 按固定声明名排列完整表，改善同类 JSON 的字典复用；不按内容排序，
+      // 因而 watch 期间只改数据不会改变其它模块已经使用的索引。
+      const order = [...groupIndices.keys()].map(key => `${key.split('\0')[1]}\0${key}`)
+          .sort().map(key => key.slice(key.indexOf('\0') + 1));
+      const orderedValues = order.map(key => groupValues[groupIndices.get(key)!]);
+      groupValues.length = 0;
+      groupValues.push(...orderedValues);
+      order.forEach((key, index) => groupIndices.set(key, index));
     };
     refreshGroup();
     const virtualId = '\0fluentread:standalone-settings-data';

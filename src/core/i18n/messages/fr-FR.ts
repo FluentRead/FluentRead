@@ -34,6 +34,14 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const frFRMessages = {
+    "privateTranslation.title": "Modèle de traduction privée",
+    "privateTranslation.scope": "Uniquement les requêtes privées confirmées par le navigateur via la traduction partagée. Hors lecture, rédaction, dictionnaire, voix et OCR séparés. Les scripts utilisateur ne détectent pas le mode privé. Si activé, toute identité privée inconnue est refusée, sans appel au modèle normal.",
+    "privateTranslation.service": "Service de traduction privée",
+    "privateTranslation.credentials": "Utilise la connexion et les identifiants du service choisi. Créez un service IA personnalisé pour des identifiants séparés.",
+    "privateTranslation.model": "Identifiant du modèle privé",
+    "privateTranslation.policy": "Uniquement OpenAI et les connexions compatibles personnalisées avec corps standard. Un corps personnalisé entraîne une erreur, sans suppression silencieuse. ID obligatoire, aucun repli. Le fournisseur peut conserver les données. La traduction privée ne lit ni ne stocke les caches partagés de traduction ou de résumé ; une répétition peut rappeler le modèle.",
+    "privateTranslation.required": "Choisissez un service disponible et un identifiant de modèle, sinon la traduction privée échouera.",
+
     "settings.backup.includeContext": "Inclure le contexte du vocabulaire",
     "feedback.serviceHint": "Vérifiez la connexion ou le modèle du service choisi, puis réessayez.",
     "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",

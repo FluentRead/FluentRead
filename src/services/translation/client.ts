@@ -676,7 +676,8 @@ function captureTranslationGlossaryOptions(options: TranslateOptions) {
 function assertTranslationCredentials(service: string, modelOverride?: string): void {
   // content script 按设计只接收公开配置，因此无法检查 API 凭据。后台请求边界加载
   // 后台加载专用持久凭据后执行权威校验。仅扩展页面按设计能够读取凭据，可保留本地快速失败。
-  if (!isTrustedCredentialStorageContext()) return;
+  // 专用模型的有效连接只能由后台可信 sender 身份决定；此处不能用普通连接凭据提前拒绝。
+  if (config.privateTranslation?.enabled || !isTrustedCredentialStorageContext()) return;
 
   const credentialConfig = modelOverride
     ? {

@@ -1228,7 +1228,14 @@ describe('userscript browser shim injection', () => {
                 vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', standalone);
                 vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
                 vi.resetModules();
-                const {createUserscriptCatalogCompressionPlugin} = await import('@/userscript/vite.config');
+                // Configuration import also encodes unrelated UI language data. Keep that setup
+                // lossless and cheap; restore the real worker before exercising every site catalog.
+                const gzipModule = await import('@/userscript/buildGzip');
+                const setupCompression = vi.spyOn(gzipModule, 'gzipLargeStandaloneUserscriptData')
+                    .mockImplementation(async data => gzipModule.gzipUserscriptBuildData(data));
+                let createUserscriptCatalogCompressionPlugin: typeof import('@/userscript/vite.config').createUserscriptCatalogCompressionPlugin;
+                try { ({createUserscriptCatalogCompressionPlugin} = await import('@/userscript/vite.config')); }
+                finally { setupCompression.mockRestore(); }
                 const plugin = createUserscriptCatalogCompressionPlugin() as unknown as {resolveId:(source:string,importer:string)=>string|null;load:(id:string)=>string|null|Promise<string>};
                 const importer = resolve(process.cwd(), 'src/core/site-adaptation/catalog.ts');
                 const sample=[];
@@ -2893,7 +2900,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
         ['src/core/config/driveSync.ts', ['VISIBLE_FIELDS']],
-        ['src/features/settings/model/navigation.ts', ['settingsPagePanels', 'settingsSearchTargets']],
+        ['src/features/settings/model/navigation.ts', ['STATIC_NAVIGATION_GROUPS', 'UI_LANGUAGE_SEARCH_ALIASES', 'settingsPagePanels', 'settingsSearchTargets']],
         ['src/core/config/translationLoadingStyle.ts', ['translationLoadingStyleOptions']],
         ['src/core/config/freeTranslation.ts', ['FREE_TRANSLATION_PROVIDERS']],
         ['src/core/language/catalog.ts', ['translationLanguageOptions']],

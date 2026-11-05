@@ -19,6 +19,9 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/core/config/privateTranslation.ts',
+                'src/services/translation/privateRouting.ts',
+                'src/features/settings/ui/PrivateTranslationSettings.vue',
                 'src/ui/confirmExport.ts',
                 'src/platform/browser/translationSidepanel.ts',
                 'src/app/sidepanel/index.ts',

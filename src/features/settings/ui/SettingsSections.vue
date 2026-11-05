@@ -67,6 +67,7 @@
       <strong>{{ defaultTextServiceLabel }}</strong>
       <p>{{ selectedTextServiceUnavailableMessage }}请在上方选择可用服务。</p>
     </div>
+    <PrivateTranslationSettings :config="config" :service-options="availableServiceOptions" :active="viewActive && props.activeSection === 'settings-general'" />
     <FeatureServiceSettings id="feature-services" data-settings-anchor="services" :data-settings-anchor-label="t('featureServices.assignments')" :active="viewActive && props.activeSection === 'settings-general'" :config="config" :service-options="availableServiceOptions" @configure-service="openInputServiceSettings" />
   </section>
   <section v-if="hasVisitedSection('settings-sites')" v-show="props.activeSection === 'settings-sites'" id="settings-sites" class="settings-section site-settings-section">
@@ -614,6 +615,7 @@ const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
 import UiLanguageSelector from '@/src/ui/components/UiLanguageSelector.vue';
 import FeatureServiceSettings from './FeatureServiceSettings.vue';
+import PrivateTranslationSettings from './PrivateTranslationSettings.vue';
 import { hasSavedServiceConfiguration } from '@/src/ui/view-model/serviceLibrary';
 import {getServiceCredentialGuide, getServiceWebsite} from '@/src/ui/view-model/serviceCatalog';
 const ServiceCatalog = defineAsyncComponent(() => import('./services/ServiceCatalog.vue'));

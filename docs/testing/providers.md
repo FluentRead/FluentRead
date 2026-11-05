@@ -147,3 +147,7 @@ Popup 服务概览显示默认、继承和独立功能在配置中选择的模�
 
 确定性夹具经过真实 broker 和 core，覆盖默认直连且不请求公共端点、繁体目标、429 后公共回退、1500 UTF-16 分块、自定义地址边界、取消中止，以及真实 Control 悬浮翻译/恢复/再翻译的 `[1,0,1]` 和邻段 `[0,0,0]`。`--live` 额外只发送一句公开短文到 DeepL，公共备用端点仍用夹具；结果单独记录，不能推断长期可用性、全部语言质量或 Firefox 实机表现。实现及本次证据范围见 [DeepLX 直连验证](../maintainers/deeplx-direct-968.md)。
 
+
+## 无痕专用共享翻译模型
+
+`privateTranslation`、`privateTranslationIntegration` 和 `privateTranslationSettingsLifecycle` 验证默认关闭、不可用选择保留、仅可信 sender 隐私身份启用、独立模型快照与迟到设置事件。专用模型开关开启与关闭均验证可信无痕请求不读写共享译文或摘要缓存。集成测试经过真实 fallback、broker 和锁定 OpenAI-compatible SDK，用离线 HTTP 端口检查最终模型、连接与凭据、统计、批量、并发/缓存隔离、取消、配置变化和不可用时不回退。新增纯配置、路由及设置组件纳入严格四维覆盖；已有配置归一化、快照和 broker 仍由各自全集回归守护。功能与限制见[无痕专用翻译模型](../guide/private-translation.md)。离线通过不代表真实无痕窗口、Firefox 实机、供应商质量或独立 OCR/阅读/写作验收。

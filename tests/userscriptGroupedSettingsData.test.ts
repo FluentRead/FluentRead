@@ -18,7 +18,7 @@ const owners = [
     ['src/core/glossary/builtins.ts', 'BUILTIN_GLOSSARIES'],
     ['src/core/config/videoSubtitleAppearance.ts', 'VIDEO_SUBTITLE_SKINS'],
     ['src/features/settings/model/chromeTranslationPreparation.ts', 'TEST_SAMPLES'],
-    ['src/features/settings/model/navigation.ts', 'settingsPagePanels', 'settingsSearchTargets'],
+    ['src/features/settings/model/navigation.ts', 'settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS', 'UI_LANGUAGE_SEARCH_ALIASES'],
     ['src/core/config/translationLoadingStyle.ts', 'translationLoadingStyleOptions'],
     ['src/core/config/freeTranslation.ts', 'FREE_TRANSLATION_PROVIDERS'],
     ['src/core/language/catalog.ts', 'translationLanguageOptions'],
@@ -26,6 +26,15 @@ const owners = [
     ['src/core/config/sentenceHighlight.ts', 'SENTENCE_HIGHLIGHT_STYLES'],
     ['src/core/config/selectionTts.ts', 'SELECTION_TTS_VOICE_OPTIONS'],
     ['src/core/config/localTts.ts', 'LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS'],
+    ['src/features/full-page-translation/ui/translationIndicators.ts', 'iconPaths'],
+    ['src/ui/translationLoadingIndicator.ts', 'HOST_IMPORTANT_STYLES'],
+    ['src/core/language/codes.ts', 'LANGUAGE_ALIASES', 'DEFAULT_SCRIPTS'],
+    ['src/features/reading-assistant/sentenceAnalysis.ts', 'ROLES'],
+    ['src/core/harness/promptDefaults.ts', 'GRAMMAR_CARD_FORMAT'],
+    ['src/core/config/selectionPreview.ts', 'learningPreviewAnswers'],
+    ['src/features/image-translation/ocrLanguages.ts', 'IMAGE_OCR_LANGUAGE_PACKS'],
+    ['src/providers/translation/aliyun-translation.ts', 'aliyunErrorHints'],
+    ['src/core/i18n/language.ts', 'localizedUiLanguageLabels'],
 ] as const;
 
 function initializer(code: string, name: string) {
@@ -71,7 +80,8 @@ describe('standalone grouped settings data', () => {
                 const second = context.getSettingsData!(index);
                 expect(JSON.stringify(first)).toBe(JSON.stringify(evaluate(initializer(source, name))));
                 expect(JSON.stringify(second)).toBe(JSON.stringify(first));
-                expect(second).not.toBe(first);
+                // Object tables retain separate instances; immutable primitive strings retain their value.
+                if (first !== null && typeof first === 'object') expect(second).not.toBe(first);
             }
         }
         expect(inflations).toBe(1);
@@ -105,12 +115,16 @@ describe('standalone grouped settings data', () => {
             }
             const plugin = createUserscriptSettingsDataPlugin(fixture, true, true, true);
             const transform = plugin.transform as (code: string, id: string) => {code: string};
+            const stablePath = resolve(fixture, 'src/core/config/catalog.ts');
+            const stableSource = readFileSync(stablePath, 'utf8');
+            const stableTransform = transform(stableSource, stablePath).code;
             const path = resolve(fixture, 'src/core/harness/promptLocales.ts');
             const changed = readFileSync(path, 'utf8').replace('You are the FluentRead', 'updated FluentRead');
             writeFileSync(path, changed);
             expect(() => transform(changed, path)).toThrow('changed during build');
             (plugin.buildStart as () => void)();
             expect(transform(changed, path).code).toContain('__fluentreadGetSettingsData');
+            expect(transform(stableSource, stablePath).code).toBe(stableTransform);
         } finally {
             rmSync(fixture, {recursive: true, force: true});
         }

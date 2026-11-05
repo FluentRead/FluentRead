@@ -34,6 +34,14 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const esESMessages = {
+    "privateTranslation.title": "Modelo de traducción privada",
+    "privateTranslation.scope": "Solo solicitudes privadas confirmadas por el navegador en la traducción compartida. Excluye lectura, escritura, diccionario, voz y OCR independientes. Los scripts de usuario no detectan el modo privado. Al activarlo, se rechazan las solicitudes de privacidad desconocida sin usar el modelo normal.",
+    "privateTranslation.service": "Servicio de traducción privada",
+    "privateTranslation.credentials": "Usa la conexión y credenciales del servicio elegido. Cree un servicio de IA personalizado para credenciales separadas.",
+    "privateTranslation.model": "ID del modelo privado",
+    "privateTranslation.policy": "Solo OpenAI y conexiones compatibles personalizadas con cuerpo estándar. Un cuerpo personalizado produce un error, no se elimina en silencio. ID obligatorio y sin modelo alternativo. El proveedor puede conservar datos. La traducción privada no lee ni guarda cachés compartidas de traducción o resumen; repetir una solicitud puede volver a llamar al modelo.",
+    "privateTranslation.required": "Elija un servicio disponible e indique un ID de modelo o la traducción privada fallará.",
+
     "settings.backup.includeContext": "Incluir el contexto del vocabulario",
     "feedback.serviceHint": "Revisa la conexión o el modelo del servicio seleccionado e inténtalo de nuevo.",
     "feedback.retryHint": "Vuelve a intentarlo en un momento. Se conservarán el texto original y la selección.",

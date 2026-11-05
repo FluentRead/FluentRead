@@ -1,5 +1,7 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
+ * 弹窗定位：自动卡片优先放在选中行上方，必要时切换下方或按较大空间限高并保留滚动；仅在用户拖动或调整尺寸后固定手动位置。
+ * 局部限高：整卡滚动跟随实际写入的 maxHeight，加载内容尚短时也保留后续滚动空间，不只依赖定位算法的可选限高结果。
  * 失败呈现：无结果时以简短原因、下一步提示和一个主操作展示；当前鉴权错误优先配置服务，重试按需展开，已有结果仍保留行内提示。
  * 来源提交：只允许完整位于同一局部编辑宿主的用户文本选区；右键目标与编辑宿主保持一致。翻译与词典异步结果交付前复核已克隆选区的正文、连接和适配器边界，不依赖原生高亮仍然存在；来源失效时撤销旧卡片，词书保存仍保留失联上下文回退。
  * 两点选取：默认关闭及文档适配器跳过快捷键冲突计算，快捷键开启单次起终点选择并放行开放 Shadow DOM 编辑区；复用原生选区与现有划词入口，完成后的首次选区读取保留同轮延迟滚动，随后恢复普通滚动收起，取消、编辑与卸载撤销首帧保护；短状态提示不捕获页面指针，未命中文字或起终点重合时说明可继续操作，配置变更和卸载释放控制器。
@@ -19,7 +21,7 @@
       <span class="fr-selection-indicator-glyph" aria-hidden="true">译</span>
     </button>
 
-    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-short-viewport': isShortViewport() }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
+    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-short-viewport': isShortViewport() || Number.parseFloat(tooltipStyle.maxHeight) < 140 }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
       <div class="fr-study-navigation">
         <img class="fr-tooltip-brand-icon" :src="selectionTranslatorIconUrl" alt="" aria-hidden="true" draggable="false" />
         <div class="fr-study-toolbar" role="group" aria-label="划词卡片内容" :title="isWordSelection ? '词典释义 · 按词性分类' : '先看译文，按需深入'" @focusin="handleStudyToolbarFocus">
@@ -383,6 +385,7 @@ let selectionFrame: number | null = null;
 let clickSelectionFirstReadPending = false;
 let positionFrame: number | null = null;
 let positionRevision = 0;
+let pendingPositionRefreshSelection = true;
 let zoomRequestGeneration = 0;
 let selectionLossTimer: number | null = null;
 let selectionPresentationTimer: number | null = null;
@@ -847,6 +850,8 @@ const popupResizeEdges = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'] as const;
 const popupManipulating = ref(false);
 let manualPopupPosition: {left: number; top: number} | null = null;
 let manualPopupSize: {width: number; height: number} | null = null;
+const anchoredPopupMaxHeight = ref<number | null>(null);
+let popupPositionManuallyAdjusted = false;
 let popupGesture: {pointerId: number; x: number; y: number; rect: DOMRect; edge: string; element: HTMLElement} | null = null;
 let pendingPopupPoint: {x: number; y: number} | null = null;
 let popupGestureFrame: number | null = null;
@@ -871,6 +876,8 @@ function resetPopupGeometry(): void {
   cancelPositionUpdate();
   manualPopupPosition = null;
   manualPopupSize = null;
+  anchoredPopupMaxHeight.value = null;
+  popupPositionManuallyAdjusted = false;
 }
 
 function applyManualPopupGeometry(measured?: Pick<DOMRect, 'width'>): void {
@@ -882,16 +889,18 @@ function applyManualPopupGeometry(measured?: Pick<DOMRect, 'width'>): void {
   const left = Math.max(viewport.left + 12, Math.min(manualPopupPosition.left, viewport.right - width - 12));
   const compact = isShortViewport();
   // 临时退化只改变呈现，不写回用户几何；常规卡仍保留左上角和原高度限制。
-  const top = compact ? viewport.top : Math.max(viewport.top + 12, Math.min(manualPopupPosition.top, viewport.bottom - Math.min(140 * scale, Math.max(1, viewport.height - 24)) - 12));
+  const minimumHeight = popupPositionManuallyAdjusted || manualPopupSize ? 140 * scale : 1;
+  const top = compact ? viewport.top : Math.max(viewport.top + 12, Math.min(manualPopupPosition.top, viewport.bottom - Math.min(minimumHeight, Math.max(1, viewport.height - 24)) - 12));
   const availableHeight = compact ? viewport.height : Math.max(1, viewport.bottom - top - 12);
   const height = manualPopupSize ? Math.min(manualPopupSize.height, availableHeight) : undefined;
+  const maxHeight = compact ? availableHeight : Math.min(anchoredPopupMaxHeight.value ?? 520 * scale, availableHeight);
   if (!compact) {
     manualPopupPosition = {left, top};
     if (manualPopupSize) manualPopupSize = {width, height: height!};
   }
   tooltipStyle.value = {
     left: px(left), top: px(top),
-    maxHeight: px((compact || manualPopupSize ? availableHeight : Math.min(520 * scale, availableHeight)) / scale),
+    maxHeight: px((compact || manualPopupSize ? availableHeight : maxHeight) / scale),
     ...(manualPopupSize ? {width: px(width / scale)} : {}),
     ...(height !== undefined ? {height: px(height / scale)} : {}),
   };
@@ -922,6 +931,9 @@ function beginPopupGesture(event: PointerEvent): void {
   if (!edge && blank && event.clientX >= target.getBoundingClientRect().left + target.clientLeft + target.clientWidth) return;
   event.preventDefault();
   stopPopupGesture();
+  // 用户开始拖动或调整尺寸后，解除自动锚点的限高，仍由视口边缘约束手动卡片。
+  anchoredPopupMaxHeight.value = null;
+  popupPositionManuallyAdjusted = true;
   const rect = element.getBoundingClientRect();
   popupGesture = {pointerId: event.pointerId, x: event.clientX, y: event.clientY, rect, edge, element};
   element.setPointerCapture(event.pointerId);
@@ -973,8 +985,8 @@ function updatePosition(refreshSelection = true): void {
   const current = snapshot.value;
   if (!current) return;
   const revision = positionRevision;
-  // 卡片首次打开后使用自己的锚点；内容、播放或页面滚动不需反复量宿主选区。
-  if (showTooltip.value && manualPopupPosition) { applyManualPopupGeometry(); return; }
+  // 自动卡片的ResizeObserver只复用初始选区矩形并重算侧边/限高；页面事件不反复量宿主选区，手动卡则固定几何。
+  if (showTooltip.value && manualPopupPosition && (popupPositionManuallyAdjusted || manualPopupSize || refreshSelection || !current.anchor)) { applyManualPopupGeometry(); return; }
   const rects = refreshSelection
     ? Array.from(current.range.getClientRects()).map(toSelectionRect).filter(rect => rect.width > 0 || rect.height > 0)
     : [];
@@ -1013,23 +1025,32 @@ function updatePosition(refreshSelection = true): void {
   if (showTooltip.value) void nextTick(() => {
     const tooltip = tooltipRef.value;
     if (!tooltip || !showTooltip.value || snapshot.value !== current || revision !== positionRevision) return;
-    if (manualPopupPosition) { applyManualPopupGeometry(); return; }
+    if (popupPositionManuallyAdjusted || manualPopupSize) { applyManualPopupGeometry(); return; }
     const rect = tooltip.getBoundingClientRect();
-    const position = calculateSelectionPopupPosition(snapshot.value.anchor, { width: rect.width, height: rect.height }, viewportSize.value);
+    // 自动限高会让实测高度暂时等于旧上限；恢复到默认自然上限参与重算，避免内容变化时在“放开/再次限高”间抖动。
+    const measuredHeight = rect.height;
+    const naturalHeight = anchoredPopupMaxHeight.value !== null && measuredHeight >= anchoredPopupMaxHeight.value - 1
+      ? Math.max(measuredHeight, 520 * popupScale.value) : measuredHeight;
+    const position = calculateSelectionPopupPosition(snapshot.value.anchor, { width: rect.width, height: naturalHeight }, viewportSize.value);
     manualPopupPosition = {left: position.left, top: position.top};
+    anchoredPopupMaxHeight.value = position.maxHeight ?? null;
     applyManualPopupGeometry(rect);
     popupPlacement.value = position.placement;
   });
 }
 
-function schedulePositionUpdate(): void {
+function schedulePositionUpdate(refreshSelection = true): void {
   if (!showIndicator.value && !showTooltip.value) return;
+  // 同一帧如同时收到卡片尺寸变化和普通位置事件，优先用已保存锚点重新布局，不重复读取宿主 Range。
+  if (!refreshSelection) pendingPositionRefreshSelection = false;
   if (positionFrame !== null) return;
   const revision = ++positionRevision;
   positionFrame = window.requestAnimationFrame(() => {
     if (revision !== positionRevision) return;
     positionFrame = null;
-    updatePosition();
+    const shouldRefreshSelection = pendingPositionRefreshSelection;
+    pendingPositionRefreshSelection = true;
+    updatePosition(shouldRefreshSelection);
     if (import.meta.env.BROWSER === 'safari' && readingKeyboardFocus?.reveal) {
       const focus = readingKeyboardFocus;
       void nextTick(() => revealReadingInput(focus, revision));
@@ -1037,10 +1058,16 @@ function schedulePositionUpdate(): void {
   });
 }
 
+function scheduleAutomaticPopupResize(): void {
+  // ResizeObserver只需读取当前卡片和保存的选区锚点，不重测或克隆页面选区。
+  if (!popupPositionManuallyAdjusted) schedulePositionUpdate(false);
+}
+
 function cancelPositionUpdate(): void {
   positionRevision += 1;
   if (positionFrame !== null) window.cancelAnimationFrame(positionFrame);
   positionFrame = null;
+  pendingPositionRefreshSelection = true;
 }
 
 function applyPageZoom(value: unknown): void {
@@ -1051,17 +1078,14 @@ function applyPageZoom(value: unknown): void {
   stopPopupGesture();
   // 手动位置和尺寸以视口 CSS 像素保存；缩放后换算，才能保持屏幕上的实际位置和大小。
   const ratio = previousZoom / nextZoom;
-  if (manualPopupPosition) manualPopupPosition = {
-    left: manualPopupPosition.left * ratio,
-    top: manualPopupPosition.top * ratio,
-  };
-  if (manualPopupSize) manualPopupSize = {
-    width: manualPopupSize.width * ratio,
-    height: manualPopupSize.height * ratio,
-  };
+  const anchor = !popupPositionManuallyAdjusted ? snapshot.value?.anchor : null;
+  for (const geometry of [manualPopupPosition, manualPopupSize, anchor]) {
+    if (geometry) for (const [key, value] of Object.entries(geometry)) (geometry as Record<string, number>)[key] = value * ratio;
+  }
+  if (anchoredPopupMaxHeight.value !== null) anchoredPopupMaxHeight.value *= ratio;
   pageZoom.value = nextZoom;
   viewportSize.value = getSafeVisualViewportRect();
-  schedulePositionUpdate();
+  schedulePositionUpdate(!showTooltip.value);
 }
 
 async function requestPageZoom(): Promise<void> {
@@ -1094,7 +1118,7 @@ function handleViewportResize(): void {
     if (isShortViewport() && Date.now() < focus.expiresAt
       && (['width', 'height', 'top', 'left'] as const).some(key => previous[key] !== viewportSize.value[key])) focus.reveal = true;
   }
-  schedulePositionUpdate();
+  schedulePositionUpdate(!showTooltip.value);
   void requestPageZoom();
 }
 
@@ -2723,7 +2747,7 @@ onMounted(() => {
     tooltipResizeObserver?.disconnect();
     tooltipResizeObserver = null;
     if (!tooltip || typeof ResizeObserver === 'undefined') return;
-    tooltipResizeObserver = new ResizeObserver(schedulePositionUpdate);
+    tooltipResizeObserver = new ResizeObserver(scheduleAutomaticPopupResize);
     tooltipResizeObserver.observe(tooltip);
   }, { flush: 'post' });
   watch(() => JSON.stringify(readingPreferences.value), (nextPreferences, previousPreferences) => {

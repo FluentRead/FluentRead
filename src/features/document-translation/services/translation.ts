@@ -1,5 +1,6 @@
 /**
  * @file src/features/document-translation/services/translation.ts
+ * 字幕参考：仅为提示词 AI 的带时间轴片段构建相邻 cue 参考；按 cue 隔离复用，普通文档继续章节内去重，输出不改变片段或时间戳。
  * 文件职责：编排文档片段的批量翻译流程，在固定语言和服务快照下按数量及字符预算拆批，并向调用方持续报告确定性进度。
  * 主要内容：定义进度与逐段提交契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，固定缓存策略并透传至批量和降级请求；在单批请求与重试总预算内尊重 Retry-After，暂时限频时由本任务冻结服务共享冷却派发闸门，自身退避与同伴尚余冷却都计入等待预算；禁用客户端叠加重试，冻结服务单次超时，绝对期限中止请求与等待并拒收迟到结果。按阅读位置变化重排待译片段并复用批次游标，以章节内去重避免重复原文挤占批量预算；构建有界篇章参考并区分人工确认译文，移除服务凭空加入的表情符号，报告真实等待数量。原样返回的专名与短词保留原文，复用已有译文续译，固定文件级上下文；不可恢复故障停止派发但收齐在途成功，显式取消覆盖运行时就绪等待、立即移除监听并禁止迟到提交。
  * 模块边界：该层不解析文件、不持久化配置，也不直接绑定具体 provider；上层负责冻结用户设置并注入 gateway，文档结构由 core 提供，网络和缓存语义由应用翻译客户端承担。
@@ -7,6 +8,7 @@
 import {serializeTranslationError, TranslationRequestError} from '@/src/services/translation/errors';
 import {createDiscourseContext, discourseContextLimits, type DiscourseBlock} from '@/src/services/translation/context/discourse';
 import type {DocumentSegment} from '@/src/features/document-translation/core/document';
+import {buildSubtitleContext, isTimedSubtitleCue} from '@/src/core/translation/subtitleContext';
 
 export interface DocumentTranslationProgress {
     completed: number;
@@ -81,6 +83,8 @@ export interface DocumentTranslationRequestOptions {
     maxRetries?: number;
     /** 当前批次绝对预算的剩余时间，交给客户端限制后台传输。 */
     timeout?: number;
+    /** SRT/VTT/ASS 相邻字幕，用来理解跨 cue 的完整句意；不改变请求内各片段边界。 */
+    subtitleContext?: string;
     /** 显式使用翻译客户端已有的 AI 多段槽协议；只有具备该能力的服务批次携带此标记。 */
     aiMultiSegment?: boolean;
     /** 当前文档开启多段时才发送；后台校验入口，免费池按真实线路能力消费槽位。 */
@@ -96,6 +100,8 @@ export interface DocumentTranslationGateway {
     waitUntilReady(): PromiseLike<unknown> | unknown;
     getDefaultService(): string;
     getDefaultModel?(service: string): string;
+    /** 仅提示词型 AI 能使用本地字幕上下文。 */
+    supportsSubtitleContext?(service: string, model?: string): boolean;
     /** 与客户端一致的单次预算；任务开始时冻结，文档总预算不得截短明确的服务设置。 */
     getRequestTimeout?(service: string, batch: boolean): number;
     supportsBatch(service: string): boolean;
@@ -389,12 +395,19 @@ export function createDocumentSegmentTranslator(
         const cacheOptions = options.useCache === undefined ? {} : {useCache: options.useCache};
         const service = options.serviceOverride || gateway.getDefaultService();
         const model = options.modelOverride || gateway.getDefaultModel?.(service);
+        const subtitlePositions = gateway.supportsSubtitleContext?.(service, model) && segments.some(isTimedSubtitleCue)
+            ? new Map(segments.map((segment, index) => [segment.id, index])) : undefined;
+        const subtitleContextFor = subtitlePositions
+            ? (batch: readonly DocumentSegment[]) => buildSubtitleContext(segments, batch, subtitlePositions)
+            : () => undefined;
         const singleRequestTimeout = gateway.getRequestTimeout?.(service, false);
         const batchRequestTimeout = gateway.getRequestTimeout?.(service, true);
         const enableAIContext = options.enableAIContext === true;
         const blocks = Object.freeze(documentDiscourseBlocks(segments).map(block => Object.freeze(block)));
         const blockSections = new Map(blocks.map(block => [Number(block.id), block.section]));
-        const reuseKeys = new Map(segments.map(segment => [segment.id, JSON.stringify([blockSections.get(segment.id), segment.source])]));
+        const reuseKeys = new Map(segments.map(segment => [segment.id, JSON.stringify([
+            blockSections.get(segment.id), segment.source, subtitlePositions && isTimedSubtitleCue(segment) ? segment.id : '',
+        ])]));
         const reuseKey = ({id}: DocumentSegment) => reuseKeys.get(id)!;
         const segmentById = new Map(segments.map(segment => [segment.id, segment]));
         const discourse = enableAIContext ? createDiscourseContext() : undefined;
@@ -526,9 +539,11 @@ export function createDocumentSegmentTranslator(
                 if (failure) throw failure;
             };
             const translateSegment = (segment: DocumentSegment, deadlineAt = retryDeadline(options, singleRequestTimeout)) => withRetryBackoff(async attempt => {
+                const subtitleContext = subtitleContextFor([segment]);
                 const received = await gateway.translateText(segment.source, context, {
                     ...glossaryOptions, ...cacheOptions, ...discourseOptions(segment, [segment.source]),
                     enableNativeBatch: false, ...attempt, pageContext,
+                    ...(subtitleContext ? {subtitleContext} : {}),
                     serviceOverride: service, modelOverride: model, sourceLanguage, targetLanguage, maxRetries,
                 });
                 if (typeof received !== 'string' || !received.trim()) throw new Error('翻译服务返回空译文，请重试');
@@ -551,10 +566,12 @@ export function createDocumentSegmentTranslator(
                     const deadlineAt = retryDeadline(options, requestTimeout);
                     try {
                         const result = await withRetryBackoff(async attempt => {
+                        const subtitleContext = subtitleContextFor(batch);
                         const requestOptions: DocumentTranslationRequestOptions = {
                             ...glossaryOptions,
                             ...cacheOptions,
                             ...discourseOptions(batch[0], batch.map(segment => segment.source)),
+                            ...(subtitleContext ? {subtitleContext} : {}),
                             enableNativeBatch: !single,
                             ...attempt,
                             pageContext,

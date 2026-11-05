@@ -2,6 +2,14 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## 字幕文件上下文（issue #1182）
+
+`documentTranslationApi`、`documentTranslationExamplesApi` 验证 SRT/VTT/ASS 邻句与当前 cue 身份、1200 字符预算、长 cue、断续批次、重复台词、普通 AI 文档去重、组合 AI 和专用 MT 模型边界；导出后重解析，cue 数量、时间戳及原结构保持一致。
+
+`backgroundTranslationHandler`、`translateApiPerformance`、`translationBroker`、`template` 验证字符串与长度协议、冻结的请求、单条与合批缓存隔离、摘要关闭时的参考与回显恢复、无上下文重试移除字幕字段，以及各 AI 消息模板的槽位约束。新纯模块 `src/core/translation/subtitleContext.ts` 纳入四项 100% 覆盖率。
+
+真实浏览器使用隔离 Edge、受控 OpenAI 兼容响应，上传字幕文件后验证翻译、重译与下载，检查实际请求中的参考、缓存及导出时间轴。范围为导入的字幕文件；网页视频和会议实时字幕不属于此链路。受控结果验证协议，不能据此声称真实模型措辞质量或跨浏览器接受度。
+
 ## 论文版式回归
 
 `tests/pdfPaperLayouts.test.ts` 用 pdf-lib 按真实字体度量现场生成典型论文版式，再走真实的 PDF.js 解析与版面分析，逐项断言送翻片段的文字与顺序。目前覆盖：

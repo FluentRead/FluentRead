@@ -1,5 +1,6 @@
 /**
  * @file src/services/translation/client.ts
+ * 字幕参考：单条与批量请求冻结并限制字幕文档的相邻 cue 字符串，资格与缓存由后台统一判断。
  * 文件职责：作为页面与后台翻译 broker 之间的客户端代理，统一管理单条、批量和视频字幕翻译的队列、取消、重试、超时、上下文与统计。
  * 主要内容：关闭的服务在客户端请求入口拒绝并返回不可重试错误；在等待前冻结调用选项、原文数组、显式排除语言、服务/模型与语言参数及各服务原生合批偏好，单条与批量文本先按本地证据预检，再对未跳过文本等待可取消的补充证据；免费聚合及谷歌内部换线免除外层重复重试，保留组合 AI 上下文；AI 默认在等待前冻结用户请求预算并额外预留一秒收取后台结果；请求携带随机 clientRequestId，并在导航取消/超时时通知后台停止真实 provider。
  * 模块边界：客户端不实现供应商协议、不直接读写翻译缓存，也不修改全文 DOM；单条、批量与字幕调用的信号贯穿本地排队和已启动传输，等待取消不占用活动传输租约；内部槽请求保留空响应供调用方严格解析和逐槽回退，本模块属于跨 feature 的请求编排服务；后台 runtime/broker 负责 provider 与缓存，各 feature 负责展示和会话状态。
@@ -18,6 +19,7 @@ import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {buildGlossaryRevision} from '@/src/core/glossary';
+import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {isTrustedCredentialStorageContext} from '@/src/platform/storage/credentialContext';
 import {config, requestConfigCountIncrement} from '@/src/services/config/store';
@@ -380,6 +382,7 @@ export async function translateText(origin: string, context: string = document.t
             context,
             pageContext,
             ...(options.discourseContext ? {discourseContext: options.discourseContext.slice(0, 2400)} : {}),
+            ...(options.subtitleContext ? {subtitleContext: options.subtitleContext.slice(0, SUBTITLE_CONTEXT_LIMIT)} : {}),
             ...(options.enableAIContext !== undefined ? {enableAIContext: options.enableAIContext} : {}),
             origin,
             enableNativeBatch,
@@ -503,6 +506,7 @@ export async function translateTextBatch(
             context,
             pageContext,
             ...(options.discourseContext ? {discourseContext: options.discourseContext.slice(0, 2400)} : {}),
+            ...(options.subtitleContext ? {subtitleContext: options.subtitleContext.slice(0, SUBTITLE_CONTEXT_LIMIT)} : {}),
             ...(options.enableAIContext !== undefined ? {enableAIContext: options.enableAIContext} : {}),
             origin: pendingOrigins,
             ...(import.meta.env.BROWSER !== 'userscript' && options.documentBatch === true ? {documentBatch: true} : {}),
@@ -654,6 +658,8 @@ export interface TranslateOptions {
   pageContext?: string;
   /** 当前单篇材料的有界证据，仅在允许 AI 上下文时交给现有 provider。 */
   discourseContext?: string;
+  /** SRT/VTT/ASS 相邻 cue 原文；只用于文档字幕翻译，不改变输出时间轴。 */
+  subtitleContext?: string;
   /** 当前请求是否允许 AI 网页上下文；全文翻译用它固定会话启动时策略。 */
   enableAIContext?: boolean;
   /** 本次请求冻结的原生合批设置；全文会话不重新读取后续配置变更。 */

@@ -1,5 +1,6 @@
 /**
  * @file src/app/document-translation/runtime.ts
+ * 字幕能力：通用提示词模型及含已启用 AI 成员的组合可消费相邻 cue；专用 MT 模型沿用原协议。
  * 文件职责：把通用翻译客户端、配置 store 与文档 feature 的纯服务连接起来，为页面提供可直接调用的分段翻译和文件下载适配器。
  * 主要内容：按固定服务和模型提供文档默认批量、可关闭的翻译流程，注入客户端原有单次超时和文档总预算，不改写全局 AI 多段开关；为扫描版 PDF 组装“渲染页面 → 文字识别 → 换算坐标”的页面识别器；为默认原版导出注入 JPEG 绘制器，为显式重排导出注入可复制文字与图表端口，并持有、释放本次导出的 PDF.js 租约。
  * 模块边界：本文件是 app adapter，不解析源文件、不维护页面进度，也不实现 PDF/EPUB/DOCX 编码；业务算法归 document-translation feature，网络请求归 translation client。
@@ -17,6 +18,7 @@ import {acquirePdfDocument, renderPdfReadingPages, rasterizePdfReadingPages, ras
 import type {PdfPageRecognizer} from '@/src/features/document-translation/services/pdfOcr';
 import {config, configReady} from '@/src/services/config/store';
 import {supportsNativeTranslationBatch} from '@/src/services/translation/capabilities';
+import {hasCompositeTranslationAIContext} from '@/src/core/config/compositeTranslation';
 import type {
     DocumentRenderMode,
     ParsedDocument,
@@ -31,6 +33,8 @@ export const translateDocumentSegments = createDocumentSegmentTranslator({
     waitUntilReady: () => configReady,
     getDefaultService: () => config.service,
     getDefaultModel: (service) => resolveConfiguredModel(config.model?.[service], config.customModel?.[service]),
+    supportsSubtitleContext: (service, model) => servicesType.isUseAIContext(service, model)
+        || hasCompositeTranslationAIContext(config, service),
     getRequestTimeout: (service, batch) => getTranslationTimeout(service, undefined, batch),
     supportsBatch: (service) => service === services.freeTranslation || supportsNativeTranslationBatch(service),
     supportsAIMultiSegment: (service, model) => servicesType.isUseAIContext(service, model),

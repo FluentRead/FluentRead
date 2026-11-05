@@ -112,6 +112,15 @@ function enableContextGate(): void {
 }
 
 describe('translation API request lifecycle performance', () => {
+  it.each(['single', 'batch'] as const)('freezes and bounds subtitle context for %s without changing the document scope', async kind => {
+    mocks.config.service = 'mock-ai'; mocks.config.enableAIContext = true;
+    const context = deferred<string>(); mocks.getPageTranslationContext.mockReturnValue(context.promise);
+    mocks.sendMessage.mockResolvedValue(kind === 'single' ? '有效译文' : ['有效译文']);
+    const options = {subtitleContext: 'a'.repeat(1500), glossaryContext: 'document' as const, maxRetries: 0};
+    const pending = kind === 'single' ? translateText('Source', 'Document', options) : translateTextBatch(['Source'], 'Document', options);
+    await flushMicrotasks(); options.subtitleContext = 'changed after awaiting'; context.resolve('page context'); await pending;
+    expect(mocks.sendMessage).toHaveBeenCalledWith(expect.objectContaining({subtitleContext: 'a'.repeat(1200), glossaryContext: 'document'}));
+  });
   it.each(['single', 'batch', 'video'] as const)('rejects disabled %s requests before context, credentials, transport and accounting, then allows re-enable', async kind => {
     mocks.config.disabledTranslationServices = ['mock'];
     const run = () => kind === 'batch' ? translateTextBatch(['Source'], 'Page')

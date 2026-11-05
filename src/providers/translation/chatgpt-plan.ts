@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/chatgpt-plan.ts
+ * 字幕参考：将后台规范化的相邻 cue 标记交给共用提示模板，供应商协议与返回结构保持原契约。
  * 文件职责：通过本机 OAuth 助手把统一翻译请求转换为 ChatGPT 套餐的 Responses 文本或图片请求。
  * 主要内容：复用冻结配置与公共提示词模板，限制请求字段为 model/input/instructions，逐条执行等长数组，严格读取 SSE 完成响应、清理推理文本并上报无敏感信息用量，保留共享取消、截止时间和并发租约。
  * 模块边界：本文件只适配 provider 协议，不接触 OAuth/配对凭据、UI、存储或会话状态；本机 HTTP 边界由 platform bridge 提供，缓存、术语保护与路由由 translation broker 负责。
@@ -39,6 +40,7 @@ export function buildChatGPTPlanPayload(request: ChatGPTPlanRequest, origin: str
     const payload = JSON.parse(commonMsgTemplate({
         origin,
         context: request.pageContext,
+        subtitleContext: request.subtitleContext,
         prompt: request.summaryPrompt,
         systemPrompt: request.summarySystemPrompt,
         serviceOverride: services.chatgptPlan,

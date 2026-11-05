@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/deepseek.ts
+ * 字幕参考：将后台规范化的相邻 cue 标记交给共用提示模板，供应商协议与返回结构保持原契约。
  *
  * 文件职责：适配 DeepSeek 官方或代理端点，并根据配置选择 Chat Completions 或 Responses 协议进行翻译。
  * 主要内容：从快照解析 thinking/API 模式和 endpoint，将受信选区图片传给 Chat/Responses 多模态模板，执行 Bearer 请求、HTTP/JSON 校验、上报协议对应的 token 用量并清理模型推理标记；路由改写与 Responses 输出读取复用 responses-api 共享模块。 可核对的公开符号包括 buildDeepSeekEndpoint、default:deepseek。
@@ -51,6 +52,7 @@ async function deepseek(message: TranslationProviderRequest<string>) {
         ? deepseekResponsesMsgTemplate({
             origin: message.origin,
             context: message.pageContext,
+            subtitleContext: message.subtitleContext,
             prompt: message.summaryPrompt,
             systemPrompt: message.summarySystemPrompt,
             serviceOverride: service,
@@ -63,6 +65,7 @@ async function deepseek(message: TranslationProviderRequest<string>) {
         : deepseekMsgTemplate({
             origin: message.origin,
             context: message.pageContext,
+            subtitleContext: message.subtitleContext,
             prompt: message.summaryPrompt,
             systemPrompt: message.summarySystemPrompt,
             serviceOverride: service,

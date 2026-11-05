@@ -2763,6 +2763,26 @@ describe('automatic card audio layout', () => {
     });
 });
 
+describe('editable text selection capture', () => {
+    it('shows the selection entry for a user-selected range contained by one contenteditable host', async () => {
+        const fixture = mountSelection();
+        fixture.config.selectionTranslatorTrigger = 'icon';
+        fixture.config.selectionTranslatorDelay = 0;
+        fixture.notifyConfig(); await Vue.nextTick();
+        const selected = fixture.selectedSnapshot('Good ideas deserve attention.', parent => {
+            parent.setAttribute('contenteditable', 'true');
+        });
+
+        fixture.state.applySelection(selected);
+        await Vue.nextTick();
+
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.state.showIndicator).toBe(true);
+        expect(fixture.state.showTooltip).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+    });
+});
+
 describe('context menu selection ownership', () => {
     async function prepareMenu(browserTarget: SelectionBuildTarget = 'chrome') {
         const fixture = mountSelection(false, undefined, browserTarget);
@@ -3047,15 +3067,49 @@ describe('context menu selection ownership', () => {
         expect(fixture.translateText).toHaveBeenCalledTimes(1);
     });
 
-    it('allows a contenteditable=false text island while rejecting inherited editable targets', async () => {
+    it('leaves editable target validation to Range ownership while still rejecting native inputs', async () => {
         const fixture = await prepareMenu();
-        const editableParent = {getAttribute: () => 'true', parentElement: null};
-        const target = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
-            closest: () => null, getAttribute: () => 'false', parentElement: editableParent,
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
         });
-        expect(fixture.state.isContextMenuInputTarget(target)).toBe(false);
-        target.getAttribute = () => null;
-        expect(fixture.state.isContextMenuInputTarget(target)).toBe(true);
+        expect(fixture.state.isContextMenuInputTarget(editor)).toBe(false);
+        expect(fixture.state.isContextMenuInputTarget(fixture.inputTarget)).toBe(true);
+    });
+
+    it('captures and translates an editor selection only when the menu target shares its editable root', async () => {
+        const fixture = await prepareMenu();
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
+        });
+        fixture.paragraph.parentElement = editor;
+
+        fixture.state.handleContextMenu({isTrusted: true, target: editor});
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler('Good ideas deserve attention.')).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        for (let attempt = 0; attempt < 5; attempt++) {await Promise.resolve(); await Vue.nextTick();}
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
+
+    it('rejects a stale page Range when the context menu opens in a different editable root', async () => {
+        const fixture = await prepareMenu();
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
+        });
+
+        fixture.state.handleContextMenu({isTrusted: true, target: editor});
+        expect(fixture.state.contextMenuSelection).toBeNull();
+        expect(fixture.state.contextMenuSourceRejected).toBe(true);
+        expect(fixture.contextMenuHandler('Good ideas deserve attention.')).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
     });
 
     it.each(['disconnected', 'foreign-document', 'collapsed', 'text-changed', 'protected'] as const)(

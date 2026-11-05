@@ -302,6 +302,36 @@ describe('issue #704 inline code in prose selections', () => {
     });
 });
 
+describe('explicit selections inside editable text', () => {
+    function fixture(html: string) {
+        const {document} = parseHTML('<html><body><main><p></p></main></body></html>');
+        const paragraph = document.querySelector('p')!;
+        paragraph.innerHTML = html;
+        const range = mockRange(paragraph.firstChild, paragraph.lastChild, {
+            commonAncestor: paragraph, intersectingNodes: [...paragraph.querySelectorAll('*')],
+        });
+        return {document, paragraph, range};
+    }
+
+    it('allows a complete range in one local editor only for the normal selection flow', () => {
+        const inside = fixture('<span contenteditable="true">Read this editor text.</span>');
+        expect(shouldIgnoreSelection(inside.range)).toBe(true);
+        expect(shouldIgnoreSelection(inside.range, true)).toBe(false);
+
+        const crossing = fixture('<span contenteditable="true">Editor text.</span> Outside text.');
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+    });
+
+    it.each([
+        '<span contenteditable="true" data-fluent-read-ui>Extension text.</span>',
+        '<span contenteditable="true" aria-hidden="true">Hidden text.</span>',
+        '<span contenteditable="true" translate="no">Protected text.</span>',
+        '<textarea>Input text.</textarea>',
+    ])('keeps protected editor content out: %s', html => {
+        expect(shouldIgnoreSelection(fixture(html).range, true)).toBe(true);
+    });
+});
+
 describe('document no-translate shells in explicit selections', () => {
     function fixture(htmlAttributes = '', bodyAttributes = '', content = '<p id="content">Readable response text.</p>') {
         const {document} = parseHTML(`<html ${htmlAttributes}><head></head><body ${bodyAttributes}><div id="root">${content}</div></body></html>`);

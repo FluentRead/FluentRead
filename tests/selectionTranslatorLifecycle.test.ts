@@ -3341,7 +3341,34 @@ describe('selection card bounded layout work', () => {
         fixture.state.handleViewportResize(); await vi.advanceTimersByTimeAsync(32);
         expect(fixture.state.tooltipStyle).toMatchObject({top: '135px', maxHeight: '520px'});
         expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
-        expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+    });
+
+    it('remeasures a reflowed range once per viewport frame and keeps the whole new selection clear', async () => {
+        const fixture = await automaticCard();
+        const rects = [
+            {left: 20, right: 250, top: 100, bottom: 124, width: 230, height: 24},
+            {left: 20, right: 180, top: 124, bottom: 148, width: 160, height: 24},
+        ];
+        fixture.range.getClientRects.mockReturnValue(rects as never[]);
+        fixture.window.innerHeight = 500;
+        fixture.state.handleViewportResize();
+        fixture.state.handleViewportResize();
+        fixture.state.scheduleAutomaticPopupResize();
+        await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+        expect(fixture.state.snapshot.anchor).toEqual(rects[1]);
+        expect(fixture.state.snapshot.popupAnchor).toEqual({...rects[1], top: 100, height: 48});
+        const top = parseFloat(fixture.state.tooltipStyle.top);
+        expect(top + 80 <= 90 || top >= 158).toBe(true);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+    });
+
+    it('keeps a usable full-card fallback when selected text occupies all vertical space', async () => {
+        const fixture = await automaticCard(270, 10, 260);
+        expect(fixture.state.isShortViewport()).toBe(true);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '0px', maxHeight: '270px'});
     });
 
     it('scales the saved anchor together with automatic geometry before a zoom resize', async () => {
@@ -3352,7 +3379,7 @@ describe('selection card bounded layout work', () => {
         fixture.state.applyPageZoom(2); await vi.advanceTimersByTimeAsync(32);
         expect(fixture.state.snapshot.anchor).toMatchObject({left: 40, right: 90, top: 50, bottom: 62.5, width: 50, height: 12.5});
         expect(parseFloat(fixture.state.tooltipStyle.top)).toBeGreaterThanOrEqual(72.5);
-        expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
     });
 
     it('observes only the current card, reflows on resize and disconnects on unmount', async () => {

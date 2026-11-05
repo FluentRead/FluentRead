@@ -4,6 +4,7 @@ import {
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
+    getSelectionPopupAnchor,
     getSelectionPresentationDelayRemaining,
     getEditableSelectionRoot,
     isSameLanguage,
@@ -619,6 +620,16 @@ describe('selection translator core geometry', () => {
         expect(chooseSelectionRect(rects, true)).toEqual(rects[1]);
         expect(chooseSelectionRect(rects, false)).toEqual(rects[0]);
         expect(chooseSelectionRect([])).toBeNull();
+    });
+
+    it('keeps every selected line clear while aligning to the directional endpoint', () => {
+        expect(getSelectionPopupAnchor([])).toBeNull();
+        expect(getSelectionPopupAnchor([rects[0]])).toEqual(rects[0]);
+        expect(getSelectionPopupAnchor(rects)).toEqual({...rects[1], top: 100, height: 48});
+        expect(getSelectionPopupAnchor(rects, false)).toEqual({...rects[0], bottom: 148, height: 48});
+        const anchor = getSelectionPopupAnchor(rects)!;
+        const card = calculateSelectionPopupPosition(anchor, {width: 360, height: 80}, {width: 1000, height: 500});
+        expect(card.top + 80 <= anchor.top - 10 || card.top >= anchor.bottom + 10).toBe(true);
     });
 
     it('keeps the popup above the selection when there is room', () => {

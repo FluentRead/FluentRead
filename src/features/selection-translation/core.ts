@@ -1,7 +1,7 @@
 /**
  * @file src/features/selection-translation/core.ts
  * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点和语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
 import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
@@ -531,6 +531,15 @@ export function shouldIgnoreSelection(range: Range, allowEditableSelection = fal
 export function chooseSelectionRect(rects: SelectionRect[], isForward = true): SelectionRect | null {
     if (rects.length === 0) return null;
     return isForward ? rects[rects.length - 1] : rects[0];
+}
+
+/** 卡片避让完整选区的纵向范围，横向仍对齐选择方向的端点行。 */
+export function getSelectionPopupAnchor(rects: SelectionRect[], isForward = true): SelectionRect | null {
+    const anchor = chooseSelectionRect(rects, isForward);
+    if (!anchor) return null;
+    let {top, bottom} = anchor;
+    for (const rect of rects) {top = Math.min(top, rect.top); bottom = Math.max(bottom, rect.bottom);}
+    return {...anchor, top, bottom, height: bottom - top};
 }
 
 /**

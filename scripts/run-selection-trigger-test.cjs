@@ -3281,15 +3281,35 @@ async function main() {
           return tabs.find(tab => tab.active)?.id ?? tabs[0]?.id;
         });
         assert(Number.isInteger(tabId), '找不到隔离测试页的 tabId');
+        // 原生 tabs.setZoom 后 Playwright 默认裁图沿用未换算的 CSS 尺寸；CDP Viewport 使用 DIP。
+        const zoomScreenshot = async (name, zoom) => {
+          const viewport = await page.evaluate(() => ({width:innerWidth,height:innerHeight,dpr:devicePixelRatio}));
+          const session = await context.newCDPSession(page);
+          try {
+            const captured = await session.send('Page.captureScreenshot', {format:'png',fromSurface:true,captureBeyondViewport:false,
+              clip:{x:0,y:0,width:viewport.width*zoom,height:viewport.height*zoom,scale:1}});
+            const bytes = Buffer.from(captured.data,'base64');
+            const dimensions = {width:bytes.readUInt32BE(16),height:bytes.readUInt32BE(20)};
+            (result.zoomScreenshots ||= []).push({name,zoom,viewport,dimensions});
+            fs.writeFileSync(path.join(args.artifactsDir,name),bytes);
+            assert(dimensions.width === Math.round(viewport.width*viewport.dpr)
+              && dimensions.height === Math.round(viewport.height*viewport.dpr), '原生缩放截图未覆盖完整可见视口');
+          } finally {await session.detach();}
+        };
         const samples = [];
         for (const factor of [1, 2, 0.5, 1]) {
           await popup.evaluate(({tabId, factor}) => chrome.tabs.setZoom(tabId, factor), {tabId, factor});
           await page.waitForTimeout(450);
           const zoom = await popup.evaluate(tabId => chrome.tabs.getZoom(tabId), tabId);
           const card = await box();
+          const selectedBounds = await page.evaluate(() => {
+            const r = getSelection().getRangeAt(0).getBoundingClientRect(); return {top:r.top,bottom:r.bottom};
+          });
+          assert(card.bottom <= selectedBounds.top - 8 || card.y >= selectedBounds.bottom + 8,
+            `缩放后卡片遮挡重新换行的选区：${JSON.stringify({zoom,card,selectedBounds})}`);
           const viewport = await page.evaluate(() => ({width: innerWidth, height: innerHeight, dpr: devicePixelRatio}));
-          samples.push({zoom, card, viewport, screenWidth: card.width * zoom, screenHeight: card.height * zoom});
-          await page.screenshot({path: path.join(args.artifactsDir, `selection-zoom-${String(factor).replace('.', '-')}.png`)});
+          samples.push({zoom, card, selectedBounds, viewport, screenWidth: card.width * zoom, screenHeight: card.height * zoom});
+          await zoomScreenshot(`selection-zoom-${String(factor).replace('.', '-')}.png`,zoom);
           assert(card.x >= 10 && card.y >= 10 && card.right <= viewport.width - 10 && card.bottom <= viewport.height - 10,
             `缩放后卡片超出视口：${JSON.stringify(samples.at(-1))}`);
         }
@@ -3309,7 +3329,7 @@ async function main() {
           const coldCard = await box();
           assert(coldZoom === 2 && Math.abs(coldCard.width * coldZoom - expected.screenWidth) < 3,
             `预设 200% 缩放后新页面的卡片尺寸不正确：${JSON.stringify({coldZoom, coldCard})}`);
-          await page.screenshot({path: path.join(args.artifactsDir, 'selection-zoom-cold-2.png')});
+          await zoomScreenshot('selection-zoom-cold-2.png',coldZoom);
           result.cases.push({id: 'geometry.zoom-before-load', status: 'passed', coldZoom, coldCard});
           const beforeDrag = await box();
           const afterDrag = await gesture('.fr-study-navigation', 60, 20);

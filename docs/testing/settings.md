@@ -153,7 +153,7 @@ node scripts/testing/run-translation-stats-ui-test.cjs \
 
 同一浏览器几何专项会双击英文单词，延迟返回受控词典和译文，检查选中行间距、整卡滚动、关闭按钮、八次稳定采样和视口放大后的恢复；`--zoom-only` 补验 50%、100%、200% 与预设缩放加载。
 
-自动卡片避让选中行的回归见 `selectionTranslatorCore` 与 `selectionTranslatorLifecycle`：覆盖两侧都放不下时的限高、可见视口外的旧锚点、异步内容扩高与缩小、尺寸观察器合帧和卸载、视口变大后的限高释放，以及手动拖动后停止自动重定位。极矮视口仍沿用整卡滚动的可见性退化；正常视口中某一侧不足 140px 时也让整卡滚动，避免标题或正文被裁掉。真实几何与滚动须结合生产浏览器证据，不把受控 DOM 测试当作 CSS 布局验收。
+自动卡片避让完整选区的回归见 `selectionTranslatorCore` 与 `selectionTranslatorLifecycle`：覆盖两侧都放不下时的限高、可见视口外的旧锚点、异步内容扩高与缩小、尺寸观察器合帧和卸载、视口变化时合帧重测换行后的完整 Range、视口变大后的限高释放，以及手动拖动后停止自动重定位。极矮视口或选区占满纵向空间、连关闭按钮都放不下时，沿用整卡滚动的可见性退化；正常视口中某一侧不足 140px 时也让整卡滚动，避免标题或正文被裁掉。真实几何与滚动须结合生产浏览器证据，不把受控 DOM 测试当作 CSS 布局验收。
 
 `node scripts/run-selection-trigger-test.cjs --geometry-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <浏览器测试技能>/scripts/focus-safe-browser.cjs --runtime-diagnostics <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir /private/tmp/fluentread-selection-geometry` 使用临时 Edge profile 和第二屏后台窗口，检查顶部与内容空白处拖动、八个方向缩放、自动换行、正文选择、复制、滚动后位置保持、最小尺寸和视口边界，以及关闭、禁用、重新划词和迟到译文。截图涵盖放大、窄窗口和深色主题。页面及微软翻译响应为本地夹具，不代表真实供应商质量；窗口手势通过真实 CDP 输入执行。
 

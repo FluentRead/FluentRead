@@ -208,6 +208,10 @@ describe('组合翻译公开配置', () => {
         expect(hasCompositeTranslationAIContext(config, provider().id)).toBe(false);
         config.model.tongyi = 'qwen-plus';
         expect(hasCompositeTranslationAIContext(config, provider().id)).toBe(true);
+        config.disabledTranslationServices = ['tongyi'];
+        expect(hasCompositeTranslationAIContext(config, provider().id)).toBe(false);
+        config.disabledTranslationServices = [];
+        expect(hasCompositeTranslationAIContext(config, provider().id)).toBe(true);
         expect(hasCompositeTranslationAIContext({compositeTranslationProviders: [provider({services: ['google', 'openai']})]}, provider().id)).toBe(true);
     });
 });

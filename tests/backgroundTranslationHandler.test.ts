@@ -102,6 +102,11 @@ describe('background translation fallback handler', () => {
         expect(Object.getOwnPropertySymbols(parsed)).toEqual([]);
         expect(parsed).toEqual({origin: 'hello'});
     });
+    it('字幕参考仅接受有界字符串，不复制额外字幕对象或无限文本', () => {
+        for (const subtitleContext of ['', 'x'.repeat(1200)]) expect(parseTranslationRequest({origin: 'cue', glossaryContext: 'document', subtitleContext})).toMatchObject({subtitleContext});
+        expect(() => parseTranslationRequest({origin: 'cue', subtitleContext: 'x'.repeat(1201)})).toThrow('1200');
+        for (const subtitleContext of [null, 1, {}, []]) expect(() => parseTranslationRequest({origin: 'cue', subtitleContext})).toThrow('subtitleContext');
+    });
 
     it('原生合批只接受并透传显式布尔值，旧消息缺省仍由 broker 配置决定', () => {
         expect(parseTranslationRequest({origin: ['a', 'b'], enableNativeBatch: false}))
@@ -142,7 +147,7 @@ describe('background translation fallback handler', () => {
             {origin: source, enableAIContext: true}, {origin: source, validateTranslationSlots: true},
             {origin: source, aiMultiSegment: true}, {origin: source, documentBatch: true},
             {origin: source, glossaryContext: 'document'}, {origin: source, context: 'page'},
-            {origin: source, pageContext: 'private page'}, {origin: source, discourseContext: 'context'},
+            {origin: source, pageContext: 'private page'}, {origin: source, discourseContext: 'context'}, {origin: source, subtitleContext: 'neighbor'},
         ]) {
             expect(() => parseTranslationRequest({enableAIContext: false, ...invalid, validateInlineCodeTranslation: true}))
                 .toThrow('行内代码翻译请求格式无效');

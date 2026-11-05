@@ -273,6 +273,86 @@ function measuredProviderConfig(entryCount = 100) {
 }
 
 describe('translation broker', () => {
+    it('拒绝畸形或超长字幕参考，且不读取缓存或调用 provider', async () => {
+        for (const subtitleContext of [null, 1, {}, [], 'x'.repeat(1201)]) {
+            await expect(translateWithCache({origin: 'Source', subtitleContext} as never)).rejects.toThrow('subtitleContext');
+        }
+        expect(mocks.cacheGet).not.toHaveBeenCalled(); expect(mocks.service).not.toHaveBeenCalled();
+    });
+    it.each([['ai', 'page'], ['ai', 'video'], ['mock', 'document']] as const)('字幕参考不进入 %s / %s 的 provider 或缓存身份', async (service, glossaryContext) => {
+        mocks.config.service = service;
+        await translateWithCache({origin: 'Independent source.', glossaryContext, subtitleContext: 'private neighbor', useCache: true});
+        expect(mocks.service.mock.calls.at(-1)![0]).not.toHaveProperty('subtitleContext');
+        expect(mocks.service.mock.calls.at(-1)![0].pageContext).toBe('');
+        expect(translationCacheIdentities().every(identity => !Object.hasOwn(identity, 'subtitleContext'))).toBe(true);
+    });
+    it('空白字幕参考复用原有无上下文身份，不改变普通文档请求', async () => {
+        mocks.config.service = 'ai';
+        await translateWithCache({origin: 'Independent source.', glossaryContext: 'document'});
+        await translateWithCache({origin: 'Independent source.', glossaryContext: 'document', subtitleContext: '  '});
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0]).not.toHaveProperty('subtitleContext');
+    });
+    it('网页摘要关闭时仍发送限定字幕参考，不额外摘要或携带文件预览，并隔离相同原文的不同邻句', async () => {
+        mocks.config.service = 'ai'; mocks.config.enableAIContext = false;
+        mocks.service.mockImplementation(async message => message.subtitleContext.includes('anchor A') ? '甲方赞助' : '乙方赞助');
+        const run = (subtitleContext: string) => translateWithCache({origin: 'sponsored by', glossaryContext: 'document',
+            pageContext: 'PRIVATE OUTSIDE THE CUE WINDOW', subtitleContext});
+        await expect(run('anchor A')).resolves.toBe('甲方赞助');
+        await expect(run('anchor B')).resolves.toBe('乙方赞助');
+        await expect(run('anchor A')).resolves.toBe('甲方赞助');
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+        for (const [message] of mocks.service.mock.calls) {
+            expect(message.summaryPrompt).toBeUndefined(); expect(message.pageContext).toContain('<subtitle_context>');
+            expect(message.pageContext).not.toContain('PRIVATE OUTSIDE'); expect(message.pageContext.length).toBeLessThanOrEqual(4000);
+        }
+        expect(translationCacheIdentities().some(identity => identity.subtitleContext === 'anchor A')).toBe(true);
+        expect(translationCacheIdentities().every(identity => identity.pageContextValidationPolicy?.version === 2)).toBe(true);
+    });
+    it('AI 字幕合批的分项缓存同样隔离邻句，并保留原槽位顺序', async () => {
+        mocks.config.service = 'ai';
+        const translate = (text: string) => text.replaceAll('Alpha', '甲').replaceAll('Beta', '乙');
+        mocks.service.mockImplementation(async ({origin}: {origin: string | string[]}) => Array.isArray(origin) ? origin.map(translate) : translate(origin));
+        for (const subtitleContext of ['first anchor', 'second anchor', 'first anchor']) {
+            await expect(translateWithCache({origin: ['Alpha', 'Beta'], aiMultiSegment: true, glossaryContext: 'document', subtitleContext})).resolves.toEqual(['甲', '乙']);
+        }
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+        expect(translationCacheIdentities().some(identity => identity.subtitleContext === 'first anchor')).toBe(true);
+        expect(translationCacheIdentities().some(identity => identity.subtitleContext === 'second anchor')).toBe(true);
+    });
+    it.each(['single', 'batch'] as const)('字幕 %s 在摘要关闭时仍拦截上下文回显，且无上下文重译不再携带字幕字段', async kind => {
+        mocks.config.service = 'ai'; mocks.config.enableAIContext = false;
+        const leaked = 'Ebullioscopic <webpage_context> unrelated neighboring reference </webpage_context>';
+        const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        mocks.service.mockResolvedValueOnce(leaked).mockImplementation(async ({origin}: {origin: string}) =>
+            kind === 'single' ? '沸点测量' : origin.replaceAll('Alpha', '甲').replaceAll('Beta', '乙'));
+        const options = {glossaryContext: 'document' as const, aiMultiSegment: kind === 'batch', subtitleContext: 'Adjacent source cue'};
+        const request: TranslationRequestMessage = kind === 'single'
+            ? {...options, origin: 'Ebullioscopic'} : {...options, origin: ['Alpha', 'Beta']};
+        await expect(translateWithCache(request)).resolves.toEqual(kind === 'single' ? '沸点测量' : ['甲', '乙']);
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+        expect(mocks.service.mock.calls[0][0].subtitleContext).toBe('Adjacent source cue');
+        expect(mocks.service.mock.calls[1][0]).toMatchObject({pageContext: ''});
+        expect(mocks.service.mock.calls[1][0].subtitleContext).toBeUndefined();
+        expect(mocks.cacheSet.mock.calls.every(([, value]) => !value.includes('<webpage_context>'))).toBe(true);
+        expect(warning).toHaveBeenCalledOnce();
+    });
+    it('字幕无上下文重译再次回显参考时明确失败，不缓存坏结果', async () => {
+        mocks.config.service = 'ai'; mocks.config.enableAIContext = false;
+        vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        mocks.service.mockResolvedValue('Ebullioscopic <webpage_context> neighboring reference </webpage_context>');
+        await expect(translateWithCache({origin: 'Ebullioscopic', glossaryContext: 'document', subtitleContext: 'Adjacent source'})).rejects.toThrow();
+        expect(mocks.service).toHaveBeenCalledTimes(2); expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+    it('字幕原文回显的逐槽重试也移除参考字段', async () => {
+        mocks.config.service = 'ai';
+        const source = 'Our meeting is sponsored by the following company.';
+        mocks.service.mockResolvedValueOnce(source).mockResolvedValueOnce('本次会议由以下公司赞助。');
+        await expect(translateWithCache({origin: source, glossaryContext: 'document', subtitleContext: 'Neighbor cue'})).resolves.toBe('本次会议由以下公司赞助。');
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+        expect(mocks.service.mock.calls[1][0]).toMatchObject({pageContext: ''});
+        expect(mocks.service.mock.calls[1][0].subtitleContext).toBeUndefined();
+    });
     it.each([false, true])('rejects saved public ChatGPT before cache/provider without resetting service or slug (override: %s)', async override => {
         mocks.config.service = override ? 'mock' : services.chatgptPlan;
         mocks.config.model[services.chatgptPlan] = 'saved-account-model';
@@ -711,6 +791,7 @@ describe('translation broker', () => {
             {origin: source, enableAIContext: false, aiMultiSegment: true}, {origin: source, enableAIContext: false, documentBatch: true},
             {origin: source, enableAIContext: false, pageContext: 'other page'},
             {origin: source, enableAIContext: false, discourseContext: 'private evidence'},
+            {origin: source, enableAIContext: false, subtitleContext: 'private neighbor'},
             {origin: source, enableAIContext: false, glossaryContext: 'document' as const},
         ];
         for (const message of invalid) await expect(translateWithCache({...message, validateInlineCodeTranslation: true})).rejects.toThrow('行内代码翻译请求格式无效');
@@ -2238,12 +2319,13 @@ describe('translation broker', () => {
         const identities = translationCacheIdentities();
         expect(identities.map(identity => identity.pageContext).some(context => context?.includes('chapter-a'))).toBe(true);
         expect(identities.map(identity => identity.pageContext).some(context => context?.includes('chapter-b'))).toBe(true);
-        await translateWithCache({origin: 'An independent source.', pageContext: 'a'.repeat(4000),
-            discourseContext: 'b'.repeat(10000)});
+        await translateWithCache({origin: 'An independent source.', pageContext: 'a'.repeat(4000), glossaryContext: 'document',
+            discourseContext: 'b'.repeat(10000), subtitleContext: 'c'.repeat(1200)});
         const last = mocks.service.mock.calls.at(-1)![0];
         expect(last.pageContext.length).toBeLessThanOrEqual(4000);
         expect(last).not.toHaveProperty('discourseContext');
         expect(last.pageContext).toContain('</discourse_evidence>');
+        expect(last.pageContext).toContain('</subtitle_context>');
     });
 
     it('关闭上下文或机器服务不外传篇章原始数据', async () => {

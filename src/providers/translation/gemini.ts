@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/gemini.ts
+ * 字幕参考：将后台规范化的相邻 cue 标记交给共用提示模板，供应商协议与返回结构保持原契约。
  *
  * 文件职责：适配 Google Gemini generateContent 协议，支持官方 endpoint、代理、自定义模型与 API Key 头部差异。
  * 主要内容：从配置快照选取模型和 URL，使用 geminiMsgTemplate 构造 contents，把调用方取消与显式剩余预算或 AI 配置默认截止合并后通过 runtimeFetch 请求，校验并拼接 candidates 的最终文本、忽略思考块，再旁路归一 usageMetadata。 可核对的公开符号包括 default:gemini。
@@ -49,6 +50,7 @@ async function gemini(message: TranslationProviderRequest<string>) {
     const body = geminiMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

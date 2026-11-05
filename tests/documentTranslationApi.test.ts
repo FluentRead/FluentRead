@@ -1,5 +1,6 @@
 import {TranslationRequestError, serializeTranslationError} from '@/src/services/translation/errors';
 import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {buildSubtitleContext, isTimedSubtitleCue, SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 
 import {
     createDocumentSegmentTranslator,
@@ -29,6 +30,85 @@ beforeEach(() => {
 });
 
 describe('document translation API', () => {
+    const cues = (count: number) => Array.from({length: count}, (_, id) => ({id, source: `cue-${id}`,
+        timeStart: `00:00:${String(id).padStart(2, '0')},000`, timeEnd: `00:00:${String(id).padStart(2, '0')},900`}));
+    const reference = (all: ReturnType<typeof cues>, batch = all) => buildSubtitleContext(all, batch, new Map(all.map((cue, index) => [cue.id, index])));
+    it('字幕参考只读取带完整时间轴的 cue，缺失位置或空文本不产生参考', () => {
+        const all = cues(1);
+        expect(isTimedSubtitleCue(all[0])).toBe(true);
+        expect(isTimedSubtitleCue({id: 0, source: 'plain'})).toBe(false);
+        expect(isTimedSubtitleCue({...all[0], timeEnd: ''})).toBe(false);
+        expect(reference(all, [])).toBeUndefined();
+        expect(reference([{...all[0], timeStart: ''}])).toBeUndefined();
+        expect(buildSubtitleContext(all, all, new Map())).toBeUndefined();
+        expect(reference([{...all[0], source: '  '}])).toBeUndefined();
+    });
+    it('字幕参考按原顺序覆盖前后六条，重复窗口仍按当前 cue 区分身份', () => {
+        const all = cues(15), before = JSON.stringify(all);
+        const text = reference(all, [all[7]])!;
+        expect([...text.matchAll(/\ncue-(\d+)(?=\n|$)/gu)].map(match => Number(match[1]))).toEqual(Array.from({length: 13}, (_, i) => i + 1));
+        expect(text).toContain('Context anchor cue positions: 8');
+        const identical = cues(2).map(cue => ({...cue, source: 'Same words'}));
+        expect(reference(identical, [identical[0]])).not.toBe(reference(identical, [identical[1]]));
+        expect(JSON.stringify(all)).toBe(before);
+    });
+    it('字幕批次覆盖每个请求附近的邻句，重复候选不重复输出', () => {
+        const all = cues(15), text = reference(all, [all[4], all[10]])!;
+        expect([...text.matchAll(/\ncue-(\d+)(?=\n|$)/gu)].map(match => Number(match[1]))).toEqual(all.map(cue => cue.id));
+        expect(text).toContain('Context anchor cue positions: 5, 11');
+    });
+    it('长 cue 不挤走邻句，任意元数据和大量 anchor 均遵守总字符上限', () => {
+        const all = cues(15).map(cue => ({...cue, source: 'x'.repeat(2000)}));
+        const text = reference(all, [all[7]])!;
+        expect(text.length).toBeLessThanOrEqual(SUBTITLE_CONTEXT_LIMIT);
+        expect(text).toContain('[cue 7 |'); expect(text).toContain('[cue 9 |');
+        expect(text).not.toContain('x'.repeat(161));
+        const malformed = cues(2); malformed[0].timeStart = 't'.repeat(2000);
+        expect(reference(malformed, [malformed[0]])).toContain('cue-1');
+        expect(reference(cues(1000))).toBeUndefined();
+    });
+    it('字幕邻句跳过无时间轴和空白项，保持有效的请求 cue', () => {
+        const all = cues(3); all[1].timeEnd = ''; all[2].source = ' ';
+        const text = reference(all, [all[0]])!;
+        expect(text).toContain('cue-0'); expect(text).not.toContain('cue-1'); expect(text).not.toContain('cue 3 |');
+    });
+    it('开启字幕能力仍保留普通 AI 文档的原文去重', async () => {
+        mocks.translateText.mockImplementation(async source => `译文 ${source}`);
+        const translate = createDocumentSegmentTranslator({waitUntilReady: mocks.waitUntilReady, getDefaultService: () => 'openai',
+            supportsSubtitleContext: () => true, supportsBatch: () => false, translateText: mocks.translateText, translateTextBatch: mocks.translateTextBatch});
+        const all = [{id: 0, source: 'Repeated'}, {id: 1, source: 'Repeated'}];
+        expect(await translate(all, {fileName: 'plain.txt'})).toEqual(['译文 Repeated', '译文 Repeated']);
+        expect(mocks.translateText).toHaveBeenCalledOnce();
+        expect(mocks.translateText.mock.calls[0][2]).not.toHaveProperty('subtitleContext');
+    });
+    it('字幕逐条请求携带独立邻句，网页摘要关闭时仍有效且不合并时间轴', async () => {
+        mocks.translateText.mockImplementation(async source => `译文 ${source}`);
+        const translate = createDocumentSegmentTranslator({waitUntilReady: mocks.waitUntilReady, getDefaultService: () => 'openai',
+            supportsSubtitleContext: () => true, supportsBatch: () => false, translateText: mocks.translateText, translateTextBatch: mocks.translateTextBatch});
+        const all = cues(2).map(cue => ({...cue, source: 'Repeated'})), before = JSON.stringify(all);
+        expect(await translate(all, {fileName: 'clip.srt', enableAIContext: false, batchTranslation: false})).toEqual(['译文 Repeated', '译文 Repeated']);
+        expect(mocks.translateText).toHaveBeenCalledTimes(2);
+        const references = mocks.translateText.mock.calls.map(call => call[2].subtitleContext);
+        expect(references[0]).not.toBe(references[1]); expect(references.every(value => value.length <= 1200)).toBe(true);
+        expect(JSON.stringify(all)).toBe(before);
+        // 混合输入中的普通段落仍可复用；它不冒充字幕参考。
+        mocks.translateText.mockClear();
+        await translate([...cues(1), {id: 1, source: 'Plain'}, {id: 2, source: 'Plain'}], {fileName: 'mixed.txt', batchTranslation: false});
+        expect(mocks.translateText.mock.calls.filter(call => call[0] === 'Plain')).toHaveLength(1);
+    });
+    it('字幕 AI 批次保留所有槽位和模型边界，单槽降级继续携带正确邻句', async () => {
+        mocks.translateTextBatch.mockRejectedValueOnce(Object.assign(new Error('unsupported slots'), {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'}));
+        mocks.translateText.mockImplementation(async source => `译文 ${source}`);
+        const translate = createDocumentSegmentTranslator({waitUntilReady: mocks.waitUntilReady, getDefaultService: () => 'openai',
+            supportsSubtitleContext: () => true, supportsBatch: () => false, supportsAIMultiSegment: () => true,
+            translateText: mocks.translateText, translateTextBatch: mocks.translateTextBatch});
+        expect(await translate(cues(2), {fileName: 'clip.vtt'})).toEqual(['译文 cue-0', '译文 cue-1']);
+        expect(mocks.translateTextBatch).toHaveBeenCalledOnce();
+        expect(mocks.translateTextBatch.mock.calls[0][2]).toMatchObject({aiMultiSegment: true, subtitleContext: expect.stringContaining('positions: 1, 2')});
+        expect(mocks.translateText.mock.calls.map(call => call[2].subtitleContext)).toEqual([
+            expect.stringContaining('positions: 1\n'), expect.stringContaining('positions: 2\n'),
+        ]);
+    });
     it.each(['resolve', 'reject'] as const)('取消未就绪运行时立即结束任务并消费迟到 %s', async late => {
         let resolveReady!: () => void, rejectReady!: (error: Error) => void;
         const readiness = new Promise<void>((resolve, reject) => {resolveReady = resolve; rejectReady = reject;});

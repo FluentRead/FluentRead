@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/claude.ts
+ * 字幕参考：将后台规范化的相邻 cue 标记交给共用提示模板，供应商协议与返回结构保持原契约。
  *
  * 文件职责：适配 Anthropic Claude Messages API，将 FluentRead 翻译消息转换为 Claude 请求并解析文本响应。
  * 主要内容：从配置快照选择模型、代理和 x-api-key，使用 claudeMsgTemplate 构建 body，把调用方取消与显式剩余预算或 AI 配置默认截止合并后通过 runtimeFetch 发起请求，统一处理 HTTP/JSON 数据并旁路上报 Claude token 用量。 可核对的公开符号包括 default:claude。
@@ -42,6 +43,7 @@ async function claude(message: TranslationProviderRequest<string>) {
     const body = claudeMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

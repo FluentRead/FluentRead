@@ -1,5 +1,6 @@
 /**
  * @file src/core/config/compositeTranslation.ts
+ * 上下文能力：仅统计当前已启用且能消费提示词的成员，关闭项与原生翻译模型不使组合开启 AI 参考。
  * 文件职责：定义可把多个已配置翻译服务组成单一选择项的公开配置契约，供配置归一化、服务目录、设置表单与 broker 共同使用。
  * 主要内容：规范化随机、轮流与智能策略、稳定组合 ID、成员顺序及单成员时间预算；剔除失效自定义成员、重复成员和嵌套组合，并提供无副作用的查询、目录和删除辅助函数。
  * 模块边界：只处理不含凭据的公开组合数据，不读写存储、不发起网络请求、不保存运行统计；真实服务调用、失败回退和智能排序由翻译编排层负责。
@@ -8,6 +9,7 @@ import {resolveConfiguredModel, services, servicesType} from './catalog';
 import {isConfiguredCustomOpenAIProvider, isCustomOpenAIProviderId, type CustomOpenAIProvider, type CustomOpenAIServiceOption} from './customOpenAI';
 import {parseApiKeyRequirementKey} from './validation';
 import {sha256Hex} from '@/src/shared/function/sha256';
+import {isTranslationServiceDisabled} from './serviceAvailability';
 
 export const COMPOSITE_TRANSLATION_PROVIDER_ID_PREFIX = 'composite:' as const;
 export const DEFAULT_COMPOSITE_TRANSLATION_TIMEOUT_MS = 12_000;
@@ -119,7 +121,8 @@ export function hasCompositeTranslationAIContext(config: object, serviceId: stri
     if (!isCompositeTranslationProviderId(serviceId)) return false;
     const source = config as Record<string, any>;
     const provider = getCompositeTranslationProvider(source.compositeTranslationProviders, serviceId);
-    return provider?.services.some(service => servicesType.isUseAIContext(service,
+    return provider?.services.some(service => !isTranslationServiceDisabled(source.disabledTranslationServices, service)
+        && servicesType.isUseAIContext(service,
         resolveConfiguredModel(source.model?.[service], source.customModel?.[service]))) ?? false;
 }
 

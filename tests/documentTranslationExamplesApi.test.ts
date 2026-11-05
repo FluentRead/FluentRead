@@ -3,7 +3,8 @@ import JSZip from 'jszip';
 import {PDFDocument} from 'pdf-lib';
 
 const mocks = vi.hoisted(() => ({
-    config: {service: 'microsoft', model: {} as Record<string, string>, customModel: {} as Record<string, string>, enableAIMultiSegment: false},
+    config: {service: 'microsoft', model: {} as Record<string, string>, customModel: {} as Record<string, string>, enableAIMultiSegment: false,
+        disabledTranslationServices: [] as string[], compositeTranslationProviders: [] as import('@/src/core/config/compositeTranslation').CompositeTranslationProvider[]},
     translateText: vi.fn(),
     translateTextBatch: vi.fn(),
 }));
@@ -42,12 +43,52 @@ beforeEach(() => {
     mocks.config.model = {};
     mocks.config.customModel = {};
     mocks.config.enableAIMultiSegment = false;
+    mocks.config.disabledTranslationServices = [];
+    mocks.config.compositeTranslationProviders = [];
     mocks.translateText.mockReset();
     mocks.translateTextBatch.mockReset();
     mocks.translateTextBatch.mockImplementation(async (origins: string[]) => origins.map((origin) => `Translated: ${origin}`));
 });
 
 describe('document translation examples API regression', () => {
+    it.each([
+        ['clip.srt', '1\n00:00:00,000 --> 00:00:01,000\nsponsored by\n\n2\n00:00:01,000 --> 00:00:01,500\n(someone)\n'],
+        ['clip.vtt', 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nsponsored by\n\n00:00:01.000 --> 00:00:01.500\n(someone)\n'],
+        ['clip.ass', '[Script Info]\nTitle: Context\n[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\nDialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,sponsored by\nDialogue: 0,0:00:01.00,0:00:01.50,Default,,0,0,0,,(someone)\n'],
+    ])('%s shares timed cue context without changing cue counts, timestamps or export structure', async (name, source) => {
+        mocks.config.service = 'openai'; mocks.config.model.openai = 'fixture';
+        mocks.translateTextBatch.mockImplementation(async (origins: string[]) => origins.map((_, index) => index ? '某人' : '赞助商是'));
+        const document = parseDocument(name, source), before = JSON.stringify(document);
+        expect(document.segments).toHaveLength(2);
+        const translated = await translateDocumentSegments(document.segments, {fileName: name, enableAIContext: false});
+        expect(translated).toEqual(['赞助商是', '某人']);
+        expect(mocks.translateTextBatch).toHaveBeenCalledOnce();
+        const options = mocks.translateTextBatch.mock.calls[0][2];
+        expect(options.subtitleContext).toContain(document.segments[0].timeStart);
+        expect(options.subtitleContext).toContain(document.segments[1].timeEnd);
+        expect(options.subtitleContext.length).toBeLessThanOrEqual(1200);
+        const reparsed = parseDocument(name, renderDocument(document, translated, 'translated'));
+        expect(reparsed.segments.map(({source, timeStart, timeEnd}) => ({source, timeStart, timeEnd}))).toEqual(document.segments.map((cue, index) => ({source: translated[index], timeStart: cue.timeStart, timeEnd: cue.timeEnd})));
+        expect(JSON.stringify(document)).toBe(before);
+    });
+    it.each([['microsoft', ''], ['tongyi', 'qwen-mt-plus']])('does not send subtitle context to %s / %s', async (service, model) => {
+        mocks.config.service = service; mocks.config.model[service] = model;
+        mocks.translateText.mockResolvedValue('有效译文');
+        await translateDocumentSegments([{id: 0, source: 'Cue', timeStart: '00:00:00.000', timeEnd: '00:00:01.000'}], {fileName: 'clip.srt', batchTranslation: false});
+        expect(mocks.translateText).toHaveBeenCalledOnce();
+        expect(mocks.translateText.mock.calls[0][2]).not.toHaveProperty('subtitleContext');
+    });
+    it('a composite uses subtitle context only while an enabled prompt AI member can consume it', async () => {
+        mocks.config.service = 'composite:context'; mocks.config.model.openai = 'fixture';
+        mocks.config.compositeTranslationProviders = [{id: mocks.config.service, name: 'Context', strategy: 'sequential', services: ['microsoft', 'openai'], timeoutMs: 12000}];
+        mocks.translateText.mockResolvedValue('有效译文');
+        const cue = [{id: 0, source: 'Cue', timeStart: '00:00:00.000', timeEnd: '00:00:01.000'}];
+        await translateDocumentSegments(cue, {fileName: 'clip.srt', batchTranslation: false});
+        expect(mocks.translateText.mock.calls.at(-1)![2].subtitleContext).toContain('Context anchor');
+        mocks.config.disabledTranslationServices = ['openai'];
+        await translateDocumentSegments(cue, {fileName: 'clip.srt', batchTranslation: false});
+        expect(mocks.translateText.mock.calls.at(-1)![2]).not.toHaveProperty('subtitleContext');
+    });
     it.each(['microsoft', 'google', 'deepL', 'azureTranslator', 'googleCloudTranslation', 'freeTranslation'])('%s uses native-capable document batches by default and single calls when disabled', async service => {
         mocks.config.service = service;
         mocks.translateText.mockImplementation(async source => `Translated: ${source}`);

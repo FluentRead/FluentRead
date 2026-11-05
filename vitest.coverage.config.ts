@@ -355,6 +355,7 @@ export default defineConfig({
                 'src/core/config/writing.ts',
                 'src/core/config/writingReadiness.ts',
                 'src/core/config/serviceAvailability.ts',
+                'src/core/translation/subtitleContext.ts',
                 'src/core/config/writingPreview.ts',
                 'src/features/writing-assistant/entryPlacement.ts',
                 'src/features/writing-assistant/entrySession.ts',

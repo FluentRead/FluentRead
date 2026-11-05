@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/tongyi.ts
+ * 字幕参考：将后台规范化的相邻 cue 标记交给共用提示模板，供应商协议与返回结构保持原契约。
  *
  * 文件职责：适配阿里云通义千问 OpenAI 兼容接口，并根据模型选择常规或 token-plan 计费端点。
  * 主要内容：从配置快照解析服务、模型、proxy 和 token，使用 tongyiMsgTemplate 生成 payload，通过 runtimeFetch 请求，旁路上报 OpenAI-compatible 用量并读取 choices 译文。 可核对的公开符号包括 default:tongyi。
@@ -42,6 +43,7 @@ async function tongyi(message: TranslationProviderRequest<string>) {
     const body = tongyiMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

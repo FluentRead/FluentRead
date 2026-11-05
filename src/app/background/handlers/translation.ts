@@ -1,5 +1,6 @@
 /**
  * @file src/app/background/handlers/translation.ts
+ * 字幕协议：相邻 cue 为受长度限制的字符串，行内代码协议不允许混入此参考。
  * 文件职责：解析没有显式 type 的翻译请求，并把它作为后台消息路由的受控 fallback 接入共享翻译 broker。
  * 主要内容：校验 origin、clientRequestId、原生合批冻结偏好、AI 多段、文档合批、内部槽和行内代码标记校验与检测样本；文档合批仅从真实扩展文档页的数组请求保留，以发送者和随机 ID 管理 AbortController，并提供精确取消 handler。
  * 模块边界：本文件只承担协议验证与 fallback 适配，不选择 provider、不缓存结果、不读取配置或凭据；真正的翻译执行由注入的 translateWithCache 完成。
@@ -15,6 +16,7 @@ import type {
 } from '@/src/services/translation/types';
 import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 import {isValidInlineCodeSource} from '@/src/core/translation/inlineCodeMarkers';
+import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 
 interface TranslationRequestCandidate extends Record<string, unknown> {
     origin: unknown;
@@ -47,6 +49,7 @@ const STRING_FIELDS = [
     'context',
     'pageContext',
     'discourseContext',
+    'subtitleContext',
     'serviceOverride',
     'modelOverride',
     'sourceLanguage',
@@ -167,6 +170,9 @@ export function parseTranslationRequest(candidate: TranslationRequestCandidate):
     if (candidate.enableAIContext !== undefined && typeof candidate.enableAIContext !== 'boolean') {
         throw new TypeError('翻译请求字段 enableAIContext 必须是布尔值');
     }
+    if (typeof candidate.subtitleContext === 'string' && candidate.subtitleContext.length > SUBTITLE_CONTEXT_LIMIT) {
+        throw new TypeError('翻译请求字段 subtitleContext 必须是不超过 1200 字符的字符串');
+    }
     if (candidate.aiMultiSegment !== undefined && typeof candidate.aiMultiSegment !== 'boolean') {
         throw new TypeError('翻译请求字段 aiMultiSegment 必须是布尔值');
     }
@@ -182,7 +188,7 @@ export function parseTranslationRequest(candidate: TranslationRequestCandidate):
     if (candidate.validateInlineCodeTranslation === true && (
         typeof origin !== 'string' || !isValidInlineCodeSource(origin) || candidate.validateTranslationSlots === true ||
         candidate.aiMultiSegment === true || candidate.documentBatch === true || candidate.enableAIContext !== false ||
-        Boolean(candidate.context) || Boolean(candidate.pageContext) || Boolean(candidate.discourseContext) ||
+        Boolean(candidate.context) || Boolean(candidate.pageContext) || Boolean(candidate.discourseContext) || Boolean(candidate.subtitleContext) ||
         (candidate.glossaryContext !== undefined && candidate.glossaryContext !== 'page')
     )) throw new TypeError('行内代码翻译请求格式无效');
     if (candidate.enableNativeBatch !== undefined && typeof candidate.enableNativeBatch !== 'boolean') {

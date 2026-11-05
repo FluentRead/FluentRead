@@ -1,5 +1,6 @@
 /**
  * @file src/services/translation/requestIdentity.ts
+ * 字幕身份：实际消费的相邻 cue 参考及泄漏校验策略参与结果身份，网页摘要关闭时仍隔离不同字幕上下文。
  * 文件职责：根据已冻结的请求配置构建翻译结果缓存身份，并统一模型、实际端点与上下文资格的纯策略。
  * 主要内容：维护单条、文本槽、原生批次与 AI 多段的身份维度，按实际消费的端点、合批偏好、图片原样成功策略、术语、文档保护、提示词、上下文泄漏门禁和自动识别样本隔离缓存；仅含 emoji 的正文增加字素恢复策略，摘要沿用独立身份；通过注入端口复用既有模型和端点解析。
  * 模块边界：不读取全局配置、不发起 provider 请求、不操作缓存仓库或在途去重，也不持有取消、调度或统计状态；broker 使用本模块生成结果身份，传输和 pending 生命周期仍由 broker 负责。
@@ -14,6 +15,7 @@ import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {getAliyunTranslationEndpoint} from '@/src/core/config/constants';
 import {getDeepLEndpoint} from '@/src/core/config/deepl';
 import {hasEmojiLiterals} from '@/src/core/translation/emojiLiterals';
+import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 
 export type CacheRequestMode = 'single' | 'slot-protocol' | 'inline-code-v1' | 'batch' | 'ai-multi-segment';
 
@@ -111,6 +113,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         mode: CacheRequestMode,
         modelOverride?: string,
         sourceLanguageDetectionText?: string,
+        subtitleContext?: string,
     ): string {
         const {config: current, service, sourceLanguage, targetLanguage} = execution;
         // 公开入口已冻结本次匹配范围；普通键复用保护条目，避免两次扫描同一术语库。
@@ -131,6 +134,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
             ...(execution.acceptUnchangedResult ? {unchangedResultPolicy: 1} : {}),
             ...(supportsNativeTranslationBatch(service) ? {enableNativeBatch: execution.nativeBatchEnabled} : {}),
             model: getSelectedModel(current, service, modelOverride),
+            ...(subtitleContext ? {subtitleContext: subtitleContext.slice(0, SUBTITLE_CONTEXT_LIMIT)} : {}),
             endpoint: getProviderEndpoint(current, service),
             azureOpenaiEndpoint: service === 'azureOpenai' ? current.azureOpenaiEndpoint : undefined,
             ...(service === 'freeTranslation' ? {freeTranslationPolicy: {
@@ -157,11 +161,11 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
                 : undefined,
             // 步骤 1：DeepL 把标题上下文直接发送给 provider；AI adapter 通过 prompt 注入页面上下文。
             context: service === 'deepL' ? context : undefined,
-            pageContext: isAIContextEnabled(execution, modelOverride) ? pageContext : undefined,
+            pageContext: isAIContextEnabled(execution, modelOverride) || subtitleContext ? pageContext : undefined,
             // v2 补齐跨语种短原文异常扩写的软恢复门禁。旧上下文结果未经过此门禁，
             // 仅隔离实际携带 AI 页面上下文的正文缓存，摘要、无上下文与机器翻译身份保持稳定。
             // 新身份中的结果已经复验；缓存读取仍只拒绝确定泄漏，合法长扩写不会每次重试。
-            ...(pageContext.trim() && isAIContextEnabled(execution, modelOverride)
+            ...(pageContext.trim() && (isAIContextEnabled(execution, modelOverride) || subtitleContext)
                 ? {pageContextValidationPolicy: {version: 2}}
                 : {}),
             ...((service === 'chromeTranslator' || service === 'localTranslation')

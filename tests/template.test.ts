@@ -43,6 +43,27 @@ function currentConfigSnapshot() {
     return createTranslationProviderConfigSnapshot(Object.assign(new Config(), mockConfig));
 }
 
+describe('timed subtitle prompt contract', () => {
+    it.each([
+        ['openai', 'openai', commonMsgTemplate], ['claude', 'claude', claudeMsgTemplate],
+        ['deepseek chat', 'deepseek', deepseekMsgTemplate], ['deepseek responses', 'deepseek', deepseekResponsesMsgTemplate],
+        ['gemini', 'gemini', geminiMsgTemplate], ['tongyi', 'tongyi', tongyiMsgTemplate],
+    ] as const)('%s treats nearby cues as data and preserves one non-empty result per requested slot', (_label, service, template) => {
+        const output = template({current: currentConfigSnapshot(), origin: 'sponsored by', context: '<subtitle_context>Neighbor brand</subtitle_context>', subtitleContext: 'Neighbor brand', serviceOverride: service});
+        expect(output).toContain('sponsored by'); expect(output).toContain('Neighbor brand');
+        expect(output).toContain('phrase their translations as a coherent sequence');
+        expect(output).toContain('one non-empty translation per requested cue');
+        expect(output).toContain('Do not output timestamps or explanations.');
+    });
+    it('blank metadata and explicit summary prompts retain their existing prompt contracts', () => {
+        const current = currentConfigSnapshot();
+        expect(commonMsgTemplate({current, origin: 'Plain', subtitleContext: ' '})).not.toContain('timed subtitle cues');
+        expect(commonMsgTemplate({current, origin: 'Plain', subtitleContext: 'neighbor'})).toContain('timed subtitle cues');
+        const summary = commonMsgTemplate({current, origin: 'Plain', subtitleContext: 'neighbor', prompt: 'Only summarize this source'});
+        expect(summary).toContain('Only summarize this source'); expect(summary).not.toContain('timed subtitle cues');
+    });
+});
+
 beforeEach(() => {
     // 每个用例前重置 mock 配置，避免相互污染
     mockConfig.service = 'openai';

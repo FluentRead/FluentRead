@@ -2079,7 +2079,12 @@ async function main() {
       'content-type': 'application/json; charset=utf-8',
     });
     const directionSuffix = args.directionOnly ? ` [to=${fixtureRequestUrl.searchParams.get('to') || ''}]` : '';
-    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly || args.editableSelectionOnly ? sources : [source]).map(text => ({ translations: [{ text: args.lifecycleOnly ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」` : `测试译文：${text}${directionSuffix}` }] }))));
+    // 成功夹具必须包含目标语言正文；仅加中文前缀的英文回显会被真实的错语种校验拒绝。
+    const translatedFixture = text => args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly
+      ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」`
+      : `测试译文：${text}${directionSuffix}`;
+    response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly || args.editableSelectionOnly ? sources : [source])
+      .map(text => ({ translations: [{ text: translatedFixture(text) }] }))));
   });
   try {
     await new Promise((resolve, reject) => {

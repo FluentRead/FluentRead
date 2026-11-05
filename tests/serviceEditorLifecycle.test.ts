@@ -66,6 +66,13 @@ const picker = {options: [{value: 'fixed'}, {value: 'custom', removable: true}],
 function fillProvider() {Object.assign(state.draft, {name: 'Local', endpoint: 'http://localhost:11434/v1', apiKey: 'synthetic', model: 'local-model'})}
 
 describe('服务子编辑器的写入与焦点归属', () => {
+  it('组合成员选择不能加入关闭服务，已有关闭成员仍保留在草稿中', async () => {
+    const draft = runtime.reactive({name: 'Group', strategy: 'sequential', services: ['google', 'microsoft'], timeoutMs: 12000});
+    await mount('CompositeTranslationFields', {draft, members: [{value: 'google', label: 'Google', disabled: true}, {value: 'microsoft', label: 'Microsoft'}, {value: 'closed', label: 'Closed', disabled: true}], errors: {}}, {onUpdate: emitted});
+    expect(state.availableMembers).toEqual([]);
+    state.actions.selectMember({currentTarget: {value: 'closed'}}); await settle();
+    expect(emitted).not.toHaveBeenCalled(); expect(draft.services).toEqual(['google', 'microsoft']);
+  })
   it('唯一创建窗口默认接口，组合校验至少两个成员且旧提交不跨重开', async () => {
     const interfaceSubmit = vi.fn()
     await mount('CustomOpenAIProviderDialog', {config: runtime.reactive(new Config()), modelValue: true}, {onSubmit: interfaceSubmit, 'onSubmit:composite': emitted})

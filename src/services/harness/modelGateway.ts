@@ -1,5 +1,6 @@
 /**
  * @file src/services/harness/modelGateway.ts
+ * 服务启用：创建模型前拒绝关闭项，覆盖普通 AI、自定义服务、B站和套餐分支。
  * 文件职责：把已配置的 FluentRead AI 服务适配为 Harness 可消费的 LanguageModel。
  * 主要内容：解析 OpenAI 兼容端点、注入凭据与供应商头、保留 tools/messages/system
  * 语义，直连官方 MiMo 时兼容退役编号而保留配置值，单独适配固定端点与模型的 B站匿名讲解，并对未开放的 ChatGPT 套餐、DeepSeek Responses 配置和其他机器翻译服务给出明确错误。
@@ -24,6 +25,7 @@ import {parseCustomHeaders, mergeCustomHeaders} from '@/src/core/config/customHe
 import {getServiceApiKeys} from '@/src/core/config/apiKeys';
 import {runWithApiKeyRotation, withServiceApiKey} from '@/src/services/translation/apiKeyRotation';
 import {createChatGPTPlanHarnessModel} from './chatgptPlanModel';
+import {isTranslationServiceDisabled, TRANSLATION_SERVICE_DISABLED_MESSAGE} from '@/src/core/config/serviceAvailability';
 import {getTranslationServiceUnavailableMessage} from '@/src/services/translation/capabilities';
 import {endpointFor, zhipuBearer, serviceHeaders, transformBody, snapshotHarnessConfig, sanitizeHarnessModelMessage, normalizeHarnessTransportError} from './modelConfig';
 export {getHarnessModelInputKey, sanitizeHarnessModelMessage} from './modelConfig';
@@ -111,6 +113,7 @@ type LanguageModelStreamOptions = Parameters<ConcreteLanguageModel['doStream']>[
  * 重新创建底层 provider，避免某次调用中途读取到 UI 正在编辑的凭据。
  */
 export function createHarnessLanguageModel(config: Config, service: string, model: string): LanguageModel {
+  if (isTranslationServiceDisabled(config.disabledTranslationServices, service)) throw new Error(TRANSLATION_SERVICE_DISABLED_MESSAGE);
   if (service === services.chatgptPlan) {
     const unavailable = getTranslationServiceUnavailableMessage(service);
     if (unavailable) throw Object.assign(new Error(unavailable), {kind: 'bad-request', retryable: false});

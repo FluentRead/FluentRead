@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/SettingsSections.vue
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
- * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；服务能力仅从当前编辑目标派生，翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，术语库按分区及缓存活跃状态同步显示快照，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围，网站适配区域复用来源返回条并隔离配置及范围变化后的迟到操作，划词设置顶部提供不带修复说明的来源返回按钮并按所属配置及分区启停；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，网页辅助和主题说明用稳定 key 直接渲染，软件语言控件随分区及缓存活跃状态启停，并保留固定 Language 识别词以便选错语言后恢复，提供当前默认服务的配置入口，将专项服务分配按需展开，并把译文样式与翻译设置跨页入口放入对应分组标题；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本复用配置编辑会话隔离草稿与权威基线，批量水合时暂停完整草稿扫描，在途与失败编辑保留字段归属，继续同步保存和离页补丁交接，协调网站入口、配置及凭据保存、历史恢复和能力过滤。
+ * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，目录开关停用服务时自动切换默认服务并阻止新请求；详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；服务能力仅从当前编辑目标派生，翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，术语库按分区及缓存活跃状态同步显示快照，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围，网站适配区域复用来源返回条并隔离配置及范围变化后的迟到操作，划词设置顶部提供不带修复说明的来源返回按钮并按所属配置及分区启停；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，网页辅助和主题说明用稳定 key 直接渲染，软件语言控件随分区及缓存活跃状态启停，并保留固定 Language 识别词以便选错语言后恢复，提供当前默认服务的配置入口，将专项服务分配按需展开，并把译文样式与翻译设置跨页入口放入对应分组标题；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本复用配置编辑会话隔离草稿与权威基线，批量水合时暂停完整草稿扫描，在途与失败编辑保留字段归属，继续同步保存和离页补丁交接，协调网站入口、配置及凭据保存、历史恢复和能力过滤。
  * 锚点编排：翻译设置保留连续表单，双语逐句阅读辅助与智能高亮各有独立锚点；智能高亮仅在翻译设置分区激活时挂载，定位不隐藏其他分组，既有表单配置保持原归属。新建兼容服务对话框只在首次请求打开时挂载，此后保留实例与关闭动画；加载中或失败时在添加入口旁显示可关闭提示，并停用入口说明气泡以免遮挡反馈，离开后不复活旧提示，草稿仍由原有活跃上下文和关闭流程管理。
  * 两点选取：在划词触发组内按需显示紧凑开关与快捷键编辑，分区活跃状态限制录制归属。
  * 交互延迟归属：悬浮与划词延迟只在所属活跃分区确认后提交，外部同步或离开使旧输入失效，保留原步长、范围及空值恢复规则。
@@ -165,6 +165,7 @@
         :selected-model="selectedConfigurationModel"
         :services="configurationCompute.filteredServices"
         :favorite-services="config.favoriteServices"
+        :disabled-services="config.disabledTranslationServices"
         :configured-services="configuredServiceIds"
         :model-options="configurationModelOptions"
         :show-model="configurationCompute.showModel"
@@ -174,6 +175,7 @@
         :allow-custom-models="configurationCompute.allowCustomModels"
         @update:service="setConfigurationService"
         @update:default-service="setDefaultConfigurationService"
+        @toggle-availability="toggleServiceAvailability"
         @update:model="selectConfigurationModel"
         @add:service="openCustomProviderDialog"
         @add:model="addConfigurationModel"
@@ -706,6 +708,7 @@ import {
   getTranslationServiceUnavailableMessage,
   supportsTranslationGlossary,
 } from '@/src/services/translation/capabilities';
+import {markDisabledTranslationServices, normalizeDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {chatGPTPlanDevelopmentEnabled} from '@/src/platform/chatgpt-plan/buildMode';
 
 const props = withDefaults(defineProps<{
@@ -940,7 +943,8 @@ const serviceOptionsWithCustomProviders = computed(() => localizeServiceOptions(
   [...config.value.customOpenAIProviders, ...config.value.compositeTranslationProviders],
   translateLegacy,
 ));
-const availableServiceOptions = computed(() => filterAvailableTranslationServices(serviceOptionsWithCustomProviders.value));
+const platformAvailableServiceOptions = computed(() => filterAvailableTranslationServices(serviceOptionsWithCustomProviders.value));
+const availableServiceOptions = computed(() => markDisabledTranslationServices(platformAvailableServiceOptions.value, config.value.disabledTranslationServices));
 // 显式设为默认沿用通用设置的配置补丁链；目录浏览本身只改变编辑目标。
 const setDefaultConfigurationService = (value: string) => {
   if (!viewActive.value || props.activeSection !== 'settings-services'
@@ -948,6 +952,24 @@ const setDefaultConfigurationService = (value: string) => {
     || value !== selectedConfigurationService.value
     || !availableServiceOptions.value.some(item => item.value === value && !item.disabled)) return;
   config.value.service = value;
+};
+const toggleServiceAvailability = (service: string, enabled: boolean) => {
+  if (!viewActive.value || props.activeSection !== 'settings-services' || typeof enabled !== 'boolean') return;
+  const serviceOptions = platformAvailableServiceOptions.value.filter(item => !item.disabled && item.value !== 'machine' && item.value !== 'ai');
+  if (!serviceOptions.some(item => item.value === service)) return;
+  const disabled = new Set(normalizeDisabledTranslationServices(config.value.disabledTranslationServices));
+  if (enabled) {
+    if (!disabled.delete(service)) return;
+  } else {
+    if (disabled.has(service) || serviceOptions.filter(item => !disabled.has(item.value)).length <= 1) return;
+    disabled.add(service);
+  }
+  updateConfigAtomically(draft => {
+    draft.disabledTranslationServices = [...disabled];
+    if (disabled.has(draft.service)) {
+      draft.service = serviceOptions.find(item => !disabled.has(item.value))!.value;
+    }
+  });
 };
 // 目录中的机器 / AI 标记只用于分组，不再作为不可选择的菜单选项。
 const textServiceGroups = computed(() => {
@@ -968,7 +990,7 @@ const selectedVideoServiceLabel = computed(() => {
   const service = config.value.videoService || config.value.service;
   return serviceOptionsWithCustomProviders.value.find(item => item.value === service)?.label || service;
 });
-const configuredServiceIds = computed(() => availableServiceOptions.value
+const configuredServiceIds = computed(() => platformAvailableServiceOptions.value
   .filter(item => !item.disabled && hasSavedServiceConfiguration(item.value, config.value))
   .map(item => item.value));
 const videoServiceOptions = computed(() => availableServiceOptions.value.filter((item: any) => !item.disabled));
@@ -978,8 +1000,13 @@ const videoGlossaryDescription = computed(() => {
   const model = resolveConfiguredModel(config.value.model[service], config.value.customModel[service]);
   return t(supportsTranslationGlossary(service, model) ? 'glossary.scopeHint' : 'glossary.unsupportedHint');
 });
-const selectedTextServiceUnavailableMessage = computed(() => getTranslationServiceUnavailableMessage(config.value.service));
-const selectedVideoServiceUnavailableMessage = computed(() => getTranslationServiceUnavailableMessage(config.value.videoService || config.value.service));
+const selectedTextServiceUnavailableMessage = computed(() => config.value.disabledTranslationServices.includes(config.value.service)
+  ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(config.value.service));
+const selectedVideoServiceUnavailableMessage = computed(() => {
+  const service = config.value.videoService || config.value.service;
+  return config.value.disabledTranslationServices.includes(service)
+    ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(service);
+});
 const fullPageTranslationModeOptions = [
   {value: 'viewport', label: '按阅读进度'},
   {value: 'all', label: '翻译到页底'},

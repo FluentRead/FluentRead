@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/QuickTranslationProfiles.vue
  * 文件职责：提供悬浮、全文与局部容器翻译的多方案设置界面，让每个额外快捷键独立选择翻译服务、模型、目标语言和展示策略。
- * 主要内容：按动作筛选并编辑快捷翻译方案，复用快捷键录制与服务图标组件，聚合内置和自定义模型，并在新增、启停、删除及跨方案热键去重后发出最新配置快照；按活跃配置、方案生命周期、字段版本与录制会话限定旧事件，确认复验容量与全部旧入口冲突，保留已启用的两点选取组合。
+ * 主要内容：按动作筛选并编辑快捷翻译方案，复用快捷键录制与服务图标组件，聚合内置和自定义模型，并在新增、启停、删除及跨方案热键去重后发出最新配置快照；关闭的翻译服务显示为禁选项并阻止保存为新选择；按活跃配置、方案生命周期、字段版本与录制会话限定旧事件。
  * 模块边界：组件只编辑父级传入的 QuickTranslationProfile 列表，不直接保存 Config、不注册网页快捷键或执行翻译；配置归一化与运行时路由仍由 core 和对应 feature 负责。
  -->
 <template>
@@ -108,7 +108,7 @@
             >
               <el-option :label="t('quickTranslation.followDefault', {value: serviceLabel(config.service)})" value="" />
               <el-option
-                v-if="row.profile.service && !isProfileAvailable(row.profile)"
+                v-if="row.profile.service && !isProfileAvailable(row.profile) && !serviceOptions.some(option => option.value === row.profile.service)"
                 :label="t('quickTranslation.serviceUnavailable', {service: serviceLabel(row.profile.service)})"
                 :value="row.profile.service"
                 disabled
@@ -118,6 +118,7 @@
                 :key="option.value"
                 :label="option.label"
                 :value="option.value"
+                :disabled="option.disabled"
               />
             </el-select>
           </label>
@@ -264,6 +265,7 @@ import {
 } from '@/src/core/config/quickTranslation'
 import {canonicalizeHotkey, parseHotkey, resolveConfiguredHotkey, validateHotkeyConflicts} from '@/src/core/hotkey'
 import {filterAvailableTranslationServices, isTranslationServiceAvailable, supportsTranslationGlossary} from '@/src/services/translation/capabilities'
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability'
 import GlossaryLibrarySelect from '@/src/ui/components/GlossaryLibrarySelect.vue'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
 import {useUiI18n} from '@/src/ui/i18n'
@@ -273,6 +275,7 @@ const CustomHotkeyInput = defineAsyncComponent(() => import('@/src/ui/components
 interface ServiceOption {
   value: string
   label: string
+  disabled?: boolean
 }
 
 interface LanguageOption {
@@ -309,7 +312,9 @@ const isAtCapacity = computed(() => visibleProfiles.value.length >= MAX_QUICK_TR
 const showCapacity = computed(() => visibleProfiles.value.length >= MAX_QUICK_TRANSLATION_PROFILES - 1)
 const allServiceOptions = computed<ServiceOption[]>(() => withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(options.services, props.config.customOpenAIProviders), props.config.compositeTranslationProviders)
   .filter(option => !option.disabled).map(option => ({value: option.value, label: translateLegacy(option.label)})))
-const serviceOptions = computed<ServiceOption[]>(() => filterAvailableTranslationServices(allServiceOptions.value))
+const serviceOptions = computed<ServiceOption[]>(() => markDisabledTranslationServices(
+  filterAvailableTranslationServices(allServiceOptions.value), props.config.disabledTranslationServices,
+))
 const serviceLabels = computed(() => new Map(allServiceOptions.value.map(option => [option.value, option.label])))
 const defaultDisplayModeLabel = computed(() => translateLegacy(props.config.display === 0 ? '仅译文' : '双语对照'))
 const defaultFullPageModeLabel = computed(() => props.config.fullPageTranslationMode === 'all' ? translateLegacy('翻译到页底') : translateLegacy('按阅读进度'))
@@ -454,7 +459,7 @@ function setEnabled(profile: QuickTranslationProfile, value: unknown): void {
   if (profile.enabled !== value) updateProfile(profile, {enabled: value})
 }
 function setService(profile: QuickTranslationProfile, value: unknown): void {
-  if (typeof value !== 'string' || (value && !serviceOptions.value.some(option => option.value === value)) || profile.service === value) return
+  if (typeof value !== 'string' || (value && !serviceOptions.value.some(option => option.value === value && !option.disabled)) || profile.service === value) return
   updateProfile(profile, {service: value, model: ''})
   if ((value || props.config.service) === services.google && profile.displayMode !== 'bilingual') ElMessage.info(t('quickTranslation.googleNotice'))
 }
@@ -491,7 +496,7 @@ function isGoogleProfile(profile: QuickTranslationProfile): boolean {
 }
 
 function isProfileAvailable(profile: QuickTranslationProfile): boolean {
-  return serviceOptions.value.some(option => option.value === effectiveService(profile)) && isTranslationServiceAvailable(effectiveService(profile))
+  return serviceOptions.value.some(option => option.value === effectiveService(profile) && !option.disabled) && isTranslationServiceAvailable(effectiveService(profile))
 }
 
 function serviceLabel(service: string): string {

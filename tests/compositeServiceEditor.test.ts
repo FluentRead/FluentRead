@@ -13,6 +13,15 @@ const members = [{value: 'google', label: 'Google'}, {value: 'microsoft', label:
 const base = (): CompositeTranslationDraft => ({name: ' Everyday ', strategy: 'sequential', services: ['google', 'microsoft'], timeoutMs: 12000})
 
 describe('组合翻译编辑草稿', () => {
+  it('保留关闭成员的原选择与标签，改名保存不删除成员，重新启用后恢复候选', () => {
+    const config = new Config(); config.disabledTranslationServices = ['google'];
+    const before = JSON.stringify(config); const options = getCompositeMemberOptions(config);
+    expect(options.find(item => item.value === 'google')).toMatchObject({disabled: true});
+    expect(validateCompositeTranslationDraft(base(), options)).toMatchObject({valid: true, draft: {services: ['google', 'microsoft']}});
+    expect(JSON.stringify(config)).toBe(before);
+    config.disabledTranslationServices = [];
+    expect(getCompositeMemberOptions(config).find(item => item.value === 'google')?.disabled).not.toBe(true);
+  })
   it('公开成员目录不提供未开放的ChatGPT，不改写已保存组合或模型', () => {
     const config = new Config(); config.model[services.chatgptPlan] = 'saved-account-model';
     config.compositeTranslationProviders = [{id: 'composite:saved', name: 'Saved', strategy: 'sequential', services: [services.chatgptPlan, services.microsoft], timeoutMs: 12000}];

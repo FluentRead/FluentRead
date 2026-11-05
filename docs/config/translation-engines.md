@@ -32,6 +32,12 @@ outline: false
 
 <figure class="doc-figure"><a href="/screenshots/ui/zh-CN/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/zh-CN/settings-services.webp" width="2560" height="1600" alt="流畅阅读翻译服务目录与连接配置" loading="lazy" /></a><figcaption>填写连接并检查成功后，再设为默认或分配给某项功能。</figcaption></figure>
 
+## 关闭暂时不用的服务
+
+在**设置 → 翻译服务**中，用目录每行右侧的开关关闭或重新启用服务。关闭会保留密钥、模型和各功能原有选择，停止该服务的新请求；当前默认服务被关闭时自动改用另一项已启用服务，至少保留一项开启。
+
+关闭的服务仍可在目录中配置，其他选择面板会禁选或移除它。组合翻译跳过关闭成员，编辑组合时保留原成员；免费翻译池也跳过同一标识的关闭服务，原参与列表不变。重新启用后恢复使用已有配置。
+
 ## 免费翻译如何工作？
 
 默认使用**自动均衡**，根据可用性和响应速度在已启用服务间分配请求；失败时可能把同一段原文发给另一家服务。也可选择**优先顺序**，按列表依次尝试，至少保留一项。只想使用一家时，停用其他项或选择独立服务。

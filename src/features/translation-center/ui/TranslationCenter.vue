@@ -1,7 +1,7 @@
 <!--
  * @file src/features/translation-center/ui/TranslationCenter.vue
  * 文件职责：提供以输入和多服务对照为中心的翻译工作台，清晰展示凭据、请求进度和旧结果。
- * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话；侧栏支持 Enter 翻译、Shift+Enter 换行，输入法组合期间不触发，原设置页快捷键保持不变；侧栏专用布局由原生入口样式负责；侧边栏用紧凑按钮显示服务或已选数量，完整保留多服务对比与模型标识，移除重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
+ * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话；侧栏支持 Enter 翻译、Shift+Enter 换行，输入法组合期间不触发，原设置页快捷键保持不变；侧栏专用布局由原生入口样式负责；关闭的服务自动从比较列表排除；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
  * 模块边界：不实现 provider 协议、不保存原文和译文、不更改网页默认服务；翻译复用 app client 的服务超时配置，设置导航交给外层，卸载时释放自有页面监听器和请求。
  -->
 <template>
@@ -66,6 +66,7 @@ import UiSelect from '@/src/ui/components/UiSelect.vue';
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import {filterAvailableTranslationServices, isTranslationServiceAvailable} from '@/src/services/translation/capabilities';
+import {filterEnabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {getMultilingualTargetLanguageLabel, models, options, resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {getCustomOpenAIProvider, getCustomOpenAIProviderModels, isConfiguredCustomOpenAIProvider, type CustomOpenAIProvider, withCustomOpenAIServiceOptions} from '@/src/core/config/customOpenAI';
@@ -119,9 +120,9 @@ type TranslationCenterConfigPatch = {translationCenterServices?: string[]; trans
 
 const serviceOptions = computed(() => {
   void configRevision.value;
-  return filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
+  return filterEnabledTranslationServices(filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
     options.services, customOpenAIProviders.value,
-  ), config.compositeTranslationProviders)).filter(item => !item.disabled).map(item => ({...item, label: translateLegacy(item.label)}));
+  ), config.compositeTranslationProviders)).map(item => ({...item, label: translateLegacy(item.label)})), config.disabledTranslationServices);
 });
 const hiddenUnavailableServices = computed(() => {
   void configRevision.value;

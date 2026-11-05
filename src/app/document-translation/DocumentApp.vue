@@ -1,5 +1,6 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
+ 服务启用：关闭的服务不进入候选，保留独立选择并提示重新启用，翻译动作沿现有可用性检查阻止发送。
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
  主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
  OCR 续译：混合 PDF 补入扫描段落时，按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。PDF 提取文字含异常控制字符时只提示核对原文，不改写原文或译文。
@@ -496,6 +497,8 @@ import {
   readPdfSourceFragment,
   releasePdfDocument,
   filterAvailableTranslationServices,
+  filterEnabledTranslationServices,
+  isTranslationServiceDisabled,
   formatDocumentReaderText,
   getDocumentAcceptAttribute,
   getDocumentEmptyReaderHint,
@@ -1099,19 +1102,21 @@ const formatCards = [
   {code: 'SUB', label: '字幕 / 歌词', tone: 'violet'},
 ];
 
-const serviceOptions = computed(() => filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
+const serviceOptions = computed(() => filterEnabledTranslationServices(filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
   options.services,
   config.customOpenAIProviders,
 ), config.compositeTranslationProviders)).filter((item: any) => !item.disabled).map((item: any) => ({
   ...item,
   label: translateLegacy(item.label),
   description: item.description ? translateLegacy(item.description) : item.description,
-})));
+})), config.disabledTranslationServices));
 const effectiveDocumentService = computed(() => config.documentService || config.service);
 // 不可用只影响可选性；旧服务必须显示真实名称，不把 ChatGPT 或本地模型误写成 Chrome。
-const unavailableDocumentServiceLabel = computed(() => translateLegacy(
-  options.services.find(item => item.value === effectiveDocumentService.value)?.label || effectiveDocumentService.value,
-));
+const unavailableDocumentServiceLabel = computed(() =>
+  config.customOpenAIProviders.find(item => item.id === effectiveDocumentService.value)?.name
+  || config.compositeTranslationProviders.find(item => item.id === effectiveDocumentService.value)?.name
+  || translateLegacy(options.services.find(item => item.value === effectiveDocumentService.value)?.label || effectiveDocumentService.value),
+);
 // “跟随默认”后面写明当前默认的是哪个服务，读者不必去设置页确认。
 const followDefaultLabel = computed(() => {
   const name = serviceOptions.value.find(item => item.value === config.service)?.label
@@ -1120,7 +1125,8 @@ const followDefaultLabel = computed(() => {
 });
 const activeDocumentModels = computed(() => config.documentService ? config.documentModel : config.model);
 const activeDocumentCustomModels = computed(() => config.documentService ? config.documentCustomModel : config.customModel);
-const documentServiceUnavailableMessage = computed(() => getTranslationServiceUnavailableMessage(effectiveDocumentService.value));
+const documentServiceUnavailableMessage = computed(() => isTranslationServiceDisabled(config.disabledTranslationServices, effectiveDocumentService.value)
+  ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(effectiveDocumentService.value));
 const selectedCustomOpenAIProvider = computed(() => getCustomOpenAIProvider(
   config.customOpenAIProviders,
   effectiveDocumentService.value,

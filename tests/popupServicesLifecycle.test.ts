@@ -84,6 +84,17 @@ function expectTargetVisible(el: Element) {const box=geometry(el);expect(box.top
 
 
 describe('Popup 服务选择实际缓存模板', () => {
+  it('关闭的服务不能在功能面板重新选用，原独立选择保留并可在启用后恢复', async () => {
+    const config = runtime.reactive(new Config()); config.disabledTranslationServices = ['deepseek']; config.hoverTranslationService = 'deepseek';
+    await mountPopup(config); const before = JSON.stringify(config); await open('default'); await search('deepseek');
+    expect(option('deepseek')).toBeNull(); expect(JSON.stringify(config)).toBe(before);
+    pickerBack()(); await settle();
+    expect(row('hover')?.querySelector('.assignment-warning')?.getAttribute('aria-label')).toBe('settings.services.library.serviceDisabledMessage');
+    await open('hover'); expect(option('deepseek').hasAttribute('disabled')).toBe(true);
+    const stale = eventOf(option('deepseek')); stale(); await settle(); expect(JSON.stringify(config)).toBe(before);
+    config.disabledTranslationServices = []; await settle();
+    expect(option('deepseek').hasAttribute('disabled')).toBe(false);
+  })
   it('实际选择视图同步清掉抽屉旧滚动，返回后默认行可见且不滚动宿主',async()=>{
     await mountPopup();const scroller=attachOwnedScroller();scroller.scrollTop=840;const source=row('default') as HTMLElement;source.focus();eventOf(source)()
     expect(scroller.scrollTop).toBe(0);await settle();expectTargetVisible(document.querySelector('input')!);expect(focus).toHaveBeenLastCalledWith({preventScroll:true})

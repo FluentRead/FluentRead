@@ -113,6 +113,34 @@ describe('非 Safari 免费池不依赖权限策略', () => {
     });
 });
 
+describe('全局服务关闭与免费池', () => {
+    it('跳过关闭成员，权重保持零，自动回退不改变原服务池或健康记录', async () => {
+        mockConfig.freeTranslationOrder = ['microsoft', 'google']; mockConfig.disabledTranslationServices = ['microsoft'];
+        microsoftMock.mockResolvedValue(['不应请求']); googleMock.mockResolvedValue('有效译文');
+        const before = JSON.stringify(mockConfig);
+        await expect(settle(translateFreeText('Hello from FluentRead.'))).resolves.toBe('有效译文');
+        expect(microsoftMock).not.toHaveBeenCalled(); expect(googleMock).toHaveBeenCalledOnce();
+        const weights = await getFreeTranslationWeightSnapshot(createTranslationProviderConfigSnapshot(providerConfigFixture(mockConfig)));
+        expect(weights.entries.find(entry => entry.providerId === 'microsoft')).toMatchObject({status: 'disabled', weight: 0});
+        expect(JSON.stringify(mockConfig)).toBe(before);
+    });
+    it('全部成员关闭时不恢复默认池或发送请求，重新启用后可以翻译', async () => {
+        mockConfig.freeTranslationOrder = ['microsoft']; mockConfig.disabledTranslationServices = ['microsoft'];
+        const pending = translateFreeText('Hello from FluentRead.');
+        const rejected = expect(pending).rejects.toThrow('未选择可用的免密钥服务');
+        await settle(pending.catch(() => undefined)); await rejected;
+        expect(microsoftMock).not.toHaveBeenCalled(); expect(googleMock).not.toHaveBeenCalled();
+        mockConfig.disabledTranslationServices = []; microsoftMock.mockResolvedValue(['有效译文']);
+        await expect(settle(translateFreeText('Hello from FluentRead.'))).resolves.toBe('有效译文');
+        expect(microsoftMock).toHaveBeenCalledOnce();
+    });
+    it('逐服务检查也不绕过全局关闭开关', async () => {
+        mockConfig.disabledTranslationServices = ['microsoft'];
+        await expect(translateFreeTranslationProvider('microsoft', withProviderSnapshot({origin: 'Do not send.'}, mockConfig))).rejects.toThrow('所选翻译服务已关闭');
+        expect(microsoftMock).not.toHaveBeenCalled();
+    });
+});
+
 describe('Safari 免费池授权过滤', () => {
     function setGranted(hosts: readonly string[]) {
         vi.stubEnv('BROWSER', 'safari');

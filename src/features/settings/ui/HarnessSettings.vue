@@ -20,7 +20,7 @@
         <div class="harness-provider-field">
           <label>AI 讲解服务</label>
           <el-select v-model="config.harness.service" class="harness-select" @change="config.harness.model = ''" clearable aria-label="学习讲解服务" :aria-describedby="!effectiveServiceSupportsHarness ? 'harness-service-hint' : undefined" placeholder="跟随当前默认服务" filterable>
-            <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" />
+            <el-option v-for="item in serviceOptions" :key="item.value" :label="item.label" :value="item.value" :disabled="item.disabled" />
           </el-select>
           <small v-if="!effectiveServiceSupportsHarness" id="harness-service-hint" class="service-hint" role="status">当前默认服务不能回答学习问题，请在这里选择一个 AI 服务</small>
           <small v-if="isBilibiliReading" class="harness-free-hint" role="status">免费基础读懂/用法，无需 API Key；完整语法、练习和追问可切换 AI 服务。触发学习动作时发送选中文字和已授权的段落</small>
@@ -82,6 +82,7 @@ import {models, options, resolveConfiguredModel, services} from '@/src/core/conf
 import {getCustomOpenAIProviderLabel, getCustomOpenAIProviderModels, isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI'
 import {HARNESS_ACTIONS, isReadingActionSupported, isReadingService, resolveHarnessModel, type HarnessActionId} from '@/src/core/config/harness'
 import {filterAvailableTranslationServices} from '@/src/services/translation/capabilities'
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability'
 import type {Config} from '@/src/core/config/model'
 import SettingsGroup from './components/SettingsGroup.vue'
 import SettingsItem from './components/SettingsItem.vue'
@@ -95,10 +96,10 @@ const emit = defineEmits<{navigate: [section: string]}>()
 const previewAction = ref<HarnessActionId>(props.config.harness.defaultAction)
 const previewAnswer = computed(() => previewAction.value === 'grammar' ? sentenceAnalysis : learningPreviewAnswers[previewAction.value][config.value.harness.explanationDepth])
 const {t} = useUiI18n()
-const serviceOptions = computed(() => filterAvailableTranslationServices([
+const serviceOptions = computed(() => markDisabledTranslationServices(filterAvailableTranslationServices([
   ...options.services.filter((item) => !item.disabled && isReadingService(item.value)).map(item => item.value === services.bilibili ? {...item, label: 'B站翻译 · 免费'} : item),
   ...config.value.customOpenAIProviders.filter((provider) => !options.services.some((item) => item.value === provider.id)).map((provider) => ({value: provider.id, label: getCustomOpenAIProviderLabel(config.value.customOpenAIProviders, provider.id)})),
-]))
+]), config.value.disabledTranslationServices))
 const modelOptions = computed(() => {
   const service = config.value.harness.service || config.value.service
   if (service === services.chatgptPlan) return [...new Set([

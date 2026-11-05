@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     } as Record<string, string>,
     customModel: {mock: '', 'mock-ai': '', chromeTranslator: ''} as Record<string, string>,
     service: 'mock',
+    disabledTranslationServices: [] as string[],
     from: 'en',
     to: 'zh-CN',
     useCache: true,
@@ -111,6 +112,18 @@ function enableContextGate(): void {
 }
 
 describe('translation API request lifecycle performance', () => {
+  it.each(['single', 'batch', 'video'] as const)('rejects disabled %s requests before context, credentials, transport and accounting, then allows re-enable', async kind => {
+    mocks.config.disabledTranslationServices = ['mock'];
+    const run = () => kind === 'batch' ? translateTextBatch(['Source'], 'Page')
+      : kind === 'video' ? translateVideoText('Source') : translateText('Source', 'Page');
+    await expect(run()).rejects.toMatchObject({kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED'});
+    expect(mocks.sendMessage).not.toHaveBeenCalled(); expect(mocks.getPageTranslationContext).not.toHaveBeenCalled();
+    expect(mocks.getMissingCredentialMessage).not.toHaveBeenCalled(); expect(mocks.persistCountIncrement).not.toHaveBeenCalled();
+    mocks.config.disabledTranslationServices = [];
+    mocks.sendMessage.mockResolvedValue(kind === 'batch' ? ['有效译文'] : '有效译文');
+    await expect(run()).resolves.toEqual(kind === 'batch' ? ['有效译文'] : '有效译文');
+    expect(mocks.sendMessage).toHaveBeenCalledOnce();
+  });
   beforeEach(() => {
     vi.useFakeTimers();
     mocks.sendMessage.mockReset();
@@ -128,6 +141,7 @@ describe('translation API request lifecycle performance', () => {
     mocks.config.enableAIContext = false;
     mocks.config.nativeBatchTranslationEnabled = {};
     mocks.config.service = 'mock';
+    mocks.config.disabledTranslationServices = [];
     mocks.config.videoService = 'mock';
     mocks.config.compositeTranslationProviders = [];
     mocks.config.aiRequestTimeoutMs = undefined;

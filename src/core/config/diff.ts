@@ -537,6 +537,8 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     floatingBallCompact: {group: 'general', label: '缩小悬浮球', format: formatBoolean},
     floatingBallSettingsEntryVisible: {group: 'general', label: '悬浮球设置入口', format: formatBoolean},
     floatingBallCollapsedOpacity: {group: 'general', label: '悬浮球收起不透明度', format: (value) => formatNumber(value, '%')},
+    floatingBallDefaultMargin: {group: 'general', label: '悬浮球默认边距', format: (value) => formatNumber(value, ' px')},
+    floatingBallPopoutMargin: {group: 'general', label: '悬浮球弹出边距', format: (value) => formatNumber(value, ' px')},
     translationProgressPanelEnabled: {group: 'general', label: '翻译进度面板', format: formatBoolean},
     bilingualSentenceHighlightEnabled: {group: 'translation', label: '双语逐句高亮', format: formatBoolean},
     bilingualSentenceHighlightStyle: {group: 'translation', label: '逐句高亮样式', format: value => formatEnum(value, labelsFor(SENTENCE_HIGHLIGHT_STYLES))},

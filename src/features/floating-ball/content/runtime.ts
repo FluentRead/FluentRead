@@ -99,6 +99,8 @@ function readPresentation(source: Config): FloatingBallPresentation {
         compact: source.floatingBallCompact === true,
         settingsEntryVisible: source.floatingBallSettingsEntryVisible !== false,
         collapsedOpacity: source.floatingBallCollapsedOpacity,
+        defaultMargin: source.floatingBallDefaultMargin,
+        popoutMargin: source.floatingBallPopoutMargin,
     };
 }
 

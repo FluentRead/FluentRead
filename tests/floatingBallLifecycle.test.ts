@@ -110,6 +110,38 @@ function mountBall(initial: Record<string, unknown> = {}, navigatorPort: {maxTou
 async function flush() {await Vue.nextTick(); await Vue.nextTick();}
 
 describe('FloatingBall actual SFC lifecycle', () => {
+  it.each(['left','right'])('keeps equal signed margins stationary at the %s dock and updates unequal hover margins', async side => {
+    const port = mountBall({position:side,presentation:{toolsDisplay:'hover',hoverDelay:0,defaultMargin:-18,popoutMargin:-18}});await flush();
+    const initial = port.ball().style.getPropertyValue(side);
+    expect(initial).toContain('-18px');
+    port.ball().dispatchEvent(port.event('mouseenter'));await flush();
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);
+    expect(port.ball().style.getPropertyValue(side)).toBe(initial);
+    port.props.presentation = {...port.props.presentation,popoutMargin:24};await flush();
+    expect(port.ball().style.getPropertyValue(side)).toContain('24px');
+    port.ball().dispatchEvent(port.event('mouseleave'));await flush();
+    expect(port.ball().style.getPropertyValue(side)).toBe(initial);
+    port.unmount();expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['always','hidden'])('uses only the default margin outside hover mode: %s', async toolsDisplay => {
+    const port = mountBall({position:'right',presentation:{toolsDisplay,hoverDelay:0,defaultMargin:12,popoutMargin:80}});await flush();
+    port.ball().dispatchEvent(port.event('mouseenter'));await flush();
+    expect(port.ball().style.right).toContain('12px');
+    port.props.presentation = {...port.props.presentation,popoutMargin:-80};await flush();
+    expect(port.ball().style.right).toContain('12px');
+    port.props.presentation = {...port.props.presentation,defaultMargin:-10};await flush();
+    expect(port.ball().style.right).toContain('-10px');
+  });
+
+  it('retains margin values when docking and uses the panned visible viewport origin', async () => {
+    const port = mountBall({position:'right',presentation:{defaultMargin:15,popoutMargin:30}});await flush();
+    port.viewport({left:80,top:160,right:470,bottom:560,width:390,height:400});await flush();
+    expect(port.ball().style.right).toContain('530px');
+    port.exposed.value!.setPosition('left',0.5);await flush();
+    expect(port.ball().style.left).toContain('80px');
+    expect(port.ball().style.left).toContain('15px');
+  });
   it('offers the injected secondary manga reading action without changing the main toggle', async () => {
     const read=vi.fn();const port=mountBall({manga:{available:true,active:true,pending:false,errors:0},onMangaReading:read,presentation:{toolsDisplay:'hover',hoverDelay:0}});await flush();
     port.ball().dispatchEvent(port.event('mouseenter'));await flush();const button=port.document.querySelector<HTMLElement>('.floating-ball-reading')!;

@@ -170,6 +170,8 @@ const VISIBLE_FIELDS: Record<string, string> = {
     floatingBallCompact: '缩小悬浮球',
     floatingBallSettingsEntryVisible: '悬浮球设置入口',
     floatingBallCollapsedOpacity: '悬浮球收起不透明度',
+    floatingBallDefaultMargin: '悬浮球默认边距',
+    floatingBallPopoutMargin: '悬浮球弹出边距',
     paragraphCopyEnabled: '段落复制',
     sectionTranslationHotkeyEnabled: '局部翻译快捷键',
     sectionTranslationRules: '记住的翻译区域',
@@ -305,6 +307,7 @@ function previewValue(value: unknown, sensitive: boolean, field: string): string
         if (field === 'translationCacheMaxBytes' && Number.isFinite(value)) return `${Number((value / 1024 / 1024).toFixed(2))} MiB`;
         if (field.endsWith('Ms') || field.endsWith('Delay') || field === 'selectionTranslatorDelay' || field === 'inputBoxTranslationInterval') return `${value} ms`;
         if (field === 'floatingBallCollapsedOpacity' || field === 'videoSubtitleFontSize') return `${value}%`;
+        if (field === 'floatingBallDefaultMargin' || field === 'floatingBallPopoutMargin') return `${value} px`;
     }
     const choices = field === 'theme' ? options.theme : field === 'from' ? options.from : field === 'to' ? options.to : field === 'style' ? options.styles : [];
     const option = choices.find(option => option.value === value);

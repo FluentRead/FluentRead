@@ -110,6 +110,7 @@ describe('设置文案七语一致性', () => {
       ui.language.value = language;await Vue.nextTick();
       const text = ui.document.querySelector('main')!.textContent!;
       for (const key of ['settings.floatingBall.title', 'settings.floatingBall.toolsDisplayDescription', 'settings.floatingBall.hoverDelayHelp', 'settings.floatingBall.tools.hover', 'settings.floatingBall.tools.hidden',
+        'settings.floatingBall.defaultMargin', 'settings.floatingBall.defaultMarginDescription', 'settings.floatingBall.popoutMargin', 'settings.floatingBall.popoutMarginDescription',
         userscript ? 'settings.floatingBall.click.settings' : 'settings.floatingBall.click.quickPanel',
         userscript ? 'settings.floatingBall.clickDescriptionUserscript' : 'settings.floatingBall.clickDescription']) expect(text).toContain(ui.t(key));
       expect(ui.document.querySelector('input')!.getAttribute('aria-label')).toBe(ui.t('settings.floatingBall.hoverDelayAria'));
@@ -123,13 +124,23 @@ describe('设置文案七语一致性', () => {
     const delay = ui.document.querySelector('input')! as unknown as HTMLInputElement;
     delay.value = '999999';delay.dispatchEvent(new ui.window.Event('change'));await Vue.nextTick();
     expect(ui.config.floatingBallHoverDelay).toBe(configModel.normalizeFloatingBallHoverDelay(999999));
+    const number = (key:string,value:string) => {
+      const input = ui.document.querySelector(`[aria-label="${ui.t(key)}"]`) as unknown as HTMLInputElement;
+      input.value = value;input.dispatchEvent(new ui.window.Event('change'));
+    };
+    number('settings.floatingBall.defaultMarginAria','-999');number('settings.floatingBall.popoutMarginAria','999');await Vue.nextTick();
+    expect(ui.config).toMatchObject({floatingBallDefaultMargin:-200,floatingBallPopoutMargin:200});
+    number('settings.floatingBall.popoutMarginAria','invalid');await Vue.nextTick();
+    expect(ui.config.floatingBallPopoutMargin).toBe(200);
     await ui.click('[data-value="settings"]');expect(ui.config.floatingBallClickAction).toBe('settings');
     await ui.click('[data-value="hidden"]');expect(ui.config.floatingBallToolsDisplay).toBe('hidden');
     expect(ui.document.querySelector('input')!.getAttribute('aria-label')).toBe(ui.t('settings.floatingBall.collapsedOpacityAria'));
     expect(ui.document.querySelector(`[aria-label="${ui.t('settings.floatingBall.settingsEntry')}"]`)!.hasAttribute('disabled')).toBe(true);
-    await ui.click('[data-value="always"]');expect(ui.document.querySelectorAll('input').length).toBe(0);
+    await ui.click('[data-value="always"]');expect(ui.document.querySelectorAll('input').length).toBe(1);
+    expect(ui.config.floatingBallPopoutMargin).toBe(200);
     ui.config.disableFloatingBall = true;await Vue.nextTick();
     expect(ui.document.querySelector('main')!.textContent).toContain(ui.t('settings.floatingBall.disabledNote'));
     for (const control of ui.document.querySelectorAll('button')) expect(control.hasAttribute('disabled')).toBe(true);
+    for (const control of ui.document.querySelectorAll('input')) expect(control.hasAttribute('disabled')).toBe(true);
   });
 });

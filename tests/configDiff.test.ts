@@ -164,6 +164,8 @@ describe('配置差异预览', () => {
             floatingBallCompact: false,
             floatingBallSettingsEntryVisible: true,
             floatingBallCollapsedOpacity: 52,
+            floatingBallDefaultMargin: 0,
+            floatingBallPopoutMargin: 20,
         }, {
             floatingBallToolsDisplay: 'always',
             floatingBallHoverDelay: 500,
@@ -171,6 +173,8 @@ describe('配置差异预览', () => {
             floatingBallCompact: true,
             floatingBallSettingsEntryVisible: false,
             floatingBallCollapsedOpacity: 20,
+            floatingBallDefaultMargin: -18,
+            floatingBallPopoutMargin: -18,
         });
 
         expect(group(result, 'general')?.changes).toEqual([
@@ -180,6 +184,8 @@ describe('配置差异预览', () => {
             {key: 'floatingBallCompact', label: '缩小悬浮球', before: '关闭', after: '开启'},
             {key: 'floatingBallSettingsEntryVisible', label: '悬浮球设置入口', before: '开启', after: '关闭'},
             {key: 'floatingBallCollapsedOpacity', label: '悬浮球收起不透明度', before: '52%', after: '20%'},
+            {key: 'floatingBallDefaultMargin', label: '悬浮球默认边距', before: '0 px', after: '-18 px'},
+            {key: 'floatingBallPopoutMargin', label: '悬浮球弹出边距', before: '20 px', after: '-18 px'},
         ]);
 
         const domains = buildConfigDiff({floatingBallDisabledDomains: []}, {floatingBallDisabledDomains: ['example.com']});

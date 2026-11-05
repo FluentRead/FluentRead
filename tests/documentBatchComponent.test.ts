@@ -7,6 +7,7 @@ import ts from 'typescript';
 import * as vue from 'vue';
 import {Config} from '@/src/core/config/model';
 import * as compositeTranslation from '@/src/core/config/compositeTranslation';
+import * as serviceAvailability from '@/src/core/config/serviceAvailability';
 import * as catalog from '@/src/core/config/catalog';
 import * as documentCore from '@/src/features/document-translation/core/document';
 import * as presentation from '@/src/features/document-translation/ui/presentation';
@@ -63,7 +64,7 @@ beforeEach(async () => {
   download = vi.fn(async (document, translations, mode) => ({data: documentCore.renderDocument(document, translations, mode),
     fileName: documentCore.createDocumentDownloadName(document.fileName, mode), mimeType: 'text/plain'}));
   persist = vi.fn().mockResolvedValue(undefined);
-  const api = {...materialPorts, ...catalog, ...compositeTranslation, ...documentCore, ...presentation, ...preview, ...richPreviewSync, ...pdfOcr, ...documentTasks, useConfigEditor, createPdfPageRecognizer: () => async () => [], hasDistinctTranslation, Config, TranslationRequestError, serializeTranslationError, createDocumentImportWorkflow, createDocumentRecognitionWorkflow, createDocumentExportWorkflow,
+  const api = {...materialPorts, ...catalog, ...compositeTranslation, ...serviceAvailability, ...documentCore, ...presentation, ...preview, ...richPreviewSync, ...pdfOcr, ...documentTasks, useConfigEditor, createPdfPageRecognizer: () => async () => [], hasDistinctTranslation, Config, TranslationRequestError, serializeTranslationError, createDocumentImportWorkflow, createDocumentRecognitionWorkflow, createDocumentExportWorkflow,
     documentRetryBackoff: {maxWaitMs: 0}, createDocumentHistoryCommitter,
     createDocumentHistory: () => ({list: async () => [], listChecked: async () => ({status: 'ok', entries: []}), load: async () => null, loadChecked: async () => ({status: 'ok', record: null}), save: async () => false, saveChecked: async () => ({status: 'unavailable'}), remove: async () => false, removeChecked: async () => ({status: 'unavailable'}), clear: async () => false}), documentHistoryId: async () => '',
     parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download, generateDocumentArchive,

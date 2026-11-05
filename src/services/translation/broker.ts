@@ -55,6 +55,7 @@ import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
 import {createCompositeTranslationRoutingState} from './compositeRouting';
 import {resolveCloudRegion, services} from '@/src/core/config/catalog';
+import {isTranslationServiceDisabled, TRANSLATION_SERVICE_DISABLED_MESSAGE} from '@/src/core/config/serviceAvailability';
 import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {isValidInlineCodeSource, isValidInlineCodeTranslation} from '@/src/core/translation/inlineCodeMarkers';
 import {getServiceApiKeys} from '@/src/core/config/apiKeys';
@@ -1626,6 +1627,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             ? normalizeAiRequestTimeoutMs(current.aiRequestTimeoutMs) : DEFAULT_PROVIDER_TIMEOUT_MS);
         const providerDeadline = providerStartedAt + providerBudget;
         trace.serviceId = selectedService;
+        if (isTranslationServiceDisabled(current.disabledTranslationServices, selectedService)) {
+            throw Object.assign(new Error(TRANSLATION_SERVICE_DISABLED_MESSAGE), {
+                kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED',
+            });
+        }
         if (selectedService === services.chatgptPlan) {
             const unavailable = getTranslationServiceUnavailableMessage(selectedService);
             if (unavailable) throw Object.assign(new Error(unavailable), {kind: 'bad-request', retryable: false});
@@ -1634,11 +1640,19 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             const profile = getCompositeTranslationProvider(current.compositeTranslationProviders, selectedService);
             if (!profile) throw new Error('组合翻译服务已被删除，请重新选择服务');
             if (!profile.services.length) throw new Error('请先为组合翻译添加至少一个服务');
+            // 受信快照也可能含旧配置；在排序前排除递归和自引用成员。
+            const nonRecursiveMembers = profile.services.filter(member => !isCompositeTranslationProviderId(member));
+            if (!nonRecursiveMembers.length) throw new Error('组合翻译没有可用的成员服务');
+            const enabledProfile = {
+                ...profile,
+                services: nonRecursiveMembers.filter(member => !isTranslationServiceDisabled(current.disabledTranslationServices, member)),
+            };
+            if (!enabledProfile.services.length) throw Object.assign(new Error('组合翻译的所有成员都已关闭，请重新启用至少一个服务'), {
+                kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED',
+            });
             let lastError: unknown;
-            for (const member of compositeRouting.order(profile)) {
+            for (const member of compositeRouting.order(enabledProfile)) {
                 throwIfRequestAborted(requestControl?.signal);
-                // 即使受信快照含未规范化的旧配置，也不允许递归组合或自引用。
-                if (isCompositeTranslationProviderId(member)) continue;
                 const startedAt = now();
                 const remaining = Math.min(profile.timeoutMs, getRemainingDeadlineMs(providerDeadline));
                 const child = attachTranslationProviderConfig({

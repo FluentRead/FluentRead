@@ -1,5 +1,6 @@
 /**
  * @file src/ui/view-model/compositeServiceEditor.ts
+ * 服务启用：关闭成员保留标签和已保存选择，候选禁选交给表单，改名或排序不会删除关闭成员。
  * 文件职责：为组合服务创建与编辑表单提供不含凭据的草稿转换和校验。
  * 主要内容：从平台可用的普通服务目录派生成员候选，校验名称、成员数量、策略与单路等待时限；新建和已有组合共用规则，显示候选不修改已保存成员。
  * 模块边界：不修改配置、不保存数据、不调用翻译；成员只引用现有服务 ID，不复制密钥、模型或接口配置。
@@ -17,14 +18,15 @@ import {
 } from '@/src/core/config/compositeTranslation'
 import type { ServiceOption } from './serviceCatalog'
 import {filterAvailableTranslationServices} from '@/src/services/translation/capabilities'
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability'
 
 export type CompositeTranslationDraft = Omit<CompositeTranslationProvider, 'id'>
 export type CompositeTranslationDraftErrors = Partial<Record<'name' | 'services' | 'timeoutMs', string>>
 export const MAX_COMPOSITE_SERVICE_NAME_LENGTH = 80
 
 export function getCompositeMemberOptions(config: Config): ServiceOption[] {
-  return filterAvailableTranslationServices(withCustomOpenAIServiceOptions(options.services, config.customOpenAIProviders)
-    .filter(option => !option.disabled && !isCompositeTranslationProviderId(option.value)))
+  return markDisabledTranslationServices(filterAvailableTranslationServices(withCustomOpenAIServiceOptions(options.services, config.customOpenAIProviders)
+    .filter(option => !option.disabled && !isCompositeTranslationProviderId(option.value))), config.disabledTranslationServices)
 }
 
 export function createCompositeTranslationDraft(provider?: CompositeTranslationProvider): CompositeTranslationDraft {

@@ -1,5 +1,6 @@
 <!--
  @file src/app/popup/PopupServices.vue
+ 服务启用：关闭项不进入新候选，保留已有独立选择并显示关闭提示，迟到点击仍复验当前候选。
  文件职责：在 Popup 翻译服务抽屉中展示功能分配概览，以独立选择面板替代层叠下拉菜单，让窄弹窗里的服务选择更直观。
  B站匿名讲解只出现在阅读分配中，并展示固定有效模型；写作继续遵循通用AI服务边界。
  主要内容：突出网页默认服务，以紧凑列表展示各功能的独立服务或继承状态，继承行在同一行标出“跟随默认”与实际跟随的服务，且仅在模型与默认服务的配置模型不同时才显示模型行，以统一状态标签呈现服务并让多语言名称完整换行，保留本地图标、配置模型和配置提醒；选择面板合并功能标题、返回与关闭操作，搜索框随列表一起滚动，常用区只放可直接使用的服务，按免费翻译、已配置或正在使用的服务、微软与谷歌、热门服务排序，待配置的服务留在更多服务中，当前选中项始终在常用区，更多服务默认收起并按机器翻译、云服务厂商与 AI 翻译分组，选项下方标出配置模型或待配置状态，支持模型搜索及键盘导航，保留不可用的旧选择，缓存默认、继承或独立行的配置模型及本地化说明，避免将设置中的模型声明为最终请求模型；只让当前活跃配置和所属面板的事件修改草稿，焦点返回复验面板与用户焦点；切换时仅重置所属抽屉的滚动，渲染后在同一归属保护内让搜索框或原分配行可见，不滚动宿主页面；可见区扩大时只修正仍聚焦的同一搜索外框被吸顶标题遮住的位置，保留查询和长列表滚动归属。
@@ -84,6 +85,7 @@ import {getTranslationServiceUnavailableMessage, isTranslationServiceAvailable} 
 import {searchServiceOptions, splitServiceChoices, type ServiceOption, type ServiceSearchOption} from '@/src/ui/view-model/serviceCatalog';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
 import {useUiI18n} from '@/src/ui/i18n';
+import {isTranslationServiceDisabled} from '@/src/core/config/serviceAvailability';
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
 type Field = {id: string; feature?: FeatureServiceDefinition};
 type PickerSession = {field: Field; config: Config; selected: string; service: string; current: () => boolean};
@@ -112,6 +114,7 @@ function selectionMatches(config: Config, field: Field, value: string, service: 
 }
 function warning(feature?: FeatureServiceDefinition) {
   const config = props.config, service = effective(feature);
+  if (isTranslationServiceDisabled(config.disabledTranslationServices, service)) return t('settings.services.library.serviceDisabledMessage');
   if (feature && !isFeatureServiceSupported(feature, service, config.customOpenAIProviders)) return `${t(`featureServices.${feature.id}`)} · ${t('featureServices.aiOnly')}`;
   const model = feature ? getFeatureModel(config, feature) : config.model[service];
   const message = getTranslationServiceUnavailableMessage(service) || getMissingCredentialMessage(service, config, model);
@@ -144,7 +147,8 @@ const searchableModels = computed(() => {
 });
 const filteredChoices = computed(() => {
   const feature = editing.value?.feature;
-  const available = props.serviceOptions.filter(option => !option.disabled && isTranslationServiceAvailable(option.value)
+  const available = props.serviceOptions.filter(option => !option.disabled
+    && !isTranslationServiceDisabled(props.config.disabledTranslationServices, option.value) && isTranslationServiceAvailable(option.value)
     && (!isCustomOpenAIProviderId(option.value) || Boolean(getCustomOpenAIProvider(props.config.customOpenAIProviders, option.value)))
     && (!feature || isFeatureServiceSupported(feature, option.value, props.config.customOpenAIProviders)));
   const matches = searchServiceOptions(available, query.value, searchableModels.value, props.config.model, props.config.customModel);

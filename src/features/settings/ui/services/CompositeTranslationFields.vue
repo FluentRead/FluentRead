@@ -1,5 +1,6 @@
 <!--
  * @file src/features/settings/ui/services/CompositeTranslationFields.vue
+ * 服务启用：新增成员候选排除关闭项，已有关闭成员仍能查看、排序或移除，保存沿用原成员。
  * 文件职责：用紧凑设置行编辑组合成员、调用方式与单成员时限，创建和编辑共用同一表单。
  * 主要内容：名称、成员、调用方式与等待时间复用服务详情的表单 token 和分隔行；成员选择即添加，以图标按钮排序或移除；等待时间直接可见，输入旁固定显示秒并关联超时回退说明；窄详情与创建窗口统一纵向表单。
  * 模块边界：只发送不含凭据的草稿补丁，名称共用、验证及保存归调用方；活动身份限定旧控件事件，不直接修改配置或发起翻译。
@@ -74,7 +75,7 @@ const selectedMember = ref('')
 const nameId = useId(), timeoutId = useId(), timeoutDescriptionId = useId()
 const strategies: CompositeTranslationStrategy[] = ['sequential', 'random', 'smart']
 const strategyOptions = computed(() => strategies.map(value => ({value, label: t(`settings.services.composite.${value}`)})))
-const availableMembers = computed(() => props.members.filter(member => !props.draft.services.includes(member.value)))
+const availableMembers = computed(() => props.members.filter(member => !member.disabled && !props.draft.services.includes(member.value)))
 const memberNames = computed(() => new Map(props.members.map(member => [member.value, member.label])))
 const memberLabel = (service: string) => memberNames.value.get(service) || service
 const {active, capture} = useSettingsActionContext(() => props.active, () => [props.context, props.draft, props.members, props.showName, props.draft.services.join('\0')])

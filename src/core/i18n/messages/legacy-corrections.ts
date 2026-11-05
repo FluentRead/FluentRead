@@ -21,6 +21,7 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     // 配置差异和云同步沿用中文字段名，与设置页的语义资源保持一致。
     ["AI 多段每批最多片段数", "Maximum text fragments per AI translation batch", "AI 翻訳のバッチあたりの最大テキスト断片数", "AI 번역 배치당 최대 텍스트 조각 수", "Nombre maximal de fragments par lot de traduction IA", "Максимум текстовых фрагментов в пакете ИИ-перевода", "Máximo de fragmentos por lote de traducción con IA"],
     ["AI 多段每批最多字符数", "Maximum source characters per AI translation batch", "AI 翻訳のバッチあたりの最大原文文字数", "AI 번역 배치당 최대 원문 글자 수", "Nombre maximal de caractères source par lot de traduction IA", "Максимум символов оригинала в пакете ИИ-перевода", "Máximo de caracteres originales por lote de traducción con IA"],
+    ["已关闭翻译服务", "Disabled translation services", "無効にした翻訳サービス", "비활성화된 번역 서비스", "Services de traduction désactivés", "Отключённые сервисы перевода", "Servicios de traducción desactivados"],
     // 两点选取的设置说明、快捷键校验和起终点提示；动态 Esc 后缀由 legacy-patterns 组合。
     ["两点选取", "Two-point selection", "2 点選択", "두 지점 선택", "Sélection en deux points", "Выделение по двум точкам", "Selección por dos puntos"],
     ["编辑两点选取快捷键", "Edit two-point selection shortcut", "2 点選択のショートカットを編集", "두 지점 선택 단축키 편집", "Modifier le raccourci de sélection en deux points", "Изменить сочетание клавиш для выделения по двум точкам", "Editar el atajo de selección por dos puntos"],

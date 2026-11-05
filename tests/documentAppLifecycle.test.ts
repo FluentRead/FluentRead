@@ -134,6 +134,25 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('removes disabled services from document choices, retains the saved selection and blocks translation until re-enabled', async () => {
+        state.config.documentService = 'openai'; state.config.disabledTranslationServices = ['openai']; await flush();
+        expect(state.serviceOptions.some((item: {value: string}) => item.value === 'openai')).toBe(false);
+        expect(state.effectiveDocumentService).toBe('openai');
+        expect(state.documentServiceUnavailableMessage).toBe('settings.services.library.serviceDisabledMessage');
+        state.config.disabledTranslationServices = []; await flush();
+        expect(state.serviceOptions.some((item: {value: string}) => item.value === 'openai')).toBe(true);
+        expect(state.documentServiceUnavailableMessage).toBeNull();
+    });
+    it('keeps user-defined names for disabled custom and composite document selections', async () => {
+        state.config.customOpenAIProviders = [{id: 'custom:closed', name: 'Saved local service', endpoint: 'https://fixture.invalid/v1', models: ['fixture']}];
+        state.config.compositeTranslationProviders = [{id: 'composite:closed', name: 'Saved group', strategy: 'sequential', services: ['google', 'microsoft'], timeoutMs: 12000}];
+        for (const [service, name] of [['custom:closed', 'Saved local service'], ['composite:closed', 'Saved group']]) {
+            state.config.documentService = service; state.config.disabledTranslationServices = [service]; await flush();
+            expect(state.unavailableDocumentServiceLabel).toBe(name);
+            expect(state.effectiveDocumentService).toBe(service);
+            expect(state.serviceOptions.some((item: {value: string}) => item.value === service)).toBe(false);
+        }
+    });
     it('shows one localized nonmodal notice for actual PDF extracted controls without changing source, geometry or corrections', async () => {
         ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items: [
             {str: 'Known \u0003 source \u007f text.', transform: [12, 0, 0, 12, 5, 50], width: 80, height: 12, fontName: 'body'},

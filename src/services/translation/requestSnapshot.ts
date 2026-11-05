@@ -31,6 +31,7 @@ export type {TrustedTranslationGlossaryContext} from './types';
 import {normalizeFreeTranslationOrder, normalizeFreeTranslationMode} from '@/src/core/config/freeTranslation';
 import {normalizeApiKeyRecoveryMs} from '@/src/core/config/scheduling';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
+import {normalizeDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import type {CompositeTranslationProvider} from '@/src/core/config/compositeTranslation';
 import {normalizeDeepLApiPlan} from '@/src/core/config/deepl';
@@ -394,6 +395,7 @@ export function createTranslationProviderConfigSnapshot(
     };
     return Object.freeze({
         ...providerSource,
+        disabledTranslationServices: Object.freeze(normalizeDisabledTranslationServices(source.disabledTranslationServices)),
         aiRequestTimeoutMs: normalizeAiRequestTimeoutMs(source.aiRequestTimeoutMs),
         freeTranslationOrder: Object.freeze(normalizeFreeTranslationOrder(source.freeTranslationOrder)),
         freeTranslationMode: normalizeFreeTranslationMode(source.freeTranslationMode),

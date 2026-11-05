@@ -12,6 +12,12 @@
 
 生产 Chrome 构建后，运行 `node scripts/testing/run-video-menu-ui-test.cjs --suite subtitle-order --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`。专项在第二屏临时 Edge 后台正常窗口中验证真实点击和键盘切换、字幕上下几何、无重复翻译请求、刷新后偏好、单语显示、390/320px 菜单与外部配置同步，并保存截图及运行时诊断。网页、媒体、原字幕和翻译响应使用确定性夹具，不代表原站、在线服务、Firefox 或 Safari 系统全屏实机验收。
 
+## 自定义字幕轮廓与背景（issue #1183）
+
+`videoSubtitleAppearance` 验证旧配置继续跟随皮肤、轮廓样式与颜色/粗细归一化，以及关闭背景时透明背景、边框、阴影和模糊一并清除。`videoSubtitleAppearanceSettingsLifecycle` 执行真实设置组件的控件事件，验证实时预览、透明度保留、禁用状态和七种界面语言；`videoCaptionPlatformRuntime` 验证 Meet 等平台字幕面板消费同一组外观变量。YouTube/X 与平台字幕 DOM 均使用受控夹具，不代表真实网站或跨浏览器实机验收。
+
+先运行 `pnpm test:unit -- tests/videoSubtitleAppearance.test.ts --dry-run` 与 `pnpm test:functional -- tests/videoSubtitleAppearanceSettingsLifecycle.test.ts tests/videoCaptionPlatformRuntime.test.ts --dry-run` 核对范围，再运行相同命令并移除 `--dry-run` 执行定向回归。
+
 ## 视频完整句学习
 
 视频字幕总开关关闭时，YouTube/X 播放器按钮和菜单必须移除；播放器菜单的「关闭」遵循同一行为，重新开启从扩展弹窗或设置页操作。`videoSubtitleTrackPriorityRuntime` 覆盖两个平台初始关闭、已打开菜单的移除、周期同步后保持隐藏、重复开启不产生副本，以及隐藏字幕与关闭功能的区别。生产 Chrome 构建后使用 `node scripts/run-video-menu-state-test.cjs --button-visibility-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --artifacts-dir <证据目录>` 定向验证：初始关闭、外部配置关闭、控制栏重建、刷新、菜单关闭、重新开启，以及字幕关闭时网页段落翻译—恢复—再次翻译的 `[1, 0, 1]`。脚本使用临时 Edge 后台正常窗口与受控 YouTube/X DOM、媒体和翻译响应；不代表原站、在线服务或 Firefox 运行验收。

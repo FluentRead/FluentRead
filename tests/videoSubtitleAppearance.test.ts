@@ -82,7 +82,11 @@ describe('video subtitle appearance contract', () => {
       bilingualOrder: 'original-first',
       bottomOffset: 25,
       autoBottom: false,
+      backgroundVisible: true,
       backgroundOpacity: 0,
+      outlineStyle: 'skin',
+      outlineColor: '#000000',
+      outlineWidth: 1,
       lineSpacing: 1.35,
       maxWidth: 67,
       fontScale: 123,
@@ -113,6 +117,17 @@ describe('video subtitle appearance contract', () => {
       translationColor: '#0f766e',
       backgroundOpacity: 88,
     });
+  });
+
+  it('轮廓颜色归一化透明 hex 与 RGB，拒绝越界通道和无效 CSS', () => {
+    for (const [value, expected] of [
+      [' #FF102080 ', '#ff102080'], ['rgb(255, 16, 32)', '#ff1020'],
+      ['rgba(255, 16, 32, 1)', '#ff1020'], ['rgba(255, 16, 32, 0)', '#ff102000'],
+      ['rgba(256, 0, 0, .5)', '#000000'], ['rgba(-1, 0, 0, .5)', '#000000'],
+      ['rgba(0, 0, 0, 1.5)', '#000000'], ['url(https://example.test)', '#000000'],
+    ]) expect(normalizeVideoSubtitleAppearance({outlineColor: value}).outlineColor).toBe(expected);
+    const shadow = getVideoSubtitleAppearanceCssVars({skin: 'clean', outlineStyle: 'shadow'});
+    expect(shadow['--fluent-read-video-subtitle-text-shadow'].split(', ')).toHaveLength(8);
   });
 
   it('双语顺序默认原文在上，合法值经配置保存保留，旧值和非法值回退且不改其他外观', () => {
@@ -154,6 +169,33 @@ describe('video subtitle appearance contract', () => {
       '--fluent-read-video-subtitle-max-width': '75%',
       '--fluent-read-video-subtitle-font-scale': '140%',
     });
+  });
+
+  it('保留旧皮肤轮廓，并归一化自定义轮廓、透明度与背景开关', () => {
+    expect(normalizeVideoSubtitleAppearance({skin: 'glass'})).toMatchObject({
+      outlineStyle: 'skin', outlineColor: '#00000066', outlineWidth: 1, backgroundVisible: true,
+    });
+    const stroke = normalizeVideoSubtitleAppearance({outlineStyle: 'stroke', outlineColor: 'rgba(255, 16, 32, .5)', outlineWidth: 2.34});
+    expect(stroke).toMatchObject({outlineStyle: 'stroke', outlineColor: '#ff102080', outlineWidth: 2.3});
+    expect(getVideoSubtitleAppearanceCssVars(stroke)).toMatchObject({
+      '--fluent-read-video-subtitle-text-stroke': '2.3px #ff102080',
+    });
+    const shadow = getVideoSubtitleAppearanceCssVars({outlineStyle: 'shadow', outlineColor: '#12ab34', outlineWidth: 2});
+    expect(shadow['--fluent-read-video-subtitle-text-stroke']).toBe('0');
+    expect(shadow['--fluent-read-video-subtitle-text-shadow']).toContain('2px 0px 0 #12ab34');
+    const none = getVideoSubtitleAppearanceCssVars({outlineStyle: 'none'});
+    expect(none['--fluent-read-video-subtitle-text-stroke']).toBe('0');
+    expect(none['--fluent-read-video-subtitle-text-shadow']).toBe('none');
+    const noBackground = getVideoSubtitleAppearanceCssVars({backgroundVisible: false, backgroundOpacity: 72});
+    expect(noBackground).toMatchObject({
+      '--fluent-read-video-subtitle-background': 'transparent',
+      '--fluent-read-video-subtitle-border': 'transparent',
+      '--fluent-read-video-subtitle-shadow': 'none',
+      '--fluent-read-video-subtitle-backdrop-filter': 'none',
+    });
+    expect(normalizeVideoSubtitleAppearance({backgroundVisible: 'false'}).backgroundVisible).toBe(true);
+    expect(normalizeVideoSubtitleAppearance({outlineStyle: 'invalid', outlineWidth: 99, outlineColor: 'url(javascript:alert(1))'}))
+      .toMatchObject({outlineStyle: 'skin', outlineWidth: 4, outlineColor: '#000000'});
   });
 
   it('keeps video source language separate from the webpage language during normalization', () => {

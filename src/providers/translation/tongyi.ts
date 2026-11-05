@@ -42,6 +42,7 @@ async function tongyi(message: TranslationProviderRequest<string>) {
     const body = tongyiMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

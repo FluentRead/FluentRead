@@ -366,6 +366,7 @@ export async function translateText(origin: string, context: string = document.t
             context,
             pageContext,
             ...(options.discourseContext ? {discourseContext: options.discourseContext.slice(0, 2400)} : {}),
+            ...(options.subtitleContext ? {subtitleContext: options.subtitleContext.slice(0, 1200)} : {}),
             ...(options.enableAIContext !== undefined ? {enableAIContext: options.enableAIContext} : {}),
             origin,
             enableNativeBatch,
@@ -488,6 +489,7 @@ export async function translateTextBatch(
             context,
             pageContext,
             ...(options.discourseContext ? {discourseContext: options.discourseContext.slice(0, 2400)} : {}),
+            ...(options.subtitleContext ? {subtitleContext: options.subtitleContext.slice(0, 1200)} : {}),
             ...(options.enableAIContext !== undefined ? {enableAIContext: options.enableAIContext} : {}),
             origin: pendingOrigins,
             ...(import.meta.env.BROWSER !== 'userscript' && options.documentBatch === true ? {documentBatch: true} : {}),
@@ -638,6 +640,8 @@ export interface TranslateOptions {
   pageContext?: string;
   /** 当前单篇材料的有界证据，仅在允许 AI 上下文时交给现有 provider。 */
   discourseContext?: string;
+  /** SRT/VTT/ASS 相邻 cue 原文；只用于文档字幕翻译，不改变输出时间轴。 */
+  subtitleContext?: string;
   /** 当前请求是否允许 AI 网页上下文；全文翻译用它固定会话启动时策略。 */
   enableAIContext?: boolean;
   /** 本次请求冻结的原生合批设置；全文会话不重新读取后续配置变更。 */

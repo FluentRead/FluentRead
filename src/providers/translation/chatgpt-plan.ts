@@ -39,6 +39,7 @@ export function buildChatGPTPlanPayload(request: ChatGPTPlanRequest, origin: str
     const payload = JSON.parse(commonMsgTemplate({
         origin,
         context: request.pageContext,
+        subtitleContext: request.subtitleContext,
         prompt: request.summaryPrompt,
         systemPrompt: request.summarySystemPrompt,
         serviceOverride: services.chatgptPlan,

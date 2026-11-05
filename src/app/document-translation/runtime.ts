@@ -31,6 +31,7 @@ export const translateDocumentSegments = createDocumentSegmentTranslator({
     waitUntilReady: () => configReady,
     getDefaultService: () => config.service,
     getDefaultModel: (service) => resolveConfiguredModel(config.model?.[service], config.customModel?.[service]),
+    supportsSubtitleContext: (service) => servicesType.isAI(service),
     getRequestTimeout: (service, batch) => getTranslationTimeout(service, undefined, batch),
     supportsBatch: (service) => service === services.freeTranslation || supportsNativeTranslationBatch(service),
     supportsAIMultiSegment: (service, model) => servicesType.isUseAIContext(service, model),

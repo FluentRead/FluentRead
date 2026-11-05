@@ -238,6 +238,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         pageContext: string,
         mode: CacheRequestMode,
         modelOverride?: string,
+        subtitleContext?: string,
     ): string {
         // AI 多段结果会受同批邻段影响，不能只按当前 origin 复用到另一种组合。
         // 把槽位序号和当前项放在首位，再携带完整有序批次的摘要；同批重复原文也不会被错误折叠。
@@ -251,6 +252,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             pageContext,
             mode,
             modelOverride,
+            undefined,
+            subtitleContext,
         );
     }
 
@@ -773,7 +776,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     ): Promise<string> {
         const result = requireSingleResult(await callProviderWithinDeadline(
             execution,
-            applyRemainingDeadline({...message, context: '', pageContext: ''}, requestDeadline),
+            applyRemainingDeadline({...message, context: '', pageContext: '', subtitleContext: undefined}, requestDeadline),
         ));
         if (isDefiniteRecoveryPageContextLeak(
             execution,
@@ -848,6 +851,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     origin: packet.payload,
                     context: nextContext,
                     pageContext: nextPageContext,
+                    subtitleContext: nextPageContext ? message.subtitleContext : undefined,
                 }, requestDeadline),
             ))
         );
@@ -1247,6 +1251,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 : message.validateTranslationSlots === true ? 'slot-protocol' : 'single',
             message.modelOverride,
             message.sourceLanguageDetectionText,
+            message.subtitleContext,
         );
         const imageInput = getTranslationImageInput(message);
         const imageSuffix = imageInput ? `:image:${sha256Hex(imageInput)}` : '';
@@ -1353,6 +1358,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             pageContext,
             cacheMode,
             message.modelOverride,
+            undefined,
+            message.subtitleContext,
         );
         // 完整批次身份只计算一次；AI 分项用定长摘要保留邻段和槽位语义，避免逐项携带整个批次。
         const batchFingerprint = cacheMode === 'ai-multi-segment' ? sha256Hex(batchKey) : '';
@@ -1375,6 +1382,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const request = useCache ? (async () => {
             const itemKeys = message.origin.map((origin, index) => buildBatchItemCacheKey(
                 execution, origin, index, batchFingerprint, context, pageContext, cacheMode, message.modelOverride,
+                message.subtitleContext,
             ));
             const reads = new Map<string, Promise<string | null>>();
             // 步骤 1：分项读取缓存，只把缺失且去重后的原文交给 provider。
@@ -1571,6 +1579,10 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         // 此标志可经公开 runtime 协议进入后台；即使调用方绕过 parser，缓存边界也必须拒绝不兼容形态。
         if (message.validateInlineCodeTranslation !== undefined && typeof message.validateInlineCodeTranslation !== 'boolean') {
             throw new TypeError('翻译请求字段 validateInlineCodeTranslation 必须是布尔值');
+        }
+        if (message.subtitleContext !== undefined
+            && (typeof message.subtitleContext !== 'string' || message.subtitleContext.length > 1_200)) {
+            throw new TypeError('翻译请求字段 subtitleContext 必须是不超过 1200 字符的字符串');
         }
         if (message.validateInlineCodeTranslation === true && (
             typeof message.origin !== 'string' || !isValidInlineCodeSource(message.origin) ||
@@ -1791,8 +1803,15 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         // 篇章证据不进入摘要缓存：每段只复用原有页面摘要，且总参考预算保持 4,000。
         const discourse = !imageInput && isAIContextEnabled(execution, message.modelOverride)
             && typeof message.discourseContext === 'string' ? message.discourseContext.slice(0, 2400) : '';
-        const pageContext = discourse
-            ? `${summarizedPageContext.slice(0, Math.max(0, 4000 - discourse.length - 48))}\n<discourse_evidence>\n${discourse}\n</discourse_evidence>`.slice(0, 4000)
+        const subtitleContext = !imageInput && glossaryContext === 'document' && typeof message.subtitleContext === 'string'
+            ? message.subtitleContext.slice(0, 1200) : '';
+        const references = [
+            discourse ? `<discourse_evidence>\n${discourse}\n</discourse_evidence>` : '',
+            subtitleContext ? `<subtitle_context>\n${subtitleContext}\n</subtitle_context>` : '',
+        ].filter(Boolean).join('\n');
+        const pageContext = references
+            ? [summarizedPageContext.slice(0, Math.max(0, 4000 - references.length - 1)), references]
+                .filter(Boolean).join('\n').slice(0, 4000)
             : summarizedPageContext;
         const remainingProviderBudget = getRemainingDeadlineMs(providerDeadline);
 

@@ -42,6 +42,7 @@ async function claude(message: TranslationProviderRequest<string>) {
     const body = claudeMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

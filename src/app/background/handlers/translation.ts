@@ -47,6 +47,7 @@ const STRING_FIELDS = [
     'context',
     'pageContext',
     'discourseContext',
+    'subtitleContext',
     'serviceOverride',
     'modelOverride',
     'sourceLanguage',
@@ -166,6 +167,10 @@ export function parseTranslationRequest(candidate: TranslationRequestCandidate):
     }
     if (candidate.enableAIContext !== undefined && typeof candidate.enableAIContext !== 'boolean') {
         throw new TypeError('翻译请求字段 enableAIContext 必须是布尔值');
+    }
+    if (candidate.subtitleContext !== undefined
+        && (typeof candidate.subtitleContext !== 'string' || candidate.subtitleContext.length > 1_200)) {
+        throw new TypeError('翻译请求字段 subtitleContext 必须是不超过 1200 字符的字符串');
     }
     if (candidate.aiMultiSegment !== undefined && typeof candidate.aiMultiSegment !== 'boolean') {
         throw new TypeError('翻译请求字段 aiMultiSegment 必须是布尔值');

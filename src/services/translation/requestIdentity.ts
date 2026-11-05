@@ -111,6 +111,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         mode: CacheRequestMode,
         modelOverride?: string,
         sourceLanguageDetectionText?: string,
+        subtitleContext?: string,
     ): string {
         const {config: current, service, sourceLanguage, targetLanguage} = execution;
         // 公开入口已冻结本次匹配范围；普通键复用保护条目，避免两次扫描同一术语库。
@@ -131,6 +132,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
             ...(execution.acceptUnchangedResult ? {unchangedResultPolicy: 1} : {}),
             ...(supportsNativeTranslationBatch(service) ? {enableNativeBatch: execution.nativeBatchEnabled} : {}),
             model: getSelectedModel(current, service, modelOverride),
+            ...(subtitleContext ? {subtitleContext: subtitleContext.slice(0, 1200)} : {}),
             endpoint: getProviderEndpoint(current, service),
             azureOpenaiEndpoint: service === 'azureOpenai' ? current.azureOpenaiEndpoint : undefined,
             ...(service === 'freeTranslation' ? {freeTranslationPolicy: {

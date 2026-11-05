@@ -49,6 +49,7 @@ async function gemini(message: TranslationProviderRequest<string>) {
     const body = geminiMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

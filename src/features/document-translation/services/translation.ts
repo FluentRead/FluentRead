@@ -81,6 +81,8 @@ export interface DocumentTranslationRequestOptions {
     maxRetries?: number;
     /** 当前批次绝对预算的剩余时间，交给客户端限制后台传输。 */
     timeout?: number;
+    /** SRT/VTT/ASS 相邻字幕，用来理解跨 cue 的完整句意；不改变请求内各片段边界。 */
+    subtitleContext?: string;
     /** 显式使用翻译客户端已有的 AI 多段槽协议；只有具备该能力的服务批次携带此标记。 */
     aiMultiSegment?: boolean;
     /** 当前文档开启多段时才发送；后台校验入口，免费池按真实线路能力消费槽位。 */
@@ -96,6 +98,8 @@ export interface DocumentTranslationGateway {
     waitUntilReady(): PromiseLike<unknown> | unknown;
     getDefaultService(): string;
     getDefaultModel?(service: string): string;
+    /** 仅提示词型 AI 能使用本地字幕上下文。 */
+    supportsSubtitleContext?(service: string, model?: string): boolean;
     /** 与客户端一致的单次预算；任务开始时冻结，文档总预算不得截短明确的服务设置。 */
     getRequestTimeout?(service: string, batch: boolean): number;
     supportsBatch(service: string): boolean;
@@ -336,6 +340,44 @@ function boundedLimit(value: number | undefined, fallback: number): number {
     return Number.isFinite(value) && value! >= 1 ? Math.min(fallback, Math.floor(value!)) : fallback;
 }
 
+const DOCUMENT_SUBTITLE_CONTEXT_LIMIT = 1_200;
+
+/** 给定请求批次，取字幕 cue 及其前后邻句；本批正文仍通过原有槽位单独返回译文。 */
+function buildSubtitleContext(
+    segments: readonly DocumentSegment[],
+    batch: readonly DocumentSegment[],
+    positions: ReadonlyMap<number, number>,
+): string | undefined {
+    if (!batch.length || batch.some(segment => !segment.timeStart || !segment.timeEnd)) return undefined;
+    const indexes = batch.map(segment => positions.get(segment.id)).filter((index): index is number => index !== undefined);
+    if (indexes.length !== batch.length) return undefined;
+    const first = Math.min(...indexes);
+    const last = Math.max(...indexes);
+    const selected: Array<{index: number; text: string}> = [];
+    const seen = new Set<number>();
+    let length = 0;
+
+    for (let distance = 0; distance <= 6; distance += 1) {
+        for (const index of distance === 0 ? [first, last] : [first - distance, last + distance]) {
+            if (seen.has(index)) continue;
+            seen.add(index);
+            const segment = segments[index];
+            if (!segment?.timeStart || !segment.timeEnd || !segment.source.trim()) continue;
+            const prefix = `[${segment.timeStart} --> ${segment.timeEnd}]\n`;
+            const available = DOCUMENT_SUBTITLE_CONTEXT_LIMIT - length - prefix.length - 2;
+            if (available <= 0) continue;
+            const source = segment.source.trim();
+            const text = `${prefix}${source.length <= available ? source : source.slice(0, available)}`;
+            selected.push({index, text});
+            length += text.length + 2;
+        }
+    }
+
+    if (!selected.length) return undefined;
+    selected.sort((left, right) => left.index - right.index);
+    return selected.map(item => item.text).join('\n\n');
+}
+
 function buildDocumentContext(segments: readonly DocumentSegment[], fileName: string, supplied?: string): string {
     if (supplied?.trim()) return supplied.trim().slice(0, 4_000);
     const preview = segments
@@ -382,6 +424,7 @@ export function createDocumentSegmentTranslator(
         segments.forEach(({id}) => { translations[id] = options.initialTranslations?.[id] || ''; });
         const pending = segments.filter(({id}) => !translations[id].trim());
         const context = options.fileName || 'FluentRead 文档';
+        const segmentPositions = new Map(segments.map((segment, index) => [segment.id, index]));
         const pageContext = buildDocumentContext(segments, context, options.pageContext);
         // 步骤 1：一次文档任务固定语言对，不能被设置页同步更新或用户中途改选污染后续批次。
         const sourceLanguage = options.sourceLanguage;
@@ -389,12 +432,18 @@ export function createDocumentSegmentTranslator(
         const cacheOptions = options.useCache === undefined ? {} : {useCache: options.useCache};
         const service = options.serviceOverride || gateway.getDefaultService();
         const model = options.modelOverride || gateway.getDefaultModel?.(service);
+        const hasSubtitleContext = Boolean(gateway.supportsSubtitleContext?.(service, model));
+        const subtitleContextFor = hasSubtitleContext
+            ? (batch: readonly DocumentSegment[]) => buildSubtitleContext(segments, batch, segmentPositions)
+            : () => undefined;
         const singleRequestTimeout = gateway.getRequestTimeout?.(service, false);
         const batchRequestTimeout = gateway.getRequestTimeout?.(service, true);
         const enableAIContext = options.enableAIContext === true;
         const blocks = Object.freeze(documentDiscourseBlocks(segments).map(block => Object.freeze(block)));
         const blockSections = new Map(blocks.map(block => [Number(block.id), block.section]));
-        const reuseKeys = new Map(segments.map(segment => [segment.id, JSON.stringify([blockSections.get(segment.id), segment.source])]));
+        const reuseKeys = new Map(segments.map(segment => [segment.id, JSON.stringify([
+            blockSections.get(segment.id), segment.source, hasSubtitleContext ? segment.id : '',
+        ])]));
         const reuseKey = ({id}: DocumentSegment) => reuseKeys.get(id)!;
         const segmentById = new Map(segments.map(segment => [segment.id, segment]));
         const discourse = enableAIContext ? createDiscourseContext() : undefined;
@@ -526,9 +575,11 @@ export function createDocumentSegmentTranslator(
                 if (failure) throw failure;
             };
             const translateSegment = (segment: DocumentSegment, deadlineAt = retryDeadline(options, singleRequestTimeout)) => withRetryBackoff(async attempt => {
+                const subtitleContext = subtitleContextFor([segment]);
                 const received = await gateway.translateText(segment.source, context, {
                     ...glossaryOptions, ...cacheOptions, ...discourseOptions(segment, [segment.source]),
                     enableNativeBatch: false, ...attempt, pageContext,
+                    ...(subtitleContext ? {subtitleContext} : {}),
                     serviceOverride: service, modelOverride: model, sourceLanguage, targetLanguage, maxRetries,
                 });
                 if (typeof received !== 'string' || !received.trim()) throw new Error('翻译服务返回空译文，请重试');
@@ -551,10 +602,12 @@ export function createDocumentSegmentTranslator(
                     const deadlineAt = retryDeadline(options, requestTimeout);
                     try {
                         const result = await withRetryBackoff(async attempt => {
+                        const subtitleContext = subtitleContextFor(batch);
                         const requestOptions: DocumentTranslationRequestOptions = {
                             ...glossaryOptions,
                             ...cacheOptions,
                             ...discourseOptions(batch[0], batch.map(segment => segment.source)),
+                            ...(subtitleContext ? {subtitleContext} : {}),
                             enableNativeBatch: !single,
                             ...attempt,
                             pageContext,

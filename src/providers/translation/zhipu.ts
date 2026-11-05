@@ -60,6 +60,7 @@ async function zhipu(message: TranslationProviderRequest<string>) {
     const body = commonMsgTemplate({
         origin: message.origin,
         context: message.pageContext,
+        subtitleContext: message.subtitleContext,
         prompt: message.summaryPrompt,
         systemPrompt: message.summarySystemPrompt,
         serviceOverride: service,

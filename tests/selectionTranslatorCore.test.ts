@@ -4,6 +4,7 @@ import {
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
+    getSelectionPopupAnchor,
     getSelectionPresentationDelayRemaining,
     getEditableSelectionRoot,
     isSameLanguage,
@@ -621,6 +622,16 @@ describe('selection translator core geometry', () => {
         expect(chooseSelectionRect([])).toBeNull();
     });
 
+    it('keeps every selected line clear while aligning to the directional endpoint', () => {
+        expect(getSelectionPopupAnchor([])).toBeNull();
+        expect(getSelectionPopupAnchor([rects[0]])).toEqual(rects[0]);
+        expect(getSelectionPopupAnchor(rects)).toEqual({...rects[1], top: 100, height: 48});
+        expect(getSelectionPopupAnchor(rects, false)).toEqual({...rects[0], bottom: 148, height: 48});
+        const anchor = getSelectionPopupAnchor(rects)!;
+        const card = calculateSelectionPopupPosition(anchor, {width: 360, height: 80}, {width: 1000, height: 500});
+        expect(card.top + 80 <= anchor.top - 10 || card.top >= anchor.bottom + 10).toBe(true);
+    });
+
     it('keeps the popup above the selection when there is room', () => {
         expect(calculateSelectionPopupPosition({ ...rects[0], top: 300, bottom: 324 }, { width: 360, height: 160 }, { width: 1200, height: 800 })).toEqual({
             left: 80,
@@ -641,6 +652,39 @@ describe('selection translator core geometry', () => {
         expect(calculateSelectionPopupPosition({top: 120, bottom: 144, left: 20, right: 100, width: 80, height: 24},
             {width: 280, height: 160}, {left: 80, top: 100, width: 320, height: 300}))
             .toEqual({left: 92, top: 154, placement: 'bottom'});
+    });
+
+    it.each([
+        {top: 100, bottom: 125, expected: {top: 135, placement: 'bottom', maxHeight: 123}},
+        {top: 160, bottom: 185, expected: {top: 12, placement: 'top', maxHeight: 138}},
+        {top: 123, bottom: 147, expected: {top: 12, placement: 'top', maxHeight: 101}},
+    ])('bounds a tall card beside the selected line: $top–$bottom', ({top, bottom, expected}) => {
+        expect(calculateSelectionPopupPosition({top, bottom, left: 80, right: 180, width: 100, height: bottom - top},
+            {width: 360, height: 520}, {width: 1000, height: 270})).toEqual({left: 80, ...expected});
+    });
+
+    it.each([
+        {top: 500, bottom: 524, placement: 'top'},
+        {top: -100, bottom: -76, placement: 'bottom'},
+    ] as const)('bounds a saved anchor outside the visible viewport: $placement', ({top, bottom, placement}) => {
+        expect(calculateSelectionPopupPosition({top, bottom, left: 80, right: 180, width: 100, height: 24},
+            {width: 360, height: 520}, {width: 1000, height: 300}))
+            .toEqual({left: 80, top: 12, placement, maxHeight: 276});
+    });
+
+    it('keeps visible lines clear across card heights and viewport sizes', () => {
+        for (const viewportHeight of [170, 270, 500, 900]) {
+            for (let top = 12; top <= viewportHeight - 36; top += 17) {
+                const anchor = {top, bottom: top + 24, left: 80, right: 180, width: 100, height: 24};
+                for (const height of [80, 240, 520]) {
+                    const result = calculateSelectionPopupPosition(anchor, {width: 360, height}, {width: 1000, height: viewportHeight});
+                    const displayedHeight = result.maxHeight ?? height;
+                    expect(result.top).toBeGreaterThanOrEqual(12);
+                    expect(result.top + displayedHeight).toBeLessThanOrEqual(viewportHeight - 12);
+                    expect(result.top + displayedHeight <= anchor.top - 10 || result.top >= anchor.bottom + 10).toBe(true);
+                }
+            }
+        }
     });
 
 

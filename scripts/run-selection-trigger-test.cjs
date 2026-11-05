@@ -5,6 +5,7 @@
 // --lifecycle-only 检查宿主节点恢复、启停、路由、失败重试与键盘/窄屏界面，要求 --runtime-diagnostics。
 // --document-shell-only 只验证 DeepSeek 类文档根禁译外壳下的划词入口与局部保护。
 // --click-selection-only 只验证按需两点选取；通过 --runtime-diagnostics 传入 CDP 诊断收集器。
+// --geometry-only / --zoom-only 检查自动避让及手动几何，要求 --runtime-diagnostics。
 // --click-selection-stress-only 只诊断滚动后立即确认终点的重复手势与事件时序。
 // Popup 快捷抽屉提供独立启用开关与双语/仅译文选择；触发方式、显示延迟和自定义快捷键在完整设置页修改，
 // 两个真实扩展页面同时打开，断言设置页写入、Popup 模式同步与网页中的真实划词手势结果一致。
@@ -54,7 +55,7 @@ function parseArgs(argv) {
     clickSelectionStressOnly: argv.includes('--click-selection-stress-only'),
     runtimeDiagnostics: readArg(argv, 'runtime-diagnostics', ''),
   };
-  if ((args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly)
+  if ((args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly || args.geometryOnly || args.zoomOnly)
     && (!args.runtimeDiagnostics || !fs.existsSync(args.runtimeDiagnostics))) {
     throw new Error('划词专项需要 --runtime-diagnostics <runtime-diagnostics.cjs> 以采集扩展隔离世界及后台诊断');
   }
@@ -849,7 +850,8 @@ async function waitForSelectionUi(page, expected, description) {
     state = await readSelectionUi(page);
     const matches = Object.entries(expected).every(([key, value]) => key === 'resultPrefix'
       ? state.resultText.startsWith(String(value))
-      : key === 'resultSuffix' ? state.resultText.endsWith(String(value)) : state[key] === value);
+      : key === 'resultSuffix' ? state.resultText.endsWith(String(value))
+      : key === 'tooltipIncludes' ? state.tooltipText.includes(String(value)) : state[key] === value);
     if (matches) return;
     await page.waitForTimeout(50);
   }
@@ -2080,7 +2082,7 @@ async function main() {
     });
     const directionSuffix = args.directionOnly ? ` [to=${fixtureRequestUrl.searchParams.get('to') || ''}]` : '';
     // 成功夹具必须包含目标语言正文；仅加中文前缀的英文回显会被真实的错语种校验拒绝。
-    const translatedFixture = text => args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly
+    const translatedFixture = text => args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly || args.geometryOnly || args.zoomOnly
       ? `测试译文：这是用于验证划词翻译和界面交互的中文内容，保留选区标识以核对请求归属。原文标识：「${text}」`
       : `测试译文：${text}${directionSuffix}`;
     response.end(JSON.stringify((args.inlineCodeOnly || args.contextMenuOnly || args.editableSelectionOnly ? sources : [source])
@@ -2116,7 +2118,7 @@ async function main() {
       context = browserSession.context;
       createIsolatedPage = () => focusSafe.newPageWithoutForeground(context);
       activateInputPage = page => focusSafe.activateExtensionTabWithoutForeground(context, page);
-      if (args.contextMenuOnly || args.editableSelectionOnly || args.lifecycleOnly || args.clickSelectionOnly || args.documentShellOnly) {
+      if (args.contextMenuOnly || args.editableSelectionOnly || args.lifecycleOnly || args.clickSelectionOnly || args.documentShellOnly || args.geometryOnly || args.zoomOnly) {
         const browserPid = await getGuardedBrowserPid(browserSession);
         result.ownedBrowserPid = browserPid;
         assertBackgroundFocus = async label => {
@@ -2143,7 +2145,7 @@ async function main() {
       result.focusPolicy = 'foreground-authorized';
       result.windowPlacement = { mode: 'headed-explicit-foreground', windowState: 'normal', viewport: { width: 1280, height: 900 } };
     }
-    if (args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly) {
+    if (args.clickSelectionOnly || args.documentShellOnly || args.lifecycleOnly || args.contextMenuOnly || args.editableSelectionOnly || args.geometryOnly || args.zoomOnly) {
       runtimeDiagnostics = require(path.resolve(args.runtimeDiagnostics)).createRuntimeDiagnostics();
       await runtimeDiagnostics.start(context);
     }
@@ -2157,11 +2159,17 @@ async function main() {
       });
     };
     attachWorkerDiagnostics(worker);
-    const installTranslationFixture = (target) => target.evaluate(({fixtureUrl, directionOnly}) => {
+    const installTranslationFixture = (target) => target.evaluate(({fixtureUrl, directionOnly, geometryOnly}) => {
       if (globalThis.__fluentReadSelectionFixtureFetchInstalled) return;
       const nativeFetch = globalThis.fetch.bind(globalThis);
       globalThis.fetch = (input, init) => {
         const requestUrl = typeof input === 'string' || input instanceof URL ? String(input) : input.url;
+        if (geometryOnly && requestUrl.startsWith('https://api.dictionaryapi.dev/api/v2/entries/en/')) {
+          const word = decodeURIComponent(requestUrl.split('/').at(-1));
+          return new Promise(resolve => setTimeout(() => resolve(new Response(JSON.stringify([{word, phonetics: [],
+            meanings: [{partOfSpeech: 'noun', definitions: [{definition: 'A controlled dictionary definition for card layout verification. '.repeat(20)}]}]}]),
+          {headers: {'content-type': 'application/json; charset=utf-8'}})), 900));
+        }
         return requestUrl.startsWith('https://edge.microsoft.com/translate/translatetext')
           ? nativeFetch(directionOnly
             ? `${fixtureUrl}?to=${encodeURIComponent(new URL(requestUrl).searchParams.get('to') || '')}`
@@ -2169,7 +2177,7 @@ async function main() {
           : nativeFetch(input, init);
       };
       globalThis.__fluentReadSelectionFixtureFetchInstalled = true;
-    }, {fixtureUrl: translationFixtureUrl, directionOnly: args.directionOnly});
+    }, {fixtureUrl: translationFixtureUrl, directionOnly: args.directionOnly, geometryOnly: args.geometryOnly});
     await installTranslationFixture(worker);
     context.on('serviceworker', (target) => {
       attachWorkerDiagnostics(target);
@@ -3166,7 +3174,7 @@ async function main() {
           const element = this.querySelector(selector), r = element.getBoundingClientRect();
           const x = r.left + 7 * (r.width / element.offsetWidth), y = r.top + r.height / 2;
           const hit = this.getRootNode().elementFromPoint(x, y);
-          if (!hit || !hit.closest('.fr-study-navigation') || hit.closest('button,a,input,textarea,select,[contenteditable]')) throw new Error('Navigation drag point is interactive or obscured');
+          if (!hit || !hit.closest('.fr-study-navigation') || hit.closest('button,a,input,textarea,select,[contenteditable]')) throw new Error('Navigation drag point is interactive or obscured: '+JSON.stringify({x,y,hit:hit?.className,visibility:getComputedStyle(this).visibility}));
           return {x,y};
         }`) : {x: r.x + r.width / 2, y: r.y + r.height / 2};
         const {x, y} = point;
@@ -3178,7 +3186,8 @@ async function main() {
         return box();
       };
       const near = (a, b) => Math.abs(a - b) < 2;
-      const open = async (text = TARGET_TEXT.repeat(6)) => {
+      // 拖动后的双轴缩放夹具保留真实的下方空间；超长内容的限高和滚动由上面的单词卡专项覆盖。
+      const open = async (text = TARGET_TEXT.repeat(3)) => {
         await activateInputPage(page);
         await page.keyboard.press('Escape');
         await resetFixture(page);
@@ -3186,6 +3195,16 @@ async function main() {
         await page.locator('#target').click();
         await selectTextWithDomRange(page, '#target', 4096);
         await waitForSelectionUi(page, {tooltip: true}, '打开几何测试卡片');
+        // DOM 已插入时首次锚定仍可能处于 visibility:hidden；真实指针只操作已显示且完成首帧布局的卡片。
+        let previous, stable = 0;
+        const deadline = Date.now() + 3000;
+        while (Date.now() < deadline) {
+          const current = await inspect('', `function(){const r=this.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,visible:getComputedStyle(this).visibility!=='hidden'};}`);
+          stable = current.visible && previous && ['x','y','width','height'].every(key => near(current[key],previous[key])) ? stable + 1 : 0;
+          if (stable >= 2) return;
+          previous = current; await page.waitForTimeout(40);
+        }
+        throw new Error('几何测试卡片未完成首次可见布局');
       };
       const ready = async () => {
         await waitForSelectionUi(page, {resultPrefix: '测试译文：'}, '等待夹具译文');
@@ -3197,6 +3216,63 @@ async function main() {
         assert(r.x >= 10 && r.y >= 10 && r.right <= viewport.width - 10 && r.bottom <= viewport.height - 10, `窗口超出视口 ${JSON.stringify({r,viewport})}`);
         return r;
       };
+      if (args.geometryOnly) {
+        await assertBackgroundFocus('automatic card geometry');
+        await patchStoredConfig(popup, {selectionDictionarySource: 'free-dictionary'});
+        await page.setViewportSize({width: 800, height: 270});
+        await activateInputPage(page);
+        await resetFixture(page);
+        await page.locator('#target').evaluate(el => {
+          el.textContent = 'geometry';
+          el.style.cssText = 'position:absolute;left:80px;top:100px;margin:0;font:16px/24px Arial';
+        });
+        translationResponseDelayMs = 1100;
+        const requestsBefore = translationRequestCount;
+        await page.locator('#target').click({clickCount: 2});
+        await waitForSelectionUi(page, {tooltip: true}, '双击单词显示自动卡片');
+        const anchor = await page.evaluate(() => {
+          const range = getSelection().getRangeAt(0), r = range.getBoundingClientRect();
+          return {top: r.top, bottom: r.bottom};
+        });
+        const clear = async label => {
+          const card = await box();
+          assert(card.bottom <= anchor.top - 8 || card.y >= anchor.bottom + 8,
+            `${label} 遮挡选中行：${JSON.stringify({anchor, card})}`);
+          assert(card.y >= 11 && card.bottom <= 259, `${label} 超出视口：${JSON.stringify(card)}`);
+          return card;
+        };
+        const loading = await clear('加载中');
+        await waitForSelectionUi(page, {tooltipIncludes: '原文标识：「geometry」'}, '单词译文到达');
+        await waitForSelectionUi(page, {tooltipIncludes: 'Free Dictionary API'}, '受控词典到达');
+        await page.waitForTimeout(300);
+        const completed = await clear('译文和词典到达后');
+        const samples = [];
+        for (let index = 0; index < 8; index++) {samples.push(await clear('限高稳定性')); await page.waitForTimeout(50);}
+        assert(samples.every(sample => near(sample.y, completed.y) && near(sample.height, completed.height)), '自动限高出现尺寸循环');
+        const scrolling = await inspect('', `function() {
+          const close = this.querySelector('.fr-close-btn').getBoundingClientRect();
+          this.scrollTop = this.scrollHeight;
+          const scrollTop = this.scrollTop; this.scrollTop = 0;
+          return {overflow:getComputedStyle(this).overflowY, scrollTop, close:{top:close.top,bottom:close.bottom}};
+        }`);
+        result.automaticGeometry = {anchor,loading,completed,samples,scrolling};
+        assert(scrolling.overflow === 'auto' && scrolling.scrollTop > 0, '限高卡片没有保留整卡滚动');
+        assert(scrolling.close.top >= completed.y && scrolling.close.bottom <= completed.bottom, '限高卡片关闭按钮被裁掉');
+        const sourceRequests = result.fixtureRequests.filter(({body}) => Array.isArray(body) && body[0] === 'geometry');
+        assert(sourceRequests.length === 1, '卡片重定位重复请求原选词翻译');
+        result.automaticGeometryRequests = {source:sourceRequests.length,total:translationRequestCount-requestsBefore,
+          note:'Dictionary definitions may request their own Chinese assistance translation.'};
+        result.cases.push({id:'geometry.automatic-double-click-and-async-content',status:'passed',anchor,loading,completed,samples,scrolling});
+        await page.screenshot({path:path.join(args.artifactsDir,'selection-automatic-constrained.png')});
+        await page.setViewportSize({width:800,height:800}); await page.waitForTimeout(350);
+        const expanded = await box();
+        assert(expanded.y >= anchor.bottom + 8 && expanded.height > completed.height + 20, '视口变大后没有释放自动限高');
+        result.cases.push({id:'geometry.automatic-viewport-expansion',status:'passed',expanded});
+        await page.screenshot({path:path.join(args.artifactsDir,'selection-automatic-expanded.png')});
+        translationResponseDelayMs = 0;
+        await page.keyboard.press('Escape');
+        await page.setViewportSize({width:1280,height:900});
+      }
       if (args.zoomOnly) {
         await open(TARGET_TEXT);
         await ready();
@@ -3205,15 +3281,35 @@ async function main() {
           return tabs.find(tab => tab.active)?.id ?? tabs[0]?.id;
         });
         assert(Number.isInteger(tabId), '找不到隔离测试页的 tabId');
+        // 原生 tabs.setZoom 后 Playwright 默认裁图沿用未换算的 CSS 尺寸；CDP Viewport 使用 DIP。
+        const zoomScreenshot = async (name, zoom) => {
+          const viewport = await page.evaluate(() => ({width:innerWidth,height:innerHeight,dpr:devicePixelRatio}));
+          const session = await context.newCDPSession(page);
+          try {
+            const captured = await session.send('Page.captureScreenshot', {format:'png',fromSurface:true,captureBeyondViewport:false,
+              clip:{x:0,y:0,width:viewport.width*zoom,height:viewport.height*zoom,scale:1}});
+            const bytes = Buffer.from(captured.data,'base64');
+            const dimensions = {width:bytes.readUInt32BE(16),height:bytes.readUInt32BE(20)};
+            (result.zoomScreenshots ||= []).push({name,zoom,viewport,dimensions});
+            fs.writeFileSync(path.join(args.artifactsDir,name),bytes);
+            assert(dimensions.width === Math.round(viewport.width*viewport.dpr)
+              && dimensions.height === Math.round(viewport.height*viewport.dpr), '原生缩放截图未覆盖完整可见视口');
+          } finally {await session.detach();}
+        };
         const samples = [];
         for (const factor of [1, 2, 0.5, 1]) {
           await popup.evaluate(({tabId, factor}) => chrome.tabs.setZoom(tabId, factor), {tabId, factor});
           await page.waitForTimeout(450);
           const zoom = await popup.evaluate(tabId => chrome.tabs.getZoom(tabId), tabId);
           const card = await box();
+          const selectedBounds = await page.evaluate(() => {
+            const r = getSelection().getRangeAt(0).getBoundingClientRect(); return {top:r.top,bottom:r.bottom};
+          });
+          assert(card.bottom <= selectedBounds.top - 8 || card.y >= selectedBounds.bottom + 8,
+            `缩放后卡片遮挡重新换行的选区：${JSON.stringify({zoom,card,selectedBounds})}`);
           const viewport = await page.evaluate(() => ({width: innerWidth, height: innerHeight, dpr: devicePixelRatio}));
-          samples.push({zoom, card, viewport, screenWidth: card.width * zoom, screenHeight: card.height * zoom});
-          await page.screenshot({path: path.join(args.artifactsDir, `selection-zoom-${String(factor).replace('.', '-')}.png`)});
+          samples.push({zoom, card, selectedBounds, viewport, screenWidth: card.width * zoom, screenHeight: card.height * zoom});
+          await zoomScreenshot(`selection-zoom-${String(factor).replace('.', '-')}.png`,zoom);
           assert(card.x >= 10 && card.y >= 10 && card.right <= viewport.width - 10 && card.bottom <= viewport.height - 10,
             `缩放后卡片超出视口：${JSON.stringify(samples.at(-1))}`);
         }
@@ -3233,7 +3329,7 @@ async function main() {
           const coldCard = await box();
           assert(coldZoom === 2 && Math.abs(coldCard.width * coldZoom - expected.screenWidth) < 3,
             `预设 200% 缩放后新页面的卡片尺寸不正确：${JSON.stringify({coldZoom, coldCard})}`);
-          await page.screenshot({path: path.join(args.artifactsDir, 'selection-zoom-cold-2.png')});
+          await zoomScreenshot('selection-zoom-cold-2.png',coldZoom);
           result.cases.push({id: 'geometry.zoom-before-load', status: 'passed', coldZoom, coldCard});
           const beforeDrag = await box();
           const afterDrag = await gesture('.fr-study-navigation', 60, 20);
@@ -3250,6 +3346,8 @@ async function main() {
           await inside();
           result.cases.push({id: 'geometry.zoom-drag-resize', status: 'passed', beforeDrag, afterDrag, afterResize, afterReset});
         }
+        await runtimeDiagnostics.flush(); runtimeDiagnostics.assertClean();
+        result.runtimeDiagnostics = runtimeDiagnostics.snapshot();
         result.ok = result.consoleErrors.length === 0;
         result.screenshots = ['selection-zoom-1.png', 'selection-zoom-2.png', 'selection-zoom-0-5.png', 'selection-zoom-cold-2.png']
           .map(file => path.join(args.artifactsDir, file));
@@ -3265,8 +3363,11 @@ async function main() {
       const requests = translationRequestCount;
       const moved = await gesture('.fr-study-navigation', 160, -60);
       assert(near(moved.x, initial.x + 160) && near(moved.y, initial.y - 60), `标题栏拖动失败 ${JSON.stringify({initial,moved})}`);
+      const resizeViewport = await page.evaluate(() => ({width:innerWidth,height:innerHeight}));
+      assert(moved.right + 200 <= resizeViewport.width - 12 && moved.bottom + 80 <= resizeViewport.height - 12,
+        `双轴缩放夹具缺少可用空间：${JSON.stringify({moved,resizeViewport})}`);
       const widened = await gesture('[data-resize-edge="se"]', 200, 80);
-      assert(near(widened.width, moved.width + 200) && widened.height > moved.height, '右下角缩放失败');
+      assert(near(widened.width, moved.width + 200) && near(widened.height, moved.height + 80), '右下角缩放失败');
       const wrapped = await inspect('pre', `function() {
         return [...this.querySelectorAll('pre')].map(el => ({client:el.clientWidth,scroll:el.scrollWidth,height:el.getBoundingClientRect().height}));
       }`);
@@ -3351,7 +3452,9 @@ async function main() {
       await patchStoredConfig(popup, {theme:'dark'});
       await page.waitForTimeout(300);
       await page.screenshot({path:path.join(args.artifactsDir,'selection-dark.png')});
-      result.screenshots = ['selection-resized.png','selection-narrow.png','selection-dark.png'].map(file => path.join(args.artifactsDir,file));
+      result.screenshots = ['selection-automatic-constrained.png','selection-automatic-expanded.png','selection-resized.png','selection-narrow.png','selection-dark.png'].map(file => path.join(args.artifactsDir,file));
+      await runtimeDiagnostics.flush(); runtimeDiagnostics.assertClean();
+      result.runtimeDiagnostics = runtimeDiagnostics.snapshot();
       result.ok = result.consoleErrors.length === 0;
       result.finishedAt = new Date().toISOString();
       fs.writeFileSync(path.join(args.artifactsDir,'report.json'), `${JSON.stringify(result,null,2)}\n`);

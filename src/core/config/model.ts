@@ -3,6 +3,7 @@
  *
  * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
+ * 悬浮球边距：默认与悬停展开分别保存有符号 px 值，旧配置缺失时补齐默认值，读取和导入统一按范围及整数步长规范化。
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
@@ -284,6 +285,26 @@ export const FLOATING_BALL_COLLAPSED_OPACITY_MIN = 20;
 export const FLOATING_BALL_COLLAPSED_OPACITY_MAX = 100;
 export const FLOATING_BALL_COLLAPSED_OPACITY_STEP = 4;
 
+export const DEFAULT_FLOATING_BALL_DEFAULT_MARGIN = 0;
+export const DEFAULT_FLOATING_BALL_POPOUT_MARGIN = 20;
+export const FLOATING_BALL_MARGIN_MIN = -200;
+export const FLOATING_BALL_MARGIN_MAX = 200;
+export const FLOATING_BALL_MARGIN_STEP = 1;
+
+/** 悬浮球横向边距允许负数，使按钮可以贴到视口边缘或部分移出视口。 */
+export function normalizeFloatingBallMargin(
+    value: unknown,
+    fallback: number = DEFAULT_FLOATING_BALL_DEFAULT_MARGIN,
+): number {
+    return clampStepped(
+        value,
+        fallback,
+        FLOATING_BALL_MARGIN_MIN,
+        FLOATING_BALL_MARGIN_MAX,
+        FLOATING_BALL_MARGIN_STEP,
+    );
+}
+
 function clampStepped(value: unknown, fallback: number, min: number, max: number, step: number): number {
     const number = typeof value === 'number'
         ? value
@@ -479,6 +500,8 @@ export class Config {
     floatingBallCompact: boolean; // 是否使用更小的悬浮球尺寸，减少对网页内容的遮挡
     floatingBallSettingsEntryVisible: boolean; // 是否在悬浮球上显示打开设置页的入口
     floatingBallCollapsedOpacity: number; // 悬浮球收起时的不透明度百分比
+    floatingBallDefaultMargin: number; // 悬浮球默认状态相对视口边缘的水平边距（px，可为负数）
+    floatingBallPopoutMargin: number; // 悬停展开时悬浮球相对视口边缘的水平边距（px，可为负数）
     floatingBallDisabledDomains: string[]; // 不显示悬浮球的可注册域名（eTLD+1）
     customHotkey: string; // 自定义鼠标悬浮快捷键
     quickTranslationProfiles: QuickTranslationProfile[]; // 额外快捷翻译方案；悬浮与全文各最多 8 项
@@ -695,6 +718,8 @@ export class Config {
         this.floatingBallCompact = false; // 默认使用标准尺寸
         this.floatingBallSettingsEntryVisible = true; // 默认保留设置入口
         this.floatingBallCollapsedOpacity = DEFAULT_FLOATING_BALL_COLLAPSED_OPACITY; // 默认保持既有半透明收起效果
+        this.floatingBallDefaultMargin = DEFAULT_FLOATING_BALL_DEFAULT_MARGIN; // 默认按钮贴近视口边缘，减少对正文的遮挡
+        this.floatingBallPopoutMargin = DEFAULT_FLOATING_BALL_POPOUT_MARGIN; // 悬停展开时向内留出操作间距
         this.floatingBallDisabledDomains = []; // 开启后默认不额外排除网站
         this.customHotkey = ''; // 自定义鼠标悬浮快捷键为空
         this.quickTranslationProfiles = []; // 默认仅保留旧快捷键，新方案由用户按需添加
@@ -1394,6 +1419,14 @@ export function normalizeConfig(value: unknown): Config {
     normalized.floatingBallSettingsEntryVisible = source.floatingBallSettingsEntryVisible !== false;
     normalized.floatingBallCollapsedOpacity = normalizeFloatingBallCollapsedOpacity(
         source.floatingBallCollapsedOpacity,
+    );
+    normalized.floatingBallDefaultMargin = normalizeFloatingBallMargin(
+        source.floatingBallDefaultMargin,
+        DEFAULT_FLOATING_BALL_DEFAULT_MARGIN,
+    );
+    normalized.floatingBallPopoutMargin = normalizeFloatingBallMargin(
+        source.floatingBallPopoutMargin,
+        DEFAULT_FLOATING_BALL_POPOUT_MARGIN,
     );
     normalized.floatingBallDisabledDomains = normalizeFloatingBallDisabledDomains(
         source.floatingBallDisabledDomains,

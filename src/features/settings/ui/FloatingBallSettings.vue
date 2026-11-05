@@ -1,6 +1,6 @@
 <!--
  * @file src/features/settings/ui/FloatingBallSettings.vue
- * 文件职责：提供悬浮球的进阶外观与交互设置，把按钮显示方式、展开延迟、点击行为、紧凑尺寸、设置入口、收起不透明度和禁用网站集中在一处编辑。
+ * 文件职责：提供悬浮球的进阶外观与交互设置，把按钮显示方式、展开延迟、点击行为、紧凑尺寸、设置入口、收起不透明度、边距和禁用网站集中在一处编辑。
  * 主要内容：全部标签、选项和辅助说明使用稳定 i18n key；按扩展与脚本的真实入口区分“快捷面板”和“完整设置”，组件以分段控件和设置页统一的紧凑数值框呈现各字段，写入前统一调用 core/config 的归一化函数，悬浮球关闭时禁用全部控件，并复用站点名单编辑器维护不显示悬浮球的域名。
  * 模块边界：它只修改传入的配置对象，不发送标签页消息、不挂载悬浮球也不实现站点匹配；持久化由设置页统一触发，页面侧生效由悬浮球 content runtime 订阅配置完成。
  -->
@@ -100,6 +100,41 @@
       />
     </SettingsItem>
 
+    <SettingsItem
+      :label="t('settings.floatingBall.defaultMargin')"
+      :description="t('settings.floatingBall.defaultMarginDescription')"
+      :disabled="!enabled"
+    >
+      <SettingsNumberInput
+        :model-value="props.config.floatingBallDefaultMargin"
+        unit="px"
+        :aria-label="t('settings.floatingBall.defaultMarginAria')"
+        :min="FLOATING_BALL_MARGIN_MIN"
+        :max="FLOATING_BALL_MARGIN_MAX"
+        :step="FLOATING_BALL_MARGIN_STEP"
+        :disabled="!enabled"
+        @change="handleDefaultMarginChange"
+      />
+    </SettingsItem>
+
+    <SettingsItem
+      v-if="props.config.floatingBallToolsDisplay === 'hover'"
+      :label="t('settings.floatingBall.popoutMargin')"
+      :description="t('settings.floatingBall.popoutMarginDescription')"
+      :disabled="!enabled"
+    >
+      <SettingsNumberInput
+        :model-value="props.config.floatingBallPopoutMargin"
+        unit="px"
+        :aria-label="t('settings.floatingBall.popoutMarginAria')"
+        :min="FLOATING_BALL_MARGIN_MIN"
+        :max="FLOATING_BALL_MARGIN_MAX"
+        :step="FLOATING_BALL_MARGIN_STEP"
+        :disabled="!enabled"
+        @change="handlePopoutMarginChange"
+      />
+    </SettingsItem>
+
     <AlwaysTranslateSites
       :model-value="props.config.floatingBallDisabledDomains"
       variant="disable-floating-ball"
@@ -118,9 +153,13 @@ import {
   FLOATING_BALL_HOVER_DELAY_MAX,
   FLOATING_BALL_HOVER_DELAY_MIN,
   FLOATING_BALL_HOVER_DELAY_STEP,
+  FLOATING_BALL_MARGIN_MAX,
+  FLOATING_BALL_MARGIN_MIN,
+  FLOATING_BALL_MARGIN_STEP,
   normalizeFloatingBallClickAction,
   normalizeFloatingBallCollapsedOpacity,
   normalizeFloatingBallHoverDelay,
+  normalizeFloatingBallMargin,
   normalizeFloatingBallToolsDisplay,
 } from '@/src/core/config/model';
 import AlwaysTranslateSites from './AlwaysTranslateSites.vue';
@@ -162,6 +201,17 @@ function handleHoverDelayChange(value: number | undefined) {
 
 function handleCollapsedOpacityChange(value: number | undefined) {
   props.config.floatingBallCollapsedOpacity = normalizeFloatingBallCollapsedOpacity(value);
+}
+
+function handleDefaultMarginChange(value: number | undefined) {
+  props.config.floatingBallDefaultMargin = normalizeFloatingBallMargin(value);
+}
+
+function handlePopoutMarginChange(value: number | undefined) {
+  props.config.floatingBallPopoutMargin = normalizeFloatingBallMargin(
+    value,
+    props.config.floatingBallPopoutMargin,
+  );
 }
 
 function handleDisabledDomainsChange(domains: string[]) {

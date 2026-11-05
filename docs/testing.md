@@ -139,6 +139,7 @@ pnpm compile
 | <span id="论文版式回归"></span>论文版式回归 | [查看](testing/documents.md#论文版式回归) |
 | <span id="扫描版-pdf-识别"></span>扫描版 PDF 识别 | [查看](testing/documents.md#扫描版-pdf-识别) |
 | <span id="pdf-在线与本地划词"></span>PDF 在线与本地划词 | [查看](testing/documents.md#pdf-在线与本地划词) |
+| 悬浮球边距（issue #1225） | [查看](testing/settings.md#悬浮球边距-issue-1225) |
 | <span id="划词窗口拖动与缩放-issue-525"></span>划词窗口拖动与缩放（issue #525） | [查看](testing/settings.md#划词窗口拖动与缩放-issue-525) |
 | <span id="单篇篇章参考"></span>单篇篇章参考 | [查看](testing/providers.md#单篇篇章参考) |
 | <span id="ai-多段请求合并"></span>AI 多段请求合并 | [查看](testing/providers.md#ai-多段请求合并) |

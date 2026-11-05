@@ -7,6 +7,17 @@ import {buildDriveSyncDiff, driveSyncPayload as completePayload, driveValuesEqua
 const driveSyncPayload = (config: Record<string, unknown>) => completePayload(config, true);
 function complete(patch: Record<string, unknown> = {}) {return toDriveSyncConfig(normalizeConfig({...new Config(), videoServiceDefaultMigrated: true, ...patch}));}
 describe('Google Drive 完整快照和安全合并', () => {
+    it('previews signed margin units and keeps selected remote values through backup restoration', () => {
+        const local = complete({floatingBallDefaultMargin: 0, floatingBallPopoutMargin: 20});
+        const remote = complete({floatingBallDefaultMargin: -18, floatingBallPopoutMargin: -18});
+        const parsed = parseDriveSyncPayload(completePayload(remote));
+        expect(restoreDriveSyncSettings(local, parsed)).toMatchObject({floatingBallDefaultMargin: -18, floatingBallPopoutMargin: -18});
+        const diff = buildDriveSyncDiff(local, local, remote);
+        expect(diff.changes.find(change => change.label === '悬浮球默认边距')).toMatchObject({local:'0 px',remote:'-18 px'});
+        expect(diff.changes.find(change => change.label === '悬浮球弹出边距')).toMatchObject({local:'20 px',remote:'-18 px'});
+        const merged = resolveDriveSyncDiff(diff, Object.fromEntries(diff.changes.map(change => [change.id,'remote'])));
+        expect(merged).toMatchObject({floatingBallDefaultMargin: -18, floatingBallPopoutMargin: -18});
+    });
     it('浏览器默认译文字体属于普通备份设置，恢复和双向同步保留布尔选择及中文差异名称', () => {
         for (const enabled of [true, false]) {
             const local = complete({browserDefaultTranslationFont: !enabled, translationAppearance: {fontFamily: 'mono'}});

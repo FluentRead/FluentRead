@@ -8,13 +8,21 @@ import {createVideoSubtitleBackgroundHandlers} from './handlers';
 import {extensionDomClient} from '@/src/platform/offscreen/extensionClient';
 import {createVideoAiSubtitleCacheHandlers} from './cacheHandlers';
 import {videoAiSubtitleCacheRepository} from './transcriptionCache';
+import {config, configReady, getConfigHydrationStatus} from '@/src/services/config/store';
 import {createVideoReadingAnnotationHandlers} from './readingAnnotation';
 
 export function createVideoSubtitleBackgroundRuntime() {
+    let hydrated = false;
+    void configReady.then(() => { hydrated = true; }, () => undefined);
     return [
         ...createVideoReadingAnnotationHandlers({offscreen: extensionDomClient, runtimeId: browser.runtime.id}),
         ...createVideoSubtitleBackgroundHandlers({
             offscreen: extensionDomClient,
+            readNativeSettings: () => {
+                if (!hydrated || getConfigHydrationStatus() !== 'ready') throw new Error('字幕配置尚未安全加载，请稍后重试');
+                return {enabled: config.on && config.videoTranslationEnabled, provider: config.videoTranscriptionProvider,
+                    baseUrl: config.videoNativeAsrBaseUrl, sourceLanguage: config.videoSourceLanguage || 'auto'};
+            },
             storage: {
                 get: async (key) => browser.storage.local.get(key),
                 set: async (value) => { await browser.storage.local.set(value); },

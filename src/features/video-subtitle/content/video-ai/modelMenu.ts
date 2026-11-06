@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/video-ai/modelMenu.ts
  * 文件职责：协调播放器内 AI 字幕请求、缓存恢复和主动选择模型的菜单入口。
- * 主要内容：等待缓存时校验媒体所有权，主动换模型只作废旧缓存读取并保留当前字幕；确认视图打开后将焦点交给可操作按钮。
+ * 主要内容：等待缓存时校验媒体所有权与既有模型设置代际，主动换模型只作废旧缓存读取并保留当前字幕；确认视图打开后将焦点交给可操作按钮。
  * 模块边界：通过注入端口访问运行时状态，不持有视频、配置或识别会话；下载与确认由 modelSetup 负责。
  */
 import type {VideoAiModelSetup} from './modelSetup';
@@ -38,8 +38,10 @@ export function createVideoAiModelMenu(dependencies: VideoAiModelMenuDependencie
             dependencies.setRegenerating(regenerate);
             dependencies.ensureEnabled();
             const epoch = dependencies.mediaEpoch();
+            const revision = dependencies.setup.revision;
             if (!regenerate && await dependencies.restoreCache()) return;
-            if (!dependencies.isCurrent() || menu.hidden || epoch !== dependencies.mediaEpoch()) return;
+            if (!dependencies.isCurrent() || menu.hidden || epoch !== dependencies.mediaEpoch()
+                || revision !== dependencies.setup.revision) return;
             if (!dependencies.supportsLocal()) {
                 dependencies.setError('当前浏览器不支持本地 AI 字幕');
                 return;

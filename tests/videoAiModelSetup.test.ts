@@ -363,3 +363,41 @@ describe('video AI model setup', () => {
     expect(stale.dependencies.startGeneration).not.toHaveBeenCalled();
   });
 });
+
+describe('native ASR model setup avoids browser downloads', () => {
+  it('starts native generation without browser preparation', async () => {
+    const f = setup({isNative: () => true});
+    await f.controller.request(() => true);
+    expect(f.controller.revision).toBe(1);
+    expect(f.events).toEqual(['error:', 'start']);
+    expect(f.controller.choice).toBeNull();
+    expect(f.controller.checking).toBe(false);
+    expect(f.controller.downloading).toBe(false);
+    expect(f.sendMessage).not.toHaveBeenCalled();
+    expect(f.dependencies.watchDownload).not.toHaveBeenCalled();
+    expect(f.dependencies.persistModel).not.toHaveBeenCalled();
+  });
+  it('routes model switching to settings without generating', async () => {
+    const f = setup({isNative: () => true});
+    await f.controller.request(() => true, true);
+    expect(f.events).toEqual(['error:请在设置中切换识别方式']);
+    expect(f.dependencies.onChange).toHaveBeenCalledOnce();
+    expect(f.controller.revision).toBe(1);
+    expect(f.sendMessage).not.toHaveBeenCalled();
+  });
+  it('rejects hidden and invalidated native requests without transport', async () => {
+    const f = setup({isNative: () => true});
+    await f.controller.request(() => false);
+    f.invalidate();
+    await f.controller.request(() => true);
+    expect(f.controller.revision).toBe(2);
+    expect(f.dependencies.startGeneration).not.toHaveBeenCalled();
+    expect(f.sendMessage).not.toHaveBeenCalled();
+  });
+  it('retains browser setup when native selection explicitly returns false', async () => {
+    const f = setup({isNative: () => false, responses: {fluentReadGetLocalVideoModelState: [{success: true, models: ['tiny']}]}});
+    await f.controller.request(() => true);
+    expect(f.sendMessage).toHaveBeenCalledOnce();
+    expect(f.dependencies.startGeneration).toHaveBeenCalledOnce();
+  });
+});

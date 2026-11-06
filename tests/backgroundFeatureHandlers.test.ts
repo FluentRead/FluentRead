@@ -1358,3 +1358,13 @@ it('opens only registered form targets belonging to the requested settings secti
     await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, target: 'video-sentence-learning-appearance'})).rejects.toThrow('无效的设置目标');
     expect(openSection).toHaveBeenCalledOnce(); expect(openDefaultPage).not.toHaveBeenCalled();
 });
+
+
+it('accepts the registered AI segmentation target only within video settings', async () => {
+    const openDefaultPage = vi.fn(async () => undefined), openSection = vi.fn(async () => undefined);
+    const handler = createOpenOptionsPageHandler({openDefaultPage, openSection});
+    await handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-video', target: 'video-semantic-segmentation'});
+    expect(openSection).toHaveBeenCalledWith('settings-video', undefined, 'video-semantic-segmentation');
+    await expect(handler.handle({type: OPEN_OPTIONS_PAGE_MESSAGE_TYPE, section: 'settings-interface', target: 'video-semantic-segmentation'})).rejects.toThrow();
+    expect(openSection).toHaveBeenCalledOnce();
+});

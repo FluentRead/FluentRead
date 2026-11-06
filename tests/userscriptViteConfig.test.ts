@@ -2908,7 +2908,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
         ['src/core/config/driveSync.ts', ['VISIBLE_FIELDS']],
-        ['src/features/settings/model/navigation.ts', ['settingsPagePanels', 'settingsSearchTargets']],
+        ['src/features/settings/model/navigation.ts', ['settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS']],
         ['src/core/config/translationLoadingStyle.ts', ['translationLoadingStyleOptions']],
         ['src/core/config/freeTranslation.ts', ['FREE_TRANSLATION_PROVIDERS']],
         ['src/core/language/catalog.ts', ['translationLanguageOptions']],
@@ -3013,4 +3013,27 @@ describe('userscript bundled CSS encoding', () => {
             expect(bundle).not.toHaveProperty('fixture.css');
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
+});
+
+
+describe('extension-only semantic settings build boundary', () => {
+    it('bundles the userscript no-op instead of the unavailable AI settings form', async () => {
+        const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-semantic-settings-'));
+        try {
+            const entry = resolve(fixture, 'entry.ts');
+            writeFileSync(entry, "export {default} from '@/src/features/settings/ui/VideoSemanticSegmentationSettings.vue';");
+            const {build} = await import('vite');
+            const result = await build({configFile: false, publicDir: false, logLevel: 'silent',
+                resolve: {alias: userscriptAliases},
+                build: {write: false, minify: false, rollupOptions: {input: entry, preserveEntrySignatures: 'strict', output: {format: 'es'}}}});
+            const outputs = Array.isArray(result) ? result : [result];
+            expect(outputs).toHaveLength(1);
+            if (!('output' in outputs[0])) throw new Error('Expected a bundle');
+            const chunks = outputs[0].output.filter(item => item.type === 'chunk');
+            expect(chunks).toHaveLength(1);
+            expect(Object.keys(chunks[0].modules)).toContain(resolve(process.cwd(), 'userscript/videoSemanticSettings.ts'));
+            expect(Object.keys(chunks[0].modules)).not.toContain(resolve(process.cwd(), 'src/features/settings/ui/VideoSemanticSegmentationSettings.vue'));
+            expect(chunks[0].code).toContain('UserscriptVideoSemanticSettingsUnavailable');
+        } finally {rmSync(fixture, {recursive: true, force: true});}
+    });
 });

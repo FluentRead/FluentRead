@@ -29,7 +29,7 @@ interface YoutubeTimedTextEvent {
   segs?: YoutubeTimedTextSegment[];
 }
 
-function extractBalancedJson(source: string, start: number): string | null {
+export function extractBalancedJson(source: string, start: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;

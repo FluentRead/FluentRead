@@ -533,6 +533,7 @@
       "tests/francRuntimeBuild.test.ts",
       "tests/longPageMockTransport.test.ts",
       "tests/compactExtensionZip.test.ts",
+      "tests/youtubeDirectAudio.test.ts",
       "tests/imageDetectionEvidence.test.ts",
       "tests/imageParagraphGapEvidence.test.ts",
       "tests/imageDetectionSnapshot.test.ts",

@@ -137,3 +137,7 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 
 该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
 
+
+## YouTube 受限直达音轨本地转写
+
+`youtubeDirectAudio` 覆盖当前视频身份、直达音频资格、googlevideo URL 边界、完整响应与 PCM 校验、取消/期限和自有字幕层清理；`videoSubtitleTrackPriorityRuntime` 通过真实生产模块及 DOM 验证入口资格、fullCapture 接线、晚到原生字幕仲裁、导航/广告/取消/卸载，以及失败不触碰播放器/CC。全部音频、模型和网络端口均为确定性夹具，不代表真实 YouTube 音轨或 CORS 验收。受限能力、缓存行为和未验证范围见 [YouTube 直达音轨](../maintainers/youtube-direct-audio.md)。

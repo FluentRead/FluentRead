@@ -196,7 +196,7 @@ function assertEnabledVideoSettingsState(state, stored, expectedMode = 'bilingua
 
 function comparableConfigWithoutVideoToggle(value) {
   const comparable = {...value};
-  delete comparable.videoTranslationEnabled;
+  delete comparable.videoSubtitleVisible;
   delete comparable.__fluentConfigRevision;
   return JSON.stringify(comparable);
 }
@@ -204,7 +204,7 @@ function comparableConfigWithoutVideoToggle(value) {
 async function sampleStableVideoToggleState(page, control, expected, durationMs = 6000) {
   // 界面先乐观更新，后台持久化随后完成；稳定窗口从存储值落定后开始计时。
   const persistDeadline = Date.now() + 5000;
-  while ((await readExtensionConfig(control)).videoTranslationEnabled !== expected) {
+  while ((await readExtensionConfig(control)).videoSubtitleVisible !== expected) {
     if (Date.now() > persistDeadline) throw new Error(`字幕翻译开关没有在 5 秒内持久化为 ${expected}`);
     await page.waitForTimeout(100);
   }
@@ -212,16 +212,14 @@ async function sampleStableVideoToggleState(page, control, expected, durationMs 
   const startedAt = Date.now();
   while (Date.now() - startedAt < durationMs) {
     const menuButton = await readPlayerMenuButtonState(page);
-    if (expected) assertPlayerMenuButtonState(menuButton);
-    else if (menuButton.present || menuButton.menuPresent) {
-      throw new Error(`关闭视频后播放器入口或菜单仍存在：${JSON.stringify(menuButton)}`);
-    }
+    assertPlayerMenuButtonState(menuButton);
     const ui = {button: String(menuButton.active), menu: String(menuButton.menuPresent && !menuButton.offSelected), menuButton};
     const stored = await readExtensionConfig(control);
     samples.push({
       elapsedMs: Date.now() - startedAt,
       ...ui,
-      stored: stored.videoTranslationEnabled,
+      stored: stored.videoSubtitleVisible,
+      featureEnabled: stored.videoTranslationEnabled,
       revision: stored.__fluentConfigRevision,
     });
     await page.waitForTimeout(250);
@@ -230,7 +228,7 @@ async function sampleStableVideoToggleState(page, control, expected, durationMs 
   const expectedString = String(expected);
   if (samples.some((sample) => sample.button !== expectedString
     || sample.menu !== expectedString
-    || sample.stored !== expected)) {
+    || sample.stored !== expected || sample.featureEnabled !== true)) {
     throw new Error(`字幕翻译开关在稳定窗口内发生跳变：${JSON.stringify(samples)}`);
   }
   if (new Set(samples.map((sample) => sample.revision)).size !== 1) {
@@ -742,8 +740,8 @@ async function main() {
     });
     const beforeDisableConfig = await readExtensionConfig(control);
     await page.locator('#fluent-read-video-subtitle-menu [data-mode="off"]').press('Enter');
-    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-button')
-      && !document.querySelector('#fluent-read-video-subtitle-menu')
+    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')
+      && document.querySelector('#fluent-read-video-subtitle-menu [data-mode="off"]')?.getAttribute('aria-checked') === 'true'
       && !document.querySelector('#fluent-read-video-subtitle')?.textContent?.trim(), null, {timeout: 10000});
     const disabledMenu = await page.evaluate(() => ({
       buttonPresent: Boolean(document.querySelector('#fluent-read-video-subtitle-button')),
@@ -757,31 +755,17 @@ async function main() {
       throw new Error(`关闭字幕翻译产生了额外配置差异：${JSON.stringify({beforeDisableConfig, afterDisableConfig})}`);
     }
     await page.screenshot({path: path.join(artifactsDir, 'video-subtitle-fixture-disabled.png'), fullPage: false});
-    // Off 会销毁入口和菜单；只通过真实设置控件恢复，不能点击旧节点或直接写配置。
-    const reenableSettingsPage = await createPage();
-    let reenabledFromSettings;
-    try {
-      await reenableSettingsPage.goto(`chrome-extension://${extensionId}/options.html#settings-video`, {waitUntil: 'domcontentloaded'});
-      await activatePage(reenableSettingsPage);
-      const toggle = reenableSettingsPage.locator('#settings-video').getByRole('switch', {name: '视频字幕翻译', exact: true});
-      await toggle.waitFor({state: 'visible', timeout: 10000});
-      if (await toggle.getAttribute('aria-checked') !== 'false') throw new Error('设置页未显示视频关闭状态');
-      await toggle.press('Enter');
-      await reenableSettingsPage.waitForFunction(() => document.querySelector('#settings-video .feature-enable-card [role="switch"]')?.getAttribute('aria-checked') === 'true', null, {timeout: 10000});
-      await waitForAsyncCondition(async () => (await readExtensionConfig(control)).videoTranslationEnabled === true,
-        {timeoutMs: 10000, message: '从真实设置页重新启用视频未持久化'});
-      reenabledFromSettings = await readVideoSettingsState(reenableSettingsPage);
-      assertEnabledVideoSettingsState(reenabledFromSettings, await readExtensionConfig(control));
-      await reenableSettingsPage.screenshot({path: path.join(artifactsDir, 'video-subtitle-fixture-settings-reenabled.png'), fullPage: true});
-    } finally {
-      await reenableSettingsPage.close();
-    }
-    await activatePage(page);
-    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')?.classList.contains('fluent-read-video-subtitle-active') === true
-      && document.querySelector('#fluent-read-video-subtitle-menu')?.hidden === true, null, {timeout: 10000});
+    // 关闭字幕后入口仍可操作；关闭并重开菜单，再从真实模式控件恢复。
+    await page.locator('#fluent-read-video-subtitle-menu [data-action="close-menu"]').click();
     assertPlayerMenuButtonState(await readPlayerMenuButtonState(page), false);
     await page.locator('#fluent-read-video-subtitle-button').press('Enter');
-    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-menu')?.hidden === false, null, {timeout: 10000});
+    await page.locator('#fluent-read-video-subtitle-menu [data-mode="bilingual"]').click();
+    await waitForAsyncCondition(async () => (await readExtensionConfig(control)).videoSubtitleVisible === true,
+      {timeoutMs: 10000, message: '从播放器菜单重新启用字幕未持久化'});
+    const reenabledFromMenu = await readPlayerMenuButtonState(page);
+    await page.screenshot({path: path.join(artifactsDir, 'video-subtitle-fixture-menu-reenabled.png'), fullPage: false});
+    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')?.classList.contains('fluent-read-video-subtitle-active') === true
+      && document.querySelector('#fluent-read-video-subtitle-menu')?.hidden === false, null, {timeout: 10000});
     assertPlayerMenuButtonState(await readPlayerMenuButtonState(page), true);
     const enabledStabilitySamples = await sampleStableVideoToggleState(page, control, true);
     const afterEnableConfig = await readExtensionConfig(control);
@@ -838,9 +822,9 @@ async function main() {
       await page.screenshot({path: path.join(artifactsDir, 'video-menu-only-closed.png'), fullPage: false});
       evidence = {ok: pageErrors.length === 0 && consoleErrors.length === 0 && unexpectedNetworkRequests.length === 0
         && translationRequests === 0 && aiTranslationSources.length === 0,
-        suite, scope: 'Production menu-button semantics, keyboard Off removes entry/menu, real Options switch re-enables, close/reopen and persistence only',
+        suite, scope: 'Production menu-button semantics, keyboard Off keeps entry/menu, player mode re-enables subtitles, close/reopen and persistence only',
         notRun: ['full Options/document cross-context matrix', 'subtitle translation/provider quality', 'download', 'timing/pretranslation/karaoke', 'native mobile/assistive technology'],
-        navigationMode, playerUi, menu, disabledMenu, reenabledFromSettings, menuAccessibility,
+        navigationMode, playerUi, menu, disabledMenu, reenabledFromMenu, menuAccessibility,
         menuButtons: {initial: initialMenuButton, opened: openedMenuButton, closed: closedMenuButton, reopened: reopenedMenuButton, final: finalMenuButton},
         videoToggleStability: {edges: videoToggleEdges, disabledSamples: disabledStabilitySamples.length, enabledSamples: enabledStabilitySamples.length},
         translationRequests, aiTranslationRequests: aiTranslationSources.length, pageErrors, consoleErrors, unexpectedNetworkRequests,
@@ -1469,7 +1453,7 @@ async function main() {
       playerUi,
       menu,
       disabledMenu,
-      reenabledFromSettings,
+      reenabledFromMenu,
       popupFeature,
       initialVideoSettingsState,
       videoSettingsDescription,

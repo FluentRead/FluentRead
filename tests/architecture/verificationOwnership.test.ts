@@ -145,6 +145,8 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('scripts/testing/')
         // 发布脚本的真实归档和 gh 失败/恢复夹具由 processRegression 统一执行。
         || path.startsWith('scripts/release/')
+        // AMO 清单格式化的字段保留和拒绝错误输入夹具由 releaseManifest/processRegression 执行。
+        || path === 'scripts/amo/prepare-review-output.mjs'
         || path.startsWith('scripts/quality/')
         || path.startsWith('scripts/agent-bridge/')
         || path.startsWith('scripts/wasm/')

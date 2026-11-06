@@ -363,6 +363,15 @@ export default defineConfig({
             groupModuleWorkers(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
+            // CommonJS 26 的 auto 判定有条件/无条件 require 竞态。固定后台 CryptoJS
+            // 初始化包装，保留 0.0.40 上传包的执行顺序，使不同目录的重建逐字节一致。
+            // 升级依赖后应重新核对包装清单，不能依赖 auto 或关闭循环依赖处理。
+            if (entrypoints.some(entrypoint => entrypoint.type === 'background')) {
+                const build = viteConfig.build ??= {};
+                build.commonjsOptions = {...build.commonjsOptions, strictRequires: [
+                    '**/crypto-js/{core,enc-base64,md5,hmac,sha256,evpkdf,cipher-core,sha1}.js',
+                ]};
+            }
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。

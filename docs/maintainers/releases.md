@@ -28,6 +28,12 @@ Zotero、Obsidian、油猴版本目前独立维护。根版本标签表示整组
 
 先运行 `pnpm build:firefox`，再按根目录 README 的命令安装 Mozilla 官方 `addons-linter` 并执行 `pnpm lint:firefox:amo`。校验脚本可指定目录或最终 ZIP，保存完整 JSON，不屏蔽规则；校验错误或校验器失败会使命令失败，警告仍保留在报告中。构建与源码 ZIP 的复现步骤也在 README，源码包应与提交的安装包来自同一次打包。[Mozilla 本地校验说明](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)、[源码提交要求](https://extensionworkshop.com/documentation/publish/source-code-submission/)
 
+AMO 自动构建入口为 `npm run build-for-amo`，复用现有 `build:firefox`，再以两空格缩进写入同一份 manifest JSON，输出 `.output/firefox-mv2`。在干净目录解压本次提交的源码 ZIP，运行 `pnpm install --frozen-lockfile`，再执行该入口；固定 Node.js、pnpm 和锁文件版本，并记录完整日志。按文件路径和解压后的字节内容与后台实际上传包比较，不能用当前 `main` 的构建结果代替已提交版本的复现，也不能只核对版本号或文件数量。ZIP 时间戳和压缩参数不作为扩展内容相同的依据。[Mozilla 自动构建入口说明](https://discourse.mozilla.org/t/help-our-source-code-review-process-add-a-build-for-amo-script/148822)
+
+Vite 内置的 CommonJS 26 默认自动判断条件 require；同一 CryptoJS 模块被条件和无条件导入时，包装结果可能受构建时序影响。后台构建固定八个 CryptoJS 模块的初始化包装，保留原上传包的执行顺序。升级 CryptoJS、Vite 或改变后台 CommonJS 依赖后，应重新审查包装清单、相关密码学回归和跨目录构建结果；不能只重跑构建直到偶然匹配。[CommonJS 包装选项](https://github.com/rollup/plugins/tree/master/packages/commonjs#strictrequires)
+
+补充待审版本的构建入口或审核文档时，以该版本已上传的源码包为基础；核对生产源码和锁文件没有变化，再重新验证生成内容与原安装包一致。审核说明应给出构建环境、命令、输出目录、实际复现结果，以及本次校验器警告的来源和输入边界；准备好材料后再按授权更新 AMO。
+
 2026-10-27 的告警修复保留了桌面 Firefox 140（含 ESR 140），没有提高最低版本或未经验收声明 Android 支持。内置数据同意功能在桌面 140、Android 142 起提供，因此这组清单会保留 Android 最低版本提示；向审核者说明桌面兼容范围。后续支持 Android 时应先完成设备验证，再明确声明兼容版本。[Mozilla 内置数据同意机制](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/)、[Android 兼容性验证](https://extensionworkshop.com/documentation/develop/developing-extensions-for-firefox-for-android/)
 
 依赖适配由 `scripts/testing/extension-csp-build.ts`、`scripts/testing/defuddle-entity-build.ts` 和 `scripts/wasm/package-diagnostics.ts` 在构建中执行：完整源码 SHA-256 不符即停止，不直接修改上游包；WASM 二进制不变。全局回退改用 `globalThis`，ZIP 不再编译历史字符串回调，PDF 使用已有解释器，ONNX 使用静态调用闭包，Defuddle 的实体解码改用共享纯文本解码器。升级依赖时必须重新审查固定输入与语义测试，不应通过忽略校验规则维持通过。
@@ -69,7 +75,7 @@ git push origin refs/tags/v0.0.41
 
 ```sh
 node --test --test-concurrency=1 tests/release*.test.mjs
-node scripts/release/manifest.mjs --check --tag v0.0.40
+node scripts/release/manifest.mjs --check --tag v0.0.41
 ```
 
 打包器只收集已构建且通过相应验证的产物，例如 `node scripts/release/bundle.mjs --target chrome`；不会自动构建或发布。临时目录统一为 `reports/release/`，已加入 Git 忽略并从 Firefox 源码 ZIP 排除，避免本地再次打包时夹带旧安装包。

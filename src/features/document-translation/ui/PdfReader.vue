@@ -1,7 +1,7 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
  文件职责：以左右对照的连续页面显示可划词的 PDF 原页和保持原版排版的译文页，每个新译文段落用一次有界局部像素读回匹配版面配色，并保留“重排阅读”作为可选的显示方式。
- 主要内容：智能高亮按所选模型重新评分，模型切换传递固定请求身份；页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开并提供键盘可达的全文对照弹窗，拖选与原生选区保留期间保持展开，译文文字层接住段间空白且背景不拦截选择；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读使用同一实际计划组织正文与原图裁剪，区域身份或坐标变化才重裁剪，普通译文变化复用原像素并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；触控板捏合与 Ctrl/Cmd 加减号只缩放阅读内容，保留指针所在页内坐标，捏合期间复用画布和文字层、停下后重绘；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
+ 主要内容：智能高亮按所选模型重新评分，模型切换传递固定请求身份；页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开并提供键盘可达的全文对照弹窗，拖选与原生选区保留期间保持展开，译文文字层接住段间空白且背景不拦截选择；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读使用同一实际计划组织正文与原图裁剪，区域身份或坐标变化才重裁剪，普通译文变化复用原像素并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；全文对照、目录标题和搜索词各自自动确定文字方向，不改变工具栏或原译文列顺序；触控板捏合与 Ctrl/Cmd 加减号只缩放阅读内容，保留指针所在页内坐标，捏合期间复用画布和文字层、停下后重绘；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
  材料续读：仅公开等待 DOM 提交并淘汰旧布局锚点的 resumePage 页码方法，供已验证文件身份的文档组合根调用；原页渲染与下载结构保持自身职责。
  模块边界：组件只组织阅读布局、叠加层与页面调度；文档由组合根导入、翻译由既有服务提供，划词卡片由页面组合根复用统一翻译卡。
 -->
@@ -35,7 +35,7 @@
         <div class="pdf-menu pdf-search" :class="{open: openMenu === 'search'}">
           <button type="button" class="pdf-tool-button" :class="{active: openMenu === 'search' || searchHits.length > 0}" aria-haspopup="dialog" :aria-expanded="openMenu === 'search'" :aria-label="t('document.pdfReading.search')" :title="t('document.pdfReading.search')" @click="toggleSearch"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="m13.2 13.2 3.6 3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
           <div v-if="openMenu === 'search'" class="pdf-menu-panel pdf-search-panel" role="dialog" :aria-label="t('document.pdfReading.search')">
-            <input ref="searchInput" v-model="searchQuery" type="search" :placeholder="t('document.pdfReading.searchPlaceholder')" :aria-label="t('document.pdfReading.search')" @keydown.enter.prevent="stepSearch($event.shiftKey ? -1 : 1)" />
+            <input ref="searchInput" v-model="searchQuery" dir="auto" type="search" :placeholder="t('document.pdfReading.searchPlaceholder')" :aria-label="t('document.pdfReading.search')" @keydown.enter.prevent="stepSearch($event.shiftKey ? -1 : 1)" />
             <span class="pdf-search-count" role="status">{{ searchHits.length ? `${searchIndex + 1} / ${searchHits.length}` : searchQuery.trim() ? '0' : '' }}</span>
             <button type="button" :disabled="!searchHits.length" :aria-label="t('document.pdfReading.searchPrevious')" :title="t('document.pdfReading.searchPrevious')" @click="stepSearch(-1)">‹</button>
             <button type="button" :disabled="!searchHits.length" :aria-label="t('document.pdfReading.searchNext')" :title="t('document.pdfReading.searchNext')" @click="stepSearch(1)">›</button>
@@ -60,7 +60,7 @@
         <button type="button" :class="{selected: outlineLanguage === 'source'}" :aria-pressed="outlineLanguage === 'source'" @click="outlineLanguage = 'source'">{{ t('document.pdfReading.original') }}</button>
         <button type="button" :class="{selected: outlineLanguage === 'translated'}" :aria-pressed="outlineLanguage === 'translated'" @click="outlineLanguage = 'translated'">{{ t('document.pdfReading.translated') }}</button>
       </div>
-      <button v-for="item in outlineItems" :key="item.id" type="button" class="pdf-outline-item" :class="{current: item.id === activeOutlineId}" :style="{paddingLeft: `${12 + (item.level - 1) * 14}px`}" :aria-current="item.id === activeOutlineId ? 'location' : undefined" :title="item.source" data-i18n-ignore @click="jumpToPosition(item.pageIndex, item.y)"><span>{{ item.title }}</span><small>{{ item.pageIndex + 1 }}</small></button>
+      <button v-for="item in outlineItems" :key="item.id" type="button" class="pdf-outline-item" :class="{current: item.id === activeOutlineId}" :style="{paddingLeft: `${12 + (item.level - 1) * 14}px`}" :aria-current="item.id === activeOutlineId ? 'location' : undefined" :title="item.source" data-i18n-ignore @click="jumpToPosition(item.pageIndex, item.y)"><span dir="auto">{{ item.title }}</span><small>{{ item.pageIndex + 1 }}</small></button>
     </nav>
     </Teleport>
     <div ref="viewport" class="pdf-page-scroll" data-pdf-scroll tabindex="0" :data-reader-zoom="scale" :aria-label="t('document.pdfReading.continuousPages')" @scroll.passive="scheduleViewport" @keydown="handleViewportKey">
@@ -92,7 +92,7 @@
                     <div v-if="entry.translated" class="pdf-translation-block" :class="{overflowing: entry.overflow, heading: entry.role === 'heading', 'selection-expanded': expandedSelectionBlocks.has(entry.id)}" :style="entry.boxStyle" :data-pdf-segment-index="entry.segmentIndex" :data-pdf-source-text="entry.source" :data-pdf-source-id="entry.id" :data-pdf-role="entry.role" data-i18n-ignore @pointerenter="showHighlight(layout, entry)">
                       <i v-for="(rect, index) in entry.eraseStyles" :key="index" class="pdf-translation-erase" :style="rect" aria-hidden="true" />
                       <p class="pdf-translation-text" :style="entry.textStyle" data-fluentread-pdf-lines><span v-for="(line, index) in entry.lines" :key="index" :class="{justified: line.justified}">{{ line.text }}</span></p>
-                      <button v-if="entry.overflow || continuationBySegment.has(entry.segmentIndex)" type="button" class="pdf-full-passage-button" data-fluentread-pdf-decoration :aria-label="t(continuationBySegment.has(entry.segmentIndex) ? 'document.pdfReading.crossPageContext' : 'document.pdfReading.fullPassage')" :title="t(continuationBySegment.has(entry.segmentIndex) ? 'document.pdfReading.crossPageContext' : 'document.pdfReading.fullPassage')" @click.stop="openFullPassage(layout.page.pageNumber, entry.segmentIndex)"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true"><path d="M5 15 15 5M6 5h9v9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+                      <button v-if="entry.overflow || continuationBySegment.has(entry.segmentIndex)" type="button" class="pdf-full-passage-button" data-fluentread-pdf-decoration :aria-label="t(continuationBySegment.has(entry.segmentIndex) ? 'document.pdfReading.crossPageContext' : 'document.pdfReading.fullPassage')" :title="t(continuationBySegment.has(entry.segmentIndex) ? 'document.pdfReading.crossPageContext' : 'document.pdfReading.fullPassage')" @click.stop="openFullPassage(layout.page.pageNumber, entry.segmentIndex)"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true"><path d="M10 5v11M3 4.5c2.4-.8 4.7-.5 7 1.2 2.3-1.7 4.6-2 7-1.2v10c-2.4-.8-4.7-.5-7 1.2-2.3-1.7-4.6-2-7-1.2z" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
                     </div>
                     <span v-else-if="translating && entry.pending" class="pdf-translation-spinner" :style="entry.spinnerStyle" :data-pdf-pending-segment="entry.segmentIndex" data-fluentread-pdf-decoration role="status" :aria-label="t('document.pdfReading.translatingBlock')"><TranslationLoadingPreview :loading-style="loadingStyle" :animated="animated" /></span>
                   </template>
@@ -110,8 +110,8 @@
       <header><h2 id="pdf-full-passage-heading">{{ t(fullPassageParts.length > 1 ? 'document.pdfReading.crossPageContext' : 'document.pdfReading.fullPassage') }}<small v-if="fullPassage">{{ fullPassageParts.map(part => t('document.pdfReading.pageNumber', {page: part.page})).join(' → ') }}</small></h2><button type="button" autofocus :aria-label="t('document.pdfReading.closePassage')" @click="fullPassageDialog?.close()">×</button></header>
       <div v-if="fullPassage" class="pdf-full-passage-content">
         <div v-for="part in fullPassageParts" :key="part.segmentIndex" class="pdf-full-passage-pair">
-          <section class="pdf-full-passage-source"><h3>{{ t('document.pdfReading.original') }}<small v-if="fullPassageParts.length > 1"> · {{ t('document.pdfReading.pageNumber', {page: part.page}) }}</small></h3><p data-i18n-ignore>{{ document.segments[part.segmentIndex]?.source }}</p></section>
-          <section><h3>{{ t('document.pdfReading.translated') }}</h3><p class="pdf-full-passage-translation" data-i18n-ignore>{{ translations[part.segmentIndex] || t('document.pdfReading.waitingTranslation') }}</p></section>
+          <section class="pdf-full-passage-source"><h3>{{ t('document.pdfReading.original') }}<small v-if="fullPassageParts.length > 1"> · {{ t('document.pdfReading.pageNumber', {page: part.page}) }}</small></h3><p dir="auto" data-i18n-ignore>{{ document.segments[part.segmentIndex]?.source }}</p></section>
+          <section><h3>{{ t('document.pdfReading.translated') }}</h3><p dir="auto" class="pdf-full-passage-translation" data-i18n-ignore>{{ translations[part.segmentIndex] || t('document.pdfReading.waitingTranslation') }}</p></section>
         </div>
       </div>
     </dialog>
@@ -1016,7 +1016,8 @@ onBeforeUnmount(() => {
 .pdf-full-passage-source p {font-size: 14px;}
 .pdf-full-passage-content h3 {font-size: 12px; font-weight: 500; margin: 0 0 10px; color: var(--muted);}
 .pdf-full-passage-content p {white-space: pre-wrap; overflow-wrap: anywhere; user-select: text; margin: 0; font-size: 15px; line-height: 1.8;}
-.pdf-full-passage-button {position: absolute; right: -4px; bottom: -4px; z-index: 4; pointer-events: auto; cursor: pointer; border: 1px solid #cbd5e1; border-radius: 5px; padding: 0; width: 24px; height: 24px; background: #fff; color: #334155; font: 16px/1 sans-serif; box-shadow: 0 1px 4px #10182820;}
+.pdf-full-passage-button {position: absolute; right: -4px; bottom: -4px; z-index: 4; display: inline-flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; border: 0; border-radius: 4px; padding: 0; width: 24px; height: 24px; background: transparent; color: #64748b; font: 16px/1 sans-serif; box-shadow: none;}
+.pdf-full-passage-button:hover, .pdf-full-passage-button:focus-visible {background: #f1f5f9; color: #334155;}
 .pdf-cross-page-context {display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-left: 6px; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-soft); color: var(--muted); cursor: pointer;}
 .pdf-full-passage-dialog button:focus-visible, .pdf-cross-page-context:focus-visible, .pdf-full-passage-button:focus-visible {outline: 2px solid var(--brand); outline-offset: 2px;}
 @media (max-width: 600px) {.pdf-full-passage-content {padding: 16px;} .pdf-full-passage-pair {grid-template-columns: 1fr; gap: 20px;} .pdf-full-passage-source {position: static; max-height: none; overflow: visible;} .pdf-full-passage-dialog header {padding: 12px 16px;}}
@@ -1072,7 +1073,7 @@ onBeforeUnmount(() => {
 .pdf-outline-language button {flex: 1; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer;}
 .pdf-outline-language button.selected {color: var(--brand-strong); background: var(--surface); box-shadow: 0 1px 4px rgba(35, 47, 82, .1); font-weight: 700;}
 .pdf-outline-item {display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 6px 10px 6px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; line-height: 1.45; text-align: left; cursor: pointer;}
-.pdf-outline-item span {flex: 1; min-width: 0; overflow-wrap: anywhere;}
+.pdf-outline-item span {flex: 1; min-width: 0; overflow-wrap: anywhere; text-align: start;}
 .pdf-outline-item small {flex: none; color: var(--muted); font-size: 10.5px; font-variant-numeric: tabular-nums;}
 .pdf-outline-item:hover {background: var(--surface-soft);}
 .pdf-outline-item.current {color: var(--brand-strong); background: var(--brand-soft); font-weight: 600;}

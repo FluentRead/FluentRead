@@ -9,6 +9,16 @@ import {writingSite, isWritingEditor, findReplyEditors, editorText, captureEdito
 import {parseWritingRequest} from '@/src/features/writing-assistant/background';
 export const request = {type: 'fluentReadWriting', action: 'run', requestId: 'write-1', intent: 'draft', instruction: 'Write an invitation', draft: '', context: '', language: 'zh-CN', tone: 'natural', history: []} as const;
 describe('Writing readiness shared by settings, card and runtime', () => {
+  it('blocks a disabled independent or inherited service without changing its model or credentials', () => {
+    const config = new Config(); config.service = 'openai'; config.model.openai = 'writer'; config.token.openai = 'fixture';
+    config.disabledTranslationServices = ['openai'];
+    for (const service of ['', 'openai']) {
+      config.writing.service = service;
+      const before = JSON.stringify(config);
+      for (const credentials of [true, false]) expect(resolveWritingReadiness(config, credentials)).toMatchObject({ready: false, issue: 'unavailable', service: 'openai', model: 'writer', message: expect.stringContaining('已关闭')});
+      expect(JSON.stringify(config)).toBe(before);
+    }
+  });
   it('keeps an unavailable saved AI service and model while preventing generation even with complete configuration', () => {
     const config = new Config(); config.service = services.chatgptPlan; config.model[services.chatgptPlan] = 'saved-account-model';
     const before = JSON.stringify(config);

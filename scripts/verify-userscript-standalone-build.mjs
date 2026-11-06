@@ -30,11 +30,11 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// Current main 35da5a47d measures 3,624,686 bytes with locked dependencies
-// and Node 22.23.2. CloudGPU adds 520 bytes, measuring 3,625,206 bytes.
-// Preserve main's existing 314-byte allowance and round the 520-byte feature
-// increment up to 1 KB. This is an explicit 1 KB feature budget update;
-// the regular Greasy Fork artifact keeps its separate 2 MB limit.
-const maxBytes = 3_626_000;
+// Main 2b9645bc2 measures 3,631,889 bytes with locked dependencies. Service
+// availability controls, seven locale labels, persistent defaults and shared
+// request guards measure 3,637,675 bytes: a reviewed 5,786-byte feature
+// increment. Add a bounded 6 KB budget increment (1,325 bytes spare); the
+// regular Greasy Fork artifact retains its separate 2 MB platform limit.
+const maxBytes = 3_639_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

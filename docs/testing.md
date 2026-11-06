@@ -71,6 +71,7 @@ pnpm compile
 | <span id="popup-首次打开与语言引导"></span>Popup 首次打开与语言引导 | [查看](testing/popup.md#popup-首次打开与语言引导) |
 | <span id="popup-操作恢复与翻译服务-ui"></span>Popup 操作恢复与翻译服务 UI | [查看](testing/popup.md#popup-操作恢复与翻译服务-ui) |
 | <span id="划词行内代码与代码块-issue-704、-845"></span>划词行内代码与代码块（issue #704、#845） | [查看](testing/webpage.md#划词行内代码与代码块-issue-704、-845) |
+| <span id="编辑器内显式选区-issue-1237"></span>编辑器内显式选区（issue #1237） | [查看](testing/webpage.md#编辑器内显式选区-issue-1237) |
 | <span id="同目标语言跳过与统一语言判断"></span>同目标语言跳过与统一语言判断 | [查看](testing/webpage.md#同目标语言跳过与统一语言判断) |
 | <span id="冻结真实网页的完整扩展-a-b"></span>冻结真实网页的完整扩展 A/B | [查看](testing/webpage.md#冻结真实网页的完整扩展-a-b) |
 | <span id="原文回显与逐槽恢复"></span>原文回显与逐槽恢复 | [查看](testing/webpage.md#原文回显与逐槽恢复) |
@@ -138,6 +139,7 @@ pnpm compile
 | <span id="论文版式回归"></span>论文版式回归 | [查看](testing/documents.md#论文版式回归) |
 | <span id="扫描版-pdf-识别"></span>扫描版 PDF 识别 | [查看](testing/documents.md#扫描版-pdf-识别) |
 | <span id="pdf-在线与本地划词"></span>PDF 在线与本地划词 | [查看](testing/documents.md#pdf-在线与本地划词) |
+| 悬浮球边距（issue #1225） | [查看](testing/settings.md#悬浮球边距-issue-1225) |
 | <span id="划词窗口拖动与缩放-issue-525"></span>划词窗口拖动与缩放（issue #525） | [查看](testing/settings.md#划词窗口拖动与缩放-issue-525) |
 | <span id="单篇篇章参考"></span>单篇篇章参考 | [查看](testing/providers.md#单篇篇章参考) |
 | <span id="ai-多段请求合并"></span>AI 多段请求合并 | [查看](testing/providers.md#ai-多段请求合并) |

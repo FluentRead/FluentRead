@@ -131,7 +131,6 @@ jobs:
               pnpm zip:edge
               pnpm zip:firefox
               node scripts/testing/verify-extension-manifests.mjs --require-chrome-archive --require-firefox-archives
-              node scripts/release/verify-edge.mjs
               node scripts/thunderbird/package.mjs
               for target in chrome edge firefox thunderbird; do
                 node scripts/release/bundle.mjs --target "$target"

@@ -28,6 +28,17 @@ async function pollValue(read, accepts, label, timeout=30000) {
  do {const value=await read();if(accepts(value))return value;await new Promise(resolve=>setTimeout(resolve,50));} while(Date.now()<until);
  throw new Error('Timed out waiting for '+label);
 }
+async function readTranslationStatus(page, tabId) {
+ return page.evaluate(async id=>{
+  try {const state=await chrome.tabs.sendMessage(id,{type:'getFullPageTranslationState'},{frameId:0});return {status:state?.toolbarStatus,code:state?.diagnostic?.code};}
+  catch {return undefined;}
+ },tabId);
+}
+async function waitForCompletedTranslation(page, tabId, timeout=30000) {
+ const status=await pollValue(()=>readTranslationStatus(page,tabId),value=>value?.status==='translated','the completed page translation',timeout);
+ await page.locator('[data-testid="page-translation"][aria-pressed="true"][aria-busy="false"]').waitFor({timeout});
+ return status;
+}
 async function fitNativePopup(page) {
  const width=await page.evaluate(()=>Math.ceil(parseFloat(getComputedStyle(document.documentElement).width)));
  assert.ok(width>=300&&width<=420,'Use the production popup intrinsic width');await page.setViewportSize({width,height:600});
@@ -48,6 +59,26 @@ async function assertCollapsedDiagnostic(page, code, label) {
  assert.ok(metrics.height>0&&metrics.height<=24&&metrics.width<=28,'Default diagnosis must be a small icon: '+JSON.stringify(metrics));
  assert.ok(metrics.right<=metrics.viewport,'Status trigger stays inside popup');
  (result.collapsedDiagnosticLayouts ||= {})[label]=metrics;return notice;
+}
+// 测量真实布局，防止状态入口出现后挤换行或遮住主操作与网站规则。
+async function readDiagnosticMenuLayout(page) {
+ return page.evaluate(() => {
+  const selectors={hero:'.hero-card',main:'[data-testid="page-translation"]',label:'.translate-label',section:'[data-testid="section-translation"]',always:'[data-setting="always-translate-site"]',disable:'[data-setting="disable-extension-site"]',font:'[data-testid="page-font-entry"]',mode:'[data-testid="popup-display-mode"]',quick:'[data-popup-module="quickFeatures"]',trigger:'[data-diagnostic-details-toggle]'};
+  const rect=element=>{if(!element)return null;const r=element.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};};
+  const boxes=Object.fromEntries(Object.entries(selectors).map(([key,selector])=>[key,rect(document.querySelector(selector))]));
+  const hits=Object.fromEntries(['main','section','always','disable','font','mode','trigger'].map(key=>{const r=boxes[key];return [key,Boolean(r&&document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest(selectors[key]))];}));
+  return {boxes,hits};
+ });
+}
+function assertDiagnosticMenuStable(before, after) {
+ for(const key of ['hero','main','section','always','disable','font','mode','quick']) {
+  assert.ok(before.boxes[key]&&after.boxes[key],key+' is present');
+  for(const dimension of ['x','y','width','height'])assert.ok(Math.abs(before.boxes[key][dimension]-after.boxes[key][dimension])<0.5,`${key} moved in ${dimension}`);
+ }
+ const {main,label,trigger}=after.boxes;
+ assert.ok(trigger.x>=main.x&&trigger.right<=main.right&&trigger.y>=main.y&&trigger.bottom<=main.bottom,'Diagnostic stays within its reserved action area');
+ assert.ok(label.right<=trigger.x||trigger.right<=label.x||label.bottom<=trigger.y||trigger.bottom<=label.y,'Diagnostic does not cover the action label');
+ assert.ok(Object.values(after.hits).every(Boolean),'Each control remains independently clickable');
 }
 async function openDiagnosticDetails(page, code) {
  const notice=diagnosticNotice(page,code),toggle=notice.locator('[data-diagnostic-details-toggle]');
@@ -97,8 +128,8 @@ async function previewDiagnostic(page, code) {
    await popup.locator('[data-testid="page-translation"]').waitFor();
    assert.ok((await popup.locator('.provider-summary-heading strong').textContent()).includes('免费'));
    await popup.locator('[data-testid="page-translation"]').evaluate(el=>el.click());
-   await popup.waitForFunction(()=>document.querySelector('[data-diagnostic-code]') || document.querySelector('.first-use-hint')?.textContent?.includes('译文已显示'),{},{timeout:120000});
-   result.liveDefault = await popup.evaluate(async tabId=>{const s=await chrome.tabs.sendMessage(tabId,{type:'getFullPageTranslationState'},{frameId:0});return {status:s?.toolbarStatus,code:s?.diagnostic?.code};},tabId);
+   result.liveDefault = await pollValue(()=>readTranslationStatus(popup,tabId),value=>value?.status==='translated'||Boolean(value?.code),'default translation or diagnosis',120000);
+   if(result.liveDefault.status==='translated')await popup.locator('[data-testid="page-translation"][aria-pressed="true"][aria-busy="false"]').waitFor();
    await shot(popup,'02-default-free-live');
    assert.equal(result.liveDefault.status,'translated','Default free translation must actually succeed for this live check.');record('live default free service translates public synthetic fixture');
    if(await popup.locator('[data-testid="page-translation"][aria-pressed="true"]').count())await popup.locator('[data-testid="page-translation"]').evaluate(el=>el.click());
@@ -118,7 +149,7 @@ async function previewDiagnostic(page, code) {
   await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();
   const click = async selector => popup.locator(selector).evaluate(el => el.click());
   await click('[data-testid="page-translation"]');
-  await popup.locator('.first-use-hint').filter({hasText:'译文已显示'}).waitFor({timeout:30000});
+  await waitForCompletedTranslation(popup,tabId);
   assert.ok(await source.locator('.fluentread-translation').count() || await source.locator('[data-fluentread-translation]').count() || (await source.content()).includes('跨越语言阅读'));
   record('first actual provider fixture result, not merely started');await shot(popup,'03-first-success');
   // 保持面板打开，同 URL 刷新后从独立消息触发翻译，仅靠新文档广播更新面板。
@@ -138,7 +169,7 @@ async function previewDiagnostic(page, code) {
   result.refreshAfterReady = await popup.evaluate(tabId=>chrome.tabs.sendMessage(tabId,{type:'getFullPageTranslationState'},{frameId:0}),tabId);
   result.refreshCommand = await popup.evaluate(tabId=>chrome.tabs.sendMessage(tabId,{type:'contextMenuTranslate',action:'fullPage'},{frameId:0}),tabId);
   assert.equal(result.refreshCommand?.status,'success','Refreshed document must acknowledge the independent translation command');assert.equal(result.refreshCommand.documentToken,result.refreshBefore.documentToken);assert.equal(result.refreshCommand.isTranslated,true);
-  await popup.locator('.first-use-hint').filter({hasText:'译文已显示'}).waitFor({timeout:30000});
+  await waitForCompletedTranslation(popup,tabId);
   result.refreshTransitions=await popup.evaluate(()=>window.__selfHelpTransitions);result.previousDocumentToken=previousDocumentToken;
   result.refreshRuns.push({previousDocumentToken,before:result.refreshBefore,command:result.refreshCommand,transitions:result.refreshTransitions});
   }
@@ -148,8 +179,11 @@ async function previewDiagnostic(page, code) {
    mode = testMode;
    // A new document removes translation cache identity while keeping the same fixed source tab.
    await source.goto(base + '/article?case=' + testMode);
-   await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();await click('[data-testid="page-translation"]');
+   await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();
+   const menuBefore=await readDiagnosticMenuLayout(popup);await click('[data-testid="page-translation"]');
    await popup.locator(`[data-diagnostic-code="${expected}"]`).waitFor({timeout:30000});
+   const menuAfter=await readDiagnosticMenuLayout(popup);assertDiagnosticMenuStable(menuBefore,menuAfter);
+   (result.diagnosticMenuLayouts ||= {})[testMode]={before:menuBefore,after:menuAfter};
    await assertCollapsedDiagnostic(popup,expected,testMode);await shot(popup,'04-' + testMode);record('actual '+testMode+' error classified');
    if (testMode === 'auth') {
     await previewDiagnostic(popup,'authentication');
@@ -187,7 +221,7 @@ async function previewDiagnostic(page, code) {
    await assertCollapsedDiagnostic(popup,failure,failure);await shot(popup,'09-'+failure);record('actual '+failure+' recovery state');
    await context.setOffline(false);mode = 'success';
    await activateDiagnosticAction(popup,'retry',failure);
-   await popup.locator('.first-use-hint').filter({hasText:'译文已显示'}).waitFor({timeout:30000});record('explicit retry resumes the same page after '+failure);
+   await waitForCompletedTranslation(popup,tabId);record('explicit retry resumes the same page after '+failure);
   }
   mode='hold';await source.goto(base+'/article?case=cancel');await popup.reload();await popup.locator('[data-testid="page-translation"]').waitFor();await click('[data-testid="page-translation"]');
   let until=Date.now()+10000;while(!requests.some(r=>r.mode==='hold')&&Date.now()<until)await new Promise(r=>setTimeout(r,50));assert.ok(requests.some(r=>r.mode==='hold'));

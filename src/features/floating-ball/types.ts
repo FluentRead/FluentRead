@@ -1,7 +1,7 @@
 /**
  * @file src/features/floating-ball/types.ts
  * 文件职责：定义悬浮球 feature 在运行时与视图之间传递的展示契约类型，让高级外观配置有唯一的结构来源。
- * 主要内容：FloatingBallPresentation 描述按钮显示方式、展开延迟、点击行为、紧凑尺寸、设置入口可见性与收起不透明度六项可配置外观。
+ * 主要内容：FloatingBallPresentation 描述按钮显示方式、展开延迟、点击行为、紧凑尺寸、设置入口、收起不透明度和两种横向边距。
  * 模块边界：本文件只包含类型声明，不读取配置、不包含默认值推导，也不触碰 DOM；归一化属于 core/config，装配与订阅属于 content/runtime，渲染属于 ui。
  */
 import type {FloatingBallClickAction, FloatingBallToolsDisplay} from '@/src/core/config/model';
@@ -20,4 +20,8 @@ export interface FloatingBallPresentation {
   settingsEntryVisible: boolean;
   /** 收起状态下的不透明度百分比（20-100）。 */
   collapsedOpacity: number;
+  /** 收起或常驻状态下，悬浮球主体到视口边缘的水平距离（px，可为负数）。 */
+  defaultMargin: number;
+  /** 鼠标悬停展开时，悬浮球主体到视口边缘的水平距离（px，可为负数）。 */
+  popoutMargin: number;
 }

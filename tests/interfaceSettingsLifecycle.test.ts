@@ -2,6 +2,7 @@ import {readFileSync} from 'node:fs'
 import {resolve} from 'node:path'
 import {parseHTML} from 'linkedom'
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest'
+vi.mock('@/src/platform/browser/translationSidepanel', () => ({canOpenTranslationSidepanel: () => false}))
 
 // 实际 SFC setup/watch/KeepAlive；原生弹窗和缓存由隔离生产扩展另验。
 import * as runtime from 'vue'

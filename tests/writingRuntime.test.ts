@@ -16,6 +16,14 @@ function stream(parts: any[] = [{type: 'text-delta', text: 'Draft'}], actual = '
 beforeEach(() => { mocks.stream.mockReset().mockImplementation(() => stream()); mocks.model.mockClear(); mocks.normalize.mockClear(); });
 afterEach(() => vi.useRealTimers());
 describe('Writing model runtime', () => {
+  it('rejects disabled services before memory lookup, model creation and streaming', async () => {
+    const current = config(); current.disabledTranslationServices = ['openai']; const recall = vi.fn();
+    const before = JSON.stringify(current);
+    await expect(createWritingRuntime(() => current, undefined, {recall})(request, controller().signal, vi.fn()))
+      .resolves.toMatchObject({success: false, error: expect.stringContaining('已关闭')});
+    expect(recall).not.toHaveBeenCalled(); expect(mocks.model).not.toHaveBeenCalled(); expect(mocks.stream).not.toHaveBeenCalled();
+    expect(JSON.stringify(current)).toBe(before);
+  });
   it('rejects saved public ChatGPT before memory, model creation or stream and retains preferences', async () => {
     const current = config(); current.writing.service = services.chatgptPlan; current.writing.model = 'saved-account-model';
     const before = JSON.stringify(current); const recall = vi.fn();

@@ -19,6 +19,7 @@ import * as clickSelectionRuntime from '@/src/features/selection-translation/con
 import {services} from '@/src/core/config/catalog';
 import * as vocabularyProtocol from '@/src/features/vocabulary/protocol';
 import * as visualViewport from '@/src/platform/dom/visualViewport';
+import * as selectionZoom from '@/src/features/selection-translation/pageZoom';
 import * as modalDialogHost from '@/src/features/selection-translation/content/modalDialogHost';
 import {beginMaterialCapture as beginCapture, completeMaterialCapture as completeCapture, type MaterialSelection} from '@/src/features/vocabulary/materialCapture';
 import {observeNativePdfSelectionCard} from '@/src/app/selection/cardVisibility';
@@ -2763,6 +2764,26 @@ describe('automatic card audio layout', () => {
     });
 });
 
+describe('editable text selection capture', () => {
+    it('shows the selection entry for a user-selected range contained by one contenteditable host', async () => {
+        const fixture = mountSelection();
+        fixture.config.selectionTranslatorTrigger = 'icon';
+        fixture.config.selectionTranslatorDelay = 0;
+        fixture.notifyConfig(); await Vue.nextTick();
+        const selected = fixture.selectedSnapshot('Good ideas deserve attention.', parent => {
+            parent.setAttribute('contenteditable', 'true');
+        });
+
+        fixture.state.applySelection(selected);
+        await Vue.nextTick();
+
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.state.showIndicator).toBe(true);
+        expect(fixture.state.showTooltip).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
+    });
+});
+
 describe('context menu selection ownership', () => {
     async function prepareMenu(browserTarget: SelectionBuildTarget = 'chrome') {
         const fixture = mountSelection(false, undefined, browserTarget);
@@ -3047,15 +3068,49 @@ describe('context menu selection ownership', () => {
         expect(fixture.translateText).toHaveBeenCalledTimes(1);
     });
 
-    it('allows a contenteditable=false text island while rejecting inherited editable targets', async () => {
+    it('leaves editable target validation to Range ownership while still rejecting native inputs', async () => {
         const fixture = await prepareMenu();
-        const editableParent = {getAttribute: () => 'true', parentElement: null};
-        const target = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
-            closest: () => null, getAttribute: () => 'false', parentElement: editableParent,
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
         });
-        expect(fixture.state.isContextMenuInputTarget(target)).toBe(false);
-        target.getAttribute = () => null;
-        expect(fixture.state.isContextMenuInputTarget(target)).toBe(true);
+        expect(fixture.state.isContextMenuInputTarget(editor)).toBe(false);
+        expect(fixture.state.isContextMenuInputTarget(fixture.inputTarget)).toBe(true);
+    });
+
+    it('captures and translates an editor selection only when the menu target shares its editable root', async () => {
+        const fixture = await prepareMenu();
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
+        });
+        fixture.paragraph.parentElement = editor;
+
+        fixture.state.handleContextMenu({isTrusted: true, target: editor});
+        expect(fixture.state.contextMenuSelection).not.toBeNull();
+        expect(fixture.contextMenuHandler('Good ideas deserve attention.')).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        for (let attempt = 0; attempt < 5; attempt++) {await Promise.resolve(); await Vue.nextTick();}
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
+
+    it('rejects a stale page Range when the context menu opens in a different editable root', async () => {
+        const fixture = await prepareMenu();
+        const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
+            nodeType: 1,
+            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
+        });
+
+        fixture.state.handleContextMenu({isTrusted: true, target: editor});
+        expect(fixture.state.contextMenuSelection).toBeNull();
+        expect(fixture.state.contextMenuSourceRejected).toBe(true);
+        expect(fixture.contextMenuHandler('Good ideas deserve attention.')).toBe(false);
+        expect(fixture.translateText).not.toHaveBeenCalled();
     });
 
     it.each(['disconnected', 'foreign-document', 'collapsed', 'text-changed', 'protected'] as const)(
@@ -3237,6 +3292,150 @@ it('相同译文隐藏后，切换选区与不同结果仍恢复显示', async (
 
 
 describe('selection card bounded layout work', () => {
+    async function automaticCard(viewportHeight = 500, anchorTop = 230, anchorBottom = 250) {
+        const fixture = mountSelection();
+        let height = 80;
+        const range = {getClientRects: vi.fn(() => [])};
+        const cardRect = vi.fn(() => ({width: 388, height}));
+        Object.assign(fixture.state, {
+            snapshot: {text: 'Practice helps.', range, anchor: {left: 80, right: 180, top: anchorTop, bottom: anchorBottom, width: 100, height: anchorBottom - anchorTop}, isForward: true},
+            tooltipRef: {getBoundingClientRect: cardRect}, showTooltip: true,
+            viewportSize: {left: 0, top: 0, right: 1000, bottom: viewportHeight, width: 1000, height: viewportHeight},
+        });
+        fixture.state.updatePosition(false); await Vue.nextTick();
+        return {...fixture, range, cardRect, setHeight(value: number) {height = value;}};
+    }
+
+    it('does not push a constrained automatic card back over its selected line', async () => {
+        const fixture = await automaticCard(270, 100, 125);
+        fixture.setHeight(520);
+        fixture.state.updatePosition(false); await Vue.nextTick();
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '135px', maxHeight: '123px'});
+        expect(parseFloat(fixture.state.tooltipStyle.top)).toBeGreaterThanOrEqual(135);
+        expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+    });
+
+    it('repositions growing content, keeps the cap stable and releases it after content shrinks', async () => {
+        const fixture = await automaticCard();
+        expect(fixture.state.tooltipStyle.top).toBe('140px');
+        fixture.setHeight(520);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '260px', maxHeight: '228px'});
+        fixture.setHeight(228);
+        for (let index = 0; index < 4; index++) {
+            fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+            expect(fixture.state.tooltipStyle).toMatchObject({top: '260px', maxHeight: '228px'});
+        }
+        fixture.setHeight(100);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '120px', maxHeight: '368px'});
+        expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
+        expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+    });
+
+    it('releases an old automatic cap when the visible viewport expands', async () => {
+        const fixture = await automaticCard(270, 100, 125);
+        fixture.setHeight(520); fixture.state.updatePosition(false); await Vue.nextTick();
+        fixture.setHeight(123);
+        fixture.window.innerHeight = 800;
+        fixture.state.handleViewportResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '135px', maxHeight: '520px'});
+        expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+    });
+
+    it('remeasures a reflowed range once per viewport frame and keeps the whole new selection clear', async () => {
+        const fixture = await automaticCard();
+        const rects = [
+            {left: 20, right: 250, top: 100, bottom: 124, width: 230, height: 24},
+            {left: 20, right: 180, top: 124, bottom: 148, width: 160, height: 24},
+        ];
+        fixture.range.getClientRects.mockReturnValue(rects as never[]);
+        fixture.window.innerHeight = 500;
+        fixture.state.handleViewportResize();
+        fixture.state.handleViewportResize();
+        fixture.state.scheduleAutomaticPopupResize();
+        await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+        expect(fixture.state.snapshot.anchor).toEqual(rects[1]);
+        expect(fixture.state.snapshot.popupAnchor).toEqual({...rects[1], top: 100, height: 48});
+        const top = parseFloat(fixture.state.tooltipStyle.top);
+        expect(top + 80 <= 90 || top >= 158).toBe(true);
+        fixture.state.scheduleAutomaticPopupResize(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+    });
+
+    it('keeps a usable full-card fallback when selected text occupies all vertical space', async () => {
+        const fixture = await automaticCard(270, 10, 260);
+        expect(fixture.state.isShortViewport()).toBe(true);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '0px', maxHeight: '270px'});
+    });
+
+    it('scales the saved anchor together with automatic geometry before a zoom resize', async () => {
+        const fixture = await automaticCard(270, 100, 125);
+        fixture.setHeight(520); fixture.state.updatePosition(false); await Vue.nextTick();
+        vi.spyOn(selectionZoom, 'normalizeSelectionPageZoom').mockReturnValue(2);
+        fixture.setHeight(260);
+        fixture.state.applyPageZoom(2); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.snapshot.anchor).toMatchObject({left: 40, right: 90, top: 50, bottom: 62.5, width: 50, height: 12.5});
+        expect(parseFloat(fixture.state.tooltipStyle.top)).toBeGreaterThanOrEqual(72.5);
+        expect(fixture.range.getClientRects).toHaveBeenCalledOnce();
+    });
+
+    it('observes only the current card, reflows on resize and disconnects on unmount', async () => {
+        const callbacks: (() => void)[] = [];
+        const observe = vi.fn(), disconnect = vi.fn();
+        vi.stubGlobal('ResizeObserver', class {
+            constructor(callback: () => void) {callbacks.push(callback);}
+            observe = observe;
+            disconnect = disconnect;
+        });
+        const fixture = await automaticCard();
+        expect(observe).toHaveBeenCalledWith(fixture.state.tooltipRef);
+        fixture.setHeight(520); callbacks.at(-1)!(); await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.tooltipStyle).toMatchObject({top: '260px', maxHeight: '228px'});
+        fixture.unmount();
+        expect(disconnect).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('uses whole-card scrolling for a constrained side without treating the whole viewport as short', async () => {
+        const fixture = mountSelection(false, undefined, 'chrome', true), port = fixture.renderPort!;
+        Object.assign(fixture.state, {
+            snapshot: {text: 'Practice helps.', range: {}, anchor: {left: 80, right: 180, top: 100, bottom: 125, width: 100, height: 25}, isForward: true},
+            showTooltip: true, translationResult: '保留可滚动的译文。'.repeat(40),
+            viewportSize: {left: 0, top: 0, right: 1000, bottom: 270, width: 1000, height: 270},
+        });
+        await Vue.nextTick();
+        const card = port.root.querySelector('.fr-translation-tooltip') as HTMLElement;
+        card.getBoundingClientRect = () => ({width: 388, height: 80}) as DOMRect;
+        fixture.state.tooltipRef = Vue.markRaw(card);
+        fixture.state.updatePosition(false); await Vue.nextTick(); await Vue.nextTick();
+        expect(fixture.state.isShortViewport()).toBe(false);
+        expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
+        expect(card.classList.contains('fr-short-viewport')).toBe(true);
+        expect(card.style.getPropertyValue('top')).toBe('135px');
+        expect(card.style.getPropertyValue('max-height')).toBe('123px');
+        expect(card.querySelector('[aria-label="关闭翻译结果"]')).not.toBeNull();
+        expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+    });
+
+    it('coalesces resize and ordinary events without rereading the source and clears pending work on close', async () => {
+        const fixture = await automaticCard();
+        fixture.setHeight(520);
+        fixture.cardRect.mockClear();
+        fixture.state.schedulePositionUpdate(); fixture.state.scheduleAutomaticPopupResize();
+        await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.cardRect).toHaveBeenCalledOnce();
+        expect(fixture.range.getClientRects).not.toHaveBeenCalled();
+        fixture.state.scheduleAutomaticPopupResize(); fixture.state.hideAll();
+        const settled = {...fixture.state.tooltipStyle};
+        await vi.advanceTimersByTimeAsync(32);
+        expect(fixture.state.tooltipStyle).toEqual(settled);
+        expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
+        fixture.unmount(); expect(vi.getTimerCount()).toBe(0);
+    });
+
     async function gestureFixture(edge = '') {
         const fixture = mountSelection();
         const frames = new Map<number, FrameRequestCallback>();
@@ -3272,6 +3471,16 @@ describe('selection card bounded layout work', () => {
         const flush = () => {const pending = [...frames.values()];frames.clear();pending.forEach(callback => callback(0));};
         return {...fixture, element, frames, pointer, flush};
     }
+
+    it('keeps user geometry fixed after dragging and clears automatic constraints', async () => {
+        const fixture = await gestureFixture();
+        expect(fixture.state.popupPositionManuallyAdjusted).toBe(true);
+        expect(fixture.state.anchoredPopupMaxHeight).toBeNull();
+        fixture.state.scheduleAutomaticPopupResize();
+        expect(fixture.frames.size).toBe(0);
+        fixture.state.resetPopupGeometry();
+        expect(fixture.state.popupPositionManuallyAdjusted).toBe(false);
+    });
 
     it('leaves short-card touch pans native instead of capturing a title drag, then restores normal dragging', async () => {
         const {state, window, element, pointer, frames} = await gestureFixture();

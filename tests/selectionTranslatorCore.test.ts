@@ -4,7 +4,9 @@ import {
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
+    getSelectionPopupAnchor,
     getSelectionPresentationDelayRemaining,
+    getEditableSelectionRoot,
     isSameLanguage,
     isSelectionExcludedTagName,
     normalizeSelectionText,
@@ -302,6 +304,74 @@ describe('issue #704 inline code in prose selections', () => {
     });
 });
 
+describe('explicit selections inside editable text', () => {
+    function fixture(html: string) {
+        const {document} = parseHTML('<html><body><main><p></p></main></body></html>');
+        const paragraph = document.querySelector('p')!;
+        paragraph.innerHTML = html;
+        const range = mockRange(paragraph.firstChild, paragraph.lastChild, {
+            commonAncestor: paragraph, intersectingNodes: [...paragraph.querySelectorAll('*')],
+        });
+        return {document, paragraph, range};
+    }
+
+    it('allows a complete range in one local editor only for the normal selection flow', () => {
+        const inside = fixture('<span contenteditable="true">Read this editor text.</span>');
+        expect(shouldIgnoreSelection(inside.range)).toBe(true);
+        expect(shouldIgnoreSelection(inside.range, true)).toBe(false);
+
+        const crossing = fixture('<span contenteditable="true">Editor text.</span> Outside text.');
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+    });
+
+    it.each([
+        '<span contenteditable="true" data-fluent-read-ui>Extension text.</span>',
+        '<span contenteditable="true" aria-hidden="true">Hidden text.</span>',
+        '<span contenteditable="true" translate="no">Protected text.</span>',
+        '<textarea>Input text.</textarea>',
+    ])('keeps protected editor content out: %s', html => {
+        expect(shouldIgnoreSelection(fixture(html).range, true)).toBe(true);
+    });
+
+    it('recognizes textbox descendants and retains native controls inside an editor', () => {
+        expect(shouldIgnoreSelection(fixture('<span role="textbox"><i>Editor text.</i></span>').range, true)).toBe(false);
+        const input = fixture('<span contenteditable="true"><button>Protected action</button></span>');
+        input.document.querySelector('button')!.getClientRects = () => [{width: 80, height: 20}] as unknown as DOMRectList;
+        expect(shouldIgnoreSelection(input.range, true)).toBe(true);
+        const crossing = fixture('Before <span role="textbox">Editor text.</span> after.');
+        crossing.document.querySelector('[role="textbox"]')!.getClientRects = () => [{width: 80, height: 20}] as unknown as DOMRectList;
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+    });
+
+    it('resolves inherited editability and stops at noneditable and document boundaries', () => {
+        expect(getEditableSelectionRoot(null)).toBeNull();
+        const {document} = fixture('Text');
+        expect(getEditableSelectionRoot(document)).toBeNull();
+        document.body.setAttribute('contenteditable', 'true');
+        expect(getEditableSelectionRoot(document.body)).toBeNull();
+        const parent = document.createElement('section');
+        Object.defineProperty(parent, 'isContentEditable', {value: false});
+        const editor = document.createElement('div');
+        Object.defineProperty(editor, 'isContentEditable', {value: true});
+        parent.append(editor);
+        expect(getEditableSelectionRoot(editor)).toBe(editor);
+        editor.remove();
+        expect(getEditableSelectionRoot(editor)).toBe(editor);
+        editor.setAttribute('contenteditable', 'false');
+        expect(getEditableSelectionRoot(editor)).toBeNull();
+        editor.innerHTML = '<span contenteditable="true">Local editor</span>';
+        expect(getEditableSelectionRoot(editor.firstChild)).toBe(editor.firstChild);
+    });
+
+    it.each(['missing', 'throws'] as const)('checks ancestry when an editor contains method %s', mode => {
+        const value = fixture('<span contenteditable="true"><i>Selected text.</i></span>');
+        Object.defineProperty(value.paragraph.firstChild, 'contains', {value: mode === 'missing' ? undefined
+            : () => {throw new Error('host contains unavailable');}});
+        const text = value.document.querySelector('i')!.firstChild!;
+        expect(shouldIgnoreSelection(mockRange(text, text, {commonAncestor: text}), true)).toBe(false);
+    });
+});
+
 describe('document no-translate shells in explicit selections', () => {
     function fixture(htmlAttributes = '', bodyAttributes = '', content = '<p id="content">Readable response text.</p>') {
         const {document} = parseHTML(`<html ${htmlAttributes}><head></head><body ${bodyAttributes}><div id="root">${content}</div></body></html>`);
@@ -552,6 +622,16 @@ describe('selection translator core geometry', () => {
         expect(chooseSelectionRect([])).toBeNull();
     });
 
+    it('keeps every selected line clear while aligning to the directional endpoint', () => {
+        expect(getSelectionPopupAnchor([])).toBeNull();
+        expect(getSelectionPopupAnchor([rects[0]])).toEqual(rects[0]);
+        expect(getSelectionPopupAnchor(rects)).toEqual({...rects[1], top: 100, height: 48});
+        expect(getSelectionPopupAnchor(rects, false)).toEqual({...rects[0], bottom: 148, height: 48});
+        const anchor = getSelectionPopupAnchor(rects)!;
+        const card = calculateSelectionPopupPosition(anchor, {width: 360, height: 80}, {width: 1000, height: 500});
+        expect(card.top + 80 <= anchor.top - 10 || card.top >= anchor.bottom + 10).toBe(true);
+    });
+
     it('keeps the popup above the selection when there is room', () => {
         expect(calculateSelectionPopupPosition({ ...rects[0], top: 300, bottom: 324 }, { width: 360, height: 160 }, { width: 1200, height: 800 })).toEqual({
             left: 80,
@@ -572,6 +652,39 @@ describe('selection translator core geometry', () => {
         expect(calculateSelectionPopupPosition({top: 120, bottom: 144, left: 20, right: 100, width: 80, height: 24},
             {width: 280, height: 160}, {left: 80, top: 100, width: 320, height: 300}))
             .toEqual({left: 92, top: 154, placement: 'bottom'});
+    });
+
+    it.each([
+        {top: 100, bottom: 125, expected: {top: 135, placement: 'bottom', maxHeight: 123}},
+        {top: 160, bottom: 185, expected: {top: 12, placement: 'top', maxHeight: 138}},
+        {top: 123, bottom: 147, expected: {top: 12, placement: 'top', maxHeight: 101}},
+    ])('bounds a tall card beside the selected line: $top–$bottom', ({top, bottom, expected}) => {
+        expect(calculateSelectionPopupPosition({top, bottom, left: 80, right: 180, width: 100, height: bottom - top},
+            {width: 360, height: 520}, {width: 1000, height: 270})).toEqual({left: 80, ...expected});
+    });
+
+    it.each([
+        {top: 500, bottom: 524, placement: 'top'},
+        {top: -100, bottom: -76, placement: 'bottom'},
+    ] as const)('bounds a saved anchor outside the visible viewport: $placement', ({top, bottom, placement}) => {
+        expect(calculateSelectionPopupPosition({top, bottom, left: 80, right: 180, width: 100, height: 24},
+            {width: 360, height: 520}, {width: 1000, height: 300}))
+            .toEqual({left: 80, top: 12, placement, maxHeight: 276});
+    });
+
+    it('keeps visible lines clear across card heights and viewport sizes', () => {
+        for (const viewportHeight of [170, 270, 500, 900]) {
+            for (let top = 12; top <= viewportHeight - 36; top += 17) {
+                const anchor = {top, bottom: top + 24, left: 80, right: 180, width: 100, height: 24};
+                for (const height of [80, 240, 520]) {
+                    const result = calculateSelectionPopupPosition(anchor, {width: 360, height}, {width: 1000, height: viewportHeight});
+                    const displayedHeight = result.maxHeight ?? height;
+                    expect(result.top).toBeGreaterThanOrEqual(12);
+                    expect(result.top + displayedHeight).toBeLessThanOrEqual(viewportHeight - 12);
+                    expect(result.top + displayedHeight <= anchor.top - 10 || result.top >= anchor.bottom + 10).toBe(true);
+                }
+            }
+        }
     });
 
 

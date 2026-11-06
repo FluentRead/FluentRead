@@ -7,8 +7,9 @@ import {
   searchServiceOptions,
   splitServiceChoices,
 } from '@/src/ui/view-model/serviceCatalog'
-import { customModelString, defaultModels, models, services, servicesType } from '@/src/core/config/catalog'
+import { customModelString, defaultModels, models, options as catalogOptions, services, servicesType } from '@/src/core/config/catalog'
 import { Config, normalizeConfig } from '@/src/core/config/model'
+import {filterEnabledTranslationServices, isTranslationServiceDisabled, markDisabledTranslationServices, normalizeDisabledTranslationServices} from '@/src/core/config/serviceAvailability'
 
 const options = [
   { value: 'machine', label: '机器翻译', disabled: true },
@@ -294,5 +295,42 @@ describe('service catalog helpers', () => {
     )
     expect(pending.common.map((item) => item.value)).toEqual(['freeTranslation', 'openai', 'microsoft', 'google', 'bilibili'])
     expect(pending.more.map((item) => item.value)).toEqual(['deepL', 'deepseek'])
+  })
+})
+
+describe('service availability helpers', () => {
+  it('retains disabled services inside their original directory groups so they can be re-enabled', () => {
+    const marked = markDisabledTranslationServices(options, ['microsoft', 'openai'])
+    const groups = buildServiceGroups(marked)
+    expect(groups.map(group => group.id)).toEqual(['machine', 'ai'])
+    expect(groups[0].items.find(item => item.value === 'microsoft')).toMatchObject({disabled: true})
+    expect(groups[1].items.find(item => item.value === 'openai')).toMatchObject({disabled: true})
+    expect(buildServiceSections(marked).flatMap(section => section.groups.flatMap(group => group.items)).map(item => item.value))
+      .toContain('openai')
+    const actualGroups = buildServiceGroups(markDisabledTranslationServices(catalogOptions.services, ['microsoft', 'tencent', 'openai']))
+    expect(actualGroups.map(group => group.id)).toEqual(['machine', 'cloud', 'ai'])
+    expect(actualGroups[1].items.find(item => item.value === 'tencent')).toMatchObject({disabled: true})
+  })
+  it('preserves inherent disabled flags, treats absent lists as enabled and never mutates the catalog', () => {
+    const catalog = [{value: 'fixed', disabled: true}, {value: 'active'}]
+    expect(markDisabledTranslationServices(catalog, [])).toEqual(catalog)
+    expect(markDisabledTranslationServices(catalog, ['fixed'])).toEqual(catalog)
+    expect(filterEnabledTranslationServices(catalog, undefined)).toEqual([{value: 'active'}])
+    expect(isTranslationServiceDisabled(['other'], 'active')).toBe(false)
+    expect(catalog).toEqual([{value: 'fixed', disabled: true}, {value: 'active'}])
+  })
+  it('normalizes closed IDs without duplicates, whitespace, invalid values, or unbounded entries', () => {
+    expect(normalizeDisabledTranslationServices(['openai', ' openai ', 'deeplx', '', null, 12, 'x'.repeat(129)]))
+      .toEqual(['openai', 'deeplx'])
+    expect(normalizeDisabledTranslationServices(undefined)).toEqual([])
+  })
+
+  it('keeps closed choices visible but disabled, and filters disabled services from active lists', () => {
+    const catalog = [{value: 'google', label: 'Google'}, {value: 'openai', label: 'OpenAI'}]
+    const marked = markDisabledTranslationServices(catalog, ['openai'])
+    expect(marked).toEqual([{value: 'google', label: 'Google'}, {value: 'openai', label: 'OpenAI', disabled: true}])
+    expect(filterEnabledTranslationServices(marked, ['openai'])).toEqual([{value: 'google', label: 'Google'}])
+    expect(isTranslationServiceDisabled(['openai'], 'openai')).toBe(true)
+    expect(isTranslationServiceDisabled(undefined, 'openai')).toBe(false)
   })
 })

@@ -4,6 +4,7 @@ import {realpathSync} from 'node:fs';
 import {searchForWorkspaceRoot} from 'vite';
 import vue from '@vitejs/plugin-vue';
 import {createDeepLXRuntimeBuildPlugin} from './scripts/testing/deeplx-runtime-build';
+import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 
 const configuredMaxWorkers = Number(process.env.FLUENTREAD_TEST_MAX_WORKERS);
@@ -18,7 +19,7 @@ export default defineConfig({
         // npm 包只发布类型；测试须显式 mock 应用端口，禁止落到真实 Obsidian 环境。
         resolveId: (id) => id === 'obsidian' ? '\0fluentread-test-obsidian' : null,
         load: (id) => id === '\0fluentread-test-obsidian' ? 'throw new Error("Obsidian application API must be mocked in tests"); export {};' : null,
-    }, createDeepLXRuntimeBuildPlugin(__dirname), vue({include: [
+    }, createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), vue({include: [
         /\/src\/(?:features\/share-card\/ui\/ShareCardStudio|features\/selection-translation\/ui\/SelectionTranslator|features\/settings\/ui\/services\/RequestLimit(?:Settings|Fields)|features\/reading-assistant\/ui\/[^/]+|ui\/components\/(?:MarkdownContent|MarkdownTable|[^/]*Reading[^/]*)|features\/image-translation\/ui\/(?:MangaEntry|MangaReadingPanel)|app\/document-translation\/(?:DocumentApp|DocumentSegmentEditor)|ui\/components\/(?:CustomHotkeyInput|UiSelect|GlossaryLibrarySelect|ServiceIcon|TranslationLoadingPreview|UiIcon|FeatureEnableCard)|features\/settings\/ui\/components\/(?:FieldHelp|InterfaceSkinPreview|PopupLayoutPreview|PopupLayoutPreviewItem|SettingsGroup|SettingsItem|TranslationColorField|TranslationStylePreview|WritingStylePreview|SegmentedControl))\.vue$/,
         resolve(__dirname, 'src/features/settings/ui/services/RequestHeaderSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/ServiceCatalog.vue'),

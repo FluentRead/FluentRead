@@ -191,6 +191,53 @@ describe('document import workflow ownership', () => {
         f.load.mockResolvedValueOnce(null);await f.workflow.openHistory('missing');expect(f.ports.onHistoryMissing).toHaveBeenCalledOnce();
     });
 
+    it.each(['missing binary', 'wrong binary kind', 'missing bytes', 'untyped bytes', 'different length', 'different values', 'wrong snapshot format and missing binary'] as const)
+        ('reparses a current PDF cache with %s from the actual record bytes without borrowing another source target', async invalid => {
+            const f = importFixture(); f.ports.history = f.history;
+            const bytes = new Uint8Array([4, 5, 6]);
+            const snapshot: ParsedDocument = {...document(), fileName: 'cached.pdf', format: 'pdf', segments: [{id: 0, source: 'Cached foreign source'}],
+                binary: {kind: 'pdf', bytes: bytes.slice(), pages: []}};
+            if (invalid === 'wrong snapshot format and missing binary') {snapshot.format = 'txt'; delete snapshot.binary;}
+            else if (invalid === 'missing binary') delete snapshot.binary;
+            else if (invalid === 'wrong binary kind') Object.assign(snapshot.binary!, {kind: 'epub'});
+            else Object.assign(snapshot.binary!, {bytes: invalid === 'missing bytes' ? undefined : invalid === 'untyped bytes' ? [4, 5, 6]
+                : invalid === 'different length' ? new Uint8Array([4, 5]) : new Uint8Array([4, 5, 7])});
+            const saved = {...record(snapshot), format: 'pdf', bytes, mimeType: 'application/pdf', translations: ['Foreign cached target']}, before = structuredClone(saved);
+            f.load.mockResolvedValue(saved);
+            let fresh: ParsedDocument | undefined;
+            vi.mocked(f.ports.parseFile).mockImplementationOnce(async input => fresh = {...document(), fileName: input.name, format: 'pdf',
+                segments: [{id: 0, source: 'Actual record source'}], binary: {kind: 'pdf', bytes: new Uint8Array(await input.arrayBuffer()), pages: []}});
+            await f.workflow.openHistory(saved.id);
+            expect(f.ports.parseFile).toHaveBeenCalledOnce(); expect(f.tasks).toHaveLength(1); expect(f.tasks[0].document).toBe(fresh);
+            expect(f.tasks[0].document?.segments[0].source).toBe('Actual record source'); expect(f.tasks[0].bytes).toEqual(bytes);
+            expect(f.tasks[0].document?.binary?.bytes).toEqual(bytes); expect(f.tasks[0].translations).toEqual(['']);
+            expect(f.tasks[0].retainedRevisions).toEqual([{source: 'Cached foreign source', translation: 'Foreign cached target'}]);
+            expect(saved).toEqual(before);
+        });
+
+    it.each(['same object', 'equal copy'] as const)('reuses a current PDF cache with %s bytes without parsing', async identity => {
+        const f = importFixture(); f.ports.history = f.history;
+        const bytes = new Uint8Array([4, 5, 6]), snapshot: ParsedDocument = {...document(), fileName: 'cached.pdf', format: 'pdf',
+            binary: {kind: 'pdf', bytes: identity === 'same object' ? bytes : bytes.slice(), pages: []}};
+        const saved = {...record(snapshot), bytes, mimeType: 'application/pdf'}, before = structuredClone(saved); f.load.mockResolvedValue(saved);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).not.toHaveBeenCalled(); expect(f.tasks[0].document).toBe(snapshot);
+        expect(f.tasks[0]).toMatchObject({bytes, translations: ['Kept correction'], savedRevision: 0}); expect(saved).toEqual(before);
+    });
+
+    it('cancels a current-cache byte mismatch reparse and releases its late result without publishing an obsolete task', async () => {
+        const f = importFixture(); f.ports.history = f.history;
+        const snapshot: ParsedDocument = {...document(), fileName: 'cached.pdf', format: 'pdf', binary: {kind: 'pdf', bytes: new Uint8Array([1]), pages: []}};
+        const saved = {...record(snapshot), bytes: new Uint8Array([2]), mimeType: 'application/pdf'}, before = structuredClone(saved);
+        const fresh: ParsedDocument = {...snapshot, binary: {kind: 'pdf', bytes: saved.bytes.slice(), pages: []}}, parsing = pending(fresh);
+        f.load.mockResolvedValue(saved); vi.mocked(f.ports.parseFile).mockReturnValueOnce(parsing.promise);
+        const work = f.workflow.openHistory(saved.id); await vi.waitFor(() => expect(f.ports.parseFile).toHaveBeenCalledOnce());
+        const signal = vi.mocked(f.ports.parseFile).mock.calls[0][1]!.signal; f.workflow.cancel(); expect(signal!.aborted).toBe(true);
+        parsing.resolve(fresh); await work;
+        expect(f.tasks).toEqual([]); expect(f.ports.releaseDocument).toHaveBeenCalledOnce(); expect(f.ports.releaseDocument).toHaveBeenCalledWith(fresh);
+        expect(f.ports.onFinished).not.toHaveBeenCalled(); expect(saved).toEqual(before);
+    });
+
     it.each([[15, 16], [17, 18]])('reparses an obsolete version %i history snapshot for version %i and recovers edits by matching original text', async (obsoleteVersion, currentVersion) => {
         const f = importFixture();f.ports.history = f.history;f.ports.parsedVersion = currentVersion;
         f.load.mockResolvedValue(record(document(), obsoleteVersion));

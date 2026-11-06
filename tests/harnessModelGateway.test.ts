@@ -22,6 +22,12 @@ function response(body: unknown): Response {
 }
 
 describe('harness model gateway', () => {
+  it.each([services.openai, services.bilibili, services.chatgptPlan, 'custom:closed'])('rejects disabled %s before constructing any AI transport', service => {
+    const config = new Config(); config.disabledTranslationServices = [service];
+    const before = JSON.stringify(config);
+    expect(() => createHarnessLanguageModel(config, service, 'saved-model')).toThrow('所选翻译服务已关闭');
+    expect(JSON.stringify(config)).toBe(before);
+  });
   afterEach(() => {
     setRuntimeFetch();
     planBuild.enabled = false;

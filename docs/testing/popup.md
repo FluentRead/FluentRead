@@ -38,7 +38,7 @@ node scripts/testing/run-sidepanel-translation-test.cjs \
 
 ## Popup 操作恢复与翻译服务 UI
 
-首次翻译与自助恢复主流程使用 `run-self-help-ui-test.cjs --extension <生产产物> --artifacts <新证据目录> --playwright-root <捆绑Node包目录> --locales true --refresh-rounds 3`，保留真实故障、重试、取消、报告导出与七语场景。默认诊断只显示翻译区底栏右侧的 24px 状态入口，脚本断言原因浮层、恢复动作和报告尚未挂载；所有动作和报告必须先通过入口展开，Escape 收起并还原焦点。浮层不撑高翻译区，报告需再次明确预览后生成，关闭浮层与忽略诊断分别验收。使用稳定 `data-diagnostic-*` 选择器。此处仅说明验收契约，实际通过情况以当前产物报告为准。
+首次翻译与自助恢复主流程使用 `run-self-help-ui-test.cjs --extension <生产产物> --artifacts <新证据目录> --playwright-root <捆绑Node包目录> --locales true --refresh-rounds 3`，保留真实故障、重试、取消、报告导出与七语场景。默认诊断只显示翻译按钮预留区域内的 24px 状态入口，脚本断言原因浮层、恢复动作和报告尚未挂载；所有动作和报告必须先通过入口展开，Escape 收起并还原焦点。认证、模型与限流故障出现前后，脚本比较网站开关、模式按钮和后续模块的位置，确认入口不遮挡按钮文字或其他控件。浮层不撑高翻译区，报告需再次明确预览后生成，关闭浮层与忽略诊断分别验收。使用稳定 `data-diagnostic-*` 选择器。此处仅说明验收契约，实际通过情况以当前产物报告为准。
 
 `node scripts/testing/run-popup-actions-service-ui-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <捆绑Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-popup-actions-ui` 只运行本次 Popup、服务分配、划词抽屉及界面预览专项，不触发全量回归。
 

@@ -2278,8 +2278,8 @@ describe('site translation coverage contract', () => {
   function hoverScrollTarget() {
     return {
       scrollIntoViewIfNeeded: async () => undefined,
-      evaluate: async (fn: (node: {scrollIntoView: (options: unknown) => void}) => unknown) =>
-        fn({scrollIntoView: () => undefined}),
+      evaluate: async (fn: (node: {ownerDocument: {defaultView: {innerHeight: number}}; getBoundingClientRect: () => {height: number}; scrollIntoView: (options: unknown) => void}) => unknown) =>
+        fn({ownerDocument: {defaultView: {innerHeight: 900}}, getBoundingClientRect: () => ({height: 40}), scrollIntoView: () => undefined}),
     };
   }
 
@@ -2709,7 +2709,8 @@ describe('site translation coverage contract', () => {
       if (!staysCovered) top = 390;
     });
     const target = {scrollIntoViewIfNeeded: vi.fn(async () => undefined),
-      evaluate: async (fn: (node: {scrollIntoView: typeof center}) => unknown) => fn({scrollIntoView: center})};
+      evaluate: async (fn: (node: {ownerDocument: {defaultView: {innerHeight: number}}; getBoundingClientRect: () => {height: number}; scrollIntoView: typeof center}) => unknown) =>
+        fn({ownerDocument: {defaultView: {innerHeight: 816}}, getBoundingClientRect: () => ({height: 40}), scrollIntoView: center})};
     const page = {evaluate: async (fn: (arg: unknown) => unknown, arg: unknown) => fn(arg),
       mouse: {move: vi.fn()}, keyboard: {down: vi.fn(), up: vi.fn()}, waitForFunction: vi.fn(),
       waitForTimeout: async (ms: number) => {vi.advanceTimersByTime(ms);}};
@@ -2731,6 +2732,39 @@ describe('site translation coverage contract', () => {
       expect(target.scrollIntoViewIfNeeded).toHaveBeenCalledOnce();
       expect(document.body.innerHTML).toBe(original);
     } finally {vi.unstubAllGlobals();vi.useRealTimers();}
+  });
+
+  it.each([false, true])('scrolls native text into view when a long bilingual owner contains a large translation, translationFirst=%s', translationFirst => {
+    vi.useFakeTimers(); vi.setSystemTime(0);
+    const translation = '<span class="fluent-read-bilingual-content">A very tall translated copy.</span>';
+    const original = '<span hidden>Hidden auxiliary text.</span><span id="native">Original article words.</span>';
+    const {document} = parseHTML(`<html><body><p id="article">${translationFirst ? translation + original : original + translation}</p></body></html>`);
+    const article = document.getElementById('article')!;
+    const native = document.getElementById('native')!;
+    const before = article.innerHTML;
+    const ownerScroll = vi.fn(), nativeScroll = vi.fn(), translationScroll = vi.fn();
+    Object.defineProperty(article, 'getBoundingClientRect', {value: () => ({height: 4000})});
+    Object.defineProperty(document.defaultView, 'innerHeight', {value: 900, configurable: true});
+    Object.defineProperty(article, 'scrollIntoView', {value: ownerScroll});
+    Object.defineProperty(native, 'getClientRects', {value: () => [{width: 120, height: 20}]});
+    Object.defineProperty(native, 'scrollIntoView', {value: nativeScroll});
+    Object.defineProperty(article.querySelector('.fluent-read-bilingual-content'), 'scrollIntoView', {value: translationScroll});
+    vi.stubGlobal('document', document); vi.stubGlobal('window', {innerHeight: 900});
+    const point = {x: 60, y: 400, textIndex: 1, text: 'Original article words.', hitPolicy: 'native-text',
+      rect: {left: 20, top: 390, width: 120, height: 20}};
+    const page = {evaluate: async () => point, mouse: {move: vi.fn()}, keyboard: {down: vi.fn(), up: vi.fn()},
+      waitForFunction: vi.fn(), waitForTimeout: async (ms: number) => {vi.advanceTimersByTime(ms);}};
+    const target = {scrollIntoViewIfNeeded: async () => undefined, evaluate: async (fn: (node: Element) => void) => fn(article)};
+    return (async () => {
+      try {
+        await toggleHover(page, target, {selector: '#article', index: 0}, 1, 500);
+        expect(nativeScroll).toHaveBeenCalledWith({block: 'center', inline: 'nearest', behavior: 'instant'});
+        expect(ownerScroll).not.toHaveBeenCalled(); expect(translationScroll).not.toHaveBeenCalled();
+        expect(page.keyboard.down.mock.calls).toEqual([['Control']]);
+        expect(Date.now()).toBeGreaterThanOrEqual(200);
+        expect(article.innerHTML).toBe(before);
+      } finally {vi.unstubAllGlobals(); vi.useRealTimers();}
+    })();
   });
 
   it('waits through post-restore movement and temporary occlusion before sending one trusted hotkey', async () => {

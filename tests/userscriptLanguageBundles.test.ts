@@ -21,6 +21,43 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('omits unavailable local video ASR labels while retaining extension dictionaries', () => {
+        expect(zhCNMessages).not.toHaveProperty('video.aiLocalHint');
+        for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
+            const original = extensionBundles[language].messages;
+            const projected = currentUserscriptLanguageBundle(language).messages;
+            const keys = Object.keys(original).filter(key => key.startsWith('video.ai') || key.startsWith('video.model'));
+            expect(keys).toHaveLength(40);
+            for (const key of keys) {expect(original[key]).toBeTruthy(); expect(projected).not.toHaveProperty(key);}
+            expect(projected['cancel']).toBe(original['cancel']);
+        }
+    });
+    it('keeps subtitle appearance labels in all extension languages and omits the unsupported userscript controls', () => {
+        expect(extensionChinese['video.appearance.outlineStyle']).toBeTruthy();
+        expect(zhCNMessages).not.toHaveProperty('video.appearance.outlineStyle');
+        for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
+            const original = extensionBundles[language].messages;
+            const projected = currentUserscriptLanguageBundle(language).messages;
+            const keys = Object.keys(original).filter(key => key.startsWith('video.appearance.'));
+            expect(keys).toHaveLength(8);
+            for (const key of keys) {expect(original[key]).toBeTruthy(); expect(projected).not.toHaveProperty(key);}
+        }
+    });
+    it('keeps the actual language-delta comparator reflexive and ordered across sorting implementations',()=>{
+        const baseline={messages:{unchanged:'same'},legacyText:{},legacyPatterns:{early:[],late:[]}};
+        const current={messages:{zeta:'Z',alpha:'A',middle:'M',unchanged:'same'},legacyText:{},legacyPatterns:{early:[],late:[]}};
+        const before=JSON.stringify({baseline,current}),nativeSort=Array.prototype.sort;let comparatorChecks=0;
+        const spy=vi.spyOn(Array.prototype,'sort').mockImplementationOnce(function(this:Array<[string,string]>,compare?: (a:[string,string],b:[string,string])=>number){
+            expect(compare).toBeTypeOf('function');if(!compare)throw Error('Missing actual language-delta comparator');
+            expect(compare(this[0],this[0])).toBe(0);expect(compare(this[0],this[1])).toBeGreaterThan(0);expect(compare(this[1],this[0])).toBeLessThan(0);comparatorChecks++;
+            return Reflect.apply(nativeSort,this,[compare]);
+        });
+        try {
+            const update=createUserscriptLanguageUpdate(current,baseline);
+            expect(comparatorChecks).toBe(1);expect(Object.keys(update.messages)).toEqual(['alpha','middle','zeta']);expect(update.messages).toEqual({alpha:'A',middle:'M',zeta:'Z'});
+            expect(JSON.stringify({baseline,current})).toBe(before);
+        } finally {spy.mockRestore();}
+    });
     it('preserves all real language updates after standalone build compression',async()=>{
         const updates=Object.fromEntries(Object.entries(UI_LANGUAGE_BUNDLES).filter(([language])=>language!=='en-US')
             .map(([language,baseline])=>[language,createUserscriptLanguageUpdate(currentUserscriptLanguageBundle(language as keyof typeof UI_LANGUAGE_BUNDLES),baseline)]));
@@ -157,6 +194,16 @@ describe('standalone default message provider', () => {
 });
 
 describe('userscript remote UI language data', () => {
+    it('keeps native manga filter labels in extension locales without adding them to userscript bundles', () => {
+        const nativeLabels=['未绘制译文','查看全文','复制全文'];
+        for(const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]){
+            const original=extensionBundles[language],projected=currentUserscriptLanguageBundle(language);
+            for(const source of nativeLabels){expect(original.legacyText[source]).toBeTruthy();expect(projected.legacyText).not.toHaveProperty(source);}
+            for(const source of ['复制全部','原文对照','漫画文字'])expect(projected.legacyText[source]).toBe(original.legacyText[source]);
+            for(const source of nativeLabels)expect(original.legacyText[source]).toBeTruthy();
+        }
+        for(const source of nativeLabels)expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText).not.toHaveProperty(source);
+    });
     it('keeps native sidebar messages in extension locales and omits them from every userscript locale', () => {
         expect(extensionChinese['sidepanel.title']).toBeTruthy();
         expect(Object.keys(zhCNMessages).some(key => key.startsWith('sidepanel.'))).toBe(false);

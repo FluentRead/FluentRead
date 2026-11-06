@@ -118,9 +118,9 @@ async function mount(plugin?: Plugin) {
 }
 
 describe('Popup 首页关键信息', () => {
-  it('首次提示不覆盖偏好，已有翻译记录的用户不重复展示首译提示', async () => {
+  it('无论是否已有翻译记录，首页都不占用一行展示首次提示', async () => {
     config.count = 0;const before = {service: config.service, from: config.from, to: config.to, model: config.model.openai};
-    await mount();expect(document.querySelector('[data-testid="first-translation-hint"]')).not.toBeNull();
+    await mount();expect(document.querySelector('[data-testid="first-translation-hint"]')).toBeNull();
     publish(next => {next.count = 20});await settle();
     expect(document.querySelector('[data-testid="first-translation-hint"]')).toBeNull();
     expect({service: config.service, from: config.from, to: config.to, model: config.model.openai}).toEqual(before);

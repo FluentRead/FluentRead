@@ -104,7 +104,7 @@ export function startMangaInferenceWorker(): void {
             }
             else if (message.type === 'prepare-ocr' || message.type === 'recognize') {
                 ocr ??= await createBrowserMangaOcr(undefined, progress);
-                if (message.type === 'recognize') { progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box',...(message.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{})}); }
+                if (message.type === 'recognize') { progress('recognizing'); result = await ocr.recognize(message.image!, {flatten: true, noCache: true, strategy: 'per-box',...(message.imageDetectionEvidence===true?{imageDetectionEvidence:true as const}:{}),...(message.mangaParagraphGapEvidence===true?{mangaParagraphGapEvidence:true as const}:{})}); }
             } else {
                 painter ??= await createBrowserMangaInpainter(undefined, (percent, initializing) => progress(initializing ? 'initializing' : 'preparing', percent));
                 if (message.type === 'inpaint') { progress('recognizing'); result = await painter.run(message.patch!); }

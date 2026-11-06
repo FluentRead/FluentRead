@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/mangaRendering.ts
  * 文件职责：在整段漫画区域中绘制适合阅读的译文，避免整行逐框放大和复杂背景扩散条纹。
  * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
- * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；绘制区域局限于识别框，完整原图仍可通过现有按钮对照。
+ * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；白底旁置规划只消费调用方已证明的候选，保持完整译文和源字号下限，不提供像素或清字授权；完整原图仍可通过现有按钮对照。
  */
 import type {MangaRegion} from './mangaRegions';
 import {getImageTextColor, getImageTextBackgroundColor} from './rendering';
@@ -13,6 +13,95 @@ import {planMangaTextFlow} from './mangaTextFlow';
 import {createMangaGlyphRasterLedger,rasterizeMangaGlyphs} from './mangaGlyphRaster';
 
 export interface MangaBackground {color: string; uniform: boolean}
+type Box=MangaRegion['bbox'];
+type MangaMeasure=(text:string,size:number)=>{width:number;ascent:number;descent:number};
+export interface MangaBlankLayoutBudget {readonly remainingMeasurements:number;readonly remainingCharacters:number}
+type BlankLayoutRemaining={remainingMeasurements:number;remainingCharacters:number};
+const blankLayoutBudgets=new WeakMap<MangaBlankLayoutBudget,BlankLayoutRemaining>();
+const BLANK_LAYOUT_EXHAUSTED=Symbol('blank layout budget exhausted');
+
+/** 同一页的所有补绘共享余额；冻结视图不能抬高、重置或转授内部计费余额。 */
+export function createMangaBlankLayoutBudget():MangaBlankLayoutBudget {
+    const remaining={remainingMeasurements:1024,remainingCharacters:65_536};
+    const budget=Object.freeze({get remainingMeasurements(){return remaining.remainingMeasurements;},get remainingCharacters(){return remaining.remainingCharacters;}});
+    blankLayoutBudgets.set(budget,remaining);return budget;
+}
+
+function mangaTranslationSpace(bounds:Box,maxSize:number,display:boolean) {
+    const w=bounds.x1-bounds.x0,h=bounds.y1-bounds.y0;
+    const inset=Math.min(display ? Math.max(3,maxSize*.12) : Math.min(4,maxSize*.1),w/4,h/4);
+    return {w,h,inset};
+}
+
+function mangaTranslationMeasureInk(lineWidth:(size:number)=>number,measure:MangaMeasure) {
+    return (text:string,size:number)=>{
+        const {ascent,descent}=measure(text,size);
+        if(![ascent,descent].every(Number.isFinite)||ascent+descent<=0)return undefined;
+        const padding=lineWidth(size)/2+.5;
+        return {ascent:ascent+padding,descent:descent+padding};
+    };
+}
+
+/** 清字后的原区域和已证明白底的旁置区域共用同一个完整文字 fit。 */
+function fitMangaTranslation(text:string,bounds:Box,maxSize:number,display:boolean,lineWidth:(size:number)=>number,measure:MangaMeasure) {
+    const {w,h,inset}=mangaTranslationSpace(bounds,maxSize,display);
+    const layout=layoutMangaTranslationText(text,w-inset*2,h,(text,size)=>measure(text,size).width,maxSize,mangaTranslationMeasureInk(lineWidth,measure));
+    const fits=(layout.ink?.height??layout.lines.length*layout.lineHeight)<=h&&layout.lines.every(line=>measure(line,layout.fontSize).width<=w-inset*2);
+    return {bounds,layout,fits};
+}
+
+/** 只选择调用方已证明的白底候选；不证明像素、不清字、不降低源字号或截断译文。 */
+export function planMangaBlankTranslation(context:CanvasRenderingContext2D,region:MangaRegion,width:number,height:number,spaces:readonly Box[],budget:MangaBlankLayoutBudget=createMangaBlankLayoutBudget()):MangaRegion|undefined {
+    if(![width,height].every(value=>Number.isSafeInteger(value)&&value>0&&value<=8192)||width*height>16_777_216
+        ||!region||region.vertical||typeof region.text!=='string'||!region.text.trim()||region.text.length>4096
+        ||!Number.isFinite(region.fontSize)||region.fontSize<=0||!Array.isArray(spaces)||!spaces.length)return;
+    const valid=(box:Box|undefined):box is Box=>!!box&&[box.x0,box.y0,box.x1,box.y1].every(Number.isFinite)
+        &&box.x0>=0&&box.y0>=0&&box.x1<=width&&box.y1<=height&&box.x1>box.x0&&box.y1>box.y0;
+    if(!valid(region.bbox))return;
+    const maxSize=Math.min(region.fontSize*1.05,width*.034);
+    if(maxSize<region.fontSize)return;
+    const remaining=blankLayoutBudgets.get(budget);
+    if(!remaining||remaining.remainingMeasurements===0||remaining.remainingCharacters===0)return;
+    context.save();
+    let failed=false,firstError:unknown;
+    try {
+        context.textBaseline='alphabetic';context.textAlign='left';
+        let measuredSize=NaN,validMetrics=true;
+        const measure:MangaMeasure=(text,size)=>{
+            // 每次逻辑度量都扣费；不能用缓存命中规避文字遍历成本，也不因候选失败或原生异常退款。
+            if(remaining.remainingMeasurements===0||remaining.remainingCharacters<text.length){
+                remaining.remainingMeasurements=remaining.remainingCharacters=0;throw BLANK_LAYOUT_EXHAUSTED;
+            }
+            remaining.remainingMeasurements--;remaining.remainingCharacters-=text.length;
+            if(measuredSize!==size){context.font=`600 ${size}px ${MANGA_TEXT_FONT}`;measuredSize=size;}
+            const metrics=context.measureText(text),value={width:metrics.width,ascent:metrics.actualBoundingBoxAscent,descent:metrics.actualBoundingBoxDescent};
+            if(![value.width,value.ascent,value.descent,value.ascent+value.descent].every(Number.isFinite)
+                ||value.width<0||(text.length>0&&value.ascent+value.descent<=0))validMetrics=false;
+            return value;
+        };
+        const lineWidth=(size:number)=>Math.max(.5,size*.035);
+        // 只做源字号的最大布局准入，失败就跳过；不会为不可读的小空白二分搜索到源字号以下。
+        const sourceFloor=createMangaTranslationSearch(region.text,(text,size)=>measure(text,size).width,region.fontSize,mangaTranslationMeasureInk(lineWidth,measure));
+        let best:ReturnType<typeof fitMangaTranslation>|undefined;
+        for(let index=0;index<Math.min(32,spaces.length);index++){
+            const box=spaces[index];if(!valid(box))continue;
+            const {w,h,inset}=mangaTranslationSpace(box,maxSize,false),floor=sourceFloor.prepare(w-inset*2,h);
+            if(!validMetrics)return;
+            if(!floor.maximum)continue;
+            const next=fitMangaTranslation(region.text,box,maxSize,false,lineWidth,measure);
+            if(!validMetrics)return;
+            if(next.fits&&next.layout.ink&&next.layout.fontSize>=region.fontSize&&(!best||next.layout.fontSize>best.layout.fontSize))best=next;
+            if(best?.layout.fontSize===maxSize)break;
+        }
+        // fontSize保留源基准，后续真实draw才会复现本次相同的maxSize和fit，而非再次放大已选字号。
+        return best?{...region,bbox:{...best.bounds},sourceBoxes:[]}:undefined;
+    } catch(error) {if(error!==BLANK_LAYOUT_EXHAUSTED){failed=true;firstError=error;}}
+    finally {
+        if(failed){try{context.restore();}catch{/* 原始原生度量/状态错误优先于恢复错误。 */}}
+        else context.restore();
+    }
+    if(failed)throw firstError;
+}
 
 export function mangaRegionBackground(pixels: Uint8ClampedArray, width: number, height: number, box: MangaRegion['bbox']) {
     const sampled = getImageTextBackgroundColor(pixels, width, height, box);
@@ -98,18 +187,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                 return value;
             };
             const lineWidth = (size:number)=>Math.max(.5,size*(sampled.uniform ? .035 : .14));
-            const fit=(bounds:MangaRegion['bbox'])=>{
-                const w=bounds.x1-bounds.x0,h=bounds.y1-bounds.y0;
-                const inset=Math.min(display ? Math.max(3,maxSize*.12) : Math.min(4,maxSize*.1),w/4,h/4);
-                const layout=layoutMangaTranslationText(region.text,w-inset*2,h,(text,size)=>measure(text,size).width,maxSize,(text,size)=>{
-                const {ascent,descent} = measure(text,size);
-                if (![ascent,descent].every(Number.isFinite) || ascent+descent<=0) return undefined;
-                const padding = lineWidth(size)/2+.5;
-                return {ascent:ascent+padding,descent:descent+padding};
-                });
-                const fits=(layout.ink?.height??layout.lines.length*layout.lineHeight)<=h&&layout.lines.every(line=>measure(line,layout.fontSize).width<=w-inset*2);
-                return {bounds,layout,fits};
-            };
+            const fit=(bounds:MangaRegion['bbox'])=>fitMangaTranslation(region.text,bounds,maxSize,display,lineWidth,measure);
             const bounds={x0:left,y0:top,x1:right,y1:bottom};
             const available=protection?mangaAlphaClearRects(protection,bounds,alphaLayoutBudget):[bounds];
             if(!available.length)throw new Error('漫画透明图案遮挡译文区域，已保留原图');

@@ -233,6 +233,8 @@ export interface TranslationConfigSnapshot {
         glossaryIds?: readonly string[] | null;
     }>;
     service: string;
+    /** 关闭后不能作为 provider 使用；组合路由也会跳过关闭成员。 */
+    disabledTranslationServices?: readonly string[];
     from: string;
     to: string;
     useCache: boolean;

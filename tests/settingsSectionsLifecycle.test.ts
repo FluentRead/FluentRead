@@ -108,7 +108,7 @@ function configureSectionPorts(data: Record<string, any>, {template = false, req
         ? vi.importActual('@/src/features/settings/ui/components/SegmentedControl.vue') : {default: empty});
     vi.doMock('@/src/features/settings/ui/services/CustomOpenAIProviderDialog.vue', async () =>
         ({__esModule: true, default: template ? await data.loadProvider() : empty}));
-    componentPort('@/src/features/settings/ui/services/ServiceCatalog.vue', template ? {props: ['active','service','modelOptions','selectedModel'], emits: ['add:service','update:service','update:default-service','update:model','add:model','remove:model'],
+    componentPort('@/src/features/settings/ui/services/ServiceCatalog.vue', template ? {props: ['active','service','modelOptions','selectedModel'], emits: ['add:service','update:service','update:default-service','toggle-availability','update:model','add:model','remove:model'],
         setup(props: any, {emit, slots}: any) {
             if (serviceEvents) data.serviceCatalog = {props, emit};
             if (!failureDisplay) runtime.onMounted(data.catalogMounted);
@@ -1120,6 +1120,27 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         await f.catalog('update:default-service','openai');expect(f.patch).not.toHaveBeenCalled();
         await f.catalog('update:default-service','microsoft');expect(f.state.config.service).toBe('microsoft');expect(f.patch).toHaveBeenCalledOnce();
         f.props.activeSection='settings-general';await settle();f.patch.mockClear();await f.catalog('update:default-service','google');expect(f.state.config.service).toBe('microsoft');expect(f.patch).not.toHaveBeenCalled();
+    });
+    it('关闭当前默认服务时自动改用启用项，保留其他入口原有选择',async()=>{
+        const f=await serviceEditorFixture({service:'google',hoverTranslationService:'google'});f.patch.mockClear();
+        await f.catalog('toggle-availability','google',false);
+        expect(f.state.config.disabledTranslationServices).toContain('google');
+        expect(f.state.config.service).not.toBe('google');
+        expect(f.state.config.disabledTranslationServices).not.toContain(f.state.config.service);
+        expect(f.state.config.hoverTranslationService).toBe('google');
+        expect(f.patch).toHaveBeenCalled();
+        expect(f.patch.mock.calls.at(-1)?.[0]).toMatchObject({service: f.state.config.service, disabledTranslationServices: ['google']});
+        expect(f.patch).toHaveBeenCalledOnce();
+    });
+    it('最后一个启用服务不能关闭，且重新启用只清除该服务的关闭标记',async()=>{
+        const f=await serviceEditorFixture({service:'google'});
+        const allExceptDefault=f.state.availableServiceOptions.filter((item: {value:string})=>item.value!=='google').map((item: {value:string})=>item.value);
+        f.state.config.disabledTranslationServices=allExceptDefault;await settle();f.patch.mockClear();
+        await f.catalog('toggle-availability','google',false);
+        expect(f.state.config.disabledTranslationServices).toEqual(allExceptDefault);
+        expect(f.state.config.service).toBe('google');
+        await f.catalog('toggle-availability','microsoft',true);
+        expect(f.state.config.disabledTranslationServices).not.toContain('microsoft');
     });
     it('自定义连接添加/选择/删除模型各只提交完整快照，保留同级服务与文档选择',async()=>{
         const f=await serviceEditorFixture({customOpenAIProviders:[customConnection(),customConnection('custom:2','second')],model:{'custom:1':'model-a'},documentModel:{'custom:1':'model-a'}});

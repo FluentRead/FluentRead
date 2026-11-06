@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/background/semanticRuntime.ts
  * 文件职责：为 AI 字幕边界处理器装配既有供应商 transport 与显式断句配置。
- * 主要内容：冻结模型输入、只使用首个配置 key、禁止 SDK 重试，模型仅返回候选边界 ID。
+ * 主要内容：冻结模型输入、只使用首个配置 key、禁止 SDK 重试；所选服务关闭时取消在途请求并拒绝晚到结果，模型仅返回候选边界 ID。
  * 模块边界：不接入聊天会话、记忆或翻译缓存，不上传音视频，不自动选服务或切换供应商。
  */
 import {isExtensionDisabledOnSite} from '@/src/core/site-rules/domain';
@@ -9,11 +9,13 @@ import {generateText} from 'ai';
 import {config, subscribeConfig} from '@/src/services/config/store';
 import {isHarnessService} from '@/src/core/config/harness';
 import {getServiceApiKeys} from '@/src/core/config/apiKeys';
+import {isTranslationServiceDisabled} from '@/src/core/config/serviceAvailability';
 import {createHarnessLanguageModel} from '@/src/services/harness/modelGateway';
 import {snapshotHarnessConfig, getHarnessModelInputKey} from '@/src/services/harness/modelConfig';
 import {createVideoSemanticHandlers} from './semanticSegmentation';
 
 export function createVideoSemanticRuntime() {
+  const serviceEnabled = () => !isTranslationServiceDisabled(config.disabledTranslationServices, config.videoSemanticSegmentationService);
   const handlers = createVideoSemanticHandlers({
     runtimeId: browser.runtime.id,
     allowedSite: url => !isExtensionDisabledOnSite(url, config.disabledExtensionDomains),
@@ -21,7 +23,7 @@ export function createVideoSemanticRuntime() {
     settings: () => ({
       enabled: config.on && config.videoTranslationEnabled && config.videoSemanticSegmentationEnabled === true
         && !!config.videoSemanticSegmentationModel && !!config.videoSemanticSegmentationService
-        && isHarnessService(config.videoSemanticSegmentationService, config.customOpenAIProviders),
+        && isHarnessService(config.videoSemanticSegmentationService, config.customOpenAIProviders) && serviceEnabled(),
       revision: JSON.stringify([config.videoSemanticSegmentationEnabled, config.videoSemanticSegmentationService,
         config.videoSemanticSegmentationModel, getHarnessModelInputKey(config, config.videoSemanticSegmentationService, config.videoSemanticSegmentationModel)]),
     }),
@@ -50,7 +52,7 @@ export function createVideoSemanticRuntime() {
   let revision = '';
   subscribeConfig(() => {
     const next = JSON.stringify([config.on, config.videoTranslationEnabled, config.videoSemanticSegmentationEnabled,
-      config.videoSemanticSegmentationService, config.videoSemanticSegmentationModel, config.disabledExtensionDomains,
+      config.videoSemanticSegmentationService, config.videoSemanticSegmentationModel, config.disabledExtensionDomains, serviceEnabled(),
       getHarnessModelInputKey(config, config.videoSemanticSegmentationService, config.videoSemanticSegmentationModel)]);
     if (next !== revision) { revision = next; handlers.cancelAll(); }
   });

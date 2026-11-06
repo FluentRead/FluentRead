@@ -8,9 +8,10 @@ function source(path: string): string {
 
 function cssRule(file: string, selector: string): string {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const match = file.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 'u'));
-  expect(match, `缺少样式规则：${selector}`).not.toBeNull();
-  return match?.[1] ?? '';
+  // 同一完整选择器可拆分声明；不把较长选择器的后缀误当作独立规则。
+  const matches = [...file.matchAll(new RegExp(`(?:^|\\n)\\s*${escapedSelector}\\s*\\{([^}]*)\\}`, 'gu'))];
+  expect(matches.length, `缺少样式规则：${selector}`).toBeGreaterThan(0);
+  return matches.map(match => match[1]).join('\n');
 }
 
 function numericDeclaration(rule: string, property: string): number {
@@ -56,15 +57,16 @@ describe('低干扰悬浮 UI', () => {
     );
     const expanded = cssRule(
       floatingBall,
-      '.fr-floating-ball.floating-ball-expanded .floating-ball-item',
+      '.floating-ball-main',
     );
 
     const rightFallback = variableFallback(rightCollapsed, 'opacity', '--fr-ball-collapsed-opacity');
     expect(rightFallback).toBeGreaterThanOrEqual(0.4);
     expect(rightFallback).toBeLessThanOrEqual(0.6);
     expect(variableFallback(leftCollapsed, 'opacity', '--fr-ball-collapsed-opacity')).toBe(rightFallback);
-    expect(rightCollapsed).toContain('transform: translateX(calc(50% + var(--fr-ball-edge-gap)))');
-    expect(leftCollapsed).toContain('transform: translateX(calc(-50% - var(--fr-ball-edge-gap)))');
+    expect(rightCollapsed).not.toContain('transform:');
+    expect(leftCollapsed).not.toContain('transform:');
+    expect(expanded).toContain('transform: none');
     expect(numericDeclaration(expanded, 'opacity')).toBe(1);
     expect(numericDeclaration(cssRule(floatingBall, '.dragging .floating-ball-main'), 'opacity')).toBe(1);
     const brand = floatingBall.match(/<div\s+ref="floatingBallMain"[\s\S]*?<\/div>/u)?.[0] ?? '';
@@ -130,17 +132,7 @@ describe('低干扰悬浮 UI', () => {
     expect(main).toContain('height: var(--fr-ball-size)');
     expect(tool).toContain('width: var(--fr-ball-tool-size)');
     expect(floatingBall).toContain("'--fr-ball-collapsed-opacity': String(presentation.value.collapsedOpacity / 100)");
-    const gap = numericDeclaration(root, '--fr-ball-edge-gap');
-    const rightDock = cssRule(floatingBall, '.fr-floating-ball[data-position="right"]');
-    const leftDock = cssRule(floatingBall, '.fr-floating-ball[data-position="left"]');
-    const hiddenRight = cssRule(floatingBall, '.floating-ball-item');
-    const hiddenLeft = cssRule(floatingBall, '.fr-floating-ball[data-position="left"] .floating-ball-item');
-    const rightShift = Number(hiddenRight.match(/translateX\(([0-9]+)px\)/u)?.[1]);
-    const leftShift = Number(hiddenLeft.match(/translateX\(-([0-9]+)px\)/u)?.[1]);
-    expect(rightDock).toContain('right: var(--fr-ball-edge-gap)');
-    expect(leftDock).toContain('left: var(--fr-ball-edge-gap)');
-    expect(gap - rightShift).toBeGreaterThanOrEqual(16);
-    expect(gap - leftShift).toBeGreaterThanOrEqual(16);
+    expect(main).toContain('transform: none');
     expect(cssRule(floatingBall, '.floating-ball-tool')).toContain('pointer-events: none');
     expect(cssRule(floatingBall, '.fr-floating-ball.floating-ball-expanded .floating-ball-tool'))
       .toContain('pointer-events: auto');

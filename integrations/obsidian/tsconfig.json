@@ -6,5 +6,5 @@
     "types": ["vite/client", "node"],
     "skipLibCheck": true
   },
-  "include": ["./*.ts"]
+  "include": ["./*.ts", "../../src/features/document-translation/core/pdfReaderBidi.d.ts"]
 }

@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
         hasCandidate?: () => boolean,
     ) => hasCandidate?.() ?? false),
     getSelection: vi.fn<() => Selection | null>(() => null),
+    shouldIgnoreSelection: vi.fn(() => false),
 }));
 
 vi.mock('@/src/services/config/store', () => ({config: mocks.config}));
@@ -44,7 +45,7 @@ vi.mock('@/src/features/full-page-translation/public', () => ({
 vi.mock('@/src/features/selection-translation/core', async importOriginal => ({
     ...await importOriginal<typeof import('@/src/features/selection-translation/core')>(),
     readSelectionText: vi.fn((_range: Range, value: string) => value),
-    shouldIgnoreSelection: vi.fn(() => false),
+    shouldIgnoreSelection: mocks.shouldIgnoreSelection,
 }));
 
 type Listener = (event: Record<string, unknown>) => void;
@@ -135,6 +136,16 @@ describe('全文翻译快捷键状态联动', () => {
         const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
         expect(createContentHotkeyRuntime(() => false).selectionShortcutPorts.hasActiveSelectionTranslationCandidate()).toBe(visible);
         expect(bounds).toHaveBeenCalledOnce();
+    });
+    it('allows the selection shortcut candidate inside the same editable text range', async () => {
+        const range = {getClientRects: () => [{width: 160, height: 24}],
+            getBoundingClientRect: () => ({width: 160, height: 24})};
+        mocks.getSelection.mockReturnValue({rangeCount: 1, isCollapsed: false,
+            toString: () => 'Selected text inside the editor.', getRangeAt: () => range} as unknown as Selection);
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        const ports = createContentHotkeyRuntime(() => false).selectionShortcutPorts;
+        expect(ports.hasActiveSelectionTranslationCandidate()).toBe(true);
+        expect(mocks.shouldIgnoreSelection).toHaveBeenCalledWith(range, true);
     });
     it.each([['Alt+T', 'MacIntel', 'macOS'], ['custom', 'Win32', '其他']] as const)('开发模式记录实际配置的 %s 快捷键并执行全文动作', async (configured, platform, os) => {
         vi.stubGlobal('process', {env: {NODE_ENV: 'development'}});

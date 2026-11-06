@@ -98,6 +98,42 @@ describe('translation center product workflow', () => {
     expect(state.cards.map((card: any) => card.service)).toEqual(defaults);
     expect(defaults).toEqual(['freeTranslation', 'google']);expect(requestPatch).not.toHaveBeenCalled();
   });
+  it('translates on sidebar Enter while preserving multiline input and IME composition', async () => {
+    close();config.translationCenterServices = ['google'];await mountCenter('sidebar');
+    const editor = host.querySelector<HTMLTextAreaElement>('textarea')!;
+    expect(editor.getAttribute('aria-describedby')).toBe('sidebar-input-help');
+    expect(editor.getAttribute('title')).toContain('Shift + Enter');
+    expect(host.querySelector('#sidebar-input-help')?.textContent).toContain('Shift + Enter');
+    const keydown = (options: Record<string, unknown>) => {
+      const event = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'Enter'}, options);
+      editor.dispatchEvent(event);return event;
+    };
+    state.sourceText = 'Copied text';await vue.nextTick();
+    for (const options of [{shiftKey: true}, {altKey: true}, {isComposing: true}, {keyCode: 229}]) {
+      expect(keydown(options).defaultPrevented).toBe(false);
+    }
+    expect(translateText).not.toHaveBeenCalled();
+    expect(keydown({}).defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(state.successfulCards).toHaveLength(1));
+    expect(translateText).toHaveBeenCalledOnce();expect(translateText.mock.calls[0][0]).toBe('Copied text');
+    expect(keydown({repeat: true}).defaultPrevented).toBe(true);expect(translateText).toHaveBeenCalledOnce();
+    expect(keydown({ctrlKey: true}).defaultPrevented).toBe(true);
+    await vi.waitFor(() => expect(translateText).toHaveBeenCalledTimes(2));
+  });
+  it('keeps plain Enter as a newline in settings and blocks sidebar shortcuts when unavailable or running', async () => {
+    state.sourceText = 'Text';await vue.nextTick();
+    const settingsEnter = Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'Enter'});
+    host.querySelector('textarea')!.dispatchEvent(settingsEnter);
+    expect(settingsEnter.defaultPrevented).toBe(false);expect(translateText).not.toHaveBeenCalled();
+    close();config.translationCenterServices = ['openai'];await mountCenter('sidebar');state.sourceText = 'Text';
+    const press = () => host.querySelector('textarea')!.dispatchEvent(Object.assign(new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}), {key: 'Enter'}));
+    press();expect(translateText).not.toHaveBeenCalled();expect(state.state.run).toBe(0);
+    config.translationCenterServices = ['google'];subscription(config);config.on = false;subscription(config);
+    press();expect(translateText).not.toHaveBeenCalled();
+    config.on = true;subscription(config);const pending = deferred();translateText.mockReturnValueOnce(pending.promise);
+    press();press();expect(translateText).toHaveBeenCalledOnce();pending.resolve('translated');
+    await vi.waitFor(() => expect(state.successfulCards).toHaveLength(1));
+  });
   it('retains a long saved comparison list and searches, toggles and copies each provider with its model identity', async () => {
     close();
     const providers = Array.from({length: 16}, (_, index) => ({id: `custom:team-${index + 1}`, name: `Team service ${index + 1}`,
@@ -469,7 +505,7 @@ describe('translation center product workflow', () => {
   it('protects user content from legacy localization and provides persistent layout controls', () => {
     expect(source).toContain('<p data-i18n-ignore>{{ card.result }}</p>');
     expect(source).toContain('v-model="sourceText" data-i18n-ignore');
-    expect(source).toContain('!event.isComposing'); expect(source).toContain('prefers-reduced-motion');
+    expect(source).toContain('event.isComposing'); expect(source).toContain('prefers-reduced-motion');
     expect(source).toContain('aria-pressed="resultLayout');
     const css = compileStyle({source: descriptor.styles[0].content, filename, id: 'data-v-center-test', scoped: true}).code;
     expect(css).toContain(':root.dark .translation-center .translate-primary-button');

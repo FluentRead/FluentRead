@@ -1,0 +1,139 @@
+{
+  "source": "OpenStax University Physics Volume 1, PDF page 24 / printed page 14; revision UP1-2016-002(05/18)-MJ",
+  "sourceUrl": "https://assets.openstax.org/oscms-prodcms/media/documents/UniversityPhysicsVolume1-LR.pdf",
+  "sourceSha256": "baaa1f5ceef30bb30efbd192375ad6ae89e3baa8ac195ae081542971f3a4343a",
+  "copyright": "Copyright 2018 Rice University",
+  "license": "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/",
+  "attribution": "Download for free at https://openstax.org/details/books/university-physics-volume-1.",
+  "changes": "Selected PDF.js text atoms and two vector rectangles transformed into unrotated page geometry; textbook wording unchanged. Regression data only, not part of extension builds.",
+  "width": 612,
+  "height": 792,
+  "atoms": [
+    {
+      "text": "1.2 | Units and Standards",
+      "x": 72,
+      "y": 497.8533515624997,
+      "width": 202.97300000000004,
+      "height": 18.9921875,
+      "fontFamily": "sans-serif",
+      "baseline": 513.2429999999997,
+      "fontSize": 17
+    },
+    {
+      "text": "Learning Objectives",
+      "x": 239.09,
+      "y": 529.778171875,
+      "width": 133.68600000000004,
+      "height": 15.640625,
+      "fontFamily": "sans-serif",
+      "baseline": 542.452,
+      "fontSize": 14
+    },
+    {
+      "text": "By the end of this section, you will be able to:",
+      "x": 82.25,
+      "y": 558.69190234375,
+      "width": 189.4015,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 567.292,
+      "fontSize": 9.5
+    },
+    {
+      "text": "•",
+      "x": 91.424,
+      "y": 577.21690234375,
+      "width": 3.3249999999999997,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 585.817,
+      "fontSize": 9.5
+    },
+    {
+      "text": "Describe how SI base units are defined.",
+      "x": 105.60000000000001,
+      "y": 577.60990234375,
+      "width": 167.80799999999994,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 586.21,
+      "fontSize": 9.5
+    },
+    {
+      "text": "•",
+      "x": 91.424,
+      "y": 591.38490234375,
+      "width": 3.3249999999999997,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 599.985,
+      "fontSize": 9.5
+    },
+    {
+      "text": "Describe how derived units are created from base units.",
+      "x": 105.60000000000001,
+      "y": 591.77790234375,
+      "width": 234.83050000000003,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 600.378,
+      "fontSize": 9.5
+    },
+    {
+      "text": "•",
+      "x": 91.424,
+      "y": 605.55290234375,
+      "width": 3.3249999999999997,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 614.153,
+      "fontSize": 9.5
+    },
+    {
+      "text": "Express quantities given in SI units using metric prefixes.",
+      "x": 105.60000000000001,
+      "y": 605.94590234375,
+      "width": 239.5425,
+      "height": 10.61328125,
+      "fontFamily": "sans-serif",
+      "baseline": 614.546,
+      "fontSize": 9.5
+    },
+    {
+      "text": "As we saw previously, the range of objects and phenomena studied in physics is immense. From the incredibly short lifetime",
+      "x": 72,
+      "y": 630.0174238281251,
+      "width": 467.94432150000006,
+      "height": 10.5205078125,
+      "fontFamily": "serif",
+      "baseline": 638.4830000000001,
+      "fontSize": 9.5
+    },
+    {
+      "text": "of a nucleus to the age of Earth, from the tiny sizes of subnuclear particles to the vast distance to the edges of the known",
+      "x": 72,
+      "y": 641.417423828125,
+      "width": 467.99838600000015,
+      "height": 10.5205078125,
+      "fontFamily": "serif",
+      "baseline": 649.883,
+      "fontSize": 9.5
+    }
+  ],
+  "graphics": [
+    {
+      "x": 72,
+      "y": 527.049,
+      "width": 468,
+      "height": 93.02999999999997,
+      "kind": "path"
+    },
+    {
+      "x": 72.75,
+      "y": 527.799,
+      "width": 466.5,
+      "height": 21,
+      "kind": "path"
+    }
+  ]
+}

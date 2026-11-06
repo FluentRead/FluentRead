@@ -6,7 +6,7 @@
  * 极矮视口：服务选择的返回、搜索、清除与关闭复用原节点并排，隐藏装饰留白而不缩小操作区，输入状态与整页遮罩保持；触屏语言选择使用独立 portal 标记，46px 控件与 16px 输入避免继续沿用桌面紧凑尺寸，列表随可见高度收缩并给关闭入口让位。
  * 品牌触屏：coarse 指针或已确认的 Firefox Android Popup 为官网链接提供居中的 46px 命中区，内部图标保持 32px，桌面链接仍随 32px 图标紧凑排布，不使用外扩重叠区域。
  * 快捷层级：悬停和划词标题与开关共用一行并保留独立关闭按钮，说明只承载实际作用范围；圈选快捷键集中在示意中，服务摘要不保留数量徽标的空间。
- * 侧边栏入口：在翻译主操作下提供一行紧凑文本按钮，展示原生侧栏图标与打开反馈，沿用同一主题与焦点样式。
+ * 顶部入口：赞赏与侧边栏使用紧凑图标及悬停提示，侧边栏不再占用翻译卡片的独立行，触屏仍保留命中面积。
  */
 @import "../../ui/styles/feedback.css";
 /* Popup 页面样式跟随 app 页面边界，避免 WXT 入口目录继续承载实现。 */
@@ -69,10 +69,9 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 /* 工具栏 popup 的 viewport 也由页面撑开；用 100dvh 限高会把首次打开锁在启动占位的矮高度。 */
 .popup-shell { max-height: 560px; overflow-y: auto; scrollbar-width: thin; }
 .popup-content { position: relative; z-index: 1; }
-.sidebar-translation-entry { display: flex; align-items: center; gap: 7px; width: 100%; min-height: 30px; margin-top: 7px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font-size: 12px; text-align: left; cursor: pointer; }
-.sidebar-translation-entry svg { width: 17px; height: 17px; flex: none; color: var(--muted); }
-.sidebar-translation-entry > span:first-of-type { flex: 1; }
-.sidebar-translation-entry:hover:not(:disabled) { color: var(--brand-strong); border-color: var(--brand); }
+.sidebar-translation-entry { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 11px; color: var(--muted); background: var(--surface); cursor: pointer; }
+.sidebar-translation-entry svg { width: 18px; height: 18px; }
+.sidebar-translation-entry:hover:not(:disabled) { color: var(--brand-strong); border-color: rgba(239, 71, 118, .35); background: var(--brand-soft); }
 .sidebar-translation-entry:disabled { opacity: .5; cursor: not-allowed; }
 .popup-shell.language-onboarding-shell { overflow-x: hidden; }
 /* 首启引导直接铺满弹窗；各界面风格都会给 .popup-shell 设置留白，这里统一清除，避免弹窗里再套一层边框。 */
@@ -126,7 +125,7 @@ button:focus-visible, select:focus-visible { outline: 3px solid rgba(239, 71, 11
 .settings-button:hover { border-color: rgba(239, 71, 118, .35); color: var(--brand-strong); background: var(--brand-soft); }
 .settings-button svg { width: 17px; height: 17px; flex: none; }
 .donation-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 68px; height: 34px; padding: 0 10px;
+  display: inline-flex; flex: none; align-items: center; justify-content: center; width: 34px; min-width: 34px; height: 34px; padding: 0;
   border: 1px solid rgba(215, 166, 47, .28); border-radius: 11px; color: #a16b12; background: #fff9e9; font-size: 11px; font-weight: 700; cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease, background 160ms ease, transform 160ms ease;
 }
@@ -611,8 +610,8 @@ footer > button { justify-self: end; }
 .language-pair .fluentread-select .el-select__selected-item { font-size: 11px; font-weight: 650; }
 .select-row > .fluentread-select { width: 180px; flex: 0 1 58%; }
 
-/* 高频操作保持直达：版本、赞赏与设置同排，不隐藏按钮标签。 */
-.popup-header .donation-button { min-width: 58px; padding: 0 8px; }
+/* 高频操作保持直达：赞赏是紧凑图标，设置保留文字。 */
+:root[data-interface-skin] .popup-header .donation-button { width: 34px; min-width: 34px; height: 34px; padding: 0; }
 .popup-header .header-actions { gap: 7px; }
 .popup-header .settings-button { min-width: 32px; padding: 0 7px; }
 .hero-card { box-shadow: none; }
@@ -818,9 +817,13 @@ footer button { font-weight: 500; color: var(--muted); }
 }
 
 /* 同排操作保持紧凑高度；短标题合并快捷键，完整用途和长组合由按钮提示呈现。 */
-:root .popup-shell[data-interface-skin] .translate-action { display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
+:root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 36px; --diagnostic-color: #fff; position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
+:root[data-interface-skin="minimal"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--ink); }
+:root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--skin-action-text, #fff); }
+:root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action.is-translated { --diagnostic-color: var(--brand-strong); }
+:root.dark[data-interface-skin="contrast"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: #000; }
 :root .popup-shell[data-interface-skin] .translate-action > .translate-button {
-  display: flex; flex: 1 1 0; flex-wrap: nowrap; align-items: center; min-width: 0; min-height: 42px; height: auto; padding: 6px 10px; overflow: visible;
+  display: flex; flex: 1 1 0; flex-wrap: nowrap; align-items: center; min-width: 0; min-height: 42px; height: auto; padding: 6px var(--diagnostic-space); overflow: visible;
 }
 :root .popup-shell[data-interface-skin] .translate-action .translate-label {
   flex: 0 1 auto; min-width: 0; overflow: visible; text-overflow: clip; white-space: nowrap; line-height: 1.25;
@@ -829,18 +832,26 @@ footer button { font-weight: 500; color: var(--muted); }
 :root .popup-shell[data-interface-skin] .translate-action > .section-translate-button {
   display: inline-flex; flex: 0 0 auto; flex-direction: column; justify-content: center; gap: 2px; width: var(--popup-secondary-action-width); min-width: var(--popup-secondary-action-width); height: auto; min-height: 42px; padding: 4px 5px;
 }
+/* 入口叠在主按钮的预留区域，不参与网站规则或按钮的布局；详情沿整行右缘展开。 */
+:root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic {
+  position: absolute; inset: 0; z-index: 5; width: auto; height: auto; margin: 0; pointer-events: none;
+}
+:root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic :is(.diagnostic-trigger, .diagnostic-details) { pointer-events: auto; }
+:root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic .diagnostic-trigger {
+  position: absolute; top: 50%; right: 6px; transform: translateY(-50%); border-radius: 50%; color: var(--diagnostic-color); background: transparent;
+}
+:root .popup-shell[data-interface-skin] .translate-action.has-section-translation > .fluentread-diagnostic .diagnostic-trigger { right: calc(var(--popup-secondary-action-width) + 12px); }
+:root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic .diagnostic-trigger:hover { color: var(--diagnostic-color); background: color-mix(in srgb, var(--diagnostic-color) 14%, transparent); }
+:root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic .diagnostic-trigger:focus-visible { outline-color: var(--diagnostic-color); }
 /* 仅移除网站规则模块的外框，排序容器、独立按钮与各皮肤的按钮状态均保留。 */
 :root .popup-shell[data-interface-skin] .site-rule-row[data-popup-module="siteRule"] {
   min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
 }
 
-/* 首次操作与真实完成提示紧邻主操作，保持正文与主要功能可见。 */
-.first-use-hint { margin: 7px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .translation-meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
 :root .popup-shell[data-interface-skin] .translation-meta > .site-rule-row[data-popup-module="siteRule"] { flex: 1; min-width: 0; margin-top: 0; }
 /* 显示模式常驻局部按钮下方；网站规则可换行，右侧工具独立对齐，不增加默认中文弹窗高度。 */
 .translation-tools { position: relative; display: flex; flex: none; align-items: center; gap: 6px; margin-inline-start: auto; }
-.popup-shell .translation-tools > .fluentread-diagnostic { position: static; margin-left: 0; }
 .display-mode-slot { display: grid; place-items: center; flex: 0 0 var(--popup-secondary-action-width); width: var(--popup-secondary-action-width); }
 .display-mode-slot.with-page-font { display: flex; justify-content: center; gap: 6px; flex-basis: max(54px, var(--popup-secondary-action-width)); width: max(54px, var(--popup-secondary-action-width)); }
 .display-mode-button { display: grid; place-items: center; box-sizing: border-box; width: 24px; height: 24px; padding: 2px; border: 1px solid transparent; border-radius: 6px; color: var(--brand-strong); background: var(--surface-soft); cursor: pointer; }
@@ -860,8 +871,6 @@ footer button { font-weight: 500; color: var(--muted); }
 .display-mode-button:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-soft); }
 .display-mode-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .display-mode-button:disabled { color: var(--muted); opacity: .55; cursor: default; }
-/* 诊断图标可在模式图标左侧；浮层仍以工具组右缘为锚点，避免向左越出窄弹窗。 */
-.translation-tools .diagnostic-details { right: 0; }
 
 .popup-startup-recovery { padding: 20px; color: var(--ink); font-size: 12px; line-height: 1.6; }
 .popup-startup-recovery p { color: var(--muted); }
@@ -870,6 +879,9 @@ footer button { font-weight: 500; color: var(--muted); }
 
 /* any-pointer 同时覆盖触屏与连接鼠标的 iPad；46px 为原生 sheet 缩放留余量，并非任意缩放下 44px 的保证。 */
 @media (any-pointer: coarse) {
+  :root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 50px; }
+  :root .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic .diagnostic-trigger { right: 0; }
+  :root .popup-shell[data-interface-skin] .translate-action.has-section-translation > .fluentread-diagnostic .diagnostic-trigger { right: calc(var(--popup-secondary-action-width) + 6px); }
   :root .popup-shell .brand-icon-link { min-width: 46px; min-height: 46px; align-items: center; justify-content: center; }
   :root .popup-shell .donation-close { width: 46px; height: 46px; }
   :root .popup-shell .donation-card h2 { padding-right: 44px; }
@@ -936,6 +948,9 @@ footer button { font-weight: 500; color: var(--muted); }
 /* Firefox Android 的固定扩展容器可能报告 fine pointer；已确认的 Android 容器仍使用与 coarse 相同的触摸命中预算。 */
 :root[data-fluentread-android-popup] .popup-shell .brand-icon-link { min-width: 46px; min-height: 46px; align-items: center; justify-content: center; }
 :root[data-fluentread-android-popup] .popup-shell .donation-close { width: 46px; height: 46px; }
+:root[data-fluentread-android-popup] .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 50px; }
+:root[data-fluentread-android-popup] .popup-shell[data-interface-skin] .translate-action > .fluentread-diagnostic .diagnostic-trigger { right: 0; }
+:root[data-fluentread-android-popup] .popup-shell[data-interface-skin] .translate-action.has-section-translation > .fluentread-diagnostic .diagnostic-trigger { right: calc(var(--popup-secondary-action-width) + 6px); }
 :root[data-fluentread-android-popup] .popup-shell .donation-card h2 { padding-right: 44px; }
 :root[data-fluentread-android-popup] .popup-shell[data-interface-skin] .translate-action > .translate-button,
 :root[data-fluentread-android-popup] .popup-shell[data-interface-skin] .translate-action > .section-translate-button {

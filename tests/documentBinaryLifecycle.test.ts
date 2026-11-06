@@ -6,6 +6,7 @@ import {pathToFileURL} from 'node:url';
 import JSZip from 'jszip';
 import {PDFDocument} from 'pdf-lib';
 import {createServer} from 'vite';
+import {createPdfReaderBidiBuildPlugin} from '../scripts/testing/pdfjs-bidi-build';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {DOCUMENT_MAX_BYTES, PDF_MAX_BYTES, parseDocument, type ParsedDocument, type PdfDocumentBlock} from '@/src/features/document-translation/core/document';
 import {assertArchiveSafety, createDocumentDownload, parseBinaryDocument, parseDocumentFile, pdfTextBlocks, pdfTextLines} from '@/src/features/document-translation/services/binary';
@@ -447,7 +448,7 @@ it('documentbinaryAudit destroys a failed preview without retaining an unload li
     const server = await createServer({root, configFile: false, appType: 'custom', logLevel: 'silent',
         resolve: {alias: {'@': root}}, server: {middlewareMode: true, hmr: false, watch: null},
         optimizeDeps: {noDiscovery: true, include: []}, ssr: {noExternal: ['pdfjs-dist']},
-        plugins: [{name: 'document-lifecycle-native-pdf-ports', enforce: 'pre', resolveId(id) {
+        plugins: [createPdfReaderBidiBuildPlugin(root), {name: 'document-lifecycle-native-pdf-ports', enforce: 'pre', resolveId(id) {
             if (id === apiId || id === workerId) return id;
             if (id === 'pdfjs-dist/legacy/build/pdf.mjs') return apiId;
             if (id === 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url') return workerId;

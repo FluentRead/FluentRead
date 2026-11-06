@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/WritingSettings.vue
  * 文件职责：提供写作助手总开关、默认回复偏好和 AI 服务连接设置。
- * 主要内容：用单层开关、与其他分区一致的“左标签、右控件”服务与语言设置行，以及左侧预览、右侧风格设置组织内容，窄屏按预览、设置依次展示；缺失配置直接提示在 AI 服务一行，清楚区分默认偏好与真实生成，服务与风格模块提供同页导航目标。
+ * 主要内容：用单层开关、与其他分区一致的“左标签、右控件”服务与语言设置行，以及左侧预览、右侧风格设置组织内容，窄屏按预览、设置依次展示；关闭的服务保留为禁选项并显示未就绪提示；缺失配置直接提示在 AI 服务一行，清楚区分默认偏好与真实生成，服务与风格模块提供同页导航目标。
  * 模块边界：服务候选与就绪提示遵循共享平台可用性；继承项及内置名称显式本地化，选择框与传送到页面的选项保护用户服务名和模型值；ChatGPT 套餐选择器保留已保存的全局与写作实际模型 slug，不发起账户模型发现；只编辑设置中心持久化的同一份写作配置并恢复被禁用的网站；选项通过写作 UI 公开入口复用，不加载网页卡片，不请求模型也不生成真实正文。
  -->
 <template>
@@ -19,7 +19,7 @@
         <template v-if="readiness.issue && readiness.issue !== 'model'" #description><small class="writing-setup-message" role="status">{{ readiness.message }}</small></template>
         <el-select v-model="config.writing.service" data-i18n-ignore :empty-values="[null, undefined]" :aria-label="translateLegacy('写作服务')" :placeholder="translateLegacy('选择 AI 服务')" @change="config.writing.model = ''" filterable>
           <el-option value="" data-i18n-ignore :label="t('writing.experience.inheritService', {service: defaultServiceLabel})" />
-          <el-option v-for="item in serviceOptions" :key="item.value" data-i18n-ignore :label="item.label" :value="item.value" />
+          <el-option v-for="item in serviceOptions" :key="item.value" data-i18n-ignore :label="item.label" :value="item.value" :disabled="item.disabled" />
         </el-select>
       </SettingsItem>
       <SettingsItem label="模型">
@@ -74,6 +74,7 @@ import {getMultilingualTargetLanguageLabel, models, options, resolveConfiguredMo
 import {isHarnessService} from '@/src/core/config/harness';
 import {resolveWritingReadiness} from '@/src/core/config/writingReadiness';
 import {filterAvailableTranslationServices, getTranslationServiceUnavailableMessage} from '@/src/services/translation/capabilities';
+import {markDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {getCustomOpenAIProviderModels, isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
 import {WRITING_LANGUAGES, WRITING_LENGTHS, WRITING_STYLES, WRITING_TONES, WRITING_ROLES, WRITING_TONE_MAX_LENGTH, WRITING_ROLE_MAX_LENGTH, resolveWritingLanguage, resolveWritingReferenceLanguage} from '@/src/core/config/writing';
 import {WritingChoices} from '@/src/features/writing-assistant/ui/public';
@@ -112,9 +113,11 @@ function customPreference(field: 'tone' | 'role', presets: readonly {value: stri
 }
 const {choice: toneChoice, text: customTone, update: updateCustomTone} = customPreference('tone', WRITING_TONES, WRITING_TONE_MAX_LENGTH, 'natural');
 const {choice: roleChoice, text: customRole, update: updateCustomRole} = customPreference('role', WRITING_ROLES, WRITING_ROLE_MAX_LENGTH, 'auto');
-const serviceOptions = computed(() => filterAvailableTranslationServices([...options.services.filter(item => !item.disabled && isHarnessService(item.value)).map(item => ({...item, label: translateLegacy(item.label)})), ...config.value.customOpenAIProviders.map(item => ({value: item.id, label: item.name}))]));
+const serviceOptions = computed(() => markDisabledTranslationServices(filterAvailableTranslationServices([...options.services.filter(item => !item.disabled && isHarnessService(item.value)).map(item => ({...item, label: translateLegacy(item.label)})), ...config.value.customOpenAIProviders.map(item => ({value: item.id, label: item.name}))]), config.value.disabledTranslationServices));
 const service = computed(() => config.value.writing.service || config.value.service);
-const readiness = computed(() => resolveWritingReadiness(config.value, true, getTranslationServiceUnavailableMessage(service.value)));
+const serviceUnavailableMessage = computed(() => config.value.disabledTranslationServices.includes(service.value)
+  ? t('settings.services.library.serviceDisabledMessage') : getTranslationServiceUnavailableMessage(service.value));
+const readiness = computed(() => resolveWritingReadiness(config.value, true, serviceUnavailableMessage.value));
 const supported = computed(() => readiness.value.supported);
 const defaultServiceLabel = computed(() => {const builtin = options.services.find(item => item.value === config.value.service); return builtin ? translateLegacy(builtin.label) : serviceOptions.value.find(item => item.value === config.value.service)?.label || config.value.service;});
 const resolvedModel = computed(() => resolveConfiguredModel(config.value.model[service.value], config.value.customModel[service.value]));

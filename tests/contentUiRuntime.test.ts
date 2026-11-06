@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
     floatingBallCompact: false,
     floatingBallSettingsEntryVisible: true,
     floatingBallCollapsedOpacity: 52,
+    floatingBallDefaultMargin: 0,
+    floatingBallPopoutMargin: 20,
     floatingBallDisabledDomains: [] as string[],
     translationProgressPanelEnabled: true,
   },
@@ -123,6 +125,8 @@ beforeEach(() => {
     floatingBallCompact: false,
     floatingBallSettingsEntryVisible: true,
     floatingBallCollapsedOpacity: 52,
+    floatingBallDefaultMargin: 0,
+    floatingBallPopoutMargin: 20,
     floatingBallDisabledDomains: [],
     translationProgressPanelEnabled: true,
   });
@@ -212,6 +216,8 @@ describe('悬浮球 content runtime', () => {
       compact: false,
       settingsEntryVisible: true,
       collapsedOpacity: 52,
+      defaultMargin: 0,
+      popoutMargin: 20,
     });
     expect(runtime.mountFloatingBall()).toBeNull();
     expect(mocks.subscribeFullPageTranslationProgress).toHaveBeenCalledOnce();
@@ -326,6 +332,8 @@ describe('悬浮球 content runtime', () => {
       floatingBallCompact: true,
       floatingBallSettingsEntryVisible: false,
       floatingBallCollapsedOpacity: 20,
+      floatingBallDefaultMargin: -18,
+      floatingBallPopoutMargin: 30,
     });
 
     expect(presentation).toEqual({
@@ -335,6 +343,8 @@ describe('悬浮球 content runtime', () => {
       compact: true,
       settingsEntryVisible: false,
       collapsedOpacity: 20,
+      defaultMargin: -18,
+      popoutMargin: 30,
     });
     expect(mocks.createVueShadowUi).toHaveBeenCalledOnce();
 

@@ -1,4 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+const sidebarPreview = vi.hoisted(() => ({available: false}));
+vi.mock('@/src/platform/browser/translationSidepanel', () => ({canOpenTranslationSidepanel: () => sidebarPreview.available}));
 // 实际 runtime-dom 客户端装配。Element Plus 与界面翻译是受控 UI ports；
 // SFC、Vue 生命周期、DOM、核心颜色/高亮/预览与排序模块保持真实。
 const dom = await vi.hoisted(async () => {
@@ -862,6 +864,18 @@ describe('shared UI actual client SFC lifecycle', () => {
   it('projects skin previews and updates their accessible labels and tokens across every registry entry', async () => {
     const mounted = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});
     for (const chosen of interfaceSkinOptions) {mounted.props.skin = chosen;mounted.props.previewLabel = chosen.label;await settle();const section = mounted.root.querySelector('section')!;expect(section.getAttribute('data-preview-skin')).toBe(chosen.value);expect(section.getAttribute('aria-label')).toBe(chosen.label);expect(section.style.getPropertyValue('--interface-popup-width')).toBe(`${chosen.popupWidth}px`);expect(section.querySelector('.preview-popup')!.getAttribute('data-preview-skin')).toBe(chosen.value);expect(mounted.root.querySelectorAll('button,input')).toHaveLength(0);}
+  });
+  it('previews the compact coffee and sidebar icons in their real order when the browser supports a sidebar', async () => {
+    sidebarPreview.available = true;
+    const supported = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});
+    const actions = [...supported.root.querySelectorAll('.preview-header-actions > span')];
+    expect(actions).toHaveLength(3);
+    expect(actions[0].textContent).toBe('');expect(actions[0].querySelector('svg')).not.toBeNull();
+    expect(actions[1].textContent).toBe('');expect(actions[1].querySelector('svg rect')).not.toBeNull();
+    expect(actions[2].textContent).toContain('设置');
+    sidebarPreview.available = false;
+    const unsupported = await mount(InterfaceSkinPreview, {skin: skin(), previewLabel: 'Preview'});
+    expect(unsupported.root.querySelectorAll('.preview-header-actions > span')).toHaveLength(2);
   });
   it('updates writing examples and all custom fallback notes using the actual pure preview module', async () => {
     const mounted = await mount(WritingStylePreview, {length: 'short', style: 'auto', tone: 'natural', role: 'auto', animated: false});

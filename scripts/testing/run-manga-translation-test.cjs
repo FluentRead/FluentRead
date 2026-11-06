@@ -24,6 +24,10 @@ const {chromium} = require(path.join(packages, 'playwright'));
 const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground} = require(helper);
 const liveSite = process.argv.includes('--live-site');
 const liveTranslation = process.argv.includes('--live-translation');
+const translationService = arg('translation-service','google');
+const imageTranslationService = arg('image-translation-service',translationService);
+if((translationService!=='google'||imageTranslationService!=='google')&&!liveTranslation)
+    throw new Error('Non-Google translation providers require --live-translation; only Google has a deterministic transport fixture');
 const readerSmoke = process.argv.includes('--reader-smoke');
 const canvasReaderTest = process.argv.includes('--canvas-reader');
 const backgroundReaderTest = process.argv.includes('--background-reader');
@@ -90,7 +94,7 @@ if(qualityManifest){
         assert.ok(['en','ja','ko','ru','auto'].includes(fixture.sourceLanguage),'Quality scenes specify a supported OCR language');
         assert.ok([fixture.width,fixture.height].every(value=>Number.isInteger(value)&&value>0&&value<=8192)&&fixture.width*fixture.height<=16_777_216,'Quality scene dimensions match the runtime 8192-side / 16MP limits');
         validateQualityFixtureExpectations(fixture);
-        assert.ok(Array.isArray(fixture.protectedProbes)&&fixture.protectedProbes.length&&fixture.protectedProbes.every(probe=>Number.isInteger(probe.x)&&probe.x>=0&&probe.x<fixture.width&&Number.isInteger(probe.y)&&probe.y>=0&&probe.y<fixture.height&&Array.isArray(probe.rgb)&&probe.rgb.length===3&&probe.rgb.every(value=>Number.isInteger(value)&&value>=0&&value<=255)),'Quality scenes declare protected source pixels');
+        assert.ok(Array.isArray(fixture.protectedProbes)&&(fixture.protectedProbes.length||(fixture.protectedAlphaProbes?.length??0)>0)&&fixture.protectedProbes.every(probe=>Number.isInteger(probe.x)&&probe.x>=0&&probe.x<fixture.width&&Number.isInteger(probe.y)&&probe.y>=0&&probe.y<fixture.height&&Array.isArray(probe.rgb)&&probe.rgb.length===3&&probe.rgb.every(value=>Number.isInteger(value)&&value>=0&&value<=255)),'Quality scenes declare protected source pixels');
     }
 }
 const pipelineInputs=qualityFixtures?.map(fixture=>fixture.input)||explicitPipelineInputs;
@@ -98,8 +102,8 @@ if(qualityManifest)assert.ok(fs.existsSync(path.join(extensionDir,'manifest.json
 if(ordinaryImageQuality)assert.ok(qualityManifest&&!liveSite&&!liveTranslation&&!readerSmoke&&!surfaceReaderTest&&!segmentReaderTest
     &&!baseline&&!errorRecoveryTest&&!readAheadTest&&!scrollStabilityTest&&!scrollIntentTest&&!cacheNavigationTest&&!tieredCacheTest&&!pageFeedbackTest&&prefetchPages===0
     &&!offlineModels&&!preloadModels&&!blockedOfficial&&!blockedAll
-    &&qualityFixtures.every(fixture=>!fixture.expectedNoText&&['en','ja','auto'].includes(fixture.sourceLanguage)),
-    'Ordinary Paddle quality requires a controlled nonempty en/ja/auto corpus and shared OCR cache, without other reader modes, prefetch or legacy model-source diagnostics');
+    &&qualityFixtures.every(fixture=>['en','ja','auto'].includes(fixture.sourceLanguage)),
+    'Ordinary Paddle quality requires a controlled en/ja/auto corpus, including explicitly wordless scenes, and shared OCR cache, without other reader modes, prefetch or legacy model-source diagnostics');
 if(errorRecoveryTest)assert.ok(!liveSite&&!liveTranslation&&!readerSmoke&&!canvasReaderTest&&!backgroundReaderTest&&!segmentReaderTest&&!pipelineInputs
     &&!readAheadTest&&!scrollStabilityTest&&!scrollIntentTest&&!cacheNavigationTest&&!tieredCacheTest&&!pageFeedbackTest&&prefetchPages===0,
     'Error recovery uses only its controlled fixture with prefetch disabled, without live/pipeline/other reader modes');
@@ -114,6 +118,8 @@ const startupExtensionId=arg('extension-id',null);
 if(startupExtensionId)assert.match(startupExtensionId,/^[a-p]{32}$/,'Use a verified unpacked extension ID');
 const traceReader=process.argv.includes('--trace-reader');
 const traceLayout=process.argv.includes('--trace-layout')||Boolean(qualityManifest);
+const assertNoRenderSkips=process.argv.includes('--assert-no-render-skips');
+if(assertNoRenderSkips)assert.ok(liveSite&&readerSmoke&&traceLayout,'--assert-no-render-skips requires a traced live reader smoke');
 const recoveryFixtureUrl=errorRecoverySurface==='canvas'?'https://comic-walker.com/detail/KC_1068_S/episodes/KC_1068_E':
     errorRecoverySurface==='background'?'https://palcy.jp/comics/1068':'https://mangaplus.shueisha.co.jp/viewer/1024050';
 const targetUrl = arg('site-url',errorRecoveryTest?recoveryFixtureUrl:'https://mangaplus.shueisha.co.jp/viewer/1024050');
@@ -176,7 +182,8 @@ if(readerDismissSelector)assert.ok(imageTurnKey,'Public reader notices are limit
 let profile; let launchAttempted = false;
 fs.mkdirSync(artifacts, {recursive: true});
 const report = {site: liveSite ? 'live MANGA Plus' : 'controlled MANGA Plus reader fixture',
-    translation: liveTranslation ? 'live Google' : 'deterministic Google text transport',
+    translation: liveTranslation ? `live ${translationService}` : 'deterministic Google text transport',
+    imageTranslationService,
     ocr: ordinaryImageQuality ? 'real production PaddleOCR ordinary-image profile' : ['ru','ko'].includes(sourceLanguage) ? 'real production Tesseract with manga cleanup and typesetting' : 'real production PaddleOCR', qualityProfile, cases: [], screenshots: [], errors: [], hostErrors: [], pageErrors: [], consoleErrors: []};
 if(errorRecoveryTest){
     report.site=`controlled ${errorRecoverySurface} recovery fixture using production reader discovery`;
@@ -668,6 +675,44 @@ async function toggle() {
     await page.mouse.click(expanded.x,expanded.y);
 }
 async function ops() {return worker.evaluate(()=>globalThis.__mangaTest.operations.length);}
+async function setInputFilesUsingLocalPaths(locator,ownerPage,files,browserContext) {
+    try {await locator.setInputFiles(files);return 'playwright';}
+    catch(error) {
+        if(!/Cannot transfer files larger than 50Mb to a browser not co-located with the server/.test(error.message))throw error;
+        // CDP sends only local file paths to this same-host browser; it avoids copying a 200+ MB model through Playwright's remote transport.
+        const session=await browserContext.newCDPSession(ownerPage);
+        try {
+            await session.send('DOM.enable');
+            const {root}=await session.send('DOM.getDocument',{depth:1});
+            const {nodeId}=await session.send('DOM.querySelector',{nodeId:root.nodeId,selector:'input[type="file"]'});
+            assert.ok(nodeId,'Model file input is present in the isolated browser document');
+            await session.send('DOM.setFileInputFiles',{nodeId,files});
+            assert.equal(await locator.evaluate(input=>input.files?.length),files.length,'The browser accepted every local model path');
+            report.modelFileImportTransport='CDP local paths';
+            return 'CDP local paths';
+        } finally {await session.detach();}
+    }
+}
+async function assertLatestLayoutHasNoSkippedTranslations() {
+    if(!assertNoRenderSkips)return;
+    const id=await worker.evaluate(()=>globalThis.__mangaTest.operations.at(-1));
+    const layout=await worker.evaluate(id=>globalThis.__mangaTest.layoutResults?.find(result=>result.requestId===id),id);
+    assert.ok(layout,'The real offscreen response was captured for the visible source page');
+    const skipped=layout.lines.filter(line=>line.renderSkipped).map(line=>line.sourceText);
+    assert.deepEqual(skipped,[],'The manga page has no OCR echo that forces a valid neighboring translation to be skipped');
+    report.renderSkipAssertions??=[];report.renderSkipAssertions.push({requestId:id,sourceLines:layout.lines.length,skipped});
+}
+async function readerScrollState() {
+    return page.evaluate(selector=>{
+        const image=[...document.querySelectorAll(selector)].at(-1),containers=[];
+        for(let element=image?.parentElement;element;element=element.parentElement){
+            if(element.scrollHeight<=element.clientHeight+4)continue;
+            containers.push({tag:element.tagName,id:element.id,className:String(element.className||'').slice(0,120),top:element.scrollTop,scrollHeight:element.scrollHeight,clientHeight:element.clientHeight});
+        }
+        const root=document.scrollingElement;
+        return {windowY:scrollY,windowHeight:innerHeight,documentHeight:root?.scrollHeight||document.documentElement.scrollHeight,containers};
+    },readerSelector);
+}
 async function scrollReaderImage(index) {
     if(readerNextSelector){
         assert.ok(index>=readerCurrentIndex,'Normal page-turn samples move forward through observed body images');
@@ -675,6 +720,31 @@ async function scrollReaderImage(index) {
             await page.locator(readerNextSelector).click({timeout:15000});readerCurrentIndex++;
             await page.locator(readerSelector).nth(readerCurrentIndex).waitFor({state:'visible',timeout:15000});
         }
+    }else{
+        // Infinite-scroll readers may only insert the next body image after the
+        // last currently loaded image reaches the viewport. Discover it with
+        // bounded ordinary wheel gestures before locating the requested index.
+        const images=page.locator(readerSelector),initialCount=await images.count(),steps=[];
+        let count=initialCount,stagnantSteps=0;
+        for(let attempt=0;count<=index&&attempt<Math.min(60,index+12);attempt++){
+            const before=await readerScrollState();
+            const beforeCount=count,last=images.last();
+            if(beforeCount){
+                await last.scrollIntoViewIfNeeded();
+                const box=await last.boundingBox();
+                if(box)await page.mouse.move(box.x+box.width/2,Math.min(before.windowHeight-8,Math.max(8,box.y+box.height*.75)));
+            }else await page.mouse.move(Math.floor(innerWidth/2),Math.floor(before.windowHeight*.75));
+            await page.mouse.wheel(0,Math.max(300,Math.floor(before.windowHeight*.8)));
+            await page.waitForTimeout(400);
+            count=await images.count();
+            const after=await readerScrollState();
+            steps.push({attempt:attempt+1,count,scroll:after});
+            const noProgress=count===beforeCount&&JSON.stringify(after)===JSON.stringify(before);
+            stagnantSteps=noProgress?stagnantSteps+1:0;
+            if(stagnantSteps>=3)break;
+        }
+        (report.readerImageDiscovery??=[]).push({targetIndex:index,initialCount,finalCount:count,steps});
+        if(count<=index)throw new Error(`Unable to reveal body image index ${index}; loaded ${count} matching elements after bounded scroll discovery`);
     }
     const image=page.locator(readerSelector).nth(index);
     const anchor=page.locator(readerScrollSelector||readerSelector).nth(index);
@@ -824,7 +894,7 @@ async function assertQuietReading() {
         return;
     }
     assert.equal(await mangaEntry('return !!this.querySelector(".fr-manga-entry")'),false,'No automatic reader panel');
-    assert.notEqual(await imageUi('return [...this.querySelectorAll(".fr-image-feedback")].some(e=>!e.hidden && (e.dataset.manga!=="true" || e.dataset.phase!=="loading" || !!e.querySelector("button")))'),true,'Only noninteractive per-page manga status may appear');
+    assert.notEqual(await imageUi('return [...this.querySelectorAll(".fr-image-feedback")].some(e=>{if(e.hidden)return false;const warning=e.dataset.phase==="translated"&&e.dataset.warning==="true"&&e.dataset.warningAction==="true";return e.dataset.manga!=="true"&&(e.dataset.phase!=="loading"&&!warning)||[...e.querySelectorAll("button")].some(button=>!button.hidden&&!button.classList.contains("fr-image-warning-button"))})'),true,'Only loading status or the dedicated read-text warning may appear during manga reading');
     assert.notEqual(await imageUi('return [...this.querySelectorAll(".fr-image-controls")].some(e=>!e.hidden && getComputedStyle(e).display!=="none")'),true,'No per-image original, text or cancel controls while reading');
 }
 
@@ -1244,7 +1314,7 @@ async function verifyPipelinePerformance(extensionId) {
         else await wait(async()=>!!await ball(`return this.querySelector('.floating-ball-manga')`),30000);
         const before=await ops();const start=Date.now();
         await modelObserver.command('Runtime.evaluate',{expression:'globalThis.__pipelineSamples.workers=[];globalThis.__pipelineSamples.runs=[];globalThis.__pipelineSamples.encodes=[];globalThis.__pipelineSamples.reads=[];globalThis.__pipelineSamples.sessions=[];globalThis.__pipelineSamples.canvasCalls={};globalThis.__pipelineSamples.yields=[];globalThis.__pipelineSamples.gpuSubmissions=0'});
-        const measured=await require('./local-model-browser-helpers.cjs').measureBrowser(launched.context,`manga-round-${round+1}`,artifacts,async()=>{
+        const measured=await require('./local-model-browser-helpers.cjs').measureBrowser(launched.context,`manga-case-${report.pipeline.length+1}-round-${round+1}`,artifacts,async()=>{
             await toggle();
             await wait(async()=>await imageUi(`return !!this.querySelector('.fr-image-feedback:not([hidden]) .fr-image-spinner:not([hidden])')`),10000);
             report.loadingFrames??=[];
@@ -1295,7 +1365,7 @@ async function verifyPipelinePerformance(extensionId) {
             Object.assign(result,evaluateCapturedQualityFixture(fixture,layout.lines));
             if(fixture.expectedNoText) {
                 result.wordlessPage={noTextTransport:texts.length===0,noBitmap:!displayedBitmap,sourcePreserved:JSON.stringify(await page.locator('.zao-image').first().evaluate(image=>({src:image.src,srcset:image.getAttribute('srcset'),sizes:image.getAttribute('sizes'),style:image.getAttribute('style')})))===JSON.stringify(sourceState)};
-                if(!result.wordlessPage.noBitmap||!result.wordlessPage.sourcePreserved)result.qualityFailures.push({type:'wordless-page-render',reason:'A wordless source must remain visible without a translated bitmap',...result.wordlessPage});
+                if(!result.wordlessPage.noTextTransport||!result.wordlessPage.noBitmap||!result.wordlessPage.sourcePreserved)result.qualityFailures.push({type:'wordless-page-render',reason:'A wordless source must issue no text transport and remain visible without a translated bitmap',...result.wordlessPage});
             }
             const capturedPixels=await page.evaluate(async({source,translated,probes})=>{
                 const sample=async src=>{const image=new Image();image.src=src;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(image,0,0);return {width:canvas.width,height:canvas.height,pixels:probes.map(({x,y})=>Array.from(ctx.getImageData(x,y,1,1).data))};};
@@ -1305,6 +1375,10 @@ async function verifyPipelinePerformance(extensionId) {
             result.protectedPixels={source:{...capturedPixels.source,pixels:capturedPixels.source.pixels.slice(0,rgbCount)},translated:{...capturedPixels.translated,pixels:capturedPixels.translated.pixels.slice(0,rgbCount)}};
             const {qualityFailures:alphaFailures,...alpha}=evaluateQualityAlphaProbes(fixture,{sourcePixels:capturedPixels.source.pixels.slice(rgbCount),translatedPixels:capturedPixels.translated.pixels.slice(rgbCount)});
             Object.assign(result,alpha);result.qualityFailures.push(...alphaFailures);
+            // Declared nontext protection compares the same native source/output RGBA, not authored RGB.
+            for(let index=0;index<(fixture.protectedAlphaProbes?.length??0);index++){
+                assert.deepEqual(capturedPixels.translated.pixels[rgbCount+index],capturedPixels.source.pixels[rgbCount+index],`Protected nontext RGBA remains unchanged: ${caseName} probe ${index}`);
+            }
             assert.equal(result.protectedPixels.source.width,fixture.width);assert.equal(result.protectedPixels.source.height,fixture.height);
             assert.equal(result.protectedPixels.translated.width,fixture.width);assert.equal(result.protectedPixels.translated.height,fixture.height);
             for(let index=0;index<fixture.protectedProbes.length;index++){
@@ -1771,7 +1845,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         imageTranslationMangaEnabled:!ordinaryImageQuality,imageTranslationMangaDownloadConfirmed:true,imageTranslationMangaPromptEnabled:false,imageTranslationHoverEnabled:ordinaryImageQuality,disableFloatingBall:ordinaryImageQuality,
         ...(ordinaryImageQuality?{imageTranslationOcrEngine:'paddle'}:{}),
         imageTranslationMangaPrefetchPages:prefetchPages,
-        service:'google',from:sourceLanguage,to:targetLanguage,useCache:true,enableAIContext:false,animations:false});
+        service:translationService,imageTranslationService,from:sourceLanguage,to:targetLanguage,useCache:true,enableAIContext:false,animations:false});
     await worker.evaluate(({live,trace,traceLayout,layoutTraceLimit})=>{
         const original=globalThis.fetch.bind(globalThis);
         const test=globalThis.__mangaTest={operations:[],inputs:[],requests:[],transportRequests:[],cancellations:[],textBatches:[],progress:[],sourceRequests:[]};
@@ -1781,7 +1855,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
             chrome.runtime.sendMessage=function(...args){
                 const message=args[0],observe=response=>{
                     if(message?.type==='FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN'&&Array.isArray(response?.lines)&&test.layoutResults.length<layoutTraceLimit)
-                        test.layoutResults.push({requestId:message.requestId,noBitmap:response.success===true&&(response.imageUnchanged===true||message.manga===true&&(Array.isArray(response.mangaPatches?.patches)&&response.mangaPatches.patches.length===0||response.lines.length===0&&typeof response.image==='string'&&response.image===message.image)),lines:response.lines.map(({text,sourceText,bbox,fontSize,sourceBoxes,vertical})=>({text,sourceText,bbox,fontSize,sourceBoxes,vertical}))});
+                        test.layoutResults.push({requestId:message.requestId,noBitmap:response.success===true&&(response.imageUnchanged===true||message.manga===true&&(Array.isArray(response.mangaPatches?.patches)&&response.mangaPatches.patches.length===0||response.lines.length===0&&typeof response.image==='string'&&response.image===message.image)),lines:response.lines.map(({text,sourceText,bbox,fontSize,sourceBoxes,vertical,renderSkipped,numericUncertain})=>({text,sourceText,bbox,fontSize,sourceBoxes,vertical,renderSkipped,numericUncertain}))});
                     return response;
                 };
                 const last=args.length-1,callback=args[last];
@@ -1824,6 +1898,19 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
                 if(list)return new Response(JSON.stringify(translations),{status:200});
                 const entry=[null,null,null,null,null,[['流畅阅读：看懂每一页漫画']]];
                 return new Response(JSON.stringify(entries.map(request=>['wrb.fr','MkEWBc',JSON.stringify([null,[[entry]]]),null,null,null,request[3]])),{status:200});
+            }
+            if(endpoint.hostname==='edge.microsoft.com'&&endpoint.pathname==='/translate/translatetext'){
+                const startedAt=Date.now();let payload;
+                try{payload=typeof options?.body==='string'?JSON.parse(options.body):undefined;}catch{}
+                const items=Array.isArray(payload)?payload.length:0;
+                try{
+                    const response=await original(input,options);
+                    test.transportRequests.push({endpoint:'microsoft-translatetext',items,status:response.status,durationMs:Date.now()-startedAt});
+                    return response;
+                }catch(error){
+                    test.transportRequests.push({endpoint:'microsoft-translatetext',items,errorName:error?.name||'Error',durationMs:Date.now()-startedAt});
+                    throw error;
+                }
             }
             if(!live&&/^(?:translate(?:-pa)?\.googleapis\.com|translate\.google\.(?:com|co\.uk))$/.test(endpoint.hostname))throw new Error('Unexpected Google fixture transport');
             return original(input,options);
@@ -1887,7 +1974,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
             if(!preparedModels)await prepareModelFilesForTest();
         }
         const files=preparedModels?.files||readImageTranslationModelManifest().map(asset=>({...asset,path:path.join(preloadModels,asset.filename)}));
-        await importInput.setInputFiles(files.map(file=>file.path));
+        await setInputFilesUsingLocalPaths(importInput,modelSettings,files.map(file=>file.path),context);
         const requiredOcr=files.some(file=>file.kind==='ocr'),requiredInpaint=files.some(file=>file.kind==='inpaint'),requiredSeg=files.some(file=>file.kind==='seg');
         const until=Date.now()+60000;let status;
         while(Date.now()<until){
@@ -2011,6 +2098,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
     await wait(async()=>(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-busy')`))==='false');
     assert.equal(await source.evaluate(i=>i.style.opacity),'0','The observed source has its translated bitmap displayed');
     assert.equal(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-pressed')`),'true');
+    await assertLatestLayoutHasNoSkippedTranslations();
     report.pageDurationsMs.push({page:1,ms:Date.now()-started,includesFirstModelPreparation:true});
     await toolScreenshot('active');assert.ok(report.buttonStates.active.badge>=19);
     if(!liveSite){assert.ok((await ops())<=2,'Only the visible page and its canceled preparation/retry run');
@@ -2032,6 +2120,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
     await wait(async()=>(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-busy')`))==='false');
     assert.ok((await imageUi(`return this.querySelectorAll('.fluent-read-image-translation-bitmap').length`))>0);
     assert.equal(await second.evaluate(i=>i.style.opacity),'0','The new observed page displays its own translated result');
+    await assertLatestLayoutHasNoSkippedTranslations();
     const afterScroll=await ops();assert.ok(afterScroll>=before);
     report.scrollOperationCounts={before,after:afterScroll,mode:afterScroll>before?'new-operation':'existing-result'};
     report.pageDurationsMs.push({page:2,ms:Date.now()-started,mayIncludeFirstInpaintingPreparation:true});
@@ -2046,6 +2135,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         await wait(async()=>(await ball(`return this.querySelector('.floating-ball-manga').getAttribute('aria-busy')`))==='false');
         assert.ok((await imageUi(`return this.querySelectorAll('.fluent-read-image-translation-bitmap').length`))>0);
         assert.equal(await image.evaluate(i=>i.style.opacity),'0');
+        await assertLatestLayoutHasNoSkippedTranslations();
         (report.additionalScrollOperationCounts??=[]).push({page:index+1,before:previous,after:await ops()});
         report.pageDurationsMs.push({page:index+1,ms:Date.now()-started});
         await screenshot(`${String(index+1).padStart(2,'0')}-dialogue-translated`);report.cases.push(report.currentCase);
@@ -2135,7 +2225,8 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
     report.modelStatusAfter=await popup.evaluate(()=>chrome.runtime.sendMessage({type:'fluentReadMangaModelStatus'}));
     assert.deepEqual(report.modelStatusAfter,{success:true,ready:false,bytes:0,inpaintingReady:false,source:expectedModelSource});
     if(offlineModels){
-        await modelSettings.locator('.manga-model-settings input[type=file]').setInputFiles(['PP-OCRv6_small_det.onnx','PP-OCRv6_small_rec.onnx','ppocrv6_dict.txt','lama-manga-dynamic.onnx'].map(name=>path.join(offlineModels,name)));
+        await setInputFilesUsingLocalPaths(modelSettings.locator('.manga-model-settings input[type=file]'),modelSettings,
+            ['PP-OCRv6_small_det.onnx','PP-OCRv6_small_rec.onnx','ppocrv6_dict.txt','lama-manga-dynamic.onnx'].map(name=>path.join(offlineModels,name)),context);
         await modelSettings.locator('.manga-model-settings small').filter({hasText:'226 MB'}).waitFor({timeout:60000});
         report.offlineStatus=await popup.evaluate(()=>chrome.runtime.sendMessage({type:'fluentReadMangaModelStatus'}));
         assert.equal(report.offlineStatus.ready,true);assert.equal(report.offlineStatus.inpaintingReady,true);

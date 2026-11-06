@@ -1,7 +1,7 @@
 <!--
  * @file src/features/translation-center/ui/TranslationCenter.vue
  * 文件职责：提供以输入和多服务对照为中心的翻译工作台，清晰展示凭据、请求进度和旧结果。
- * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话，侧栏专用布局由原生入口样式负责；侧边栏用紧凑按钮显示服务或已选数量，完整保留多服务对比与模型标识，移除重复语言/耗时、拖拽和常驻配置说明，不覆盖设置页保存的结果布局，暂停时通过外层打开通用设置；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
+ * 主要内容：设置页与原生侧边栏共用输入、服务选择和请求会话；侧栏支持 Enter 翻译、Shift+Enter 换行，输入法组合期间不触发，原设置页快捷键保持不变；侧栏专用布局由原生入口样式负责；关闭的服务自动从比较列表排除；相同译文仍可显示和复制；复用配置补丁保存语言、顺序和结果布局；服务目录按凭据状态分组并支持模型搜索；卡片提供配置入口、独立重试和复制，设置同步保留原文及结果，请求身份和停止由 comparison 模型维护，全局暂停取消在途任务并保留输入与已完成结果。
  * 模块边界：不实现 provider 协议、不保存原文和译文、不更改网页默认服务；翻译复用 app client 的服务超时配置，设置导航交给外层，卸载时释放自有页面监听器和请求。
  -->
 <template>
@@ -16,12 +16,12 @@
           <button class="language-swap-button icon-button" type="button" :aria-label="ct('swap')" :title="ct(sourceLanguage === 'auto' ? 'swapAuto' : 'swap')" :disabled="sourceLanguage === 'auto'" @click="swapLanguages"><UiIcon name="swap" /></button>
           <div class="language-picker-group"><label v-if="surface !== 'sidebar'" for="translation-center-target">{{ ct('target') }}</label><UiSelect id="translation-center-target" v-model="targetLanguage" :aria-label="ct('target')" :title="languageLabel(targetLanguage)" :wrap-label="false" :show-search-icon="false" filterable @visible-change="targetMenuOpen = $event" @change="persistTranslationCenterConfig('target')"><template #label><span data-i18n-ignore>{{ targetMenuOpen ? t('select.search') : languageLabel(targetLanguage).split(' / ')[0] }}</span></template><ElOption v-for="item in targetLanguageOptions" :key="item.value" :value="item.value" data-i18n-ignore :label="getMultilingualTargetLanguageLabel(item.value, item.label, language)" /></UiSelect></div>
         </div>
-        <div class="translation-editor"><textarea ref="sourceEditor" v-model="sourceText" data-i18n-ignore :maxlength="MAX_TEXT_LENGTH" :placeholder="ct('placeholder')" :aria-label="ct('input')" :aria-describedby="surface !== 'sidebar' ? 'translation-input-help' : undefined" @keydown="handleEditorKeydown" /><button v-if="surface === 'sidebar' && sourceText" class="sidebar-clear-button icon-button" type="button" :aria-label="ct('clear')" :title="ct('clear')" @click="clearSource"><UiIcon name="close" :size="16" /></button><button v-if="!sourceText && surface !== 'sidebar'" class="example-button" type="button" @click="useExample"><UiIcon name="pen" :size="15" />{{ ct('example') }}</button></div>
+        <div class="translation-editor"><textarea ref="sourceEditor" v-model="sourceText" data-i18n-ignore :maxlength="MAX_TEXT_LENGTH" :placeholder="ct('placeholder')" :aria-label="ct('input')" :aria-describedby="surface === 'sidebar' ? 'sidebar-input-help' : 'translation-input-help'" :title="surface === 'sidebar' ? t('sidepanel.keyboardHint') : undefined" @keydown="handleEditorKeydown" /><button v-if="surface === 'sidebar' && sourceText" class="sidebar-clear-button icon-button" type="button" :aria-label="ct('clear')" :title="ct('clear')" @click="clearSource"><UiIcon name="close" :size="16" /></button><button v-if="!sourceText && surface !== 'sidebar'" class="example-button" type="button" @click="useExample"><UiIcon name="pen" :size="15" />{{ ct('example') }}</button></div>
         <div v-if="surface !== 'sidebar'" class="translation-input-meta"><span>{{ sourceText.length.toLocaleString() }} / 5,000</span><span v-if="isRunning" role="status">{{ ct('progress', {done: settledCount, total: requestedCount}) }}</span></div>
         <p v-if="!translationEnabled" class="input-notice translation-paused" role="status">{{ t('popup.heroDisabled') }} · <button v-if="surface === 'sidebar'" class="text-button" type="button" @click="emit('configure-general')">{{ translateLegacy('通用设置') }}</button><a v-else href="#settings-general">{{ translateLegacy('通用设置') }}</a></p>
         <p v-if="sameLanguage" class="input-notice" role="status">{{ ct('sameLanguage') }}</p>
         <p v-if="!readyCards.length && surface !== 'sidebar'" class="input-notice" role="status">{{ ct('noReady') }}</p>
-        <div class="translation-input-footer"><button v-if="isRunning" class="translate-stop-button" type="button" @click="session.stop()"><UiIcon name="close" :size="16" />{{ ct('stop') }}</button><button v-else class="translate-primary-button" type="button" :disabled="!canTranslate || !readyCards.length" @click="runTranslation"><UiIcon name="translate" :size="17" />{{ ct(state.run ? 'again' : 'start') }}<kbd v-if="surface !== 'sidebar'">{{ shortcutLabel }}</kbd></button><p v-if="surface !== 'sidebar'" id="translation-input-help">{{ ct('privacy') }}</p></div>
+        <div class="translation-input-footer"><button v-if="isRunning" class="translate-stop-button" type="button" @click="session.stop()"><UiIcon name="close" :size="16" />{{ ct('stop') }}</button><button v-else class="translate-primary-button" type="button" :disabled="!canTranslate || !readyCards.length" @click="runTranslation"><UiIcon name="translate" :size="17" />{{ ct(state.run ? 'again' : 'start') }}<kbd v-if="surface !== 'sidebar'">{{ shortcutLabel }}</kbd></button><p v-if="surface === 'sidebar'" id="sidebar-input-help" class="sidebar-keyboard-hint">{{ t('sidepanel.keyboardHint') }}</p><p v-if="surface !== 'sidebar'" id="translation-input-help">{{ ct('privacy') }}</p></div>
       </section>
       <section class="translation-results-panel" :aria-label="ct('results')">
         <div class="translation-panel-heading results-heading">
@@ -66,6 +66,7 @@ import UiSelect from '@/src/ui/components/UiSelect.vue';
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import {filterAvailableTranslationServices, isTranslationServiceAvailable} from '@/src/services/translation/capabilities';
+import {filterEnabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import {getMultilingualTargetLanguageLabel, models, options, resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {getCustomOpenAIProvider, getCustomOpenAIProviderModels, isConfiguredCustomOpenAIProvider, type CustomOpenAIProvider, withCustomOpenAIServiceOptions} from '@/src/core/config/customOpenAI';
@@ -119,9 +120,9 @@ type TranslationCenterConfigPatch = {translationCenterServices?: string[]; trans
 
 const serviceOptions = computed(() => {
   void configRevision.value;
-  return filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
+  return filterEnabledTranslationServices(filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(
     options.services, customOpenAIProviders.value,
-  ), config.compositeTranslationProviders)).filter(item => !item.disabled).map(item => ({...item, label: translateLegacy(item.label)}));
+  ), config.compositeTranslationProviders)).map(item => ({...item, label: translateLegacy(item.label)})), config.disabledTranslationServices);
 });
 const hiddenUnavailableServices = computed(() => {
   void configRevision.value;
@@ -272,7 +273,16 @@ function clearSource() {session.stop(); sourceText.value = ''; feedback.value = 
 function runTranslation() {if (canTranslate.value && !isRunning.value) void session.run(readyCards.value.map(card => card.service), currentInput);}
 function retryService(service: string) {if (canTranslate.value && !credentialWarning(service)) void session.run([service], currentInput);}
 function retryIncomplete() {if (canTranslate.value) void session.run(incompleteCards.value.map(card => card.service), currentInput);}
-function handleEditorKeydown(event: KeyboardEvent) {if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {event.preventDefault(); runTranslation();}}
+function handleEditorKeydown(event: KeyboardEvent) {
+  if (props.surface !== 'sidebar') {
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.isComposing) {event.preventDefault(); runTranslation();}
+    return;
+  }
+  if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) return;
+  if (!event.ctrlKey && !event.metaKey && (event.shiftKey || event.altKey)) return;
+  event.preventDefault();
+  if (!event.repeat) runTranslation();
+}
 async function toggleServicePicker() {if (servicePickerOpen.value) {closePicker(true); return;} servicePickerOpen.value = true; await nextTick(); serviceSearch.value?.focus();}
 function closePicker(restoreFocus: boolean) {servicePickerOpen.value = false; serviceSearchQuery.value = ''; if (restoreFocus) servicePickerTrigger.value?.focus();}
 function closeServicePicker(event: Event) {if (!servicePicker.value?.contains(event.target as Node)) closePicker(false);}

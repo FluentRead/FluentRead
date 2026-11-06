@@ -1,7 +1,7 @@
 /**
  * @file src/app/sidepanel/sidepanel.css
  * 文件职责：定义原生翻译侧边栏的自适应外壳、紧凑工作台与主题。
- * 主要内容：使用共享 token 和界面字体，固定紧凑标题并将剩余高度交给可滚动的翻译工作台；浅色、深色和服务菜单消费同一组语义变量；侧栏输入、服务菜单和结果布局仅随原生入口打包，避免进入 userscript 的设置页。
+ * 主要内容：使用共享 token 和界面字体，固定紧凑标题并将剩余高度交给可滚动的翻译工作台；键盘操作说明供输入框提示和辅助技术使用而不占常态布局；浅色、深色和服务菜单消费同一组语义变量；侧栏输入、服务菜单和结果布局仅随原生入口打包，避免进入 userscript 的设置页。
  * 模块边界：这里只管理扩展自有文档，不匹配宿主网页；只为 sidepanel-shell 内的 translation-center 展示变体覆写布局，不改变设置页和 userscript 的样式。
  */
 @import '../../ui/styles/tokens.css';
@@ -33,7 +33,7 @@ button { color: inherit; }
 .sidepanel-shell .translation-center.is-sidebar .sidebar-clear-button { position: absolute; top: 5px; right: 5px; width: 26px; height: 26px; }
 .sidepanel-shell .translation-center.is-sidebar .translation-input-meta { margin: 6px 0; }
 .sidepanel-shell .translation-center.is-sidebar .translation-input-footer { padding-top: 6px; }
-.sidepanel-shell .translation-center.is-sidebar .translation-input-footer p { margin-top: 8px; }
+.sidepanel-shell .translation-center.is-sidebar .translation-input-footer .sidebar-keyboard-hint { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .sidepanel-shell .translation-center.is-sidebar .translate-primary-button, .sidepanel-shell .translation-center.is-sidebar .translate-stop-button { min-height: 32px; padding: 6px 10px; }
 .sidepanel-shell .translation-center.is-sidebar .results-heading { align-items: center; gap: 8px; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 .sidepanel-shell .translation-center.is-sidebar .translation-center-service-picker { flex: 1; min-width: 0; }

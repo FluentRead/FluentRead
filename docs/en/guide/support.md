@@ -19,6 +19,6 @@ To discuss sponsorship, email [**a1914493943@gmail.com**](mailto:a1914493943@gma
 
 ## Individual contributions
 
-Voluntary contributions through WeChat Support or Ko-fi also help maintain the project.
+Voluntary contributions through WeChat Support or Ko-fi also help maintain the project. You can also open the support options from the coffee icon at the top of the extension popup.
 
 <SupportOptions en />

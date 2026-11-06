@@ -537,6 +537,8 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     floatingBallCompact: {group: 'general', label: '缩小悬浮球', format: formatBoolean},
     floatingBallSettingsEntryVisible: {group: 'general', label: '悬浮球设置入口', format: formatBoolean},
     floatingBallCollapsedOpacity: {group: 'general', label: '悬浮球收起不透明度', format: (value) => formatNumber(value, '%')},
+    floatingBallDefaultMargin: {group: 'general', label: '悬浮球默认边距', format: (value) => formatNumber(value, ' px')},
+    floatingBallPopoutMargin: {group: 'general', label: '悬浮球弹出边距', format: (value) => formatNumber(value, ' px')},
     translationProgressPanelEnabled: {group: 'general', label: '翻译进度面板', format: formatBoolean},
     bilingualSentenceHighlightEnabled: {group: 'translation', label: '双语逐句高亮', format: formatBoolean},
     bilingualSentenceHighlightStyle: {group: 'translation', label: '逐句高亮样式', format: value => formatEnum(value, labelsFor(SENTENCE_HIGHLIGHT_STYLES))},
@@ -557,6 +559,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
 
     service: {group: 'general', label: '默认翻译服务', format: formatService},
     favoriteServices: {group: 'translationServices', label: '常用翻译服务', format: (value) => Array.isArray(value) ? formatArray(value, formatService) : formatValue(value)},
+    disabledTranslationServices: {group: 'translationServices', label: '已关闭翻译服务', format: (value) => Array.isArray(value) ? formatArray(value, formatService) : formatValue(value)},
     customOpenAIProviders: {group: 'translationServices', label: '自定义 OpenAI 服务', format: formatCustomOpenAIProviders},
     compositeTranslationProviders: {group: 'translationServices', label: '组合翻译服务', format: formatCompositeTranslationProviders},
     apiKeyRotationEnabled: {group: 'translationServices', label: '自动轮换', format: value => formatRecord(configRecord(value))},

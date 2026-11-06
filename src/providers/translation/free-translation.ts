@@ -1,5 +1,6 @@
 /**
  * @file src/providers/translation/free-translation.ts
+ * 服务启用：冻结配置中的全局关闭项不参与权重、自动候选或单路检查，原免费池选择与健康记录保留。
  * 文件职责：按冻结的用户设置编排免费翻译，并接入有界请求、取消和跨段冷却。
  * 主要内容：冻结匿名请求配置和共享预算；Safari 每次请求读取临时域授权集合，未授权候选不入池、不计健康，单服务检查同样拦截；文档合批保留完整混合池，原生候选消费有界全组、其他候选只消费首段并继续余槽，普通调用沿用原分组条件和冻结的服务合批偏好；逐槽验证术语、文档标签、语言和原文回显，图片文字的内部策略接受有效原样结果且不继续换线，保持线路健康、间隔、取消及真实字符统计；向免费池与子服务传递真实在途租约，使取消后的迟到传输继续受候选、总池和后台并发约束；单服务检查不换线，跳过多线路中已确认不支持的语言方向。
  * 模块边界：只装配已有 provider；健康状态与并发调度由 freeFallback 服务持有。
@@ -30,6 +31,7 @@ import {
     normalizeFreeTranslationMode,
 } from '@/src/core/config/freeTranslation';
 import {abortErrorFromSignal} from '@/src/platform/http/runtime';
+import {isTranslationServiceDisabled, TRANSLATION_SERVICE_DISABLED_MESSAGE} from '@/src/core/config/serviceAvailability';
 import {isFreeProviderAllowed, readFreePoolAccess, requireFreeProviderAccess, type FreePoolAccess} from '@/src/platform/browser/freeProviderPermissions';
 import {freeTranslationHealthStorage} from '@/src/platform/storage/freeTranslationHealthStorage';
 import {createFreeFallbackRunner, UntranslatedFreeResultError, WrongLanguageFreeResultError, type FreeFallbackCandidate, type FreeFallbackLease} from '@/src/services/translation/freeFallback';
@@ -162,6 +164,7 @@ export async function translateFreeTranslationProvider(providerId: string, messa
     if (!isFreeTranslationProviderId(providerId)) throw new Error('无效的免费翻译服务');
     const origin = message.origin;
     const frozen = prepareRequest(message);
+    if (isTranslationServiceDisabled(requireTranslationProviderConfig(frozen).disabledTranslationServices, providerId)) throw new Error(TRANSLATION_SERVICE_DISABLED_MESSAGE);
     const prepared = import.meta.env.BROWSER === 'safari'
         ? await prepareAuthorizedRequest(frozen, [providerId], providerId) : frozen;
     return translateProviderText(providerId, {...prepared, origin});
@@ -210,9 +213,14 @@ function providerIdentity(id: string, current: TranslationProviderConfigSnapshot
     return `${id}:${sha256Hex(JSON.stringify(connection))}`;
 }
 
-/** 为设置页提供实际可用池权重；Safari 同样过滤未授权项，保留全部健康记录与用户配置。 */
+function enabledFreeProviders(current: TranslationProviderConfigSnapshot): string[] {
+    return normalizeFreeTranslationOrder(current.freeTranslationOrder)
+        .filter(id => !isTranslationServiceDisabled(current.disabledTranslationServices, id));
+}
+
+/** 为设置页提供实际可用池权重；关闭项与 Safari 未授权项不入池，保留健康记录与用户配置。 */
 export async function getFreeTranslationWeightSnapshot(current: TranslationProviderConfigSnapshot, now = Date.now()): Promise<FreeTranslationWeightSnapshot> {
-    const enabled = normalizeFreeTranslationOrder(current.freeTranslationOrder);
+    const enabled = enabledFreeProviders(current);
     const enabledProviderIds = import.meta.env.BROWSER === 'safari'
         ? (await readFreePoolAccess(enabled)).grantedIds : enabled;
     const healthByIdentity = new Map((await runFallback.getHealthSnapshot()).map(entry => [entry.identity, entry]));
@@ -235,7 +243,7 @@ function candidatesFor(text: string, message: PreparedRequest, groupSources?: re
 } {
     const current = requireTranslationProviderConfig(message);
     const routeByIdentity = new Map<string, string>();
-    const enabled = normalizeFreeTranslationOrder(current.freeTranslationOrder);
+    const enabled = enabledFreeProviders(current);
     const allowed = import.meta.env.BROWSER === 'safari'
         ? enabled.filter(id => isFreeProviderAllowed(message[FREE_TRANSLATION_ACCESS]!, id as FreeProviderId)) : enabled;
     // 单线路仍让 provider 返回准确的语言方向错误；多线路不反复消费已证实无效的候选。
@@ -303,7 +311,7 @@ interface FreeSlotGroup { indexes: number[]; sources: string[]; characters: numb
 /** 合批只由冻结的完整启用池决定，不用临时权限或健康过滤提升混合池。 */
 function usesNativeFreeGroups(length: number, message: FrozenRequest): boolean {
     const current = requireTranslationProviderConfig(message);
-    const enabled = normalizeFreeTranslationOrder(current.freeTranslationOrder);
+    const enabled = enabledFreeProviders(current);
     return length > FREE_TRANSLATION_GROUP_MAX_SLOTS
         && enabled.every(id => (id === 'microsoft' || id === 'google')
             && isNativeTranslationBatchEnabled(id, current.nativeBatchTranslationEnabled));
@@ -402,7 +410,7 @@ export default async function freeTranslation(message: TranslationProviderReques
             || usesNativeFreeGroups(origin.length, frozen)) && origin.every(text => !text.trim()))) return origin;
     }
     const prepared = import.meta.env.BROWSER === 'safari'
-        ? await prepareAuthorizedRequest(frozen, normalizeFreeTranslationOrder(requireTranslationProviderConfig(frozen).freeTranslationOrder)) : frozen;
+        ? await prepareAuthorizedRequest(frozen, enabledFreeProviders(requireTranslationProviderConfig(frozen))) : frozen;
     if (typeof origin === 'string') return translatePreparedText(origin, prepared);
     return translateFreeBatch(origin, prepared);
 }

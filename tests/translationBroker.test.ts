@@ -93,6 +93,7 @@ const mocks = vi.hoisted(() => {
     const buildTranslationCacheKey = vi.fn((identity: unknown) => JSON.stringify(identity));
     const config = {
         service: 'mock',
+        disabledTranslationServices: [] as string[],
         maxConcurrentTranslations: 6,
         translationRequestsPerSecond: 0,
         translationRequestsPerMinute: 0,
@@ -280,6 +281,22 @@ describe('translation broker', () => {
             .rejects.toMatchObject({message: expect.stringContaining('尚未开放公开接入'), kind: 'bad-request', retryable: false});
         expect(mocks.cacheGet).not.toHaveBeenCalled(); expect(mocks.service).not.toHaveBeenCalled(); expect(mocks.planService).not.toHaveBeenCalled();
         expect(JSON.stringify(mocks.config)).toBe(before);
+    });
+    it('rejects a globally disabled service before cache lookup or provider dispatch', async () => {
+        mocks.config.disabledTranslationServices = ['mock'];
+        await expect(translateWithCache({origin: 'Source'})).rejects.toMatchObject({
+            message: '所选翻译服务已关闭，请到服务目录重新启用，或选择其他服务。',
+            kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED',
+        });
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.service).not.toHaveBeenCalled();
+    });
+    it('freezes and normalizes disabled service IDs in the provider config snapshot', () => {
+        const disabledTranslationServices = ['mock', 'mock'];
+        const snapshot = createTranslationProviderConfigSnapshot({...mocks.config, disabledTranslationServices});
+        disabledTranslationServices.push('google');
+        expect(snapshot.disabledTranslationServices).toEqual(['mock']);
+        expect(Object.isFrozen(snapshot.disabledTranslationServices)).toBe(true);
     });
     it('skips an unavailable saved ChatGPT composite member and can use the next existing provider', async () => {
         const current = new Config(); current.service = 'composite:saved'; current.model[services.chatgptPlan] = 'saved-account-model';
@@ -574,6 +591,7 @@ describe('translation broker', () => {
             .forEach(service => mocks.machineServices.add(service));
         Object.assign(mocks.config, {
             service: 'mock',
+            disabledTranslationServices: [],
             from: 'auto',
             to: 'zh-Hans',
             useCache: true,
@@ -1893,6 +1911,54 @@ describe('translation broker', () => {
             targetLanguage: 'zh-Hans',
         })).resolves.toEqual(['same-译文', 'other-译文']);
         expect(mocks.service).not.toHaveBeenCalled();
+    });
+
+    it.each(['google', 'freeTranslation'])('%s 批次关闭缓存后仍只翻译一份重复原文，保留空白及原位置', async service => {
+        mocks.config.service = service;
+        const first = 'The first sentence needs translation.';
+        const second = 'The second sentence needs translation.';
+        mocks.service.mockResolvedValue(['第一句译文。', '第二句译文。']);
+        const request = {origin: [first, '', first, second, ' \t', second, first], useCache: false};
+
+        await expect(translateWithCache(request)).resolves.toEqual([
+            '第一句译文。', '', '第一句译文。', '第二句译文。', ' \t', '第二句译文。', '第一句译文。',
+        ]);
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0].origin).toEqual([first, second]);
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+
+    it('关闭缓存和原生合批后逐条执行也只翻译一份重复原文', async () => {
+        mocks.config.service = 'google';
+        mocks.config.useCache = false;
+        mocks.config.nativeBatchTranslationEnabled = {google: false};
+        mocks.service.mockImplementation(async ({origin}: {origin: string}) => `${origin}译文`);
+
+        await expect(translateWithCache({origin: ['Alpha', 'Beta', 'Alpha', 'Beta']}))
+            .resolves.toEqual(['Alpha译文', 'Beta译文', 'Alpha译文', 'Beta译文']);
+        expect(mocks.service.mock.calls.map(([message]) => message.origin)).toEqual(['Alpha', 'Beta']);
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+        expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+
+    it('无缓存去重只合并完全相同的原文，不合并大小写或空白不同的文本', async () => {
+        mocks.service.mockImplementation(async ({origin}: {origin: string[]}) => origin.map(text => `${text}译文`));
+        const sources = ['Open source', 'open source', 'Open source ', 'Open source'];
+        await expect(translateWithCache({origin: sources, useCache: false}))
+            .resolves.toEqual(sources.map(text => `${text}译文`));
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(sources.slice(0, 3));
+    });
+
+    it('无缓存 AI 多段仍保留重复原文的独立槽位与邻段语义', async () => {
+        mocks.config.service = 'ai';
+        const sources = ['The same sentence.', 'A different sentence.', 'The same sentence.'];
+        const packet = serializeTranslationSlots(sources);
+        const outputs = ['第一处译文。', '中间译文。', '第三处译文。'];
+        mocks.service.mockResolvedValue(outputs.map((output, index) => `${packet.starts[index]}${output}${packet.ends[index]}`).join('\n'));
+        await expect(translateWithCache({origin: sources, useCache: false, aiMultiSegment: true})).resolves.toEqual(outputs);
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0].origin).toBe(packet.payload);
     });
 
     it('persists unchanged batch items so ambiguous target-language text is not translated again', async () => {

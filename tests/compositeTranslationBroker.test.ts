@@ -51,6 +51,30 @@ function setup(members: string[] = [services.google, services.microsoft]) {
 afterEach(() => vi.useRealTimers());
 
 describe('组合翻译真实 broker 接入', () => {
+    it('所有供应商抛出空错误时仍返回明确失败，而不伪造成功或丢失路由记录', async () => {
+        const h = setup(); vi.mocked(h.providers.google).mockRejectedValue(undefined); vi.mocked(h.providers.microsoft).mockRejectedValue(undefined);
+        await expect(h.broker.translateWithCache({origin: sourceText, useCache: false})).rejects.toThrow('组合翻译没有可用的成员服务');
+        expect(h.providers.google).toHaveBeenCalledOnce(); expect(h.providers.microsoft).toHaveBeenCalledOnce();
+        expect(h.recordRequest.mock.calls[0][0].routes).toEqual([services.google, services.microsoft]);
+    });
+    it('跳过已关闭的组合成员并在其他成员上继续回退', async () => {
+        const h = setup([services.google, services.microsoft]);
+        h.config.disabledTranslationServices = [services.google];
+        await expect(h.broker.translateWithCache({origin: sourceText, useCache: false})).resolves.toBe(translatedText);
+        expect(h.providers.google).not.toHaveBeenCalled();
+        expect(h.providers.microsoft).toHaveBeenCalledOnce();
+        expect(h.recordRequest.mock.calls[0][0].routes).toEqual([services.microsoft]);
+    });
+
+    it('组合成员全部关闭时在 provider 调用前返回明确错误', async () => {
+        const h = setup([services.google, services.microsoft]);
+        h.config.disabledTranslationServices = [services.google, services.microsoft];
+        await expect(h.broker.translateWithCache({origin: sourceText, useCache: false}))
+            .rejects.toMatchObject({message: '组合翻译的所有成员都已关闭，请重新启用至少一个服务', kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED'});
+        expect(h.providers.google).not.toHaveBeenCalled();
+        expect(h.providers.microsoft).not.toHaveBeenCalled();
+    });
+
     it('图片组合的单条协议成员接受整批原样结果，沿用取消所有权且不换成员', async () => {
         const h = setup([services.claude, services.google]);
         h.config.token.claude = 'fixture-claude';

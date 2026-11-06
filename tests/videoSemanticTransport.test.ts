@@ -74,6 +74,39 @@ describe('semantic runtime through the real SDK and shared gateway', () => {
     expect(JSON.stringify(result)).not.toContain('fixture-first');
   });
 
+  it('aborts when the selected service is disabled and requires a fresh request after re-enabling', async () => {
+    let release!: (response: Response) => void;
+    const fetch = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(resolve => {release = resolve;}));
+    setRuntimeFetch(fetch);
+    const handlers = createVideoSemanticRuntime(); const pending = handlers[0].handle(request('availability'), context);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    const init = fetch.mock.calls[0][1]!;
+    current().disabledTranslationServices = ['unrelated']; ports.changed!();
+    expect(init.signal?.aborted).toBe(false);
+    current().disabledTranslationServices = [service]; ports.changed!();
+    expect(init.signal?.aborted).toBe(true);
+    expect(await pending).toMatchObject({success: false});
+    await expect(handlers[0].handle(request('disabled-request'), context)).rejects.toThrow('not configured');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    release(response()); await Promise.resolve();
+    current().disabledTranslationServices = []; ports.changed!();
+    const nextFetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => response()); setRuntimeFetch(nextFetch);
+    expect(await handlers[0].handle(request('re-enabled'), context)).toMatchObject({success: true});
+    expect(nextFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a late response if service disablement is visible before its config notification', async () => {
+    let release!: (response: Response) => void;
+    const fetch = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(resolve => {release = resolve;}));
+    setRuntimeFetch(fetch);
+    const pending = createVideoSemanticRuntime()[0].handle(request('late-disable'), context);
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    current().disabledTranslationServices = [service];
+    release(response());
+    expect(await pending).toMatchObject({success: false});
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it('aborts on a real custom-body fingerprint change and rejects a late response', async () => {
     let release!: (response: Response) => void;
     const fetch = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) => new Promise<Response>(resolve => {release = resolve;}));

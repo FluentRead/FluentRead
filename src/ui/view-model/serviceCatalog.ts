@@ -1,5 +1,6 @@
 /**
  * @file src/ui/view-model/serviceCatalog.ts
+ * 启用边界：只把 machine/cloud/ai 标记视为目录标题；关闭的真实服务保留在原分组，供目录重新启用。
  * 文件职责：为服务与模型选择界面提供无框架的视图模型转换，把扁平配置选项整理成可搜索、可分层和可稳定展示的数据。
  * 主要内容：定义服务目录分组与官方网站入口，提供云服务厂商的免费额度与开通指引，安全派生自定义服务站点，按服务与模型关键词搜索，并把选择面板的服务拆成按使用意图排序的常用区与更多区。
  * 模块边界：这些函数不读取 Vue 状态、不修改 Config，也不判断平台能力或发起连接测试；原始目录由 core/config 提供，Popup/Options 等调用方负责交互与渲染。
@@ -242,7 +243,7 @@ export function buildServiceGroups(options: ServiceOption[]): ServiceGroup[] {
   let current: ServiceGroup = { id: 'other', label: '其他服务', items: [] }
 
   for (const option of options) {
-    if (option.disabled) {
+    if (option.disabled && (option.value === 'machine' || option.value === 'cloud' || option.value === 'ai')) {
       if (current.items.length) groups.push(current)
       current = {
         id: option.value,

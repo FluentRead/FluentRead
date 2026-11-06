@@ -1,7 +1,7 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
- * 文件职责：呈现用户开启后的页面悬浮工具，将全文翻译、品牌手柄和漫画入口按顺序组织，并保留拖动停靠与可选常驻模式。
- * 主要内容：品牌主体显示圆形本地图标，全文和漫画动作保留直接切换；活动漫画提供次级文字入口并与面板共享打开状态，键盘焦点和阅读期间不自动收起。悬停、触屏、拖动和视口变化沿用现有停靠交互。
+ * 文件职责：呈现用户开启后的页面悬浮工具，将全文翻译、品牌手柄和漫画入口按顺序组织，并保留拖动停靠、可选常驻模式和可调边距。
+ * 主要内容：品牌主体显示圆形本地图标，全文和漫画动作保留直接切换；活动漫画提供次级文字入口并与面板共享打开状态，键盘焦点和阅读期间不自动收起。默认与悬停展开边距分别控制横向停靠位置，悬停、触屏、拖动和视口变化沿用现有交互。
  * 模块边界：它只负责视觉与局部交互，不直接调用浏览器消息、保存配置或执行全文翻译；这些副作用由 content/runtime 通过 props、事件和 defineExpose 桥接，外观配置的归一化留在 core/config。
  -->
 <template>
@@ -140,6 +140,8 @@ const DEFAULT_PRESENTATION: FloatingBallPresentation = {
   compact: false,
   settingsEntryVisible: true,
   collapsedOpacity: 52,
+  defaultMargin: 0,
+  popoutMargin: 20,
 };
 
 const props = defineProps({
@@ -233,6 +235,9 @@ const showTranslateTool = computed(() => props.showMenu && presentation.value.to
 const showSettingsTool = computed(() => showTranslateTool.value && presentation.value.settingsEntryVisible);
 // 隐藏工具按钮不影响主体展开，键盘与触屏仍能完整访问悬浮球。
 const isMenuExpanded = computed(() => isAlwaysExpanded.value || isExpanded.value || touchExpanded.value || (import.meta.env.BROWSER !== 'userscript' && popupOpen!.value));
+const positionMargin = computed(() => presentation.value.toolsDisplay === 'hover' && isMenuExpanded.value
+  ? presentation.value.popoutMargin
+  : presentation.value.defaultMargin);
 const isMainActionable = computed(() => presentation.value.clickAction !== 'none');
 const displayTranslationStatus = computed(() => isTranslating.value ? translationStatus.value : 'idle');
 const translationActionLabel = computed(() => {
@@ -268,6 +273,8 @@ const mainActionTitle = computed(() => {
 const rootStyle = computed<CSSProperties>(() => ({
   ...positionStyle.value,
   '--fr-ball-collapsed-opacity': String(presentation.value.collapsedOpacity / 100),
+  '--fr-ball-default-margin': `${presentation.value.defaultMargin}px`,
+  '--fr-ball-popout-margin': `${presentation.value.popoutMargin}px`,
 } as CSSProperties));
 
 function clearExpandTimer() {
@@ -352,12 +359,13 @@ function applyDockPositionStyle(containerHeight: number) {
   const viewport = getVisualViewportRect();
   const halfHeight = Math.min(containerHeight / 2, viewport.height / 2);
   const centerY = viewport.top + resolveFloatingBallCenterY(verticalPosition.value, viewport.height, containerHeight);
+  const margin = `${positionMargin.value}px`;
   positionStyle.value = {
     top: `clamp(calc(${viewport.top + halfHeight}px + env(safe-area-inset-top, 0px)), ${centerY}px, calc(${viewport.bottom - halfHeight}px - env(safe-area-inset-bottom, 0px)))`,
     left: currentDisplayPosition.value === 'left'
-      ? `calc(${viewport.left}px + max(var(--fr-ball-edge-gap), env(safe-area-inset-left, 0px)))` : 'auto',
+      ? `calc(${viewport.left}px + env(safe-area-inset-left, 0px) + ${margin})` : 'auto',
     right: currentDisplayPosition.value === 'right'
-      ? `calc(${Math.max(0, window.innerWidth - viewport.right)}px + max(var(--fr-ball-edge-gap), env(safe-area-inset-right, 0px)))` : 'auto',
+      ? `calc(${Math.max(0, window.innerWidth - viewport.right)}px + env(safe-area-inset-right, 0px) + ${margin})` : 'auto',
     transform: undefined,
   };
 }
@@ -639,6 +647,10 @@ watch(() => props.showMenu, (visible) => {
 watch(() => presentation.value.settingsEntryVisible, () => {
   nextTick(updatePositionStyle);
 });
+
+watch(positionMargin, () => {
+  nextTick(updatePositionStyle);
+});
 </script>
 
 <style scoped>
@@ -647,7 +659,8 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   --fr-ball-tool-size: 40px;
   --fr-ball-icon-size: 18px;
   --fr-ball-mascot-size: 24px;
-  --fr-ball-edge-gap: 20px;
+  --fr-ball-default-margin: 0px;
+  --fr-ball-popout-margin: 20px;
   position: fixed;
   /* 工具入口位于独立阅读面板和操作弹窗之下，窄屏时不遮住正文。 */
   z-index: 2147483646;
@@ -658,32 +671,44 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   gap: 8px;
   color: #596273;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  transition: transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: left 0.46s cubic-bezier(0.22, 1, 0.36, 1), right 0.46s cubic-bezier(0.22, 1, 0.36, 1), transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
   user-select: none;
   touch-action: none;
   pointer-events: none;
   will-change: transform;
 }
 
-/* 收起时不让透明容器覆盖网页；展开后连接主体与页面边缘，避免图标移入页面时悬停中断。 */
+/* 收起时不让透明容器覆盖网页；展开后连接默认位置、弹出位置与视口边缘，避免移动时悬停中断。 */
 .fr-floating-ball.floating-ball-expanded {
   pointer-events: auto;
 }
 
-.fr-floating-ball.floating-ball-expanded::after {
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"]::before,
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"]::after {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: var(--fr-ball-edge-gap);
   content: '';
 }
 
-.fr-floating-ball.floating-ball-expanded[data-position="right"]::after {
-  right: calc(var(--fr-ball-edge-gap) * -1);
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"][data-position="right"]::before {
+  left: calc(-1 * max(0px, calc(var(--fr-ball-default-margin) - var(--fr-ball-popout-margin))));
+  right: 100%;
 }
 
-.fr-floating-ball.floating-ball-expanded[data-position="left"]::after {
-  left: calc(var(--fr-ball-edge-gap) * -1);
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"][data-position="right"]::after {
+  left: 100%;
+  right: calc(-1 * max(0px, var(--fr-ball-popout-margin)));
+}
+
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"][data-position="left"]::before {
+  left: calc(-1 * max(0px, var(--fr-ball-popout-margin)));
+  right: 100%;
+}
+
+.fr-floating-ball.floating-ball-expanded[data-tools-display="hover"][data-position="left"]::after {
+  left: 100%;
+  right: calc(-1 * max(0px, calc(var(--fr-ball-default-margin) - var(--fr-ball-popout-margin))));
 }
 
 .fr-floating-ball.is-compact {
@@ -694,17 +719,15 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   gap: 6px;
 }
 .fr-floating-ball.manga-reader {
-  --fr-ball-size:32px;--fr-ball-tool-size:32px;--fr-ball-icon-size:15px;--fr-ball-mascot-size:19px;--fr-ball-reader-inset:16px;gap:6px;
+  --fr-ball-size:32px;--fr-ball-tool-size:32px;--fr-ball-icon-size:15px;--fr-ball-mascot-size:19px;gap:6px;
 }
 
 .fr-floating-ball[data-position="left"] {
-  left: var(--fr-ball-edge-gap);
   align-items: flex-start;
   transform: translateY(-50%);
 }
 
 .fr-floating-ball[data-position="right"] {
-  right: var(--fr-ball-edge-gap);
   transform: translateY(-50%);
 }
 
@@ -716,11 +739,11 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   will-change: transform;
 }
 
-.fr-floating-ball[data-position="left"] .floating-ball-item {
+.fr-floating-ball[data-position="left"] .floating-ball-tool {
   transform: translateX(-4px);
 }
 
-.fr-floating-ball.floating-ball-expanded .floating-ball-item {
+.fr-floating-ball.floating-ball-expanded .floating-ball-tool {
   opacity: 1;
   transform: translateX(0) !important;
 }
@@ -747,6 +770,7 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   overflow: visible;
   order: 1;
   color: #ec4d7d;
+  transform: none;
 }
 
 .floating-ball-translate {order:0;}
@@ -757,12 +781,10 @@ watch(() => presentation.value.settingsEntryVisible, () => {
 
 .fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="right"] .floating-ball-main {
   opacity: var(--fr-ball-collapsed-opacity, 0.52);
-  transform: translateX(calc(50% + var(--fr-ball-edge-gap)));
 }
 
 .fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="left"] .floating-ball-main {
   opacity: var(--fr-ball-collapsed-opacity, 0.52);
-  transform: translateX(calc(-50% - var(--fr-ball-edge-gap)));
 }
 
 .fr-floating-ball.floating-ball-expanded .floating-ball-main {
@@ -816,9 +838,8 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   opacity: var(--fr-ball-collapsed-opacity, 0.52);
   pointer-events: auto;
 }
-/* 半圆把手留在滚动条内侧；macOS 滚动时出现的原生滚动条不能吞掉全部命中区域。 */
-.fr-floating-ball.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position="right"] :is(.floating-ball-manga,.floating-ball-main) {transform:translateX(calc(50% + var(--fr-ball-edge-gap) - var(--fr-ball-reader-inset)));clip-path:inset(-6px 50% -6px -6px);opacity:var(--fr-ball-collapsed-opacity,.52);}
-.fr-floating-ball.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position="left"] :is(.floating-ball-manga,.floating-ball-main) {transform:translateX(calc(-50% - var(--fr-ball-edge-gap) + var(--fr-ball-reader-inset)));clip-path:inset(-6px -6px -6px 50%);opacity:var(--fr-ball-collapsed-opacity,.52);}
+/* 漫画入口与主体共用可调边距，收起时保持完整点击区域。 */
+.fr-floating-ball.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-manga,.floating-ball-main) {transform:none;clip-path:none;opacity:var(--fr-ball-collapsed-opacity,.52);}
 .fr-floating-ball .floating-ball-manga.manga-active,
 .fr-floating-ball .floating-ball-manga:hover,
 .fr-floating-ball .floating-ball-manga:focus-visible { opacity: 1; color: #ec4d7d; }
@@ -937,7 +958,6 @@ watch(() => presentation.value.settingsEntryVisible, () => {
 .fr-floating-ball.is-touch-capable {
   --fr-ball-size: 44px;
   --fr-ball-tool-size: 44px;
-  --fr-ball-edge-gap: 12px;
 }
 .fr-floating-ball.is-touch-capable:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga),
 .fr-floating-ball.is-touch-capable.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga) {
@@ -952,7 +972,6 @@ watch(() => presentation.value.settingsEntryVisible, () => {
   .fr-floating-ball.manga-reader {
     --fr-ball-size: 44px;
     --fr-ball-tool-size: 44px;
-    --fr-ball-edge-gap: 12px;
   }
   .fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga),
   .fr-floating-ball.manga-reader:not(.floating-ball-expanded):not(.dragging)[data-position] :is(.floating-ball-main, .floating-ball-manga) {

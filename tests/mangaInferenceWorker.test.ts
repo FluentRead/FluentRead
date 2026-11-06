@@ -80,6 +80,13 @@ describe('漫画推理 Worker 消息处理器', () => {
         const [,transfer]=scope.postMessage.mock.calls.find(([message])=>message===result)!;
         expect(transfer).toEqual([bits.buffer]);expect(transfer).not.toContain(originalProbability.buffer);
     });
+    it('漫画可请求像素段落证据且不生成检测帧传输',async()=>{
+        ocr.recognize.mockResolvedValue({results:[],imageParagraphGapProofs:[]});
+        const result=await send({requestId:47,type:'recognize',image:'manga',mangaParagraphGapEvidence:true});
+        expect(ocr.recognize).toHaveBeenCalledWith('manga',{flatten:true,noCache:true,strategy:'per-box',mangaParagraphGapEvidence:true});
+        expect(result).toMatchObject({requestId:47,success:true,result:{results:[],imageParagraphGapProofs:[]}});
+        expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([]);
+    });
     it('侧车重复buffer只转移一次，非ArrayBuffer不列transfer，正常消息仍不含新flag',async()=>{
         const bits=new Uint8Array([1]),shared=new Uint8Array(new SharedArrayBuffer(1));
         const geometry={pageWidth:1,pageHeight:1,x:0,y:0,width:1,height:1};

@@ -16,14 +16,15 @@ const naturalRoot=new URL('./fixtures/manga-natural/',import.meta.url);
 const naturalManifest=JSON.parse(readFileSync(new URL('manifest.json',naturalRoot),'utf8'));
 const runnerAst=ts.createSourceFile('runner.cjs',readFileSync(new URL('../scripts/testing/run-manga-translation-test.cjs',import.meta.url),'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
 describe('普通图片质量矩阵使用独立的真实入口',()=>{
-    it('拒绝把真实站点、其他阅读模式、无字页或其他OCR引擎混入普通Paddle质量统计',()=>{
+    it('普通Paddle允许明确无字负控，同时拒绝真实站点、其他阅读模式和其他OCR引擎',()=>{
         const admission=runnerAst.statements.find(node=>ts.isIfStatement(node)&&node.expression.getText(runnerAst)==='ordinaryImageQuality')!.getText(runnerAst);
         const base:any={assert:require('node:assert/strict'),ordinaryImageQuality:true,qualityManifest:{},qualityFixtures:[{sourceLanguage:'en'},{sourceLanguage:'ja'},{sourceLanguage:'auto'}],prefetchPages:0,offlineModels:null,preloadModels:null,blockedOfficial:false,blockedAll:false};
         const modes=['liveSite','liveTranslation','readerSmoke','surfaceReaderTest','segmentReaderTest','baseline','errorRecoveryTest','readAheadTest','scrollStabilityTest','scrollIntentTest','cacheNavigationTest','tieredCacheTest','pageFeedbackTest'];
         for(const mode of modes)base[mode]=false;
         expect(()=>runInNewContext(admission,base)).not.toThrow();
+        expect(()=>runInNewContext(admission,{...base,qualityFixtures:[{sourceLanguage:'en',expectedNoText:true,regions:[],expectedSource:[],expectedAnchors:[]}]})).not.toThrow();
         for(const mode of modes)expect(()=>runInNewContext(admission,{...base,[mode]:true})).toThrow();
-        for(const overrides of [{qualityManifest:null},{prefetchPages:1},{offlineModels:'/fixed-models'},{preloadModels:'/fixed-models'},{blockedOfficial:true},{blockedAll:true},{qualityFixtures:[{sourceLanguage:'en',expectedNoText:true}]},{qualityFixtures:[{sourceLanguage:'ru'}]},{qualityFixtures:[{sourceLanguage:'ko'}]}])
+        for(const overrides of [{qualityManifest:null},{prefetchPages:1},{offlineModels:'/fixed-models'},{preloadModels:'/fixed-models'},{blockedOfficial:true},{blockedAll:true},{qualityFixtures:[{sourceLanguage:'ru'}]},{qualityFixtures:[{sourceLanguage:'ko'}]}])
             expect(()=>runInNewContext(admission,{...base,...overrides})).toThrow();
         expect(()=>runInNewContext(admission,{...base,ordinaryImageQuality:false,liveSite:true,qualityManifest:null})).not.toThrow();
     });
@@ -38,6 +39,34 @@ describe('普通图片质量矩阵使用独立的真实入口',()=>{
             if(point.hit&&point.y<point.viewport.height){await run();expect(clicks).toEqual([[120,80]]);}
             else{await expect(run()).rejects.toThrow('visible and hit-testable');expect(clicks).toEqual([]);}
         }
+    });
+});
+describe('真实runner的无字页和透明图保护判据',()=>{
+    const statements=(predicate:(node:ts.Node)=>boolean)=>{
+        const matches:ts.Node[]=[];const visit=(node:ts.Node)=>{if(predicate(node))matches.push(node);ts.forEachChild(node,visit);};visit(runnerAst);expect(matches).toHaveLength(1);return matches[0].getText(runnerAst);
+    };
+    it('只有已声明合法RGBA保护点时才允许RGB点为空，缺保护或非法坐标仍拒绝',()=>{
+        const admission=statements(node=>ts.isExpressionStatement(node)&&ts.isCallExpression(node.expression)&&node.expression.arguments[1]?.getText(runnerAst)==="'Quality scenes declare protected source pixels'");
+        const valid=fixture({protectedProbes:[],protectedAlphaProbes:[{x:30,y:20,rgba:[17,24,39,1]}]});
+        const run=(f:any)=>{validateQualityFixtureExpectations(f);runInNewContext(admission,{assert:require('node:assert/strict'),fixture:f});};
+        expect(()=>run(valid)).not.toThrow();
+        for(const overrides of [{protectedAlphaProbes:[]},{protectedAlphaProbes:[{x:400,y:20,rgba:[17,24,39,1]}]},{protectedAlphaProbes:[{x:30,y:20,rgba:[17,24,39,256]}]},{protectedProbes:[{x:30,y:20,rgb:[17,24]}]}])
+            expect(()=>run({...valid,...overrides})).toThrow();
+    });
+    it('无字页即使保持原图，也必须因真实文字传输而失败',()=>{
+        const verdict=statements(node=>ts.isIfStatement(node)&&node.expression.getText(runnerAst).startsWith('!result.wordlessPage.noTextTransport||'));
+        const run=(change:any={})=>{const result={wordlessPage:{noTextTransport:true,noBitmap:true,sourcePreserved:true,...change},qualityFailures:[]};runInNewContext(verdict,{result});return result.qualityFailures;};
+        expect(run()).toEqual([]);
+        for(const change of [{noTextTransport:false},{noBitmap:false},{sourcePreserved:false}])expect(run(change)).toContainEqual(expect.objectContaining({type:'wordless-page-render'}));
+    });
+    it('逐通道核对实际原图与输出RGBA，不借作者RGB修饰原生量化值，也不改采样',()=>{
+        const loop=statements(node=>ts.isForStatement(node)&&!!node.condition?.getText(runnerAst).includes('fixture.protectedAlphaProbes?.length'));
+        const f={protectedAlphaProbes:[{x:30,y:20,rgba:[17,24,39,1]}]};
+        const source=[[10,20,30,255],[0,0,0,1]];
+        const run=(pixel:number[])=>{const capturedPixels={source:{pixels:source},translated:{pixels:[source[0],[...pixel]]}},before=JSON.stringify(capturedPixels);runInNewContext(loop,{fixture:f,capturedPixels,rgbCount:1,caseName:'native-alpha1',assert:require('node:assert/strict')});expect(JSON.stringify(capturedPixels)).toBe(before);};
+        expect(()=>run([0,0,0,1])).not.toThrow();
+        for(const changed of [[1,0,0,1],[0,1,0,1],[0,0,1,1],[0,0,0,2]])expect(()=>run(changed)).toThrow('Protected nontext RGBA');
+        expect(f.protectedAlphaProbes[0].rgba).toEqual([17,24,39,1]);
     });
 });
 const generalParagraphFixture=()=>{
@@ -181,6 +210,21 @@ describe('通用独立段落门禁',()=>{
 });
 
 describe('真实漫画runner多轮layout采集的有界容量',()=>{
+    it('逐景资源轨迹具有独立文件名，多景同轮及同名图片不覆盖前次采样',()=>{
+        let label:ts.Expression|undefined;
+        const visit=(node:ts.Node)=>{
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst).endsWith('.measureBrowser'))label=node.arguments[1];
+            ts.forEachChild(node,visit);
+        };
+        visit(runnerAst);expect(label).toBeDefined();
+        const labels=new Set<string>();
+        for(let scene=0;scene<32;scene++)for(let round=0;round<5;round++){
+            const name=runInNewContext(label!.getText(runnerAst),{report:{pipeline:{length:labels.size}},round,caseName:'same-input-name'});
+            expect(name).toMatch(/^manga-case-\d+-round-\d+$/);
+            expect(labels.has(name)).toBe(false);labels.add(name);
+        }
+        expect(labels.size).toBe(160);
+    });
     it('32景五轮保留全部160次响应及预留，承诺以外的记录仍有硬上限',async()=>{
         const source=readFileSync(new URL('../scripts/testing/run-manga-translation-test.cjs',import.meta.url),'utf8');
         const ast=ts.createSourceFile('runner.cjs',source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
@@ -193,7 +237,7 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
         visit(ast);expect(initializer).not.toBe('');expect(observer).not.toBe('');
         const limit=runInNewContext(initializer,{qualityFixtures:Array(32),pipelineRounds:5});
         expect(limit).toBeGreaterThanOrEqual(160);expect(limit).toBeLessThanOrEqual(168);
-        const baselineResponse={lines:[{text:'受控译文',sourceText:'actual source',bbox:box(10,10,90,30)}]};
+        const baselineResponse={lines:[{text:'受控译文',sourceText:'actual source',bbox:box(10,10,90,30),renderSkipped:true,numericUncertain:true}]};
         let response:any=baselineResponse;
         const chrome={runtime:{sendMessage:(_message:unknown,callback?:Function)=>{if(callback)callback(response);return Promise.resolve(response);},onMessage:{addListener:()=>undefined}}};
         const sandbox:any={chrome,fetch:()=>{throw new Error('Layout trace replay must not fetch');}};
@@ -210,7 +254,7 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
         }
         const results=sandbox.__mangaTest.layoutResults;
         expect(results).toHaveLength(limit);expect(results[159].requestId).toBe('159');
-        expect(results[159].lines[0].sourceText).toBe('actual source');
+        for(const index of [158,159])expect(results[index].lines[0]).toMatchObject({sourceText:'actual source',renderSkipped:true,numericUncertain:true});
         expect(results.slice(0,6).map((result:any)=>result.noBitmap)).toEqual([true,true,false,false,false,false]);
         for(const result of results.slice(0,2))expect(evaluateQualityFixture(fixture(),{texts:result.lines.map((line:any)=>line.sourceText),lines:result.lines}).anchors.every((anchor:any)=>!anchor.found)).toBe(true);
         await chrome.runtime.sendMessage({type:'UNRELATED',requestId:'host'});

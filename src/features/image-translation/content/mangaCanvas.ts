@@ -3,6 +3,7 @@
  * 文件职责：把可读正文画布、背景图片和长图分段快照接入既有漫画识别与局部译图合成，保留宿主正文及翻页交互。
  * 主要内容：自动布局以小尺寸指纹提示重绘，显式操作先隐藏旧译层并以完整 PNG 摘要验证来源；任务复用独立快照编码，合成后复核完整来源再发布；原生画布仅在译层真正显示时借用透明度与过渡样式隐藏下层原字，撤层时归还并保留宿主后续改写；背景等载体可异步准备自身绘制层资源，发布前复核任务归属，暂停时隐藏复用、取消或淘汰时销毁；注入正文锚点、绘制范围及核心裁切支持背景与分段；会话端口串行调度，失败时复用图片的紧凑恢复控件并通过原会话重试，取消、来源变化和关闭释放控件且不伪造成功；缓存只保留有界压缩图块。最后捕获之后的无事件重绘不作逐帧一致性承诺。
  * 模块边界：只读取公开 DOM 画布或注入的已展示正文快照，不访问站点接口、不读取受污染像素、不更改原画布像素；本模块仅为原生画布借用透明度，背景资源与样式归还由载体端口负责，不隐藏背景元素或共享长图宿主；识别和翻译由注入的现有图片客户端完成。
+ * 分段核心：纯坐标 viewport 同时参与译层、阅读及压缩缓存身份；新任务复制冻结一次，识别请求和最终裁切使用同一快照，等待期间范围漂移则撤回迟到结果，不增加布局读取。
  */
 import {compressMangaPage, createMangaLightCache, type MangaCompressedPage, type MangaPatchPacket} from '../mangaPatchResult';
 import {encodeImageCanvas, encodeReadingImageCanvas, readingImageEncodingBusy} from '../services/imageEncoding';
@@ -12,6 +13,7 @@ import {imageTranslationFailureCode, imageLocalFailureMessage} from '../failure'
 import {sha256Hex} from '@/src/shared/function/sha256';
 import {prepareMangaReadingLines, type createMangaReadingSnapshots} from './mangaReadingSnapshots';
 import type {MangaReadingResult} from './mangaReadingCoordinator';
+import type {ImageViewport} from '@/src/shared/image/types';
 
 interface CanvasState {
     identity: string;
@@ -104,7 +106,8 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         readingBounds?: (element:T) => DOMRect | null;
         capture: (element: T, target: HTMLCanvasElement, signal: AbortSignal) => Promise<void>;
         bounds: (element: T) => DOMRect;
-        viewport?: (element: T) => {x: number; y: number; width: number; height: number};
+        /** 纯同步图像像素坐标查询；不得读取 DOM 布局或执行异步探测。 */
+        viewport?: (element: T) => ImageViewport;
         presentation?: (element: T, surface: HTMLCanvasElement, signal: AbortSignal) => Promise<MangaSurfacePresentation>;
     };
     hostId?: string;
@@ -114,7 +117,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         openSettings: (section: ImageSettingsSection) => Promise<void>;
         translateUi?: (source: string) => string;
     };
-    translate: (image: string, signal: AbortSignal) => Promise<{mangaPatches?: MangaPatchPacket; lines: MangaCompressedPage['lines']}>;
+    translate: (image: string, signal: AbortSignal, mangaViewport?:ImageViewport) => Promise<{mangaPatches?: MangaPatchPacket; lines: MangaCompressedPage['lines']}>;
 }) {
     const states = new Map<T, CanvasState>();
     // key 含每个载体的实例 id，活动完成页可按键常数时间定位，无需遍历全部页面。
@@ -171,13 +174,17 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         state.sourceLease = {opacity, transition, ownedTransition: TRANSITION_PROPERTIES.map(property => readStyleProperty(style, property)), computedOpacity, originalStyleAttribute, ownedStyleAttribute: element.getAttribute('style'), classAttribute: element.getAttribute('class')};
     }
 
+    const viewportKey=(viewport:ImageViewport|undefined)=>viewport===undefined?'':`:viewport:${viewport.x},${viewport.y},${viewport.width},${viewport.height}`;
+    function sourceIdentity(element:T,fingerprint:string|null,viewport:ImageViewport|undefined):string|null {
+        if(disposed||!fingerprint)return null;
+        if(!ids.has(element))ids.set(element,++sequence);
+        return `${ids.get(element)}:${fingerprint}:${ports.configurationIdentity()}${viewportKey(viewport)}`;
+    }
+
     function identity(element: T): string | null {
         if (disposed) return null;
         if (ports.source) {
-            const fingerprint = ports.source.identity(element);
-            if (!fingerprint) return null;
-            if (!ids.has(element)) ids.set(element, ++sequence);
-            return `${ids.get(element)}:${fingerprint}:${ports.configurationIdentity()}`;
+            return sourceIdentity(element,ports.source.identity(element),ports.source.viewport?.(element));
         }
         const canvas = element as unknown as HTMLCanvasElement;
         if (canvas.width < 80 || canvas.height < 40 || canvas.width > 8192 || canvas.height > 8192
@@ -361,7 +368,10 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
 
     async function translate(canvas: T): Promise<void> {
         if (reuse(canvas)) return;
-        const owner = identity(canvas);
+        if(disposed)return;
+        const viewport=ports.source?.viewport?.(canvas);
+        const mangaViewport=viewport===undefined?undefined:Object.freeze({x:viewport.x,y:viewport.y,width:viewport.width,height:viewport.height});
+        const owner = ports.source?sourceIdentity(canvas,ports.source.identity(canvas),mangaViewport):identity(canvas);
         if (!owner || !ports.enabled() || !anchor(canvas).isConnected) return;
         const previous = states.get(canvas);
         const retained = !ports.source && previous?.completed && !previous.failed ? previous : undefined;
@@ -400,7 +410,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
             if (!page) {
                 image ??= await encodeImageCanvas(original, controller.signal);
                 if (!current()) return;
-                const result = await ports.translate(image, controller.signal);
+                const result = mangaViewport===undefined?await ports.translate(image, controller.signal):await ports.translate(image, controller.signal,mangaViewport);
                 if (!current()) return;
                 if (result.lines.length === 0) page = {width: original.width, height: original.height, patches: [], lines: []};
                 else {
@@ -423,8 +433,8 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 if (latestKey !== key) throw new Error('画布内容已变化，请重试');
                 if (ports.cacheEnabled()) retainedInLightCache=lightCache.put(key, page);
             }
-            if (surface && ports.source?.viewport) {
-                const viewport = ports.source.viewport(canvas);
+            if (surface && mangaViewport!==undefined) {
+                const viewport = mangaViewport;
                 const cropped = document.createElement('canvas');
                 cropped.width = viewport.width;cropped.height = viewport.height;
                 try {
@@ -465,7 +475,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
         if(!ports.source)return identity(canvas);
         if(!ports.source.readingIdentity)return null;
         const fingerprint=ports.source.readingIdentity(canvas),id=ids.get(canvas);
-        return fingerprint&&id?`${id}:${fingerprint}:${ports.configurationIdentity()}`:null;
+        return fingerprint&&id?`${id}:${fingerprint}:${ports.configurationIdentity()}${viewportKey(ports.source.viewport?.(canvas))}`:null;
     }
 
     function readingVisible(canvas:T,verifiedIdentity?:string|null,readingHost?:HTMLElement|null,waiting=false):boolean {

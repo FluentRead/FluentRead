@@ -1,8 +1,8 @@
 <!--
  * @file src/features/settings/ui/services/ServiceCatalog.vue
- * 文件职责：以服务目录和清晰分层的配置工作区呈现翻译服务，窄屏按需展开目录，标题操作按详情区实际宽度排列，保持配置与默认使用分离；默认状态由目录标记和显式按钮表达，标题不重复显示状态徽章。
- * 主要内容：侧栏为同行名称与标签保留稳定宽度，窄屏目录使用单列；侧栏展示全部内置及自定义服务，分组可单独收起，选中服务或回到本页时展开正在配置的服务所在分组；顶部分组导航复用设置页的紧凑样式，点击后展开并滚动到对应分组，随目录滚动同步高亮并横向显示当前入口；搜索过滤目录时展开全部匹配分组，此时点击分组导航会清空搜索并回到完整目录；自定义按钮直接打开创建表单，入口下方的状态插槽由父组件反馈首次窗口加载，反馈显示时停用按钮说明气泡，避免遮挡提示与关闭操作；右侧服务标题支持程序聚焦且不加入 Tab 顺序，集中展示服务名称及接口性质徽章、模型、官网帮助和连接配置；目录搜索文本按需缓存，目录几何按帧合并并缓存分组位置，滚动只读取当前位置，活跃上下文限定操作并取消过期焦点、滚动与帧回调。
- * 模块边界：目录提供“配置服务”“自定义服务”和“添加组合”入口，组合与自建接口共同显示在自定义目录且不展示模型字段；标题栏在检查连接左侧提供显式设为默认操作，通过独立事件交给外层 SettingsSections 持久化，公开构建不展示 ChatGPT 登录模块或旧配置详情，模块只在显式开发开关下可见，不编辑凭据、不测试连接也不保存配置；分组收起状态只保存在本次页面会话，不写入配置，停用或切换上下文时取消目录帧并重建分组尺寸及字体观察，卸载时清理观察器与监听；详细表单归 ServiceConfiguration.vue，服务定义来自 core/config。
+ * 文件职责：以服务目录和分层配置工作区呈现翻译服务，并独立管理服务启用状态与默认服务。
+ * 主要内容：侧栏展示全部内置及自定义服务，提供服务启用开关和分组折叠；搜索、分组导航与右侧配置区保留现有交互；目录搜索文本与几何按需缓存，活跃上下文限定操作并取消过期焦点、滚动与帧回调。
+ * 模块边界：服务启用与默认切换通过独立事件交给外层 SettingsSections 持久化；目录仍允许配置已关闭服务，关闭后阻止其新翻译请求；公开构建不展示 ChatGPT 登录模块或旧配置详情；分组折叠只保存在本次页面会话，卸载时清理观察器与监听；详细表单归 ServiceConfiguration.vue，服务定义来自 core/config。
  -->
 <template>
   <section
@@ -60,7 +60,9 @@
               <ServiceCatalogItem v-for="item in group.items" :key="item.value" :item="item" compact
                 :selected="service === item.value" :is-default="defaultService === item.value"
                 :is-configured="configuredSet.has(item.value)" :is-favorite="favoriteSet.has(item.value)"
-                :onSelect="actions.selectService" />
+                :availability-enabled="!disabledServiceSet.has(item.value)"
+                :availability-toggle-disabled="!active || (Boolean(item.disabled) && !disabledServiceSet.has(item.value)) || (!disabledServiceSet.has(item.value) && enabledServiceCount <= 1)"
+                :onSelect="actions.selectService" :onToggleAvailability="actions.toggleAvailability" />
             </div>
           </section>
           <p v-if="!visibleDirectoryGroups.length" class="catalog-empty" role="status">{{ t('settings.services.library.empty') }}</p>
@@ -218,6 +220,7 @@ const props = withDefaults(defineProps<{
   selectedModel?: string
   services: ServiceOption[]
   favoriteServices: string[]
+  disabledServices?: string[]
   configuredServices: string[]
   modelOptions: ModelPickerOption[]
   showModel: boolean
@@ -225,11 +228,12 @@ const props = withDefaults(defineProps<{
   maximumModelLength: number
   customModelCount: number
   allowCustomModels: boolean
-}>(), {active: true, addServiceFeedbackVisible: false})
+}>(), {active: true, addServiceFeedbackVisible: false, disabledServices: () => []})
 
 const emit = defineEmits<{
   'update:service': [value: string]
   'update:default-service': [value: string]
+  'toggle-availability': [service: string, enabled: boolean]
   'update:model': [value: string]
   'add:service': []
   'add:model': [value: string]
@@ -246,6 +250,7 @@ const addButton = ref<HTMLButtonElement | null>(null)
 const connectionActionTarget = ref<HTMLElement | null>(null)
 const configuredSet = computed(() => new Set(props.configuredServices))
 const favoriteSet = computed(() => new Set(props.favoriteServices))
+const disabledServiceSet = computed(() => new Set(props.disabledServices))
 const customServices = computed(() => props.services.filter((item) => isCustomOpenAIProviderId(item.value) || isCompositeTranslationProviderId(item.value)))
 const builtInServices = computed(() => props.services.filter((item) => !isCustomOpenAIProviderId(item.value) && !isCompositeTranslationProviderId(item.value)
   && (item.value !== services.chatgptPlan || chatGPTPlanDevelopmentEnabled)))
@@ -255,6 +260,7 @@ const directoryGroups = computed(() => [
   ...(customServices.value.length ? [{ id: 'custom', label: t('settings.services.library.custom'), items: customServices.value }] : []),
 ])
 const allServices = computed(() => directoryGroups.value.flatMap(group => group.items))
+const enabledServiceCount = computed(() => allServices.value.filter(item => !item.disabled && !disabledServiceSet.value.has(item.value)).length)
 // 延迟建立索引，空搜索不读取或规范化逐项文本；连续输入复用同一目录索引。
 const directorySearchText = computed(() => new Map(allServices.value.map(item => [item,
   [item.label, item.value, item.description, ...(item.searchTerms || [])].join(' ').normalize('NFKC').toLocaleLowerCase(),
@@ -493,7 +499,7 @@ watch(active, (enabled, previous) => {
   if (enabled && !previous) resetConfigurationScroll(false)
 }, {flush: 'post'})
 function selectService(service: string): void {
-  if (!active.value || !allServices.value.some(item => item.value === service && !item.disabled)) return
+  if (!active.value || !allServices.value.some(item => item.value === service && (!item.disabled || disabledServiceSet.value.has(item.value)))) return
   expandGroupOf(service)
   if (service === props.service) {
     const restoreFocus = directoryOpen.value
@@ -511,6 +517,7 @@ const actions = computed(() => {
   const current = capture()
   return {
     selectService: (value: string) => {if (current()) selectService(value)},
+    toggleAvailability: (service: string, enabled: boolean) => {if (current()) emit('toggle-availability', service, enabled)},
     setDefaultService: () => {if (current()) setDefaultService()},
     revealGroup: (id: string) => {if (current()) return revealGroup(id)},
     toggleGroup: (id: string) => {if (current()) toggleGroup(id)},

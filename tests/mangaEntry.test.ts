@@ -1,4 +1,6 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
 import {parseHTML} from 'linkedom';
 
 const mocks = vi.hoisted(() => ({
@@ -36,6 +38,19 @@ describe('独立漫画入口所有权和配置端口', () => {
     it('读取面板沿用界面主题并只在复制操作时访问剪贴板', async () => {
         const writeText=vi.fn().mockResolvedValue(undefined);vi.stubGlobal('navigator',{clipboard:{writeText}});
         await mountMangaEntry({} as never);expect(props().reading.theme).toBe('auto');expect(writeText).not.toHaveBeenCalled();
+        expect(mocks.create.mock.calls[0][1]).toHaveProperty('css');
+        const source=readFileSync(resolve('src/features/image-translation/content/mangaEntry.ts'),'utf8');
+        const panel=readFileSync(resolve('src/features/image-translation/ui/MangaReadingPanel.vue'),'utf8');
+        const styles=readFileSync(resolve('src/features/image-translation/ui/manga-entry.css'),'utf8');
+        expect(source).toContain("manga-entry.css?inline");expect(source).toContain('css:mangaEntryStyles');
+        expect(styles).toContain('.fr-manga-reading-copy-actions');expect(styles).toContain('@media (max-width: 480px)');
+        expect(panel).toContain('class="fr-manga-reading-mark"');expect(panel).toContain('aria-hidden="true"');
+        expect(styles).toContain('--fr-color-muted: #737c8f');expect(styles).toContain('--fr-color-line: #e5e8ef');
+        expect(styles).toContain('-webkit-font-smoothing: antialiased');
+        expect(styles).toContain('--fr-manga-control-radius: var(--fr-control-radius, 9px)');
+        expect(styles).toContain('var(--fr-color-brand-strong, #dc315f)');expect(styles).toContain('--fr-manga-warning-soft: var(--fr-warning-soft, #fff5df)');
+        expect(styles).toMatch(/\.fr-manga-reading\s*\{[^}]*width:\s*min\(420px, calc\(100vw - 32px\)\)/s);
+        expect(styles).toMatch(/\.fr-manga-reading button,[\s\S]*?appearance:\s*none;[\s\S]*?font:\s*inherit;/);
         mocks.config.theme='dark';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('dark');
         mocks.config.theme='light';mocks.subscribe.mock.calls[0][0]();expect(props().reading.theme).toBe('light');
         await props().reading.copy('译文');expect(writeText).toHaveBeenCalledOnce();expect(writeText).toHaveBeenCalledWith('译文');

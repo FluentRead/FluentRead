@@ -635,6 +635,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
 
     autoTranslate: {group: 'siteRules', label: '所有网站自动翻译', format: formatBoolean},
     alwaysTranslateDomains: {group: 'siteRules', label: '始终翻译网站'},
+    readingAppearanceSites: {group: 'siteRules', label: '网站阅读字体'},
     disabledExtensionDomains: {group: 'siteRules', label: '禁用扩展网站'},
     translationOnlyDomains: {group: 'siteRules', label: '仅显示译文网站'},
     floatingBallDisabledDomains: {group: 'siteRules', label: '禁用悬浮球网站'},

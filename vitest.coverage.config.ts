@@ -19,6 +19,12 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/app/content/readingAppearance.ts',
+                'src/core/config/readingAppearance.ts',
+                'src/features/reading-appearance/runtime.ts',
+                'src/features/reading-appearance/content.ts',
+                'src/app/popup/readingAppearanceActions.ts',
+
                 'src/ui/confirmExport.ts',
                 'src/platform/browser/translationSidepanel.ts',
                 'src/app/sidepanel/index.ts',

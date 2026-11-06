@@ -2,7 +2,7 @@
   "name": "FluentRead-流畅阅读",
   "description": "Read web pages in two languages, translate selected text, and choose from multiple translation services.",
   "private": true,
-  "version": "0.0.40",
+  "version": "0.0.41",
   "userscriptVersion": "2.0.2",
   "type": "module",
   "engines": {

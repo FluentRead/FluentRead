@@ -75,7 +75,7 @@ git push origin refs/tags/v0.0.41
 
 ```sh
 node --test --test-concurrency=1 tests/release*.test.mjs
-node scripts/release/manifest.mjs --check --tag v0.0.40
+node scripts/release/manifest.mjs --check --tag v0.0.41
 ```
 
 打包器只收集已构建且通过相应验证的产物，例如 `node scripts/release/bundle.mjs --target chrome`；不会自动构建或发布。临时目录统一为 `reports/release/`，已加入 Git 忽略并从 Firefox 源码 ZIP 排除，避免本地再次打包时夹带旧安装包。

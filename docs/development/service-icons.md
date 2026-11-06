@@ -40,6 +40,7 @@
 | `perplexity` | [`perplexity.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/perplexity.svg) |
 | `runcrate` | Lobe Icons 未收录；单色路径取自 Runcrate 官方应用图标（圆角方块内的终端提示符），由 Runcrate 提供 |
 | `cloudgpu` | Lobe Icons 未收录；单色路径取自 CloudGPU 官网图标 [`icon.svg`](https://cloudgpu.app/icon.svg)（三道圆头线，与站内标记同几何），描边转为填充以便统一着色 |
+| `cheapaimodel` | Lobe Icons 未收录；单色路径取自 cheapaimodel 官网图标 [`favicon.svg`](https://cheapaimodel.ai/favicon.svg)（三道斜顶竖条），去掉底色方块后缩放到 24 网格 |
 | `googleCloudTranslation` | [`googlecloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/googlecloud.svg) |
 | `azureTranslator` | [`azure.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/azure.svg) |
 | `aliyunTranslation` | [`alibabacloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/alibabacloud.svg) |

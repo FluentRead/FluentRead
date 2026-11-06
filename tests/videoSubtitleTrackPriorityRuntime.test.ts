@@ -1,7 +1,7 @@
 /**
  * @file tests/videoSubtitleTrackPriorityRuntime.test.ts
  * 文件职责：从实际 mountVideoSubtitleTranslation 公共入口验证 X 轨道优先与 YouTube 同轮选择、人工字幕回退及卸载后的异步资格。
- * 主要内容：真实桥消息、video、TextTrack 与配置订阅驱动播放器、轨道 loader、缓存和 DOM；覆盖移动端兄弟底控显隐与字幕布局自动同步、重绑和清理、菜单入口展开语义、两站初始禁用与 Off 清理、媒体事件后不复活、重复外部启用重建、真实模式项保存、同句调用预算、实际服务线路或套餐变化后的缓存失效、时钟漂移、NaN、seek、偏移、人工轨空档与迟到结果。
+ * 主要内容：真实桥消息、video、TextTrack 与配置订阅驱动播放器、轨道 loader、缓存和 DOM；覆盖移动端兄弟底控显隐与字幕布局自动同步、重绑和清理、菜单入口展开语义、两站菜单关闭字幕后保留入口与重新挂载恢复、功能总开关移除入口、关闭后的迟到结果与下载清理、重复外部启用重建、真实模式项保存、同句调用预算、实际服务线路或套餐变化后的缓存失效、时钟漂移、NaN、seek、偏移、人工轨空档与迟到结果。
  * 模块边界：linkedom 补齐缺失的浏览器媒体/几何接口并按观察器订阅过滤记录；只 mock 外部端口，命名 selector spy 保留真实实现，不替换业务算法或修改全局数组原型。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -542,8 +542,9 @@ describe('public mounted mobile YouTube subtitle control layout', () => {
     expect(menu.hidden).toBe(true); expect(panel.parentElement?.id).toBe(VIDEO_SUBTITLE_SCROLL_HOST_ID); expect(panel.scrollTop).toBe(120);
     expect(f.document.querySelectorAll('#' + VIDEO_SUBTITLE_PANEL_ID)).toHaveLength(1);
     await toggleMenu(); clickMenu(f, '[data-mode="off"]'); await settle();
-    expect(ports.config.videoTranslationEnabled).toBe(false); expect(menu.isConnected).toBe(false);
-    expect(f.scope.querySelector('.fluent-read-video-menu-host')).toBeNull();
+    expect(ports.config.videoTranslationEnabled).toBe(true); expect(ports.config.videoSubtitleVisible).toBe(false);
+    expect(menu.isConnected).toBe(true);
+    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).not.toBeNull();
     expect(f.document.getElementById(VIDEO_SUBTITLE_SCROLL_HOST_ID)).toBeNull(); expect(panel.hasAttribute('tabindex')).toBe(false);
   });
 
@@ -853,39 +854,53 @@ describe('public mounted player menu entry semantics', () => {
     await clickEntry(); expectMenuButton(true);
     clickMenu(f, '[data-mode="off"]'); await settle();
     expect(ports.patch).toHaveBeenCalledOnce();
-    expect(ports.patch).toHaveBeenLastCalledWith({videoTranslationEnabled: false});
-    expect(subtitleSettings()).toEqual({...initialSettings, enabled: false});
-    // #1004：Off 关闭视频功能后移除入口和菜单，不从已卸载菜单内重新启用。
-    expect(button.isConnected).toBe(false); expect(menu.isConnected).toBe(false);
-    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBeNull();
+    expect(ports.patch).toHaveBeenLastCalledWith({videoSubtitleVisible: false});
+    expect(subtitleSettings()).toEqual({...initialSettings, visible: false});
+    // 菜单关闭字幕保留入口和当前菜单，设置中心的功能开关才会移除节点。
+    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBe(button);
+    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBe(menu);
+    expectMenuButton(true);
+    expect(selectedMode()).toBe('off');
+    expect(button.classList.contains(VIDEO_TRANSLATION_ACTIVE_CLASS)).toBe(false);
+    expect(button.getAttribute('aria-label')).toContain('Off');
+    clickMenu(f, '[data-mode="off"]'); await settle();
+    expect(ports.patch).toHaveBeenCalledOnce();
     if (platform === 'youtube') {
       expect(f.document.querySelector('.ytp-subtitles-button')?.getAttribute('aria-pressed')).toBe('true');
     }
     f.changeConfig({uiLanguage: 'zh-CN'}); await settle();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBeNull();
+    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBe(button);
+    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBe(menu);
+    expect(button.getAttribute('aria-label')).toContain('已关闭');
+    await clickEntry(); expectMenuButton(false);
+    await clickEntry(); expectMenuButton(true);
+    await vi.advanceTimersByTimeAsync(1100);
+    expect(ports.translate).toHaveBeenCalledTimes(initialRequests);
     dispose(); await settle();
 
-    // 禁用时重新挂载仍不创建播放器 UI；外部配置重新启用才创建全新节点。
+    // 关闭字幕后重新挂载仍有入口，并保持关闭状态；从菜单选择双语即可恢复。
     const disposeRemounted = f.start(); await settle();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBeNull();
-    f.changeConfig({videoTranslationEnabled: true, uiLanguage: 'en-US'}); await settle();
+    f.changeConfig({uiLanguage: 'en-US'}); await settle();
     const replacement = f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)!;
     const replacementMenu = f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!;
     expect(replacement).not.toBe(button); expect(replacementMenu).not.toBe(menu);
     expect(f.document.querySelectorAll(`#${VIDEO_TRANSLATION_BUTTON_ID}`)).toHaveLength(1);
     expect(f.document.querySelectorAll(`#${VIDEO_TRANSLATION_MENU_ID}`)).toHaveLength(1);
     expectMenuButton(false, replacement, replacementMenu);
+    expect(replacement.getAttribute('aria-label')).toContain('Off');
+    expect(replacement.classList.contains(VIDEO_TRANSLATION_ACTIVE_CLASS)).toBe(false);
+    expect(subtitleSettings()).toEqual({...initialSettings, visible: false});
+    expect(replacementMenu.querySelector('[data-mode="off"]')?.getAttribute('aria-checked')).toBe('true');
+    await clickEntry(true, replacement); expectMenuButton(true, replacement, replacementMenu);
+    clickMenu(f, '[data-mode="bilingual"]'); await settle();
+    expect(ports.patch).toHaveBeenLastCalledWith({videoSubtitleDisplayMode: 'bilingual', videoSubtitleVisible: true});
     expect(replacement.getAttribute('aria-label')).toContain('Enabled');
     expect(replacement.classList.contains(VIDEO_TRANSLATION_ACTIVE_CLASS)).toBe(true);
     expect(subtitleSettings()).toEqual(initialSettings);
     const enabledRequests = ports.translate.mock.calls.length;
-    await clickEntry(true, replacement); expectMenuButton(true, replacement, replacementMenu);
     clickMenu(f, '[data-action="close-menu"]'); await settle();
     expectMenuButton(false, replacement, replacementMenu);
-    expect(ports.patch).toHaveBeenCalledOnce();
+    expect(ports.patch).toHaveBeenCalledTimes(2);
     expect(ports.translate).toHaveBeenCalledTimes(enabledRequests);
     disposeRemounted(); await settle();
     expect(replacement.isConnected).toBe(false); expect(replacementMenu.isConnected).toBe(false);
@@ -901,7 +916,7 @@ describe('public mounted player menu entry semantics', () => {
     expect(freshButton.getAttribute('aria-label')).toContain('Enabled');
     const remountRequests = ports.translate.mock.calls.length;
     await clickEntry(true, freshButton); expectMenuButton(true, freshButton, freshMenu);
-    expect(ports.patch).toHaveBeenCalledOnce();
+    expect(ports.patch).toHaveBeenCalledTimes(2);
     expect(ports.translate).toHaveBeenCalledTimes(remountRequests);
     disposeEnabledRemount(); await settle();
     expect(freshButton.isConnected).toBe(false); expect(freshMenu.isConnected).toBe(false);
@@ -1231,7 +1246,7 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
     dispose(); await settle(); expect(scanVideos[0].isConnected).toBe(false);
   });
 
-  it.each(['media', 'language', 'off', 'dispose'])('rejects a late downloaded-model status after %s invalidates the request', async change => {
+  it.each(['media', 'language', 'off', 'menu-off', 'dispose'])('rejects a late downloaded-model status after %s invalidates the request', async change => {
     const status = deferred<unknown>();
     ports.send.mockImplementation(async (message: {type: string}) => message.type === 'fluentReadGetLocalVideoModelState'
       ? status.promise : {success: true, hit: false});
@@ -1244,12 +1259,13 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
       f.emitVideo('loadedmetadata');
     } else if (change === 'language') f.changeConfig({videoSourceLanguage: 'zh'});
     else if (change === 'off') f.changeConfig({videoTranslationEnabled: false});
+    else if (change === 'menu-off') clickMenu(f, '[data-mode="off"]');
     else dispose();
     await settle(); status.resolve({success: true, models: ['tiny']}); await settle();
     expect(ports.send.mock.calls.some(([message]) => message.type === 'fluentReadPrepareLocalVideoModel')).toBe(false);
   });
 
-  it.each(['media', 'off', 'dispose'])('stops pending download progress immediately after %s invalidates the player', async change => {
+  it.each(['media', 'off', 'menu-off', 'dispose'])('stops pending download progress immediately after %s invalidates the player', async change => {
     const prepared = deferred<unknown>();
     ports.send.mockImplementation(async (message: {type: string; keepWarm?: boolean}) => {
       if (message.type === 'fluentReadGetLocalVideoModelState') return {success: true, models: []};
@@ -1267,6 +1283,7 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
       f.video.poster = 'https://pbs.twimg.com/ext_tw_video_thumb/456/pu/img/new.jpg';
       f.emitVideo('loadedmetadata');
     } else if (change === 'off') f.changeConfig({videoTranslationEnabled: false});
+    else if (change === 'menu-off') clickMenu(f, '[data-mode="off"]');
     else dispose();
     await settle(); expect(ports.stopProgress).toHaveBeenCalledOnce();
     prepared.resolve({success: true, models: ['tiny']}); await settle();
@@ -1596,6 +1613,32 @@ describe('public mounted YouTube timed cue selection and lifecycle', () => {
 
 
 describe('public mounted video player button follows the video translation switch', () => {
+  it.each(['x', 'youtube'] as const)('%s：菜单关闭字幕后忽略迟到译文，保留入口并可恢复翻译', async platform => {
+    const pending = deferred<string>();
+    ports.translate.mockImplementationOnce(() => pending.promise);
+    const text = 'A sentence waiting for translation.';
+    const f = fixture(platform === 'x' ? text : undefined, platform);
+    f.video.currentTime = .5; f.start();
+    if (platform === 'youtube') {
+      f.emitTimedText([{startMs: 0, durationMs: 3000, text}]); f.setCaption(text);
+    }
+    await settle();
+    expect(ports.translate).toHaveBeenCalled();
+    const menu = f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!;
+    menu.hidden = false; clickMenu(f, '[data-mode="off"]'); await settle();
+    const requests = ports.translate.mock.calls.length;
+    pending.resolve('A late translation that must stay hidden.');
+    f.emitVideo('timeupdate'); await vi.advanceTimersByTimeAsync(1100);
+    expect(f.displayed().translated || '').toBe('');
+    expect(ports.translate).toHaveBeenCalledTimes(requests);
+    expect(f.document.querySelectorAll('#' + VIDEO_TRANSLATION_BUTTON_ID)).toHaveLength(1);
+    expect(menu.querySelector('[data-mode="off"]')?.getAttribute('aria-checked')).toBe('true');
+    clickMenu(f, '[data-mode="bilingual"]'); await settle();
+    expect(ports.config.videoTranslationEnabled).toBe(true);
+    expect(ports.config.videoSubtitleVisible).toBe(true);
+    expect(f.displayed().translated).toBe(translation(text));
+  });
+
   it.each(['x', 'youtube'] as const)('%s：关闭视频字幕翻译后移除已打开的菜单，重复开启只恢复一份入口', async platform => {
     const f = fixture(undefined, platform); f.start(); await settle();
     expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).not.toBeNull();
@@ -1616,7 +1659,7 @@ describe('public mounted video player button follows the video translation switc
     expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).not.toBe(oldMenu);
   });
 
-  it.each(['x', 'youtube'] as const)('%s：初始关闭时不挂载入口，菜单关闭后仍保持扩展总开关开启', async platform => {
+  it.each(['x', 'youtube'] as const)('%s：设置关闭时不挂载入口，字幕已关闭时重复选择关闭保持入口和总开关', async platform => {
     ports.config.videoTranslationEnabled = false;
     const f = fixture(undefined, platform); f.start(); await vi.advanceTimersByTimeAsync(1100);
     expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
@@ -1627,10 +1670,12 @@ describe('public mounted video player button follows the video translation switc
     expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).not.toBeNull();
     f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)!.hidden = false;
     clickMenu(f, '[data-mode="off"]'); await settle();
-    expect(ports.config.videoTranslationEnabled).toBe(false);
+    expect(ports.config.videoTranslationEnabled).toBe(true);
+    expect(ports.config.videoSubtitleVisible).toBe(false);
+    expect(ports.patch).not.toHaveBeenCalled();
     expect(ports.config.on).toBe(true);
-    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).toBeNull();
-    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).toBeNull();
+    expect(f.document.getElementById(VIDEO_TRANSLATION_BUTTON_ID)).not.toBeNull();
+    expect(f.document.getElementById(VIDEO_TRANSLATION_MENU_ID)).not.toBeNull();
     expect(f.document.getElementById('host')?.textContent).toBe('host original');
   });
 });

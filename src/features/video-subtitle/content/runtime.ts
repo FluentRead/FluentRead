@@ -1,6 +1,6 @@
 /**
  * @file src/features/video-subtitle/content/runtime.ts
- * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单、完整句学习与下载；独立管理 YouTube 播放器的原生字幕隐藏所有权，切句不释放，切模式、离开与卸载时恢复。
+ * 文件职责：装配视频及会议字幕运行时，并协调 YouTube/X 原生字幕、目标语言人工轨、逐条翻译、校时、菜单、完整句学习与下载；菜单关闭字幕时保留播放器入口，设置中心关闭功能时移除入口；独立管理 YouTube 播放器的原生字幕隐藏所有权，切句不释放，切模式、离开与卸载时恢复。
  * 主要内容：挂载原句学习与独立本地读音控制器，原文变化立即作废旧读音，字幕隐藏或关闭取消请求；读音开关复用既有配置与菜单并保持仅译文模式语义，说明与下载可独立展开，Escape 逐层关闭且菜单关闭重置临时展开状态；双语顺序复用现有外观配置即时保存与重排，不重发翻译；显示模式变化重新授予同句翻译资格并复用已有缓存，不混入字幕原文及导出；媒体切换和配置变化取消有界字幕预取并清理控制，协调字幕校时、预翻译与补译导出确认，并为可选逐字高亮提供当前句时间；X 分片加载尊重原生轨道优先级和原译文成对显示，播放器内换模型保留取消焦点，完整 AI 识别提前展示稳定句，完成后才缓存和导出。
  * 模块边界：本文件只在 content 页面编排，同视频底控的局部显隐订阅与字幕布局共用帧调度，帧内先校准自有菜单宿主再测菜单，并随关闭、重绑和销毁清理；完整 AI 字幕缓存请求与提交身份由 subtitleSession 拥有，requestSession 将完整采集映射为后台单流的唯一请求代际；采集资源仍归 fullCapture，不拦截 fetch/XHR 也不实现翻译 provider，翻译经统一 service client。
  */
@@ -888,9 +888,9 @@ export function mountVideoSubtitleTranslation(): () => void {
     const enabled = config.on && config.videoTranslationEnabled;
     const visible = config.videoSubtitleVisible !== false;
     const status = config.on
-      ? (config.videoTranslationEnabled ? videoUi('video.enabled') : videoUi('video.disabled'))
+      ? (enabled && visible ? videoUi('video.enabled') : videoUi('video.disabled'))
       : videoUi('video.globalDisabled');
-    button?.classList.toggle(VIDEO_TRANSLATION_ACTIVE_CLASS, enabled);
+    button?.classList.toggle(VIDEO_TRANSLATION_ACTIVE_CLASS, enabled && visible);
     // 入口只开关菜单；清理复用节点上的旧 toggle 语义，不把字幕状态冒充点击动作。
     button?.removeAttribute('aria-pressed');
     button?.setAttribute('aria-expanded', String(!menu.hidden));
@@ -911,7 +911,7 @@ export function mountVideoSubtitleTranslation(): () => void {
       learningButton.disabled = isAiFullActive() && aiFullPhase !== 'ready';
       learningButton.title = learningButton.disabled ? videoUi('video.sourcePreparing') : videoUi('video.learning.title');
     }
-    renderVideoSubtitleTiming(menu, subtitleOffsetMs, enabled && pretranslationCues.length > 0, language);
+    renderVideoSubtitleTiming(menu, subtitleOffsetMs, enabled && visible && pretranslationCues.length > 0, language);
     renderVideoAiMenu(menu, {
       available: isXVideoPage() && browserCapabilities.extensionDom,
       checking: aiModelSetup.checking, downloading: aiModelSetup.downloading, downloadProgress: aiModelSetup.downloadProgress,
@@ -1030,8 +1030,11 @@ export function mountVideoSubtitleTranslation(): () => void {
   });
   const selectMenuMode = (mode: VideoMenuMode) => {
     if (mode === 'off') {
-      if (!config.videoTranslationEnabled) return;
-      persistVideoConfig({ videoTranslationEnabled: false });
+      if (config.videoSubtitleVisible === false) return;
+      // 菜单只关闭字幕显示；功能总开关留给设置中心，保留再次开启字幕的入口。
+      persistVideoConfig({ videoSubtitleVisible: false });
+      downloads.cancel();
+      aiModelSetup.reset();
       if (isAiFullActive()) {
         stopFullAiSubtitleGeneration();
       }

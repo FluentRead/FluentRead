@@ -436,8 +436,8 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('#ytp-caption-window-container')?.getAttribute('data-fluent-read-video-display-mode') === 'bilingual', null, { timeout: 10000 });
 
     await page.locator('#fluent-read-video-subtitle-menu [data-mode="off"]').click();
-    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-button')
-      && !document.querySelector('#fluent-read-video-subtitle-menu')
+    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')
+      && document.querySelector('#fluent-read-video-subtitle-menu [data-mode="off"]')?.getAttribute('aria-checked') === 'true'
       && !document.querySelector('#fluent-read-video-subtitle')?.textContent?.trim(), null, {timeout: 10000});
     const disabledFromPlayer = await page.evaluate(() => ({
       buttonPresent: Boolean(document.querySelector('#fluent-read-video-subtitle-button')),
@@ -446,29 +446,13 @@ async function main() {
     }));
     await page.screenshot({path: path.join(artifactsDir, 'youtube-video-subtitle-disabled.png'), fullPage: false});
 
-    // 关闭后入口和菜单已销毁；从扩展设置的真实控件重新启用。
-    const reenableSettings = await createIsolatedPage();
-    try {
-      await reenableSettings.goto(`chrome-extension://${extensionId}/options.html#settings-video`, {waitUntil: 'domcontentloaded'});
-      await activateTestPage(reenableSettings);
-      await waitForAsyncCondition(async () => (await readExtensionConfig(reenableSettings)).videoTranslationEnabled === false,
-        {timeoutMs: 10000, message: '播放器关闭视频未持久化'});
-      const toggle = reenableSettings.locator('#settings-video').getByRole('switch', {name: '视频字幕翻译', exact: true});
-      await toggle.waitFor({state: 'visible', timeout: 10000});
-      if (await toggle.getAttribute('aria-checked') !== 'false') throw new Error('设置页未显示视频关闭状态');
-      await toggle.click();
-      await reenableSettings.waitForFunction(() => document.querySelector('#settings-video .feature-enable-card [role="switch"]')?.getAttribute('aria-checked') === 'true', null, {timeout: 10000});
-      await waitForAsyncCondition(async () => (await readExtensionConfig(reenableSettings)).videoTranslationEnabled === true,
-        {timeoutMs: 10000, message: '从设置页重新启用视频未持久化'});
-      await reenableSettings.screenshot({path: path.join(artifactsDir, 'youtube-video-subtitle-settings-reenabled.png'), fullPage: true});
-    } finally {
-      await reenableSettings.close();
-    }
-    await activateTestPage(page);
-    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')?.classList.contains('fluent-read-video-subtitle-active') === true
-      && document.querySelector('#fluent-read-video-subtitle-menu')?.hidden === true, null, {timeout: 10000});
+    // 关闭字幕保留播放器入口；重新打开菜单即可选择显示方式。
+    await page.locator('#fluent-read-video-subtitle-menu [data-action="close-menu"]').click();
     assertPlayerMenuButtonState(await readPlayerMenuButtonState(page), false);
     await clickVideoTranslationButton();
+    await page.locator('#fluent-read-video-subtitle-menu [data-mode="bilingual"]').click();
+    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-button')?.classList.contains('fluent-read-video-subtitle-active') === true
+      && document.querySelector('#fluent-read-video-subtitle-menu')?.hidden === false, null, {timeout: 10000});
     await page.locator('#fluent-read-video-subtitle-menu').waitFor({state: 'visible', timeout: 10000});
     await page.evaluate(() => {
       let container = document.querySelector('#ytp-caption-window-container');
@@ -488,7 +472,7 @@ async function main() {
       return Boolean(overlay?.textContent?.match(/[\u3400-\u9fff]/));
     }, null, { timeout: 45000 });
     assertPlayerMenuButtonState(await readPlayerMenuButtonState(page), true);
-    const reenabledFromSettings = await page.evaluate(() => ({
+    const reenabledFromMenu = await page.evaluate(() => ({
       buttonActive: Boolean(document.querySelector('#fluent-read-video-subtitle-button')?.classList.contains('fluent-read-video-subtitle-active')),
       overlayText: document.querySelector('#fluent-read-video-subtitle')?.textContent || '',
     }));
@@ -526,9 +510,9 @@ async function main() {
       overlayCount,
       translationOnly,
       disabledFromPlayer,
-      reenabledFromSettings,
+      reenabledFromMenu,
       extensionPageErrors,
-      disabledClearedOverlay: !disabledFromPlayer.buttonPresent && !disabledFromPlayer.menuPresent && disabledFromPlayer.overlayText === '',
+      disabledClearedOverlay: disabledFromPlayer.buttonPresent && disabledFromPlayer.menuPresent && disabledFromPlayer.overlayText === '',
       artifactsDir,
       launchMode,
       focusPolicy,

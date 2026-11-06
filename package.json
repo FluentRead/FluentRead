@@ -25,6 +25,7 @@
     "verify:brand": "node scripts/verify-brand-copy.mjs",
     "verify:i18n": "node scripts/testing/run-resource-safe.mjs -- vitest run tests/i18n.test.ts tests/i18nMaterials.test.ts tests/i18nKeyReferences.test.ts tests/i18nRuntimeContracts.test.ts tests/i18nSettingsCopy.test.ts tests/i18nMetadata.test.ts tests/i18nContentUi.test.ts tests/uiLanguageBundles.test.ts tests/uiI18nOwnership.test.ts tests/uiI18nBundleLoading.test.ts tests/personalCorrectionUiPanel.test.ts tests/videoSentenceLearningComponent.test.ts tests/documentTranslationPresentation.test.ts tests/i18nPlural.test.ts tests/userscriptLanguageBundles.test.ts tests/userscriptMetadata.test.ts tests/vocabularyBookComponentLifecycle.test.ts tests/documentationToolContracts.test.ts tests/popupFeatureVisibility.test.ts tests/serviceDirectoryLifecycle.test.ts tests/settingsSectionsLifecycle.test.ts",
     "build:firefox": "node scripts/testing/run-resource-safe.mjs -- wxt build -b firefox",
+    "build-for-amo": "npm run build:firefox && node scripts/amo/prepare-review-output.mjs",
     "lint:firefox:amo": "node scripts/testing/lint-firefox-amo.mjs",
     "build:safari": "node scripts/testing/run-resource-safe.mjs -- wxt build -b safari --mv2",
     "safari:check": "node scripts/safari/package.mjs --check",

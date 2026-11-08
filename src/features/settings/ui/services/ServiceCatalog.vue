@@ -191,6 +191,7 @@ import {options as catalogOptions, services} from '@/src/core/config/catalog'
 import {chatGPTPlanDevelopmentEnabled} from '@/src/platform/chatgpt-plan/buildMode'
 import {
   buildServiceSections,
+  serviceDirectorySearchText,
   type ServiceCredentialGuide,
   type ServiceOption,
   type ServiceWebsite,
@@ -262,9 +263,7 @@ const allServices = computed(() => directoryGroups.value.flatMap(group => group.
 const enabledServiceCount = computed(() => allServices.value.filter(item => !item.disabled).length)
 const directorySearchLabel = computed(() => t('settings.services.library.search'))
 // 延迟建立索引，空搜索不读取或规范化逐项文本；连续输入复用同一目录索引。
-const directorySearchText = computed(() => new Map(allServices.value.map(item => [item,
-  [item.label, item.value, item.description, ...(item.searchTerms || [])].join(' ').normalize('NFKC').toLocaleLowerCase(),
-])))
+const directorySearchText = computed(() => new Map(allServices.value.map(item => [item, serviceDirectorySearchText(item)])))
 const keyword = computed(() => serviceQuery.value.trim().normalize('NFKC').toLocaleLowerCase())
 const matchesSearch = (item: ServiceOption) => !keyword.value || directorySearchText.value.get(item)!.includes(keyword.value)
 const visibleDirectoryGroups = computed(() => {

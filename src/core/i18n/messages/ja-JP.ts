@@ -429,7 +429,6 @@ export const jaJPMessages = {
     "settings.services.library.addService": "サービスを追加",
     "settings.services.library.added": "追加済み",
     "settings.services.library.configureService": "{service} を設定",
-    "settings.services.library.addNamedService": "{service} を追加",
     "settings.services.library.views": "サービス表示",
     "settings.services.library.mine": "マイサービス",
     "settings.services.library.all": "すべてのサービス",

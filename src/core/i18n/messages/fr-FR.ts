@@ -429,7 +429,6 @@ export const frFRMessages = {
     "settings.services.library.addService": "Ajouter un service",
     "settings.services.library.added": "Ajouté",
     "settings.services.library.configureService": "Configurer {service}",
-    "settings.services.library.addNamedService": "Ajouter {service}",
     "settings.services.library.views": "Vues des services",
     "settings.services.library.mine": "Mes services",
     "settings.services.library.all": "Tous les services",

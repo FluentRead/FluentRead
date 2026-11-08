@@ -429,7 +429,6 @@ export const koKRMessages = {
     "settings.services.library.addService": "서비스 추가",
     "settings.services.library.added": "추가됨",
     "settings.services.library.configureService": "{service} 설정",
-    "settings.services.library.addNamedService": "{service} 추가",
     "settings.services.library.views": "서비스 보기",
     "settings.services.library.mine": "내 서비스",
     "settings.services.library.all": "모든 서비스",

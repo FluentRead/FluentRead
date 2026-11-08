@@ -425,7 +425,6 @@ export const zhCNMessages = {
     "settings.services.library.addService": "添加服务",
     "settings.services.library.added": "已添加",
     "settings.services.library.configureService": "配置 {service}",
-    "settings.services.library.addNamedService": "添加 {service}",
     "settings.services.library.views": "服务视图",
     "settings.services.library.mine": "我的服务",
     "settings.services.library.all": "全部服务",

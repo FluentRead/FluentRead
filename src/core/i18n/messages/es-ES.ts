@@ -429,7 +429,6 @@ export const esESMessages = {
     "settings.services.library.addService": "Añadir servicio",
     "settings.services.library.added": "Añadido",
     "settings.services.library.configureService": "Configurar {service}",
-    "settings.services.library.addNamedService": "Añadir {service}",
     "settings.services.library.views": "Vistas de servicios",
     "settings.services.library.mine": "Mis servicios",
     "settings.services.library.all": "Todos los servicios",

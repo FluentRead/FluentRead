@@ -429,7 +429,6 @@ export const ruRUMessages = {
     "settings.services.library.addService": "Добавить сервис",
     "settings.services.library.added": "Добавлен",
     "settings.services.library.configureService": "Настроить {service}",
-    "settings.services.library.addNamedService": "Добавить {service}",
     "settings.services.library.views": "Виды сервисов",
     "settings.services.library.mine": "Мои сервисы",
     "settings.services.library.all": "Все сервисы",

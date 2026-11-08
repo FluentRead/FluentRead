@@ -430,7 +430,6 @@ export const enUSMessages = {
     "settings.services.library.addService": "Add service",
     "settings.services.library.added": "Added",
     "settings.services.library.configureService": "Configure {service}",
-    "settings.services.library.addNamedService": "Add {service}",
     "settings.services.library.views": "Service views",
     "settings.services.library.mine": "My services",
     "settings.services.library.all": "All services",

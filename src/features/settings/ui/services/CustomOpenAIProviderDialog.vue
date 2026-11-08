@@ -7,18 +7,18 @@
 <template>
   <el-dialog :model-value="modelValue && active && ownedOpen" width="min(600px, calc(100vw - 28px))" class="custom-openai-provider-dialog" :style="dialogViewportStyle" data-testid="custom-service-dialog" :title="t('settings.services.composite.customTitle')" :close-on-click-modal="false" destroy-on-close :onOpened="actions.focus" :onUpdate:modelValue="actions.update">
     <form class="custom-provider-form" novalidate :onSubmit="withModifiers(actions.submit, ['prevent'])">
-      <div class="custom-service-types" :class="{'has-restore': restoreServices.length}" role="group" :aria-label="t('settings.services.composite.serviceType')">
-        <button type="button" data-testid="custom-service-type-interface" :aria-pressed="serviceType === 'interface'" :disabled="!active" :onClick="actions.type.bind(null, 'interface')">{{ t('settings.services.composite.interfaceType') }}</button>
-        <button type="button" data-testid="custom-service-type-composite" :aria-pressed="serviceType === 'composite'" :disabled="!active" :onClick="actions.type.bind(null, 'composite')">{{ t('settings.services.composite.compositeType') }}</button>
-        <button v-if="restoreServices.length" type="button" data-testid="custom-service-type-restore" :aria-pressed="serviceType === 'restore'" :disabled="!active" :onClick="actions.type.bind(null, 'restore')">{{ t('settings.services.library.restoreDirectory') }}</button>
+      <div class="custom-service-types" role="group" :aria-label="t('settings.services.composite.serviceType')">
+        <button v-for="[type, label] in visibleServiceTypes" :key="type" type="button"
+          :data-testid="`custom-service-type-${type}`" :aria-pressed="serviceType === type" :disabled="!active"
+          :onClick="actions.type.bind(null, type)">{{ t(label) }}</button>
       </div>
       <template v-if="serviceType === 'restore'">
         <label>
-          <input type="search" data-testid="custom-service-restore-search" :value="restoreQuery" :onInput="actions.searchRestore" :aria-label="t('common.search')" :placeholder="t('common.search')" />
+          <input type="search" data-testid="custom-service-restore-search" :value="restore.query" :onInput="actions.restore.bind(null, 'query')" :aria-label="t('common.search')" :placeholder="t('common.search')" />
         </label>
         <div v-if="restoreMatches.length" class="restore-service-options" role="group" :aria-label="t('settings.services.library.restoreDirectory')">
           <label v-for="item in restoreMatches" :key="item.value" class="restore-service-option">
-            <input type="radio" name="restore-service" :value="item.value" :data-service-restore="item.value" :checked="restoreSelection === item.value" :onChange="actions.selectRestore.bind(null, item.value)" />
+            <input type="radio" name="restore-service" :value="item.value" :data-service-restore="item.value" :checked="restore.selection === item.value" :onChange="actions.restore.bind(null, 'selection')" />
             <ServiceIcon :service="item.value" :label="item.label" size="small" />
             <span>{{ item.label }}</span>
           </label>
@@ -61,7 +61,7 @@
 import {computed, reactive, ref, watch, withKeys, withModifiers} from 'vue'
 import {Config} from '@/src/core/config/model'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
-import {searchServiceOptions, type ServiceOption} from '@/src/ui/view-model/serviceCatalog'
+import {serviceDirectorySearchText, type ServiceOption} from '@/src/ui/view-model/serviceCatalog'
 import {useUiI18n, localizeServiceOptions} from '@/src/ui/i18n'
 import {useSettingsActionContext} from '../../model/useSettingsActionContext'
 import {CUSTOM_OPENAI_RESERVED_MODEL_ID, MAX_CUSTOM_OPENAI_MODEL_LENGTH, MAX_CUSTOM_OPENAI_PROVIDER_ENDPOINT_LENGTH, MAX_CUSTOM_OPENAI_PROVIDER_NAME_LENGTH} from '@/src/core/config/customOpenAI'
@@ -70,7 +70,12 @@ import CompositeTranslationFields from './CompositeTranslationFields.vue'
 import {getVisualViewportRect, observeVisualViewport} from '@/src/platform/dom/visualViewport'
 
 interface CustomOpenAIProviderDraft {name: string; endpoint: string; apiKey: string; model: string}
-type CustomServiceType = 'interface' | 'composite' | 'restore'
+const serviceTypes = [
+  ['interface', 'settings.services.composite.interfaceType'],
+  ['composite', 'settings.services.composite.compositeType'],
+  ['restore', 'settings.services.library.restoreDirectory'],
+] as const
+type CustomServiceType = (typeof serviceTypes)[number][0]
 const props = withDefaults(defineProps<{modelValue: boolean; config?: Config; active?: boolean; context?: unknown; restoreServices?: ServiceOption[]; maximumNameLength?: number; maximumEndpointLength?: number; maximumModelLength?: number}>(), {active: true, restoreServices: () => [], maximumNameLength: MAX_CUSTOM_OPENAI_PROVIDER_NAME_LENGTH, maximumEndpointLength: MAX_CUSTOM_OPENAI_PROVIDER_ENDPOINT_LENGTH, maximumModelLength: MAX_CUSTOM_OPENAI_MODEL_LENGTH})
 const emit = defineEmits<{'update:modelValue': [value: boolean]; submit: [draft: CustomOpenAIProviderDraft]; 'submit:composite': [draft: CompositeTranslationDraft]; 'submit:restore': [service: string]}>()
 const {t, translateLegacy} = useUiI18n()
@@ -79,10 +84,13 @@ const draft = reactive<CustomOpenAIProviderDraft>({name: '', endpoint: '', apiKe
 const compositeDraft = reactive(createCompositeTranslationDraft())
 const compositeErrors = ref<CompositeTranslationDraftErrors>({})
 const serviceType = ref<CustomServiceType>('interface')
-const restoreQuery = ref('')
-const restoreSelection = ref('')
-const restoreMatches = computed(() => searchServiceOptions(props.restoreServices, restoreQuery.value, new Map()))
-const canRestore = computed(() => restoreMatches.value.some(item => item.value === restoreSelection.value))
+const visibleServiceTypes = computed(() => props.restoreServices.length ? serviceTypes : serviceTypes.slice(0, 2))
+const restore = reactive({query: '', selection: ''})
+const restoreMatches = computed(() => {
+  const keyword = restore.query.trim().normalize('NFKC').toLocaleLowerCase()
+  return keyword ? props.restoreServices.filter(item => serviceDirectorySearchText(item).includes(keyword)) : props.restoreServices
+})
+const canRestore = computed(() => restoreMatches.value.some(item => item.value === restore.selection))
 const fallbackConfig = new Config()
 const memberConfig = computed(() => props.config || fallbackConfig)
 const members = computed(() => localizeServiceOptions(getCompositeMemberOptions(memberConfig.value), memberConfig.value.customOpenAIProviders, translateLegacy))
@@ -90,7 +98,7 @@ const compositeFormDraft = computed(() => ({...compositeDraft, name: draft.name}
 const ownedOpen = ref(props.modelValue)
 const errors = reactive({name: '', endpoint: '', model: ''})
 const nameError = computed(() => serviceType.value === 'composite' ? compositeErrors.value.name ? t(compositeErrors.value.name) : '' : translateLegacy(errors.name))
-const {active, capture} = useSettingsActionContext(() => props.active !== false, () => [props.context, props.config, props.modelValue, serviceType.value])
+const {active, capture} = useSettingsActionContext(() => props.active !== false, () => [props.context, props.config, props.modelValue, serviceType.value, props.restoreServices])
 const dialogViewportStyle = ref<Record<string, string>>()
 // 变量只写入本窗口，CSS 决定是否采用触屏布局；订阅随关闭、停用、缓存和卸载释放，不改变表单或焦点归属。
 watch(() => props.modelValue && active.value && ownedOpen.value, (open, _previous, onCleanup) => {
@@ -120,18 +128,13 @@ const actions = computed(() => {
       if (field === 'name') compositeErrors.value = {...compositeErrors.value, name: undefined}
     },
     type: (value: CustomServiceType) => {
-      if (!current() || !ownedOpen.value || !['interface', 'composite', 'restore'].includes(value) || (value === 'restore' && !props.restoreServices.length)) return
+      if (!current() || !ownedOpen.value || !visibleServiceTypes.value.some(([type]) => type === value)) return
       serviceType.value = value
       errors.name = '';errors.endpoint = '';errors.model = '';compositeErrors.value = {}
     },
-    searchRestore: (event: Event) => {
+    restore: (field: keyof typeof restore, event: Event) => {
       if (current() && ownedOpen.value && serviceType.value === 'restore' && event.target instanceof HTMLInputElement) {
-        restoreQuery.value = event.target.value
-      }
-    },
-    selectRestore: (service: string) => {
-      if (current() && ownedOpen.value && serviceType.value === 'restore' && restoreMatches.value.some(item => item.value === service)) {
-        restoreSelection.value = service
+        restore[field] = event.target.value
       }
     },
     composite: (patch: Partial<CompositeTranslationDraft>) => {if (current() && ownedOpen.value && serviceType.value === 'composite') {Object.assign(compositeDraft, patch);compositeErrors.value = {}}},
@@ -143,8 +146,7 @@ const actions = computed(() => {
 function resetDraft(): void {
   Object.assign(draft, {name: '', endpoint: '', apiKey: '', model: ''})
   Object.assign(compositeDraft, createCompositeTranslationDraft())
-  restoreQuery.value = ''
-  restoreSelection.value = ''
+  restore.query = ''; restore.selection = ''
   errors.name = '';errors.endpoint = '';errors.model = '';compositeErrors.value = {};serviceType.value = 'interface'
 }
 function focusFirstField(): void {if (active.value && ownedOpen.value && props.modelValue) nameInput.value?.focus()}
@@ -155,7 +157,7 @@ function submitProvider(): void {
   if (!active.value || !ownedOpen.value || !props.modelValue) return
   if (serviceType.value === 'restore') {
     if (!canRestore.value) return
-    const service = restoreSelection.value
+    const service = restore.selection
     closeDialog()
     emit('submit:restore', service)
     return
@@ -174,8 +176,9 @@ function submitProvider(): void {
   closeDialog();emit('submit', value)
 }
 watch(() => props.modelValue, open => {resetDraft();ownedOpen.value = open && active.value}, {flush: 'sync'})
-watch(() => props.restoreServices.length, count => {
-  if (!count && serviceType.value === 'restore') serviceType.value = 'interface'
+watch(() => props.restoreServices, items => {
+  if (!items.some(item => item.value === restore.selection)) restore.selection = ''
+  if (!items.length && serviceType.value === 'restore') serviceType.value = 'interface'
 }, {flush: 'sync'})
 watch(() => [active.value, props.context, props.config], () => closeDialog(), {flush: 'sync'})
 </script>
@@ -188,8 +191,7 @@ watch(() => [active.value, props.context, props.config], () => closeDialog(), {f
 .custom-provider-form input:focus-visible { outline: 2px solid var(--brand, #ef4776); outline-offset: 1px; }
 .custom-provider-form input[aria-invalid='true'] { border-color: var(--el-color-danger, #d9345e); }
 .custom-provider-form .field-error { color: var(--el-color-danger, #c52f58); }
-.custom-service-types { display: inline-grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 3px; padding: 3px; width: fit-content; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
-.custom-service-types.has-restore { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.custom-service-types { display: inline-grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 3px; padding: 3px; width: fit-content; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
 .custom-service-types button { overflow-wrap: anywhere; min-height: 32px; padding: 5px 14px; border: 0; border-radius: 7px; color: var(--muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
 .custom-service-types button[aria-pressed='true'] { color: var(--brand-strong); background: var(--surface); box-shadow: 0 2px 6px rgba(31, 40, 61, .08); }
 .restore-service-options { display: grid; gap: 2px; max-height: 240px; overflow-y: auto; overscroll-behavior: contain; }
@@ -232,7 +234,7 @@ watch(() => [active.value, props.context, props.config], () => closeDialog(), {f
   .custom-provider-form :deep(.composite-fields input),
   .custom-provider-form :deep(.composite-fields select) { min-width: 0; min-height: 44px; font-size: 16px; }
   .custom-service-types { width: 100%; box-sizing: border-box; }
-  .custom-service-types.has-restore button { padding-inline: 8px; }
+  .custom-service-types button { padding-inline: 8px; }
   .custom-service-types button,
   .custom-provider-form footer button,
   .custom-provider-form :deep(.composite-fields button),

@@ -19,6 +19,7 @@ const sources: Record<ExtensionVendorSource, string> = {
     'fontkit': path.join(path.dirname(require.resolve('@pdf-lib/fontkit')), 'fontkit.es.js'),
     'lodash-root': createRequire(require.resolve('element-plus')).resolve('lodash-es/_root.js'),
     'onnx-asyncify': path.join(path.dirname(transformersRequire.resolve('onnxruntime-web/webgpu')), 'ort-wasm-simd-threaded.asyncify.mjs'),
+    'zod-v4-schemas': path.join(path.dirname(require.resolve('zod/v4/core')), 'schemas.js'),
 };
 const original = (kind: ExtensionVendorSource) => fs.readFileSync(sources[kind], 'utf8');
 const patched = (kind: ExtensionVendorSource) => patchExtensionVendorSource(kind, original(kind));
@@ -116,6 +117,8 @@ describe('extension dependency CSP packaging', () => {
         expect(transform('wrapper', '\0/vendor/jszip/dist/jszip.min.js')).toBeUndefined();
         expect(transform('wrapper', `${sources.jszip}?commonjs-proxy`)).toBeUndefined();
         expect(transform(original('jszip'), sources.jszip)?.code).toBe(patched('jszip'));
+        const zodSchemas = transform(original('zod-v4-schemas'), sources['zod-v4-schemas'])?.code;
+        expect(zodSchemas).toContain('const jit = false;');
         const emitFile = vi.fn(() => 'fixture');
         const load = plugin.load as (this: unknown, id: string) => string | undefined;
         expect(load.call({emitFile}, sources['pdfjs-worker'])).toBeUndefined();

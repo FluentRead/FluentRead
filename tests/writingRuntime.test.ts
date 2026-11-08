@@ -267,7 +267,14 @@ describe('Writing Harness tools and memory', () => {
     const result = await createWritingRuntime(() => c, undefined, mode === 'no-reader' ? undefined : {recall})(input, controller().signal, vi.fn(), mode === 'private');
     expect(result.success).toBe(true); expect(mocks.stream.mock.calls[0][0].tools).toBeUndefined(); expect(recall).not.toHaveBeenCalled();
   });
-  it.each([['read_context', {url: 'https://outside.test'}], ['search_memory', {query: ''}], ['send_reply', {}]] as const)('rejects invalid or unavailable %s calls before a second model step', async (name, input) => {
+  it.each([
+    ['read_context', {url: 'https://outside.test'}],
+    ['read_context', new Date()],
+    ['search_memory', {query: ''}],
+    ['search_memory', {query: '🙂'.repeat(251)}],
+    ['search_memory', Object.assign(new Date(), {query: 'writing'})],
+    ['send_reply', {}],
+  ] as const)('rejects invalid or unavailable %s calls before a second model step', async (name, input) => {
     const c = config(); c.harness.memoryEnabled = true; const recall = vi.fn();
     mocks.stream.mockImplementationOnce(() => toolStream(name, input));
     const result = await createWritingRuntime(() => c, undefined, {recall})(request, controller().signal, vi.fn());

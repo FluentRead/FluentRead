@@ -5,6 +5,7 @@
  * 模块边界：不读密钥或浏览器全局；由应用层注入配置就绪、资格和生成函数。
  */
 import {z} from 'zod';
+import {isProtocolInputObject} from '@/src/core/messaging/validation';
 import {WRITING_ACTIONS, WRITING_LENGTHS, WRITING_STYLES, WRITING_ROLE_MAX_LENGTH, WRITING_TONE_MAX_LENGTH, isWritingLanguage, normalizeWritingLanguage, normalizeWritingLength} from '@/src/core/config/writing';
 import type {WritingRequest, WritingResponse, WritingProgress, WritingStreamMessage} from './types';
 
@@ -15,18 +16,25 @@ export interface WritingPort {
     onDisconnect: {addListener(fn: () => void): void; removeListener(fn: () => void): void};
     postMessage(message: WritingStreamMessage): void;
 }
-const requestSchema = z.object({
+// Keep the transport's UTF-16 limits when Zod counts Unicode code points.
+const boundedText = (limit: number) => z.string().refine(value => value.length <= limit);
+const historyEntrySchema = z.preprocess(
+    input => isProtocolInputObject(input) ? input : null,
+    z.strictObject({question: boundedText(2000), answer: boundedText(12000)}),
+);
+const requestSchema = z.strictObject({
     type: z.literal('fluentReadWriting'), action: z.literal('run'), requestId: z.string().regex(/^[\w.:-]{1,128}$/u),
     intent: z.string().refine(value => WRITING_ACTIONS.some(item => item.id === value)),
-    instruction: z.string().max(2000), draft: z.string().max(12000), context: z.string().max(12000),
-    language: z.string().max(32).refine(isWritingLanguage).transform(normalizeWritingLanguage),
-    tone: z.string().max(WRITING_TONE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1),
-    length: z.string().refine(value => value === 'auto' || WRITING_LENGTHS.some(item => item.value === value)).default('short').transform(normalizeWritingLength),
-    style: z.string().refine(value => WRITING_STYLES.some(item => item.value === value)).default('auto'),
-    role: z.string().max(WRITING_ROLE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1).default('auto'),
-    history: z.array(z.object({question: z.string().max(2000), answer: z.string().max(12000)}).strict()).max(4),
-}).strict();
+    instruction: boundedText(2000), draft: boundedText(12000), context: boundedText(12000),
+    language: boundedText(32).refine(isWritingLanguage).transform(normalizeWritingLanguage),
+    tone: boundedText(WRITING_TONE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1),
+    length: z.string().refine(value => value === 'auto' || WRITING_LENGTHS.some(item => item.value === value)).prefault('short').transform(normalizeWritingLength),
+    style: z.string().refine(value => WRITING_STYLES.some(item => item.value === value)).prefault('auto'),
+    role: boundedText(WRITING_ROLE_MAX_LENGTH).regex(/^[^\u0000-\u001f\u007f]*$/u).trim().min(1).prefault('auto'),
+    history: z.array(historyEntrySchema).max(4),
+});
 export const parseWritingRequest = (value: unknown): WritingRequest | null => {
+    if (!isProtocolInputObject(value)) return null;
     const parsed = requestSchema.safeParse(value);
     return parsed.success ? parsed.data as WritingRequest : null;
 };

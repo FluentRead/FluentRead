@@ -1379,7 +1379,7 @@ export const zhCNMessages = {
     'options.aboutFeedbackDescription': "报告问题，分享建议",
     'options.aboutThanks': '流畅阅读的发展离不开社区的慷慨支持，你可以通过微信赞赏或Ko-fi支持我们。',
     'popup.donationTitle': '支持流畅阅读',
-    'popup.donationDescription': '感谢您对开源项目的支持。',
+    'popup.donationDescription': '流畅阅读开源免费，你可以支持我们。',
     'popup.donationClose': '关闭赞赏窗口',
     'popup.donationWechat': '微信赞赏',
     'popup.donationEnlargeCode': '放大微信赞赏码',

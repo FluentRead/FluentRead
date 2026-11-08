@@ -14,8 +14,12 @@ import type {ModelUsageEvent} from '@/src/services/model-usage/types';
 import {createHarnessLanguageModel} from './modelGateway';
 import {createHarnessUsageEvent} from './usage';
 import {createBilibiliVisibleStream} from './visibleStream';
+import {isReadContextInput} from './readContext';
 export {normalizeHarnessModelError} from './modelGateway';
-const READ_CONTEXT_INPUT = z.object({reason: z.string().max(200).optional()}).strict();
+export const readContextInputSchema = z.preprocess(
+    input => isReadContextInput(input) ? input : null,
+    z.strictObject({reason: z.string().max(200).optional()}),
+);
 
 function toModelMessages(messages: readonly HarnessMessage[]): ModelMessage[] {
     return messages.map(message => ({role: message.role, content: message.content} as ModelMessage));
@@ -73,7 +77,7 @@ export function createHarnessGenerator(
 ): HarnessGenerate {
     const toolSet: ToolSet = Object.fromEntries(tools.map(definition => [definition.name, tool({
         description: definition.description,
-        inputSchema: READ_CONTEXT_INPUT,
+        inputSchema: readContextInputSchema,
     })]));
     return makeGenerate(createHarnessLanguageModel(config, service, model), toolSet, service, model, recordUsage);
 }

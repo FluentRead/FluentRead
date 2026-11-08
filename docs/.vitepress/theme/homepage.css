@@ -1,4 +1,4 @@
-/* 赞助区位于功能介绍之后，以单个空席位承接企业合作，窄屏自然纵排。 */
+/* 赞助区位于功能介绍之后，窄屏将介绍和赞助图标网格纵向排列。 */
 .bv-sponsors {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
@@ -13,11 +13,6 @@
   max-width: 490px;
   color: var(--fr-muted);
   font-size: 14px;
-}
-.bv-sponsor-contact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 24px;
 }
 @media (max-width: 760px) {
   .bv-sponsors {

@@ -25,7 +25,7 @@ const evidence = (file: string, data: Uint8Array) => {
     if (directory) {mkdirSync(directory, {recursive: true}); writeFileSync(join(directory, file), data);}
 };
 async function readOutline(bytes: Uint8Array) {
-    const task = getDocument({data: bytes.slice(), isEvalSupported: false});
+    const task = getDocument({data: bytes.slice()});
     try {
         const pdf = await task.promise;
         const read = async (items: NonNullable<Awaited<ReturnType<typeof pdf.getOutline>>>): Promise<any[]> => Promise.all(items.map(async item => {

@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
       - name: Set up Node.js and dependency cache
         uses: actions/setup-node@v6
         with:
@@ -56,9 +56,9 @@ jobs:
           path: |
             .wxt/cache/extension.tsbuildinfo
             .wxt/cache/userscript-gzip
-          key: fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
+          key: fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-${{ github.sha }}
           restore-keys: |
-            fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'package.json', 'tsconfig.json') }}-
+            fluentread-build-${{ runner.os }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.json') }}-
       - name: Install audit tools
         run: |
           if ! command -v rg >/dev/null 2>&1; then

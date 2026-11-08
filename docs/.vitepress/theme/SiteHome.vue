@@ -8,6 +8,15 @@ import brandTaglines from '../../../src/core/i18n/messages/brand-taglines.json'
 const props = defineProps<{ en?: boolean }>()
 const t = (zh: string, english: string) => (props.en ? english : zh)
 const link = (path: string) => withBase((props.en ? '/en' : '') + path)
+const sponsors = [
+  {
+    name: t('哔哩哔哩', 'bilibili'),
+    project: 'Index-Translate',
+    icon: '/support/bilibili.svg',
+    href: 'https://index-translate.bilibili.com/',
+    recognition: t('首位赞助伙伴', 'First sponsor'),
+  },
+]
 const features = [
   {
     kind: 'webpage',
@@ -202,29 +211,40 @@ const faqs = [
     <section id="sponsors" class="bv-section bv-sponsors" aria-labelledby="bv-sponsors-title">
       <div>
         <span class="bv-section-number">{{ t('企业与项目赞助', 'SPONSOR FLUENTREAD') }}</span>
-        <h2 id="bv-sponsors-title">{{ t('支持开源，让世界更大', 'Support open source. A bigger world.') }}</h2>
+        <h2 id="bv-sponsors-title">{{ t('支持开源，与流畅阅读同行', 'Support open source with FluentRead') }}</h2>
         <p>{{
           t(
-            '项目目前主要由个人支持，每月为开源开发投入数万美元的 API Token 费用。我们相信，流畅阅读能为世界带来更多美好。',
-            'The project is currently funded mainly out of pocket, with tens of thousands of US dollars spent each month on API tokens for open-source development. We believe FluentRead can make the world a little better.'
+            '项目目前主要由个人支持，每月投入数百美元用于项目维护。我们相信，流畅阅读能为世界带来更多美好。',
+            'The project is currently funded mainly out of pocket, with a few hundred US dollars spent each month on maintenance. We believe FluentRead can make the world a little better.'
           )
         }}</p>
-        <div class="bv-sponsor-contact">
-          <a class="bv-text-link" href="mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship">{{ t('邮件联系', 'Email us') }} →</a>
-          <a class="bv-text-link" :href="withBase('/support/wechat-contact.jpg')" target="_blank" rel="noopener noreferrer">{{ t('添加微信', 'Add on WeChat') }} ↗</a>
-        </div>
       </div>
-      <a
-        class="fr-sponsor-slot"
-        :href="link('/guide/support')"
-      >
-        <span class="fr-sponsor-plus" aria-hidden="true">+</span>
-        <span class="fr-sponsor-copy">
-          <strong>{{ en ? 'Your brand here' : '虚位以待' }}</strong>
-          <span>{{ en ? 'Become our first sponsor' : '成为首位赞助伙伴' }}</span>
-        </span>
-        <span class="fr-sponsor-arrow" aria-hidden="true">↗</span>
-      </a>
+      <div>
+        <ul class="fr-sponsor-grid" :aria-label="t('赞助伙伴', 'Sponsors')">
+          <li v-for="sponsor in sponsors" :key="sponsor.href">
+            <a
+              class="fr-sponsor-tile"
+              :href="sponsor.href"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img :src="withBase(sponsor.icon)" alt="" width="38" height="38" />
+              <strong>{{ sponsor.name }}</strong>
+              <span>{{ sponsor.project }}</span>
+            </a>
+            <span v-if="sponsor.recognition" class="fr-sponsor-recognition">{{ sponsor.recognition }}</span>
+          </li>
+          <li>
+            <a class="fr-sponsor-tile fr-sponsor-invite" :href="link('/guide/support#sponsorship')">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                <circle cx="16" cy="16" r="13" />
+                <path d="M16 10v12m-6-6h12" stroke-linecap="round" />
+              </svg>
+              <strong>{{ t('成为赞助伙伴', 'Become a sponsor') }}</strong>
+            </a>
+          </li>
+        </ul>
+      </div>
     </section>
     <section class="bv-section bv-faq">
       <div>
@@ -265,80 +285,71 @@ const faqs = [
 </template>
 
 <style scoped>
-.fr-sponsor-slot {
+.fr-sponsor-grid {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fr-sponsor-grid > li {
+  width: 112px;
+  text-align: center;
+}
+.fr-sponsor-tile {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
-  width: 100%;
-  min-width: 0;
-  min-height: 144px;
-  padding: 28px;
-  border: 1px dashed #c9b7bf;
-  border-radius: 18px;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  padding: 10px;
+  border: 1px solid #e4d8de;
+  border-radius: 14px;
   background: #fcf9fa;
   color: var(--vp-c-text-1);
-  text-decoration: none !important;
+  line-height: 1.3;
+  text-decoration: none;
   transition: border-color 160ms, background-color 160ms;
 }
-.fr-sponsor-slot:hover {
+.fr-sponsor-tile:hover {
   border-color: var(--vp-c-brand-1);
   background: #fbf3f6;
 }
-.fr-sponsor-slot:focus-visible {
+.fr-sponsor-tile:focus-visible {
   outline: 2px solid var(--vp-c-brand-1);
   outline-offset: 4px;
 }
-.fr-sponsor-plus {
-  display: grid;
-  place-items: center;
-  flex: 0 0 48px;
-  height: 48px;
-  border: 1px solid #e4d8de;
-  border-radius: 12px;
-  color: var(--vp-c-brand-1);
-  background: white;
-  font-size: 28px;
-  font-weight: 400;
-  line-height: 1;
+.fr-sponsor-tile img {
+  margin-bottom: 2px;
 }
-.fr-sponsor-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 5px;
-  line-height: 1.6;
-}
-.fr-sponsor-copy strong {
-  font-size: 20px;
-  font-weight: 650;
-  color: var(--vp-c-text-1);
-}
-.fr-sponsor-copy > span {
+.fr-sponsor-tile strong {
   font-size: 14px;
+  font-weight: 650;
+}
+.fr-sponsor-tile > span {
+  color: var(--fr-muted);
+  font-size: 11px;
+}
+.fr-sponsor-invite {
+  gap: 8px;
+  border-color: #d58ba5;
+  border-style: dashed;
+  background: #fff4f8;
   color: var(--vp-c-brand-1);
 }
-.fr-sponsor-arrow {
-  align-self: flex-start;
-  margin-left: auto;
-  color: var(--vp-c-brand-1);
-  font-size: 20px;
+.fr-sponsor-invite:hover {
+  background: #fceaf1;
 }
-@media (max-width: 480px) {
-  .fr-sponsor-slot {
-    gap: 14px;
-    padding: 22px 18px;
-  }
-  .fr-sponsor-plus {
-    flex-basis: 36px;
-    height: 36px;
-    font-size: 24px;
-  }
-  .fr-sponsor-copy strong {
-    font-size: 18px;
-  }
+.fr-sponsor-recognition {
+  display: block;
+  margin-top: 6px;
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .fr-sponsor-slot {
+  .fr-sponsor-tile {
     transition: none;
   }
 }

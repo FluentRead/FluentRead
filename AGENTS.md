@@ -7,7 +7,7 @@
 
 ## 技术基线
 
-- 保持现有技术栈：WXT 0.21、Vue 3、TypeScript、Element Plus 和 pnpm 9。当前锁文件实际使用 WXT 0.21.5；未经明确升级任务，不按新版文档擅自使用仅在更高版本存在的 API。
+- 保持现有技术栈：WXT 0.21、Vue 3、TypeScript、Element Plus 和 pnpm 12。当前锁文件实际使用 WXT 0.21.5。未经明确升级任务，不按新版文档擅自使用仅在更高版本存在的 API。
 - 遵循 [架构设计](docs/architecture.md) 的单向模块边界：
   - `entrypoints/`：WXT 文件式入口，只绑定生命周期并组装 `src/app`。
   - `src/app/`：background/content/popup/options/document/offscreen 的静态 composition root；`userscript/` 是独立发布出口。

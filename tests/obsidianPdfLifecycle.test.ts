@@ -61,7 +61,7 @@ describe('Obsidian PDF extraction resource ownership', () => {
         ]);
         expect(fixture.pages.every(value => value.cleanup.mock.calls.length === 1)).toBe(true);
         expect(fixture.result.destroy).toHaveBeenCalledOnce(); expect(createUrl).toHaveBeenCalledOnce();
-        expect(ports.getDocument.mock.calls[0][0]).toMatchObject({disableFontFace: true, isEvalSupported: false, useWorkerFetch: false});
+        expect(ports.getDocument.mock.calls[0][0]).toMatchObject({disableFontFace: true, disableWorkerRendering: true, useWorkerFetch: false});
     });
     it('reuses one worker across concurrent documents and revokes it once', async () => {
         // 先固定 API mock；并发边界由 worker gate 控制，不依赖测试器同时解析动态 mock 的时序。

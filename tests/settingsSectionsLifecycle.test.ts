@@ -1158,6 +1158,30 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         expect(f.patch.mock.calls.at(-1)?.[0]).toMatchObject({service: f.state.config.service, disabledTranslationServices: ['google']});
         expect(f.patch).toHaveBeenCalledOnce();
     });
+    it('移除弹窗的回车确认仅在容器聚焦时触发，并忽略连发和输入法回车', async () => {
+        const f = await serviceEditorFixture({service: 'google'});
+        f.patch.mockClear();
+        await f.catalog('toggle-availability', 'deepinfra', false);
+        const dialog = f.availabilityDialog()!;
+        const cancel = dialog.querySelector('[data-service-availability-cancel]')!;
+        const pressEnter = (target: Element, modifiers: Partial<KeyboardEvent> = {}) => {
+            const event = new f.domWindow!.Event('keydown', {bubbles: true, cancelable: true});
+            target.dispatchEvent(Object.assign(event, {key: 'Enter', ...modifiers}));
+            return event.defaultPrevented;
+        };
+        expect(pressEnter(dialog, {repeat: true})).toBe(true);
+        expect(pressEnter(dialog, {isComposing: true})).toBe(true);
+        expect(pressEnter(dialog, {shiftKey: true})).toBe(false);
+        expect(pressEnter(cancel)).toBe(false);
+        expect(f.patch).not.toHaveBeenCalled();
+
+        expect(pressEnter(dialog)).toBe(true);
+        await settle();
+        expect(f.availabilityDialog()).toBeNull();
+        expect(f.state.config.disabledTranslationServices).toContain('deepinfra');
+        expect(f.state.config.service).toBe('google');
+        expect(f.patch).toHaveBeenCalledOnce();
+    });
     it('最后一个启用服务不能关闭，且重新启用只清除该服务的关闭标记',async()=>{
         const f=await serviceEditorFixture({service:'google'});
         const allExceptDefault=f.state.availableServiceOptions.filter((item: {value:string})=>item.value!=='google').map((item: {value:string})=>item.value);

@@ -6,6 +6,7 @@
     "verbatimModuleSyntax": false,
     "noUncheckedIndexedAccess": false,
     "noImplicitOverride": false,
+    "types": ["node", "chrome"],
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },

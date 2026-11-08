@@ -69,9 +69,14 @@ function encodedDataBytes(source: string, decoder = 'decodeUserscriptData'): Uin
 function observeDataDecoder(): import('vite-userscript').Plugin {
     return {name: 'observe-userscript-data-decoder', enforce: 'pre', transform(code, id) {
         if (id !== resolve(process.cwd(), 'userscript/dataEncoding.ts')) return null;
-        const declaration = 'export function decodeUserscriptData(value: string): Uint8Array {';
-        expect(code.split(declaration)).toHaveLength(2);
-        return code.replace(declaration, declaration + '\n globalThis.__observeUserscriptDataDecode(value);');
+        const source = ts.createSourceFile(id, code, ts.ScriptTarget.Latest, true);
+        const declarations = source.statements.filter(ts.isFunctionDeclaration)
+            .filter(declaration => declaration.name?.text === 'decodeUserscriptData' && declaration.body);
+        expect(declarations).toHaveLength(1);
+        const [decoder] = declarations;
+        const position = decoder.body!.getStart(source) + 1;
+        const input = decoder.parameters[0].name.getText(source);
+        return code.slice(0, position) + `\n globalThis.__observeUserscriptDataDecode(${input});` + code.slice(position);
     }};
 }
 
@@ -915,6 +920,7 @@ describe('userscript browser shim injection', () => {
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
         expect(Object.hasOwn(projected, 'popup.donationButton')).toBe(false);
+        expect(Object.hasOwn(projected, 'popup.donationDescription')).toBe(false);
         expect(projected['popup.aiContext.how']).toBeTruthy();
         expect(projected['popup.aiContext.settingsTitle']).toBeTruthy();
         expect(extension['document.config.loadFailed']).toBeTruthy();
@@ -933,7 +939,7 @@ describe('userscript browser shim injection', () => {
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
             && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)
-            && key !== 'popup.donationButton' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
+            && key !== 'popup.donationButton' && key !== 'popup.donationDescription' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);
         expect(projected['contextMenu.translateSelection']).toBeTruthy();

@@ -105,17 +105,17 @@
     "onnxruntime-web": "1.23.2",
     "pako": "2.1.0",
     "pdf-lib": "1.17.1",
-    "pdfjs-dist": "4.10.38",
+    "pdfjs-dist": "6.5.438",
     "pinyin-pro": "3.29.4",
     "ppu-paddle-ocr": "6.6.0",
     "saxes": "6.0.0",
-    "tesseract.js": "^6.0.1",
+    "tesseract.js": "^7.0.0",
     "thai-rtgs": "0.1.3",
     "tldts": "^7.4.19",
     "turndown": "7.2.4",
     "webextension-polyfill": "^0.12.0",
     "x-fetch": "0.3.0",
-    "zod": "3.25.76"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",
@@ -134,26 +134,16 @@
     "linkedom": "0.18.12",
     "obsidian": "1.13.1",
     "storybook": "10.6.6",
-    "typescript": "^5.7.3",
+    "typescript": "~6.0.3",
     "vite": "^8.3.6",
     "vite-userscript": "npm:vite@5.4.21",
     "vitepress": "^1.6.3",
     "vitest": "^5.1.0",
     "vue": "^3.5.45",
-    "vue-tsc": "^2.2.0",
+    "vue-tsc": "3.3.13",
     "web-ext": "^10.8.0",
     "web-ext-run": "0.2.4",
     "wxt": "^0.21.5"
   },
-  "pnpm": {
-    "overrides": {
-      "react": "18.3.1",
-      "react-dom": "18.3.1",
-      "vitepress>vite": "5.4.21"
-    },
-    "patchedDependencies": {
-      "ppu-paddle-ocr@6.6.0": "patches/ppu-paddle-ocr@6.6.0.patch"
-    }
-  },
-  "packageManager": "pnpm@9.12.1+sha1.7084e7df42ee1d221994c2c2599277a2a937f050"
+  "packageManager": "pnpm@12.18.0+sha512.9d7882d5dc82147ecfc4e062aa34834e0ad0296710a1837a1115ae012127d36b7109e321ac1598a1dd0a65597681b1e99917e12ed0d749eae91187943363beb3"
 }

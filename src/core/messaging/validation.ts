@@ -12,6 +12,11 @@ export const isNonEmptyString: Validator<string> = (value): value is string => i
 export function isMessageRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+/** Reject non-record objects at protocol boundaries that use strict Zod schemas. */
+export function isProtocolInputObject(value: unknown): value is Record<string, unknown> {
+    if (!isMessageRecord(value) || value instanceof Date || value instanceof Map || value instanceof Set) return false;
+    return typeof value.then !== 'function' || typeof value.catch !== 'function';
+}
 export function optional<T>(validator: Validator<T>): Validator<T | undefined> {
     return (value): value is T | undefined => value === undefined || validator(value);
 }

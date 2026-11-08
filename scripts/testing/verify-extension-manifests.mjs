@@ -7,6 +7,7 @@ import process from 'node:process';
 import {isDeepStrictEqual} from 'node:util';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createHash, createPublicKey} from 'node:crypto';
+import {PDFJS_DECODER_FILES} from './pdfjs-assets.mjs';
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 // 发布校验 CLI 不直接导入 TypeScript；与公开身份常量的对应关系由 manifest 合约测试校验。
@@ -335,6 +336,9 @@ async function main() {
         && requiredData.length === expectedData.length
         && expectedData.every((permission) => requiredData.includes(permission)),
     'Firefox manifest 的数据传输分类必须完整且不得声明 none');
+    for (const file of PDFJS_DECODER_FILES.map(name => `pdfjs/wasm/${name}`)) {
+        assert(chromeFiles.includes(file) && firefoxFiles.includes(file), `扩展缺少本地 PDF.js 解码资源：${file}`);
+    }
     const chromeOcrAssets = chromeFiles.filter((file) => file.startsWith('fluent-read-ocr/'));
     const firefoxOcrAssets = firefoxFiles.filter((file) => file.startsWith('fluent-read-ocr/'));
     assert(chromeOcrAssets.some((file) => file.includes('/core/'))
@@ -383,12 +387,15 @@ async function main() {
         const [extensionArchive, sourceArchive] = await Promise.all(
             firefoxArchives.map((archive) => listArchiveArtifacts(path.join(outputDir, archive))),
         );
-        for (const file of ['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json', 'wxt.config.ts',
+        for (const file of ['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
             'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'patches/ppu-paddle-ocr@6.6.0.patch']) {
             assert(sourceArchive.includes(file), `Firefox 审核源码包缺少 ${file}`);
         }
         assert(!sourceArchive.some(file => /(?:^|\/)\.env(?:$|\.)|^(?:node_modules|coverage)\//u.test(file)),
             'Firefox 审核源码包包含本地环境文件或生成目录');
+        for (const file of PDFJS_DECODER_FILES) {
+            assert(extensionArchive.includes(`pdfjs/wasm/${file}`), `Firefox 扩展包缺少本地 PDF.js 解码资源：${file}`);
+        }
         firefoxArchiveOcrAssets = [
             ...extensionArchive.filter((file) => file.startsWith('fluent-read-ocr/')),
             ...sourceArchive.filter((file) => file.startsWith('public/fluent-read-ocr/')),
@@ -396,8 +403,9 @@ async function main() {
         assert(extensionArchive.includes('offscreen.html')
             && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/core/'))
             && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/worker/'))
-            && sourceArchive.some(file => file.startsWith('public/fluent-read-ocr/core/')),
-        'Firefox 扩展包与源码包必须保留共享 DOM 页面和 OCR 资源');
+            && ['package.json', 'pnpm-lock.yaml', 'scripts/wasm/package-diagnostics.ts',
+                'public/fluent-read-ocr/NOTICE.md'].every(file => sourceArchive.includes(file)),
+        'Firefox 扩展包与源码包必须保留共享 DOM 页面、OCR 资源及可复现构建输入');
     }
 
     console.log(JSON.stringify({

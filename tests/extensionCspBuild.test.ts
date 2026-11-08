@@ -93,12 +93,13 @@ describe('extension dependency CSP packaging', () => {
         expect(bytes.byteLength).toBeLessThan(font.stream.buffer.length);
     });
 
-    it('PDF 主模块和 Worker 都固定走解释执行，不保留 JIT 或动态 require', () => {
-        expect(patched('pdfjs-main')).toContain('function isEvalSupported() { return false; }');
+    it('PDF Worker 对文档 PostScript 固定走解释执行，图片解码保留本地预编译 WASM', () => {
+        expect(patched('pdfjs-main')).not.toContain("Function('return this')");
         const worker = patched('pdfjs-worker');
-        expect(worker).toContain('function isEvalSupported(){return!1}');
-        expect(worker).toContain('new PostScriptEvaluator(o)');
-        expect(worker).not.toContain('new Function');
+        expect(worker).not.toContain('Failed to compile PostScript function to wasm');
+        expect(worker).toContain(':PSStackBasedInterpreter.build(r,t,n)}(s,a,r,!0),i,o)');
+        expect(worker).toContain('openjpeg.wasm');
+        expect(worker).toContain('jbig2.wasm');
     });
 
     it('regenerator 和 lodash 保留现代浏览器全局且无需编译字符串', () => {

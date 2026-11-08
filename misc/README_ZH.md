@@ -52,15 +52,15 @@
 
 ## 企业与项目赞助
 
-项目目前主要由个人支持，每月为开源开发投入数万美元的 API Token 费用。我们相信，流畅阅读能为世界带来更多美好。
+项目目前主要由个人支持，每月投入数百美元用于项目维护。我们相信，流畅阅读能为世界带来更多美好。
 
-<a href="mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship"><img src="../docs/public/support/sponsor-placeholder-zh.svg" width="480" height="128" alt="虚位以待，成为流畅阅读赞助伙伴" /></a>
+感谢 [**哔哩哔哩 Index-Translate**](https://index-translate.bilibili.com/) 成为流畅阅读的首位赞助伙伴。
 
-[邮件联系](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) · [添加微信](https://read.thinkstu.com/support/wechat-contact.jpg)
+[成为赞助伙伴](https://read.thinkstu.com/guide/support#sponsorship) · [邮件联系](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) · [添加微信](https://read.thinkstu.com/support/wechat-contact.jpg)
 
 ## 本地开发
 
-使用 Node.js 20 或以上及 pnpm 9。首次运行 `pnpm install --frozen-lockfile` 安装依赖。
+按 `.nvmrc` 和 `package.json` 的 `packageManager` 字段分别安装 Node.js 和 pnpm。首次运行 `pnpm install --frozen-lockfile` 安装依赖。
 
 - `pnpm dev` 启动本地开发。
 - `pnpm zip` 构建并打包 Chrome 扩展。

@@ -690,6 +690,14 @@ describe('PDF visible graphics geometry', () => {
             {kind: 'path', x: 10, y: 250, width: 30, height: 30},
         ]);
     });
+    it('uses the PDF.js 6 combined paint operation and ignores clip-only and empty paths', () => {
+        const list = {fnArray: [ops.constructPath, ops.constructPath, ops.constructPath, ops.constructPath],
+            argsArray: [[ops.fill, [new Float32Array()], new Float32Array([20, 30, 40, 50])],
+                [ops.endPath, [new Float32Array()], new Float32Array([1, 1, 90, 90])],
+                [ops.stroke, [null], null], null]};
+        expect(extractPdfGraphicsShapes(list, ops, {width: 100, height: 100, transform: [1, 0, 0, 1, 0, 0]}))
+            .toEqual([{kind: 'path', x: 20, y: 30, width: 20, height: 20}]);
+    });
     it('clips page edges, rejects invalid/outside/empty drawings, and handles absent operands', () => {
         const list = {fnArray: [ops.transform, ops.paintImageXObject, ops.restore, ops.transform, ops.paintImageXObject, ops.restore, ops.constructPath, ops.fill, ops.constructPath, ops.stroke, ops.transform, ops.paintFormXObjectBegin, 999], argsArray: [[20, 0, 0, 20, -10, -10], [], null, [1, 0, 0, 1, 400, 400], [], null, [[], [], [NaN, 0, 1, 1]], null, [[], [], [1, 1, 1, 1]], null, null, null, null]};
         expect(extractPdfGraphicsShapes(list, ops, {width: 100, height: 100, transform: [1, 0, 0, 1, 0, 0]})).toEqual([{kind: 'image', x: 0, y: 0, width: 10, height: 10}]);

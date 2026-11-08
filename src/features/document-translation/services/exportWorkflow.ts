@@ -4,6 +4,7 @@
  * 主要内容：调用时捕获任务、原文、译文和修订；编码与归档结束后再次检查任务身份，取消或切换后拒绝下载旧内容；仅确认已导出的修订，集中清理对象 URL 与成功提示计时器。
  * 模块边界：不保存第二份任务状态、不实现格式编码或历史提交；任务资格、编码、展示事件与浏览器下载通过显式端口连接。
  */
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import type JSZip from 'jszip';
 import type {DocumentRenderMode} from '../core/document';
 import type {PdfReadingPresentation} from '../core/pdfReadingPlan';
@@ -113,7 +114,7 @@ export function createDocumentExportWorkflow(ports: DocumentExportPorts) {
                     onPdfProgress: pdf => {if (current()) ports.onProgress({kind: 'single', pdf});},
                     onArchiveProgress: percent => {if (current()) ports.onProgress({kind: 'single', percent});},
                 });
-                return {blob: new Blob([download.data], {type: download.mimeType}), fileName: download.fileName};
+                return {blob: new Blob([typeof download.data === 'string' ? download.data : asArrayBufferBytes(download.data)], {type: download.mimeType}), fileName: download.fileName};
             });
         },
         batch(tasks: readonly DocumentQueueItem[], mode: DocumentRenderMode): Promise<void> {
@@ -134,7 +135,7 @@ export function createDocumentExportWorkflow(ports: DocumentExportPorts) {
                 const bytes = await ports.generateArchive(zip, {streamFiles: true}, {signal,
                     onProgress: percent => {if (current()) ports.onProgress({kind: 'batch', percent});},
                 });
-                return {blob: new Blob([bytes], {type: 'application/zip'}), fileName: 'FluentRead-documents.zip'};
+                return {blob: new Blob([asArrayBufferBytes(bytes)], {type: 'application/zip'}), fileName: 'FluentRead-documents.zip'};
             });
         },
         saveBlob,

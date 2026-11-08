@@ -15,7 +15,7 @@ import SupportOptions from '../.vitepress/theme/SupportOptions.vue'
 
 赞助伙伴可在官网与 README 展示品牌名称或 Logo、一句话介绍和官网链接。展示内容会明确标注为赞助，合作周期与具体内容通过沟通确定。
 
-若有合作意向，请发送邮件至 [**a1914493943@gmail.com**](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) 或者 [**1914493943@qq.com**](mailto:1914493943@qq.com?subject=FluentRead%20sponsorship)，附上项目名称、官网和希望的合作方式。
+若有合作意向，欢迎发邮件至 [**a1914493943@gmail.com**](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) 或 [**1914493943@qq.com**](mailto:1914493943@qq.com?subject=FluentRead%20sponsorship)，也可以[**扫码添加微信**](/support/wechat-contact.jpg)。联系时请附上项目名称、官网和希望的合作方式。
 
 ## 个人赞赏
 

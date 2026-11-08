@@ -106,7 +106,7 @@ describe('affected behavior test planning', () => {
         expect(select(['docs/testing.md'])).toMatchObject({testFiles: ['tests/architecture/boundary.test.ts'], coverageFiles: [], extensionChanged: false});
     });
     it('explicitly widens behavior scope when shared test configuration changes', () => {
-        for (const file of ['vitest.config.ts', '.nvmrc']) {
+        for (const file of ['vitest.config.ts', '.nvmrc', 'pnpm-workspace.yaml']) {
             expect(select([file])).toMatchObject({testFiles: ['tests/a.test.ts', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts', 'tests/fixture.test.ts'],
                 coverageFiles: [], globalInputs: [file], reason: 'shared-test-configuration', extensionChanged: true});
         }

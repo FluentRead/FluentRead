@@ -78,7 +78,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
     new Function('require', 'exports', 'module', compiled.code)((id: string) => {
         if (id.endsWith('.vue')) {
             const path = id.startsWith('@/') ? id.slice(2) : resolve(dirname(filename), id);
-            return {default: loadClient(path, components)};
+            return {__esModule: true, default: loadClient(path, components)};
         }
         if (!(id in dependencies)) throw new Error(`Unexpected subtitle settings dependency: ${id}`);
         return dependencies[id];

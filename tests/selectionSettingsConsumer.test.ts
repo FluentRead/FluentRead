@@ -64,17 +64,17 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         '@/src/core/config/selectionDictionary': selectionDictionary,
         '@/src/platform/browser/capabilities': {browserCapabilities},
         'element-plus': {ElMessage: {warning}, ElOption: OptionPort},
-        '@/src/ui/components/UiSelect.vue': {default: SelectPort},
-        './components/SettingsItem.vue': {default: SettingsItemPort},
+        '@/src/ui/components/UiSelect.vue': {__esModule: true, default: SelectPort},
+        './components/SettingsItem.vue': {__esModule: true, default: SettingsItemPort},
         '@/src/core/config/selectionPreview': preview,
         '@/src/features/reading-assistant/ui/answer/public': {ReadingAnswer: ReadingAnswerPort},
-        './HarnessSettings.vue': {default: HarnessSettingsPort},
+        './HarnessSettings.vue': {__esModule: true, default: HarnessSettingsPort},
         './settings-card-heading.css': {},
     };
     const module = {exports: {} as {default: Vue.Component}};
     new Function('require', 'exports', 'module', compiled.code)((id: string) => {
         if (Object.hasOwn(dependencies, id)) return dependencies[id];
-        if (id.endsWith('.vue')) return {default: loadClient(id.startsWith('@/') ? id.slice(2) : resolve(dirname(filename), id), components)};
+        if (id.endsWith('.vue')) return {__esModule: true, default: loadClient(id.startsWith('@/') ? id.slice(2) : resolve(dirname(filename), id), components)};
         throw new Error(`Unexpected Selection settings dependency: ${id}`);
     }, module.exports, module);
     components.set(filename, module.exports.default);

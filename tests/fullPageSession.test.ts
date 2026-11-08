@@ -13,7 +13,7 @@ vi.mock('@/src/services/config/store', async () => {
 function fixture() {
     const {document} = parseHTML('<html><body><p>Source</p></body></html>');
     const root = document.documentElement as unknown as HTMLElement;
-    const observer = {root: null, rootMargin: '0px', thresholds: [0.01],
+    const observer = {root: null, rootMargin: '0px', scrollMargin: '0px', thresholds: [0.01],
         disconnect: vi.fn(), observe: vi.fn(), unobserve: vi.fn(), takeRecords: () => []};
     const mutationObserver = {disconnect: vi.fn(), observe: vi.fn(), takeRecords: () => []};
     const ports = {

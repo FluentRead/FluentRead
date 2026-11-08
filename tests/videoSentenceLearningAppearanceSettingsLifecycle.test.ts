@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 // 执行真实 Vue 模板和共享设置布局；linkedom 只替代外部浏览器 DOM。

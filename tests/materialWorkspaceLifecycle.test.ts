@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {FixturePageError, materialPageFixture} from './helpers/materialPageFixture';
 import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';

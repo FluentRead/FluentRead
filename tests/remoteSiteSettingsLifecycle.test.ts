@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {App} from 'vue';
 import type {DriveSyncPreview, DriveSyncStatus, CloudBackupDeletePreview} from '@/src/services/config/remoteConfigSync';

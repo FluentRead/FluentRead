@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import * as runtime from 'vue';
 import VocabularyBook from '@/src/features/vocabulary/ui/VocabularyBook.vue';
 import LearningCenter from '@/src/features/settings/ui/LearningCenter.vue';

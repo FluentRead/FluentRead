@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import {buildModelUsageDashboard} from '@/src/services/model-usage/aggregation';

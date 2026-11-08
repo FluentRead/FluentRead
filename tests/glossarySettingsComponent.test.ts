@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import * as runtime from 'vue';

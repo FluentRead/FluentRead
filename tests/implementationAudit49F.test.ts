@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';

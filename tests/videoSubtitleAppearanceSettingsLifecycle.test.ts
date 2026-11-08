@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 /**
  * @file tests/videoSubtitleAppearanceSettingsLifecycle.test.ts
  * 文件职责：执行字幕外观设置的真实客户端 SFC、共享布局与控件事件，验证设置草稿和实时预览的一致性。

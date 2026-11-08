@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 // Real Vue runtime-dom and client templates; only browser, config and rendering environment ports are controlled.

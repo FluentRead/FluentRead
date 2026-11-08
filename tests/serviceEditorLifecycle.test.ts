@@ -1,3 +1,4 @@
+import {getFixtureRootNode} from './helpers/vueDomFixture';
 /**
  * @file tests/serviceEditorLifecycle.test.ts
  * 文件职责：验证实际设置子组件的写入边界与延迟焦点生命周期。
@@ -41,7 +42,7 @@ async function mount(name: string, values: Record<string, unknown>, listeners: R
   function remove(node: Node) {const siblings = node.parent?.children;if (siblings) {const index = siblings.indexOf(node);if (index >= 0) siblings.splice(index, 1)}node.parent = undefined}
   function insert(node: Node, parent: Node, anchor?: Node | null) {remove(node);const siblings = parent.children ||= [];const at = anchor ? siblings.indexOf(anchor) : -1;siblings.splice(at < 0 ? siblings.length : at, 0, node);node.parent = parent}
   const renderer = runtime.createRenderer<Node, Node>({patchProp: (node, key, _previous, value) => {node.props[key] = value}, insert,
-    remove, createElement: tag => {const node = {tag, tagName: tag.toUpperCase(), value: '', props: {}, focus, addEventListener: () => {}, removeEventListener: () => {}};nodes.push(node);return node}, createText: () => ({props: {}}), createComment: () => ({props: {}}), setText: () => {},
+    remove, createElement: tag => {const node = {tag, tagName: tag.toUpperCase(), value: '', props: {}, focus, getRootNode: getFixtureRootNode<Node>, addEventListener: () => {}, removeEventListener: () => {}};nodes.push(node);return node}, createText: () => ({props: {}}), createComment: () => ({props: {}}), setText: () => {},
     setElementText: () => {}, parentNode: node => node.parent || null, nextSibling: node => {const siblings = node.parent?.children || [];return siblings[siblings.indexOf(node) + 1] || null}, querySelector: () => null,
     setScopeId: () => {}, cloneNode: () => ({props: {}}), insertStaticContent: (_html, parent, anchor) => {const first = {props: {}}, last = {props: {}};insert(first, parent, anchor);insert(last, parent, anchor);return [first, last]}})
   const source = runtime.shallowReactive({active: true, context: {}, contextKey: 'service-a', ...values})

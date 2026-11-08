@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';

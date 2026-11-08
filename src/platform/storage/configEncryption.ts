@@ -33,7 +33,7 @@ function bytesToBase64(bytes: Uint8Array): string {
     return btoa(binary);
 }
 
-function base64ToBytes(value: string): Uint8Array {
+function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
     const binary = atob(value);
     return Uint8Array.from(binary, character => character.charCodeAt(0));
 }

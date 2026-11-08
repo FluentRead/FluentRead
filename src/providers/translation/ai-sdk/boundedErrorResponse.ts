@@ -12,7 +12,7 @@ export const OPENAI_ERROR_BODY_LIMIT = Object.freeze({
 });
 const ERROR_BODY_TIMEOUT_MS = 1_000;
 
-function copyResponse(response: Response, bytes: Uint8Array | null, synthetic: boolean): Response {
+function copyResponse(response: Response, bytes: Uint8Array<ArrayBuffer> | null, synthetic: boolean): Response {
   const headers = new Headers(response.headers);
   if (synthetic) {
     headers.delete('content-length');

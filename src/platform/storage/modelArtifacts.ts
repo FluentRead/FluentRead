@@ -84,7 +84,7 @@ export function createModelArtifactStore(cacheName: string, files: readonly Mode
         let timer: ReturnType<typeof setTimeout> | undefined;
         const arm = (ms: number) => {clearTimeout(timer); timer = setTimeout(abort, ms);};
         let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-        let originalBody: ReadableStream<Uint8Array> | null | undefined;
+        let originalBody: Response['body'] | undefined;
         try {
             active(signal); arm(20_000);
             const response = await waitAttempt(() => fetch(file.url.replace('https://huggingface.co', origin), {signal: controller.signal, credentials: 'omit', referrerPolicy: 'no-referrer', headers: offset ? {Range: `bytes=${offset}-`} : {}}).then(response => {

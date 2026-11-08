@@ -20,7 +20,7 @@ for (let index = 0; index < USERSCRIPT_DATA_ALPHABET.length; index += 1) {
 }
 
 /** Base91 仅用于 gzip 静态资源；保留每个字节，拒绝非字母字符。 */
-function decode91(value: string): Uint8Array {
+function decode91(value: string): Uint8Array<ArrayBuffer> {
     const bytes = new Uint8Array(Math.ceil((value.length - USERSCRIPT_COMPACT_DATA_PREFIX.length) * 7 / 8));
     let pending = -1, buffer = 0, bits = 0, offset = 0;
     for (let index = USERSCRIPT_COMPACT_DATA_PREFIX.length; index < value.length; index++) {
@@ -57,7 +57,7 @@ function decode91(value: string): Uint8Array {
 }
 
 /** 解码构建生成的资源；既有 Base64 的合法空白与异常行为继续由浏览器 atob 决定。 */
-export function decodeUserscriptData(value: string): Uint8Array {
+export function decodeUserscriptData(value: string): Uint8Array<ArrayBuffer> {
     if (value.startsWith(USERSCRIPT_COMPACT_DATA_PREFIX)) return decode91(value);
     if (!value.startsWith(USERSCRIPT_DATA_PREFIX)) {
         return Uint8Array.from(atob(value), character => character.charCodeAt(0));

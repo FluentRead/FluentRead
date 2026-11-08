@@ -451,6 +451,7 @@
 </template>
 
 <script lang="ts" setup>
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {captureDocumentMaterialLocator, resolveMaterialDocumentResume} from './materialResume';
 
 import {ElOption} from 'element-plus';
@@ -1964,7 +1965,7 @@ function downloadOriginalDocument(): void {
   if (!source) return;
   originalDownloadError.value = '';
   try {
-    const blob = 'bytes' in source ? new Blob([source.bytes], {type: source.mimeType}) : source.blob;
+    const blob = 'bytes' in source ? new Blob([asArrayBufferBytes(source.bytes)], {type: source.mimeType}) : source.blob;
     saveDownloadBlob(blob, source.fileName);
     if (!preparingDownload.value) downloadDialog.value?.close();
   } catch (error) {

@@ -9,10 +9,9 @@
     "skipLibCheck": true,
     "types": ["vite/client", "node"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": "..",
     "paths": {
-      "@/src/ui/i18n": ["storybook/preview-i18n.ts"],
-      "@/*": ["./*"]
+      "@/src/ui/i18n": ["./preview-i18n.ts"],
+      "@/*": ["../*"]
     }
   },
   "include": ["./**/*.ts", "./**/*.vue", "../.storybook/**/*.ts"]

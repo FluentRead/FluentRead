@@ -12,7 +12,7 @@ function downloads(){
     return {api,changed,erased,emit:(id:number,state:string)=>changed.forEach(listener=>listener({id,state:{current:state}})),erase:(id:number)=>erased.forEach(listener=>listener(id))};
 }
 function filesystem(){
-    const files=new Map<string,Uint8Array[]>(),deleted:string[]=[];let held=0;
+    const files=new Map<string,Uint8Array<ArrayBuffer>[]>(),deleted:string[]=[];let held=0;
     const controls:{write?:(chunk:Uint8Array|string)=>Promise<void>;close?:()=>Promise<void>;abort?:()=>Promise<void>;read?:()=>void}={};
     const dir={getFileHandle:vi.fn(async(name:string,options?:{create?:boolean})=>{
         if(!files.has(name)){if(!options?.create)throw new DOMException('missing','NotFoundError');files.set(name,[]);}

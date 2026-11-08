@@ -14,7 +14,7 @@ function source(relativePath: string): string {
     return readFileSync(new URL(`../${relativePath}`, import.meta.url), 'utf8');
 }
 
-async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
+async function gzip(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
     const compressed = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
     return new Uint8Array(await new Response(compressed).arrayBuffer());
 }

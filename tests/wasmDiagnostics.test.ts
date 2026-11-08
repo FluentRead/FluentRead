@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -18,7 +19,7 @@ describe('packaged WASM diagnostic severity', () => {
         const {code, wasm} = splitTesseractWasm(source);
         const original = source.match(/"data:application\/octet-stream;base64,([A-Za-z0-9+/]+={0,2})"/)![1];
         expect(wasm.equals(Buffer.from(original, 'base64'))).toBe(true);
-        expect(WebAssembly.validate(wasm)).toBe(true);
+        expect(WebAssembly.validate(asArrayBufferBytes(wasm))).toBe(true);
         expect(code).not.toContain(original);
         expect(code.length).toBeLessThan(150_000);
         expect(Buffer.byteLength(code) + wasm.length).toBeLessThan(Buffer.byteLength(source) - 900_000);

@@ -56,7 +56,7 @@ export function createPdfReadingFontLoader(overrides: Partial<PdfReadingFontLoad
     type Download = {controller: AbortController; subscribers: number; promise: Promise<Uint8Array>};
     let pending: Download | undefined;
 
-    async function readVerified(response: Response, signal: AbortSignal): Promise<Uint8Array> {
+    async function readVerified(response: Response, signal: AbortSignal): Promise<Uint8Array<ArrayBuffer>> {
         if (!response.ok || !response.body || /text\/html/iu.test(response.headers.get('Content-Type') || '')) {
             cancelUnreadResponseBody(response);
             throw new Error('PDF 导出字体来源不可用');

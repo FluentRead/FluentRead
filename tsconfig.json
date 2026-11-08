@@ -2,6 +2,7 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "allowArbitraryExtensions": true,
+    "types": ["node", "chrome"],
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },

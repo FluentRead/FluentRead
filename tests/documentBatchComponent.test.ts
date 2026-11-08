@@ -17,6 +17,7 @@ import * as pdfOcr from '@/src/features/document-translation/services/pdfOcr';
 import * as documentTasks from '@/src/features/document-translation/ui/useDocumentTasks';
 import * as downloadCopy from '@/src/app/document-translation/downloadCopy';
 import * as materialResume from '@/src/app/document-translation/materialResume';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {useConfigEditor} from '@/src/features/settings/model/useConfigEditor';
 import {createDocumentImportWorkflow} from '@/src/features/document-translation/services/importWorkflow';
 import {createDocumentRecognitionWorkflow} from '@/src/features/document-translation/services/recognitionWorkflow';
@@ -79,6 +80,7 @@ beforeEach(async () => {
   new Function('require', 'exports', compiled)((id: string) => {
     if (id === 'vue') return {...vue, onMounted: () => {}, onUnmounted: (fn: () => void) => unload.push(fn)};
     if (id === './index' || id === '@/src/app/document-translation' || id === '@/src/core/translation/result') return api;
+    if (id === '@/src/shared/function/arrayBufferBytes') return {asArrayBufferBytes};
     if (id === './downloadCopy') return downloadCopy;
     if (id === './materialResume') return materialResume;
     if (id === 'webextension-polyfill') return {runtime: {sendMessage: materialTransport.sendMessage}, extension: {inIncognitoContext: false}};

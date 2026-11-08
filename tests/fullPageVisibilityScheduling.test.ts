@@ -2169,7 +2169,7 @@ describe("全文翻译可见性锚点", () => {
         top.open = true;
         top.innerHTML = '<p>Read this nested announcement first.</p>';
         const matches = top.matches.bind(top);
-        top.matches = selector => selector === ':modal' ? top.open : matches(selector);
+        vi.spyOn(top, 'matches').mockImplementation(selector => selector === ':modal' ? top.open : matches(selector));
         Object.defineProperty(top, 'getBoundingClientRect', {value: () => ({left: 200, top: 100,
             right: 800, bottom: 300, width: 600, height: 200})});
         notice.append(top);

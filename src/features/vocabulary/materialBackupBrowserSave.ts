@@ -4,6 +4,7 @@
  * 主要内容：复用 OPFS、跨页面锁和完成标记；有下载 API 时确认终态后清理，anchor 回退则交给用户确认后清理；不确定时保留源文件并允许取回。
  * 模块边界：不触发备份读取、不修改材料，不保证页面卸载后下载继续；权限或平台不可用时由调用方选择回退方式。
  */
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import browser from 'webextension-polyfill';
 import {createMaterialBackupOpfsTarget, materialBackupTemporaryFileTime, materialBackupTemporaryFileName, MaterialBackupDownloadNotStartedError, type MaterialBackupOpfsPlatform, type MaterialBackupOpfsDownload, type MaterialBackupDownloadTerminal} from './materialBackupOpfsSave';
 import type {MaterialBackupSaveTarget, MaterialBackupWritable} from './materialBackupSave';
@@ -132,7 +133,7 @@ function createMaterialBrowserOpfsStorage(env:MaterialBrowserBackupStorageEnviro
                 catch(cleanupError){throw Object.assign(new Error('创建备份时未能清理新建的空临时文件，请在临时文件列表检查。'),{name:'MaterialBackupInitializationCleanupError',cause:error,cleanupError});}
                 throw error;
             }
-            const target:MaterialBackupWritable & {file():Promise<Blob>}={write:chunk=>writer.write(chunk),close:()=>writer.close(),abort:reason=>writer.abort(reason),file:()=>file.getFile()};
+            const target:MaterialBackupWritable & {file():Promise<Blob>}={write:chunk=>writer.write(typeof chunk==='string'?chunk:asArrayBufferBytes(chunk)),close:()=>writer.close(),abort:reason=>writer.abort(reason),file:()=>file.getFile()};
             return target;
         },
         async markReady(name,file){

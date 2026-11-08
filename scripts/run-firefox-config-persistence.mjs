@@ -4,7 +4,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import {randomUUID} from 'node:crypto';
-import {connect} from '../node_modules/.pnpm/web-ext-run@0.2.4/node_modules/web-ext-run/lib/firefox/remote.js';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+
+// Resolve the pinned dependency first; pnpm can change the peer suffix in its virtual store.
+const webExtEntry = pathToFileURL(createRequire(import.meta.url).resolve('web-ext-run'));
+const {connect} = await import(new URL('./lib/firefox/remote.js', webExtEntry));
 
 const args = new Map();
 for (let index = 2; index < process.argv.length; index += 1) {

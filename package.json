@@ -139,17 +139,8 @@
     "vitest": "^2.1.9",
     "vue": "^3.5.45",
     "vue-tsc": "^2.2.0",
+    "web-ext-run": "0.2.4",
     "wxt": "^0.20.18"
   },
-  "pnpm": {
-    "overrides": {
-      "vite": "5.4.21",
-      "react": "18.3.1",
-      "react-dom": "18.3.1"
-    },
-    "patchedDependencies": {
-      "ppu-paddle-ocr@6.6.0": "patches/ppu-paddle-ocr@6.6.0.patch"
-    }
-  },
-  "packageManager": "pnpm@9.12.1+sha1.7084e7df42ee1d221994c2c2599277a2a937f050"
+  "packageManager": "pnpm@12.18.0+sha512.9d7882d5dc82147ecfc4e062aa34834e0ad0296710a1837a1115ae012127d36b7109e321ac1598a1dd0a65597681b1e99917e12ed0d749eae91187943363beb3"
 }

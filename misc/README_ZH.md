@@ -60,7 +60,7 @@
 
 ## 本地开发
 
-使用 Node.js 20 或以上及 pnpm 9。首次运行 `pnpm install --frozen-lockfile` 安装依赖。
+按 `.nvmrc` 和 `package.json` 的 `packageManager` 字段分别安装 Node.js 和 pnpm。首次运行 `pnpm install --frozen-lockfile` 安装依赖。
 
 - `pnpm dev` 启动本地开发。
 - `pnpm zip` 构建并打包 Chrome 扩展。

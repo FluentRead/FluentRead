@@ -1,6 +1,7 @@
 import {afterAll, describe, expect, it} from 'vitest';
 import {execFile, spawn, type ChildProcess} from 'node:child_process';
 import {createServer} from 'node:net';
+import {createRequire} from 'node:module';
 import {existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {delimiter, join, resolve} from 'node:path';
@@ -849,13 +850,14 @@ describe('audit49 J continuation2 public consumer lifecycle', () => {
 async function rdpCLI(mode: 'wrong-id' | 'wrong-actor' | 'report') {
     const root = mkdtempSync(join(fixtureRoot, 'rdp-'));
     const artifacts = join(root, 'artifacts');mkdirSync(artifacts);
-    const remote = join(workspaceRoot, 'node_modules/.pnpm/web-ext-run@0.2.4/node_modules/web-ext-run/lib/firefox/remote.js');
+    const webExtEntry = pathToFileURL(createRequire(import.meta.url).resolve('web-ext-run'));
+    const remote = new URL('./lib/firefox/remote.js', webExtEntry).href;
     const loader = join(root, 'loader.mjs');
     writeFileSync(loader, `import {pathToFileURL} from 'node:url';
-export async function resolve(specifier,context,next){if(specifier.endsWith('/web-ext-run/lib/firefox/remote.js'))return next(${JSON.stringify(pathToFileURL(remote).href)},context);return next(specifier,context);}
+export async function resolve(specifier,context,next){if(specifier.endsWith('/web-ext-run/lib/firefox/remote.js'))return next(${JSON.stringify(remote)},context);return next(specifier,context);}
 export async function load(url,context,next){if(url===${JSON.stringify(pathToFileURL(join(sourceRoot, 'scripts/run-firefox-config-persistence.mjs')).href)})console.log('ORIGINAL_CLI_LOADED');return next(url,context);}`);
     const preload = join(root, 'preload.mjs');
-    writeFileSync(preload, `import fs from 'node:fs';import path from 'node:path';import {RemoteFirefox} from ${JSON.stringify(pathToFileURL(remote).href)};
+    writeFileSync(preload, `import fs from 'node:fs';import path from 'node:path';import {RemoteFirefox} from ${JSON.stringify(remote)};
 const original=RemoteFirefox.prototype.disconnect;RemoteFirefox.prototype.disconnect=function(...args){console.log('RDP_DISCONNECT_REQUESTED');return original.apply(this,args);};
 const write=fs.writeFileSync;fs.writeFileSync=function(file,...args){if(${JSON.stringify(mode)}==='report'&&path.basename(file)==='firefox-config-persistence.json')throw new Error('controlled report write failure');return write.call(this,file,...args);};`);
     const packets: unknown[] = [];const sockets = new Set<import('node:net').Socket>();

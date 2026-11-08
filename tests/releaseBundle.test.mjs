@@ -45,7 +45,8 @@ async function fixture(t) {
     }
     await zip(root, `.output/${prefix}-sources.zip`, {
         'package.json': {version: productVersion, userscriptVersion},
-        'pnpm-lock.yaml': 'lockfileVersion: 9.0', 'wxt.config.ts': 'export default {}',
+        '.nvmrc': '22.23.4', 'pnpm-lock.yaml': 'lockfileVersion: 9.0', 'pnpm-workspace.yaml': 'overrides: {}',
+        'patches/ppu-paddle-ocr@6.6.0.patch': 'patch fixture', 'wxt.config.ts': 'export default {}',
     });
     const zoteroManifest = {version: '3.1.4', applications: {zotero: {id: 'fluentread@fixture'}}};
     await write(root, 'integrations/zotero/manifest.json', zoteroManifest);
@@ -200,6 +201,15 @@ test('stale product, source, plugin and userscript versions fail before writing 
             await assert.rejects(readFile(join(root, 'reports/release/fragments', `${target}.json`)), {code: 'ENOENT'});
         });
     }
+});
+
+test('rejects Firefox source archives without the pnpm workspace settings', async t => {
+    const root = await fixture(t);
+    const path = join(root, `.output/${prefix}-sources.zip`);
+    const source = await JSZip.loadAsync(await readFile(path));
+    source.remove('pnpm-workspace.yaml');
+    await write(root, `.output/${prefix}-sources.zip`, await source.generateAsync({type: 'nodebuffer'}));
+    await assert.rejects(bundleRelease({root, targets: ['firefox']}), /pnpm-workspace\.yaml/u);
 });
 
 test('empty, corrupt, incomplete and incorrect-format archives cannot become release assets', async t => {

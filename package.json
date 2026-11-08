@@ -72,7 +72,8 @@
     "docs:build:site": "pnpm docs:build && pnpm storybook:build",
     "docs:contributors": "node scripts/update-readme-contributors.mjs",
     "analyze:bundle": "node scripts/testing/run-resource-safe.mjs -- node scripts/testing/analyze-bundle-size.mjs",
-    "test:cloud-backup": "node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.cloud-backup.config.ts"
+    "test:cloud-backup": "node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.cloud-backup.config.ts",
+    "compile:partitions": "node scripts/testing/verify-pinned-userscript-languages.mjs && node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-typecheck-partitions.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.116",

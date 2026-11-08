@@ -151,3 +151,6 @@
   #fluent-read-video-learning-panel .fr-video-learning-translation { font-size: max(14px, var(--fluent-read-video-learning-font-size, 13px)); }
   #fluent-read-video-learning-panel .fr-video-learning textarea { font-size: max(16px, var(--fluent-read-video-learning-font-size, 13px)); }
 }
+
+#fluent-read-video-learning-panel .fr-video-learning-semantic { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+#fluent-read-video-learning-panel .fr-video-learning-semantic > p { flex-basis: 100%; }

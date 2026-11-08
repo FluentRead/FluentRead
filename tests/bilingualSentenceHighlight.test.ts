@@ -184,6 +184,25 @@ describe('bilingual sentence coordinates and ordered alignment', () => {
     });
 });
 
+describe('bilingual sentence hard breaks', () => {
+    afterEach(() => vi.unstubAllGlobals());
+    it.each(['native', 'fallback'] as const)('preserves line breaks, abbreviations and UTF-16 offsets with %s segmentation', backend => {
+        if (backend === 'fallback') vi.stubGlobal('Intl', {...Intl, Segmenter: undefined});
+        const text = ' \n Dr. 🧪 Smith uses Fig.\r\n\r\n Second line\u2028 Third line\u2029 ';
+        const expected = ['Dr. 🧪 Smith uses Fig.', 'Second line', 'Third line'];
+        expect(texts(text)).toEqual(expected);
+        expect(sentenceSpans(text, 3)).toEqual(expected.map(sentence => ({
+            start: text.indexOf(sentence),
+            end: text.indexOf(sentence) + sentence.length,
+        })));
+        expect(sentenceSpans(text, 2)).toEqual([]);
+    });
+    it('checks the full word boundary when repairing an abbreviation', () => {
+        expect(texts('ImageProf. Next sentence. Prof. Chen stayed.'))
+            .toEqual(['ImageProf.', 'Next sentence.', 'Prof. Chen stayed.']);
+    });
+});
+
 function registerBilingual(owner: HTMLElement, wrapper: HTMLElement, synthetic = false) {
     const attempt = beginTranslation(owner, 'bilingual', 'content', synthetic)!;
     expect(markTranslationComplete(owner, attempt.state, attempt.generation, false)).toBe(true);
@@ -196,6 +215,7 @@ function fixture(html = '<p id="owner" data-row="10">First. Second.<span data-ro
     const frames = new Map<number, FrameRequestCallback>();
     let frameId = 0;
     let collapsed = true;
+    let geometryReads = 0;
     const callback: {value?: MutationCallback} = {};
     const disconnect = vi.fn();
     const observe = vi.fn();
@@ -205,7 +225,12 @@ function fixture(html = '<p id="owner" data-row="10">First. Second.<span data-ro
     Object.defineProperty(document, 'defaultView', {value: new Proxy(window, {get: (target, name) => name === 'MutationObserver' ? Observer : Reflect.get(target, name)})});
     vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {frames.set(++frameId, cb); return frameId;});
     vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
-    vi.stubGlobal('getComputedStyle', (element: HTMLElement) => ({display: element.style.display, visibility: element.style.visibility}));
+    vi.stubGlobal('getComputedStyle', (element: HTMLElement) => ({
+        display: element.style.display,
+        visibility: element.style.visibility,
+        whiteSpace: element.style.whiteSpace,
+        whiteSpaceCollapse: element.style.getPropertyValue('white-space-collapse'),
+    }));
     // 手写 DOM 仅提供排版夹具；所有权与请求阶段沿用生产状态机，公开标记不代表真实译文。
     const wrappers = document.querySelectorAll<HTMLElement>('.fluent-read-bilingual-content[data-fr-translation-owned="true"]');
     const owners = new Map<HTMLElement, HTMLElement>();
@@ -217,8 +242,12 @@ function fixture(html = '<p id="owner" data-row="10">First. Second.<span data-ro
         return {
             setStart(n: Text, s: number) {node = n; start = s;},
             setEnd(_n: Text, e: number) {end = e;},
+            get startContainer() {return node;},
+            get startOffset() {return start;},
+            get endOffset() {return end;},
             toString: () => node.data.slice(start, end),
             getClientRects: () => {
+                geometryReads++;
                 const top = Number(node.parentElement!.closest('[data-row]')?.getAttribute('data-row') || 50);
                 return [{left: start * 10, right: end * 10, top, bottom: top + 10, width: (end - start) * 10, height: 10}];
             },
@@ -233,7 +262,8 @@ function fixture(html = '<p id="owner" data-row="10">First. Second.<span data-ro
     };
     const highlighted = () => [...(registry.get(BILINGUAL_HIGHLIGHT_NAME) ?? [])].map(range => range.toString());
     const mutate = (target: Node = document.querySelector('#owner')!) => callback.value?.([{target} as MutationRecord], {} as MutationObserver);
-    return {document, window, registry, move, flush, highlighted, mutate, disconnect, observe, frames, select: () => {collapsed = false;}};
+    return {document, window, registry, move, flush, highlighted, mutate, disconnect, observe, frames,
+        geometryReads: () => geometryReads, select: () => {collapsed = false;}};
 }
 
 describe('paint-only bilingual hover lifecycle', () => {
@@ -359,6 +389,46 @@ describe('paint-only bilingual hover lifecycle', () => {
         f.move('[translate="no"]'); expect(f.highlighted()).toEqual([]);
         dispose();
     });
+    it('allows document-level translate guards while preserving local protected text', () => {
+        const f = fixture('<p id="owner" data-row="10">First. <span id="protected" data-row="20" translate="NO">Protected.</span>Second.' +
+            '<span id="translation" class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="30">一句。二句。</span></p>');
+        f.document.documentElement.setAttribute('translate', 'no');
+        f.document.body.setAttribute('translate', 'no');
+        const dispose = installBilingualSentenceHighlight(f.document);
+        f.move(); expect(f.highlighted()).toEqual(['First.', '一句。']);
+        f.move('#translation', 40, 35); expect(f.highlighted()).toEqual(['Second.', '二句。']);
+        f.move('#protected', 20, 25); expect(f.highlighted()).toEqual([]);
+        dispose();
+    });
+    it('highlights the same complete sentence across collapsed source and translation newlines', () => {
+        const f = fixture('<p id="owner" data-row="10">One. The full\r\n' +
+            '<a id="link" data-row="20" href="/project">sentence\nruns</a><span id="tail" data-row="30"> to here. Next.</span>' +
+            '<span class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="40">开始。完整的\n' +
+            '<strong id="translated-link" data-row="50">句子\r\n延续</strong>到这里。结束。</span></p>');
+        const before = f.document.body.innerHTML;
+        const dispose = installBilingualSentenceHighlight(f.document);
+        const fullSentence = ['The full\r\n', 'sentence\nruns', ' to here.', '完整的\n', '句子\r\n延续', '到这里。'];
+        for (const [selector, x, y] of [['#owner', 80, 15], ['#link', 20, 25], ['#tail', 20, 35], ['#translated-link', 20, 55]] as const) {
+            f.move(selector, x, y);
+            expect(f.highlighted()).toEqual(fullSentence);
+        }
+        f.move('#owner', 20, 15); expect(f.highlighted()).toEqual(['One.', '开始。']);
+        f.move('#tail', 115, 35); expect(f.highlighted()).toEqual(['Next.', '结束。']);
+        expect(f.document.body.innerHTML).toBe(before);
+        dispose();
+    });
+    it('preserves BR and CSS-preserved line breaks while respecting an inline collapse override', () => {
+        const f = fixture('<p id="owner" data-row="10">See Fig.<br>' +
+            '<span id="lines" data-row="20" style="white-space: pre-line">second line\nthird line ' +
+            '<b id="collapsed" data-row="30" style="white-space: pre-line; white-space-collapse: collapse">continues\nhere. Final words.</b></span>' +
+            '<span class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="40">第一行。第二行。第三行接着写。最后一行仍是独立的内容。</span></p>');
+        const dispose = installBilingualSentenceHighlight(f.document);
+        f.move('#owner', 20, 15); expect(f.highlighted()).toEqual(['See Fig.', '第一行。']);
+        f.move('#lines', 20, 25); expect(f.highlighted()).toEqual(['second line', '第二行。']);
+        f.move('#collapsed', 20, 35); expect(f.highlighted()).toEqual(['third line ', 'continues\nhere.', '第三行接着写。']);
+        f.move('#collapsed', 180, 35); expect(f.highlighted()).toEqual(['Final words.', '最后一行仍是独立的内容。']);
+        dispose();
+    });
     it('coalesces pointer input and cancels pending frames on all clear paths', () => {
         const f = fixture(); const dispose = installBilingualSentenceHighlight(f.document);
         f.move('#owner', 20, 15, 0, false); f.move('#owner', 95, 15, 0, false);
@@ -438,6 +508,76 @@ describe('paint-only bilingual hover lifecycle', () => {
     });
 });
 
+describe('bilingual sentence hover geometry', () => {
+    afterEach(() => vi.unstubAllGlobals());
+    const caretPosition = (offsetNode: Node, offset: number): CaretPosition => ({offsetNode, offset, getClientRect: () => null});
+    it('uses bounded geometry reads for a late sentence on either side of a long paragraph', () => {
+        const source = Array.from({length: 200}, (_, index) => `Line ${index + 1}.`).join(' ');
+        const translation = Array.from({length: 200}, (_, index) => `第${index + 1}句。`).join('');
+        const f = fixture(`<p id="owner" data-row="10">${source}<span id="translation" data-row="30" class="fluent-read-bilingual-content" data-fr-translation-owned="true">${translation}</span></p>`);
+        const sourceNode = f.document.querySelector('#owner')!.firstChild!;
+        const translationNode = f.document.querySelector('#translation')!.firstChild!;
+        const sourceOffset = source.lastIndexOf('Line 200.') + 2;
+        const translationOffset = translation.lastIndexOf('第200句。') + 2;
+        f.document.caretPositionFromPoint = (_x, y) => y < 30
+            ? caretPosition(sourceNode, sourceOffset)
+            : caretPosition(translationNode, translationOffset);
+        const dispose = installBilingualSentenceHighlight(f.document);
+        for (let frame = 0; frame < 5; frame++) {
+            f.move('#owner', sourceOffset * 10 + frame, 15);
+            expect(f.highlighted()).toEqual(['Line 200.', '第200句。']);
+            f.move('#translation', translationOffset * 10 + frame, 35);
+            expect(f.highlighted()).toEqual(['Line 200.', '第200句。']);
+        }
+        expect(f.geometryReads()).toBeLessThanOrEqual(20);
+        dispose();
+    });
+    it('bounds geometry reads when one sentence spans many inline text nodes', () => {
+        const fragments = Array.from({length: 119}, (_, index) => `<span data-row="${index * 20 + 10}">word </span>`).join('');
+        const f = fixture(`<p id="owner">${fragments}<span id="tail" data-row="2400">ends here.</span><span class="fluent-read-bilingual-content" data-fr-translation-owned="true">这是完整译文。</span></p>`);
+        const tail = f.document.querySelector('#tail')!;
+        f.document.caretPositionFromPoint = () => caretPosition(tail.firstChild!, 2);
+        const dispose = installBilingualSentenceHighlight(f.document);
+        for (const x of [20, 22]) {
+            f.move('#tail', x, 2405);
+            expect(f.highlighted().join('')).toBe('word '.repeat(119) + 'ends here.这是完整译文。');
+        }
+        expect(f.geometryReads()).toBeLessThanOrEqual(4);
+        dispose();
+    });
+    it('checks both sides of a caret boundary and verifies current geometry before painting', () => {
+        const moreSource = ' Sentence.'.repeat(32);
+        const moreTranslation = '后一句。'.repeat(32);
+        const f = fixture(`<p id="owner" data-row="10">First. Second.${moreSource}<span data-row="30" class="fluent-read-bilingual-content" data-fr-translation-owned="true">一句。二句。${moreTranslation}</span></p>`);
+        const owner = f.document.querySelector('#owner')!;
+        const translation = owner.querySelector('.fluent-read-bilingual-content')!;
+        let point = caretPosition(translation.firstChild!, 3);
+        const caret = vi.fn(() => point);
+        f.document.caretPositionFromPoint = caret;
+        const dispose = installBilingualSentenceHighlight(f.document);
+        f.move('.fluent-read-bilingual-content', 29, 35);
+        expect(f.highlighted()).toEqual(['First.', '一句。']);
+        f.move('.fluent-read-bilingual-content', 31, 35);
+        expect(f.highlighted()).toEqual(['Second.', '二句。']);
+        expect(caret).toHaveBeenCalledTimes(2);
+        // 即使光标 API 指向另一句，实际命中的文字仍应走几何回退。
+        point = caretPosition(owner.firstChild!, 2);
+        f.move('#owner', 90, 15);
+        expect(f.highlighted()).toEqual(['Second.', '二句。']);
+        f.move('#owner', 65, 15);
+        expect(f.highlighted()).toEqual([]);
+        f.move('#owner', 20, 15);
+        expect(f.highlighted()).toEqual(['First.', '一句。']);
+        // 不发送 mutation，模拟外部排版变化，下一帧仍须使用实时几何。
+        owner.setAttribute('data-row', '100');
+        f.move('#owner', 20, 15);
+        expect(f.highlighted()).toEqual([]);
+        f.move('#owner', 20, 105);
+        expect(f.highlighted()).toEqual(['First.', '一句。']);
+        dispose();
+    });
+});
+
 describe('large bilingual owners through the public hover lifecycle', () => {
     afterEach(() => {vi.unstubAllGlobals(); vi.restoreAllMocks();});
     function deepFixture(depth = 20_000) {
@@ -485,15 +625,23 @@ describe('large bilingual owners through the public hover lifecycle', () => {
         expect(ranges).toHaveBeenCalledTimes(4);
         dispose();
     });
-    it('stops oversized collection before visiting the tail or collecting the translation', () => {
-        const f = fixture('<p id="owner">' + 'x'.repeat(100_001) + '<b id="tail">Unvisited.</b><span class="fluent-read-bilingual-content" data-fr-translation-owned="true">译文。</span></p>');
+    it('skips repeated oversized collection until the source changes', () => {
+        const f = fixture('<p id="owner" data-row="10">' + 'x'.repeat(100_001) + '<b id="tail">Unvisited.</b><span class="fluent-read-bilingual-content" data-fr-translation-owned="true">译文。</span></p>');
         const style = vi.mocked(f.window.getComputedStyle);
         const read = vi.fn(style);
         vi.stubGlobal('getComputedStyle', read);
         const dispose = installBilingualSentenceHighlight(f.document);
         f.move(); finish(f);
+        f.move(); f.move('.fluent-read-bilingual-content', 20, 55); finish(f);
         expect(f.highlighted()).toEqual([]);
+        // 超过上限后，既不读取段尾和译文，也不因同段内移动而重扫。
         expect(read.mock.calls.map(([element]) => (element as Element).id)).toEqual(['owner']);
+        const owner = f.document.querySelector('#owner')!;
+        owner.firstChild!.textContent = 'Source.';
+        f.document.querySelector('#tail')!.remove();
+        f.mutate(owner);
+        f.move(); finish(f);
+        expect(f.highlighted()).toEqual(['Source.', '译文。']);
         dispose();
     });
     it('yields while collecting a sparse translation and invalidates both maps when it changes', () => {

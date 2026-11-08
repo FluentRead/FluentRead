@@ -23,6 +23,7 @@ export {
     maxComposedAncestorDepth,
     getOpenShadowRoots,
     getTranslatableControlValueAttribute,
+    findTextPointAtPoint,
     isProtectedDescendantElement,
     isTopLevelApplicationShell,
 } from './dom';

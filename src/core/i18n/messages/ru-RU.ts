@@ -1124,7 +1124,7 @@ export const ruRUMessages = {
     'options.aboutFeedbackDescription': "Сообщить о проблеме или предложить идею",
     'options.aboutThanks': 'FluentRead — проект с открытым исходным кодом, дальнейшее развитие которого зависит от щедрой поддержки сообщества. Вы можете поддержать его через WeChat или Ko-fi.',
     'popup.donationTitle': 'Поддержать FluentRead',
-    'popup.donationDescription': 'Спасибо за поддержку проекта с открытым исходным кодом.',
+    'popup.donationDescription': 'Бесплатный проект с открытым кодом. Вы можете нас поддержать.',
     'popup.donationClose': 'Закрыть окно поддержки',
     'popup.donationWechat': 'Через WeChat',
     'popup.donationEnlargeCode': 'Увеличить код поддержки WeChat',

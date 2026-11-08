@@ -1124,7 +1124,7 @@ export const frFRMessages = {
     'options.aboutFeedbackDescription': "Signaler un problème ou proposer une idée",
     'options.aboutThanks': 'FluentRead est un projet open source dont le développement continu dépend du généreux soutien de sa communauté. Vous pouvez le soutenir via WeChat ou Ko-fi.',
     'popup.donationTitle': 'Soutenir FluentRead',
-    'popup.donationDescription': 'Merci de soutenir ce projet open source.',
+    'popup.donationDescription': 'Gratuit et open source. Vous pouvez nous soutenir.',
     'popup.donationClose': 'Fermer la fenêtre de soutien',
     'popup.donationWechat': 'Via WeChat',
     'popup.donationEnlargeCode': 'Agrandir le code de soutien WeChat',

@@ -1384,7 +1384,7 @@ export const enUSMessages = {
     'options.aboutFeedbackDescription': "Report problems and share ideas",
     'options.aboutThanks': 'FluentRead is an open-source project whose continued development depends on the generous support of its community. You can support it through WeChat or Ko-fi.',
     'popup.donationTitle': 'Support FluentRead',
-    'popup.donationDescription': 'Thank you for supporting this open-source project.',
+    'popup.donationDescription': 'Free and open source. You can support us.',
     'popup.donationClose': 'Close support dialog',
     'popup.donationWechat': 'WeChat Support',
     'popup.donationEnlargeCode': 'Enlarge the WeChat support code',

@@ -13,7 +13,7 @@ import SupportOptions from '../.vitepress/theme/SupportOptions.vue'
 
 ## 企业与项目赞助 {#sponsorship}
 
-感谢赞助伙伴 [**哔哩哔哩 Index-Translate**](https://index-translate.bilibili.com/) 对流畅阅读的支持。
+感谢 [**哔哩哔哩 Index-Translate**](https://index-translate.bilibili.com/) 成为流畅阅读的首位赞助伙伴。
 
 赞助伙伴可在官网与 README 展示品牌名称或 Logo、一句话介绍和官网链接。展示内容会明确标注为赞助，合作周期与具体内容通过沟通确定。
 

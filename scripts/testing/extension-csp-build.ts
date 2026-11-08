@@ -16,6 +16,7 @@ const SOURCE_SHA256 = {
     'fontkit': '62ad9c769e6a7a9028b0c711504908f0a231955b39619aaabd56dd4eabe800be',
     'lodash-root': 'df58ff96c454ca91ace20d20e6af49b354c70dfba7e737adc00cd23e8ff77168',
     'onnx-asyncify': '5959c6733039619c9af710d8e1bae8d6e84402787990637be987c2b1bd6c5fa9',
+    'zod-v4-schemas': 'd466582c022b08a3f9eb1a65d5970d8ca25064d73a5a838d76414ae36440a76b',
 } as const;
 export type ExtensionVendorSource = keyof typeof SOURCE_SHA256;
 
@@ -55,6 +56,9 @@ export function patchExtensionVendorSource(kind: ExtensionVendorSource, original
             return replaceOnce(source, 'Function("r", "regeneratorRuntime = r")(runtime)', 'globalThis.regeneratorRuntime = runtime');
         case 'lodash-root':
             return replaceOnce(source, "Function('return this')()", 'globalThis');
+        case 'zod-v4-schemas':
+            // 直接选择 Zod 自带的非 JIT 解析路径，避免对象 schema 在初始化时探测 eval。
+            return replaceOnce(source, 'const jit = !core.globalConfig.jitless;', 'const jit = false;');
         case 'jszip':
             // JSZip 自身只传函数；不支持历史 setImmediate 字符串回调，避免将字符串编译成代码。
             return replaceOnce(source, '"function"!=typeof e&&(e=new Function(""+e));',
@@ -109,6 +113,7 @@ export function extensionCspBuildPlugin(): Plugin {
                 [/(?:^|\/)pdfjs-dist\/legacy\/build\/pdf\.mjs$/, 'pdfjs-main'],
                 [/(?:^|\/)@pdf-lib\/fontkit\/dist\/fontkit\.es\.js$/, 'fontkit'],
                 [/(?:^|\/)lodash-es\/_root\.js$/, 'lodash-root'],
+                [/(?:^|\/)zod\/v4\/core\/schemas\.js$/, 'zod-v4-schemas'],
             ];
             const match = modules.find(([pattern]) => pattern.test(file));
             if (match) return {code: patchExtensionVendorSource(match[1], source), map: null};

@@ -45,19 +45,31 @@ Close the menu or press Esc to cancel while translating missing text; completed 
 
 ## An X video without subtitles
 
-The desktop Chrome, Edge, and Firefox extensions can try local transcription:
+The desktop Chrome, Edge, and Firefox extensions use Whisper in the browser by default to transcribe X videos.
 
 1. Open the X player's FluentRead menu and choose to generate AI subtitles.
-2. On first use, select and confirm a model download. **Small** is recommended (about 590 MB); **Tiny** (about 100 MB) and **Base** (about 150 MB) use less storage.
-3. Wait for audio reading and recognition; you can stop at any time. Stable sentences appear early, but the timeline is cached and exports enabled only after recognition finishes successfully.
+2. For Whisper in the browser, select and confirm a model download on first use. **Small** is recommended (about 590 MB). **Tiny** (about 100 MB) and **Base** (about 150 MB) use less storage.
+3. Wait while the extension reads and transcribes the audio. You can stop at any time. Stable sentences appear early, and the timeline is cached and becomes exportable after recognition succeeds.
 
-All models support multiple languages. Use **Auto** when the language is unknown or changes; specify a known single language if preferred. Audio recognition runs locally, using available GPU acceleration and falling back to CPU. Recognized text still goes to your translation service. Original-only mode requests no translation.
+All Whisper models support multiple languages. Use **Auto** when the language is unknown or changes, or specify a known single language. Whisper in the browser uses available GPU acceleration and falls back to CPU. FluentRead sends recognized text to your translation service according to the display mode. Original-only mode displays the transcript locally.
 
 The limit is **20 minutes per video**. Speed depends on the video and device. Some media formats or restricted videos cannot be read; try opening the post or refreshing. Quiet speech, music, accents, and specialist terms can affect accuracy.
 
 Use **Subtitle options → Recognition model / Regenerate this video** to change models or recognize again. Existing captions remain until confirmation; cancel preserves them. Stop an active download or recognition before switching models. Regeneration does not require clearing other videos' caches.
 
-Manage resources under **Video translation settings → Local AI subtitles**. Models download separately from the extension and need a connection on first use. Retry failed downloads to reuse complete files and fill missing ones. Clearing browser caches can require downloading again. A recognition failure removes incomplete previews; a translation failure preserves the recognized source.
+Manage Whisper models under **Video translation settings → Local AI subtitles**. The first download requires a connection. Retry failed downloads to reuse complete files and fill missing ones. Clearing browser caches can require downloading again. A recognition failure removes incomplete previews, while a translation failure preserves the recognized source.
+
+### Use Local Qwen3 ASR
+
+If you have vLLM with support for this model, run the command below to start a local service. It must serve the fixed model `Qwen/Qwen3-ASR-1.7B` at `POST /v1/audio/transcriptions` without credentials. [vLLM model recipe](https://github.com/vllm-project/recipes/blob/main/models/Qwen/Qwen3-ASR-1.7B.yaml)
+
+```sh
+vllm serve Qwen/Qwen3-ASR-1.7B --host 127.0.0.1 --port 8000
+```
+
+In **Video translation settings → Local AI subtitles → Recognition method**, choose **Local Qwen3 ASR**, enter `http://127.0.0.1:8000`, and save. The address must use `127.0.0.1` or `[::1]`. Once the service is running, select **Generate AI subtitles** on an X video with a readable audio track. This sends the audio to your local service.
+
+FluentRead estimates caption timing from audio windows. Stopping cancels the extension's request, and the server may continue processing audio it already received. If the service fails, retry or switch back to **Whisper in the browser** in settings.
 
 </details>
 

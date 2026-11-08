@@ -1,6 +1,6 @@
 # Firefox source review
 
-Use Node.js 20 or later and the pnpm 9 version pinned in `package.json`. Run these commands from the root of the extracted Firefox source ZIP.
+Use the Node.js and pnpm versions specified in `package.json`. Run these commands from the root of the extracted Firefox source ZIP.
 
 ```sh
 pnpm install --frozen-lockfile

@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/release-packages.yml'
+      - '.nvmrc'
       - 'scripts/release/**'
       - 'tests/release*.test.mjs'
   # Rehearse packaging on the selected ref; manual runs never publish a Release.
@@ -40,7 +41,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - name: Validate version and release source
         id: version
         env:
@@ -71,7 +72,7 @@ jobs:
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Prepare locked build tools
@@ -114,7 +115,7 @@ jobs:
       - uses: pnpm/action-setup@v5
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Prepare locked build tools
@@ -177,7 +178,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - uses: actions/download-artifact@v4
         with:
           pattern: release-build-*
@@ -212,7 +213,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
       - uses: actions/download-artifact@v4
         with:
           name: release-packages

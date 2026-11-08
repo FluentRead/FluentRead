@@ -2,7 +2,7 @@
  * @file scripts/verify-userscript-build.mjs
  * 文件职责：校验 userscript 产物的元信息、资源协议、体积与兼容性运行边界。
  * 主要内容：静态断言及隔离 VM 兼容层检查；体积预算按已测量的共享功能增量调整。
- * 模块边界：只读取构建产物，不安装脚本、不访问外部页面或修改运行配置。
+ * 模块边界：只读取构建产物和本地包版本，不安装脚本、不访问外部页面或修改运行配置。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +11,11 @@ import vm from 'node:vm';
 
 const root = process.cwd();
 const packageJson = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const vueVersion = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/vue/package.json'), 'utf8')).version;
+const elementPlusVersion = JSON.parse(fs.readFileSync(path.join(root, 'node_modules/element-plus/package.json'), 'utf8')).version;
+const vueRequire = `// @require      https://cdn.jsdelivr.net/npm/vue@${vueVersion}/dist/vue.global.prod.js`;
+const vueBridgeRequire = '// @require      https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@184a3d74f61b9d2a8d47080787f7e0180b98414d/userscript/vueElementPlusBridge.v1.js';
+const elementPlusRequire = `// @require      https://cdn.jsdelivr.net/npm/element-plus@${elementPlusVersion}/dist/index.full.min.js`;
 const artifactPath = path.join(root, '.output/userscript/fluent-read.user.js');
 const source = fs.readFileSync(artifactPath, 'utf8');
 const artifactBytes = Buffer.byteLength(source);
@@ -164,12 +169,12 @@ const assertions = [
   [source.includes('// @grant        GM.xmlHttpRequest'), 'Safari GM request grant is required'],
   [source.includes('// @inject-into  content'), 'Safari GM APIs require content-world injection'],
   [source.includes('// @connect      *'), 'provider requests require @connect'],
-  [source.includes('// @require      https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js'), 'pinned Vue @require is missing'],
-  [source.includes('// @require      https://cdn.jsdelivr.net/gh/FluentRead/FluentRead@184a3d74f61b9d2a8d47080787f7e0180b98414d/userscript/vueElementPlusBridge.v1.js'), 'pinned Vue / Element Plus UMD bridge @require is missing'],
+  [source.includes(vueRequire), 'pinned Vue @require is missing'],
+  [source.includes(vueBridgeRequire), 'pinned Vue / Element Plus UMD bridge @require is missing'],
   [!source.includes('FluentRead/FluentRead@main/userscript/'), 'userscript resources must use an immutable commit'],
-  [source.indexOf('vue.global.prod.js') < source.indexOf('vueElementPlusBridge.v1.js')
-    && source.indexOf('vueElementPlusBridge.v1.js') < source.indexOf('element-plus@2.9.3/dist/index.full.min.js'), 'Vue bridge must load between Vue and Element Plus'],
-  [source.includes('// @require      https://cdn.jsdelivr.net/npm/element-plus@2.9.3/dist/index.full.min.js'), 'pinned Element Plus @require is missing'],
+  [source.includes(elementPlusRequire), 'pinned Element Plus @require is missing'],
+  [source.indexOf(vueRequire) < source.indexOf(vueBridgeRequire)
+    && source.indexOf(vueBridgeRequire) < source.indexOf(elementPlusRequire), 'Vue bridge must load between Vue and Element Plus'],
   [source.includes('// @require      https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako_inflate.min.js'), 'pako fallback @require is missing'],
   [source.includes('globalThis.__fluentReadUserscriptCssCompressed='), 'userscript CSS must be compressed'],
   [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'userscript browser capability marker is missing'],

@@ -13,6 +13,8 @@ import {encodeUserscriptDataCompact} from './buildDataEncoding';
 import ts from 'typescript';
 import {normalizePath, type Plugin} from 'vite';
 
+const TLDTS_VERSION = '7.4.19';
+
 /** 只编码锁定版本的纯数据模块；结构漂移时拒绝构建，不压缩或执行库算法。 */
 export function createUserscriptTldtsDataCompressionPlugin(root: string, enabled = false, compact = false, standalone = false): Plugin {
     let sourcePath = '';
@@ -20,8 +22,8 @@ export function createUserscriptTldtsDataCompressionPlugin(root: string, enabled
         const require = createRequire(resolve(root, 'package.json'));
         const manifestPath = require.resolve('tldts/package.json');
         const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {name?: unknown; version?: unknown};
-        if (manifest.name !== 'tldts' || manifest.version !== '7.4.10') {
-            throw new Error('Standalone suffix data requires locked tldts 7.4.10');
+        if (manifest.name !== 'tldts' || manifest.version !== TLDTS_VERSION) {
+            throw new Error(`Standalone suffix data requires locked tldts ${TLDTS_VERSION}`);
         }
         sourcePath = normalizePath(realpathSync(resolve(dirname(manifestPath), 'dist/es6/src/data/trie.js')));
     }
@@ -41,7 +43,7 @@ export function createUserscriptTldtsDataCompressionPlugin(root: string, enabled
             const source = ts.createSourceFile(id, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
             const names = ['nodeFlags', 'edgeStart', 'edgeLength', 'edgeChild', 'labelText', 'rulesRoot', 'exceptionsRoot'];
             const arrayTypes = ['Uint8Array', 'Uint16Array', 'Uint8Array', 'Uint16Array'];
-            const arrayLengths = [622, 623, 10216, 10216];
+            const arrayLengths = [658, 659, 10421, 10421];
             if (source.statements.length !== names.length) throw unsupported();
             const values: Array<number[] | string | number> = [];
             for (const [index, statement] of source.statements.entries()) {

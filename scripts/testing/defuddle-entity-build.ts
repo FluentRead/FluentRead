@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import type {Plugin} from 'vite';
 
 // defuddle 的公开入口是 webpack 打包的 UMD，不是 dist/utils/dom.js；完整来源摘要固定后才允许适配。
-const DEFUDDLE_SHA256 = '1352cd8db48ee1993806358841a9b0f528b52b866ffd93ef11fa5af05db2cc64';
+const DEFUDDLE_SHA256 = 'f40075dc7b7b0460c16f77b9486a0ee66907a19677d2984e198e94356116a1e8';
 const ORIGINAL_DECODER = 'e.decodeHTMLEntities=function(t,e){const r=t.createElement("textarea");return r.innerHTML=e,r.value}';
 const REPLACEMENT_DECODER = 'e.decodeHTMLEntities=function(t,e){return __fluentreadDecodeTextareaHtml(e,t)}';
 

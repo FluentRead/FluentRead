@@ -167,7 +167,7 @@ const fixtureContracts: Array<{name: string; assert: (markdown: string) => void}
         expect(markdown).toMatch(/^> - A supporting note item/mu);
     }},
     {name: 'generated-footnote', assert: (markdown) => {
-        expect(markdown).toContain('supporting note [^1]');
+        expect(markdown).toMatch(/supporting note ?\[\^1\] that identifies/u);
         expect(markdown).toMatch(/^\[\^1\]: The first supporting footnote/mu);
         expect(markdown).not.toContain('footnote-backref');
     }},

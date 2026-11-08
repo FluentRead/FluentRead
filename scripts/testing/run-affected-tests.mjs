@@ -15,7 +15,7 @@ const PROJECT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const GROUPS = ['architecture', 'unit', 'functional', 'regression'];
 const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
 const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
-const GLOBAL_TEST_INPUTS = new Set(['package.json', 'pnpm-lock.yaml', 'tsconfig.json',
+const GLOBAL_TEST_INPUTS = new Set(['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json',
     'vitest.config.ts',
     'scripts/testing/vitest-resource-lock.mjs']);
 const slash = value => value.split(path.sep).join('/');
@@ -181,7 +181,7 @@ export function selectAffected({files, changed, matrix, coveragePaths, coverageA
     return {changed: [...changed].sort(), testFiles: testFiles.sort(), coverageFiles: coverageFiles.sort(),
         globalInputs, reason: globalInputs.length ? 'shared-test-configuration' : 'changed-dependency-graph',
         extensionChanged: changed.some(file => /^(?:src|entrypoints|userscript|public|styles|scripts|tests|assets)\//u.test(file)
-            || /^(?:package\.json|pnpm-lock\.yaml|tsconfig\.json|wxt\.config\.ts|vitest[^/]*\.ts)$/u.test(file)
+            || /^(?:\.nvmrc|package\.json|pnpm-lock\.yaml|tsconfig\.json|wxt\.config\.ts|vitest[^/]*\.ts)$/u.test(file)
             || file === '.github/workflows/extension-quality.yml')};
 }
 

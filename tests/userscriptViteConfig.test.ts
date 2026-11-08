@@ -1967,7 +1967,7 @@ describe('standalone locked public and private suffix pure-data encoding', () =>
                 mkdirSync(resolve(packageRoot, 'dist/es6/src/data'), {recursive: true});
                 mkdirSync(resolve(fixture, 'userscript'), {recursive: true});
                 writeFileSync(resolve(fixture, 'package.json'), '{}');
-                writeFileSync(resolve(packageRoot, 'package.json'), JSON.stringify({name: 'tldts', version: '7.4.10'}));
+                writeFileSync(resolve(packageRoot, 'package.json'), JSON.stringify({name: 'tldts', version: '7.4.19'}));
                 writeFileSync(fixturePath, original);
                 const worker = mode === 'failure' ? "throw new Error('controlled worker failure');" : mode === 'corrupt'
                     ? "require('node:worker_threads').parentPort.postMessage(new Uint8Array([1, 2]));"
@@ -2087,8 +2087,8 @@ describe('standalone locked public and private suffix pure-data encoding', () =>
     }, 30_000);
 
     it.each([
-        ['new-version', {name: 'tldts', version: '7.4.11'}],
-        ['wrong-package', {name: 'tldts-icann', version: '7.4.10'}],
+        ['previous-version', {name: 'tldts', version: '7.4.10'}],
+        ['wrong-package', {name: 'tldts-icann', version: '7.4.19'}],
         ['missing-version', {name: 'tldts'}],
     ])('fails closed for %s before resolving or transforming its data module', (_label, manifest) => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-suffix-data-owner-'));
@@ -2097,7 +2097,7 @@ describe('standalone locked public and private suffix pure-data encoding', () =>
             const packageRoot = resolve(fixture, 'node_modules/tldts');
             mkdirSync(packageRoot, {recursive: true});
             writeFileSync(resolve(packageRoot, 'package.json'), JSON.stringify({...manifest, main: 'index.js'}));
-            expect(() => createPlugin(true, fixture)).toThrow('requires locked tldts 7.4.10');
+            expect(() => createPlugin(true, fixture)).toThrow('requires locked tldts 7.4.19');
         } finally {
             rmSync(fixture, {recursive: true, force: true});
         }
@@ -2123,7 +2123,7 @@ describe('standalone locked public and private suffix pure-data encoding', () =>
             const plugin = plugins.find(item => item.name === 'bundle-userscript-css')!;
             const entry = {type: 'chunk', isEntry: true, code: 'var suffixOwnerFixture = 1;', moduleIds: [dataPath]};
             await Reflect.apply(plugin.generateBundle!.handler, {}, [{}, {'entry.js': entry}]);
-            expect(entry.code).toContain('tldts 7.4.10 — MIT');
+            expect(entry.code).toContain('tldts 7.4.19 — MIT');
             expect(entry.code).toContain(originalLicense.trim());
             expect(entry.moduleIds).toEqual([dataPath]);
             expect(readFileSync(resolve(packageRoot, 'LICENSE'), 'utf8')).toBe(originalLicense);

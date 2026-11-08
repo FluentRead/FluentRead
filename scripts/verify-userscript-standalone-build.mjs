@@ -9,6 +9,8 @@ const metadataEnd = source.indexOf('// ==/UserScript==');
 if (metadataEnd < 0) throw new Error('Standalone userscript metadata is missing');
 const metadata = source.slice(0, metadataEnd);
 const {userscriptVersion} = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'));
+const {version: vueVersion} = JSON.parse(readFileSync(resolve(root, 'node_modules/vue/package.json'), 'utf8'));
+const {version: elementPlusVersion} = JSON.parse(readFileSync(resolve(root, 'node_modules/element-plus/package.json'), 'utf8'));
 const assertions = [
     [source.startsWith('// ==UserScript==\n'), 'Metadata must be the first bytes'],
     [metadata.includes(`// @version      ${userscriptVersion}`), 'Standalone version is stale'],
@@ -21,8 +23,8 @@ const assertions = [
     [!source.includes('fluent-read-writing-assistant'), 'Writing assistant runtime must be excluded'],
     [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'Userscript browser capability marker is missing'],
     [source.includes('pako 2.1.0 —'), 'Bundled gzip fallback or license notice is missing'],
-    [source.includes('@vue/runtime-dom 3.5.13 —'), 'Bundled Vue or license notice is missing'],
-    [source.includes('element-plus 2.9.3 —'), 'Bundled UI or license notice is missing'],
+    [source.includes(`@vue/runtime-dom ${vueVersion} — MIT`), 'Bundled Vue or license notice is missing'],
+    [source.includes(`element-plus ${elementPlusVersion} — MIT`), 'Bundled UI or license notice is missing'],
 ];
 for (const [passed, message] of assertions) {
     if (!passed) throw new Error(message);
@@ -30,10 +32,9 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// Main eb737d3bc measures 3,641,502 bytes with locked dependencies and Node 22.
-// Cheaper Inference and cheapaimodel add 980 bytes, measuring 3,642,482 bytes.
-// Budget 1 KB for the two entries and retain roughly 500 bytes of headroom.
-// The regular Greasy Fork artifact retains its separate 2 MB platform limit.
-const maxBytes = 3_643_000;
+// On Node 22.23.4, main e081256b3 measures 3,642,078 bytes and the dependency
+// patch build measures 3,652,010 bytes. Retain roughly 1 KB of headroom.
+// The Greasy Fork artifact retains its separate 2 MB platform limit.
+const maxBytes = 3_653_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

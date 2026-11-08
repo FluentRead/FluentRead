@@ -60,7 +60,7 @@ The project is currently funded mainly out of pocket, with tens of thousands of 
 
 ## Local development
 
-Use Node.js 20+ and pnpm 9. Install dependencies with `pnpm install --frozen-lockfile`.
+Use the Node.js version in `.nvmrc` to match CI and the pnpm version pinned in `package.json`. Install dependencies with `pnpm install --frozen-lockfile`.
 
 - `pnpm dev` starts local development.
 - `pnpm zip` builds and packages the Chrome extension.

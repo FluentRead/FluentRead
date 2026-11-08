@@ -23,7 +23,7 @@ pnpm install --frozen-lockfile
 pnpm exec wxt prepare
 ```
 
-Node.js 和 pnpm 版本以仓库 `package.json` 为准。开发扩展使用 `pnpm dev`；需要生产产物验证时运行 `pnpm build`，加载 `.output/chrome-mv3`。使用临时浏览器 profile，避免让测试改动日常配置。
+Node.js 版本以 `.nvmrc` 为准，pnpm 版本以 `package.json` 为准。开发扩展使用 `pnpm dev`。需要生产产物验证时运行 `pnpm build`，加载 `.output/chrome-mv3`。使用临时浏览器 profile，避免让测试改动日常配置。
 
 ## 文件放在哪里
 

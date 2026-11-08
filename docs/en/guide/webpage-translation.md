@@ -29,6 +29,12 @@ Passages already in the target or an excluded language usually keep their source
 
 </details>
 
+## Read arXiv papers
+
+On an arXiv abstract page, choose **Bilingual translation (FluentRead)** in the paper access area. FluentRead opens the official HTML for that version and translates from your reading position using your configured language and service. The original table of contents, formulas, and citation links remain usable.
+
+When arXiv only provides a PDF, choose **Read PDF** to open the original in the FluentRead [document reader](/en/guide/document-translation). The site’s own PDF and HTML links remain available. These shortcuts are available in the browser extension.
+
 ## AI context and terminology
 
 Open **Translation services → AI context** in the extension popup, enable the preference, and choose a configured AI service that supports it. New translations can reference the page topic, current section, nearby passages, and available earlier definitions and translations to help interpret ambiguous words and references. Enabling it does not rewrite existing translations; restore the original and translate again to apply it.

@@ -1,11 +1,14 @@
 /**
  * @file src/core/i18n/messages/pdfReading.ts
- * 文件职责：维护 PDF 在线导入、分页阅读、缩放、划词提示、提取文字异常提醒、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
+ * 文件职责：维护 arXiv 论文入口、PDF 在线导入、分页阅读、缩放、划词提示、提取文字异常提醒、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
  * 主要内容：提供简短的重试、更换服务、暂时中断和按需展开详情文案，按七种语言独立导出静态目录，让默认中文界面直接引用中文资源；保留七语汇总对象供构建期资源生成、userscript 与其他 locale 复用。
  * 模块边界：仅提供静态资源，不读取文档、网络或用户配置；运行时消费者按语言引用独立常量，避免把非当前语言文案打进默认目录。
  */
 
 export const pdfReadingChineseMessages = {
+    "document.paperReading.bilingual": "双语翻译（流畅阅读）",
+    "document.paperReading.pdf": "PDF 阅读",
+    "document.paperReading.openFailed": "无法打开 PDF 阅读器，请重试。",
     "document.translationRecovery.unavailable": "当前服务不可用",
     "document.translationRecovery.retry": "重试",
     "document.translationRecovery.switchService": "更换服务",
@@ -93,6 +96,9 @@ export const pdfReadingChineseMessages = {
 };
 
 export const pdfReadingEnglishMessages = {
+    "document.paperReading.bilingual": "Bilingual translation (FluentRead)",
+    "document.paperReading.pdf": "Read PDF",
+    "document.paperReading.openFailed": "Couldn’t open the PDF reader. Try again.",
     "document.translationRecovery.unavailable": "Service unavailable",
     "document.translationRecovery.retry": "Retry",
     "document.translationRecovery.switchService": "Change service",
@@ -180,6 +186,9 @@ export const pdfReadingEnglishMessages = {
 };
 
 export const pdfReadingJapaneseMessages = {
+    "document.paperReading.bilingual": "対訳（FluentRead）",
+    "document.paperReading.pdf": "PDF を読む",
+    "document.paperReading.openFailed": "PDF リーダーを開けませんでした。もう一度お試しください。",
     "document.translationRecovery.unavailable": "サービスを利用できません",
     "document.translationRecovery.retry": "再試行",
     "document.translationRecovery.switchService": "サービスを変更",
@@ -267,6 +276,9 @@ export const pdfReadingJapaneseMessages = {
 };
 
 export const pdfReadingKoreanMessages = {
+    "document.paperReading.bilingual": "이중 언어 번역 (FluentRead)",
+    "document.paperReading.pdf": "PDF 읽기",
+    "document.paperReading.openFailed": "PDF 리더를 열 수 없습니다. 다시 시도해 주세요.",
     "document.translationRecovery.unavailable": "서비스를 사용할 수 없습니다",
     "document.translationRecovery.retry": "재시도",
     "document.translationRecovery.switchService": "서비스 변경",
@@ -354,6 +366,9 @@ export const pdfReadingKoreanMessages = {
 };
 
 export const pdfReadingFrenchMessages = {
+    "document.paperReading.bilingual": "Traduction bilingue (FluentRead)",
+    "document.paperReading.pdf": "Lire le PDF",
+    "document.paperReading.openFailed": "Impossible d’ouvrir le lecteur PDF. Réessayez.",
     "document.translationRecovery.unavailable": "Service indisponible",
     "document.translationRecovery.retry": "Réessayer",
     "document.translationRecovery.switchService": "Changer de service",
@@ -441,6 +456,9 @@ export const pdfReadingFrenchMessages = {
 };
 
 export const pdfReadingSpanishMessages = {
+    "document.paperReading.bilingual": "Traducción bilingüe (FluentRead)",
+    "document.paperReading.pdf": "Leer el PDF",
+    "document.paperReading.openFailed": "No se pudo abrir el lector de PDF. Inténtalo de nuevo.",
     "document.translationRecovery.unavailable": "Servicio no disponible",
     "document.translationRecovery.retry": "Reintentar",
     "document.translationRecovery.switchService": "Cambiar servicio",
@@ -528,6 +546,9 @@ export const pdfReadingSpanishMessages = {
 };
 
 export const pdfReadingRussianMessages = {
+    "document.paperReading.bilingual": "Двуязычный перевод (FluentRead)",
+    "document.paperReading.pdf": "Читать PDF",
+    "document.paperReading.openFailed": "Не удалось открыть PDF. Попробуйте ещё раз.",
     "document.translationRecovery.unavailable": "Сервис недоступен",
     "document.translationRecovery.retry": "Повторить",
     "document.translationRecovery.switchService": "Сменить сервис",

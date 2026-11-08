@@ -5,6 +5,7 @@
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
  */
 import {createLearningContentFeatures} from './learningFeatures';
+import {createReaderContentFeatures} from './readerFeatures';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 import {createShadowRootUi} from 'wxt/utils/content-script-ui/shadow-root';
 import {constants} from '@/src/core/config/constants';
@@ -25,18 +26,11 @@ import {
     createInputTranslationContentFeature,
     handleTranslation,
     inputBoxTranslationConfigKey,
-    isAreaTranslatorMounted,
     isFullPageTranslationActive, noteBilingualHostGesture,
-    mountAreaTranslator, startAreaTranslationFromContextMenu, mountFloatingBall, isFloatingBallAllowedOnPage,
-    mountHoverTranslationContentFeature, mountImageTranslator, mountParagraphCopyContentFeature, mountSectionTranslationContentFeature,
-    isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, unmountMangaEntry,
-    mountSelectionTranslator, mountTranslationProgressPanel,
+    mountHoverTranslationContentFeature, mountParagraphCopyContentFeature, mountSectionTranslationContentFeature,
     mountVideoSubtitleTranslation,
     isSupportedVideoPage,
     restoreOriginalContent, resetFullPageTranslationRouteState, createPageTranslationDisplayModeSync,
-    unmountAreaTranslator, unmountFloatingBall, unmountImageTranslator,
-    unmountSelectionTranslator,
-    unmountTranslationProgressPanel,
 } from './features';
 import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
@@ -56,6 +50,9 @@ import {createOptionalContentFeatureRuntime, type OptionalContentFeatureRuntime}
 import {createPageInformationHighlightRuntime} from './informationHighlight';
 import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 import {createPageTranslationFontRuntime} from './pageTranslationFont';
+import {consumeArxivPaperReading, mountArxivPaperReading, waitForArxivPaperDom} from './arxivPaperReading';
+import {translate} from '@/src/core/i18n';
+import {showPageNotice} from '@/src/features/page-notice/public';
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     if (isRawXmlContentDocument(document) || ctx.isInvalid) return;
@@ -73,10 +70,15 @@ export async function startContentApp(ctx: ContentScriptContext,
     if (ctx.isInvalid || cleanedUp) { cleanup(); return; }
     await ensureUiLanguageBundle(config.uiLanguage);
     if (ctx.isInvalid || cleanedUp || (document.readyState === 'loading' && !await waitForContentDocument(document, pageEventController.signal))) { cleanup(); return; }
+    const paperDom = import.meta.env.BROWSER === 'userscript' ? undefined
+        : waitForArxivPaperDom(document, window.location.href, pageEventController.signal);
+    if (paperDom && (!await paperDom || ctx.isInvalid || cleanedUp)) { cleanup(); return; }
     const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
     applyCoreTranslationPreferences(config); clearLegacyPageTranslationCache();
     const siteRules = createSiteRuleMatcher(config);
     let currentPageSiteDisabled = siteRules.isExtensionDisabled(window.location.href);
+    let paperReadingRequested = import.meta.env.BROWSER !== 'userscript' && config.on && !currentPageSiteDisabled
+        && consumeArxivPaperReading(window, document);
     let unsubscribeContentConfig: (() => void) | null = null;
     const runtimeMessages = browser.runtime.onMessage;
     let featureController: AbortController | null = null;
@@ -129,6 +131,20 @@ export async function startContentApp(ctx: ContentScriptContext,
         featureController = activationController;
         const isActivationCurrent = () => isPageRuntimeEnabled() && featureController === activationController
             && !activationController.signal.aborted;
+        if (import.meta.env.BROWSER !== 'userscript') {
+            const signal = activationController.signal;
+            mountArxivPaperReading(document, window.location.href, signal, {
+                bilingualLabel: translate('document.paperReading.bilingual', config.uiLanguage),
+                pdfLabel: translate('document.paperReading.pdf', config.uiLanguage),
+                openPdf: async url => (await browser.runtime.sendMessage({type: 'openArxivPaperPdf', url}))?.status === 'success',
+                onPdfOpenFailed: () => showPageNotice(translate('document.paperReading.openFailed', config.uiLanguage),
+                    'error', {key: 'arxiv-paper-reading', signal}),
+            });
+            if (paperReadingRequested) {
+                paperReadingRequested = false;
+                autoTranslateEnglishPage({displayMode: 'bilingual', fullPageMode: 'viewport', scope: 'content'});
+            }
+        }
         optionalContentFeatures = createOptionalContentFeatureRuntime({
             activationSignal: activationController.signal,
             config,
@@ -154,40 +170,7 @@ export async function startContentApp(ctx: ContentScriptContext,
             () => { resetHoverKeyboardGesture(); resetFullPageKeyboardGesture(); }, mailFullPageToggle);
         activePageFeatureRegistry = createContentFeatureRegistry([
             ...createLearningContentFeatures(ctx, config, capabilities),
-            {
-                id: 'floating-ball',
-                isEnabled: () => config.on && config.disableFloatingBall !== true && isFloatingBallAllowedOnPage(),
-                mount: () => mountFloatingBall(ctx),
-                unmount: unmountFloatingBall,
-                isMounted: () => Boolean(document.getElementById('fluent-read-floating-ball-container')),
-            },
-            {
-                id: 'selection-translator',
-                isEnabled: () => config.on && config.disableSelectionTranslator !== true && config.selectionTranslatorMode !== 'disabled',
-                mount: () => mountSelectionTranslator(ctx),
-                unmount: unmountSelectionTranslator,
-                isMounted: () => Boolean(document.getElementById('fluent-read-selection-translator-container')),
-            },
-            {
-                id: 'selection-area-translator',
-                requiredCapability: 'areaTranslation',
-                isEnabled: () => config.on && config.selectionAreaEnabled === true,
-                mount: () => mountAreaTranslator(ctx),
-                unmount: unmountAreaTranslator,
-                isMounted: isAreaTranslatorMounted,
-            },
-            {id: 'image-translator', requiredCapability: 'imageTranslation', isEnabled: isImageTranslatorNeeded,
-                mount: () => mountImageTranslator(), unmount: unmountImageTranslator},
-            {id: 'manga-entry', requiredCapability: 'imageTranslation',
-                isEnabled: () => config.on && config.imageTranslationMangaEnabled && isMangaReaderPage(),
-                mount: () => mountMangaEntry(ctx, {startAreaTranslation: startAreaTranslationFromContextMenu}), unmount: unmountMangaEntry},
-            {
-                id: 'translation-progress-panel',
-                isEnabled: () => config.on && config.translationProgressPanelEnabled === true,
-                mount: () => mountTranslationProgressPanel(ctx),
-                unmount: unmountTranslationProgressPanel,
-                isMounted: () => Boolean(document.getElementById('fluent-read-translation-status-container')),
-            },
+            ...createReaderContentFeatures(ctx, config),
             ...(import.meta.env.BROWSER === 'userscript' ? [] : [informationHighlight!.feature]),
         ], {capabilities,
             onError: (featureId, phase, error) => {

@@ -866,6 +866,38 @@ describe('网站正文规则目录', () => {
         verify();
     });
 
+    it('arXiv HTML 只翻译论文叙述，保留目录、作者、引文与公式', () => {
+        const url = new URL('https://arxiv.org/html/1706.03762v7');
+        const document = documentFor(`
+            <div id="announcement-banner" class="ds-announcement"><p>Announcements from the arXiv website.</p></div>
+            <div id="infobox" class="infobox"><p>License for the converted article.</p></div>
+            <div class="arxiv-html-header"><p id="toolbar">Read the paper as a PDF.</p></div>
+            <div class="ltx_page_navbar"><p id="toc"><a href="#S1">Table of contents</a></p></div>
+            <article class="ltx_document">
+                <h1 class="ltx_title" id="title">A study of efficient models</h1>
+                <div class="ltx_authors"><div class="ltx_para"><p id="author">The author and their affiliation</p></div></div>
+                <section id="S1"><div class="ltx_para"><p id="paragraph">This experiment compares <math class="ltx_Math"><mi>x</mi></math> with the baseline <cite class="ltx_cite"><a href="#bib1">A. Author, 2020</a></cite>.</p></div></section>
+                <section class="ltx_bibliography"><div class="ltx_para"><p id="bib1">The reference entry describes an earlier study.</p></div></section>
+            </article>
+        `);
+        const core = new TranslationCandidateCore({url, adapters});
+        const candidates = core.discover(document);
+        expect(candidates.some(candidate => candidate.element.id === 'title')).toBe(true);
+        expect(candidates.some(candidate => candidate.element.id === 'paragraph')).toBe(true);
+        for (const selector of ['#announcement-banner', '#infobox', '.arxiv-html-header', '.ltx_page_navbar', '.ltx_authors', '.ltx_bibliography']) {
+            const excluded = document.querySelector(selector)!;
+            expect(candidates.some(candidate => excluded.contains(candidate.element)), selector).toBe(false);
+        }
+        for (const selector of ['math', '.ltx_cite']) expect(core.shouldStayOriginal(document.querySelector(selector)!)).toBe(true);
+        const paragraph = document.getElementById('paragraph')!;
+        const snapshot = createTranslationSourceSnapshot(paragraph, core.shouldStayOriginal);
+        expect(snapshot.slots.map(slot => slot.source).join(' ')).toContain('This experiment compares');
+        expect(snapshot.slots.map(slot => slot.source).join(' ')).not.toContain('A. Author');
+        const output = documentFor(applyTranslationsToSnapshot(snapshot, snapshot.slots.map(() => '正文译文')));
+        expect(output.querySelector('math')?.textContent).toBe('x');
+        expect(output.querySelector('cite a')?.getAttribute('href')).toBe('#bib1');
+    });
+
     it('ar5iv 定理中的可读叙述可形成候选，内联 MathML 保持受保护', () => {
         const url = new URL('https://ar5iv.labs.arxiv.org/html/2106.03753');
         const adapter = adapterById.get('ar5iv')!;

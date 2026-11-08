@@ -874,6 +874,7 @@ export default defineConfig({
                 'src/providers/translation/ai-sdk/openai-transport.ts',
                 'src/providers/translation/ai-sdk/openai-compatible.ts',
                 'src/providers/translation/ai-sdk/openai-http.ts',
+                'src/providers/translation/ai-sdk/openai-response-text.ts',
                 'userscript/openaiCompatible.ts',
                 'userscript/settingsDataPlugin.ts',
                 'src/providers/translation/auth.ts',

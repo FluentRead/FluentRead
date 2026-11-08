@@ -8,9 +8,10 @@ import {createOpenAICompatible} from '@ai-sdk/openai-compatible';
 import {generateText} from 'ai';
 import {normalizeAiSdkError} from './errors';
 import {translateOpenAICompatible, type AiSdkTranslationRequest, type OpenAICompatibleExecution} from './openai-transport';
+import {readOpenAICompatibleText, type OpenAICompatibleMessageContent} from './openai-response-text';
 export {AI_SDK_MAX_RETRIES, AI_SDK_REQUEST_TIMEOUT_MS, type AiSdkTranslationRequest} from './openai-transport';
 
-const sdkExecution: OpenAICompatibleExecution = {
+export const openAICompatibleSdkExecution: OpenAICompatibleExecution = {
   async run(call) {
     const provider = createOpenAICompatible({
       name: 'fluentread', baseURL: call.endpoint.baseURL, apiKey: call.apiKey,
@@ -21,13 +22,15 @@ const sdkExecution: OpenAICompatibleExecution = {
       model: provider(call.requestBody.model as string),
       // 实际扩展格式 body 已在共享层验证；固定 prompt 避免 SDK 拒绝 developer/image_url。
       prompt: 'FluentRead OpenAI-compatible request',
-      maxRetries: call.maxRetries, abortSignal: call.signal,
+      maxRetries: call.maxRetries, abortSignal: call.signal, include: {responseBody: true},
     });
-    return result.text;
+    // SDK 7 会把拒答字段追加到 result.text；翻译只消费 provider 的正文。
+    const response = result.finalStep.response.body as {choices: Array<{message: {content?: OpenAICompatibleMessageContent}}>};
+    return readOpenAICompatibleText(response.choices[0].message.content);
   },
   normalizeError: normalizeAiSdkError,
 };
 
 export function translateWithOpenAICompatibleAiSdk(request: AiSdkTranslationRequest): Promise<string | string[]> {
-  return translateOpenAICompatible(request, sdkExecution);
+  return translateOpenAICompatible(request, openAICompatibleSdkExecution);
 }

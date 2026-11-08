@@ -44,7 +44,6 @@ const array = (value: unknown): any[] => {
 };
 // 此生成端口只承接 Harness 当前唯一的只读工具；约束由共享 validator 再次校验。
 const toolSchema = {...READ_CONTEXT_INPUT_SCHEMA, $schema: 'http://json-schema.org/draft-07/schema#'};
-const googleToolSchema = {type: 'object', properties: {reason: {type: 'string'}}};
 
 function openaiMessages(input: HarnessGenerateInput): RecordValue[] {
     return [{role: 'system', content: input.system}, ...input.messages.flatMap<RecordValue>(message => {
@@ -118,7 +117,7 @@ function prepare(config: Config, service: string, model: string, tools: readonly
         // 与共享 gateway 一致：显式代理是完整 endpoint，不追加路径或 query。
         return {url: config.proxy[service]?.trim() || `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, headers,
             body: {...geminiMessages(input, model), generationConfig: {maxOutputTokens: 1200},
-                ...(tools.length ? {tools: [{functionDeclarations: tools.map(tool => ({name: tool.name, description: tool.description, parameters: googleToolSchema}))}], toolConfig: {functionCallingConfig: {mode: 'AUTO'}}} : {})}};
+                ...(tools.length ? {tools: [{functionDeclarations: tools.map(tool => ({name: tool.name, description: tool.description, parametersJsonSchema: toolSchema}))}], toolConfig: {functionCallingConfig: {mode: 'AUTO'}}} : {})}};
     }
     if (service === services.bilibili) return {
         url: `https://${BILIBILI_FREE_TRANSLATION_DOMAIN}/v1/chat/completions`, headers,

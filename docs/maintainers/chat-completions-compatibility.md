@@ -6,7 +6,7 @@
 
 [Responses 类型](https://github.com/openai/openai-python/blob/main/src/openai/types/responses/response_create_params.py)使用 `max_output_tokens` 和不同的输入、工具、事件结构。原生 Claude Messages 使用 `max_tokens`，Gemini 使用 `generationConfig.maxOutputTokens`。因此不能对所有 JSON 请求做全局字段替换，也不能把 Chat 到 Responses 的迁移当作字段别名转换。
 
-项目锁定的 `@ai-sdk/openai-compatible` 2.0.70 将 `maxOutputTokens` 编码成 `max_tokens`，然后调用 `transformRequestBody`；其流式入口也在最终序列化前调用该 hook。[上游 compatible 实现](https://github.com/vercel/ai/blob/main/packages/openai-compatible/src/chat/openai-compatible-chat-language-model.ts)仍采用通用映射。[专用 OpenAI 实现](https://github.com/vercel/ai/blob/main/packages/openai/src/chat/openai-chat-language-model.ts)另有模型能力、采样限制与推理参数逻辑，不能假设 compatible 包包含这些能力。本次不升级 SDK 或切换整套传输协议。
+项目锁定的 `@ai-sdk/openai-compatible` 3.0.87 将 `maxOutputTokens` 编码成 `max_tokens`，然后调用 `transformRequestBody`；其流式入口也在最终序列化前调用该 hook。[上游 compatible 实现](https://github.com/vercel/ai/blob/main/packages/openai-compatible/src/chat/openai-compatible-chat-language-model.ts)仍采用通用映射。[专用 OpenAI 实现](https://github.com/vercel/ai/blob/main/packages/openai/src/chat/openai-chat-language-model.ts)另有模型能力、采样限制与推理参数逻辑，不能假设 compatible 包包含这些能力。扩展、阅读和写作使用 AI SDK 7。阅读和写作沿用兼容 Chat Completions 的入口及现有工具循环。
 
 官方 Chat 类型允许 `reasoning_effort`，并明确不同模型支持不同取值；`service_tier` 接受 `fast` / `priority` 等值，响应报告实际使用的等级。传递用户配置不等于证明某个账户或模型支持它。这里不新增自动推理强度、采样参数过滤或 Fast 默认值，保留现有 Thinking 适配与明确的自定义字段优先级。
 
@@ -21,6 +21,8 @@
 | 第三方网关、OpenRouter、本地兼容服务、Azure 版本化 deployment | 默认 `max_tokens` | 不能从模型别名或服务名称推断实际支持版本 |
 | 任意 Chat 端点显式指定非空 `max_completion_tokens` | `max_completion_tokens`，删除旧字段 | 用户声明该端点的新字段能力 |
 | Claude / Gemini / Responses / 固定匿名入口 | 原有专用适配器 | 不进入本次通用 Chat 转换 |
+
+非流式翻译只读取响应的 `choices[0].message.content`，包括分段返回的文本。供应商单独返回的 `refusal`、思考内容和工具调用不计作译文。
 
 只精确识别官方 origin 和 Chat 路径；相似主机名、不同端口、HTTP 及不同路径不视为官方协议。Azure 保留旧默认，不推断部署别名对应的模型，也不假定所有 API 版本相同；需要新字段的部署可以显式配置。
 

@@ -15,6 +15,7 @@ const EXPECTED_PROVIDER_FILES = [
     'ai-sdk/errors.ts',
     'ai-sdk/openai-compatible.ts',
     'ai-sdk/openai-http.ts',
+    'ai-sdk/openai-response-text.ts',
     'ai-sdk/openai-transport.ts',
     'ai-sdk/transport-errors.ts',
     'aliyun-translation.ts',

@@ -92,7 +92,7 @@ describe('harness model gateway', () => {
       expect(body).not.toHaveProperty('max_tokens'); expect(body).not.toHaveProperty('max_completion_tokens');
       return response({choices: [{message: {role: 'assistant', content: 'done'}, finish_reason: 'stop'}]});
     });
-    await generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), system: 'System', prompt: 'Explain', tools: {lookup: tool({inputSchema: z.object({q: z.string()})})}, maxRetries: 0});
+    await generateText({model: createHarnessLanguageModel(config, services.openai, 'gpt-6-luna'), instructions: 'System', prompt: 'Explain', tools: {lookup: tool({inputSchema: z.object({q: z.string()})})}, maxRetries: 0});
   });
 
   it.each([
@@ -273,7 +273,7 @@ describe('harness model gateway', () => {
       // 对照真实 SDK 默认行为，确保该错误确实会触发原始控制台日志。
       const baseline = streamText({model: createHarnessLanguageModel(config, services.bilibili, ''), prompt: source, maxRetries: 0});
       let rawError: unknown;
-      for await (const part of baseline.fullStream) if (part.type === 'error') rawError = part.error;
+      for await (const part of baseline.stream) if (part.type === 'error') rawError = part.error;
       expect(rawError).toMatchObject({statusCode: 400});
       expect(consoleError).toHaveBeenCalledWith(rawError);
       consoleError.mockClear();
@@ -330,7 +330,7 @@ describe('harness model gateway', () => {
     });
     setRuntimeFetch(fetchMock);
     const model = createHarnessLanguageModel(config, services.deepseek, 'deepseek-chat');
-    await generateText({model, system: 'Use Chinese', prompt: 'Explain'});
+    await generateText({model, instructions: 'Use Chinese', prompt: 'Explain'});
   });
 
   it('supports explicit compatible endpoint overrides and disabled thinking', async () => {
@@ -423,7 +423,7 @@ describe('harness model gateway', () => {
     setRuntimeFetch(directFetch);
     const directConfig = new Config();
     directConfig.token[services.claude] = 'direct-secret';
-    expect((await generateText({model: createHarnessLanguageModel(directConfig, services.claude, 'claude-test'), prompt: 'Explain'})).text).toBe('direct');
+    expect((await generateText({model: createHarnessLanguageModel(directConfig, services.claude, 'claude-test'), prompt: 'Explain', maxOutputTokens: 1200})).text).toBe('direct');
     expect(createHarnessLanguageModel(new Config(), services.claude, 'claude-no-key')).toBeTruthy();
   });
 
@@ -559,7 +559,7 @@ describe('harness model gateway multi-key rotation', () => {
     const chunks = partial.textStream[Symbol.asyncIterator]();
     expect(await chunks.next()).toEqual({value: 'once', done: false});
     transport!.error(new Error('partial stream failure'));
-    await expect(chunks.next()).rejects.toThrow('partial stream failure');
+    await expect(chunks.next()).rejects.toMatchObject({message: 'Failed to process successful response', cause: {message: 'partial stream failure'}});
     expect(calls).toBe(1);
   });
 });

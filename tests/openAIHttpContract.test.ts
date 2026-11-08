@@ -5,27 +5,12 @@
  * 模块边界：不 mock SDK、不读取研究目录、不联网；不替代共享 transport 的预算、租约、用量与真实浏览器验收。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {createOpenAICompatible} from '@ai-sdk/openai-compatible';
-import {generateText} from 'ai';
-import {normalizeAiSdkError} from '@/src/providers/translation/ai-sdk/errors';
+import {openAICompatibleSdkExecution as sdkExecution} from '@/src/providers/translation/ai-sdk/openai-compatible';
 import {standaloneOpenAIExecution} from '@/src/providers/translation/ai-sdk/openai-http';
 import type {OpenAICompatibleCall, OpenAICompatibleExecution} from '@/src/providers/translation/ai-sdk/openai-transport';
 
 const EPOCH = Date.UTC(2026, 9, 15);
 const SECRET = 'contract-fixture-secret';
-const sdkExecution: OpenAICompatibleExecution = {
-  async run(call) {
-    const provider = createOpenAICompatible({
-      name: 'fluentread', baseURL: call.endpoint.baseURL, apiKey: call.apiKey,
-      headers: call.headers, queryParams: call.endpoint.queryParams,
-      fetch: call.fetch, transformRequestBody: () => call.requestBody,
-    });
-    return (await generateText({model: provider(call.requestBody.model as string),
-      prompt: 'FluentRead OpenAI-compatible request', maxRetries: call.maxRetries, abortSignal: call.signal})).text;
-  },
-  normalizeError: normalizeAiSdkError,
-};
-
 type BodyLifecycle = {reads: number; cancel: number; releaseLock: number; streamCancel: number};
 type Reply = {
   body?: unknown;
@@ -150,6 +135,7 @@ async function compare(scenario: Scenario) {
 
 beforeEach(() => {
   vi.stubGlobal('window', {});
+  vi.stubGlobal('navigator', {userAgent: 'FluentRead Fixture Browser'});
   vi.stubGlobal('fetch', vi.fn(() => {throw new Error('External network is forbidden in contract tests');}));
   vi.stubGlobal('AI_SDK_TELEMETRY_INTEGRATIONS', undefined);
 });
@@ -167,7 +153,7 @@ describe('standalone OpenAI HTTP contract against the real SDK', () => {
     response_format: {type: 'json_object'}, custom_field: [0, false, ''], stream: false};
     const result = await compare({replies: [{body: success()}], call: {requestBody}});
     expect(result.requests[0].body).toBe(JSON.stringify(requestBody));
-    expect(result.requests[0].headers['user-agent']).toBe('ai/6.0.264 ai-sdk/provider-utils/4.0.46 runtime/browser');
+    expect(result.requests[0].headers['user-agent']).toBe('ai/7.0.165 ai-sdk-provider-utils/5.0.76 fluentread fixture browser');
     expect(result.requests[0].url).toBe('https://fixture.invalid/v1/chat/completions?api-version=fixture+version');
   });
 
@@ -257,7 +243,15 @@ describe('standalone OpenAI HTTP contract against the real SDK', () => {
     expect(result.outcome).toEqual({ok: true, text: 'content' in message ? message.content || '' : ''});
   });
 
+  it('joins only text parts of structured content without returning reasoning or refusal', async () => {
+    const content = [{type: 'text', text: '译'}, {type: 'thinking', thinking: [{type: 'text', text: 'hidden'}]},
+      {type: 'text', text: 2}, {type: 'text', text: '文'}];
+    const result = await compare({replies: [{body: success({content, refusal: 'not a translation'})}]});
+    expect(result.outcome).toEqual({ok: true, text: '译文'});
+  });
+
   it.each([
+    ['invalid part type', success({content: [{type: 1, text: 'not text'}]})],
     ['number content', success({content: 123})], ['wrong role', success({role: 'user', content: '译文'})],
     ['number reasoning', success({reasoning: 123})], ['number id', success({content: null}, {id: 123})],
     ['string created', success({}, {created: 'now'})], ['invalid usage', success({}, {usage: {prompt_tokens: '4'}})],
@@ -340,14 +334,14 @@ describe('standalone OpenAI HTTP contract against the real SDK', () => {
   it('intentionally does not read or run host telemetry while preserving the actual translation', async () => {
     const events: Array<{name: string; value: unknown}> = [];
     const getter = vi.fn(() => [{
-      onStart(event: {prompt?: unknown}) {events.push({name: 'start', value: event.prompt});},
-      onFinish(event: {text?: unknown; request?: {body?: unknown}}) {events.push({name: 'finish', value: {text: event.text, body: event.request?.body}});},
+      onStepStart(event: {messages?: unknown}) {events.push({name: 'start', value: event.messages});},
+      onEnd(event: {text?: unknown; finalStep?: {request?: {body?: unknown}}}) {events.push({name: 'end', value: {text: event.text, body: event.finalStep?.request?.body}});},
     }]);
     Object.defineProperty(globalThis, 'AI_SDK_TELEMETRY_INTEGRATIONS', {configurable: true, get: getter});
     const sdk = await observe(sdkExecution, {replies: [{body: success()}]});
     expect(getter).toHaveBeenCalledTimes(1);
-    expect(events).toEqual([{name: 'start', value: 'FluentRead OpenAI-compatible request'},
-      {name: 'finish', value: {text: '译文', body: sdk.requests[0].body}}]);
+    expect(events).toEqual([{name: 'start', value: [{role: 'user', content: 'FluentRead OpenAI-compatible request'}]},
+      {name: 'end', value: {text: '译文', body: undefined}}]);
     getter.mockClear(); events.length = 0;
     const standalone = await observe(standaloneOpenAIExecution, {replies: [{body: success()}]});
     expect(standalone).toEqual(sdk);

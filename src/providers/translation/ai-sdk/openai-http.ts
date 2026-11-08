@@ -3,9 +3,11 @@
  * 文件职责：执行 FluentRead 已准备的非流式 OpenAI 兼容 HTTP 请求，供普通与 standalone 脚本使用。
  * 主要内容：保持锁定 SDK 的请求头、响应文本校验、有限读取和重试等待合同，保留取消信号及最后一次 HTTP 错误；具体 payload、并发租约和用量仍经共享 transport 处理。
  * 模块边界：不是通用 SDK 替代，不提供工具、流式或结构化生成 API，不执行宿主页注入的 SDK telemetry 钩子；不持有配置、缓存或凭据，不直接调用全局 fetch。
- * 协议依据：Vercel AI SDK 6.0.264、openai-compatible 2.0.70 与 provider-utils 4.0.46（Apache-2.0）；产物保留上游版权和许可来源。
+ * 协议依据：Vercel AI SDK 7.0.165、openai-compatible 3.0.87 与 provider-utils 5.0.76（Apache-2.0）；产物保留上游版权和许可来源。
  */
+import {readRuntimeUserAgent} from '@/src/platform/browser/capabilities';
 import type {OpenAICompatibleCall, OpenAICompatibleExecution} from './openai-transport';
+import {readOpenAICompatibleText, type OpenAICompatibleMessageContent} from './openai-response-text';
 import {normalizeLlmTransportError, type LlmHttpFailure} from './transport-errors';
 
 class HttpFailure extends Error implements LlmHttpFailure {
@@ -28,7 +30,7 @@ function httpFailure(response: Response, message: string, body?: string): HttpFa
     status, Object.fromEntries(response.headers.entries()), body);
 }
 
-// 对照 ai6.0.264/provider-utils4.0.46 的有限读取合同；先检查声明长度，随后按真实字节累计。
+// 对照 ai7.0.165/provider-utils5.0.76 的有限读取合同；先检查声明长度，随后按真实字节累计。
 async function readBody(response: Response): Promise<string> {
   const limit = 2 * 1024 * 1024 * 1024;
   const declared = response.headers.get('content-length');
@@ -95,13 +97,15 @@ function validTool(value: unknown): boolean {
   return extra == null || record(extra) && (extra.google == null || record(extra.google) && string(extra.google.thought_signature));
 }
 
-function validResponse(value: unknown): value is {choices: Array<{message: {content?: string | null}}> } {
+function validResponse(value: unknown): value is {choices: Array<{message: {content?: OpenAICompatibleMessageContent}}> } {
   return record(value) && safeTree(value) && fields(value, ['id', 'model'], string) && number(value.created)
     && validUsage(value.usage) && Array.isArray(value.choices) && value.choices.every(choice => {
       if (!record(choice) || !string(choice.finish_reason) || !record(choice.message)) return false;
       const message = choice.message;
       return (message.role == null || message.role === 'assistant')
-        && fields(message, ['content', 'reasoning_content', 'reasoning'], string)
+        && (string(message.content) || Array.isArray(message.content)
+          && message.content.every(part => record(part) && typeof part.type === 'string'))
+        && fields(message, ['reasoning_content', 'reasoning'], string)
         && (message.tool_calls == null || Array.isArray(message.tool_calls) && message.tool_calls.every(validTool));
     });
 }
@@ -132,8 +136,9 @@ async function attempt(call: OpenAICompatibleCall, url: string, headers: Record<
   let parsed: unknown;
   try { parsed = JSON.parse(body); } catch { /* 与 schema 失败统一为不可重试的 HTTP 响应错误。 */ }
   if (!validResponse(parsed)) throw httpFailure(response, 'Invalid JSON response', body);
-  // 空 choices 在原 SDK 中是原生 TypeError；不伪装成空译文成功。
-  return parsed.choices[0]!.message.content || '';
+  const choice = parsed.choices[0];
+  if (!choice) throw new Error('Response did not contain any choices.');
+  return readOpenAICompatibleText(choice.message.content);
 }
 
 function retryDelay(error: HttpFailure, fallback: number): number {
@@ -169,7 +174,7 @@ export const standaloneOpenAIExecution: OpenAICompatibleExecution = {
       'content-type': 'application/json',
       ...(call.apiKey ? {authorization: `Bearer ${call.apiKey}`} : {}),
       ...call.headers,
-      'user-agent': 'ai/6.0.264 ai-sdk/provider-utils/4.0.46 runtime/browser',
+      'user-agent': ['ai/7.0.165 ai-sdk-provider-utils/5.0.76', readRuntimeUserAgent(globalThis).toLowerCase()].filter(Boolean).join(' '),
     }).entries());
     const send = async (retry: number): Promise<string> => {
       try { return await attempt(call, url.toString(), headers); }

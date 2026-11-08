@@ -18,7 +18,7 @@ export function createHarnessUsageEvent(input: {
     actualModel?: string;
     startedAt: number;
     durationMs: number;
-    usage?: LanguageModelUsage;
+    usage?: LanguageModelUsage & {cachedInputTokens?: number; reasoningTokens?: number};
     outcome: ModelUsageOutcome;
 }): ModelUsageEvent {
     const usage = input.usage;

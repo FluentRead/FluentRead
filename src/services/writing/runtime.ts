@@ -113,12 +113,12 @@ export function createWritingRuntime(getConfig: () => Config, record?: (event: M
                 generationStarted = true;
                 const startedAt = Date.now();
                 try {
-                    const result = streamText({model, system: input.system, messages: input.messages as ModelMessage[],
+                    const result = streamText({model, instructions: input.system, messages: input.messages as ModelMessage[],
                         ...(Object.keys(toolSet).length ? {tools: toolSet} : {}), abortSignal: input.signal,
                         maxRetries: 0, maxOutputTokens: request.intent === 'translate' ? 6000 : 3000});
                     let text = '';
                     const toolCalls: HarnessToolCall[] = [];
-                    for await (const part of result.fullStream) {
+                    for await (const part of result.stream) {
                         if (input.signal.aborted) throw new Error('已停止生成');
                         if (part.type === 'error') throw part.error;
                         if (part.type === 'text-delta') { text += part.text; input.onText?.(text); }
@@ -126,11 +126,11 @@ export function createWritingRuntime(getConfig: () => Config, record?: (event: M
                     }
                     if (!text.trim() && !toolCalls.length) throw new Error('模型没有返回正文，请重试');
                     if (request.intent === 'translate' && await result.finishReason === 'length') throw new Error('对照译文未完整生成，请重试');
-                    const [usage, response] = await Promise.all([result.usage, result.response]);
+                    const [usage, {response}, messages] = await Promise.all([result.usage, result.finalStep, result.responseMessages]);
                     if (input.signal.aborted) throw new Error('已停止生成');
                     actualModel = response.modelId || modelId;
                     save(createHarnessUsageEvent({service, model: modelId, actualModel, startedAt, durationMs: Date.now() - startedAt, usage, outcome: 'success'}));
-                    const assistant = response.messages.find(message => message.role === 'assistant');
+                    const assistant = messages.find(message => message.role === 'assistant');
                     return {assistant: {role: 'assistant', content: assistant?.content ?? [{type: 'text', text}]}, text, toolCalls};
                 } catch (error) {
                     save(createHarnessUsageEvent({service, model: modelId, startedAt, durationMs: Date.now() - startedAt,

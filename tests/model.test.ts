@@ -119,6 +119,10 @@ describe('AI 模型编号列表', () => {
             'deepseek-v4.1-flash', 'kimi-k3', 'qwen3.6-35b', customModelString,
         ]);
         expect(defaultModelIds[services.cloudgpu]).toBe('deepseek-v4.1-flash');
+        expect(models.get(services.cheapaimodel)).toEqual([
+            'deepseek-v4-1-flash', 'glm-5.3-flash', 'glm-5.3', customModelString,
+        ]);
+        expect(defaultModelIds[services.cheapaimodel]).toBe('deepseek-v4-1-flash');
         expect(models.get(services.yiyan)).toContain('ernie-5.1');
         expect(models.get(services.minimax)).toContain('MiniMax-M2.7');
         expect(models.get(services.minimax)).toContain('MiniMax-M3');
@@ -178,6 +182,8 @@ describe('AI 模型编号列表', () => {
             services.perplexity,
             services.runcrate,
             services.cloudgpu,
+            services.cheaperinference,
+            services.cheapaimodel,
             services.ollama,
             services.custom,
         ]);
@@ -197,6 +203,8 @@ describe('AI 模型编号列表', () => {
             services.perplexity,
             services.runcrate,
             services.cloudgpu,
+            services.cheaperinference,
+            services.cheapaimodel,
             services.ollama,
             services.custom,
         ]);

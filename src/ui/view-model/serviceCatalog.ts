@@ -70,6 +70,8 @@ const serviceWebsites = {
   perplexity: 'https://www.perplexity.ai/account/api',
   runcrate: 'https://www.runcrate.ai/dashboard/api-keys',
   cloudgpu: 'https://cloudgpu.app/api/console',
+  cheaperinference: 'https://cheaperinference.com',
+  cheapaimodel: 'https://console.cheapaimodel.ai/keys',
 } satisfies Record<keyof typeof services, string>
 
 /**

@@ -293,6 +293,29 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
     expect(JSON.parse(String(init.body))).toMatchObject({model: 'deepseek-v4.1-flash', stream: false});
   });
 
+  it.each([
+    {service: services.cheaperinference, model: 'gpt-5.4-mini', endpoint: 'https://api.cheaperinference.com/v1/chat/completions'},
+    {service: services.cheapaimodel, model: 'deepseek-v4-1-flash', endpoint: 'https://api.cheapaimodel.ai/v1/chat/completions'},
+  ].flatMap(provider => ['', 'https://gateway.example/v1/chat/completions'].map(proxy => ({
+    ...provider,
+    proxy,
+  }))))('$service keeps its own credentials and model with proxy "$proxy"', async ({service, model, endpoint, proxy}) => {
+    mockConfig.service = service;
+    mockConfig.model = {[service]: model, [services.openai]: 'other-model'};
+    mockConfig.token = {[service]: `fixture-${service}-only`, [services.openai]: 'fixture-openai-only'};
+    mockConfig.proxy = {[service]: proxy};
+    const fetchMock = vi.fn().mockImplementation(async () => successResponse('已验证服务路由'));
+    setRuntimeFetch(fetchMock);
+
+    await expect(translateWithOpenAICompatibleAiSdk(withProviderSnapshot({origin: 'hello'}, mockConfig)))
+      .resolves.toBe('已验证服务路由');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(proxy || endpoint);
+    expect(new Headers(init.headers).get('Authorization')).toBe(`Bearer fixture-${service}-only`);
+    expect(JSON.parse(String(init.body))).toMatchObject({model, stream: false});
+  });
+
   it('preserves custom top-level fields while keeping the SDK-owned stream mode', async () => {
     mockConfig.custom = 'http://127.0.0.1:11434/non-standard-generate';
     mockConfig.customBody[services.custom] = JSON.stringify({

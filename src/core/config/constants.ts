@@ -99,6 +99,8 @@ export const urls: any = {
     [services.perplexity]: "https://api.perplexity.ai/chat/completions",
     [services.runcrate]: "https://api.runcrate.ai/v1/chat/completions",
     [services.cloudgpu]: "https://cloudgpu.app/v1/chat/completions",
+    [services.cheaperinference]: "https://api.cheaperinference.com/v1/chat/completions",
+    [services.cheapaimodel]: "https://api.cheapaimodel.ai/v1/chat/completions",
     [services.ollama]: DEFAULT_OLLAMA_ENDPOINT,
     // 云服务厂商机器翻译。Azure、阿里云与火山引擎的实际域名由所选地域决定，
     // 这里登记默认地域的地址，供凭据绑定与设置页展示使用。

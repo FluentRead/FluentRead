@@ -368,7 +368,7 @@ describe('settings center CLI remaining current UI contracts', () => {
 
     it('keeps the complete custom-service name visible, wrapping and within its card', () => {
         const {matchesWrappedServiceLabel} = bindings(['matchesWrappedServiceLabel']);
-        const css = cssDeclarations('src/features/settings/ui/services/ServiceCatalogItem.vue', '.library-copy strong');
+        const css = cssDeclarations('src/features/settings/ui/services/ServiceCatalogItem.vue', '.library-name strong');
         expect(css['white-space']).toBe('normal');
         expect(css['overflow-wrap']).toBe('anywhere');
         const metrics = {

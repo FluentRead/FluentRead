@@ -3517,7 +3517,7 @@ async function main() {
     }
     const customServiceLabelLayout = await customServiceSection.locator(`[data-service-value="${customServiceId}"]`).evaluate(button => {
       const card = button.closest('.library-item')?.getBoundingClientRect();
-      const label = button.querySelector('.library-copy strong');
+      const label = button.querySelector('.library-name strong');
       const labelRect = label?.getBoundingClientRect();
       const labelStyle = label ? getComputedStyle(label) : null;
       return {
@@ -3531,7 +3531,6 @@ async function main() {
         textOverflow: labelStyle?.textOverflow ?? '',
         whiteSpace: labelStyle?.whiteSpace ?? '',
         overflowWrap: labelStyle?.overflowWrap ?? '',
-        status: button.querySelector('.library-copy small')?.textContent?.trim() || '',
       };
     });
     // ServiceCatalogItem.vue 明确允许完整名称换行，仍必须可见且落在卡片边界内。

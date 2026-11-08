@@ -58,7 +58,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
 
 type ItemProps = {
     item: ServiceOption; selected: boolean; isDefault: boolean; isConfigured: boolean;
-    isFavorite: boolean; compact: boolean; status: string; removeDisabled?: boolean;
+    isFavorite: boolean; removeDisabled?: boolean;
 };
 let app: Vue.App | undefined, root: HTMLElement;
 async function settle(): Promise<void> {await Vue.nextTick(); await Vue.nextTick();}
@@ -70,7 +70,7 @@ async function mount(component: Vue.Component, props: Record<string, unknown>, o
 }
 async function mountItem(overrides: Partial<ItemProps> = {}) {
     const props = Vue.reactive<ItemProps>({item: {value: 'deeplx', label: 'DeepLX'}, selected: false,
-        isDefault: false, isConfigured: false, isFavorite: false, compact: true, status: '', ...overrides});
+        isDefault: false, isConfigured: false, isFavorite: false, ...overrides});
     const onSelect = vi.fn<(value: string) => void>();
     const onRemove = vi.fn<(service: string) => void>();
     const component = loadClient('src/features/settings/ui/services/ServiceCatalogItem.vue');
@@ -138,23 +138,20 @@ describe('服务目录行实际客户端模板', () => {
         expect(JSON.stringify(props)).toBe(before);
     });
 
-    it('公开 props 更新按默认、已保存、常用逐级切换，同时更新选中状态与紧凑说明', async () => {
-        const {props} = await mountItem({isDefault: true, isConfigured: true, isFavorite: true, status: '可用服务'});
+    it('公开 props 更新按默认、已保存、常用逐级切换，同时更新选中状态', async () => {
+        const {props} = await mountItem({isDefault: true, isConfigured: true, isFavorite: true});
         expectBadge('.library-default', '默认', true);
         expect(control('button').getAttribute('aria-pressed')).toBe('false');
-        expect(root.querySelector('small')).toBeNull();
-        props.isDefault = false; props.selected = true; props.compact = false; await settle();
+        props.isDefault = false; props.selected = true; await settle();
         expectBadge('.library-configured', '已保存');
         expect(root.querySelector('.library-default, .library-common')).toBeNull();
         expect(control('button').getAttribute('aria-pressed')).toBe('true');
         expect(control('.library-item').classList.contains('active')).toBe(true);
-        expect(control('.library-item').classList.contains('compact')).toBe(false);
-        expect(control('small').textContent).toBe('可用服务');
         props.isConfigured = false; await settle();
         expectBadge('.library-common', '常用');
         expect(root.querySelector('.library-configured')).toBeNull();
-        props.isFavorite = false; props.selected = false; props.status = ''; await settle();
-        expect(root.querySelector('.library-default, .library-configured, .library-common, small')).toBeNull();
+        props.isFavorite = false; props.selected = false; await settle();
+        expect(root.querySelector('.library-default, .library-configured, .library-common')).toBeNull();
         expectBadge('[data-service-nature-badge="deeplx"]', '免费 · 非官方');
         expect(control('button').getAttribute('aria-pressed')).toBe('false');
         expect(control('.library-item').classList.contains('active')).toBe(false);

@@ -28,7 +28,7 @@
         <button ref="directoryToggle" type="button" class="mobile-directory-toggle" :disabled="!active" :aria-expanded="directoryOpen" :aria-controls="directoryId" :onClick="actions.toggleDirectory">
           <ServiceIcon :service="isCustomOpenAIProviderId(service) ? 'custom' : service" :label="selectedService?.label" size="small" />
           <span class="mobile-directory-name">{{ selectedService?.label }}</span><small>{{ t('settings.organization.chooseService') }}</small>
-          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+          <UiIcon name="chevron-down" :size="16" />
         </button>
         <div :id="directoryId" class="service-directory-content">
         <div class="rail-heading">
@@ -38,7 +38,7 @@
           </div>
           <el-tooltip :content="t('settings.services.library.addHelp')" placement="bottom" :show-after="250" :trigger="['hover', 'focus']" :disabled="!active || addServiceFeedbackVisible">
           <button ref="addButton" type="button" class="service-add-button" data-testid="custom-service-add" :disabled="!active" :aria-label="t('settings.services.library.add')" :onClick="actions.addService">
-            <svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14" /></svg>
+            <UiIcon name="plus" :size="15" />
             <span>{{ t('settings.services.library.add') }}</span>
           </button>
           </el-tooltip>
@@ -49,7 +49,7 @@
           <UiIcon name="plus" :size="14" />{{ t('settings.services.library.restoreDirectory') }}
         </button>
         <label class="catalog-search">
-          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+          <UiIcon name="search" :size="16" />
           <input :value="serviceQuery" :disabled="!active" :onInput="actions.updateQuery" type="search" :aria-label="directorySearchLabel" :placeholder="directorySearchLabel" />
         </label>
         <div ref="groupsElement" class="service-groups" :onScrollPassive="actions.syncActiveGroup" :onWheelPassive="actions.releasePinnedGroup" :onTouchstartPassive="actions.releasePinnedGroup" :onPointerdown="actions.releasePinnedGroup" :onKeydown="actions.releasePinnedGroup" :onFocusin="actions.releasePinnedGroup">
@@ -71,7 +71,7 @@
               </button>
             </h4>
             <div v-show="isGroupOpen(group.id)" :id="`${directoryId}-${group.id}`" class="directory-items">
-              <ServiceCatalogItem v-for="item in group.items" :key="item.value" :item="item" compact
+                <ServiceCatalogItem v-for="item in group.items" :key="item.value" :item="item"
                 :selected="service === item.value" :is-default="defaultService === item.value"
                 :is-configured="configuredSet.has(item.value)" :is-favorite="favoriteSet.has(item.value)"
                 :remove-disabled="!active || item.disabled || enabledServiceCount <= 1"
@@ -117,7 +117,7 @@
               :disabled="!active || service === defaultService || !selectedService || selectedService.disabled"
               :onClick="actions.setDefaultService"
             >
-              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+              <UiIcon name="check" :size="16" />
               {{ t(service === defaultService ? 'settings.services.library.default' : 'settings.services.library.setDefault') }}
             </button>
             <div ref="connectionActionTarget" class="hero-connection-action" />

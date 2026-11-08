@@ -218,10 +218,6 @@ const faqs = [
             'The project is currently funded mainly out of pocket, with a few hundred US dollars spent each month on maintenance. We believe FluentRead can make the world a little better.'
           )
         }}</p>
-        <div class="bv-sponsor-contact">
-          <a class="bv-text-link" href="mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship">{{ t('邮件联系', 'Email us') }} →</a>
-          <a class="bv-text-link" :href="withBase('/support/wechat-contact.jpg')" target="_blank" rel="noopener noreferrer">{{ t('添加微信', 'Add on WeChat') }} ↗</a>
-        </div>
       </div>
       <div>
         <ul class="fr-sponsor-grid" :aria-label="t('赞助伙伴', 'Sponsors')">
@@ -238,10 +234,16 @@ const faqs = [
             </a>
             <span v-if="sponsor.recognition" class="fr-sponsor-recognition">{{ sponsor.recognition }}</span>
           </li>
+          <li>
+            <a class="fr-sponsor-tile fr-sponsor-invite" :href="link('/guide/support#sponsorship')">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+                <circle cx="16" cy="16" r="13" />
+                <path d="M16 10v12m-6-6h12" stroke-linecap="round" />
+              </svg>
+              <strong>{{ t('成为赞助伙伴', 'Become a sponsor') }}</strong>
+            </a>
+          </li>
         </ul>
-        <a class="bv-text-link" :href="link('/guide/support#sponsorship')">
-          {{ t('成为赞助伙伴', 'Become a sponsor') }} <span aria-hidden="true">→</span>
-        </a>
       </div>
     </section>
     <section class="bv-section bv-faq">
@@ -329,6 +331,16 @@ const faqs = [
 .fr-sponsor-tile > span {
   color: var(--fr-muted);
   font-size: 11px;
+}
+.fr-sponsor-invite {
+  gap: 8px;
+  border-color: #d58ba5;
+  border-style: dashed;
+  background: #fff4f8;
+  color: var(--vp-c-brand-1);
+}
+.fr-sponsor-invite:hover {
+  background: #fceaf1;
 }
 .fr-sponsor-recognition {
   display: block;

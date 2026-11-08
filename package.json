@@ -105,7 +105,7 @@
     "onnxruntime-web": "1.23.2",
     "pako": "2.1.0",
     "pdf-lib": "1.17.1",
-    "pdfjs-dist": "4.10.38",
+    "pdfjs-dist": "6.5.438",
     "pinyin-pro": "3.29.4",
     "ppu-paddle-ocr": "6.6.0",
     "saxes": "6.0.0",

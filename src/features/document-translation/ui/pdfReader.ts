@@ -187,14 +187,14 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 // 仅译文原版排版直接从此画布逐段取色；其他源画布无需牺牲绘制加速。
                 const context = canvas.getContext('2d', {alpha: false, ...(!readable && !showSource ? {willReadFrequently: true} : {})});
                 if (!context) throw new Error('浏览器 Canvas 初始化失败');
-                renderTask = page.render({canvasContext: context, viewport, transform: [size.outputScale, 0, 0, size.outputScale, 0, 0], background: '#ffffff'});
+                renderTask = page.render({canvas: null, canvasContext: context, viewport, transform: [size.outputScale, 0, 0, size.outputScale, 0, 0], background: '#ffffff'});
                 const work = [abortable(renderTask.promise, controller.signal)];
                 if (showSource) {
                     text = globalThis.document.createElement('div');
                     text.className = 'fluentread-pdf-text-layer';
                     text.setAttribute('data-fluentread-pdf-text', '');
                     text.setAttribute('data-pdf-page-number', String(model.pageNumber));
-                    text.style.setProperty('--scale-factor', String(viewport.scale));
+                    text.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit));
                     textLayer = new module.TextLayer({textContentSource: page.streamTextContent(), container: text, viewport});
                     work.push(abortable(textLayer.render(), controller.signal));
                 }

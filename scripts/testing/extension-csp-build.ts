@@ -11,8 +11,8 @@ const SOURCE_SHA256 = {
     'tesseract-worker': '576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d',
     'regenerator-runtime': 'e4fa2bcc7507e23fb226bad104bd3c526149ebc9891afbc4bb3a4a0c88afded3',
     'jszip': 'acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e',
-    'pdfjs-main': '081d3b6f426d38a8029766f8839f505e9cbf2c81a71d62c26eada142e6c21ae4',
-    'pdfjs-worker': 'bd88805178a26c729db8c0107a5b630cb900ec070f4d8c7529a3e45530afd41d',
+    'pdfjs-main': '2792b7c390ad6d5f4245d326b70deebbc990fa4bcac691412f6df886abb9e867',
+    'pdfjs-worker': 'b4c8353ded0d88d2e2009574a29eb4e0c3ff7e942ecdf51ef5f71566a9667f31',
     'fontkit': '62ad9c769e6a7a9028b0c711504908f0a231955b39619aaabd56dd4eabe800be',
     'lodash-root': 'df58ff96c454ca91ace20d20e6af49b354c70dfba7e737adc00cd23e8ff77168',
     'onnx-asyncify': '5959c6733039619c9af710d8e1bae8d6e84402787990637be987c2b1bd6c5fa9',
@@ -64,17 +64,13 @@ export function patchExtensionVendorSource(kind: ExtensionVendorSource, original
             return replaceOnce(source, '"function"!=typeof e&&(e=new Function(""+e));',
                 'if("function"!=typeof e)throw new TypeError("setImmediate callback must be a function");');
         case 'pdfjs-main':
-            // 此构建仅运行于浏览器；Node require 回退不可达，浏览器全局由原生 globalThis 提供。
-            source = replaceOnce(source, `Function('return require("' + name + '")')()`, 'undefined');
-            source = replaceOnce(source, "Function('return this')()", 'globalThis');
-            return replaceOnce(source, 'function isEvalSupported() {\n  try {\n    new Function("");\n    return true;\n  } catch {\n    return false;\n  }\n}',
-                'function isEvalSupported() { return false; }');
+            // PDF.js 6 已移除字符串代码生成；旧浏览器 polyfill 的全局回退替换为原生全局。
+            return replaceOnce(source, "Function('return this')()", 'globalThis');
         case 'pdfjs-worker':
-            source = replaceOnce(source, `Function('return require("'+e+'")')()`, 'undefined');
             source = replaceOnce(source, 'Function("return this")()', 'globalThis');
-            source = replaceOnce(source, 'function isEvalSupported(){try{new Function("");return!0}catch{return!1}}', 'function isEvalSupported(){return!1}');
-            // PDF.js 自带 PostScriptEvaluator 完整解释执行路径；始终使用扩展 CSP 允许的路径。
-            return replaceOnce(source, 'if(t&&FeatureTest.isEvalSupported){const e=(new PostScriptCompiler).compile(o,r,s);if(e)return new Function("src","srcOffset","dest","destOffset",e)}', '');
+            // 保留 PostScript 解释执行策略。图片解码仍可使用预编译的本地 WASM。
+            source = replaceOnce(source, 'try{if(e.useWasm){const e=buildPostScriptWasmFunction(s,a,r);if(e)return setArity(e,i,o)}}catch{}warn("Failed to compile PostScript function to wasm, falling back to JS");', '');
+            return replaceOnce(source, ':PSStackBasedInterpreter.build(r,t,n)}(s,a,r),i,o)', ':PSStackBasedInterpreter.build(r,t,n)}(s,a,r,!0),i,o)');
         case 'fontkit':
             source = replaceOnce(source, "bound = Function('binder', 'return function (' + boundArgs.join(',') + '){ return binder.apply(this,arguments); }')(binder);",
                 "bound = function () { return binder.apply(this, arguments); };\n  Object.defineProperty(bound, 'length', {value: boundLength});");

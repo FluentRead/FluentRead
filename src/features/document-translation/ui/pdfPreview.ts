@@ -101,11 +101,12 @@ function browserPdfDocument(bytes: Uint8Array): BrowserPdfResource {
         resource.task = getDocument({
             data: new Uint8Array(bytes),
             disableFontFace: false,
-            isEvalSupported: false,
+            disableWorkerRendering: true,
             useWorkerFetch: false,
             cMapPacked: true,
             cMapUrl: `${pdfAssetRoot}/cmaps/`,
             standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
+            wasmUrl: `${pdfAssetRoot}/wasm/`,
         });
         return resource.task.promise;
     }).catch((error) => {
@@ -188,7 +189,7 @@ async function renderPdfSourceCanvas(bytes: Uint8Array, pageNumber: number, widt
         if (!context) throw new Error('浏览器 Canvas 初始化失败');
         context.fillStyle = '#ffffff';
         context.fillRect(0, 0, canvas.width, canvas.height);
-        const task = page.render({canvasContext: context, viewport});
+        const task = page.render({canvas: null, canvasContext: context, viewport});
         const cancel = () => task.cancel();
         controller.signal.addEventListener('abort', cancel, {once: true});
         if (controller.signal.aborted) cancel();

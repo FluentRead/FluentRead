@@ -12,6 +12,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {Script} from 'node:vm';
 import {createRequire} from 'node:module';
 import JSZip from 'jszip';
+import {PDFJS_DECODER_FILES} from '../../scripts/testing/pdfjs-assets.mjs';
 
 const integrationDir = dirname(fileURLToPath(import.meta.url));
 const repositoryDir = resolve(integrationDir, '../..');
@@ -21,6 +22,7 @@ const requiredFiles = [
     'manifest.json', 'bootstrap.js', 'content/native.js', 'content/workspace.js',
     'content/workspace.html', 'content/workspace.css', 'content/pdfjs/pdf.worker.min.mjs',
     'content/pdfjs/cmaps/UniGB-UCS2-H.bcmap', 'content/pdfjs/standard_fonts/LiberationSans-Regular.ttf',
+    ...PDFJS_DECODER_FILES.map(file => `content/pdfjs/wasm/${file}`),
     'LICENSE', 'THIRD-PARTY-NOTICES.md',
 ];
 
@@ -83,6 +85,9 @@ async function assemble() {
     for (const resource of ['cmaps', 'standard_fonts']) {
         await cp(join(pdfDir, resource), join(outputDir, 'content/pdfjs', resource), {recursive: true});
     }
+    for (const file of PDFJS_DECODER_FILES) {
+        await copyFile(join(pdfDir, 'wasm', file), join(outputDir, 'content/pdfjs/wasm', file));
+    }
     await copyFile(join(pdfDir, 'LICENSE'), join(outputDir, 'content/pdfjs/LICENSE'));
     const noticesDir = join(outputDir, 'licenses');
     await mkdir(noticesDir, {recursive: true});
@@ -96,7 +101,7 @@ async function assemble() {
         'FluentRead for Zotero is independently implemented under GPL-3.0. Source: https://github.com/Bistutu/FluentRead', '',
         'Bundled dependencies retain their licenses in licenses/ and content/pdfjs/LICENSE.',
         '- Vue: MIT, https://github.com/vuejs/core',
-        '- PDF.js: Apache-2.0, https://github.com/mozilla/pdf.js; CMap and standard-font licenses accompany those files.',
+        '- PDF.js: Apache-2.0, https://github.com/mozilla/pdf.js; CMap, standard-font and image-decoder licenses accompany those files.',
         '- bidi-js 1.1.0: MIT, https://github.com/lojjic/bidi-js; the unchanged PDF.js bidi kernel is statically extracted at build time.',
         '- pdf-lib and fontkit: MIT, https://github.com/Hopding/pdf-lib and https://github.com/Hopding/fontkit',
         '- JSZip: MIT or GPL-3.0, https://github.com/Stuk/jszip',

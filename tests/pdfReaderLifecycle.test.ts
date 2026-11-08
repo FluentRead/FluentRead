@@ -65,7 +65,9 @@ beforeEach(() => {
     storage = new Map(); vi.stubGlobal('localStorage', {getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => {storage.set(key, value);}});
     vi.stubGlobal('ResizeObserver', class {constructor(callback: ResizeObserverCallback) {resizeCallback = callback;} observe = vi.fn(); unobserve = vi.fn(); disconnect = disconnect;});
     vi.stubGlobal('document', document); vi.stubGlobal('window', win);
-    pdfPage = {getViewport: vi.fn(({scale}: {scale: number}) => ({width: 612 * scale, height: 792 * scale, scale, transform: [scale, 0, 0, -scale, 0, 792 * scale]})), cleanup: vi.fn(), streamTextContent: vi.fn(() => ({fixture: 'text stream'})), render: vi.fn(() => ({promise: Promise.resolve(), cancel: vi.fn()}))};
+    vi.stubGlobal('Document', document.defaultView!.Document);
+    vi.stubGlobal('ShadowRoot', document.defaultView!.ShadowRoot);
+    pdfPage = {getViewport: vi.fn(({scale}: {scale: number}) => ({width: 612 * scale, height: 792 * scale, scale, userUnit: 1, transform: [scale, 0, 0, -scale, 0, 792 * scale]})), cleanup: vi.fn(), streamTextContent: vi.fn(() => ({fixture: 'text stream'})), render: vi.fn(() => ({promise: Promise.resolve(), cancel: vi.fn()}))};
     destroy = vi.fn(async () => {});
     ports.getDocument.mockImplementation(() => ({promise: Promise.resolve({getPage: vi.fn(async () => pdfPage)}), destroy}));
 });
@@ -221,7 +223,7 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         const result = await reader.render(pageModel(1), settings(), new AbortController().signal);
         expect(result.sourceText?.textContent).toBe('Original PDF words');
         expect(result.sourceText?.getAttribute('data-fluentread-pdf-text')).toBe('');
-        expect(result.sourceText?.style.getPropertyValue('--scale-factor')).toBe('1');
+        expect(result.sourceText?.style.getPropertyValue('--total-scale-factor')).toBe('1');
         expect(ports.textLayers[0].textContentSource).toEqual({fixture: 'text stream'});
         expect(ports.textLayers[0].viewport.scale).toBe(1);
         expect(pdfPage.render.mock.calls[0][0].transform).toEqual([2, 0, 0, 2, 0, 0]);

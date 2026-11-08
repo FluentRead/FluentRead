@@ -62,8 +62,15 @@ export function extractPdfGraphicsShapes(list: PdfGraphicsOperators, ops: Record
             matrix = stack.pop() || [...identity];
         } else if (fn === ops.transform && args) matrix = multiply(matrix, args);
         else if (fn === ops.paintImageXObject || fn === ops.paintInlineImageXObject || fn === ops.paintImageMaskXObject) add('image', boxFor([0, 0, 1, 1]));
-        else if (fn === ops.constructPath && args?.[2]) {const next = boxFor(args[2]); path = path ? union(path, next) : next;}
-        else if (paintsPath.has(fn)) {if (path) add('path', path); path = undefined;}
+        else if (fn === ops.constructPath && args) {
+            // PDF.js 6 combines construction and painting; older operator fixtures keep them separate.
+            if (typeof args[0] === 'number') {
+                if (args[2] && paintsPath.has(args[0])) add('path', boxFor(args[2]));
+            } else if (args[2]) {
+                const next = boxFor(args[2]);
+                path = path ? union(path, next) : next;
+            }
+        } else if (paintsPath.has(fn)) {if (path) add('path', path); path = undefined;}
         else if (fn === ops.endPath) path = undefined;
     }
     return shapes;

@@ -37,7 +37,7 @@ async function rotatedPdf(): Promise<Uint8Array> {
 
 async function outputText(bytes: Uint8Array): Promise<Array<Array<{str: string; transform: number[]}>>> {
     const {getDocument} = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    const task = getDocument({data: bytes.slice(), disableFontFace: true, isEvalSupported: false, useWorkerFetch: false});
+    const task = getDocument({data: bytes.slice(), disableFontFace: true, useWorkerFetch: false});
     try {
         const pdf = await task.promise;
         const pages: Array<Array<{str: string; transform: number[]}>> = [];
@@ -60,7 +60,7 @@ async function outputText(bytes: Uint8Array): Promise<Array<Array<{str: string; 
 
 async function displayedText(bytes: Uint8Array): Promise<Array<{width: number; height: number; text: Array<{str: string; transform: number[]}>}>> {
     const {getDocument} = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    const task = getDocument({data: bytes.slice(), disableFontFace: true, isEvalSupported: false, useWorkerFetch: false});
+    const task = getDocument({data: bytes.slice(), disableFontFace: true, useWorkerFetch: false});
     try {
         const pdf = await task.promise;
         const pages = [];
@@ -143,7 +143,7 @@ describe('real rotated PDF import and download', () => {
             page.drawText('Display text', {x: 70, y: 80, size: 12, rotate: degrees(90)});
         }
         const {getDocument} = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        const task = getDocument({data: await pdf.save(), disableFontFace: true, isEvalSupported: false, useWorkerFetch: false});
+        const task = getDocument({data: await pdf.save(), disableFontFace: true, useWorkerFetch: false});
         try {
             const source = await task.promise, actual = await source.getPage(1);
             try {

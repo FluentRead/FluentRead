@@ -16,18 +16,18 @@ describe('pinned PDF.js pure bidi build boundary', () => {
         const plugin = createPdfReaderBidiBuildPlugin(root), id = plugin.resolveId(PDF_READER_BIDI_ID)!;
         const built = plugin.load(id)!;
         const start = worker.indexOf(';// ./src/core/bidi.js\n'), end = worker.indexOf(';// ./src/core/font_substitutions.js');
-        const kernel = worker.slice(start, end), notice = worker.slice(0, 794);
-        expect(sha(kernel)).toBe('10317cd3e99766bc5fd73ab9bd2ec9cdd81b6367719a769027b5981e83fbcf52');
-        expect(sha(notice)).toBe('e2cee414b83b5912f41609bd79d8fc5561de11473ca7b63b88aa72e4c9ca7397');
+        const kernel = worker.slice(start, end), notice = worker.slice(0, worker.indexOf('*/') + 2);
+        expect(sha(kernel)).toBe('03f8324167fd1e03000c7214d4bacc673c56bff97169052f8ce42f450094fcc5');
+        expect(sha(notice)).toBe('93db28d6b86557c97d8320d1a317882c5a6f4f9862862412c6676e8a9ef76ca3');
         expect(built.startsWith(notice)).toBe(true); expect(built.split(kernel)).toHaveLength(2);
         expect(built).toContain('export function projectPdfReaderBidi(text)');
         expect(built).not.toMatch(/\b(?:import|Worker|eval|Function)\s*\(/u);
         expect(built).not.toContain('font_substitutions');
     });
     it.each([
-        ['version', worker, '4.10.39', license],
-        ['worker byte', worker + '\n', '4.10.38', license],
-        ['license byte', worker, '4.10.38', license + '\n'],
+        ['version', worker, '6.5.439', license],
+        ['worker byte', worker + '\n', '6.5.438', license],
+        ['license byte', worker, '6.5.438', license + '\n'],
     ])('refuses an unreviewed %s before delivering any module', (_label, source, version, licenseSource) => {
         expect(() => createPdfReaderBidiModule(source, version, licenseSource)).toThrow('Unsupported PDF.js reader source');
     });

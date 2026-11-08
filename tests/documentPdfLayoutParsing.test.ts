@@ -48,18 +48,18 @@ describe('real PDF structural parsing', () => {
     it('contains real Helvetica-Bold p/g outlines in both sample titles without changing their typography', async () => {
         const bytes = new Uint8Array(readFileSync(new URL('../examples/document-translation/sample.pdf', import.meta.url)));
         const before = bytes.slice();
-        class StandardFontDataFactory {
+        class BinaryDataFactory {
             async fetch({filename}: {filename: string}): Promise<Uint8Array> {
                 return new Uint8Array(readFileSync(new URL(`../node_modules/pdfjs-dist/standard_fonts/${filename}`, import.meta.url)));
             }
         }
         const {getDocument, OPS} = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        const loading = getDocument({data: bytes.slice(), disableFontFace: true, isEvalSupported: false, useWorkerFetch: false, StandardFontDataFactory});
+        const loading = getDocument({data: bytes.slice(), disableFontFace: true, useWorkerFetch: false, fontExtraProperties: true, BinaryDataFactory});
         try {
             const pdf = await loading.promise;
             for (const sample of [
-                {page: 1, title: 'Document Translation Example', size: 22, letter: 'p', point: {x: .20703125, y: -.20751953125}, pathPoint: 'L0.20703125 -0.20751953125'},
-                {page: 2, title: 'Regression Coverage', size: 19, letter: 'g', point: {x: .291015625, y: -.2119140625}, pathPoint: 'M0.291015625 -0.2119140625'},
+                {page: 1, title: 'Document Translation Example', size: 22, letter: 'p', point: {x: .20703125, y: -.20751953125}},
+                {page: 2, title: 'Regression Coverage', size: 19, letter: 'g', point: {x: .291015625, y: -.2119140625}},
             ]) {
                 const page = await pdf.getPage(sample.page);
                 try {
@@ -75,7 +75,8 @@ describe('real PDF structural parsing', () => {
                     const font = page.commonObjs.get(title.fontName);
                     expect(font.name).toBe('Helvetica-Bold');
                     // Check an actual endpoint from PDF.js's standard-font outline, without rasterizing it.
-                    expect(page.commonObjs.get(`${font.loadedName}_path_${glyph.fontChar}`)).toContain(sample.pathPoint);
+                    const path: number[] = Array.from(page.commonObjs.get(`${font.loadedName}_path_${glyph.fontChar}`).path);
+                    expect(path.some((x, index) => x === sample.point.x && path[index + 1] === sample.point.y)).toBe(true);
                     const advance = glyphs.slice(0, glyphIndex).reduce((sum, entry) => sum + entry.width, 0) * sample.size / 1000;
                     const [inkX, inkY] = viewport.convertToViewportPoint(title.transform[4] + advance + sample.point.x * sample.size,
                         title.transform[5] + sample.point.y * sample.size);
@@ -101,15 +102,15 @@ describe('real PDF structural parsing', () => {
         const bytes = new Uint8Array(readFileSync(new URL('../examples/document-translation/sample.pdf', import.meta.url)));
         const before = bytes.slice();
         const loadedFonts: string[] = [];
-        // 与浏览器读取同一套标准字体；不依赖 Node 20 缺失的 process.getBuiltinModule 读取路径。
-        class StandardFontDataFactory {
+        // 跟踪 PDF.js 6 通过 BinaryDataFactory 读取的本地标准字体。
+        class BinaryDataFactory {
             async fetch({filename}: {filename: string}): Promise<Uint8Array> {
                 loadedFonts.push(filename);
                 return new Uint8Array(readFileSync(new URL(`../node_modules/pdfjs-dist/standard_fonts/${filename}`, import.meta.url)));
             }
         }
         const {getDocument, OPS} = await import('pdfjs-dist/legacy/build/pdf.mjs');
-        const loading = getDocument({data: bytes.slice(), disableFontFace: true, isEvalSupported: false, useWorkerFetch: false, StandardFontDataFactory});
+        const loading = getDocument({data: bytes.slice(), disableFontFace: true, useWorkerFetch: false, fontExtraProperties: true, BinaryDataFactory});
         try {
             const pdf = await loading.promise;
             const page = await pdf.getPage(1);

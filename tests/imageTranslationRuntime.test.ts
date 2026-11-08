@@ -507,6 +507,42 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(client.translate).toHaveBeenCalledOnce();
     });
 
+    it.each([['opacity', '0'], ['clipPath', 'inset(50%)']])('查看器祖先通过 %s 隐藏时移除大图译层，原节点重开时复用译图', async (property, hiddenValue) => {
+        const env = setup(); env.hover(); env.click(); await flush();
+        const thumbnail = env.bitmap()!;
+        const wrapper = document.createElement('div');
+        const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
+        const preview = addSecondHoverImage(env, env.image.getBoundingClientRect);
+        preview.src = env.image.src;
+        dialog.getBoundingClientRect = preview.getBoundingClientRect;
+        wrapper.append(dialog); dialog.append(preview);
+        const wrapperStyle = {opacity: '1', clipPath: 'none'};
+        env.extraStyles.set(wrapper, wrapperStyle);
+        const bitmaps = () => Array.from(env.roots[0].querySelectorAll('.fluent-read-image-translation-bitmap'));
+        const setViewerVisible = (visible: boolean) => {
+            Object.assign(wrapperStyle, {opacity: '1', clipPath: 'none', ...(!visible && {[property]: hiddenValue})});
+            Object.assign(document, {elementsFromPoint: () => visible ? [preview, dialog, wrapper, document.body] : [document.body]});
+        };
+
+        env.dispatch(env.image, 'click', true, {button: 0});
+        document.body.append(wrapper);
+        setViewerVisible(true);
+        env.notify('style'); env.runFrames(); await flush();
+        expect(bitmaps()).toHaveLength(2);
+        setViewerVisible(false);
+        env.notify('style'); env.runFrames();
+        expect(bitmaps()).toEqual([thumbnail]);
+        expect(preview.style.opacity).not.toBe('0');
+        expect(thumbnail.parentElement?.style.display).toBe('block');
+
+        env.dispatch(env.image, 'click', true, {button: 0});
+        setViewerVisible(true);
+        env.notify('style'); env.runFrames(); await flush();
+        expect(bitmaps()).toHaveLength(2);
+        expect(preview.style.opacity).toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
+
     it('宿主遮挡期间完成的请求保留结果，遮挡解除前不覆盖页面', async () => {
         const env = setup(); const pending = deferred<typeof result>();
         client.translate.mockReturnValueOnce(pending.promise);

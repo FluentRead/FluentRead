@@ -8,6 +8,15 @@ import brandTaglines from '../../../src/core/i18n/messages/brand-taglines.json'
 const props = defineProps<{ en?: boolean }>()
 const t = (zh: string, english: string) => (props.en ? english : zh)
 const link = (path: string) => withBase((props.en ? '/en' : '') + path)
+const sponsors = [
+  {
+    name: t('哔哩哔哩', 'bilibili'),
+    project: 'Index-Translate',
+    icon: '/support/bilibili.svg',
+    href: 'https://index-translate.bilibili.com/',
+    recognition: t('首位赞助伙伴', 'First sponsor'),
+  },
+]
 const features = [
   {
     kind: 'webpage',
@@ -215,18 +224,21 @@ const faqs = [
         </div>
       </div>
       <div>
-        <a
-          class="fr-sponsor-card"
-          href="https://index-translate.bilibili.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <span class="fr-sponsor-copy">
-            <strong>{{ t('哔哩哔哩 Index-Translate', 'bilibili Index-Translate') }}</strong>
-            <span>{{ t('首位赞助伙伴', 'First sponsor') }}</span>
-          </span>
-          <span class="fr-sponsor-arrow" aria-hidden="true">↗</span>
-        </a>
+        <ul class="fr-sponsor-grid" :aria-label="t('赞助伙伴', 'Sponsors')">
+          <li v-for="sponsor in sponsors" :key="sponsor.href">
+            <a
+              class="fr-sponsor-tile"
+              :href="sponsor.href"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <img :src="withBase(sponsor.icon)" alt="" width="38" height="38" />
+              <strong>{{ sponsor.name }}</strong>
+              <span>{{ sponsor.project }}</span>
+            </a>
+            <span v-if="sponsor.recognition" class="fr-sponsor-recognition">{{ sponsor.recognition }}</span>
+          </li>
+        </ul>
         <a class="bv-text-link" :href="link('/guide/support#sponsorship')">
           {{ t('成为赞助伙伴', 'Become a sponsor') }} <span aria-hidden="true">→</span>
         </a>
@@ -271,62 +283,61 @@ const faqs = [
 </template>
 
 <style scoped>
-.fr-sponsor-card {
+.fr-sponsor-grid {
   display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fr-sponsor-grid > li {
+  width: 112px;
+  text-align: center;
+}
+.fr-sponsor-tile {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 20px;
-  width: 100%;
-  min-width: 0;
-  min-height: 144px;
-  padding: 28px;
+  justify-content: center;
+  gap: 4px;
+  aspect-ratio: 1;
+  padding: 10px;
   border: 1px solid #e4d8de;
-  border-radius: 18px;
+  border-radius: 14px;
   background: #fcf9fa;
   color: var(--vp-c-text-1);
-  text-decoration: none !important;
+  line-height: 1.3;
+  text-decoration: none;
   transition: border-color 160ms, background-color 160ms;
 }
-.fr-sponsor-card:hover {
+.fr-sponsor-tile:hover {
   border-color: var(--vp-c-brand-1);
   background: #fbf3f6;
 }
-.fr-sponsor-card:focus-visible {
+.fr-sponsor-tile:focus-visible {
   outline: 2px solid var(--vp-c-brand-1);
   outline-offset: 4px;
 }
-.fr-sponsor-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  gap: 5px;
-  line-height: 1.6;
+.fr-sponsor-tile img {
+  margin-bottom: 2px;
 }
-.fr-sponsor-copy strong {
-  font-size: 20px;
-  font-weight: 650;
-  color: var(--vp-c-text-1);
-}
-.fr-sponsor-copy > span {
+.fr-sponsor-tile strong {
   font-size: 14px;
-  color: var(--vp-c-brand-1);
+  font-weight: 650;
 }
-.fr-sponsor-arrow {
-  align-self: flex-start;
-  margin-left: auto;
-  color: var(--vp-c-brand-1);
-  font-size: 20px;
+.fr-sponsor-tile > span {
+  color: var(--fr-muted);
+  font-size: 11px;
 }
-@media (max-width: 480px) {
-  .fr-sponsor-card {
-    gap: 14px;
-    padding: 22px 18px;
-  }
-  .fr-sponsor-copy strong {
-    font-size: 18px;
-  }
+.fr-sponsor-recognition {
+  display: block;
+  margin-top: 6px;
+  color: var(--vp-c-brand-1);
+  font-size: 12px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .fr-sponsor-card {
+  .fr-sponsor-tile {
     transition: none;
   }
 }

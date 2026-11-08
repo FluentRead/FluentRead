@@ -28,7 +28,9 @@ node scripts/testing/run-sidepanel-translation-test.cjs \
 
 ## Popup 首次打开与语言引导
 
-生产构建后运行 `node scripts/testing/run-popup-first-run-height-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <捆绑Node包目录> --browser-path <Edge可执行文件> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-popup-first-run`。只检查首启相关范围：配置等待结束后直接显示单屏语言选择，不出现欢迎、下一步、返回或固定完成动画；高度随内容自适应，不要求占位和首屏等高，也不能把测试 extension tab 的 viewport 当作原生 Popup 高度。短视口检查内容撑开，避免重现 130px 高度锁定。
+生产构建后运行 `node scripts/testing/run-popup-first-run-height-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <捆绑Node包目录> --browser-path <Edge可执行文件> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-popup-first-run`。配置等待结束后应直接显示单屏语言选择，省去欢迎、下一步、返回和固定完成动画，高度随内容自适应。短视口检查在扩展标签页里模拟工具栏的当前标签查询，验证内容可以撑开，避免重现 130px 高度锁定。
+
+Safari 工具栏弹窗可能关联当前网页的标签 ID。布局判别使用 WebKit 扩展视图类型，工具栏保留内容的固有尺寸，独立标签页按视口收窄并在面板内滚动。验证时分别检查工具栏的首次打开和重开、独立标签页以及触摸宿主的填宽行为。
 
 语言页按所选宽度和深色主题检查七种语言原生名称、确认按钮可见、无横向溢出及内部裁切；选择只预览，保存等待期间控件冻结，保存确认成功后立即进入主菜单，重开不重复引导。脚本使用独立临时 Edge profile 与第二屏后台窗口，保存启动帧尺寸、布局指标和截图；`--baseline` 仅记录旧布局，不代表新验收通过。此证据不包含系统工具栏点击到 Popup 创建的延迟，也不代表 Firefox 实机或商店版本验证。
 

@@ -523,7 +523,7 @@ describe('userscript bundled library notices', () => {
         } finally {vi.unstubAllEnvs();vi.resetModules();}
     }, 30_000);
 
-    it('standalone shares the icon notice only when the complete identical terms follow', async () => {
+    it('standalone shares icon and DeepLX terms only when the complete identical terms follow', async () => {
         const fixture = mkdtempSync(resolve(tmpdir(), 'fluentread-icons-shared-mit-'));
         vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', '1');
         vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', '0');
@@ -549,6 +549,18 @@ describe('userscript bundled library notices', () => {
             expect(wrapped).toContain('Copyright (c) Second owner');
             expect(standaloneWrap('entry', 'bootstrap')).toContain(iconLicense);
             expect(standaloneWrap('entry', 'bootstrap', 'Shared MIT permission and warranty terms for the references above:')).toContain(iconLicense);
+
+            const transport = readFileSync(resolve(process.cwd(), 'src/platform/http/deeplxRuntime.ts'), 'utf8');
+            const inline = transport.slice(transport.indexOf('/*! @license'), transport.indexOf('\n\nimport'));
+            const entry = `PRECEDING_CODE;${inline}FOLLOWING_CODE;`;
+            const withTransport = standaloneWrap(entry, 'BOOTSTRAP_SENTINEL', notices);
+            expect(withTransport).toContain('PRECEDING_CODE;\nFOLLOWING_CODE;');
+            expect(normalize(withTransport.replaceAll('[Shared MIT terms below]', terms))).toContain(normalize(inline));
+            expect(withTransport.indexOf('@deeplx/core')).toBeLessThan(withTransport.indexOf(terms));
+            expect(withTransport.split(terms)).toHaveLength(2);
+            expect(standaloneWrap(entry, 'bootstrap')).toContain(entry);
+            const alteredEntry = entry.replace('FITNESS FOR A PARTICULAR PURPOSE', 'FITNESS FOR A SPECIFIC PURPOSE');
+            expect(standaloneWrap(alteredEntry, 'bootstrap', notices)).toContain(alteredEntry);
         } finally {vi.unstubAllEnvs();vi.resetModules();rmSync(fixture, {recursive: true, force: true});}
     }, 30_000);
 

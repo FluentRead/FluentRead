@@ -9,6 +9,7 @@ import {createTranslationBroker} from '@/src/services/translation/broker';
 import {supportsTranslationGlossary} from '@/src/services/translation/capabilities';
 import {
     attachTranslationGlossaryContext,
+    attachTranslationRequestControl,
     attachTranslationProviderConfig,
     createTranslationProviderConfigSnapshot,
     getTranslationGlossaryTerms,
@@ -60,12 +61,12 @@ function deferred<T>() {
     return {promise, resolve};
 }
 
-function harness() {
+function harness(service = 'openai', model = 'model-fixture', now?: () => number) {
     const config = Object.assign(new Config(), {
-        service: 'openai', from: 'en', to: 'zh-Hans', useCache: true,
+        service, from: 'en', to: 'zh-Hans', useCache: true,
         glossaryEnabled: true, glossaryLibraries: [library()],
     });
-    config.model.openai = 'model-fixture';
+    config.model[service] = model;
     const cache = new Map<string, string>();
     const identities: Record<string, unknown>[] = [];
     const resolutionCaptures: Array<{identity: Record<string, unknown>; eventEnd: number; providerCalls: number}> = [];
@@ -73,7 +74,7 @@ function harness() {
     const provider = vi.fn(async (message: TranslationProviderRequest): Promise<unknown> => {
         const snapshot = getTranslationProviderConfig(message, createTranslationProviderConfigSnapshot(config));
         const translate = (origin: string) => {
-            const body = JSON.parse(commonMsgTemplate({origin: origin, context: message.pageContext as string | undefined, prompt: message.summaryPrompt as string | undefined, systemPrompt: message.summarySystemPrompt as string | undefined, serviceOverride: 'openai', targetLanguage: 'zh-Hans', modelOverride: 'model-fixture', current: snapshot}));
+            const body = JSON.parse(commonMsgTemplate({origin, context: message.pageContext as string | undefined, prompt: message.summaryPrompt as string | undefined, systemPrompt: message.summarySystemPrompt as string | undefined, serviceOverride: service, targetLanguage: 'zh-Hans', modelOverride: message.modelOverride ?? model, current: snapshot}));
             calls.push({message, snapshot, body});
             if (message.summaryPrompt) return 'This page explains translation systems.';
             return snapshot.glossaryProtectedTokens?.some(token => origin.includes(token)) ? origin : `译文:${origin}`;
@@ -82,8 +83,8 @@ function harness() {
     });
     const get = vi.fn(async (key: string) => cache.get(key) ?? null);
     const broker = createTranslationBroker({
-        ready: Promise.resolve(), getConfig: () => config,
-        providers: {openai: provider, microsoft: provider, tongyi: provider, custom: provider},
+        ready: Promise.resolve(), getConfig: () => config, now,
+        providers: {openai: provider, microsoft: provider, tongyi: provider, custom: provider, siliconCloud: provider},
         cache: {get, set: async (key, value) => {cache.set(key, value); return true;}, clear: async () => {cache.clear();}, cleanup: async () => {}},
         serviceTypes: servicesType,
         endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}),
@@ -124,6 +125,93 @@ function keyResolutionRows(h: ReturnType<typeof harness>, start: ReturnType<type
 }
 
 describe('术语库与真实翻译编排协作', () => {
+    const hunyuanModel = 'tencent/Hunyuan-MT-7B';
+    const avengers = 'Avengers Tower has shown up in Shanghai.';
+    const avengersTranslation = '复仇者大厦出现在上海。';
+
+    it.each([
+        ['A', `${avengers} 🥹`, true],
+        ['B', `${avengers} 🥹 #avengers #ironman #spiderman #hulk💚 #captainamerica`, false],
+        ['C', `${avengers} 🥹 avengers ironman spiderman hulk💚 captainamerica`, false],
+        ['D', avengers, false],
+        ['E', `🥹 ${avengers}`, true],
+    ] as const)('硅基流动 Hunyuan emoji 复现样例 %s', async (_label, origin, losesMarker) => {
+        const h = harness('siliconCloud', hunyuanModel);
+        h.config.glossaryEnabled = false;
+        h.config.user_role.siliconCloud = 'Translate into {{to}}. Preserve emoji. {{origin}}';
+        const record = h.provider.getMockImplementation()!;
+        h.provider.mockImplementation(async message => {
+            await record(message);
+            const translated = String(message.origin).replace(avengers, avengersTranslation);
+            return losesMarker ? translated.replace(/__FRTERM_[a-z0-9_]+?__/giu, '').trim() : translated;
+        });
+        const expected = origin.replace(avengers, avengersTranslation);
+        await expect(h.request({origin})).resolves.toBe(expected);
+        expect(h.provider).toHaveBeenCalledTimes(losesMarker ? 2 : 1);
+        if (losesMarker) {
+            expect(h.calls[0].body.messages[1].content).toContain('__FRTERM_');
+            expect(h.calls[1].message.origin).toBe(origin);
+            expect(h.calls[1].body.messages[1].content).toContain(`Preserve emoji. ${origin}`);
+            expect(h.calls[1].body.messages[1].content).not.toContain('__FRTERM_');
+            expect(h.calls[1].body.messages[0]).toEqual(h.calls[0].body.messages[0]);
+        }
+        await expect(h.request({origin})).resolves.toBe(expected);
+        expect(h.provider).toHaveBeenCalledTimes(losesMarker ? 2 : 1);
+    });
+
+    it.each(['已翻译。', '🥹', '已翻译。 🥹 🥹', '已翻译。 🧪', '已翻译。 🥹 __FRTERM_unknown_0__', null])(
+        '硅基流动 Hunyuan emoji 重试拒绝无效结果 %s 且不缓存',
+        async second => {
+            const h = harness('siliconCloud', hunyuanModel);
+            h.config.glossaryEnabled = false;
+            h.provider.mockResolvedValueOnce('已翻译。').mockResolvedValueOnce(second);
+            await expect(h.request({origin: `${avengers} 🥹`})).rejects.toMatchObject({
+                code: 'GLOSSARY_PLACEHOLDER_INVALID', retryable: false, message: expect.stringContaining('表情符号'),
+            });
+            expect(h.provider).toHaveBeenCalledTimes(2);
+            expect(h.cache.size).toBe(0);
+        },
+    );
+
+    it.each([
+        ['agent 🥹', hunyuanModel],
+        ['Read 🥹.\nContinue here.', hunyuanModel],
+        [serializeTranslationSlots(['Read 🥹.', 'Continue.'], 'hunyuan-emoji').payload, hunyuanModel],
+        ['Read 🥹.', 'another-model'],
+    ])('匹配术语、结构标记、多行或其他模型时维持原校验 %s', async (origin, model) => {
+        const h = harness('siliconCloud', model);
+        h.provider.mockResolvedValue('已翻译。');
+        await expect(h.request({origin})).rejects.toMatchObject({code: 'GLOSSARY_PLACEHOLDER_INVALID'});
+        expect(h.provider).toHaveBeenCalledTimes(1);
+        expect(h.cache.size).toBe(0);
+    });
+
+    it('字面 emoji 重试沿用剩余预算且取消后不发布迟到结果', async () => {
+        let time = 0;
+        const h = harness('siliconCloud', hunyuanModel, () => time);
+        const retry = deferred<TranslationProviderRequest>();
+        const reply = deferred<string>();
+        const controller = new AbortController();
+        h.provider.mockImplementationOnce(async () => {
+            time += 200;
+            return '已翻译。';
+        }).mockImplementationOnce(message => {
+            retry.resolve(message);
+            return reply.promise;
+        });
+        const pending = h.request(attachTranslationRequestControl({origin: `${avengers} 🥹`, requestTimeoutMs: 1000}, {
+            signal: controller.signal, ownershipKey: 'hunyuan-emoji-retry',
+        }));
+        const cancelled = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        const second = await retry.promise;
+        expect(second.requestTimeoutMs).toBe(800);
+        controller.abort();
+        reply.resolve(`${avengersTranslation} 🥹`);
+        await cancelled;
+        expect(second.abortSignal?.aborted).toBe(true);
+        expect(h.cache.size).toBe(0);
+    });
+
     it('无词库时按完整字素保护正文，旧丢失 emoji 缓存不会命中新身份', async () => {
         const h = harness();h.config.glossaryEnabled = false;
         const origin = 'Deliver 🚚 then Gate1️⃣ and 👩🏽‍🔬.';

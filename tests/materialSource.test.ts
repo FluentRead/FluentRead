@@ -142,6 +142,38 @@ describe('材料来源与继续阅读', () => {
         dispose.push(mountMaterialContent(document, new AbortController().signal, () => true)); await tick();
         expect(location.search).toBe('?id=1'); expect(document.querySelector('p')!.scrollIntoView).toHaveBeenCalledOnce();
     });
+    it('binds wheel input to the page root only during article reading and releases it on route change', async () => {
+        const {document, window, location} = dom('<p>Article</p><video></video>', 'https://example.com/read?id=1');
+        const root = document.documentElement;
+        const addDocumentListener = vi.spyOn(document, 'addEventListener');
+        const addRootListener = vi.spyOn(root, 'addEventListener');
+        const removeRootListener = vi.spyOn(root, 'removeEventListener');
+        const controller = new AbortController();
+        dispose.push(mountMaterialContent(document, controller.signal, () => true));
+        window.dispatchEvent(new window.Event('popstate'));
+        expect(addDocumentListener.mock.calls.some(([type]) => type === 'wheel')).toBe(false);
+        expect(addRootListener.mock.calls.some(([type]) => type === 'wheel')).toBe(false);
+
+        const capture = () => document.dispatchEvent(new window.CustomEvent('fluentread-material-captured', {detail: 'material-1'}));
+        ports.resolve.mockResolvedValueOnce(record({kind: 'video', locator: undefined}));
+        capture(); await tick();
+        expect(addRootListener.mock.calls.some(([type]) => type === 'wheel')).toBe(false);
+
+        ports.resolve.mockResolvedValue(record({locator: undefined}));
+        capture(); await tick();
+        const registration = addRootListener.mock.calls.find(([type]) => type === 'wheel');
+        expect(registration).toEqual(['wheel', expect.any(Function), {capture: true, passive: true}]);
+        location.hash = '#details';
+        window.dispatchEvent(new window.Event('hashchange'));
+        expect(removeRootListener).not.toHaveBeenCalled();
+        location.pathname = '/other';
+        window.dispatchEvent(new window.Event('popstate'));
+        expect(removeRootListener).toHaveBeenCalledWith('wheel', registration![1], true);
+
+        capture(); await tick();
+        controller.abort();
+        expect(removeRootListener.mock.calls.filter(([type]) => type === 'wheel')).toHaveLength(2);
+    });
     it('位置无法匹配有明确恢复说明；不存在的材料立即提示', async () => {
         const {document, location, window} = dom('<p>new content</p>'); ports.resolve.mockResolvedValue(record());
         dispose.push(mountMaterialContent(document, new AbortController().signal, () => true)); await tick(); await vi.advanceTimersByTimeAsync(8000);

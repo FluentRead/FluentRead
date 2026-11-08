@@ -1,7 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import type {TranslationCandidate} from '@/src/core/translation/public';
-import {trackXHoverRemount} from '@/src/features/full-page-translation/content/hoverRemountRecovery';
+import {trackHoverRemount} from '@/src/features/full-page-translation/content/hoverRemountRecovery';
 
 const URL_X = 'https://x.com/Alice/status/123';
 const source = 'A carefully selected post about the Moon and the Earth.';
@@ -30,8 +30,8 @@ function record(target: Node, removed: readonly Node[], added: readonly Node[],
         nextSibling: nextSibling === undefined ? replacement?.nextSibling ?? null : nextSibling} as MutationRecord;
 }
 
-function fixture(url = URL_X) {
-    const {document, window} = parseHTML(`<html><body><main>${articleHtml()}</main></body></html>`);
+function fixture(url = URL_X, article = articleHtml()) {
+    const {document, window} = parseHTML(`<html><body><main>${article}</main></body></html>`);
     const address = new URL(url);
     Object.defineProperty(document, 'location', {value: address, configurable: true});
     let currentViewDocument: Document = document as unknown as Document;
@@ -52,7 +52,7 @@ function fixture(url = URL_X) {
     const candidate: TranslationCandidate = {element: owner, kind: 'content', reason: 'paragraph'};
     const isCurrent = vi.fn(() => true);
     const onCancel = vi.fn();
-    const tracking = trackXHoverRemount(candidate, 40, 30, isCurrent, onCancel);
+    const tracking = trackHoverRemount(candidate, 40, 30, isCurrent, onCancel);
     const observer = MockObserver.latest;
     const dispatchObserved = (type: string, event: Record<string, unknown>, target: 'document' | 'window' = 'document') => {
         const callback = target === 'document' ? documentListeners.mock.calls.find(([name]) => name === type)?.[1]
@@ -82,6 +82,34 @@ function fixture(url = URL_X) {
 
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => {vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
+
+describe('GitHub README hover request recovery (#969)', () => {
+    const url = 'https://github.com/bilibili/Index-Translate#news';
+    const row = (href = '/docs/install') => `<li class="post">The command uses <code>--model</code> with <a href="${href}">the guide</a>.</li>`;
+    const readme = (rows = row()) => `<article class="markdown-body"><ul>${rows}</ul></article>`;
+
+    it.each(['equivalent', 'changed-link', 'duplicate-readme'] as const)(
+        'rechecks the hovered README after a %s replacement', kind => {
+            const f = fixture(url, readme());
+            expect(f.tracking).not.toBeNull();
+            const old = f.document.querySelector('article')!;
+            const parent = old.parentNode!;
+            const next = old.cloneNode(true) as HTMLElement;
+            if (kind === 'changed-link') next.querySelector('a')!.setAttribute('href', '/changed');
+            old.replaceWith(next);
+            if (kind === 'duplicate-readme') parent.appendChild(next.cloneNode(true));
+            const fresh = next.querySelector<HTMLElement>('.post')!;
+            f.makeHovered(fresh);
+            f.observer.emit(record(parent, [old], [next]));
+            expect(f.tracking!.finish(true)?.element ?? null).toBe(kind === 'equivalent' ? fresh : null);
+        },
+    );
+
+    it('requires a unique source inside the README and a GitHub repository route', () => {
+        expect(fixture(url, readme(row() + row())).tracking).toBeNull();
+        expect(fixture(`${url.split('#')[0]}/issues/1`, readme()).tracking).toBeNull();
+    });
+});
 
 describe('X hover request recovery at native remount', () => {
     it('identifies the original and observed replacement owners without claiming unrelated nodes', () => {
@@ -336,7 +364,7 @@ describe('X hover request recovery at native remount', () => {
         const f = fixture(); f.tracking!.cancel();
         if (kind === 'post') f.document.querySelector('main')!.insertAdjacentHTML('beforeend', articleHtml());
         else f.owner.parentElement!.appendChild(f.owner.cloneNode(true));
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it.each(['another-article', 'nested-quote', 'another-main'] as const)(
@@ -346,14 +374,14 @@ describe('X hover request recovery at native remount', () => {
             if (kind === 'another-article') f.document.querySelector('main')!.insertAdjacentHTML('beforeend', other);
             else if (kind === 'nested-quote') f.document.querySelector('article')!.insertAdjacentHTML('beforeend', other);
             else f.document.body.insertAdjacentHTML('beforeend', `<main>${other}</main>`);
-            expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+            expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         },
     );
 
     it('still tracks when another main contains a different unique post and source', () => {
         const f = fixture(); f.tracking!.cancel();
         f.document.body.insertAdjacentHTML('beforeend', `<main>${articleHtml('/Bob/status/456', 'Different visible text.')}</main>`);
-        const tracking = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent);
+        const tracking = trackHoverRemount(f.candidate, 40, 30, f.isCurrent);
         expect(tracking).not.toBeNull();
         tracking?.cancel();
     });
@@ -364,7 +392,7 @@ describe('X hover request recovery at native remount', () => {
             if (kind === 'malformed') f.document.body.insertAdjacentHTML('beforeend', '<a data-base-ui-tooltip-trigger href="http://[">bad</a>');
             else if (kind === 'many-links') f.document.body.insertAdjacentHTML('beforeend', '<a data-base-ui-tooltip-trigger href="/other">x</a>'.repeat(2049));
             else f.document.querySelector('main')!.insertAdjacentHTML('beforeend', `<article>${'<div></div>'.repeat(4097)}</article>`);
-            expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+            expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         },
     );
 
@@ -373,7 +401,7 @@ describe('X hover request recovery at native remount', () => {
         const main = f.document.querySelector('main')!;
         main.insertAdjacentHTML('beforeend', '<article>' + Array.from({length: 9}, (_, index) =>
             `<div>${source} <a href="/other-${index}">NASA</a></div>`).join('') + '</article>');
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it('refuses the initial document when candidate text comparisons exhaust the shared character budget', () => {
@@ -382,7 +410,7 @@ describe('X hover request recovery at native remount', () => {
         f.owner.textContent = text;
         f.document.querySelector('main')!.insertAdjacentHTML('beforeend', '<article>' +
             Array.from({length: 6}, () => `<div>${'A'.repeat(49_999)}B</div>`).join('') + '</article>');
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it.each(['same-batch', 'earlier-batch', 'earlier-parent-dismantled', 'same-batch-parent-dismantled'] as const)(
@@ -774,7 +802,7 @@ describe('X hover request recovery at native remount', () => {
         expect(a.tracking!.finish(true)).toBeNull();
         const b = fixture(); b.tracking!.cancel();
         b.document.querySelector('article')!.insertAdjacentHTML('beforeend', '<a data-base-ui-tooltip-trigger href="/other">x</a>'.repeat(2049));
-        expect(trackXHoverRemount(b.candidate, 40, 30, b.isCurrent)).toBeNull();
+        expect(trackHoverRemount(b.candidate, 40, 30, b.isCurrent)).toBeNull();
     });
 
     it('fails closed on a very wide document without querying an unbounded node list', () => {
@@ -804,7 +832,7 @@ describe('X hover request recovery at native remount', () => {
     it('matches nested exact text without reading candidate textContent', () => {
         const f = fixture(); f.tracking!.cancel();
         f.owner.innerHTML = 'Carefully <span>selected <b>Moon</b></span> text.';
-        const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
+        const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
         const observer = MockObserver.latest;
         const old = f.document.querySelector('article')!, parent = old.parentNode!;
         const next = f.document.createElement('article');
@@ -821,7 +849,7 @@ describe('X hover request recovery at native remount', () => {
         const f = fixture(); f.tracking!.cancel();
         const text = 'A'.repeat(50_000);
         f.owner.textContent = text;
-        const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
+        const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
         const observer = MockObserver.latest;
         const old = f.document.querySelector('article')!, parent = old.parentNode!;
         const next = f.document.createElement('article');
@@ -854,7 +882,7 @@ describe('X hover request recovery at native remount', () => {
             const f = fixture(); f.tracking!.cancel();
             if (kind === 'protected-whitespace') f.owner.insertAdjacentHTML('beforeend', '<span class="notranslate">A   B</span>');
             if (kind === 'script') f.owner.insertAdjacentHTML('beforeend', '<script>old hidden script</script>');
-            const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
+            const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
             const observer = MockObserver.latest;
             const old = f.document.querySelector('article')!, parent = old.parentNode!;
             const next = f.document.createElement('article');
@@ -876,7 +904,7 @@ describe('X hover request recovery at native remount', () => {
     it('keeps an ordinary tooltip class with no tooltip-inner as source text', () => {
         const f = fixture(); f.tracking!.cancel();
         f.owner.insertAdjacentHTML('beforeend', '<span class="tooltip"><i>Visible prose</i></span>');
-        const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
+        const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent)!;
         const observer = MockObserver.latest;
         const old = f.document.querySelector('article')!, parent = old.parentNode!;
         const next = f.document.createElement('article');
@@ -907,7 +935,7 @@ describe('X hover request recovery at native remount', () => {
         script.textContent = 'x'.repeat(262_145);
         f.owner.appendChild(script);
         const walker = vi.spyOn(f.document, 'createTreeWalker');
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         expect(walker).not.toHaveBeenCalled();
     });
 
@@ -934,45 +962,45 @@ describe('X hover request recovery at native remount', () => {
             if (kind === 'base') f.address.search = '?' + 'x'.repeat(8192);
             if (kind === 'aggregate') f.document.querySelector('article')!.insertAdjacentHTML('beforeend',
                 `<a data-base-ui-tooltip-trigger href="/${'x'.repeat(1000)}">other</a>`.repeat(300));
-            expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+            expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         }
     });
 
     it('does not track unsupported sites, control candidates or incomplete post identity', () => {
         const f = fixture(); f.tracking!.cancel();
         f.address.hostname = 'example.com';
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         f.address.hostname = 'x.com';
-        expect(trackXHoverRemount({...f.candidate, kind: 'control'}, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount({...f.candidate, kind: 'control'}, 40, 30, f.isCurrent)).toBeNull();
         f.document.querySelector('[data-base-ui-tooltip-trigger]')!.remove();
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it('rejects incomplete candidate shapes, disconnected owners and ambiguous article ownership', () => {
         const f = fixture(); f.tracking!.cancel();
-        expect(trackXHoverRemount({...f.candidate, nodes: [f.owner.firstChild!]}, 40, 30, f.isCurrent)).toBeNull();
-        expect(trackXHoverRemount({...f.candidate, manualChunk: true}, 40, 30, f.isCurrent)).toBeNull();
-        expect(trackXHoverRemount({...f.candidate, allowTopLevelApplicationShell: true}, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount({...f.candidate, nodes: [f.owner.firstChild!]}, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount({...f.candidate, manualChunk: true}, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount({...f.candidate, allowTopLevelApplicationShell: true}, 40, 30, f.isCurrent)).toBeNull();
         f.document.body.appendChild(f.owner);
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         f.owner.remove();
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it('rejects malformed post links and source identities over the bounded structure budget', () => {
         const a = fixture(); a.tracking!.cancel();
         a.document.querySelector('article')!.insertAdjacentHTML('beforeend', '<a data-base-ui-tooltip-trigger href="http://[">bad</a>');
-        expect(trackXHoverRemount(a.candidate, 40, 30, a.isCurrent)).toBeNull();
+        expect(trackHoverRemount(a.candidate, 40, 30, a.isCurrent)).toBeNull();
         const b = fixture(); b.tracking!.cancel();
         b.owner.textContent = 'a'.repeat(131_073);
-        expect(trackXHoverRemount(b.candidate, 40, 30, b.isCurrent)).toBeNull();
+        expect(trackHoverRemount(b.candidate, 40, 30, b.isCurrent)).toBeNull();
     });
 
     it('rejects multiple post permalinks within the same article', () => {
         const f = fixture(); f.tracking!.cancel();
         f.document.querySelector('article')!.insertAdjacentHTML('beforeend',
             '<a data-base-ui-tooltip-trigger href="/Bob/status/456">other post</a>');
-        expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+        expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
     });
 
     it('does not reuse a replacement when unrelated malformed or excessive post links prevent uniqueness', () => {
@@ -1021,20 +1049,20 @@ describe('X hover request recovery at native remount', () => {
         const wide = fixture(); wide.tracking!.cancel();
         const article = wide.document.querySelector('article')!;
         article.insertAdjacentHTML('beforeend', '<i></i>'.repeat(16_385));
-        expect(trackXHoverRemount(wide.candidate, 40, 30, wide.isCurrent)).toBeNull();
+        expect(trackHoverRemount(wide.candidate, 40, 30, wide.isCurrent)).toBeNull();
 
         const deep = fixture(); deep.tracking!.cancel();
         for (let index = 0; index < 64; index++) {
             const wrapper = deep.document.createElement('section');
             deep.owner.replaceWith(wrapper); wrapper.appendChild(deep.owner);
         }
-        expect(trackXHoverRemount(deep.candidate, 40, 30, deep.isCurrent)).toBeNull();
+        expect(trackHoverRemount(deep.candidate, 40, 30, deep.isCurrent)).toBeNull();
     });
 
     it('refuses ancestor snapshots if a connected host reports an incomplete or inconsistent parent chain', () => {
         const outside = fixture(); outside.tracking!.cancel();
         outside.document.body.appendChild(outside.document.querySelector('article')!);
-        expect(trackXHoverRemount(outside.candidate, 40, 30, outside.isCurrent)).toBeNull();
+        expect(trackHoverRemount(outside.candidate, 40, 30, outside.isCurrent)).toBeNull();
 
         for (const mode of ['missing-parent', 'missing-child'] as const) {
             const f = fixture(); f.tracking!.cancel();
@@ -1044,7 +1072,7 @@ describe('X hover request recovery at native remount', () => {
             Object.defineProperty(f.owner, 'isConnected', {configurable: true, get: () => true});
             if (mode === 'missing-parent') Object.defineProperty(f.owner, 'parentNode', {configurable: true, get: () => null});
             else Object.defineProperty(article, 'childNodes', {configurable: true, get: () => []});
-            expect(trackXHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
+            expect(trackHoverRemount(f.candidate, 40, 30, f.isCurrent)).toBeNull();
         }
     });
 
@@ -1060,7 +1088,7 @@ describe('X hover request recovery at native remount', () => {
 
     it('uses a safe default cancellation callback', () => {
         const f = fixture(); f.tracking!.cancel();
-        const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent);
+        const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent);
         expect(recovery).not.toBeNull();
         expect(() => recovery!.cancel()).not.toThrow();
     });
@@ -1068,7 +1096,7 @@ describe('X hover request recovery at native remount', () => {
     it('retains a bounded fallback if a host DOM exposes a null textContent', () => {
         const f = fixture(); f.tracking!.cancel();
         Object.defineProperty(f.owner, 'textContent', {configurable: true, get: () => null});
-        const recovery = trackXHoverRemount(f.candidate, 40, 30, f.isCurrent);
+        const recovery = trackHoverRemount(f.candidate, 40, 30, f.isCurrent);
         expect(recovery).not.toBeNull();
         recovery!.cancel();
     });

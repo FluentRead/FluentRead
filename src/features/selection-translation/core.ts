@@ -448,18 +448,28 @@ function nextSelectionSibling(node: Node, root: Node): Node | null {
     return null;
 }
 
+/** 浏览器选中段落时可能将结束点落在下一代码块的起点；跳过完全未选中的分支。 */
+function firstUnselectedSelectionEnd(range: Range): Node | null {
+    let node = range.endContainer;
+    const root = range.commonAncestorContainer;
+    if (range.endOffset !== 0 || node === root || !node?.parentNode || !elementFromSelectionNode(node)?.closest('pre')) return null;
+    while (node.parentNode && node.parentNode !== root && !node.previousSibling) {
+        node = node.parentNode;
+    }
+    return node;
+}
+
 /** 由原生 Range 的半开边界定位遍历区间，不枚举共同祖先内未选中的前后兄弟树。 */
-function* selectionRangeNodes(range: Range): Generator<Node> {
+function* selectionRangeNodes(range: Range, unselectedEnd = firstUnselectedSelectionEnd(range)): Generator<Node> {
     const root = range.commonAncestorContainer;
     const start = range.startContainer;
     const end = range.endContainer;
-    const endIsText = end.nodeType === 3;
-    const stop = endIsText ? end : end.childNodes[range.endOffset] ?? nextSelectionSibling(end, root);
+    const stop = unselectedEnd ?? (end.nodeType === 3 ? nextSelectionSibling(end, root)
+        : end.childNodes[range.endOffset] ?? nextSelectionSibling(end, root));
     let node: Node | null = start.nodeType === 3 ? start
         : start.childNodes[range.startOffset] ?? nextSelectionSibling(start, root);
-    while (node && (endIsText || node !== stop)) {
+    while (node && node !== stop) {
         yield node;
-        if (node === end && endIsText) break;
         node = node.firstChild ?? nextSelectionSibling(node, root);
     }
 }
@@ -473,8 +483,8 @@ function hasSelectionSemanticParts(range: Range): boolean {
     return false;
 }
 
-function* selectionExcludedDescendants(range: Range): Generator<Element> {
-    for (const node of selectionRangeNodes(range)) {
+function* selectionExcludedDescendants(range: Range, unselectedEnd: Node | null): Generator<Element> {
+    for (const node of selectionRangeNodes(range, unselectedEnd)) {
         if (node.nodeType === 1 && node !== range.commonAncestorContainer && (node as Element).matches(selectionExcludedDescendantSelector)) yield node as Element;
     }
 }
@@ -498,15 +508,16 @@ function hasNonZeroClientRect(element: Element): boolean {
  */
 export function shouldIgnoreSelection(range: Range, allowEditableSelection = false): boolean {
     const editableRoot = allowEditableSelection ? getSharedEditableSelectionRoot(range) : null;
+    const unselectedEnd = firstUnselectedSelectionEnd(range);
     const boundaries = [
         elementFromSelectionNode(range.startContainer),
-        elementFromSelectionNode(range.endContainer),
+        elementFromSelectionNode(unselectedEnd ? unselectedEnd.parentNode : range.endContainer),
     ];
     if (boundaries.some(element => isSelectionExcludedElement(element, editableRoot) &&
         !(element && isInlineSelectionFormulaPart(element)))) return true;
 
     try {
-        for (const element of selectionExcludedDescendants(range)) {
+        for (const element of selectionExcludedDescendants(range, unselectedEnd)) {
             try {
                 if (!isIntrinsicallyExcludedSelectionElement(element, editableRoot) &&
                     (isDocumentSurfaceNoTranslateShell(element) || isTopLevelApplicationShell(element)

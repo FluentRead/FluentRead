@@ -22,6 +22,81 @@ const atom = (text: string, x: number, baseline: number, width = text.length * 5
 const analyze = (atoms: PdfLayoutAtom[], graphics: Parameters<typeof analyzePdfPageLayout>[0]['graphics'] = [], width = 612, height = 792) => analyzePdfPageLayout({atoms, graphics, width, height});
 const ops = Object.fromEntries(['save', 'restore', 'transform', 'paintFormXObjectBegin', 'paintFormXObjectEnd', 'paintImageXObject', 'paintInlineImageXObject', 'paintImageMaskXObject', 'constructPath', 'stroke', 'closeStroke', 'fill', 'eoFill', 'fillStroke', 'eoFillStroke', 'closeFillStroke', 'closeEOFillStroke', 'endPath'].map((name, index) => [name, index + 1]));
 
+describe('illustrated text inside a page-sized PDF form', () => {
+    const frame = {x: 30, y: 0, width: 552, height: 792};
+    const wrapper = [{...frame, kind: 'form' as const}, {...frame, x: 30.2, width: 551.8, kind: 'path' as const}];
+
+    it('keeps small text panels distinct from neighboring cards and protected art labels', () => {
+        const graphics = [...wrapper,
+            {kind: 'path' as const, x: 69, y: 103, width: 102, height: 44},
+            {kind: 'path' as const, x: 71, y: 105, width: 102, height: 44},
+            {kind: 'path' as const, x: 171, y: 105, width: 97, height: 44},
+            {kind: 'image' as const, x: 310, y: 76, width: 145, height: 101},
+        ];
+        const text = [
+            atom('A visitor slept', 86, 120, 65, 9),
+            atom('beside the river.', 78, 130, 82, 9),
+            atom('Three lights', 186, 124, 62, 9),
+            atom('were left on.', 186, 130, 61, 9),
+            atom('EAST', 355, 129, 30, 8),
+        ];
+        const result = analyze(text, graphics);
+        expect(result.blocks.filter(block => !block.preserveSource).map(block => block.source)).toEqual([
+            'A visitor slept beside the river.', 'Three lights were left on.',
+        ]);
+        expect(result.blocks.find(block => block.source === 'EAST')).toMatchObject({kind: 'figure-label', preserveSource: true});
+        expect(result.blocks[0]).toMatchObject({panelBounds: {x: 69, y: 103, width: 102, height: 44}});
+        expect(result.blocks[0].lines).toHaveLength(2);
+        expect(result.preservedRegions.every(region => region.height < frame.height)).toBe(true);
+    });
+
+    it('does not let the merged bounds of overlapping figures cover adjacent text', () => {
+        const graphics = [...wrapper,
+            {kind: 'image' as const, x: 100, y: 80, width: 290, height: 180},
+            {kind: 'image' as const, x: 340, y: 230, width: 220, height: 200},
+        ];
+        const result = analyze([atom('Read both rules.', 112, 300, 120), atom('WATER', 420, 300, 42)], graphics);
+        expect(result.blocks.find(block => block.source === 'Read both rules.')).toMatchObject({kind: 'text', preserveSource: false});
+        expect(result.blocks.find(block => block.source === 'WATER')).toMatchObject({kind: 'figure-label', preserveSource: true});
+        expect(result.preservedRegions.some(region => region.kind === 'figure' && region.height === 350)).toBe(true);
+    });
+
+    it('keeps a panel list marker while separating a row of map labels from its caption', () => {
+        const graphics = [...wrapper,
+            {kind: 'path' as const, x: 60, y: 101, width: 130, height: 49},
+            {kind: 'image' as const, x: 300, y: 80, width: 255, height: 165},
+        ];
+        const result = analyze([
+            atom('•', 72, 120, 5), atom('A list item wraps', 81, 120, 79), atom('onto a second line.', 80, 131, 78),
+            atom('oak elm ash pine fir birch yew', 321, 155, 190),
+            atom('This legend shows the names of local trees.', 321, 180, 195),
+        ], graphics);
+        expect(result.blocks.find(block => block.source === 'A list item wraps onto a second line.')).toMatchObject({
+            kind: 'text', listMarker: '•', panelBounds: {x: 60, y: 101, width: 130, height: 49},
+        });
+        expect(result.blocks.find(block => block.source.startsWith('oak elm'))).toMatchObject({kind: 'figure-label', preserveSource: true});
+        expect(result.blocks.find(block => block.source.startsWith('This legend'))).toMatchObject({kind: 'text', preserveSource: false});
+    });
+
+    it.each([
+        ['short labels', [atom('East', 75, 120, 22), atom('West.', 75, 132, 24)]],
+        ['misaligned rows', [atom('Near the river', 75, 120, 55), atom('read the sign.', 130, 132, 59)]],
+        ['discontinuous baselines', [atom('Near the river', 75, 120, 55), atom('read the sign.', 75, 145, 59)]],
+        ['dense glyphs', Array.from({length: 151}, () => atom('North.', 75, 120, 35))],
+    ] as const)('does not classify %s as a small text panel', (_kind, text) => {
+        const result = analyze([...text], [...wrapper, {kind: 'path', x: 60, y: 100, width: 140, height: 60}]);
+        expect(result.blocks.length).toBeGreaterThan(0);
+        expect(result.blocks.every(block => !block.panelBounds)).toBe(true);
+    });
+
+    it('leaves the ordinary analysis in charge when the page has too many candidate backdrops', () => {
+        const text = [atom('Keep the clue', 75, 120, 55), atom('beside its title.', 75, 132, 58)];
+        const backdrop = {kind: 'path' as const, x: 60, y: 100, width: 140, height: 60};
+        const result = analyze(text, [...wrapper, ...Array.from({length: 129}, () => ({...backdrop}))]);
+        expect(result.blocks.every(block => !block.panelBounds)).toBe(true);
+    });
+});
+
 describe('letter-spaced supported section headings', () => {
     // Smith & Levy (2013), Cognition128 pp302–319, doi:10.1016/j.cognition.2013.02.013, source PDF p1.
     // Source SHA7c325f95f5b54bc529e9c8793d26651c306841c4d1c6b64303997db47a74df77; source p1 states Creative Commons Attribution License.

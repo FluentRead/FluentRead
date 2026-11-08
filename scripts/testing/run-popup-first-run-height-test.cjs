@@ -196,6 +196,14 @@ async function main() {
       }
     });
     await popup.addInitScript(() => {
+      // This short-viewport probe simulates toolbar sizing inside an extension tab.
+      chrome.tabs.getCurrent = callback => {
+        if (typeof callback === 'function') {
+          queueMicrotask(() => callback(undefined));
+          return;
+        }
+        return Promise.resolve(undefined);
+      };
       const state = {frames: [], configDelays: 0, englishDelays: 0, stopped: false, saveReceipts: []};
       globalThis.__onboardingStartup = state;
       const send = chrome.runtime.sendMessage.bind(chrome.runtime), heldSaves=[];

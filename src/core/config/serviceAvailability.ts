@@ -10,7 +10,7 @@ export interface TranslationServiceAvailabilityOption {
   disabled?: boolean
 }
 
-export const TRANSLATION_SERVICE_DISABLED_MESSAGE = '所选翻译服务已关闭。请在翻译服务设置中使用「添加回目录」，或选择其他服务。'
+export const TRANSLATION_SERVICE_DISABLED_MESSAGE = '所选翻译服务已关闭。请在翻译服务设置的「自定义服务」中恢复，或选择其他服务。'
 
 /** 忽略非法值并按首次出现顺序去重，兼容导入的旧备份与自定义服务标识。 */
 export function normalizeDisabledTranslationServices(value: unknown): string[] {
@@ -32,7 +32,7 @@ export function isTranslationServiceDisabled(disabledServices: unknown, service:
   return Array.isArray(disabledServices) && disabledServices.some(item => item === service)
 }
 
-/** 保留已关闭项的标签与现有选择，只阻止再次选用；目录页可单独提供重新启用开关。 */
+/** 保留已关闭项的标签与现有选择，只阻止再次选用；设置页可重新启用服务。 */
 export function markDisabledTranslationServices<T extends TranslationServiceAvailabilityOption>(
   options: readonly T[],
   disabledServices: unknown,

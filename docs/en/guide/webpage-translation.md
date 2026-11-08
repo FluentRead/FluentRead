@@ -10,6 +10,8 @@ Translate an article or selected section, compare both languages, and return to 
 2. Choose the target language and service, then click **Translate**.
 3. Read in bilingual mode. Use the display-mode button at the bottom right of the translation card to switch between **Bilingual / Translation only**. Choose **Restore** to return.
 
+While choosing a translation service in the popup, press **Esc** to return to the service overview. Press it again to return to the popup home screen.
+
 Display mode is saved and updates existing translations without another request. Google Translate supports bilingual display only; switch back to bilingual before using it.
 
 For translation-only display on selected websites, enable **Translation only** under **Tools & learning → Website rules → Site preferences**. Other websites keep the global mode. See [Website reading area](/en/config/site-adaptation).
@@ -103,7 +105,7 @@ Corrections stay on this device, with limits of 1,000 records and 100 projects. 
 
 **Settings → General → Page helpers → Full-page translation ball** is off by default. Enable it, then hover, focus with the keyboard, or tap to expand. Click its translation button to translate, and again to restore. Hold and drag to either side; its position is saved.
 
-The gear opens the quick panel for the current page; click outside or press Esc to close. Advanced settings control hover or always-visible buttons, delay, click behavior, size, opacity, and sites where it stays hidden. Disabling the ball leaves Alt+T and context-menu translation available.
+The gear opens the quick panel for the current page. In translation services, **Esc** goes back one level at a time. From the main screen, press **Esc** to close the panel. You can also click outside to close it. Advanced settings control hover or always-visible buttons, delay, click behavior, size, opacity, and sites where it stays hidden. Disabling the ball leaves Alt+T and context-menu translation available.
 
 ### Context-menu translation
 

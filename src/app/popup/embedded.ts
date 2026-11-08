@@ -59,7 +59,7 @@ export function preparePopupSurface(): Promise<boolean> {
             clearTimeout(timeout);
             window.removeEventListener('message', connect);
             window.removeEventListener('pagehide', pagehide);
-            window.removeEventListener('keydown', keydown, true);
+            window.removeEventListener('keydown', keydown);
             stopSizeObservation?.();
             if (notifyParent) embeddedPort?.postMessage({type: 'close'});
             embeddedPort?.close();
@@ -71,7 +71,7 @@ export function preparePopupSurface(): Promise<boolean> {
         };
         const pagehide = () => finish(false);
         const keydown = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
+            if (event.key !== 'Escape' || event.defaultPrevented) return;
             event.preventDefault();
             closePopupSurface();
         };
@@ -94,7 +94,8 @@ export function preparePopupSurface(): Promise<boolean> {
                 document.documentElement.dataset.fluentreadEmbeddedPopup = 'true';
                 clearTimeout(timeout);
                 window.removeEventListener('message', connect);
-                window.addEventListener('keydown', keydown, true);
+                // 让 Popup 内部先处理返回，未消费的 Escape 再关闭整个面板。
+                window.addEventListener('keydown', keydown);
                 port.onmessage = message => {
                     if (message.data?.type === 'close') finish(false);
                     else if (message.data?.type === 'placed') confirmPopupPlacement?.(message.data);

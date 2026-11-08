@@ -310,6 +310,7 @@
       size="auto"
       :with-header="false"
       :append-to-body="true"
+      :close-on-press-escape="activeDrawer !== 'services'"
       modal-class="popup-drawer-modal"
       class="popup-drawer"
       :class="{ 'popup-quick-drawer': ['hover', 'selection', 'image'].includes(activeDrawer), 'popup-services-drawer': activeDrawer === 'services' }"
@@ -547,7 +548,7 @@ const onboardingLanguage = ref<UiLanguage>('zh-CN');
 const drawerVisible = ref(false);
 const drawerMounted = ref(false);
 const drawerSurface = shallowRef<HTMLElement | null>(null);
-const servicesPanel = shallowRef<{revealFocusedSearch: (current: () => boolean) => void} | null>(null);
+const servicesPanel = shallowRef<InstanceType<typeof PopupServices> | null>(null);
 let releaseDrawerViewport: (() => void) | undefined;
 const activeDrawer = ref<DrawerName>('hover');
 const pageState = reactive<PopupPageState>({tabId: null, url: '', domain: '', translated: false, busy: false, savingRule: false});
@@ -1186,6 +1187,12 @@ function closeDonation() {
 function handlePopupKeydown(event: KeyboardEvent) {
   if (!popupContext.active.value) return;
   if (event.key === 'Escape') {
+    if (drawerVisible.value && activeDrawer.value === 'services') {
+      // 服务选择和概览共用抽屉，先处理内部返回并阻止浏览器关闭 Popup。
+      event.preventDefault();
+      if (!servicesPanel.value?.backToOverview()) drawerActions.value.close();
+      return;
+    }
     brandTooltip.value?.onClose();
     brandTooltip.value?.hide();
     pageFontTooltip.value?.onClose();

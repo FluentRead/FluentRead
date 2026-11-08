@@ -400,6 +400,29 @@ describe('实际 Popup 缓存模板与页面操作',()=>{
     Object.assign(viewport,{height:80});viewport.dispatchEvent(new win.Event('resize'));flushViewport();expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(true)
     eventOf(document.querySelector('.service-panel-close')!)();await drain();expect(state.drawerVisible).toBe(false);expect(overlay.hasAttribute('data-fluent-read-popup-viewport')).toBe(false);expect(overlay.hasAttribute('data-fluent-read-popup-short')).toBe(false)
   })
+  it('翻译服务消化 Esc，服务选择先返回概览，概览再返回 Popup 主菜单',async()=>{
+    executeServicePicker=true;await mount();
+    const trigger=document.querySelector<HTMLElement>('.provider-summary')!;
+    const overviewRow=()=>document.querySelector<HTMLElement>('[data-feature-service="default"]');
+    const escape=(target:EventTarget)=>{
+      const event=Object.assign(new win.Event('keydown',{bubbles:true,cancelable:true}),{key:'Escape',code:'Escape'});
+      target.dispatchEvent(event);return event;
+    };
+    trigger.focus();eventOf(trigger)();
+    for(const deadline=Date.now()+2000;Date.now()<deadline&&!overviewRow();){await drain();await new Promise(resolve=>setTimeout(resolve,2))}
+    overviewRow()!.focus();eventOf(overviewRow()!)();await drain();
+    const input=document.querySelector<HTMLInputElement>('input[type="search"]')!;
+    expect(focused).toBe(input);
+    expect(escape(input).defaultPrevented).toBe(true);await drain();
+    expect(document.querySelector('[data-service-picker]')).toBeNull();
+    expect(focused).toBe(overviewRow());
+    expect(state.drawerVisible).toBe(true);
+    expect(escape(overviewRow()!).defaultPrevented).toBe(true);await drain();
+    expect(state.drawerVisible).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(escape(trigger).defaultPrevented).toBe(false);
+    expect(close).not.toHaveBeenCalled();
+  })
   it('只在打开的实际 teleport 遮罩跟随键盘可见边界，根 popup 固有尺寸不变',async()=>{
     await mount();const rootStyle=document.documentElement.getAttribute('style'),bodyStyle=document.body.getAttribute('style'),add=vi.spyOn(viewport,'addEventListener'),remove=vi.spyOn(viewport,'removeEventListener')
     expect(document.querySelector('.popup-drawer-modal')).toBeNull();expect(add).not.toHaveBeenCalled()

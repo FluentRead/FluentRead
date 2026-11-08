@@ -243,6 +243,7 @@ describe('userscript remote UI language data', () => {
             expect(bundle.messages).not.toHaveProperty('popup.compact.restore');
             expect(Object.keys(bundle.messages).some(key => key.startsWith('popup.displayMode.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('popup.pageFont.'))).toBe(false);
+            expect(Object.keys(bundle.messages).some(key => key.startsWith('popup.readingAppearance.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('safari.freePool.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('sidepanel.'))).toBe(false);
             expect(Object.keys(bundle.messages).some(key => key.startsWith('learning.collection.speech') && key !== 'learning.collection.speechFailed')).toBe(false);

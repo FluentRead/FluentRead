@@ -574,6 +574,7 @@ describe('图片翻译前台交互与生命周期', () => {
     it('译图随宿主容器挂载，遮挡时隐藏，布局不再匹配时用同一译图回退', async () => {
         const env = setup();
         const background = env.addBackground();
+        env.extraStyles.get(background)!.zIndex = '2';
         Object.defineProperty(background, 'offsetParent', {value: env.parent});
         let localBounds = background.getBoundingClientRect();
         const createElement = vi.mocked(document.createElement);
@@ -594,8 +595,21 @@ describe('图片翻译前台交互与生命周期', () => {
         const host = env.parent.querySelector('[data-fluent-read-ui="image-translation-bitmap"]')!;
         const bitmap = env.roots[1].querySelector<HTMLImageElement>('.fluent-read-image-translation-bitmap')!;
         expect(host.parentElement).toBe(env.parent);
+        expect(background.nextElementSibling).toBe(host);
+        expect((host as HTMLElement).style.zIndex).toBe('2');
         expect(env.roots[0].querySelector('.fluent-read-image-translation-bitmap')).toBeNull();
         expect(background.style.opacity).toBe('0');
+
+        const originalBounds = localBounds;
+        localBounds = {...localBounds, top: -300, bottom: -100};
+        env.setRect(localBounds);
+        env.scroll(); env.runFrames();
+        expect(background.style.opacity).toBe('0');
+        expect(bitmap.style.visibility).toBe('visible');
+        expect(env.roots[0].querySelector<HTMLElement>('.fluent-read-image-translation-overlay')?.style.display).toBe('none');
+        localBounds = originalBounds;
+        env.setRect(originalBounds);
+        env.scroll(); env.runFrames();
 
         const cover = document.createElement('div');
         document.body.append(cover);
@@ -755,6 +769,17 @@ describe('图片翻译前台交互与生命周期', () => {
         settings.imageTranslationHoverEnabled = false;
         env.dispatch(env.image, 'pointermove'); env.runFrames(); vi.advanceTimersByTime(600);
         expect(client.translate).not.toHaveBeenCalled(); expect(queries).not.toHaveBeenCalled();
+    });
+
+    it.each(['on', 'disableImageTranslator'] as const)('通过 %s 关闭图片翻译时指针和右键不扫描候选', option => {
+        settings[option] = option === 'disableImageTranslator';
+        const env = setup();
+        env.dispatch(env.parent, 'pointerover', true, {clientX: 50, clientY: 80});
+        env.dispatch(env.parent, 'pointermove', true, {clientX: 50, clientY: 80});
+        env.dispatch(env.parent, 'contextmenu', true, {clientX: 50, clientY: 80});
+        expect(env.windowObject.requestAnimationFrame).not.toHaveBeenCalled();
+        expect(env.imageQuery).not.toHaveBeenCalled();
+        expect(toggleContextMenuImage(env.image.src)).toBe(false);
     });
 
     it('已有译图的入口切回时立即显示，不重复等待、请求或创建观察器', async () => {
@@ -2504,6 +2529,24 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(client.translate).toHaveBeenCalledTimes(2); expect(env.bitmap()).not.toBeNull();
         expect(statuses.at(-1)).toMatchObject({active: true, pending: false, errors: 0, completed: 1});
         stop();
+    });
+    it('开启漫画时先撤下已完成的普通译图，漫画无可绘结果时保留原图', async () => {
+        const env = readerPage();
+        env.dispatch(env.image, 'contextmenu');
+        expect(toggleContextMenuImage(env.image.src)).toBe(true);
+        await flush();
+        const ordinary = env.bitmap()!;
+        expect(ordinary.isConnected).toBe(true);
+        const manga = deferred<typeof result>();
+        client.translate.mockReturnValueOnce(manga.promise);
+
+        toggleMangaTranslation(); await flush();
+        expect(client.translate.mock.calls[1][3].manga).toBe(true);
+        expect(ordinary.isConnected).toBe(false);
+        expect(env.image.style.opacity).not.toBe('0');
+        manga.resolve({...result, lines: []}); await flush();
+        expect(env.bitmap()).toBeNull();
+        expect(env.image.style.opacity).not.toBe('0');
     });
     it.each(['hidden', 'scroll'] as const)('普通单图交接等待期间进入 %s，旧任务结束后仍等待可调度', async pause => {
         const env = readerPage(); settings.from = 'en';

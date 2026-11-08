@@ -62,6 +62,16 @@ describe('image presentation foreground ownership', () => {
         expect(isImagePresentationOccluded(image, visible, host)).toBe(true);
     });
 
+    it('skips an explicitly unpainted foreground while still checking the element beneath it', () => {
+        const {image, document} = fixture();
+        const gesture = document.createElement('div'), blocker = document.createElement('div');
+        const ignoreForeground = (element: Element) => element === gesture;
+        Object.assign(document, {elementsFromPoint: () => [gesture, image]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, ignoreForeground)).toBe(false);
+        Object.assign(document, {elementsFromPoint: () => [gesture, blocker, image]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, ignoreForeground)).toBe(true);
+    });
+
     it('samples the clipped region and hides even a corner covered by a floating panel', () => {
         const {image, document} = fixture(); const panel = document.createElement('div');
         const hitTest = vi.fn((x: number, y: number) => x > 300 && y > 200 ? [panel, image] : [image]);

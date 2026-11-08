@@ -126,6 +126,33 @@ async function geometry(label) {
     assert(result.serviceControlHeight <= 30, `${label}: service control expanded vertically`);
     report.cases.push({name: label, geometry: result});
 }
+async function resultCardGeometry(label, expectedStatuses) {
+    const {canvas, cards} = await native.evaluate(() => {
+        const center = document.querySelector('.translation-center');
+        return {
+            canvas: getComputedStyle(center).backgroundColor,
+            cards: [...center.querySelectorAll('.translation-result-card')].map(card => {
+                const style = getComputedStyle(card), bounds = card.getBoundingClientRect();
+                return {service: card.dataset.service, status: card.dataset.status, background: style.backgroundColor,
+                    borderStyle: style.borderStyle, borderWidth: style.borderWidth, radius: style.borderRadius,
+                    top: bounds.top, bottom: bounds.bottom};
+            }),
+        };
+    });
+    assert.deepEqual(cards.map(card => card.status), expectedStatuses, label);
+    for (const [index, card] of cards.entries()) {
+        const detail = `${label} (${card.service})`;
+        assert.equal(card.borderStyle, 'solid', detail);
+        assert.equal(card.borderWidth, '1px', detail);
+        assert(parseFloat(card.radius) >= 8, `${detail}: corner radius ${card.radius}`);
+        assert(card.background !== canvas && card.background !== 'rgba(0, 0, 0, 0)', `${detail}: card surface ${card.background} blends into ${canvas}`);
+        if (index > 0) {
+            const gap = card.top - cards[index - 1].bottom;
+            assert(Math.abs(gap - 8) < 1, `${detail}: vertical gap ${gap}px`);
+        }
+    }
+    report.cases.push({name: label, canvas, cards, passed: true});
+}
 async function main() {
     let primaryError;
     try {
@@ -229,12 +256,14 @@ async function main() {
         assert.equal(await native.evaluate(() => document.querySelector('textarea').value), SOURCE);report.cases.push({name: 'tab switching preserves input and result', passed: true});
         report.phase = 'stop-retry';diagnostics.setPhase(report.phase);holdNext = true;const count = report.requests.length;
         await nativeClick('.translate-primary-button');await until(() => report.requests.length > count, 'held provider request');
+        await resultCardGeometry('loading result card', ['loading']);
         const stoppedAborts = report.aborts;
         await nativeClick('.translate-stop-button');await until(() => native.evaluate(() => !document.querySelector('.translate-stop-button')), 'stop settles');
         await until(() => report.aborts > stoppedAborts, 'stop aborts upstream provider');releaseHeld();
         await until(() => native.evaluate(() => document.querySelector('.translation-result-card')?.dataset.status === 'cancelled'), 'late result rejected');
         await nativeClick('.translation-result-placeholder button');await until(() => native.evaluate(() => document.querySelector('.translation-result-card')?.dataset.status === 'success'), 'retry after stop');
         failNext = true;await nativeClick('.translate-primary-button');await until(() => native.evaluate(() => Boolean(document.querySelector('.translation-result-error'))), 'failure visible');
+        await resultCardGeometry('failed result card', ['error']);
         await nativeClick('.translation-result-error button');await until(() => native.evaluate(() => document.querySelector('.translation-result-card')?.dataset.status === 'success'), 'retry after failure');
         report.cases.push({name: 'stop, late response isolation, failure and retry', passed: true});
         report.phase = 'multi-service';diagnostics.setPhase(report.phase);
@@ -259,7 +288,10 @@ async function main() {
         await nativeClick(`[data-service="${fixtures[15].id}"] .translation-result-content footer button`);
         assert.equal(await native.evaluate(() => window.__copiedText), fixtures[15].translation);
         await native.evaluate(() => {document.querySelector('.translation-center').scrollTop = 0;});
-        await geometry('native sidebar multi-service comparison');await screenshot('native-sidebar-multi-translated');
+        const comparisonStatuses = compared.map(() => 'success');
+        await geometry('native sidebar multi-service comparison');
+        await resultCardGeometry('separate cards for three translations', comparisonStatuses);
+        await screenshot('native-sidebar-multi-translated');
         // 设置页读取同一份选择；重开页面也不能把侧栏多选截断成一个服务。
         const settings = await page(`${origin}/options.html#settings-translation-center`);
         await settings.locator('.translation-center:not(.is-sidebar) .translation-result-card').first().waitFor();
@@ -273,12 +305,16 @@ async function main() {
         assert(serviceScroll.scrollHeight > serviceScroll.height);report.serviceScroll = serviceScroll;
         await geometry('native sidebar service menu');await screenshot('native-sidebar-services');await nativeClick('.service-picker-close');
         await native.send('Emulation.setDeviceMetricsOverride', {width: 320, height: 480, deviceScaleFactor: 1, mobile: false});
-        await geometry('native sidebar emulated 320x480');await nativeClick('.add-service-button');
+        await geometry('native sidebar emulated 320x480');
+        await resultCardGeometry('separate cards at 320x480', comparisonStatuses);
+        await nativeClick('.add-service-button');
         const menu = await native.evaluate(() => {const r = document.querySelector('.service-picker-popover').getBoundingClientRect();return {top: r.top, bottom: r.bottom, height: innerHeight};});
         assert(menu.top >= 0 && menu.bottom <= menu.height);await screenshot('native-sidebar-narrow-services');await nativeClick('.service-picker-close');
         await native.send('Emulation.clearDeviceMetricsOverride');
         await patch({translationCenterServices: [service]});await until(() => native.evaluate(() => !document.querySelector('.service-picker-count')), 'restore single service for lifecycle check');
-        await patch({theme: 'dark'});await until(() => native.evaluate(() => document.documentElement.classList.contains('dark')), 'dark theme');await screenshot('native-sidebar-dark');
+        await patch({theme: 'dark'});await until(() => native.evaluate(() => document.documentElement.classList.contains('dark')), 'dark theme');
+        await resultCardGeometry('dark result card', ['success']);
+        await screenshot('native-sidebar-dark');
         report.phase = 'close-reopen';diagnostics.setPhase(report.phase);holdNext = true;const closing = report.requests.length;
         await nativeClick('.translate-primary-button');await until(() => report.requests.length > closing, 'closing provider request');
         const targetId = native.target.targetId, closedAborts = report.aborts;

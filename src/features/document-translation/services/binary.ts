@@ -1485,7 +1485,8 @@ async function renderPdf(
             await appendRasterReadingPages(pageData, plan, {requireText: true, layoutPage, footerLabel: `原文第 ${pageData.pageNumber} 页 · 译文续页`});
             return;
         }
-        const pages = paginatePdfReadingPlan(plan, (text, font) => embedded.measureText(text.replace(/\t/gu, ' '), font.size));
+        const pages = paginatePdfReadingPlan(plan, (text, font) => embedded.measureText(text.replace(/\t/gu, ' '), font.size),
+            {compactLastPage: true});
         for (const [index, rendered] of pages.entries()) {
             options.signal?.throwIfAborted();
             const page = outputPdf.addPage([rendered.width, rendered.height]);

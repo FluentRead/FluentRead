@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/pdfTextLayout.ts
  * 文件职责：将 PDF 阅读计划中的完整文字和原图区域分页为可读的下载版面。
- * 主要内容：正文固定可读字号与行距，按字素和词边界换行并用有界先进先出缓存复用近期字宽；排版时忽略首尾无内容空段，保留正文内部空行，不改写存储文字；整页可容纳的公式或插图整体换页，长段落与真实超高原图跨页续排，把源坐标浮点尾差并入末条带并保全全部图像几何，不缩小文字、不裁剪译文；每页绘制项使用标准 PDF 点坐标。
+ * 主要内容：正文固定可读字号与行距，按字素和词边界换行并用有界先进先出缓存复用近期字宽；保留当前页能容纳的段内空行，避免空行单独成页，不改写存储文字；整页可容纳的公式或插图整体换页，长段落与真实超高原图跨页续排，把源坐标浮点尾差并入末条带并保全全部图像几何；原版译文续页可按最后一张的内容缩短页高，保留正文下方的页脚空间。
  * 模块边界：只消费纯阅读计划和注入的字体测量，不使用 DOM、Canvas、浏览器 API 或文件 I/O；具体绘制与编码由 PDF 光栅端口负责。
  */
 import type {PdfReadingPlan, PdfReadingRect} from './pdfReadingPlan';
@@ -102,7 +102,9 @@ export function wrapPdfReadingText(value: string, width: number, font: PdfReadin
 }
 
 /** 每个长段落和图像都可跨页；下一页继续消费原内容，绝不丢弃尾行。 */
-export function paginatePdfReadingPlan(plan: PdfReadingPlan, measure: PdfTextMeasure): PdfReadingOutputPage[] {
+export function paginatePdfReadingPlan(
+    plan: PdfReadingPlan, measure: PdfTextMeasure, {compactLastPage = false} = {},
+): PdfReadingOutputPage[] {
     const width = 612, height = 792, margin = 42;
     const availableWidth = width - margin * 2, bottom = height - margin;
     const pages: PdfReadingOutputPage[] = [];
@@ -119,6 +121,11 @@ export function paginatePdfReadingPlan(plan: PdfReadingPlan, measure: PdfTextMea
             const lines = wrapPdfReadingText(entry.text, availableWidth, font, measure);
             if (!lines.length) continue;
             for (const line of lines) {
+                if (!line) {
+                    // 保留页内段落间距，但不为超出当前页的空行分配新页。
+                    if (y + font.lineHeight <= bottom) y += font.lineHeight;
+                    continue;
+                }
                 ensure(font.lineHeight);
                 page!.items.push({kind: 'text', entryId: entry.id, segmentIndex: entry.segmentIndex, text: line, x: margin, y, width: availableWidth, font});
                 y += font.lineHeight;
@@ -153,6 +160,12 @@ export function paginatePdfReadingPlan(plan: PdfReadingPlan, measure: PdfTextMea
             }
             y += 16;
         }
+    }
+    const lastPage = pages.at(-1);
+    if (compactLastPage && lastPage) {
+        const lastItem = lastPage.items.at(-1)!;
+        const itemHeight = lastItem.kind === 'text' ? lastItem.font.lineHeight : lastItem.height;
+        lastPage.height = Math.min(height, Math.ceil(lastItem.y + itemHeight + margin));
     }
     return pages;
 }

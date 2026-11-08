@@ -71,8 +71,9 @@ describe('PDF layout overlay block selection', () => {
         expect(first.block.y + first.block.height + first.spaceBelow).toBeLessThan(65);
         expect(pdfOverlayBlocks(page([block(0, 40, 40, 100, 12, {lineCount: 1, textAlign: 'right'})]))[0].spaceRight).toBe(0);
     });
-    it('keeps table translation inside its physical cell even when the neighbouring text leaves large blank space', () => {
-        const source = block(0, 40, 100, 60, 10, {kind: 'table', lineCount: 1, cellBounds: {x: 30, y: 95, width: 100, height: 20}});
+    it.each(['cellBounds', 'panelBounds'] as const)('keeps translations inside %s even when neighbouring text leaves blank space', boundary => {
+        const source = block(0, 40, 100, 60, 10, {kind: boundary === 'cellBounds' ? 'table' : 'text',
+            lineCount: 1, [boundary]: {x: 30, y: 95, width: 100, height: 20}});
         const original = structuredClone(source);
         const fitted = pdfOverlayBlocks(page([source, block(-1, 200, 100, 20, 10, {kind: 'table', preserveSource: true})]))[0];
         expect(fitted.block.y + fitted.block.height + fitted.spaceBelow).toBeLessThan(115);

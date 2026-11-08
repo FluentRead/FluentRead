@@ -2,7 +2,7 @@
  * @file src/features/document-translation/core/pdfBlockFit.ts
  * 文件职责：为“原版排版”阅读把一段译文放回原文段落所占的矩形，决定哪些段落可以原位替换、可用高度和最终字号与分行。
  * 主要内容：筛选可原位替换的正文块并排除版面分析标记为保留的公式、图内标签、数字表格单元格与页眉页脚，含词语的表格单元格可以替换；量出段落下方到相邻内容之间的空白；从原字号开始按面积比例收缩，能完整放下时保留该布局。仍然溢出时采用能够容纳一行的最大已测字号作可读预览，完整文本交给全文面板与导出续页，不因缩成小字也放不下而牺牲预览可读性。
- * 模块边界：纯几何与文字分行，不创建 DOM 或 Canvas、不读取像素、不调用翻译；字宽测量由调用方注入，页面旋转由展示层处理。
+ * 模块边界：纯几何与文字分行，不创建 DOM 或 Canvas、不读取像素、不调用翻译；表格和图文卡片保留自身边界，字宽测量由调用方注入，页面旋转由展示层处理。
  */
 import type {PdfDocumentBlock, PdfDocumentPage} from './document';
 import {wrapPdfReadingText} from './pdfTextLayout';
@@ -41,28 +41,29 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
     const contentWidth = quarterTurn ? page.height : page.width;
     return page.blocks.flatMap(sourceBlock => {
         if (sourceBlock.preserveSource || PROTECTED_KINDS.has(sourceBlock.kind ?? '') || !(sourceBlock.width > 0) || !(sourceBlock.height > 0)) return [];
-        const cellRight = sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity;
+        const boundary = sourceBlock.cellBounds ?? sourceBlock.panelBounds;
+        const rightLimit = boundary ? right(boundary) - 0.5 : Infinity;
+        const bottomLimit = boundary ? bottom(boundary) - 0.5 : contentHeight;
         // 段落末行旁的 QED/式号可能落在该段的外接矩形里；让出右侧这一小条，不能将译文排到保留符号上。
         const rightInset = page.blocks.reduce((edge, other) => {
             const protectedSource = other.preserveSource || PROTECTED_KINDS.has(other.kind ?? '');
             return other !== sourceBlock && protectedSource && other.y < bottom(sourceBlock) && bottom(other) > sourceBlock.y
                 && other.x > sourceBlock.x + sourceBlock.width * 0.75 && other.x < right(sourceBlock) && right(other) >= right(sourceBlock) - sourceBlock.fontSize * 2
                 ? Math.min(edge, other.x - 1.5) : edge;
-        }, Math.min(right(sourceBlock), cellRight));
-        const cellBottom = sourceBlock.cellBounds ? bottom(sourceBlock.cellBounds) - 0.5 : contentHeight;
-        const clippedHeight = Math.max(1, Math.min(sourceBlock.height, cellBottom - sourceBlock.y));
+        }, Math.min(right(sourceBlock), rightLimit));
+        const clippedHeight = Math.max(1, Math.min(sourceBlock.height, bottomLimit - sourceBlock.y));
         const block = rightInset < right(sourceBlock) || clippedHeight < sourceBlock.height
             ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x), height: clippedHeight} : sourceBlock;
-        let limit = Math.min(contentHeight, cellBottom);
-        let edge = sourceBlock.cellBounds ? contentWidth : Math.max(right(block), contentWidth - Math.max(0, block.x));
+        let limit = Math.min(contentHeight, bottomLimit);
+        let edge = boundary ? contentWidth : Math.max(right(block), contentWidth - Math.max(0, block.x));
         for (const other of neighbours) {
             if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) && right(other) > block.x) limit = Math.min(limit, other.y);
             if (other.x >= right(block) - 1 && other.y < bottom(block) && bottom(other) > block.y) edge = Math.min(edge, other.x);
         }
         // 居中/右对齐文字扩宽会移动它的对齐锚点；延长一行的右边界也不能侵入下方错开的另一栏。
-        // 表格列使用单元格边界而非对称页边距，仍为相邻文字和实际页边保留间隙。
-        const usableEdge = Math.min(cellRight - 2, edge - 6);
+        // 单元格和图文卡片采用自己的右边界，同时为相邻文字和实际页边留出间隙。
+        const usableEdge = Math.min(rightLimit - 2, edge - 6);
         const spaceRight = block.lineCount <= 1 && block.textAlign === 'left' ? Math.max(0, usableEdge - right(block)) : 0;
         for (const other of neighbours) {
             if (other === sourceBlock) continue;

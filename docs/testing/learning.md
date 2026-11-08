@@ -30,6 +30,10 @@
 
 `materialWorkspaceLifecycle` 的 72 项与 `materialWorkspaceKeepAlive` 的 16 项同时验证刷新后的完整引用比较：全部引用按顺序检查 `kind`、`id`、`excerpt`、`note`、`createdAt`、`updatedAt`，缺省与 `undefined` 等价，不受对象键插入顺序影响。去除前后两份正文 JSON 输出，仍保留引用变化时的权威详情补读、旧详情失效、选择/草稿及隐藏恢复调度。正式 SFC 上限夹具三次刷新从 6 次正文 JSON、108,521,346 个输出字符降至零；这不是端到端工作量或堆测量。边界及最终证据入口见[阅读材料刷新时的引用比较](../maintainers/material-reference-equality-20261024.md)。
 
+### 阅读位置与播放器滚轮
+
+[#1248](https://github.com/FluentRead/FluentRead/issues/1248) 的回归使用同一 B 站视频和同一隔离 Edge，分别在扩展开启与关闭时进入播放器全屏，读取滚轮前后的媒体音量。`tests/materialSource.test.ts` 检查文章材料的被动滚轮监听只挂在页面根元素，切换来源或卸载时释放。播放器在 `document` 上的 `mousewheel` 监听继续接收滚轮事件。
+
 ## 关键内容空间与交互工作量
 
 划词卡片定向回归使用 `tests/selectionTranslatorLifecycle.test.ts`、`tests/readingPanelLifecycle.test.ts` 与 `tests/readingPanelStreamingResize.test.ts`，检查单帧合并拖动、结束时刷新最后位置、取消与迟到帧、视口变化、UTF-16 朗读偏移和流式正文的尺寸通知。生产构建后执行 `node scripts/testing/run-selection-key-information-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --artifacts-dir <证据目录> --phase optimized`，在第二屏临时后台 Edge 中检查译文首屏、完整原文、单行工具栏的滚轮与键盘操作、手动拖动/缩放、流式阅读期间的卡片尺寸和网页内容保留。`--phase baseline` 允许记录优化前的关键内容失败，但仍要求基础交互、原文和清理契约通过。性能探针在核对扩展 ID 的隔离世界统计实际送达的受信指针事件与卡片几何读取；请求的输入数量不等于实际事件数量，也不代表 FPS。

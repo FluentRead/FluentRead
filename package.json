@@ -115,7 +115,7 @@
     "turndown": "7.2.4",
     "webextension-polyfill": "^0.12.0",
     "x-fetch": "0.3.0",
-    "zod": "3.25.76"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",

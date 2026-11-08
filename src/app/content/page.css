@@ -5,9 +5,35 @@
  * 模块边界：选择器均以 fluent 前缀或受控状态类约束，不承担 Shadow UI 组件主题，也不决定何时添加类名；双语译文容器与译文样式预设统一在 src/ui/styles/translation-display.css，由 pageStyles 一并注入。
  */
 /* 内容脚本注入到宿主页面的 FluentRead 专属样式。 */
+.fluentread-arxiv-reading-action {
+    margin-inline-start: 1em;
+}
+
+.fluentread-arxiv-reading-action > a {
+    display: inline-flex;
+    max-inline-size: 100%;
+}
+
+.fluentread-arxiv-reading-action > a,
+#abs > a.mobile-submission-download[data-fluentread-paper-reading] {
+    align-items: center;
+    column-gap: 0.35em;
+}
+
+.fluentread-arxiv-reading-icon {
+    inline-size: 0.95em;
+    block-size: 0.95em;
+    flex: none;
+    object-fit: contain;
+}
+
 /* arXiv 的原生侧栏在窄屏会移到页面底部。仅在摘要旁已有入口时，隐藏底部的同一 FluentRead 入口。 */
 @media screen and (max-width: 768px) {
-    #abs-outer:has(#abs > .mobile-submission-download[data-fluentread-paper-reading]) .full-text li:has(> [data-fluentread-paper-reading]) {
+    .fluentread-arxiv-reading-action {
+        margin-inline-start: 0;
+    }
+
+    #abs-outer:has(#abs > .mobile-submission-download[data-fluentread-paper-reading]) .fluentread-arxiv-reading-action {
         display: none;
     }
 }

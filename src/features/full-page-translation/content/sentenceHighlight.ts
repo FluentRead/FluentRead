@@ -1,21 +1,23 @@
 /**
  * @file src/features/full-page-translation/content/sentenceHighlight.ts
  * 文件职责：在双语段落中定位鼠标下的句子，并同步绘制原文和译文的文字范围。
- * 主要内容：沿命中节点祖先读取共享状态索引，每次复核双语工件的身份与在位关系；分帧收集文字、保留原始偏移并限制文字量，同一超限段落在失效前不重复收集；较长段落按浏览器光标位置缩小待验证范围，读取实时矩形并使用原生 Highlight 绘制；离开、选择、滚动、节点变化和卸载时取消收集并释放范围与监听器。
- * 模块边界：仅消费 state 登记、renderer 创建的双语容器，不拆分宿主文本、不更改排版、不调用 provider；旧浏览器缺少绘制能力时安全停用。
+ * 主要内容：分帧收集文字和不可拆分的行内公式，保留原始偏移；以真实范围和公式位置定位原译句子，较长段落沿用光标索引；离开、选择、滚动、节点变化和卸载时释放范围和公式绘制标记。
+ * 模块边界：仅消费 state 登记、renderer 创建的双语容器，不拆分宿主文本或公式、不更改排版、不调用 provider；旧浏览器缺少绘制能力时安全停用。
  */
 import {findTextPointAtPoint} from '@/src/core/translation/dom';
 import {alignBilingualSentences, type SentenceSpan} from '@/src/core/translation/sentenceAlignment';
 import {getTranslationState} from './state';
 
 export const BILINGUAL_HIGHLIGHT_NAME = 'fluentread-bilingual-sentence';
+const formulaAttribute = 'data-fr-bilingual-sentence-formula';
 const wrapperSelector = '.fluent-read-bilingual-content[data-fr-translation-owned="true"]';
-const excludedSelector = 'script, style, textarea, input, select, button, svg, math, mjx-container, .katex, [hidden], [aria-hidden="true"], [translate="no" i]:not(html, body), [contenteditable]:not([contenteditable="false"]), [data-fr-translation-owned="true"]';
+const formulaSelector = 'math, mjx-container, .katex';
+const excludedSelector = 'script, style, textarea, input, select, button, svg, math[display="block" i], mjx-container[display="true" i], .katex-display, [hidden], [aria-hidden="true"], [translate="no" i]:not(html, body), [contenteditable]:not([contenteditable="false"]), [data-fr-translation-owned="true"]';
 // 文字范围较少时直接检查矩形，省去建立索引和额外的浏览器光标查询。
 const minRangesForCaretLookup = 16;
-interface TextRun {node: Text; start: number; end: number}
+interface TextRun {node: Text | Element; start: number; end: number}
 interface TextMap {text: string; runs: TextRun[]}
-interface Pair {source: Range[]; translation: Range[]}
+interface Pair {source: Range[]; translation: Range[]; formulas: Element[]}
 interface IndexedRange {range: Range; pair: Pair}
 type HighlightView = Window & typeof globalThis & {
     Highlight?: new (...ranges: Range[]) => Set<Range>;
@@ -38,13 +40,23 @@ function textCollector(root: Element, maxLength: number): () => TextMap | null |
             if (node !== root && node.nextSibling) siblings.push(node.nextSibling);
             next = siblings.pop();
             let text = '';
-            if (node.nodeType === 3) text = (node as Text).data;
-            else if (node.nodeType === 1) {
+            let run: Text | Element | undefined;
+            if (node.nodeType === 3) {
+                run = node as Text;
+                text = run.data;
+                // 折叠的源码换行不构成句界；等长替换保证分句偏移仍对应原始 DOM Range。
+                if (!preservesLineBreaks.has(node.parentElement!)) text = text.replace(/[\r\n]/gu, ' ');
+            } else if (node.nodeType === 1) {
                 const element = node as Element;
                 if (element !== root && element.matches(excludedSelector)) continue;
                 const style = root.ownerDocument.defaultView!.getComputedStyle(element);
                 if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') continue;
-                if (element.tagName === 'BR') text = '\n';
+                if (element.matches(formulaSelector)) {
+                    if (/^block(?:\s|$)/u.test(style.display)) continue;
+                    // 公式占一个逻辑字符。内部标点和隐藏的渲染副本不参与分句。
+                    text = '\uFFFC';
+                    run = element;
+                } else if (element.tagName === 'BR') text = '\n';
                 else if (element.firstChild) {
                     const collapse = style.whiteSpaceCollapse;
                     if (collapse ? /^(?:preserve|preserve-breaks|break-spaces)$/u.test(collapse)
@@ -57,11 +69,7 @@ function textCollector(root: Element, maxLength: number): () => TextMap | null |
             }
             if (!text) continue;
             if (text.length > maxLength - length) return null;
-            if (node.nodeType === 3) {
-                // 折叠的源码换行不构成句界；等长替换保证分句偏移仍对应原始 DOM Range。
-                if (!preservesLineBreaks.has(node.parentElement!)) text = text.replace(/[\r\n]/gu, ' ');
-                runs.push({node: node as Text, start: length, end: length + text.length});
-            }
+            if (run) runs.push({node: run, start: length, end: length + text.length});
             chunks.push(text);
             length += text.length;
         }
@@ -69,7 +77,7 @@ function textCollector(root: Element, maxLength: number): () => TextMap | null |
     };
 }
 
-function rangesFor(map: TextMap, span: SentenceSpan): Range[] {
+function rangesFor(map: TextMap, span: SentenceSpan, formulas: Element[]): Range[] {
     const ranges: Range[] = [];
     let first = 0;
     let last = map.runs.length;
@@ -80,6 +88,10 @@ function rangesFor(map: TextMap, span: SentenceSpan): Range[] {
     }
     for (let index = first; index < map.runs.length && map.runs[index].start < span.end; index++) {
         const run = map.runs[index];
+        if (run.node.nodeType === 1) {
+            formulas.push(run.node as Element);
+            continue;
+        }
         const start = Math.max(span.start, run.start);
         const end = Math.min(span.end, run.end);
         const range = run.node.ownerDocument.createRange();
@@ -104,12 +116,23 @@ function indexRanges(pairs: Pair[]): Map<Node, IndexedRange[]> {
     return index;
 }
 
-function containsPoint(range: Range, x: number, y: number): boolean {
-    for (const rect of range.getClientRects()) {
+function containsPoint(subject: Range | Element, x: number, y: number): boolean {
+    for (const rect of subject.getClientRects()) {
         if (rect.width > 0 && rect.height > 0 && x >= rect.left && x <= rect.right &&
             y >= rect.top && y <= rect.bottom) return true;
     }
     return false;
+}
+
+/** MathJax/KaTeX 的可视子树和无障碍副本命中同一外层公式。 */
+function formulaForHit(target: Element): Element | null {
+    let formula = target.closest(formulaSelector);
+    while (formula) {
+        const outer = formula.parentElement?.closest(formulaSelector);
+        if (!outer) break;
+        formula = outer;
+    }
+    return formula;
 }
 
 function pairAtCaret(index: ReadonlyMap<Node, IndexedRange[]>, hit: Element, x: number, y: number): Pair | undefined {
@@ -164,6 +187,7 @@ export function installBilingualSentenceHighlight(document: Document): () => voi
     let installed = true;
     let pairs: Pair[] = [];
     let indexedRanges: Map<Node, IndexedRange[]> | undefined;
+    let indexedFormulas: Map<Element, Pair> | undefined;
     let collecting: {wrapper: Element; source: () => TextMap | null | undefined; sourceMap?: TextMap;
         translation?: () => TextMap | null | undefined} | undefined;
     let active: Pair | undefined;
@@ -171,29 +195,35 @@ export function installBilingualSentenceHighlight(document: Document): () => voi
     let frame: number | null = null;
     const ownerAncestors: Node[] = [];
     const observer = new view.MutationObserver(records => {
-        if (owner && (!owner.isConnected || records.some(record => owner!.contains(record.target)
-            || ownerAncestors.some(ancestor => record.target.contains(ancestor))))) clear();
+        if (owner && (!owner.isConnected || records.some(record => record.attributeName !== formulaAttribute
+            && (owner!.contains(record.target) || ownerAncestors.some(ancestor => record.target.contains(ancestor)))))) clear();
     });
-    function clear(): void {
+    function unpaint(): void {
         paint.clear();
+        for (const formula of active?.formulas ?? []) formula.removeAttribute(formulaAttribute);
         active = undefined;
+    }
+    function clear(): void {
+        observer.disconnect();
+        unpaint();
         owner = null;
         ownerWrapper = null;
         ownerAncestors.length = 0;
         pairs = [];
         indexedRanges = undefined;
+        indexedFormulas = undefined;
         collecting = undefined;
         pending = null;
         if (frame !== null) view!.cancelAnimationFrame(frame);
         frame = null;
-        observer.disconnect();
     }
     const flush = (): void => {
         frame = null;
         const point = pending;
         if (!point || point.event.buttons || document.getSelection()?.isCollapsed === false) return clear();
         const {event, target: hit} = point;
-        const next = hit && ownerFor(hit);
+        const formula = hit && formulaForHit(hit);
+        const next = hit && ownerFor(formula ?? hit);
         if (!hit || !next?.owner.isConnected) return clear();
         if (next.owner !== owner || next.wrapper !== ownerWrapper) {
             clear();
@@ -224,9 +254,12 @@ export function installBilingualSentenceHighlight(document: Document): () => voi
                 const translation = collecting.translation();
                 if (translation === undefined) {frame = view.requestAnimationFrame(flush); return;}
                 if (translation) {
-                    pairs = alignBilingualSentences(source.text, translation.text).map(pair => ({
-                        source: rangesFor(source, pair.source), translation: rangesFor(translation, pair.translation),
-                    }));
+                    pairs = alignBilingualSentences(source.text, translation.text).map(({source: sourceSpan, translation: translationSpan}) => {
+                        const formulas: Element[] = [];
+                        const pair = {source: rangesFor(source, sourceSpan, formulas), translation: rangesFor(translation, translationSpan, formulas), formulas};
+                        for (const element of formulas) (indexedFormulas ??= new Map()).set(element, pair);
+                        return pair;
+                    });
                     const rangeCount = pairs.reduce((total, pair) => total + pair.source.length + pair.translation.length, 0);
                     if (rangeCount >= minRangesForCaretLookup) indexedRanges = indexRanges(pairs);
                 }
@@ -237,13 +270,17 @@ export function installBilingualSentenceHighlight(document: Document): () => voi
         pending = null;
         const {clientX, clientY} = event;
         const hitsPoint = (range: Range) => containsPoint(range, clientX, clientY);
-        const pair = (indexedRanges && pairAtCaret(indexedRanges, hit, clientX, clientY))
-            ?? pairs.find(({source, translation}) => source.some(hitsPoint) || translation.some(hitsPoint));
+        // 公式命中只能使用它自身的句对，不能借用相邻文字范围。
+        const pair = formula
+            ? (containsPoint(formula, clientX, clientY) ? indexedFormulas?.get(formula) : undefined)
+            : (indexedRanges && pairAtCaret(indexedRanges, hit, clientX, clientY))
+                ?? pairs.find(({source, translation}) => source.some(hitsPoint) || translation.some(hitsPoint));
         if (pair !== active) {
-            paint.clear();
+            unpaint();
             active = pair;
             if (pair) {
                 for (const range of [...pair.source, ...pair.translation]) paint.add(range);
+                for (const element of pair.formulas) element.setAttribute(formulaAttribute, 'true');
                 registry.set(BILINGUAL_HIGHLIGHT_NAME, paint);
             }
         }

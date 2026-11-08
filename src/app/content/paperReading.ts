@@ -1,17 +1,20 @@
 /**
  * @file src/app/content/paperReading.ts
  * 文件职责：把 FluentRead 的阅读入口放入已适配论文站的原生访问区，并识别 arXiv 的一次性正文翻译意图。
- * 主要内容：等待静态论文标记解析完毕，保留 arXiv 的 HTML 优先和窄屏布局；对只有 PDF 的论文复用受控导航入口，修复 Hugging Face 客户端接管后的入口丢失，PMC 在当前正文中启动双语翻译。
+ * 主要内容：等待静态论文标记解析完毕，为 arXiv 安装带品牌图标的独立入口并在新标签打开双语正文；对只有 PDF 的论文复用受控导航，修复 Hugging Face 客户端接管后的入口丢失，PMC 在当前正文中启动双语翻译。
  * 模块边界：仅处理页面 DOM 和导航意图；论文身份校验由共享地址模块负责，打开扩展页与开始翻译由调用方注入。
  */
 import {isSameArxivPaper, readArxivPaperUrl} from '@/src/features/document-translation/core/arxivPaperUrl';
 import {getPaperPdfSite, resolvePaperPdfUrl} from '@/src/features/document-translation/core/paperPdfSites';
+import brandIcon from '../../../public/icon/32.png?inline';
 import {isPmcPaperReadingPage, mountPmcPaperReading} from './pmcPaperReading';
 
 const readingHash = '#fluentread-bilingual';
 const readingAttribute = 'data-fluentread-paper-reading';
-const pdfAnchors = '.full-text a.download-pdf[href], #abs a.mobile-submission-download[href]';
-const htmlAnchors = '.full-text a#latexml-download-link[href], #abs a.mobile-submission-download[href]';
+const arxivDesktopAction = 'fluentread-arxiv-reading-action';
+const arxivMobileLink = `a.mobile-submission-download[href]:not([${readingAttribute}])`;
+const pdfAnchors = `.full-text ul a.download-pdf[href], #abs > ${arxivMobileLink}`;
+const htmlAnchors = `.full-text a#latexml-download-link[href], #abs > ${arxivMobileLink}`;
 const externalPdfControls = {
     huggingface: {selector: 'main section a.btn[href]', classes: 'btn'},
     acl: {selector: '#main .acl-paper-link-block > a.btn.btn-primary[href]', classes: 'btn btn-outline-primary'},
@@ -80,28 +83,43 @@ function createPdfReadingLink(document: Document, href: string, signal: AbortSig
 }
 
 function mountArxivPaperReading(document: Document, source: ArxivPaper, signal: AbortSignal, ports: PaperReadingPorts): void {
-
     const html = Array.from(document.querySelectorAll<HTMLAnchorElement>(htmlAnchors), anchor => readPaperLink(anchor, source, 'html'))
         .find(target => target !== null);
+    const lastMobileLink = Array.from(document.querySelectorAll<HTMLAnchorElement>(`#abs > ${arxivMobileLink}`)).at(-1);
     for (const nativePdf of document.querySelectorAll<HTMLAnchorElement>(pdfAnchors)) {
         const pdf = readPaperLink(nativePdf, source, 'pdf');
         if (!pdf) continue;
-        const desktopItem = nativePdf.closest('.full-text li');
-        const insertionPoint = desktopItem ?? nativePdf;
-        if (insertionPoint.nextElementSibling?.matches(`[${readingAttribute}], :has(> [${readingAttribute}])`)) continue;
+        const desktopList = nativePdf.closest('.full-text ul');
+        const insertionPoint = desktopList ?? lastMobileLink!;
+        if (insertionPoint.parentElement!.querySelector(`:scope > .${arxivDesktopAction}, :scope > [${readingAttribute}]`)) continue;
 
         const entry = html ? document.createElement('a') : createPdfReadingLink(document, pdf.url.href, signal, ports);
         if (html) {
             const destination = new URL(html.url);
             destination.hash = readingHash;
             entry.href = destination.href;
+            entry.target = '_blank';
+            entry.rel = 'noopener';
             entry.textContent = ports.bilingualLabel;
             entry.setAttribute(readingAttribute, 'html');
             entry.setAttribute('translate', 'no');
         }
-        entry.className = desktopItem ? 'abs-button' : 'mobile-submission-download';
-        const item = desktopItem ? document.createElement('li') : entry;
-        if (desktopItem) item.append(entry);
+        const icon = document.createElement('img');
+        icon.className = 'fluentread-arxiv-reading-icon';
+        icon.src = brandIcon;
+        icon.alt = '';
+        icon.setAttribute('aria-hidden', 'true');
+        icon.width = 16;
+        icon.height = 16;
+        icon.draggable = false;
+        entry.prepend(icon);
+        entry.className = desktopList ? 'abs-button' : 'mobile-submission-download';
+        const item = desktopList ? document.createElement('div') : entry;
+        if (desktopList) {
+            item.className = arxivDesktopAction;
+            item.append(entry);
+        }
+        // arXiv 与其他扩展可继续在原生列表内维护入口，FluentRead 只拥有自己的同级节点。
         insertionPoint.after(item);
         signal.addEventListener('abort', () => item.remove(), {once: true});
     }

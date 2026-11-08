@@ -2,6 +2,7 @@ import {parseHTML} from 'linkedom';
 import {describe, expect, it, vi} from 'vitest';
 import {consumeArxivPaperReading, mountPaperReading, waitForPaperReadingDom} from '@/src/app/content/paperReading';
 import {translate, UI_LANGUAGE_OPTIONS} from '@/src/core/i18n';
+import brandIcon from '../public/icon/32.png?inline';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
 registerAllUiLanguageBundles();
@@ -89,15 +90,48 @@ describe('arXiv paper reading entry', () => {
         const entries = Array.from(document.querySelectorAll(marker));
         expect(entries.map(entry => [entry.textContent, entry.getAttribute('href'), entry.getAttribute('translate')]))
             .toEqual([['双语翻译（流畅阅读）', html, 'no'], ['双语翻译（流畅阅读）', html, 'no']]);
+        for (const entry of entries) {
+            const icon = entry.querySelector('img.fluentread-arxiv-reading-icon');
+            expect(entry.firstElementChild).toBe(icon);
+            expect(icon?.getAttribute('src')).toBe(brandIcon);
+            expect(icon?.getAttribute('alt')).toBe('');
+            expect(icon?.getAttribute('aria-hidden')).toBe('true');
+            expect(entry.hasAttribute('aria-label')).toBe(false);
+        }
         expect(document.querySelector('.download-pdf')?.getAttribute('href')).toBe('/pdf/1706.03762v1');
         expect(document.querySelector('#latexml-download-link')?.getAttribute('href')).toBe('/html/1706.03762v1');
-        expect(entries[0]?.parentElement?.tagName).toBe('LI');
+        expect(entries[0]?.parentElement?.className).toBe('fluentread-arxiv-reading-action');
+        expect(entries[0]?.parentElement?.previousElementSibling).toBe(document.querySelector('.full-text ul'));
         expect(entries[1]?.className).toBe('mobile-submission-download');
+        expect(entries.map(entry => [entry.getAttribute('target'), entry.getAttribute('rel')]))
+            .toEqual([['_blank', 'noopener'], ['_blank', 'noopener']]);
         expect(ports.openPdf).not.toHaveBeenCalled();
         controller.abort();
         mount();
         expect(document.querySelectorAll(marker)).toHaveLength(0);
         expect(document.querySelectorAll('.full-text li')).toHaveLength(2);
+    });
+
+    it.each(['before', 'after'])('keeps the native list and a separate extension entry inserted %s FluentRead', order => {
+        const fixture = mountFixture(desktop.replace('</ul>', '<li><a id="latexml-download-link" href="/html/1706.03762v1">HTML</a></li></ul>')
+            + mobile.replace('</div>', '<a class="mobile-submission-download" href="/html/1706.03762v1">HTML</a></div>'));
+        const {document, controller} = fixture;
+        const nativeList = document.querySelector('.full-text ul')!;
+        const nativeItems = Array.from(nativeList.children);
+        const foreignItem = document.createElement('li');
+        foreignItem.innerHTML = '<a class="abs-button download-pdf" target="_blank" href="https://arxiv.org/html/1706.03762v1?_immersive_translate_auto_translate=1">双语版本(沉浸式翻译)</a>';
+        if (order === 'before') nativeList.append(foreignItem);
+        fixture.mount();
+        if (order === 'after') nativeList.append(foreignItem);
+        fixture.mount();
+        expect(Array.from(nativeList.children)).toEqual([...nativeItems, foreignItem]);
+        expect(document.querySelectorAll(marker)).toHaveLength(2);
+        expect(nativeList.querySelector(marker)).toBeNull();
+        expect(document.querySelector('#abs [data-fluentread-paper-reading]')?.previousElementSibling?.textContent).toBe('HTML');
+        controller.abort();
+        expect(document.querySelector(marker)).toBeNull();
+        expect(Array.from(nativeList.children)).toEqual([...nativeItems, foreignItem]);
+        expect(foreignItem.firstElementChild?.getAttribute('href')).toContain('?_immersive_translate_auto_translate=1');
     });
 
     it('uses the desktop or mobile official HTML link even if its other responsive copy is missing', () => {
@@ -127,6 +161,8 @@ describe('arXiv paper reading entry', () => {
         mount();
         const entry = document.querySelector(marker)!;
         expect(entry.getAttribute('href')).toBe(pdf);
+        expect(entry.textContent).toBe('PDF 阅读（流畅阅读）');
+        expect(entry.querySelector('img.fluentread-arxiv-reading-icon[alt=""][aria-hidden="true"]')).not.toBeNull();
         const click = (trusted: boolean) => {
             const event = new Event('click', {bubbles: true, cancelable: true});
             Object.defineProperty(event, 'isTrusted', {value: trusted});
@@ -176,6 +212,7 @@ describe('publisher PDF entries', () => {
         expect(entries).toHaveLength(1);
         const entry = entries[0]!;
         expect(entry.textContent).toBe('PDF 阅读（流畅阅读）');
+        expect(entry.querySelector('.fluentread-arxiv-reading-icon')).toBeNull();
         expect(entry.getAttribute('href')).toBe(new URL(nativePdf, href).href);
         expect(entry.getAttribute('translate')).toBe('no');
         expect(entry.className).toBe(classes);

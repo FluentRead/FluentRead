@@ -47,6 +47,8 @@ Focusing a translation link with the keyboard also reveals blur and blackout sty
 2. Hover over a sentence in the original or translation to highlight both counterparts.
 3. Use the style shortcut, or open **Interface style → Sentence highlight style**, to adjust the background and lines.
 
+Inline formulas are highlighted with their sentence. You can also hover over a formula to see the matching original and translated sentences.
+
 The highlighter treats source line breaks that the browser collapses as spaces and uses visible line breaks to find sentence boundaries.
 
 Choose from eight presets or customize background and underline colors, opacity, line style, and thickness. Set background opacity to 0% for lines only, or choose **No underline** for background only. Changes save automatically and apply to open pages immediately. **Reset to preset** clears overrides.

@@ -57,7 +57,7 @@ export async function extractPdfSegments(bytes: ArrayBuffer, signal?: AbortSigna
     const loadingTask = getDocument({
         data: new Uint8Array(bytes),
         disableFontFace: true,
-        isEvalSupported: false,
+        disableWorkerRendering: true,
         useWorkerFetch: false,
     });
     let destruction: Promise<void> | undefined;

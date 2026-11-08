@@ -1,6 +1,7 @@
 <!--
  * @file src/features/settings/ui/services/FreeTranslationSettings.vue
  * 文件职责：编辑免费翻译服务的启停、选择策略、邮箱与等待时间。
+ * 目录可用性：已从目录移除的线路隐藏并从界面分流和顺序中排除，保存的池成员和位置保留到加回时。
  * 主要内容：策略选择与启用数量默认可见，全部服务的启停、连接结果、耗时、分流参考和可选邮箱放在默认展开且可手动收起的设置卡片中，收起保留表单；B站翻译仅标注免费；Safari 单独呈现实际域授权并在真实点击中逐线路申请，权限查询有界且切换时取消等待；撤权与重新激活时复查域权限，自己授权后的事件不取消原点击；错误保留翻译键，等待上限以完整七语帮助说明逐服务与总预算，不承诺外部服务恢复时间；仅展开且活跃的分流视图合并读取后台快照，收起或切换时取消等待和旧事件，邮箱草稿只在所属配置提交。
  * 模块边界：只修改传入的配置，由设置页统一持久化；通过平台端口管理 Safari 授权，只读取不含凭据的后台权重快照，不请求翻译或更改启用顺序。
  -->
@@ -52,7 +53,7 @@
         </ul>
       </section>
       <p class="fallback-footnote">{{ t('settings.services.library.keepOne') }}</p>
-      <section class="provider-settings" :aria-label="t('settings.services.library.memoryEmail')">
+      <section v-if="!removedProviders.has('myMemory')" class="provider-settings" :aria-label="t('settings.services.library.memoryEmail')">
         <label class="compact-field"><span>{{ t('settings.services.library.memoryEmail') }}</span><el-input :model-value="myMemoryEmailDraft" :disabled="!active" :onUpdate:modelValue="actions.updateEmail" type="email" :placeholder="translateLegacy('不填写也可以使用')" :aria-label="t('settings.services.library.memoryEmail')" :aria-invalid="myMemoryEmailInvalid" :onChange="actions.commitEmail" /></label>
         <p v-if="myMemoryEmailInvalid" class="provider-note" role="status">{{ translateLegacy('请输入有效邮箱，或留空') }}</p>
         <p>{{ translateLegacy('提供邮箱后可提升额度；邮箱会随请求发送给 MyMemory') }} <a href="https://mymemory.translated.net/doc/usagelimits.php" target="_blank" rel="noreferrer">{{ translateLegacy('官方额度说明') }}</a></p>
@@ -105,8 +106,14 @@ watch(() => [config.value, config.value.myMemoryEmail, revision.value], () => {m
 function commitMyMemoryEmail(): void { if (active.value && !advanced.value && !myMemoryEmailInvalid.value) config.value.myMemoryEmail = normalizeMyMemoryEmail(myMemoryEmailDraft.value) }
 const mode = computed<FreeTranslationMode>(() => normalizeFreeTranslationMode(freeConfig.value.freeTranslationMode) as FreeTranslationMode)
 const isSequential = computed(() => mode.value === 'sequential')
-const order = computed(() => normalizeFreeTranslationOrder(config.value.freeTranslationOrder))
-const providers = computed(() => mode.value === 'sequential' ? [...order.value.flatMap(id => FREE_TRANSLATION_PROVIDERS.filter(provider => provider.id === id)), ...FREE_TRANSLATION_PROVIDERS.filter(provider => !order.value.includes(provider.id))] : [...FREE_TRANSLATION_PROVIDERS])
+const removedProviders = computed(() => new Set(config.value.disabledTranslationServices))
+const savedOrder = computed(() => normalizeFreeTranslationOrder(config.value.freeTranslationOrder))
+const order = computed(() => savedOrder.value.filter(id => !removedProviders.value.has(id)))
+const availableProviders = computed(() => FREE_TRANSLATION_PROVIDERS.filter(provider => !removedProviders.value.has(provider.id)))
+const providers = computed(() => isSequential.value ? [
+  ...order.value.flatMap(id => availableProviders.value.filter(provider => provider.id === id)),
+  ...availableProviders.value.filter(provider => !order.value.includes(provider.id)),
+] : availableProviders.value)
 const failedProviders = computed(() => providers.value.filter(provider => props.checks?.[provider.id]?.status === 'error' && props.checks[provider.id]?.error))
 const providerListOpen = ref(!advanced.value)
 watch(advanced, value => {providerListOpen.value = !value}, {flush: 'sync'})
@@ -281,14 +288,17 @@ function setMode(value: FreeTranslationMode): void { if (active.value && !advanc
 function isEnabled(id: string): boolean { return order.value.includes(id) }
 function toggleDisabled(id: string): boolean { return isEnabled(id) && order.value.length === 1 }
 function toggle(id: string, enabled: boolean): void {
-  if (!active.value || advanced.value || typeof enabled !== 'boolean' || !FREE_TRANSLATION_PROVIDERS.some(provider => provider.id === id) || enabled === isEnabled(id) || toggleDisabled(id)) return
-  config.value.freeTranslationOrder = enabled ? [...order.value, id] : order.value.filter(value => value !== id)
+  if (!active.value || advanced.value || typeof enabled !== 'boolean' || !availableProviders.value.some(provider => provider.id === id) || enabled === isEnabled(id) || toggleDisabled(id)) return
+  config.value.freeTranslationOrder = enabled ? [...savedOrder.value, id] : savedOrder.value.filter(value => value !== id)
 }
 function move(id: string, direction: -1 | 1): void {
   if (!active.value || advanced.value || !isSequential.value || (direction !== -1 && direction !== 1)) return
   const current = order.value.indexOf(id), next = current + direction
   if (current < 0 || next < 0 || next >= order.value.length) return
-  const reordered = [...order.value]; [reordered[current], reordered[next]] = [reordered[next], reordered[current]]; config.value.freeTranslationOrder = reordered
+  const reordered = [...savedOrder.value]
+  const currentSlot = reordered.indexOf(id), nextSlot = reordered.indexOf(order.value[next]);
+  [reordered[currentSlot], reordered[nextSlot]] = [reordered[nextSlot], reordered[currentSlot]]
+  config.value.freeTranslationOrder = reordered
 }
 function setDuration(seconds: number | undefined): void { if (active.value && advanced.value && typeof seconds === 'number' && Number.isFinite(seconds)) config.value.freeTranslationTimeoutMs = Math.round(Math.min(15, Math.max(1, seconds)) * 1000) }
 const actions = computed(() => {

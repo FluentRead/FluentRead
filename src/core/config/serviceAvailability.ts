@@ -10,7 +10,7 @@ export interface TranslationServiceAvailabilityOption {
   disabled?: boolean
 }
 
-export const TRANSLATION_SERVICE_DISABLED_MESSAGE = '所选翻译服务已关闭，请到服务目录重新启用，或选择其他服务。'
+export const TRANSLATION_SERVICE_DISABLED_MESSAGE = '所选翻译服务已关闭。请在翻译服务设置中使用「添加回目录」，或选择其他服务。'
 
 /** 忽略非法值并按首次出现顺序去重，兼容导入的旧备份与自定义服务标识。 */
 export function normalizeDisabledTranslationServices(value: unknown): string[] {

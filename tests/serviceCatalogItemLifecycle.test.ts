@@ -58,35 +58,24 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
 
 type ItemProps = {
     item: ServiceOption; selected: boolean; isDefault: boolean; isConfigured: boolean;
-    isFavorite: boolean; compact: boolean; status: string; availabilityEnabled?: boolean; availabilityToggleDisabled?: boolean;
+    isFavorite: boolean; compact: boolean; status: string; removeDisabled?: boolean;
 };
 let app: Vue.App | undefined, root: HTMLElement;
 async function settle(): Promise<void> {await Vue.nextTick(); await Vue.nextTick();}
 async function mount(component: Vue.Component, props: Record<string, unknown>, onSelect?: (value: string) => void,
-    onToggleAvailability?: (service: string, enabled: boolean) => void): Promise<void> {
+    onRemove?: (service: string) => void): Promise<void> {
     root = dom.document.createElement('div'); dom.document.body.append(root);
-    app = Vue.createApp({setup: () => () => Vue.h(component, {...props, ...(onSelect ? {onSelect} : {}), ...(onToggleAvailability ? {onToggleAvailability} : {})})});
-    app.component('el-tooltip', Vue.defineComponent({setup: (_props, {slots}) => () => Vue.h('span', {'data-tooltip-stub': ''}, slots.default?.())}));
-    app.component('el-switch', Vue.defineComponent({
-        inheritAttrs: false,
-        props: {modelValue: {type: Boolean, default: false}, disabled: {type: Boolean, default: false}},
-        emits: ['update:modelValue'],
-        setup: (switchProps, {attrs, emit}) => () => Vue.h('button', {
-            ...attrs, type: 'button', role: 'switch', 'aria-checked': String(switchProps.modelValue),
-            disabled: switchProps.disabled,
-            onClick: () => {if (!switchProps.disabled) emit('update:modelValue', !switchProps.modelValue)},
-        }),
-    }));
+    app = Vue.createApp({setup: () => () => Vue.h(component, {...props, ...(onSelect ? {onSelect} : {}), ...(onRemove ? {onRemove} : {})})});
     app.mount(root); await settle();
 }
 async function mountItem(overrides: Partial<ItemProps> = {}) {
     const props = Vue.reactive<ItemProps>({item: {value: 'deeplx', label: 'DeepLX'}, selected: false,
-        isDefault: false, isConfigured: false, isFavorite: false, compact: true, status: '', availabilityEnabled: true, availabilityToggleDisabled: false, ...overrides});
+        isDefault: false, isConfigured: false, isFavorite: false, compact: true, status: '', ...overrides});
     const onSelect = vi.fn<(value: string) => void>();
-    const onToggleAvailability = vi.fn<(service: string, enabled: boolean) => void>();
+    const onRemove = vi.fn<(service: string) => void>();
     const component = loadClient('src/features/settings/ui/services/ServiceCatalogItem.vue');
-    await mount(component, props, onSelect, onToggleAvailability);
-    return {props, onSelect, onToggleAvailability};
+    await mount(component, props, onSelect, onRemove);
+    return {props, onSelect, onRemove};
 }
 function control<T extends Element = HTMLElement>(selector: string): T {
     const element = root.querySelector<T>(selector);
@@ -111,17 +100,20 @@ beforeEach(() => {locale.value = 'zh-CN'; dom.document.body.replaceChildren();})
 afterEach(() => {app?.unmount(); app = undefined; dom.document.body.replaceChildren();});
 
 describe('服务目录行实际客户端模板', () => {
-    it('渲染可访问的启用开关并发出带服务身份的新状态', async () => {
-        const {props, onToggleAvailability} = await mountItem({availabilityEnabled: false});
-        const toggle = control<HTMLButtonElement>('[data-service-availability="deeplx"]');
-        expect(toggle.getAttribute('role')).toBe('switch');
-        expect(toggle.getAttribute('aria-checked')).toBe('false');
-        expect(toggle.getAttribute('aria-label')).toBe('启用 DeepLX');
-        toggle.dispatchEvent(new dom.Event('click', {bubbles: true})); await settle();
-        expect(onToggleAvailability).toHaveBeenCalledOnce();
-        expect(onToggleAvailability).toHaveBeenCalledWith('deeplx', true);
-        props.availabilityToggleDisabled = true; await settle();
-        expect(toggle.disabled).toBe(true);
+    it('叉按钮无悬浮标题，点击只发出对应服务的移除意图', async () => {
+        const {props, onSelect, onRemove} = await mountItem();
+        const remove = control<HTMLButtonElement>('button[data-service-remove="deeplx"]');
+        expect(root.querySelector('[role="switch"]')).toBeNull();
+        expect(remove.getAttribute('aria-label')).toBe('从列表移除 DeepLX');
+        expect(remove.hasAttribute('title')).toBe(false);
+        const event = new dom.Event('click', {bubbles: true});
+        Object.assign(event, {_vts: Date.now() + 1});
+        remove.dispatchEvent(event); await settle();
+        expect(onRemove).toHaveBeenCalledOnce();
+        expect(onRemove).toHaveBeenCalledWith('deeplx');
+        expect(onSelect).not.toHaveBeenCalled();
+        props.removeDisabled = true; await settle();
+        expect(remove.disabled).toBe(true);
     });
 
     it('完整名称、性质和默认标签共用名称行，点击只发出当前服务选择并保留输入', async () => {

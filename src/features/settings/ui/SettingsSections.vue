@@ -1,6 +1,7 @@
 <!--
  * @file src/features/settings/ui/SettingsSections.vue
  * 文件职责：承载 FluentRead Options 页面各业务设置分区，连接运行时配置、服务选择、快捷键、站点规则、翻译中心、OCR、词书以及导入导出和历史恢复。
+ * 服务目录移除和加回：确认前展示移除影响和默认服务的替代项，取消不写入配置，过期确认随配置或分区切换失效，正在编辑的服务移除后回到默认详情。
  * 主要内容：扩展设置入口可通过已校验的 service 查询参数选择服务编辑区，目录浏览不改写默认翻译服务，目录开关停用服务时自动切换默认服务并阻止新请求；详情标题栏显式设为默认后复用现有配置补丁持久化并同步其他页面；图片设置优先展示语言、服务与识别选择，资源与入口按需展开；服务能力仅从当前编辑目标派生，翻译设置首先展示带交互示例的阅读辅助，普通页面与网站规则连续展示任务分组并标记顶部导航的滚动定位目标，统计保留按任务切换的视图，集中分配功能服务并将模型用量合并到翻译统计，保留已访问表单实例，术语库按分区及缓存活跃状态同步显示快照，自定义快捷键弹窗按显示状态挂载并在离开所属分区时取消草稿；包含正文/全部节点识别范围，网站适配区域复用来源返回条并隔离配置及范围变化后的迟到操作，划词设置顶部提供不带修复说明的来源返回按钮并按所属配置及分区启停；模板按 activeSection 展示业务分区，通用设置首先展示全局翻译开关，再按基础配置、网页辅助、基本偏好组织控件，网页辅助和主题说明用稳定 key 直接渲染，软件语言控件随分区及缓存活跃状态启停，并保留固定 Language 识别词以便选错语言后恢复，提供当前默认服务的配置入口，将专项服务分配按需展开，并把译文样式与翻译设置跨页入口放入对应分组标题；图片与圈选合并在同页，共享仅在当前分区挂载的 OCR 管理组件；服务连接在主页面的服务目录内编辑，在界面风格页组织译文样式、风格与菜单栏布局，仅在高级选项激活时挂载缓存管理；脚本复用配置编辑会话隔离草稿与权威基线，批量水合时暂停完整草稿扫描，在途与失败编辑保留字段归属，继续同步保存和离页补丁交接，协调网站入口、配置及凭据保存、历史恢复和能力过滤。
  * 锚点编排：翻译设置保留连续表单，双语逐句阅读辅助与智能高亮各有独立锚点；智能高亮仅在翻译设置分区激活时挂载，定位不隐藏其他分组，既有表单配置保持原归属。新建兼容服务对话框只在首次请求打开时挂载，此后保留实例与关闭动画；加载中或失败时在添加入口旁显示可关闭提示，并停用入口说明气泡以免遮挡反馈，离开后不复活旧提示，草稿仍由原有活跃上下文和关闭流程管理。
  * 两点选取：在划词触发组内按需显示紧凑开关与快捷键编辑，分区活跃状态限制录制归属。
@@ -163,7 +164,7 @@
         :website="selectedConfigurationWebsite"
         :credential-guide="selectedConfigurationCredentialGuide"
         :selected-model="selectedConfigurationModel"
-        :services="configurationCompute.filteredServices"
+        :services="platformAvailableServiceOptions"
         :favorite-services="config.favoriteServices"
         :disabled-services="config.disabledTranslationServices"
         :configured-services="configuredServiceIds"
@@ -175,7 +176,7 @@
         :allow-custom-models="configurationCompute.allowCustomModels"
         @update:service="setConfigurationService"
         @update:default-service="setDefaultConfigurationService"
-        @toggle-availability="toggleServiceAvailability"
+        @toggle-availability="requestServiceAvailabilityChange"
         @update:model="selectConfigurationModel"
         @add:service="openCustomProviderDialog"
         @add:model="addConfigurationModel"
@@ -549,6 +550,17 @@
       @cancel="handleCustomSelectionHotkeyCancel"
     />
   <CustomOpenAIProviderDialog v-if="customProviderDialogRequested" :active="viewActive && props.activeSection === 'settings-services'" :config="config" :context="config" v-model="customProviderDialogOpen" @submit="createCustomProvider" @submit:composite="createCompositeProvider" />
+  <el-dialog v-if="pendingServiceAvailability" :model-value="true" data-service-availability-dialog
+    :title="t(pendingServiceAvailability.enabled ? 'settings.services.library.addNamedService' : 'settings.services.library.removeNamedService', {service: pendingServiceAvailability.item.label})"
+    width="min(400px, calc(100vw - 24px))" align-center :show-close="false" :close-on-click-modal="false"
+    :onUpdate:modelValue="serviceAvailabilityActions.update">
+    <p v-if="!pendingServiceAvailability.enabled">{{ t('settings.services.library.availabilityHelp') }}</p>
+    <p v-if="pendingServiceAvailability.replacement">{{ t('settings.services.library.defaultReplacement', {service: pendingServiceAvailability.replacement.label}) }}</p>
+    <template #footer>
+      <el-button data-service-availability-cancel :onClick="serviceAvailabilityActions.cancel">{{ t('common.cancel') }}</el-button>
+      <el-button data-service-availability-confirm :type="pendingServiceAvailability.enabled ? 'primary' : 'danger'" :onClick="serviceAvailabilityActions.confirm">{{ t('common.confirm') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script lang="ts" setup>
@@ -557,7 +569,7 @@ import ServiceRepairReturn from './services/ServiceRepairReturn.vue';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 
 // Main 处理配置信息
-import { computed, defineAsyncComponent, nextTick, ref, watch, onActivated, onBeforeUnmount, onDeactivated, onUnmounted } from 'vue'
+import { computed, defineAsyncComponent, nextTick, ref, shallowRef, watch, onActivated, onBeforeUnmount, onDeactivated, onUnmounted } from 'vue'
 
 import {isValidAzureEndpoint} from '@/src/core/config/azure';
 import { cloudRegionOptions, customModelString, defaultOption, getCloudCredentialLabels, getDefaultCloudRegion, getMultilingualTargetLanguageLabel, options, resolveConfiguredModel, services, servicesType } from '@/src/core/config/catalog';
@@ -921,17 +933,21 @@ const selectedConfigurationCredentialGuide = computed(
   () => getServiceCredentialGuide(selectedConfigurationService.value),
 );
 
-// 导入、撤销或恢复可能在当前页面仍打开时删除正在编辑的 profile。
-// 失效的 custom:* 选择应立即回退到新的默认服务，避免渲染孤儿配置字段。
+// 目录移除、导入或撤销都可能使编辑目标失效。回到默认服务，避免渲染已移除的详情。
 watch(
-  () => [configurationService.value, config.value.customOpenAIProviders.map((provider) => provider.id), config.value.compositeTranslationProviders.map((provider) => provider.id)] as const,
-  ([service]) => {
-    if (service && (isCustomOpenAIProviderId(service) && !getCustomOpenAIProvider(config.value.customOpenAIProviders, service)
+  () => [
+    configurationService.value,
+    config.value.disabledTranslationServices.includes(configurationService.value ?? ''),
+    config.value.customOpenAIProviders.map(provider => provider.id),
+    config.value.compositeTranslationProviders.map(provider => provider.id),
+  ] as const,
+  ([service, removed]) => {
+    if (service && (removed || isCustomOpenAIProviderId(service) && !getCustomOpenAIProvider(config.value.customOpenAIProviders, service)
       || isCompositeTranslationProviderId(service) && !getCompositeTranslationProvider(config.value.compositeTranslationProviders, service))) {
       configurationService.value = null;
     }
   },
-  {flush: 'sync'},
+  {immediate: true, flush: 'sync'},
 );
 
 const setConfigurationService = (value: string) => {
@@ -953,24 +969,62 @@ const setDefaultConfigurationService = (value: string) => {
     || !availableServiceOptions.value.some(item => item.value === value && !item.disabled)) return;
   config.value.service = value;
 };
-const toggleServiceAvailability = (service: string, enabled: boolean) => {
-  if (!viewActive.value || props.activeSection !== 'settings-services' || typeof enabled !== 'boolean') return;
+function resolveServiceAvailabilityChange(service: string, enabled: boolean) {
   const serviceOptions = platformAvailableServiceOptions.value.filter(item => !item.disabled && item.value !== 'machine' && item.value !== 'ai');
-  if (!serviceOptions.some(item => item.value === service)) return;
+  const item = serviceOptions.find(item => item.value === service);
   const disabled = new Set(normalizeDisabledTranslationServices(config.value.disabledTranslationServices));
-  if (enabled) {
-    if (!disabled.delete(service)) return;
-  } else {
-    if (disabled.has(service) || serviceOptions.filter(item => !disabled.has(item.value)).length <= 1) return;
-    disabled.add(service);
+  if (!item || disabled.has(service) === !enabled) return;
+  if (enabled) disabled.delete(service);
+  else disabled.add(service);
+  const fallback = serviceOptions.find(option => !disabled.has(option.value));
+  if (!fallback) return;
+  const replacement = disabled.has(config.value.service) ? fallback : undefined;
+  return {item, disabled, replacement};
+}
+const serviceAvailabilityContext = useSettingsActionContext(
+  () => viewActive.value && props.activeSection === 'settings-services' && (!props.activePanel || props.activePanel === 'connections'),
+  () => [config.value, selectedConfigurationService.value],
+);
+const pendingServiceAvailability = shallowRef<(Pick<NonNullable<ReturnType<typeof resolveServiceAvailabilityChange>>, 'item' | 'replacement'> & {
+  enabled: boolean; current: () => boolean;
+}) | null>(null);
+function requestServiceAvailabilityChange(service: string, enabled: boolean): void {
+  if (!serviceAvailabilityContext.active.value || pendingServiceAvailability.value || typeof enabled !== 'boolean') return;
+  const change = resolveServiceAvailabilityChange(service, enabled);
+  if (change) {
+    const {item, replacement} = change;
+    pendingServiceAvailability.value = {item, replacement, enabled, current: serviceAvailabilityContext.capture()};
   }
-  updateConfigAtomically(draft => {
-    draft.disabledTranslationServices = [...disabled];
-    if (disabled.has(draft.service)) {
-      draft.service = serviceOptions.find(item => !disabled.has(item.value))!.value;
-    }
-  });
-};
+}
+const currentServiceAvailabilityChange = computed(() => {
+  const request = pendingServiceAvailability.value;
+  if (!request?.current()) return;
+  const change = resolveServiceAvailabilityChange(request.item.value, request.enabled);
+  if (change?.item === request.item && change.replacement === request.replacement) return change;
+});
+watch(currentServiceAvailabilityChange, change => {
+  if (!change) pendingServiceAvailability.value = null;
+}, {flush: 'sync'});
+const serviceAvailabilityActions = computed(() => {
+  const request = pendingServiceAvailability.value;
+  const cancel = () => {
+    if (request === pendingServiceAvailability.value) pendingServiceAvailability.value = null;
+  };
+  return {
+    cancel,
+    update: (open: boolean) => {if (!open) cancel();},
+    confirm: () => {
+      if (!request || request !== pendingServiceAvailability.value) return;
+      const change = currentServiceAvailabilityChange.value;
+      cancel();
+      if (!change) return;
+      updateConfigAtomically(draft => {
+        draft.disabledTranslationServices = [...change.disabled];
+        if (change.replacement) draft.service = change.replacement.value;
+      });
+    },
+  };
+});
 // 目录中的机器 / AI 标记只用于分组，不再作为不可选择的菜单选项。
 const textServiceGroups = computed(() => {
   const groups: {value: string; label: string; options: typeof availableServiceOptions.value}[] = [];
@@ -1232,7 +1286,6 @@ const configurationCompute = ref({
   showDeepLX: computed(() => selectedConfigurationService.value === 'deeplx'),
   showMiniMaxRegion: computed(() => selectedConfigurationService.value === services.minimax),
   showMiMoRegion: computed(() => selectedConfigurationService.value === services.mimo),
-  filteredServices: availableServiceOptions,
   showNewAPI: computed(() => servicesType.isNewApi(selectedConfigurationService.value)),
   showAzureOpenaiEndpoint: computed(() => servicesType.isAzureOpenai(selectedConfigurationService.value)),
   showDeepseekApiType: computed(() => selectedConfigurationService.value === 'deepseek'),

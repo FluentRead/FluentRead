@@ -149,9 +149,10 @@ node scripts/testing/run-translation-stats-ui-test.cjs \
 
 脚本启动本地 DeepLX 与 OpenAI 兼容夹具，从设置页经真实 runtime 消息发起单条、缓存命中、429 限流、并发复用、AI 单条、批量与部分缓存请求，再验证面板概览（成功率、复用率、平均与最长耗时）、服务表现排序、失败原因、请求记录的来源/状态筛选与最慢排序、服务与今日筛选、趋势指标切换、1440/1024/820/390 与深色布局、英文界面无中文残留，以及清除确认后三张统计表清空。免费链会请求公共接口，因此线路表使用写入本次临时 profile 的线路汇总夹具，验证线路排序与无成功尝试线路的排位。报告同时检查统计库只含数值与标识字段、窗口位置、前台应用和控制台错误。夹具耗时只用于构造分布，不代表真实服务速度。
 
-## 翻译服务启用开关（issue #1201）
+## 移除和添加回翻译服务（issue #1201）
 
-- 在服务目录关闭默认、普通、自定义与组合服务；确认仍可查看配置及重新启用，默认服务自动回退，最后一项不能关闭。普通关闭设置页后重新打开，验证持久化和七语、窄屏布局。
+- 在服务目录检查行尾的 **×** 悬停无气泡，点击后须确认才移除。覆盖默认、普通、自定义与组合服务，检查移除默认服务前显示接替项，最后一项可用服务无法移除。
+- 验证移除项从主目录和搜索结果中消失。打开**添加回目录**，搜索并选择移除项，确认添加后恢复显示且保留原密钥、模型和各功能选择。两种操作都要检查取消或按 Esc 保留原状态，重开设置页后检查持久化，并验证七语和窄屏布局。
 - 验证 popup、各功能、文档与侧栏选择器不重新选用关闭服务；已有独立选择保留并提示。单条、批量、字幕、阅读与写作请求在 provider 或 transport 前拦截，关闭状态不能由缓存绕过。
 - 组合路由跳过关闭成员，全部关闭时明确失败；编辑组合保留成员和顺序。免费池的权重与请求同样排除关闭成员，不重新启用默认池；重新启用后能翻译、恢复并再次翻译。
 - 单元与实际组件测试使用 `serviceCatalog`、`serviceDirectoryLifecycle`、`settingsSectionsLifecycle`、`popupServicesLifecycle`、`serviceEditorLifecycle`、`documentAppLifecycle`、`translationBroker`、`compositeTranslationBroker`、`translateApiPerformance`、`free-translation`、`writingCore`、`writingRuntime` 和 `harnessModelGateway`。真实浏览器按运行时诊断门禁另存证据。

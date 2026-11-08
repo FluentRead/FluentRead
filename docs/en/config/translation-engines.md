@@ -32,6 +32,12 @@ Selecting a directory entry opens its connection settings and leaves the default
 
 <figure class="doc-figure"><a href="/screenshots/ui/en-US/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/en-US/settings-services.webp" width="2560" height="1600" alt="FluentRead translation service directory and connection settings" loading="lazy" /></a><figcaption>Configure and check the connection, then choose the default or assign it to a feature.</figcaption></figure>
 
+## Remove and add back services
+
+In **Settings → Translation services**, select the **×** beside a service and confirm to remove it from the directory and stop new requests to it. If you remove the default, the confirmation names the service that will take over. Keep at least one available service in the directory.
+
+To restore a service, open **Add back to directory**, search for and select it, then confirm. Your saved keys, models, and feature assignments are preserved. While the service is removed, other pickers mark it as unavailable or hide it. Combined and free translation skip it while keeping their saved member settings.
+
 ## The free service
 
 **Automatic balance** distributes requests among enabled services based on availability and speed. Failure may send the same text to another provider. **Priority order** tries the list in order; keep at least one enabled. To use one provider only, disable the others or select its standalone service.

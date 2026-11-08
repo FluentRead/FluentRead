@@ -114,6 +114,16 @@ describe('实际服务连接配置的活跃生命周期与确认归属', () => {
     expect(messages()).toHaveLength(0);uiLanguage.value='fr-FR';uiCatalogs.set('fr-FR',{'safari.freePool.permissionState':'Autorisation nécessaire'});uiBundleRevision.value++;await settle();
     expect(state.connectionTestMessage).toBe('Autorisation nécessaire');expect(state.connectionTestTitle).toBe('Autorisation nécessaire');expect(state.connectionTestState).toBe('idle');
   })
+  it('免费连接检查跳过目录已移除的线路且不计入失败', async () => {
+    props.service = 'freeTranslation';props.compute.showToken = false
+    props.config.disabledTranslationServices = ['myMemory'];await settle()
+    readAccess.mockResolvedValue({supported: true, grantedIds: ['myMemory', 'microsoft'], preferredGrant: null})
+    await check()
+    expect(readAccess.mock.calls.at(-1)?.[0]).not.toContain('myMemory')
+    expect(messages().map(([message]) => message.freeProviderId)).toEqual(['microsoft'])
+    expect(Object.keys(state.freeProviderChecks)).toEqual(['microsoft'])
+    expect(state.connectionTestState).toBe('success')
+  })
   it('Safari授权变更优先于逐路冷却，撤销后不显示旧诊断且仅重查当前授权线路', async () => {
     vi.useFakeTimers();props.service = 'freeTranslation';props.compute.showToken = false;await settle()
     readAccess.mockResolvedValue({supported: true, grantedIds: ['microsoft'], preferredGrant: null})

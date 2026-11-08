@@ -294,13 +294,16 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
   });
 
   it.each([
-    ['', 'https://api.cheapaimodel.ai/v1/chat/completions'],
-    ['https://gateway.example/v1/chat/completions', 'https://gateway.example/v1/chat/completions'],
-  ])('cheapaimodel keeps its own credentials and model, including an explicit proxy %s', async (proxy, endpoint) => {
-    mockConfig.service = services.cheapaimodel;
-    mockConfig.model = {[services.cheapaimodel]: 'deepseek-v4-1-flash', [services.openai]: 'other-model'};
-    mockConfig.token = {[services.cheapaimodel]: 'fixture-cheapaimodel-only', [services.openai]: 'fixture-openai-only'};
-    mockConfig.proxy = {[services.cheapaimodel]: proxy};
+    {service: services.cheaperinference, model: 'gpt-5.4-mini', endpoint: 'https://api.cheaperinference.com/v1/chat/completions'},
+    {service: services.cheapaimodel, model: 'deepseek-v4-1-flash', endpoint: 'https://api.cheapaimodel.ai/v1/chat/completions'},
+  ].flatMap(provider => ['', 'https://gateway.example/v1/chat/completions'].map(proxy => ({
+    ...provider,
+    proxy,
+  }))))('$service keeps its own credentials and model with proxy "$proxy"', async ({service, model, endpoint, proxy}) => {
+    mockConfig.service = service;
+    mockConfig.model = {[service]: model, [services.openai]: 'other-model'};
+    mockConfig.token = {[service]: `fixture-${service}-only`, [services.openai]: 'fixture-openai-only'};
+    mockConfig.proxy = {[service]: proxy};
     const fetchMock = vi.fn().mockImplementation(async () => successResponse('已验证服务路由'));
     setRuntimeFetch(fetchMock);
 
@@ -308,9 +311,9 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
       .resolves.toBe('已验证服务路由');
     expect(fetchMock).toHaveBeenCalledOnce();
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe(endpoint);
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer fixture-cheapaimodel-only');
-    expect(JSON.parse(String(init.body))).toMatchObject({model: 'deepseek-v4-1-flash', stream: false});
+    expect(url).toBe(proxy || endpoint);
+    expect(new Headers(init.headers).get('Authorization')).toBe(`Bearer fixture-${service}-only`);
+    expect(JSON.parse(String(init.body))).toMatchObject({model, stream: false});
   });
 
   it('preserves custom top-level fields while keeping the SDK-owned stream mode', async () => {

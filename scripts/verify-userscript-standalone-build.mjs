@@ -30,11 +30,10 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// Main b38798445 measures 3,637,675 bytes with locked dependencies. Bounded
-// subtitle references, provider prompts, cache identity and context recovery
-// measure 3,639,879 bytes: a reviewed 2,204-byte feature increment. Add a
-// bounded 3 KB budget increment (2,121 bytes spare); the regular Greasy Fork
-// artifact retains its separate 2 MB platform limit.
-const maxBytes = 3_642_000;
+// Main eb737d3bc measures 3,641,502 bytes with locked dependencies and Node 22.
+// Cheaper Inference and cheapaimodel add 980 bytes, measuring 3,642,482 bytes.
+// Budget 1 KB for the two entries and retain roughly 500 bytes of headroom.
+// The regular Greasy Fork artifact retains its separate 2 MB platform limit.
+const maxBytes = 3_643_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

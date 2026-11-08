@@ -915,6 +915,7 @@ describe('userscript browser shim injection', () => {
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
         expect(Object.hasOwn(projected, 'popup.donationButton')).toBe(false);
+        expect(Object.hasOwn(projected, 'popup.donationDescription')).toBe(false);
         expect(projected['popup.aiContext.how']).toBeTruthy();
         expect(projected['popup.aiContext.settingsTitle']).toBeTruthy();
         expect(extension['document.config.loadFailed']).toBeTruthy();
@@ -933,7 +934,7 @@ describe('userscript browser shim injection', () => {
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
             && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)
-            && key !== 'popup.donationButton' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
+            && key !== 'popup.donationButton' && key !== 'popup.donationDescription' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);
         expect(projected['contextMenu.translateSelection']).toBeTruthy();

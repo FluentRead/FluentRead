@@ -365,7 +365,7 @@ describe('translation broker', () => {
     it('rejects a globally disabled service before cache lookup or provider dispatch', async () => {
         mocks.config.disabledTranslationServices = ['mock'];
         await expect(translateWithCache({origin: 'Source'})).rejects.toMatchObject({
-            message: '所选翻译服务已关闭。请在翻译服务设置中使用「添加回目录」，或选择其他服务。',
+            message: '所选翻译服务已关闭。请在翻译服务设置的「自定义服务」中恢复，或选择其他服务。',
             kind: 'bad-request', retryable: false, code: 'TRANSLATION_SERVICE_DISABLED',
         });
         expect(mocks.cacheGet).not.toHaveBeenCalled();

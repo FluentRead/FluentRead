@@ -152,7 +152,7 @@ node scripts/testing/run-translation-stats-ui-test.cjs \
 ## 移除和添加回翻译服务（issue #1201）
 
 - 在服务目录检查行尾的 **×** 悬停无气泡，点击后须确认才移除。覆盖默认、普通、自定义与组合服务，检查移除默认服务前显示接替项，最后一项可用服务无法移除。
-- 验证移除项从主目录和搜索结果中消失。打开**添加回目录**，搜索并选择移除项，确认添加后恢复显示且保留原密钥、模型和各功能选择。两种操作都要检查取消或按 Esc 保留原状态，重开设置页后检查持久化，并验证七语和窄屏布局。
+- 验证移除项从主目录和搜索结果中消失。打开**自定义服务**，选择**恢复已移除服务**，搜索并选中移除项。点击**添加服务**后，服务恢复显示并保留原密钥、模型和各功能选择。没有移除项时，窗口仅显示兼容接口和组合翻译。两种操作都要检查取消或按 Esc 保留原状态，重开设置页后检查持久化，并验证七语和窄屏布局。
 - 验证 popup、各功能、文档与侧栏选择器不重新选用关闭服务；已有独立选择保留并提示。单条、批量、字幕、阅读与写作请求在 provider 或 transport 前拦截，关闭状态不能由缓存绕过。
 - 组合路由跳过关闭成员，全部关闭时明确失败；编辑组合保留成员和顺序。免费池的权重与请求同样排除关闭成员，不重新启用默认池；重新启用后能翻译、恢复并再次翻译。
 - 单元与实际组件测试使用 `serviceCatalog`、`serviceDirectoryLifecycle`、`settingsSectionsLifecycle`、`popupServicesLifecycle`、`serviceEditorLifecycle`、`documentAppLifecycle`、`translationBroker`、`compositeTranslationBroker`、`translateApiPerformance`、`free-translation`、`writingCore`、`writingRuntime` 和 `harnessModelGateway`。真实浏览器按运行时诊断门禁另存证据。

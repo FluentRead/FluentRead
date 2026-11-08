@@ -1,8 +1,8 @@
 <!--
  * @file src/features/settings/ui/services/ServiceCatalog.vue
  * 文件职责：以服务目录和分层配置工作区呈现翻译服务，并独立管理服务启用状态与默认服务。
- * 主要内容：侧栏展示未移除的内置及自定义服务，提供移除按钮、独立的加回列表、搜索及分组折叠；目录搜索文本与几何按需缓存，活跃上下文限定操作并取消过期焦点、滚动与帧回调。
- * 模块边界：移除、加回与默认切换通过事件交给 SettingsSections 确认及持久化；公开构建隐藏 ChatGPT 登录模块，详细表单归 ServiceConfiguration.vue；折叠和加回列表是页面状态，卸载时清理观察器与监听。
+ * 主要内容：侧栏展示未移除的内置及自定义服务，提供移除按钮、自定义服务入口、搜索及分组折叠；目录搜索文本与几何按需缓存，活跃上下文限定操作并取消过期焦点、滚动与帧回调。
+ * 模块边界：移除、自定义服务与默认切换通过事件交给 SettingsSections 确认及持久化；公开构建隐藏 ChatGPT 登录模块，详细表单归 ServiceConfiguration.vue；折叠和搜索是页面状态，卸载时清理观察器与监听。
  -->
 <template>
   <section
@@ -44,25 +44,11 @@
           </el-tooltip>
         </div>
         <slot name="add-service-status" />
-        <button v-if="removedServices.length" type="button" class="service-restore-menu" data-service-restore-menu
-          :aria-pressed="restoreOpen" :disabled="!active" :onClick="actions.toggleRestore">
-          <UiIcon name="plus" :size="14" />{{ t('settings.services.library.restoreDirectory') }}
-        </button>
         <label class="catalog-search">
           <UiIcon name="search" :size="16" />
           <input :value="serviceQuery" :disabled="!active" :onInput="actions.updateQuery" type="search" :aria-label="directorySearchLabel" :placeholder="directorySearchLabel" />
         </label>
         <div ref="groupsElement" class="service-groups" :onScrollPassive="actions.syncActiveGroup" :onWheelPassive="actions.releasePinnedGroup" :onTouchstartPassive="actions.releasePinnedGroup" :onPointerdown="actions.releasePinnedGroup" :onKeydown="actions.releasePinnedGroup" :onFocusin="actions.releasePinnedGroup">
-          <template v-if="restoreOpen">
-            <button v-for="item in matchingRemovedServices" :key="item.value" type="button" class="service-restore-item"
-              :data-service-restore="item.value" :aria-label="t('settings.services.library.addNamedService', {service: item.label})"
-              :disabled="!active" :onClick="actions.restoreService.bind(null, item.value)">
-              <ServiceIcon :service="item.value" :label="item.label" size="small" />
-              <span class="service-restore-label">{{ item.label }}</span><UiIcon name="plus" :size="16" />
-            </button>
-            <p v-if="!matchingRemovedServices.length" class="catalog-empty" role="status">{{ t('settings.services.library.empty') }}</p>
-          </template>
-          <template v-else>
           <section v-for="group in visibleDirectoryGroups" :key="group.id" :data-service-section="group.id" class="directory-section" :class="{ 'is-collapsed': !isGroupOpen(group.id) }">
             <h4>
               <button type="button" class="directory-section-toggle" :aria-expanded="isGroupOpen(group.id)" :aria-controls="`${directoryId}-${group.id}`" :disabled="!active || searching" :onClick="actions.toggleGroup.bind(null, group.id)">
@@ -79,7 +65,6 @@
             </div>
           </section>
           <p v-if="!visibleDirectoryGroups.length" class="catalog-empty" role="status">{{ t('settings.services.library.empty') }}</p>
-          </template>
         </div>
         </div>
       </aside>
@@ -206,6 +191,7 @@ import {options as catalogOptions, services} from '@/src/core/config/catalog'
 import {chatGPTPlanDevelopmentEnabled} from '@/src/platform/chatgpt-plan/buildMode'
 import {
   buildServiceSections,
+  serviceDirectorySearchText,
   type ServiceCredentialGuide,
   type ServiceOption,
   type ServiceWebsite,
@@ -255,7 +241,6 @@ const { t, translateLegacy } = useUiI18n()
 const {active, capture} = useSettingsActionContext(() => props.active, () => [props.context, props.service])
 const serviceQuery = ref('')
 const directoryOpen = ref(false)
-const restoreOpen = ref(false)
 const directoryToggle = ref<HTMLButtonElement | null>(null)
 const directoryId = useId()
 const addButton = ref<HTMLButtonElement | null>(null)
@@ -276,13 +261,9 @@ const directoryGroups = computed(() => catalogGroups.value
   .filter(group => group.items.length))
 const allServices = computed(() => directoryGroups.value.flatMap(group => group.items))
 const enabledServiceCount = computed(() => allServices.value.filter(item => !item.disabled).length)
-const removedServices = computed(() => catalogGroups.value.flatMap(group => group.items)
-  .filter(item => !item.disabled && disabledServiceSet.value.has(item.value)))
-const directorySearchLabel = computed(() => t(restoreOpen.value ? 'common.search' : 'settings.services.library.search'))
+const directorySearchLabel = computed(() => t('settings.services.library.search'))
 // 延迟建立索引，空搜索不读取或规范化逐项文本；连续输入复用同一目录索引。
-const directorySearchText = computed(() => new Map(catalogGroups.value.flatMap(group => group.items).map(item => [item,
-  [item.label, item.value, item.description, ...(item.searchTerms || [])].join(' ').normalize('NFKC').toLocaleLowerCase(),
-])))
+const directorySearchText = computed(() => new Map(allServices.value.map(item => [item, serviceDirectorySearchText(item)])))
 const keyword = computed(() => serviceQuery.value.trim().normalize('NFKC').toLocaleLowerCase())
 const matchesSearch = (item: ServiceOption) => !keyword.value || directorySearchText.value.get(item)!.includes(keyword.value)
 const visibleDirectoryGroups = computed(() => {
@@ -291,7 +272,6 @@ const visibleDirectoryGroups = computed(() => {
     .map(group => ({ ...group, items: group.items.filter(matchesSearch) }))
     .filter(group => group.items.length)
 })
-const matchingRemovedServices = computed(() => removedServices.value.filter(matchesSearch))
 const selectedService = computed(() => allServices.value.find(item => item.value === props.service)
   || (props.service === services.chatgptPlan && chatGPTPlanDevelopmentEnabled ? (() => {
     const saved = catalogOptions.services.find(item => item.value === services.chatgptPlan)!
@@ -442,7 +422,6 @@ async function revealGroup(id: string) {
   const current = capture()
   if (!current() || !directoryGroups.value.some(group => group.id === id)) return
   // 导航始终列出全部分组；搜索中点击即回到完整目录。
-  restoreOpen.value = false
   serviceQuery.value = ''
   setGroupOpen(id, true)
   pinnedGroup = id
@@ -458,7 +437,7 @@ watch(serviceQuery, releasePinnedGroup, {flush: 'sync'})
 function scheduleActiveGroupSync(): void {
   scheduleDirectoryFrame(true)
 }
-watch([visibleDirectoryGroups, collapsedGroups, directoryOpen, restoreOpen], scheduleActiveGroupSync, {flush: 'post'})
+watch([visibleDirectoryGroups, collapsedGroups, directoryOpen], scheduleActiveGroupSync, {flush: 'post'})
 function stopDirectoryObserver(): void {
   directoryFrameRevision += 1
   if (directoryFrame !== undefined) cancelAnimationFrame(directoryFrame)
@@ -541,15 +520,6 @@ const actions = computed(() => {
     removeService: (service: string) => {
       if (current() && enabledServiceCount.value > 1 && allServices.value.some(item => item.value === service && !item.disabled)) emit('toggle-availability', service, false)
     },
-    restoreService: (service: string) => {
-      if (current() && restoreOpen.value && removedServices.value.some(item => item.value === service)) emit('toggle-availability', service, true)
-    },
-    toggleRestore: () => {
-      if (!current() || !removedServices.value.length) return
-      restoreOpen.value = !restoreOpen.value
-      serviceQuery.value = ''
-      groupsElement.value?.scrollTo({top: 0, behavior: 'instant'})
-    },
     setDefaultService: () => {if (current()) setDefaultService()},
     revealGroup: (id: string) => {if (current()) return revealGroup(id)},
     toggleGroup: (id: string) => {if (current()) toggleGroup(id)},
@@ -563,8 +533,7 @@ const actions = computed(() => {
     removeModel: (value: string) => {if (current()) emit('remove:model', value)},
   }
 })
-watch(() => [active.value, props.context], () => {directoryOpen.value = false;restoreOpen.value = false;serviceQuery.value = '';pinnedGroup = ''}, {flush: 'sync'})
-watch(removedServices, items => {if (!items.length) restoreOpen.value = false}, {flush: 'sync'})
+watch(() => [active.value, props.context], () => {directoryOpen.value = false;serviceQuery.value = '';pinnedGroup = ''}, {flush: 'sync'})
 // 外部跳转和新建服务沿用同一编辑工作区，并从表单顶部开始。
 watch(() => props.service, (service) => {
   expandGroupOf(service)
@@ -585,11 +554,6 @@ watch(() => props.service, (service) => {
 .rail-heading strong { color: var(--ink, #172033); font-size: 13px; font-weight: 700; }
 .service-add-button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-height: 34px; padding: 7px 11px; border: 1.5px solid color-mix(in srgb, var(--brand) 65%, var(--line)); border-radius: 10px; color: var(--brand-strong); background: var(--surface); font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; }
 .service-add-button:hover, .service-add-button:focus-visible { border-color: var(--brand); background: var(--brand-soft); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
-.service-restore-menu { display: flex; flex-shrink: 0; align-self: flex-end; align-items: center; gap: 4px; min-height: 30px; padding: 3px 8px; margin-bottom: 4px; border: 0; border-radius: 6px; background: transparent; color: var(--brand-strong); font-size: 12px; cursor: pointer; }
-.service-restore-menu:hover, .service-restore-menu[aria-pressed="true"] { background: var(--brand-soft); }
-.service-restore-item { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font: inherit; font-size: 13px; text-align: start; cursor: pointer; }
-.service-restore-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.service-restore-item:hover { background: var(--brand-soft); }
 
 .service-count { margin-left: 4px; font-variant-numeric: tabular-nums; }
 .service-groups { overflow-y: auto; min-height: 0; flex: 1; margin-top: 12px; overscroll-behavior: contain; }

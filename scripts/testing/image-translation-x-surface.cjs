@@ -2,6 +2,104 @@
 /** X 页面快照的透明 img + 同级背景图契约，复用隔离生产产物浏览器回归。 */
 const assert = require('node:assert/strict');
 
+const xBitmap = `(paintRoot?.querySelector('img') ?? this.querySelector('.fluent-read-image-translation-overlay img'))`;
+
+async function verifyXScroll({page, ui, wait, report, surface}) {
+    const bitmapAndSource = `
+        const source = document.querySelector('#x-surface');
+        const bitmap = ${xBitmap};
+        const owner = paintRoot?.host;
+        const position = () => ({
+            sourceTop: source.getBoundingClientRect().top,
+            bitmapTop: bitmap.getBoundingClientRect().top,
+        });
+    `;
+    const probe = async scroller => {
+        const before = await ui(`
+            ${bitmapAndSource}
+            const scroller = ${scroller};
+            const initial = scroller.scrollTop;
+            const before = position();
+            // 在同一个 JS 调用栈内读取滚动前后几何，扩展的 scroll/rAF 逻辑不能参与位移。
+            scroller.scrollTop += 36;
+            const after = position();
+            const delta = scroller.scrollTop - initial;
+            scroller.scrollTop = initial;
+            const samples = [];
+            const observe = event => {
+                if (event.target !== scroller && !(scroller === document.scrollingElement && event.target === document)) return;
+                const {sourceTop, bitmapTop} = position();
+                samples.push({scrollTop: scroller.scrollTop, delta: Math.abs(sourceTop - bitmapTop)});
+            };
+            window.addEventListener('scroll', observe, true);
+            this.__scrollProbe = {samples, stop: () => window.removeEventListener('scroll', observe, true)};
+            return {
+                sameContainingBlock: owner?.parentElement === source.parentElement && owner.offsetParent === source.parentElement,
+                positioning: owner ? getComputedStyle(owner).position : getComputedStyle(bitmap.parentElement).position,
+                initial, delta, sourceDelta: after.sourceTop - before.sourceTop,
+                bitmapDelta: after.bitmapTop - before.bitmapTop,
+            };
+        `);
+        const rect = await surface.boundingBox();
+        assert.ok(rect);
+        await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
+        await page.mouse.wheel(0, 36);
+        await wait(() => ui(`return ${scroller}.scrollTop > ${before.initial};`));
+        const wheel = await ui(`
+            ${bitmapAndSource}
+            const samples = this.__scrollProbe.samples.filter(sample => sample.scrollTop > ${before.initial});
+            this.__scrollProbe.stop();
+            delete this.__scrollProbe;
+            const {sourceTop, bitmapTop} = position();
+            const delta = ${scroller}.scrollTop - ${before.initial};
+            ${scroller}.scrollTop = ${before.initial};
+            return {delta, samples, finalOffset: Math.abs(sourceTop - bitmapTop)};
+        `);
+        return {...before, wheel};
+    };
+
+    const root = await probe('document.scrollingElement');
+    await page.evaluate(() => {
+        const photo = document.querySelector('#x-surface').parentElement;
+        const scroller = document.createElement('div');
+        scroller.id = 'x-image-scroll-fixture';
+        scroller.style.cssText = `overflow:auto;overscroll-behavior:contain;height:${photo.offsetHeight + 112}px`;
+        const spacer = document.createElement('div');
+        const tail = document.createElement('div');
+        spacer.style.height = '80px';
+        tail.style.height = '240px';
+        photo.before(scroller);
+        scroller.append(spacer, photo, tail);
+        scroller.scrollTop = 32;
+    });
+    await wait(() => ui(`${bitmapAndSource}
+        const {sourceTop, bitmapTop} = position();
+        return Math.abs(sourceTop - bitmapTop) < 1;
+    `));
+    const nested = await probe("document.querySelector('#x-image-scroll-fixture')");
+    await page.evaluate(() => {
+        const photo = document.querySelector('#x-surface').parentElement;
+        document.querySelector('#x-image-scroll-fixture').replaceWith(photo);
+    });
+    report.scrollAlignment = {root, nested};
+    // 恢复夹具后等全局操作条同步，后续点击使用实际屏幕坐标。
+    await wait(() => ui(`
+        const source = document.querySelector('#x-surface').getBoundingClientRect();
+        const controls = this.querySelector('.fr-image-controls').getBoundingClientRect();
+        return Math.abs(source.bottom - controls.bottom - 8) <= 1;
+    `));
+    for (const {sameContainingBlock, positioning, delta, sourceDelta, bitmapDelta, wheel} of [root, nested]) {
+        assert.ok(delta >= 30, 'fixture must move the source before the next animation frame');
+        assert.ok(Math.abs(sourceDelta + delta) <= 1 && Math.abs(bitmapDelta - sourceDelta) <= 1,
+            `译图应同步随图片滚动：原图 ${sourceDelta}px，译图 ${bitmapDelta}px`);
+        assert.equal(sameContainingBlock, true, '译图宿主应和原背景图共用图片容器');
+        assert.equal(positioning, 'absolute');
+        assert.ok(wheel.samples.length > 0 && wheel.samples.every(sample => sample.delta <= 1) && wheel.finalOffset <= 1,
+            '可信滚轮触发的原图和译图位置偏差不能超过 1px');
+    }
+    report.cases.push('local translated bitmap scrolls with its source before JavaScript on document and nested scroll');
+}
+
 async function verifyXSurface({page, popup, worker, ui, wait, click, shot, report, originalImage, lightboxOnly = false}) {
     let settingsSequence = 0;
     async function patchSettings(config) {
@@ -158,11 +256,12 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
         assert.ok(report.downloadedLanguages.includes('jpn'), 'one-click automatic preparation must include Japanese');
     }
     const result=await ui(`
-        const bitmap=this.querySelector('.fluent-read-image-translation-overlay img');
+        const bitmap=${xBitmap};
         return {surfaceOpacity:getComputedStyle(document.querySelector('#x-surface')).opacity,
             imgOpacity:getComputedStyle(document.querySelector('#sample')).opacity,
             bitmapOpacity:getComputedStyle(bitmap).opacity,fit:getComputedStyle(bitmap).objectFit,
-            hidden:getComputedStyle(bitmap.parentElement).display==='none',size:[bitmap.naturalWidth,bitmap.naturalHeight]};`);
+            hidden:getComputedStyle(paintRoot?.host ?? bitmap.parentElement).display==='none'
+                || getComputedStyle(bitmap).visibility!=='visible',size:[bitmap.naturalWidth,bitmap.naturalHeight]};`);
     assert.equal(result.surfaceOpacity,'0');assert.equal(result.imgOpacity,'0');
     assert.equal(result.bitmapOpacity,'1');assert.equal(result.fit,'cover');assert.equal(result.hidden,false);
     assert.deepEqual(result.size,report.fixture.originalSize);
@@ -170,16 +269,21 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     report.cases.push(lightboxOnly ? 'default PaddleOCR result visibly replaces X background surface'
         : 'one-click Chinese/English/Japanese language preparation continues to real OCR, translation, and visible X replacement');
     await shot('x-04-translated');
+    const requests=await worker.evaluate(()=>globalThis.__imageFixture.requests.length);
+    if (lightboxOnly) assert.ok(requests > 0, '必须实际命中 Google 翻译 transport');
+    const operations=await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length);
+    assert.ok(operations > 0, '必须观察真实图片翻译请求');
+    if (lightboxOnly) {
+        await verifyXScroll({page, ui, wait, report, surface});
+        assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.requests.length),requests);
+        assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length),operations);
+    }
     await click('文字');
     await wait(() => ui("return !!this.querySelector('.fr-image-reader-body')"));
     report.translatedText=await ui("return this.querySelector('.fr-image-reader-body').textContent");
     assert.match(report.translatedText,/[\u4e00-\u9fff]/);
     await shot('x-05-translated-text');
     await click('文字');
-    const requests=await worker.evaluate(()=>globalThis.__imageFixture.requests.length);
-    if (lightboxOnly) assert.ok(requests > 0, '必须实际命中 Google 翻译 transport');
-    const operations=await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length);
-    assert.ok(operations > 0, '必须观察真实图片翻译请求');
     report.requests=await worker.evaluate(()=>globalThis.__imageFixture.requests);
     await menuAction();
     await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='idle'"));
@@ -192,7 +296,7 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length),operations);
     report.cases.push('right-click restore and cached redisplay preserve the X source DOM');
     await ui('this.__progressObserver?.disconnect();return true;');
-    await ui("this.__lightboxThumbnail=this.querySelector('.fluent-read-image-translation-overlay img');return true;");
+    await ui(`this.__lightboxThumbnail=${xBitmap};return true;`);
 
     // 同一个宿主查看器分别加载列表原地址、X 原尺寸变体和一张不同的图片。
     await page.evaluate(fullSize => {
@@ -235,8 +339,9 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     }, fullSizeSource ?? null);
     const viewer = page.locator('#x-lightbox-photo');
     const originalSource = await page.locator('#sample').getAttribute('src');
-    const visibleBitmaps = `[...this.querySelectorAll('.fluent-read-image-translation-overlay img')]
-        .filter(img => img.complete && img.naturalWidth > 0 && getComputedStyle(img.parentElement).display !== 'none')`;
+    const visibleBitmaps = `[...this.querySelectorAll('.fluent-read-image-translation-overlay img'), paintRoot?.querySelector('img')]
+        .filter(img => img?.complete && img.naturalWidth > 0 && getComputedStyle(img).visibility === 'visible'
+            && getComputedStyle(img.parentElement ?? img.getRootNode().host).display !== 'none')`;
     const originalVisible = `getComputedStyle(document.querySelector('#x-lightbox-photo')).opacity === '1'`;
     async function expectViewerTranslated(source) {
         await wait(() => ui(`const visible = ${visibleBitmaps};

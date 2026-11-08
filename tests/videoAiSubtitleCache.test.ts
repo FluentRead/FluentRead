@@ -161,3 +161,30 @@ describe('video AI subtitle cache background handlers', () => {
     await expect(invoke(VIDEO_AI_SUBTITLE_CACHE_GET_MESSAGE, {source: 'bad'})).rejects.toThrow('source 无效');
   });
 });
+
+describe('native ASR cache identity isolation', () => {
+  const native = {provider: 'native-qwen', model: 'Qwen/Qwen3-ASR-1.7B', nativeBaseUrl: 'http://127.0.0.1:8000/v1/'};
+  it('normalizes native identity without conflating it with browser models', () => {
+    const identity = buildVideoAiSubtitleCacheIdentity(request({...native, videoSourceLanguage: 'EN'}));
+    expect(buildVideoAiSubtitleCacheIdentity(request({...native, videoSourceLanguage: undefined, sourceLanguage: 'EN'}))).toEqual(identity);
+    expect(identity).toEqual({videoKey: 'media:67890', model: native.model, provider: 'native-qwen',
+      nativeBaseUrl: 'http://127.0.0.1:8000', sourceLanguage: 'en', schemaFingerprint: 'video-native-qwen-text-v1'});
+    expect(buildVideoAiSubtitleCacheIdentity(request({provider: 'browser'}))).toEqual(buildVideoAiSubtitleCacheIdentity(request()));
+    expect(buildVideoAiSubtitleCacheIdentity(request({provider: 'unknown'}))).toBeNull();
+    for (const nativeBaseUrl of [undefined, '', 'https://remote.example.com']) {
+      expect(buildVideoAiSubtitleCacheIdentity(request({...native, nativeBaseUrl}))).toBeNull();
+    }
+    expect(buildVideoAiSubtitleCacheIdentity(request({...native, model: 'tiny'}))).toBeNull();
+  });
+});
+
+it('native cache reuses only equivalent endpoint, language and provider identities', async () => {
+  const cache = repository();
+  const native = {provider: 'native-qwen', model: 'Qwen/Qwen3-ASR-1.7B',
+    nativeBaseUrl: 'http://127.0.0.1:8000/v1/', videoSourceLanguage: 'en'};
+  await expect(cache.set(request(native), [cue('Native result.')], 1000)).resolves.toBe(true);
+  await expect(cache.get(request({...native, nativeBaseUrl: 'http://127.0.0.1:8000'}), 1100)).resolves.toEqual([cue('Native result.')]);
+  await expect(cache.get(request({...native, nativeBaseUrl: 'http://127.0.0.1:9000'}), 1100)).resolves.toBeNull();
+  await expect(cache.get(request({...native, videoSourceLanguage: 'ja'}), 1100)).resolves.toBeNull();
+  await expect(cache.get(request({provider: 'browser', videoSourceLanguage: 'en'}), 1100)).resolves.toBeNull();
+});

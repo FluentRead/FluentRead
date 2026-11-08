@@ -805,7 +805,8 @@ describe('userscript browser shim injection', () => {
         for (const [source, value] of Object.entries(current.legacyText)) expect(mergedLegacy[source]).toBe(value);
         const materialSources = new Set(Object.keys(learningMaterialLegacyText[language as keyof typeof learningMaterialLegacyText]));
         for (const source of materialSources) expect(current.legacyText).not.toHaveProperty(source);
-        const materialPatterns = learningMaterialPatterns.map(({pattern}) => pattern);
+        // Native ASR is extension-only, like learning-material operations; all other patterns retain exact order.
+        const materialPatterns = [...learningMaterialPatterns.map(({pattern}) => pattern), '^原生转写服务返回HTTP (\\d+)$'];
         for (const phase of ['early', 'late'] as const) {
             expect(current.legacyPatterns[phase]).toEqual(original.legacyPatterns[phase].filter(([source]) => !materialPatterns.includes(source)));
         }
@@ -2908,7 +2909,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         ['src/features/settings/model/chromeTranslationPreparation.ts', ['TEST_SAMPLES']],
         ['src/core/i18n/messages/aiRequestTimeout.ts', ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages']],
         ['src/core/config/driveSync.ts', ['VISIBLE_FIELDS']],
-        ['src/features/settings/model/navigation.ts', ['settingsPagePanels', 'settingsSearchTargets']],
+        ['src/features/settings/model/navigation.ts', ['settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS']],
         ['src/core/config/translationLoadingStyle.ts', ['translationLoadingStyleOptions']],
         ['src/core/config/freeTranslation.ts', ['FREE_TRANSLATION_PROVIDERS']],
         ['src/core/language/catalog.ts', ['translationLanguageOptions']],

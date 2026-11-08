@@ -68,6 +68,11 @@ describe('video subtitle background ownership', () => {
                 : {success: true, model: 'tiny', backend: 'wasm'}
         ) as T);
         vi.doMock('@/src/platform/offscreen/extensionClient', () => ({extensionDomClient: fixture.offscreen}));
+        vi.doMock('@/src/services/config/store', () => ({
+            config: {on: true, videoTranslationEnabled: true, videoTranscriptionProvider: 'browser'},
+            configReady: Promise.resolve(),
+            getConfigHydrationStatus: () => 'ready',
+        }));
         try {
             const {createVideoSubtitleBackgroundRuntime} = await import('@/src/features/video-subtitle/background/runtime');
             const handlers = createVideoSubtitleBackgroundRuntime();
@@ -83,7 +88,10 @@ describe('video subtitle background ownership', () => {
             const cache = handlers.find(handler => handler.type === 'fluentReadGetVideoAiSubtitleCache')!;
             const cacheRequest = {type: cache.type, source: {}, model: 'tiny'};
             await expect(cache.handle(cacheRequest, {})).resolves.toMatchObject({success: true, hit: false, cues: []});
-        } finally {vi.doUnmock('@/src/platform/offscreen/extensionClient');}
+        } finally {
+            vi.doUnmock('@/src/platform/offscreen/extensionClient');
+            vi.doUnmock('@/src/services/config/store');
+        }
     });
     it.each(ownedEntryTypes)('%s does not dispatch after its cancellation was acknowledged while the previous cancellation is pending', async type => {
         const f = waitingForPreviousCancellation(type);
@@ -318,5 +326,130 @@ describe('video subtitle background ownership', () => {
         expect(result).toMatchObject({success: true, stale: true});
         expect(offscreen.sendIfPresent).not.toHaveBeenCalled();
         await cancel.handle({type: 'fluentReadCancelLocalVideoTranscription', streamId: 's', generation: 2}, context(1));
+    });
+});
+
+describe('native video background ownership', () => {
+    const selection = {provider: 'native-qwen' as const, model: 'Qwen/Qwen3-ASR-1.7B',
+        nativeBaseUrl: 'http://127.0.0.1:8000', sourceLanguage: 'en', streamId: 'native', generation: 1};
+    function nativeFixture() {
+        const f = setup();
+        const settings = {enabled: true, provider: 'native-qwen' as const, baseUrl: selection.nativeBaseUrl, sourceLanguage: 'en'};
+        const nativeTranscribe = vi.fn(async () => ({text: 'native result', model: selection.model, audioDurationMs: 0.0625}));
+        const handlers = createVideoSubtitleBackgroundHandlers({offscreen: f.offscreen as any, storage: f.storage,
+            readNativeSettings: () => settings, nativeTranscribe});
+        return {...f, settings, nativeTranscribe, handlers,
+            prepare: (patch = {}, tab = 71) => find(handlers, 'fluentReadPrepareLocalVideoModel').handle({...selection, keepWarm: true, ...patch}, context(tab)),
+            transcribe: (patch = {}, tab = 71) => find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA=', ...patch}, context(tab)),
+            cancel: (reason?: string, tab = 71) => find(handlers, 'fluentReadCancelLocalVideoTranscription').handle({...selection, reason}, context(tab))};
+    }
+    it('warms only client ownership and transcribes without Offscreen or downloads', async () => {
+        const f = nativeFixture();
+        await expect(f.prepare()).resolves.toEqual({success: true, model: selection.model, provider: 'native-qwen', preparation: 'client-only'});
+        await expect(f.transcribe()).resolves.toMatchObject({success: true, text: 'native result', provider: 'native-qwen', timingSource: 'audio-window'});
+        expect(f.nativeTranscribe).toHaveBeenCalledWith('AAA=', expect.objectContaining({baseUrl: selection.nativeBaseUrl, sourceLanguage: 'en'}));
+        expect(f.offscreen.send).not.toHaveBeenCalled();
+        expect(f.storage.set).not.toHaveBeenCalled();
+        await expect(f.cancel('complete')).resolves.toEqual({success: true, completed: true});
+        expect(f.offscreen.sendIfPresent).not.toHaveBeenCalled();
+    });
+    it.each([undefined, 'complete'])('cancels prepared native ownership without transport: %s', async reason => {
+        const f = nativeFixture();
+        await f.prepare();
+        await expect(f.cancel(reason)).resolves.toEqual(reason === 'complete' ? {success: true, completed: true} : {success: true});
+        expect(f.nativeTranscribe).not.toHaveBeenCalled();
+        expect(f.offscreen.sendIfPresent).not.toHaveBeenCalled();
+        await expect(f.prepare({}, 72)).resolves.toMatchObject({preparation: 'client-only'});
+    });
+    it('rejects native browser downloads, wrong models, missing audio and changed selection', async () => {
+        const f = nativeFixture();
+        await expect(f.prepare({keepWarm: false})).rejects.toThrow('不通过浏览器下载');
+        await expect(f.prepare({model: 'tiny'})).rejects.toThrow('模型与请求不一致');
+        await f.prepare();
+        await expect(f.prepare({sourceLanguage: 'ja'})).rejects.toThrow('识别配置已改变');
+        await expect(f.transcribe({audioPcm16Base64: undefined})).rejects.toThrow('需要 PCM16');
+        expect(f.nativeTranscribe).not.toHaveBeenCalled();
+        await expect(f.prepare({}, 72)).resolves.toMatchObject({preparation: 'client-only'});
+    });
+    it.each(['enabled', 'provider', 'baseUrl', 'sourceLanguage'])('fails closed on changed native setting %s', async field => {
+        const f = nativeFixture();
+        Object.assign(f.settings, {[field]: field === 'enabled' ? false : 'changed'});
+        await expect(f.prepare()).rejects.toThrow('本机转写选择');
+        Object.assign(f.settings, {enabled: true, provider: 'native-qwen', baseUrl: selection.nativeBaseUrl, sourceLanguage: 'en'});
+        await expect(f.prepare({}, 72)).resolves.toMatchObject({preparation: 'client-only'});
+        expect(f.offscreen.send).not.toHaveBeenCalled();
+    });
+    it.each([undefined, 'complete'])('waits for deferred native transport after cancel: %s', async reason => {
+        const f = nativeFixture();
+        const transport = deferred<{text: string; model: string; audioDurationMs: number}>();
+        f.nativeTranscribe.mockReturnValue(transport.promise);
+        const work = f.transcribe();
+        const rejected = expect(work).rejects.toThrow('generation 已取消');
+        await Promise.resolve(); await Promise.resolve();
+        expect(f.nativeTranscribe).toHaveBeenCalledOnce();
+        await expect(f.transcribe()).rejects.toThrow('仍在进行');
+        let settled = false;
+        const cancel = f.cancel(reason).then((value: unknown) => {settled = true; return value;});
+        const signal = (f.nativeTranscribe.mock.calls[0] as unknown as [string, {signal: AbortSignal}])[1].signal;
+        expect(signal.aborted).toBe(reason !== 'complete');
+        await Promise.resolve();
+        expect(settled).toBe(false);
+        transport.resolve({text: 'obsolete', model: selection.model, audioDurationMs: 0.0625});
+        await rejected;
+        await expect(cancel).resolves.toEqual(reason === 'complete' ? {success: true, completed: true} : {success: true});
+        expect(f.offscreen.sendIfPresent).not.toHaveBeenCalled();
+    });
+    it('allows a new generation only after old native cancellation settles', async () => {
+        const f = nativeFixture();
+        const transport = deferred<{text: string; model: string; audioDurationMs: number}>();
+        f.nativeTranscribe.mockReturnValueOnce(transport.promise);
+        const old = expect(f.transcribe()).rejects.toThrow('controlled rejection');
+        await Promise.resolve(); await Promise.resolve();
+        const next = f.prepare({generation: 2});
+        transport.reject(new Error('controlled rejection'));
+        await old;
+        await expect(next).resolves.toMatchObject({preparation: 'client-only'});
+        expect(f.offscreen.sendIfPresent).not.toHaveBeenCalled();
+    });
+});
+
+describe('native video runtime hydration gate', () => {
+    it.each(['ready', 'not-ready', 'rejected'])('checks hydration without weakening browser ports: %s', async state => {
+        vi.resetModules();
+        const ready = deferred<void>();
+        let status = 'loading';
+        const config = {on: true, videoTranslationEnabled: true, videoTranscriptionProvider: 'native-qwen',
+            videoNativeAsrBaseUrl: 'http://127.0.0.1:8000', videoSourceLanguage: 'en'};
+        let readSettings!: () => {enabled: boolean; provider: string; baseUrl: string; sourceLanguage: string};
+        vi.stubGlobal('browser', {runtime: {id: 'fixture-extension'}, storage: {local: {get: vi.fn(), set: vi.fn()}}});
+        vi.doMock('@/src/services/config/store', () => ({config, configReady: ready.promise, getConfigHydrationStatus: () => status}));
+        vi.doMock('@/src/platform/offscreen/extensionClient', () => ({extensionDomClient: {}}));
+        vi.doMock('@/src/features/video-subtitle/background/handlers', () => ({
+            createVideoSubtitleBackgroundHandlers: (deps: {readNativeSettings: typeof readSettings}) => {readSettings = deps.readNativeSettings; return [];},
+        }));
+        try {
+            const {createVideoSubtitleBackgroundRuntime} = await import('@/src/features/video-subtitle/background/runtime');
+            createVideoSubtitleBackgroundRuntime();
+            expect(() => readSettings()).toThrow('尚未安全加载');
+            if (state === 'rejected') ready.reject(new Error('controlled hydration failure')); else ready.resolve();
+            await Promise.resolve();
+            status = state === 'ready' ? 'ready' : 'failed';
+            if (state !== 'ready') {
+                expect(() => readSettings()).toThrow('尚未安全加载');
+            } else {
+                expect(readSettings()).toEqual({enabled: true, provider: 'native-qwen', baseUrl: config.videoNativeAsrBaseUrl, sourceLanguage: 'en'});
+                config.on = false;
+                expect(readSettings().enabled).toBe(false);
+                config.on = true; config.videoTranslationEnabled = false;
+                expect(readSettings().enabled).toBe(false);
+                config.videoSourceLanguage = '';
+                expect(readSettings().sourceLanguage).toBe('auto');
+            }
+        } finally {
+            vi.doUnmock('@/src/services/config/store');
+            vi.doUnmock('@/src/platform/offscreen/extensionClient');
+            vi.doUnmock('@/src/features/video-subtitle/background/handlers');
+            vi.resetModules();
+        }
     });
 });

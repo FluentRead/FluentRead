@@ -67,7 +67,7 @@
             <h4>
               <button type="button" class="directory-section-toggle" :aria-expanded="isGroupOpen(group.id)" :aria-controls="`${directoryId}-${group.id}`" :disabled="!active || searching" :onClick="actions.toggleGroup.bind(null, group.id)">
                 <span>{{ group.label }}</span><small>{{ group.items.length }}</small>
-                <svg v-if="!searching" class="directory-section-chevron" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 4 4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <UiIcon v-if="!searching" class="directory-section-chevron" name="chevron-down" :size="14" />
               </button>
             </h4>
             <div v-show="isGroupOpen(group.id)" :id="`${directoryId}-${group.id}`" class="directory-items">
@@ -102,9 +102,7 @@
                 :aria-label="t('settings.services.openExternal', { service: selectedService?.label || service, action: t(`settings.services.${website.kind}`) })"
               >
                 {{ t(`settings.services.${website.kind}`) }}
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M14 3h7v7M21 3 10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" />
-                </svg>
+                <UiIcon name="external" :size="14" />
               </a>
             </div>
           </div>
@@ -138,7 +136,7 @@
               <span class="credential-guide-badge">{{ t('settings.organization.guide') }}</span>
               <strong>{{ credentialGuide.freeQuota }}</strong>
             </span>
-            <svg class="credential-guide-chevron" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+            <UiIcon class="credential-guide-chevron" name="chevron-down" :size="16" />
           </summary>
           <div class="credential-guide-body">
             <small>免费额度与超额处理以厂商控制台和当前套餐为准</small>
@@ -155,9 +153,7 @@
                 :title="credentialGuide.consoleUrl"
               >
                 {{ credentialGuide.consoleLabel }}
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M14 3h7v7M21 3 10 14M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5" />
-                </svg>
+                <UiIcon name="external" :size="13" />
               </a>
               <a
                 class="credential-guide-link"
@@ -634,8 +630,8 @@ watch(() => props.service, (service) => {
 .directory-section-toggle:not(:disabled):hover { background: color-mix(in srgb, var(--line) 40%, transparent); }
 .directory-section-toggle > span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
 .directory-section-toggle small { color: var(--muted); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; }
-.directory-section-chevron { flex: none; width: 14px; height: 14px; color: var(--muted); transition: transform 150ms ease; }
-.directory-section-toggle[aria-expanded="true"] .directory-section-chevron { transform: rotate(90deg); }
+.directory-section-chevron { color: var(--muted); transform: rotate(-90deg); transition: transform 150ms ease; }
+.directory-section-toggle[aria-expanded="true"] .directory-section-chevron { transform: none; }
 .directory-section.is-collapsed .directory-section-toggle { border-radius: 8px; }
 @media (prefers-reduced-motion: reduce) { .directory-section-chevron { transition: none; } }
 .catalog-empty { padding: 32px 0; color: var(--muted, #737c8f); text-align: center; font-size: 13px; }

@@ -27,4 +27,10 @@ describe('原图加载版本与事件所有权',()=>{
         tracker.loaded(event);expect(tracker.revision(source)).toBe(0);
         tracker.loaded(event);expect(tracker.revision(source)).toBe(1);
     });
+    it('捕获处理后才登记的新图片不会在目标阶段重复计入首次 load',()=>{
+        const tracker=createImageLoadTracker(),source=image(),event=load(source);
+        tracker.markHandled(event);expect(tracker.revision(source)).toBe(0);
+        tracker.loaded(event);expect(tracker.revision(source)).toBe(0);
+        tracker.loaded(load(source));expect(tracker.revision(source)).toBe(1);
+    });
 });

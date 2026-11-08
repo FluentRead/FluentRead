@@ -28,13 +28,19 @@ function xMediaIdentity(source: string): string | undefined {
     return url.href;
 }
 
+export function samePreviewResource(source: PreviewImageSource, enlarged: string, hostname: string): boolean {
+    if (source.url === enlarged) return Boolean(source.url);
+    if (!X_HOST.test(hostname)) return false;
+    const identity = xMediaIdentity(source.url);
+    return Boolean(identity && identity === xMediaIdentity(enlarged));
+}
+
 export function samePreviewImage(source: PreviewImageSource, candidate: HTMLImageElement): boolean {
     if (!candidate.complete || !candidate.naturalWidth || !candidate.naturalHeight) return false;
     const enlarged = candidate.currentSrc || candidate.src;
-    if (source.url === enlarged) return Boolean(source.url);
-    if (!X_HOST.test(candidate.ownerDocument.location?.hostname || '')) return false;
-    const identity = xMediaIdentity(source.url);
-    if (!identity || identity !== xMediaIdentity(enlarged) || !source.width || !source.height) return false;
+    if (!samePreviewResource(source, enlarged, candidate.ownerDocument.location?.hostname || '')) return false;
+    if (source.url === enlarged) return true;
+    if (!source.width || !source.height) return false;
     // 容许 CDN 缩放时的整数舍入。即使媒体 ID 相同，裁切后的像素也不能套用整图译文。
     const {width, height} = source;
     return Math.abs(width * candidate.naturalHeight - height * candidate.naturalWidth)

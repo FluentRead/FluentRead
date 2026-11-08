@@ -4,7 +4,7 @@
  * 主要内容：普通图片全部译文不可安全绘制时保留宿主原图，并在文字面板提供译文；仅缺可选分割资源的回退在用户再次操作时轻查状态，导入就绪才重入，取消与迟到回复保持同一图片所有权，任一模式关闭后复验准入并归还原图；单图失败提供模型与服务导航，译图操作条随指针隐藏并保留键盘入口；指针局部检查仅在本次调用内复用同图几何与样式读取，第二个重叠命中立即停止，下一帧重新定位；单图识别方式纳入缓存身份，切换后不复用旧结果；在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，默认 12 张可配置的快速缓存和 100 页/16 MiB 二进制局部结果，靠近视口时直接预合成画布，无文字页只保留轻量完成标记；返页不复用已经取消的预合成，旧任务结束不能删除新任务；漫画状态以订阅快照发送并隔离同步异常，避免订阅变化重复递送或阻断请求和卸载；图片重载、独立服务及模型变化使结果失效；组合按所选成员的安全连接摘要建立响应式依赖，成员变更撤销旧任务与缓存，漫画返页复用结果不等待其他页推理；预合成不得撤下当前译图，单页反馈展示真实阶段与进度，漫画错误恢复跟随图片可见边缘，正常处理与完成隐藏操作条，换图、取消与卸载时释放资源。
  * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  * 分段旁置：仅分段载体提供已冻结的核心像素视窗，并随原漫画请求透传供完整补绘准入；普通图片与无视窗宿主不增加请求字段或读取布局。
- * 大图查看器：可信点击后仅在新打开的同图查看器复用已完成的译图，查看器与缩略图各自管理显示权。
+ * 大图查看器：可信点击后预解码已有译图，待查看器开场动画结束再接管；透明手势层不打断接管，同图高清切换及查看器节点替换复用该结果。
  * 滚动呈现：普通译图优先在与原图重合的宿主定位容器内绘制，随宿主滚动与裁切；固定层继续管理操作条和无法就地绘制的译图。
  * 滚动开销：纯滚动帧对离屏图跳过样式和裁切扫描，保留可安全随容器回到视口的译图；样式只在值变化时写入。
  */
@@ -27,7 +27,7 @@ import {fetchPageImageForOcr} from '@/src/features/image-translation/services/re
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {withImageSourceAuthorization} from './sourceAuthorization';
 import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, type ImagePresentation} from './presentation';
-import {isNativeModal, isOpenImageViewer, samePreviewImage, visibleImageViewers, type PreviewImageSource} from './imagePreview';
+import {isNativeModal, isOpenImageViewer, samePreviewImage, samePreviewResource, visibleImageViewers, type PreviewImageSource} from './imagePreview';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
 import {createMangaReader} from './mangaReader';
@@ -124,16 +124,28 @@ interface CachedImageTranslation {
 }
 
 interface PendingImagePreview {
-    source: ImageTranslationState;
-    sourceIdentity: string;
+    sourceImage: HTMLImageElement;
     resource: PreviewImageSource;
-    bitmap: HTMLImageElement;
+    bitmap?: HTMLImageElement;
     lines: ImageTranslationLine[];
     existingViewers: Set<HTMLElement>;
+    viewer?: HTMLElement;
     revision: number;
     controller: AbortController;
     timer: number;
-    decoding: boolean;
+    openingAnimations: WeakSet<Animation>;
+    loadedImages: WeakSet<HTMLImageElement>;
+    settlingImage?: HTMLImageElement;
+}
+
+interface OpenImagePreview {
+    viewer: HTMLElement;
+    state: ImageTranslationState;
+    resource: PreviewImageSource;
+    bitmap: HTMLImageElement;
+    revision: number;
+    declaredSrc: string;
+    variantLoading: boolean;
 }
 
 let mounted = false;
@@ -147,7 +159,7 @@ let layoutRecheckPending = false;
 let configurationRevision = 0;
 let stopConfigurationWatch: (() => void) | null = null;
 let pendingPreview: PendingImagePreview | null = null;
-let imagePreview: {viewer: HTMLElement; state: ImageTranslationState} | null = null;
+let imagePreview: OpenImagePreview | null = null;
 const states = new WeakMap<HTMLImageElement, ImageTranslationState>();
 const activeStates = new Set<ImageTranslationState>();
 // Map 有明确数量/像素上限；缓存监听原图 load，悬浮状态卸载期间同 URL 重载也不能复用旧位图。
@@ -588,13 +600,22 @@ function removeState(state: ImageTranslationState): void {
     state.abortController = null;
     restoreOriginalImage(state);
     state.resizeObserver?.disconnect();
-    if (state.imageLoadHandler) state.image.removeEventListener('load', state.imageLoadHandler);
+    if (state.imageLoadHandler) {
+        state.image.removeEventListener('load', state.imageLoadHandler);
+        state.image.removeEventListener('error', state.imageLoadHandler);
+    }
     state.controls.dispose();
     state.overlay.remove();
     activeStates.delete(state);
     if (imagePreview?.state === state) {
+        const preview = imagePreview;
         imagePreview = null;
         placeImageOverlayRoot();
+        if (mounted && !pendingPreview && !state.image.isConnected && state.phase === 'translated'
+            && state.translatedImage === preview.bitmap && preview.revision === configurationRevision && isOpenImageViewer(preview.viewer)) {
+            beginPendingPreview({sourceImage: state.image, resource: preview.resource, bitmap: preview.bitmap,
+                lines: state.lines, existingViewers: new Set(), viewer: preview.viewer, revision: preview.revision});
+        }
     }
     syncLayoutObservation();
     if (states.get(state.image) === state) states.delete(state.image);
@@ -630,6 +651,35 @@ function invalidateSource(state: ImageTranslationState): void {
     state.needsPreparation = false;
     setButtonState(state, 'idle', '翻译图片');
     scheduleIdleStateRemoval(state);
+}
+
+function syncImageSource(state: ImageTranslationState): void {
+    const identity = sourceIdentity(state.image);
+    const preview = imagePreview;
+    const image = state.image;
+    const variantLoading = preview?.state === state && preview.variantLoading;
+    if (identity === state.sourceIdentity && !(variantLoading && image.complete)) return;
+    if (preview?.state === state && state.phase === 'translated' && state.translatedImage === preview.bitmap
+        && preview.revision === configurationRevision && state.presentation.kind === 'image'
+        && !image.getAttribute('srcset') && !image.closest('picture')
+        && (image.src !== preview.declaredSrc || preview.variantLoading)) {
+        const hostname = image.ownerDocument.location?.hostname || '';
+        const current = image.currentSrc;
+        const sameDisplayedResource = image.complete ? samePreviewImage(preview.resource, image)
+            : !current || samePreviewResource(preview.resource, current, hostname);
+        if (sameDisplayedResource && samePreviewResource(preview.resource, image.src, hostname)) {
+            // 已知的同一媒体尺寸变体可以保留显示权；重新载入同一 URL 与换图仍走正常失效。
+            preview.declaredSrc = image.src;
+            preview.variantLoading = !image.complete || Boolean(current && current !== image.src);
+            if (state.sourceIdentity !== identity) {
+                state.sourceIdentity = identity;
+                if (state.resultIdentity) cacheResult(state, state.resultIdentity);
+            }
+            return;
+        }
+    }
+    if (variantLoading && preview) preview.variantLoading = false;
+    invalidateSource(state);
 }
 
 function detachLocalBitmapHost(state: ImageTranslationState): void {
@@ -695,6 +745,26 @@ function hideImageOverlay(state: ImageTranslationState, keepLocal = false): void
     restoreOriginalImage(state);
 }
 
+function ignorePreviewInputLayer(viewer: HTMLElement): (element: Element) => boolean {
+    const inspected = new Map<Element, boolean>();
+    return element => {
+        if (element.tagName !== 'DIV' || element.childElementCount || element.textContent?.trim() || !viewer.contains(element)) return false;
+        const known = inspected.get(element);
+        if (known !== undefined) return known;
+        const style = getComputedStyle(element);
+        const emptyContent = (content: string) => !content || content === 'none' || content === 'normal';
+        const noPaint = (style.position === 'absolute' || style.position === 'fixed')
+            && (style.backgroundColor === 'transparent' || style.backgroundColor === 'rgba(0, 0, 0, 0)')
+            && [style.backgroundImage, style.boxShadow, style.filter, style.backdropFilter].every(value => !value || value === 'none')
+            && [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth, style.outlineWidth]
+                .every(value => !Number.parseFloat(value))
+            && emptyContent(style.content)
+            && ['::before', '::after'].every(pseudo => emptyContent(getComputedStyle(element, pseudo).content));
+        inspected.set(element, noPaint);
+        return noPaint;
+    };
+}
+
 function updateBitmapAppearance(bitmap: TranslatedSurface, presentation: ImagePresentation, style: CSSStyleDeclaration,
                                 opacity: number, scaleX = 1, scaleY = 1): void {
     const fitting = presentation.kind === 'background' ? surfaceStyleToBitmap(style)
@@ -740,7 +810,8 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
     ensureImageOverlayRoot();
     const theme = config.theme === 'dark' || (config.theme === 'auto' && window.matchMedia?.('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     if (state.controls.reader.dataset.theme !== theme) state.controls.reader.dataset.theme = theme;
-    if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
+    syncImageSource(state);
+    if (!presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);
     if (state.hoverEntry && state.phase === 'idle' && !isImageHoverEligible(state.image)) {
         removeState(state);
         return;
@@ -793,7 +864,8 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
         && style.visibility !== 'hidden'
         && style.visibility !== 'collapse' && style.display !== 'none' && opacity > 0;
     const visible = usable && right > left && bottom > top;
-    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image);
+    const ignoreForeground = imagePreview?.state === state ? ignorePreviewInputLayer(imagePreview.viewer) : undefined;
+    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground);
     const bitmap = state.phase === 'translated' ? state.translatedImage : null;
     if (!visible || occluded) {
         // 非滚动帧仍复核离屏局部译图的盒子和样式。真正遮挡或失配时归还原图。
@@ -886,10 +958,18 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
         lines: [], translatedImage: null, imageUnchanged: false, resultIdentity: null, sourceStyleLease: null,
     };
     state.imageLoadHandler = (event: Event) => {
+        if (event.type === 'error') {
+            if (imagePreview?.state === state && imagePreview.variantLoading) {
+                imagePreview.variantLoading = false;
+                invalidateSource(state);
+                scheduleViewportChange();
+            }
+            return;
+        }
         imageLoadTracker.loaded(event);
         // 新源的首次 load 可能晚于 ready 和处理；共享版本只让真正重载或来源变化撤下结果。
         if (state.waitingForImage) state.sourceIdentity = sourceIdentity(image);
-        else if (state.sourceIdentity !== sourceIdentity(image)) invalidateSource(state);
+        else syncImageSource(state);
         scheduleViewportChange();
     };
     state.resizeObserver = typeof ResizeObserver === 'undefined'
@@ -897,6 +977,7 @@ function createState(image: HTMLImageElement, hoverEntry = false): ImageTranslat
     state.resizeObserver?.observe(image);
     if (state.presentation.element !== image) state.resizeObserver?.observe(state.presentation.element);
     image.addEventListener('load', state.imageLoadHandler);
+    image.addEventListener('error', state.imageLoadHandler);
     states.set(image, state);
     activeStates.add(state);
     syncLayoutObservation();
@@ -1524,6 +1605,13 @@ function clearPendingPreview(): void {
     syncLayoutObservation();
 }
 
+function beginPendingPreview(input: Omit<PendingImagePreview, 'controller' | 'timer' | 'openingAnimations' | 'loadedImages'>): PendingImagePreview {
+    const pending = pendingPreview = {...input, controller: new AbortController(), openingAnimations: new WeakSet(), loadedImages: new WeakSet(),
+        timer: window.setTimeout(clearPendingPreview, IMAGE_PREVIEW_TIMEOUT_MS)};
+    scheduleOverlayPositionUpdate();
+    return pending;
+}
+
 function handleImagePreviewClick(event: MouseEvent): void {
     if (!event.isTrusted || event.button !== 0) return;
     clearPendingPreview();
@@ -1536,21 +1624,25 @@ function handleImagePreviewClick(event: MouseEvent): void {
         || !(bitmap instanceof HTMLImageElement)
         || (source.overlay.style.display === 'none' && (!source.localBitmapHost?.isConnected || bitmap.style.visibility !== 'visible'))
         || source.resultIdentity !== configurationIdentity() || sourceIdentity(source.image) !== source.sourceIdentity) return;
-    pendingPreview = {
-        source, sourceIdentity: source.sourceIdentity, bitmap, lines: source.lines,
+    const pending = beginPendingPreview({
+        sourceImage: source.image, lines: source.lines,
         resource: {url: source.image.currentSrc || source.image.src, width: source.image.naturalWidth, height: source.image.naturalHeight},
         existingViewers: new Set(visibleImageViewers(document)), revision: configurationRevision,
-        controller: new AbortController(), timer: window.setTimeout(clearPendingPreview, IMAGE_PREVIEW_TIMEOUT_MS), decoding: false,
-    };
-    scheduleOverlayPositionUpdate();
+    });
+    // 点击时准备同一位图。宿主可以重排或重用缩略图节点，查看器仍只匹配点击时冻结的资源。
+    void loadImage(bitmap.src, pending.controller.signal).then(prepared => {
+        if (pending !== pendingPreview) return;
+        pending.bitmap = prepared;
+        scheduleOverlayPositionUpdate();
+    }, () => { if (pending === pendingPreview) clearPendingPreview(); });
 }
 
-function findPreviewTarget(pending: PendingImagePreview): {viewer: HTMLElement; image: HTMLImageElement} | undefined {
-    let match: {viewer: HTMLElement; image: HTMLImageElement} | undefined;
-    for (const viewer of visibleImageViewers(document)) {
+function findPreviewTarget(pending: PendingImagePreview): {viewer: HTMLElement; image: HTMLImageElement; surface: HTMLElement; rect: DOMRect} | undefined {
+    let match: {viewer: HTMLElement; image: HTMLImageElement; surface: HTMLElement; rect: DOMRect} | undefined;
+    for (const viewer of pending.viewer ? [pending.viewer] : visibleImageViewers(document)) {
         if (pending.existingViewers.has(viewer)) continue;
         for (const image of viewer.querySelectorAll('img')) {
-            if (image === pending.source.image || image.closest('[data-fluent-read-ui], [hidden], [aria-hidden="true"]')
+            if (image === pending.sourceImage || image.closest('[data-fluent-read-ui], [hidden], [aria-hidden="true"]')
                 || !samePreviewImage(pending.resource, image)) continue;
             const surface = resolveImagePresentation(image).element;
             const rect = surface.getBoundingClientRect();
@@ -1559,32 +1651,37 @@ function findPreviewTarget(pending: PendingImagePreview): {viewer: HTMLElement; 
                 || style.visibility === 'hidden' || style.visibility === 'collapse') continue;
             if (match?.image === image) continue;
             if (match) return;
-            match = {viewer, image};
+            match = {viewer, image, surface, rect};
         }
     }
     return match;
 }
 
-function previewStillCurrent(pending: PendingImagePreview): boolean {
-    const {source} = pending;
-    return pending === pendingPreview && pending.revision === configurationRevision && imageTranslationAllowed(false)
-        && (!source.image.isConnected || (source.phase === 'translated' && source.translatedImage === pending.bitmap
-            && sourceIdentity(source.image) === pending.sourceIdentity && presentationMatchesSource(source.image, source.presentation)));
+function previewOpening(pending: PendingImagePreview, surface: HTMLElement): boolean {
+    let waiting = false;
+    for (let element: HTMLElement | null = surface; element; element = element.parentElement) {
+        for (const animation of element.getAnimations?.() || []) {
+            if ((!animation.pending && animation.playState !== 'running')
+                || !Number.isFinite(animation.effect?.getComputedTiming().endTime)) continue;
+            waiting = true;
+            if (pending.openingAnimations.has(animation)) continue;
+            pending.openingAnimations.add(animation);
+            const {controller} = pending;
+            const recheck = () => { if (pendingPreview?.controller === controller) scheduleOverlayPositionUpdate(); };
+            void animation.finished.then(recheck, recheck);
+        }
+    }
+    return waiting;
 }
 
-async function inheritPreviewResult(pending: PendingImagePreview): Promise<void> {
-    let bitmap: HTMLImageElement;
-    try { bitmap = await loadImage(pending.bitmap.src, pending.controller.signal); }
-    catch { if (pending === pendingPreview) clearPendingPreview(); return; }
-    if (pending !== pendingPreview) return;
-    const target = previewStillCurrent(pending) ? findPreviewTarget(pending) : undefined;
-    clearPendingPreview();
-    if (!target) return;
-    const existing = states.get(target.image);
-    if (existing && (existing.manga || existing.phase !== 'idle')) return;
+function inheritPreviewResult(pending: PendingImagePreview, viewer: HTMLElement, image: HTMLImageElement, bitmap: HTMLImageElement): void {
+    const existing = states.get(image);
+    if (existing && (existing.manga || existing.phase !== 'idle')) { clearPendingPreview(); return; }
     if (imagePreview) removeState(imagePreview.state);
-    const state = existing || createState(target.image);
-    imagePreview = {viewer: target.viewer, state};
+    const state = existing || createState(image);
+    imagePreview = {viewer, state, resource: pending.resource, bitmap, revision: pending.revision,
+        declaredSrc: image.src, variantLoading: false};
+    clearPendingPreview();
     clearHoverTimer(state);
     state.hoverEntry = false;
     state.resultIdentity = configurationIdentity();
@@ -1601,10 +1698,24 @@ function updateImagePreview(): void {
     }
     const pending = pendingPreview;
     if (!pending) return;
-    if (!previewStillCurrent(pending)) { clearPendingPreview(); return; }
-    if (pending.decoding || !findPreviewTarget(pending)) return;
-    pending.decoding = true;
-    void inheritPreviewResult(pending);
+    if (pending.revision !== configurationRevision || !imageTranslationAllowed(false)
+        || (pending.viewer && !isOpenImageViewer(pending.viewer))) { clearPendingPreview(); return; }
+    if (!pending.bitmap) return;
+    const target = findPreviewTarget(pending);
+    if (!target) { pending.settlingImage = undefined; return; }
+    if (previewOpening(pending, target.surface)) return;
+    const {rect, surface, viewer, image} = target;
+    const visible = {left: Math.max(0, rect.left), top: Math.max(0, rect.top),
+        right: Math.min(window.innerWidth, rect.right), bottom: Math.min(window.innerHeight, rect.bottom)};
+    if (visible.right <= visible.left || visible.bottom <= visible.top
+        || isImagePresentationOccluded(surface, visible, imageOverlayHost, image, null, ignorePreviewInputLayer(viewer))) return;
+    if (!pending.loadedImages.has(image) && pending.settlingImage !== image) {
+        // complete 可能先于首次 load 任务。给浏览器一帧结算，避免接管后把首次 load 当成同地址重载。
+        pending.settlingImage = image;
+        scheduleOverlayPositionUpdate();
+        return;
+    }
+    inheritPreviewResult(pending, viewer, image, pending.bitmap);
 }
 
 /** 后台只传递原生菜单动作；目标必须匹配本 document 最近一次可信右键的图片快照。 */
@@ -1665,7 +1776,7 @@ function handleLayoutMutations(records: MutationRecord[]): void {
     if (sourceChanged) {
         activeStates.forEach(state => {
             if (!state.image.isConnected) removeState(state);
-            else if (sourceIdentity(state.image) !== state.sourceIdentity) invalidateSource(state);
+            else syncImageSource(state);
         });
         resultCache.forEach((_cached, image) => {
             if (!image.isConnected) deleteCachedResult(image);
@@ -1853,7 +1964,15 @@ export function mountImageTranslator(): void {
     });
     const handleImageLoad = (event: Event) => {
         imageLoadTracker.loaded(event);
-        if (pendingPreview && event.target instanceof HTMLImageElement) scheduleOverlayPositionUpdate();
+        if (pendingPreview && event.target instanceof HTMLImageElement) {
+            pendingPreview.loadedImages.add(event.target);
+            if (pendingPreview.viewer?.contains(event.target)) {
+                // 同一查看器重建节点时，在首次 load 的捕获阶段交接，赶在下一帧前复用已解码译图。
+                imageLoadTracker.markHandled(event);
+                updateImagePreview();
+            }
+            scheduleOverlayPositionUpdate();
+        }
     };
     const handlePreviewAnimationEnd = () => {
         if (pendingPreview || imagePreview) scheduleOverlayPositionUpdate();

@@ -455,7 +455,7 @@ describe('图片翻译前台交互与生命周期', () => {
         env.dispatch(env.image, 'click', true, {button: 0});
         dialog.append(preview); document.body.append(dialog);
         Object.assign(document, {elementsFromPoint: () => [preview, dialog, env.image]});
-        env.notify('', 'childList'); env.runFrames(); await flush();
+        env.notify('', 'childList'); await flush(); env.runFrames(); env.runFrames();
         const bitmaps = () => Array.from(env.roots[0].querySelectorAll<HTMLImageElement>('.fluent-read-image-translation-bitmap'));
         expect(bitmaps().map(bitmap => bitmap.src)).toEqual([result.image, result.image]);
         expect(bitmaps()[0]).toBe(thumbnail);
@@ -473,6 +473,75 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(client.translate).toHaveBeenCalledOnce();
     });
 
+    it('等待查看器开场动画后一次性交接，透明手势层和同图节点替换不撤销译图', async () => {
+        const env = setup(); env.hover(); env.click(); await flush();
+        const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
+        const preview = addSecondHoverImage(env, env.image.getBoundingClientRect);
+        preview.src = env.image.src;
+        dialog.getBoundingClientRect = preview.getBoundingClientRect;
+        const gesture = document.createElement('div');
+        env.extraStyles.set(gesture, {position: 'absolute', backgroundColor: 'rgba(0, 0, 0, 0)', backgroundImage: 'none'});
+        const finished = deferred<void>();
+        const animation = {playState: 'running', finished: finished.promise, effect: {getComputedTiming: () => ({endTime: 200})}};
+        vi.spyOn(dialog, 'getAnimations').mockReturnValue([animation as unknown as Animation]);
+        env.dispatch(env.image, 'click', true, {button: 0});
+        dialog.append(preview, gesture); document.body.append(dialog);
+        Object.assign(document, {elementsFromPoint: () => [gesture, preview, dialog, env.image]});
+        env.notify('', 'childList'); await flush(); env.runFrames();
+        const previewBitmaps = () => Array.from(env.roots[0].querySelectorAll('.fluent-read-image-translation-bitmap'));
+        expect(env.decoded).toHaveLength(2);
+        expect(previewBitmaps()).toHaveLength(1);
+        expect(preview.style.opacity).not.toBe('0');
+        animation.playState = 'finished'; finished.resolve(); await flush(); env.runFrames();
+        expect(preview.style.opacity).not.toBe('0');
+        env.dispatch(preview, 'load'); env.runFrames();
+        expect(previewBitmaps()).toHaveLength(2);
+        expect(preview.style.opacity).toBe('0');
+        const translated = previewBitmaps()[1];
+
+        const replacement = addSecondHoverImage(env, preview.getBoundingClientRect);
+        replacement.src = preview.src;
+        preview.replaceWith(replacement);
+        Object.assign(document, {elementsFromPoint: () => [gesture, replacement, dialog, env.image]});
+        env.notify('', 'childList'); env.dispatch(replacement, 'load');
+        expect(previewBitmaps()).toHaveLength(2);
+        expect(previewBitmaps()[1]).toBe(translated);
+        expect(replacement.style.opacity).toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
+
+    it.each(['same aspect', 'cropped', 'load error'] as const)('大图切换同媒体地址时复核最终像素比例和加载结果（%s）', async outcome => {
+        const env = setup();
+        Object.defineProperty(document, 'location', {value: {hostname: 'x.com'}});
+        const small = 'https://pbs.twimg.com/media/sample?format=jpg&name=small';
+        const large = 'https://pbs.twimg.com/media/sample?format=jpg&name=large';
+        env.image.src = small; env.hover(); env.click(); await flush();
+        const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
+        const preview = document.createElement('img'); preview.src = small;
+        let complete = true, height = 400;
+        Object.defineProperties(preview, {currentSrc: {get: () => preview.src}, complete: {get: () => complete},
+            naturalWidth: {value: 800}, naturalHeight: {get: () => height}});
+        preview.getBoundingClientRect = dialog.getBoundingClientRect = env.image.getBoundingClientRect;
+        env.dispatch(env.image, 'click', true, {button: 0});
+        dialog.append(preview); document.body.append(dialog);
+        Object.assign(document, {elementsFromPoint: () => [preview, dialog]});
+        env.notify('', 'childList'); env.dispatch(preview, 'load'); await flush(); env.runFrames();
+        expect(preview.style.opacity).toBe('0');
+
+        complete = false; preview.src = large;
+        env.notify('src');
+        expect(preview.style.opacity).toBe('0');
+        complete = true; height = outcome === 'cropped' ? 800 : 400;
+        env.dispatch(preview, outcome === 'load error' ? 'error' : 'load');
+        if (outcome === 'same aspect') {
+            expect(preview.style.opacity).toBe('0');
+            // 同地址的下一次真正重载不能被当成上一轮尺寸升级。
+            env.dispatch(preview, 'load');
+        }
+        expect(preview.style.opacity).not.toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+    });
+
     it('大图译图解码期间切换配置时保留查看器原图', async () => {
         const env = setup(); env.hover(); env.click(); await flush();
         const dialog = document.createElement('div'); dialog.setAttribute('role', 'dialog');
@@ -486,7 +555,7 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.decoded).toHaveLength(2);
         settings.to = 'fr';
         env.decoded[1].onload?.(new Event('load'));
-        await flush();
+        await flush(); env.runFrames();
         expect(env.roots[0].querySelectorAll('.fluent-read-image-translation-bitmap')).toHaveLength(1);
         expect(preview.style.opacity).not.toBe('0');
         expect(client.translate).toHaveBeenCalledOnce();
@@ -501,7 +570,7 @@ describe('图片翻译前台交互与生命周期', () => {
         env.image.remove();
         env.image.src = preview.src;
         dialog.append(preview); document.body.append(dialog);
-        env.notify('', 'childList'); env.runFrames(); await flush();
+        env.notify('', 'childList'); await flush(); env.runFrames();
         expect(env.bitmap()).toBeFalsy();
         expect(preview.style.opacity).not.toBe('0');
         expect(client.translate).toHaveBeenCalledOnce();
@@ -527,7 +596,7 @@ describe('图片翻译前台交互与生命周期', () => {
         env.dispatch(env.image, 'click', true, {button: 0});
         document.body.append(wrapper);
         setViewerVisible(true);
-        env.notify('style'); env.runFrames(); await flush();
+        env.notify('style'); await flush(); env.runFrames(); env.runFrames();
         expect(bitmaps()).toHaveLength(2);
         setViewerVisible(false);
         env.notify('style'); env.runFrames();
@@ -537,7 +606,7 @@ describe('图片翻译前台交互与生命周期', () => {
 
         env.dispatch(env.image, 'click', true, {button: 0});
         setViewerVisible(true);
-        env.notify('style'); env.runFrames(); await flush();
+        env.notify('style'); await flush(); env.runFrames(); env.runFrames();
         expect(bitmaps()).toHaveLength(2);
         expect(preview.style.opacity).toBe('0');
         expect(client.translate).toHaveBeenCalledOnce();

@@ -551,7 +551,7 @@ describe('bilingual sentence hover geometry', () => {
         const f = fixture(`<p id="owner" data-row="10">First. Second.${moreSource}<span data-row="30" class="fluent-read-bilingual-content" data-fr-translation-owned="true">一句。二句。${moreTranslation}</span></p>`);
         const owner = f.document.querySelector('#owner')!;
         const translation = owner.querySelector('.fluent-read-bilingual-content')!;
-        let point = caretPosition(translation.firstChild!, 3);
+        let point: CaretPosition | null = caretPosition(translation.firstChild!, 3);
         const caret = vi.fn(() => point);
         f.document.caretPositionFromPoint = caret;
         const dispose = installBilingualSentenceHighlight(f.document);
@@ -560,6 +560,13 @@ describe('bilingual sentence hover geometry', () => {
         f.move('.fluent-read-bilingual-content', 31, 35);
         expect(f.highlighted()).toEqual(['Second.', '二句。']);
         expect(caret).toHaveBeenCalledTimes(2);
+        for (const unavailablePoint of [null, caretPosition(owner.firstChild!, 2), caretPosition(translation, 0)]) {
+            point = unavailablePoint;
+            f.move('.fluent-read-bilingual-content', 20, 35);
+            expect(f.highlighted()).toEqual(['First.', '一句。']);
+            f.move('.fluent-read-bilingual-content', 45, 35);
+            expect(f.highlighted()).toEqual(['Second.', '二句。']);
+        }
         // 即使光标 API 指向另一句，实际命中的文字仍应走几何回退。
         point = caretPosition(owner.firstChild!, 2);
         f.move('#owner', 90, 15);

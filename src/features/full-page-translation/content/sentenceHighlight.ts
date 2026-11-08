@@ -4,8 +4,8 @@
  * 主要内容：沿命中节点祖先读取共享状态索引，每次复核双语工件的身份与在位关系；分帧收集文字、保留原始偏移并限制文字量，同一超限段落在失效前不重复收集；较长段落按浏览器光标位置缩小待验证范围，读取实时矩形并使用原生 Highlight 绘制；离开、选择、滚动、节点变化和卸载时取消收集并释放范围与监听器。
  * 模块边界：仅消费 state 登记、renderer 创建的双语容器，不拆分宿主文本、不更改排版、不调用 provider；旧浏览器缺少绘制能力时安全停用。
  */
+import {findTextPointAtPoint} from '@/src/core/translation/dom';
 import {alignBilingualSentences, type SentenceSpan} from '@/src/core/translation/sentenceAlignment';
-import {findTextPointAtPoint} from '@/src/core/translation/public';
 import {getTranslationState} from './state';
 
 export const BILINGUAL_HIGHLIGHT_NAME = 'fluentread-bilingual-sentence';

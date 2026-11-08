@@ -1,4 +1,4 @@
-/* 赞助区位于功能介绍之后，以单个空席位承接企业合作，窄屏自然纵排。 */
+/* 赞助区位于功能介绍之后，窄屏将介绍和赞助伙伴卡片纵向排列。 */
 .bv-sponsors {
   display: grid;
   grid-template-columns: 1.1fr 1fr;
@@ -24,36 +24,6 @@
     grid-template-columns: 1fr;
     gap: 28px;
   }
-}
-.bv-site .bv-related-service {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 16px 32px;
-  padding-top: 32px;
-  padding-bottom: 32px;
-}
-.bv-site .bv-related-service h2 {
-  margin: 0;
-  font-size: 16px;
-  letter-spacing: normal;
-}
-.bv-related-service a {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  color: var(--vp-c-brand-1);
-  font-size: 14px;
-}
-.bv-related-service a:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.bv-related-service a:focus-visible {
-  outline: 2px solid var(--vp-c-brand-1);
-  outline-offset: 4px;
-  border-radius: 2px;
 }
 /* 首屏以居中图标和两行口号为主，两侧悬浮卡片只用变换动画，不占据文档流。 */
 .bv-home-brand img {

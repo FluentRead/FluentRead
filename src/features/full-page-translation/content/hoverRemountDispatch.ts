@@ -6,7 +6,7 @@
  */
 import type {TranslationCandidate, TranslationScope} from '@/src/core/translation/public';
 import type {FullPageTranslationConfigSnapshot, PageTranslationConfigOverrides} from './translationConfigSnapshot';
-import {trackXHoverRemount, type HoverRemountRecovery} from './hoverRemountRecovery';
+import {trackHoverRemount, type HoverRemountRecovery} from './hoverRemountRecovery';
 import {HoverTranslationScheduler} from './hoverScheduler';
 
 interface HoverRemountDispatchPorts {
@@ -49,7 +49,7 @@ export function createHoverRemountDispatch(ports: HoverRemountDispatchPorts) {
                 if (tracked.get(candidate.element) === recovery) tracked.delete(candidate.element);
             };
             recovery = ports.track ? ports.track(candidate, x, y, current, onCancel)
-                : trackXHoverRemount(candidate, x, y, current, onCancel);
+                : trackHoverRemount(candidate, x, y, current, onCancel);
             if (recovery) tracked.set(candidate.element, recovery);
         }
         void ports.translate(candidate, snapshot, continuous).then(async outcome => {

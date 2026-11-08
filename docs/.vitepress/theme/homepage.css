@@ -14,11 +14,6 @@
   color: var(--fr-muted);
   font-size: 14px;
 }
-.bv-sponsor-contact {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 24px;
-}
 @media (max-width: 760px) {
   .bv-sponsors {
     grid-template-columns: 1fr;

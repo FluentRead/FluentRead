@@ -65,6 +65,14 @@ export class SentencePlaybackController {
       this.stop();
       return;
     }
+    // 同一字幕时间范围内换句时，迟到的 seeking 事件仍属于已发起的跳转。
+    if (!seekToStart && this.expectedSeekMs !== null && this.sentence?.startMs === sentence.startMs
+      && this.sentence.endMs === sentence.endMs) {
+      this.sentence = sentence;
+      if (mode === this.mode) this.notify();
+      else this.setMode(mode);
+      return;
+    }
     this.cancelFrame();
     this.operation += 1;
     this.sentence = sentence;

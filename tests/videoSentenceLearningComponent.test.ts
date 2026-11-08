@@ -787,3 +787,49 @@ describe('视频句子通过真实公开客户端关联材料', () => {
     expect(materialTransport.sendMessage).not.toHaveBeenCalled(); expect(materialCaptures()).toEqual([]);
   });
 });
+
+it('切换同一来源 cue 内语义句不重复跳回播放起点，显式重播仍使用来源范围', async () => {
+  props.cues = [{text: 'First sentence. Second sentence!', startMs: 0, durationMs: 9000}];
+  const host = await mountRendered();
+  expect(host.querySelector('[data-learning-timing-precision]')?.textContent).toBe('video.learning.cueEnvelope');
+  expect(host.querySelector('[data-learning-action="play"]')?.textContent).toBe('video.learning.replaySource');
+  video.currentTime = 4; await step(1);
+  expect(state.sentence.text).toBe('Second sentence!'); expect(video.currentTime).toBe(4);
+  await state.replay(); expect(video.currentTime).toBe(0);
+});
+
+it('跨 cue 的原句显示与翻译沿用原有空格拼接', async () => {
+  props.cues = [
+    {text: 'Sea  otters', startMs: 0, durationMs: 1500},
+    {text: 'have strong teeth.', startMs: 1500, durationMs: 1500},
+  ];
+  const host = await mountRendered();
+  expect(host.querySelector('[data-learning-original]')?.textContent).toBe('Sea otters have strong teeth.');
+  expect(host.querySelector('[data-learning-timing-precision]')).toBeNull();
+  expect(host.querySelector('[data-learning-action="play"]')?.textContent).toBe('video.learning.replay');
+  expect(translate.mock.calls.map(([text]) => text)).toEqual(['Sea otters have strong teeth.']);
+});
+it('同一来源范围内快速切句仍认领重播尚未完成的跳转', async () => {
+  props.cues = [{text: 'First sentence. Second sentence!', startMs: 1000, durationMs: 8000}];
+  let mediaTime = 4;
+  let seeking = false;
+  const seek = vi.fn((time: number) => {mediaTime = time; seeking = true;});
+  Object.defineProperties(video, {
+    currentTime: {get: () => mediaTime, set: seek},
+    seeking: {get: () => seeking},
+  });
+  await mount();
+  state.toggleMode('loop');
+  await state.replay();
+  await step(1);
+  expect(state.sentence.text).toBe('Second sentence!');
+  video.dispatchEvent(new Event('seeking'));
+  seeking = false;
+  video.dispatchEvent(new Event('seeked'));
+  expect(state.mode).toBe('loop');
+  expect(seek.mock.calls).toEqual([[1]]);
+
+  mediaTime = 6;
+  video.dispatchEvent(new Event('seeking'));
+  expect(state.mode).toBe('off');
+});

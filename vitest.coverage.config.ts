@@ -178,6 +178,8 @@ export default defineConfig({
                 'src/features/personal-corrections/content/runtime.ts',
                 'src/features/personal-corrections/ui/PersonalCorrectionPanel.vue',
                 'src/features/video-subtitle/content/sentenceTimeline.ts',
+                'src/features/video-subtitle/content/semanticLearningTimeline.ts',
+                'src/features/video-subtitle/semanticSegmentation.ts',
                 'src/features/video-subtitle/content/sentencePlayback.ts',
                 'src/features/video-subtitle/content/sentenceLearningHost.ts',
                 'src/features/video-subtitle/content/sentenceLearningSession.ts',

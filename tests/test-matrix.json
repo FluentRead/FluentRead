@@ -508,6 +508,8 @@
       "tests/personalCorrectionMemory.test.ts",
       "tests/readingEvidence.test.ts",
       "tests/videoSentenceTimeline.test.ts",
+      "tests/videoSemanticLearningTimeline.test.ts",
+      "tests/videoSemanticSegmentation.test.ts",
       "tests/vocabularyVideoSource.test.ts",
       "tests/chatgptPlanConfig.test.ts",
       "tests/modelEditing.test.ts",

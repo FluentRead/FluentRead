@@ -66,7 +66,7 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
             sharedLocale: {table: 'aiRequestTimeoutMessages', key: 'zh-CN', reference: 'aiRequestTimeoutChineseMessages'},
         });
         targets.set(normalizePath(resolve(root, 'src/core/config/driveSync.ts')), {names: ['VISIBLE_FIELDS']});
-        targets.set(normalizePath(resolve(root, 'src/features/settings/model/navigation.ts')), {names: ['settingsPagePanels', 'settingsSearchTargets']});
+        targets.set(normalizePath(resolve(root, 'src/features/settings/model/navigation.ts')), {names: ['settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS']});
         targets.set(normalizePath(resolve(root, 'src/core/config/translationLoadingStyle.ts')), {names: ['translationLoadingStyleOptions']});
         targets.set(normalizePath(resolve(root, 'src/core/config/freeTranslation.ts')), {names: ['FREE_TRANSLATION_PROVIDERS']});
         targets.set(normalizePath(resolve(root, 'src/core/language/catalog.ts')), {names: ['translationLanguageOptions']});
@@ -93,7 +93,7 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         'HARNESS_TRANSLATED_PROMPTS', 'localizedTargetLanguageLabels', 'BUILTIN_GLOSSARIES',
         'multilingualTargetLanguageLabels', 'englishTargetLanguageLabels',
         'currentModelIds', 'cloudCredentialLabels', 'featureServiceDefinitions',
-        'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets',
+        'VIDEO_SUBTITLE_SKINS', 'TEST_SAMPLES', 'settingsPagePanels', 'settingsSearchTargets', 'STATIC_NAVIGATION_GROUPS',
         'translationLoadingStyleOptions', 'FREE_TRANSLATION_PROVIDERS', 'translationLanguageOptions',
         'PARTS', 'SENTENCE_HIGHLIGHT_STYLES', 'SELECTION_TTS_VOICE_OPTIONS',
         'LOCAL_TTS_MODE_OPTIONS', 'LOCAL_TTS_VOICE_OPTIONS',

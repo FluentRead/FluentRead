@@ -5,7 +5,7 @@ import {inflateWithPako} from '@/userscript/pakoBundled';
 import {decodeUserscriptData} from '@/userscript/dataEncoding';
 import {gzipUserscriptBuildData} from '@/userscript/buildGzip';
 import ts from 'typescript';
-import {describe, expect, it, vi} from 'vitest';
+import {afterAll, beforeAll, describe, expect, it, vi} from 'vitest';
 import {createUserscriptSettingsDataPlugin} from '@/userscript/settingsDataPlugin';
 
 const root = process.cwd();
@@ -30,6 +30,7 @@ const tables = [
     ['src/features/image-translation/ocrLanguages.ts', 'IMAGE_OCR_LANGUAGE_PACKS'],
     ['src/core/config/selectionPreview.ts', 'learningPreviewAnswers'],
     ['src/ui/translationLoadingIndicator.ts', 'HOST_IMPORTANT_STYLES'],
+    ['src/features/settings/model/navigation.ts', 'STATIC_NAVIGATION_GROUPS'],
 ] as const;
 
 function transform(code: string, id = resolve(root, tables[0][0]), enabled = true, fullOptions = true) {
@@ -82,17 +83,20 @@ describe('standalone static settings data representation', () => {
             .replace(/import \{decodeUserscriptData as __fluentreadDecodeSettingsData\} from '@\/userscript\/dataEncoding';\n/u, '')).toBe(source);
     });
 
-    it.each([
+    describe.each([
         ['ordinary', '0', '0', false],
         ['standalone', '1', '0', true],
         ['greasy-fork', '0', '1', false],
         ['standalone-and-greasy', '1', '1', false],
-    ] as const)('preserves full language labels through the actual %s Vite configuration', async (_label, standalone, greasy, enabled) => {
-        vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', standalone);
-        vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', greasy);
-        vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
-        vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
-        try {
+    ] as const)('actual %s Vite configuration', (_label, standalone, greasy, enabled) => {
+        let plugin: {transform?: unknown; resolveId?: unknown; load?: unknown};
+        let run: (code: string, id: string) => {code: string} | null;
+        // Configuration loading is bounded setup; assertions retain the default test budget.
+        beforeAll(async () => {
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_STANDALONE', standalone);
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_GREASYFORK_SOURCE', greasy);
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL', 'https://fixture.invalid/vendor.js');
+            vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL', 'https://fixture.invalid/data.js');
             vi.resetModules();
             // This case checks real settings-plugin registration and complete label data.
             // Unrelated large UI-message worker compression has its own real-worker suite.
@@ -103,8 +107,15 @@ describe('standalone static settings data representation', () => {
             });
             const {default: configuration} = await import('@/userscript/vite.config');
             const config = configuration as {plugins: Array<{name?: string; transform?: unknown; resolveId?: unknown; load?: unknown}>};
-            const plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
-            const run = plugin.transform as (code: string, id: string) => {code: string} | null;
+            plugin = config.plugins.find(item => item.name === 'standalone-settings-data')!;
+            run = plugin.transform as typeof run;
+        });
+        afterAll(() => {
+            vi.doUnmock('@/userscript/buildGzip');
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        });
+        it('preserves full language labels and grouped runtime tables', async () => {
             const path = resolve(root, 'src/core/config/catalog.ts');
             const original = readFileSync(path, 'utf8');
             const result = run(original, path);
@@ -125,11 +136,7 @@ describe('standalone static settings data representation', () => {
                         .toBe(JSON.stringify(value(initializer(original, name))));
                 }
             }
-        } finally {
-            vi.doUnmock('@/userscript/buildGzip');
-            vi.unstubAllEnvs();
-            vi.resetModules();
-        }
+        });
     });
 
     it('keeps the standard build style table in Base85 with identical gzip bytes and values', () => {

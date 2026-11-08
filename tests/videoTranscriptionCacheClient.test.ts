@@ -6,6 +6,14 @@ import {getVideoTranscriptionCacheRequest, getVideoTranscriptionMediaTransition,
 describe('内容页完整识别缓存', () => {
   const cues = [{startMs: 200, durationMs: 1000, text: '안녕하세요.'}];
   const request = {source: {poster: 'https://pbs.twimg.com/ext_tw_video_thumb/123/a.jpg'}, model: 'tiny', videoSourceLanguage: 'auto'};
+  it('YouTube 身份仅保留规范 video ID，忽略广告/MSE/签名地址并隔离其他视频', () => {
+    const video = {closest: () => null, poster: 'https://example.com/ad.jpg', currentSrc: 'https://rr1.googlevideo.com/videoplayback?fake=do-not-forward'} as unknown as HTMLVideoElement;
+    const first = getVideoTranscriptionCacheRequest(video, 'tiny', 'auto', 'https://www.youtube.com/watch?v=abcdefghijk')!;
+    expect(first.source).toEqual({directSource: 'https://www.youtube.com/embed/abcdefghijk'});
+    const second = getVideoTranscriptionCacheRequest(video, 'tiny', 'auto', 'https://www.youtube.com/watch?v=XXXXXXXXXXX')!;
+    expect(getVideoTranscriptionMediaTransition(first.source, second.source, true, 'blob:same', 'blob:same').sameMedia).toBe(false);
+    expect(getVideoTranscriptionCacheRequest(video, 'tiny', 'auto', 'bad')?.source.statusUrl).toBe('bad');
+  });
   it('信息流从所属帖子读取身份，不用 profile 路径作为视频身份', () => {
     const video = {closest: () => ({querySelectorAll: () => [
       {pathname: '/someone', href: 'https://x.com/someone'},

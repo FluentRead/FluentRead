@@ -538,12 +538,22 @@ describe('bilingual sentence hover geometry', () => {
         const tail = f.document.querySelector('#tail')!;
         f.document.caretPositionFromPoint = () => caretPosition(tail.firstChild!, 2);
         const dispose = installBilingualSentenceHighlight(f.document);
-        for (const x of [20, 22]) {
-            f.move('#tail', x, 2405);
-            expect(f.highlighted().join('')).toBe('word '.repeat(119) + 'ends here.这是完整译文。');
+        let time = 0;
+        const clock = vi.spyOn(performance, 'now').mockImplementation(() => time += 5);
+        const expected = 'word '.repeat(119) + 'ends here.这是完整译文。';
+        try {
+            f.move('#tail', 20, 2405);
+            expect(f.frames.size).toBe(1);
+            for (let frame = 0; frame < 4 && f.frames.size; frame++) f.flush();
+            expect(f.frames.size).toBe(0);
+            expect(f.highlighted().join('')).toBe(expected);
+            f.move('#tail', 22, 2405);
+            expect(f.highlighted().join('')).toBe(expected);
+            expect(f.geometryReads()).toBeLessThanOrEqual(4);
+        } finally {
+            clock.mockRestore();
+            dispose();
         }
-        expect(f.geometryReads()).toBeLessThanOrEqual(4);
-        dispose();
     });
     it('checks both sides of a caret boundary and verifies current geometry before painting', () => {
         const moreSource = ' Sentence.'.repeat(32);

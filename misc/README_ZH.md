@@ -52,7 +52,7 @@
 
 ## 企业与项目赞助
 
-项目目前主要由个人支持，每月为开源开发投入数万美元的 API Token 费用。我们相信，流畅阅读能为世界带来更多美好。
+项目目前主要由个人支持，每月投入数百美元用于项目维护。我们相信，流畅阅读能为世界带来更多美好。
 
 <a href="mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship"><img src="../docs/public/support/sponsor-placeholder-zh.svg" width="480" height="128" alt="虚位以待，成为流畅阅读赞助伙伴" /></a>
 

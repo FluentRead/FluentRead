@@ -28,8 +28,8 @@ FluentRead is an open-source browser extension under GPL-3.0, with the following
 
 AI explanations require a configured AI service and model. See the user guide for feature availability, setup, and data handling.
 
-Website: https://fluent.thinkstu.com/en/
+Website: https://read.thinkstu.com/en/
 
 Source: https://github.com/FluentRead/FluentRead
 
-User guide: https://fluent.thinkstu.com/en/guide/
+User guide: https://read.thinkstu.com/en/guide/

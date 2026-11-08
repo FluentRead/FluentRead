@@ -23,7 +23,7 @@ const options = [
 
 describe('service catalog helpers', () => {
   it('points combinations to the guide without using any member endpoint', () => {
-    expect(getServiceWebsite('composite:daily', {endpoint: 'https://user:secret@example.test/private?key=fixture'})).toEqual({url: 'https://fluent.thinkstu.com/config/translation-engines', kind: 'documentation'})
+    expect(getServiceWebsite('composite:daily', {endpoint: 'https://user:secret@example.test/private?key=fixture'})).toEqual({url: 'https://read.thinkstu.com/config/translation-engines', kind: 'documentation'})
   })
   it('provides a public website or guide for every built-in service', () => {
     for (const service of Object.values(services)) {
@@ -70,7 +70,7 @@ describe('service catalog helpers', () => {
         expect(link.kind).toBe('documentation')
         expect(link.url).toBe(service === services.newapi
           ? 'https://docs.newapi.pro/'
-          : 'https://fluent.thinkstu.com/config/translation-engines')
+          : 'https://read.thinkstu.com/config/translation-engines')
       }
     }
   })

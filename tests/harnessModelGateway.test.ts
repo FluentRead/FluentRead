@@ -380,7 +380,7 @@ describe('harness model gateway', () => {
     const router = new Config();
     router.token[services.openrouter] = 'router-secret';
     const routerFetch = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
-      expect(new Headers(init?.headers).get('HTTP-Referer')).toBe('https://fluent.thinkstu.com');
+      expect(new Headers(init?.headers).get('HTTP-Referer')).toBe('https://read.thinkstu.com');
       expect(new Headers(init?.headers).get('X-Title')).toBe('FluentRead Harness');
       return response({choices: [{message: {role: 'assistant', content: 'ok'}, finish_reason: 'stop'}]});
     });

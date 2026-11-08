@@ -23,6 +23,6 @@ Requirements and availability
 • Image recognition packs and local subtitle models require initial downloads. Scanned PDF pages use local text recognition during translation; select the correct source language first. Some images, videos, and protected pages cannot be read.
 • Cloud translation sends relevant text to the selected provider. File parsing, image text recognition, and X local audio recognition happen in the browser.
 
-Guide: https://fluent.thinkstu.com/en/guide/
-Data and privacy: https://fluent.thinkstu.com/en/guide/privacy
+Guide: https://read.thinkstu.com/en/guide/
+Data and privacy: https://read.thinkstu.com/en/guide/privacy
 Source and feedback: https://github.com/FluentRead/FluentRead

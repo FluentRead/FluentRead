@@ -85,13 +85,15 @@ Enable **Word-by-word highlight** in video appearance settings (off by default) 
 
 Choose **Start sentence learning** in a YouTube/X subtitle menu to read the source sentence, context, and whole-sentence translation. It needs a readable timeline; X AI subtitles must finish first. Long or unpunctuated captions may be labelled as fragments, rather than complete sentences.
 
-- **Previous / Next** seek to original caption boundaries without playing. **Replay** plays from the sentence start.
-- **Loop sentence / Pause at end** assist the selected sentence. If playback is outside it, use Replay to start. Manual seeking releases control; your pause and playback speed remain authoritative.
+The learning panel splits existing captions into sentences using local rules. Each sentence keeps its source text and original caption timing. Sentences from the same caption can share a playback range, so moving between them keeps your current position.
+
+- **Previous / Next** select the adjacent sentence. Moving to a different source passage seeks to its start and preserves the current play or pause state.
+- **Replay source passage** plays from the start of the passage. **Loop source passage / Pause at passage end** follow the original caption timing. If the playhead is outside the range, use Replay to start. Manual seeking ends playback assistance and preserves your playback speed.
 - **Explain** is optional and calls your selection AI explanation service only when requested. It can use neighboring captions if context is allowed.
 - **Edit** changes the translation or explanation and pins the sentence. Drafts survive sentence changes during this panel session; return to the current sentence to follow playback again.
 - **Save sentence** keeps the source, confirmed translation, explanation, context, and time in the Learning Center. No explanation is required. Wait for a pending translation or enter your own before saving.
 
-With focus in the player, arrows change sentence, R toggles looping, and Q toggles end pause. Text fields keep normal typing; an open subtitle menu takes keyboard priority. Drag the panel title to move it or use its style button to change layout and size. Closing learning or captions, or switching videos, stops playback assistance.
+With focus in the player, arrows change sentence, R toggles looping, and Q toggles pause at passage end. Text fields keep normal typing; an open subtitle menu takes keyboard priority. Drag the panel title to move it or use its style button to change layout and size. Closing learning or captions, or switching videos, stops playback assistance.
 
 Learning Center sources reopen the video near its original time; X positioning needs the extension enabled. Saved text remains if a video is deleted or restricted. Subtitle offsets and bilingual order do not change the original times used for saving and looping. Vocabulary exports that omit private context also omit video URLs and times.
 

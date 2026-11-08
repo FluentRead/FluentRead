@@ -53,7 +53,11 @@ function hasSentenceEnd(text: string): boolean {
   return !/(?:\b(?:mr|mrs|ms|dr|prof|sr|jr|vs|etc|e\.g|i\.e)|\b[A-Za-z])\.$/iu.test(withoutClosingQuotes);
 }
 
-function joinCueText(left: string, right: string): string {
+export function normalizeVideoSentenceCueText(text: string): string {
+  return text.replace(/\s+/gu, ' ').trim();
+}
+
+export function joinVideoSentenceCueText(left: string, right: string): string {
   // 无空格文字保留正常连写；其余文字用空格接回字幕换行。
   const separator = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]$/u.test(left)
     && /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u.test(right) ? '' : ' ';
@@ -71,7 +75,7 @@ export function buildVideoSentenceTimeline(
     maxCues: normalizedLimit(options.maxCues, DEFAULT_LIMITS.maxCues),
     maxGapMs: normalizedLimit(options.maxGapMs, DEFAULT_LIMITS.maxGapMs),
   };
-  const ordered = cues.map((cue, index) => ({...cue, index, text: cue.text.replace(/\s+/gu, ' ').trim()}))
+  const ordered = cues.map((cue, index) => ({...cue, index, text: normalizeVideoSentenceCueText(cue.text)}))
     .filter(cue => cue.text && Number.isFinite(cue.startMs) && cue.startMs >= 0
       && Number.isFinite(cue.durationMs) && cue.durationMs > 0 && Number.isFinite(cue.startMs + cue.durationMs))
     .sort((left, right) => left.startMs - right.startMs || left.index - right.index);
@@ -91,7 +95,7 @@ export function buildVideoSentenceTimeline(
     const endMs = cue.startMs + cue.durationMs;
     let joined = cue.text;
     if (current) {
-      joined = joinCueText(current.text, cue.text);
+      joined = joinVideoSentenceCueText(current.text, cue.text);
       if (cue.startMs - current.endMs > limits.maxGapMs) flush('gap');
       else if (Math.max(current.endMs, endMs) - current.startMs > limits.maxDurationMs
         || joined.length > limits.maxCharacters || current.cueIndices.length >= limits.maxCues) flush('limit');

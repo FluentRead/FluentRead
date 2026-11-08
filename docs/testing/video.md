@@ -28,6 +28,8 @@ AI 字幕运行时的缓存恢复与完整生成提交由 `video-ai/subtitleSess
 
 `pnpm test:video:learning --coverage` 限定执行原始字幕聚合、播放控制、面板所有权与来源恢复、收藏来源及 UI 五份测试；四个新增 TypeScript 模块的 statements/branches/functions/lines 均要求 100%。字幕菜单和运行时回归使用 `videoSubtitle`、`videoSubtitleTrackPriorityRuntime`、`videoSubtitleLogic`、`videoUiI18n`，以及架构、文件头和 i18n 检查。
 
+本地规则断句专项检查同一条字幕中多句的原文和来源映射、共享时间范围时换句保留播放位置、切换来源时沿用原字幕起点，以及重播、循环和暂停仍服从原字幕时间。断句在现有时间轴上运行，专项使用受控字幕和播放器时钟。
+
 生产 Chrome 构建后运行：
 
 ```sh

@@ -96,6 +96,22 @@ describe('视频单句播放器控制器', () => {
     h.controller.destroy();
   });
 
+  it('跳转待完成时允许同一时间范围切换辅助模式', () => {
+    const h = harness();
+    let time = 5;
+    const seek = vi.fn((value: number) => {time = value; h.media.seeking = true;});
+    Object.defineProperty(h.media, 'currentTime', {get: () => time, set: seek});
+    h.controller.select(h.sentence, 'loop');
+    const nextSentence = {...h.sentence, id: 'next-semantic-sentence'};
+    h.controller.select(nextSentence, 'pause', false);
+    h.media.dispatchEvent(new Event('seeking'));
+    h.media.seeking = false;
+    h.media.dispatchEvent(new Event('seeked'));
+    expect(h.controller.getState()).toMatchObject({sentence: nextSentence, mode: 'pause'});
+    expect(seek.mock.calls).toEqual([[1]]);
+    h.controller.destroy();
+  });
+
   it('重播已在起点的暂停媒体不产生多余 seek，准备中的非有限时间不创建循环', () => {
     const h = harness(); const setter = vi.spyOn(h.media, 'currentTime', 'set');
     h.media.currentTime = 1; setter.mockClear(); h.media.paused = true;

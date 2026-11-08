@@ -16,7 +16,7 @@ const SOURCE_SHA256 = {
     'fontkit': '62ad9c769e6a7a9028b0c711504908f0a231955b39619aaabd56dd4eabe800be',
     'lodash-root': 'df58ff96c454ca91ace20d20e6af49b354c70dfba7e737adc00cd23e8ff77168',
     'onnx-asyncify': '5959c6733039619c9af710d8e1bae8d6e84402787990637be987c2b1bd6c5fa9',
-    'zod-v4-schemas': 'd466582c022b08a3f9eb1a65d5970d8ca25064d73a5a838d76414ae36440a76b',
+    'zod-v4-schemas': '0ee56e8afbae28eeb1060a162ad7e56f0675ee6fb83f0ae56bea2e088f6cdbc0',
 } as const;
 export type ExtensionVendorSource = keyof typeof SOURCE_SHA256;
 

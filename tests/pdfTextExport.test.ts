@@ -382,6 +382,25 @@ describe('visible Unicode PDF reading export', () => {
         saveEvidence('layout-overflow-searchable-continuations.pdf', download.data as Uint8Array);
     });
 
+    it.each(['translated', 'bilingual'] as const)('sizes a short %s overflow sheet to its content and keeps the link to the source', async mode => {
+        const full = '短续页完整译文。';
+        const download = await createDocumentDownload(await fixture(), ['标题', full], mode, {
+            pdfFontLoader: async () => fontBytes,
+            pdfPageRasterizer: async () => ({data: layoutPng, format: 'png', textItems: [], overflowNotes: [
+                {segmentIndex: 1, text: full, x: 42, y: 110, width: 500, height: 40},
+            ]}),
+        });
+        const bytes = download.data as Uint8Array;
+        const pdf = await PDFDocument.load(bytes);
+        const [source, continuation] = pdf.getPages();
+        expect(source.getHeight()).toBe(800);
+        expect(continuation.getSize()).toEqual({width: 612, height: 139});
+        expect(await pageLabels(bytes)).toEqual(['1', '1 · 译文续页 1']);
+        expect((await extract(bytes))[1]).toContain(full);
+        const link = continuation.node.Annots()!.lookup(0, PDFDict);
+        expect(link.get(PDFName.of('Dest'))!.toString()).toContain(source.ref.toString());
+    });
+
     it('keeps source line geometry, explicit order and source-only text after progress releases translation segments', async () => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');

@@ -41,26 +41,29 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
     const contentWidth = quarterTurn ? page.height : page.width;
     return page.blocks.flatMap(sourceBlock => {
         if (sourceBlock.preserveSource || PROTECTED_KINDS.has(sourceBlock.kind ?? '') || !(sourceBlock.width > 0) || !(sourceBlock.height > 0)) return [];
+        const cellRight = sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity;
         // 段落末行旁的 QED/式号可能落在该段的外接矩形里；让出右侧这一小条，不能将译文排到保留符号上。
         const rightInset = page.blocks.reduce((edge, other) => {
             const protectedSource = other.preserveSource || PROTECTED_KINDS.has(other.kind ?? '');
             return other !== sourceBlock && protectedSource && other.y < bottom(sourceBlock) && bottom(other) > sourceBlock.y
                 && other.x > sourceBlock.x + sourceBlock.width * 0.75 && other.x < right(sourceBlock) && right(other) >= right(sourceBlock) - sourceBlock.fontSize * 2
                 ? Math.min(edge, other.x - 1.5) : edge;
-        }, Math.min(right(sourceBlock), sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity));
+        }, Math.min(right(sourceBlock), cellRight));
         const cellBottom = sourceBlock.cellBounds ? bottom(sourceBlock.cellBounds) - 0.5 : contentHeight;
         const clippedHeight = Math.max(1, Math.min(sourceBlock.height, cellBottom - sourceBlock.y));
         const block = rightInset < right(sourceBlock) || clippedHeight < sourceBlock.height
             ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x), height: clippedHeight} : sourceBlock;
-        let limit = Math.min(contentHeight, cellBottom), edge = Math.min(sourceBlock.cellBounds ? right(sourceBlock.cellBounds) - 0.5 : Infinity,
-            Math.max(right(block), contentWidth - Math.max(0, block.x)));
+        let limit = Math.min(contentHeight, cellBottom);
+        let edge = sourceBlock.cellBounds ? contentWidth : Math.max(right(block), contentWidth - Math.max(0, block.x));
         for (const other of neighbours) {
             if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) && right(other) > block.x) limit = Math.min(limit, other.y);
             if (other.x >= right(block) - 1 && other.y < bottom(block) && bottom(other) > block.y) edge = Math.min(edge, other.x);
         }
         // 居中/右对齐文字扩宽会移动它的对齐锚点；延长一行的右边界也不能侵入下方错开的另一栏。
-        const spaceRight = block.lineCount <= 1 && block.textAlign === 'left' ? Math.max(0, edge - right(block) - 6) : 0;
+        // 表格列使用单元格边界而非对称页边距，仍为相邻文字和实际页边保留间隙。
+        const usableEdge = Math.min(cellRight - 2, edge - 6);
+        const spaceRight = block.lineCount <= 1 && block.textAlign === 'left' ? Math.max(0, usableEdge - right(block)) : 0;
         for (const other of neighbours) {
             if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) + spaceRight && right(other) > block.x) limit = Math.min(limit, other.y);

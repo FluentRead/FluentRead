@@ -531,7 +531,7 @@ export async function rasterizePdfTranslationPage(input: PdfRasterPageInput): Pr
     }
 }
 
-/** 固定字号逐页编码；只保留一张源图和一张输出 Canvas，译文长短不会扩大画布。 */
+/** 固定字号逐页编码；原版译文续页按最后一张的内容缩短页高，只保留一张源图和一张输出 Canvas。 */
 export const rasterizePdfReadingPages: PdfReadingRasterizer = async function* (input) {
     if (typeof globalThis.document === 'undefined') throw new Error('当前环境无法生成 PDF 译文页面，请在浏览器扩展中下载');
     input.signal?.throwIfAborted();
@@ -545,7 +545,7 @@ export const rasterizePdfReadingPages: PdfReadingRasterizer = async function* (i
         const pages = paginatePdfReadingPlan(input.plan, (text, font) => {
             context.font = `${font.weight} ${font.size}px ${family}`;
             return context.measureText(text).width;
-        });
+        }, {compactLastPage: Boolean(input.footerLabel)});
         const lineCounts = new Map<number, number>();
         for (const page of pages) for (const item of page.items) if (item.kind === 'text') lineCounts.set(item.segmentIndex, (lineCounts.get(item.segmentIndex) ?? 0) + 1);
         if (pages.some(page => page.items.some(item => item.kind === 'region'))) {

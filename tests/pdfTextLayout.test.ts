@@ -39,9 +39,16 @@ describe('PDF fixed-font complete-text pagination', () => {
         const blank = textPlan(text);
         expect(wrapPdfReadingText(text, 528, body, measure)).toEqual([]);
         expect(paginatePdfReadingPlan(blank, measure)).toEqual([]);
+        expect(paginatePdfReadingPlan(blank, measure, {compactLastPage: true})).toEqual([]);
         const content = textPlan('正文');
         expect(paginatePdfReadingPlan({...content, entries: [...blank.entries, ...content.entries, ...blank.entries]}, measure))
             .toEqual(paginatePdfReadingPlan(content, measure));
+    });
+    it('preserves paragraph spacing without making pages out of consecutive blank lines', () => {
+        const pages = paginatePdfReadingPlan(textPlan('首段\n\n次段' + '\n'.repeat(90) + '尾段'), measure);
+        expect(pages).toHaveLength(2);
+        expect(pages[0].items).toMatchObject([{text: '首段', y: 42}, {text: '次段', y: 42 + 2 * body.lineHeight}]);
+        expect(pages[1].items).toMatchObject([{text: '尾段', y: 42}]);
     });
     it('bounds repeated Chinese width measurements and handles unavailable segmentation and invalid measurements', () => {
         const measured = vi.fn(measure);
@@ -107,6 +114,7 @@ describe('PDF fixed-font complete-text pagination', () => {
         expect(strips.every(item => item.y + item.height <= 750)).toBe(true);
         const narrow = {...plan, entries: [{kind: 'region' as const, id: 'wide', pageNumber: 1, role: 'table', sourceRect: {x: 0, y: 0, width: 1000, height: 10}, segmentIndexes: []}]};
         expect(paginatePdfReadingPlan(narrow, measure)[0].items[0]).toMatchObject({width: 528, height: 5.28});
+        expect(paginatePdfReadingPlan(narrow, measure, {compactLastPage: true})[0].height).toBe(90);
     });
     it('moves an entire fitting formula to the next page rather than clipping it to the remaining space', () => {
         const prior = textPlan('前文\n'.repeat(31)).entries[0];

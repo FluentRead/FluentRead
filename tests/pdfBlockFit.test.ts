@@ -78,11 +78,25 @@ describe('PDF layout overlay block selection', () => {
         expect(fitted.block.y + fitted.block.height + fitted.spaceBelow).toBeLessThan(115);
         expect(fitted.block.x + fitted.block.width + fitted.spaceRight).toBeLessThan(130);
         expect(fitted.spaceBelow).toBeCloseTo(3);
-        expect(fitted.spaceRight).toBeCloseTo(23.5);
+        expect(fitted.spaceRight).toBeCloseTo(27.5);
         const tight = pdfOverlayBlocks(page([{...source, height: 30, width: 110}]))[0];
         expect(tight.block).toMatchObject({width: 89.5, height: 14.5});
         expect(tight.spaceBelow).toBe(0); expect(tight.spaceRight).toBe(0);
         expect(source).toEqual(original);
+    });
+    it('fits a narrow translated table header without using space reserved for a neighbour', () => {
+        const header = block(0, 414.477, 160, 46.495, 9.846, {kind: 'table', lineCount: 1,
+            cellBounds: {x: 408.499, y: 159, width: 58.451, height: 12}});
+        const fit = ({block, spaceRight}: ReturnType<typeof pdfOverlayBlocks>[number]) => fitPdfBlockText({
+            text: '华尔街日报 23 F1', width: (block.width + spaceRight) * 0.985, height: block.height,
+            fontSize: 9, lineHeight: 9, minFontSize: 6, weight: 400,
+        }, (text, size) => text.length * size * 0.72);
+        const [open] = pdfOverlayBlocks(page([header]));
+        expect(fit(open)).toMatchObject({lines: ['华尔街日报 23 F1'], overflow: false});
+        expect(open.block.x + open.block.width + open.spaceRight).toBeCloseTo(464.45);
+        const [bounded] = pdfOverlayBlocks(page([header, block(1, 465, 160, 60, 12)]));
+        expect(bounded.spaceRight).toBe(0);
+        expect(fit(bounded).overflow).toBe(true);
     });
     it('keeps a paragraph beside its preserved QED mark without changing source line erasure geometry', () => {
         const source = block(0, 70.86614, 686.88898, 455.55796, 26.87523, {lines: [{text: 'Source line', x: 70.86614, y: 686.88898, width: 455.55796, height: 11}]});

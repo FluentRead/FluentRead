@@ -14,7 +14,7 @@ export interface ServiceWebsite {
   kind: 'website' | 'documentation'
 }
 
-const serviceGuide = 'https://fluent.thinkstu.com/config/translation-engines'
+const serviceGuide = 'https://read.thinkstu.com/config/translation-engines'
 
 // 这里只保存供人操作的官网/控制台，不使用翻译 API endpoint 或推广链接。
 const serviceWebsites = {

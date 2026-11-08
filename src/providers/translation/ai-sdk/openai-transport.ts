@@ -100,7 +100,7 @@ function providerHeaders(service: string, apiKey: string): Record<string, string
   const headers: Record<string, string> = {};
   if (service === services.azureOpenai && apiKey) headers['api-key'] = apiKey;
   if (service === services.openrouter) {
-    headers['HTTP-Referer'] = 'https://fluent.thinkstu.com';
+    headers['HTTP-Referer'] = 'https://read.thinkstu.com';
     headers['X-Title'] = 'FluentRead';
   }
   return Object.keys(headers).length > 0 ? headers : undefined;

@@ -28,8 +28,8 @@ Closer languages. A bigger world.
 
 AI 讲解需要配置可用的 AI 服务与模型。各功能支持范围、配置方法和数据处理方式见使用指南。
 
-官网：https://fluent.thinkstu.com/
+官网：https://read.thinkstu.com/
 
 源代码：https://github.com/FluentRead/FluentRead
 
-使用指南：https://fluent.thinkstu.com/guide/
+使用指南：https://read.thinkstu.com/guide/

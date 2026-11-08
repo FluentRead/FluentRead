@@ -75,7 +75,7 @@ describe('shared OpenAI request and response boundary', () => {
   it('keeps OpenRouter attribution headers in the shared prepared request', async () => {
     const run = vi.fn(async (_call: OpenAICompatibleCall) => '译文');
     await translateOpenAICompatible(request({serviceOverride: 'openrouter'}, {model: {openrouter: 'fixture/model'}}), execution(run));
-    expect(run.mock.calls[0][0].headers).toEqual({'HTTP-Referer': 'https://fluent.thinkstu.com', 'X-Title': 'FluentRead'});
+    expect(run.mock.calls[0][0].headers).toEqual({'HTTP-Referer': 'https://read.thinkstu.com', 'X-Title': 'FluentRead'});
   });
 
   it.each([

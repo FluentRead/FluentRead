@@ -265,9 +265,9 @@ describe('免费设置的轮询和模板事件归属', () => {
 })
 
 describe('服务目录的搜索和导航归属', () => {
-  it('移除项只在独立加回列表可搜索，确认后的配置更新才使目录恢复该项', async () => {
-    const change = vi.fn()
-    await mountCatalog({disabledServices: []}, {onToggleAvailability: change})
+  it('移除项不出现在主目录或搜索中，目录仅保留自定义服务入口', async () => {
+    const change = vi.fn(), add = vi.fn()
+    await mountCatalog({disabledServices: []}, {onToggleAvailability: change, 'onAdd:service': add})
     const google = () => descendants(hostRoot).find(n => n.props['data-directory-port'] === 'google')
     google()!.props.onRemove('google')
     expect(change).toHaveBeenLastCalledWith('google', false)
@@ -275,16 +275,14 @@ describe('服务目录的搜索和导航归属', () => {
 
     source.disabledServices = ['google'];await settle()
     expect(google()).toBeUndefined()
-    state.serviceQuery = 'Google';await settle()
+    await search('ＧＯＯＧＬＥ')
     expect(state.visibleDirectoryGroups).toHaveLength(0)
-    publicNode(n => n.props['data-service-restore-menu'] !== undefined).props.onClick()
-    state.serviceQuery = 'ＧＯＯＧＬＥ';await settle()
-    publicNode(n => n.props['data-service-restore'] === 'google').props.onClick()
-    expect(change).toHaveBeenLastCalledWith('google', true)
-    expect(google()).toBeUndefined()
+    expect(descendants(hostRoot).some(n => n.props['data-service-restore-menu'] !== undefined || n.props['data-service-restore'] !== undefined)).toBe(false)
+    publicNode(n => n.props['data-testid'] === 'custom-service-add').props.onClick()
+    expect(add).toHaveBeenCalledOnce()
+    expect(change).toHaveBeenCalledOnce()
 
     source.disabledServices = [];await settle()
-    expect(state.restoreOpen).toBe(false)
     expect(google()).toBeDefined()
   })
   it('组合归入自定义目录且目录仅保留一个添加服务入口，旧上下文事件失效', async () => {

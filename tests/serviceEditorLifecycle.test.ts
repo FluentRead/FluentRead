@@ -116,6 +116,32 @@ describe('服务子编辑器的写入与焦点归属', () => {
     const old = state.actions;change(reason);await settle();old.submit();old.composite({services: ['google', 'microsoft']})
     expect(emitted).not.toHaveBeenCalled();expect(state.draft.apiKey).toBe('');expect(state.compositeDraft.services).toEqual([])
   })
+  it('恢复候选变化时旧选项不能提交，仍可选择当前候选恢复一次', async () => {
+    const google = {value: 'google', label: 'Google'}, microsoft = {value: 'microsoft', label: 'Microsoft'}
+    const nodes = await mount('CustomOpenAIProviderDialog', {modelValue: true, restoreServices: [google, microsoft]}, {'onSubmit:restore': emitted})
+    nodes.find(node => node.props['data-testid'] === 'custom-service-type-restore')!.props.onClick()
+    await settle()
+    const {window} = parseHTML('<html><body><input type="radio" value="google"></body></html>')
+    const input = window.document.querySelector('input')!
+    vi.stubGlobal('HTMLInputElement', window.HTMLInputElement)
+    input.checked = true
+    const radioEvent = {target: input, currentTarget: input}
+    const selectGoogle = nodes.find(node => node.props['data-service-restore'] === 'google')!.props.onChange
+    selectGoogle(radioEvent)
+    await settle()
+    const submit = () => nodes.find(node => node.tag === 'form')!.props.onSubmit({preventDefault: vi.fn()})
+    props.restoreServices = [microsoft]
+    await settle()
+    selectGoogle(radioEvent);submit()
+    expect(emitted).not.toHaveBeenCalled()
+    expect(state.ownedOpen).toBe(true)
+    input.value = 'microsoft'
+    nodes.find(node => node.props['data-service-restore'] === 'microsoft')!.props.onChange(radioEvent)
+    submit();submit()
+    expect(emitted).toHaveBeenCalledOnce()
+    expect(emitted).toHaveBeenCalledWith('microsoft')
+    expect(state.ownedOpen).toBe(false)
+  })
   it('组合成员添加拒绝嵌套，重排与移除使用服务身份且旧事件不能跨列表改动', async () => {
     const draft = runtime.reactive({name: 'Daily', strategy: 'sequential', services: ['google', 'microsoft'], timeoutMs: 12000})
     await mount('CompositeTranslationFields', {draft, members: [{value: 'google', label: 'Google'}, {value: 'microsoft', label: 'Microsoft'}, {value: 'custom:work', label: 'Work'}]}, {onUpdate: emitted})

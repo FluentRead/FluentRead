@@ -7,7 +7,7 @@
 
 export const pdfReadingChineseMessages = {
     "document.paperReading.bilingual": "双语翻译（流畅阅读）",
-    "document.paperReading.pdf": "PDF 阅读",
+    "document.paperReading.pdf": "PDF 阅读（流畅阅读）",
     "document.paperReading.openFailed": "无法打开 PDF 阅读器，请重试。",
     "document.translationRecovery.unavailable": "当前服务不可用",
     "document.translationRecovery.retry": "重试",
@@ -97,7 +97,7 @@ export const pdfReadingChineseMessages = {
 
 export const pdfReadingEnglishMessages = {
     "document.paperReading.bilingual": "Bilingual translation (FluentRead)",
-    "document.paperReading.pdf": "Read PDF",
+    "document.paperReading.pdf": "Read PDF (FluentRead)",
     "document.paperReading.openFailed": "Couldn’t open the PDF reader. Try again.",
     "document.translationRecovery.unavailable": "Service unavailable",
     "document.translationRecovery.retry": "Retry",
@@ -187,7 +187,7 @@ export const pdfReadingEnglishMessages = {
 
 export const pdfReadingJapaneseMessages = {
     "document.paperReading.bilingual": "対訳（FluentRead）",
-    "document.paperReading.pdf": "PDF を読む",
+    "document.paperReading.pdf": "PDF を読む（FluentRead）",
     "document.paperReading.openFailed": "PDF リーダーを開けませんでした。もう一度お試しください。",
     "document.translationRecovery.unavailable": "サービスを利用できません",
     "document.translationRecovery.retry": "再試行",
@@ -277,7 +277,7 @@ export const pdfReadingJapaneseMessages = {
 
 export const pdfReadingKoreanMessages = {
     "document.paperReading.bilingual": "이중 언어 번역 (FluentRead)",
-    "document.paperReading.pdf": "PDF 읽기",
+    "document.paperReading.pdf": "PDF 읽기 (FluentRead)",
     "document.paperReading.openFailed": "PDF 리더를 열 수 없습니다. 다시 시도해 주세요.",
     "document.translationRecovery.unavailable": "서비스를 사용할 수 없습니다",
     "document.translationRecovery.retry": "재시도",
@@ -367,7 +367,7 @@ export const pdfReadingKoreanMessages = {
 
 export const pdfReadingFrenchMessages = {
     "document.paperReading.bilingual": "Traduction bilingue (FluentRead)",
-    "document.paperReading.pdf": "Lire le PDF",
+    "document.paperReading.pdf": "Lire le PDF (FluentRead)",
     "document.paperReading.openFailed": "Impossible d’ouvrir le lecteur PDF. Réessayez.",
     "document.translationRecovery.unavailable": "Service indisponible",
     "document.translationRecovery.retry": "Réessayer",
@@ -457,7 +457,7 @@ export const pdfReadingFrenchMessages = {
 
 export const pdfReadingSpanishMessages = {
     "document.paperReading.bilingual": "Traducción bilingüe (FluentRead)",
-    "document.paperReading.pdf": "Leer el PDF",
+    "document.paperReading.pdf": "Leer el PDF (FluentRead)",
     "document.paperReading.openFailed": "No se pudo abrir el lector de PDF. Inténtalo de nuevo.",
     "document.translationRecovery.unavailable": "Servicio no disponible",
     "document.translationRecovery.retry": "Reintentar",
@@ -547,7 +547,7 @@ export const pdfReadingSpanishMessages = {
 
 export const pdfReadingRussianMessages = {
     "document.paperReading.bilingual": "Двуязычный перевод (FluentRead)",
-    "document.paperReading.pdf": "Читать PDF",
+    "document.paperReading.pdf": "Читать PDF (FluentRead)",
     "document.paperReading.openFailed": "Не удалось открыть PDF. Попробуйте ещё раз.",
     "document.translationRecovery.unavailable": "Сервис недоступен",
     "document.translationRecovery.retry": "Повторить",

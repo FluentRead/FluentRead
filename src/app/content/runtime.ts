@@ -50,7 +50,7 @@ import {createOptionalContentFeatureRuntime, type OptionalContentFeatureRuntime}
 import {createPageInformationHighlightRuntime} from './informationHighlight';
 import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 import {createPageTranslationFontRuntime} from './pageTranslationFont';
-import {consumeArxivPaperReading, mountArxivPaperReading, waitForArxivPaperDom} from './arxivPaperReading';
+import {consumeArxivPaperReading, mountPaperReading, waitForPaperReadingDom} from './paperReading';
 import {translate} from '@/src/core/i18n';
 import {showPageNotice} from '@/src/features/page-notice/public';
 export async function startContentApp(ctx: ContentScriptContext,
@@ -71,7 +71,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     await ensureUiLanguageBundle(config.uiLanguage);
     if (ctx.isInvalid || cleanedUp || (document.readyState === 'loading' && !await waitForContentDocument(document, pageEventController.signal))) { cleanup(); return; }
     const paperDom = import.meta.env.BROWSER === 'userscript' ? undefined
-        : waitForArxivPaperDom(document, window.location.href, pageEventController.signal);
+        : waitForPaperReadingDom(document, window.location.href, pageEventController.signal);
     if (paperDom && (!await paperDom || ctx.isInvalid || cleanedUp)) { cleanup(); return; }
     const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
     applyCoreTranslationPreferences(config); clearLegacyPageTranslationCache();
@@ -133,16 +133,18 @@ export async function startContentApp(ctx: ContentScriptContext,
             && !activationController.signal.aborted;
         if (import.meta.env.BROWSER !== 'userscript') {
             const signal = activationController.signal;
-            mountArxivPaperReading(document, window.location.href, signal, {
+            const startBilingual = () => autoTranslateEnglishPage({displayMode: 'bilingual', fullPageMode: 'viewport', scope: 'content'});
+            mountPaperReading(document, window.location.href, signal, {
                 bilingualLabel: translate('document.paperReading.bilingual', config.uiLanguage),
                 pdfLabel: translate('document.paperReading.pdf', config.uiLanguage),
-                openPdf: async url => (await browser.runtime.sendMessage({type: 'openArxivPaperPdf', url}))?.status === 'success',
+                startBilingual,
+                openPdf: async url => (await browser.runtime.sendMessage({type: 'openPaperPdf', url}))?.status === 'success',
                 onPdfOpenFailed: () => showPageNotice(translate('document.paperReading.openFailed', config.uiLanguage),
-                    'error', {key: 'arxiv-paper-reading', signal}),
+                    'error', {key: 'paper-reading', signal}),
             });
             if (paperReadingRequested) {
                 paperReadingRequested = false;
-                autoTranslateEnglishPage({displayMode: 'bilingual', fullPageMode: 'viewport', scope: 'content'});
+                startBilingual();
             }
         }
         optionalContentFeatures = createOptionalContentFeatureRuntime({

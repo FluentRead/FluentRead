@@ -1,7 +1,7 @@
 /**
  * @file src/app/content/page.css
  * 文件职责：定义内容脚本直接注入宿主文档的 FluentRead 专属视觉状态，覆盖翻译占位、重试、图片覆盖层、输入框反馈、已翻译提示框的鼠标命中保护与双语逐句高亮。
- * 主要内容：包含轻量个人校订来源文字、错误原因与重试控件、图片翻译按钮和 canvas、输入框状态提示、显式换行源文行容器、GitHub ListView 空行修复与 arXiv 论文入口的窄屏去重；段落 loading 已由自带 Shadow Root 的组件隔离。
+ * 主要内容：包含轻量个人校订来源文字、错误原因与重试控件、图片翻译按钮和 canvas、输入框状态提示、显式换行源文行容器、GitHub ListView 空行修复与论文入口的窄屏排版；段落 loading 已由自带 Shadow Root 的组件隔离。
  * 模块边界：选择器均以 fluent 前缀或受控状态类约束，不承担 Shadow UI 组件主题，也不决定何时添加类名；双语译文容器与译文样式预设统一在 src/ui/styles/translation-display.css，由 pageStyles 一并注入。
  */
 /* 内容脚本注入到宿主页面的 FluentRead 专属样式。 */
@@ -10,6 +10,19 @@
     #abs-outer:has(#abs > .mobile-submission-download[data-fluentread-paper-reading]) .full-text li:has(> [data-fluentread-paper-reading]) {
         display: none;
     }
+}
+
+.fluentread-paper-pdf-link[data-fluentread-paper-reading="pdf"] {
+    margin-inline-start: 0.45em;
+}
+
+/* PMC 原生图标栏保留原有布局，独立阅读按钮可在窄屏换行。 */
+.fluentread-pmc-reading-mobile[data-fluentread-paper-reading="inline"] {
+    max-inline-size: 100%;
+    margin-block-start: 0.5rem;
+    margin-inline: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 /* 来源提示不进入译文复制、校订内容或 provider 缓存。 */

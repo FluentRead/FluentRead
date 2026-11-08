@@ -866,6 +866,37 @@ describe('网站正文规则目录', () => {
         verify();
     });
 
+    it('PubMed Central 正文区的段落与标题可译，站点界面、目录和参考文献保持原文', () => {
+        const url = new URL('https://pmc.ncbi.nlm.nih.gov/articles/PMC7092803/');
+        const document = documentFor(`
+            <section class="usa-banner"><p>Official website of the United States government.</p></section>
+            <section class="pmc-header"><p>Search the research archive.</p></section>
+            <main id="main-content">
+                <section class="front-matter"><div class="ameta p">
+                    <hgroup><h1 id="title">A study of patient outcomes</h1></hgroup>
+                    <div class="cg p"><p>Authors and research team affiliations.</p></div>
+                    <div id="metadata"><p>Paper IDs and publication dates.</p></div>
+                </div></section>
+                <section class="main-article-body">
+                    <h2 id="heading">Methods and outcomes</h2>
+                    <p id="body">The researchers observed the study group over the entire trial.<sup><a id="cite" href="#reference" aria-describedby="reference">1</a></sup></p>
+                    <section class="ref-list"><p id="reference">An earlier study about the experimental group.</p></section>
+                </section>
+                <section class="pmc-sidenav__container"><p>Article resources and navigation.</p></section>
+            </main>
+        `);
+        const core = new TranslationCandidateCore({url, adapters});
+        const candidates = core.discover(document);
+        for (const id of ['title', 'heading', 'body']) {
+            expect(candidates.some(candidate => candidate.element.id === id && candidate.adapterId === 'pmc'), id).toBe(true);
+        }
+        for (const selector of ['.usa-banner', '.pmc-header', '.pmc-sidenav__container', '.cg', '#metadata', '.ref-list']) {
+            const excluded = document.querySelector(selector)!;
+            expect(candidates.some(candidate => excluded.contains(candidate.element)), selector).toBe(false);
+        }
+        expect(core.shouldStayOriginal(document.getElementById('cite')!)).toBe(true);
+    });
+
     it('arXiv HTML 只翻译论文叙述，保留目录、作者、引文与公式', () => {
         const url = new URL('https://arxiv.org/html/1706.03762v7');
         const document = documentFor(`

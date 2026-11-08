@@ -31,11 +31,13 @@
 
 </details>
 
-## 阅读 arXiv 论文
+## 阅读学术论文
 
 在 arXiv 摘要页的论文访问区点击 **双语翻译（流畅阅读）**，打开对应版本的官方 HTML 正文。流畅阅读用你配置的语言和服务，从当前阅读位置开始翻译，原站目录、公式和引文仍可使用。
 
-只有 PDF 的论文会显示 **PDF 阅读**，点击后在流畅阅读的[文档阅读器](/guide/document-translation)打开原文件。原站的 PDF 和 HTML 链接仍可直接使用。此入口适用于浏览器扩展。
+在 PubMed Central 的论文全文页，点击 **双语翻译（流畅阅读）** 可在当前页面开始翻译。
+
+在 Hugging Face Papers、ACL Anthology、CVF Open Access、NeurIPS Proceedings，以及只有 PDF 的 arXiv 论文页，点击 **PDF 阅读（流畅阅读）** 可在[文档阅读器](/guide/document-translation)打开原文件。以上入口适用于浏览器扩展。
 
 ## AI 上下文与用词
 

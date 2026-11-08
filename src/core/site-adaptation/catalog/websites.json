@@ -3277,10 +3277,22 @@
       {
         "css": [
           ".abstract p",
-          "article p"
+          "article p",
+          ".front-matter h1",
+          ".main-article-body :is(h2, h3, h4, p, figcaption)"
         ],
         "atomic": false
       }
+    ],
+    "exclude": [
+      ".usa-banner",
+      ".pmc-header",
+      ".pmc-sidenav__container",
+      ".front-matter .ameta > :not(hgroup, h1)",
+      ".main-article-body .ref-list"
+    ],
+    "protect": [
+      ".main-article-body sup > a[href^=\"#\"][aria-describedby]"
     ]
   },
   {

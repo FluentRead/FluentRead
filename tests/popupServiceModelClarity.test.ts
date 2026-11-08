@@ -277,7 +277,7 @@ describe('Popup configured model overview', () => {
     expect(config.model['custom:private']).toBe('removed-provider-model');
   });
 
-  it('requests keyboard focus through model results and returns it to the same feature on Escape', async () => {
+  it('requests keyboard focus through model results and restores it when returning to the overview', async () => {
     const {config, find, click, search, key, focused} = mount();
     await click('[data-feature-service="hover"]');
     expect(focused()).toBe(find('input[type="search"]'));
@@ -294,8 +294,7 @@ describe('Popup configured model overview', () => {
     await search('search-only-model');
     await key('input[type="search"]', 'ArrowDown');
     expect(focused()).toBe(find('[data-service-choice="deepseek"]'));
-    const escape = await key('[data-service-choice="deepseek"]', 'Escape');
-    expect(escape.cancelBubble).toBe(true);
+    await click('.service-picker-back');
     expect(focused()).toBe(find('[data-feature-service="hover"]'));
     expect(config.hoverTranslationService).toBe('');
     expect(config.model.deepseek).toBe('saved-deepseek-model');

@@ -34,7 +34,7 @@ Selecting a directory entry opens its connection settings and leaves the default
 
 ## Remove and add back services
 
-In **Settings → Translation services**, select the **×** beside a service and confirm to remove it from the directory and stop new requests to it. If you remove the default, the confirmation names the service that will take over. Keep at least one available service in the directory.
+In **Settings → Translation services**, select the **×** beside a service. Click **Confirm** or press Enter when the dialog opens to remove the service from the directory and stop new requests to it. If you remove the default, the confirmation names the service that will take over. Keep at least one available service in the directory.
 
 To restore a service, open **Custom service** and choose **Restore removed services**. Search for and select the service, then click **Add service**. Your saved keys, models, and feature assignments are preserved. While the service is removed, other pickers mark it as unavailable or hide it. Combined and free translation skip it while keeping their saved member settings.
 

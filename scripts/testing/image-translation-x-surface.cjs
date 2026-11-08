@@ -14,6 +14,31 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
         }, {config,sequence:++settingsSequence});
     }
     const surface = page.locator('#x-surface');
+    let fullSizeSource;
+    if (lightboxOnly && !originalImage) {
+        const thumbnail = 'https://pbs.twimg.com/media/fluentread-preview-fixture?format=png&name=small';
+        fullSizeSource = 'https://pbs.twimg.com/media/fluentread-preview-fixture?format=png&name=large';
+        const images = await page.locator('#sample').evaluate(async image => {
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth * 1.5;
+            canvas.height = image.naturalHeight * 1.5;
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            return [image.src, canvas.toDataURL()];
+        });
+        for (const [url, dataUrl] of [[thumbnail, images[0]], [fullSizeSource, images[1]]]) {
+            const body = Buffer.from(dataUrl.split(',')[1], 'base64');
+            await page.route(url, route => route.fulfill({
+                contentType: 'image/png', headers: {'Access-Control-Allow-Origin': '*'}, body,
+            }));
+        }
+        await page.evaluate(src => {
+            const image = document.querySelector('#sample');
+            image.crossOrigin = 'anonymous';
+            image.src = src;
+            document.querySelector('#x-surface').style.backgroundImage = `url("${src}")`;
+        }, thumbnail);
+    }
     if (originalImage) {
         await page.evaluate(src => {
             const image = document.querySelector('#sample');
@@ -61,10 +86,10 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     await page.waitForTimeout(250);
     assert.equal(await ui("return !!this.querySelector('.fr-image-controls')"),false);
 
-    async function menuAction() {
+    async function menuAction(target = surface, dismissMenu = true) {
         // 可信右键建立目标；通过生产消息执行原生菜单动作，OS 菜单项点击未自动化。
-        await surface.click({button:'right'});
-        await page.keyboard.press('Escape');
+        await target.click({button:'right'});
+        if (dismissMenu) await page.keyboard.press('Escape');
         const response=await worker.evaluate(async url => {
             const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);
             return chrome.tabs.sendMessage(tab.id,{type:'contextMenuTranslateImage'}, {frameId:0});
@@ -169,66 +194,126 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     await ui('this.__progressObserver?.disconnect();return true;');
     await ui("this.__lightboxThumbnail=this.querySelector('.fluent-read-image-translation-overlay img');return true;");
 
-    // X 点击缩略图后保留列表原节点，并在独立图层打开大图。
-    await page.evaluate(() => {
+    // 同一个宿主查看器分别加载列表原地址、X 原尺寸变体和一张不同的图片。
+    await page.evaluate(fullSize => {
+        const image = document.querySelector('#sample');
+        const differentImage = document.createElement('canvas');
+        differentImage.width = 1400;
+        differentImage.height = 700;
+        const context = differentImage.getContext('2d');
+        context.fillStyle = '#c6e7fb';
+        context.fillRect(0, 0, differentImage.width, differentImage.height);
+        const nextSource = differentImage.toDataURL();
+        let openings = 0;
         document.querySelector('#x-surface').addEventListener('click', () => {
             if (document.querySelector('#x-lightbox')) return;
-            const dialog = document.createElement('div');
+            const native = openings === 2;
+            const dialog = document.createElement(native ? 'dialog' : 'div');
             dialog.id = 'x-lightbox'; dialog.setAttribute('role', 'dialog'); dialog.setAttribute('aria-modal', 'true');
             dialog.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center';
             const photo = document.createElement('img'); photo.id = 'x-lightbox-photo';
-            photo.src = document.querySelector('#sample').src;
+            photo.src = openings++ > 0 && fullSize ? fullSize : image.src;
             photo.style.cssText = 'width:95vw;height:70vh;object-fit:contain;background:white';
             const close = document.createElement('button'); close.id = 'x-lightbox-close'; close.textContent = '关闭大图';
             close.style.cssText = 'position:absolute;right:16px;top:16px;border:0;padding:8px;background:white;color:black';
-            close.addEventListener('click', () => dialog.remove());
+            close.addEventListener('click', () => native ? dialog.close() : dialog.remove());
             const next = document.createElement('button'); next.id = 'x-lightbox-next'; next.textContent = '下一张';
             next.style.cssText = 'position:absolute;right:16px;bottom:16px;border:0;padding:8px;background:white;color:black';
-            next.addEventListener('click', () => {photo.src = document.querySelector('#sample').src + '#next';});
-            dialog.append(photo, close, next); document.body.append(dialog);
+            next.addEventListener('click', () => {photo.src = nextSource;});
+            dialog.append(photo, close, next);
+            if (native) {
+                dialog.style.cssText += ';margin:auto;border:0;padding:0;width:min(850px,90vw);height:70vh;max-width:none;max-height:none;transform:translateY(12px) scale(.95)';
+                photo.style.width = '100%';
+                photo.style.height = '100%';
+                // 原生模态框内保留可信右键，防止关闭系统菜单的 Escape 关闭模态框。
+                photo.addEventListener('contextmenu', event => event.preventDefault());
+                dialog.addEventListener('close', () => dialog.remove(), {once: true});
+            }
+            document.body.append(dialog);
+            if (native) dialog.showModal();
         });
-    });
-    await surface.click();
-    await page.locator('#x-lightbox-photo').waitFor({state:'visible'});
-    await shot('x-07-lightbox-open');
-    assert.equal(await ui("return getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display"),'none',
-        '列表缩略译图不得悬浮在宿主大图查看器上');
-    assert.equal(await surface.evaluate(el=>getComputedStyle(el).opacity),'1');
+    }, fullSizeSource ?? null);
+    const viewer = page.locator('#x-lightbox-photo');
     const originalSource = await page.locator('#sample').getAttribute('src');
-    assert.equal(await page.locator('#x-lightbox-photo').getAttribute('src'),originalSource);
+    const visibleBitmaps = `[...this.querySelectorAll('.fluent-read-image-translation-overlay img')]
+        .filter(img => img.complete && img.naturalWidth > 0 && getComputedStyle(img.parentElement).display !== 'none')`;
+    const originalVisible = `getComputedStyle(document.querySelector('#x-lightbox-photo')).opacity === '1'`;
+    async function expectViewerTranslated(source) {
+        await wait(() => ui(`const visible = ${visibleBitmaps};
+            return visible.length === 1 && visible[0].src === this.__lightboxThumbnail.src
+                && !(${originalVisible});`));
+        assert.equal(await viewer.getAttribute('src'), source);
+        if (fullSizeSource && source === fullSizeSource) {
+            assert.ok(await viewer.evaluate(photo => photo.naturalWidth > document.querySelector('#sample').naturalWidth));
+        }
+        assert.equal(await surface.evaluate(el => getComputedStyle(el).opacity), '1');
+        assert.equal(await worker.evaluate(() => globalThis.__imageFixture.requests.length), requests);
+        assert.equal(await worker.evaluate(() => globalThis.__imageFixture.operationIds.length), operations);
+    }
+    async function expectThumbnailRestored() {
+        await wait(() => ui(`const visible = ${visibleBitmaps};
+            return visible.length === 1 && visible[0] === this.__lightboxThumbnail
+                && this.querySelectorAll('.fluent-read-image-translation-overlay').length === 1;`));
+        assert.equal(await surface.evaluate(el => getComputedStyle(el).opacity), '0');
+        assert.equal(await page.locator('#sample').getAttribute('src'), originalSource);
+    }
 
-    // 大图中的翻译入口仍然可用，译层应只跟随大图，不复活列表译图。
-    await page.locator('#x-lightbox-photo').click({button:'right'}); await page.keyboard.press('Escape');
-    const response = await worker.evaluate(async url => {
-        const tab=(await chrome.tabs.query({})).find(tab=>tab.url===url);
-        return chrome.tabs.sendMessage(tab.id,{type:'contextMenuTranslateImage'}, {frameId:0});
-    },page.url());
-    assert.equal(response?.status,'success');
-    await wait(() => ui("return [...this.querySelectorAll('.fr-image-controls')].filter(el=>el.dataset.phase==='translated').length===2"));
-    const visibility = await ui("return [...this.querySelectorAll('.fluent-read-image-translation-overlay')].map(el=>getComputedStyle(el).display)");
-    assert.deepEqual(visibility,['none','block']);
-    await shot('x-08-lightbox-translated');
-    const requestsAfterViewer = await worker.evaluate(()=>globalThis.__imageFixture.requests.length);
-    const operationsAfterViewer = await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length);
-    await page.locator('#x-lightbox-next').click();
-    await wait(() => ui("return this.querySelectorAll('.fluent-read-image-translation-overlay img').length===1"));
-    assert.equal(await ui("return getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display"),'none');
-    assert.equal(await page.locator('#x-lightbox-photo').evaluate(el=>getComputedStyle(el).opacity),'1');
-    await shot('x-08-lightbox-next');
-    await page.locator('#x-lightbox-close').click();
-    await wait(() => ui("return this.querySelectorAll('.fluent-read-image-translation-overlay').length===1 && getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display==='block'"));
-    assert.equal(await surface.evaluate(el=>getComputedStyle(el).opacity),'0');
-    assert.equal(await page.locator('#sample').getAttribute('src'),originalSource);
-    assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.requests.length),requestsAfterViewer);
-    assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length),operationsAfterViewer);
-    assert.equal(await ui("return this.querySelector('.fluent-read-image-translation-overlay img')===this.__lightboxThumbnail"),true);
-    await shot('x-09-lightbox-closed');
+    report.lightboxStage = 'exact source on first open';
     await surface.click();
-    await wait(() => ui("return getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display==='none'"));
+    await viewer.waitFor({state:'visible'});
+    await expectViewerTranslated(originalSource);
+    await shot('x-07-lightbox-translated-on-open');
+
+    report.lightboxStage = 'restore preview original';
+    await menuAction(viewer);
+    await wait(() => ui(`return ${visibleBitmaps}.length === 0 && ${originalVisible};`));
+    await shot('x-08-lightbox-restored');
     await page.locator('#x-lightbox-close').click();
-    await wait(() => ui("return this.querySelectorAll('.fluent-read-image-translation-overlay').length===1 && getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display==='block'"));
-    assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.requests.length),requestsAfterViewer);
-    assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length),operationsAfterViewer);
+    await expectThumbnailRestored();
+
+    report.lightboxStage = 'X full-size source on reopen';
+    await surface.click();
+    await expectViewerTranslated(fullSizeSource ?? originalSource);
+    await shot('x-09-lightbox-reopened');
+    report.lightboxStage = 'replace preview source';
+    await page.locator('#x-lightbox-next').click();
+    await wait(() => ui(`return ${visibleBitmaps}.length === 0 && ${originalVisible};`));
+    await shot('x-10-lightbox-next');
+    await page.locator('#x-lightbox-close').click();
+    await expectThumbnailRestored();
+    await shot('x-11-lightbox-closed');
+
+    report.lightboxStage = 'native modal top layer';
+    await surface.click();
+    await expectViewerTranslated(fullSizeSource ?? originalSource);
+    assert.equal(await viewer.evaluate(photo => photo.closest('dialog').matches(':modal')), true);
+    assert.equal(await viewer.evaluate(photo =>
+        photo.closest('dialog').contains(document.querySelector('#fluent-read-image-translation-root'))), true,
+    '译图必须处于原生模态框的 top layer 中才可见');
+    const nativeBounds = await ui(`
+        const bitmap = ${visibleBitmaps}[0];
+        const photo = document.querySelector('#x-lightbox-photo');
+        const actual = bitmap.getBoundingClientRect();
+        const expected = photo.getBoundingClientRect();
+        return Object.fromEntries(['left', 'top', 'width', 'height'].map(key => [key, Math.abs(actual[key] - expected[key])]));
+    `);
+    assert.ok(Object.values(nativeBounds).every(delta => delta <= 1),
+        `原生模态框缩放后译图和原图的边界应一致：${JSON.stringify(nativeBounds)}`);
+    await shot('x-12-native-lightbox-translated');
+
+    report.lightboxStage = 'native modal restore and cached redisplay';
+    await menuAction(viewer, false);
+    await wait(() => ui(`return ${visibleBitmaps}.length === 0 && ${originalVisible};`));
+    await page.locator('#x-lightbox-close').hover();
+    await page.waitForTimeout(300); // 超过普通图片 180ms 的空闲状态回收周期。
+    assert.equal(await viewer.evaluate(photo =>
+        photo.closest('dialog').contains(document.querySelector('#fluent-read-image-translation-root'))), true);
+    await menuAction(viewer, false);
+    await expectViewerTranslated(fullSizeSource ?? originalSource);
+    await page.locator('#x-lightbox-close').click();
+    await expectThumbnailRestored();
+
+    report.lightboxStage = 'unrelated native modal';
     await page.evaluate(() => {
         const dialog = document.createElement('dialog'); dialog.id = 'native-image-dialog';
         dialog.style.cssText = 'width:400px;height:200px';
@@ -240,15 +325,21 @@ async function verifyXSurface({page, popup, worker, ui, wait, click, shot, repor
     await wait(() => ui("return getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display==='none'"));
     await page.locator('#native-image-dialog-close').click();
     await wait(() => ui("return getComputedStyle(this.querySelector('.fluent-read-image-translation-overlay')).display==='block'"));
-    assert.equal(await worker.evaluate(()=>globalThis.__imageFixture.operationIds.length),operationsAfterViewer);
     await page.locator('#native-image-dialog').evaluate(el=>el.remove());
-    report.lightbox = {visibility, requestsBefore:requests, requestsAfterViewer, operations, operationsAfterViewer,
-        originalSourcePreserved:true, decodedThumbnailRetained:true};
-    report.cases.push('trusted thumbnail click hides background translation under X-style viewer',
-        'viewer image translates independently without leaking thumbnail overlay',
+    const requestsAfterViewer = await worker.evaluate(() => globalThis.__imageFixture.requests.length);
+    const operationsAfterViewer = await worker.evaluate(() => globalThis.__imageFixture.operationIds.length);
+    assert.equal(requestsAfterViewer, requests);
+    assert.equal(operationsAfterViewer, operations);
+    delete report.lightboxStage;
+    report.lightbox = {requestsBefore: requests, requestsAfterViewer, operations, operationsAfterViewer,
+        testedFullSizeXVariant: Boolean(fullSizeSource), nativeBoundsDelta: nativeBounds,
+        originalSourcePreserved: true, decodedThumbnailRetained: true};
+    report.cases.push('trusted thumbnail click opens the existing translation in the viewer without new work',
+        'viewer restores its own original and reopening reuses the thumbnail translation',
         'switching viewer source removes stale enlarged translation',
-        'repeated viewer opening and closing keeps one cached thumbnail',
-        'native modal open attribute changes suspend and restore thumbnail without new work',
-        'closing viewer removes its state and restores cached thumbnail without requests');
+        'native image modal opens the same translation in the browser top layer',
+        'native modal keeps its translation state after restore and idle pointer exit',
+        'unrelated native modal open attribute changes suspend and restore thumbnail without new work',
+        'closing the viewer restores the same decoded thumbnail without requests');
 }
 module.exports={verifyXSurface};

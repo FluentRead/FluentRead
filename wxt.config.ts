@@ -9,11 +9,12 @@ import {checkExtensionSize} from './scripts/testing/extension-size-budget';
 import {wllamaExtensionWorker} from './scripts/testing/wllama-extension-build';
 import {createExtensionMetadataLocaleFiles, createUiLanguageBundleFiles} from './src/core/i18n/bundles';
 import {UI_LANGUAGE_BUNDLE_DIRECTORY} from './src/core/i18n/language';
-import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker} from './scripts/wasm/package-diagnostics';
+import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker, resolveTesseractSources} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from './src/platform/google-drive/constants';
 import {createDeepLXRuntimeBuildPlugin} from './scripts/testing/deeplx-runtime-build';
 import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build';
+import {PDFJS_DECODER_FILES} from './scripts/testing/pdfjs-assets.mjs';
 import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
@@ -338,7 +339,7 @@ export default defineConfig({
             'scripts/testing/evidence/**',
         ],
         // 保留源码中的第三方来源说明；includeSources 会覆盖上述排除规则。
-        includeSources: ['docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
+        includeSources: ['.nvmrc', 'pnpm-workspace.yaml', 'docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
     },
     hooks: {
         'build:manifestGenerated': (wxt, manifest) => {
@@ -354,7 +355,8 @@ export default defineConfig({
             const dev = wxt.config.command === 'serve';
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // 恢复字体加入前的生产体积预算，防止完整字体再次随 public/ 打包。
-            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : 65_000_000;
+            // PDF.js 6 本地图像解码器及回退带来约 0.8 MB；当前 Chrome 产物约 65.34 MB。
+            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : 66_000_000;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
             await checkExtensionSize(wxt.config.outDir, budget);
@@ -392,6 +394,9 @@ export default defineConfig({
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/LICENSE'), relativeDest: 'third-party-notices/pdfjs-bidi-Apache-2.0.txt'});
+            for (const file of PDFJS_DECODER_FILES) {
+                files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/wasm', file), relativeDest: `pdfjs/wasm/${file}`});
+            }
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/bidi-js/LICENSE.txt'), relativeDest: 'third-party-notices/bidi-js-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/ppu-paddle-ocr/LICENSE'), relativeDest: 'third-party-notices/ppu-paddle-ocr-MIT.txt'});
             files.push({absoluteSrc: resolve(fs.realpathSync(resolve(__dirname, 'node_modules/ppu-paddle-ocr')), '../ppu-ocv/LICENSE'), relativeDest: 'third-party-notices/ppu-ocv-MIT.txt'});
@@ -400,14 +405,11 @@ export default defineConfig({
             files.push({absoluteSrc: packageWasmDiagnostics(__dirname, resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.mjs'), 'ort-wasm-simd-threaded.asyncify.mjs', 'onnx'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'});
             files.push({absoluteSrc: resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.wasm'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/esm/wasm/wllama.wasm'), relativeDest: 'fluent-read-ai/wllama.wasm'});
-            const ocrCore = files.find(file => file.relativeDest === 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js');
-            if (!ocrCore || !('absoluteSrc' in ocrCore)) throw new Error('Missing packaged OCR core');
-            const packagedOcr = packageTesseractWasm(__dirname, ocrCore.absoluteSrc);
-            ocrCore.absoluteSrc = packagedOcr.glue;
+            const ocrSources = resolveTesseractSources(__dirname);
+            const packagedOcr = packageTesseractWasm(__dirname, ocrSources.glue);
+            files.push({absoluteSrc: packagedOcr.glue, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js'});
             files.push({absoluteSrc: packagedOcr.wasm, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm'});
-            const ocrWorker = files.find(file => file.relativeDest === 'fluent-read-ocr/worker/worker.min.js');
-            if (!ocrWorker || !('absoluteSrc' in ocrWorker)) throw new Error('Missing packaged OCR worker');
-            ocrWorker.absoluteSrc = packageTesseractWorker(__dirname, ocrWorker.absoluteSrc);
+            files.push({absoluteSrc: packageTesseractWorker(__dirname, ocrSources.worker), relativeDest: 'fluent-read-ocr/worker/worker.min.js'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/dist/worker.min.js.LICENSE.txt'), relativeDest: 'fluent-read-ocr/worker/worker.min.js.LICENSE.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/LICENSE.md'), relativeDest: 'fluent-read-ocr/LICENSE.md'});
         },

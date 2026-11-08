@@ -6,13 +6,17 @@
  -->
 <template>
   <section class="section-rules" data-testid="section-translation-rules" :aria-label="t('sectionTranslation.rules.title')">
-    <div class="rules-heading">
-      <h3>{{ t('sectionTranslation.rules.title') }}</h3>
-      <el-button v-if="!draft" size="small" text :disabled="!active || rules.length >= 100" @click="addRule">{{ t('sectionTranslation.rules.add') }}</el-button>
-    </div>
-    <el-input v-if="rules.length > 5 && !draft" v-model="filter" :placeholder="t('sectionTranslation.rules.search')" :aria-label="t('sectionTranslation.rules.search')" clearable />
-    <p v-if="!rules.length && !draft" class="rules-empty">{{ t('sectionTranslation.rules.empty') }}</p>
-    <p v-else-if="!filteredRules.length && !draft" class="rules-empty">{{ t('sectionTranslation.rules.noResults') }}</p>
+    <SettingsItem class="rules-heading" :label="t('sectionTranslation.rules.title')">
+      <template #copy>
+        <h3 class="rules-title"><strong>{{ t('sectionTranslation.rules.title') }}</strong></h3>
+        <small v-if="!rules.length && !draft" class="rules-empty">{{ t('sectionTranslation.rules.empty') }}</small>
+      </template>
+      <button v-if="!draft" type="button" class="settings-add-button" :disabled="!active || rules.length >= 100" @click="addRule">
+        {{ t('sectionTranslation.rules.add') }}
+      </button>
+    </SettingsItem>
+    <el-input v-if="rules.length > 5 && !draft" v-model="filter" class="rules-filter" :placeholder="t('sectionTranslation.rules.search')" :aria-label="t('sectionTranslation.rules.search')" clearable />
+    <p v-if="rules.length && !filteredRules.length && !draft" class="rules-empty rules-no-results">{{ t('sectionTranslation.rules.noResults') }}</p>
     <div v-if="filteredRules.length && !draft" class="rules-list">
       <article v-for="rule in filteredRules" :key="rule.id" class="rule-row" :class="{'is-disabled': !rule.enabled}" :data-rule-id="rule.id">
         <el-switch :model-value="rule.enabled" :disabled="!active" :aria-label="t('sectionTranslation.rules.enable', {site: rule.site})" @update:model-value="updateRule(rule, {enabled: Boolean($event)})" />
@@ -40,6 +44,7 @@ import {computed, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 
 import type {Config} from '@/src/core/config/model';
 import {normalizeSectionRuleSite, validateSectionTranslationRule, type SectionTranslationRule} from '@/src/core/config/sectionTranslationRules';
 import {useUiI18n} from '@/src/ui/i18n';
+import SettingsItem from './components/SettingsItem.vue';
 
 const props = withDefaults(defineProps<{config: Config; active?: boolean}>(), {active: true});
 const {t} = useUiI18n();
@@ -107,11 +112,14 @@ function saveDraft(): void {
 </script>
 
 <style scoped>
-.section-rules { display: grid; gap: 12px; margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line, #e7e9f0); }
-.rules-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.rules-heading > .el-button { flex-shrink: 0; white-space: nowrap; }
-.rules-heading h3 { margin: 0; font-size: 14px; color: var(--ink, #172033); }
-.rules-empty { margin: 0; color: var(--muted, #737c8f); font-size: 12px; line-height: 1.6; }
+.section-rules { display: grid; gap: 8px; border-top: 1px solid var(--fr-card-border, var(--line)); }
+.section-rules:has(> :is(.rules-list, .rules-no-results, .rule-editor)) { padding-bottom: var(--fr-settings-row-padding-block, 14px); }
+.rules-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.rules-title { margin: 0; font: inherit; }
+.rules-title > strong { display: block; }
+.rules-filter, .rules-no-results, .rules-list, .rule-editor { margin-inline: var(--fr-card-padding-inline, 20px); }
+.section-rules > .rules-filter { width: auto; }
+.rules-no-results { margin-block: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .rules-list { display: grid; border: 1px solid var(--line, #e7e9f0); border-radius: 10px; overflow: hidden; }
 .rule-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line, #e7e9f0); }
 .rule-row:first-child { border-top: 0; }
@@ -136,7 +144,7 @@ function saveDraft(): void {
 @media (max-width: 640px) {
     .rule-row { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto; gap: 8px; }
     .rule-main { grid-column: 2 / -1; }
-    .rule-mode { grid-column: 1 / 3; grid-row: 2; }
+    .rule-mode { grid-column: 1 / 3; grid-row: 2; width: min(100%, 144px); min-width: 0; }
     .rule-actions { grid-column: 3; grid-row: 2; justify-self: end; }
     .rule-editor { grid-template-columns: minmax(0, 1fr); }
 }

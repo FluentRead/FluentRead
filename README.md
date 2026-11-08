@@ -52,11 +52,11 @@ Store updates may arrive at different times. The userscript provides core webpag
 
 ## Sponsorship
 
-The project is currently funded mainly out of pocket, with tens of thousands of US dollars spent each month on API tokens for open-source development. We believe FluentRead can make the world a little better.
+The project is currently funded mainly out of pocket, with a few hundred US dollars spent each month on maintenance. We believe FluentRead can make the world a little better.
 
-<a href="mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship"><img src="./docs/public/support/sponsor-placeholder-en.svg" width="480" height="128" alt="Your brand here — become a FluentRead sponsor" /></a>
+Thank you to [**bilibili Index-Translate**](https://index-translate.bilibili.com/) for becoming FluentRead’s first sponsor.
 
-[Email us](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) · [Add on WeChat](https://read.thinkstu.com/support/wechat-contact.jpg)
+[Become a sponsor](https://read.thinkstu.com/en/guide/support#sponsorship) · [Email us](mailto:a1914493943@gmail.com?subject=FluentRead%20sponsorship) · [Add on WeChat](https://read.thinkstu.com/support/wechat-contact.jpg)
 
 ## Local development
 

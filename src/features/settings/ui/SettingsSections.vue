@@ -557,7 +557,8 @@
   <el-dialog v-if="pendingServiceAvailability" :model-value="true" data-service-availability-dialog
     :title="t('settings.services.library.removeNamedService', {service: pendingServiceAvailability.item.label})"
     width="min(400px, calc(100vw - 24px))" align-center :show-close="false" :close-on-click-modal="false"
-    :onUpdate:modelValue="serviceAvailabilityActions.update">
+    :onUpdate:modelValue="serviceAvailabilityActions.update"
+    @keydown.enter.exact="serviceAvailabilityActions.handleEnter">
     <p>{{ t('settings.services.library.availabilityHelp') }}</p>
     <p v-if="pendingServiceAvailability.replacement">{{ t('settings.services.library.defaultReplacement', {service: pendingServiceAvailability.replacement.label}) }}</p>
     <template #footer>
@@ -1020,15 +1021,27 @@ const serviceAvailabilityActions = computed(() => {
   const cancel = () => {
     if (request === pendingServiceAvailability.value) pendingServiceAvailability.value = null;
   };
+  const confirm = () => {
+    if (!request || request !== pendingServiceAvailability.value) return;
+    const change = currentServiceAvailabilityChange.value;
+    cancel();
+    if (!change) return;
+    applyServiceAvailabilityChange(change);
+  };
   return {
     cancel,
     update: (open: boolean) => {if (!open) cancel();},
-    confirm: () => {
-      if (!request || request !== pendingServiceAvailability.value) return;
-      const change = currentServiceAvailabilityChange.value;
-      cancel();
-      if (!change) return;
-      applyServiceAvailabilityChange(change);
+    confirm,
+    handleEnter: (event: KeyboardEvent) => {
+      if (event.repeat || event.isComposing) {
+        event.preventDefault();
+        return;
+      }
+      // Element Plus 将初始焦点放在弹窗容器。焦点移到按钮后，由按钮处理回车。
+      if (event.target === event.currentTarget) {
+        event.preventDefault();
+        confirm();
+      }
     },
   };
 });

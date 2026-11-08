@@ -220,7 +220,7 @@ describe('affected behavior test execution', () => {
         writeFileSync(filename, scopedCoverageConfig(plan, path.join(root, 'base.mjs')));
         const compiled = JSON.parse(execFileSync(process.execPath, ['--input-type=module', '-e',
             'const {default: config} = await import(process.argv[1]);console.log(JSON.stringify(config));', filename], {encoding: 'utf8'}));
-        expect(compiled).toMatchObject({plugins: ['actual-plugin'], test: {include: plan.testFiles,
+        expect(compiled).toMatchObject({plugins: ['actual-plugin'], test: {include: plan.testFiles, testTimeout: 30_000,
             coverage: {all: true, reportOnFailure: true, include: ['src/core/a.ts'], thresholds: {statements: 100, branches: 100, functions: 100, lines: 100, perFile: true}}}});
         save(root, 'vitest.coverage.config.ts', 'export default {test:{coverage:{thresholds:{statements:100,branches:100,functions:100,lines:100}}}};');
         save(root, 'tsconfig.json', JSON.stringify({compilerOptions: {noEmit: true, strict: true, types: []}, include: ['**/*']}));

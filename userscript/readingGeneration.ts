@@ -357,8 +357,8 @@ export function createHarnessGenerator(config: Config, service: string, model: s
                 throw normalized;
             }
         };
-        const result = keys.length < 2 ? await run(withServiceApiKey(frozen, service, keys[0] ?? ''))
-            : await runWithApiKeyRotation(frozen, service, run, {signal: input.signal, model});
+        const result = await (keys.length < 2 ? run(withServiceApiKey(frozen, service, keys[0] ?? ''))
+            : runWithApiKeyRotation(frozen, service, run, {signal: input.signal, model}));
         if ('error' in result) throw result.error;
         return result.value;
         } finally {

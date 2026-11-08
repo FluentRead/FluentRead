@@ -1,17 +1,18 @@
 /**
  * @file src/features/video-subtitle/content/translationCache.ts
  * 文件职责：管理一个视频轨道的译文缓存、请求合并和失败重试退避。
- * 主要内容：同步读取已完成译文，使双语在同一次更新中显示；限制缓存条数，按播放窗口清理未启动预取，并以版本隔离清理前的迟到结果。
+ * 主要内容：同步读取已完成译文，使双语在同一次更新中显示；限制缓存条数，复用边界未变化的预取窗口并清理已离开窗口的未启动预取，以版本隔离清理前的迟到结果。
  * 模块边界：只调用注入的翻译函数，不读取配置、网络或播放器；轨道和配置变化由 runtime 显式 clear。
  */
 import {VideoTranslationScheduler} from './translationScheduler';
-import {selectVideoSubtitlePretranslationCues} from './subtitleLogic';
+import {VideoSubtitlePretranslationWindow} from './subtitleLogic';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
 export class VideoTranslationCache {
   private readonly translatedVideoCache = new Map<string, string>();
   private readonly inFlightVideoTranslations = new Map<string, Promise<string>>();
   private readonly videoTranslationFailures = new Map<string, {attempts: number; retryAt: number}>();
   private readonly translationScheduler: VideoTranslationScheduler;
+  private readonly pretranslationWindow = new VideoSubtitlePretranslationWindow();
   private pretranslationCacheVersion = 0;
   private visibleRevision = 0;
   /** 原生字幕轨只在成功缓存变化时重建完整时间轴。 */
@@ -22,6 +23,7 @@ export class VideoTranslationCache {
   clear(): void {
     if (this.translatedVideoCache.size) this.visibleRevision += 1;
     this.translatedVideoCache.clear();
+    this.pretranslationWindow.clear();
     this.cancelPending();
   }
   /** 只切换显示方式时取消在途请求，保留已经成功的译文。 */
@@ -49,7 +51,7 @@ export class VideoTranslationCache {
   }
   primeUpcoming(cues: readonly VideoSubtitleCue[], currentMs: number, windowMs: number, playbackRate: number,
     request: (source: string, prefetch: boolean, cue: VideoSubtitleCue) => Promise<string>): void {
-    const selected = selectVideoSubtitlePretranslationCues(cues, currentMs, windowMs, playbackRate);
+    const selected = this.pretranslationWindow.select(cues, currentMs, windowMs, playbackRate);
     this.retainPrefetches(selected.map(cue => cue.text));
     for (const cue of selected) void request(cue.text, cue.startMs > currentMs, cue).catch(() => undefined);
   }

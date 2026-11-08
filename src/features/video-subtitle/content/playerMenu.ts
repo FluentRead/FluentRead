@@ -2,7 +2,7 @@
  * @file src/features/video-subtitle/content/playerMenu.ts
  * 文件职责：组装播放器字幕菜单，以紧凑行呈现显示方式、字幕时间、本地 AI 字幕与下载与完整句学习入口，并在同一弹层内提供模型下载确认。
  * 主要内容：常驻标题与可滚动正文分离，显示、带示意的双语顺序、读音图标开关与校时先于次级学习入口；单语时保留顺序偏好并说明生效条件，读音说明支持悬停和键盘聚焦且不重测菜单，保留仅译文时显式切回双语的入口，低频字幕下载默认收起；触屏安全视口按可用宽度排布，极矮时只保留关闭并暂时隔离正文焦点，正常视口只滚动自有正文显露明确聚焦的操作，桌面按播放器高度收紧；X 首层聚焦显示方式和当前操作，模型选择、校时、导出和重新识别放在可返回的选项页，复用稳定节点呈现来源、故障恢复及识别/下载进度，生成预览期间不开放完整字幕导出。
- * 模块边界：只操作 FluentRead 自己的菜单节点，不读取存储、不发起识别或绑定全局事件；运行时负责配置、请求与清理。
+ * 模块边界：只操作 FluentRead 自己的菜单节点，稳定文案不重复改写，仅在可切换的桌面布局上读取内容高度；运行时负责配置、请求、全局事件与清理。
  */
 import type {VideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import type {VideoSubtitleDisplayMode} from '@/src/core/config/model';
@@ -88,8 +88,8 @@ function createButton(className: string, attributes: Record<string, string>): HT
 }
 
 function setAccessibleName(element: HTMLElement, label: string): void {
-    element.setAttribute('aria-label', label);
-    element.title = label;
+    if (element.getAttribute('aria-label') !== label) element.setAttribute('aria-label', label);
+    if (element.title !== label) element.title = label;
 }
 
 function createHeader(language: UiLanguage, compact = false): HTMLElement {
@@ -661,21 +661,26 @@ export function handleVideoMenuNavigation(event: KeyboardEvent): void {
 /** “关闭”由总开关或隐藏字幕决定；三种显示方式只在字幕实际可见时高亮。 */
 export function renderVideoMenuMode(menu: HTMLElement, selected: VideoMenuMode, disabled: boolean, disabledReason: string): void {
     menu.querySelectorAll<HTMLButtonElement>('.fluent-read-video-menu-mode-group [data-mode]').forEach((item) => {
-        item.setAttribute('aria-checked', String(item.dataset.mode === selected));
-        item.disabled = disabled;
+        const checked = String(item.dataset.mode === selected);
+        if (item.getAttribute('aria-checked') !== checked) item.setAttribute('aria-checked', checked);
+        if (item.disabled !== disabled) item.disabled = disabled;
     });
     const group = menu.querySelector<HTMLElement>('.fluent-read-video-menu-mode-group');
-    if (group) group.title = disabled ? disabledReason : '';
+    const title = disabled ? disabledReason : '';
+    if (group && group.title !== title) group.title = title;
 }
 
 /** 持久配置更新时复用按钮；无时间轴且无偏移时整行收起，仍允许清除已有偏移。 */
 export function renderVideoSubtitleTiming(menu: HTMLElement, offsetMs: number, available: boolean, language: UiLanguage): void {
     const row = menu.querySelector<HTMLElement>('[data-timing-row]')!;
     row.hidden = !available && offsetMs === 0;
-    row.title = available ? '' : localizeVideoUiText('当前字幕暂不支持时间调整', language);
+    const title = available ? '' : localizeVideoUiText('当前字幕暂不支持时间调整', language);
+    if (row.title !== title) row.title = title;
     const value = menu.querySelector<HTMLOutputElement>('[data-subtitle-offset]')!;
-    value.textContent = `${offsetMs > 0 ? '+' : ''}${(offsetMs / 1000).toFixed(1)} s`;
-    value.setAttribute('aria-label', localizeVideoUiText('字幕时间偏移', language));
+    const text = `${offsetMs > 0 ? '+' : ''}${(offsetMs / 1000).toFixed(1)} s`;
+    if (value.textContent !== text) value.textContent = text;
+    const label = localizeVideoUiText('字幕时间偏移', language);
+    if (value.getAttribute('aria-label') !== label) value.setAttribute('aria-label', label);
     const earlier = menu.querySelector<HTMLButtonElement>('[data-action="subtitle-earlier"]')!;
     const later = menu.querySelector<HTMLButtonElement>('[data-action="subtitle-later"]')!;
     const reset = menu.querySelector<HTMLButtonElement>('[data-action="reset-subtitle-timing"]')!;
@@ -746,12 +751,15 @@ export function renderVideoAiMenu(menu: HTMLElement, state: VideoAiMenuState, la
     button.dataset.ready = String(ready);
     // 确定进度显示为进度条；读取音频、尚未收到下载进度等无法给出比例的阶段使用循环动画。
     button.dataset.progress = percent === undefined ? (processing || downloading ? 'indeterminate' : 'none') : 'determinate';
-    button.style.setProperty('--fluent-read-video-ai-progress', `${percent ?? 0}%`);
+    const progress = `${percent ?? 0}%`;
+    if (button.style.getPropertyValue('--fluent-read-video-ai-progress') !== progress) button.style.setProperty('--fluent-read-video-ai-progress', progress);
     const labelElement = button.querySelector<HTMLElement>('.fluent-read-video-menu-label')!;
-    labelElement.dataset.i18nKey = labelKey;
-    labelElement.textContent = translateVideoUi(labelKey, language);
-    button.querySelector<HTMLElement>('[data-state]')!.textContent = detail;
-    button.title = title;
+    if (labelElement.dataset.i18nKey !== labelKey) labelElement.dataset.i18nKey = labelKey;
+    const label = translateVideoUi(labelKey, language);
+    if (labelElement.textContent !== label) labelElement.textContent = label;
+    const stateElement = button.querySelector<HTMLElement>('[data-state]')!;
+    if (stateElement.textContent !== detail) stateElement.textContent = detail;
+    if (button.title !== title) button.title = title;
 }
 
 const downloadStatusTimers = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
@@ -804,18 +812,20 @@ export function renderVideoAiModelSelection(menu: HTMLElement, state: VideoAiMod
     const button = menu.querySelector<HTMLButtonElement>('[data-action="select-ai-model"]');
     if (!button) return;
     const params = {model: translateVideoUi(MODEL_NAME_KEYS[state.model][0], language)};
+    const serializedParams = JSON.stringify(params);
     button.hidden = !state.available;
     button.disabled = !state.available || state.disabled;
     button.dataset.model = state.model;
     button.dataset.i18nAriaKey = 'video.modelSelectionAria';
-    button.dataset.i18nParams = JSON.stringify(params);
+    button.dataset.i18nParams = serializedParams;
     setAccessibleName(button, translateVideoUi('video.modelSelectionAria', language, params));
     button.setAttribute('aria-expanded', String(menu.dataset.view === 'model-prompt'
         && menu.querySelector<HTMLElement>('[data-model-prompt]')?.dataset.purpose === 'selection'));
     const label = button.querySelector<HTMLElement>('.fluent-read-video-menu-label')!;
     label.dataset.i18nKey = 'video.modelSelection';
-    label.dataset.i18nParams = JSON.stringify(params);
-    label.textContent = translateVideoUi('video.modelSelection', language, params);
+    label.dataset.i18nParams = serializedParams;
+    const text = translateVideoUi('video.modelSelection', language, params);
+    if (label.textContent !== text) label.textContent = text;
 }
 
 function createModelPrompt(language: UiLanguage): HTMLElement {
@@ -873,9 +883,10 @@ function renderModelOption(option: VideoModelPromptOption, state: VideoModelProm
 
 /** 在同一弹层内切换到模型确认视图；传入 null 回到主菜单。 */
 export function renderVideoModelPrompt(menu: HTMLElement, state: VideoModelPromptState | null, language: UiLanguage): void {
+    // 常规状态刷新没有确认视图时不访问其节点，也不重测主菜单。
+    if (!state && !isVideoModelPromptOpen(menu)) return;
     const prompt = menu.querySelector<HTMLElement>('[data-model-prompt]');
     if (!prompt) return;
-    if (menu.dataset.view === 'export-prompt' && !state) return;
     const main = menu.querySelector<HTMLElement>('.fluent-read-video-menu-main')!;
     menu.querySelector<HTMLElement>('[data-action="select-ai-model"]')?.setAttribute('aria-expanded', String(state?.purpose === 'selection'));
     if (!state) {
@@ -937,13 +948,15 @@ export function focusVideoModelPromptReturn(menu: HTMLElement, purpose?: 'select
 
 /** 极矮视口不改子页/选中值/滚动位置；只隔离暂时折叠的自有分支，恢复时不搬回焦点。 */
 function syncVideoMenuCloseOnly(menu: HTMLElement, closeOnly: boolean): void {
+    const wasCloseOnly = menu.dataset.viewportState === 'close-only';
+    if (!closeOnly && !wasCloseOnly) return;
     const folded = Array.from(menu.querySelectorAll<HTMLElement>(
         ':scope > :not(.fluent-read-video-menu-title), :scope > .fluent-read-video-menu-title > :not(.fluent-read-video-menu-close)',
     ));
     const active = menu.ownerDocument.activeElement;
     const heldFoldedFocus = closeOnly && folded.some(node => node.contains(active));
-    if (closeOnly) menu.dataset.viewportState = 'close-only';
-    else delete menu.dataset.viewportState;
+    if (closeOnly && !wasCloseOnly) menu.dataset.viewportState = 'close-only';
+    if (!closeOnly) delete menu.dataset.viewportState;
     for (const node of folded) {
         if (closeOnly && !node.hasAttribute('inert')) {
             node.setAttribute('inert', '');
@@ -979,8 +992,9 @@ const viewportMenuSizes = new WeakMap<HTMLElement, {width: number; height: numbe
  * 矮而宽的播放器改为双列，其余保持单列。
  */
 export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {
+    const hideTools = menu.dataset.view !== 'main';
     for (const tool of menu.querySelectorAll<HTMLElement>('.fluent-read-video-menu-reading-header, [data-action="toggle-subtitle-downloads"]')) {
-        tool.hidden = menu.dataset.view !== 'main';
+        if (tool.hidden !== hideTools) tool.hidden = hideTools;
     }
     const player = menu.parentElement;
     if (menu.hidden || !player) return;
@@ -993,7 +1007,8 @@ export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {
     syncVideoMenuCloseOnly(menu, menu.dataset.presentation === 'viewport' && height < VIEWPORT_MENU_CLOSE_ONLY_HEIGHT_PX);
     // 触屏菜单的宿主是已扣除安全区的可见视口，不能再按短视频的高度测量/压缩。
     if (menu.dataset.presentation === 'viewport') {
-        menu.dataset.layout = width >= VIEWPORT_MENU_WIDE_MIN_WIDTH_PX ? 'wide' : 'stack';
+        const layout = width >= VIEWPORT_MENU_WIDE_MIN_WIDTH_PX ? 'wide' : 'stack';
+        if (menu.dataset.layout !== layout) menu.dataset.layout = layout;
         const previous = viewportMenuSizes.get(menu);
         viewportMenuSizes.set(menu, {width, height});
         // 只在宿主尺寸确实变化时照顾已有正文焦点，周期状态刷新不能拉回用户手动滚动的位置。
@@ -1003,16 +1018,18 @@ export function syncVideoPlayerMenuLayout(menu: HTMLElement): void {
         return;
     }
     viewportMenuSizes.delete(menu);
-    // X 观看首页已精简，不再因为少量说明把菜单拉成 440px 的横向面板。
-    if (menu.dataset.compact === 'true' && menu.dataset.panel === 'watch' && menu.dataset.view === 'main') {
-        menu.dataset.layout = 'stack';
+    // 窄播放器和 X 观看首页固定单列，无需强制测量内容高度。
+    if (width < WIDE_LAYOUT_MIN_PLAYER_WIDTH_PX
+        || (menu.dataset.compact === 'true' && menu.dataset.panel === 'watch' && menu.dataset.view === 'main')) {
+        if (menu.dataset.layout !== 'stack') menu.dataset.layout = 'stack';
         return;
     }
     // 下载反馈只短暂出现，不参与布局判断，避免文字出现和消失时菜单来回切换形状。
-    menu.dataset.layout = 'stack';
-    menu.dataset.measuring = 'true';
+    if (menu.dataset.layout !== 'stack') menu.dataset.layout = 'stack';
+    const hasDownloadStatus = Boolean(menu.querySelector('[data-download-status]')?.textContent);
+    if (hasDownloadStatus) menu.dataset.measuring = 'true';
     const needed = menu.scrollHeight;
-    delete menu.dataset.measuring;
+    if (hasDownloadStatus) delete menu.dataset.measuring;
     const available = height - MENU_BOTTOM_OFFSET_PX - MENU_TOP_GAP_PX;
-    menu.dataset.layout = needed > available * STACK_LAYOUT_MAX_HEIGHT_RATIO && width >= WIDE_LAYOUT_MIN_PLAYER_WIDTH_PX ? 'wide' : 'stack';
+    if (needed > available * STACK_LAYOUT_MAX_HEIGHT_RATIO) menu.dataset.layout = 'wide';
 }

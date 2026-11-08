@@ -1,10 +1,11 @@
 /**
  * @file src/features/video-subtitle/content/xCaptionSource.ts
  * 文件职责：把 X 播放器中的原生轨道、sidecar 与本地识别时间轴映射到唯一合成字幕容器。
- * 主要内容：清理原生 cue 的时间标记后按播放时间选择正文；每次 sync 在隐藏模式写完后选择一次 live 轨道，供时间轴判定与当前正文读取共用，不跨轮缓存轨道或 cue；仅在内容变化时写入 DOM，保留原生 TextTrack 模式并在媒体离开时恢复。
+ * 主要内容：清理原生 cue 的时间标记后按播放时间选择正文；每次 sync 在隐藏模式写完后选择一次 live 轨道，供时间轴判定与当前正文读取共用，不跨轮缓存轨道或 cue；仅在内容变化时写入 DOM 并通知帧更新，保留原生 TextTrack 模式并在媒体离开时恢复。
  * 模块边界：不读取配置存储、不识别或翻译音频，也不发起网络请求；运行时注入当前媒体及字幕状态，负责挂载和卸载时序。
  */
 import {VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_CAPTION_SEGMENT_SELECTOR, VIDEO_PLAYER_SELECTOR, findVideoPlayer, isXVideoPage} from './ui';
+import {normalizeVideoCaptionText} from './subtitleLogic';
 import {getVisibleVideoAiCue} from './video-ai/cueTimeline';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
 import {cleanSubtitleText, selectXSubtitleLanguageResources} from './xVideoSubtitleData';
@@ -19,9 +20,8 @@ export class XCaptionSource {
     }
     this.changedTracks.clear();
   }
-  private getOrCreateContainer(): HTMLElement | null {
-    const video = this.read().video;
-    const player = this.read().player || video?.closest<HTMLElement>(VIDEO_PLAYER_SELECTOR) || video?.parentElement || findVideoPlayer();
+  private getOrCreateContainer(video: HTMLVideoElement | null, boundPlayer?: HTMLElement): HTMLElement | null {
+    const player = boundPlayer || video?.closest<HTMLElement>(VIDEO_PLAYER_SELECTOR) || video?.parentElement || findVideoPlayer();
     if (!player) return null;
     let container = document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID);
     if (!(container instanceof HTMLElement)) {
@@ -50,11 +50,12 @@ export class XCaptionSource {
   };
 
   private selectedNativeTracks(): TextTrack[] {
-    const tracks = Array.from(this.read().video?.textTracks || [])
+    const {video, language} = this.read();
+    const tracks = Array.from(video?.textTracks || [])
       .filter(track => track.kind === 'captions' || track.kind === 'subtitles');
     tracks.sort((left, right) => Number((this.changedTracks.get(right) || right.mode) === 'showing')
       - Number((this.changedTracks.get(left) || left.mode) === 'showing'));
-    return selectXSubtitleLanguageResources(tracks.map(track => ({track, languageCode: track.language})), this.read().language)
+    return selectXSubtitleLanguageResources(tracks.map(track => ({track, languageCode: track.language})), language)
       .map(({track}) => track);
   }
 
@@ -70,11 +71,11 @@ export class XCaptionSource {
     return null;
   }
 
-  /** 将 X 的 TextTrack / sidecar / AI cue 统一映射到既有字幕翻译观察器。 */
-  sync(): HTMLElement | null {
-    const {video, enabled, aiActive, aiCues, sidecarCues} = this.read();
+  /** 映射 TextTrack / sidecar / AI cue，并在帧回调中复用本轮已同步的容器。 */
+  sync(onTextChange?: (container: HTMLElement) => void): HTMLElement | null {
     if (!isXVideoPage()) return null;
-    const container = this.getOrCreateContainer();
+    const {video, player, enabled, aiActive, aiCues, sidecarCues} = this.read();
+    const container = this.getOrCreateContainer(video, player);
     if (!container) return null;
     if (!enabled) {
       this.restoreTracks();
@@ -142,7 +143,8 @@ export class XCaptionSource {
 
     const segment = container.querySelector<HTMLElement>(VIDEO_CAPTION_SEGMENT_SELECTOR);
     if (!segment) return container;
-    if (segment.textContent !== text) segment.textContent = text;
+    const previousText = segment.textContent || '';
+    if (previousText !== text) segment.textContent = text;
     const display = text ? 'block' : 'none';
     if (segment.style.display !== display) segment.style.display = display;
     if (container.dataset.fluentReadCaptionSource !== sourceKind) {
@@ -150,6 +152,9 @@ export class XCaptionSource {
     }
     if (container.dataset.fluentReadCueId !== cueId) {
       container.dataset.fluentReadCueId = cueId;
+    }
+    if (onTextChange && previousText !== text && normalizeVideoCaptionText(previousText) !== normalizeVideoCaptionText(text)) {
+      onTextChange(container);
     }
     return container;
   };

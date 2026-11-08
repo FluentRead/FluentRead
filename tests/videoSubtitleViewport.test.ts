@@ -32,6 +32,7 @@ import {
   markVideoUi,
   removeTranslationOverlay,
   syncTranslationOverlayPosition,
+  VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS,
   VIDEO_PLAYER_HOST_CLASS,
   VIDEO_SUBTITLE_PANEL_ID,
   VIDEO_TRANSLATION_LAYER_ID,
@@ -394,6 +395,30 @@ describe('mobile YouTube readable control avoidance', () => {
 });
 
 describe('desktop subtitle geometry during menu interaction', () => {
+  it('centers the normalized panel once without measuring unused native rows', () => {
+    const {document, window, player, layer} = fixture({intrinsic: [1000, 600]});
+    Object.defineProperty(window, 'location', {configurable: true, value: new URL('https://www.youtube.com/watch?v=desktop')});
+    const caption = document.createElement('div');
+    caption.innerHTML = '<span class="ytp-caption-segment">A native subtitle</span>';
+    player.appendChild(caption);
+    const nativeRect = vi.fn(() => rect(400, 520, 200, 30));
+    Object.defineProperty(caption.firstElementChild!, 'getBoundingClientRect', {value: nativeRect});
+    getOrCreateTranslationOverlay(player).textContent = 'Translated subtitle';
+    const panel = document.getElementById(VIDEO_SUBTITLE_PANEL_ID)!;
+    const panelRect = vi.fn(() => rect(400, 400, 200, 45));
+    Object.defineProperty(panel, 'getBoundingClientRect', {value: panelRect});
+    layer.classList.add(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+
+    syncTranslationOverlayPosition(caption);
+    expect({panelReads: panelRect.mock.calls.length, nativeReads: nativeRect.mock.calls.length})
+      .toEqual({panelReads: 1, nativeReads: 0});
+    expect(panel.style.left).toBe('400px');
+
+    layer.classList.remove(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS);
+    syncTranslationOverlayPosition(caption);
+    expect(nativeRect).toHaveBeenCalledOnce();
+    expect(panel.style.getPropertyValue('--fluent-read-video-subtitle-bottom')).toBe('188px');
+  });
   it.each([
     {name: 'windowed bottom', width: 960, scale: 1, fullscreen: false, position: 'bottom'},
     {name: 'fullscreen bottom', width: 1920, scale: 1, fullscreen: true, position: 'bottom'},

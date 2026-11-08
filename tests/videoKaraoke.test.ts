@@ -4,7 +4,7 @@
  * 主要内容：覆盖中英文与标点的无损切分、时长估算和进度定位；字幕行在开关两种状态下的写入与复用；逐帧上色只改动变化的单元；控制器在播放、暂停、拖动、无时间轴和销毁时的行为。
  * 模块边界：使用 linkedom 与手动帧队列，不启动播放器运行时、翻译或真实浏览器。
  */
-import {afterEach, describe, expect, it} from 'vitest';
+import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {
   estimateVideoKaraokeDurationMs,
@@ -134,9 +134,12 @@ describe('字幕行写入与上色', () => {
     paintVideoKaraokeLine(line, .625);
     expect(states(line)).toEqual(['sung', 'sung', 'active', null]);
     expect(fills(line)).toEqual(['', '', '50.0%', '']);
-    const activeStyle = units(line)[2].getAttribute('style');
-    paintVideoKaraokeLine(line, .625);
-    expect(units(line)[2].getAttribute('style')).toBe(activeStyle);
+    const active = units(line)[2];
+    const writeState = vi.spyOn(active, 'setAttribute');
+    for (let frame = 1; frame <= 20; frame++) paintVideoKaraokeLine(line, .625 + frame * .001);
+    expect(writeState.mock.calls.filter(([name]) => name === VIDEO_KARAOKE_STATE_ATTRIBUTE)).toHaveLength(0);
+    expect(fills(line)).toEqual(['', '', '58.0%', '']);
+    writeState.mockRestore();
 
     paintVideoKaraokeLine(line, .3);
     expect(states(line)).toEqual(['sung', 'active', null, null]);

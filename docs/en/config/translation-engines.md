@@ -28,7 +28,7 @@ FluentRead is free and open source. Providers may charge separately. Chat subscr
 3. Choose **Check connection**. It sends a short request and may use allowance; success describes that check only.
 4. Choose **Set as default translation service**, then try a webpage. Documents, subtitles, and the reading card can have separate selections.
 
-Selecting a directory entry only opens its configuration. It does not change the default. You can also assign services from General settings or **Translation service** in the extension menu.
+Selecting a directory entry opens its connection settings and leaves the default service selected. You can assign services from **Translation service** in the extension menu or **Services by feature** in General settings. **Services by feature** starts expanded. Select its heading to collapse it.
 
 <figure class="doc-figure"><a href="/screenshots/ui/en-US/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/en-US/settings-services.webp" width="2560" height="1600" alt="FluentRead translation service directory and connection settings" loading="lazy" /></a><figcaption>Configure and check the connection, then choose the default or assign it to a feature.</figcaption></figure>
 

@@ -28,7 +28,7 @@ outline: false
 3. 点击**检查连接**。它会发送一条短请求，可能消耗少量额度；通过只表示本次检查成功。
 4. 点击**设为默认翻译服务**，再回网页试译。文档、字幕和翻译卡片可独立选服务，请分别检查。
 
-点击目录只打开连接配置，不会更换默认服务。也可从扩展菜单的**翻译服务**或通用设置分配各功能使用的服务。
+点击目录只打开连接配置，不会更换默认服务。可以从扩展菜单的**翻译服务**或通用设置的**按功能选择服务**为各功能分配服务。**按功能选择服务**默认展开，点击标题即可收起。
 
 <figure class="doc-figure"><a href="/screenshots/ui/zh-CN/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/zh-CN/settings-services.webp" width="2560" height="1600" alt="流畅阅读翻译服务目录与连接配置" loading="lazy" /></a><figcaption>填写连接并检查成功后，再设为默认或分配给某项功能。</figcaption></figure>
 

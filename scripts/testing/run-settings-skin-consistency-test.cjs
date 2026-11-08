@@ -231,8 +231,8 @@ async function main() {
       for (const width of [1440, 390]) {
         const label = `${skin}-${theme}-${width}`; currentCase = `general-${label}`; await openOptions('settings-general', width);
         await page.waitForFunction(({skin, dark}) => document.documentElement.dataset.interfaceSkin === skin && document.documentElement.classList.contains('dark') === dark, {skin, dark: theme === 'dark'});
-        const disclosure = page.locator('details.feature-services'); assert.equal(await disclosure.getAttribute('open'), null);
-        await disclosure.locator(':scope > summary').click(); assert.equal(await disclosure.locator('[data-feature-service]:visible').count(), 9);
+        const disclosure = page.locator('details.feature-services'); assert.notEqual(await disclosure.getAttribute('open'), null);
+        assert.equal(await disclosure.locator('[data-feature-service]:visible').count(), 9);
         await page.mouse.move(0, 0); await settle();
         const summaryTitle = await disclosure.locator('.feature-services-status').getAttribute('title');
         const warned = await disclosure.locator('.settings-item:has(.feature-service-warning)').evaluateAll(nodes => nodes.map(node => ({name: node.querySelector('.feature-service-heading strong').textContent.trim(), feature: node.querySelector('[data-feature-service]').dataset.featureService})));

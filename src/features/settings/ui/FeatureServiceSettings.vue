@@ -1,11 +1,11 @@
 <!--
  * @file src/features/settings/ui/FeatureServiceSettings.vue
- * 文件职责：在通用设置中按需展开各功能的翻译服务分配，沿用默认服务，摘要提示独立配置与需要处理的状态。
+ * 文件职责：在通用设置中默认展开各功能的翻译服务分配，沿用默认服务，摘要提示独立配置与需要处理的状态。
  * 主要内容：按当前配置和功能选择限定缓存事件，复验服务能力，缓存各行模型与凭据提示；关闭的功能服务保留为不可选的当前值并显示已关闭提示；标题旁仅在没有操作提示时显示 AI 服务限制，下一行展示有效模型，阅读单独支持B站免费讲解，写作保留通用AI限制；配置连接定位到翻译服务页，默认选择保持独立。
  * 模块边界：仅修改父级传入的配置草稿，复用现有字段与自动保存；不保存第二份映射，不发起翻译或测试连接请求。
  -->
 <template>
-  <SettingsDisclosure class="feature-services" data-testid="feature-services" data-i18n-ignore
+  <SettingsDisclosure class="feature-services" data-testid="feature-services" data-i18n-ignore default-open
     :title="t('featureServices.open')" :description="t('featureServices.shortHelp')"
     :status-tone="summaryWarning ? 'warning' : 'neutral'">
     <template #status><span class="feature-services-status" :title="summaryWarning || summaryServices">{{ summaryWarning ? t('featureServices.needsSetup') : summaryServices }}</span></template>

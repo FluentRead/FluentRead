@@ -91,9 +91,9 @@ async function mountFeature(config = runtime.reactive(new Config()), values: Rec
 async function mountMenu(config: Config = runtime.reactive(Object.assign(new Config(), {disableImageTranslator: false, disableSelectionTranslator: false, selectionTranslatorMode: 'bilingual'})), values: Record<string, unknown> = {}) {await mount(menuPath, {config, ...values})}
 
 describe('功能服务分配实际缓存模板归属', () => {
-  it('默认折叠显示继承摘要，独立服务的缺配置状态仍可发现且不改变配置', async () => {
+  it('默认展开并显示继承摘要，独立服务的缺配置状态仍可发现且不改变配置', async () => {
     const config = runtime.reactive(new Config()); config.service = 'microsoft'; config.harness.enabled = false; config.writing.enabled = false; await mountFeature(config)
-    expect(document.querySelector('details.feature-services')?.hasAttribute('open')).toBe(false)
+    expect(document.querySelector('details.feature-services')?.hasAttribute('open')).toBe(true)
     expect(state.summaryServices).toBe('featureServices.followDefault')
     expect(state.summaryWarning).toBe('')
     config.selectionTranslationService = 'openai'; await settle()
@@ -110,6 +110,8 @@ describe('功能服务分配实际缓存模板归属', () => {
   })
   it('折叠时仍提示继承服务的缺凭据与已开启 AI 功能的能力问题', async () => {
     const config = runtime.reactive(new Config()); config.service = 'microsoft'; config.harness.enabled = false; config.writing.enabled = false; await mountFeature(config)
+    const disclosure = document.querySelector('details.feature-services')!
+    disclosure.removeAttribute('open')
     expect(state.summaryWarning).toBe('')
     config.harness.enabled = true; await settle()
     expect(state.summaryWarning).toContain('featureServices.reading')
@@ -117,6 +119,7 @@ describe('功能服务分配实际缓存模板归属', () => {
     expect(state.summaryWarning).toBe('featureServices.writing · featureServices.needsAi')
     expect(document.querySelector('[data-feature-service="writing"] .feature-service-warning')?.textContent).toBe('featureServices.needsAi')
     expect(document.querySelector('.feature-services-status')?.getAttribute('title')).toBe(state.summaryWarning)
+    expect(disclosure.hasAttribute('open')).toBe(false)
     config.writing.enabled = false; config.service = 'openai'; await settle()
     expect(state.summaryWarning).toContain('API Key')
     config.token.openai = 'fixture'; await settle()

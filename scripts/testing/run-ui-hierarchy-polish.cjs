@@ -177,21 +177,24 @@ async function main() {
 
     currentCase = 'general-disclosure'; await openOptions();
     const services = page.locator('details.feature-services[data-testid="feature-services"]');
-    assert.equal(await services.getAttribute('open'), null, 'Feature services initially collapsed');
+    const servicesSummary = services.locator(':scope > summary');
+    assert.notEqual(await services.getAttribute('open'), null, 'Feature services initially expanded');
+    assert.equal(await services.locator('[data-feature-service]:visible').count(), 9);
+    await servicesSummary.scrollIntoViewIfNeeded(); await shot('general-services-expanded');
+    await servicesSummary.click();
     assert.equal(await services.locator('[data-feature-service]:visible').count(), 0, 'Collapsed services do not occupy the form');
-    await services.locator(':scope > summary').scrollIntoViewIfNeeded(); await shot('general-services-collapsed');
-    await services.locator(':scope > summary').click(); assert.equal(await services.locator('[data-feature-service]:visible').count(), 9);
-    await shot('general-services-expanded');
-    await services.locator(':scope > summary').click();
+    await shot('general-services-collapsed');
+    await servicesSummary.click(); assert.equal(await services.locator('[data-feature-service]:visible').count(), 9);
+    await servicesSummary.click();
     await page.locator('.search-box input').fill('按功能选择服务');
     await page.locator('.search-results button').filter({hasText: '翻译服务选择'}).click();
     await page.waitForFunction(() => document.querySelector('#feature-services')?.hasAttribute('open'));
     assert.equal(await services.locator('[data-feature-service]:visible').count(), 9); assert.equal(await page.locator('.search-box input').inputValue(), '');
     await shot('general-services-search-reveal');
-    await services.locator(':scope > summary').click(); await anchor('services');
+    await servicesSummary.click(); await anchor('services');
     await page.waitForFunction(() => document.querySelector('#feature-services')?.hasAttribute('open'));
     assert.equal(await services.locator('[data-feature-service]:visible').count(), 9); await shot('general-services-anchor-reveal');
-    report.cases.push({name: 'general-disclosure', rows: 9, defaultCollapsed: true, searchReveal: true, anchorReveal: true});
+    report.cases.push({name: 'general-disclosure', rows: 9, defaultOpen: true, searchReveal: true, anchorReveal: true});
 
     currentCase = 'language-recovery';
     for (const [query, nextLanguage, optionName] of [['language', 'en-US', /English/], ['语言', 'zh-CN', /Chinese|中文/]]) {

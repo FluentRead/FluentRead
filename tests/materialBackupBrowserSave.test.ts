@@ -133,7 +133,9 @@ describe('browser material backup target',()=>{
     });
     it('writes bounded chunks to OPFS and removes them only after the browser confirms completion',async()=>{
         const f=fixture(),choice=await beginMaterialBrowserBackup('backup.json',f.env);expect(choice.status).toBe('ready');if(choice.status!=='ready')return;
-        const work=saveMaterialBackup(choice.target,async consume=>{await consume(new Uint8Array([1,2]));await consume(new Uint8Array([3]));});await tick();
+        const shared=new Uint8Array(new SharedArrayBuffer(4));shared.set([9,1,2,9]);
+        f.fs.controls.write=async chunk=>{if(typeof chunk!=='string')expect(chunk.buffer).toBeInstanceOf(ArrayBuffer);};
+        const work=saveMaterialBackup(choice.target,async consume=>{await consume(shared.subarray(1,3));await consume(new Uint8Array([3]));});await tick();
         expect(f.fs.files.size).toBe(2);expect(f.d.api.download).toHaveBeenCalledWith({url:'blob:test',filename:'backup.json'});expect([...new Uint8Array(await f.urls[0].arrayBuffer())]).toEqual([1,2,3]);expect(f.fs.deleted).toHaveLength(0);
         f.d.emit(7,'complete');expect(await work).toEqual({state:'saved',bytes:3});await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);expect(f.env.revokeURL).toHaveBeenCalledWith('blob:test');expect(f.d.changed.size).toBe(0);expect(f.d.erased.size).toBe(0);
     });

@@ -133,7 +133,7 @@ function createMaterialBrowserOpfsStorage(env:MaterialBrowserBackupStorageEnviro
                 catch(cleanupError){throw Object.assign(new Error('创建备份时未能清理新建的空临时文件，请在临时文件列表检查。'),{name:'MaterialBackupInitializationCleanupError',cause:error,cleanupError});}
                 throw error;
             }
-            const target:MaterialBackupWritable & {file():Promise<Blob>}={write:chunk=>writer.write(typeof chunk==='string'?chunk:asArrayBufferBytes(chunk)),close:()=>writer.close(),abort:reason=>writer.abort(reason),file:()=>file.getFile()};
+            const target:MaterialBackupWritable & {file():Promise<Blob>}={write:chunk=>writer.write(asArrayBufferBytes(chunk)),close:()=>writer.close(),abort:reason=>writer.abort(reason),file:()=>file.getFile()};
             return target;
         },
         async markReady(name,file){

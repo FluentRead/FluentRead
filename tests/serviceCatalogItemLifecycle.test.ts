@@ -40,7 +40,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         vue: Vue,
         '@/src/ui/i18n': i18nPort,
         '@/src/core/config/compositeTranslation': compositeTranslation,
-        '@/src/ui/components/ServiceIcon.vue': {default: ServiceIcon},
+        '@/src/ui/components/ServiceIcon.vue': {__esModule: true, default: ServiceIcon},
         './service-badges.css': {},
     };
     const module = {exports: {} as {default: Vue.Component}};
@@ -48,7 +48,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         if (id in dependencies) return dependencies[id];
         if (id.endsWith('.vue')) {
             const path = id.startsWith('@/') ? id.slice(2) : resolve(dirname(filename), id);
-            return {default: loadClient(path, components)};
+            return {__esModule: true, default: loadClient(path, components)};
         }
         throw new Error(`Unexpected service badge dependency: ${id}`);
     }, module.exports, module);

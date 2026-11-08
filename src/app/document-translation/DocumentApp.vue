@@ -451,7 +451,6 @@
 </template>
 
 <script lang="ts" setup>
-import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {captureDocumentMaterialLocator, resolveMaterialDocumentResume} from './materialResume';
 
 import {ElOption} from 'element-plus';
@@ -485,6 +484,7 @@ import {
   PDF_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,
   createDocumentDownload,
+  asArrayBufferBytes,
   createPdfPageRecognizer,
   documentRetryBackoff,
   generateDocumentArchive,

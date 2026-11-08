@@ -7,6 +7,7 @@
  */
 export * from '@/src/features/document-translation/public';
 export {hasDistinctTranslation} from '@/src/core/translation/result';
+export {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 export {buildGlossaryRevision} from '@/src/core/glossary';
 export {materialCapture, materialGet, materialGeneration, MATERIAL_RESUME_PARAMETER, type MaterialRecord, type MaterialSelection} from '@/src/features/vocabulary/material/public';
 export {Config} from '@/src/core/config/model';

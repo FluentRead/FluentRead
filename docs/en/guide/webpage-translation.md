@@ -33,7 +33,7 @@ Passages already in the target or an excluded language usually keep their source
 
 ## Read research papers
 
-On an arXiv abstract page, choose **Bilingual translation (FluentRead)** in the paper access area. FluentRead opens the official HTML for that version and translates from your reading position using your configured language and service. The original table of contents, formulas, and citation links remain usable.
+On an arXiv abstract page, choose **Bilingual translation (FluentRead)** in the paper access area. FluentRead opens the official HTML for that version in a new tab and translates from your reading position using your configured language and service. The original table of contents, formulas, and citation links remain usable.
 
 On a PubMed Central article, choose **Bilingual translation (FluentRead)** to translate the full text in place.
 

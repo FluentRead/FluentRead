@@ -3171,6 +3171,13 @@
     "content": [
       {
         "css": [
+          ".ltx_authors .ltx_note_frontmatter.ltx_thanks_contribution .ltx_note_content"
+        ],
+        "resolve": "closest",
+        "atomic": true
+      },
+      {
+        "css": [
           "h1.title",
           "blockquote.abstract",
           ".ltx_para > p",
@@ -3184,11 +3191,17 @@
       "#infobox.infobox",
       ".arxiv-html-header",
       ".ltx_page_navbar",
-      ".ltx_authors",
+      ".ltx_authors > :not(.ltx_creator)",
+      ".ltx_authors > .ltx_creator > :not(.ltx_note_frontmatter.ltx_thanks_contribution)",
+      ".ltx_authors .ltx_thanks_contribution > :not(.ltx_note_outer)",
+      ".ltx_authors .ltx_thanks_contribution .ltx_note_outer > :not(.ltx_note_content)",
       ".ltx_bibliography"
     ],
     "protect": [
       ".ltx_cite"
+    ],
+    "omit": [
+      ".ltx_authors .ltx_thanks_contribution .ltx_note_content :is(.ltx_note_mark, .ltx_note_type)"
     ]
   },
   {

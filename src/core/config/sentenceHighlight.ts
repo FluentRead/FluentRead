@@ -140,6 +140,7 @@ export function buildSentenceHighlightAppearanceCss(style: unknown, value: unkno
   const declarations = Object.entries(getSentenceHighlightAppearanceStyle(style, value))
   if (!declarations.length) return ''
   return '[data-fr-bilingual-sentence-highlight="true"]::highlight(fluentread-bilingual-sentence),\n'
-    + '[data-fr-bilingual-sentence-highlight="true"] ::highlight(fluentread-bilingual-sentence) {\n'
+    + '[data-fr-bilingual-sentence-highlight="true"] ::highlight(fluentread-bilingual-sentence),\n'
+    + '[data-fr-bilingual-sentence-highlight="true"] [data-fr-bilingual-sentence-formula="true"] {\n'
     + declarations.map(([property, value]) => `  ${property}: ${value} !important;`).join('\n') + '\n}\n'
 }

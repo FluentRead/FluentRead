@@ -897,30 +897,64 @@ describe('网站正文规则目录', () => {
         expect(core.shouldStayOriginal(document.getElementById('cite')!)).toBe(true);
     });
 
-    it('arXiv HTML 只翻译论文叙述，保留目录、作者、引文与公式', () => {
+    it('arXiv HTML 翻译贡献说明、摘要和引言，保护作者资料、其他脚注、目录、引文与公式', () => {
         const url = new URL('https://arxiv.org/html/1706.03762v7');
         const document = documentFor(`
             <div id="announcement-banner" class="ds-announcement"><p>Announcements from the arXiv website.</p></div>
             <div id="infobox" class="infobox"><p>License for the converted article.</p></div>
             <div class="arxiv-html-header"><p id="toolbar">Read the paper as a PDF.</p></div>
             <div class="ltx_page_navbar"><p id="toc"><a href="#S1">Table of contents</a></p></div>
-            <article class="ltx_document">
-                <h1 class="ltx_title" id="title">A study of efficient models</h1>
-                <div class="ltx_authors"><div class="ltx_para"><p id="author">The author and their affiliation</p></div></div>
-                <section id="S1"><div class="ltx_para"><p id="paragraph">This experiment compares <math class="ltx_Math"><mi>x</mi></math> with the baseline <cite class="ltx_cite"><a href="#bib1">A. Author, 2020</a></cite>.</p></div></section>
+            <article class="ltx_document ltx_authors_1line">
+                <h1 class="ltx_title ltx_title_document" id="title">A study of efficient models</h1>
+                <div class="ltx_authors">
+                    <span class="ltx_creator ltx_role_author">
+                        <span class="ltx_personname" id="author">Alice Researcher</span>
+                        <span class="ltx_note ltx_note_frontmatter ltx_thanks_contribution ltx_role_thanks">
+                            <sup class="ltx_note_mark">†</sup><span class="ltx_note_outer"><span class="ltx_note_content" id="contribution"><sup class="ltx_note_mark">†</sup><span class="ltx_note_type">thanks:</span>Equal contribution. Alice designed the experiment, and Bob ran the evaluation.</span></span>
+                        </span>
+                        <span class="ltx_note ltx_note_frontmatter ltx_thanks_note ltx_role_thanks" id="other-note">
+                            <sup class="ltx_note_mark">†</sup><span class="ltx_note_outer"><span class="ltx_note_content">Work performed while at another institution.</span></span>
+                        </span>
+                        <span class="ltx_author_notes"><span class="ltx_author_notes_content">
+                            <span class="ltx_contact ltx_role_affiliation">University Research Laboratory</span>
+                            <span class="ltx_contact ltx_role_email"><a href="mailto:alice@example.org">alice@example.org</a></span>
+                        </span></span>
+                    </span>
+                    <div class="ltx_para"><p id="legacy-author">Another author affiliation layout.</p></div>
+                </div>
+                <div id="abstract1" class="ltx_abstract">
+                    <h6 class="ltx_title ltx_title_abstract" id="abstract-title">Abstract</h6>
+                    <p class="ltx_p" id="abstract1.1">We propose a simple architecture for sequence modeling.</p>
+                </div>
+                <section id="S1" class="ltx_section">
+                    <h2 class="ltx_title ltx_title_section" id="introduction-title"><span class="ltx_tag ltx_tag_section">1</span> Introduction</h2>
+                    <div class="ltx_para ltx_noindent"><p class="ltx_p" id="S1.p1.1">This experiment compares <math class="ltx_Math"><mi>x</mi></math> with the baseline <cite class="ltx_cite"><a href="#bib1">A. Author, 2020</a></cite>.</p></div>
+                </section>
                 <section class="ltx_bibliography"><div class="ltx_para"><p id="bib1">The reference entry describes an earlier study.</p></div></section>
             </article>
         `);
         const core = new TranslationCandidateCore({url, adapters});
         const candidates = core.discover(document);
-        expect(candidates.some(candidate => candidate.element.id === 'title')).toBe(true);
-        expect(candidates.some(candidate => candidate.element.id === 'paragraph')).toBe(true);
-        for (const selector of ['#announcement-banner', '#infobox', '.arxiv-html-header', '.ltx_page_navbar', '.ltx_authors', '.ltx_bibliography']) {
+        for (const id of ['title', 'contribution', 'abstract-title', 'abstract1.1', 'introduction-title', 'S1.p1.1']) {
+            expect(candidates.some(candidate => candidate.element.id === id && candidate.adapterId === 'arxiv'), id).toBe(true);
+        }
+        const authorCandidates = candidates.filter(candidate => candidate.element.closest('.ltx_authors'));
+        expect(authorCandidates.map(candidate => candidate.element.id)).toEqual(['contribution']);
+        const contribution = document.getElementById('contribution')!;
+        expect(core.resolve(contribution.lastChild)?.element).toBe(contribution);
+        const authorText = extractTranslationText(contribution, core.shouldStayOriginal);
+        expect(authorText).toBe('Equal contribution. Alice designed the experiment, and Bob ran the evaluation.');
+        expect(extractTranslationText(document.querySelector('.ltx_authors')!, core.shouldStayOriginal)).toBe(authorText);
+        const noteSnapshot = createTranslationSourceSnapshot(contribution, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation);
+        const noteOutput = documentFor(applyTranslationsToSnapshot(noteSnapshot, noteSnapshot.slots.map(() => '贡献说明译文')));
+        expect(noteOutput.body.textContent).toBe('贡献说明译文');
+        expect(contribution.querySelector('.ltx_note_mark')?.textContent).toBe('†');
+        for (const selector of ['#announcement-banner', '#infobox', '.arxiv-html-header', '.ltx_page_navbar', '#author', '#other-note', '#legacy-author', '.ltx_author_notes', '.ltx_bibliography']) {
             const excluded = document.querySelector(selector)!;
             expect(candidates.some(candidate => excluded.contains(candidate.element)), selector).toBe(false);
         }
         for (const selector of ['math', '.ltx_cite']) expect(core.shouldStayOriginal(document.querySelector(selector)!)).toBe(true);
-        const paragraph = document.getElementById('paragraph')!;
+        const paragraph = document.getElementById('S1.p1.1')!;
         const snapshot = createTranslationSourceSnapshot(paragraph, core.shouldStayOriginal);
         expect(snapshot.slots.map(slot => slot.source).join(' ')).toContain('This experiment compares');
         expect(snapshot.slots.map(slot => slot.source).join(' ')).not.toContain('A. Author');

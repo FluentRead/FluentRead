@@ -58,6 +58,7 @@ describe('sentence highlight custom appearance', () => {
         });
         const css = buildSentenceHighlightAppearanceCss('rose', custom);
         expect(css).toContain('::highlight(fluentread-bilingual-sentence)');
+        expect(css).toContain('[data-fr-bilingual-sentence-formula="true"]');
         expect(css).not.toMatch(/\n\s+(?:color|opacity|font-size|position|padding):/u);
         expect(getSentenceHighlightAppearanceStyle('sky', {lineStyle: 'none'})).toMatchObject({'text-decoration-line': 'none', 'text-decoration-style': 'solid'});
         expect(getSentenceHighlightAppearanceStyle('rose', {backgroundOpacity: 0})).toMatchObject({'background-color': 'rgba(239, 71, 118, 0)'});
@@ -261,7 +262,8 @@ function fixture(html = '<p id="owner" data-row="10">First. Second.<span data-ro
         if (immediate) flush();
     };
     const highlighted = () => [...(registry.get(BILINGUAL_HIGHLIGHT_NAME) ?? [])].map(range => range.toString());
-    const mutate = (target: Node = document.querySelector('#owner')!) => callback.value?.([{target} as MutationRecord], {} as MutationObserver);
+    const mutate = (target: Node = document.querySelector('#owner')!, attributeName: string | null = null) =>
+        callback.value?.([{target, attributeName} as MutationRecord], {} as MutationObserver);
     return {document, window, registry, move, flush, highlighted, mutate, disconnect, observe, frames,
         geometryReads: () => geometryReads, select: () => {collapsed = false;}};
 }
@@ -380,6 +382,59 @@ describe('paint-only bilingual hover lifecycle', () => {
         dispose(); expect(f.registry.get('host-search')).toBe(foreign);
         expect(f.registry.has(BILINGUAL_HIGHLIGHT_NAME)).toBe(false);
         f.move(); expect(f.highlighted()).toEqual([]);
+    });
+    it('highlights paired inline formulas from prose or formula hits without borrowing a neighboring sentence', () => {
+        const marker = 'data-fr-bilingual-sentence-formula';
+        const f = fixture('<p id="owner" data-row="10"><span id="first">We use </span>' +
+            '<math id="source-formula"><mi id="symbol">h</mi><mo>=</mo><mn>8</mn><annotation>Hidden. Punctuation!</annotation></math>' +
+            '<span id="first-tail" data-row="12"> attention heads.</span> <span id="second" data-row="20">Next sentence.</span>' +
+            '<span class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="40">使用' +
+            '<span class="katex" id="translated-formula"><math><mi id="translated-symbol">h</mi><mo>=</mo><mn>8</mn></math></span>个注意力头。下一句。</span></p>');
+        const sourceFormula = f.document.querySelector('#source-formula')!;
+        const translatedFormula = f.document.querySelector('#translated-formula')!;
+        for (const [element, top] of [[sourceFormula, 25], [translatedFormula, 45]] as const) {
+            Object.defineProperty(element, 'getClientRects', {value: () => [{left: 60, right: 100, top, bottom: top + 10, width: 40, height: 10}]});
+        }
+        const before = f.document.body.innerHTML;
+        const marked = () => Array.from(f.document.querySelectorAll(`[${marker}]`));
+        const dispose = installBilingualSentenceHighlight(f.document);
+        for (const [selector, x, y] of [['#first', 20, 15], ['#symbol', 70, 30], ['#translated-symbol', 70, 50]] as const) {
+            f.move(selector, x, y);
+            expect(marked()).toEqual([sourceFormula, translatedFormula]);
+            expect(f.highlighted()).toEqual(['We use ', ' attention heads.', '使用', '个注意力头。']);
+        }
+        f.mutate(sourceFormula, marker);
+        expect(marked()).toEqual([sourceFormula, translatedFormula]);
+        f.move('#symbol', 20, 15);
+        expect(marked()).toEqual([]);
+        expect(f.highlighted()).toEqual([]);
+        f.move('#second', 20, 25);
+        expect(f.highlighted()).toEqual(['Next sentence.', '下一句。']);
+        expect(marked()).toEqual([]);
+        f.move('#symbol', 70, 30);
+        f.mutate(sourceFormula, 'class');
+        expect(marked()).toEqual([]);
+        f.move('#symbol', 70, 30);
+        dispose();
+        expect(f.document.body.innerHTML).toBe(before);
+    });
+
+    it('keeps hidden, protected and display formulas out of sentence paint', () => {
+        const f = fixture('<p id="owner" data-row="10">Readable sentence. <math id="display" display="block"><mn>1</mn></math>' +
+            '<span class="katex-display"><span class="katex" id="display-katex">2</span></span>' +
+            '<math aria-hidden="true" id="hidden-math"><mn>3</mn></math>' +
+            '<span class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="30">可读的一句。' +
+            '<mjx-container id="css-block" style="display:block">4</mjx-container><mjx-container id="display-mjx" display="true">5</mjx-container></span></p>');
+        for (const formula of f.document.querySelectorAll('math, .katex, mjx-container')) {
+            Object.defineProperty(formula, 'getClientRects', {value: () => [{left: 0, right: 80, top: 10, bottom: 40, width: 80, height: 30}]});
+        }
+        const dispose = installBilingualSentenceHighlight(f.document);
+        f.move(); expect(f.highlighted()).toEqual(['Readable sentence.', '可读的一句。']);
+        for (const selector of ['#display', '#display-katex', '#hidden-math', '#css-block', '#display-mjx']) {
+            f.move(selector); expect(f.highlighted()).toEqual([]);
+            expect(f.document.querySelector('[data-fr-bilingual-sentence-formula]')).toBeNull();
+        }
+        dispose();
     });
     it('maps rich text and translation-first order while excluding hidden and protected fragments', () => {
         const f = fixture('<p id="owner" data-row="10"><span class="fluent-read-bilingual-content" data-fr-translation-owned="true" data-row="30">第一句。<b>第二句。</b></span>First <a id="link">linked</a> sentence.<br>Second sentence.<i hidden>Hidden.</i><i style="display:none">Invisible.</i><i style="visibility:hidden">Invisible.</i><i style="visibility:collapse">Invisible.</i><span translate="no">Protected.</span><!--comment--></p>');

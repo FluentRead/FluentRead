@@ -571,6 +571,53 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(reader.hidden).toBe(false);
     });
 
+    it('译图随宿主容器挂载，遮挡时隐藏，布局不再匹配时用同一译图回退', async () => {
+        const env = setup();
+        const background = env.addBackground();
+        Object.defineProperty(background, 'offsetParent', {value: env.parent});
+        let localBounds = background.getBoundingClientRect();
+        const createElement = vi.mocked(document.createElement);
+        const create = createElement.getMockImplementation()!;
+        createElement.mockImplementation(((name: string) => {
+            const element = create(name);
+            if (name === 'div') {
+                Object.defineProperty(element, 'offsetParent', {get: () => element.parentElement});
+                element.getBoundingClientRect = () => localBounds;
+            }
+            return element;
+        }) as typeof document.createElement);
+
+        env.hover();
+        const button = env.button();
+        env.dispatch(button, 'click');
+        await flush();
+        const host = env.parent.querySelector('[data-fluent-read-ui="image-translation-bitmap"]')!;
+        const bitmap = env.roots[1].querySelector<HTMLImageElement>('.fluent-read-image-translation-bitmap')!;
+        expect(host.parentElement).toBe(env.parent);
+        expect(env.roots[0].querySelector('.fluent-read-image-translation-bitmap')).toBeNull();
+        expect(background.style.opacity).toBe('0');
+
+        const cover = document.createElement('div');
+        document.body.append(cover);
+        Object.assign(document, {elementsFromPoint: () => [cover, background]});
+        env.scroll(); env.runFrames();
+        expect(bitmap.style.visibility).toBe('hidden');
+        expect(background.style.opacity).not.toBe('0');
+        cover.remove();
+        Object.assign(document, {elementsFromPoint: () => [background]});
+        localBounds = {...localBounds, width: localBounds.width + 20};
+        env.scroll(); env.runFrames();
+        expect(host.isConnected).toBe(false);
+        expect(env.roots[0].querySelector('.fluent-read-image-translation-bitmap')).toBe(bitmap);
+        expect(bitmap.style.visibility).toBe('visible');
+        expect(background.style.opacity).toBe('0');
+        expect(client.translate).toHaveBeenCalledOnce();
+
+        env.dispatch(button, 'click');
+        expect(bitmap.isConnected).toBe(false);
+        expect(background.style.opacity).not.toBe('0');
+    });
+
     it('翻译后离开图片隐藏操作条，回到译图恢复入口且不重复翻译', async () => {
         const env = setup();env.hover();env.click();await flush();
         const controls = env.button().closest<HTMLElement>('.fr-image-controls')!;

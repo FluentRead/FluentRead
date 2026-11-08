@@ -5,6 +5,7 @@
  * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  * 分段旁置：仅分段载体提供已冻结的核心像素视窗，并随原漫画请求透传供完整补绘准入；普通图片与无视窗宿主不增加请求字段或读取布局。
  * 大图查看器：可信点击后仅在新打开的同图查看器复用已完成的译图，查看器与缩略图各自管理显示权。
+ * 滚动呈现：普通译图优先在与原图重合的宿主定位容器内绘制，随宿主滚动与裁切；固定层继续管理操作条和无法就地绘制的译图。
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
@@ -51,6 +52,7 @@ const openMangaReading = (event: MouseEvent) => mangaReadingOpener?.(event) ?? f
 
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
 const IMAGE_TRANSLATION_ROOT = 'fluent-read-image-translation-root';
+const IMAGE_BITMAP_CSS = '.fluent-read-image-translation-bitmap { position: absolute !important; inset: 0 !important; display: block !important; box-sizing: border-box !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; pointer-events: none !important; }';
 const MIN_IMAGE_WIDTH = 80;
 const MIN_IMAGE_HEIGHT = 40;
 const IMAGE_READ_TIMEOUT_MS = 15_000;
@@ -94,6 +96,8 @@ interface ImageTranslationState {
     waitingForImage: boolean;
     lines: ImageTranslationLine[];
     translatedImage: TranslatedSurface | null;
+    // undefined 表示当前译图尚未检查就地挂载，null 表示已选择固定层回退。
+    localBitmapHost?: HTMLDivElement | null;
     imageUnchanged: boolean;
     retryWhenSegmentationReady?: true;
     resultIdentity: string | null;
@@ -171,6 +175,8 @@ function lightResult(image: HTMLImageElement): MangaCompressedPage | undefined {
 }
 function releaseSurface(state: ImageTranslationState): void {
     const surface = state.translatedImage; surface?.remove(); state.translatedImage = null;
+    detachLocalBitmapHost(state);
+    state.localBitmapHost = undefined;
     if (surface?.tagName === 'CANVAS' && resultCache.get(state.image)?.translatedImage !== surface) {
         (surface as HTMLCanvasElement).width = 0; (surface as HTMLCanvasElement).height = 0;
     }
@@ -486,7 +492,7 @@ function ensureImageOverlayRoot(): HTMLDivElement {
     style.textContent = `
       :host { all: initial; position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2147483645; }
       .${IMAGE_TRANSLATION_OVERLAY} { position: fixed !important; overflow: hidden !important; pointer-events: none !important; box-sizing: border-box !important; }
-      .fluent-read-image-translation-bitmap { position: absolute !important; inset: 0 !important; display: block !important; box-sizing: border-box !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; pointer-events: none !important; }
+      ${IMAGE_BITMAP_CSS}
       ${IMAGE_CONTROLS_CSS}
     `;
     const container = document.createElement('div');
@@ -581,11 +587,7 @@ function removeState(state: ImageTranslationState): void {
     syncLayoutObservation();
     if (states.get(state.image) === state) states.delete(state.image);
     if (!state.image.isConnected) {deleteCachedResult(state.image); forgetLightResult(state.image);}
-    const surface = state.translatedImage;
-    state.translatedImage = null;
-    if (surface?.tagName === 'CANVAS' && resultCache.get(state.image)?.translatedImage !== surface) {
-        (surface as HTMLCanvasElement).width = 0; (surface as HTMLCanvasElement).height = 0;
-    }
+    releaseSurface(state);
 }
 
 function setPresentation(state: ImageTranslationState, presentation: ImagePresentation): void {
@@ -616,6 +618,49 @@ function invalidateSource(state: ImageTranslationState): void {
     state.needsPreparation = false;
     setButtonState(state, 'idle', '翻译图片');
     scheduleIdleStateRemoval(state);
+}
+
+function detachLocalBitmapHost(state: ImageTranslationState): void {
+    const host = state.localBitmapHost;
+    if (!host) return;
+    state.resizeObserver?.unobserve(host);
+    host.remove();
+    state.localBitmapHost = null;
+}
+
+function sharesBitmapBox(host: HTMLElement, parent: HTMLElement, rect: DOMRect): boolean {
+    if (host.parentElement !== parent || host.offsetParent !== parent) return false;
+    const box = host.getBoundingClientRect();
+    return Math.abs(box.left - rect.left) <= 0.5 && Math.abs(box.top - rect.top) <= 0.5
+        && Math.abs(box.width - rect.width) <= 0.5 && Math.abs(box.height - rect.height) <= 0.5;
+}
+
+function placeLocalBitmap(state: ImageTranslationState, surface: HTMLElement, rect: DOMRect, style: CSSStyleDeclaration, bitmap: TranslatedSurface): boolean {
+    if (state.localBitmapHost === null) return false;
+    const parent = surface.parentElement;
+    // 只复用宿主已建立的定位容器；不修改原图或父容器的定位方式。
+    const eligible = !state.manga && parent && parent.tagName !== 'PICTURE' && surface.offsetParent === parent
+        && style.position !== 'fixed' && style.position !== 'sticky'
+        && [style.transform, style.translate, style.rotate, style.scale].every(value => !value || value === 'none');
+    if (state.localBitmapHost) {
+        if (eligible && sharesBitmapBox(state.localBitmapHost, parent, rect)) return true;
+        detachLocalBitmapHost(state);
+        state.overlay.prepend(bitmap);
+        return false;
+    }
+    state.localBitmapHost = null;
+    if (!eligible) return false;
+    const host = document.createElement('div');
+    host.dataset.fluentReadUi = 'image-translation-bitmap';
+    host.style.cssText = 'all: initial !important; position: absolute !important; inset: 0 !important; display: block !important; pointer-events: none !important';
+    parent.append(host);
+    if (!sharesBitmapBox(host, parent, rect)) { host.remove(); return false; }
+    const sheet = document.createElement('style');
+    sheet.textContent = IMAGE_BITMAP_CSS;
+    host.attachShadow({mode: 'closed'}).append(sheet, bitmap);
+    state.localBitmapHost = host;
+    state.resizeObserver?.observe(host);
+    return true;
 }
 
 function updateOverlayPosition(state: ImageTranslationState): void {
@@ -650,7 +695,8 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     let top = Math.max(0, rect.top);
     let right = Math.min(window.innerWidth, rect.right);
     let bottom = Math.min(window.innerHeight, rect.bottom);
-    let opacity = Number.parseFloat(state.sourceStyleLease?.computedOpacity || style.opacity || '1');
+    const sourceOpacity = Number.parseFloat(state.sourceStyleLease?.computedOpacity || style.opacity || '1');
+    let opacity = sourceOpacity;
     for (let ancestor = surface.parentElement; ancestor; ancestor = ancestor.parentElement) {
         const ancestorStyle = getComputedStyle(ancestor);
         opacity *= Number.parseFloat(ancestorStyle.opacity || '1');
@@ -686,6 +732,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.overlay.style.display = visible && !occluded ? 'block' : 'none';
     if (!visible || occluded) {
         // 译层不可见时释放原图，避免移出视口、宿主裁切或布局变化留下空白。
+        if (state.localBitmapHost && state.translatedImage) state.translatedImage.style.visibility = 'hidden';
         restoreOriginalImage(state);
         if (occluded) state.controls.hideReader();
         return;
@@ -709,16 +756,18 @@ function updateOverlayPosition(state: ImageTranslationState): void {
     state.controls.feedback.style.maxWidth = `${Math.max(0, right - left - 16) / hostScaleX}px`;
     if (!state.translatedImage || state.phase !== 'translated') return;
     const bitmap = state.translatedImage;
-    const scaleX = surface.offsetWidth ? rect.width / surface.offsetWidth / hostScaleX : 1;
-    const scaleY = surface.offsetHeight ? rect.height / surface.offsetHeight / hostScaleY : 1;
-    // 原生 replaced element 负责 object-fit 与完整 object-position 语法；滚动仅移动层，不重复解码或绘制整幅 Canvas。
+    const localBitmap = placeLocalBitmap(state, surface, rect, style, bitmap);
+    const scaleX = !localBitmap && surface.offsetWidth ? rect.width / surface.offsetWidth / hostScaleX : 1;
+    const scaleY = !localBitmap && surface.offsetHeight ? rect.height / surface.offsetHeight / hostScaleY : 1;
+    // 原生 replaced element 负责 object-fit 与 object-position。就地挂载时祖先的透明度、缩放与裁切由浏览器应用。
     const fitting = state.presentation.kind === 'background' ? surfaceStyleToBitmap(style)
         : {objectFit: style.objectFit || 'fill', objectPosition: style.objectPosition || '50% 50%'};
     bitmap.style.objectFit = fitting.objectFit;
     bitmap.style.objectPosition = fitting.objectPosition;
     bitmap.style.borderRadius = style.borderRadius;
     bitmap.style.backgroundColor = style.backgroundColor;
-    bitmap.style.opacity = String(opacity);
+    bitmap.style.opacity = String(localBitmap ? sourceOpacity : opacity);
+    bitmap.style.visibility = 'visible';
     bitmap.style.filter = style.filter;
     for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
         const scale = side === 'Left' || side === 'Right' ? scaleX : scaleY;
@@ -728,7 +777,7 @@ function updateOverlayPosition(state: ImageTranslationState): void {
         bitmap.style[`border${side}Color`] = style[`border${side}Color`];
     }
     // 先挂载并布置已解码的译图，再在同一帧交接显示权；加载和不可见状态不隐藏原图。
-    if (localHost) {
+    if (localHost && !localBitmap) {
         const rendered = state.overlay.getBoundingClientRect();
         if (Math.abs(rendered.left - rect.left) > 1 || Math.abs(rendered.top - rect.top) > 1
             || Math.abs(rendered.width - rect.width) > 1 || Math.abs(rendered.height - rect.height) > 1) {
@@ -1021,7 +1070,7 @@ function showTranslatedImage(state: ImageTranslationState): void {
         image.className = 'fluent-read-image-translation-bitmap';
         if (image.tagName === 'IMG') (image as HTMLImageElement).alt = '';
         image.setAttribute('aria-hidden', 'true');
-        state.overlay.prepend(image);
+        if (!state.localBitmapHost) state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
     setButtonState(state, 'translated', state.lines.some(line => line.renderSkipped)

@@ -24,11 +24,25 @@ Zotero、Obsidian、油猴版本目前独立维护。根版本标签表示整组
 
 此流程发布 GitHub 下载附件。Chrome Web Store、Edge Add-ons、Firefox AMO、Greasy Fork 和 Apple App Store 的账号认证、审核与分发需要各自接入。Greasy Fork 专用源码要求提交过且一致的固定依赖资源；保持现有保护，本流程发布标准版和 standalone 安装脚本，不自动改写托管资源。Zotero 的 `updates.json` 也不会在此流程中自动启用。
 
+## 本地打包
+
+- Chrome 使用 `pnpm build` 构建，`pnpm zip` 生成安装包。扩展 ID、Google OAuth 和商店更新说明见[扩展身份和安装包](extension-identity-and-packages.md#一个-chrome-zip-如何用于两种场景)。
+- Edge 使用 `pnpm zip:edge` 生成独立的商店包。
+- Firefox 使用 `pnpm build:firefox` 构建，`pnpm zip:firefox` 同时生成安装包和审核源码包。提交 AMO 时使用同一次打包的两个文件。
+
 ## Firefox AMO 告警检查
 
-先运行 `pnpm build:firefox`，再按根目录 README 的命令安装 Mozilla 官方 `addons-linter` 并执行 `pnpm lint:firefox:amo`。校验脚本可指定目录或最终 ZIP，保存完整 JSON，不屏蔽规则；校验错误或校验器失败会使命令失败，警告仍保留在报告中。构建与源码 ZIP 的复现步骤也在 README，源码包应与提交的安装包来自同一次打包。[Mozilla 本地校验说明](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/)、[源码提交要求](https://extensionworkshop.com/documentation/publish/source-code-submission/)
+先构建 Firefox 扩展，再单独安装 Mozilla 的校验器并执行检查。
 
-AMO 自动构建入口为 `npm run build-for-amo`，复用现有 `build:firefox`，再以两空格缩进写入同一份 manifest JSON，输出 `.output/firefox-mv2`。在干净目录解压本次提交的源码 ZIP，运行 `pnpm install --frozen-lockfile`，再执行该入口；固定 Node.js、pnpm 和锁文件版本，并记录完整日志。按文件路径和解压后的字节内容与后台实际上传包比较，不能用当前 `main` 的构建结果代替已提交版本的复现，也不能只核对版本号或文件数量。ZIP 时间戳和压缩参数不作为扩展内容相同的依据。[Mozilla 自动构建入口说明](https://discourse.mozilla.org/t/help-our-source-code-review-process-add-a-build-for-amo-script/148822)
+```sh
+pnpm build:firefox
+npm install --prefix /tmp/fluentread-amo-tools --ignore-scripts --no-audit --no-fund addons-linter@10.15.0
+pnpm lint:firefox:amo --linter /tmp/fluentread-amo-tools/node_modules/.bin/addons-linter --report /tmp/fluentread-amo-report.json
+```
+
+脚本默认检查构建目录。核对实际上传内容时，把安装 ZIP 作为 `pnpm lint:firefox:amo` 的第一个参数。脚本保存完整 JSON 报告和告警，出现校验错误或校验器执行失败时返回非零状态。签名和审核由 AMO 完成。[Mozilla 本地校验说明](https://extensionworkshop.com/documentation/develop/getting-started-with-web-ext/) · [源码提交要求](https://extensionworkshop.com/documentation/publish/source-code-submission/)
+
+在干净目录解压本次提交的源码 ZIP，按 [Firefox 审核构建指南](https://github.com/FluentRead/FluentRead/blob/main/scripts/amo/README.md) 构建。该指南随源码 ZIP 提供。固定 Node.js、pnpm 和锁文件版本，并记录完整日志。对照后台实际上传包，逐一比较解压后的文件路径和内容。用提交审核的源码版本复现，版本号、文件数量、ZIP 时间戳和压缩参数无法证明内容一致。[Mozilla 自动构建入口说明](https://discourse.mozilla.org/t/help-our-source-code-review-process-add-a-build-for-amo-script/148822)
 
 Vite 内置的 CommonJS 26 默认自动判断条件 require；同一 CryptoJS 模块被条件和无条件导入时，包装结果可能受构建时序影响。后台构建固定八个 CryptoJS 模块的初始化包装，保留原上传包的执行顺序。升级 CryptoJS、Vite 或改变后台 CommonJS 依赖后，应重新审查包装清单、相关密码学回归和跨目录构建结果；不能只重跑构建直到偶然匹配。[CommonJS 包装选项](https://github.com/rollup/plugins/tree/master/packages/commonjs#strictrequires)
 

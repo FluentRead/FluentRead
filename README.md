@@ -60,26 +60,12 @@ The project is currently funded mainly out of pocket, with tens of thousands of 
 
 ## Local development
 
-Requirements: Node.js 20 or later and pnpm 9.
+Use Node.js 20+ and pnpm 9. Install dependencies with `pnpm install --frozen-lockfile`.
 
-Node.js 22.12 or later in the 22.x line is recommended, matching CI; `.nvmrc` selects Node 22. Check both `node --version` and `pnpm exec node --version` after switching. Older Node 20 releases can emit an experimental JSON-module warning from WXT's spinner dependency; using Node 22 avoids it without suppressing warnings. Type-check and userscript compression caches are described in [testing](./docs/testing.md#编译与构建缓存).
+- `pnpm dev` starts local development.
+- `pnpm zip` builds and packages the Chrome extension.
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dev
-```
-
-Use `pnpm build` to build the Chrome extension and `pnpm zip` to generate one `-chrome.zip`, preserving its public key, fixed extension ID, and Google OAuth configuration. Use the same ZIP for manual installation and preparation for an update to the existing Chrome Web Store item. Packaging removes the obsolete `-chrome-store.zip` for the same version. See [extension identity and packages](./docs/maintainers/extension-identity-and-packages.md) for details.
-
-Use `pnpm build:firefox` to build the Firefox extension, `pnpm zip:firefox` to generate its installation and review-source ZIPs, and `pnpm zip:edge` to generate the separate Microsoft Edge Add-ons ZIP without the Chrome `key`. The review-source ZIP includes the extension build inputs; website assets, test evidence, and other distribution targets are omitted. Use `pnpm compile` for type checking and `pnpm docs:build` to build the website. See [architecture](./docs/architecture.md) and [testing](./docs/testing.md) for project conventions.
-
-For Mozilla reviewers, the Firefox build uses Node.js 20 or later, pnpm 9 (the exact pnpm version is pinned in `packageManager`), and the checked-in `pnpm-lock.yaml`. From the source ZIP root, run `pnpm install --frozen-lockfile` followed by `npm run build-for-amo`; the generated extension is in `.output/firefox-mv2`. The `build-for-amo` entry delegates to `build:firefox`, so AMO's builder selects Firefox explicitly instead of the default Chrome target. No private credentials or `.env` file are needed. The build keeps the upstream vendor files intact and applies source-hash-checked adaptations in `scripts/testing/extension-csp-build.ts`, `scripts/testing/defuddle-entity-build.ts`, and `scripts/wasm/package-diagnostics.ts`. Those transformations are part of the submitted sources and run on every build.
-
-The AMO warning remediation build was checked on macOS ARM64 with Node.js 20.11.1 and pnpm 9.12.1; there are no OS-specific native compilation steps for the extension. Background builds pin the CryptoJS CommonJS initialization wrappers because automatic conditional-require detection can produce different output between builds. The AMO entry also writes `manifest.json` in a consistent two-space format for file comparisons, without changing any manifest fields or JavaScript. Vendored OCR sources and licenses are listed in `public/fluent-read-ocr/NOTICE.md`. The other patched packages and exact versions come from `package.json` and `pnpm-lock.yaml`: Tesseract.js/regenerator-runtime, JSZip, PDF.js, fontkit, lodash-es, ONNX Runtime Web, and Defuddle. Their original files remain available through the official npm packages. The CSP adaptations replace global-object fallbacks with `globalThis`, reject unused string timer callbacks, keep PDF.js on its interpreter, and replace the ONNX Emscripten invoker with a static closure. Defuddle's entity-decoding call is adapted to the shared `entities` text decoder; its original package is not modified. WASM binaries are unchanged.
-
-Before AMO submission, install Mozilla's validator separately, for example `npm install --prefix /tmp/fluentread-amo-tools --ignore-scripts --no-audit --no-fund addons-linter@10.15.0`, then run `pnpm lint:firefox:amo --linter /tmp/fluentread-amo-tools/node_modules/.bin/addons-linter --report /tmp/fluentread-amo-report.json`. The command checks the built Firefox directory by default; pass the installation ZIP as the first argument to check that exact upload. It preserves the complete report and fails on errors or validator failure. Warnings remain visible for review. Successful local validation does not confirm AMO signing or approval.
-
-Run `pnpm storybook` to explore the real Vue components and interface themes locally. See the [design system guide](./docs/en/guide/design-system.md). Use `pnpm docs:build:site` to build the documentation with the component explorer.
+[Other browsers](./docs/maintainers/releases.md#本地打包) · [Firefox source review](./scripts/amo/README.md)
 
 ## Contributing
 

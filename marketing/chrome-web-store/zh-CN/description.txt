@@ -23,6 +23,6 @@ AI 翻译卡片
 • 图片识别语言包和本地字幕模型首次使用需要下载。扫描版 PDF 在翻译时使用本地文字识别，请先选对源语言；部分图片、视频和受保护网页无法读取。
 • 云端翻译会将待译文字发送给所选服务；文件解析、图片文字识别和 X 本地音频识别在浏览器中进行。
 
-使用指南：https://fluent.thinkstu.com/guide/
-数据与隐私：https://fluent.thinkstu.com/guide/privacy
+使用指南：https://read.thinkstu.com/guide/
+数据与隐私：https://read.thinkstu.com/guide/privacy
 源代码与反馈：https://github.com/FluentRead/FluentRead

@@ -55,7 +55,7 @@ export function serviceHeaders(service: string, apiKey: string): Record<string, 
   const headers: Record<string, string> = {};
   if (service === services.azureOpenai && apiKey) headers['api-key'] = apiKey;
   if (service === services.openrouter) {
-    headers['HTTP-Referer'] = 'https://fluent.thinkstu.com';
+    headers['HTTP-Referer'] = 'https://read.thinkstu.com';
     headers['X-Title'] = 'FluentRead Harness';
   }
   return Object.keys(headers).length ? headers : undefined;

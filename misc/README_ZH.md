@@ -60,14 +60,12 @@
 
 ## 本地开发
 
-环境要求：Node.js 20 或以上、pnpm 9。
+使用 Node.js 20 或以上及 pnpm 9。首次运行 `pnpm install --frozen-lockfile` 安装依赖。
 
-```sh
-pnpm install --frozen-lockfile
-pnpm dev
-```
+- `pnpm dev` 启动本地开发。
+- `pnpm zip` 构建并打包 Chrome 扩展。
 
-`pnpm build` 构建 Chrome 扩展，`pnpm compile` 执行类型检查，`pnpm docs:build` 构建官网。架构与测试约定见[架构说明](../docs/architecture.md)和[测试说明](../docs/testing.md)。
+[其他浏览器打包](../docs/maintainers/releases.md#本地打包)
 
 ## 贡献与反馈
 

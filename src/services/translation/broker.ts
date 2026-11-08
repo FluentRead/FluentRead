@@ -1,6 +1,7 @@
 /**
  * @file src/services/translation/broker.ts
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
+ * Emoji 兼容：硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
  *
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
  * 主要内容：createTranslationBroker 同时支持单条、批量和页面摘要，验证 provider 返回数量、类型及明显的原文回显或错语种，图片文字的内部策略接受有效原样结果并隔离缓存，空来源在本地保留；普通数组无论是否缓存都先合并完全相同的原文，再按原位置回填，AI 多段保留独立槽位与邻段语义；仅在原生批次响应结构异常时以相同取消所有权和剩余 deadline 逐段恢复，整批完成前不发布缓存；对完整多段协议逐槽修复上下文回显并拒绝空译文，以包含 Chrome auto 检测样本的完整身份构建缓存键，并按实际消费的云地域和凭据摘要、匿名额度身份、等待策略、清理代次与剩余 deadline 隔离 pending 请求；入口在等待前复制消息，ready 采用有界水合等待，之后按最终服务解析 AI 配置预算并扣除已等待时间，取消检查后沿用可信配置快照，仅未附着的公开请求复制备用配置；批次摘要与分项缓存键只构建一次并复用，重复身份只读写一次；每次公开请求累计缓存复用、上游调用次数、耗时与免费链线路尝试，结束后向注入的统计端口交付只含规模数值、服务与线路标识的事件。 可核对的公开符号包括 createTranslationBroker、聚合导出。
@@ -47,7 +48,7 @@ import {buildGlossaryRevision, resolveGlossary} from '@/src/core/glossary';
 import {supportsNativeTranslationBatch, supportsTranslationBatch, supportsTranslationGlossary, getTranslationServiceUnavailableMessage} from './capabilities';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
-import {isGlossaryOnlyResult, prepareGlossaryRequest} from './glossaryProtection';
+import {isGlossaryOnlyResult, prepareGlossaryRequest, prepareLiteralEmojiRetry} from './glossaryProtection';
 import {
     isDefinitePageContextLeak,
     isLikelyPageContextLeak,
@@ -561,19 +562,32 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         message: TranslationRequestMessage,
     ): Promise<unknown> {
         const deadlineAt = now() + normalizeDeadlineTimeoutMs(message.requestTimeoutMs as number);
-        return runWithApiKeyRotation(execution.config, execution.service, (selected, attempt) => (
-            callProviderAttemptWithinDeadline({...execution, config: selected}, attachTranslationProviderConfig({
+        const model = getSelectedModel(execution.config, execution.service, message.modelOverride);
+        const invoke = (restoreLiteralEmoji?: (result: unknown) => string) => runWithApiKeyRotation(
+            execution.config, execution.service,
+            (selected, attempt) => callProviderAttemptWithinDeadline({...execution, config: selected}, attachTranslationProviderConfig({
                 ...message,
                 enableNativeBatch: message.enableNativeBatch ?? execution.nativeBatchEnabled,
                 requestTimeoutMs: attempt.attemptTimeoutMs ?? getRemainingDeadlineMs(deadlineAt),
-            }, selected))
-        ), {signal: execution.abortSignal, deadlineAt, now,
-            model: getSelectedModel(execution.config, execution.service, message.modelOverride)});
+            }, selected), restoreLiteralEmoji),
+            {signal: execution.abortSignal, deadlineAt, now, model},
+        );
+        try {
+            return await invoke();
+        } catch (error) {
+            if (execution.service !== services.siliconCloud || serializeTranslationError(error).code !== 'GLOSSARY_PLACEHOLDER_INVALID'
+                || getTranslationImageInput(message)
+                || getEffectiveRequestModel(execution.config, execution.service, message.modelOverride) !== 'tencent/Hunyuan-MT-7B') throw error;
+            const restoreLiteralEmoji = prepareLiteralEmojiRetry(message, execution.config);
+            if (!restoreLiteralEmoji) throw error;
+            return invoke(restoreLiteralEmoji);
+        }
     }
 
     async function callProviderAttemptWithinDeadline(
         execution: TranslationRequestExecution,
         message: TranslationRequestMessage,
+        restoreLiteralEmoji?: (result: unknown) => string,
     ): Promise<unknown> {
         throwIfRequestAborted(execution.abortSignal);
         const timeoutMs = normalizeDeadlineTimeoutMs(message.requestTimeoutMs as number);
@@ -634,6 +648,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     });
                     const operation = Promise.resolve().then(async () => {
                         throwIfRequestAborted(execution.abortSignal);
+                        if (restoreLiteralEmoji) return restoreLiteralEmoji(await provider({...providerMessage}));
                         const protectedRequest = prepareGlossaryRequest(providerMessage, execution.config);
                         return protectedRequest.restore(await provider({...protectedRequest.message}));
                     });

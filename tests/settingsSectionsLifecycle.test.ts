@@ -616,6 +616,16 @@ function inputProvider(fixture: Awaited<ReturnType<typeof mountSections>>, field
 function submitProviderFromTemplate(fixture: Awaited<ReturnType<typeof mountSections>>) {
     fixture.document!.querySelector('form.custom-provider-form')!.dispatchEvent(new fixture.domWindow!.Event('submit', {bubbles: true, cancelable: true}));
 }
+async function switchToServiceRestore(fixture: Awaited<ReturnType<typeof mountSections>>) {
+    fixture.document!.querySelector('[data-testid="custom-service-type-restore"]')!.dispatchEvent(new fixture.domWindow!.Event('click'));
+    await settle();
+}
+async function selectServiceToRestore(fixture: Awaited<ReturnType<typeof mountSections>>, service: string) {
+    const choice = fixture.document!.querySelector<HTMLInputElement>(`input[data-service-restore="${service}"]`)!;
+    choice.checked = true;
+    choice.dispatchEvent(new fixture.domWindow!.Event('change', {bubbles: true}));
+    await settle();
+}
 
 describe('新服务对话框实际模板首次挂载与后续实例归属', () => {
     it('唯一添加窗口切换为组合后只保留一个名称与保存按钮，提交不混入隐藏的接口密钥', async () => {
@@ -625,6 +635,7 @@ describe('新服务对话框实际模板首次挂载与后续实例归属', () =
         expect(fixture.providerState!.serviceType).toBe('interface');
         expect(document.querySelectorAll('[data-testid="custom-service-dialog"]')).toHaveLength(1);
         expect(document.querySelector('[data-testid="custom-service-type-interface"]')?.getAttribute('aria-pressed')).toBe('true');
+        expect(document.querySelector('[data-testid="custom-service-type-restore"]')).toBeNull();
         inputProvider(fixture, 'name', '  Daily combination  ');inputProvider(fixture, 'endpoint', 'https://hidden.example/v1');
         inputProvider(fixture, 'api-key', 'fixture-hidden-secret');inputProvider(fixture, 'model', 'hidden-model');
         const oldInterfaceSubmit = fixture.providerState!.actions.submit;
@@ -1115,7 +1126,7 @@ async function serviceEditorFixture(configSnapshot: Record<string, unknown> = {}
         expect(button).toBeTruthy();
         button!.dispatchEvent(new fixture.domWindow!.Event('click', {bubbles: true}));await settle();
     };
-    return {...fixture,catalog,configuration,availabilityDialog,availabilityAction};
+    return {...fixture,catalog,configuration,availabilityDialog,availabilityAction, get providerState() {return fixture.providerState;}};
 }
 const customConnection = (id='custom:1', model='model-a') => ({id,name:`连接 ${id}`,endpoint:`https://${id.replace(':','-')}.example/v1`,models:[model]});
 
@@ -1155,11 +1166,13 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         expect(f.availabilityDialog()).toBeNull();
         expect(f.state.config.disabledTranslationServices).toEqual(allExceptDefault);
         expect(f.state.config.service).toBe('google');
-        await f.catalog('toggle-availability','microsoft',true);
+        addProviderFromTemplate(f);await f.finishProviderLoad();
+        await switchToServiceRestore(f);
+        await selectServiceToRestore(f, 'microsoft');
         expect(f.state.config.disabledTranslationServices).toContain('microsoft');
         expect(f.patch).not.toHaveBeenCalled();
-        await f.availabilityAction('confirm');
-        expect(f.state.config.disabledTranslationServices).not.toContain('microsoft');
+        submitProviderFromTemplate(f);await settle();
+        expect(f.state.config.disabledTranslationServices).toEqual(allExceptDefault.filter((service: string) => service !== 'microsoft'));
         expect(f.patch).toHaveBeenCalledOnce();
     });
     it('配置中的替代服务发生变化时，撤销旧确认而不关闭默认服务',async()=>{
@@ -1171,18 +1184,54 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         expect(f.state.config.service).toBe('google');
         expect(f.state.config.disabledTranslationServices).toEqual(['freeTranslation']);
     });
-    it('移除正在编辑的服务后回到默认详情，加回时保留原有服务配置',async()=>{
-        const f=await serviceEditorFixture({service:'google',myMemoryEmail:'reader@example.test'});
-        await f.catalog('update:service','myMemory');
-        expect(f.state.selectedConfigurationService).toBe('myMemory');
-        await f.catalog('toggle-availability','myMemory',false);
-        expect(f.state.selectedConfigurationService).toBe('myMemory');
+    it('从自定义服务搜索并恢复移除项，取消不保存且确认保留原有服务配置',async()=>{
+        const f=await serviceEditorFixture({
+            service: 'google', documentService: 'custom:1', hoverTranslationService: 'custom:1',
+            customOpenAIProviders: [customConnection()], token: {'custom:1': 'fixture-key'},
+            model: {'custom:1': 'model-a'}, disabledTranslationServices: ['microsoft'],
+        });
+        await f.catalog('update:service','custom:1');
+        await f.catalog('toggle-availability','custom:1',false);
+        expect(f.state.selectedConfigurationService).toBe('custom:1');
         await f.availabilityAction('confirm');
         expect(f.state.selectedConfigurationService).toBe('google');
-        await f.catalog('toggle-availability','myMemory',true);
-        await f.availabilityAction('confirm');
+        f.patch.mockClear();
+
+        addProviderFromTemplate(f);await f.finishProviderLoad();
+        await switchToServiceRestore(f);
+        const choices = () => [...f.document!.querySelectorAll('[data-service-restore]')].map(choice => choice.getAttribute('data-service-restore'));
+        expect(choices()).toEqual(expect.arrayContaining(['microsoft', 'custom:1']));
+        expect(choices()).toHaveLength(2);
+        expect(f.document!.querySelector('[data-testid="custom-service-name"]')).toBeNull();
+        expect(f.document!.querySelector('[data-testid="custom-service-save"]')!.hasAttribute('disabled')).toBe(true);
+        submitProviderFromTemplate(f);await settle();
+        expect(f.patch).not.toHaveBeenCalled();
+        inputProvider(f, 'restore-search', 'ＣＵＳＴＯＭ：１');await settle();
+        expect(choices()).toEqual(['custom:1']);
+        await selectServiceToRestore(f, 'custom:1');
+        const staleSubmit = f.providerState!.actions.submit;
+        f.document!.querySelector('button.secondary-button')!.dispatchEvent(new f.domWindow!.Event('click'));
+        await settle();
+        expect(f.state.customProviderDialogOpen).toBe(false);
+        expect(f.patch).not.toHaveBeenCalled();
+        expect(f.state.config.disabledTranslationServices).toContain('custom:1');
+
+        addProviderFromTemplate(f);await settle();
+        expect(f.providerState!.serviceType).toBe('interface');
+        await switchToServiceRestore(f);
+        expect(choices()).toHaveLength(2);
+        await selectServiceToRestore(f, 'custom:1');
+        staleSubmit();expect(f.patch).not.toHaveBeenCalled();
+        submitProviderFromTemplate(f);await settle();
+        expect(f.patch).toHaveBeenCalledOnce();
+        expect(f.state.customProviderDialogOpen).toBe(false);
+        expect(f.availabilityDialog()).toBeNull();
         expect(f.state.selectedConfigurationService).toBe('google');
-        expect(f.state.config.myMemoryEmail).toBe('reader@example.test');
+        expect(f.state.config).toMatchObject({
+            service: 'google', documentService: 'custom:1', hoverTranslationService: 'custom:1',
+            token: {'custom:1': 'fixture-key'}, model: {'custom:1': 'model-a'},
+            disabledTranslationServices: ['microsoft'], customOpenAIProviders: [customConnection()],
+        });
     });
     it('自定义连接添加/选择/删除模型各只提交完整快照，保留同级服务与文档选择',async()=>{
         const f=await serviceEditorFixture({customOpenAIProviders:[customConnection(),customConnection('custom:2','second')],model:{'custom:1':'model-a'},documentModel:{'custom:1':'model-a'}});

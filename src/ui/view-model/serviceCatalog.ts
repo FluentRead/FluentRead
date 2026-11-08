@@ -215,6 +215,11 @@ export interface ServiceOption {
   catalogKind?: string
 }
 
+/** 目录和恢复列表共用服务关键词，无需解析模型选项。 */
+export function serviceDirectorySearchText(item: ServiceOption): string {
+  return [item.label, item.value, item.description, ...(item.searchTerms || [])].join(' ').normalize('NFKC').toLocaleLowerCase()
+}
+
 export interface ServiceGroup {
   id: string
   label: string

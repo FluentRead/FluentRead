@@ -6,11 +6,12 @@ const ports = vi.hoisted(() => ({
     ready: Promise.resolve() as Promise<void>, hydration: 'ready' as 'loading' | 'ready' | 'blocked',
     mainGate: undefined as Promise<void> | undefined, onboardingGate: undefined as Promise<void> | undefined,
     mainLoaded: vi.fn(), onboardingLoaded: vi.fn(), ensureBundle: vi.fn(async (_language: unknown) => {}), font: vi.fn(async (_font: unknown) => {}),
-    browser: 'chrome', platform: vi.fn(), currentTab: vi.fn(), tabApi: 'present' as 'present' | 'missing-tabs' | 'missing-method', unmountCallbacks: [] as Array<()=>void>,
+    browser: 'chrome', platform: vi.fn(), currentTab: vi.fn(), tabViews: vi.fn(), tabApi: 'present' as 'present' | 'missing-tabs' | 'missing-method', unmountCallbacks: [] as Array<()=>void>,
     createApp: vi.fn(), plugin: vi.fn(() => ({kind: 'i18n'})), use: vi.fn(), component: vi.fn(), mount: vi.fn(), anonymousElement: false,
 }));
 vi.mock('webextension-polyfill', () => ({default: {
     runtime: {getPlatformInfo: ports.platform},
+    extension: {getViews: ports.tabViews},
     get tabs() {return ports.tabApi==='missing-tabs' ? undefined : {getCurrent: ports.tabApi==='missing-method' ? undefined : ports.currentTab};},
 }}));
 vi.mock('../src/platform/browser/capabilities', () => ({browserCapabilities: {get browser() {return ports.browser;}}}));
@@ -41,7 +42,7 @@ beforeEach(async () => {
     Object.assign(ports.config, {uiLanguageSetupCompleted: false, uiLanguage: 'en-US', interfaceFont: 'system'});
     ports.font.mockReset().mockResolvedValue(undefined); ports.ensureBundle.mockReset().mockResolvedValue(undefined);
     ports.browser='chrome';ports.platform.mockReset().mockResolvedValue({os:'mac'});ports.unmountCallbacks=[];ports.anonymousElement=false;
-    ports.tabApi='present';ports.currentTab.mockReset().mockResolvedValue(undefined);
+    ports.tabApi='present';ports.currentTab.mockReset().mockResolvedValue(undefined);ports.tabViews.mockReset().mockReturnValue([]);
     ports.mount.mockReset();ports.createApp.mockReturnValue({use: ports.use, component: ports.component, mount: ports.mount,onUnmount: (fn:()=>void)=>ports.unmountCallbacks.push(fn)});
     vi.stubGlobal('document', parseHTML('<html><body></body></html>').document);
     vi.stubGlobal('window', new EventTarget());
@@ -592,7 +593,7 @@ describe('Popup fixed tab host lifecycle', () => {
         return {promise,resolve};
     }
     it.each([
-        ['chrome',0,false],['edge',42,true],['firefox',Number.MAX_SAFE_INTEGER,false],['safari',17,true],['thunderbird',1,false],
+        ['chrome',0,false],['edge',42,true],['firefox',Number.MAX_SAFE_INTEGER,false],['thunderbird',1,false],
     ] as const)('%s 真实标签页 id=%s 对完成状态=%s 启用自有固定视口且卸载释放',async(browser,id,completed)=>{
         ports.browser=browser;ports.config.uiLanguageSetupCompleted=completed;ports.currentTab.mockResolvedValue({id});
         await bootstrap.mountPreparedPopupApp('#owned');
@@ -600,6 +601,29 @@ describe('Popup fixed tab host lifecycle', () => {
         expect(document.documentElement.getAttribute(attribute)).toBe('');
         expect(ports.createApp).toHaveBeenCalledWith({kind:completed?'main':'onboarding'});
         ports.unmountCallbacks.forEach(fn=>fn());expect(document.documentElement.hasAttribute(attribute)).toBe(false);
+    });
+    it.each(['toolbar','standalone','unavailable','missing-window'] as const)('Safari %s uses the extension view type, even with an associated tab ID', async host => {
+        ports.browser = 'safari';
+        ports.currentTab.mockResolvedValue({id: 7});
+        ports.tabViews.mockReturnValue(host === 'standalone' ? [window] : [new EventTarget()]);
+        if (host === 'unavailable') ports.tabViews.mockImplementation(() => {throw new Error('Views unavailable');});
+        if (host === 'missing-window') vi.stubGlobal('window', undefined);
+
+        await bootstrap.mountPreparedPopupApp('#owned');
+        expect(ports.mount).toHaveBeenCalledOnce();
+        expect(ports.currentTab).not.toHaveBeenCalled();
+        if (host === 'missing-window') expect(ports.tabViews).not.toHaveBeenCalled();
+        else expect(ports.tabViews.mock.calls).toEqual([[{type: 'tab'}]]);
+        expect(document.documentElement.hasAttribute(attribute)).toBe(host === 'standalone');
+        if (host === 'standalone') {
+            pageTransition('pagehide', true);
+            expect(document.documentElement.hasAttribute(attribute)).toBe(false);
+            pageTransition('pageshow', true);
+            expect(document.documentElement.hasAttribute(attribute)).toBe(true);
+            expect(ports.tabViews).toHaveBeenCalledOnce();
+        }
+        ports.unmountCallbacks.forEach(fn => fn());
+        expect(document.documentElement.hasAttribute(attribute)).toBe(false);
     });
     it.each([
         ['toolbar',undefined],['null-tab',null],['missing-id',{}],['string-id',{id:'7'}],['negative-id',{id:-1}],

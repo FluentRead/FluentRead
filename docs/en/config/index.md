@@ -2,6 +2,8 @@
 
 Open full settings with the gear in the extension menu. Use search when you cannot find an option, such as target language, shortcuts, or menu layout. Most changes save automatically.
 
+Desktop settings open with all sidebar groups expanded. Scroll within the sidebar in a short window. On narrow screens, use the category menu at the top.
+
 <GuideVisual kind="settings" en />
 
 ## Start with these

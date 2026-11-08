@@ -1,4 +1,4 @@
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createReadingAnnotationRuntime} from '@/src/features/video-subtitle/offscreen/readingAnnotation';
 import {createVideoReadingAnnotationHandlers} from '@/src/features/video-subtitle/background/readingAnnotation';
 import {isReadingAnnotationWorkerRequest, isReadingAnnotationWorkerResponse, parseReadingAnnotationResponse, type ReadingAnnotationInput, type ReadingAnnotationRequest} from '@/src/core/messaging/readingAnnotation';
@@ -6,6 +6,8 @@ import {parseOffscreenRequest, parseOffscreenResponse} from '@/src/core/messagin
 import {createOffscreenMessageListener, type OffscreenMessageDependencies} from '@/src/app/offscreen/messageRouter';
 import type {OffscreenClient} from '@/src/platform/offscreen/client';
 import {READING_ANNOTATION_REQUEST_TIMEOUT_MS, READING_ANNOTATION_WORKER_TIMEOUT_MS} from '@/src/core/readingAnnotation';
+
+type AnnotateReading = NonNullable<OffscreenMessageDependencies['readingAnnotation']>['annotate'];
 
 const reading = {text: 'konnichiwa', language: 'ja', scheme: 'hepburn'};
 const input = {text: 'こんにちは', language: 'ja'};
@@ -124,7 +126,7 @@ describe('离屏读音Worker资源归属', () => {
     vi.useFakeTimers(); const worker = fakeWorker(); const createWorker = vi.fn().mockImplementationOnce(() => {throw new Error('create');}).mockReturnValue(worker.instance);
     const runtime = createReadingAnnotationRuntime({createWorker});
     await expect(runtime.annotate(input)).rejects.toThrow('create');
-    (worker.instance.postMessage as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {throw new Error('post');});
+    (worker.instance.postMessage as Mock<Worker['postMessage']>).mockImplementationOnce(() => {throw new Error('post');});
     await expect(runtime.annotate(input)).rejects.toThrow('post');
     const active = runtime.annotate(input); const jobs = Array.from({length: 16}, () => runtime.annotate(input));
     await expect(runtime.annotate(input)).rejects.toThrow('队列已满');
@@ -204,7 +206,7 @@ describe('后台读音发送方与取消隔离', () => {
 });
 
 describe('离屏读音路由', () => {
-  function setup(annotate = vi.fn(async () => reading), feature = true) {
+  function setup(annotate = vi.fn<AnnotateReading>(async () => reading), feature = true) {
     const dependencies = {runtimeId: 'extension', readingAnnotation: feature ? {annotate} : undefined,
       translate: vi.fn(), ttsPlayer: {play: vi.fn(), stop: vi.fn(), seek: vi.fn()}, fetchImage: vi.fn(), translateImage: vi.fn(), translateArea: vi.fn(), downloadOcrLanguages: vi.fn()} as OffscreenMessageDependencies;
     const listener = createOffscreenMessageListener(dependencies);
@@ -225,7 +227,7 @@ describe('离屏读音路由', () => {
 
   it('先取消、重复请求与在途取消均不放行旧结果，回复保持一次', async () => {
     let complete!: (value: typeof reading) => void;
-    const annotate = vi.fn((_input: unknown, _signal?: AbortSignal) => new Promise<typeof reading>(resolve => {complete = resolve;}));
+    const annotate = vi.fn<AnnotateReading>(() => new Promise<typeof reading>(resolve => {complete = resolve;}));
     const {dispatch} = setup(annotate); const request = {type: 'READING_ANNOTATION', ...input, requestId: 'a'};
     await dispatch({type: 'READING_ANNOTATION_CANCEL', requestId: 'a'});
     await expect(dispatch(request)).resolves.toMatchObject({success: false}); expect(annotate).not.toHaveBeenCalled();

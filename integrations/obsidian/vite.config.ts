@@ -15,6 +15,15 @@ export default defineConfig({
     publicDir: false,
     resolve: {alias: {'@': repositoryDir}},
     plugins: [createDeepLXRuntimeBuildPlugin(repositoryDir), createPdfReaderBidiBuildPlugin(repositoryDir), {
+        name: 'obsidian-pdfjs-node-fallback',
+        transform(source, id) {
+            if (!/\/pdfjs-dist\/legacy\/build\/pdf\.mjs$/u.test(id.replaceAll('\\', '/'))) return null;
+            // Obsidian 桌面 CJS 已提供绝对文件名。PDF.js 的 Node 回退需要绝对路径，
+            // 在浏览器渲染进程不会执行该分支，也不会新增对 Node 模块的顶层加载。
+            const code = source.replaceAll('.createRequire(import.meta.url)', '.createRequire(__filename)');
+            return code === source ? null : {code, map: null};
+        },
+    }, {
         name: 'copy-obsidian-manifest',
         closeBundle() {
             copyFileSync(resolve(integrationDir, 'manifest.json'), resolve(outputDir, 'manifest.json'));
@@ -29,10 +38,10 @@ export default defineConfig({
             formats: ['cjs'],
             fileName: () => 'main.js',
         },
-        rollupOptions: {
+        rolldownOptions: {
             external: ['obsidian', 'electron'],
             output: {
-                inlineDynamicImports: true,
+                codeSplitting: false,
                 banner: `/*!
 FluentRead Translation for Obsidian is licensed under GPL-3.0; source: https://github.com/FluentRead/FluentRead
 This bundle includes PDF.js, Copyright 2024 Mozilla Foundation, licensed under Apache-2.0.

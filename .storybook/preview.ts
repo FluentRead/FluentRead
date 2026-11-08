@@ -18,6 +18,7 @@ import '../storybook/preview.css'
 setup(app => { app.component('ElInputNumber', ElInputNumber) })
 
 const preview: Preview = {
+  tags: ['autodocs'],
   globalTypes: {
     theme: {
       description: '明暗主题',
@@ -55,7 +56,7 @@ const preview: Preview = {
     options: { storySort: { order: ['Overview', 'Foundations', 'UI', 'Examples'] } },
     controls: { expanded: true },
     docs: { toc: true },
-    viewport: { viewports: {
+    viewport: { options: {
       popup: { name: 'Popup · 320px', styles: { width: '320px', height: '640px' } },
       mobile: { name: 'Mobile · 390px', styles: { width: '390px', height: '844px' } },
       desktop: { name: 'Desktop · 1280px', styles: { width: '1280px', height: '800px' } },

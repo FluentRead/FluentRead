@@ -1,12 +1,12 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {showSectionReminder} from '@/src/features/section-translation/content/reminder';
 
 let document: Document;
 let root: ShadowRoot;
 let controller: AbortController;
-let translate: ReturnType<typeof vi.fn>;
-let dismiss: ReturnType<typeof vi.fn>;
+let translate: Mock<() => Promise<void>>;
+let dismiss: Mock<() => void>;
 beforeEach(() => {
     const dom = parseHTML('<html><body><p>Keep reading.</p></body></html>');
     document = dom.document as unknown as Document;

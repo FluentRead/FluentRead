@@ -1,5 +1,5 @@
 import './helpers/vueDomFixture';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createHash} from 'node:crypto';
 import {mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -13,7 +13,7 @@ const dom = await vi.hoisted(async () => {
     Object.defineProperty(parsed.window.Node.prototype, Symbol.toStringTag, {
         configurable: true, get() { return this.constructor.name; },
     });
-    for (const key of ['document', 'Node', 'Element', 'HTMLElement', 'SVGElement', 'ShadowRoot', 'Event', 'CustomEvent']) {
+    for (const key of ['document', 'Document', 'Node', 'Element', 'HTMLElement', 'SVGElement', 'ShadowRoot', 'Event', 'CustomEvent']) {
         Object.defineProperty(globalThis, key, {configurable: true, writable: true, value: (parsed.window as any)[key]});
     }
     Object.defineProperty(parsed.document, 'contentType', {configurable: true, value: 'text/html'});
@@ -741,7 +741,7 @@ describe('49F real config-store ownership through the full platform public handl
         try {
             storageModule.completeUserscriptConfigPreparation(); await store.configReady; ready = true;
             const {createPlatformMessageHandler} = await import('@/userscript/platformFull');
-            const stops: ReturnType<typeof vi.fn>[] = [];
+            const stops: Mock<() => void>[] = [];
             const watch = storageModule.configStorage.watch.bind(storageModule.configStorage);
             vi.spyOn(storageModule.configStorage, 'watch').mockImplementation((key, callback) => {
                 const stop = vi.fn(watch(key, callback)); stops.push(stop); return stop;
@@ -812,7 +812,7 @@ describe('49F full platform cleanup through the public browser owner', () => {
         vi.doMock('@/src/features/vocabulary/repository', () => ({vocabularyBook: {pruneUndo: async () => undefined}}));
         const browser = await import('@/userscript/browser');
         const platform = await import('@/userscript/platformFull');
-        type OwnedWatch = {key: string; callback: (value: any) => void; stop: ReturnType<typeof vi.fn>; release(): void; error?: Error; onStop?: () => void};
+        type OwnedWatch = {key: string; callback: (value: any) => void; stop: Mock<() => void>; release(): void; error?: Error; onStop?: () => void};
         const owned: OwnedWatch[] = [];
         let acquiring = false;
         const watch = storage.configStorage.watch.bind(storage.configStorage);
@@ -972,14 +972,14 @@ describe('49F real Vue partial construction disposal and retry', () => {
         vi.doMock('@/src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: () => bundle.promise}));
         const callbacks: Array<(config: any) => void> = [];
         const subscribed = new Set<unknown>();
-        const stops: ReturnType<typeof vi.fn>[] = [];
+        const stops: Mock<() => void>[] = [];
         let cleanupError: Error | undefined;
         ports.subscribe.mockImplementation(callback => {
             callbacks.push(callback); subscribed.add(callback);
             const stop = vi.fn(() => {subscribed.delete(callback); if (cleanupError) throw cleanupError;});
             stops.push(stop); return stop;
         });
-        const observers: Array<{callback: MutationCallback; active: boolean; observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn>}> = [];
+        const observers: Array<{callback: MutationCallback; active: boolean; observe: Mock; disconnect: Mock}> = [];
         vi.stubGlobal('MutationObserver', class {
             active = false;
             observe = vi.fn(() => {this.active = true; if (observeFailure) throw observeFailure;});
@@ -1609,7 +1609,7 @@ describe('49F owned settings i18n client admission', () => {
         registerAllUiLanguageBundles();
         const i18n = await import('@/src/ui/i18n');
         ports.config.uiLanguage = 'zh-CN';
-        const subscriptions = new Set<(config: any) => void>(), callbacks: Array<(config: any) => void> = [], stops: ReturnType<typeof vi.fn>[] = [];
+        const subscriptions = new Set<(config: any) => void>(), callbacks: Array<(config: any) => void> = [], stops: Mock<() => boolean>[] = [];
         ports.subscribe.mockImplementation(callback => {
             subscriptions.add(callback);callbacks.push(callback);
             const stop = vi.fn(() => subscriptions.delete(callback));stops.push(stop);return stop;
@@ -1618,7 +1618,7 @@ describe('49F owned settings i18n client admission', () => {
             Object.assign(ports.config, value);
             for (const callback of subscriptions) callback(ports.config);
         });
-        const observers: Array<{callback: MutationCallback; root?: Node; active: boolean; observe: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn>}> = [];
+        const observers: Array<{callback: MutationCallback; root?: Node; active: boolean; observe: Mock; disconnect: Mock}> = [];
         vi.stubGlobal('MutationObserver', class {
             root?: Node;active = false;
             observe = vi.fn((root: Node) => {this.root = root;this.active = true;});

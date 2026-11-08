@@ -1,4 +1,4 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 
 const ports = vi.hoisted(() => ({
     apiGate: undefined as Promise<void> | undefined,
@@ -29,7 +29,7 @@ function task(pages = [page(), page(['Second page'])]) {
 }
 type Module = typeof import('../integrations/obsidian/pdf');
 const extract = (module: Module, signal?: AbortSignal) => (module.extractPdfSegments as (bytes: ArrayBuffer, signal?: AbortSignal) => Promise<unknown>)(bytes(), signal);
-let module: Module; let createUrl: ReturnType<typeof vi.fn>; let revokeUrl: ReturnType<typeof vi.fn>;
+let module: Module; let createUrl: Mock<typeof URL.createObjectURL>; let revokeUrl: Mock<typeof URL.revokeObjectURL>;
 beforeEach(async () => {
     vi.resetModules(); vi.clearAllMocks(); ports.apiGate = undefined; ports.workerGate = undefined; ports.options.workerSrc = '';
     ports.getDocument.mockReset();

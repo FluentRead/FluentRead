@@ -9,7 +9,7 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createHash, createPublicKey} from 'node:crypto';
 
 const PROJECT_ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
-// Node 20 CLI 不直接导入 TypeScript；与公开身份常量的对应关系由 manifest 合约测试校验。
+// 发布校验 CLI 不直接导入 TypeScript；与公开身份常量的对应关系由 manifest 合约测试校验。
 const GOOGLE_DRIVE_DEFAULT_CLIENT_ID = '474699705334-7fua4hnkq1nmfu92cof0kdnmqsk5kth8.apps.googleusercontent.com';
 const GOOGLE_DRIVE_EXTENSION_ID = 'djnlaiohfaaifbibleebjggkghlmcpcj';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -383,6 +383,12 @@ async function main() {
         const [extensionArchive, sourceArchive] = await Promise.all(
             firefoxArchives.map((archive) => listArchiveArtifacts(path.join(outputDir, archive))),
         );
+        for (const file of ['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'tsconfig.json', 'wxt.config.ts',
+            'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'patches/ppu-paddle-ocr@6.6.0.patch']) {
+            assert(sourceArchive.includes(file), `Firefox 审核源码包缺少 ${file}`);
+        }
+        assert(!sourceArchive.some(file => /(?:^|\/)\.env(?:$|\.)|^(?:node_modules|coverage)\//u.test(file)),
+            'Firefox 审核源码包包含本地环境文件或生成目录');
         firefoxArchiveOcrAssets = [
             ...extensionArchive.filter((file) => file.startsWith('fluent-read-ocr/')),
             ...sourceArchive.filter((file) => file.startsWith('public/fluent-read-ocr/')),

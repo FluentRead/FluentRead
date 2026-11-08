@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createRequire} from 'node:module';
 import {parseHTML} from 'linkedom';
-import {describe, expect, it, vi} from 'vitest';
+import {describe, expect, it, vi, type Mock} from 'vitest';
 import cases from './browser-translation-cases.json';
 import establishedFixtures from '../scripts/site-translation/site-adaptation-established-fixtures.json';
 import type {YoutubeFetchPort} from '../src/features/video-subtitle/content/youtubeTimedTextBridgeCore';
@@ -93,7 +93,7 @@ describe('X request-level runtime attribution', () => {
     const coverage = {pages: [{status: 'listening'}], workers: [{attached: true}], failures: [] as unknown[], limitations: ['original limitation']};
     const originalCalls: {receiver: unknown; params: unknown}[] = [];
     const session = new EventEmitter() as EventEmitter & {
-      send: ReturnType<typeof vi.fn>; detach: ReturnType<typeof vi.fn>;
+      send: Mock; detach: Mock;
     };
     session.send = vi.fn(async (method: string) => {
       if (method === 'Network.enable' && options.networkUnavailable) throw new Error('Network domain unavailable');
@@ -384,11 +384,11 @@ describe('dismissible public promotion preparation', () => {
     '<form><input name="session_key"><button type="submit">Sign in</button></form></section>';
   type Fixture = {
     document: Document;
-    page: {url: () => string; locator: (selector: string) => {click: ReturnType<typeof vi.fn>; press: ReturnType<typeof vi.fn>};
+    page: {url: () => string; locator: (selector: string) => {click: Mock; press: Mock};
       evaluate: (fn: (input: unknown) => unknown, input: unknown) => Promise<unknown>;
-      waitForFunction: ReturnType<typeof vi.fn>};
-    nativeClick: ReturnType<typeof vi.fn>;
-    nativePress: ReturnType<typeof vi.fn>;
+      waitForFunction: Mock};
+    nativeClick: Mock;
+    nativePress: Mock;
     location: {href: string; pathname: string};
   };
   async function withPromotion(run: (fixture: Fixture) => Promise<void>,

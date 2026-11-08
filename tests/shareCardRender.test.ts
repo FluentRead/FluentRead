@@ -1,7 +1,7 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {normalizeShareCardPreferences, SHARE_CARD_THEMES} from '@/src/core/config/shareCard';
 import {renderShareCard} from '@/src/features/share-card/render';
-let canvas: {width: number; height: number; getContext: ReturnType<typeof vi.fn>; toBlob: ReturnType<typeof vi.fn>};
+let canvas: {width: number; height: number; getContext: Mock; toBlob: Mock};
 let painted: Array<{text: string; x: number; y: number}>;
 beforeEach(() => {
     painted = [];

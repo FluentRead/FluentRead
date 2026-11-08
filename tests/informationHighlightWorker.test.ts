@@ -1,5 +1,5 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-const mocks = vi.hoisted(() => ({env: {backends: {onnx: {wasm: {}}}} as any, config: vi.fn(), tokenizer: vi.fn(), model: vi.fn(), match: vi.fn(), store: vi.fn(), tensors: [] as Array<{dispose: ReturnType<typeof vi.fn>}>}));
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
+const mocks = vi.hoisted(() => ({env: {backends: {onnx: {wasm: {}}}} as any, config: vi.fn(), tokenizer: vi.fn(), model: vi.fn(), match: vi.fn(), store: vi.fn(), tensors: [] as Array<{dispose: Mock}>}));
 vi.mock('@huggingface/transformers', () => ({env: mocks.env, AutoConfig: {from_pretrained: mocks.config}, AutoTokenizer: {from_pretrained: mocks.tokenizer}, AutoModelForCausalLM: {from_pretrained: mocks.model}, Tensor: class {
     dispose = vi.fn(); constructor(public type: string, public data: ArrayLike<number>, public dims: number[]) {mocks.tensors.push(this);}
 }}));
@@ -11,7 +11,7 @@ import * as modelCatalog from '@/src/core/config/informationHighlightModel';
 
 const flush = async () => {for (let i = 0; i < 40; i++) await Promise.resolve(); await new Promise(resolve => setTimeout(resolve,0)); for (let i = 0; i < 10; i++) await Promise.resolve();};
 describe('static model worker uses prepared files and serial cooperative cancellation', () => {
-    let listener: (event: {data: InformationHighlightWorkerRequest}) => void, post: ReturnType<typeof vi.fn>, model: ReturnType<typeof vi.fn>;
+    let listener: (event: {data: InformationHighlightWorkerRequest}) => void, post: Mock, model: Mock;
     beforeEach(() => {
         vi.clearAllMocks(); mocks.tensors.length = 0;
         mocks.env.backends.onnx.wasm = {};

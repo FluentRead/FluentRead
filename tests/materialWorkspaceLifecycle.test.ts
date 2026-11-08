@@ -3,7 +3,7 @@ import {FixturePageError, materialPageFixture} from './helpers/materialPageFixtu
 import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import MaterialWorkspace from '@/src/features/vocabulary/ui/MaterialWorkspace.vue';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {MATERIAL_IMPORT_MAX_FRAMES,MATERIAL_IMPORT_MAX_RECORD_BYTES,type MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 import type {MaterialBackupOutcome} from '@/src/features/vocabulary/materialBackupRestore';
 import type {MaterialImportStatus} from '@/src/features/vocabulary/materialImportPortClient';
@@ -83,7 +83,7 @@ async function mount(options: {supportsSpill?:boolean;shown?: import('vue').Ref<
   const {document, window} = options.surface || parseHTML('<html><body><main></main></body></html>');
   delete (window as any).showSaveFilePicker;
   vi.stubGlobal('document', document); vi.stubGlobal('window', window);
-  for (const key of ['Node','Element','HTMLElement','SVGElement']) vi.stubGlobal(key, (window as any)[key]);
+  for (const key of ['Node','Element','HTMLElement','SVGElement','Document','ShadowRoot']) vi.stubGlobal(key, (window as any)[key]);
   const component = MaterialWorkspace;
   const renderer = runtime.createRenderer<any,any>({
     createElement: (tag, ns) => runtime.markRaw(ns === 'svg' ? document.createElementNS('http://www.w3.org/2000/svg', tag) : document.createElement(tag)),
@@ -285,7 +285,7 @@ it.each(['unmount','different-material'] as const)('does not move focus from an 
   const field=ui.document.querySelector<HTMLTextAreaElement>('#fr-material-note')!;
   const focus=vi.spyOn(field,'focus');
   namedButton(ui,'编辑').dispatchEvent(new ui.window.Event('click',{bubbles:true}));
-  let replacementFocus: ReturnType<typeof vi.fn> | undefined;
+  let replacementFocus: Mock<HTMLElement['focus']> | undefined;
   if(reason==='unmount'){
     ui.unmount();const replacement=ui.document.createElement('textarea');replacement.id='fr-material-note';replacementFocus=vi.fn();replacement.focus=replacementFocus;ui.document.body.append(replacement);
   }else ui.document.querySelector('[data-material-id="b"]')!.dispatchEvent(new ui.window.Event('click',{bubbles:true}));

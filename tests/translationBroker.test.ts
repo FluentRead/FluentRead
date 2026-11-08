@@ -656,8 +656,8 @@ describe('translation broker', () => {
         expect(mocks.service).toHaveBeenCalledTimes(4);
     });
     beforeEach(async () => {
-        planBuild.enabled = false; mocks.planService.mockReset();
-        vi.clearAllMocks();
+        planBuild.enabled = false;
+        vi.resetAllMocks();
         mocks.cacheStore.clear();
         mocks.aiSdkServices.clear();
         mocks.aiSdkServices.add('aiSdk');
@@ -721,7 +721,6 @@ describe('translation broker', () => {
         mocks.config.customModel = {};
         mocks.config.token = {};
         mocks.config.apiKeys = {};
-        mocks.service.mockReset();
         mocks.service.mockResolvedValue('默认译文');
         mocks.getMissingCredentialMessage.mockReturnValue(null);
         mocks.endpointResolver.mockImplementation((serviceName: string, _current?: unknown) => {

@@ -4,7 +4,7 @@
  * 主要内容：保留播放器操作、翻译与草稿回归；材料通过真实公开 begin/complete/client 验证来源、时间、代次冻结与成功引用，失败和旧播放器卸载不会误关联；真实错误输出边界使用六语词典且不会改写字幕、译文或模型回答。
  * 模块边界：仅替换媒体、模型及浏览器消息传输，不替换材料采集逻辑；DOM 布局与真实平台由独立生产验收覆盖。
  */
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {parseHTML} from 'linkedom';
 import * as vue from 'vue';
 import {Config} from '@/src/core/config/model';
@@ -40,9 +40,9 @@ const deferred = <T>() => {
 let state: Record<string, any>, config: Config;
 let video: HTMLVideoElement, props: Record<string, any>;
 let subscription: () => void;
-let translate: ReturnType<typeof vi.fn>, sendRuntimeMessage: ReturnType<typeof vi.fn>, streamReading: ReturnType<typeof vi.fn>;
-let cancelReading: ReturnType<typeof vi.fn>, unsubscribe: ReturnType<typeof vi.fn>, emit: ReturnType<typeof vi.fn>;
-let annotateVideoReading: ReturnType<typeof vi.fn>;
+let translate: Mock, sendRuntimeMessage: Mock, streamReading: Mock;
+let cancelReading: Mock, unsubscribe: Mock, emit: Mock;
+let annotateVideoReading: Mock;
 let readingCallbacks: {progress: (value: any) => void; result: (value: any) => void; error: (cause: Error) => void};
 let renderedUnmount: (() => void) | undefined;
 
@@ -247,9 +247,9 @@ describe('完整句学习组件的调度与异步归属回归', () => {
 
   it('播放器拒绝重播给出反馈，换句后的迟到拒绝不污染新句', async () => {
     const late = deferred<void>(); await mount();
-    (video.play as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('autoplay denied'));
+    (video.play as Mock).mockRejectedValueOnce(new Error('autoplay denied'));
     await state.replay(); expect(state.error).toBe('video.learning.playFailed');
-    (video.play as ReturnType<typeof vi.fn>).mockReturnValueOnce(late.promise);
+    (video.play as Mock).mockReturnValueOnce(late.promise);
     const pending = state.replay(); await step(1); late.reject(new Error('old playback')); await pending;
     expect(state.error).toBe('');
     state.returnToCurrent(); Object.assign(video, {seeking: true, currentTime: 4}); video.dispatchEvent(new Event('timeupdate')); await flush();

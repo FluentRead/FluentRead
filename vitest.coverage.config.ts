@@ -13,7 +13,6 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             enabled: true,
-            all: true,
             clean: true,
             reportOnFailure: true,
             reportsDirectory: 'coverage/core',

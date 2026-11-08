@@ -2,6 +2,10 @@
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
     "allowArbitraryExtensions": true,
+    "module": "ESNext",
+    "verbatimModuleSyntax": false,
+    "noUncheckedIndexedAccess": false,
+    "noImplicitOverride": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },

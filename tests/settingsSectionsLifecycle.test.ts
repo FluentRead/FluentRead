@@ -2,7 +2,7 @@ import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import {customModelString, defaultOption, models} from '@/src/core/config/catalog';
 import {getApiKeyRequirementKey} from '@/src/core/config/validation';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi, type Mock} from 'vitest';
 
 const key = '__frSettingsSectionsLifecycle';
 let app: import('vue').App | undefined;
@@ -13,7 +13,7 @@ function deferred<T>() {let resolve!: (value: T) => void, reject!: (error: unkno
     const promise = new Promise<T>((yes, no) => {resolve = yes;reject = no;});return {promise, resolve, reject};}
 async function settle() {await runtime.nextTick();for (let i = 0; i < 8; i++) await Promise.resolve();await runtime.nextTick();}
 // 实际父/子 SFC 模板使用 LinkeDOM 节点和事件；Element Plus 弹窗动画、浏览器焦点由根任务真实浏览器复验。
-function createDomRenderer(document: Document, focus: ReturnType<typeof vi.fn>) {
+function createDomRenderer(document: Document, focus: Mock<HTMLElement['focus']>) {
     return runtime.createRenderer({patchProp(element: any, name: string, previous: any, next: any) {
         if (name === 'class') {element.className = String(next ?? '');return;}
         if (name === 'value') {element.value = next ?? '';return;}

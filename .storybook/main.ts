@@ -4,13 +4,12 @@ import type { StorybookConfig } from '@storybook/vue3-vite'
 const root = fileURLToPath(new URL('../', import.meta.url))
 const config: StorybookConfig = {
   stories: ['../storybook/**/*.stories.ts'],
-  addons: ['@storybook/addon-essentials'],
+  addons: ['@storybook/addon-docs'],
   framework: {
     name: '@storybook/vue3-vite',
     options: { builder: { viteConfigPath: `${root}.storybook/vite.config.ts` } },
   },
   core: { disableTelemetry: true, disableProjectJson: true },
-  docs: { autodocs: true },
   async viteFinal(config) {
     const { mergeConfig } = await import('vite')
     return mergeConfig(config, {

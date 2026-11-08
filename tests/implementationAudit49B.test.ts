@@ -9,8 +9,8 @@ const dom = await vi.hoisted(async () => {
         Object.defineProperty(globalThis, name, {configurable: true, writable: true, value: (window as any)[name]});
     }
     const frames = new Map<number, FrameRequestCallback>(); let nextFrame = 0;
-    Object.defineProperty(globalThis, 'requestAnimationFrame', {configurable: true, value: (fn: FrameRequestCallback) => {frames.set(++nextFrame, fn); return nextFrame;}});
-    Object.defineProperty(globalThis, 'cancelAnimationFrame', {configurable: true, value: (id: number) => frames.delete(id)});
+    Object.defineProperty(globalThis, 'requestAnimationFrame', {configurable: true, writable: true, value: (fn: FrameRequestCallback) => {frames.set(++nextFrame, fn); return nextFrame;}});
+    Object.defineProperty(globalThis, 'cancelAnimationFrame', {configurable: true, writable: true, value: (id: number) => frames.delete(id)});
     Object.defineProperty(globalThis, 'ResizeObserver', {configurable: true, value: class {observe() {} unobserve() {} disconnect() {}}});
     Object.defineProperty(globalThis, 'matchMedia', {configurable: true, value: () => ({matches: false})});
     Object.defineProperty(globalThis, 'navigator', {configurable: true, value: {platform: 'Mac', clipboard: {writeText: async () => undefined}}});

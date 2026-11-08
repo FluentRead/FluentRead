@@ -4,6 +4,8 @@
 
 ## 编译与构建缓存
 
+扩展和 Storybook 使用 Vite 8。油猴标准版、独立版与 Greasy Fork 共用固定的 `vite-userscript` 构建器，保留现有脚本体积和功能隔离门禁。文档站的 VitePress 依赖独立解析到 Vite 5。
+
 本地开发与 CI 共用 `.nvmrc` 指定的 Node.js 版本。切换后分别检查 `node --version` 和 `pnpm exec node --version`，确保交互式 shell 与 pnpm 的 PATH 使用同一版本。
 
 `pnpm compile` 继续校验固定语言资源并检查完整的 Vue/TypeScript 项目，增量信息写入各工作树自己的 `.wxt/cache/extension.tsbuildinfo`，不缩小 include 范围或放宽诊断。可以删除这个文件强制重建缓存，或运行 `pnpm exec vue-tsc --noEmit` 单独比较编译器的非增量耗时；类型错误仍须使本次命令失败。其他集成的类型检查不共用此缓存路径。

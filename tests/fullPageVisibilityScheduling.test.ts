@@ -2546,7 +2546,7 @@ describe("全文翻译可见性锚点", () => {
         const pending = deferred<string[]>();
         runtime.requests.mockImplementation(() => pending.promise);
         const attempts: Array<{cancel: ReturnType<typeof vi.fn>}> = [];
-        const spy = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((candidate, _x, _y, _current, onCancel) => {
+        const spy = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((candidate, _x, _y, _current, onCancel) => {
             const cancel = vi.fn(() => onCancel?.());
             attempts.push({cancel});
             return {cancel, ownsOwner: element => element === candidate.element || (candidate.element === first && element === replacement),
@@ -2597,7 +2597,7 @@ describe("全文翻译可见性锚点", () => {
             .mockResolvedValueOnce(previous as never)
             .mockReturnValueOnce(pending.promise)
             .mockResolvedValue((action === 'changed' ? updated : action === 'context-only' ? previous : {}) as never);
-        const track = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
+        const track = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
             cancel: () => onCancel?.(), ownsOwner: element => element === old || element === replacement, waitForReplacement: async () => true,
             finish: stale => stale ? replacementCandidate : null,
         }));
@@ -2636,7 +2636,7 @@ describe("全文翻译可见性锚点", () => {
             const cancelFrame = vi.fn();
             replaceGlobal('requestAnimationFrame', () => 37);
             replaceGlobal('cancelAnimationFrame', cancelFrame);
-            const track = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
+            const track = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
                 cancel: () => onCancel?.(), ownsOwner: element => element === old || element === replacement, waitForReplacement: async () => true, finish,
             }));
             try {
@@ -2696,7 +2696,7 @@ describe("全文翻译可见性锚点", () => {
             const guard = vi.spyOn(personalCorrectionRuntime, 'personalCorrectionIsCurrent')
                 .mockImplementationOnce(() => pendingCheck.promise).mockResolvedValue(true);
             const finish = vi.fn((stale: boolean) => stale ? replacementCandidate : null);
-            const track = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
+            const track = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
                 cancel: () => onCancel?.(), ownsOwner: element => element === old || element === replacement,
                 waitForReplacement: async () => true, finish,
             }));
@@ -2736,7 +2736,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.pointCandidate = candidate; runtime.candidates = [candidate];
         const pending = deferred<string[]>(); runtime.requests.mockImplementationOnce(() => pending.promise);
         const finish = vi.fn(() => null);
-        const track = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
+        const track = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
             cancel: () => onCancel?.(), ownsOwner: element => element === old, waitForReplacement: async () => true, finish,
         }));
         try {
@@ -2764,7 +2764,7 @@ describe("全文翻译可见性锚点", () => {
         const waitForReplacement = vi.fn(() => waiting.promise);
         const finish = vi.fn((stale: boolean) => stale ? replacementCandidate : null);
         const cancel = vi.fn(() => waiting.resolve(false));
-        const track = vi.spyOn(hoverRemountRecovery, 'trackXHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
+        const track = vi.spyOn(hoverRemountRecovery, 'trackHoverRemount').mockImplementation((_candidate, _x, _y, _current, onCancel) => ({
             cancel: () => {cancel(); onCancel?.();}, ownsOwner: element => element === old || element === replacement,
             waitForReplacement, finish,
         }));

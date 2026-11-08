@@ -110,6 +110,8 @@ export interface PdfDocumentBlock {
     preserveSource?: boolean;
     /** 表格单元格的原始边界，供译文拟合与文字擦除使用；原字形矩形仍保留在 lines 中。 */
     cellBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
+    /** 图文卡片底框约束译文和遮罩范围；原文字形位置仍来自 lines。 */
+    panelBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
     lines?: PdfDocumentLine[];
 }
 

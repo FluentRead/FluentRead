@@ -120,8 +120,7 @@ class MockElement {
     }
 
     closest(selector: string): MockElement | null {
-        if (selector.startsWith('math,')) return null;
-        return this.closestMatch ? this : null;
+        return this.closestMatch && selector.includes('.notranslate') ? this : null;
     }
 
     get firstChild(): Node | null { return this.childNodes[0] ?? null; }
@@ -517,6 +516,22 @@ describe('selection range traversal scope and cost', () => {
         expect(afterGeometry).not.toHaveBeenCalled();
         expect(shouldIgnoreSelection(rangeIn(document, main, 0, main, 2))).toBe(true);
         expect(shouldIgnoreSelection(rangeIn(document, main, 1, main, 3))).toBe(true);
+    });
+
+    it('accepts a paragraph selection ending at the empty leading edge of an adjacent protected code block', () => {
+        const {document} = parseHTML('<html><body><article><p>Read <code>--version</code> and see the <a>guide</a>.</p>\n<div class="notranslate"><pre><span>Private command</span></pre><button>Copy</button></div></article></body></html>');
+        const start = document.querySelector('p')!.firstChild!;
+        const pre = document.querySelector('pre')!;
+        const command = pre.querySelector('span')!.firstChild!;
+        const protectedBlock = pre.parentElement!;
+        protectedBlock.getClientRects = () => [{width: 100, height: 40}] as unknown as DOMRectList;
+        const geometry = vi.spyOn(protectedBlock, 'getClientRects');
+
+        expect(shouldIgnoreSelection(rangeIn(document, start, 0, pre, 0))).toBe(false);
+        expect(shouldIgnoreSelection(rangeIn(document, start, 0, command, 0))).toBe(false);
+        expect(geometry).not.toHaveBeenCalled();
+        expect(shouldIgnoreSelection(rangeIn(document, start, 0, command, 1))).toBe(true);
+        expect(shouldIgnoreSelection(rangeIn(document, start, 0, protectedBlock, 1))).toBe(true);
     });
 
     it('empty element boundary positions move to the next subtree without leaving the common ancestor', () => {

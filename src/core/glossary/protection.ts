@@ -23,7 +23,7 @@ export class GlossaryPlaceholderError extends Error {
     readonly code = 'GLOSSARY_PLACEHOLDER_INVALID';
     readonly retryable = false;
     constructor() {
-        super('翻译服务未完整保留术语，请重试或切换翻译服务');
+        super('翻译服务未完整保留术语、表情符号等受保护内容，请重试或切换翻译服务');
         this.name = 'GlossaryPlaceholderError';
     }
 }

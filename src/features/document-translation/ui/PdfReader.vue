@@ -3,6 +3,7 @@
  文件职责：以左右对照的连续页面显示可划词的 PDF 原页和保持原版排版的译文页，每个新译文段落用一次有界局部像素读回匹配版面配色，并保留“重排阅读”作为可选的显示方式。
  主要内容：智能高亮按所选模型重新评分，模型切换传递固定请求身份；页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开并提供键盘可达的全文对照弹窗，拖选与原生选区保留期间保持展开，译文文字层接住段间空白且背景不拦截选择；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读使用同一实际计划组织正文与原图裁剪，区域身份或坐标变化才重裁剪，普通译文变化复用原像素并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；全文对照、目录标题和搜索词各自自动确定文字方向，不改变工具栏或原译文列顺序；触控板捏合与 Ctrl/Cmd 加减号只缩放阅读内容，保留指针所在页内坐标，捏合期间复用画布和文字层、停下后重绘；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
  材料续读：仅公开等待 DOM 提交并淘汰旧布局锚点的 resumePage 页码方法，供已验证文件身份的文档组合根调用；原页渲染与下载结构保持自身职责。
+ 原位遮罩：表格单元格和图文卡片共用解析阶段确认的边界，避免擦除相邻版块。
  模块边界：组件只组织阅读布局、叠加层与页面调度；文档由组合根导入、翻译由既有服务提供，划词卡片由页面组合根复用统一翻译卡。
 -->
 <template>
@@ -486,12 +487,12 @@ const overlayPages = computed(() => {
       entry.boxStyle = {...entry.boxStyle, width: px(width), height: px((block.height + spaceBelow) * s), '--pdf-block-background': colors?.background ?? '#fff'};
       entry.textStyle = {fontSize: px(fit.fontSize), lineHeight: px(fit.lineHeight), fontWeight: String(block.fontWeight), textAlign: block.textAlign, color: colors?.foreground ?? '#111827', fontFamily: serif ? SERIF_FAMILY : SANS_FAMILY};
       entry.eraseStyles = lines.flatMap(line => {
-        // 表格保留原表线；擦除字形的内边距也必须停在单元格边界内，与导出画布一致。
-        const cell = block.cellBounds;
-        const left = Math.max(line.x - 1, cell ? cell.x + 0.5 : -Infinity);
-        const top = Math.max(line.y - 1, cell ? cell.y + 0.5 : -Infinity);
-        const right = Math.min(line.x + line.width + 1, cell ? cell.x + cell.width - 0.5 : Infinity);
-        const bottom = Math.min(line.y + line.height + 2, cell ? cell.y + cell.height - 0.5 : Infinity);
+        // 擦除范围留在单元格或图文卡片内部，与导出画布一致。
+        const boundary = block.cellBounds ?? block.panelBounds;
+        const left = Math.max(line.x - 1, boundary ? boundary.x + 0.5 : -Infinity);
+        const top = Math.max(line.y - 1, boundary ? boundary.y + 0.5 : -Infinity);
+        const right = Math.min(line.x + line.width + 1, boundary ? boundary.x + boundary.width - 0.5 : Infinity);
+        const bottom = Math.min(line.y + line.height + 2, boundary ? boundary.y + boundary.height - 0.5 : Infinity);
         return right > left && bottom > top ? [{left: px((left - block.x) * s), top: px((top - block.y) * s), width: px((right - left) * s), height: px((bottom - top) * s)}] : [];
       });
       return entry;

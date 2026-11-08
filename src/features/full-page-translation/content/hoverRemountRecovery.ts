@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/hoverRemountRecovery.ts
- * 文件职责：为 X 已确认的公开帖子正文提供受限的在途悬浮重挂恢复。
- * 主要内容：仅在请求期间短暂观察节点换代；预存有界祖先路径，绑定唯一帖子链接、正文结构和精确文本槽，分批替换还须保持同一父节点与兄弟边界。
+ * 文件职责：为 X 公开帖子正文和 GitHub 仓库 README 提供受限的在途悬浮重挂恢复。
+ * 主要内容：仅在请求期间短暂观察节点换代；预存有界祖先路径，绑定唯一帖子链接或同路由的唯一 README、正文结构和精确文本槽，分批替换还须保持同一父节点与兄弟边界。
  * 模块边界：不复用旧译文、不发起请求、不改变宿主 DOM；不推断跨文档、跨路由或身份不唯一的节点。
  */
 import {collectLiveTranslationTextSlots, getCurrentTranslationCore, type TranslationCandidate} from '@/src/core/translation/public';
@@ -22,6 +22,7 @@ const MAX_ANCESTOR_CHILDREN = 16_384;
 const WATCH_MS = 30_000;
 const REPLACEMENT_GRACE_MS = 1_000;
 const X_HOSTS = new Set(['x.com', 'www.x.com', 'twitter.com', 'www.twitter.com']);
+const GITHUB_README_SELECTOR = 'article.markdown-body';
 interface ScanBudget {nodes: number; text: number; urls: number}
 interface ScanEntry {node: Node; inMain: boolean; inMainArticle: boolean; article: Element | null}
 
@@ -142,12 +143,12 @@ function sourceIdentity(candidate: TranslationCandidate): string | null {
 }
 
 function sourceIsUnique(document: Document, candidate: TranslationCandidate, source: string, text: string,
-    budget = scanBudget()): boolean {
+    budget: ScanBudget, readme?: HTMLElement): boolean {
     let count = 0;
     let elements = 0;
     let identities = 0;
-    const complete = scan(document, budget, ({node, inMainArticle}) => {
-        if (node.nodeType !== 1 || !inMainArticle || (node as Element).localName !== candidate.element.localName) return true;
+    const complete = scan(readme ?? document, budget, ({node, inMainArticle}) => {
+        if (node.nodeType !== 1 || (!readme && !inMainArticle) || (node as Element).localName !== candidate.element.localName) return true;
         if (++elements > MAX_POST_ELEMENTS) return false;
         // sameText 消耗同一预算；预算不足也必须拒绝整个判定。
         if (!sameText(node, text, budget)) return budget.nodes >= 0 && budget.text >= 0;
@@ -156,6 +157,18 @@ function sourceIsUnique(document: Document, candidate: TranslationCandidate, sou
         return true;
     });
     return complete && count === 1;
+}
+
+/** 只认仓库页主区域内唯一的 README；初次扫描也记录已连接节点，排除旧节点迁移。 */
+function githubReadmeIsUnique(article: HTMLElement, budget: ScanBudget, seen?: WeakSet<Node>): boolean {
+    let found = false;
+    return scan(article.ownerDocument, budget, ({node, inMain}) => {
+        seen?.add(node);
+        if (!inMain || node.nodeType !== 1 || !(node as Element).matches(GITHUB_README_SELECTOR)) return true;
+        if (node !== article) return false;
+        found = true;
+        return true;
+    }) && found;
 }
 
 /**
@@ -259,14 +272,18 @@ export interface HoverRemountRecovery {
 }
 
 /** 一次手势只保存一个候选；分批替换须在有界时间内填回同一父节点的原位置。 */
-export function trackXHoverRemount(candidate: TranslationCandidate, _x: number, _y: number,
+export function trackHoverRemount(candidate: TranslationCandidate, _x: number, _y: number,
     isCurrent: () => boolean, onCancel: () => void = () => {}): HoverRemountRecovery | null {
     const owner = candidate.element;
     const document = owner.ownerDocument;
     const view = document.defaultView;
-    if (!view || !owner.isConnected || !X_HOSTS.has(document.location.hostname) || candidate.kind !== 'content'
-        || candidate.nodes?.length || candidate.visualRange || candidate.manualChunk || candidate.allowTopLevelApplicationShell) return null;
-    const article = owner.closest<HTMLElement>('article');
+    if (!view || !owner.isConnected || candidate.kind !== 'content' || candidate.nodes?.length
+        || candidate.visualRange || candidate.manualChunk || candidate.allowTopLevelApplicationShell) return null;
+    const {hostname, pathname} = document.location;
+    const readme = hostname === 'github.com' && /^\/[^/]+\/[^/]+\/?$/u.test(pathname);
+    if (!readme && !X_HOSTS.has(hostname)) return null;
+    const articleSelector = readme ? GITHUB_README_SELECTOR : 'article';
+    const article = owner.closest<HTMLElement>(articleSelector);
     if (!article || !article.contains(owner)) return null;
     const ancestors = captureAncestors(owner, article);
     if (!ancestors) return null;
@@ -274,12 +291,23 @@ export function trackXHoverRemount(candidate: TranslationCandidate, _x: number, 
     // 复用原有的全页唯一性扫描记录它们，避免另外遍历一遍文档。
     const seenHistory = new WeakSet<Node>();
     const initialBudget = scanBudget();
-    const oldPost = postIdentity(article, document, initialBudget);
+    const oldPost = readme ? null : postIdentity(article, document, initialBudget);
     const sourceText = boundedText(owner, initialBudget);
     if (sourceText === null) return null;
     const source = sourceIdentity(candidate);
-    if (!oldPost || source === null ||
-        !initialIdentityIsUnique(document, candidate, source, sourceText, oldPost, initialBudget, seenHistory)) return null;
+    if (source === null) return null;
+    const unique = readme ? githubReadmeIsUnique(article, initialBudget, seenHistory)
+        && sourceIsUnique(document, candidate, source, sourceText, initialBudget, article)
+        : oldPost !== null && initialIdentityIsUnique(document, candidate, source, sourceText, oldPost, initialBudget, seenHistory);
+    if (!unique) return null;
+
+    const matchesIdentity = (nextCandidate: TranslationCandidate, nextArticle: HTMLElement, budget: ScanBudget): boolean => {
+        const post = readme ? null : postIdentity(nextArticle, document, budget);
+        const articleMatches = readme ? githubReadmeIsUnique(nextArticle, budget)
+            : post !== null && post === oldPost && postIsUnique(document, post, budget);
+        return articleMatches && sameText(nextCandidate.element, sourceText, budget) && sourceIdentity(nextCandidate) === source
+            && sourceIsUnique(document, nextCandidate, source, sourceText, budget, readme ? nextArticle : undefined);
+    };
     const route = document.location.href;
     let current = true;
     let replacement: HTMLElement | null = null;
@@ -323,12 +351,8 @@ export function trackXHoverRemount(candidate: TranslationCandidate, _x: number, 
             const next = nodeAtPath(addedRoot, ownerPath) as HTMLElement | null;
             if (!next || next.nodeType !== 1 || !next.isConnected || next.ownerDocument !== document) continue;
             const nextArticle = articlePath ? nodeAtPath(addedRoot, articlePath) as HTMLElement | null : article;
-            if (!nextArticle || next.closest('article') !== nextArticle) continue;
-            const post = postIdentity(nextArticle, document, budget);
-            if (!post || post !== oldPost || !postIsUnique(document, post, budget)) continue;
-            const nextCandidate = {...candidate, element: next};
-            if (sameText(next, sourceText, budget) && sourceIdentity(nextCandidate) === source &&
-                sourceIsUnique(document, nextCandidate, source, sourceText, budget)) matches.push(next);
+            if (!nextArticle || next.closest(articleSelector) !== nextArticle) continue;
+            if (matchesIdentity({...candidate, element: next}, nextArticle, budget)) matches.push(next);
         }
         if (matches.length !== 1) return false;
         replacement = matches[0]!;
@@ -452,12 +476,9 @@ export function trackXHoverRemount(candidate: TranslationCandidate, _x: number, 
                 && next?.isConnected && next.ownerDocument === document && next.matches(':hover') && replacementLocation !== null
                 && remainsAtOriginalLocation(replacementLocation) && neverSeen(replacementLocation.root);
             if (!usable || !next) {cancel(); return null;}
-            const nextArticle = next.closest<HTMLElement>('article');
-            const budget = scanBudget();
-            const post = nextArticle && postIdentity(nextArticle, document, budget);
+            const nextArticle = next.closest<HTMLElement>(articleSelector);
             const nextCandidate = {...candidate, element: next};
-            const accepted = post === oldPost && postIsUnique(document, post, budget) && sameText(next, sourceText, budget) && sourceIdentity(nextCandidate) === source
-                && sourceIsUnique(document, nextCandidate, source, sourceText, budget);
+            const accepted = nextArticle && matchesIdentity(nextCandidate, nextArticle, scanBudget());
             cancel();
             return accepted ? nextCandidate : null;
         },

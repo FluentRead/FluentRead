@@ -2,7 +2,7 @@
  * @file src/features/document-translation/ui/pdfPreview.ts
  * 文件职责：在浏览器 Canvas 环境中生成 PDF 预览和原版译页；显式重排导出按嵌入字体分页，仅公式图表编码为图像，由二进制服务绘制可复制文字。
  * 主要内容：共用 PDF.js 与有界单页 Canvas；导出每页一次像素读回，阅读器每个新段只读回包含取样边缘的局部快照；重排的光栅与文字导出共用原图旋转裁剪，复用保护筛选、表格裁剪和有界拟合，超长译文返回完整批注与逐行搜索层，缺字或离线时可用带相同 Unicode 文字层的有界光栅续页；下载分批绘制并优先 JPEG 编码，预览和重排图表使用 PNG；取消、失败与完成释放画布，租约隔离阅读器与导出，迟到加载不能复活已释放资源。
- * 模块边界：这里负责视觉光栅化而不决定片段翻译或文件结构；PDF 文本块来自 binary 服务，静态地址来自 pdfResources 应用端口，领域类型来自 core，Canvas/PDF.js 仅应在文档 UI 环境调用，不能进入通用纯算法层。
+ * 模块边界：这里负责视觉光栅化而不决定片段翻译或文件结构；单元格与图文卡片沿用解析边界，PDF 文本块来自 binary 服务，静态地址来自 pdfResources，Canvas/PDF.js 仅在文档 UI 环境调用。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {pdfFallbackBidiLine, withPdfFallbackBidiDirection} from '../core/pdfFallbackBidi';
@@ -415,13 +415,13 @@ function* paintPdfTranslationSteps(
             context.fillStyle = `rgb(${background[0]}, ${background[1]}, ${background[2]})`;
             const rectangles = block.lines?.flatMap(line => line.runs?.length ? line.runs : [line]);
             const erase = rectangles?.length ? rectangles.map(rect => ({x: rect.x * scaleX, y: rect.y * scaleY, width: rect.width * scaleX, height: rect.height * scaleY})) : [{x, y, width: block.width * scaleX, height: block.height * scaleY}];
-            const cell = block.cellBounds;
+            const boundary = block.cellBounds ?? block.panelBounds;
             erase.forEach(rect => {
-                // 分数像素的 fillRect 边缘会混入原字形的抗锯齿颜色；向外覆盖整像素，单元格边界仍向内约束以保留表格线。
-                const left = Math.max(0, Math.floor(rect.x - padding), cell ? Math.ceil((cell.x + 0.5) * scaleX) : 0);
-                const top = Math.max(0, Math.floor(rect.y - padding), cell ? Math.ceil((cell.y + 0.5) * scaleY) : 0);
-                const right = Math.min(virtualWidth, Math.ceil(rect.x + rect.width + padding), cell ? Math.floor((cell.x + cell.width - 0.5) * scaleX) : virtualWidth);
-                const bottom = Math.min(virtualHeight, Math.ceil(rect.y + rect.height + padding), cell ? Math.floor((cell.y + cell.height - 0.5) * scaleY) : virtualHeight);
+                // 擦除向外覆盖整像素，遇到单元格或卡片边界时向内约束。
+                const left = Math.max(0, Math.floor(rect.x - padding), boundary ? Math.ceil((boundary.x + 0.5) * scaleX) : 0);
+                const top = Math.max(0, Math.floor(rect.y - padding), boundary ? Math.ceil((boundary.y + 0.5) * scaleY) : 0);
+                const right = Math.min(virtualWidth, Math.ceil(rect.x + rect.width + padding), boundary ? Math.floor((boundary.x + boundary.width - 0.5) * scaleX) : virtualWidth);
+                const bottom = Math.min(virtualHeight, Math.ceil(rect.y + rect.height + padding), boundary ? Math.floor((boundary.y + boundary.height - 0.5) * scaleY) : virtualHeight);
                 if (right > left && bottom > top) context.fillRect(left, top, right - left, bottom - top);
             });
             if ((index + 1) % 16 === 0) yield;

@@ -76,17 +76,20 @@ export function createVideoReadingPlayer(ports: ReadingPlayerPorts) {
       const readingEnabled = enabled() && subtitlesEnabled;
       const toggle = menu.querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]');
       if (toggle) {
-        toggle.setAttribute('aria-checked', String(config.videoSubtitleAppearance.readingAnnotation === true));
+        const checked = String(config.videoSubtitleAppearance.readingAnnotation === true);
+        if (toggle.getAttribute('aria-checked') !== checked) toggle.setAttribute('aria-checked', checked);
         toggle.disabled = !browserCapabilities.extensionDom || !subtitlesEnabled;
-        toggle.setAttribute('aria-label', videoUi('video.readingAnnotation.label'));
+        const label = videoUi('video.readingAnnotation.label');
+        if (toggle.getAttribute('aria-label') !== label) toggle.setAttribute('aria-label', label);
       }
       const status = menu.querySelector<HTMLElement>('[data-reading-status]');
       if (status) {
-        status.textContent = !browserCapabilities.extensionDom ? videoUi('video.readingAnnotation.unavailable')
+        const text = !browserCapabilities.extensionDom ? videoUi('video.readingAnnotation.unavailable')
           : !readingEnabled ? ''
             : selectedMode === 'translation-only' ? videoUi('video.readingAnnotation.originalRequired')
               : controller.state.status === 'error' ? videoUi('video.readingAnnotation.error') : '';
-        status.hidden = !status.textContent;
+        if (status.textContent !== text) status.textContent = text;
+        if (status.hidden !== !text) status.hidden = !text;
       }
       const retry = menu.querySelector<HTMLButtonElement>('[data-action="retry-reading-annotation"]');
       if (retry) retry.hidden = !readingEnabled || selectedMode === 'translation-only' || controller.state.status !== 'error';

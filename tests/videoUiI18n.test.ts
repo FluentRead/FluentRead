@@ -805,6 +805,11 @@ describe('video player menu composition', () => {
     expect(model.getAttribute('aria-expanded')).toBe('true');
     renderVideoAiModelSelection(menu, {model: 'base', available: true, disabled: false}, 'en-US');
     expect(model.getAttribute('aria-expanded')).toBe('true');
+    const modelLabel = model.getAttribute('aria-label');
+    const modelText = model.querySelector('.fluent-read-video-menu-label')!.firstChild;
+    refreshVideoUiText(menu, 'en-US');
+    expect(model.getAttribute('aria-label')).toBe(modelLabel);
+    expect(model.querySelector('.fluent-read-video-menu-label')!.firstChild).toBe(modelText);
     renderVideoModelPrompt(menu, null, 'zh-CN');
     expect(model.getAttribute('aria-expanded')).toBe('false');
     renderVideoModelPrompt(menu, {...choice, purpose: 'setup'}, 'zh-CN');
@@ -1023,6 +1028,9 @@ describe('video player menu composition', () => {
     expect(isVideoModelPromptOpen(menu)).toBe(false);
     const youtubeMenu = createVideoPlayerMenu('zh-CN', false);
     expect(() => renderVideoModelPrompt(youtubeMenu, null, 'zh-CN')).not.toThrow();
+    expect(() => renderVideoModelPrompt(youtubeMenu, {
+      options: VIDEO_LOCAL_TRANSCRIPTION_MODELS, downloaded: [], recommended: 'base', selected: 'base',
+    }, 'zh-CN')).not.toThrow();
     expect(isVideoModelPromptOpen(youtubeMenu)).toBe(false);
     expect(main.hidden).toBe(false);
     expect(prompt.hidden).toBe(true);
@@ -1098,9 +1106,26 @@ describe('video player menu composition', () => {
     size(640, 360, 172);
     syncVideoPlayerMenuLayout(menu);
     expect(menu.dataset.layout).toBe('stack');
+    const measureFeedback = vi.fn(() => {
+      expect(menu.dataset.measuring).toBe('true');
+      return 172;
+    });
+    Object.defineProperty(menu, 'scrollHeight', {configurable: true, get: measureFeedback});
+    setVideoMenuDownloadStatus(menu, '已下载 · 2 条');
+    expect(measureFeedback).toHaveBeenCalledOnce();
+    expect(menu.dataset.measuring).toBeUndefined();
     size(280, 200, 172);
+    menu.dataset.layout = 'wide';
+    const measureContent = vi.fn(() => 172);
+    Object.defineProperty(menu, 'scrollHeight', {configurable: true, get: measureContent});
     syncVideoPlayerMenuLayout(menu);
     expect(menu.dataset.layout).toBe('stack');
+    expect(measureContent).not.toHaveBeenCalled();
+    size(640, 220, 172);
+    const measurePlayer = vi.fn(() => 640);
+    Object.defineProperty(player, 'clientWidth', {configurable: true, get: measurePlayer});
+    renderVideoModelPrompt(menu, null, 'zh-CN');
+    expect(measurePlayer).not.toHaveBeenCalled();
     size(0, 0, 172);
     menu.dataset.layout = 'wide';
     syncVideoPlayerMenuLayout(menu);

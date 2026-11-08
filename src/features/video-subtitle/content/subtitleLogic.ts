@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/subtitleLogic.ts
  * 文件职责：提供字幕批量翻译、配置指纹和渐进文本展示的纯逻辑。
- * 主要内容：相同译文保留原文且不重复展示；合成双语导出文本、去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，排除过期字幕，并以手动偏移计算有效字幕区间。
+ * 主要内容：相同译文保留原文且不重复展示；合成双语导出文本、去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间。
  * 模块边界：只处理输入数据和注入翻译函数，不读取 DOM、全局配置或浏览器接口。
  */
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
@@ -110,31 +110,67 @@ export function selectVideoSubtitleCueAtOffset(cues: readonly VideoSubtitleCue[]
   return active;
 }
 
-/** 当前句独占首位；滚动字幕的重复条目和已结束字幕不占后续八句的预取名额。 */
-export function selectVideoSubtitlePretranslationCues(
-  cues: readonly VideoSubtitleCue[], currentMs: number, windowMs: number, playbackRate = 1,
-): VideoSubtitleCue[] {
-  if (!Number.isFinite(currentMs) || !Number.isFinite(windowMs) || windowMs <= 0) return [];
-  const rate = Number.isFinite(playbackRate) && playbackRate > 0 ? Math.max(1, playbackRate) : 1;
-  const active = selectVideoSubtitleCueAtOffset(cues, currentMs, 0);
-  const upcoming = cues.filter(cue => cue.durationMs > 0 && cue.startMs > currentMs && cue.startMs <= currentMs + windowMs * rate)
-    .sort((left, right) => left.startMs - right.startMs);
-  const selected: VideoSubtitleCue[] = [];
-  const sources = new Set<string>();
-  const append = (cue: VideoSubtitleCue): boolean => {
-    const source = normalizeVideoCaptionText(cue.text);
-    if (!source || sources.has(source)) return false;
-    sources.add(source);
-    selected.push(cue);
-    return true;
+/** 当前句独占首位；调用者以新数组发布轨道更新，播放头未跨过边界时复用上次选句。 */
+export class VideoSubtitlePretranslationWindow {
+  private previous?: {
+    cues: readonly VideoSubtitleCue[];
+    currentMs: number;
+    spanMs: number;
+    nextChangeMs: number;
+    nextOutsideStartMs: number;
+    selected: readonly VideoSubtitleCue[];
   };
-  if (active) append(active);
-  let count = 0;
-  for (const cue of upcoming) {
-    if (append(cue)) count += 1;
-    if (count === 8) break;
+
+  clear(): void { this.previous = undefined; }
+
+  select(cues: readonly VideoSubtitleCue[], currentMs: number, windowMs: number, playbackRate = 1): readonly VideoSubtitleCue[] {
+    if (!Number.isFinite(currentMs) || !Number.isFinite(windowMs) || windowMs <= 0) return [];
+    const rate = Number.isFinite(playbackRate) && playbackRate > 0 ? Math.max(1, playbackRate) : 1;
+    const spanMs = windowMs * rate;
+    const windowEndMs = currentMs + spanMs;
+    const previous = this.previous;
+    // 播放头跨过句界，或窗口末端纳入一条新句时，才需要重新选句。
+    if (previous?.cues === cues && previous.spanMs === spanMs && currentMs >= previous.currentMs
+      && currentMs < previous.nextChangeMs && windowEndMs < previous.nextOutsideStartMs) return previous.selected;
+
+    let active: VideoSubtitleCue | undefined;
+    const upcoming: VideoSubtitleCue[] = [];
+    let nextChangeMs = Infinity;
+    let nextOutsideStartMs = Infinity;
+    for (const cue of cues) {
+      const {startMs, durationMs} = cue;
+      if (!(durationMs > 0)) continue;
+      if (startMs > currentMs) {
+        if (startMs <= windowEndMs) {
+          upcoming.push(cue);
+          nextChangeMs = Math.min(nextChangeMs, startMs);
+        } else {
+          nextOutsideStartMs = Math.min(nextOutsideStartMs, startMs);
+        }
+      } else if (startMs + durationMs > currentMs && (!active || startMs > active.startMs)) {
+        active = cue;
+      }
+    }
+    if (active) nextChangeMs = Math.min(nextChangeMs, active.startMs + active.durationMs);
+
+    const selected: VideoSubtitleCue[] = [];
+    const sources = new Set<string>();
+    const append = (cue: VideoSubtitleCue) => {
+      const source = normalizeVideoCaptionText(cue.text);
+      if (!source || sources.has(source)) return;
+      sources.add(source);
+      selected.push(cue);
+    };
+    if (active) append(active);
+    const limit = selected.length + 8;
+    upcoming.sort((left, right) => left.startMs - right.startMs);
+    for (const cue of upcoming) {
+      append(cue);
+      if (selected.length === limit) break;
+    }
+    this.previous = {cues, currentMs, spanMs, nextChangeMs, nextOutsideStartMs, selected};
+    return selected;
   }
-  return selected;
 }
 
 /** 滚动字幕会保留上一句；仅把末尾完整词组成的前缀用于匹配正在出现的新句。 */

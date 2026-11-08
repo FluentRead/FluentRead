@@ -14,6 +14,35 @@ describe('VideoTranslationCache', () => {
     expect(request).toHaveBeenCalledTimes(2);
   });
 
+  it('长时间轴在边界之间不重扫，当前句仍能按原优先级检查请求', () => {
+    let timingReads = 0;
+    const cues = Array.from({length: 4000}, (_, index) => ({
+      get startMs() { timingReads += 1; return index * 3000; },
+      durationMs: 2500,
+      text: `Cue ${index}`,
+    }));
+    const cache = new VideoTranslationCache(async () => 'ok');
+    const request = vi.fn(async () => 'ok');
+    cache.primeUpcoming(cues, 500, 600, 1, request);
+    expect(timingReads).toBeGreaterThanOrEqual(cues.length);
+    const afterFirstSelection = timingReads;
+
+    for (let currentMs = 620; currentMs <= 2180; currentMs += 120) {
+      cache.primeUpcoming(cues, currentMs, 600, 1, request);
+    }
+    expect(request).toHaveBeenCalledTimes(15);
+    // primeUpcoming 每次只读被选中 cue 的起点以保持当前/预取优先级。
+    expect(timingReads - afterFirstSelection).toBe(14);
+    expect(request).toHaveBeenLastCalledWith('Cue 0', false, cues[0]);
+
+    cache.primeUpcoming(cues, 2400, 600, 1, request);
+    expect(request).toHaveBeenLastCalledWith('Cue 1', true, cues[1]);
+    cache.clear();
+    const afterClear = timingReads;
+    cache.primeUpcoming(cues, 2400, 600, 1, request);
+    expect(timingReads - afterClear).toBeGreaterThanOrEqual(cues.length);
+  });
+
   it('同步读取规范化后的成功译文，不重复请求，并随 clear 清理', async () => {
     const translate = vi.fn(async () => '同步译文');
     const cache = new VideoTranslationCache(translate);

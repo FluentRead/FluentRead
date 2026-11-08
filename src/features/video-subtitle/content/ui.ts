@@ -56,35 +56,45 @@ function readI18nParams(element: HTMLElement): TranslationParams | undefined {
 /** 界面语言变化时按节点上记录的文案键重新填充文字、可访问名称与提示。 */
 export function refreshVideoUiText(root: HTMLElement, language: UiLanguage): void {
     root.querySelectorAll<HTMLElement>('[data-i18n-key]').forEach((element) => {
-        element.textContent = translateVideoUi(element.dataset.i18nKey!, language, readI18nParams(element));
+        const text = translateVideoUi(element.dataset.i18nKey!, language, readI18nParams(element));
+        if (element.textContent !== text) element.textContent = text;
     });
     root.querySelectorAll<HTMLElement>('[data-i18n-aria-key]').forEach((element) => {
-        const label = translateVideoUi(element.dataset.i18nAriaKey!, language);
-        element.setAttribute('aria-label', label);
-        element.title = label;
+        const label = translateVideoUi(element.dataset.i18nAriaKey!, language, readI18nParams(element));
+        if (element.getAttribute('aria-label') !== label) element.setAttribute('aria-label', label);
+        if (!element.dataset.i18nTitleKey && element.title !== label) element.title = label;
     });
     root.querySelectorAll<HTMLElement>('[data-i18n-title-key]').forEach((element) => {
-        element.title = translateVideoUi(element.dataset.i18nTitleKey!, language);
+        const title = translateVideoUi(element.dataset.i18nTitleKey!, language);
+        if (element.title !== title) element.title = title;
     });
 }
 
+/** 菜单关闭时仍更新可见的入口和字幕层，无变化的名称不触发 DOM 观察器。 */
 export function refreshVideoUiAccessibility(
-    menu: HTMLElement,
+    menu: HTMLElement | null,
     button: HTMLElement | null,
     document: Document,
     language: UiLanguage,
     status: string,
 ): void {
-    menu.setAttribute('aria-label', translateVideoUi('video.menuAriaLabel', language));
-    menu.querySelector<HTMLElement>('.fluent-read-video-menu-mode-group')?.setAttribute('aria-label', translateVideoUi('video.displayMode', language));
-    const buttonLabel = translateVideoUi('video.buttonAriaLabel', language, {status});
-    button?.setAttribute('aria-label', buttonLabel);
-    if (button) button.title = buttonLabel;
-    document.getElementById('fluent-read-video-subtitle-panel')?.setAttribute('aria-label', translateVideoUi('video.panelAriaLabel', language));
-    document.getElementById('fluent-read-video-subtitle')?.setAttribute('aria-label', translateVideoUi('video.translationOverlayAriaLabel', language));
-    document.getElementById('fluent-read-video-subtitle-original')?.setAttribute('aria-label', translateVideoUi('video.originalOverlayAriaLabel', language));
+    const setLabel = (element: HTMLElement | null, label: string) => {
+        if (element && element.getAttribute('aria-label') !== label) element.setAttribute('aria-label', label);
+    };
+    if (menu) {
+        setLabel(menu, translateVideoUi('video.menuAriaLabel', language));
+        setLabel(menu.querySelector('.fluent-read-video-menu-mode-group'), translateVideoUi('video.displayMode', language));
+    }
+    if (button) {
+        const buttonLabel = translateVideoUi('video.buttonAriaLabel', language, {status});
+        setLabel(button, buttonLabel);
+        if (button.title !== buttonLabel) button.title = buttonLabel;
+    }
+    setLabel(document.getElementById(VIDEO_SUBTITLE_PANEL_ID), translateVideoUi('video.panelAriaLabel', language));
+    setLabel(document.getElementById(VIDEO_TRANSLATION_OVERLAY_ID), translateVideoUi('video.translationOverlayAriaLabel', language));
+    setLabel(document.getElementById(VIDEO_NORMALIZED_CAPTION_OVERLAY_ID), translateVideoUi('video.originalOverlayAriaLabel', language));
     const reading = document.getElementById(VIDEO_READING_OVERLAY_ID);
-    if (reading) reading.setAttribute('aria-label', translateVideoUi(reading.dataset.readingLabelKey || 'video.readingAnnotation.label', language));
+    if (reading) setLabel(reading, translateVideoUi(reading.dataset.readingLabelKey || 'video.readingAnnotation.label', language));
 }
 
 export const VIDEO_AI_CAPTION_CONTAINER_ID = 'fluent-read-video-ai-caption-container';
@@ -591,11 +601,6 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   }
   // 测量阶段不解除同句滚动交互；临时宿主与原 layer 始终使用相同坐标与显示状态。
   prepareSubtitlePanelLayout(panel, layer, player);
-  const visibleCaptionSegments = getVisibleCaptionSegments(container)
-    .map((element) => element.getBoundingClientRect())
-    .filter((rect) => rect.width > 0 && rect.height > 0);
-  // YouTube 在字幕切换期间会短暂保留一个空的、甚至回到播放器顶部的容器。
-  // 没有真实字幕片段时保留上一次位置，避免译文被重新定位到顶部后闪过。
 
   const playerWidth = viewport ? viewport.width : playerRect.width || 960;
   const menu = document.getElementById(VIDEO_TRANSLATION_MENU_ID);
@@ -647,11 +652,12 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
       ? `max(${(viewport?.left || 0) + 12}px, env(safe-area-inset-left, 0px), min(${panelLeft}, calc(100% - max(12px, env(safe-area-inset-right, 0px)) - ${width}px)))`
       : panelLeft;
   };
-  centerPanel();
   // 菜单或学习面板开启时撤回兄弟宿主；字幕回原层且不接收指针，避免遮挡当前交互面板。
-  const adaptive = !menuOpen && !learningOpen && isYouTubeVideoPage() && compactPlayer && autoBottom && config.on !== false && config.videoTranslationEnabled !== false && config.videoSubtitleVisible !== false && viewport
-    && positionMobileYoutubeSubtitle(panel, player, layer, viewport, availableWidth);
-  if (adaptive) return;
+  if (!menuOpen && !learningOpen && isYouTubeVideoPage() && compactPlayer && autoBottom && config.on !== false
+    && config.videoTranslationEnabled !== false && config.videoSubtitleVisible !== false && viewport) {
+    centerPanel();
+    if (positionMobileYoutubeSubtitle(panel, player, layer, viewport, availableWidth)) return;
+  }
   finishSubtitlePanelLayout(panel, menuOpen || learningOpen);
   fitVideoSubtitleFontSize(baseFontSize * fontScale,
     fullscreen ? Math.min(maximumHeight, panel.clientHeight || maximumHeight) : maximumHeight,
@@ -665,7 +671,12 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
   // 则继续使用固定底部锚点，避免随着原生 DOM 的词宽变化上下跳动。
   const displayMode = normalizeVideoSubtitleDisplayMode(config.videoSubtitleDisplayMode);
   const normalizedCaptionActive = layer?.classList.contains(VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS) === true;
-  if (!isXVideoPage() && !compactPlayer && appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive && visibleCaptionSegments.length > 0) {
+  if (!isXVideoPage() && !compactPlayer && appearance.position === 'bottom' && displayMode === 'bilingual' && !normalizedCaptionActive) {
+    // 仅在译文需要避开桌面原生行时测量，忽略切换期间空的原生容器。
+    const visibleCaptionSegments = getVisibleCaptionSegments(container)
+      .map(element => element.getBoundingClientRect())
+      .filter(rect => rect.width > 0 && rect.height > 0);
+    if (visibleCaptionSegments.length === 0) return;
     const playerHeight = playerRect.height || 540;
     const nativeCaptionTop = Math.min(...visibleCaptionSegments.map((rect) => rect.top - playerRect.top));
     const panelHeight = panel.getBoundingClientRect().height;

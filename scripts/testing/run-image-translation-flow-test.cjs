@@ -610,37 +610,46 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     }
     await page.goto(fixtureUrl);
     cdp = await context.newCDPSession(page);
-    async function rootObject() {
+    async function shadowObjects(includeXBitmap) {
         const tree = await cdp.send('DOM.getDocument', {depth: -1, pierce: true});
         let host;
+        let bitmapHost;
         function visit(node) {
             const attributes = node.attributes || [];
             for (let index = 0; index < attributes.length; index += 2) {
-                if (attributes[index] === 'id' && attributes[index + 1] === 'fluent-read-image-translation-root') host = node;
+                const key = attributes[index];
+                const value = attributes[index + 1];
+                if (key === 'id' && value === 'fluent-read-image-translation-root') host = node;
+                if (includeXBitmap && key === 'data-fluent-read-ui' && value === 'image-translation-bitmap') bitmapHost = node;
             }
             for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) visit(child);
         }
         visit(tree.root);
-        const shadow = host?.shadowRoots?.[0];
-        if (!shadow) return null;
-        // 原生模态框切换可能在两条 CDP 命令之间移动宿主节点，使用稳定的后端节点标识。
-        return (await cdp.send('DOM.resolveNode', {backendNodeId: shadow.backendNodeId})).object.objectId;
+        // 宿主节点可能在两条 CDP 命令之间移动，使用稳定的后端节点标识。
+        const resolveShadow = async element => {
+            const shadow = element?.shadowRoots?.[0];
+            if (!shadow) return null;
+            return (await cdp.send('DOM.resolveNode', {backendNodeId: shadow.backendNodeId})).object.objectId;
+        };
+        return Promise.all([resolveShadow(host), resolveShadow(bitmapHost)]);
     }
-    async function ui(code) {
-        const objectId = await rootObject();
-        if (!objectId) return null;
+    async function ui(code, includeXBitmap = false) {
+        const [objectId, bitmapRootId] = await shadowObjects(includeXBitmap);
         try {
+            if (!objectId) return null;
             const response = await cdp.send('Runtime.callFunctionOn', {
-                objectId, functionDeclaration: `function(){${code}}`, returnByValue: true,
+                objectId, functionDeclaration: `function(paintRoot){${code}}`, returnByValue: true,
+                arguments: bitmapRootId ? [{objectId: bitmapRootId}] : [],
             });
             if (response.exceptionDetails) {
                 throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text);
             }
             return response.result.value;
         } finally {
-            await cdp.send('Runtime.releaseObject', {objectId}).catch(error => {
-                report.cleanupErrors.push(`CDP object release: ${error.message}`);
-            });
+            await Promise.all([objectId, bitmapRootId].filter(Boolean).map(id =>
+                cdp.send('Runtime.releaseObject', {objectId: id}).catch(error => {
+                    report.cleanupErrors.push(`CDP object release: ${error.message}`);
+                })));
         }
     }
     readUi = ui;
@@ -935,7 +944,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     if (xSurface) {
         currentCase = 'X snapshot surface and first-use automatic OCR languages';
         const {verifyXSurface} = require('./image-translation-x-surface.cjs');
-        await verifyXSurface({page, context, popup, worker, ui, wait, click, shot, report,
+        await verifyXSurface({page, context, popup, worker, ui: code => ui(code, true), wait, click, shot, report,
             originalImage: arg('original-image', null), lightboxOnly:xLightbox});
         if (!xLightbox) assert.ok(report.ocrTargets.some(target => target.type === 'worker' && target.url.includes('/fluent-read-ocr/')),
             '必须实际监听 dedicated OCR Worker，才能断言不存在语言加载错误');

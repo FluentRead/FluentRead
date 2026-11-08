@@ -98,8 +98,9 @@ it.each([
     transport.mockResolvedValue(new Response(`data: ${payload}\n\n`));await expect(createHarnessGenerator(config(), 'openai', 'reader', tools)(input())).rejects.toThrow();
 });
 
-it('releases a stalled body reader promptly on cancellation and never publishes a late answer', async () => {
-    const cancel = vi.fn();const body = new ReadableStream<Uint8Array>({cancel});transport.mockResolvedValue(new Response(body));
+it.each([false, true])('releases a stalled body reader and blocks late answers when the cancellation handshake rejects: %s', async rejectCancel => {
+    const cancel = vi.fn(async () => {if (rejectCancel) throw new Error('remote cancellation failed');});
+    const body = new ReadableStream<Uint8Array>({cancel});transport.mockResolvedValue(new Response(body));
     const controller = new AbortController(), request = {...input(), signal: controller.signal};const pending = createHarnessGenerator(config(), 'openai', 'reader', [])(request);
     await vi.waitFor(() => expect(body.locked).toBe(true));controller.abort();await expect(pending).rejects.toThrow();expect(cancel).toHaveBeenCalledOnce();expect(body.locked).toBe(false);expect(request.onText).not.toHaveBeenCalled();
 });
@@ -218,6 +219,41 @@ it('keeps signed Claude thinking and merges parallel tool results exactly like t
         bodies.push(JSON.parse(transport.mock.calls[1][1]!.body as string));
     }
     expect(bodies[1].messages).toEqual(bodies[0].messages);expect(bodies[1].messages.at(-1).content).toHaveLength(2);
+});
+
+it('omits empty Claude proxy credentials and ignores unsupported streamed metadata', async () => {
+    const value = config('claude');
+    value.token.claude = '';
+    value.proxy.claude = 'https://claude.fixture.test/messages';
+    const [start, ...answer] = claude();
+    transport.mockResolvedValue(events([start,
+        {type: 'content_block_start', index: 1, content_block: {type: 'server_tool_use', name: 'web_search'}},
+        {type: 'content_block_delta', index: 1, delta: {type: 'citations_delta', citation: {type: 'char_location'}}},
+        {type: 'content_block_stop', index: 1}, ...answer]));
+    const result = await createHarnessGenerator(value, 'claude', 'reader', [])(input());
+    const [url, init] = transport.mock.calls[0];
+    expect(url).toBe(value.proxy.claude);
+    expect(new Headers(init?.headers).has('x-api-key')).toBe(false);
+    expect(result).toEqual({text: 'Visible answer', assistant: {role: 'assistant', content: [{type: 'text', text: 'Visible answer'}]}, toolCalls: []});
+});
+
+it('omits empty Gemini proxy credentials and combines only adjacent text and thought fragments', async () => {
+    const value = config('gemini');
+    value.token.gemini = '';
+    value.proxy.gemini = 'https://gemini.fixture.test/generate';
+    transport.mockResolvedValue(events([{candidates: [{content: {parts: [
+        {text: 'Hidden ', thought: true}, {text: 'reasoning', thought: true},
+        {inlineData: {mimeType: 'image/png', data: 'AA=='}},
+        {text: 'Visible '}, {text: 'answer'},
+    ]}, finishReason: 'STOP'}]}]));
+    const request = input();
+    const result = await createHarnessGenerator(value, 'gemini', 'reader', [])(request);
+    const [url, init] = transport.mock.calls[0];
+    expect(url).toBe(value.proxy.gemini);
+    expect(new Headers(init?.headers).has('x-goog-api-key')).toBe(false);
+    expect(result.assistant.content).toEqual([{type: 'reasoning', text: 'Hidden reasoning'}, {type: 'text', text: 'Visible answer'}]);
+    expect(result.text).toBe('Visible answer');
+    expect(request.onText).toHaveBeenLastCalledWith('Visible answer');
 });
 
 it.each([

@@ -47,8 +47,8 @@ let serial = 0;
 const source = 'Practice helps every day.';
 const request = (overrides: Partial<ReadingRequest> = {}): ReadingRequest => ({type: 'fluentReadHarness', action: 'run', requestId: `request-${++serial}`, intent: 'grammar', question: '', selection: {text: source, context: source, sentence: source}, ...overrides});
 function generated(text = '练习有助于每天进步。', hold?: Promise<void>) {
-    return {fullStream: (async function* () {yield {type: 'text-delta', id: 'answer', text};if (hold) await hold;})(),
-        response: Promise.resolve({messages: [], modelId: 'controlled-reader'}), usage: Promise.resolve({}), finishReason: Promise.resolve('stop')};
+    return {stream: (async function* () {yield {type: 'text-delta', id: 'answer', text};if (hold) await hold;})(),
+        finalStep: Promise.resolve({response: {modelId: 'controlled-reader'}}), responseMessages: Promise.resolve([]), usage: Promise.resolve({}), finishReason: Promise.resolve('stop')};
 }
 function begin(input = request()) {
     const progress = vi.fn<(value: ReadingProgress) => void>(), result = vi.fn<(value: ReadingResponse) => void>(), error = vi.fn();

@@ -75,9 +75,9 @@
     "test:cloud-backup": "node scripts/testing/run-resource-safe.mjs -- vitest run --config vitest.cloud-backup.config.ts"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "3.0.116",
-    "@ai-sdk/google": "3.0.121",
-    "@ai-sdk/openai-compatible": "2.0.70",
+    "@ai-sdk/anthropic": "4.0.99",
+    "@ai-sdk/google": "4.0.114",
+    "@ai-sdk/openai-compatible": "3.0.87",
     "@ctrl/tinycolor": "3.6.1",
     "@deeplx/core": "0.3.1",
     "@element-plus/icons-vue": "^2.3.1",
@@ -91,7 +91,7 @@
     "@wllama/wllama": "3.6.1",
     "@wxt-dev/storage": "^1.0.1",
     "bidi-js": "1.1.0",
-    "ai": "6.0.264",
+    "ai": "7.0.165",
     "crypto-js": "^4.2.0",
     "defuddle": "^0.19.6",
     "dexie": "^4.4.7",

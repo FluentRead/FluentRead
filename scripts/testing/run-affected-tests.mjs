@@ -205,7 +205,8 @@ export function createPlan(root, base) {
 }
 
 export function scopedCoverageConfig(plan, baseConfigUrl) {
-    return `import base from ${JSON.stringify(baseConfigUrl)};\nexport default {...base,test:{...base.test,include:${JSON.stringify(plan.testFiles)},coverage:{...base.test.coverage,enabled:true,all:true,reportOnFailure:true,include:${JSON.stringify(plan.coverageFiles)},reportsDirectory:'coverage/affected',thresholds:{...base.test.coverage.thresholds,statements:100,branches:100,functions:100,lines:100,perFile:true}}}};\n`;
+    // V8 插桩下，仓库扫描与大型样本在 CI 中曾耗时超过 Vitest 默认的 5 秒。
+    return `import base from ${JSON.stringify(baseConfigUrl)};\nexport default {...base,test:{...base.test,testTimeout:30_000,include:${JSON.stringify(plan.testFiles)},coverage:{...base.test.coverage,enabled:true,all:true,reportOnFailure:true,include:${JSON.stringify(plan.coverageFiles)},reportsDirectory:'coverage/affected',thresholds:{...base.test.coverage.thresholds,statements:100,branches:100,functions:100,lines:100,perFile:true}}}};\n`;
 }
 
 export function testInvocation(plan, configPath) {

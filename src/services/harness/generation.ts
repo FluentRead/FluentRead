@@ -38,8 +38,8 @@ function makeGenerate(model: LanguageModel, toolSet: ToolSet, service: string, m
         const toolCalls: HarnessToolCall[] = [];
         try {
             // SDK 默认记录原始 provider 错误；统一交给下方统计及外层脱敏错误路径。
-            const result = await streamText({model, system: input.system, messages: toModelMessages(input.messages), tools: toolSet, maxRetries: 0, maxOutputTokens: 1200, abortSignal: input.signal, onError: () => {}});
-            for await (const part of result.fullStream) {
+            const result = await streamText({model, instructions: input.system, messages: toModelMessages(input.messages), tools: toolSet, maxRetries: 0, maxOutputTokens: 1200, abortSignal: input.signal, onError: () => {}});
+            for await (const part of result.stream) {
                 if (part.type === 'text-delta') {
                     if (bilibiliText) {
                         const visible = bilibiliText.append(part.text);
@@ -54,7 +54,7 @@ function makeGenerate(model: LanguageModel, toolSet: ToolSet, service: string, m
                     throw part.error;
                 }
             }
-            const response = await result.response;
+            const {response} = await result.finalStep;
             if (service === services.bilibili) {
                 const finishReason = await result.finishReason;
                 if (finishReason === 'length') throw new Error('B站讲解已截断，请缩短选文后重试');
@@ -63,7 +63,7 @@ function makeGenerate(model: LanguageModel, toolSet: ToolSet, service: string, m
             }
             const usage = await result.usage;
             record(createHarnessUsageEvent({service, model: modelId, actualModel: response.modelId, startedAt, durationMs: Date.now() - startedAt, usage, outcome: 'success'}));
-            const assistant = response.messages.find(message => message.role === 'assistant');
+            const assistant = (await result.responseMessages).find(message => message.role === 'assistant');
             return {assistant: {role: 'assistant', content: service === services.bilibili ? [{type: 'text', text}] : assistant?.content ?? [{type: 'text', text}]}, text, toolCalls} satisfies HarnessGenerateResult;
         } catch (error) {
             record(createHarnessUsageEvent({service, model: modelId, startedAt, durationMs: Date.now() - startedAt, outcome: input.signal.aborted ? (input.signal.reason instanceof Error && /超时/u.test(input.signal.reason.message) ? 'timeout' : 'cancelled') : 'error'}));

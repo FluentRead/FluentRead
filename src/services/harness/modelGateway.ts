@@ -2,14 +2,14 @@
  * @file src/services/harness/modelGateway.ts
  * 服务启用：创建模型前拒绝关闭项，覆盖普通 AI、自定义服务、B站和套餐分支。
  * 文件职责：把已配置的 FluentRead AI 服务适配为 Harness 可消费的 LanguageModel。
- * 主要内容：解析 OpenAI 兼容端点、注入凭据与供应商头、保留 tools/messages/system
+ * 主要内容：解析 OpenAI 兼容端点、注入凭据与供应商头、保留 tools/messages/instructions
  * 语义，直连官方 MiMo 时兼容退役编号而保留配置值，单独适配固定端点与模型的 B站匿名讲解，并对未开放的 ChatGPT 套餐、DeepSeek Responses 配置和其他机器翻译服务给出明确错误。
  * 模块边界：本文件只负责模型 transport，不管理会话、UI、提示词、缓存或配置持久化；
  * 请求由 AI SDK 执行，网络统一经过 runtimeFetch。
  */
 import {createOpenAICompatible} from '@ai-sdk/openai-compatible';
 import {createAnthropic} from '@ai-sdk/anthropic';
-import {createGoogleGenerativeAI} from '@ai-sdk/google';
+import {createGoogle} from '@ai-sdk/google';
 import type {LanguageModel} from 'ai';
 import type {Config} from '@/src/core/config/model';
 import {services} from '@/src/core/config/catalog';
@@ -41,13 +41,12 @@ export function normalizeHarnessModelError(error: unknown, service: string, apiK
 }
 
 /**
- * 创建可执行文本生成及工具调用的 LanguageModel。调用方传入的 messages、system、tools
+ * 创建可执行文本生成及工具调用的 LanguageModel。调用方传入的 messages、instructions、tools
  * 会原样交给 AI SDK；这里不注入翻译 prompt，也不改写会话语义。
  */
-type ConcreteLanguageModel = Extract<LanguageModel, {specificationVersion: 'v3'}>;
+type ConcreteLanguageModel = Extract<LanguageModel, {specificationVersion: 'v4'}>;
 
 function createSingleHarnessLanguageModel(config: Config, service: string, model: string): ConcreteLanguageModel {
-  if (service === services.chatgptPlan) return createChatGPTPlanHarnessModel(model);
   if (service === services.bilibili) {
     // 免费入口只使用已验证的官方模型；残留凭据、代理、多 Key 和自定义模型均不参与请求。
     const provider = createOpenAICompatible({
@@ -77,10 +76,10 @@ function createSingleHarnessLanguageModel(config: Config, service: string, model
       headers: {'anthropic-dangerous-direct-browser-access': 'true'},
       fetch: nativeFetch(config, service),
     });
-    return provider(requestedModel) as ConcreteLanguageModel;
+    return provider(requestedModel);
   }
   if (service === services.gemini) {
-    const provider = createGoogleGenerativeAI({
+    const provider = createGoogle({
       name: 'fluentread-harness-gemini',
       apiKey: configuredKey || undefined,
       fetch: nativeFetch(config, service),
@@ -117,7 +116,7 @@ export function createHarnessLanguageModel(config: Config, service: string, mode
   if (service === services.chatgptPlan) {
     const unavailable = getTranslationServiceUnavailableMessage(service);
     if (unavailable) throw Object.assign(new Error(unavailable), {kind: 'bad-request', retryable: false});
-    return createSingleHarnessLanguageModel(config, service, model);
+    return createChatGPTPlanHarnessModel(model);
   }
   if (service === services.bilibili) return createSingleHarnessLanguageModel(config, service, model);
   const keys = getServiceApiKeys(config, service);
@@ -142,12 +141,11 @@ export function createHarnessLanguageModel(config: Config, service: string, mode
     },
     {signal, model},
   );
-  const wrapped = new Proxy(baseModel, {
+  return new Proxy(baseModel, {
     get(target, property) {
       if (property === 'doGenerate') return (options: LanguageModelGenerateOptions) => invoke(selected => Promise.resolve(createSingleHarnessLanguageModel(selected, service, model).doGenerate(options)), options.abortSignal);
       if (property === 'doStream') return (options: LanguageModelStreamOptions) => invoke(selected => Promise.resolve(createSingleHarnessLanguageModel(selected, service, model).doStream(options)), options.abortSignal);
       return Reflect.get(target, property, target);
     },
-  }) as unknown as LanguageModel;
-  return wrapped;
+  });
 }

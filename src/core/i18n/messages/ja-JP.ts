@@ -1124,7 +1124,7 @@ export const jaJPMessages = {
     'options.aboutFeedbackDescription': "問題の報告・アイデアの共有",
     'options.aboutThanks': 'FluentRead はオープンソースプロジェクトです。継続的な開発はコミュニティの温かい支援に支えられています。WeChat または Ko-fi で任意にご支援いただけます。',
     'popup.donationTitle': 'FluentRead を支援',
-    'popup.donationDescription': 'オープンソースプロジェクトへのご支援に感謝します。',
+    'popup.donationDescription': 'FluentRead は無料のオープンソースです。応援をお待ちしています。',
     'popup.donationClose': '支援画面を閉じる',
     'popup.donationWechat': 'WeChat で支援',
     'popup.donationEnlargeCode': 'WeChat 支援コードを拡大',

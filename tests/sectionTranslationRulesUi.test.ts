@@ -25,6 +25,7 @@ beforeEach(() => {
     const dom = parseHTML('<html><body><div id="app"></div></body></html>'); document = dom.document; window = dom.window;
     root = document.querySelector('#app')!;
     vi.stubGlobal('document', document);
+    vi.stubGlobal('Element', window.Element);
 });
 afterEach(async () => {app?.unmount(); app = undefined; await settle(); vi.unstubAllGlobals();});
 

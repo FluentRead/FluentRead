@@ -22,13 +22,12 @@
         </span>
         <button
           type="button"
-          class="add-button"
+          class="settings-add-button add-button"
           :disabled="!active || isAtCapacity"
           :title="isAtCapacity ? t('quickTranslation.capacityLimit', {count: MAX_QUICK_TRANSLATION_PROFILES}) : ''"
           :data-testid="`quick-profile-add-${action}`"
           :onClick="addAction"
         >
-          <span aria-hidden="true">＋</span>
           {{ translateLegacy('添加') }}
         </button>
       </div>
@@ -656,11 +655,20 @@ function profileSwitchLabel(profile: QuickTranslationProfile): string {
   color: var(--ink, #172033);
 }
 
+.quick-translation-profiles[data-action="section"] {
+  padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px);
+  border-color: var(--fr-card-border, var(--line));
+}
+
+.quick-translation-profiles[data-action="section"] .profiles-toolbar {
+  align-items: center;
+  min-height: calc(var(--fr-settings-row-min-height, 66px) - 2 * var(--fr-settings-row-padding-block, 14px));
+}
+
 .profiles-toolbar,
 .toolbar-actions,
 .profile-summary-row,
 .profile-summary,
-.add-button,
 .hotkey-button {
   display: flex;
   align-items: center;
@@ -747,7 +755,6 @@ function profileSwitchLabel(profile: QuickTranslationProfile): string {
 
 .profile-summary:focus-visible,
 .delete-button:focus-visible,
-.add-button:focus-visible,
 .hotkey-button:focus-visible {
   outline: 2px solid rgba(239, 71, 118, .35);
   outline-offset: 2px;
@@ -924,34 +931,6 @@ kbd {
   font-size: 9px;
 }
 
-.add-button {
-  justify-content: center;
-  gap: 4px;
-  min-height: 32px;
-  padding: 5px 12px;
-  border: 1px solid rgba(239, 71, 118, .28);
-  border-radius: 8px;
-  color: var(--brand-strong, #dc315f);
-  background: var(--brand-soft, #fff0f4);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.add-button:hover:not(:disabled) {
-  border-color: rgba(239, 71, 118, .48);
-  background: rgba(239, 71, 118, .12);
-}
-
-.add-button > span {
-  font-size: 13px;
-}
-
-.add-button:disabled {
-  cursor: not-allowed;
-  opacity: .5;
-}
-
 @media (max-width: 900px) {
   .profile-editor {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -967,7 +946,7 @@ kbd {
     align-items: flex-start;
   }
 
-  .profiles-copy p {
+  .quick-translation-profiles:not([data-action="section"]) .profiles-copy p {
     max-width: 210px;
   }
 
@@ -991,7 +970,7 @@ kbd {
     gap: 10px;
   }
 
-  .profiles-copy p {
+  .quick-translation-profiles:not([data-action="section"]) .profiles-copy p {
     display: none;
   }
 

@@ -18,7 +18,7 @@
         <div v-if="props.config.sectionTranslationHotkey === 'custom'" class="section-translation-hotkey-custom">
           <span v-if="props.config.customSectionTranslationHotkey" class="section-translation-hotkey-text" data-i18n-ignore>{{ hotkeyDisplayName }}</span>
           <span v-else class="section-translation-hotkey-text section-translation-hotkey-placeholder">{{ t('sectionTranslation.settings.hotkeyCustomEmpty') }}</span>
-          <el-button size="small" type="text" :aria-label="t('sectionTranslation.settings.hotkeyEdit')" :title="t('sectionTranslation.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
+          <el-button size="small" text :disabled="!props.config.sectionTranslationHotkeyEnabled" :aria-label="t('sectionTranslation.settings.hotkeyEdit')" :title="t('sectionTranslation.settings.hotkeyEdit')" @click="openCustomHotkeyDialog">
             <el-icon><Edit /></el-icon>
           </el-button>
         </div>

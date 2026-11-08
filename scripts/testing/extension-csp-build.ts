@@ -8,7 +8,7 @@ import type {Plugin} from 'vite';
  * 每个完整输入均锁定 SHA-256；上游升级须重新审查，不能猜测替换压缩后的任意代码。
  */
 const SOURCE_SHA256 = {
-    'tesseract-worker': '38645599043239c0eb6db08a6504a92dcdc292200535f3e9339cd77c4443b842',
+    'tesseract-worker': '576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d',
     'regenerator-runtime': 'e4fa2bcc7507e23fb226bad104bd3c526149ebc9891afbc4bb3a4a0c88afded3',
     'jszip': 'acc7e41455a80765b5fd9c7ee1b8078a6d160bbbca455aeae854de65c947d59e',
     'pdfjs-main': '081d3b6f426d38a8029766f8839f505e9cbf2c81a71d62c26eada142e6c21ae4',

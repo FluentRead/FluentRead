@@ -390,8 +390,9 @@ async function main() {
         assert(extensionArchive.includes('offscreen.html')
             && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/core/'))
             && firefoxArchiveOcrAssets.some(file => file.startsWith('fluent-read-ocr/worker/'))
-            && sourceArchive.some(file => file.startsWith('public/fluent-read-ocr/core/')),
-        'Firefox 扩展包与源码包必须保留共享 DOM 页面和 OCR 资源');
+            && ['package.json', 'pnpm-lock.yaml', 'scripts/wasm/package-diagnostics.ts',
+                'public/fluent-read-ocr/NOTICE.md'].every(file => sourceArchive.includes(file)),
+        'Firefox 扩展包与源码包必须保留共享 DOM 页面、OCR 资源及可复现构建输入');
     }
 
     console.log(JSON.stringify({

@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const assert = require('node:assert/strict');
+const {createRequire} = require('node:module');
 const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i < 0 ? fallback : process.argv[i + 1]; };
 const source = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const languageDirectory = arg('language-dir');
@@ -27,7 +28,8 @@ const report = {source, cases: [], pageErrors: [], evidence: 'Real packaged Tess
         fs.cpSync(source, fixture, {recursive: true});
         fs.mkdirSync(path.join(fixture, 'probe-data'));
         for (const language of ['chi_sim', 'eng']) fs.copyFileSync(path.join(languages, `${language}.traineddata`), path.join(fixture, 'probe-data', `${language}.traineddata`));
-        fs.copyFileSync(path.resolve('public/fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js'), path.join(fixture, 'probe-ocr-baseline.js'));
+        const sdkRequire = createRequire(require.resolve('tesseract.js'));
+        fs.copyFileSync(sdkRequire.resolve('tesseract.js-core/tesseract-core-simd-lstm.wasm.js'), path.join(fixture, 'probe-ocr-baseline.js'));
         fs.copyFileSync(path.resolve('node_modules/tesseract.js/dist/tesseract.min.js'), path.join(fixture, 'probe-tesseract.js'));
         fs.writeFileSync(path.join(fixture, 'probe.html'), '<!doctype html><title>OCR diagnostics verification</title><h1>OCR diagnostics verification</h1>');
         launchAttempted = true;
@@ -74,7 +76,7 @@ const report = {source, cases: [], pageErrors: [], evidence: 'Real packaged Tess
         assert.equal(report.cases[0].text, report.cases[1].text);
         assert.equal(report.cases[0].confidence, report.cases[1].confidence);
         const oldParameter = entry => /Warning: Parameter not found: language_model_ngram_on/.test(entry.text);
-        assert.ok(report.cases[0].logs.some(entry => oldParameter(entry) && entry.type === 'warning'));
+        assert.ok(report.cases[0].logs.some(entry => oldParameter(entry) && entry.type === 'error'));
         assert.ok(report.cases[1].logs.some(entry => oldParameter(entry) && entry.type === 'debug'));
         assert.equal(report.cases[1].logs.filter(entry => ['warning', 'error'].includes(entry.type)).length, 0);
         logs.length = 0;

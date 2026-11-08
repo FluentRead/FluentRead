@@ -18,8 +18,11 @@ const producer = await import(pathToFileURL(resolve(sourceRoot, 'scripts/wasm/pa
 const bridge = await import(pathToFileURL(resolve(sourceRoot, 'scripts/agent-bridge/bridge.mjs')).href);
 const require = createRequire(import.meta.url);
 const helpers = require(resolve(sourceRoot, 'scripts/testing/local-model-browser-helpers.cjs'));
-const coreSource = resolve(root, 'public/fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js');
-const workerSource = resolve(root, 'public/fluent-read-ocr/worker/worker.min.js');
+const ocrSources = typeof producer.resolveTesseractSources === 'function'
+    ? producer.resolveTesseractSources(sourceRoot)
+    : {glue: resolve(sourceRoot, 'public/fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js'),
+        worker: resolve(sourceRoot, 'public/fluent-read-ocr/worker/worker.min.js'), wasm: undefined};
+const {glue: coreSource, worker: workerSource} = ocrSources;
 const temporary: string[] = [];
 function fixtureRoot() {
     const directory = mkdtempSync(join(tmpdir(), 'fluentread-audit49k-'));
@@ -36,7 +39,7 @@ async function actualCore() {
     const artifacts = producer.packageTesseractWasm(fixtureRoot(), coreSource);
     const realm = createContext({URL, self: {location: {href: 'https://fixture.invalid/fluent-read-ocr/worker/worker.min.js'}},
         WebAssembly, Uint8Array, ArrayBuffer, atob, btoa, setTimeout, clearTimeout,
-        console: {debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn()}});
+        console: {log: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn()}});
     runInContext(readFileSync(artifacts.glue, 'utf8'), realm, {filename: artifacts.glue, timeout: 5_000});
     const module = await realm.TesseractCore({wasmBinary: new Uint8Array(readFileSync(artifacts.wasm)), print: vi.fn(), printErr: vi.fn()});
     return {module, artifacts};
@@ -104,7 +107,8 @@ describe('audit49K actual derived OCR consumer entries', () => {
     it('preserves the decoded WASM SHA and both raw vendor resources', async () => {
         const before = [coreSource, workerSource].map(file => createHash('sha256').update(readFileSync(file)).digest('hex'));
         const {module, artifacts} = await actualCore();
-        const original = producer.splitTesseractWasm(readFileSync(coreSource, 'utf8')).wasm;
+        const original = ocrSources.wasm ? readFileSync(ocrSources.wasm)
+            : Buffer.from(readFileSync(coreSource, 'utf8').match(/data:application\/octet-stream;base64,([A-Za-z0-9+/]+=*)/)![1], 'base64');
         expect(createHash('sha256').update(readFileSync(artifacts.wasm)).digest('hex')).toBe(createHash('sha256').update(original).digest('hex'));
         expect(WebAssembly.validate(original)).toBe(true);
         workerArtifact();

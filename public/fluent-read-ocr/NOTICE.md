@@ -1,21 +1,21 @@
 FluentRead bundles the following open-source OCR assets for local image text recognition:
 
-- Tesseract.js 6.0.1, Apache-2.0
-- tesseract.js-core 6.1.2, Apache-2.0
+- Tesseract.js 7.0.0, Apache-2.0
+- tesseract.js-core 7.0.0, Apache-2.0
 - The worker's bundled dependencies retain their notices in
   worker/worker.min.js.LICENSE.txt. The Apache-2.0 license is included in
   LICENSE.md.
 
 Original distributions and readable sources:
 
-- Tesseract.js 6.0.1: https://www.npmjs.com/package/tesseract.js/v/6.0.1
-  and https://github.com/naptha/tesseract.js/tree/v6.0.1
-- tesseract.js-core 6.1.2: https://www.npmjs.com/package/tesseract.js-core/v/6.1.2
-  and https://github.com/naptha/tesseract.js-core/tree/v6.1.2
+- Tesseract.js 7.0.0: https://www.npmjs.com/package/tesseract.js/v/7.0.0
+  and https://github.com/naptha/tesseract.js/tree/v7.0.0
+- tesseract.js-core 7.0.0: https://www.npmjs.com/package/tesseract.js-core/v/7.0.0
+  and https://github.com/naptha/tesseract.js-core/tree/v7.0.0
 
 The worker and WebAssembly code are loaded from this extension's own resources.
 The build derives guarded JavaScript corrections from the pinned upstream files;
-the decoded WebAssembly bytes remain unchanged. No OCR code is downloaded from a
+the distributed WebAssembly bytes remain unchanged. No OCR code is downloaded from a
 third-party CDN at runtime.
 
 Language traineddata (including eng, chi_sim, jpn and requested vertical variants)

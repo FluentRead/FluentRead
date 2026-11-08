@@ -12,6 +12,7 @@ import type {PersonalCorrectionRecord} from '@/src/core/personal-corrections/pub
 import {createUiI18nPlugin} from '@/src/ui/i18n';
 import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
+import './helpers/vueDomFixture';
 
 const mocks=vi.hoisted(()=>({config:{theme:'auto',interfaceSkin:'default',uiLanguage:'zh-CN'},listeners:new Set<(value:any)=>void>(),stop:vi.fn()}));
 vi.mock('@/src/services/config/store',()=>({config:mocks.config,configReady:Promise.resolve(),getConfigRevision:()=>0,requestConfigPatch:vi.fn(),subscribeConfig:(fn:(value:any)=>void)=>{mocks.listeners.add(fn);return()=>{mocks.listeners.delete(fn);mocks.stop();};}}));

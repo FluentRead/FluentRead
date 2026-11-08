@@ -338,7 +338,7 @@ export default defineConfig({
             'scripts/testing/evidence/**',
         ],
         // 保留源码中的第三方来源说明；includeSources 会覆盖上述排除规则。
-        includeSources: ['docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
+        includeSources: ['.nvmrc', 'pnpm-workspace.yaml', 'docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
     },
     hooks: {
         'build:manifestGenerated': (wxt, manifest) => {

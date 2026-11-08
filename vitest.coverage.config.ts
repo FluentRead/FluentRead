@@ -20,6 +20,8 @@ export default defineConfig({
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
                 'src/ui/confirmExport.ts',
+                'src/core/config/nativeAsr.ts',
+                'src/features/video-subtitle/background/nativeTranscription.ts',
                 'src/platform/browser/translationSidepanel.ts',
                 'src/app/sidepanel/index.ts',
                 'src/app/sidepanel/SidepanelApp.vue',

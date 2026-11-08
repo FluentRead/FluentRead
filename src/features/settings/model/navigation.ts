@@ -2,6 +2,7 @@
  * @file src/features/settings/model/navigation.ts
  * 文件职责：定义设置中心侧边栏的导航信息模型，并提供默认分区、哈希解析与搜索过滤等不依赖 Vue 或浏览器 API 的纯规则。
  * 主要内容：完整句学习外观拥有界面风格独立分类与可直达锚点；包含按功能分组的标题、副标题、图标、关键词和 section ID，以及翻译设置内区分双语逐句阅读与智能高亮的独立锚点、同页分组、服务分配与模型用量深链接；旧圈选地址解析为图片页；通用页文案对应日常翻译、网页辅助与基本偏好的阅读顺序，从同一注册表派生导航列表与后台合法分区 ID，导出 resolveNavigationItem、resolveRequestedSection 与 filterNavigationItems。
+ * 构建表示：完整静态导航组保持字面量，系统与数据组保留品牌来源引用；消费者仍读取同一完整注册表。
  * 请求配置搜索：将 AI 翻译超时、timeout 与慢模型等待关键词归入高级请求限制。
  * 模块边界：该模块只描述导航元数据，不切换 DOM、不写 location.hash 也不保存配置；Options 页面负责路由同步，SettingsSections.vue 负责各分区实际内容。
  */
@@ -71,7 +72,7 @@ export const settingsSearchTargets: readonly SettingsSearchTarget[] = [
   },
 ]
 
-export const navigationGroups = [
+const STATIC_NAVIGATION_GROUPS = [
   {
     label: '基础配置',
     items: [
@@ -161,10 +162,14 @@ export const navigationGroups = [
         id: 'settings-translation-stats', icon: '◔', label: '翻译统计', description: '请求规模、耗时与服务表现', group: '工具与学习',
         heading: '翻译统计', summary: '查看每次翻译请求的规模和耗时，比较各翻译服务的响应速度与稳定性',
         kicker: '本地工具', title: '翻译统计', detail: '查看翻译请求的规模、耗时分布和各服务的表现',
-        searchDescription: '翻译统计、请求统计、请求大小、请求规模、字符数、耗时、平均耗时、最长耗时、最大耗时、P95、响应速度、成功率、失败原因、超时、缓存命中、服务对比、性能' + ' · ' + '模型用量、调用统计、Token、请求记录、耗时、输入 Token、输出 Token、缓存输入、缓存写入、缓存命中率、导入、导出、Kimi、月之暗面、OpenAI、DeepSeek',
+        searchDescription: '翻译统计、请求统计、请求大小、请求规模、字符数、耗时、平均耗时、最长耗时、最大耗时、P95、响应速度、成功率、失败原因、超时、缓存命中、服务对比、性能 · 模型用量、调用统计、Token、请求记录、耗时、输入 Token、输出 Token、缓存输入、缓存写入、缓存命中率、导入、导出、Kimi、月之暗面、OpenAI、DeepSeek',
       },
     ],
   },
+] as const satisfies readonly NavigationGroup[]
+
+export const navigationGroups = [
+  ...STATIC_NAVIGATION_GROUPS,
   {
     label: '系统与数据',
     items: [

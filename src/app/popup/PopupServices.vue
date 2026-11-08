@@ -9,7 +9,7 @@
  概览标题：复用原关闭工具行显示本地化标题，窄屏允许标题换行且不压缩关闭命中区；更多服务初始收起，搜索跨完整目录，返回或重新打开选择面板恢复常用优先。
 -->
 <template>
-  <div ref="panel" class="popup-service-panel" data-i18n-ignore :onKeydown="panelActions.keydown">
+  <div ref="panel" class="popup-service-panel" data-i18n-ignore>
     <div v-if="!editing" class="popup-service-toolbar">
       <h2 class="service-overview-title">{{ t('popup.providers.title') }}</h2>
       <button type="button" class="service-panel-close" :aria-label="t('common.close')" :onClick="panelActions.close">×</button>
@@ -238,7 +238,7 @@ function revealFocusedSearch(owner: () => boolean) {
     if (item.top < cover.bottom) revealInScroller(scroller, border, heading);
   });
 }
-defineExpose({revealFocusedSearch});
+defineExpose({revealFocusedSearch, backToOverview});
 function focusAfterRender(current: () => boolean, before: Element | null, target: () => HTMLElement | null) {
   const root = panel.value, startedHere = before === document.body || Boolean(before && root?.contains(before));
   const scroller = root?.closest<HTMLElement>('.popup-services-drawer .el-drawer__body');
@@ -262,10 +262,11 @@ function openPicker(field: Field) {
   // 当前选中项始终在常用区内；转场回顶并只在当前抽屉内恢复搜索位置。
   focusAfterRender(ownView(), before, () => searchInput.value);
 }
-function backToOverview(value: PickerSession) {
-  if (!ownsSession(value)) return;
+function backToOverview(value = session.value) {
+  if (!value || !ownsSession(value)) return false;
   const before = document.activeElement, id = value.field.id;
   resetPicker();focusAfterRender(ownView(), before, () => panel.value?.querySelector<HTMLButtonElement>(`[data-feature-service="${id}"]`) || null);
+  return true;
 }
 function choose(value: PickerSession, service: string) {
   if (!ownsSession(value)) return;
@@ -298,7 +299,6 @@ const panelActions = computed(() => {
       if (ownsControls() && event.key === 'ArrowDown') {event.preventDefault();results.value?.querySelector<HTMLButtonElement>('[role="option"]:not(:disabled)')?.focus();}
     },
     navigate: (event: KeyboardEvent) => {if (ownsControls()) navigateOptions(event);},
-    keydown: (event: KeyboardEvent) => {if (owned() && value && event.key === 'Escape') {event.stopPropagation();backToOverview(value);}},
   };
 });
 </script>

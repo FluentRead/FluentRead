@@ -165,6 +165,9 @@ describe('页内 popup 授权与界面生命周期', () => {
     it('Escape 和页面动作通知父端一次并清理尺寸监听，其他按键和消息不关闭面板', async () => {
         const f = fixture(); popup.closePopupSurface(); const port = await authorizeFrame(f); popup.observeEmbeddedPopupSize();
         port.onmessage?.({data: {type: 'resize'}}); f.target.dispatchEvent(Object.assign(new Event('keydown'), {key: 'Enter'})); expect(popup.isPopupSurfaceActive()).toBe(true);
+        const handled = Object.assign(new Event('keydown', {cancelable: true}), {key: 'Escape'});
+        handled.preventDefault(); f.target.dispatchEvent(handled);
+        expect(popup.isPopupSurfaceActive()).toBe(true); expect(port.postMessage).not.toHaveBeenCalledWith({type: 'close'});
         const event = Object.assign(new Event('keydown', {cancelable: true}), {key: 'Escape'}); f.target.dispatchEvent(event); popup.closePopupSurface();
         expect(event.defaultPrevented).toBe(true); expect(port.postMessage.mock.calls.filter(([message]) => message.type === 'close')).toHaveLength(1);
         expect(port.close).toHaveBeenCalledOnce(); expect(f.observers[0].disconnect).toHaveBeenCalledOnce(); expect(f.probe.remove).toHaveBeenCalledOnce();

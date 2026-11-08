@@ -240,7 +240,7 @@ async function mountSections({ready = Promise.resolve(), configSnapshot, templat
         }, unmounted() {if (this.$options.__name === 'CustomOpenAIProviderDialog') providerUnmounted();}});
         app.component('el-dialog', runtime.defineComponent({props: ['modelValue'], setup(props, {attrs, slots}) {
             return () => {dialogPort = {open: props.modelValue, opened: attrs.onOpened};
-                return runtime.h('div', {...attrs, 'data-fixture-open': String(props.modelValue)}, slots.default?.());};
+                return runtime.h('div', {...attrs, 'data-fixture-open': String(props.modelValue)}, [slots.default?.(), slots.footer?.()]);};
         }}));
     }
     app.provide(runtime.ssrContextKey, {modules: new Set<string>()});app.config.warnHandler = () => {};
@@ -523,9 +523,9 @@ describe('设置主表单实际组件异步归属', () => {
         expect(query).not.toHaveBeenCalled();expect(send).not.toHaveBeenCalled();
     });
     it('服务列表直接复用已筛选能力结果，切换显示模式不会再分配同样的列表', async () => {
-        const {state} = await mountSections();const first = state.configurationCompute.filteredServices;
-        expect(first).toBe(state.availableServiceOptions);state.config.display = 2;await settle();
-        expect(state.configurationCompute.filteredServices).toBe(first);
+        const {state} = await mountSections();const first = state.platformAvailableServiceOptions;
+        expect(first.length).toBeGreaterThan(0);state.config.display = 2;await settle();
+        expect(state.platformAvailableServiceOptions).toBe(first);
     });
     it('公开版水合旧套餐默认与slug不改配置，编辑目标回退可用服务且不补回隐藏入口', async () => {
         const {state, patch} = await mountSections({activeSection: 'settings-services', configSnapshot: {
@@ -537,7 +537,7 @@ describe('设置主表单实际组件异步归属', () => {
         expect(state.availableServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         expect(state.textServiceGroups.flatMap((group: {options: {value: string}[]}) => group.options).some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         expect(state.videoServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
-        expect(state.configurationCompute.filteredServices.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
+        expect(state.platformAvailableServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         const saved = state.setDefaultConfigurationService;saved('chatgptPlan');state.setDefaultConfigurationService('chatgptPlan');await settle();
         expect(JSON.stringify(state.config)).toBe(before);expect(patch).not.toHaveBeenCalled();
     });
@@ -548,7 +548,7 @@ describe('设置主表单实际组件异步归属', () => {
         const saved = state.setDefaultConfigurationService;
         if (method === 'direct') state.setConfigurationService('chatgptPlan');await settle();
         expect(state.selectedConfigurationService).toBe('freeTranslation');
-        expect(state.configurationCompute.filteredServices.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
+        expect(state.platformAvailableServiceOptions.some((item: {value: string}) => item.value === 'chatgptPlan')).toBe(false);
         saved('chatgptPlan');state.setDefaultConfigurationService('chatgptPlan');await settle();
         expect(state.config.service).toBe('microsoft');expect(state.config.model.chatgptPlan).toBe('saved-account-model');expect(patch).not.toHaveBeenCalled();
     });
@@ -1109,7 +1109,13 @@ async function serviceEditorFixture(configSnapshot: Record<string, unknown> = {}
     await vi.waitFor(()=>expect(fixture.data.serviceConfiguration).toBeDefined());
     const catalog = async (event: string, ...values: unknown[]) => {fixture.data.serviceCatalog!.emit(event,...values);await settle();};
     const configuration = async (event: string, ...values: unknown[]) => {fixture.data.serviceConfiguration!.emit(event,...values);await settle();};
-    return {...fixture,catalog,configuration};
+    const availabilityDialog = () => fixture.document!.querySelector('[data-service-availability-dialog]');
+    const availabilityAction = async (action: 'cancel' | 'confirm') => {
+        const button = availabilityDialog()?.querySelector(`[data-service-availability-${action}]`);
+        expect(button).toBeTruthy();
+        button!.dispatchEvent(new fixture.domWindow!.Event('click', {bubbles: true}));await settle();
+    };
+    return {...fixture,catalog,configuration,availabilityDialog,availabilityAction};
 }
 const customConnection = (id='custom:1', model='model-a') => ({id,name:`连接 ${id}`,endpoint:`https://${id.replace(':','-')}.example/v1`,models:[model]});
 
@@ -1121,9 +1127,18 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         await f.catalog('update:default-service','microsoft');expect(f.state.config.service).toBe('microsoft');expect(f.patch).toHaveBeenCalledOnce();
         f.props.activeSection='settings-general';await settle();f.patch.mockClear();await f.catalog('update:default-service','google');expect(f.state.config.service).toBe('microsoft');expect(f.patch).not.toHaveBeenCalled();
     });
-    it('关闭当前默认服务时自动改用启用项，保留其他入口原有选择',async()=>{
+    it('取消不保存，确认关闭默认服务后一次保存替代项并保留其他入口原有选择',async()=>{
         const f=await serviceEditorFixture({service:'google',hoverTranslationService:'google'});f.patch.mockClear();
         await f.catalog('toggle-availability','google',false);
+        expect(f.availabilityDialog()).not.toBeNull();
+        expect(f.state.config.disabledTranslationServices).not.toContain('google');
+        expect(f.state.config.service).toBe('google');
+        expect(f.patch).not.toHaveBeenCalled();
+        await f.availabilityAction('cancel');
+        expect(f.availabilityDialog()).toBeNull();
+        expect(f.patch).not.toHaveBeenCalled();
+        await f.catalog('toggle-availability','google',false);
+        await f.availabilityAction('confirm');
         expect(f.state.config.disabledTranslationServices).toContain('google');
         expect(f.state.config.service).not.toBe('google');
         expect(f.state.config.disabledTranslationServices).not.toContain(f.state.config.service);
@@ -1137,10 +1152,37 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         const allExceptDefault=f.state.availableServiceOptions.filter((item: {value:string})=>item.value!=='google').map((item: {value:string})=>item.value);
         f.state.config.disabledTranslationServices=allExceptDefault;await settle();f.patch.mockClear();
         await f.catalog('toggle-availability','google',false);
+        expect(f.availabilityDialog()).toBeNull();
         expect(f.state.config.disabledTranslationServices).toEqual(allExceptDefault);
         expect(f.state.config.service).toBe('google');
         await f.catalog('toggle-availability','microsoft',true);
+        expect(f.state.config.disabledTranslationServices).toContain('microsoft');
+        expect(f.patch).not.toHaveBeenCalled();
+        await f.availabilityAction('confirm');
         expect(f.state.config.disabledTranslationServices).not.toContain('microsoft');
+        expect(f.patch).toHaveBeenCalledOnce();
+    });
+    it('配置中的替代服务发生变化时，撤销旧确认而不关闭默认服务',async()=>{
+        const f=await serviceEditorFixture({service:'google'});
+        await f.catalog('toggle-availability','google',false);
+        expect(f.availabilityDialog()).not.toBeNull();
+        f.state.config.disabledTranslationServices=['freeTranslation'];await settle();
+        expect(f.availabilityDialog()).toBeNull();
+        expect(f.state.config.service).toBe('google');
+        expect(f.state.config.disabledTranslationServices).toEqual(['freeTranslation']);
+    });
+    it('移除正在编辑的服务后回到默认详情，加回时保留原有服务配置',async()=>{
+        const f=await serviceEditorFixture({service:'google',myMemoryEmail:'reader@example.test'});
+        await f.catalog('update:service','myMemory');
+        expect(f.state.selectedConfigurationService).toBe('myMemory');
+        await f.catalog('toggle-availability','myMemory',false);
+        expect(f.state.selectedConfigurationService).toBe('myMemory');
+        await f.availabilityAction('confirm');
+        expect(f.state.selectedConfigurationService).toBe('google');
+        await f.catalog('toggle-availability','myMemory',true);
+        await f.availabilityAction('confirm');
+        expect(f.state.selectedConfigurationService).toBe('google');
+        expect(f.state.config.myMemoryEmail).toBe('reader@example.test');
     });
     it('自定义连接添加/选择/删除模型各只提交完整快照，保留同级服务与文档选择',async()=>{
         const f=await serviceEditorFixture({customOpenAIProviders:[customConnection(),customConnection('custom:2','second')],model:{'custom:1':'model-a'},documentModel:{'custom:1':'model-a'}});

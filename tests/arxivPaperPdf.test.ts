@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {createArxivPaperPdfHandler, createDocumentNavigationHandlers} from '@/src/app/background/documentNavigation';
+import {createPaperPdfHandler, createDocumentNavigationHandlers} from '@/src/app/background/documentNavigation';
 import {isSameArxivPaper, readArxivPaperUrl} from '@/src/features/document-translation/core/arxivPaperUrl';
 import {readPdfSourceFragment} from '@/src/features/document-translation/core/pdfSource';
 import {createBackgroundMessageRouter} from '@/src/services/messaging/backgroundRouter';
@@ -10,7 +10,7 @@ vi.mock('@/src/services/config/store', () => ({config, configReady: Promise.reso
 const origin = 'https://arxiv.org';
 const abs = origin + '/abs/1706.03762v7';
 const pdf = origin + '/pdf/1706.03762v7';
-const message = {type: 'openArxivPaperPdf', url: pdf} as const;
+const message = {type: 'openPaperPdf', url: pdf} as const;
 const sender = {id: 'fluentread', url: abs, frameId: 0, tab: {id: 0, windowId: 4}};
 
 afterEach(() => {
@@ -48,11 +48,11 @@ describe('arXiv paper URL identity', () => {
     });
 });
 
-describe('Open arXiv paper PDF background message', () => {
+describe('Open paper PDF background message', () => {
     function setup() {
         const isDisabled = vi.fn(() => false);
         const openPdf = vi.fn(async () => undefined);
-        const handler = createArxivPaperPdfHandler({ready: Promise.resolve(), extensionId: 'fluentread', isDisabled, openPdf});
+        const handler = createPaperPdfHandler({ready: Promise.resolve(), extensionId: 'fluentread', isDisabled, openPdf});
         return {handler, isDisabled, openPdf};
     }
 
@@ -83,6 +83,19 @@ describe('Open arXiv paper PDF background message', () => {
         await expect(handler.handle(request, {sender})).resolves.toEqual({status: 'failed'});
         await expect(handler.handle(request, {sender})).resolves.toEqual({status: 'success'});
         expect(openPdf.mock.calls).toEqual([[pdf, 4], [pdf, 4]]);
+    });
+
+    it('uses the real source site settings for a cross-site Hugging Face PDF', async () => {
+        const {handler, isDisabled, openPdf} = setup();
+        const source = 'https://huggingface.co/papers/1706.03762';
+        const context = {sender: {...sender, url: source}};
+        const request = {...message, url: 'https://arxiv.org/pdf/1706.03762'};
+        isDisabled.mockReturnValueOnce(true);
+        await expect(handler.handle(request, context)).resolves.toEqual({status: 'disabled'});
+        expect(openPdf).not.toHaveBeenCalled();
+        await expect(handler.handle(request, context)).resolves.toEqual({status: 'success'});
+        expect(isDisabled).toHaveBeenLastCalledWith(source);
+        expect(openPdf).toHaveBeenCalledWith(request.url, 4);
     });
 
     it('opens the existing reader in the source window and respects global and per-site switches', async () => {

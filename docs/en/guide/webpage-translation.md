@@ -29,11 +29,13 @@ Passages already in the target or an excluded language usually keep their source
 
 </details>
 
-## Read arXiv papers
+## Read research papers
 
 On an arXiv abstract page, choose **Bilingual translation (FluentRead)** in the paper access area. FluentRead opens the official HTML for that version and translates from your reading position using your configured language and service. The original table of contents, formulas, and citation links remain usable.
 
-When arXiv only provides a PDF, choose **Read PDF** to open the original in the FluentRead [document reader](/en/guide/document-translation). The site’s own PDF and HTML links remain available. These shortcuts are available in the browser extension.
+On a PubMed Central article, choose **Bilingual translation (FluentRead)** to translate the full text in place.
+
+On Hugging Face Papers, ACL Anthology, CVF Open Access, NeurIPS Proceedings, and arXiv pages that only offer a PDF, choose **Read PDF (FluentRead)** to open the original in the [document reader](/en/guide/document-translation). These shortcuts are available in the browser extension.
 
 ## AI context and terminology
 

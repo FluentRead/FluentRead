@@ -214,18 +214,23 @@ const faqs = [
           <a class="bv-text-link" :href="withBase('/support/wechat-contact.jpg')" target="_blank" rel="noopener noreferrer">{{ t('添加微信', 'Add on WeChat') }} ↗</a>
         </div>
       </div>
-      <a
-        class="fr-sponsor-card"
-        href="https://index-translate.bilibili.com/"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        <span class="fr-sponsor-copy">
-          <strong>{{ t('哔哩哔哩 Index-Translate', 'bilibili Index-Translate') }}</strong>
-          <span>{{ t('赞助伙伴', 'Sponsor') }}</span>
-        </span>
-        <span class="fr-sponsor-arrow" aria-hidden="true">↗</span>
-      </a>
+      <div>
+        <a
+          class="fr-sponsor-card"
+          href="https://index-translate.bilibili.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span class="fr-sponsor-copy">
+            <strong>{{ t('哔哩哔哩 Index-Translate', 'bilibili Index-Translate') }}</strong>
+            <span>{{ t('首位赞助伙伴', 'First sponsor') }}</span>
+          </span>
+          <span class="fr-sponsor-arrow" aria-hidden="true">↗</span>
+        </a>
+        <a class="bv-text-link" :href="link('/guide/support#sponsorship')">
+          {{ t('成为赞助伙伴', 'Become a sponsor') }} <span aria-hidden="true">→</span>
+        </a>
+      </div>
     </section>
     <section class="bv-section bv-faq">
       <div>

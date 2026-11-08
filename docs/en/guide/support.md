@@ -13,7 +13,7 @@ Thank you for supporting FluentRead’s continued development and maintenance.
 
 ## Team and project sponsorship {#sponsorship}
 
-Thank you to our sponsor, [**bilibili Index-Translate**](https://index-translate.bilibili.com/).
+Thank you to [**bilibili Index-Translate**](https://index-translate.bilibili.com/) for becoming FluentRead’s first sponsor.
 
 Sponsors can display a brand name or logo, a short introduction, and a website link on our website and README. Placements will be clearly labeled as sponsorship, with the duration and details agreed together.
 

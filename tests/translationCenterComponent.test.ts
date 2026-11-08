@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {readFileSync} from 'node:fs';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {compileStyle, parse} from 'vue/compiler-sfc';

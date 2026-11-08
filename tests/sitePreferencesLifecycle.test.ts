@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 await vi.hoisted(async () => {

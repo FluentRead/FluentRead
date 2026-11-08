@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 /**
  * @file tests/readingWritingUiBehavior.test.ts
  * 文件职责：运行阅读与写作小组件的真实 Vue 客户端模板、输入和键盘行为。

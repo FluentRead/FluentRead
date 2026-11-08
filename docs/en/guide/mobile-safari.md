@@ -45,7 +45,7 @@ Chrome’s built-in translation, image OCR, and area capture are unavailable, al
 <details class="guide-details">
 <summary>Build and install the source preview</summary>
 
-Use macOS, full Xcode, Node 20+, and the repository’s locked pnpm dependencies. Run from the repository root:
+Use macOS, full Xcode, and the Node.js and pnpm versions specified in `.nvmrc` and `package.json`. Run these commands from the repository root.
 
 ```sh
 pnpm safari:check

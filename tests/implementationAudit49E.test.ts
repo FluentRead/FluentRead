@@ -1,4 +1,5 @@
 import {afterAll, afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import './helpers/vueDomFixture';
 await vi.hoisted(async () => {
     const {parseHTML} = await import('linkedom');
     const {window, document} = parseHTML('<html><body></body></html>');

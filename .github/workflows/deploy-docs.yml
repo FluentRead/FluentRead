@@ -15,6 +15,7 @@ on:
       - 'src/features/settings/ui/settings-page.css'
       - '.storybook/**'
       - 'storybook/**'
+      - '.nvmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'tsconfig.json'
@@ -38,6 +39,7 @@ on:
       - 'src/features/settings/ui/settings-page.css'
       - '.storybook/**'
       - 'storybook/**'
+      - '.nvmrc'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'tsconfig.json'
@@ -68,7 +70,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version-file: .nvmrc
           cache: pnpm
       - name: Install dependencies
         # Skip third-party install scripts; prepare build tools and WXT types explicitly below.

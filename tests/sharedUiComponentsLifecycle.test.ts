@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 const sidebarPreview = vi.hoisted(() => ({available: false}));
 vi.mock('@/src/platform/browser/translationSidepanel', () => ({canOpenTranslationSidepanel: () => sidebarPreview.available}));

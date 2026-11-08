@@ -106,8 +106,10 @@ describe('affected behavior test planning', () => {
         expect(select(['docs/testing.md'])).toMatchObject({testFiles: ['tests/architecture/boundary.test.ts'], coverageFiles: [], extensionChanged: false});
     });
     it('explicitly widens behavior scope when shared test configuration changes', () => {
-        expect(select(['vitest.config.ts'])).toMatchObject({testFiles: ['tests/a.test.ts', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts', 'tests/fixture.test.ts'],
-            coverageFiles: [], globalInputs: ['vitest.config.ts'], reason: 'shared-test-configuration'});
+        for (const file of ['vitest.config.ts', '.nvmrc']) {
+            expect(select([file])).toMatchObject({testFiles: ['tests/a.test.ts', 'tests/architecture/boundary.test.ts', 'tests/b.test.ts', 'tests/fixture.test.ts'],
+                coverageFiles: [], globalInputs: [file], reason: 'shared-test-configuration', extensionChanged: true});
+        }
     });
     it('rejects duplicated classification and changed covered code without traceable behavior tests', () => {
         expect(() => selectAffected({files: files(), changed: [], matrix: {groups: {unit: ['tests/a.test.ts'], functional: ['tests/a.test.ts']}}, coveragePaths: []})).toThrow('重复归类');

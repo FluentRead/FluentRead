@@ -1,3 +1,4 @@
+import {getFixtureRootNode} from './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi, type MockInstance} from 'vitest';
 import {readFileSync} from 'node:fs';
 import JSZip from 'jszip';
@@ -63,7 +64,7 @@ vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({GlobalWorkerOptions: {}, OPS:
 }}));
 
 type HostNode = EventTarget & {type: string; props: Record<string, any>; children: HostNode[]; parent?: HostNode; text?: string; showModal: () => void; close: () => void; style: Record<string, string>};
-const node = (type: string): HostNode => Object.assign(new EventTarget(), {type, tagName: type.toUpperCase(), props: {}, children: [] as HostNode[], style: {}, showModal: vi.fn(), close: vi.fn(), getAttribute: (_name: string) => undefined});
+const node = (type: string): HostNode => Object.assign(new EventTarget(), {type, tagName: type.toUpperCase(), props: {}, children: [] as HostNode[], style: {}, showModal: vi.fn(), close: vi.fn(), getRootNode: getFixtureRootNode<HostNode>, getAttribute: (_name: string) => undefined});
 const renderer = createRenderer<HostNode, HostNode>({
     createElement: node, createText: value => Object.assign(node('#text'), {text: value}), createComment: value => Object.assign(node('#comment'), {text: value}),
     setText: (element, text) => {element.text = text;}, setElementText: (element, text) => {element.text = text; element.children = [];},

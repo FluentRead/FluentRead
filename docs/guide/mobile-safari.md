@@ -45,7 +45,7 @@ iOS 系统视频全屏不会显示网页上的双语浮层。原生扩展预览�
 <details class="guide-details">
 <summary>从源码构建和安装预览</summary>
 
-需要 macOS、完整 Xcode、Node 20+ 和仓库锁定的 pnpm 依赖。在仓库根目录运行：
+需要 macOS、完整 Xcode，以及仓库 `.nvmrc` 和 `package.json` 指定的 Node.js 与 pnpm 版本。在仓库根目录执行以下命令。
 
 ```sh
 pnpm safari:check

@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 /**
  * @file tests/settingsControlUiBehavior.test.ts
  * 文件职责：执行设置小组件真实 Vue 客户端模板与输入、切换和生命周期。

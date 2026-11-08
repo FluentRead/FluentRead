@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 /**
  * @file tests/implementationAudit48J.test.ts
  * 文件职责：审查第 48 批 J 的分享卡片公共算法、渲染与真实客户端工作台生命周期。

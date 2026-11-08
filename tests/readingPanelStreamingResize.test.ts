@@ -1,3 +1,4 @@
+import './helpers/vueDomFixture';
 /**
  * @file tests/readingPanelStreamingResize.test.ts
  * 文件职责：执行阅读面板真实 Vue setup 与客户端模板，验证流式正文不重复要求父卡片测量。

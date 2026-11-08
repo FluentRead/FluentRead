@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本、扩展面板导航和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载等类型化 router 与生命周期。
+ * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} from './providerRuntime';
@@ -53,7 +53,7 @@ import {installHarnessBackgroundRuntime} from './harnessRuntime';
 import {installMaterialRuntimes} from './materialRuntimes';
 import {createImageGlossaryContext} from './imageGlossaryContext';
 import {createEmbeddedFrameBackgroundHandlers, type EmbeddedFrameBackgroundContext} from '@/src/features/full-page-translation/background/embeddedFrameHandlers';
-import {createNativePdfSelectionHandler} from './nativePdfSelection';
+import {createDocumentNavigationHandlers} from './documentNavigation';
 import {buildGlossaryRevision} from '@/src/core/glossary';
 type BackgroundRuntimeContext = QQMailFrameBackgroundContext & NeteaseMailFrameBackgroundContext
     & EmbeddedFrameBackgroundContext & ConfigPersistenceContext & VocabularyBackgroundContext & SelectionTtsContext
@@ -86,7 +86,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         getGlossaryRevision: () => buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
     });
     const handlers: Array<BackgroundMessageHandler<BackgroundRuntimeContext>> = [
-        createNativePdfSelectionHandler(),
+        ...createDocumentNavigationHandlers(),
         ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(tabBroadcast),
         createChatGPTPlanHandler(),
         createTranslationCancelHandler(translationRequestRegistry),

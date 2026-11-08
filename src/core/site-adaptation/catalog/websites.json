@@ -3162,6 +3162,17 @@
         ],
         "atomic": false
       }
+    ],
+    "exclude": [
+      "#announcement-banner.ds-announcement",
+      "#infobox.infobox",
+      ".arxiv-html-header",
+      ".ltx_page_navbar",
+      ".ltx_authors",
+      ".ltx_bibliography"
+    ],
+    "protect": [
+      ".ltx_cite"
     ]
   },
   {

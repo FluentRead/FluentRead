@@ -378,30 +378,6 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
   .about-support-options { grid-template-columns: minmax(0, 1fr); }
   .about-support-method { min-height: 0; }
 }
-/* 桌面侧栏按可用高度收紧留白；保留字号与全部入口，极矮窗口仍独立滚动。 */
-@media (min-width: 701px) {
-  .settings-app .sidebar {
-    --sidebar-row-height: clamp(32px, calc(4vh + 1px), 40px);
-    padding-top: clamp(12px, 2vh, 20px);
-    padding-bottom: 12px;
-  }
-  .settings-app .sidebar .brand { flex-shrink: 0; padding-bottom: 12px; }
-  .settings-app .sidebar .brand img { width: 36px; height: 36px; border-radius: 11px; box-shadow: none; }
-  .settings-app .sidebar nav {
-    min-height: 0; gap: 7px; padding: 2px 2px 4px;
-    align-content: start; overflow-x: hidden; overscroll-behavior-y: contain;
-    scrollbar-gutter: stable; scrollbar-width: thin;
-  }
-  .settings-app .sidebar .nav-group { gap: 1px; }
-  .settings-app .sidebar .nav-group-label { padding-bottom: 2px; line-height: 12px; }
-  .settings-app .sidebar nav button {
-    min-height: var(--sidebar-row-height); padding: 3px 9px;
-    grid-template-columns: 24px minmax(0, 1fr); gap: 9px; border-radius: 8px;
-  }
-  .settings-app .sidebar .nav-icon { width: 24px; height: 24px; border-radius: 7px; }
-  .settings-app .sidebar nav strong { line-height: 18px; overflow-wrap: anywhere; }
-}
-
 @media (max-width: 1050px) {
   body { min-width: 0; }
   .sidebar { flex-basis: 210px; width: 210px; }
@@ -530,15 +506,13 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 /* 设置中心的层级：导航 / 页内分类 / 内容分组；表单保持适读宽度，工作台保留可用空间。 */
 .settings-app { --settings-content-width: 1080px; }
 .settings-app .sidebar { flex-basis: 224px; width: 224px; padding: 24px 16px 16px; background: var(--surface); backdrop-filter: none; }
-.settings-app .sidebar .brand { padding: 0 10px 24px; gap: 10px; }
+.settings-app .sidebar .brand { padding: 0 10px; gap: 10px; }
 .settings-app .sidebar .brand img { width: 34px; height: 34px; border-radius: 9px; box-shadow: none; }
 .settings-app .brand strong { font-size: 16px; font-weight: 650; }
 .settings-app .brand small { font-size: 11px; line-height: 1.5; }
-.settings-app .sidebar nav { gap: 20px; padding: 0 2px 12px; scrollbar-gutter: auto; }
-.settings-app .nav-group-items { display: grid; gap: 2px; }
-.settings-app .sidebar nav button[data-section] { min-height: 40px; padding: 8px 10px; border-radius: 10px; gap: 9px; }
-.settings-app .sidebar nav .nav-group-toggle { display: flex; justify-content: space-between; min-height: 28px; padding: 4px 11px; border: 0; border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; }
-.nav-chevron { font-size: 18px; line-height: 1; transform: rotate(0deg); transition: transform 150ms ease; }
+.settings-app .nav-group-items { display: grid; }
+.settings-app .sidebar nav .nav-group-toggle { display: flex; justify-content: space-between; gap: 6px; min-height: 22px; padding: 2px 11px; border: 0; border-radius: 6px; color: var(--muted); font-size: 11px; font-weight: 600; overflow-wrap: anywhere; }
+.nav-chevron { flex: none; font-size: 18px; line-height: 1; transform: rotate(0deg); transition: transform 150ms ease; }
 .nav-chevron.open { transform: rotate(90deg); }
 .mobile-settings-navigation { display: none; }
 .settings-app .workspace { --settings-navigation-inset: 32px; padding: 12px 32px 20px; }
@@ -564,7 +538,7 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 .settings-app .settings-group-body > .feature-enable-card { margin: 0; border: 0; border-radius: 0; }
 .settings-app .settings-group-body > .feature-enable-card + * { border-top: 1px solid var(--line); }
 @media (max-width: 1100px) and (min-width: 701px) {
-  .settings-app .sidebar { flex-basis: 196px; width: 196px; }
+  .settings-app .sidebar { width: clamp(196px, 28vw, 224px); flex-basis: auto; padding-inline: 12px; }
   .settings-app .sidebar .brand { padding-inline: 0; }
   .settings-app .workspace { --settings-navigation-inset: 24px; padding: 12px 24px 20px; }
   .settings-app .topbar { flex-direction: row; align-items: center; gap: 16px; }
@@ -590,9 +564,30 @@ h1 { margin-bottom: 6px; font-size: 26px; line-height: 1.25; letter-spacing: -.0
 }
 
 /* 页面直接从页内导航或设置内容开始，当前页面名称由 main 的辅助技术标签提供。 */
-.settings-app .sidebar .brand { padding-bottom: 18px; }
-.settings-app .sidebar .search-box { flex: none; width: 100%; height: 38px; margin-bottom: 22px; padding: 0 10px; border-radius: 8px; background: var(--surface-soft); }
+.settings-app .sidebar .search-box { flex: none; width: 100%; padding: 0 10px; border-radius: 8px; background: var(--surface-soft); }
 .settings-app .sidebar .search-box input { min-width: 0; font-size: 11px; }
+
+/* 桌面侧栏压缩行间留白，较矮窗口仍可在导航内独立滚动。 */
+@media (min-width: 701px) {
+  .settings-app .sidebar { padding-block: 12px; }
+  .settings-app .sidebar .brand { flex: none; padding-bottom: 10px; }
+  .settings-app .sidebar .search-box { height: 34px; margin-bottom: 8px; }
+  .settings-app .sidebar nav {
+    min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 5px; padding: 2px 2px 4px;
+    align-content: start; overscroll-behavior-y: contain;
+    scrollbar-gutter: stable; scrollbar-width: thin;
+  }
+  .settings-app .sidebar .nav-group { gap: 2px; }
+  .settings-app .sidebar :is(.nav-group, .nav-group-items) { min-width: 0; }
+  .settings-app .sidebar nav button[data-section] {
+    min-height: clamp(30px, calc(4vh - 1px), 36px); padding: 1px 8px;
+    grid-template-columns: 22px minmax(0, 1fr); gap: 8px; border-radius: 8px;
+  }
+  .settings-app .sidebar nav button:focus-visible { outline-offset: -3px; }
+  .settings-app .sidebar .nav-icon { width: 22px; height: 22px; }
+  .settings-app .sidebar nav strong { line-height: 16px; overflow-wrap: anywhere; }
+}
+
 .settings-app .topbar { min-height: 40px; margin-bottom: 18px; align-items: center; flex-direction: row; gap: 12px; }
 .settings-app .topbar .settings-page-tabs { flex: 1; margin: 0; }
 .settings-app .userscript-settings-close { margin-left: auto; width: 36px; height: 36px; flex-basis: 36px; border-radius: 8px; }

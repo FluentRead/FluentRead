@@ -947,7 +947,12 @@ describe('网站正文规则目录', () => {
             expect(parseSiteRulePack({version: 1, rules: [standalone]}), rule.id).toMatchObject({ok: true});
             if (standalone.content?.length) {
                 expect(standalone.protect, rule.id).toEqual(expect.arrayContaining(['code', 'pre', 'input', 'textarea']));
-                expect(standalone.exclude, rule.id).toContain('nav');
+                // JetBrains 的目录沿用通用侧边栏设置，避免站点规则强制排除导航。
+                if (rule.id === 'jetbrains-idea-whatsnew') {
+                    expect(standalone.exclude).toBeUndefined();
+                } else {
+                    expect(standalone.exclude, rule.id).toContain('nav');
+                }
             } else {
                 // 只补元数据边界的规则保留通用发现，独立夹具必须证明正文没有被白名单收窄。
                 expect(rule.profile).toBeUndefined();

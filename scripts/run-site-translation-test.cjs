@@ -1687,7 +1687,7 @@ async function waitForStableTarget(page, selector, timeout) {
 
 // Read-only preconditions for one native dismiss action. Accessibility attributes are never rewritten.
 function readDismissiblePromotionStateInPage({dialogSelector, buttonSelector, contentSelector, expectedUrl,
-  afterDismissal = false, waitForButton = false, diagnostics = false}) {
+  afterDismissal = false, allowEmptyFragment = false, waitForButton = false, diagnostics = false}) {
   const paint = node => {
     if (!node) return {painted: false, reasons: ['missing']};
     const reasons = [], rect = node.getBoundingClientRect();
@@ -1708,6 +1708,8 @@ function readDismissiblePromotionStateInPage({dialogSelector, buttonSelector, co
   const blockers = [...document.querySelectorAll('dialog[open],[role="dialog"],[role="alertdialog"],[aria-modal="true"]')]
     .filter(node => paint(node).painted);
   const button = buttons[0], content = contents[0];
+  const dismissLink = button?.matches('a[href="#"][data-action="dismiss"][aria-label="close"]:not([target],[download],[ping])') &&
+    !document.querySelector('base[target]') && new URL('#', document.baseURI || expectedUrl).href === `${expectedUrl}#`;
   const contentHidden = !!content?.closest('[hidden],[inert],[aria-hidden="true"]');
   const ariaHiddenAncestor = button?.closest('[aria-hidden="true"]');
   const inertAncestor = button?.closest('[inert]');
@@ -1716,7 +1718,8 @@ function readDismissiblePromotionStateInPage({dialogSelector, buttonSelector, co
   const inactiveKnownPromotionAncestor = !!ariaHiddenAncestor && !!content && !inertAncestor && dialogs.length === 1 &&
     ariaHiddenAncestor !== dialogs[0] && ariaHiddenAncestor.contains(dialogs[0]) && !ariaHiddenAncestor.contains(content);
   const formAttributes = ['form', 'formaction', 'formmethod', 'formenctype', 'formtarget', 'formnovalidate'];
-  const state = {urlUnchanged: location.href === expectedUrl, path: location.pathname,
+  const state = {urlUnchanged: location.href === expectedUrl || (allowEmptyFragment && location.href === `${expectedUrl}#`),
+    path: location.pathname,
     dialogCount: dialogs.length, visibleDialogCount: visibleDialogs.length, blockingDialogCount: blockers.length,
     unrecognizedBlockingDialogs: blockers.filter(node => !visibleDialogs.includes(node)).map(node => ({tag: node.localName,
       role: node.getAttribute('role'), ariaModal: node.getAttribute('aria-modal')})),
@@ -1749,7 +1752,7 @@ function readDismissiblePromotionStateInPage({dialogSelector, buttonSelector, co
         dialogs[0].getAttribute('aria-modal') !== 'true') reject('promotion dialog is not unique and modal');
     if (state.content.insideDialog) reject('configured content is inside the promotion');
     if (afterDismissal) return false;
-    if (buttons.length !== 1 || !state.button.insideDialog || button.localName !== 'button' || state.button.disabled ||
+    if (buttons.length !== 1 || !state.button.insideDialog || (button.localName !== 'button' && !dismissLink) || state.button.disabled ||
         (state.button.inaccessibleAncestor && !inactiveKnownPromotionAncestor)) reject('dismiss button is not unique, native and actionable inside the promotion');
     const type = state.button.typeAttribute;
     // Native LinkedIn's close button omits type. It is safe only without any associated/ancestor form.
@@ -1759,7 +1762,7 @@ function readDismissiblePromotionStateInPage({dialogSelector, buttonSelector, co
       if (waitForButton) return false;
       reject('known promotion dismiss button is not yet active and painted');
     }
-    return {action: 'dismiss', publicContentCount: contents.length};
+    return {action: 'dismiss', dismissLink, publicContentCount: contents.length};
   }
   if (contentHidden) {
     if (afterDismissal) return false;
@@ -1781,16 +1784,22 @@ async function prepareDismissiblePromotion(page, config, expectedUrl, timeout) {
     }
     const before = await page.evaluate(readDismissiblePromotionStateInPage, argument);
     if (before.action === 'none') return {status: 'not-present', nativeClicks: 0, ...normalized, url: expectedUrl};
-    if (Date.now() >= deadline) throw new Error('native preparation deadline exceeded before click');
+    if (Date.now() >= deadline) throw new Error('native preparation deadline exceeded before dismissal');
     assertPageFocusAllowed(page);
-    await page.locator(normalized.buttonSelector).click({timeout: remaining()});
-    if (page.url() !== expectedUrl) throw new Error('URL changed after click');
+    const dismissal = page.locator(normalized.buttonSelector);
+    // 站点的浮动导航有时覆盖关闭链接，使用它原生支持的键盘激活。
+    if (before.dismissLink) await dismissal.press('Enter', {timeout: remaining()});
+    else await dismissal.click({timeout: remaining()});
+    const staysOnPage = () => page.url() === expectedUrl || (before.dismissLink && page.url() === `${expectedUrl}#`);
+    if (!staysOnPage()) throw new Error('URL changed after dismissal');
+    const afterArgument = {...argument, afterDismissal: true, allowEmptyFragment: before.dismissLink};
     const ready = await page.waitForFunction(readDismissiblePromotionStateInPage,
-      {...argument, afterDismissal: true}, {timeout: remaining(), polling: 100});
+      afterArgument, {timeout: remaining(), polling: 100});
     await ready?.dispose?.();
-    const after = await page.evaluate(readDismissiblePromotionStateInPage, {...argument, afterDismissal: true});
-    if (!after || after.action !== 'none' || page.url() !== expectedUrl) throw new Error('public content did not become readable');
-    return {status: 'dismissed', nativeClicks: 1, ...normalized, url: expectedUrl};
+    const after = await page.evaluate(readDismissiblePromotionStateInPage, afterArgument);
+    if (!after || after.action !== 'none' || !staysOnPage()) throw new Error('public content did not become readable');
+    return {status: 'dismissed', nativeClicks: 1, ...(before.dismissLink ? {nativeActivation: 'keyboard-enter'} : {}),
+      ...normalized, url: page.url()};
   } catch (error) {
     assertPageFocusAllowed(page);
     let details;
@@ -3711,8 +3720,14 @@ async function main() {
       reportProgress(`页面预滚动已完成：${args.prepareScrollSelector}`);
     }
     if (args.prepareDismissiblePromotion) {
-      // 实站可能在早期准备后才激活推广；正常预滚动后有界等候，再检查唯一安全关闭动作。
-      await page.waitForTimeout(Math.min(2000, args.timeout));
+      const {dialogSelector, waitForDialogMs} = args.prepareDismissiblePromotion;
+      if (waitForDialogMs) {
+        // 有些可选弹窗由异步脚本在页面准备后挂载。
+        await page.locator(dialogSelector).first().waitFor({state: 'visible', timeout: Math.min(waitForDialogMs, args.timeout)})
+          .catch(error => {if (error.name !== 'TimeoutError') throw error;});
+      } else {
+        await page.waitForTimeout(Math.min(2000, args.timeout));
+      }
       runtimeDiagnostics.setPhase(`${args.case}/${args.mode}/dismissible-promotion`);
       promotionPreparation = {status: 'started', ...args.prepareDismissiblePromotion};
       promotionPreparation = await prepareDismissiblePromotion(page, args.prepareDismissiblePromotion, args.url, args.timeout);

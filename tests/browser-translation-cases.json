@@ -1,4 +1,35 @@
 {
+  "jetbrains-idea-whatsnew": {
+    "url": "https://www.jetbrains.com/idea/whatsnew/2026-3/",
+    "prepareScrollSelector": "#agents-models-subscriptions > header h3",
+    "prepareDismissiblePromotion": {
+      "dialogSelector": "#ch2-dialog[role='dialog'][aria-modal='true']",
+      "buttonSelector": "#ch2-dialog a.ch2-dialog-close-btn[data-action='dismiss']",
+      "contentSelector": "#agents-models-subscriptions",
+      "waitForDialogMs": 10000
+    },
+    "hoverSelector": "#agents-models-subscriptions > header .whatsnew-feature-block__content p",
+    "hoverTargets": [
+      {"name": "compatible-agents", "selector": "#agents-models-subscriptions > header .whatsnew-feature-block__content p", "index": 0},
+      {"name": "existing-subscriptions", "selector": "#agents-models-subscriptions > header .whatsnew-feature-block__content p", "index": 1},
+      {"name": "free-junie-lite", "selector": "#agents-models-subscriptions > header .whatsnew-feature-block__content p", "index": 2},
+      {"name": "feature-title", "selector": "#agents-models-subscriptions > header h3"}
+    ],
+    "requiredSelectors": ["#agents-models-subscriptions > header h3", "#agents-models-subscriptions > header .whatsnew-feature-block__content p"],
+    "coverageRules": [
+      {"name": "feature-title", "selector": "#agents-models-subscriptions > header h3", "kind": "heading", "minInitial": 1},
+      {"name": "feature-prose", "selector": "#agents-models-subscriptions > header .whatsnew-feature-block__content p", "kind": "content", "minInitial": 3, "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "forbiddenSelectors": ["#agents-models-subscriptions button[data-test='next-button']"],
+    "interactionSelectors": ["#agents-models-subscriptions p a[href='/acp/']", "#agents-models-subscriptions p a[href='https://junie.jetbrains.com/']", "#agents-models-subscriptions button[data-test='next-button']"],
+    "modes": ["hover", "full"],
+    "tier": "required",
+    "fullPageScope": "initial-corpus",
+    "hoverHotkey": "Control",
+    "fullPageHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "notes": "Pinned version of the reported What's New page. Verify the three feature paragraphs inside an article header, the adjacent heading, inline link destinations, and the media carousel control. Controlled-provider runs verify complete source transport and restoration."
+  },
   "englio-article": {
     "url": "https://englio.ai/article/89a4209f-974a-4d66-ac21-939da26ed7a2",
     "hoverSelector": "main p[data-article-start]:has(> span[data-word-pos])",

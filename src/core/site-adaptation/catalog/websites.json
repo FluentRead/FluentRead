@@ -18,6 +18,22 @@
     "exclude": ["nav"]
   },
   {
+    "id": "jetbrains-idea-whatsnew",
+    "name": "JetBrains IntelliJ IDEA 更新说明",
+    "match": {
+      "hosts": ["www.jetbrains.com"],
+      "paths": ["/idea/whatsnew", "/idea/whatsnew/*"]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": ["main.whatsnew-page-content article.whatsnew-feature-block > header > .whatsnew-feature-block__content p"],
+        "resolve": "closest"
+      }
+    ],
+    "protect": ["code", "pre", "input", "textarea"]
+  },
+  {
     "id": "dart",
     "name": "Dart 文档导语",
     "match": {

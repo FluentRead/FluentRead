@@ -113,6 +113,8 @@ describe('deferred franc runtime construction',()=>{
 });
 
 describe('Greasy Fork vendor source freshness',()=>{
+    const nodeExecutable='/fixture/bin/node';
+    const viteExecutable='node_modules/vite-userscript/bin/vite.js';
     function execute(options:{stale?:boolean;missing?:boolean;prepare?:boolean;file?:string}={}) {
         const calls:{command:string;args:string[];env?:Record<string,string>}[]=[],writes:string[]=[];
         const plugin=options.file??'scripts/testing/franc-runtime-build.ts',commit='a'.repeat(40);
@@ -129,7 +131,7 @@ describe('Greasy Fork vendor source freshness',()=>{
         };
         const context=createContext({Buffer,path,fileURLToPath,spawnSync,console:{log:()=>{}},
             fs:{mkdirSync:()=>{},copyFileSync:()=>{},readFileSync:bytes,writeFileSync:(file:string)=>writes.push(file)},
-            process:{argv:['node','/fixture/scripts/build-userscript-greasyfork.mjs',...(options.prepare?['--prepare-resources']:[])],env:{}}});
+            process:{execPath:nodeExecutable,argv:[nodeExecutable,'/fixture/scripts/build-userscript-greasyfork.mjs',...(options.prepare?['--prepare-resources']:[])],env:{}}});
         const code=readFileSync('scripts/build-userscript-greasyfork.mjs','utf8').replace(/^import[^\n]+\n/gmu,'')
             .replace('import.meta.url',JSON.stringify('file:///fixture/scripts/build-userscript-greasyfork.mjs'));
         let error:unknown;try {runInContext(code,context);}catch(failure){error=failure;}
@@ -139,14 +141,15 @@ describe('Greasy Fork vendor source freshness',()=>{
         const result=execute({[reason]:true,file});
         expect(result.error).toBeDefined();
         expect(String(result.error)).toContain(reason==='stale'?'failed (1)':'plugin absent at resource commit');
-        expect(result.calls.some(call=>call.command==='pnpm')).toBe(false);
+        expect(result.calls.every(call=>call.command==='git')).toBe(true);
     });
     it('retains the immutable resource source and verification flow when all vendor inputs match',()=>{
         const result=execute();
         expect(result.error).toBeUndefined();
         expect(result.calls.find(call=>call.command==='git'&&call.args[0]==='diff')?.args)
             .toEqual(expect.arrayContaining(['scripts/testing/franc-runtime-build.ts','public/third-party-notices/franc-min-MIT.txt']));
-        const build=result.calls.find(call=>call.command==='pnpm');
+        const build=result.calls.find(call=>call.command===nodeExecutable);
+        expect(build?.args).toEqual([viteExecutable,'build','--config','userscript/vite.config.ts']);
         expect(build?.env?.FLUENTREAD_USERSCRIPT_VENDOR_URL).toContain('@'+'a'.repeat(40)+'/userscript/resources/');
         expect(result.calls.at(-1)?.args).toEqual(['scripts/verify-userscript-greasyfork-build.mjs']);
         expect(result.writes).toHaveLength(0);
@@ -154,8 +157,10 @@ describe('Greasy Fork vendor source freshness',()=>{
     it('prepares both resources without requiring source commits or invoking network tools',()=>{
         const result=execute({prepare:true});
         expect(result.error).toBeUndefined();
-        expect(result.calls.map(call=>call.command)).toEqual(['pnpm','pnpm']);
-        expect(result.calls[0].args).toContain('userscript/vendor.vite.config.ts');
+        expect(result.calls.map(({command,args})=>({command,args}))).toEqual([
+            {command:nodeExecutable,args:[viteExecutable,'build','--config','userscript/vendor.vite.config.ts']},
+            {command:nodeExecutable,args:[viteExecutable,'build','--config','userscript/vite.config.ts']},
+        ]);
         expect(result.calls[1].env?.FLUENTREAD_USERSCRIPT_VENDOR_URL).toBe('http://127.0.0.1:57511/fluentread-vendor.v1.js');
         expect(result.writes).toHaveLength(2);
     });

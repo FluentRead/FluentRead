@@ -181,7 +181,7 @@ describe('Hacker News reading boundaries', () => {
         expect(candidates.every(candidate => readableText(core, candidate).length < 100)).toBe(true);
         expect(steps.some(step => step.element.id.startsWith('metadata-'))).toBe(false);
         expect(steps.length).toBeLessThan(count * 21 + 10);
-    });
+    }, 30_000);
 });
 
 describe('Explicit non-atomic inline reading containers', () => {

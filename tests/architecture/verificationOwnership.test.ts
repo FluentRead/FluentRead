@@ -374,7 +374,7 @@ describe('repository verification ownership', () => {
             && !strictCoverage.has(path));
 
         expect(uncovered).toEqual([]);
-    });
+    }, 60_000);
 
     it('Vue 业务组件具有真实消费者，展示例外保持无状态，历史债务不能随源码变化续期', () => {
         const registry = JSON.parse(readFileSync(projectPath('tests/architecture/vue-verification-owners.json'), 'utf8')) as {

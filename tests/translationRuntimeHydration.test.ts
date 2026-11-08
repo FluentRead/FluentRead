@@ -146,9 +146,12 @@ describe('实际 Vite 翻译组合根的统计可达性', () => {
         const {mkdtempSync, realpathSync, writeFileSync, rmSync} = await import('node:fs');
         const {tmpdir} = await import('node:os');
         const {resolve, isAbsolute} = await import('node:path');
-        const {build} = await import('vite');
+        const {build} = await (browser === 'userscript' ? import('vite-userscript') : import('vite'));
         const {default: configuration} = await import('@/userscript/vite.config');
         const config = configuration as import('vite').UserConfig;
+        const resolveOptions: {
+            alias?: Record<string, string> | readonly {find: string | RegExp; replacement: string}[];
+        } | undefined = config.resolve;
         const root = process.cwd();
         const fixture = realpathSync(mkdtempSync(resolve(tmpdir(), 'fluentread-stats-build-')));
         const runtime = resolve(root, 'src/app/translation/runtime.ts');
@@ -172,7 +175,7 @@ describe('实际 Vite 翻译组合根的统计可达性', () => {
             globalThis.statsBuildFixture = {translateWithCache, marker, source${standalone === '1' ? ', createPlatformMessageHandler' : ''}};`);
         try {
             const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent',
-                resolve: config.resolve, define: {...config.define, 'import.meta.env.BROWSER': JSON.stringify(browser)},
+                resolve: resolveOptions, define: {...config.define, 'import.meta.env.BROWSER': JSON.stringify(browser)},
                 build: {write: false, minify: false, lib: {entry, formats: ['es']},
                     rollupOptions: {external(source, importer) {
                         if (!importer) return false;

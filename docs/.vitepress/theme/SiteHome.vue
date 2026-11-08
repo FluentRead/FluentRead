@@ -202,11 +202,11 @@ const faqs = [
     <section id="sponsors" class="bv-section bv-sponsors" aria-labelledby="bv-sponsors-title">
       <div>
         <span class="bv-section-number">{{ t('企业与项目赞助', 'SPONSOR FLUENTREAD') }}</span>
-        <h2 id="bv-sponsors-title">{{ t('支持开源，让世界更大', 'Support open source. A bigger world.') }}</h2>
+        <h2 id="bv-sponsors-title">{{ t('支持开源，与流畅阅读同行', 'Support open source with FluentRead') }}</h2>
         <p>{{
           t(
-            '项目目前主要由个人支持，每月为开源开发投入数万美元的 API Token 费用。我们相信，流畅阅读能为世界带来更多美好。',
-            'The project is currently funded mainly out of pocket, with tens of thousands of US dollars spent each month on API tokens for open-source development. We believe FluentRead can make the world a little better.'
+            '项目目前主要由个人支持，每月投入数百美元用于项目维护。我们相信，流畅阅读能为世界带来更多美好。',
+            'The project is currently funded mainly out of pocket, with a few hundred US dollars spent each month on maintenance. We believe FluentRead can make the world a little better.'
           )
         }}</p>
         <div class="bv-sponsor-contact">

@@ -130,17 +130,20 @@ const unicodeNotice = `/*\n${fs.readFileSync(resolve(root, 'public/third-party-n
 const serviceIconsLicense = fs.readFileSync(resolve(root, 'public/third-party-notices/lobe-icons-MIT.txt'), 'utf8');
 const tinycolorLicense = fs.readFileSync(resolve(root, 'public/third-party-notices/tinycolor-MIT.txt'), 'utf8');
 const serviceIconsNotice = `/*\n${serviceIconsLicense}\n*/`;
+const mitPermissionStart = 'Permission is hereby granted';
+const normalizeNotice = (text: string) => text.replace(/\s+/gu, ' ').trim();
+const mitTermsOffset = tinycolorLicense.indexOf(mitPermissionStart);
+const mitTerms = mitTermsOffset < 0 ? '' : tinycolorLicense.slice(mitTermsOffset).trim();
+const sharedMitMarker = '[Shared MIT terms below]';
+const sharedMitTitle = 'Shared MIT permission and warranty terms for the references above:';
+const sharedMitBlock = `/*\n${sharedMitTitle}\n${mitTerms}\n*/`;
 // 两个库共用完全相同的 MIT 正文；分别保留包/版本、来源、提交与版权，只合并授权和免责正文。
 const sharedMitNotice = bundleLibraries ? '' : (() => {
-    const permissionStart = 'Permission is hereby granted';
-    const iconsStart = serviceIconsLicense.indexOf(permissionStart);
-    const tinycolorStart = tinycolorLicense.indexOf(permissionStart);
-    const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
-    if (iconsStart < 0 || tinycolorStart < 0
-        || normalize(serviceIconsLicense.slice(iconsStart)) !== normalize(tinycolorLicense.slice(tinycolorStart))) {
+    const iconsStart = serviceIconsLicense.indexOf(mitPermissionStart);
+    if (iconsStart < 0 || !mitTerms || normalizeNotice(serviceIconsLicense.slice(iconsStart)) !== normalizeNotice(mitTerms)) {
         throw new Error('Bundled MIT notice bodies differ; retain both complete notices');
     }
-    return `/*\n${serviceIconsLicense.slice(0, iconsStart).trimEnd()}\n\n@ctrl/tinycolor 3.6.1 — MIT\n${tinycolorLicense.slice(0, tinycolorStart).trimEnd()}\n\n${serviceIconsLicense.slice(iconsStart).trimEnd()}\n*/`;
+    return `/*\n${serviceIconsLicense.slice(0, iconsStart).trimEnd()}\n\n@ctrl/tinycolor 3.6.1 — MIT\n${tinycolorLicense.slice(0, mitTermsOffset).trimEnd()}\n\n${serviceIconsLicense.slice(iconsStart).trimEnd()}\n*/`;
 })();
 const browserShimPath = resolve(root, 'userscript/browser.ts');
 const projectRoot = `${normalizePath(root)}/`;
@@ -262,28 +265,40 @@ export const executionGuardEnd = '/* FluentRead userscript execution guard:end *
 /** 独立版仅在后续存在完整相同的 MIT 正文时共享图标授权；否则保留完整原文。 */
 function serviceIconsNoticeForBundle(thirdPartyNotices: string): string {
     if (!bundleLibraries) return sharedMitNotice;
-    const start = 'Permission is hereby granted';
-    const iconStart = serviceIconsLicense.indexOf(start), canonicalStart = tinycolorLicense.indexOf(start);
-    if (iconStart < 0 || canonicalStart < 0) return serviceIconsNotice;
-    const terms = tinycolorLicense.slice(canonicalStart).trim();
-    const normalize = (text: string) => text.replace(/\s+/gu, ' ').trim();
-    const sharedBlock = `/*\nShared MIT permission and warranty terms for the references above:\n${terms}\n*/`;
-    if (normalize(serviceIconsLicense.slice(iconStart)) !== normalize(terms) || !thirdPartyNotices.includes(sharedBlock)) {
+    const iconStart = serviceIconsLicense.indexOf(mitPermissionStart);
+    if (iconStart < 0 || !mitTerms || !thirdPartyNotices.includes(sharedMitBlock)
+        || normalizeNotice(serviceIconsLicense.slice(iconStart)) !== normalizeNotice(mitTerms)) {
         return serviceIconsNotice;
     }
-    return `/*\n${serviceIconsLicense.slice(0, iconStart).trimEnd()}\n\n[Shared MIT terms below]\n*/`;
+    return `/*\n${serviceIconsLicense.slice(0, iconStart).trimEnd()}\n\n${sharedMitMarker}\n*/`;
+}
+
+/** 只迁移 DeepLX transport 的内联许可，完整相同的正文才能复用独立版已有的授权。 */
+function placeDeepLXRuntimeNotice(entryCode: string, thirdPartyNotices: string): {entryCode: string; thirdPartyNotices: string} {
+    if (!bundleLibraries || !mitTerms || !thirdPartyNotices.includes(sharedMitBlock)) return {entryCode, thirdPartyNotices};
+    const notice = /\/\*! @license\s+MIT License\s+@deeplx\/core\s+[^*]+\*\//u.exec(entryCode)?.[0];
+    const termsStart = notice?.indexOf(mitPermissionStart) ?? -1;
+    if (!notice || termsStart < 0 || normalizeNotice(notice.slice(termsStart, -2)) !== normalizeNotice(mitTerms)) {
+        return {entryCode, thirdPartyNotices};
+    }
+    const attribution = `${notice.slice(0, termsStart).trimEnd()}\n\n${sharedMitMarker}\n*/`;
+    return {
+        entryCode: entryCode.replace(notice, '\n'),
+        thirdPartyNotices: thirdPartyNotices.replace(sharedMitBlock, () => `${attribution}\n${sharedMitBlock}`),
+    };
 }
 
 export function wrapUserscriptEntry(entryCode: string, bootstrapCode: string, thirdPartyNotices = ''): string {
+    const placed = placeDeepLXRuntimeNotice(entryCode, thirdPartyNotices);
     return [
         metadata,
         unicodeNotice,
         serviceIconsNoticeForBundle(thirdPartyNotices),
-        ...(thirdPartyNotices ? [thirdPartyNotices] : []),
+        ...(placed.thirdPartyNotices ? [placed.thirdPartyNotices] : []),
         executionGuardStart,
         'if (!globalThis.__fluentReadUserscriptBootstrapped) {',
         bootstrapCode,
-        entryCode,
+        placed.entryCode,
         '}',
         executionGuardEnd,
     ].join('\n');
@@ -336,12 +351,10 @@ export function bundledLibraryNotices(moduleIds: readonly string[]): string {
     if (!bundleLibraries) return notices;
     // 完整独立版还包含不同版权及内嵌子依赖的同一 MIT 正文。分别共享双引号与单引号的
     // 完整版本，仅允许换行/空白差异；每个版权、来源和前后附加条款保留在原位置。
-    const permissionStart = tinycolorLicense.indexOf('Permission is hereby granted');
-    if (permissionStart < 0) throw new Error('Canonical bundled MIT permission terms are missing');
-    const terms = tinycolorLicense.slice(permissionStart).trim();
+    if (!mitTerms) throw new Error('Canonical bundled MIT permission terms are missing');
     const variants = [
-        {terms, marker: '[Shared MIT terms below]', title: 'Shared MIT permission and warranty terms for the references above:'},
-        {terms: terms.replace(/"/gu, "'"), marker: '[Shared single-quoted MIT terms below]',
+        {terms: mitTerms, marker: sharedMitMarker, title: sharedMitTitle},
+        {terms: mitTerms.replace(/"/gu, "'"), marker: '[Shared single-quoted MIT terms below]',
             title: 'Shared single-quoted MIT permission and warranty terms for the references above:'},
     ];
     for (const variant of variants) {

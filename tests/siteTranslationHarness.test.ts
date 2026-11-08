@@ -375,6 +375,7 @@ describe('dismissible public promotion preparation', () => {
     buttonSelector: 'button.contextual-sign-in-modal__modal-dismiss[data-tracking-control-name="pulse-article_contextual-sign-in-modal_modal_dismiss"]',
     contentSelector: 'article.article-main',
   };
+  const linkConfig = {...config, buttonSelector: 'a.cookie-dialog-close'};
   const publicUrl = 'https://www.linkedin.com/pulse/independently-authored-public-article';
   const html = '<main aria-hidden="true"><article class="article-main"><h1>A public article title</h1>' +
     '<p>The complete public paragraph is present before dismissing the promotion.</p></article></main>' +
@@ -383,17 +384,22 @@ describe('dismissible public promotion preparation', () => {
     '<form><input name="session_key"><button type="submit">Sign in</button></form></section>';
   type Fixture = {
     document: Document;
-    page: {url: () => string; locator: (selector: string) => {click: ReturnType<typeof vi.fn>};
+    page: {url: () => string; locator: (selector: string) => {click: ReturnType<typeof vi.fn>; press: ReturnType<typeof vi.fn>};
       evaluate: (fn: (input: unknown) => unknown, input: unknown) => Promise<unknown>;
       waitForFunction: ReturnType<typeof vi.fn>};
     nativeClick: ReturnType<typeof vi.fn>;
+    nativePress: ReturnType<typeof vi.fn>;
     location: {href: string; pathname: string};
   };
   async function withPromotion(run: (fixture: Fixture) => Promise<void>,
-    options: {afterClick?: (fixture: Pick<Fixture, 'document' | 'location'>) => void;
+    options: {dismissalLink?: boolean; afterClick?: (fixture: Pick<Fixture, 'document' | 'location'>) => void;
       beforePoll?: (fixture: Pick<Fixture, 'document' | 'location'>) => void} = {}) {
     const parsed = parseHTML(`<html><body>${html}</body></html>`);
     const document = parsed.document as unknown as Document;
+    if (options.dismissalLink) {
+      document.querySelector(config.buttonSelector)!.outerHTML =
+        '<a class="cookie-dialog-close" href="#" data-action="dismiss" aria-label="close"></a>';
+    }
     Object.defineProperty(parsed.window.HTMLElement.prototype, 'getBoundingClientRect', {configurable: true,
       value: () => ({width: 400, height: 100})});
     const location = {href: publicUrl, pathname: new URL(publicUrl).pathname};
@@ -405,7 +411,7 @@ describe('dismissible public promotion preparation', () => {
       previous.set(name, Object.getOwnPropertyDescriptor(globalThis, name));
       Object.defineProperty(globalThis, name, {configurable: true, writable: true, value});
     }
-    const nativeClick = vi.fn(async () => {
+    const handleDismissal = async () => {
       // This is the authored site's native handler, not an action performed by the helper's page predicate.
       expect(document.querySelector('main')!.getAttribute('aria-hidden')).toBe('true');
       if (options.afterClick) options.afterClick({document, location});
@@ -413,16 +419,24 @@ describe('dismissible public promotion preparation', () => {
         document.querySelector(config.dialogSelector)!.setAttribute('hidden', '');
         document.querySelector('main')!.removeAttribute('aria-hidden');
       }
+    };
+    const nativeClick = vi.fn(handleDismissal);
+    const nativePress = vi.fn(async (key: string) => {
+      expect(key).toBe('Enter');
+      await handleDismissal();
     });
     const page = {url: () => location.href,
-      locator: (selector: string) => {expect(selector).toBe(config.buttonSelector); return {click: nativeClick};},
+      locator: (selector: string) => {
+        expect(selector).toBe(options.dismissalLink ? linkConfig.buttonSelector : config.buttonSelector);
+        return {click: nativeClick, press: nativePress};
+      },
       evaluate: async (fn: (input: unknown) => unknown, input: unknown) => fn(input),
       waitForFunction: vi.fn(async (fn: (input: unknown) => unknown, input: unknown) => {
         options.beforePoll?.({document, location});
         if (!fn(input)) throw new Error('promotion/public content did not become readable');
         return {dispose: vi.fn(async () => undefined)};
       })};
-    try {await run({document, page, nativeClick, location});}
+    try {await run({document, page, nativeClick, nativePress, location});}
     finally {for (const [name, descriptor] of previous) {
       if (descriptor) Object.defineProperty(globalThis, name, descriptor);
       else Reflect.deleteProperty(globalThis, name);
@@ -432,7 +446,8 @@ describe('dismissible public promotion preparation', () => {
   it('normalizes only three explicit selectors and keeps the feature optional', () => {
     expect(normalizeDismissiblePromotion(undefined)).toBeUndefined();
     expect(normalizeDismissiblePromotion(Object.fromEntries(Object.entries(config).map(([key, value]) => [key, ` ${value} `])))).toEqual(config);
-    const base = Object.values(cases)[0];
+    expect(normalizeDismissiblePromotion({...config, waitForDialogMs: 10000})).toEqual({...config, waitForDialogMs: 10000});
+    const base = cases['englio-article'];
     expect(normalizeCaseConfig('public-promo', {...base, prepareDismissiblePromotion: config}).prepareDismissiblePromotion).toEqual(config);
     expect(normalizeCaseConfig('ordinary', base)).not.toHaveProperty('prepareDismissiblePromotion');
     expect(collectBaseCaseConfigErrors('public-promo', {...base, prepareDismissiblePromotion: config, prepareClickText: 'Any other action'}))
@@ -441,9 +456,39 @@ describe('dismissible public promotion preparation', () => {
 
   it.each([null, false, true, 1, 'click', [], {}, {...config, contentSelector: undefined},
     {...config, dialogSelector: ''}, {...config, buttonSelector: '  '}, {...config, contentSelector: ['article']},
+    {...config, waitForDialogMs: 0}, {...config, waitForDialogMs: 15001}, {...config, waitForDialogMs: '1000'},
     {...config, action: 'remove'}, {...config, url: '/login'}, {...config, clicks: 2}])('rejects malformed or additional action configuration %#', value => {
     expect(() => normalizeDismissiblePromotion(value)).toThrow('prepareDismissiblePromotion');
-    expect(() => normalizeCaseConfig('invalid-promo', {...Object.values(cases)[0], prepareDismissiblePromotion: value})).toThrow('prepareDismissiblePromotion');
+    expect(() => normalizeCaseConfig('invalid-promo', {...cases['englio-article'], prepareDismissiblePromotion: value})).toThrow('prepareDismissiblePromotion');
+  });
+
+  it.each(['', '#'])('closes a cookie banner with the native dismiss link and URL suffix %j', async suffix => {
+    await withPromotion(async ({page, nativeClick, nativePress}) => {
+      await expect(prepareDismissiblePromotion(page, linkConfig, publicUrl, 1000))
+        .resolves.toMatchObject({status: 'dismissed', nativeActivation: 'keyboard-enter', url: `${publicUrl}${suffix}`});
+      expect(nativePress.mock.calls).toEqual([['Enter', expect.anything()]]);
+      expect(nativeClick).not.toHaveBeenCalled();
+    }, {dismissalLink: true, afterClick: ({document, location}) => {
+      document.querySelector(config.dialogSelector)!.setAttribute('hidden', '');
+      document.querySelector('main')!.removeAttribute('aria-hidden');
+      location.href = `${publicUrl}${suffix}`;
+    }});
+  });
+
+  it('rejects a dismiss link that changes the page URL beyond an empty fragment', async () => {
+    await withPromotion(async ({page}) => {
+      await expect(prepareDismissiblePromotion(page, linkConfig, publicUrl, 1000)).rejects.toThrow('URL changed after dismissal');
+    }, {dismissalLink: true, afterClick: ({location}) => {location.href = `${publicUrl}#different`;}});
+  });
+
+  it.each([['href', '/privacy'], ['data-action', 'accept'], ['aria-label', 'Cookie settings'],
+    ['target', '_blank'], ['download', ''], ['ping', '/tracking']])('refuses a dismiss link with %s=%s', async (name, value) => {
+    await withPromotion(async ({document, page, nativeClick, nativePress}) => {
+      document.querySelector(linkConfig.buttonSelector)!.setAttribute(name, value);
+      await expect(prepareDismissiblePromotion(page, linkConfig, publicUrl, 1000)).rejects.toThrow('preparation refused');
+      expect(nativePress).not.toHaveBeenCalled();
+      expect(nativeClick).not.toHaveBeenCalled();
+    }, {dismissalLink: true});
   });
 
   it.each([undefined, 'button'])('uses one native click for an unassociated safe button type %s', async type => {

@@ -27,12 +27,17 @@ function normalizeDismissiblePromotion(value) {
   if (value === undefined) return undefined;
   const fields = ['dialogSelector', 'buttonSelector', 'contentSelector'];
   if (!value || typeof value !== 'object' || Array.isArray(value) ||
-      Object.keys(value).length !== fields.length || Object.keys(value).some(key => !fields.includes(key)) ||
+      Object.keys(value).some(key => !fields.includes(key) && key !== 'waitForDialogMs') ||
       fields.some(key => !Object.prototype.hasOwnProperty.call(value, key) ||
         typeof value[key] !== 'string' || !value[key].trim())) {
-    throw new Error('prepareDismissiblePromotion 必须仅声明非空字符串 dialogSelector/buttonSelector/contentSelector');
+    throw new Error('prepareDismissiblePromotion 必须声明非空字符串 dialogSelector/buttonSelector/contentSelector');
   }
-  return Object.fromEntries(fields.map(key => [key, value[key].trim()]));
+  const {waitForDialogMs} = value;
+  if (waitForDialogMs !== undefined && (!Number.isInteger(waitForDialogMs) || waitForDialogMs <= 0 || waitForDialogMs > 15000)) {
+    throw new Error('prepareDismissiblePromotion.waitForDialogMs 必须是 1-15000 的整数');
+  }
+  return {...Object.fromEntries(fields.map(key => [key, value[key].trim()])),
+    ...(waitForDialogMs === undefined ? {} : {waitForDialogMs})};
 }
 
 function normalizeFacebookPublicPostPreparation(value) {

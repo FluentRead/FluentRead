@@ -168,6 +168,65 @@ describe('Kagi News content-bearing buttons', () => {
     });
 });
 
+describe('JetBrains IntelliJ IDEA release-note paragraphs', () => {
+    function fixture(href = 'https://www.jetbrains.com/idea/whatsnew/', includeSidebarRegions = false) {
+        const {document} = parseHTML(`<html lang="en"><body>
+            <header><nav><p id="navigation">Browse other JetBrains products.</p></nav></header>
+            <main class="whatsnew-page-content"><article class="whatsnew-feature-block">
+                <header>
+                    <div class="whatsnew-feature-block__content">
+                        <h3 id="title">Choose your own agents and models</h3>
+                        <div class="jb-offset-top-16">
+                            <p id="agents">The IDE supports <a href="/acp/">compatible coding agents</a> from several providers.</p>
+                            <p id="subscriptions">Your existing subscription can be used in the terminal.</p>
+                            <p id="lite">Use the <a href="https://junie.jetbrains.com/">free configuration</a> without a subscription.</p>
+                            <p id="protected" translate="no">This paragraph must stay original.</p>
+                        </div>
+                    </div>
+                    <button id="share">Share this feature</button>
+                </header>
+            </article><article><header><p id="metadata">Published by the release team.</p></header></article>
+            <aside><nav><ul><li id="sidebar">Find the terminal improvements in this release.</li></ul></nav></aside>
+            </main>
+        </body></html>`);
+        const adapters = compileSiteRulePack(builtinSiteRulePack);
+        const core = new TranslationCandidateCore({url: new URL(href), adapters, scope: 'content', includeSidebarRegions});
+        return {document, core, agents: document.getElementById('agents')!};
+    }
+
+    it.each(['/idea/whatsnew', '/idea/whatsnew/', '/idea/whatsnew/2026-3/'])('discovers the feature prose and preserves header boundaries on %s', pathname => {
+        const {document, core, agents} = fixture(`https://www.jetbrains.com${pathname}`);
+        const candidates = core.discover(document);
+        expect(candidates.map(candidate => candidate.element.id)).toEqual(['title', 'agents', 'subscriptions', 'lite']);
+        expect(candidates.slice(1).map(candidate => candidate.adapterId)).toEqual(Array(3).fill('jetbrains-idea-whatsnew'));
+        const link = agents.querySelector('a')!;
+        expect(core.resolve(link.firstChild)?.element).toBe(agents);
+        const snapshot = createTranslationSourceSnapshot(agents, core.shouldStayOriginal);
+        expect(snapshot.slots.map(slot => slot.source.trim())).toEqual([
+            'The IDE supports', 'compatible coding agents', 'from several providers.',
+        ]);
+        expect(snapshot.clone.querySelector('a')?.getAttribute('href')).toBe('/acp/');
+
+        const replacement = agents.cloneNode(true) as HTMLElement;
+        agents.replaceWith(replacement);
+        expect(core.discover(replacement.querySelector('a')!).map(candidate => candidate.element)).toEqual([replacement]);
+    });
+
+    it('preserves the option to translate the navigation sidebar', () => {
+        const {document, core} = fixture(undefined, true);
+        const sidebar = document.getElementById('sidebar')!;
+        const candidate = core.discover(document).find(candidate => candidate.element === sidebar);
+        expect(candidate).toBeDefined();
+        expect(candidate?.adapterId).toBeUndefined();
+    });
+
+    it.each(['https://www.jetbrains.com/idea/features/', 'https://example.test/idea/whatsnew/'])('keeps ordinary header filtering on %s', href => {
+        const {document, core, agents} = fixture(href);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title']);
+        expect(core.resolve(agents.firstChild)).toBeNull();
+    });
+});
+
 describe('Englio word-segmented article paragraphs', () => {
     function fixture(href = 'https://englio.ai/article/example', settings = normalizeSiteAdaptationSettings(undefined)) {
         const source = Array(140).fill('Readers follow the complete English article while learning new words.').join(' ');

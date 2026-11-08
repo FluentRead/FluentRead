@@ -67,6 +67,13 @@
       "liveVerification": "tests/browser-translation-cases.json#englio-article"
     },
     {
+      "id": "jetbrains-idea-whatsnew",
+      "category": "documentation",
+      "verification": "site-fixture",
+      "fixture": "tests/siteAdaptationCore.test.ts",
+      "liveVerification": "tests/browser-translation-cases.json#jetbrains-idea-whatsnew"
+    },
+    {
       "id": "dart",
       "category": "documentation",
       "verification": "site-fixture",

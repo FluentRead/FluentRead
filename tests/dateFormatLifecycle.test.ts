@@ -10,8 +10,9 @@ const rules: Intl.DateTimeFormatOptions = {month: 'numeric', day: 'numeric', hou
 const timestamp = Date.UTC(2026, 9, 11, 10, 23);
 let defaults: {locale: string; timeZone: string};
 function createConstructorSpy() {
-    return vi.spyOn(Intl, 'DateTimeFormat').mockImplementation((locales, options) => new NativeDateTimeFormat(locales ?? defaults.locale,
-        {...options, timeZone: options?.timeZone || defaults.timeZone}));
+    return vi.spyOn(Intl, 'DateTimeFormat').mockImplementation(function (locales, options) {
+        return new NativeDateTimeFormat(locales ?? defaults.locale, {...options, timeZone: options?.timeZone || defaults.timeZone});
+    });
 }
 let constructor: ReturnType<typeof createConstructorSpy>;
 const apps = new Set<App>();
@@ -115,7 +116,7 @@ describe('per-render native date formatting through Vue lifecycle', () => {
     });
     it('retries a failed constructor later within the same synchronous render', () => {
         const failure = new RangeError('controlled Intl constructor failure');
-        constructor.mockImplementationOnce(() => {throw failure;});
+        constructor.mockImplementationOnce(function () {throw failure;});
         let recovered = '';
         const Owner = defineComponent({setup() {
             const format = useRenderDateFormatter(rules);
@@ -125,7 +126,7 @@ describe('per-render native date formatting through Vue lifecycle', () => {
         expect(constructor).toHaveBeenCalledTimes(2);expect(recovered).toBe(expected());
     });
     it('recovers after a constructor error escapes a render without keeping a failed cache', async () => {
-        constructor.mockImplementationOnce(() => {throw new RangeError('controlled failure');});
+        constructor.mockImplementationOnce(function () {throw new RangeError('controlled failure');});
         const owner = fixture(2);expect(owner.errors).toHaveLength(1);
         constructor.mockClear();owner.revision.value++;await settle();
         expect(constructor).toHaveBeenCalledOnce();expect(owner.renders.at(-1)![0]).toBe(expected());

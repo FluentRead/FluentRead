@@ -15,7 +15,6 @@ describe('shared Vitest regression configuration', () => {
         expect(execution).toEqual(base.test);
         expect(execution.environment).toBe('node');
         expect(execution.isolate).not.toBe(false);
-        expect(execution.testTransformMode?.web).toContain('**/tests/mangaEntryComponentLifecycle.test.ts');
         expect(coverage).toBeDefined();
     });
 
@@ -33,7 +32,7 @@ describe('shared Vitest regression configuration', () => {
     it('keeps all-file instrumentation and the four strict 100 percent coverage gates', () => {
         const coverage = strict.test?.coverage;
         expect(coverage).toMatchObject({
-            provider: 'v8', enabled: true, all: true, clean: true,
+            provider: 'v8', enabled: true, clean: true,
             exclude: ['**/*.d.ts'],
             thresholds: {statements: 100, branches: 100, functions: 100, lines: 100},
         });

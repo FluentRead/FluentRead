@@ -1137,7 +1137,7 @@ function sourceBody(path: string): string {
 
 describe('TTS worker entrypoint metadata isolation', () => {
     it('WXT 的实际元数据转换移除 TTS 运行时导入，避免在 Node 中装载另一版 ONNX', async () => {
-        const transformUrl = pathToFileURL(resolve(dirname(createRequire(import.meta.url).resolve('wxt')), 'core/utils/transform.mjs')).href;
+        const transformUrl = pathToFileURL(resolve(dirname(createRequire(import.meta.url).resolve('wxt')), 'internal/transform.mjs')).href;
         const {removeMainFunctionCode} = await import(/* @vite-ignore */ transformUrl) as {
             removeMainFunctionCode(source: string): {code: string};
         };
@@ -1412,22 +1412,23 @@ describe('extension manifest capability contract', () => {
     it('只为扩展页面拆分 Vue 与域名算法，不覆盖显式分包配置', () => {
         const config: InlineConfig = {};
         configureExtensionUiChunks([{type: 'popup'}, {type: 'options'}, {type: 'unlisted-page'}, {type: 'sidepanel'}], config);
-        const output = config.build!.rollupOptions!.output!;
+        const output = config.build!.rolldownOptions!.output!;
         expect(Array.isArray(output)).toBe(false);
-        const choose = (output as {manualChunks: (id: string) => string | undefined}).manualChunks;
+        const groups = (output as {codeSplitting: {groups: {name: string; test: RegExp}[]}}).codeSplitting.groups;
+        expect(groups.map(group => group.name)).toEqual(['vue-runtime', 'domain-parser']);
+        const choose = (id: string) => groups.find(group => group.test.test(id))?.name;
         expect(choose('/app/node_modules/vue/dist/vue.runtime.esm-bundler.js')).toBe('vue-runtime');
-        expect(choose('/app/node_modules/.pnpm/@vue+shared@3.5.13/node_modules/@vue/shared/dist/shared.esm-bundler.js')).toBe('vue-runtime');
-        expect(choose('C:\\app\\node_modules\\@vue\\reactivity\\dist\\reactivity.esm-bundler.js')).toBe('vue-runtime');
+        expect(choose('/app/node_modules/.pnpm/@vue+shared@3.5.45/node_modules/@vue/shared/dist/shared.esm-bundler.js')).toBe('vue-runtime');
+        expect(choose(String.raw`C:\app\node_modules\@vue\reactivity\dist\reactivity.esm-bundler.js`)).toBe('vue-runtime');
         expect(choose('/app/node_modules/tldts/dist/es6/src/data/trie.js')).toBe('domain-parser');
         expect(choose('/app/node_modules/tldts-core/dist/es6/index.js')).toBe('domain-parser');
         expect(choose('/app/node_modules/vue-router/index.js')).toBeUndefined();
         expect(choose('/app/src/core/i18n/index.ts')).toBeUndefined();
-        const existing = {framework: ['vue']};
-        const explicit: InlineConfig = {build: {rollupOptions: {output: [{manualChunks: existing}, {}]}}};
+        const explicit: InlineConfig = {build: {rolldownOptions: {output: [{codeSplitting: false}, {}]}}};
         configureExtensionUiChunks([{type: 'options'}], explicit);
-        const outputs = explicit.build!.rollupOptions!.output as {manualChunks?: unknown}[];
-        expect(outputs[0].manualChunks).toBe(existing);
-        expect(outputs[1].manualChunks).toBeTypeOf('function');
+        const outputs = explicit.build!.rolldownOptions!.output as {codeSplitting?: unknown}[];
+        expect(outputs[0].codeSplitting).toBe(false);
+        expect(outputs[1].codeSplitting).toEqual({groups});
     });
 
     it('内容脚本、后台、模块 Worker、未知和库模式构建保留原有输出结构', () => {
@@ -1439,6 +1440,6 @@ describe('extension manifest capability contract', () => {
         }
         const library: InlineConfig = {build: {lib: {entry: 'fixture.ts', name: 'fixture'}}};
         configureExtensionUiChunks([{type: 'popup'}], library);
-        expect(library.build!.rollupOptions).toBeUndefined();
+        expect(library.build!.rolldownOptions).toBeUndefined();
     });
 });

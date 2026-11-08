@@ -170,7 +170,7 @@ function shadowMouse(panel: Element, target: Element, host: Element, type: 'mous
     retarget(host);dom.document.dispatchEvent(event);expect(stop).not.toHaveBeenCalled();expect(prevent).not.toHaveBeenCalled();return event;
 }
 function outside() {const node = dom.document.createElement('button');dom.document.body.append(node);return node;}
-const mouseCalls = (spy: ReturnType<typeof vi.spyOn>) => spy.mock.calls.filter(([name, , capture]) => (name === 'mousedown' || name === 'mouseup') && capture === true);
+const mouseCalls = (spy: {mock: {calls: ReadonlyArray<readonly unknown[]>}}) => spy.mock.calls.filter(([name, , capture]) => (name === 'mousedown' || name === 'mouseup') && capture === true);
 beforeEach(() => {ports.mode = 'actual';ports.panels = [];ports.sourceRoots = [];ports.exposed = [];vi.useFakeTimers();});
 afterEach(async () => {for (const app of apps) app.unmount();apps.clear();await settle();vi.clearAllTimers();vi.useRealTimers();vi.restoreAllMocks();dom.clearFocus();dom.document.body.replaceChildren();});
 

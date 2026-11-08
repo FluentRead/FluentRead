@@ -1,4 +1,4 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {Config} from '@/src/core/config/model';
 import {mountPlatformCaptions} from '@/src/features/video-subtitle/content/platformRuntime';
@@ -363,7 +363,7 @@ describe('网页会议字幕生命周期', () => {
     });
 });
 
-function videoFixture(url: string, translate?: ReturnType<typeof vi.fn>) {
+function videoFixture(url: string, translate?: Mock) {
     const f = fixture(url, `<div class="video-player"><video src="one.mp4"></video><span data-purpose="captions-cue-text">${sentence}</span></div>`, translate);
     const video = f.document.querySelector('video')! as unknown as HTMLVideoElement;
     video.getBoundingClientRect = () => ({left: 50, top: 50, width: 800, height: 450}) as DOMRect;

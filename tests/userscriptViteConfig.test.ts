@@ -66,7 +66,7 @@ function encodedDataBytes(source: string, decoder = 'decodeUserscriptData'): Uin
 }
 
 // Observe the existing production decoder inside real consumer builds, retaining its complete implementation.
-function observeDataDecoder(): import('vite').Plugin {
+function observeDataDecoder(): import('vite-userscript').Plugin {
     return {name: 'observe-userscript-data-decoder', enforce: 'pre', transform(code, id) {
         if (id !== resolve(process.cwd(), 'userscript/dataEncoding.ts')) return null;
         const source = ts.createSourceFile(id, code, ts.ScriptTarget.Latest, true);
@@ -95,8 +95,8 @@ async function bundledCommonjsOwner(entry: string, files: Record<string, string>
             mkdirSync(resolve(file, '..'), {recursive: true});
             writeFileSync(file, source);
         }
-        const {build} = await import('vite');
-        const configured = (userscriptConfig as import('vite').UserConfig).build!;
+        const {build} = await import('vite-userscript');
+        const configured = (userscriptConfig as unknown as import('vite-userscript').UserConfig).build!;
         const result = await build({root: process.cwd(), configFile: false, publicDir: false, logLevel: 'silent',
             build: {...configured, write: false, outDir: resolve(fixture, 'unused-output'),
                 lib: {entry: entryPath, name: 'CommonjsOwnerFixture', formats: ['iife']},
@@ -754,7 +754,7 @@ describe('authoritative site catalogs with an external pinned data asset', () =>
         try {
             vi.resetModules();
             const {createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const plugin = createPlugin();
             const resolveId = typeof plugin.resolveId === 'function' ? plugin.resolveId : plugin.resolveId!.handler;
             const load = typeof plugin.load === 'function' ? plugin.load : plugin.load!.handler;
@@ -1072,7 +1072,7 @@ describe('userscript browser shim injection', () => {
                 file === resourcePath ? staleSource : nativeRead(file, options)) as typeof readFileSync);
             vi.resetModules();
             const {createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const plugin = createPlugin();
             const resolveId = typeof plugin.resolveId === 'function' ? plugin.resolveId : plugin.resolveId!.handler;
             const load = typeof plugin.load === 'function' ? plugin.load : plugin.load!.handler;
@@ -1161,7 +1161,7 @@ describe('userscript browser shim injection', () => {
             const defines = (standalone as {define: Record<string, string>}).define;
             const plugin = createPlugin() as unknown as {resolveId: (source: string, importer: string) => string; load: (id: string) => Promise<string>};
             const source = await plugin.load(plugin.resolveId('./messages/zh-CN', resolve(process.cwd(), 'src/core/i18n/index.ts')));
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const provider = await import('@/userscript/defaultMessageData');
             const compiled = await transformWithEsbuild(source, 'standalone-chinese.js', {format: 'cjs', target: 'es2018'});
             const realm = {module: {exports: {} as {zhCNMessages: Record<string, string>}}, require: (id: string) => {
@@ -1207,7 +1207,7 @@ describe('userscript browser shim injection', () => {
         try {
             vi.resetModules();
             const {default: standalone, createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
-            const config = standalone as import('vite').UserConfig;
+            const config = standalone as unknown as import('vite-userscript').UserConfig;
             const entry = resolve(fixture, 'entry.mjs');
             writeFileSync(entry, [
                 'import {ensureUiLanguageBundle} from "@/userscript/uiLanguageBundles";',
@@ -1215,9 +1215,9 @@ describe('userscript browser shim injection', () => {
                 'import {translate,translateLegacyText,hasUiLanguageBundle} from "@/src/core/i18n";',
                 'globalThis.languageOwner={ensureUiLanguageBundle,readDefaultMessageKeys,translate,translateLegacyText,hasUiLanguageBundle};',
             ].join('\n'));
-            const {build} = await import('vite');
+            const {build} = await import('vite-userscript');
             const result = await build({root: process.cwd(), configFile: false, publicDir: false, logLevel: 'silent',
-                plugins: [createPlugin()], resolve: config.resolve, define: config.define,
+                plugins: [createPlugin() as unknown as import('vite-userscript').Plugin], resolve: config.resolve, define: config.define,
                 build: {...config.build, write: false, outDir: resolve(fixture, 'unused-output'),
                     lib: {entry, name: 'LanguageOwner', formats: ['iife']},
                     rollupOptions: {output: {inlineDynamicImports: true}}}});
@@ -1333,7 +1333,7 @@ describe('userscript browser shim injection', () => {
             const encoded = encodedDataBytes(moduleSource!)[0];
             const original = JSON.parse(readFileSync(resolve(process.cwd(), `src/core/site-adaptation/catalog/${name}.json`), 'utf8'));
             expect(JSON.parse(gunzipSync(encoded).toString('utf8'))).toEqual(original);
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const compiled = await transformWithEsbuild(moduleSource!, 'offline-catalog.js', {format: 'cjs', target: 'es2018'});
             const inflate = vi.fn(inflateBundledFrancData), decode = vi.fn(decodeUserscriptData);
             const realm = {module: {exports: {} as {default: unknown}}, require: (id: string) => {
@@ -1403,7 +1403,7 @@ describe('userscript browser shim injection', () => {
 
     it('移除 userscript 不可达的字幕外观组件后才排除其专用读音文案', async () => {
         const {parse, compileScript} = await import('vue/compiler-sfc');
-        const {transformWithEsbuild} = await import('vite');
+        const {transformWithEsbuild} = await import('vite-userscript');
         const filename = resolve(process.cwd(), 'src/features/settings/ui/SettingsSections.vue');
         const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename});
         const source = compileScript(descriptor, {id: 'userscript-video-appearance-boundary'}).content;
@@ -2225,7 +2225,7 @@ describe('standalone About images at explicit use boundaries', () => {
     async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), standalone = false) {
         const plugin = createUserscriptAboutImagesCompressionPlugin(root, true, standalone) as unknown as {load(id: string): string | Promise<string>};
         const source = await plugin.load(helperId);
-        const {transformWithEsbuild} = await import('vite');
+        const {transformWithEsbuild} = await import('vite-userscript');
         const compiled = await transformWithEsbuild(source, 'about-images-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as {getSupportImageUrl(normal: string): string; getContactImageUrl(): string}};
         const decode = vi.fn(decodeUserscriptData);
@@ -2376,12 +2376,12 @@ describe('standalone About images at explicit use boundaries', () => {
         try {
             vi.resetModules();
             const {default: configuration} = await import('@/userscript/vite.config');
-            const config = configuration as import('vite').UserConfig;
-            const plugin = (config.plugins as import('vite').Plugin[]).find(item => item.name === 'compress-standalone-about-images');
+            const config = configuration as unknown as import('vite-userscript').UserConfig;
+            const plugin = (config.plugins as import('vite-userscript').Plugin[]).find(item => item.name === 'compress-standalone-about-images');
             expect(plugin).toBeDefined();
             const entryPath = resolve(fixture, 'entry.mjs');
             writeFileSync(entryPath, 'import {getSupportImageUrl,getContactImageUrl} from "@/src/app/options/aboutImages"; globalThis.aboutImagesOwner={getSupportImageUrl,getContactImageUrl};');
-            const {build} = await import('vite');
+            const {build} = await import('vite-userscript');
             const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent',
                 plugins: [plugin!], resolve: config.resolve,
                 build: {...config.build, write: false, outDir: resolve(fixture, 'unused-output'),
@@ -2413,7 +2413,7 @@ describe('standalone About images at explicit use boundaries', () => {
             }
             api.getSupportImageUrl('other-normal-url');api.getContactImageUrl();
             expect(decode).not.toHaveBeenCalled();
-            const bootstrapPlugin = (config.plugins as import('vite').Plugin[]).find(item => item.name === 'bundle-userscript-css') as unknown as {
+            const bootstrapPlugin = (config.plugins as import('vite-userscript').Plugin[]).find(item => item.name === 'bundle-userscript-css') as unknown as {
                 generateBundle: {handler: Function};
             };
             await Reflect.apply(bootstrapPlugin.generateBundle.handler, {emitFile: vi.fn()}, [{}, {'entry.js': chunk}]);
@@ -2453,7 +2453,7 @@ describe('standalone service brand paths at actual icon use', () => {
         return result.source;
     }
     async function loadAccessors(decoder = vi.fn(inflateBundledFrancData), source = positiveSource()) {
-        const {transformWithEsbuild} = await import('vite');
+        const {transformWithEsbuild} = await import('vite-userscript');
         const compiled = await transformWithEsbuild(source, 'service-brands-owner.js', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as BrandApi};
         const decode = vi.fn(decodeUserscriptData), parse = vi.fn(JSON.parse), hostData = {controlledHostData: true};
@@ -2616,12 +2616,12 @@ describe('standalone service brand paths at actual icon use', () => {
         try {
             vi.resetModules();
             const {default: configuration} = await import('@/userscript/vite.config');
-            const config = configuration as import('vite').UserConfig;
-            const plugin = (config.plugins as import('vite').Plugin[]).find(item => item.name === 'compress-standalone-service-brand-icons');
+            const config = configuration as unknown as import('vite-userscript').UserConfig;
+            const plugin = (config.plugins as import('vite-userscript').Plugin[]).find(item => item.name === 'compress-standalone-service-brand-icons');
             expect(plugin).toBeDefined();
             const entryPath = resolve(fixture, 'entry.mjs');
             writeFileSync(entryPath, 'import {getServiceBrandIcon} from "@/src/ui/assets/serviceBrandIcons"; globalThis.serviceBrandOwner={getServiceBrandIcon};');
-            const {build} = await import('vite');
+            const {build} = await import('vite-userscript');
             const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent', plugins: [plugin!, observeDataDecoder()], resolve: config.resolve,
                 build: {...config.build, write: false, outDir: resolve(fixture, 'unused-output'),
                     lib: {entry: entryPath, name: 'ServiceBrandOwner', formats: ['iife']}, rollupOptions: {output: {inlineDynamicImports: true}}}});
@@ -2700,10 +2700,10 @@ describe('standalone OpenAI transport build boundary', () => {
                 + `import {marker} from ${JSON.stringify(resolve(fixture, 'openai-compatible.ts'))};`
                 + `import rawOwner from ${JSON.stringify(`${owner}.ts?raw`)};`
                 + 'globalThis.vendorBoundaryFixture={model:createOpenAICompatible({name:"vendor-control",baseURL:"https://fixture.invalid/v1"})("vendor-control-model"),marker,rawOwner};';
-            const {build} = await import('vite');
-            const config = userscriptConfig as import('vite').UserConfig;
+            const {build} = await import('vite-userscript');
+            const config = userscriptConfig as unknown as import('vite-userscript').UserConfig;
             const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent',
-                plugins: [createStandaloneOpenAITransportPlugin(), {name: 'controlled-vendor-consumer',
+                plugins: [createStandaloneOpenAITransportPlugin() as unknown as import('vite-userscript').Plugin, {name: 'controlled-vendor-consumer',
                     resolveId(id) { return id === entryPath ? id : null; }, load(id) { return id === entryPath ? entrySource : null; }}],
                 resolve: config.resolve, define: config.define,
                 build: {...config.build, write: false, outDir: resolve(fixture, 'unused-output'),
@@ -2746,8 +2746,8 @@ describe('standalone OpenAI transport build boundary', () => {
         try {
             vi.resetModules();
             const {default: configuration} = await import('@/userscript/vite.config');
-            const config = configuration as import('vite').UserConfig;
-            const plugin = (config.plugins as import('vite').Plugin[]).find(item => item.name === 'standalone-openai-transport');
+            const config = configuration as unknown as import('vite-userscript').UserConfig;
+            const plugin = (config.plugins as import('vite-userscript').Plugin[]).find(item => item.name === 'standalone-openai-transport');
             expect(Boolean(plugin)).toBe(lightweight);
             const callerSources = new Map(callers.map(id => {
                 const match = readFileSync(id, 'utf8').match(/import\s*\{translateWithOpenAICompatibleAiSdk\}\s*from\s*['"]([^'"]+)['"]/u);
@@ -2759,13 +2759,13 @@ describe('standalone OpenAI transport build boundary', () => {
             writeFileSync(entryPath, imports.map((source, i) => `import {translateWithOpenAICompatibleAiSdk as run${i}} from ${JSON.stringify(source)};`).join('\n')
                 + `\nglobalThis.openAIOwnerFixture=[${imports.map((_, i) => `run${i}`).join(',')}];`);
             const loadedCallers = new Set<string>();
-            const boundary: import('vite').Plugin = {name: 'controlled-openai-consumer', enforce: 'pre', load(id) {
+            const boundary: import('vite-userscript').Plugin = {name: 'controlled-openai-consumer', enforce: 'pre', load(id) {
                 if (callerSources.has(id)) { loadedCallers.add(id); return callerSources.get(id); }
                 // 共享编排另有独立合同测试；这里保留真实 execution.run 的可达性，且不替换任何 SDK 模块。
                 if (id === transport) return 'export function translateOpenAICompatible(call, execution) { return execution.run(call); } export const AI_SDK_MAX_RETRIES=2, AI_SDK_REQUEST_TIMEOUT_MS=120000;';
                 return null;
             }};
-            const {build} = await import('vite');
+            const {build} = await import('vite-userscript');
             const result = await build({root, configFile: false, publicDir: false, logLevel: 'silent',
                 plugins: [...(plugin ? [plugin] : []), boundary], resolve: config.resolve, define: config.define,
                 build: {...config.build, write: false, outDir: resolve(fixture, 'unused-output'),
@@ -2832,7 +2832,7 @@ describe('userscript appearance registry data owner', () => {
     const fixture=(skin='[{value:"skin"}]',font='[{value:"font"}]')=>`export const interfaceSkinOptions=${skin};export const interfaceFontOptions=${font};export const popupModuleOptions=[{value:"module"}];export const popupQuickFeatureOptions=[{value:"feature"}];`;
     function transformed(code=actualSource){const result=plugin().transform(code,id);expect(result).not.toBeNull();return result!.code;}
     async function execute(source:string){
-        const {transformWithEsbuild}=await import('vite');
+        const {transformWithEsbuild}=await import('vite-userscript');
         const compiled=await transformWithEsbuild(source,'appearance-owner.ts',{format:'cjs',target:'es2018'});
         const module={exports:{} as typeof originalAppearance},decode=vi.fn(inflateBundledFrancData),unrelated={unchanged:true};
         const realm={module,exports:module.exports,Uint8Array,atob,unrelated,require:(name:string)=>{
@@ -2903,10 +2903,10 @@ describe('userscript appearance registry data owner', () => {
         vi.stubEnv('FLUENTREAD_USERSCRIPT_VENDOR_URL','https://fixture.invalid/vendor.js');vi.stubEnv('FLUENTREAD_USERSCRIPT_DATA_URL','https://fixture.invalid/data.js');
         const directory=mkdtempSync(resolve(tmpdir(),'fluentread-appearance-owner-'));
         try{
-            vi.resetModules();const {default:configuration}=await import('@/userscript/vite.config');const config=configuration as import('vite').UserConfig;
-            const selected=(config.plugins as import('vite').Plugin[]).find(item=>item.name==='standalone-settings-data');expect(selected).toBeDefined();
+            vi.resetModules();const {default:configuration}=await import('@/userscript/vite.config');const config=configuration as unknown as import('vite-userscript').UserConfig;
+            const selected=(config.plugins as import('vite-userscript').Plugin[]).find(item=>item.name==='standalone-settings-data');expect(selected).toBeDefined();
             const entry=resolve(directory,'entry.ts');writeFileSync(entry,'import * as appearance from "@/src/core/config/interfaceAppearance";globalThis.appearanceOwner=appearance;');
-            const {build}=await import('vite');const result=await build({root,configFile:false,publicDir:false,logLevel:'silent',plugins:[selected!,observeDataDecoder()],resolve:config.resolve,
+            const {build}=await import('vite-userscript');const result=await build({root,configFile:false,publicDir:false,logLevel:'silent',plugins:[selected!,observeDataDecoder()],resolve:config.resolve,
                 build:{...config.build,write:false,outDir:resolve(directory,'unused'),lib:{entry,name:'AppearanceOwner',formats:['iife']},rollupOptions:{output:{inlineDynamicImports:true}}}});
             const results=Array.isArray(result)?result:[result];if(results.length!==1||!('output' in results[0])||results[0].output.length!==1||results[0].output[0].type!=='chunk')throw Error('Expected one real appearance consumer chunk');
             const chunk=results[0].output[0];expect(chunk.imports).toEqual([]);expect(chunk.dynamicImports).toEqual([]);
@@ -2944,7 +2944,7 @@ describe('standalone immutable glossary and UI catalogs', () => {
         };
         expect(transform(false, true)).toBeNull();expect(transform(true, false)).toBeNull();
         const transformed = transform(true, true)!.code;
-        const {transformWithEsbuild} = await import('vite');
+        const {transformWithEsbuild} = await import('vite-userscript');
         async function readCatalog(source: string) {
             const ast = ts.createSourceFile(id, source, ts.ScriptTarget.Latest, true);
             const dataStatements = ast.statements.filter(statement => ts.isVariableStatement(statement) && statement.declarationList.declarations.some(declaration => (names as readonly string[]).includes(declaration.name.getText(ast)))).map(statement => statement.getText(ast)).join('\n');
@@ -2977,7 +2977,7 @@ describe('standalone shared AI timeout locale data', () => {
     const fixture = (chinese = '{message:"中文"}', table = '{"zh-CN":aiRequestTimeoutChineseMessages,"en-US":{message:"English"}}') =>
         `export const aiRequestTimeoutChineseMessages=${chinese};export const aiRequestTimeoutMessages=${table};`;
     it('restores every real locale with the same shared Chinese export identity and key order', async () => {
-        const {transformWithEsbuild} = await import('vite');
+        const {transformWithEsbuild} = await import('vite-userscript');
         const compiled = await transformWithEsbuild(transform(original).code, 'shared-timeout-catalog.ts', {format: 'cjs', target: 'es2018'});
         const module = {exports: {} as typeof import('@/src/core/i18n/messages/aiRequestTimeout')}, decode = vi.fn(inflateBundledFrancData);
         runInNewContext(compiled.code, {module, exports: module.exports, Uint8Array, atob, require: (name: string) => {

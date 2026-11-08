@@ -350,7 +350,7 @@ describe('userscript remote UI language data', () => {
         vi.resetModules();
         try {
             const {default: standalone, createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const provider = await import('@/userscript/defaultMessageData');
             const encoding = await import('@/userscript/dataEncoding');
             expect(provider.readDefaultMessageKeys()).toBeUndefined();

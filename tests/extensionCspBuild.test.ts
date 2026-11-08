@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
 import {createContext, runInContext} from 'node:vm';
 import {extensionCspBuildPlugin, patchExtensionVendorSource, type ExtensionVendorSource} from '../scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin, patchDefuddleEntitySource, replaceDefuddleEntityDecoder} from '../scripts/testing/defuddle-entity-build';
@@ -124,13 +125,14 @@ describe('extension dependency CSP packaging', () => {
         const load = plugin.load as (this: unknown, id: string) => string | undefined;
         expect(load.call({emitFile}, sources['pdfjs-worker'])).toBeUndefined();
         expect(load.call({emitFile}, `${sources['pdfjs-worker']}?url`)).toBe('export default import.meta.ROLLUP_FILE_URL_fixture;');
-        expect(emitFile).toHaveBeenCalledWith({type: 'asset', name: 'pdf.worker.min.mjs', source: patched('pdfjs-worker'), needsCodeReference: true});
+        expect(emitFile).toHaveBeenCalledWith({type: 'asset', fileName: 'assets/pdf.worker.min.mjs', source: patched('pdfjs-worker')});
     });
 
     it('摇树删除未使用的 PDF Worker，实际引用时保留 CSP 安全的资源', async () => {
-        const {rollup} = createRequire(require.resolve('vite'))('rollup');
+        const rolldownPath = createRequire(require.resolve('vite')).resolve('rolldown');
+        const {rolldown} = await import(/* @vite-ignore */ pathToFileURL(rolldownPath).href);
         const build = async (used: boolean) => {
-            const bundle = await rollup({
+            const bundle = await rolldown({
                 input: 'fixture-entry',
                 plugins: [{
                     name: 'fixture',

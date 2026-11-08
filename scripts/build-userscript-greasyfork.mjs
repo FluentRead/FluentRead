@@ -52,7 +52,7 @@ const buildEnv = {
 };
 
 if (prepareResources) {
-    run('pnpm', ['exec', 'vite', 'build', '--config', 'userscript/vendor.vite.config.ts']);
+    run(process.execPath, ['node_modules/vite-userscript/bin/vite.js', 'build', '--config', 'userscript/vendor.vite.config.ts']);
 } else {
     for (const source of vendorSources) {
         gitOutput(['cat-file', '-e', `${commit}:${source}`]);
@@ -61,7 +61,7 @@ if (prepareResources) {
     fs.mkdirSync(path.resolve(root, '.output/userscript-vendor'), {recursive: true});
     fs.copyFileSync(path.resolve(root, resources[0][1]), path.resolve(root, resources[0][0]));
 }
-run('pnpm', ['exec', 'vite', 'build', '--config', 'userscript/vite.config.ts'], buildEnv);
+run(process.execPath, ['node_modules/vite-userscript/bin/vite.js', 'build', '--config', 'userscript/vite.config.ts'], buildEnv);
 
 for (const [built, tracked] of resources) {
     const builtBytes = fs.readFileSync(path.resolve(root, built));

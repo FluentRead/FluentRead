@@ -897,14 +897,19 @@ describe("指定节点翻译状态机", () => {
         const owner = document.querySelector<HTMLElement>('p')!;
         const source = owner.firstChild;
         // 观察实际反向索引桶的创建，避免用受 JIT/机器影响的耗时阈值。
-        const writes = vi.spyOn(WeakMap.prototype, 'set');
-        const ownerBucketWrites = () => writes.mock.calls.filter(([key, value]) =>
-            key === owner && value instanceof Set &&
-            [...value].some(member => member instanceof WeakRef));
+        // Vitest 自身使用 WeakMap，直接记录目标 owner 的写入，避免 spy 重入。
+        const nativeSet = WeakMap.prototype.set;
+        const writes: unknown[] = [];
+        WeakMap.prototype.set = function (key, value) {
+            if (key === owner) writes.push(value);
+            return nativeSet.call(this, key, value);
+        };
+        const ownerBucketWrites = () => writes.filter(value =>
+            value instanceof Set && [...value].some(member => member instanceof WeakRef));
         try {
             const attempt = beginTranslation(owner, 'bilingual')!;
             expect(ownerBucketWrites()).toHaveLength(1);
-            writes.mockClear();
+            writes.length = 0;
             expect(markTranslationComplete(owner, attempt.state, attempt.generation)).toBe(true);
             const first = document.createElement('span');
             const second = document.createElement('span');
@@ -921,7 +926,7 @@ describe("指定节点翻译状态机", () => {
             expect(owner.firstChild).toBe(source);
             expect(source?.textContent).toBe('Readable source.');
         } finally {
-            writes.mockRestore();
+            WeakMap.prototype.set = nativeSet;
             restoreTranslation(owner);
         }
         expect(getTranslationOwnersForIndexedNode(owner)).toEqual([]);

@@ -5,7 +5,8 @@ import {basename, dirname, resolve} from 'node:path';
 import {runInNewContext} from 'node:vm';
 import vue from '@vitejs/plugin-vue';
 import ts from 'typescript';
-import {defineConfig, normalizePath, transformWithEsbuild, type Plugin} from 'vite';
+import {defineConfig, normalizePath, type Plugin} from 'vite';
+import {transformWithEsbuild} from 'vite-userscript';
 import {createUserscriptMetadata} from './metadata';
 import {createUserscriptCharacterDataCompressionPlugin} from './characterDataPlugin';
 import {createUserscriptFrancDataCompressionPlugin} from './francDataPlugin';
@@ -489,7 +490,7 @@ export function injectUserscriptBrowserImports(code: string, id: string): string
         && new URLSearchParams(query).get('type') === 'script';
     if (!cleanId.startsWith(projectRoot) || (!isScriptModule && !isVueScriptModule)) return null;
 
-    const injected = findFreeBrowserGlobals(code, cleanId);
+    const injected = findFreeBrowserGlobals(code, isVueScriptModule ? `${cleanId}.ts` : cleanId);
     if (injected.length === 0) return null;
 
     const specifiers = injected.map((name) => name === 'browser' ? 'default as browser' : 'chrome');

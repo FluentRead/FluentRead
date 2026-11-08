@@ -10,6 +10,24 @@ import {createReadingDictionaryAliases} from './scripts/testing/reading-annotati
 const configuredMaxWorkers = Number(process.env.FLUENTREAD_TEST_MAX_WORKERS);
 const maxWorkers = Number.isInteger(configuredMaxWorkers) && configuredMaxWorkers > 0 ? configuredMaxWorkers : 2;
 
+/** 测试在 Node 里提供自己的 DOM。保留客户端 SFC 模板，模块加载仍由 Vitest 管理。 */
+function clientVue(options: Parameters<typeof vue>[0]) {
+    const plugin = vue(options);
+    const load = plugin.load;
+    const transform = plugin.transform;
+    if (load && typeof load !== 'function') {
+        plugin.load = {...load, handler(id, context) {
+            return load.handler.call(this, id, {...context, ssr: false});
+        }};
+    }
+    if (transform && typeof transform !== 'function') {
+        plugin.transform = {...transform, handler(code, id, context) {
+            return transform.handler.call(this, code, id, {...context, moduleType: context?.moduleType ?? 'js', ssr: false});
+        }};
+    }
+    return plugin;
+}
+
 // 独立的 Vitest 配置（与 wxt 构建配置互不影响）
 export default defineConfig({
     // worktree 可共享安装的依赖；客户端 SFC 测试须能加载其真实路径，保留默认严格文件边界。
@@ -19,7 +37,7 @@ export default defineConfig({
         // npm 包只发布类型；测试须显式 mock 应用端口，禁止落到真实 Obsidian 环境。
         resolveId: (id) => id === 'obsidian' ? '\0fluentread-test-obsidian' : null,
         load: (id) => id === '\0fluentread-test-obsidian' ? 'throw new Error("Obsidian application API must be mocked in tests"); export {};' : null,
-    }, createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), vue({include: [
+    }, createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), clientVue({include: [
         /\/src\/(?:features\/share-card\/ui\/ShareCardStudio|features\/selection-translation\/ui\/SelectionTranslator|features\/settings\/ui\/services\/RequestLimit(?:Settings|Fields)|features\/reading-assistant\/ui\/[^/]+|ui\/components\/(?:MarkdownContent|MarkdownTable|[^/]*Reading[^/]*)|features\/image-translation\/ui\/(?:MangaEntry|MangaReadingPanel)|app\/document-translation\/(?:DocumentApp|DocumentSegmentEditor)|ui\/components\/(?:CustomHotkeyInput|UiSelect|GlossaryLibrarySelect|ServiceIcon|TranslationLoadingPreview|UiIcon|FeatureEnableCard)|features\/settings\/ui\/components\/(?:FieldHelp|InterfaceSkinPreview|PopupLayoutPreview|PopupLayoutPreviewItem|SettingsGroup|SettingsItem|TranslationColorField|TranslationStylePreview|WritingStylePreview|SegmentedControl))\.vue$/,
         resolve(__dirname, 'src/features/settings/ui/services/RequestHeaderSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/ServiceCatalog.vue'),
@@ -152,11 +170,10 @@ export default defineConfig({
         environment: 'node',
         // 对已发布 core 执行同一 transport/browser 替换，避免 Node 外置依赖绕过插件。
         server: {deps: {inline: ['@deeplx/core']}},
-        testTransformMode: {web: ['**/tests/sidepanelApp.test.ts', '**/tests/aiMultiSegmentSettingsLifecycle.test.ts', '**/tests/clickSelectionSettingsLifecycle.test.ts', '**/tests/videoSubtitleTrackPriorityRuntime.test.ts', '**/tests/floatingBallLifecycle.test.ts', '**/tests/promptSyncLifecycle.test.ts', '**/tests/configRestoreOwnership.test.ts', '**/tests/areaTranslationTrigger.test.ts', '**/tests/areaTranslationRecovery.test.ts', '**/tests/glossarySettingsComponent.test.ts', '**/tests/uiLanguageSelectorLifecycle.test.ts', '**/tests/uiLanguageOnboardingLifecycle.test.ts', '**/tests/uiI18nOwnership.test.ts', '**/tests/settingsUiLanguageOwnership.test.ts', '**/tests/learningCenterLifecycle.test.ts', '**/tests/popupAppLifecycle.test.ts', '**/tests/remoteSiteSettingsLifecycle.test.ts', '**/tests/popupServicesLifecycle.test.ts', '**/tests/popupChildOwnership.test.ts', '**/tests/serviceDirectoryLifecycle.test.ts', '**/tests/serviceEditorLifecycle.test.ts', '**/tests/freeTranslationSettings.test.ts', '**/tests/modelVisionSettingsLifecycle.test.ts', '**/tests/quickProfileSettingsLifecycle.test.ts', '**/tests/interfaceSettingsLifecycle.test.ts', '**/tests/localTranslationModelSettingsLifecycle.test.ts', '**/tests/localModelSettingsLifecycle.test.ts', '**/tests/promptEditorLifecycle.test.ts', '**/tests/readingPanelStreamingResize.test.ts', '**/tests/optionsAppNavigationLifecycle.test.ts', '**/tests/videoSentenceLearningComponent.test.ts', '**/tests/translationCenterComponent.test.ts', '**/tests/settingsSectionsLifecycle.test.ts', '**/tests/usageDashboardLifecycle.test.ts', '**/tests/popupKeyInformation.test.ts', '**/tests/userscriptFreeTranslationSettings.test.ts', '**/tests/readingPanelLifecycle.test.ts', '**/tests/materialWorkspaceLifecycle.test.ts', '**/tests/materialWorkspaceKeepAlive.test.ts', '**/tests/vocabularyBookComponentLifecycle.test.ts', '**/tests/vocabularyTtsPageCancellationRuntime.test.ts', '**/tests/selectionTranslatorLifecycle.test.ts', '**/tests/serviceConfigurationLifecycle.test.ts', '**/tests/selfHelpNotice.test.ts', '**/tests/settingsControlUiBehavior.test.ts', '**/tests/readingWritingUiBehavior.test.ts', '**/tests/sitePreferencesLifecycle.test.ts', '**/tests/popupSiteRuleLifecycle.test.ts', '**/tests/writingSurfaceLifecycle.test.ts', '**/tests/sectionTranslationRulesUi.test.ts', '**/tests/chatgptPlanSettingsLifecycle.test.ts', '**/tests/videoSentenceLearningAppearanceSettingsLifecycle.test.ts', '**/tests/personalCorrectionUiPanel.test.ts', '**/tests/pdfReaderLifecycle.test.ts', '**/tests/finalCoveragePublicBoundariesA.test.ts', '**/tests/implementationAudit49A.test.ts', '**/tests/implementationAudit49B.test.ts', '**/tests/implementationAudit49C.test.ts', '**/tests/implementationAudit49E.test.ts', '**/tests/implementationAudit49F.test.ts', '**/tests/implementationAudit49H.test.ts', '**/tests/implementationAudit48J.test.ts', '**/tests/implementationAudit48I.test.ts', '**/tests/implementationAudit48C.test.ts', '**/tests/implementationAudit48E.test.ts', '**/tests/mangaEntryComponentLifecycle.test.ts', '**/tests/mangaReadingPanel.test.ts', '**/tests/customHotkeyInputLifecycle.test.ts', '**/tests/sharedUiComponentsLifecycle.test.ts', '**/tests/documentAppLifecycle.test.ts', '**/tests/documentUserActions.test.ts']},
         include: ['tests/**/*.test.ts'],
         globalSetup: ['./scripts/testing/vitest-resource-lock.mjs'],
         maxWorkers,
-        minWorkers: 1,
+        clearMocks: false,
         fileParallelism: false,
         // 页内样式契约执行四份实际 CSS，避免空 inline 样式掩盖命名或所有权回归。
         css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|translation-loading-indicator|bilingual-sentence-highlight|vocabulary-reencounter))\.css(?:\?|$)/]},

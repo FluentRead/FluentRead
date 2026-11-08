@@ -87,18 +87,35 @@ export function patchExtensionVendorSource(kind: ExtensionVendorSource, original
 
 /** WXT 构建内的模块与 ?url worker 资源均适配；不改 node_modules 或源码仓库中的 vendor。 */
 export function extensionCspBuildPlugin(): Plugin {
+    const workerReferences = new Set<string>();
+    const retainedReferences = new Set<string>();
     return {
         name: 'fluentread-extension-csp-vendor',
         enforce: 'pre',
         apply: 'build',
+        buildStart() {
+            workerReferences.clear();
+            retainedReferences.clear();
+        },
         load(id) {
             const file = id.split('?')[0].replace(/\\/g, '/');
             if (!/(?:^|\/)pdfjs-dist\/legacy\/build\/pdf\.worker\.min\.mjs$/.test(file)
                 || !new URLSearchParams(id.split('?')[1] ?? '').has('url')) return;
             const source = patchExtensionVendorSource('pdfjs-worker', fs.readFileSync(file, 'utf8'));
-            // 仅在构建产物真正引用 URL 时保留资源；其他入口可能加载模块但被摇树移除。
-            const reference = this.emitFile({type: 'asset', name: 'pdf.worker.min.mjs', source, needsCodeReference: true});
+            const reference = this.emitFile({type: 'asset', fileName: 'assets/pdf.worker.min.mjs', source});
+            workerReferences.add(reference);
             return `export default import.meta.ROLLUP_FILE_URL_${reference};`;
+        },
+        resolveFileUrl({referenceId}) {
+            if (workerReferences.has(referenceId)) retainedReferences.add(referenceId);
+            return null;
+        },
+        generateBundle(_options, bundle) {
+            // Rolldown 会保留被摇树删除的 URL 对应的资产。只输出实际解析 URL 的入口所需副本。
+            for (const reference of workerReferences) {
+                if (!retainedReferences.has(reference)) delete bundle[this.getFileName(reference)];
+            }
+            retainedReferences.clear();
         },
         transform(source, id) {
             if (id.includes('\0') || id.includes('?')) return;

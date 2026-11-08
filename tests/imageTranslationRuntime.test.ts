@@ -1,4 +1,4 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createHash} from 'node:crypto';
 import {parseHTML} from 'linkedom';
 import {toRaw} from 'vue';
@@ -123,8 +123,11 @@ function setup(bitmapSize = {width:400,height:200}) {
         return element;
     }) as never);
     const roots: ShadowRoot[] = [];
-    const originalAttach = domWindow.Element.prototype.attachShadow;
-    vi.spyOn(domWindow.Element.prototype, 'attachShadow').mockImplementation(function (this: Element, init: ShadowRootInit) {
+    const elementPrototype = domWindow.Element.prototype;
+    const previousAttach = elementPrototype.attachShadow;
+    if (vi.isMockFunction(previousAttach)) previousAttach.mockRestore();
+    const originalAttach = elementPrototype.attachShadow;
+    vi.spyOn(elementPrototype, 'attachShadow').mockImplementation(function (this: Element, init: ShadowRootInit) {
         const root = originalAttach.call(this, init);
         roots.push(root);
         return root;
@@ -155,8 +158,8 @@ function setup(bitmapSize = {width:400,height:200}) {
         addEventListener: vi.fn((name: string, callback: EventListener) => windowHandlers.set(name, callback)),
         removeEventListener: vi.fn((name: string) => windowHandlers.delete(name)),
     };
-    const observers: Array<{callback: MutationCallback; disconnect: ReturnType<typeof vi.fn>; observe: ReturnType<typeof vi.fn>}> = [];
-    const resizeObservers: Array<{callback: ResizeObserverCallback; disconnect: ReturnType<typeof vi.fn>; observe: ReturnType<typeof vi.fn>; unobserve: ReturnType<typeof vi.fn>}> = [];
+    const observers: Array<{callback: MutationCallback; disconnect: Mock; observe: Mock}> = [];
+    const resizeObservers: Array<{callback: ResizeObserverCallback; disconnect: Mock; observe: Mock; unobserve: Mock}> = [];
     vi.stubGlobal('MutationObserver', class {
         disconnect = vi.fn(); observe = vi.fn();
         constructor(public callback: MutationCallback) {observers.push(this);}
@@ -2864,7 +2867,7 @@ describe('视频预览不自动显示图片翻译', () => {
         vi.stubGlobal('createImageBitmap', decode);
         client.translate.mockResolvedValue({...result, image: '', mangaPatches: {width: 400, height: 200, patches: [{x: 0, y: 0, width: 10, height: 20, image: 'data:image/png;base64,AQID'}]}});
         toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
-        const pending = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>(); decode.mockReturnValueOnce(pending.promise);
+        const pending = deferred<{width: number; height: number; close: Mock<() => void>}>(); decode.mockReturnValueOnce(pending.promise);
         chapter.near(0); await flush(); const before = decode.mock.calls.length;
         chapter.near(-1); const returned = chapter.arrive(0); await returned;
         const late = {width: 10, height: 20, close: vi.fn()}; pending.resolve(late); await flush();
@@ -2880,7 +2883,7 @@ describe('视频预览不自动显示图片翻译', () => {
         vi.stubGlobal('createImageBitmap', decode);
         client.translate.mockResolvedValue({...result, image: '', mangaPatches: {width: 400, height: 200, patches: [{x: 0, y: 0, width: 10, height: 20, image: 'data:image/png;base64,AQID'}]}});
         toggleMangaTranslation(); await flush(); env.runFrames(); await flush(); await chapter.visit(3); await chapter.visit(6); await chapter.visit(9);
-        const old = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>(), current = deferred<{width: number; height: number; close: ReturnType<typeof vi.fn>}>();
+        const old = deferred<{width: number; height: number; close: Mock<() => void>}>(), current = deferred<{width: number; height: number; close: Mock<() => void>}>();
         decode.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
         chapter.near(0); await flush(); const before = decode.mock.calls.length;
         chapter.near(-1); chapter.near(0); await flush();
@@ -2896,7 +2899,7 @@ describe('视频预览不自动显示图片翻译', () => {
         const chapter=cacheChapter(env,10),decode=vi.fn().mockImplementation(async()=>({width:10,height:20,close:vi.fn()}));vi.stubGlobal('createImageBitmap',decode);
         client.translate.mockResolvedValue({...result,image:'',mangaPatches:{width:400,height:200,patches:[{x:0,y:0,width:10,height:20,image:'data:image/png;base64,AQID'}]}});
         toggleMangaTranslation();await flush(); env.runFrames(); await flush();await chapter.visit(3);await chapter.visit(6);await chapter.visit(9);
-        const pending=deferred<{width:number;height:number;close:ReturnType<typeof vi.fn>}>();decode.mockReturnValueOnce(pending.promise);
+        const pending=deferred<{width:number;height:number;close:Mock<() => void>}>();decode.mockReturnValueOnce(pending.promise);
         chapter.near(0);await flush();
         if(change==='pause')toggleMangaTranslation();
         if(change==='source'){chapter.pages[0].src+='?new';env.scroll();env.runFrames();}

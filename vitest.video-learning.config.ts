@@ -19,7 +19,6 @@ export default defineConfig({
         ],
         coverage: {
             provider: 'v8',
-            all: true,
             include: [
                 'src/core/config/videoSentenceLearningAppearance.ts',
                 'src/features/settings/ui/VideoSentenceLearningAppearanceSettings.vue',

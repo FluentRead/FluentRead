@@ -150,6 +150,8 @@ describe('翻译服务连接测试', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.restoreAllMocks();
+        adapter.mockReset();
+        freeAdapter.mockReset();
     });
 
     it('调用真实适配器并禁用翻译缓存', async () => {

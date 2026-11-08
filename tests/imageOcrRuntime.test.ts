@@ -1,4 +1,4 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createSharedOcrTasks} from '@/src/features/image-translation/services/sharedOcrTasks';
 
 const {recognize, ensureLanguages, clearModels, disposeWorker, removeFiles, createRuntime, tesseractCreateWorker, prefetchModels} = vi.hoisted(() => ({
@@ -24,12 +24,12 @@ describe('图片 OCR 处理与结果缓存', () => {
     let recognizeImage: typeof import('@/src/features/image-translation/services/ocrRuntime')['recognizeImage'];
     let dimensions: {width: number; height: number};
     let sources: Array<{src: string; onload: (() => void) | null; onerror: (() => void) | null}>;
-    let canvas: {width: number; height: number; getContext: ReturnType<typeof vi.fn>; toDataURL: ReturnType<typeof vi.fn>; toBlob: ReturnType<typeof vi.fn>};
+    let canvas: {width: number; height: number; getContext: Mock; toDataURL: Mock; toBlob: Mock};
     let pngBlob: Blob;
     let encodedSizes: Array<{width: number; height: number}>;
-    let readers: Array<{result: string | null; readyState: number; onload: (() => void) | null; onerror: (() => void) | null; readAsDataURL: ReturnType<typeof vi.fn>; abort: ReturnType<typeof vi.fn>}>;
+    let readers: Array<{result: string | null; readyState: number; onload: (() => void) | null; onerror: (() => void) | null; readAsDataURL: Mock; abort: Mock}>;
     let sourcePixels: Uint8ClampedArray;
-    let context: {drawImage: ReturnType<typeof vi.fn>; getImageData: ReturnType<typeof vi.fn>; putImageData: ReturnType<typeof vi.fn>; fillRect: ReturnType<typeof vi.fn>; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
+    let context: {drawImage: Mock; getImageData: Mock; putImageData: Mock; fillRect: Mock; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
     it.each(['invalid','too-many'] as const)('只读圈选忽略 %s 的低分数字噪声，正常返回正文',async problem=>{

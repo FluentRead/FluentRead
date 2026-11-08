@@ -8,7 +8,7 @@ export default defineConfig({
         ...base.test,
         include: ['tests/informationHighlight*.test.ts', 'tests/i18n.test.ts'],
         coverage: {
-            provider: 'v8', enabled: true, all: true,
+            provider: 'v8', enabled: true,
             reportsDirectory: 'coverage/information-highlight',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [

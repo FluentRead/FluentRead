@@ -10,7 +10,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const {createRequire} = require('node:module');
 const {pathToFileURL} = require('node:url');
 
 const sha = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -28,9 +27,7 @@ async function main() {
   if (!Array.isArray(manifest.documents) || !manifest.documents.length) throw new Error('Manifest needs explicit documents');
   fs.mkdirSync(output, {recursive: true});
   const repository = path.resolve(__dirname, '../..');
-  // pnpm 不提升传递依赖；从已声明的 Vitest 解析 Vite，不依赖机器的全局安装。
-  const testRequire = createRequire(require.resolve('vitest/package.json'));
-  const {createServer} = await import(pathToFileURL(path.join(path.dirname(testRequire.resolve('vite/package.json')), 'dist/node/index.js')).href);
+  const {createServer} = await import('vite');
   const hmrServer = require('node:http').createServer();
   const server = await createServer({root: repository, configFile: path.join(__dirname, 'pdfjs-reader-audit.config.ts'), server: {middlewareMode: true, hmr: {server: hmrServer}},
     resolve: {alias: {'@': repository}}, optimizeDeps: {noDiscovery: true}});

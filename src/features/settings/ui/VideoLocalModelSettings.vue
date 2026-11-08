@@ -1,19 +1,30 @@
 <!--
  * @file src/features/settings/ui/VideoLocalModelSettings.vue
- * 文件职责：提供 X 本地视频字幕模型选择与下载管理，向用户呈现模型推荐、可用状态和缓存操作。
+ * 文件职责：提供本地视频字幕识别方式、浏览器模型下载、本机 Qwen 服务地址与字幕缓存管理。
  * 主要内容：紧凑卡片选择 Tiny/Base/Small，呈现质量、体积、推荐、可用状态和真实下载字节；设备与缓存说明收进悬停/焦点帮助，下载来源始终自动处理且不展示供应方与换源信息；失败可重试，命令结束重读权威缓存；停用时移除 UI 监听，旧配置事件及迟到回包不进入新视图。
- * 模块边界：通过视频 feature 公共配置和后台消息获取模型，不直接执行识别、下载权重或操作网页播放器；下载进度只读取后台转存的变化事件。
+ * 模块边界：沿用设置草稿及显式保存，不在加载/切换时探测本机服务；通过视频 feature 公共配置和后台消息获取浏览器模型状态，不直接执行识别或操作网页播放器；下载进度只读取后台转存的变化事件。
  -->
 <template>
   <section class="video-model-management" aria-labelledby="video-model-management-title">
     <div class="video-model-download-heading">
       <div>
         <div class="video-model-title"><h3 id="video-model-management-title">{{ translateLegacy('识别模型') }}</h3><FieldHelp :content="t('video.modelDeviceHint')" :label="translateLegacy('本地字幕模型使用说明')" /></div>
-        <p class="video-model-status" role="status">{{ !modelStateLoaded ? '正在读取模型状态…' : downloaded.includes(config.videoLocalModel) ? '当前模型已下载，可直接生成' : t('video.modelChoiceHint') }}</p>
+        <p v-if="config.videoTranscriptionProvider !== 'native-qwen'" class="video-model-status" role="status">{{ !modelStateLoaded ? '正在读取模型状态…' : downloaded.includes(config.videoLocalModel) ? '当前模型已下载，可直接生成' : t('video.modelChoiceHint') }}</p>
       </div>
     </div>
     <p v-if="!browserCapabilities.extensionDom" class="capability-warning" role="status">当前浏览器不支持本地 AI 字幕，无法下载或运行本地模型</p>
-    <div class="video-model-list" role="radiogroup" aria-label="本地 AI 字幕模型">
+    <fieldset class="video-asr-provider" :disabled="!active || !config.videoTranslationEnabled || !browserCapabilities.extensionDom">
+      <legend>识别方式</legend>
+      <label><input :checked="config.videoTranscriptionProvider === 'browser'" :onChange="providerControls.chooseBrowser" type="radio" name="video-asr-provider" value="browser" /> 浏览器内 Whisper</label>
+      <label><input :checked="config.videoTranscriptionProvider === 'native-qwen'" :onChange="providerControls.chooseNative" type="radio" name="video-asr-provider" value="native-qwen" /> 本机 Qwen3 ASR</label>
+      <div v-if="config.videoTranscriptionProvider === 'native-qwen'" class="video-native-asr-settings">
+        <label>本机服务地址 <input :value="config.videoNativeAsrBaseUrl" :onInput="providerControls.inputEndpoint" type="url" maxlength="512" placeholder="http://127.0.0.1:8000" /></label>
+        <p>固定模型：Qwen/Qwen3-ASR-1.7B。使用标准 vLLM 音频转写接口，仅允许 127.0.0.1 或 [::1]，服务需由你事先启动。</p>
+        <p>保存设置不会探测端口、启动服务或下载权重。开始 AI 字幕后才发送音频到所填本机地址；失败会报错，不自动切回 Whisper。</p>
+        <p>该接口返回文本，字幕时间按音频窗口估计，并非字级对齐；此处不代表模型已经加载或已使用 GPU。</p>
+      </div>
+    </fieldset>
+    <div v-if="config.videoTranscriptionProvider !== 'native-qwen'" class="video-model-list" role="radiogroup" aria-label="本地 AI 字幕模型">
       <article v-for="item in modelCards" :key="item.value" class="video-model-card" :class="{ selected: item.value === config.videoLocalModel, disabled: !active || !config.videoTranslationEnabled || !browserCapabilities.extensionDom }" :onClick="item.choose">
         <label class="video-model-choice">
           <input v-model="item.selection.value" type="radio" name="video-local-model" :value="item.value" :aria-label="item.label" :disabled="!active || !config.videoTranslationEnabled || !browserCapabilities.extensionDom" />
@@ -84,7 +95,21 @@ const {t, translateLegacy} = useUiI18n();
 const props = withDefaults(defineProps<{config: Config; active?: boolean; context?: unknown}>(), {active: true});
 // 设置页会整体替换草稿；始终读取最新 prop，避免卡片继续编辑旧配置。
 const config = computed(() => props.config);
-const {active, capture, revision} = useSettingsActionContext(() => props.active, () => [props.config, props.context]);
+// 同一草稿内切换识别方式也更换操作身份，旧控件和异步回包不能跨方式复活。
+const {active, capture, revision} = useSettingsActionContext(() => props.active, () => [props.config, props.context, props.config.videoTranscriptionProvider]);
+const providerControls = computed(() => {
+  const current = capture(), target = props.config;
+  const editable = () => current() && target.videoTranslationEnabled && browserCapabilities.extensionDom;
+  const choose = (value: 'browser' | 'native-qwen') => {if (editable()) target.videoTranscriptionProvider = value;};
+  // 直接绑定本次渲染的闭包，不用在触发时重新读取最新 computed 的 v-model 包装器。
+  return {
+    chooseBrowser: () => choose('browser'),
+    chooseNative: () => choose('native-qwen'),
+    inputEndpoint: (event: Event) => {
+      if (editable() && target.videoTranscriptionProvider === 'native-qwen') target.videoNativeAsrBaseUrl = (event.target as HTMLInputElement).value;
+    },
+  };
+});
 const modelOptions = VIDEO_LOCAL_TRANSCRIPTION_MODELS;
 const modelCopy: Record<VideoLocalTranscriptionModel, [string, string]> = {
   tiny: ['video.modelTinyName', 'video.modelTinyHint'],
@@ -133,7 +158,7 @@ let modelGeneration = 0;
 let cacheGeneration = 0;
 
 function selectModel(model: VideoLocalTranscriptionModel, current: () => boolean, target: Config): void {
-  if (!current() || !target.videoTranslationEnabled || !browserCapabilities.extensionDom) return;
+  if (!current() || target.videoTranscriptionProvider === 'native-qwen' || !target.videoTranslationEnabled || !browserCapabilities.extensionDom) return;
   target.videoLocalModel = model;
 }
 
@@ -156,7 +181,7 @@ function handleDownloadProgress(id: string, next: DownloadProgressValue | undefi
 
 async function refresh(force = false): Promise<void> {
   const current = capture();
-  if (!current() || !force && (downloading.value.length || removing.value.length)) return;
+  if (!current() || props.config.videoTranscriptionProvider === 'native-qwen' || !force && (downloading.value.length || removing.value.length)) return;
   const request = ++modelGeneration;
   try {
     const response = await browser.runtime.sendMessage({type: VIDEO_LOCAL_TRANSCRIPTION_STATE_MESSAGE}) as {success?: boolean; models?: unknown} | undefined;
@@ -174,7 +199,7 @@ async function refresh(force = false): Promise<void> {
 }
 
 async function download(model: VideoLocalTranscriptionModel, current = capture()): Promise<void> {
-  if (!current()) return;
+  if (!current() || props.config.videoTranscriptionProvider === 'native-qwen') return;
   if (!browserCapabilities.extensionDom) {
     downloadError.value = '当前浏览器不支持本地 AI 字幕';
     return;
@@ -207,7 +232,7 @@ async function download(model: VideoLocalTranscriptionModel, current = capture()
 }
 
 async function removeModel(model: VideoLocalTranscriptionModel, current = capture()): Promise<void> {
-  if (!current() || removing.value.includes(model)) return;
+  if (!current() || props.config.videoTranscriptionProvider === 'native-qwen' || removing.value.includes(model)) return;
   modelGeneration++;
   removing.value.push(model);
   downloadError.value = '';
@@ -313,6 +338,12 @@ svg { width: 15px; height: 15px; flex: none; }
 .video-model-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
 .video-model-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); transition: border-color 150ms ease, background 150ms ease; }
 .video-model-card:not(.disabled) { cursor: pointer; }
+.video-asr-provider { display: grid; gap: 10px; min-width: 0; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 12px; }
+.video-asr-provider > label { display: flex; align-items: center; gap: 8px; }
+.video-native-asr-settings { display: grid; gap: 8px; overflow-wrap: anywhere; }
+.video-native-asr-settings label { display: grid; gap: 6px; }
+.video-native-asr-settings input { width: 100%; min-width: 0; box-sizing: border-box; padding: 8px; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.video-native-asr-settings p { margin: 0; color: var(--muted); line-height: 1.6; }
 .video-model-card:not(.disabled):hover { border-color: var(--brand); }
 .video-model-card.selected { border-color: var(--brand); background: color-mix(in srgb, var(--brand-soft) 24%, var(--surface)); }
 .video-model-card:focus-within { outline: 2px solid var(--brand); outline-offset: 3px; }

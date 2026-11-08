@@ -862,7 +862,7 @@ describe('audit49C followup1 cross-model convergence through public handlers and
         const current = state as {config: Config};
         const requests = ports.send.mock.calls.length;
         expect(host.querySelector('.video-model-source-links')).toBeNull(); expect(host.querySelector('[data-video-model-source]')).toBeNull();
-        expect([...host.querySelectorAll('input[type="radio"]')].map(input => input.getAttribute('value'))).toEqual(['tiny', 'base', 'small']);
+        expect([...host.querySelectorAll('.video-model-list input[type="radio"]')].map(input => input.getAttribute('value'))).toEqual(['tiny', 'base', 'small']);
         let bubbled = 0; host.addEventListener('click', () => bubbled++);
         videoCard(host, 'base').dispatchEvent(new Event('click', {bubbles: true})); await settle();
         expect(current.config.videoLocalModel).toBe('base'); expect(ports.send).toHaveBeenCalledTimes(requests); expect(bubbled).toBe(1);

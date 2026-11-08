@@ -226,6 +226,14 @@ const faqs = [
         <span class="fr-sponsor-arrow" aria-hidden="true">↗</span>
       </a>
     </section>
+    <section class="bv-section bv-related-service" aria-labelledby="bv-related-service-title">
+      <h2 id="bv-related-service-title">{{ t('相关服务', 'Related service') }}</h2>
+      <a href="https://index-translate.bilibili.com/" target="_blank" rel="noopener noreferrer">
+        <strong>Index-Translate</strong>
+        <span>{{ t('哔哩哔哩', 'bilibili') }}</span>
+        <span aria-hidden="true">↗</span>
+      </a>
+    </section>
     <section class="bv-section bv-faq">
       <div>
         <span class="bv-section-number">{{ t('使用须知', 'GETTING STARTED') }}</span>

@@ -25,6 +25,36 @@
     gap: 28px;
   }
 }
+.bv-site .bv-related-service {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+.bv-site .bv-related-service h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: normal;
+}
+.bv-related-service a {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--vp-c-brand-1);
+  font-size: 14px;
+}
+.bv-related-service a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bv-related-service a:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
 /* 首屏以居中图标和两行口号为主，两侧悬浮卡片只用变换动画，不占据文档流。 */
 .bv-home-brand img {
   width: 38px;

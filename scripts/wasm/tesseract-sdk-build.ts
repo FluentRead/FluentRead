@@ -16,8 +16,8 @@ export function tesseractSdkBuildPlugin(): Plugin {
             const file = id.split('?')[0].replace(/\\/g, '/');
             if (!/(?:^|\/)tesseract\.js\/src\/createWorker\.js$/.test(file)) return;
             const version = JSON.parse(fs.readFileSync(resolve(dirname(file), '../package.json'), 'utf8')).version;
-            if (version !== '6.0.1' || createHash('sha256').update(source).digest('hex') !== SDK_SHA256) {
-                throw new Error('Unsupported tesseract.js 6.0.1 createWorker source: review SDK initialization packaging');
+            if (version !== '7.0.0' || createHash('sha256').update(source).digest('hex') !== SDK_SHA256) {
+                throw new Error('Unsupported tesseract.js 7.0.0 createWorker source: review SDK initialization packaging');
             }
             const patches = [
                 ['  workerCounter += 1;\n\n  const startJob', `  workerCounter += 1;

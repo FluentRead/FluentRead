@@ -40,11 +40,14 @@ beforeAll(async () => {
         runInContext(compiled.code, realm, {filename: file, timeout: 5_000});
         producer = module.exports as typeof producer;
     }
-    const core = producer.packageTesseractWasm(ownedOutputRoot, resolve(resourceRoot, coreFile));
+    const sources = typeof producer.resolveTesseractSources === 'function'
+        ? producer.resolveTesseractSources(resourceRoot)
+        : {glue: resolve(resourceRoot, coreFile), worker: resolve(resourceRoot, workerFile)};
+    const core = producer.packageTesseractWasm(ownedOutputRoot, sources.glue);
     shippedAssets.set(coreFile, core.glue);
     packagedWasm = readFileSync(core.wasm);
     // 原 WXT hook 直接拷贝锁定 worker；新 hook 使用真实公开 producer，原文件保持不变。
-    if (producer.packageTesseractWorker) shippedAssets.set(workerFile, producer.packageTesseractWorker(ownedOutputRoot, resolve(resourceRoot, workerFile)));
+    if (producer.packageTesseractWorker) shippedAssets.set(workerFile, producer.packageTesseractWorker(ownedOutputRoot, sources.worker));
 });
 
 afterAll(() => {if (ownedOutputRoot) rmSync(ownedOutputRoot, {recursive: true, force: true});});
@@ -410,7 +413,7 @@ describe('audit 49G shipped userscript resources', () => {
 });
 
 describe('audit 49G shipped OCR worker message entry', () => {
-    it('initializes the actual embedded WASM and exercises its public memory filesystem', async () => {
+    it('initializes the actual packaged WASM and exercises its public memory filesystem', async () => {
         const realm = nativeCoreRealm();
         const module = await realm.TesseractCore({print: vi.fn(), printErr: vi.fn()});
         module.FS.writeFile('/synthetic.txt', 'Synthetic 中文🙂');
@@ -418,8 +421,8 @@ describe('audit 49G shipped OCR worker message entry', () => {
         const api = new module.TessBaseAPI();
         try {
             expect(api.Version()).toMatch(/^5\./u);
-            expect(module.OEM_LSTM_ONLY).toBe(1);
-            expect(module.PSM_SPARSE_TEXT).toBe(11);
+            api.SetPageSegMode(11);
+            expect(api.GetPageSegMode()).toBe(11);
         } finally {
             api.End();
             module.destroy(api);

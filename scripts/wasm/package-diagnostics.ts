@@ -1,13 +1,27 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
 import {patchExtensionVendorSource} from '../testing/extension-csp-build';
 
-// 原始 vendor 仍保留在 public/。只修正已逐入口复现的固定版本发布副本；升级必须重新审查。
-const OCR_CORE_SHA256 = '9d7c43fb206dc9f48475228b46bf35f888fa9e6259da2e67d5a75c77049f2dc7';
-const OCR_WORKER_SHA256 = '38645599043239c0eb6db08a6504a92dcdc292200535f3e9339cd77c4443b842';
+// Core 与 Worker 均来自锁定的 npm 包。校验原始字节后只适配本地加载、异常清理和诊断出口。
+const OCR_CORE_SHA256 = 'e48e2f02ddae3716c8dd24bf41cd290d4efa96892d689cdc4013c2545d63f469';
+const OCR_WASM_SHA256 = '34e8d50cac216427d86bf397d610fdd9f49492539bbcdfbfccc4eda20c810bea';
+const OCR_WORKER_SHA256 = '576b7df7e3393e137e51849357c9adb53fe7ac1bb69bfa06cf3d61520f182c6d';
+const OCR_WASM_FILE = 'tesseract-core-simd-lstm.wasm';
+const OCR_CORE_FACTORY = 'async function(moduleArg={}){';
 
-function requirePinnedSource(source: string, digest: string, name: string): void {
+export function resolveTesseractSources(root: string) {
+    const sdk = createRequire(path.resolve(root, 'package.json')).resolve('tesseract.js/package.json');
+    const core = createRequire(sdk);
+    return {
+        glue: core.resolve('tesseract.js-core/tesseract-core-simd-lstm.js'),
+        wasm: core.resolve(`tesseract.js-core/${OCR_WASM_FILE}`),
+        worker: path.resolve(path.dirname(sdk), 'dist/worker.min.js'),
+    };
+}
+
+function requirePinnedSource(source: string | Buffer, digest: string, name: string): void {
     if (createHash('sha256').update(source).digest('hex') !== digest) {
         throw new Error(`Unsupported ${name} source: review OCR packaging before upgrading`);
     }
@@ -18,53 +32,39 @@ function replaceOnce(source: string, before: string, after: string): string {
     return source.replace(before, after);
 }
 
-/** 保留仓库中的原始 vendor 文件；扩展产物将内嵌 Base64 还原为同字节的本地 WASM。 */
-export function splitTesseractWasm(source: string): {code: string; wasm: Buffer} {
-    const embedded = [...source.matchAll(/"data:application\/octet-stream;base64,([A-Za-z0-9+/]+={0,2})"/g)];
-    const factory = 'function(TesseractCore = {})  {';
-    if (embedded.length !== 1 || source.split(factory).length !== 2) {
-        throw new Error('Unsupported embedded Tesseract WASM format');
-    }
-    const wasm = Buffer.from(embedded[0][1], 'base64');
-    if (wasm.toString('base64') !== embedded[0][1]
-        || !wasm.subarray(0, 8).equals(Buffer.from([0, 97, 115, 109, 1, 0, 0, 0]))) {
-        throw new Error('Invalid embedded Tesseract WASM binary');
-    }
-    const fileName = 'tesseract-core-simd-lstm.wasm';
-    // importScripts 不设置 document.currentScript，Emscripten 默认会相对于 worker/ 查找内核。
-    // 扩展固定从自有 worker/worker.min.js 启动，明确使用兄弟 core/ 路径；保留调用方的 locateFile。
-    const locate = `TesseractCore.locateFile ||= (file, prefix) => file === ${JSON.stringify(fileName)}
+// importScripts 从 worker/ 执行，Emscripten 默认按 Worker 的 URL 查找 WASM。
+// 保留调用方提供的 locateFile，扩展默认从兄弟 core/ 路径加载。
+export function useLocalTesseractWasm(source: string): string {
+    const locate = `moduleArg.locateFile ||= (file, prefix) => file === ${JSON.stringify(OCR_WASM_FILE)}
         ? new URL('../core/' + file, self.location.href).href : prefix + file;`;
-    const code = source.replace(embedded[0][0], JSON.stringify(fileName))
-        .replace(factory, `${factory}\n${locate}\n`);
-    return {code, wasm};
+    return replaceOnce(source, OCR_CORE_FACTORY, `${OCR_CORE_FACTORY}\n${locate}\n`);
 }
 
-/** 把拆分出的二进制与诊断适配后的 glue 一起登记给 WXT，保持已有 corePath 不变。 */
+/** 打包官方分离版的 WASM 与经过诊断适配的 glue，保持扩展现有 corePath。 */
 export function packageTesseractWasm(root: string, sourcePath: string): {glue: string; wasm: string} {
     const source = fs.readFileSync(sourcePath, 'utf8');
-    requirePinnedSource(source, OCR_CORE_SHA256, 'tesseract.js-core 6.1.2');
-    // FS.writeFile 已取得 stream 后，数据校验或写入失败仍必须 close；不改变编码、flags 或原生字节。
+    requirePinnedSource(source, OCR_CORE_SHA256, 'tesseract.js-core 7.0.0 glue');
+    const wasm = path.join(path.dirname(sourcePath), OCR_WASM_FILE);
+    requirePinnedSource(fs.readFileSync(wasm), OCR_WASM_SHA256, 'tesseract.js-core 7.0.0 WASM');
+    // FS.writeFile 已取得 stream 后，数据校验或写入失败仍必须 close。
     const corrected = replaceOnce(source,
-        'a=B.open(a,d.flags,d.mode);if("string"==typeof c)',
-        'a=B.open(a,d.flags,d.mode);try{if("string"==typeof c)');
-    const split = splitTesseractWasm(replaceOnce(corrected,
-        'else throw Error("Unsupported data type");B.close(a)},cwd:',
-        'else throw Error("Unsupported data type")}finally{B.close(a)}},cwd:'));
+        'a=x.open(a,c.flags,c.mode);"string"==typeof b',
+        'a=x.open(a,c.flags,c.mode);try{"string"==typeof b');
+    const local = useLocalTesseractWasm(replaceOnce(corrected,
+        'ArrayBuffer.isView(b)?x.write(a,b,0,b.byteLength,void 0,c.Fh):r("Unsupported data type");x.close(a)},cwd:',
+        'if(!ArrayBuffer.isView(b))throw Error("Unsupported data type");x.write(a,b,0,b.byteLength,void 0,c.Fh)}finally{x.close(a)}},cwd:'));
     const outputDirectory = path.resolve(root, '.wxt/packaged-wasm');
-    const glue = path.join(outputDirectory, 'tesseract-core-simd-lstm.wasm.js');
-    const wasm = path.join(outputDirectory, 'tesseract-core-simd-lstm.wasm');
+    const glue = path.join(outputDirectory, `${OCR_WASM_FILE}.js`);
     const adapter = fs.readFileSync(path.resolve(root, 'scripts/wasm/diagnostics.js'), 'utf8');
     fs.mkdirSync(outputDirectory, {recursive: true});
-    fs.writeFileSync(glue, instrumentWasmDiagnostics(split.code, 'tesseract', adapter));
-    fs.writeFileSync(wasm, split.wasm);
+    fs.writeFileSync(glue, instrumentWasmDiagnostics(local, 'tesseract', adapter));
     return {glue, wasm};
 }
 
 /** 生成扩展实际加载的 worker，保留完整 vendor 和 LICENSE 说明，不修改原始锁定资源。 */
 export function packageTesseractWorker(root: string, sourcePath: string): string {
     let source = fs.readFileSync(sourcePath, 'utf8');
-    requirePinnedSource(source, OCR_WORKER_SHA256, 'tesseract.js 6.0.1 worker');
+    requirePinnedSource(source, OCR_WORKER_SHA256, 'tesseract.js 7.0.0 worker');
     source = patchExtensionVendorSource('tesseract-worker', source);
     // 让 dispatch 的 Promise 错误出口观察到异步 Core 工厂失败，保留 worker/job 身份。
     source = replaceOnce(source,
@@ -98,8 +98,8 @@ export function packageTesseractWorker(root: string, sourcePath: string): string
 export function instrumentWasmDiagnostics(source: string, runtime: 'onnx' | 'tesseract', adapter: string): string {
     const factory = runtime === 'onnx'
         ? /(?:async function\(moduleArg = \{\}\) \{|async function ortWasmThreaded\(moduleArg=\{\}\)\{)/g
-        : /function\(TesseractCore = \{\}\)  \{/g;
-    const stderr = runtime === 'onnx' ? 'console.error.bind(console)' : 'console.warn.bind(console)';
+        : /async function\(moduleArg=\{\}\)\{/g;
+    const stderr = 'console.error.bind(console)';
     // 格式变化必须在构建时失败，避免升级后静默失去分级或替换错误位置。
     if ([...source.matchAll(factory)].length !== 1 || source.split(stderr).length !== 2) {
         throw new Error(`Unsupported ${runtime} WASM diagnostic glue`);

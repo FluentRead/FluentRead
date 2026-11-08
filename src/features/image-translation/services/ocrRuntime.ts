@@ -31,7 +31,7 @@ function extensionAsset(path: string): string {
 }
 
 type TesseractRecognitionResult = Awaited<ReturnType<Worker['recognize']>>;
-// 6.1.2 内置 core 在遍历语言 vector 时追加 CJK 模型声明的竖排子语言，会使迭代器失效并误读为「;」。
+// 原内置 core 在遍历语言 vector 时追加 CJK 模型声明的竖排子语言，会使迭代器失效并误读为「;」。
 // 所需语言（含 jpn_vert 等竖排模型）已由 getImageOcrModelLanguages 显式传入；初始化时关闭隐式子语言。
 // 上游同类修复：https://github.com/tesseract-ocr/tesseract/issues/4002；JS 类型未列出此 core 初始化参数。
 const OCR_INIT_CONFIG = {tessedit_load_sublangs: ''} as unknown as Parameters<typeof createWorker>[3];
@@ -41,7 +41,7 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
     createWorker: async (languages, onProgress) => createWorker(languages.split('+'), 1, {
         workerPath: extensionAsset('worker/worker.min.js'),
         // 直接指向 SIMD + LSTM 内核：扩展支持的 Chrome/Edge（Offscreen 需 109+）与 Firefox 140+
-        // 均支持 WASM SIMD，且只使用 LSTM 引擎；不再打包永远不会被选中的非 SIMD 变体。
+        // 均支持 WASM SIMD，且只使用 LSTM 引擎。只打包这一内核，维持已支持浏览器的同一资源路径。
         corePath: extensionAsset('core/tesseract-core-simd-lstm.wasm.js'),
         cachePath: 'fluent-read-image-ocr',
         // 不再把 traineddata 打进扩展；Tesseract.js 会从 jsDelivr 按需下载，

@@ -1,6 +1,6 @@
 import './helpers/vueDomFixture';
 import {readFileSync} from 'node:fs';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {compileStyle, parse} from 'vue/compiler-sfc';
 import {parseHTML} from 'linkedom';
 import * as vue from 'vue';
@@ -13,9 +13,9 @@ const source = readFileSync(filename, 'utf8');
 const {descriptor} = parse(source, {filename});
 import TranslationCenter from '@/src/features/translation-center/ui/TranslationCenter.vue';
 let state: Record<string, any>, config: Config;
-let requestPatch: ReturnType<typeof vi.fn>, translateText: ReturnType<typeof vi.fn>, copy: ReturnType<typeof vi.fn>;
+let requestPatch: Mock, translateText: Mock, copy: Mock;
 let subscription: (next: Config) => void;
-let emit: ReturnType<typeof vi.fn>, unmount: (() => void) | undefined, host: HTMLElement;
+let emit: Mock, unmount: (() => void) | undefined, host: HTMLElement;
 let configReady: Promise<void>;
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: vi.fn()}}}));
 vi.mock('@/src/services/config/store', () => ({
@@ -41,11 +41,13 @@ const close = () => {unmount?.(); unmount = undefined;};
 beforeEach(async () => {
   config = new Config(); emit = vi.fn();
   requestPatch = vi.fn().mockResolvedValue(undefined); translateText = vi.fn().mockResolvedValue('translated'); copy = vi.fn().mockResolvedValue(undefined);
-  const {document} = parseHTML('<html><body></body></html>'); document.body.style.userSelect = 'text';
+  const {document, window} = parseHTML('<html><body></body></html>'); document.body.style.userSelect = 'text';
   Object.assign(document, {elementFromPoint: vi.fn()});
   vi.stubGlobal('window', new EventTarget());
   vi.stubGlobal('navigator', {platform: 'MacIntel', clipboard: {writeText: copy}});
   vi.stubGlobal('document', document);
+  vi.stubGlobal('Document', window.Document);
+  vi.stubGlobal('ShadowRoot', window.ShadowRoot);
   configReady = Promise.resolve();
   await mountCenter();
 });

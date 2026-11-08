@@ -21,6 +21,15 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('omits the extension popup support description while keeping support labels used in settings', () => {
+        for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
+            const original = extensionBundles[language].messages;
+            const projected = currentUserscriptLanguageBundle(language).messages;
+            expect(original['popup.donationDescription']).toBeTruthy();
+            expect(projected).not.toHaveProperty('popup.donationDescription');
+            expect(projected['popup.donationTitle']).toBe(original['popup.donationTitle']);
+        }
+    });
     it('omits unavailable local video ASR labels while retaining extension dictionaries', () => {
         expect(zhCNMessages).not.toHaveProperty('video.aiLocalHint');
         for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
@@ -341,7 +350,7 @@ describe('userscript remote UI language data', () => {
         vi.resetModules();
         try {
             const {default: standalone, createUserscriptCatalogCompressionPlugin: createPlugin} = await import('@/userscript/vite.config');
-            const {transformWithEsbuild} = await import('vite');
+            const {transformWithEsbuild} = await import('vite-userscript');
             const provider = await import('@/userscript/defaultMessageData');
             const encoding = await import('@/userscript/dataEncoding');
             expect(provider.readDefaultMessageKeys()).toBeUndefined();

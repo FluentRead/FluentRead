@@ -1,0 +1,17 @@
+overrides:
+  react: 18.3.1
+  react-dom: 18.3.1
+  vitepress>vite: 5.4.21
+
+patchedDependencies:
+  ppu-paddle-ocr@6.6.0: patches/ppu-paddle-ocr@6.6.0.patch
+
+allowBuilds:
+  esbuild: true
+  # CI runs only esbuild's install script. Keep the same boundary for a local install.
+  onnxruntime-node: false
+  protobufjs: false
+  sharp: false
+  spawn-sync: false
+  tesseract.js: false
+  vue-demi: false

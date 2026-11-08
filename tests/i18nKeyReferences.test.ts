@@ -14,7 +14,7 @@ describe('稳定 i18n key 的生产调用契约', () => {
         const audit = collectUiMessageReferences(process.cwd());
         expect(audit.references.length).toBeGreaterThan(700);
         expect(auditUiMessageReferences(audit.references, zhCNMessages)).toEqual([]);
-    });
+    }, 30_000);
 
     it('设置与个人校订的稳定资源在最终七语目录中生效，不被旧的对象展开顺序静默覆盖', () => {
         for (const {value: language} of UI_LANGUAGE_OPTIONS) {

@@ -4,6 +4,7 @@
  * 主要内容：在同一取消代次中校验格式和大小、读取格式、恢复 OCR 与人工校订历史以及当前任务的重译缓存策略；历史不可读取时标记任务以阻止旧记录被自动覆盖；取消后丢弃迟到读取，失败文件独立入队，不改写已有文档的译文或翻译错误。
  * 模块边界：不持有任务队列、当前选择、进度或历史提交副本；读取、任务提交和展示均经显式端口，历史保存仍由页面的 historyCommitter 负责。
  */
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {getDocumentFormat, getDocumentMaxBytes, type ParsedDocument} from '../core/document';
 import type {parseDocumentFile} from './binary';
 import type {fetchOnlinePdf, PdfDownloadProgress} from './pdfSource';
@@ -131,7 +132,7 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
             const record = result.record;
             if (!record) {await ports.onHistoryMissing();return;}
             const snapshot = record.parsedVersion === ports.parsedVersion ? record.parsed as ParsedDocument | undefined : undefined;
-            const file = new File([record.bytes], record.name, {type: record.mimeType});
+            const file = new File([asArrayBufferBytes(record.bytes)], record.name, {type: record.mimeType});
             const pdf = snapshot?.binary?.kind === 'pdf' ? snapshot.binary : undefined;
             // 解析版本相同仍不足以复用 PDF：快照必须属于当前记录的原始文件，否则从记录字节重新读取。
             const invalidPdf = (record.format === 'pdf' || snapshot?.format === 'pdf' || pdf !== undefined) && (!pdf || !(pdf.bytes instanceof Uint8Array)

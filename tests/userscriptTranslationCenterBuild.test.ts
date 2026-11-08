@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {compileScript, parse} from 'vue/compiler-sfc';
-import {transformWithEsbuild} from 'vite';
+import {transformWithEsbuild} from 'vite-userscript';
 import {describe, expect, it} from 'vitest';
 import {createUserscriptTranslationCenterPlugin} from '@/userscript/translationCenterPlugin';
 

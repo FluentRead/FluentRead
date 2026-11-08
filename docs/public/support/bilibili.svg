@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#d33869" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Same Bilibili TV glyph as ServiceIcon.vue. -->
+  <path d="M7 6h10a4 4 0 0 1 4 4v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4v-6a4 4 0 0 1 4-4Z"/>
+  <path d="m8 2 3 4m5-4-3 4M8 11v4m8-4v4m-6 2h4"/>
+</svg>

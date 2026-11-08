@@ -16,7 +16,7 @@ import russian from './languages/ru-RU.83347fe7c1e5f5da.json';
 import spanish from './languages/es-ES.ccf366fbe218633c.json';
 
 export function userscriptMessages<T extends Record<string, string>>(messages: T): T {
-    return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice'].includes(key)
+    return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice', 'popup.donationDescription'].includes(key)
         && !key.startsWith('informationHighlight.')
         && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
         && !key.startsWith('contextMenu.notice.') && !key.startsWith('video.learning.')
@@ -82,9 +82,9 @@ export function currentUserscriptLanguageBundle(language: RegisteredUiLanguage):
     };
 }
 
-/** 所有脚本入口不挂载文档页或请求统计页面。 */
+/** 所有脚本入口不挂载文档页、请求统计页面或扩展弹窗的支持说明。 */
 export function userscriptPageMessages<T extends Record<string, string>>(messages: T): T {
-    return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice'].includes(key)
+    return Object.fromEntries(Object.entries(messages).filter(([key]) => !['learning.collection.undoExtensionNotice', 'popup.donationDescription'].includes(key)
         && !key.startsWith('document.') && !key.startsWith('translationStats.'))) as T;
 }
 

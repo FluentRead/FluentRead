@@ -615,7 +615,7 @@ async function mountClientOptions(requestedSection: string, browser: 'userscript
     contact: vi.fn(() => ordinaryImages.getContactImageUrl() as string)};
   let dialogSlotRuns = 0;
   const dialogNotifications: {closed?: () => void} = {};
-  for (const key of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'SVGElement', 'Event'])
+  for (const key of ['window', 'document', 'Document', 'ShadowRoot', 'Node', 'Element', 'HTMLElement', 'SVGElement', 'Event'])
     vi.stubGlobal(key, key === 'window' ? window : window[key as keyof typeof window]);
   const prefix = '#fluentread-userscript-settings';
   const routeSearch=route ? '?target='+encodeURIComponent(route.target) : '';
@@ -719,7 +719,11 @@ async function mountClientOptions(requestedSection: string, browser: 'userscript
   let mounted = false;
   scope.unmount = () => {if (mounted) {mounted = false;app.unmount();}frames.clear();host.remove();};unmount = scope.unmount;
   app.mount(host);mounted = true;
-  const settle = async () => {for (let i = 0; i < 10; i++) {await Promise.resolve();await runtime.nextTick();}};
+  const settle = async () => {
+    await runtime.nextTick();
+    await vi.dynamicImportSettled();
+    await runtime.nextTick();
+  };
   await settle();
   if(route){for(const callback of [...mutationCallbacks])callback();await settle();}
   const rail = (section: string) => host.querySelector<HTMLButtonElement>(`button[data-section="${section}"]`)!;

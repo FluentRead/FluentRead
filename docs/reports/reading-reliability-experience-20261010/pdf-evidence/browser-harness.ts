@@ -34,7 +34,7 @@ const assert = (condition: boolean, message: string) => {if (!condition) throw n
         const download = await createDocumentDownload(document, translations, mode, {...options, pdfPresentation: presentation,
             onPdfProgress: value => progress.push(value)});
         const bytes = download.data as Uint8Array;
-        const task = getDocument({data: bytes.slice(), isEvalSupported: false});
+        const task = getDocument({data: bytes.slice()});
         const pdf = await task.promise;
         const texts = [];
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
@@ -75,13 +75,13 @@ const assert = (condition: boolean, message: string) => {if (!condition) throw n
     assert(iteratorReleased, 'Reading iterator did not release');
     assert(cancellationCanvases.length === 2 && cancellationCanvases.every(canvas => canvas.width === 0 && canvas.height === 0), 'Canceled export kept Canvas pixels');
 
-    const task = getDocument({data: readingBytes!.slice(), isEvalSupported: false});
+    const task = getDocument({data: readingBytes!.slice()});
     const pdf = await task.promise;
     const page = await pdf.getPage(1);
     const viewport = page.getViewport({scale: 1.5});
     const canvas = globalThis.document.querySelector('canvas')!;
     canvas.width = viewport.width; canvas.height = viewport.height;
-    await page.render({canvasContext: canvas.getContext('2d')!, viewport}).promise;
+    await page.render({canvas, viewport}).promise;
     const container = globalThis.document.querySelector('.textLayer') as HTMLElement;
     container.style.setProperty('--scale-factor', '1.5');
     await new TextLayer({textContentSource: await page.getTextContent(), container, viewport}).render();

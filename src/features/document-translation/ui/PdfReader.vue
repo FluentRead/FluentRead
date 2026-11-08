@@ -1121,11 +1121,21 @@ onBeforeUnmount(() => {
 .pdf-reading-region {margin: 0 0 1.2em; width: 100%;}
 .pdf-region-canvas {max-width: 100%; margin-inline: auto; background: #fff;}
 .pdf-region-canvas :deep(canvas) {display: block; width: 100%; height: auto;}
-/* 锁定 PDF.js 4.10.38 TextLayer 的必需几何规则，限定在阅读器内，避免导入整个 viewer 的全局样式。 */
-.pdf-canvas-host :deep(.fluentread-pdf-text-layer) {position: absolute; text-align: initial; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: transparent; z-index: 1; user-select: text;}
+/* PDF.js 6 TextLayer 将字号、水平缩放和旋转作为变量写入，几何规则只作用于本阅读器。 */
+.pdf-canvas-host :deep(.fluentread-pdf-text-layer) {
+  position: absolute; text-align: initial; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none;
+  forced-color-adjust: none; transform-origin: 0 0; caret-color: transparent; z-index: 1; user-select: text;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+}
 .pdf-canvas-host :deep(.fluentread-pdf-text-layer :is(span, br)) {color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0;}
-.pdf-canvas-host :deep(.fluentread-pdf-text-layer > :not(.markedContent)), .pdf-canvas-host :deep(.fluentread-pdf-text-layer .markedContent span:not(.markedContent)) {z-index: 1;}
-.pdf-canvas-host :deep(.fluentread-pdf-text-layer span.markedContent) {top: 0; height: 0;}
+.pdf-canvas-host :deep(.fluentread-pdf-text-layer > :is(span, br):not(.markedContent)), .pdf-canvas-host :deep(.fluentread-pdf-text-layer .markedContent span:not(.markedContent)) {
+  z-index: 1;
+  font-size: calc(var(--total-scale-factor) * var(--min-font-size) * var(--font-height, 0px));
+  transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1)) scale(calc(1 / var(--min-font-size)));
+}
+.pdf-canvas-host :deep(.fluentread-pdf-text-layer span.markedContent) {display: contents;}
 .pdf-canvas-host :deep(.fluentread-pdf-text-layer span[role='img']) {user-select: none; cursor: default;}
 .pdf-canvas-host :deep(.fluentread-pdf-text-layer[data-main-rotation='90']) {transform: rotate(90deg) translateY(-100%);}
 .pdf-canvas-host :deep(.fluentread-pdf-text-layer[data-main-rotation='180']) {transform: rotate(180deg) translate(-100%, -100%);}

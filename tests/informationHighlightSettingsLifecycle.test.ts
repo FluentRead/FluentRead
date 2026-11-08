@@ -55,6 +55,10 @@ function element(selector: string): Element {const current = document.querySelec
 function event(selector: string, name = 'onClick'): (...args: unknown[]) => unknown {
   const callback = events.get(element(selector))?.[name]; expect(callback, `${selector} ${name}`).toBeTypeOf('function'); return callback
 }
+async function openHotkeyRecorder() {
+  event('[data-information-highlight-hotkey]')()
+  await vi.waitFor(() => element('[data-highlight-hotkey-recorder]'))
+}
 function modeSelect() {return event('[data-information-highlight-mode-select]', 'onUpdate:modelValue')}
 function card(modelId: InformationHighlightModelId) {return `section[data-information-highlight-model-id="${modelId}"]`}
 function modelChoice(modelId: InformationHighlightModelId) {return event(`[data-information-highlight-model-choice="${modelId}"]`, 'onChange')}
@@ -135,7 +139,7 @@ describe('信息高亮设置真实父子模板与生命周期', () => {
   it.each([true, false])('点选已预留时拒绝高亮启用和改键，全局开关 %s 不释放已配置组合', async on => {
     await mount('keywords'); props.config.on = on; props.config.selectionTranslatorMode = 'bilingual'; props.config.disableSelectionTranslator = false;
     props.config.selectionClickSelectEnabled = true; props.config.selectionClickSelectHotkey = 'Alt+Shift+S'; await settle();
-    event('[data-information-highlight-hotkey]')(); await settle();
+    await openHotkeyRecorder();
     const validate = event('[data-highlight-hotkey-recorder]', 'validate');
     expect(validate('shift+alt+s')).toBe('informationHighlight.hotkey.conflict');
     event('[data-highlight-hotkey-recorder]', 'onConfirm')('Alt+Shift+S'); await settle();
@@ -146,7 +150,7 @@ describe('信息高亮设置真实父子模板与生命周期', () => {
     expect(props.config.informationHighlight.hotkeyEnabled).toBe(false); expect(props.config.selectionClickSelectEnabled).toBe(true);
     expect(warnings).toHaveBeenCalledWith('informationHighlight.hotkey.conflict');
     expect(element('[data-information-highlight-hotkey]').hasAttribute('disabled')).toBe(false);
-    event('[data-information-highlight-hotkey]')(); await settle();
+    await openHotkeyRecorder();
     expect(event('[data-highlight-hotkey-recorder]', 'validate')('Alt+Shift+S')).toBe('');
     event('[data-highlight-hotkey-recorder]', 'onConfirm')('Alt+J'); await settle();
     event('[data-information-highlight-hotkey-enabled]', 'onUpdate:modelValue')(true); await settle();

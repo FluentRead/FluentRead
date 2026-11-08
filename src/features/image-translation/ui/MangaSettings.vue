@@ -47,7 +47,7 @@
       <label class="manga-site-search">{{ t('搜索网站名称或域名') }}<input v-model="siteSearch" type="search" :aria-label="t('搜索网站名称或域名')" /></label>
       <small data-i18n-ignore>{{ filteredSites.length }} / {{ MANGA_SITE_CATALOG.length }}</small>
       <div class="manga-site-list">
-        <div v-for="site in filteredSites" :key="site.name" class="manga-site"><span><strong data-i18n-ignore>{{ site.name }}</strong><small data-i18n-ignore>{{ site.hosts.join(' · ') || t('域名待确认') }}</small></span><span class="manga-site-badge">{{ t(site.hosts.length === 0 ? '域名待确认' : site.hosts.some(host => MANGA_AREA_READER_HOSTS.includes(host)) ? '画布或分片 · 圈选翻译' : site.hosts.some(host => MANGA_CANVAS_READER_HOSTS.includes(host) || MANGA_BACKGROUND_READER_HOSTS.includes(host)) || ['Pixiv', 'MANGA Plus by SHUEISHA'].includes(site.name) ? '内置适配' : '已登记图片阅读器') }}</span></div>
+        <div v-for="site in filteredSites" :key="site.name" class="manga-site"><span><strong data-i18n-ignore>{{ site.name }}</strong><small data-i18n-ignore>{{ site.hosts.join(' · ') || t('域名待确认') }}</small></span><span class="manga-site-badge">{{ siteBadge(site) }}</span></div>
         <p v-if="filteredSites.length === 0">{{ t('没有匹配的网站') }}</p>
       </div>
       <p>{{ t('进入阅读页即可识别，无需先开启普通图片翻译或悬浮球') }}</p>
@@ -86,6 +86,13 @@ const filteredSites = computed(() => {
   const search = siteSearch.value.trim().toLocaleLowerCase();
   return MANGA_SITE_CATALOG.filter(site => `${site.name} ${site.hosts.join(' ')}`.toLocaleLowerCase().includes(search));
 });
+function siteBadge({hosts, name}: typeof MANGA_SITE_CATALOG[number]): string {
+  if (hosts.length === 0) return t('域名待确认');
+  if (hosts.some(host => MANGA_AREA_READER_HOSTS.includes(host))) return t('画布或分片 · 圈选翻译');
+  if (hosts.some(host => MANGA_CANVAS_READER_HOSTS.includes(host) || MANGA_BACKGROUND_READER_HOSTS.includes(host))
+      || ['Pixiv', 'MANGA Plus by SHUEISHA'].includes(name)) return t('内置适配');
+  return t('已登记图片阅读器');
+}
 function addSite() {
   error.value = '';
   const rule = createMangaSiteRule(url.value, selector.value);

@@ -1,4 +1,5 @@
 import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createContext, runInContext, type Context} from 'node:vm';
@@ -40,18 +41,21 @@ beforeAll(async () => {
         runInContext(compiled.code, realm, {filename: file, timeout: 5_000});
         producer = module.exports as typeof producer;
     }
-    const core = producer.packageTesseractWasm(ownedOutputRoot, resolve(resourceRoot, coreFile));
+    const sources = typeof producer.resolveTesseractSources === 'function'
+        ? producer.resolveTesseractSources(resourceRoot)
+        : {glue: resolve(resourceRoot, coreFile), worker: resolve(resourceRoot, workerFile)};
+    const core = producer.packageTesseractWasm(ownedOutputRoot, sources.glue);
     shippedAssets.set(coreFile, core.glue);
     packagedWasm = readFileSync(core.wasm);
     // 原 WXT hook 直接拷贝锁定 worker；新 hook 使用真实公开 producer，原文件保持不变。
-    if (producer.packageTesseractWorker) shippedAssets.set(workerFile, producer.packageTesseractWorker(ownedOutputRoot, resolve(resourceRoot, workerFile)));
+    if (producer.packageTesseractWorker) shippedAssets.set(workerFile, producer.packageTesseractWorker(ownedOutputRoot, sources.worker));
 });
 
 afterAll(() => {if (ownedOutputRoot) rmSync(ownedOutputRoot, {recursive: true, force: true});});
 
 function wasmFetch(input: string | URL | Request) {
     if (String(input) !== 'https://fixture.invalid/core/tesseract-core-simd-lstm.wasm') throw new Error(`Unexpected fixture network: ${input}`);
-    return Promise.resolve(new Response(packagedWasm, {headers: {'Content-Type': 'application/wasm'}}));
+    return Promise.resolve(new Response(asArrayBufferBytes(packagedWasm), {headers: {'Content-Type': 'application/wasm'}}));
 }
 
 function nativeCoreRealm() {
@@ -410,7 +414,7 @@ describe('audit 49G shipped userscript resources', () => {
 });
 
 describe('audit 49G shipped OCR worker message entry', () => {
-    it('initializes the actual embedded WASM and exercises its public memory filesystem', async () => {
+    it('initializes the actual packaged WASM and exercises its public memory filesystem', async () => {
         const realm = nativeCoreRealm();
         const module = await realm.TesseractCore({print: vi.fn(), printErr: vi.fn()});
         module.FS.writeFile('/synthetic.txt', 'Synthetic 中文🙂');
@@ -418,8 +422,8 @@ describe('audit 49G shipped OCR worker message entry', () => {
         const api = new module.TessBaseAPI();
         try {
             expect(api.Version()).toMatch(/^5\./u);
-            expect(module.OEM_LSTM_ONLY).toBe(1);
-            expect(module.PSM_SPARSE_TEXT).toBe(11);
+            api.SetPageSegMode(11);
+            expect(api.GetPageSegMode()).toBe(11);
         } finally {
             api.End();
             module.destroy(api);

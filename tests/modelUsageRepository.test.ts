@@ -454,7 +454,7 @@ describe('大模型用量 IndexedDB repository', () => {
         expect(() => parseModelUsageTransferDocument(cyclic)).toThrow('无法序列化');
 
         const encode = vi.spyOn(TextEncoder.prototype, 'encode')
-            .mockReturnValue({byteLength: 128 * 1024 * 1024 + 1} as Uint8Array);
+            .mockReturnValue({byteLength: 128 * 1024 * 1024 + 1} as Uint8Array<ArrayBuffer>);
         expect(() => parseModelUsageTransferDocument({
             format: 'fluentread-model-usage',
             version: 1,
@@ -476,7 +476,7 @@ describe('大模型用量 IndexedDB repository', () => {
             toArray: async () => [],
         } as never);
         const encode = vi.spyOn(TextEncoder.prototype, 'encode')
-            .mockReturnValue({byteLength: 128 * 1024 * 1024 + 1} as Uint8Array);
+            .mockReturnValue({byteLength: 128 * 1024 * 1024 + 1} as Uint8Array<ArrayBuffer>);
         await expect(repository.exportData(2_000)).rejects.toThrow('导出文件超过 128 MiB 上限');
         encode.mockRestore();
 

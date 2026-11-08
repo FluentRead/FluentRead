@@ -1,4 +1,5 @@
 import 'fake-indexeddb/auto';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import Dexie from 'dexie';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
@@ -27,7 +28,7 @@ async function read(blob: Blob) {
   const prepared = await prepareMaterialBackup(blob), frames: Frame[] = [];
   await sendMaterialBackup(blob, prepared, async frame => {frames.push(frame);});
   const actual = [];
-  for (let i = 0; i < prepared.manifest.records; i++) actual.push(JSON.parse(await new Blob(frames.filter(frame => frame.record === i).map(frame => frame.bytes)).text()));
+  for (let i = 0; i < prepared.manifest.records; i++) actual.push(JSON.parse(await new Blob(frames.filter(frame => frame.record === i).map(frame => asArrayBufferBytes(frame.bytes))).text()));
   return {prepared, frames, actual};
 }
 
@@ -202,7 +203,7 @@ describe('material backup source reader', () => {
       expect(plan.manifest).toMatchObject({records: 2, bytes: 8, frames: 4});
       await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
       expect(frames.map(frame => [frame.record, frame.part, frame.bytes.length])).toEqual([[0,0,2],[0,1,2],[1,0,2],[1,1,2]]);
-      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"ab""cd"');
+      expect(await new Blob(frames.map(frame => asArrayBufferBytes(frame.bytes))).text()).toBe('"ab""cd"');
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
   it('lets the background budget admit records exceeding the former fixed total', async () => {
@@ -217,7 +218,7 @@ describe('material backup source reader', () => {
       expect(plan.manifest.bytes).toBe(6);
       await reader.sendMaterialBackup(source, plan, async frame => {frames.push(frame);});
       expect(frames.map(frame => frame.record)).toEqual([0, 1]);
-      expect((await Promise.all(frames.map(frame => new Blob([frame.bytes]).text()))).map(value => JSON.parse(value))).toEqual(['a','b']);
+      expect((await Promise.all(frames.map(frame => new Blob([asArrayBufferBytes(frame.bytes)]).text()))).map(value => JSON.parse(value))).toEqual(['a','b']);
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
   });
   it('validates the entire file before applying the record limit to the last materials key', async () => {
@@ -234,7 +235,7 @@ describe('material backup source reader', () => {
       const plan = await reader.prepareMaterialBackup(blob), frames: Frame[] = [];
       await reader.sendMaterialBackup(blob, plan, async frame => {frames.push(frame);});
       expect(plan.manifest.records).toBe(1);
-      expect(await new Blob(frames.map(frame => frame.bytes)).text()).toBe('"a"');
+      expect(await new Blob(frames.map(frame => asArrayBufferBytes(frame.bytes))).text()).toBe('"a"');
       await expect(reader.prepareMaterialBackup(new Blob([source.slice(0, -1) + ',"ignored":[1,]}'])))
         .rejects.toBeInstanceOf(SyntaxError);
       const oversizedLast = `{"format":"fluentread-learning-materials","version":1,"materials":["a"],"materials":[${first}]}`;
@@ -260,7 +261,7 @@ describe('material backup source reader', () => {
       expect(prepared.plan.fileDigest).toBe(bytesToHex(sha256(new Uint8Array(await source.arrayBuffer()))));
       expect(decode.mock.calls.filter(([, options]) => options?.stream === true).length).toBeLessThan(8);
       const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
-      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toEqual(expected[0]);
+      expect(JSON.parse(await new Blob(frames.map(frame => asArrayBufferBytes(frame.bytes))).text())).toEqual(expected[0]);
       const changed = new Uint8Array(await source.arrayBuffer()); changed[prefix.length + 8] = 0xfe;
       const changedBlob = new Blob([changed]), changedSliceOriginal = source.slice.bind(source);
       source.slice = (start, end, type) => changedBlob.slice(start, end, type);
@@ -293,7 +294,7 @@ describe('material backup source reader', () => {
       const prepared = await reader.prepareMaterialBackup(source);
       expect(prepared.manifest.bytes).toBe(5); // 两个引号加替换字符的三个 UTF-8 字节。
       const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
-      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('\ufffd');
+      expect(JSON.parse(await new Blob(frames.map(frame => asArrayBufferBytes(frame.bytes))).text())).toBe('\ufffd');
       const tooLarge = new Blob([prefix, new Uint8Array([0xff, 0xff]), encoder.encode('"]}')]);
       await expect(reader.prepareMaterialBackup(tooLarge)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
@@ -313,7 +314,7 @@ describe('material backup source reader', () => {
       const prepared = await reader.prepareMaterialBackup(source);
       expect(prepared.manifest.bytes).toBe(limit);
       const frames: Frame[] = []; await reader.sendMaterialBackup(source, prepared, async frame => {frames.push(frame);});
-      expect(JSON.parse(await new Blob(frames.map(frame => frame.bytes)).text())).toBe('a'.repeat(pad.length) + '😀');
+      expect(JSON.parse(await new Blob(frames.map(frame => asArrayBufferBytes(frame.bytes))).text())).toBe('a'.repeat(pad.length) + '😀');
       const tooLong = new Blob([prefix, pad, emoji, encoder.encode('x"]}')]);
       await expect(reader.prepareMaterialBackup(tooLong)).rejects.toMatchObject({name: 'MaterialBackupCapacityError'});
     } finally {vi.doUnmock('@/src/features/vocabulary/materialProtocol'); vi.resetModules();}
@@ -382,7 +383,7 @@ describe('material backup source reader', () => {
   it('maintains existing stage digest and ordered bounded frames', async () => {
     const blob = new Blob([wrap(`{"text":"😀${'x'.repeat(140000)}"},-0,1e400`)]), {prepared, frames, actual} = await read(blob), h = sha256.create();
     for (let i = 0; i < actual.length; i++) {
-      const all = frames.filter(frame => frame.record === i).map(frame => frame.bytes), bytes = new Uint8Array(await new Blob(all).arrayBuffer()), n = bytes.length;
+      const all = frames.filter(frame => frame.record === i).map(frame => asArrayBufferBytes(frame.bytes)), bytes = new Uint8Array(await new Blob(all).arrayBuffer()), n = bytes.length;
       h.update(new Uint8Array([(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255])); h.update(bytes);
     }
     expect(bytesToHex(h.digest())).toBe(prepared.manifest.digest);

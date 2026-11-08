@@ -5,6 +5,7 @@
  * 模块边界：使用内存 IndexedDB 和假的 fetch，不联网、不启动 Tesseract Worker。
  */
 import {readFileSync} from 'node:fs';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {gzipSync} from 'node:zlib';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {IDBFactory} from 'fake-indexeddb';
@@ -26,7 +27,7 @@ function readStored(key: string): Promise<unknown> {
 
 function gzipResponse(bytes: number[], headers: Record<string, string> = {}): Response {
     const body = gzipSync(new Uint8Array(bytes));
-    return new Response(body, {headers: {'Content-Type': 'application/gzip', 'Content-Length': String(body.byteLength), ...headers}});
+    return new Response(asArrayBufferBytes(body), {headers: {'Content-Type': 'application/gzip', 'Content-Length': String(body.byteLength), ...headers}});
 }
 
 describe('OCR 模型缓存读写', () => {

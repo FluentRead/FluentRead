@@ -1,13 +1,13 @@
 import {parseHTML} from 'linkedom';
 import {createRenderer, h, markRaw, nextTick, reactive, type App} from 'vue';
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 vi.mock('@/src/ui/components/UiIcon.vue', () => ({default: {render: () => null}}));
 vi.mock('element-plus', async () => ({ElIcon: {setup: (_: unknown, {slots}: any) => () => h('span', {}, slots.default?.())}}));
 import component from '@/src/ui/components/CustomHotkeyInput.vue';
 import * as hotkeyModule from '@/src/core/hotkey';
 
 let app: App, state: Record<string, any>, props: {modelValue: boolean; currentValue: string; validate?: (value: string) => string};
-let doc: Document, active: HTMLElement | null, emitted: ReturnType<typeof vi.fn>, root: HTMLElement;
+let doc: Document, active: HTMLElement | null, emitted: Mock, root: HTMLElement;
 const handlers = new WeakMap<Element, Record<string, any>>();
 async function settle() {await nextTick(); await nextTick();}
 async function mount(value = '', initiallyFocused = true, initiallyVisible = true) {

@@ -2,6 +2,7 @@ import {describe, expect, it, vi} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
 import {createContext, runInContext} from 'node:vm';
 import {extensionCspBuildPlugin, patchExtensionVendorSource, type ExtensionVendorSource} from '../scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin, patchDefuddleEntitySource, replaceDefuddleEntityDecoder} from '../scripts/testing/defuddle-entity-build';
@@ -92,12 +93,13 @@ describe('extension dependency CSP packaging', () => {
         expect(bytes.byteLength).toBeLessThan(font.stream.buffer.length);
     });
 
-    it('PDF 主模块和 Worker 都固定走解释执行，不保留 JIT 或动态 require', () => {
-        expect(patched('pdfjs-main')).toContain('function isEvalSupported() { return false; }');
+    it('PDF Worker 对文档 PostScript 固定走解释执行，图片解码保留本地预编译 WASM', () => {
+        expect(patched('pdfjs-main')).not.toContain("Function('return this')");
         const worker = patched('pdfjs-worker');
-        expect(worker).toContain('function isEvalSupported(){return!1}');
-        expect(worker).toContain('new PostScriptEvaluator(o)');
-        expect(worker).not.toContain('new Function');
+        expect(worker).not.toContain('Failed to compile PostScript function to wasm');
+        expect(worker).toContain(':PSStackBasedInterpreter.build(r,t,n)}(s,a,r,!0),i,o)');
+        expect(worker).toContain('openjpeg.wasm');
+        expect(worker).toContain('jbig2.wasm');
     });
 
     it('regenerator 和 lodash 保留现代浏览器全局且无需编译字符串', () => {
@@ -123,13 +125,14 @@ describe('extension dependency CSP packaging', () => {
         const load = plugin.load as (this: unknown, id: string) => string | undefined;
         expect(load.call({emitFile}, sources['pdfjs-worker'])).toBeUndefined();
         expect(load.call({emitFile}, `${sources['pdfjs-worker']}?url`)).toBe('export default import.meta.ROLLUP_FILE_URL_fixture;');
-        expect(emitFile).toHaveBeenCalledWith({type: 'asset', name: 'pdf.worker.min.mjs', source: patched('pdfjs-worker'), needsCodeReference: true});
+        expect(emitFile).toHaveBeenCalledWith({type: 'asset', fileName: 'assets/pdf.worker.min.mjs', source: patched('pdfjs-worker')});
     });
 
     it('摇树删除未使用的 PDF Worker，实际引用时保留 CSP 安全的资源', async () => {
-        const {rollup} = createRequire(require.resolve('vite'))('rollup');
+        const rolldownPath = createRequire(require.resolve('vite')).resolve('rolldown');
+        const {rolldown} = await import(/* @vite-ignore */ pathToFileURL(rolldownPath).href);
         const build = async (used: boolean) => {
-            const bundle = await rollup({
+            const bundle = await rolldown({
                 input: 'fixture-entry',
                 plugins: [{
                     name: 'fixture',

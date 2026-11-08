@@ -1252,7 +1252,7 @@ describe('video player binding', () => {
 
   it('keeps an existing fallback and tolerates a hostile hover matcher', () => {
     const fixture = createFixture('<div class="player"><video></video><div class="fluent-read-video-controls"></div></div>');
-    fixture.player.matches = (() => { throw new Error('hostile selector'); }) as typeof fixture.player.matches;
+    vi.spyOn(fixture.player, 'matches').mockImplementation(() => { throw new Error('hostile selector'); });
     const button = fixture.document.createElement('button');
     const binding = createVideoPlayerBinding({document: fixture.document, locator: fixture.locator, getState: () => ({enabled: true}), createButton: () => button});
     fixture.video.dispatchEvent(new fixture.window.Event('pointerover', {bubbles: true}));

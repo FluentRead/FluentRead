@@ -30,7 +30,7 @@ async function mount(href = 'chrome-extension://fixture/options.html?returnTabId
   vi.stubGlobal('location', {href})
   const compiled = compileVueInlineFixture('src/features/settings/ui/services/ServiceRepairReturn.vue', {id: 'service-return'})
   const language = vue.ref<UiLanguage>(locale), bundleRevision = vue.ref(0)
-  const dependencies: Record<string, unknown> = {'vue': vue, 'webextension-polyfill': {default: {tabs: {get, update}}},
+  const dependencies: Record<string, unknown> = {'vue': vue, 'webextension-polyfill': {__esModule: true, default: {tabs: {get, update}}},
     '@/src/ui/i18n': {useUiI18n: () => ({language, bundleRevision})}, '@/src/services/diagnostics': diagnostics, '../../model/useSettingsActionContext': actionContext, './serviceRepairFocus': repairFocus}
   const module = {exports: {} as {default: vue.Component}}
   new Function('require', 'exports', 'module', compiled.code)((id: string) => {if (!(id in dependencies)) throw new Error(id);return dependencies[id]}, module.exports, module)

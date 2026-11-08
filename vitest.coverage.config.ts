@@ -13,7 +13,6 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             enabled: true,
-            all: true,
             clean: true,
             reportOnFailure: true,
             reportsDirectory: 'coverage/core',
@@ -318,6 +317,7 @@ export default defineConfig({
                 'src/features/reading-assistant/sentenceAnalysis.ts',
                 'src/core/config/selectionPreview.ts',
                 'src/shared/function/sha256.ts',
+                'src/shared/function/arrayBufferBytes.ts',
                 'src/core/translation/sentenceAlignment.ts',
                 'src/features/full-page-translation/content/sentenceHighlight.ts',
                 'src/app/content/bilingualSentenceHighlight.ts',

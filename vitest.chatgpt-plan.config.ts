@@ -4,7 +4,7 @@ import base from './vitest.config';
 // ChatGPT 套餐接入的专属行为门禁，显式范围避免启动全量回归。
 export default defineConfig({...base, test: {...base.test,
     include: ['tests/chatgptPlanBridgeClient.test.ts', 'tests/chatgptPlanConfig.test.ts', 'tests/chatgptPlanHarness.test.ts', 'tests/chatgptPlanProvider.test.ts', 'tests/chatgptPlanSettingsLifecycle.test.ts'],
-    coverage: {provider: 'v8', all: true, reporter: ['text', 'json-summary', 'json'], reportsDirectory: '/private/tmp/fluentread-chatgpt-plan-coverage',
+    coverage: {provider: 'v8', reporter: ['text', 'json-summary', 'json'], reportsDirectory: '/private/tmp/fluentread-chatgpt-plan-coverage',
         include: [
             'src/core/i18n/serviceLabels.ts',
             'src/platform/chatgpt-plan/buildMode.ts',

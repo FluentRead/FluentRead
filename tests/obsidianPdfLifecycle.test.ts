@@ -1,4 +1,4 @@
-import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 
 const ports = vi.hoisted(() => ({
     apiGate: undefined as Promise<void> | undefined,
@@ -29,7 +29,7 @@ function task(pages = [page(), page(['Second page'])]) {
 }
 type Module = typeof import('../integrations/obsidian/pdf');
 const extract = (module: Module, signal?: AbortSignal) => (module.extractPdfSegments as (bytes: ArrayBuffer, signal?: AbortSignal) => Promise<unknown>)(bytes(), signal);
-let module: Module; let createUrl: ReturnType<typeof vi.fn>; let revokeUrl: ReturnType<typeof vi.fn>;
+let module: Module; let createUrl: Mock<typeof URL.createObjectURL>; let revokeUrl: Mock<typeof URL.revokeObjectURL>;
 beforeEach(async () => {
     vi.resetModules(); vi.clearAllMocks(); ports.apiGate = undefined; ports.workerGate = undefined; ports.options.workerSrc = '';
     ports.getDocument.mockReset();
@@ -61,7 +61,7 @@ describe('Obsidian PDF extraction resource ownership', () => {
         ]);
         expect(fixture.pages.every(value => value.cleanup.mock.calls.length === 1)).toBe(true);
         expect(fixture.result.destroy).toHaveBeenCalledOnce(); expect(createUrl).toHaveBeenCalledOnce();
-        expect(ports.getDocument.mock.calls[0][0]).toMatchObject({disableFontFace: true, isEvalSupported: false, useWorkerFetch: false});
+        expect(ports.getDocument.mock.calls[0][0]).toMatchObject({disableFontFace: true, disableWorkerRendering: true, useWorkerFetch: false});
     });
     it('reuses one worker across concurrent documents and revokes it once', async () => {
         // 先固定 API mock；并发边界由 worker gate 控制，不依赖测试器同时解析动态 mock 的时序。

@@ -54,9 +54,9 @@ export default defineConfig(({mode}) => {
                 formats: ['iife'],
                 fileName: () => `content/${mode}.js`,
             },
-            rollupOptions: {
+            rolldownOptions: {
                 output: {
-                    inlineDynamicImports: true,
+                    codeSplitting: false,
                     assetFileNames: 'content/[name][extname]',
                     banner: '/*! FluentRead for Zotero — GPL-3.0; source: https://github.com/Bistutu/FluentRead */',
                 },

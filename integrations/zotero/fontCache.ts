@@ -4,6 +4,7 @@
  * 主要内容：把固定摘要字体映射为 Cache 的响应端口，私有目录内原子写入；下载、大小限制、摘要校验、损坏修复和取消仍由共享字体加载器处理，已验证字节只以副本交给调用方。
  * 模块边界：不访问 Zotero 全局、文献内容或凭据；宿主显式注入文件 API 和缓存目录，缓存不可用时仍可使用经过校验的会话字体。
  */
+import {asArrayBufferBytes} from '../../src/shared/function/arrayBufferBytes';
 import {createPdfReadingFontLoader, PDF_READING_FONT_BYTES, PDF_READING_FONT_CACHE_KEY,
     PDF_READING_FONT_SHA256} from '../../src/features/document-translation/services/pdfReadingFont';
 
@@ -52,7 +53,7 @@ export function createZoteroFontLoader(options: ZoteroFontCacheOptions): ZoteroF
             if (!matches(request) || !await io.exists(path)) return undefined;
             // 只多读一个字节就能让共享加载器识别超长文件，避免损坏文件导致无界内存分配。
             const bytes = await io.read(path, {maxBytes: PDF_READING_FONT_BYTES + 1});
-            return new Response(bytes, {headers: {'Content-Type': 'font/woff2'}});
+            return new Response(asArrayBufferBytes(bytes), {headers: {'Content-Type': 'font/woff2'}});
         },
         async put(request, response) {
             if (!matches(request)) return;

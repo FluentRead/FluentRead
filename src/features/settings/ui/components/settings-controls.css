@@ -1,7 +1,7 @@
 /**
  * @file src/features/settings/ui/components/settings-controls.css
  * 文件职责：让设置页与独立组件示例使用同一套开关尺寸、输入框圆角、命中区域和焦点反馈。
- * 主要内容：设置页已有容器与显式使用 fr-settings-controls 的组件组合共享 Element Plus 控件外观，开关保留 44px 高的操作区域、清晰滑块位置与可见键盘焦点；独立开关行的悬停与指针反馈对应 SettingsItem 的点击转发。
+ * 主要内容：设置页已有容器与显式使用 fr-settings-controls 的组件组合共享 Element Plus 控件外观，开关保留 44px 高的操作区域、清晰滑块位置与可见键盘焦点；独立开关行的悬停与指针反馈对应 SettingsItem 的点击转发；设置行中的添加操作共享紧凑的品牌色按钮。
  * 模块边界：只改变明确加入设置控件范围的外观，不修改开关值、可访问名称、键盘行为或业务状态，也不要求复用方挂载完整 Options 页面骨架。
  */
 :is(.settings-app .settings-card, .fr-settings-controls) :is(.el-input__wrapper, .el-select__wrapper) { border-radius: 8px; box-shadow: none; }
@@ -13,3 +13,42 @@
 :is(.settings-app .settings-card, .fr-settings-controls) .el-switch:focus-within { outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand)); outline-offset: 2px; }
 :is(.settings-app, .fr-settings-controls) .settings-item:has(> .settings-item-control > .el-switch:not(.is-disabled)) { cursor: pointer; }
 :is(.settings-app, .fr-settings-controls) .settings-item:has(> .settings-item-control > .el-switch:not(.is-disabled)):hover { background: var(--surface-soft); }
+
+.settings-add-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: 8px;
+  color: var(--brand-strong);
+  background: var(--brand-soft);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.settings-add-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--brand) 48%, transparent);
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+.settings-add-button:focus-visible {
+  outline: var(--fr-focus-width, 2px) solid var(--fr-focus-color, var(--brand));
+  outline-offset: 2px;
+}
+
+.settings-add-button::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(currentColor, currentColor) center / 10px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 1.5px 10px no-repeat;
+}
+
+.settings-add-button:disabled { cursor: not-allowed; opacity: .5; }

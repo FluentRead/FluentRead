@@ -9,11 +9,12 @@ import {checkExtensionSize} from './scripts/testing/extension-size-budget';
 import {wllamaExtensionWorker} from './scripts/testing/wllama-extension-build';
 import {createExtensionMetadataLocaleFiles, createUiLanguageBundleFiles} from './src/core/i18n/bundles';
 import {UI_LANGUAGE_BUNDLE_DIRECTORY} from './src/core/i18n/language';
-import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker} from './scripts/wasm/package-diagnostics';
+import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker, resolveTesseractSources} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from './src/platform/google-drive/constants';
 import {createDeepLXRuntimeBuildPlugin} from './scripts/testing/deeplx-runtime-build';
 import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build';
+import {PDFJS_DECODER_FILES} from './scripts/testing/pdfjs-assets.mjs';
 import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
@@ -34,7 +35,7 @@ export function createSafariBackgroundPage(env: Pick<ConfigEnv, 'browser' | 'man
     return [{relativeDest: 'safari-background.html', contents: '<!doctype html>\n<html>\n<head><meta charset="utf-8"></head>\n<body><script src="./background.js"></script></body>\n</html>\n'}];
 }
 
-/** WXT 0.20.18 先由入口生成 scripts，再调用 manifestGenerated；在此保留非持久生命周期并替换页面。 */
+/** WXT 先由入口生成 scripts，再调用 manifestGenerated；在此保留非持久生命周期并替换页面。 */
 export function configureSafariBackgroundPage(
     env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>,
     manifest: {background?: {scripts?: string[]; persistent?: boolean; page?: string; service_worker?: string}},
@@ -50,7 +51,7 @@ export function configureSafariBackgroundPage(
 
 /**
  * Chromium 重载扩展会更换动态资源 UUID，旧页面保存的 CSS/图标地址因此失效。
- * WXT 0.20.18 在生成清单时才追加 Shadow UI CSS，故在 manifestGenerated 阶段
+ * WXT 在生成清单时才追加 Shadow UI CSS，故在 manifestGenerated 阶段
  * 仅将这几项已公开的界面资源改为稳定地址；语言包和其他资源继续保持原规则。
  * 不增加可访问文件、站点或权限；稳定地址的公开 UI 资产可被网页按固定 ID 探测。
  */
@@ -164,16 +165,14 @@ export function configureExtensionUiChunks(entrypoints: readonly {type: string}[
     const pages = new Set(['popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every(entrypoint => pages.has(entrypoint.type)) || config.build?.lib) return;
     const build = config.build ??= {};
-    const rollup = build.rollupOptions ??= {};
-    const output = rollup.output ??= {};
+    const rolldown = build.rolldownOptions ??= {};
+    const output = rolldown.output ??= {};
     for (const target of Array.isArray(output) ? output : [output]) {
-        if (target.manualChunks !== undefined) continue;
-        target.manualChunks = (source: string) => {
-            const id = source.replaceAll('\\', '/');
-            if (/\/node_modules\/(?:@vue\/(?:reactivity|runtime-core|runtime-dom|shared)|vue)\//u.test(id)) return 'vue-runtime';
-            if (/\/node_modules\/(?:tldts|tldts-core)\//u.test(id)) return 'domain-parser';
-            return undefined;
-        };
+        if (target.codeSplitting !== undefined || target.manualChunks !== undefined) continue;
+        target.codeSplitting = {groups: [
+            {name: 'vue-runtime', test: /[\\/]node_modules[\\/](?:@vue[\\/](?:reactivity|runtime-core|runtime-dom|shared)|vue)[\\/]/u},
+            {name: 'domain-parser', test: /[\\/]node_modules[\\/](?:tldts|tldts-core)[\\/]/u},
+        ]};
     }
 }
 
@@ -302,6 +301,7 @@ export default defineConfig({
     },
     vite: (env) => {
         const isProductionBuild = env.command === 'build' && env.mode === 'production';
+        const browserTargets: Readonly<Record<string, string>> = {chrome: 'chrome87', edge: 'edge88', firefox: 'firefox140', safari: 'safari26'};
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
@@ -310,13 +310,15 @@ export default defineConfig({
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
                 reportCompressedSize: false,
+                // Chromium 沿用 Vite 5 基线。Firefox 和 Safari 已在 manifest 明确最低版本。
+                target: browserTargets[env.browser] ?? ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+                // 源码层脱敏之外，生产构建也移除 console 和 debugger。
+                ...(isProductionBuild ? {rolldownOptions: {output: {minify: {mangle: true, compress: {dropConsole: true, dropDebugger: true}}}}} : {}),
                 ...(env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' as const : false} : {}),
             },
             define: {
                 'process.env.VUE_APP_VERSION': JSON.stringify(packageJson.version),
             },
-            // 源码层脱敏是主要控制；生产构建再移除诊断输出，作为未来新增日志的纵深防护。
-            esbuild: isProductionBuild ? {drop: ['console', 'debugger']} : undefined,
         };
     },
     manifest: createExtensionManifest,
@@ -324,21 +326,14 @@ export default defineConfig({
         name: 'fluent-read',
         // 发布包采用标准 DEFLATE 的最高压缩等级；仅增加打包时间，不改变解压后的资源或运行时。
         compressionLevel: 9,
-        // AMO 源码包保留扩展源码、锁文件、构建脚本及字体/OCR 资产，
-        // 排除网站素材、测试证据和其他发布出口，避免超过 200 MB 上传限制。
-        excludeSources: [
-            'coverage/**',
-            'reports/release/**',
-            'docs/**',
-            'marketing/**',
-            'userscript/**',
-            'storybook/**',
-            'integrations/**',
-            'examples/**',
-            'scripts/testing/evidence/**',
+        // WXT 0.21 将 includeSources 作为白名单。仅包含复现扩展和审核所需的
+        // 文件，点文件只明确允许 .nvmrc，避免带入 .env 等本地配置。
+        includeSources: [
+            '.nvmrc', 'LICENSE', 'README.md', 'PRIVACY.md', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
+            'entrypoints/**', 'src/**', 'styles/**', 'assets/**', 'misc/**', 'public/**', 'scripts/**', 'patches/**',
+            'docs/development/service-icons.md', 'docs/guide/deepseek-harness.md',
         ],
-        // 保留源码中的第三方来源说明；includeSources 会覆盖上述排除规则。
-        includeSources: ['docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
+        excludeSources: ['coverage/**', 'scripts/testing/evidence/**', '**/.DS_Store'],
     },
     hooks: {
         'build:manifestGenerated': (wxt, manifest) => {
@@ -352,9 +347,11 @@ export default defineConfig({
         },
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';
+            const browser = wxt.config.browser;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
-            // 恢复字体加入前的生产体积预算，防止完整字体再次随 public/ 打包。
-            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : 65_000_000;
+            // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_100_000 : 66_000_000;
+            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
             await checkExtensionSize(wxt.config.outDir, budget);
@@ -363,15 +360,6 @@ export default defineConfig({
             groupModuleWorkers(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
-            // CommonJS 26 的 auto 判定有条件/无条件 require 竞态。固定后台 CryptoJS
-            // 初始化包装，保留 0.0.40 上传包的执行顺序，使不同目录的重建逐字节一致。
-            // 升级依赖后应重新核对包装清单，不能依赖 auto 或关闭循环依赖处理。
-            if (entrypoints.some(entrypoint => entrypoint.type === 'background')) {
-                const build = viteConfig.build ??= {};
-                build.commonjsOptions = {...build.commonjsOptions, strictRequires: [
-                    '**/crypto-js/{core,enc-base64,md5,hmac,sha256,evpkdf,cipher-core,sha1}.js',
-                ]};
-            }
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
             configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。
@@ -392,6 +380,9 @@ export default defineConfig({
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/LICENSE'), relativeDest: 'third-party-notices/pdfjs-bidi-Apache-2.0.txt'});
+            for (const file of PDFJS_DECODER_FILES) {
+                files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/wasm', file), relativeDest: `pdfjs/wasm/${file}`});
+            }
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/bidi-js/LICENSE.txt'), relativeDest: 'third-party-notices/bidi-js-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/ppu-paddle-ocr/LICENSE'), relativeDest: 'third-party-notices/ppu-paddle-ocr-MIT.txt'});
             files.push({absoluteSrc: resolve(fs.realpathSync(resolve(__dirname, 'node_modules/ppu-paddle-ocr')), '../ppu-ocv/LICENSE'), relativeDest: 'third-party-notices/ppu-ocv-MIT.txt'});
@@ -400,14 +391,11 @@ export default defineConfig({
             files.push({absoluteSrc: packageWasmDiagnostics(__dirname, resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.mjs'), 'ort-wasm-simd-threaded.asyncify.mjs', 'onnx'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'});
             files.push({absoluteSrc: resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.wasm'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/esm/wasm/wllama.wasm'), relativeDest: 'fluent-read-ai/wllama.wasm'});
-            const ocrCore = files.find(file => file.relativeDest === 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js');
-            if (!ocrCore || !('absoluteSrc' in ocrCore)) throw new Error('Missing packaged OCR core');
-            const packagedOcr = packageTesseractWasm(__dirname, ocrCore.absoluteSrc);
-            ocrCore.absoluteSrc = packagedOcr.glue;
+            const ocrSources = resolveTesseractSources(__dirname);
+            const packagedOcr = packageTesseractWasm(__dirname, ocrSources.glue);
+            files.push({absoluteSrc: packagedOcr.glue, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js'});
             files.push({absoluteSrc: packagedOcr.wasm, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm'});
-            const ocrWorker = files.find(file => file.relativeDest === 'fluent-read-ocr/worker/worker.min.js');
-            if (!ocrWorker || !('absoluteSrc' in ocrWorker)) throw new Error('Missing packaged OCR worker');
-            ocrWorker.absoluteSrc = packageTesseractWorker(__dirname, ocrWorker.absoluteSrc);
+            files.push({absoluteSrc: packageTesseractWorker(__dirname, ocrSources.worker), relativeDest: 'fluent-read-ocr/worker/worker.min.js'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/dist/worker.min.js.LICENSE.txt'), relativeDest: 'fluent-read-ocr/worker/worker.min.js.LICENSE.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/LICENSE.md'), relativeDest: 'fluent-read-ocr/LICENSE.md'});
         },

@@ -65,7 +65,9 @@ beforeEach(() => {
     storage = new Map(); vi.stubGlobal('localStorage', {getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => {storage.set(key, value);}});
     vi.stubGlobal('ResizeObserver', class {constructor(callback: ResizeObserverCallback) {resizeCallback = callback;} observe = vi.fn(); unobserve = vi.fn(); disconnect = disconnect;});
     vi.stubGlobal('document', document); vi.stubGlobal('window', win);
-    pdfPage = {getViewport: vi.fn(({scale}: {scale: number}) => ({width: 612 * scale, height: 792 * scale, scale, transform: [scale, 0, 0, -scale, 0, 792 * scale]})), cleanup: vi.fn(), streamTextContent: vi.fn(() => ({fixture: 'text stream'})), render: vi.fn(() => ({promise: Promise.resolve(), cancel: vi.fn()}))};
+    vi.stubGlobal('Document', document.defaultView!.Document);
+    vi.stubGlobal('ShadowRoot', document.defaultView!.ShadowRoot);
+    pdfPage = {getViewport: vi.fn(({scale}: {scale: number}) => ({width: 612 * scale, height: 792 * scale, scale, userUnit: 1, transform: [scale, 0, 0, -scale, 0, 792 * scale]})), cleanup: vi.fn(), streamTextContent: vi.fn(() => ({fixture: 'text stream'})), render: vi.fn(() => ({promise: Promise.resolve(), cancel: vi.fn()}))};
     destroy = vi.fn(async () => {});
     ports.getDocument.mockImplementation(() => ({promise: Promise.resolve({getPage: vi.fn(async () => pdfPage)}), destroy}));
 });
@@ -221,7 +223,7 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         const result = await reader.render(pageModel(1), settings(), new AbortController().signal);
         expect(result.sourceText?.textContent).toBe('Original PDF words');
         expect(result.sourceText?.getAttribute('data-fluentread-pdf-text')).toBe('');
-        expect(result.sourceText?.style.getPropertyValue('--scale-factor')).toBe('1');
+        expect(result.sourceText?.style.getPropertyValue('--total-scale-factor')).toBe('1');
         expect(ports.textLayers[0].textContentSource).toEqual({fixture: 'text stream'});
         expect(ports.textLayers[0].viewport.scale).toBe(1);
         expect(pdfPage.render.mock.calls[0][0].transform).toEqual([2, 0, 0, 2, 0, 0]);
@@ -464,6 +466,14 @@ const click = (element: Element | null | undefined): void => {element!.dispatchE
 const classes = (element: Element | null | undefined): string[] => (element!.getAttribute('class') ?? '').split(/\s+/).filter(Boolean);
 function flushFrames(): void {const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(0));}
 
+async function waitForSourceTextLayers(root: ParentNode, count: number): Promise<void> {
+    await vi.waitFor(async () => {
+        flushFrames();
+        await componentFlush();
+        expect(root.querySelectorAll('article[data-render-state="ready"] [data-fluentread-pdf-text] span')).toHaveLength(count);
+    }, {timeout: 3000});
+}
+
 describe('PDF reader color readback performance', () => {
     function coloredContext() {
         const canvas = {width: 1224, height: 1584};
@@ -572,7 +582,7 @@ describe('PDF material resume ownership', () => {
 describe('PDF document pinch zoom integration', () => {
     it('keeps the pointer over the same page point and reuses raster output until the pinch settles', async () => {
         const {root, viewport, state} = mountReader(model());
-        await componentFlush();
+        await waitForSourceTextLayers(root, 1);
         viewport.scrollTop = 0; viewport.scrollLeft = 0;
         viewport.getBoundingClientRect = () => ({left: 100, top: 50, width: 920, height: 600} as DOMRect);
         const column = root.querySelector('.pdf-page-column') as HTMLElement;
@@ -658,7 +668,7 @@ describe('PDF reader information highlight composition', () => {
     it('starts by explicit action, independently scores selectable original and translated text, and cleans paint across zoom and document replacement', async () => {
         const registry = nativeInformationPaint(), score = vi.fn(async (text: string) => scoreInformationKeywords(text));
         const reader = mountReader(model(8), 'bilingual', Array(8).fill('Translated paragraphs preserve readable scientific vocabulary.'), {information: {preferences: {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, mode: 'surprisal-local', style: 'background'}, scoreLocal: score, available: true}});
-        await componentFlush(); flushFrames(); await componentFlush();
+        await waitForSourceTextLayers(reader.root, 5);
         expect(score).not.toHaveBeenCalled(); expect(reader.root.querySelector('.pdf-information-highlight')!.getAttribute('aria-pressed')).toBe('false');
         const before = reader.viewport.innerHTML;
         clickInformation(reader.root);
@@ -742,7 +752,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
 
     it('moves native selection guards with either boundary and restores them after collapsed or released selection', async () => {
         vi.stubGlobal('Range', {END_TO_END: 2, START_TO_END: 1});
-        const {root} = mountReader(model(2)); await componentFlush();
+        const {root} = mountReader(model(2)); await waitForSourceTextLayers(root, 2);
         const layers = root.querySelectorAll<HTMLElement>('[data-fluentread-pdf-text]'), layer = layers[0], first = layer.querySelector('span')!;
         const second = document.createElement('span'); second.textContent = 'More original text'; layer.append(second);
         Object.defineProperties(layer, {offsetWidth: {value: 612}, offsetHeight: {value: 792}});

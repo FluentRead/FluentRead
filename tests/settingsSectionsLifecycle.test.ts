@@ -2,7 +2,7 @@ import * as runtime from 'vue';
 import {parseHTML} from 'linkedom';
 import {customModelString, defaultOption, models} from '@/src/core/config/catalog';
 import {getApiKeyRequirementKey} from '@/src/core/config/validation';
-import {afterEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, describe, expect, it, vi, type Mock} from 'vitest';
 
 const key = '__frSettingsSectionsLifecycle';
 let app: import('vue').App | undefined;
@@ -13,7 +13,7 @@ function deferred<T>() {let resolve!: (value: T) => void, reject!: (error: unkno
     const promise = new Promise<T>((yes, no) => {resolve = yes;reject = no;});return {promise, resolve, reject};}
 async function settle() {await runtime.nextTick();for (let i = 0; i < 8; i++) await Promise.resolve();await runtime.nextTick();}
 // 实际父/子 SFC 模板使用 LinkeDOM 节点和事件；Element Plus 弹窗动画、浏览器焦点由根任务真实浏览器复验。
-function createDomRenderer(document: Document, focus: ReturnType<typeof vi.fn>) {
+function createDomRenderer(document: Document, focus: Mock<HTMLElement['focus']>) {
     return runtime.createRenderer({patchProp(element: any, name: string, previous: any, next: any) {
         if (name === 'class') {element.className = String(next ?? '');return;}
         if (name === 'value') {element.value = next ?? '';return;}
@@ -1156,6 +1156,30 @@ describe('设置主表单服务目录与模型事件提交',()=>{
         expect(f.state.config.hoverTranslationService).toBe('google');
         expect(f.patch).toHaveBeenCalled();
         expect(f.patch.mock.calls.at(-1)?.[0]).toMatchObject({service: f.state.config.service, disabledTranslationServices: ['google']});
+        expect(f.patch).toHaveBeenCalledOnce();
+    });
+    it('移除弹窗的回车确认仅在容器聚焦时触发，并忽略连发和输入法回车', async () => {
+        const f = await serviceEditorFixture({service: 'google'});
+        f.patch.mockClear();
+        await f.catalog('toggle-availability', 'deepinfra', false);
+        const dialog = f.availabilityDialog()!;
+        const cancel = dialog.querySelector('[data-service-availability-cancel]')!;
+        const pressEnter = (target: Element, modifiers: Partial<KeyboardEvent> = {}) => {
+            const event = new f.domWindow!.Event('keydown', {bubbles: true, cancelable: true});
+            target.dispatchEvent(Object.assign(event, {key: 'Enter', ...modifiers}));
+            return event.defaultPrevented;
+        };
+        expect(pressEnter(dialog, {repeat: true})).toBe(true);
+        expect(pressEnter(dialog, {isComposing: true})).toBe(true);
+        expect(pressEnter(dialog, {shiftKey: true})).toBe(false);
+        expect(pressEnter(cancel)).toBe(false);
+        expect(f.patch).not.toHaveBeenCalled();
+
+        expect(pressEnter(dialog)).toBe(true);
+        await settle();
+        expect(f.availabilityDialog()).toBeNull();
+        expect(f.state.config.disabledTranslationServices).toContain('deepinfra');
+        expect(f.state.config.service).toBe('google');
         expect(f.patch).toHaveBeenCalledOnce();
     });
     it('最后一个启用服务不能关闭，且重新启用只清除该服务的关闭标记',async()=>{

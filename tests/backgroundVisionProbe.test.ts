@@ -4,7 +4,9 @@ import {createVisionProbeHandlers} from '@/src/app/background/handlers/visionPro
 import {VISION_PROBE_MESSAGE, VISION_PROBE_CANCEL_MESSAGE} from '@/src/services/translation/types';
 import {createVisionProbeIdentity} from '@/src/core/config/visionProbe';
 import {prepareModelVisionRoute, freezeVisionProbeConfig} from '@/src/services/translation/visionProbe';
-import {createAreaTranslationBackgroundHandlers, AREA_TRANSLATE_CAPTURE_MESSAGE_TYPE} from '@/src/features/area-translation/background';
+import {createAreaTranslationBackgroundHandlers, AREA_TRANSLATE_CAPTURE_MESSAGE_TYPE, type AreaTranslationBackgroundDependencies} from '@/src/features/area-translation/background';
+
+type AreaVisionResolver = ReturnType<NonNullable<AreaTranslationBackgroundDependencies<object>['prepareVisionRoute']>>;
 
 const context = {sender:{url:'chrome-extension://fixture/options.html'}};
 const config = () => { const c=new Config();c.service='deepseek';c.model.deepseek='future-vision'; return c; };
@@ -52,7 +54,7 @@ describe('识图测试后台契约与圈选路由',()=>{
         await expect(test.handle(message, context)).resolves.toMatchObject({success: true});expect(resolve).toHaveBeenCalledTimes(2);
     });
     it('圈选使用异步能力判断，支持时跳过 OCR，未知时标明回退，检测错误不触发 OCR',async()=>{
-        const resolve=vi.fn<any>().mockResolvedValueOnce({mode:'vision'}).mockResolvedValueOnce({mode:'ocr',fallback:'unknown'}).mockRejectedValueOnce(new Error('HTTP 401'));
+        const resolve=vi.fn<AreaVisionResolver>().mockResolvedValueOnce({mode:'vision'}).mockResolvedValueOnce({mode:'ocr',fallback:'unknown'}).mockRejectedValueOnce(new Error('HTTP 401'));
         const ocr=vi.fn(async()=>({image:'cropped',lines:[]})), vision=vi.fn(async()=>({image:'cropped',lines:[],recognitionMethod:'vision'}));
         const languages=vi.fn(async()=>undefined);
         const [,handler]=createAreaTranslationBackgroundHandlers({captureVisibleTab:async()=>'',getDefaultSourceLanguage:()=> 'en',assertLanguagesDownloaded:languages,
@@ -99,7 +101,7 @@ describe('识图测试后台契约与圈选路由',()=>{
         expect(freezeVisionProbeConfig({...config(),modelVision:undefined}).modelVision).toEqual({});
     });
     it('本地 OCR 不探测，明确不支持或无法确认走 OCR，探测网络失败不回退',async()=>{
-        const source=config(), resolve=vi.fn<any>().mockResolvedValueOnce({capability:'unsupported'}).mockResolvedValueOnce({capability:'unknown'}).mockRejectedValueOnce(new Error('network'));
+        const source=config(), resolve=vi.fn<Parameters<typeof prepareModelVisionRoute>[1]>().mockResolvedValueOnce({capability:'unsupported',source:'probe'}).mockResolvedValueOnce({capability:'unknown',source:'unknown'}).mockRejectedValueOnce(new Error('network'));
         source.areaRecognitionMode='ocr';await expect(prepareModelVisionRoute(source,resolve)({})).resolves.toMatchObject({mode:'ocr'});expect(resolve).not.toHaveBeenCalled();
         source.areaRecognitionMode='prefer-vision';const run=prepareModelVisionRoute(source,resolve);
         await expect(run({})).resolves.toEqual({mode:'ocr',fallback:'unsupported'});

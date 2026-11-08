@@ -2143,11 +2143,13 @@ describe('guard transaction registration failures',()=>{
     const failure=Error('signal registration failed');let guardedListener:EventListenerOrEventListenerObject|null=null,callbacks=0;
     let wrapped:EventListener|null=null,queued:PromiseLike<unknown>|undefined;
     const add=vi.spyOn(controller.signal,'addEventListener').mockImplementation((type,listener,options)=>{
-      if(Dexie.currentTransaction){
+      const transaction=Dexie.currentTransaction;
+      if(transaction?.db===target.db){
         guardedListener=listener;
         wrapped=event=>{callbacks++;if(typeof listener==='function')listener.call(controller.signal,event);else listener.handleEvent(event);};
         nativeAdd(type,wrapped,options);
-        queued=target.stage.sessions.update(token.id,{phase:'sealed'});void Promise.resolve(queued).catch(()=>{});
+        // Bind the reentrant write to the transaction whose listener registration fails.
+        queued=transaction.table(target.stage.sessions.name).update(token.id,{phase:'sealed'});void Promise.resolve(queued).catch(()=>{});
         throw failure;
       }
       nativeAdd(type,listener,options);

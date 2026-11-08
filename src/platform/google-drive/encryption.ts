@@ -37,9 +37,9 @@ function encode(bytes: Uint8Array): string {
     return btoa(binary);
 }
 
-function decode(value: unknown, expectedLength?: number): Uint8Array {
+function decode(value: unknown, expectedLength?: number): Uint8Array<ArrayBuffer> {
     if (typeof value !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/u.test(value)) throw new DriveEncryptionError('云端密文编码无效');
-    let bytes: Uint8Array;
+    let bytes: Uint8Array<ArrayBuffer>;
     try {
         bytes = Uint8Array.from(atob(value), char => char.charCodeAt(0));
     } catch {
@@ -56,7 +56,7 @@ function runtime(): Crypto {
     return globalThis.crypto;
 }
 
-async function deriveKey(crypto: Crypto, passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+async function deriveKey(crypto: Crypto, passphrase: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
     const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
     return crypto.subtle.deriveKey(
         {name: 'PBKDF2', hash: 'SHA-256', iterations: DRIVE_ENCRYPTION_ITERATIONS, salt},

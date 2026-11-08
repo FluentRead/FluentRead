@@ -2169,7 +2169,7 @@ describe("全文翻译可见性锚点", () => {
         top.open = true;
         top.innerHTML = '<p>Read this nested announcement first.</p>';
         const matches = top.matches.bind(top);
-        top.matches = selector => selector === ':modal' ? top.open : matches(selector);
+        vi.spyOn(top, 'matches').mockImplementation(selector => selector === ':modal' ? top.open : matches(selector));
         Object.defineProperty(top, 'getBoundingClientRect', {value: () => ({left: 200, top: 100,
             right: 800, bottom: 300, width: 600, height: 200})});
         notice.append(top);
@@ -3138,7 +3138,9 @@ describe("全文翻译可见性锚点", () => {
         runtime.realCore = new TranslationCandidateCore({url: new URL('https://bsky.app/profile/bsky.app'),
             adapters: composeSiteAdapters(builtinSiteRulePack, normalizeSiteAdaptationSettings(undefined))});
         const pending = deferred<string[]>(); runtime.requests.mockReturnValueOnce(pending.promise);
-        autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(51); await waitForRequestCount(1);
+        autoTranslateEnglishPage();
+        // 来源准备可能跨多个调度切片，先确认请求已发出再变更结构。
+        await vi.waitFor(() => expect(runtime.requests).toHaveBeenCalledOnce(), {timeout: 1_000, interval: 10});
         const state = getTranslationState(label)!;
         expect(state.phase).toBe('loading');
         const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); link.insertBefore(icon, link.firstChild);

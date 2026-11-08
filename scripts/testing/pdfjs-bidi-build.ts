@@ -10,10 +10,10 @@ import type {Plugin} from 'vite';
 
 export const PDF_READER_BIDI_ID = 'virtual:fluentread-pdfjs-bidi';
 const RESOLVED_ID = `\0${PDF_READER_BIDI_ID}`;
-const VERSION = '4.10.38';
-const WORKER_SHA = '5e9f76bd5e65fbd1602b29fc50e50490aeeacd34a715b2282b73f7e8029242e0';
-const MODULE_SHA = '10317cd3e99766bc5fd73ab9bd2ec9cdd81b6367719a769027b5981e83fbcf52';
-const NOTICE_SHA = 'e2cee414b83b5912f41609bd79d8fc5561de11473ca7b63b88aa72e4c9ca7397';
+const VERSION = '6.5.438';
+const WORKER_SHA = '8336aabf764cb08c818555a2fd2545e4fed10837146de927564875c93b3c4f83';
+const MODULE_SHA = '03f8324167fd1e03000c7214d4bacc673c56bff97169052f8ce42f450094fcc5';
+const NOTICE_SHA = '93db28d6b86557c97d8320d1a317882c5a6f4f9862862412c6676e8a9ef76ca3';
 const LICENSE_SHA = '0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594';
 const START = ';// ./src/core/bidi.js\n';
 const END = ';// ./src/core/font_substitutions.js';
@@ -28,12 +28,12 @@ export function createPdfReaderBidiModule(worker: string, version: string, licen
         throw new Error('Missing or ambiguous PDF.js bidi module boundary');
     }
     const start = worker.indexOf(START), end = worker.indexOf(END);
-    const original = worker.slice(start, end), notice = worker.slice(0, 794);
+    const original = worker.slice(start, end), notice = worker.slice(0, worker.indexOf('*/') + 2);
     if (end <= start || sha(original) !== MODULE_SHA || sha(notice) !== NOTICE_SHA) {
         throw new Error('Unsupported PDF.js bidi module or Apache notice');
     }
-    // 唯一外部引用 warn() 仅在 Arabic 分支出现，此公开导出的精确字符集不会进入该分支。
-    return notice + '\n/* FluentRead: unchanged PDF.js 4.10.38 bidi kernel; static guarded export only. */\n'
+    // 受限的 ASCII/Hebrew 输入不会进入调用外部 warn() 的字形分类分支。
+    return notice + '\n/* FluentRead: unchanged PDF.js 6.5.438 bidi kernel; static guarded export only. */\n'
         + original + '\nexport function projectPdfReaderBidi(text) {\n'
         + '  if (typeof text !== "string" || !text || text.length > 8192 || /[^\\x20-\\x7e\\u05d0-\\u05ea]/u.test(text)) return undefined;\n'
         + '  return bidi(text, -1, false);\n}\n';

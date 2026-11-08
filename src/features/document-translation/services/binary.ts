@@ -746,6 +746,28 @@ function isScannedPdfPage(atoms: readonly PdfLayoutAtom[], blocks: readonly PdfL
     return false;
 }
 
+/** PDF.js 6 FontPathInfo.path 按 DrawOPS 交错操作码和绝对坐标；只读取有限的包围盒数据。 */
+function pdfGlyphYBounds(outline: unknown): readonly [number, number] | undefined {
+    if (typeof outline !== 'object' || !outline || !('path' in outline)) return;
+    const path = outline.path;
+    if (!ArrayBuffer.isView(path) || !('length' in path)) return;
+    const points = path as unknown as ArrayLike<number>;
+    if (points.length > 4096 || points[0] !== 0) return; // moveTo
+    const coordinateCounts = [2, 2, 6, 4, 0]; // moveTo, lineTo, curveTo, quadraticCurveTo, closePath
+    let low = Infinity, high = -Infinity;
+    for (let index = 0; index < points.length;) {
+        const count = coordinateCounts[points[index++]];
+        if (count === undefined || index + count > points.length) return;
+        for (const end = index + count; index < end; index += 2) {
+            const x = points[index], y = points[index + 1];
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+            low = Math.min(low, y);
+            high = Math.max(high, y);
+        }
+    }
+    if (low >= -4 && high <= 4 && high > low) return [low, high];
+}
+
 /** 解析阶段本已禁用 FontFace；复用 PDF.js 已加载的数学分隔符、括号组件和重音轮廓，不保留额外字库或解析普通字体。 */
 function pdfMathGlyphStyles(items: readonly PdfTextItem[], styles: Record<string, PdfTextStyle>,
     operators: {fnArray: readonly number[]; argsArray: readonly any[]}, ops: Record<string, number>,
@@ -790,13 +812,9 @@ function pdfMathGlyphStyles(items: readonly PdfTextItem[], styles: Record<string
             visited.add(id);
             try {
                 if (!objects.has(id)) continue;
-                const path: unknown = objects.get(id);
-                // PDF.js 输出归一化的绝对 M/L/C/Q/Z 路径；曲线控制点包围盒保持保守，不执行字体代码。
-                if (typeof path !== 'string' || path.length > 4096 || !path.startsWith('M') || /[^MLCQZ\d\s.,eE+\-]/u.test(path)) continue;
-                const values = (path.match(/[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/gu) ?? []).map(Number);
-                if (!values.length || values.length % 2 || !values.every(Number.isFinite)) continue;
-                const ys = values.filter((_value, index) => index % 2 === 1), low = Math.min(...ys), high = Math.max(...ys);
-                if (low < -4 || high > 4 || high <= low) continue;
+                const limits = pdfGlyphYBounds(objects.get(id));
+                if (!limits) continue;
+                const [low, high] = limits;
                 let bounds = boundsByFont.get(font);
                 if (!bounds) {boundsByFont.set(font, bounds = new Map()); result[font] = {...styles[font], glyphBounds: bounds};}
                 const previous = bounds.get(glyph.unicode);
@@ -825,12 +843,13 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
     const loadingTask = getPdfDocument({
         data: new Uint8Array(bytes),
         disableFontFace: true,
-        isEvalSupported: false,
+        disableWorkerRendering: true,
         useWorkerFetch: false,
         ...(pdfAssetRoot ? {
             cMapPacked: true,
             cMapUrl: `${pdfAssetRoot}/cmaps/`,
             standardFontDataUrl: `${pdfAssetRoot}/standard_fonts/`,
+            wasmUrl: `${pdfAssetRoot}/wasm/`,
         } : {}),
     });
 

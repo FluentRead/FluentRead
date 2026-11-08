@@ -1,4 +1,5 @@
 import {describe, expect, it, vi} from 'vitest';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -38,7 +39,7 @@ describe('packaged WASM diagnostic severity', () => {
             const original = readFileSync(sources.glue, 'utf8');
             const result = packageTesseractWasm(root, sources.glue);
             expect(readFileSync(result.wasm).equals(readFileSync(sources.wasm))).toBe(true);
-            expect(WebAssembly.validate(readFileSync(result.wasm))).toBe(true);
+            expect(WebAssembly.validate(asArrayBufferBytes(readFileSync(result.wasm)))).toBe(true);
             expect(readFileSync(result.glue, 'utf8')).toContain('la=fluentReadWasmStderr');
             expect(readFileSync(result.glue, 'utf8').length).toBeLessThan(150_000);
             expect(readFileSync(sources.glue, 'utf8')).toBe(original);

@@ -4,6 +4,7 @@
  * 主要内容：装配按需创建、空闲释放的字幕读音 Worker；智能高亮消息携带所选模型，模型下载与状态互相独立、推理共用单 Worker 预算；将 base64 音频解码为 Uint8Array，注入 Audio、Blob URL 创建/释放和带 frame/page 路由的状态回传，向播放控制入口注入扩展 ID 校验，组合 Chrome Translation、OCR、图片/区域翻译与语言包下载依赖，把朗读模型、字幕模型和语言包的下载进度发布给后台，注册 message listener。
  * 模块边界：本文件只负责 Web API 资源与用例装配，不解析业务消息、不实现 OCR/翻译，也不创建 Offscreen document；两种浏览器容器的文档生命周期均由 platform/offscreen client 和 WXT 入口管理。
  */
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {
     downloadImageOcrLanguages,
     removeImageOcrLanguages,
@@ -80,7 +81,7 @@ export function startOffscreenApp(): void {
     const ttsPlayer = createSelectionTtsPlayer({
         createAudio: () => new Audio(),
         decodeBase64: decodeAudioBase64,
-        createObjectUrl: (bytes, contentType) => URL.createObjectURL(new Blob([bytes], {type: contentType})),
+        createObjectUrl: (bytes, contentType) => URL.createObjectURL(new Blob([asArrayBufferBytes(bytes)], {type: contentType})),
         revokeObjectUrl: (url) => URL.revokeObjectURL(url),
         notifyProgress: (request, progress, position) => {
             void chrome.runtime.sendMessage({type: 'selectionTtsPlaybackState', ...parseSelectionTtsRoute(request), state: 'progress', progress, position}, () => {void chrome.runtime.lastError;});

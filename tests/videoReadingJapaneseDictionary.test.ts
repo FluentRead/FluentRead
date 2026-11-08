@@ -1,5 +1,6 @@
 /** 日语固定词典清单与真实锁定包保持一致，并通过同一数据层离线复用，不执行下载代码。 */
 import {readFileSync} from 'node:fs';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {afterEach, describe, expect, it, vi} from 'vitest';
@@ -32,7 +33,7 @@ describe('pinned optional Japanese dictionary', () => {
             delete: async (key: string) => entries.delete(key),
         };
         vi.stubGlobal('caches', {open: vi.fn(async () => cache)});
-        const fetcher = vi.fn(async (url: string) => new Response(readFileSync(join(packageRoot, 'dict', url.slice(url.lastIndexOf('/') + 1)))));
+        const fetcher = vi.fn(async (url: string) => new Response(asArrayBufferBytes(readFileSync(join(packageRoot, 'dict', url.slice(url.lastIndexOf('/') + 1))))));
         vi.stubGlobal('fetch', fetcher);
         await expect(readJapaneseDictionaryFile('https://arbitrary.test/script.js')).rejects.toThrow('Unknown');
         expect(fetcher).not.toHaveBeenCalled();

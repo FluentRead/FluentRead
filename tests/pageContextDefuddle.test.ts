@@ -212,7 +212,7 @@ describe('Defuddle page snapshot adapter', () => {
         installFilteredTreeWalker(document as unknown as Document);
         if (fallback === 'html') Object.defineProperty(document, 'body', {value: null});
         const node = document.querySelector('p')!;
-        node.matches = () => {throw new Error('controlled selector port failure');};
+        vi.spyOn(node, 'matches').mockImplementation(() => {throw new Error('controlled selector port failure');});
         Object.defineProperty(globalThis, 'document', {value: document, configurable: true});
         Object.defineProperty(globalThis, 'location', {value: {href: `https://example.com/bounded-${fallback}`}, configurable: true});
         expect(await getPageTranslationContext()).toContain('Fallback article');

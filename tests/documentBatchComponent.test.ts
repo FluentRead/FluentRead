@@ -17,6 +17,7 @@ import * as pdfOcr from '@/src/features/document-translation/services/pdfOcr';
 import * as documentTasks from '@/src/features/document-translation/ui/useDocumentTasks';
 import * as downloadCopy from '@/src/app/document-translation/downloadCopy';
 import * as materialResume from '@/src/app/document-translation/materialResume';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {useConfigEditor} from '@/src/features/settings/model/useConfigEditor';
 import {createDocumentImportWorkflow} from '@/src/features/document-translation/services/importWorkflow';
 import {createDocumentRecognitionWorkflow} from '@/src/features/document-translation/services/recognitionWorkflow';
@@ -67,7 +68,7 @@ beforeEach(async () => {
   const api = {...materialPorts, ...catalog, ...compositeTranslation, ...serviceAvailability, ...documentCore, ...presentation, ...preview, ...richPreviewSync, ...pdfOcr, ...documentTasks, useConfigEditor, createPdfPageRecognizer: () => async () => [], hasDistinctTranslation, Config, TranslationRequestError, serializeTranslationError, createDocumentImportWorkflow, createDocumentRecognitionWorkflow, createDocumentExportWorkflow,
     documentRetryBackoff: {maxWaitMs: 0}, createDocumentHistoryCommitter,
     createDocumentHistory: () => ({list: async () => [], listChecked: async () => ({status: 'ok', entries: []}), load: async () => null, loadChecked: async () => ({status: 'ok', record: null}), save: async () => false, saveChecked: async () => ({status: 'unavailable'}), remove: async () => false, removeChecked: async () => ({status: 'unavailable'}), clear: async () => false}), documentHistoryId: async () => '',
-    parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download, generateDocumentArchive,
+    parseDocumentFile: parseFile, translateDocumentSegments: translate, createDocumentDownload: download, generateDocumentArchive, asArrayBufferBytes,
     buildGlossaryRevision: () => '', runtimeConfig: new Config(), configReady: Promise.resolve(),
     subscribeConfig: () => () => {}, requestConfigPatch: persist,
     getMissingCredentialMessage: () => '', getTranslationServiceUnavailableMessage: () => '',

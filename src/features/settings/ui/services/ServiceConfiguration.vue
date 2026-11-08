@@ -110,7 +110,7 @@
         <div class="connection-field-label"><strong>接口地址</strong><FieldHelp :content="t('settings.services.customEndpointHelp')" /></div>
         <div class="connection-field-control">
           <el-input
-            :model-value="customProvider.endpoint"
+            :model-value="customProvider?.endpoint"
             aria-label="自定义服务接口地址"
             data-testid="custom-service-edit-endpoint"
             placeholder="http://localhost:11434/v1/chat/completions"

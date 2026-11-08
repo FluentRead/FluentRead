@@ -66,7 +66,7 @@ export async function withModelDownload<T>(
         const total = setTimeout(abort, options.timeoutMs ?? 300_000);
         const connecting = setTimeout(abort, options.connectTimeoutMs ?? 10_000);
         let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-        let originalBody: ReadableStream<Uint8Array> | null | undefined;
+        let originalBody: Response['body'] | undefined;
         let target: ReadableStreamDefaultController<Uint8Array> | undefined;
         const interrupted = new Promise<never>((_resolve, reject) => {
             controller.signal.addEventListener('abort', () => {

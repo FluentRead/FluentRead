@@ -1,5 +1,6 @@
 import {getFixtureRootNode} from './helpers/vueDomFixture';
 import {afterEach, beforeEach, describe, expect, it, vi, type MockInstance} from 'vitest';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {readFileSync} from 'node:fs';
 import JSZip from 'jszip';
 import openstaxListCallout from './fixtures/pdf-openstax-page24-callout.json';
@@ -380,7 +381,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         const paragraph = (text: string, heading = false) => `<w:p>${heading ? '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' : ''}<w:r><w:t>${text}</w:t></w:r></w:p>`;
         zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraph('Main heading', true)}<w:tbl><w:tr><w:tc>${paragraph('Left table cell')}</w:tc><w:tc>${paragraph('Right table cell')}</w:tc></w:tr></w:tbl></w:body></w:document>`);
         zip.file('word/header1.xml', `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${paragraph('Header heading', true)}${paragraph('Header body')}</w:hdr>`);
-        const bytes = await zip.generateAsync({type: 'uint8array'}); await state.loadFiles([new File([bytes], 'tables.docx')]); await flush();
+        const bytes = await zip.generateAsync({type: 'uint8array'}); await state.loadFiles([new File([asArrayBufferBytes(bytes)], 'tables.docx')]); await flush();
         const table = walkHost(root).find(entry => entry.type === 'table' && entry.props.class === 'docx-table')!;
         expect(hostText(table)).toContain('Left table cell'); expect(hostText(table)).toContain('Right table cell');
         state.editSegment(1, 'Reviewed left cell'); state.previewMode = 'bilingual'; await flush(); expect(hostText(table)).toContain('Reviewed left cell');
@@ -784,13 +785,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     });
 
     it('derives keyed priority from native DOCX parts, EPUB chapters, and paginated reader anchors', async () => {
-        await state.loadFiles([new File([readFileSync('examples/document-translation/sample.docx')], 'priority.docx', {type: getDocumentMimeType('docx')})]); await flush();
+        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('examples/document-translation/sample.docx'))], 'priority.docx', {type: getDocumentMimeType('docx')})]); await flush();
         const body = state.readingPriorityKey();
         state.docxPartIndex = 1; await flush();
         const part = state.readingPriorityKey();
         expect(part).not.toBe(body); expect(part.start).toBe(state.currentDocxPart.paragraphSegments[0].segmentIndex);
         expect(state.readingPriorityKey()).toBe(part);
-        await state.loadFiles([new File([readFileSync('examples/document-translation/sample.epub')], 'priority.epub', {type: getDocumentMimeType('epub')})]); await flush();
+        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('examples/document-translation/sample.epub'))], 'priority.epub', {type: getDocumentMimeType('epub')})]); await flush();
         const chapter = state.readingPriorityKey();
         state.epubChapterIndex = 1; await flush();
         expect(state.readingPriorityKey()).not.toBe(chapter);
@@ -861,7 +862,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         zip.file('word/header1.xml', `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${Array.from({length: 85}, (_, index) => `<w:p><w:r><w:t>Second part unique paragraph ${index + 1}.</w:t></w:r></w:p>`).join('')}</w:hdr>`);
         const bytes = await zip.generateAsync({type: 'uint8array'});
         const fingerprint = await documentHistoryId(bytes); expect(fingerprint).toMatch(/^[a-f\d]{32}$/u);
-        await state.loadFiles([new File([bytes], 'material-sections.docx', {type: getDocumentMimeType('docx')})]); await flush();
+        await state.loadFiles([new File([asArrayBufferBytes(bytes)], 'material-sections.docx', {type: getDocumentMimeType('docx')})]); await flush();
         state.documentQueue[0].historyId = fingerprint;
         expect(state.docxParts[1].path).toBe('word/header1.xml');
         state.docxPartIndex = 1; await flush(); state.readerPage = 2; await flush();
@@ -1133,7 +1134,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     it.each(['pdf', 'epub', 'docx', 'html', 'md', 'txt', 'json', 'srt', 'vtt', 'ass', 'ssa', 'lrc'])('downloads the exact original %s file before translation without another read or export', async extension => {
         const bytes = readFileSync(`examples/document-translation/sample.${extension}`);
         const name = `sample.${extension}`;
-        const input = new File([bytes], name, {type: getDocumentMimeType(extension === 'md' ? 'markdown' : extension as any)});
+        const input = new File([asArrayBufferBytes(bytes)], name, {type: getDocumentMimeType(extension === 'md' ? 'markdown' : extension as any)});
         const read = vi.spyOn(input, 'arrayBuffer');
         const encode = vi.spyOn(binaryService, 'createDocumentDownload');
         await state.loadFiles([input]); await flush();

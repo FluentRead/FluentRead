@@ -1,4 +1,5 @@
 import {describe, expect, it, vi, afterEach, afterAll} from 'vitest';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, existsSync} from 'node:fs';
 import {resolve, join, dirname} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -110,7 +111,7 @@ describe('audit49K actual derived OCR consumer entries', () => {
         const original = ocrSources.wasm ? readFileSync(ocrSources.wasm)
             : Buffer.from(readFileSync(coreSource, 'utf8').match(/data:application\/octet-stream;base64,([A-Za-z0-9+/]+=*)/)![1], 'base64');
         expect(createHash('sha256').update(readFileSync(artifacts.wasm)).digest('hex')).toBe(createHash('sha256').update(original).digest('hex'));
-        expect(WebAssembly.validate(original)).toBe(true);
+        expect(WebAssembly.validate(asArrayBufferBytes(original))).toBe(true);
         workerArtifact();
         expect([coreSource, workerSource].map(file => createHash('sha256').update(readFileSync(file)).digest('hex'))).toEqual(before);
         module.FS.writeFile('/utf8', '中文🙂'); expect(module.FS.readFile('/utf8', {encoding: 'utf8'})).toBe('中文🙂');
@@ -757,7 +758,7 @@ async function nativeSdkFixture(stage: 'loadLanguage' | 'initialize', cleanupThr
                 setInterval: (fn: () => void, ms: number) => {const timer = setInterval(() => {if (!owned.terminated) fn();}, ms); owned.timers.add(timer); return timer;},
                 clearInterval: (timer: ReturnType<typeof setTimeout>) => {clearInterval(timer); owned.timers.delete(timer);},
                 fetch: async (url: string) => String(url).endsWith('.wasm')
-                    ? new Response(readFileSync(artifacts.wasm), {headers: {'Content-Type': 'application/wasm'}})
+                    ? new Response(asArrayBufferBytes(readFileSync(artifacts.wasm)), {headers: {'Content-Type': 'application/wasm'}})
                     : stage === 'initialize' ? new Response(new Uint8Array([1, 2, 3, 4])) : new Response('controlled missing language', {status: 404}),
                 addEventListener: (type: string, fn: (event: any) => void) => {if (type === 'message') this.receive = fn;},
                 postMessage: (packet: unknown) => queueMicrotask(() => {if (!owned.terminated) try {owned.onmessage?.({data: packet});} catch (error) {errors.push(String(error));}}),

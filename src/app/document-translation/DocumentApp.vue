@@ -484,6 +484,7 @@ import {
   PDF_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,
   createDocumentDownload,
+  asArrayBufferBytes,
   createPdfPageRecognizer,
   documentRetryBackoff,
   generateDocumentArchive,
@@ -1964,7 +1965,7 @@ function downloadOriginalDocument(): void {
   if (!source) return;
   originalDownloadError.value = '';
   try {
-    const blob = 'bytes' in source ? new Blob([source.bytes], {type: source.mimeType}) : source.blob;
+    const blob = 'bytes' in source ? new Blob([asArrayBufferBytes(source.bytes)], {type: source.mimeType}) : source.blob;
     saveDownloadBlob(blob, source.fileName);
     if (!preparingDownload.value) downloadDialog.value?.close();
   } catch (error) {

@@ -1,4 +1,5 @@
 import {copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {join, resolve} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createContext, runInContext, type Context} from 'node:vm';
@@ -54,7 +55,7 @@ afterAll(() => {if (ownedOutputRoot) rmSync(ownedOutputRoot, {recursive: true, f
 
 function wasmFetch(input: string | URL | Request) {
     if (String(input) !== 'https://fixture.invalid/core/tesseract-core-simd-lstm.wasm') throw new Error(`Unexpected fixture network: ${input}`);
-    return Promise.resolve(new Response(packagedWasm, {headers: {'Content-Type': 'application/wasm'}}));
+    return Promise.resolve(new Response(asArrayBufferBytes(packagedWasm), {headers: {'Content-Type': 'application/wasm'}}));
 }
 
 function nativeCoreRealm() {

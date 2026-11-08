@@ -475,7 +475,7 @@ describe('字体任务队列和不可协作端口', () => {
     if (stage === 'read') {
       const response = new Response('placeholder')
       vi.spyOn(response, 'body', 'get').mockReturnValue({getReader: () => ({read: block,
-        cancel: () => Promise.resolve()})} as unknown as ReadableStream<Uint8Array>)
+        cancel: () => Promise.resolve()})} as unknown as NonNullable<Response['body']>)
       h.deps.fetch.mockResolvedValueOnce(response)
     }
     if (stage === 'digest') h.deps.digest = vi.fn().mockImplementationOnce(block).mockImplementation(digest)

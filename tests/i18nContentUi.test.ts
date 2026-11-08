@@ -48,11 +48,12 @@ function fixture(language: UiLanguage) {
     });
     function mount(file: string, props: Record<string, unknown>, extra: Record<string, unknown>, components: Record<string, Vue.Component> = {}) {
         const compiled = compileVueInlineFixture(resolve(process.cwd(), file), {id: 'i18n-content-boundary'});
+        // 夹具以 ESM 模块形状提供导入，保留 TypeScript 6 CommonJS emit 的默认导出语义。
         const ports = {'vue': Vue, '@/src/ui/i18n': {useUiI18n: () => i18n}, ...extra};
         const module = {exports: {}} as {exports: {default?: Vue.Component}};
         new Function('require', 'module', 'exports', compiled.code)((id: string) => {
             if (!Object.hasOwn(ports, id)) throw new Error(`Unconfigured UI fixture dependency: ${id}`);
-            return ports[id as keyof typeof ports];
+            return {__esModule: true, ...ports[id as keyof typeof ports]};
         }, module, module.exports);
         const host = document.createElement('div'); document.body.append(host);
         const reactiveProps = Vue.shallowReactive(props);

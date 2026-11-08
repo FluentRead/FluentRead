@@ -162,6 +162,7 @@
 </template>
 
 <script setup lang="ts">
+import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {downloadTextFile as downloadFile} from '@/src/shared/dom/downloadTextFile';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import UiIcon from '@/src/ui/components/UiIcon.vue'
@@ -402,7 +403,7 @@ async function playEntryAudioBytes(bytes: Uint8Array, contentType: string, gener
     speechPhase.value = 'playing';
     return 'playing';
   }
-  const audioUrl = URL.createObjectURL(new Blob([bytes], {type: contentType || 'audio/mpeg'}));
+  const audioUrl = URL.createObjectURL(new Blob([asArrayBufferBytes(bytes)], {type: contentType || 'audio/mpeg'}));
   entryAudioUrl = audioUrl;
   const audio = new Audio(audioUrl);
   entryAudio = audio;

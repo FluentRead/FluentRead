@@ -25,8 +25,8 @@ export function canCacheOptionalEcdict(): boolean {
     return typeof globalThis.caches?.open === 'function' && typeof globalThis.crypto?.subtle?.digest === 'function';
 }
 
-async function verifiedRows(bytes: Uint8Array): Promise<EcdictCompactRow[]> {
-    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as BufferSource)),
+async function verifiedRows(bytes: Uint8Array<ArrayBuffer>): Promise<EcdictCompactRow[]> {
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
         byte => byte.toString(16).padStart(2, '0')).join('');
     if (hash !== FULL_SHA256) throw new Error('Optional dictionary integrity mismatch');
     // readBounded 已保证字节数；固定摘要绑定仓库审计过的完整 JSON，
@@ -34,7 +34,7 @@ async function verifiedRows(bytes: Uint8Array): Promise<EcdictCompactRow[]> {
     return JSON.parse(new TextDecoder().decode(bytes)) as EcdictCompactRow[];
 }
 
-async function readBounded(response: Response): Promise<Uint8Array> {
+async function readBounded(response: Response): Promise<Uint8Array<ArrayBuffer>> {
     if (!response.ok) {cancelUnreadResponseBody(response); throw new Error(`Optional dictionary HTTP ${response.status}`);}
     if (!response.body) throw new Error('Optional dictionary response body missing');
     const reader = response.body.getReader();

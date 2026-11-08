@@ -23,6 +23,8 @@ const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-image-flow'));
 const playwrightRoot = arg('playwright-root', process.env.PLAYWRIGHT_ROOT);
 const focusHelper = arg('focus-safe-helper', process.env.FLUENTREAD_FOCUS_SAFE_HELPER);
+const diagnosticsHelper = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);
+const diagnostics = diagnosticsHelper && require(path.resolve(diagnosticsHelper)).createRuntimeDiagnostics();
 const xLightbox = process.argv.includes('--x-lightbox');
 const xSurface = process.argv.includes('--x-surface') || xLightbox;
 const recoveryOnly = process.argv.includes('--recovery-only');
@@ -313,6 +315,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     assert.equal(launched.windowPlacement.mode, 'background-visible-no-focus');
     assert.equal(launched.windowPlacement.browserFrontmost, false);
     const context = launched.context;
+    await diagnostics?.start(context);
     report.console = [];
     context.on('console', message => {
         if (['warning', 'error'].includes(message.type())) report.console.push({type: message.type(), text: message.text().slice(0, 1500)});
@@ -326,7 +329,8 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         let diagnosticMessageId = 0;
         report.ocrConsole = [];
         report.ocrTargets = [];
-        const targetIsOcr = targetInfo => targetInfo.url.includes('/fluent-read-ocr/') || targetInfo.url.endsWith('/offscreen.html');
+        const targetIsOcr = targetInfo => targetInfo.url.includes('/fluent-read-ocr/')
+            || targetInfo.url.endsWith('/mangaInferenceWorker.js') || targetInfo.url.endsWith('/offscreen.html');
         const sendToTargetSession = async (sessionId, method, params = {}) => {
             const id = ++diagnosticMessageId;
             const message = JSON.stringify({id, method, params});
@@ -389,10 +393,20 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
                 return;
             }
             if (event.method === 'Target.detachedFromTarget') return;
+            if (event.method === 'Runtime.exceptionThrown') {
+                const details = event.params.exceptionDetails;
+                report.ocrConsole.push({
+                    type: 'error',
+                    targetSessionId: parentSessionId,
+                    text: details.exception?.description || details.text,
+                    stack: details.stackTrace?.callFrames || [],
+                });
+            }
             if (event.method === 'Runtime.consoleAPICalled' && ['warning','error'].includes(event.params.type)) {
                 report.ocrConsole.push({
                     type: event.params.type,
                     targetSessionId: parentSessionId,
+                    stack: event.params.stackTrace?.callFrames || [],
                     text: event.params.args.map(arg=>arg.value ?? arg.description ?? '').join(' ').slice(0,2000),
                 });
             }
@@ -415,7 +429,10 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         await Promise.all(targetInfos.map(targetInfo=>attachTarget(targetInfo)));
     }
     worker = context.serviceWorkers().find(w => w.url().startsWith('chrome-extension://')) || await context.waitForEvent('serviceworker', { timeout: 30000 });
+    diagnostics?.setExtensionId(new URL(worker.url()).host);
+    diagnostics?.setPhase('extension configuration and model setup');
     const popup = await newPageWithoutForeground(context, 30000);
+    await diagnostics?.attachPage(popup, 'extension-popup-options');
     await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
     await popup.evaluate(async ({xSurface, xLightbox}) => {
         const read = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
@@ -584,8 +601,14 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         await worker.evaluate(() => {globalThis.__imageFixture.requests = []; globalThis.__imageFixture.endpointHosts = []; globalThis.__imageFixture.rejectPrimaryXsrf = false;});
     }
     page = await newPageWithoutForeground(context, 30000);
+    await diagnostics?.attachPage(page, 'image-fixture-content');
+    diagnostics?.setPhase(xSurface ? 'X-style thumbnail translation and preview' : 'image translation fixture');
     page.on('pageerror', e => report.errors.push(e.message));
-    await page.goto(`http://127.0.0.1:${server.address().port}/`);
+    const fixtureUrl = xLightbox ? 'https://x.com/fluentread-fixture/status/1' : `http://127.0.0.1:${server.address().port}/`;
+    if (xLightbox) {
+        await page.route(fixtureUrl, route => route.fulfill({contentType: 'text/html; charset=utf-8', body: html}));
+    }
+    await page.goto(fixtureUrl);
     cdp = await context.newCDPSession(page);
     async function rootObject() {
         const tree = await cdp.send('DOM.getDocument', {depth: -1, pierce: true});
@@ -600,7 +623,8 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         visit(tree.root);
         const shadow = host?.shadowRoots?.[0];
         if (!shadow) return null;
-        return (await cdp.send('DOM.resolveNode', {nodeId: shadow.nodeId})).object.objectId;
+        // 原生模态框切换可能在两条 CDP 命令之间移动宿主节点，使用稳定的后端节点标识。
+        return (await cdp.send('DOM.resolveNode', {backendNodeId: shadow.backendNodeId})).object.objectId;
     }
     async function ui(code) {
         const objectId = await rootObject();
@@ -915,6 +939,11 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
             originalImage: arg('original-image', null), lightboxOnly:xLightbox});
         if (!xLightbox) assert.ok(report.ocrTargets.some(target => target.type === 'worker' && target.url.includes('/fluent-read-ocr/')),
             '必须实际监听 dedicated OCR Worker，才能断言不存在语言加载错误');
+        if (xLightbox && diagnostics) {
+            assert.ok(report.ocrTargets.some(target => target.type === 'worker' && target.url.endsWith('/mangaInferenceWorker.js')),
+                '必须实际监听 PaddleOCR Worker');
+            assert.equal(report.ocrConsole.length, 0, 'Offscreen 和 PaddleOCR Worker 无运行时错误或告警');
+        }
         assert.equal(report.ocrConsole.some(entry => entry.diagnosticError), false, 'OCR 控制台监听不得静默失效');
         assert.equal(report.ocrConsole.some(entry => /Error opening data file|Failed loading language|Tesseract couldn't load/.test(entry.text || '')),
             false, '显式下载的语言包不应触发子语言文件加载错误');
@@ -1286,6 +1315,20 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     if (cdp) {
         if (readUi) await readUi('this.__progressObserver?.disconnect(); return true;').catch(() => undefined);
         await cdp.detach().catch(error => report.cleanupErrors.push(`CDP session detach: ${error.message}`));
+    }
+    if (diagnostics && launched) {
+        try {
+            await diagnostics.flush();
+            report.runtimeDiagnostics = diagnostics.snapshot();
+            fs.writeFileSync(path.join(artifacts, 'runtime-diagnostics.json'), JSON.stringify(report.runtimeDiagnostics, null, 2));
+            if (!report.runtimeDiagnostics.passed) {
+                report.success = false;
+                process.exitCode = 1;
+            }
+        } catch (error) {
+            report.cleanupErrors.push(`runtime diagnostics: ${error.message}`);
+        }
+        await diagnostics.stop().catch(error => report.cleanupErrors.push(`runtime diagnostics detach: ${error.message}`));
     }
     // 启动抛错时无法在这里证明浏览器已退出，保留本次临时配置以供诊断。
     let browserClosed = !launchAttempted;

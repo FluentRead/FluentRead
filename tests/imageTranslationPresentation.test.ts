@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {isImagePresentationOccluded, presentationMatchesSource, resolveImagePresentation, surfaceStyleToBitmap} from '@/src/features/image-translation/content/presentation';
+import {isNativeModal, isOpenImageViewer, samePreviewImage, visibleImageViewers} from '@/src/features/image-translation/content/imagePreview';
 
 type Style = Partial<CSSStyleDeclaration> & {backgroundImage?: string};
 
@@ -220,5 +221,150 @@ describe('image presentation surface resolution', () => {
     it('uses defaults for missing surface style fields', () => {
         expect(surfaceStyleToBitmap({backgroundSize: undefined as never, backgroundPosition: undefined as never})).toEqual({objectFit: 'fill', objectPosition: '50% 50%'});
         expect(surfaceStyleToBitmap({backgroundSize: 'cover', backgroundPosition: '   '})).toEqual({objectFit: 'cover', objectPosition: '50% 50%'});
+    });
+});
+
+describe('image preview resource matching', () => {
+    const url = 'https://example.test/image.png';
+    const thumbnail = {url, width: 400, height: 200};
+    const xThumbnail = {...thumbnail, url: 'https://pbs.twimg.com/media/photo?name=small&format=jpg&version=1'};
+    const xFullSize = 'https://pbs.twimg.com/media/photo?version=1&format=png&name=4096x4096';
+
+    function candidate(src: string, options: {hostname?: string; currentSrc?: string; complete?: boolean; width?: number; height?: number} = {}) {
+        const {document} = parseHTML('<html><body><img></body></html>');
+        if (options.hostname) Object.defineProperty(document, 'location', {value: {hostname: options.hostname}});
+        const image = document.querySelector('img') as HTMLImageElement;
+        image.src = src;
+        Object.defineProperties(image, {
+            currentSrc: {value: options.currentSrc ?? ''},
+            complete: {value: options.complete ?? true},
+            naturalWidth: {value: options.width ?? 800},
+            naturalHeight: {value: options.height ?? 400},
+        });
+        return image;
+    }
+
+    it('matches the selected resource, then falls back to the declared src', () => {
+        expect(samePreviewImage(thumbnail, candidate(url))).toBe(true);
+        expect(samePreviewImage(thumbnail, candidate('fallback.png', {currentSrc: url}))).toBe(true);
+        expect(samePreviewImage(thumbnail, candidate(url, {currentSrc: 'https://example.test/different.png'}))).toBe(false);
+        expect(samePreviewImage({...thumbnail, url: ''}, candidate(''))).toBe(false);
+    });
+
+    it.each([{complete: false}, {width: 0}, {height: 0}])('waits for a usable enlarged image (%o)', options => {
+        expect(samePreviewImage(thumbnail, candidate(url, options))).toBe(false);
+    });
+
+    it('reuses X CDN size and format variants of the same full image only on X and Twitter', () => {
+        expect(samePreviewImage(xThumbnail, candidate(xFullSize, {hostname: 'x.com', height: 401}))).toBe(true);
+        expect(samePreviewImage(xThumbnail, candidate(xFullSize, {hostname: 'mobile.twitter.com'}))).toBe(true);
+        expect(samePreviewImage(xThumbnail, candidate(xFullSize, {hostname: 'x.com.example.test'}))).toBe(false);
+        expect(samePreviewImage(xThumbnail, candidate(xFullSize, {hostname: 'x.com', height: 800}))).toBe(false);
+        expect(samePreviewImage({...xThumbnail, width: 0}, candidate(xFullSize, {hostname: 'x.com'}))).toBe(false);
+        expect(samePreviewImage({...xThumbnail, height: 0}, candidate(xFullSize, {hostname: 'x.com'}))).toBe(false);
+    });
+
+    it.each([
+        'https://example.test/media/photo?name=orig',
+        'https://pbs.twimg.com/media/photo/extra?name=orig',
+        'https://pbs.twimg.com/media/photo?format=jpg&version=1',
+        'https://pbs.twimg.com/media/photo?name=thumb&version=1',
+        'https://pbs.twimg.com/media/photo?name=large&name=orig&version=1',
+        'https://pbs.twimg.com/media/other?name=large&version=1',
+        'https://pbs.twimg.com/media/photo?name=large&version=2',
+    ])('rejects an ambiguous or distinct X CDN resource (%s)', src => {
+        expect(samePreviewImage({...xThumbnail, url: src}, candidate(xFullSize, {hostname: 'x.com'}))).toBe(false);
+    });
+});
+
+describe('image preview viewer visibility', () => {
+    const rect = {left: 20, top: 40, right: 420, bottom: 240, width: 400, height: 200} as DOMRect;
+
+    function viewerFixture() {
+        const {document} = parseHTML(`<html><body><main>
+            <dialog id="native" open><img></dialog>
+            <div id="aria" role="dialog"></div>
+            <div id="modal" aria-modal="true"></div>
+            <dialog id="closed" role="dialog"></dialog>
+            <div id="unrelated"></div>
+        </main></body></html>`);
+        const container = document.querySelector('main')!;
+        for (const viewer of container.children) viewer.getBoundingClientRect = () => rect;
+        const styles = new Map<Element, Style>();
+        vi.stubGlobal('getComputedStyle', (element: Element) => styles.get(element) ?? {});
+        return {document, container, styles, native: document.getElementById('native')!, aria: document.getElementById('aria')!};
+    }
+
+    it('finds open native and ARIA viewers and excludes closed, detached, and hidden elements', () => {
+        const {document, container, native, aria} = viewerFixture();
+        expect(visibleImageViewers(document).map(viewer => viewer.id)).toEqual(['native', 'aria', 'modal']);
+        expect(isOpenImageViewer(document.getElementById('unrelated')!)).toBe(false);
+        aria.remove();
+        expect(isOpenImageViewer(aria)).toBe(false);
+        native.setAttribute('hidden', '');
+        expect(isOpenImageViewer(native)).toBe(false);
+        native.removeAttribute('hidden');
+        container.setAttribute('aria-hidden', 'true');
+        expect(isOpenImageViewer(native)).toBe(false);
+    });
+
+    it.each([{width: 0}, {height: 0}])('excludes a viewer with an empty rectangle (%o)', bounds => {
+        const {aria} = viewerFixture();
+        aria.getBoundingClientRect = () => ({...rect, ...bounds});
+        expect(isOpenImageViewer(aria)).toBe(false);
+    });
+
+    it.each(['hidden', 'collapse'])('excludes a viewer with CSS visibility %s', visibility => {
+        const {aria, styles} = viewerFixture();
+        styles.set(aria, {visibility});
+        expect(isOpenImageViewer(aria)).toBe(false);
+    });
+
+    it.each([{opacity: '0'}, {contentVisibility: 'hidden'}])('checks hidden viewer ancestors (%o)', style => {
+        const {aria, container, styles} = viewerFixture();
+        styles.set(container, style);
+        expect(isOpenImageViewer(aria)).toBe(false);
+        styles.set(container, {opacity: '0.5', clipPath: 'none'});
+        expect(isOpenImageViewer(aria)).toBe(true);
+    });
+
+    it('requires a hit within a clipped viewer or its descendants', () => {
+        const {document, container, native, styles} = viewerFixture();
+        vi.stubGlobal('window', {innerWidth: 800, innerHeight: 600});
+        styles.set(container, {clipPath: 'inset(50%)'});
+        expect(isOpenImageViewer(native)).toBe(true);
+        const hitTest = vi.fn((): Element[] => [container]);
+        Object.assign(document, {elementsFromPoint: hitTest});
+        expect(isOpenImageViewer(native)).toBe(false);
+        expect(hitTest).toHaveBeenCalledWith(220, 140);
+        hitTest.mockReturnValue([native.querySelector('img')!]);
+        expect(isOpenImageViewer(native)).toBe(true);
+    });
+
+    it.each([{left: 900, right: 1300}, {top: 900, bottom: 1100}])('keeps a clipped viewer open when scrolled offscreen (%o)', bounds => {
+        const {document, aria, styles} = viewerFixture();
+        vi.stubGlobal('window', {innerWidth: 800, innerHeight: 600});
+        styles.set(aria, {clipPath: 'inset(1px)'});
+        aria.getBoundingClientRect = () => ({...rect, ...bounds});
+        const hitTest = vi.fn(() => []);
+        Object.assign(document, {elementsFromPoint: hitTest});
+        expect(isOpenImageViewer(aria)).toBe(true);
+        expect(hitTest).not.toHaveBeenCalled();
+    });
+
+    it('distinguishes a browser modal from a modeless dialog or ARIA dialog', () => {
+        const {native, aria} = viewerFixture();
+        const supports = vi.fn(() => false);
+        vi.stubGlobal('CSS', {supports});
+        expect(isNativeModal(aria)).toBe(false);
+        expect(supports).not.toHaveBeenCalled();
+        expect(isNativeModal(native)).toBe(false);
+        expect(supports).toHaveBeenCalledWith('selector(:modal)');
+        supports.mockReturnValue(true);
+        const matches = vi.spyOn(native, 'matches').mockReturnValue(false);
+        expect(isNativeModal(native)).toBe(false);
+        matches.mockReturnValue(true);
+        expect(isNativeModal(native)).toBe(true);
+        expect(matches).toHaveBeenCalledWith(':modal');
     });
 });

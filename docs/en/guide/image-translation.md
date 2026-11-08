@@ -15,6 +15,8 @@ For horizontal manga text affected by source protection, a complete translation 
 2. Hover over an image for about 0.6 seconds, then click its lower-left translation icon. You can also use the image context menu.
 3. Prepare recognition resources when prompted on first use. Once finished, switch between original and translated images, or open **Text → Compare original** to check recognition, read long translations, and copy text.
 
+When you click a translated image and the site's viewer opens the same image, the enlarged view reuses the existing translation without running recognition or translation again.
+
 Choose **Cancel** to stop processing; downloaded resources remain available. The text panel helps when a translation is long or the image is small. Controls hide when you leave the image and return when you hover over it.
 
 Press **Escape** inside the text panel to close it and return to an available entry. Focus stays elsewhere if you have already moved to another page control. Copy feedback follows the current view and latest operation; if copying fails, select the text and copy it manually.

@@ -13,7 +13,9 @@ If text is missing or too much is translated, check the reading area first. Use 
 
 Some sites keep author names, timestamps, votes, and navigation unchanged while translating articles, comments, or product descriptions. If the area you need is still missed, adjust its content rule or report the URL and area.
 
-Explicit topic tags stay in their original language, including `chatgpt` and `rate-limit` on the OpenAI community and standard tag links on other forums and blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
+Explicit topic tags and Discourse category badges retain their original text. Examples include `chatgpt`, `rate-limit`, and `API` on forums, as well as standard tag links on blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
+
+In the OpenAI Developer Community, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
 
 ## Translate every time—or leave it alone
 

@@ -1,6 +1,7 @@
 /**
  * @file src/services/translation/broker.ts
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
+ * 网页术语：独立的常用词槽在本地原位保留，正文沿用用户词条优先的占位回填，摘要、字幕和图像请求保持各自的保护范围。
  * Emoji 兼容：硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
  *
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
@@ -48,7 +49,7 @@ import {buildGlossaryRevision, resolveGlossary} from '@/src/core/glossary';
 import {supportsNativeTranslationBatch, supportsTranslationBatch, supportsTranslationGlossary, getTranslationServiceUnavailableMessage} from './capabilities';
 import {isNativeTranslationBatchEnabled} from '@/src/core/config/nativeBatch';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
-import {isGlossaryOnlyResult, prepareGlossaryRequest, prepareLiteralEmojiRetry} from './glossaryProtection';
+import {isGlossaryOnlyResult, prepareGlossaryRequest, prepareLiteralEmojiRetry, shouldKeepCommonWebTermLabel} from './glossaryProtection';
 import {
     isDefinitePageContextLeak,
     isLikelyPageContextLeak,
@@ -299,8 +300,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         }
         const protocol = getSingleSlotProtocol(message);
         const parsed = protocol && parseTranslationSlots(protocol.packet, result);
-        return Boolean(parsed && parsed.every((translation, index) =>
-            isCacheableResult(protocol!.sources[index]!, translation, execution)));
+        return Boolean(parsed && parsed.every((translation, index) => {
+            const source = protocol!.sources[index]!;
+            return shouldKeepCommonWebTermLabel(execution.config, source) ? source === translation
+                : isCacheableResult(source, translation, execution);
+        }));
     }
 
     function requireSingleResult(result: unknown): string {
@@ -741,7 +745,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             if (!parsed) return result;
             for (let index = 0; index < parsed.length; index++) {
                 const slotMessage = {...message, origin: protocol.sources[index]!, validateTranslationSlots: false};
-                if (!hasTranslationContent(slotMessage.origin)) {
+                if (!hasTranslationContent(slotMessage.origin) || shouldKeepCommonWebTermLabel(execution.config, slotMessage.origin)) {
                     parsed[index] = slotMessage.origin;
                     continue;
                 }
@@ -1123,8 +1127,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
 
     function cachePageSummary(key: string, value: PageSummaryResult): void {
         if (pageSummaryCache.size >= PAGE_SUMMARY_CACHE_SIZE) {
-            const oldestKey = pageSummaryCache.keys().next().value;
-            if (oldestKey) pageSummaryCache.delete(oldestKey);
+            const oldestKey = pageSummaryCache.keys().next().value!;
+            pageSummaryCache.delete(oldestKey);
         }
         pageSummaryCache.set(key, value);
     }
@@ -1298,11 +1302,12 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 requestDeadline,
                 execution.abortSignal,
             );
+            let leakedPageContext = false;
             if (cached !== null) {
                 getRemainingDeadlineMs(requestDeadline);
                 // 缓存中的软重合可能是已经经过无上下文复验的合法译名；
                 // 只用明确边界/长复制信号否定旧缓存，避免每次都重译。
-                const leakedPageContext = isDefiniteRecoveryPageContextLeak(
+                leakedPageContext = isDefiniteRecoveryPageContextLeak(
                     execution,
                     message.origin,
                     cached,
@@ -1313,34 +1318,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     execution.trace.cachedSegments = 1;
                     return cached;
                 }
-
-                const recovered = leakedPageContext
-                    ? await callSingleProviderWithoutPageContext(
-                        execution,
-                        message,
-                        requestDeadline,
-                        pageContext,
-                    )
-                    : await callSingleProviderWithContextRecovery(
-                        execution,
-                        message,
-                        context,
-                        pageContext,
-                        requestDeadline,
-                    );
-                if (isCacheableSingleResult(execution, message, recovered)) {
-                    await persistCacheWrite(requestGeneration, key, recovered);
-                }
-                return recovered;
             }
 
-            const result = await callSingleProviderWithContextRecovery(
-                execution,
-                message,
-                context,
-                pageContext,
-                requestDeadline,
-            );
+            const result = leakedPageContext
+                ? await callSingleProviderWithoutPageContext(execution, message, requestDeadline, pageContext)
+                : await callSingleProviderWithContextRecovery(execution, message, context, pageContext, requestDeadline);
             if (isCacheableSingleResult(execution, message, result)) {
                 await persistCacheWrite(requestGeneration, key, result);
             }
@@ -1778,6 +1760,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         current = Object.freeze({...current,
             glossaryTerms: Object.freeze(glossaryTerms.map(term => Object.freeze({...term}))),
             glossaryMatchContext: Object.freeze({context: glossaryContext, sourceLanguage, targetLanguage, pageUrl: glossarySource?.pageUrl,
+                preserveCommonWebTerms: supportsGlossary && glossaryContext === 'page' && !imageInput && modelUsagePurpose(message) === 'translation',
                 glossaryIds: selectedGlossaryIds ? Object.freeze([...selectedGlossaryIds]) : null}),
         });
         const execution: TranslationRequestExecution = {
@@ -1813,6 +1796,20 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (serviceOverride && !deps.serviceTypes.machine.has(serviceOverride) && !deps.serviceTypes.isAI(serviceOverride)) {
             throw new Error('独立翻译服务不可用，请选择已配置的机器翻译或 AI 服务');
         }
+
+        // 纯术语留在本地。混合批次从摘要、缓存和 provider 链路移除这些槽，结束时按原位置填回。
+        const sourceBatch = Array.isArray(message.origin) ? message.origin : undefined;
+        const translatedIndexes = sourceBatch && current.glossaryMatchContext?.preserveCommonWebTerms
+            ? Array.from(sourceBatch).flatMap((origin, index) => shouldKeepCommonWebTermLabel(current, origin) ? [] : [index])
+            : undefined;
+        if (translatedIndexes?.length === 0) return message.origin;
+        if (typeof message.origin === 'string' && current.glossaryMatchContext?.preserveCommonWebTerms) {
+            // 富文本标签可以拆为多个原生文本槽；只有通过原协议核验的槽参与纯术语判断。
+            const protocol = getSingleSlotProtocol(message as TranslationSingleRequestMessage);
+            if (shouldKeepCommonWebTermLabel(current, protocol?.sources.join(' ') ?? message.origin)) return message.origin;
+        }
+        const filteredBatch = sourceBatch && translatedIndexes && translatedIndexes.length < sourceBatch.length
+            ? translatedIndexes : undefined;
 
         const context = typeof message.context === 'string' ? message.context : '';
         const rawPageContext = typeof message.pageContext === 'string' ? message.pageContext : '';
@@ -1868,6 +1865,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const requestMessage = attachTranslationProviderConfig(
             {
                 ...providerInput,
+                origin: sourceBatch && filteredBatch ? filteredBatch.map(index => sourceBatch[index]!) : message.origin,
                 ...(subtitleContext ? {subtitleContext} : {}),
                 glossaryIds,
                 sourceLanguage,
@@ -1881,7 +1879,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (imageInput) attachTranslationImageInput(requestMessage, imageInput);
         // 步骤 5：根据 origin 类型进入单条或批量管线，两者共享缓存身份与 pending 去重。
         if (Array.isArray(requestMessage.origin)) {
-            return translateBatchWithCache(
+            const translated = await translateBatchWithCache(
                 execution,
                 requestMessage as TranslationBatchRequestMessage,
                 context,
@@ -1891,6 +1889,10 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 providerDeadline,
                 providerBudget,
             );
+            if (!sourceBatch || !filteredBatch) return translated;
+            const restored = Array.from(sourceBatch, origin => origin ?? '');
+            filteredBatch.forEach((index, position) => {restored[index] = translated[position]!;});
+            return restored;
         }
         return translateSingleWithCache(
             execution,

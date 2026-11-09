@@ -667,12 +667,12 @@ describe('userscript inline CSS compression', () => {
     const plugin = createUserscriptInlineCssCompressionPlugin(root);
     const transform = (code: string, moduleId = id) => Reflect.apply((plugin.transform as {handler: Function}).handler, {}, [code, moduleId]);
 
-    it('standalone uses the existing compact codec without changing decoded CSS', () => {
+    it('standalone uses the existing compact codec without changing decoded CSS', async () => {
         const css = '.sample::after{content:"中文 🦦";margin:1px}\n'.repeat(100);
         const code = `export default ${JSON.stringify(css)};`;
         const standard = transform(code);
         const compactPlugin = createUserscriptInlineCssCompressionPlugin(root, true, true);
-        const compact = Reflect.apply((compactPlugin.transform as {handler: Function}).handler, {}, [code, id]) as {code:string};
+        const compact = await Reflect.apply((compactPlugin.transform as {handler: Function}).handler, {}, [code, id]) as {code:string};
         expect(standard.code).toContain('~85:');
         expect(compact.code).toContain('~91:');
         const [before] = encodedDataBytes(standard.code), [after] = encodedDataBytes(compact.code);
@@ -681,7 +681,7 @@ describe('userscript inline CSS compression', () => {
         expect(gunzipSync(after).toString('utf8')).toBe(css);
     });
 
-    it('restores each inline CSS resource observed at userscript startup without changing decoded bytes', () => {
+    it('restores each inline CSS resource observed at userscript startup without changing decoded bytes', async () => {
         const files = [
             'src/features/page-notice/content/notice.css', 'src/ui/styles/translation-loading-indicator.css',
             'src/features/section-translation/content/reminder.css', 'src/features/section-translation/content/picker.css',
@@ -691,12 +691,32 @@ describe('userscript inline CSS compression', () => {
         for (const file of files) {
             const css = readFileSync(resolve(root, file), 'utf8'), source = `export default ${JSON.stringify(css)};`, cssId = `${resolve(root, file)}?inline`;
             const standard = transform(source, cssId) as {code:string}|null;
-            const encoded = Reflect.apply((compact.transform as {handler: Function}).handler, {}, [source, cssId]) as {code:string}|null;
+            const encoded = await Reflect.apply((compact.transform as {handler: Function}).handler, {}, [source, cssId]) as {code:string}|null;
             if (!standard || !encoded) {expect(encoded).toBe(standard); continue;}
             const [before] = encodedDataBytes(standard.code), [after] = encodedDataBytes(encoded.code);
             expect(after.length, file).toBeLessThanOrEqual(before.length);
             expect(gunzipSync(after), file).toEqual(gunzipSync(before));
             expect(gunzipSync(after).toString('utf8'), file).toBe(css);
+        }
+    });
+
+    it('retains the compact baseline when the standalone CSS candidate is larger', async () => {
+        vi.resetModules();
+        const gzip = await import('@/userscript/buildGzip');
+        const candidate = vi.spyOn(gzip, 'gzipLargeStandaloneUserscriptData')
+            .mockImplementation(async input => gzipSync(input, {level: 0}));
+        try {
+            const {createUserscriptInlineCssCompressionPlugin: create} = await import('@/userscript/inlineCssPlugin');
+            const css = '.sample{color:var(--theme)}\n'.repeat(180);
+            const code = `export default ${JSON.stringify(css)};`;
+            const compact = create(root, true, true);
+            const result = await Reflect.apply((compact.transform as {handler: Function}).handler, {}, [code, id]) as {code: string};
+            const [bytes] = encodedDataBytes(result.code);
+            expect(candidate).toHaveBeenCalledOnce();
+            expect(Buffer.from(bytes)).toEqual(gzipUserscriptBuildData(Buffer.from(css), undefined, true));
+        } finally {
+            candidate.mockRestore();
+            vi.resetModules();
         }
     });
 

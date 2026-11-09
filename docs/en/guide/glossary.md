@@ -4,6 +4,10 @@ Set consistent translations for names, products, and technical terms in machine 
 
 <GuideVisual kind="glossary" en />
 
+## Common terms on web pages
+
+Web and plain-text translation preserve the original spelling of common technical terms such as `API`, `SDK`, `JSON`, `HTML`, and `ChatGPT` by default. Standalone labels stay in the original text, and terms in sentences carry over into the translation. Matching is case-sensitive across websites and treats names such as `myAPI` as separate identifiers. When glossaries are enabled, matching custom entries take precedence.
+
 ## Add your first term
 
 1. Open **Tools & learning → Glossaries** and choose **Add entry**. A glossary is created if needed.

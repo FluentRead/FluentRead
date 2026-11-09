@@ -140,6 +140,14 @@ describe('原始槽的补充证据与快照', () => {
         expect(runtime.requests[0]?.options.sourceLanguage).toBe('ja');
     });
 
+    it('按默认术语保护后的 UTF-8 长度限制行内代码试探', async () => {
+        Object.assign(runtime.config, {from: 'en', to: 'zh-Hans'});
+        const source = `Read __FRCODE_0123456789abcdef_0__ and ${'call the API. '.repeat(25)}`;
+        expect(new TextEncoder().encode(source).length).toBeLessThan(450);
+        expect(await tryTranslateInlineCodeSentence(source, () => ['ignored'], captureFullPageTranslationConfig())).toBeNull();
+        expect(runtime.requests).toEqual([]);
+    });
+
     it('行内代码试探只发送标记正文，以无标记文字检测语言并冻结缓存设置', async () => {
         Object.assign(runtime.config, {service: 'freeTranslation', to: 'zh-Hans', glossaryEnabled: false, glossaryLibraries: [], enableAIContext: false});
         const snapshot = captureFullPageTranslationConfig();
@@ -421,6 +429,7 @@ describe('原始槽的补充证据与快照', () => {
 });
 
 afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
 });
 
@@ -670,17 +679,52 @@ describe('同次批译复制快照的 slot key 复用', () => {
 });
 
 describe('取消与失败重试', () => {
-    it('调用方取消只影响外语槽请求，已判断为同目标的槽不会被提交', async () => {
-        runtime.config.service = 'google';
+    it.each(['google', 'localTranslation'])('%s：调用方取消只影响已提交的外语槽', async service => {
+        runtime.config.service = service;
         runtime.pending = {resolve: () => undefined};
         const controller = new AbortController();
         const snapshot = captureFullPageTranslationConfig();
         const request = translateTextSlots([german, english], snapshot, controller.signal);
         await vi.waitFor(() => expect(runtime.requests).toHaveLength(1));
         controller.abort();
+        expect(runtime.requests[0]?.options.signal).toMatchObject({aborted: true});
         runtime.pending?.resolve();
-        await request.catch(() => undefined);
+        await expect(request).rejects.toMatchObject({name: 'AbortError'});
         expect(submitted()).toEqual([english]);
+    });
+
+    it('逐槽并发失败时保留第一个错误并停止领取后续槽', async () => {
+        runtime.config.service = 'localTranslation';
+        const firstError = new Error('first slot failed');
+        runtime.nextError = firstError;
+        runtime.fail = 1;
+        await expect(translateTextSlots(
+            [english, unknownEnglish, otherUnknownEnglish],
+            captureFullPageTranslationConfig(),
+        )).rejects.toBe(firstError);
+        expect(submitted()).toEqual([english, unknownEnglish]);
+    });
+
+    it('悬停旧请求的到期计时不会淘汰同键的新结果', async () => {
+        vi.useFakeTimers();
+        const session = {
+            active: true,
+            translationSlotCache: new Map(),
+            retainSettledResults: false,
+            allowNativeBatch: false,
+            ...createFullPageRequestSessionState(),
+        };
+        const snapshot = captureFullPageTranslationConfig();
+        const translate = () => translateTextSlots([english], snapshot, undefined, undefined, session);
+        await expect(translate()).resolves.toEqual([`T:${english}`]);
+        await vi.advanceTimersByTimeAsync(125);
+        session.translationRequestCache.clear();
+        await expect(translate()).resolves.toEqual([`T:${english}`]);
+        await vi.advanceTimersByTimeAsync(125);
+        await expect(translate()).resolves.toEqual([`T:${english}`]);
+        expect(submitted()).toEqual([english, english]);
+        await vi.advanceTimersByTimeAsync(125);
+        expect(session.translationRequestCache.size).toBe(0);
     });
 
     it('失败后强制重试仍只请求外语槽，并在成功后回填', async () => {

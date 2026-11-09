@@ -1,11 +1,12 @@
 /**
  * @file src/services/translation/glossaryProtection.ts
  * 文件职责：在统一翻译调用边界保护术语，使机器翻译、AI 与批量请求共用相同的本地回填规则。
- * 主要内容：按冻结范围一次选取用户与自动条目，文档入口保护地址、代码式名称及有限相邻数学表达式，复用首次匹配身份而不重复扫描；内部 g 标签原样送翻并避开用户短词匹配，保持消息和内部槽协议，按实际目标语言校验批量形状、行内结构和未翻译正文；纯术语判断比较 NFC 写法，实际回填保留原文 Unicode；userscript 编译时移除不支持的文档专属路径。
+ * 主要内容：按冻结范围选取用户与自动条目，网页保留常用技术术语，文档保护地址、代码式名称及有限相邻数学表达式；内部 g 标签原样送翻并避开用户短词匹配，保持消息和内部槽协议，按实际目标语言校验批量形状、行内结构和未翻译正文；纯术语判断比较 NFC 写法，实际回填保留原文 Unicode；userscript 编译时移除不支持的文档专属路径。
  * 模块边界：不自行调用网络或修改配置；缓存、取消、超时与最终结果验证仍由 broker 管理。
- * 字素保护：先处理用户与文档术语，再对剩余完整 emoji 叠加同一占位符协议；摘要不强制保留，用户译法优先且未配置词库的翻译也受保护。兼容重试只接受无术语及结构标记的单行正文，按原顺序逐一验证完整 emoji 字素。
+ * 字素保护：先处理用户与自动术语，再对剩余完整 emoji 叠加同一占位符协议；摘要不强制保留，用户译法优先且未配置词库的翻译也受保护。兼容重试仅接受无用户术语和结构标记的单行正文，检查 emoji 字素顺序及默认术语的原写法和次数。
  */
-import {GlossaryPlaceholderError, protectGlossaryText, resolveGlossaryEntries, type GlossaryProtectionEntry} from '@/src/core/glossary';
+import {findGlossaryMatches, GlossaryPlaceholderError, protectGlossaryText, resolveGlossaryEntries, type GlossaryProtectionEntry} from '@/src/core/glossary';
+import {hasOnlyCommonWebTerms, matchCommonWebTerms} from '@/src/core/glossary/commonWebTerms';
 import {DocumentInlineMarkerError, documentInlineMarkerRanges, normalizeDocumentInlineMarkers, validateDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import {findDocumentLiteralTerms} from '@/src/core/translation/documentLiterals';
 import {protectDocumentMathText} from '@/src/core/translation/documentMathProtection';
@@ -24,13 +25,20 @@ function getGlossaryProtectionPlan(current: TranslationProviderConfigSnapshot, o
         glossaryIds: context.glossaryIds ? [...context.glossaryIds] : null,
         text: source,
     }).terms : [];
-    const automatic = import.meta.env.BROWSER !== 'userscript' && context.context === 'document'
-        ? findDocumentLiteralTerms(source, entries) : [];
+    const automatic = context.preserveCommonWebTerms ? matchCommonWebTerms(source, entries)
+        : import.meta.env.BROWSER !== 'userscript' && context.context === 'document'
+            ? findDocumentLiteralTerms(source, entries) : [];
     return {entries: [...entries, ...automatic], automatic};
 }
 
 export function getGlossaryProtectionEntries(current: TranslationProviderConfigSnapshot, origin: string | string[]) {
     return getGlossaryProtectionPlan(current, origin).entries;
+}
+
+/** 独立术语直接复用原文；显式用户译法仍走原有翻译路径。 */
+export function shouldKeepCommonWebTermLabel(current: TranslationProviderConfigSnapshot, origin: string): boolean {
+    return Boolean(current.glossaryMatchContext?.preserveCommonWebTerms && hasOnlyCommonWebTerms(origin)
+        && (!current.glossaryTerms?.length || isGlossaryOnlyResult(current, origin, origin)));
 }
 
 export function prepareGlossaryRequest(message: TranslationRequestMessage, current: TranslationProviderConfigSnapshot) {
@@ -81,14 +89,20 @@ export function prepareLiteralEmojiRetry(message: TranslationRequestMessage, cur
     if (typeof origin !== 'string' || current.glossaryMatchContext?.context === 'document'
         || /[\r\n]/u.test(origin) || reservedProtectionMarker.test(origin)) return undefined;
     const original = findEmojiLiteralRanges(origin).map(range => origin.slice(range.start, range.end));
-    if (!original.length || !/\p{L}/u.test(origin) || getGlossaryProtectionEntries(current, origin).length) return undefined;
+    if (!original.length || !/\p{L}/u.test(origin)) return undefined;
+    const {entries, automatic} = getGlossaryProtectionPlan(current, origin);
+    if (entries.length !== automatic.length) return undefined;
+    const commonTerms = (value: string) => automatic.length
+        ? findGlossaryMatches(value, automatic).map(match => match.entry.source).sort().join(' ') : '';
+    const expectedTerms = commonTerms(origin);
     return (result: unknown): string => {
         if (typeof result !== 'string' || !/\p{L}/u.test(result) || reservedProtectionMarker.test(result)) {
             throw new GlossaryPlaceholderError();
         }
         const actual = findEmojiLiteralRanges(result);
         if (actual.length !== original.length
-            || actual.some((range, index) => result.slice(range.start, range.end) !== original[index])) {
+            || actual.some((range, index) => result.slice(range.start, range.end) !== original[index])
+            || commonTerms(result) !== expectedTerms) {
             throw new GlossaryPlaceholderError();
         }
         return result;

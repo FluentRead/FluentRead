@@ -536,6 +536,7 @@ export default defineConfig({
                 'src/core/glossary/model.ts',
                 'src/core/glossary/revisionMemo.ts',
                 'src/core/glossary/builtins.ts',
+                'src/core/glossary/commonWebTerms.ts',
                 'src/core/glossary/match.ts',
                 'src/core/glossary/protection.ts',
                 'src/services/translation/glossaryProtection.ts',

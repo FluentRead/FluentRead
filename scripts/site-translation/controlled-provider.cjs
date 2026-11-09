@@ -25,24 +25,28 @@ function controlledProviderRuntime(installTransport = false) {
     }
     return prefix + translated + encodeText(text.slice(cursor));
   }
-  function decodeText(text) {
+  function decodeText(text, acceptLiteral = () => false) {
     // 页面可合并多个逐槽响应，所有槽都必须被还原并参与完整原文比较。
     if (typeof text !== 'string' || !text.includes(prefix)) return null;
     const body = text.replaceAll(prefix, '');
     if (!/[\u4e00-\u4eff]/u.test(body)) return null;
     let decoded = '', cursor = 0;
     const decoder = new TextDecoder('utf-8', {fatal: true});
+    const validLiteral = value => {
+      const plain = value.replace(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/giu, '');
+      return !/\p{L}/u.test(plain) || acceptLiteral(plain);
+    };
     for (const match of body.matchAll(/[\u4e00-\u4eff]+/gu)) {
       const literal = body.slice(cursor, match.index);
-      // DOM 已解码的五种 HTML 字符可保留；普通字词不能冒充编码后的正文。
-      if (/\p{L}/u.test(literal.replace(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/giu, ''))) return null;
+      // DOM 字符与已核对的原样术语可保留；普通字词必须来自受控译文。
+      if (!validLiteral(literal)) return null;
       try {
         decoded += literal + decoder.decode(Uint8Array.from(match[0], char => char.charCodeAt(0) - 0x4e00));
       } catch {return null;}
       cursor = match.index + match[0].length;
     }
     const literal = body.slice(cursor);
-    if (/\p{L}/u.test(literal.replace(/&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/giu, ''))) return null;
+    if (!validLiteral(literal)) return null;
     return decoded + literal;
   }
   if (!installTransport) return {encode, decodeText};
@@ -72,10 +76,17 @@ function controlledProviderRuntime(installTransport = false) {
 const {encode: encodeControlledTranslation, decodeText: decodeControlledTranslationText} = controlledProviderRuntime();
 
 function isControlledTranslationForSource(output, source, sourceParts = [source]) {
-  const decoded = decodeControlledTranslationText(output);
+  const inputs = [source, sourceParts.join(''), sourceParts.join(' ')];
+  let allowedTerms;
+  const decoded = decodeControlledTranslationText(output, literal => {
+    const {hasOnlyCommonWebTerms, matchCommonWebTerms} = loadOriginalSlotPolicies();
+    if (!hasOnlyCommonWebTerms(literal)) return false;
+    allowedTerms ??= new Set(matchCommonWebTerms(inputs).map(term => term.source));
+    return matchCommonWebTerms(literal).every(term => allowedTerms.has(term.source));
+  });
   if (decoded === null) return false;
   const normalize = text => text.replace(/\s+/gu, ' ').trim();
-  return [source, sourceParts.join(''), sourceParts.join(' ')].some(input => normalize(input) === normalize(decoded));
+  return inputs.some(input => normalize(input) === normalize(decoded));
 }
 
 // 页面证据只投影实际 DOM。保护子树通过原标签/文本/href 与译文骨架配对，
@@ -375,7 +386,12 @@ function loadOriginalSlotPolicies() {
   const path = require('node:path'), {createRequire} = require('node:module');
   const root = path.resolve(__dirname, '../..');
   const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild');
-  const built = esbuild.buildSync({stdin: {contents: `export {shouldSkipTranslationForTarget} from './src/core/language/detect'; export {isNonTranslatableLiveData} from './src/core/translation/liveData'; export {isIdentifierLikeText} from './src/core/translation/text';`, resolveDir: root}, alias: {'@': root}, bundle: true, write: false, platform: 'node', format: 'cjs', logLevel: 'silent'});
+  const built = esbuild.buildSync({stdin: {contents: `
+    export {shouldSkipTranslationForTarget} from './src/core/language/detect';
+    export {isNonTranslatableLiveData} from './src/core/translation/liveData';
+    export {isIdentifierLikeText} from './src/core/translation/text';
+    export {hasOnlyCommonWebTerms, matchCommonWebTerms} from './src/core/glossary/commonWebTerms';
+  `, resolveDir: root}, alias: {'@': root}, bundle: true, write: false, platform: 'node', format: 'cjs', logLevel: 'silent'});
   const policyModule = {exports: {}};
   require('node:vm').runInThisContext(`(function(require,module,exports){${built.outputFiles[0].text}\n})`, {filename: 'controlled-source-slot-policy.cjs'})(require, policyModule, policyModule.exports);
   originalSlotPolicies = policyModule.exports;

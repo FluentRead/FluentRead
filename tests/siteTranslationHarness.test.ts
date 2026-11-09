@@ -5987,6 +5987,17 @@ describe('geometry-bounded long-page scrolling',()=>{
   });
 });
 
+it('attributes controlled prose with preserved common terms to the complete original', () => {
+  const {encodeControlledTranslation, isControlledTranslationForSource} = require('../scripts/site-translation/controlled-provider.cjs');
+  const source = 'Call the API to read JSON.';
+  const output = encodeControlledTranslation('Call the ') + 'API' + encodeControlledTranslation(' to read ') + 'JSON' + encodeControlledTranslation('.');
+  expect(isControlledTranslationForSource(output, source)).toBe(true);
+  expect(isControlledTranslationForSource(output.replace('API', 'SDK'), source)).toBe(false);
+  expect(isControlledTranslationForSource(output.replace('API', 'API API'), source)).toBe(false);
+  expect(isControlledTranslationForSource(encodeControlledTranslation('Call my') + 'API', 'Call myAPI')).toBe(false);
+  expect(isControlledTranslationForSource('测试译文：Call the API to read JSON.', source)).toBe(false);
+});
+
 describe('Steam discussion pinned-label source projection', () => {
   const {encodeControlledTranslation, readControlledPageEvidenceInPage, assertControlledPageEvidence,
     captureSourcePartitions, assertSourcePartitions} = require('../scripts/site-translation/controlled-provider.cjs');

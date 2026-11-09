@@ -42,6 +42,7 @@
 | `cloudgpu` | Lobe Icons 未收录；单色路径取自 CloudGPU 官网图标 [`icon.svg`](https://cloudgpu.app/icon.svg)（三道圆头线，与站内标记同几何），描边转为填充以便统一着色 |
 | `cheaperinference` | Lobe Icons 未收录；单色路径取自 Cheaper Inference 官方标记（24×24，`fill="currentColor"`） |
 | `cheapaimodel` | Lobe Icons 未收录；单色路径取自 cheapaimodel 官网图标 [`favicon.svg`](https://cheapaimodel.ai/favicon.svg)（三道斜顶竖条），去掉底色方块后缩放到 24 网格 |
+| `standardcompute` | Lobe Icons 未收录；单色路径取自 Standard Compute 官网图标 [`icon.svg`](https://standardcompute.com/icon.svg)（一个竖直矩形），按 512 网格等比缩放到 24 网格 |
 | `googleCloudTranslation` | [`googlecloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/googlecloud.svg) |
 | `azureTranslator` | [`azure.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/azure.svg) |
 | `aliyunTranslation` | [`alibabacloud.svg`](https://github.com/lobehub/lobe-icons/blob/53ead06d734cc6c003db5a87860907c4bbadfbc0/packages/static-svg/icons/alibabacloud.svg) |

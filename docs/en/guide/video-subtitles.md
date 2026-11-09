@@ -31,7 +31,7 @@ Adjust size, background, position, width, and bilingual order in video appearanc
 
 If captions are early or late, open **Subtitle timing** in the player menu (under **Subtitle options** on X). Adjust by **0.5 seconds**, up to **±10 seconds**, or reset to zero. The saved offset applies to later videos and moves both lines together. It does not change playback or exported timestamps. Timing needs an available subtitle timeline.
 
-Click **Download subtitles** in the menu header, then choose **Original / Translated / Bilingual** to save SRT. Bilingual files always put the original first, regardless of display order, and omit duplicate text.
+Click **Download subtitles** in the menu header, then choose **Original / Translated / Bilingual** to save SRT. Each bilingual cue puts the original on the first line and the translation on the second. Identical lines appear once. The bilingual export uses a single timeline. An overlapping cue ends when the next one starts, and cues that start together share one entry.
 
 Translated or bilingual exports first show how much text still needs translation and its time span:
 

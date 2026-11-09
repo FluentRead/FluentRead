@@ -136,6 +136,34 @@ describe('video subtitle logic', () => {
     expect(mergeBilingualVideoSubtitleCues(cues, [])).toEqual(cues.map(cue => ({...cue, text: cue.text.trim()})));
   });
 
+  it('双语导出按毫秒整理重叠、同起点重复和多行字幕', () => {
+    const first = {startMs: 0, durationMs: 1400, text: 'First sentence.'};
+    const second = {startMs: 1000.3, durationMs: 1000, text: 'Second\r\n\r\nsentence.'};
+    const simultaneous = {startMs: 1000.4, durationMs: 800, text: 'Another speaker.'};
+    const short = {startMs: 2400.1, durationMs: 0.1, text: 'Later.'};
+    const cues = [second, first, simultaneous, second, short];
+    const translated = ['第二句。\n补充。', '第一句。', '另一位说话者。', '第二句。\n补充。', '稍后。']
+      .map((text, index) => ({...cues[index], text}));
+
+    expect(mergeBilingualVideoSubtitleCues(cues, translated)).toEqual([
+      {startMs: 0, durationMs: 1000, text: 'First sentence.\n第一句。'},
+      {startMs: 1000, durationMs: 1000, text: 'Second sentence. / Another speaker.\n第二句。 补充。 / 另一位说话者。'},
+      {startMs: 2400, durationMs: 1, text: 'Later.\n稍后。'},
+    ]);
+    expect(cues[1]).toEqual({startMs: 0, durationMs: 1400, text: 'First sentence.'});
+  });
+
+  it('双语导出跳过空白字幕和无效区间', () => {
+    const cues = [
+      {startMs: 0, durationMs: 1000, text: ' \n '},
+      {startMs: -1, durationMs: 1000, text: 'Negative start.'},
+      {startMs: 600, durationMs: 0, text: 'Empty interval.'},
+      {startMs: 900, durationMs: Infinity, text: 'Infinite end.'},
+      {startMs: Number.MAX_SAFE_INTEGER, durationMs: 1000, text: 'Imprecise end.'},
+    ];
+    expect(mergeBilingualVideoSubtitleCues(cues, [])).toEqual([]);
+  });
+
   it('渐进字幕优先匹配当前时段，再按完整匹配、长度和开始时间消除歧义', () => {
     const previous = {startMs: 0, durationMs: 1000, text: 'Hello world'};
     const current = {startMs: 3000, durationMs: 1000, text: 'Hello world'};

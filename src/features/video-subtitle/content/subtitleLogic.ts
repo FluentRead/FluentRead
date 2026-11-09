@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/subtitleLogic.ts
  * 文件职责：提供字幕批量翻译、配置指纹和渐进文本展示的纯逻辑。
- * 主要内容：相同译文保留原文且不重复展示；合成双语导出文本、去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间。
+ * 主要内容：相同译文保留原文且不重复展示；合成双语导出的双行文本和单轨时间轴，去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间。
  * 模块边界：只处理输入数据和注入翻译函数，不读取 DOM、全局配置或浏览器接口。
  */
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
@@ -292,20 +292,38 @@ export async function translateVideoSubtitleCues(
   }));
 }
 
-/**
- * 双语字幕把原文放在上一行、译文放在下一行。译文与原文相同（包括已是目标语言而跳过翻译）
- * 时只保留一行，避免导出的文件里出现两行一样的字幕。
- */
+/** 为剪辑导出生成单轨字幕：每种语言占一行，相同译文只显示一次，后续字幕开始时结束上一条。 */
 export function mergeBilingualVideoSubtitleCues(
   cues: readonly VideoSubtitleCue[],
   translated: readonly VideoSubtitleCue[],
 ): VideoSubtitleCue[] {
-  return cues.map((cue, index) => {
-    const original = cue.text.trim();
-    const translation = (translated[index]?.text || '').trim();
-    const unchanged = !hasDistinctTranslation(normalizeVideoCaptionText(original), normalizeVideoCaptionText(translation));
-    return {...cue, text: unchanged ? original : `${original}\n${translation}`};
-  });
+  const ordered = cues.flatMap((cue, index) => {
+    const original = normalizeVideoCaptionText(cue.text);
+    const startMs = Math.round(cue.startMs);
+    const endMs = Math.max(startMs + 1, Math.round(cue.startMs + cue.durationMs));
+    if (!original || cue.startMs < 0 || cue.durationMs <= 0 || !Number.isSafeInteger(endMs)) return [];
+    return [{startMs, endMs, original, translation: normalizeVideoCaptionText(translated[index]?.text || '')}];
+  }).sort((left, right) => left.startMs - right.startMs);
+
+  const result: VideoSubtitleCue[] = [];
+  for (let index = 0; index < ordered.length;) {
+    const {startMs} = ordered[index]!;
+    let endMs = startMs;
+    const originals = new Set<string>();
+    const translations = new Set<string>();
+    // SRT 只有毫秒精度。同起点的内容按语言合在一条，保留不同台词并去掉重复文本。
+    do {
+      const cue = ordered[index++]!;
+      endMs = Math.max(endMs, cue.endMs);
+      originals.add(cue.original);
+      if (hasDistinctTranslation(cue.original, cue.translation)) translations.add(cue.translation);
+    } while (ordered[index]?.startMs === startMs);
+    const durationMs = Math.min(endMs, ordered[index]?.startMs ?? endMs) - startMs;
+    const original = [...originals].join(' / ');
+    const translation = [...translations].join(' / ');
+    result.push({startMs, durationMs, text: translation ? `${original}\n${translation}` : original});
+  }
+  return result;
 }
 
 /** 与后台翻译 cache key 对齐的配置指纹；配置变化时旧译文不能写回视频。 */

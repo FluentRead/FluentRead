@@ -263,9 +263,9 @@ describe('YouTube 字幕轨道数据', () => {
 
     const previousParser = Object.getOwnPropertyDescriptor(globalThis, 'DOMParser');
     class FixtureDOMParser {
-      parseFromString() {
+      parseFromString(source: string) {
         return {
-          querySelectorAll: () => [
+          querySelectorAll: () => source === '<transcript/>' ? [] : [
             {
               getAttribute: () => null,
               textContent: null,
@@ -291,6 +291,7 @@ describe('YouTube 字幕轨道数据', () => {
       expect(parseYoutubeTimedTextResponse('<transcript><text start="2.5">DOM &amp; XML</text></transcript>')).toEqual([
         {startMs: 2500, durationMs: 0, text: 'DOM & XML'},
       ]);
+      expect(parseYoutubeTimedTextResponse('<transcript/>')).toEqual([]);
     } finally {
       if (previousParser) Object.defineProperty(globalThis, 'DOMParser', previousParser);
       else Reflect.deleteProperty(globalThis, 'DOMParser');
@@ -759,6 +760,7 @@ describe('YouTube 字幕轨道数据', () => {
     {words: ['This', `${apostrophe}s`, 'a', `James${apostrophe}`, 'book.'], text: `This${apostrophe}s a James${apostrophe} book.`},
     {words: ['John', `${apostrophe}s`, `dogs${apostrophe}`, 'food.'], text: `John${apostrophe}s dogs${apostrophe} food.`},
     {words: ['John', apostrophe, 's', `dogs${apostrophe}`, 'food.'], text: `John${apostrophe}s dogs${apostrophe} food.`},
+    {words: ['Read', apostrophe, 's', 'example [‘].'], text: `Read${apostrophe}s example [‘].`},
     {words: ['we', 'quote', `${apostrophe}I don${apostrophe}`, 't', 'today.'], text: `we quote ${apostrophe}I don${apostrophe} t today.`},
     {words: ['we', 'quote', `${apostrophe}we l${apostrophe}`, 'aimons', 'today.'], text: `we quote ${apostrophe}we l${apostrophe} aimons today.`},
     {words: ['it', `${apostrophe}s`, `${apostrophe}ready${apostrophe}`, 'now.'], text: `it${apostrophe}s ${apostrophe}ready${apostrophe} now.`},

@@ -509,7 +509,12 @@ function formatSrtTimestamp(milliseconds: number): string {
 }
 
 export function cuesToSrt(cues: VideoSubtitleCue[]): string {
-  return finalizeVideoSubtitleCues(cues).map((cue, index) => {
+  return serializeSrtCues(finalizeVideoSubtitleCues(cues));
+}
+
+/** 写出已整理的时间轴，保留每条字幕的时间范围和行结构。 */
+export function serializeSrtCues(cues: readonly VideoSubtitleCue[]): string {
+  return cues.map((cue, index) => {
     const endMs = cue.startMs + cue.durationMs;
     return `${index + 1}\n${formatSrtTimestamp(cue.startMs)} --> ${formatSrtTimestamp(endMs)}\n${cue.text}\n`;
   }).join('\n');

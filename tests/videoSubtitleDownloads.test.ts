@@ -199,14 +199,31 @@ describe('字幕下载与人工轨优先', () => {
     });
 
     it('导出双语时使用人工字幕，仅为没有人工字幕的句子请求翻译', async () => {
-        const second = {...cue, startMs: 1000, text: 'Second original.'};
+        const second = {...cue, startMs: 800, text: 'Second original.'};
         const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [cue, second]}],
             human: {ready: async () => undefined, at: time => time < 1000 ? '人工字幕' : ''}});
         await f.downloads.translated(f.menu, f.button, true);
         expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(second.text);
-        expect(f.save).toHaveBeenCalledWith([{...cue, text: 'Original caption.\n人工字幕'}, {...second, text: 'Second original.\n译文：Second original.'}], 'zh-Hans-bilingual');
+        expect(f.save).toHaveBeenCalledWith(
+            '1\n00:00:00,000 --> 00:00:00,800\nOriginal caption.\n人工字幕\n\n2\n00:00:00,800 --> 00:00:01,800\nSecond original.\n译文：Second original.\n',
+            'zh-Hans-bilingual');
         expect(f.button.getAttribute('aria-busy')).toBeNull();
         await vi.advanceTimersByTimeAsync(2200); expect(f.button.disabled).toBe(false); f.downloads.destroy();
+    });
+
+    it('双语 SRT 写入保留每条短字幕的原译文配对', async () => {
+        const cues = ['Up', 'Down', 'Left'].map((text, index) => ({startMs: index * 500, durationMs: 500, text}));
+        const translations = new Map([['Up', '上'], ['Down', '下'], ['Left', '左']]);
+        const f = fixture({isX: () => true, nativeX: () => ({languageCode: 'en', cues}), peek: source => translations.get(source)});
+
+        await f.downloads.translated(f.menu, f.button, true);
+
+        expect(f.save).toHaveBeenCalledWith([
+            '1\n00:00:00,000 --> 00:00:00,500\nUp\n上\n',
+            '2\n00:00:00,500 --> 00:00:01,000\nDown\n下\n',
+            '3\n00:00:01,000 --> 00:00:01,500\nLeft\n左\n',
+        ].join('\n'), 'zh-Hans-bilingual');
+        f.downloads.destroy();
     });
 
     it('关闭人工字幕优先后按配置使用服务，目标为空时仍能命名译文下载', async () => {
@@ -214,7 +231,7 @@ describe('字幕下载与人工轨优先', () => {
         f.config.videoPreferHumanSubtitles = false; f.config.to = '';
         await f.downloads.translated(f.menu, f.button, false);
         expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(cue.text);
-        expect(f.save).toHaveBeenCalledWith([{...cue, text: '译文：Original caption.'}], 'translated-translated'); f.downloads.destroy();
+        expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n译文：Original caption.\n', 'translated-translated'); f.downloads.destroy();
     });
 
     it('关闭功能、翻译失败或取消时不导出，按钮反馈不会遗留计时器', async () => {
@@ -264,12 +281,15 @@ describe('字幕下载与人工轨优先', () => {
     });
     it('仅导已有结果不补译，跳过缺口但保留原始时间戳与 partial 文件标记', async () => {
         const second = {...cue, startMs: 10000, durationMs: 3000, text: 'Second'};
-        const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [cue, second]}],
-            peek: source => source === second.text ? '已有译文' : undefined, confirm: vi.fn(async () => 'existing' as const)});
+        const third = {...second, text: 'Third'};
+        const translations = new Map([['Second', '第二句'], ['Third', '第三句']]);
+        const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [cue, second, third]}],
+            peek: source => translations.get(source), confirm: vi.fn(async () => 'existing' as const), ui: vi.fn(key => key)});
         await f.downloads.translated(f.menu, f.button, true);
         expect(f.translate).not.toHaveBeenCalled();
-        expect(f.ports.confirm).toHaveBeenCalledWith(f.menu, expect.objectContaining({total: 2, ready: 1, missing: 1, requests: 1, cached: 1}), true, expect.any(AbortSignal));
-        expect(f.save).toHaveBeenCalledWith([{...second, text: 'Second\n已有译文'}], 'zh-Hans-bilingual-partial');
+        expect(f.ports.confirm).toHaveBeenCalledWith(f.menu, expect.objectContaining({total: 3, ready: 2, missing: 1, requests: 1, cached: 2}), true, expect.any(AbortSignal));
+        expect(f.save).toHaveBeenCalledWith('1\n00:00:10,000 --> 00:00:13,000\nSecond / Third\n第二句 / 第三句\n', 'zh-Hans-bilingual-partial');
+        expect(f.ports.ui).toHaveBeenCalledWith('video.exportedPartial', {count: 2, total: 3, missing: 1});
         expect(f.status).toHaveBeenLastCalledWith(f.menu, 'video.exportedPartial', 2200);
         f.downloads.destroy();
     });
@@ -283,7 +303,7 @@ describe('字幕下载与人工轨优先', () => {
         expect(f.save).not.toHaveBeenCalled();
         const second = f.downloads.translated(f.menu, f.button, false);
         await vi.advanceTimersByTimeAsync(0); cached = '新缓存'; choose('complete'); await second;
-        expect(f.translate).not.toHaveBeenCalled(); expect(f.save).toHaveBeenCalledWith([{...cue, text: '新缓存'}], 'zh-Hans-translated');
+        expect(f.translate).not.toHaveBeenCalled(); expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n新缓存\n', 'zh-Hans-translated');
         f.downloads.destroy();
     });
     it.each(['language', 'model', 'glossary', 'prompt', 'headers', 'media', 'page'])('确认期间 %s 改变不能补译或保存旧预览', async change => {
@@ -405,7 +425,7 @@ describe('字幕下载与人工轨优先', () => {
         const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [{...cue, text: '  '}, {...cue, startMs: 5000}]}]});
         await f.downloads.translated(f.menu, f.button, false);
         expect(f.ports.confirm).toHaveBeenCalledWith(f.menu, expect.objectContaining({total: 1, missing: 1, requests: 1}), false, expect.any(AbortSignal));
-        expect(f.translate).toHaveBeenCalledOnce(); expect(f.save).toHaveBeenCalledWith([{...cue, startMs: 5000, text: `译文：${cue.text}`}], 'zh-Hans-translated'); f.downloads.destroy();
+        expect(f.translate).toHaveBeenCalledOnce(); expect(f.save).toHaveBeenCalledWith('1\n00:00:05,000 --> 00:00:06,000\n译文：Original caption.\n', 'zh-Hans-translated'); f.downloads.destroy();
     });
     it.each([true, false])('无补译缺口的确认页提供 %s 双语选择，完成后恢复可用焦点', async bilingual => {
         const parsed = parseHTML('<html><body><button id="trigger"></button><div id="menu"><div class="fluent-read-video-menu-main"></div></div></body></html>');
@@ -471,7 +491,7 @@ describe('字幕下载与人工轨优先', () => {
     it('原文下载成功或失败的反馈与等待计时器由下载协调器管理', async () => {
         const ready = fixture(); const errorMessage = vi.fn(() => '原文读取失败');
         await ready.downloads.original(ready.menu, ready.button, errorMessage);
-        expect(ready.save).toHaveBeenCalledWith([cue], 'en'); expect(errorMessage).not.toHaveBeenCalled();
+        expect(ready.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\nOriginal caption.\n', 'en'); expect(errorMessage).not.toHaveBeenCalled();
         expect(ready.status).toHaveBeenLastCalledWith(ready.menu, 'video.downloaded', 2400);
         await vi.advanceTimersByTimeAsync(2400); expect(ready.button.disabled).toBe(false); ready.downloads.destroy();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

@@ -1,13 +1,13 @@
 /**
  * @file src/features/video-subtitle/content/downloads.ts
  * 文件职责：协调原文、译文与双语字幕导出，避免播放器运行时继续承载下载与人工轨回退细节。
- * 主要内容：选择 X 原生或完整 AI、YouTube 捕获或初始化轨道，拒绝把识别中的预览导出为完整字幕，优先人工目标时间轴和当前缓存，预览缺失范围与去重请求量，确认后补译或导出明确标记的已有条目；以媒体与配置身份隔离迟到结果，集中管理反馈计时器，结束时由当前状态恢复按钮，销毁后拒绝迟到恢复。
+ * 主要内容：选择 X 原生或完整 AI、YouTube 捕获或初始化轨道，拒绝把识别中的预览导出为完整字幕，优先人工目标时间轴和当前缓存，预览缺失范围与去重请求量，确认后补译或导出明确标记的已有条目，交付已序列化的 SRT；以媒体与配置身份隔离迟到结果，集中管理反馈计时器，结束时由当前状态恢复按钮，销毁后拒绝迟到恢复。
  * 读取约束：未捕获的 YouTube 轨道复用字幕传输总时限与字节预算，取消及时释放请求等待。
  * 模块边界：网络、配置、界面文案、状态提示和文件下载由注入端口提供，不直接访问全局页面或存储。
  */
 import type {Config} from '@/src/core/config/model';
 import {readVideoCaptionText} from './subtitleTransport';
-import {buildYoutubeTimedTextUrl, chooseYoutubeCaptionTrackForLocation, finalizeVideoSubtitleCues, parseYoutubeTimedTextResponse, type VideoSubtitleCue} from './youtubeSubtitleData';
+import {buildYoutubeTimedTextUrl, chooseYoutubeCaptionTrackForLocation, cuesToSrt, finalizeVideoSubtitleCues, parseYoutubeTimedTextResponse, serializeSrtCues, type VideoSubtitleCue} from './youtubeSubtitleData';
 import {createVideoSubtitleAbortError, mergeBilingualVideoSubtitleCues, normalizeVideoCaptionText, translateVideoSubtitleCues, getVideoTranslationConfigFingerprint} from './subtitleLogic';
 
 export type VideoSubtitleExportChoice = 'complete' | 'existing' | 'cancel';
@@ -71,7 +71,7 @@ interface VideoDownloadPorts {
     confirm(menu: HTMLElement, preview: VideoSubtitleExportPreview, bilingual: boolean, signal: AbortSignal): Promise<VideoSubtitleExportChoice>;
     ui(key: string, params?: Record<string, string | number>): string;
     status(menu: HTMLElement, message: string, delay?: number): void;
-    save(cues: VideoSubtitleCue[], language: string): void;
+    save(srt: string, language: string): void;
     /** 菜单状态拥有者重算当前资格，防止旧反馈把新识别中的导出重新启用。 */
     refreshButtons?(): void;
 }
@@ -155,7 +155,7 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
         try {
             const result = await wait(current, assertCurrent, resolve);
             assertCurrent();
-            ports.save(result.cues, result.languageCode);
+            ports.save(cuesToSrt(result.cues), result.languageCode);
             feedback = ports.ui('video.downloaded', {count: result.cues.length});
         } catch (error) {
             feedback = errorMessage(error);
@@ -229,9 +229,11 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
             const partial = translatedCues.length !== originals.length;
             // 失败/取消不会下载看似完整的文件；仅已有结果保留原时间轴并明确标为 partial。
             const cues = bilingual ? mergeBilingualVideoSubtitleCues(retainedOriginals, translatedCues) : translatedCues;
-            ports.save(cues, `${language}-${bilingual ? 'bilingual' : 'translated'}${partial ? '-partial' : ''}`);
+            // 双语已经按原译文配对整理，直接写入 SRT，避免再次按单语词流合并。
+            const srt = bilingual ? serializeSrtCues(cues) : cuesToSrt(cues);
+            ports.save(srt, `${language}-${bilingual ? 'bilingual' : 'translated'}${partial ? '-partial' : ''}`);
             feedback = ports.ui(partial ? 'video.exportedPartial' : 'video.downloaded',
-                {count: cues.length, total: originals.length, missing: originals.length - cues.length});
+                {count: partial ? translatedCues.length : cues.length, total: originals.length, missing: originals.length - translatedCues.length});
         } catch (error) {
             const aborted = error instanceof Error && error.name === 'AbortError';
             feedback = ports.ui(aborted ? 'video.cancelled' : 'video.downloadFailed');

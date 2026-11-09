@@ -752,10 +752,11 @@ describe('public mounted player menu entry semantics', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:youtube-export');
   });
 
-  it('exports a native X track with explicit missing-translation confirmation and cancels a later export cleanly', async () => {
+  it('exports a native X track with a single bilingual timeline and cancels a later export cleanly', async () => {
     const f = fixture('Current native sentence.');
     Object.defineProperty(f.native!, 'cues', {configurable: true, value: [
       {startTime: 0, endTime: 10, text: 'Current native sentence.'}, {startTime: 40, endTime: 45, text: 'A future native sentence.'},
+      {startTime: 44, endTime: 48, text: 'The following native sentence.'},
     ]});
     const blobs: Blob[] = [];
     defineBrowserPort(URL, 'createObjectURL', {configurable: true, value: (blob: Blob) => {blobs.push(blob);return `blob:download-${blobs.length}`;}});
@@ -767,7 +768,11 @@ describe('public mounted player menu entry semantics', () => {
     expect(menu.querySelector('[data-export-prompt]')).not.toBeNull();expect(f.callsFor('A future native sentence.')).toBe(0);
     clickMenu(f, '[data-export-choice="complete"]');await settle();
     expect(f.callsFor('A future native sentence.')).toBe(1);
-    expect(await blobs[1].text()).toContain('A future native sentence.\n测试译文：A future native sentence.');
+    expect(await blobs[1].text()).toBe([
+      '1\n00:00:00,000 --> 00:00:10,000\nCurrent native sentence.\n测试译文：Current native sentence.\n',
+      '2\n00:00:40,000 --> 00:00:44,000\nA future native sentence.\n测试译文：A future native sentence.\n',
+      '3\n00:00:44,000 --> 00:00:48,000\nThe following native sentence.\n测试译文：The following native sentence.\n',
+    ].join('\n'));
     clickMenu(f, '[data-action="download-translated-subtitles"]');await settle();
     clickMenu(f, '[data-export-choice="cancel"]');await settle();
     expect(blobs).toHaveLength(2);expect(menu.querySelector('[data-download-status]')?.textContent).toContain('取消');

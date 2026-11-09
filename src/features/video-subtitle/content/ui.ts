@@ -9,7 +9,7 @@
 import {getVideoSubtitleAppearanceCssVars, normalizeVideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
-import {cuesToSrt, sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
+import {sanitizeSubtitleFilename, type VideoSubtitleCue} from './youtubeSubtitleData';
 import {getCaptionPlatform} from './platforms';
 import {timedTextTrackKey} from './timedTextTrackCache';
 import {fitVideoSubtitleFontSize} from './subtitleLayout';
@@ -226,8 +226,7 @@ export function isOriginalTimedTextUrl(url: string): boolean {
   }
 }
 
-export function downloadSubtitleSrt(cues: VideoSubtitleCue[], languageCode: string): void {
-  const srt = cuesToSrt(cues);
+export function downloadSubtitleSrt(srt: string, languageCode: string): void {
   if (!srt.trim()) throw new Error('字幕轨道没有可下载的内容');
 
   const title = sanitizeSubtitleFilename(document.title.replace(/\s*-\s*(?:YouTube|X)\s*$/i, ''));

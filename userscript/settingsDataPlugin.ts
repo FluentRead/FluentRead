@@ -134,13 +134,14 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         async load(id) {
             if (!groupEnabled || id !== virtualId) return null;
             for (const [path, target] of targets) if (target.names.some(name => groupedNames.has(name))) this.addWatchFile(path);
-            const input = Buffer.from(JSON.stringify(groupValues.map(value => JSON.stringify(value))));
+            // JSON.stringify 会转义值中的换行；每行保存一个值，省去字符串的二次转义。
+            const input = Buffer.from(groupValues.map(value => JSON.stringify(value)).join('\n'));
             const bytes = await gzipLargeStandaloneUserscriptData(input, root);
             const encoded = encodeUserscriptDataCompact(bytes);
             return "import {inflateWithPako} from '@/userscript/pakoRuntime';\n"
                 + "import {decodeUserscriptData} from '@/userscript/dataEncoding';\n"
                 + 'let values;\n'
-                + `export function getSettingsData(index) { values ||= JSON.parse(inflateWithPako(decodeUserscriptData(${JSON.stringify(encoded)}))); return JSON.parse(values[index]); }`;
+                + `export function getSettingsData(index) { values ||= inflateWithPako(decodeUserscriptData(${JSON.stringify(encoded)})).split("\\n"); return JSON.parse(values[index]); }`;
         },
         transform(code, id) {
             const target = targets.get(normalizePath(id.split('?')[0]));

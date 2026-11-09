@@ -4252,6 +4252,27 @@ describe('translation broker', () => {
         expect(mocks.service.mock.calls.filter(([message]) => message.summaryPrompt)).toHaveLength(2);
     });
 
+    it('清理后完成的旧摘要读取不会重新填充内存缓存', async () => {
+        mocks.config.service = 'ai';
+        mocks.config.enableAIContext = true;
+        const staleSummary = deferred<string>();
+        mocks.cacheGet.mockImplementationOnce(() => staleSummary.promise);
+        mocks.service.mockImplementation(async (message: {summaryPrompt?: string}) =>
+            message.summaryPrompt ? 'Fresh summary' : '正文译文');
+
+        const pageContext = 'Shared page context';
+        const oldRequest = translateWithCache({origin: 'Before clearing cache', pageContext});
+        await vi.waitFor(() => expect(mocks.cacheGet).toHaveBeenCalledOnce());
+        await clearTranslationCache();
+        staleSummary.resolve('Stale summary');
+        await expect(oldRequest).resolves.toBe('正文译文');
+        expect(mocks.service.mock.calls.filter(([message]) => message.summaryPrompt)).toHaveLength(0);
+        expect(mocks.cacheSet).not.toHaveBeenCalled();
+
+        await expect(translateWithCache({origin: 'After clearing cache', pageContext})).resolves.toBe('正文译文');
+        expect(mocks.service.mock.calls.filter(([message]) => message.summaryPrompt)).toHaveLength(1);
+    });
+
     it('清理期间使未完成的单条与批量请求失效，旧结果不能重新写缓存或继续参与去重', async () => {
         let resolveSingle!: (value: string) => void;
         mocks.service.mockImplementationOnce(() => new Promise<string>((resolve) => {
@@ -4432,6 +4453,26 @@ describe('translation broker', () => {
         await expect(translateWithCache({origin: 'clear-barrier-source'}))
             .resolves.toBe('连续清理后新译文');
         expect(mocks.service).toHaveBeenCalledTimes(2);
+    });
+
+    it('清理失败仍释放后续清理及翻译请求的等待', async () => {
+        const firstClear = deferred<void>();
+        const failure = new Error('cache clear failed');
+        mocks.cacheClear.mockImplementationOnce(() => firstClear.promise);
+
+        const failed = expect(clearTranslationCache()).rejects.toBe(failure);
+        const nextClear = clearTranslationCache();
+        const translation = translateWithCache({origin: 'After the failed cache clear'});
+        await flushMicrotasks();
+        expect(mocks.cacheClear).toHaveBeenCalledOnce();
+        expect(mocks.cacheGet).not.toHaveBeenCalled();
+
+        firstClear.reject(failure);
+        await failed;
+        await nextClear;
+        await expect(translation).resolves.toBe('默认译文');
+        expect(mocks.cacheClear).toHaveBeenCalledTimes(2);
+        expect(mocks.cacheGet).toHaveBeenCalledOnce();
     });
 
     it('等待 clear 屏障仍服从调用方取消和绝对 deadline', async () => {

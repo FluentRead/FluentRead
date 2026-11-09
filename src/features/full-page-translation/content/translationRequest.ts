@@ -567,7 +567,7 @@ function retireTranslationRequest(
     key: string,
     entry: FullPageTranslationRequestCacheEntry,
 ): void {
-    if (cache.get(key) === entry) cache.delete(key);
+    cache.delete(key);
     clearTranslationRequestCancelTimer(entry);
     clearTranslationRequestSettledExpiryTimer(entry);
     if (entry.waiters === 0) cancelTranslationRequest(entry);

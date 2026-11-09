@@ -1127,8 +1127,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
 
     function cachePageSummary(key: string, value: PageSummaryResult): void {
         if (pageSummaryCache.size >= PAGE_SUMMARY_CACHE_SIZE) {
-            const oldestKey = pageSummaryCache.keys().next().value;
-            if (oldestKey) pageSummaryCache.delete(oldestKey);
+            const oldestKey = pageSummaryCache.keys().next().value!;
+            pageSummaryCache.delete(oldestKey);
         }
         pageSummaryCache.set(key, value);
     }
@@ -1302,11 +1302,12 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 requestDeadline,
                 execution.abortSignal,
             );
+            let leakedPageContext = false;
             if (cached !== null) {
                 getRemainingDeadlineMs(requestDeadline);
                 // 缓存中的软重合可能是已经经过无上下文复验的合法译名；
                 // 只用明确边界/长复制信号否定旧缓存，避免每次都重译。
-                const leakedPageContext = isDefiniteRecoveryPageContextLeak(
+                leakedPageContext = isDefiniteRecoveryPageContextLeak(
                     execution,
                     message.origin,
                     cached,
@@ -1317,34 +1318,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     execution.trace.cachedSegments = 1;
                     return cached;
                 }
-
-                const recovered = leakedPageContext
-                    ? await callSingleProviderWithoutPageContext(
-                        execution,
-                        message,
-                        requestDeadline,
-                        pageContext,
-                    )
-                    : await callSingleProviderWithContextRecovery(
-                        execution,
-                        message,
-                        context,
-                        pageContext,
-                        requestDeadline,
-                    );
-                if (isCacheableSingleResult(execution, message, recovered)) {
-                    await persistCacheWrite(requestGeneration, key, recovered);
-                }
-                return recovered;
             }
 
-            const result = await callSingleProviderWithContextRecovery(
-                execution,
-                message,
-                context,
-                pageContext,
-                requestDeadline,
-            );
+            const result = leakedPageContext
+                ? await callSingleProviderWithoutPageContext(execution, message, requestDeadline, pageContext)
+                : await callSingleProviderWithContextRecovery(execution, message, context, pageContext, requestDeadline);
             if (isCacheableSingleResult(execution, message, result)) {
                 await persistCacheWrite(requestGeneration, key, result);
             }

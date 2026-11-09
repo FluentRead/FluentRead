@@ -5574,7 +5574,7 @@ describe("全文翻译可见性锚点", () => {
         expect(runtime.requests).toHaveBeenCalledWith(['Removed before execution']);
     });
 
-    it('AI 多段共享请求在全部候选取消后终止底层批次', async () => {
+    it.each([false, true])('AI 多段共享请求在全部候选取消后终止底层批次，复用信号=%s', async sharedCallerSignal => {
         const session = {active: true, translationSlotCache: new Map()};
         const enabled = translationSnapshot({
             service: 'ai',
@@ -5584,19 +5584,23 @@ describe("全文翻译可见性锚点", () => {
         const provider = deferred<string[]>();
         runtime.requests.mockImplementation(() => provider.promise);
         const firstController = new AbortController();
-        const secondController = new AbortController();
+        const secondController = sharedCallerSignal ? firstController : new AbortController();
         const first = translateTextSlots(['First'], enabled, firstController.signal, undefined, session);
         const second = translateTextSlots(['Second'], enabled, secondController.signal, undefined, session);
         await vi.advanceTimersByTimeAsync(40);
         const sharedSignal = runtime.requestOptions[0]?.signal as AbortSignal;
+        const sharedAborted = vi.fn();
+        sharedSignal.addEventListener('abort', sharedAborted);
 
         firstController.abort();
+        expect(sharedSignal.aborted).toBe(sharedCallerSignal);
         secondController.abort();
         await Promise.all([
             expect(first).rejects.toMatchObject({name: 'AbortError'}),
             expect(second).rejects.toMatchObject({name: 'AbortError'}),
         ]);
         expect(sharedSignal.aborted).toBe(true);
+        expect(sharedAborted).toHaveBeenCalledOnce();
         expect(runtime.cancelQueue).toHaveBeenCalledWith(expect.any(Object), expect.objectContaining({name: 'AbortError'}));
 
         const providerAbort = new Error('provider aborted');

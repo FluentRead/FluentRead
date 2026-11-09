@@ -25,7 +25,8 @@ export function matchCommonWebTerms(
     source: string | readonly string[],
     userEntries: readonly GlossaryProtectionEntry[] = [],
 ): GlossaryProtectionEntry[] {
-    const texts = typeof source === 'string' ? [source] : source.filter(text => typeof text === 'string');
+    const texts = typeof source === 'string' ? [source]
+        : Array.isArray(source) ? source.filter(text => typeof text === 'string') : [];
     // 绝大部分段落没有候选；只对实际出现过的字面量进入通用词边界匹配。
     const candidates = entries.filter(entry => texts.some(text => text.includes(entry.source)));
     if (!candidates.length) return [];

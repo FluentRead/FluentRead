@@ -162,10 +162,11 @@ describe('术语库与真实翻译编排协作', () => {
         expect(h.get).not.toHaveBeenCalled();
 
         const prose = 'Use the API to read JSON.';
-        const origin = ['API', prose, ' SDK ', prose];
+        // 历史调用可能含缺失槽；缓存按单槽读取时也必须保留其空位。
+        const origin = ['API', prose, undefined as unknown as string, ' SDK ', prose];
         for (const pageUrl of ['https://docs.example.net/guide', 'https://forum.example.org/discussion']) {
             await expect(h.broker.translateWithCache(attachTranslationGlossaryContext({origin}, {pageUrl, context: 'page'})))
-                .resolves.toEqual(['API', '使用 API 读取 JSON。', ' SDK ', '使用 API 读取 JSON。']);
+                .resolves.toEqual(['API', '使用 API 读取 JSON。', '', ' SDK ', '使用 API 读取 JSON。']);
         }
         expect(h.provider).toHaveBeenCalledTimes(1);
         expect(h.calls[0].message.origin).toEqual([expect.stringMatching(/^Use the __FRTERM_.* to read __FRTERM_/u)]);
@@ -231,6 +232,15 @@ describe('术语库与真实翻译编排协作', () => {
             else await expect(pending).rejects.toMatchObject({code: 'GLOSSARY_PLACEHOLDER_INVALID'});
             expect(h.provider).toHaveBeenCalledTimes(2);
         }
+    });
+
+    it.each(['Call the API to retrieve the records.', '🥹'])('只有带 emoji 的正文才允许字面重试 %s', async origin => {
+        const h = harness('siliconCloud', hunyuanModel);
+        h.config.glossaryEnabled = false;
+        h.provider.mockResolvedValueOnce('返回没有保留占位符。');
+        await expect(h.request({origin})).rejects.toMatchObject({code: 'GLOSSARY_PLACEHOLDER_INVALID'});
+        expect(h.provider).toHaveBeenCalledTimes(1);
+        expect(h.cache.size).toBe(0);
     });
 
     it.each([

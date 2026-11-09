@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/ui/pdfReader.ts
  * 文件职责：为 PDF 阅读器提供有界页面调度和浏览器原页渲染，使用锁定版本的 PDF.js TextLayer 让文字选择与原版面一致。
- * 主要内容：按可见页优先维护五页窗口与两项并发；离屏、缩放和卸载取消迟到任务；重排裁剪使用界面当前的原图区域，仅区域标识或几何变化使缓存失效，普通译文更新不重绘；译文页只复制一次原页像素，译文文字由阅读器叠加；直接绘制 Canvas 而不编码 PNG，单页总像素与边长有上限；共享 PDF 加载租约，失败可重试且资源只释放一次。
+ * 主要内容：按可见页优先维护五页窗口与两项并发；原版阅读缩放复用已就绪的页面，可见页需要更高分辨率时在总像素预算内准备新画布并替换，原文文字层持续挂载；重排裁剪使用界面当前的原图区域，普通译文更新复用像素；译文页复制原页像素，译文文字由阅读器叠加；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
  * 模块边界：调度器只调用注入的渲染端口；浏览器渲染端口依赖 PDF.js 和文档预览资源，不发起翻译请求、不修改原始文件或负责入口挂载。
  */
 import type {PDFPageProxy, TextLayer} from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -15,6 +15,8 @@ export const PDF_READER_MAX_RESIDENT_PAGES = 5;
 export const PDF_READER_MAX_PAGE_PIXELS = 8_000_000;
 export const PDF_READER_MAX_CANVAS_EDGE = 8192;
 export const PDF_READER_RENDER_CONCURRENCY = 2;
+/** 只补绘实际分辨率有明显提升的页面，微小捏合及达到像素上限后沿用旧图。 */
+const MIN_RASTER_INCREASE = 1.1;
 let pdfJsModule: Promise<typeof import('pdfjs-dist/legacy/build/pdf.mjs')>;
 
 export interface PdfReaderSettings {
@@ -23,13 +25,15 @@ export interface PdfReaderSettings {
     presentation?: PdfReadingPresentation;
     /** 与界面同页计划一致的裁剪范围；显式空数组表示当前没有原图区域，未提供才使用兼容源计划。 */
     regionEntries?: readonly PdfReadingRegionEntry[];
-    /** 缩放、阅读方式或原图区域变化才使该页失效；普通译文更新不触发重绘。 */
+    /** 原版页面的底图可以在当前页进入视口后按需补足清晰度。 */
+    refine?: boolean;
+    /** 同一原版页面的缩放独立于缓存身份；阅读方式和重排裁剪变化仍使结果失效。 */
     key: string;
 }
 
 export interface PdfReaderRenderedPage {
     sourceCanvas?: HTMLCanvasElement;
-    sourceText?: HTMLElement;
+    sourceText?: {element: HTMLElement; dispose: () => void};
     translatedCanvas?: HTMLCanvasElement;
     regions?: ReadonlyMap<string, HTMLCanvasElement>;
     dispose: () => void;
@@ -37,11 +41,11 @@ export interface PdfReaderRenderedPage {
 
 export type PdfReaderPageState =
     | {status: 'loading'}
-    | {status: 'ready'; output: PdfReaderRenderedPage}
+    | {status: 'ready'; output: PdfReaderRenderedPage; refreshError?: string}
     | {status: 'error'; message: string};
 
 export interface PdfReaderRenderPort {
-    render: (page: PdfDocumentPage, settings: PdfReaderSettings, signal: AbortSignal) => Promise<PdfReaderRenderedPage>;
+    render: (page: PdfDocumentPage, settings: PdfReaderSettings, signal: AbortSignal, rasterRefresh?: {pixelBudget: number; keepSourceText: boolean}) => Promise<PdfReaderRenderedPage>;
     dispose: () => void;
 }
 
@@ -63,14 +67,15 @@ export function pdfReaderPageWindow(pageCount: number, currentIndex: number, vis
 export function pdfReaderCanvasSize(width: number, height: number, _devicePixelRatio: number, canvasCount = 1, pixelBudget = PDF_READER_MAX_PAGE_PIXELS): {width: number; height: number; outputScale: number} {
     if (!Number.isFinite(pixelBudget) || pixelBudget < 1) throw new RangeError('PDF 页面像素预算不足');
     const pixelLimit = Math.floor(pixelBudget);
+    const pixelsPerCanvas = pixelLimit / Math.max(1, canvasCount);
     const safeWidth = Math.max(1, Number.isFinite(width) ? width : 1);
     const safeHeight = Math.max(1, Number.isFinite(height) ? height : 1);
     const outputScale = Math.min(
         // 至少按 2 倍超采样：1 倍屏上细小的论文字形经缩小后更锐利，窗口报告的像素比偏低时也不会发虚。
         2,
-        Math.sqrt(pixelLimit / Math.max(1, canvasCount) / safeWidth / safeHeight),
+        Math.sqrt(pixelsPerCanvas / safeWidth / safeHeight),
         PDF_READER_MAX_CANVAS_EDGE / Math.max(safeWidth, safeHeight),
-        pixelLimit / Math.max(safeWidth, safeHeight),
+        pixelsPerCanvas / Math.max(safeWidth, safeHeight),
     );
     return {width: Math.max(1, Math.floor(safeWidth * outputScale)), height: Math.max(1, Math.floor(safeHeight * outputScale)), outputScale};
 }
@@ -82,7 +87,7 @@ export function pdfReaderPageKey(page: PdfDocumentPage, scale: number, mode: Pdf
             .sort((left, right) => left.id.localeCompare(right.id));
         return JSON.stringify([scale, mode, presentation, page.blocks, (page as PdfDocumentPage & {preservedRegions?: unknown}).preservedRegions, ...(regions === undefined ? [] : [regions])]);
     }
-    return JSON.stringify([scale, mode]);
+    return JSON.stringify([mode]);
 }
 
 /** 原坐标裁剪映射到实际展示旋转，不改变原画布或源文件。 */
@@ -129,7 +134,7 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
             lease?.release();
             lease = undefined;
         },
-        render: async (model, settings, signal) => {
+        render: async (model, settings, signal, rasterRefresh) => {
             if (disposed) throw new DOMException('PDF 阅读器已关闭', 'AbortError');
             signal.throwIfAborted();
             const shared = resource();
@@ -142,25 +147,22 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
             let page: PDFPageProxy | undefined;
             let canvas: HTMLCanvasElement | undefined;
             let translatedCanvas: HTMLCanvasElement | undefined;
-            let text: HTMLElement | undefined;
-            let textLayer: TextLayer | undefined;
             const regions = new Map<string, HTMLCanvasElement>();
             let renderTask: ReturnType<PDFPageProxy['render']> | undefined;
             let released = false;
             let completed = false;
-            const dispose = () => {
+            const result: PdfReaderRenderedPage = {dispose};
+            function dispose() {
                 if (released) return;
                 released = true;
                 renderTask?.cancel();
-                textLayer?.cancel();
-                text?.replaceChildren();
-                text?.remove();
+                result.sourceText?.dispose();
                 for (const entry of [canvas, translatedCanvas, ...regions.values()]) {
                     if (!entry) continue;
                     entry.width = entry.height = 0;
                     entry.remove();
                 }
-            };
+            }
             controller.signal.addEventListener('abort', dispose, {once: true});
             try {
                 const pdf = await abortable(shared.promise, controller.signal);
@@ -176,12 +178,13 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 const regionArea = regionEntries.reduce((sum, entry) => sum + entry.sourceRect.width * entry.sourceRect.height * settings.scale ** 2, 0);
                 const canvasCount = readable ? 1 + regionArea / Math.max(1, viewport.width * viewport.height) : settings.mode === 'bilingual' ? 2 : 1;
                 // 每个原图至少占一个像素；先预留，防止超细区域的向上取整累积突破上限。
-                const size = pdfReaderCanvasSize(viewport.width, viewport.height, window.devicePixelRatio, canvasCount, PDF_READER_MAX_PAGE_PIXELS - regionEntries.length);
+                const pixelBudget = rasterRefresh?.pixelBudget ?? PDF_READER_MAX_PAGE_PIXELS;
+                const size = pdfReaderCanvasSize(viewport.width, viewport.height, window.devicePixelRatio, canvasCount, pixelBudget - regionEntries.length);
                 canvas = globalThis.document.createElement('canvas');
                 canvas.width = size.width;
                 canvas.height = size.height;
-                canvas.style.width = `${viewport.width}px`;
-                canvas.style.height = `${viewport.height}px`;
+                canvas.style.width = `${model.width}px`;
+                canvas.style.height = `${model.height}px`;
                 canvas.setAttribute('aria-hidden', 'true');
                 canvas.setAttribute('data-pdf-resource', 'source');
                 // 仅译文原版排版直接从此画布逐段取色；其他源画布无需牺牲绘制加速。
@@ -189,20 +192,24 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 if (!context) throw new Error('浏览器 Canvas 初始化失败');
                 renderTask = page.render({canvas: null, canvasContext: context, viewport, transform: [size.outputScale, 0, 0, size.outputScale, 0, 0], background: '#ffffff'});
                 const work = [abortable(renderTask.promise, controller.signal)];
-                if (showSource) {
-                    text = globalThis.document.createElement('div');
+                if (showSource && !rasterRefresh?.keepSourceText) {
+                    const textViewport = settings.scale === 1 ? viewport : page.getViewport({scale: 1});
+                    const text = globalThis.document.createElement('div');
+                    let textLayer: TextLayer | undefined;
+                    result.sourceText = {element: text, dispose: () => {textLayer?.cancel(); text.replaceChildren(); text.remove();}};
                     text.className = 'fluentread-pdf-text-layer';
                     text.setAttribute('data-fluentread-pdf-text', '');
                     text.setAttribute('data-pdf-page-number', String(model.pageNumber));
-                    text.style.setProperty('--total-scale-factor', String(viewport.scale * viewport.userUnit));
-                    textLayer = new module.TextLayer({textContentSource: page.streamTextContent(), container: text, viewport});
-                    work.push(abortable(textLayer.render(), controller.signal));
+                    text.style.setProperty('--total-scale-factor', String(textViewport.scale * textViewport.userUnit));
+                    const layer = textLayer = new module.TextLayer({textContentSource: page.streamTextContent(), container: text, viewport: textViewport});
+                    work.push(abortable(layer.render(), controller.signal).then(() => {
+                        text.setAttribute('data-fluentread-pdf-page-text', layer.textContentItemsStr.join(' '));
+                    }));
                 }
                 await Promise.all(work);
                 controller.signal.throwIfAborted();
-                if (text && textLayer) text.setAttribute('data-fluentread-pdf-page-text', textLayer.textContentItemsStr.join(' '));
                 if (readable) {
-                    let remainingPixels = PDF_READER_MAX_PAGE_PIXELS - canvas.width * canvas.height;
+                    let remainingPixels = pixelBudget - canvas.width * canvas.height;
                     for (const [index, entry] of regionEntries.entries()) {
                         controller.signal.throwIfAborted();
                         const rect = pdfReaderDisplayRect(entry.sourceRect, model);
@@ -252,7 +259,10 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 }
                 controller.signal.throwIfAborted();
                 completed = true;
-                return {sourceCanvas: showSource ? canvas : undefined, sourceText: text, translatedCanvas, ...(readable ? {regions} : {}), dispose};
+                result.sourceCanvas = showSource ? canvas : undefined;
+                result.translatedCanvas = translatedCanvas;
+                if (readable) result.regions = regions;
+                return result;
             } finally {
                 controller.signal.removeEventListener('abort', dispose);
                 signal.removeEventListener('abort', abort);
@@ -266,7 +276,8 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
 }
 
 interface ReaderEntry {
-    settings: PdfReaderSettings;
+    key: string;
+    failedScale?: number;
     controller?: AbortController;
     state: PdfReaderPageState;
 }
@@ -274,9 +285,9 @@ interface ReaderEntry {
 /** 任务拥有自己的代次；取消后即使端口晚到成功，也只能释放结果，不能占有当前页面。 */
 export class PdfReaderScheduler {
     private readonly entries = new Map<number, ReaderEntry>();
-    private wanted: number[] = [];
-    private settings!: (index: number) => PdfReaderSettings;
+    private wanted = new Map<number, PdfReaderSettings>();
     private running = 0;
+    private reservedPixels = 0;
     private disposed = false;
 
     constructor(
@@ -287,10 +298,9 @@ export class PdfReaderScheduler {
 
     update(priorityIndexes: readonly number[], settings: (index: number) => PdfReaderSettings): void {
         if (this.disposed) return;
-        this.wanted = [...new Set(priorityIndexes)].filter(index => this.pages[index]).slice(0, PDF_READER_MAX_RESIDENT_PAGES);
-        this.settings = settings;
+        this.wanted = new Map([...new Set(priorityIndexes)].filter(index => this.pages[index]).slice(0, PDF_READER_MAX_RESIDENT_PAGES).map(index => [index, settings(index)]));
         for (const [index, entry] of this.entries) {
-            if (!this.wanted.includes(index) || entry.settings.key !== settings(index).key) this.evict(index, entry);
+            if (this.wanted.get(index)?.key !== entry.key) this.evict(index, entry);
         }
         this.pump();
     }
@@ -298,13 +308,18 @@ export class PdfReaderScheduler {
     retry(index: number): void {
         const entry = this.entries.get(index);
         if (entry?.state.status === 'error') this.evict(index, entry);
+        else if (entry?.state.status === 'ready' && entry.state.refreshError !== undefined) {
+            entry.failedScale = undefined;
+            entry.state = {status: 'ready', output: entry.state.output};
+            this.onChange(this.pages[index].pageNumber, entry.state);
+        }
         this.pump();
     }
 
     dispose(): void {
         if (this.disposed) return;
         this.disposed = true;
-        this.wanted = [];
+        this.wanted.clear();
         for (const [index, entry] of this.entries) this.evict(index, entry);
         this.port.dispose();
     }
@@ -316,27 +331,74 @@ export class PdfReaderScheduler {
         this.onChange(this.pages[index].pageNumber);
     }
 
+    private availablePixels(): number {
+        // 待替换的旧画布也计入预算。异步绘制先预留额度，释放或提交后再处理排队的页。
+        let available = PDF_READER_MAX_PAGE_PIXELS * PDF_READER_MAX_RESIDENT_PAGES - this.reservedPixels;
+        for (const entry of this.entries.values()) {
+            if (entry.state.status !== 'ready') continue;
+            const {sourceCanvas, translatedCanvas, regions} = entry.state.output;
+            for (const canvas of [sourceCanvas, translatedCanvas, ...(regions?.values() ?? [])]) {
+                if (canvas) available -= canvas.width * canvas.height;
+            }
+        }
+        return Math.min(PDF_READER_MAX_PAGE_PIXELS, available);
+    }
+
     private pump(): void {
         if (this.disposed) return;
-        for (const index of this.wanted) {
+        for (const [index, settings] of this.wanted) {
             if (this.running >= PDF_READER_RENDER_CONCURRENCY) break;
-            if (this.entries.has(index)) continue;
-            const controller = new AbortController();
-            const entry: ReaderEntry = {settings: this.settings(index), controller, state: {status: 'loading'}};
-            this.entries.set(index, entry);
-            this.running += 1;
-            this.onChange(this.pages[index].pageNumber, entry.state);
-            void this.port.render(this.pages[index], entry.settings, controller.signal).then(output => {
-                if (this.disposed || controller.signal.aborted || this.entries.get(index) !== entry) {output.dispose(); return;}
-                entry.state = {status: 'ready', output};
-                entry.controller = undefined;
-                this.onChange(this.pages[index].pageNumber, entry.state);
-            }, error => {
-                if (this.disposed || controller.signal.aborted || this.entries.get(index) !== entry) return;
-                entry.state = {status: 'error', message: error instanceof Error ? error.message : String(error)};
-                entry.controller = undefined;
-                this.onChange(this.pages[index].pageNumber, entry.state);
-            }).finally(() => {this.running -= 1; this.pump();});
+            const entry = this.entries.get(index);
+            if (entry && (entry.controller || entry.state.status !== 'ready' || !settings.refine || entry.failedScale === settings.scale)) continue;
+            const page = this.pages[index];
+            const budget = this.availablePixels();
+            if (entry?.state.status === 'ready') {
+                const previous = entry.state.output;
+                const canvas = previous.sourceCanvas ?? previous.translatedCanvas;
+                const canvasCount = settings.mode === 'bilingual' ? 2 : 1;
+                if (!canvas || budget < canvasCount) continue;
+                const size = pdfReaderCanvasSize(page.width * settings.scale, page.height * settings.scale, 1, canvasCount, budget);
+                if (size.width * size.height < canvas.width * canvas.height * MIN_RASTER_INCREASE ** 2) continue;
+                this.start(index, settings, budget, entry, previous);
+            } else if (budget >= PDF_READER_MAX_PAGE_PIXELS) {
+                this.start(index, settings, PDF_READER_MAX_PAGE_PIXELS);
+            }
         }
+    }
+
+    private start(index: number, settings: PdfReaderSettings, budget: number, existing?: ReaderEntry, previous?: PdfReaderRenderedPage): void {
+        const page = this.pages[index];
+        const entry: ReaderEntry = existing ?? {key: settings.key, state: {status: 'loading'}};
+        const controller = new AbortController();
+        entry.controller = controller;
+        this.entries.set(index, entry);
+        this.running += 1;
+        this.reservedPixels += budget;
+        if (!previous) this.onChange(page.pageNumber, entry.state);
+        const rasterRefresh = previous ? {pixelBudget: budget, keepSourceText: Boolean(previous.sourceText)} : undefined;
+        const current = () => !this.disposed && !controller.signal.aborted && this.entries.get(index) === entry;
+        void this.port.render(page, settings, controller.signal, rasterRefresh).then(output => {
+            if (!current()) {output.dispose(); return;}
+            if (previous && !output.sourceText) {
+                output.sourceText = previous.sourceText;
+                previous.sourceText = undefined;
+            }
+            previous?.dispose();
+            entry.state = {status: 'ready', output};
+            entry.controller = undefined;
+            entry.failedScale = undefined;
+            this.onChange(page.pageNumber, entry.state);
+        }, error => {
+            if (!current()) return;
+            const message = error instanceof Error ? error.message : String(error);
+            entry.state = previous ? {status: 'ready', output: previous, refreshError: message} : {status: 'error', message};
+            entry.controller = undefined;
+            entry.failedScale = settings.scale;
+            this.onChange(page.pageNumber, entry.state);
+        }).finally(() => {
+            this.running -= 1;
+            this.reservedPixels -= budget;
+            this.pump();
+        });
     }
 }

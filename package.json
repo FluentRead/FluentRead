@@ -6,7 +6,8 @@
   "userscriptVersion": "2.0.2",
   "type": "module",
   "engines": {
-    "node": ">=22.23.4"
+    "node": ">=22.23.4",
+    "pnpm": ">=12.18.0"
   },
   "scripts": {
     "chatgpt:bridge": "node integrations/chatgpt-plan/cli.mjs",

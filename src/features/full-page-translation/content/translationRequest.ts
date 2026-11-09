@@ -25,6 +25,7 @@ import {identifyTextLanguage} from '@/src/core/language/identify';
 import {getSupplementalLanguageCandidate} from '@/src/core/language/supplement';
 import {isModelThinkingEnabled} from '@/src/core/config/modelThinking';
 import {createGlossaryRevisionMemoizer, protectGlossaryText} from '@/src/core/glossary';
+import {matchCommonWebTerms} from '@/src/core/glossary/commonWebTerms';
 import {translateText, translateTextBatch, type TranslateOptions} from '@/src/services/translation/client';
 import {TranslationRequestError} from '@/src/services/translation/errors';
 import {shouldSkipTranslationWithEvidence} from '@/src/services/translation/languagePreflight';
@@ -45,6 +46,7 @@ const FULL_PAGE_TRANSLATION_REQUEST_CACHE_LIMIT = 512;
 const FULL_PAGE_TRANSLATION_REMOUNT_GRACE_MS = 250;
 const NATIVE_BATCH_MAX_TEXT_SLOTS = 4;
 const NATIVE_BATCH_MAX_CHARACTERS = 2_000;
+const INLINE_CODE_PROBE_MAX_BYTES = 450;
 const AI_BATCH_COLLECTION_MS = 32;
 // 悬浮手势的每次配置捕获仍同步冻结字段；只有全库摘要经原始标量复验后复用。
 const readGlossaryRevision = createGlossaryRevisionMemoizer();
@@ -274,7 +276,8 @@ export async function tryTranslateInlineCodeSentence(
     snapshot = copyFullPageTranslationConfigSnapshot(snapshot);
     // 隐式正文或篇章上下文可能包含受保护代码，不能用于这次试探。
     // 部分免费线路按 UTF-8 字节限制请求；保留 50 字节余量，避免试探被拆开标记。
-    if (snapshot.enableAIContext || source.length > 450 || new TextEncoder().encode(source).length > 450 || hasEmojiLiterals(source) ||
+    if (snapshot.enableAIContext || source.length > INLINE_CODE_PROBE_MAX_BYTES ||
+        new TextEncoder().encode(source).length > INLINE_CODE_PROBE_MAX_BYTES || hasEmojiLiterals(source) ||
         (isCurrent && !isCurrent())) return null;
     const markerPattern = /__FRCODE_([a-f0-9]{16})_(0|[1-9]\d*)__/gu;
     const matches = [...source.matchAll(markerPattern)];
@@ -282,12 +285,16 @@ export async function tryTranslateInlineCodeSentence(
         match[1] !== matches[0]![1] || Number(match[2]) !== index)) return null;
     const detectionText = source.replace(markerPattern, ' ');
     if (/__FRCODE/iu.test(detectionText) || !detectionText.trim()) return null;
+    // 按叠加默认术语占位符后的载荷检查上游预算和 auto 识别，仍用原文构造实际请求。
+    const terms = matchCommonWebTerms(detectionText);
+    const providerSource = terms.length ? protectGlossaryText(source, terms).text : source;
+    if (terms.length && new TextEncoder().encode(providerSource).length > INLINE_CODE_PROBE_MAX_BYTES) return null;
 
     // 部分 provider（如 MyMemory）会对标记化请求重新自动识别源语言。
     // 只有标记前后都可靠且一致时才试探，不能更改用户的 auto 设置来掩盖差异。
     if (snapshot.sourceLanguage.trim().toLowerCase() === 'auto') {
         const plainLanguage = identifyTextLanguage(detectionText);
-        const taggedLanguage = identifyTextLanguage(source);
+        const taggedLanguage = identifyTextLanguage(providerSource);
         if (plainLanguage.status !== 'identified' || taggedLanguage.status !== 'identified' ||
             plainLanguage.languages.length !== 1 || taggedLanguage.languages.length !== 1 ||
             plainLanguage.languages[0] !== taggedLanguage.languages[0]) return null;

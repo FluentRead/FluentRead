@@ -2167,7 +2167,7 @@ describe('translation broker', () => {
         mocks.config.newApiUrl = 'https://legacy-newapi.example';
         mocks.config.proxy.aiSdk = 'https://legacy-proxy.example';
         mocks.config.service = 'aiSdk';
-        await translateWithCache({origin: 'AI SDK'});
+        await translateWithCache({origin: 'Integration request'});
         expect(mocks.endpointResolver).toHaveBeenCalledWith('aiSdk', expect.any(Object));
         expect(translationCacheIdentities().at(-1)).toMatchObject({
             endpoint: 'https://aiSdk.endpoint.test',
@@ -2175,7 +2175,7 @@ describe('translation broker', () => {
         });
 
         mocks.config.service = 'brokenAiSdk';
-        await translateWithCache({origin: 'Broken AI SDK'});
+        await translateWithCache({origin: 'Broken endpoint'});
         expect(translationCacheIdentities().at(-1)).toMatchObject({
             endpoint: '',
             transportProfile: 'ai-sdk-profile',
@@ -2183,7 +2183,7 @@ describe('translation broker', () => {
 
         mocks.config.service = 'azureOpenai';
         mocks.config.azureOpenaiEndpoint = 'https://azure-openai.example';
-        await translateWithCache({origin: 'Azure OpenAI'});
+        await translateWithCache({origin: 'Azure translation endpoint'});
         expect(translationCacheIdentities().at(-1)).toMatchObject({
             azureOpenaiEndpoint: 'https://azure-openai.example',
             service: 'azureOpenai',

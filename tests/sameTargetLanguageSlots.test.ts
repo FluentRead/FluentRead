@@ -140,6 +140,14 @@ describe('原始槽的补充证据与快照', () => {
         expect(runtime.requests[0]?.options.sourceLanguage).toBe('ja');
     });
 
+    it('按默认术语保护后的 UTF-8 长度限制行内代码试探', async () => {
+        Object.assign(runtime.config, {from: 'en', to: 'zh-Hans'});
+        const source = `Read __FRCODE_0123456789abcdef_0__ and ${'call the API. '.repeat(25)}`;
+        expect(new TextEncoder().encode(source).length).toBeLessThan(450);
+        expect(await tryTranslateInlineCodeSentence(source, () => ['ignored'], captureFullPageTranslationConfig())).toBeNull();
+        expect(runtime.requests).toEqual([]);
+    });
+
     it('行内代码试探只发送标记正文，以无标记文字检测语言并冻结缓存设置', async () => {
         Object.assign(runtime.config, {service: 'freeTranslation', to: 'zh-Hans', glossaryEnabled: false, glossaryLibraries: [], enableAIContext: false});
         const snapshot = captureFullPageTranslationConfig();

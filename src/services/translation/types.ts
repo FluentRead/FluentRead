@@ -229,6 +229,8 @@ export interface TranslationConfigSnapshot {
     glossaryMatchContext?: Readonly<{
         /** broker 根据当前入口派生；文档正文的地址与代码名称使用同一严格保护链。 */
         context?: TranslationGlossaryContext;
+        /** 普通网页和文字请求可以使用默认技术术语；摘要、文档和图像输入独立处理。 */
+        preserveCommonWebTerms?: boolean;
         sourceLanguage: string;
         targetLanguage: string;
         pageUrl?: string;

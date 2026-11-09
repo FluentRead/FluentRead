@@ -4,6 +4,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {Config} from '@/src/core/config/model';
 import {resolveConfiguredModel, servicesType} from '@/src/core/config/catalog';
 import {buildGlossaryRevision, type GlossaryLibrary} from '@/src/core/glossary';
+import {hasOnlyCommonWebTerms, matchCommonWebTerms} from '@/src/core/glossary/commonWebTerms';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/public';
 import {createTranslationBroker} from '@/src/services/translation/broker';
 import {supportsTranslationGlossary} from '@/src/services/translation/capabilities';
@@ -128,6 +129,109 @@ describe('术语库与真实翻译编排协作', () => {
     const hunyuanModel = 'tencent/Hunyuan-MT-7B';
     const avengers = 'Avengers Tower has shown up in Shanghai.';
     const avengersTranslation = '复仇者大厦出现在上海。';
+
+    it('默认词表仅匹配完整技术词及原有大小写，用户短语先占用匹配位置', () => {
+        expect(hasOnlyCommonWebTerms(' API / SDK · JSON ')).toBe(true);
+        for (const text of ['—', 'api', 'Use the API', 'API_v2', 'PHP API', 'API 2026']) {
+            expect(hasOnlyCommonWebTerms(text), text).toBe(false);
+        }
+        expect(matchCommonWebTerms('API JSON OpenAI API_v2 mySDK github')).toEqual([
+            {source: 'API', target: '', caseSensitive: true},
+            {source: 'JSON', target: '', caseSensitive: true},
+            {source: 'OpenAI', target: '', caseSensitive: true},
+        ]);
+        expect(matchCommonWebTerms('SDK-based and API-ready.', [
+            {source: 'API-ready', target: '接口已就绪', caseSensitive: true},
+        ]).map(term => term.source)).toEqual(['SDK']);
+        expect(matchCommonWebTerms(['ordinary words', 'myAPI and api_v2'])).toEqual([]);
+        expect(matchCommonWebTerms('用API访问，再读取JSON。').map(term => term.source)).toEqual(['API', 'JSON']);
+    });
+
+    it.each(['microsoft', 'openai'])('%s 按原位置保留独立词槽，正文中的术语经保护后回填', async service => {
+        const h = harness(service);
+        h.config.glossaryEnabled = false;
+        const record = h.provider.getMockImplementation()!;
+        h.provider.mockImplementation(async message => {
+            await record(message);
+            const translate = (source: string) => source.replace('Use the ', '使用 ').replace(' to read ', ' 读取 ').replace(/\.$/u, '。');
+            return Array.isArray(message.origin) ? message.origin.map(translate) : translate(message.origin);
+        });
+        await expect(h.request({origin: ' API / SDK · JSON '})).resolves.toBe(' API / SDK · JSON ');
+        await expect(h.request({origin: ['SDK', 'API', 'JSON']})).resolves.toEqual(['SDK', 'API', 'JSON']);
+        expect(h.provider).not.toHaveBeenCalled();
+        expect(h.get).not.toHaveBeenCalled();
+
+        const prose = 'Use the API to read JSON.';
+        const origin = ['API', prose, ' SDK ', prose];
+        for (const pageUrl of ['https://docs.example.net/guide', 'https://forum.example.org/discussion']) {
+            await expect(h.broker.translateWithCache(attachTranslationGlossaryContext({origin}, {pageUrl, context: 'page'})))
+                .resolves.toEqual(['API', '使用 API 读取 JSON。', ' SDK ', '使用 API 读取 JSON。']);
+        }
+        expect(h.provider).toHaveBeenCalledTimes(1);
+        expect(h.calls[0].message.origin).toEqual([expect.stringMatching(/^Use the __FRTERM_.* to read __FRTERM_/u)]);
+        expect(h.calls[0].snapshot.glossaryProtectedTokens).toHaveLength(2);
+        expect(h.identities).toEqual(expect.arrayContaining([expect.objectContaining({
+            glossaryTerms: [{source: 'API', target: 'API'}, {source: 'JSON', target: 'JSON'}],
+        })]));
+    });
+
+    it('站点范围内的用户译法覆盖默认词表，其他站点保留原写法', async () => {
+        const h = harness();
+        const custom = library('overrides', '智能体', ['docs.example.com']);
+        custom.entries = [{id: 'api', source: 'api', target: '接口', caseSensitive: false}];
+        h.config.glossaryLibraries = [custom];
+        await expect(h.request({origin: 'API'})).resolves.toBe('接口');
+        await expect(h.broker.translateWithCache(attachTranslationGlossaryContext({origin: 'API'},
+            {pageUrl: 'https://forum.example.org/discussion', context: 'page'}))).resolves.toBe('API');
+        expect(h.provider).toHaveBeenCalledTimes(1);
+        expect(h.calls[0].snapshot.glossaryProtectedTokens).toHaveLength(1);
+    });
+
+    it('纯术语富文本直接原样返回，混合槽中的独立术语忽略供应商扩写', async () => {
+        const h = harness();
+        h.config.glossaryEnabled = false;
+        const label = serializeTranslationSlots(['API', ' / ', 'SDK']);
+        await expect(h.request({origin: label.payload, validateTranslationSlots: true})).resolves.toBe(label.payload);
+        expect(h.provider).not.toHaveBeenCalled();
+        const source = 'Select a date to read the latest records.';
+        const mixed = serializeTranslationSlots(['API', source]);
+        h.provider.mockImplementationOnce(async message => String(message.origin)
+            .replace(/__FRTERM_[a-z0-9_]+?__/u, '$&（应用程序编程接口）')
+            .replace(source, '选择日期以查看最新记录。'));
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const translated = await h.request({origin: mixed.payload, validateTranslationSlots: true});
+            expect(parseTranslationSlots(mixed, translated as string)).toEqual(['API', '选择日期以查看最新记录。']);
+        }
+        expect(h.provider).toHaveBeenCalledTimes(1);
+    });
+
+    it('保护正文的词条参与缓存身份，字幕结果与已保存的无保护结果隔离', async () => {
+        const h = harness();
+        h.config.glossaryEnabled = false;
+        const origin = 'Call the API to fetch the latest records.';
+        h.provider.mockResolvedValueOnce('调用应用程序编程接口读取最新记录。');
+        h.provider.mockImplementationOnce(async message =>
+            `调用 ${String(message.origin).match(/__FRTERM_[a-z0-9_]+?__/u)![0]} 读取最新记录。`);
+        await expect(h.broker.translateWithCache({origin, glossaryContext: 'video'})).resolves.toContain('应用程序编程接口');
+        await expect(h.request({origin})).resolves.toBe('调用 API 读取最新记录。');
+        await expect(h.request({origin})).resolves.toBe('调用 API 读取最新记录。');
+        expect(h.provider).toHaveBeenCalledTimes(2);
+        expect(h.identities[0]).not.toHaveProperty('glossaryTerms');
+        expect(h.identities[1]).toMatchObject({glossaryTerms: [{source: 'API', target: 'API'}]});
+    });
+
+    it('Hunyuan emoji 字面重试仍核对常用术语的字形和次数', async () => {
+        const origin = 'Call the API to retrieve the records. 🥹';
+        for (const result of ['调用 API 读取记录。🥹', '调用接口读取记录。🥹']) {
+            const h = harness('siliconCloud', hunyuanModel);
+            h.config.glossaryEnabled = false;
+            h.provider.mockResolvedValueOnce('调用接口读取记录。').mockResolvedValueOnce(result);
+            const pending = h.request({origin});
+            if (result.includes('API')) await expect(pending).resolves.toBe(result);
+            else await expect(pending).rejects.toMatchObject({code: 'GLOSSARY_PLACEHOLDER_INVALID'});
+            expect(h.provider).toHaveBeenCalledTimes(2);
+        }
+    });
 
     it.each([
         ['A', `${avengers} 🥹`, true],

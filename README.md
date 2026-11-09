@@ -60,10 +60,15 @@ Thank you to [**bilibili Index-Translate**](https://index-translate.bilibili.com
 
 ## Local development
 
-Use the Node.js version in `.nvmrc` to match CI and the pnpm version pinned in `package.json`. Install dependencies with `pnpm install --frozen-lockfile`.
+Use the Node.js version in `.nvmrc` to match CI. Run pnpm through Corepack to use the version pinned in `package.json` even when your shell has an older global pnpm.
 
-- `pnpm dev` starts local development.
-- `pnpm zip` builds and packages the Chrome extension.
+```sh
+nvm install
+corepack pnpm install --frozen-lockfile
+```
+
+- `corepack pnpm dev` starts local development.
+- `corepack pnpm zip` builds and packages the Chrome extension.
 
 [Other browsers](./docs/maintainers/releases.md#本地打包) · [Firefox source review](./scripts/amo/README.md)
 

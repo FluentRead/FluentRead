@@ -55,20 +55,31 @@
   "openai-community-hot": {
     "url": "https://community.openai.com/hot",
     "hoverSelector": ".topic-list-item .link-top-line",
-    "requiredSelectors": [".topic-list-item .link-top-line"],
-    "coverageRules": [
-      {"name": "topic-titles", "selector": ".topic-list-item .link-top-line", "kind": "content", "minInitial": 3}
+    "hoverTargets": [
+      {"name": "topic-title", "selector": ".topic-list-item .link-top-line"},
+      {"name": "pinned-excerpt", "selector": ".topic-list-item .topic-excerpt"}
     ],
-    "forbiddenSelectors": [".discourse-tags", ".discourse-tag", "h1.sr-only"],
-    "dynamicForbiddenSelectors": [".discourse-tags", ".discourse-tag"],
-    "interactionSelectors": [".topic-list-item a.title[href]", ".discourse-tag[href]"],
+    "requiredSelectors": [".topic-list-item .link-top-line", ".topic-list-item .topic-excerpt"],
+    "coverageRules": [
+      {"name": "topic-titles", "selector": ".topic-list-item .link-top-line", "kind": "content", "minInitial": 3},
+      {"name": "pinned-excerpts", "selector": ".topic-list-item .topic-excerpt", "kind": "content", "minInitial": 1}
+    ],
+    "forbiddenSelectors": [
+      ".d-header", ".sidebar-container", ".list-controls", ".topic-list > thead",
+      ".topic-list-item .link-bottom-line", ".topic-list-item > td.activity",
+      ".discourse-tags", ".discourse-tag", "h1.sr-only"
+    ],
+    "dynamicForbiddenSelectors": [
+      ".topic-list-item .link-bottom-line", ".topic-list-item > td.activity", ".discourse-tags", ".discourse-tag"
+    ],
+    "interactionSelectors": [".topic-list-item a.title[href]", ".topic-list-item a.topic-excerpt[href]", ".badge-category__wrapper[href]", ".discourse-tag[href]", ".list-controls summary", "#navigation-bar a[href]"],
     "modes": ["hover", "full"],
     "tier": "required",
     "fullPageScope": "initial-corpus",
     "hoverHotkey": "Control",
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation",
-    "notes": "OpenAI community hot list: initial loaded topic titles translate while Discourse tag groups, tag names, separators and native hrefs stay unchanged. The visually hidden screen-reader H1 is guard-only; visible topic headings use role=heading spans. Shared tag guards also apply without site adapters and in all-node mode; those contracts have separate offline and authored browser fixtures. Controlled-provider acceptance does not measure translation quality."
+    "notes": "OpenAI community hot list: topic titles and pinned excerpts translate while native navigation, filters, table headings, category badges such as API, topic tags and activity dates retain their text and structure. The visually hidden screen-reader H1 is guard-only. Controlled-provider acceptance does not measure translation quality."
   },
   "microsoft-learn-translator-v3": {
     "url": "https://learn.microsoft.com/en-us/azure/ai-services/translator/text-translation/reference/v3/translate",

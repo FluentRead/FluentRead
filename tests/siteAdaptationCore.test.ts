@@ -300,28 +300,80 @@ describe('Englio word-segmented article paragraphs', () => {
     });
 });
 
-describe('OpenAI community topic list titles', () => {
-    it.each(['content', 'all'] as const)('keeps native topic titles translatable in %s scope while preserving their tags', scope => {
-        // Reduced from the live /hot DOM: a role=heading span owns status icons and a topic link.
-        const {document} = parseHTML(`<html><body><main><table class="topic-list"><tbody><tr class="topic-list-item"><td class="main-link topic-list-data">
-            <span id="title" class="link-top-line" role="heading" aria-level="2"><span class="topic-statuses"><svg></svg></span><a class="title raw-link raw-topic-link" href="/t/example/123">How can readers follow this discussion?</a></span>
-            <div class="link-bottom-line"><ul class="discourse-tags"><li><a id="tag" class="discourse-tag simple" href="/tag/rate-limit/77">rate-limit</a></li></ul></div>
-            </td></tr></tbody></table><div class="cooked"><p id="body">The readable discussion remains available for translation.</p></div></main></body></html>`);
+describe('OpenAI community reading boundaries', () => {
+    it.each(['content', 'all'] as const)('translates titles and excerpts while keeping the native interface original in %s scope', scope => {
+        // Reduced from the hydrated /hot DOM, including the narrow category and activity cells.
+        const {document} = parseHTML(`<html><body>
+            <header class="d-header"><button id="search">Search the community</button></header>
+            <nav id="d-sidebar" class="sidebar-container"><a id="side-category" href="/c/api/7">API</a><a id="side-tag" href="/tag/chatgpt/16">chatgpt</a></nav>
+            <main><div class="list-controls"><nav><a id="hot" href="/hot">Hot</a></nav><details><summary id="filter">categories</summary></details></div>
+            <table class="topic-list"><thead><tr><th id="heading">Topic</th><th>Activity</th></tr></thead>
+            <tbody><tr class="topic-list-item"><td class="main-link topic-list-data">
+                <span id="title" class="link-top-line" role="heading" aria-level="2"><span class="topic-statuses"><svg></svg></span><a class="title raw-link raw-topic-link" href="/t/example/123">How can readers follow this discussion?</a></span>
+                <div class="link-bottom-line"><a class="badge-category__wrapper" href="/c/api/7"><span class="badge-category"><span class="badge-category__name" id="api">API</span></span></a>
+                    <ul class="discourse-tags"><li><a id="tag" class="discourse-tag simple" href="/tag/rate-limit/77">rate-limit</a></li></ul></div>
+                <a id="excerpt" class="topic-excerpt" href="/t/example/123"><span>Learn to make requests with the API.</span><span class="topic-excerpt-more">read more</span></a>
+            </td><td class="posters"><a id="author" href="/u/fixture">Fixture Reader</a></td>
+                <td class="activity num"><a id="date" class="post-activity" href="/t/example/123/4"><span class="relative-date">Jan 2025</span></a></td>
+            </tr></tbody></table>
+            <div class="cooked"><p id="body">The readable discussion remains available for translation.</p></div></main></body></html>`);
         const url = new URL('https://community.openai.com/hot');
-        const core = new TranslationCandidateCore({url, scope, adapters: compileSiteRulePack(builtinSiteRulePack)});
-        const title = document.getElementById('title')!;
-        const candidate = core.resolve(title.querySelector('a')!.firstChild);
-        expect(candidate).toMatchObject({element: title, adapterId: 'openai-community'});
+        const adapters = compileSiteRulePack(builtinSiteRulePack);
+        const core = new TranslationCandidateCore({url, scope, adapters});
+        for (const id of ['title', 'excerpt']) {
+            const element = document.getElementById(id)!;
+            const candidate = core.resolve(element.querySelector(id === 'title' ? 'a' : 'span')!.firstChild);
+            expect(candidate?.element === element, id).toBe(true);
+            expect(candidate).toMatchObject({adapterId: 'openai-community', kind: 'content'});
+        }
+        for (const id of ['search', 'side-category', 'side-tag', 'hot', 'filter', 'heading', 'api', 'tag', 'author', 'date']) {
+            expect(core.resolve(document.getElementById(id)!.firstChild)?.element.id ?? null, id).toBeNull();
+        }
         const candidates = core.discover(document);
-        expect(candidates.some(candidate => candidate.element === title)).toBe(true);
-        expect(candidates.some(candidate => candidate.element.id === 'body')).toBe(true);
-        const source = candidates.map(candidate => extractTranslationTextFromNodes(candidate.nodes ?? [candidate.element], core.shouldStayOriginal)).join('\n');
-        expect(source).toContain('How can readers follow this discussion?');
-        expect(source).not.toContain('rate-limit');
-        expect(core.resolve(document.getElementById('tag')!.firstChild)).toBeNull();
-        const adapter = compileSiteRulePack(builtinSiteRulePack).find(adapter => adapter.id === 'openai-community')!;
+        expect(candidates.map(candidate => candidate.element.id)).toEqual(['title', 'excerpt', 'body']);
+        expect(extractTranslationTextFromNodes([document.getElementById('excerpt')!], core.shouldStayOriginal))
+            .toContain('Learn to make requests with the API.');
+
+        const added = document.querySelector('.topic-list-item')!.cloneNode(true) as Element;
+        document.querySelector('tbody')!.appendChild(added);
+        expect(core.discover(added).map(candidate => candidate.element.id)).toEqual(['title', 'excerpt']);
+
+        const adapter = adapters.find(adapter => adapter.id === 'openai-community')!;
         expect(adapter.matches(new URL('https://community.openai.com.example.org/hot'))).toBe(false);
         expect(adapter.matches(new URL('https://openai.com/hot'))).toBe(false);
+    });
+
+    it('keeps the no-script category and activity cells original while translating the excerpt', () => {
+        const {document} = parseHTML(`<html><body class="crawler"><main><table class="topic-list"><tbody>
+            <tr class="topic-list-item"><td class="main-link"><span class="link-top-line"><a href="/t/example/123">A public forum discussion</a></span>
+            <div class="link-bottom-line"><a class="badge-wrapper bullet" href="/c/api/7"><span class="badge-category clear-badge"><span class="category-name">API</span></span></a></div>
+            <p class="excerpt">A readable excerpt from the forum discussion.</p></td>
+            <td class="replies">2</td><td class="views">171k</td><td>February 21, 2023</td></tr>
+            </tbody></table></main></body></html>`);
+        const core = new TranslationCandidateCore({url: new URL('https://community.openai.com/hot'), scope: 'all',
+            adapters: compileSiteRulePack(builtinSiteRulePack)});
+        expect(core.discover(document).map(candidate => candidate.element.className)).toEqual(['link-top-line', 'excerpt']);
+        expect(core.resolve(document.querySelector('td:last-child')!.firstChild)).toBeNull();
+    });
+
+    it.each(['content', 'all'] as const)('translates the mobile topic link and preserves its stats in %s scope', scope => {
+        const {document} = parseHTML(`<html class="mobile-view"><body><main><table class="topic-list"><tbody>
+            <tr class="topic-list-item"><td class="topic-list-data"><div class="topic-item-metadata right">
+                <div class="main-link"><a id="title" class="title raw-link raw-topic-link" href="/t/example/123">How can readers follow this discussion?</a></div>
+                <div class="topic-item-stats"><span class="topic-item-stats__category-tags">
+                    <a class="badge-category__wrapper" id="api" href="/c/api/7">API</a>
+                    <a class="discourse-tag" id="tag" href="/tag/chatgpt/16">chatgpt</a></span>
+                    <div class="num activity last"><span class="age activity"><a id="date" href="/t/example/123/4">Jan 2025</a></span></div>
+                </div>
+            </div></td></tr></tbody></table></main></body></html>`);
+        const core = new TranslationCandidateCore({url: new URL('https://community.openai.com/hot'), scope,
+            adapters: compileSiteRulePack(builtinSiteRulePack)});
+        const title = document.getElementById('title')!;
+        expect(core.resolve(title.firstChild)?.kind).toBe('content');
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title']);
+        for (const id of ['api', 'tag', 'date']) {
+            expect(core.resolve(document.getElementById(id)!.firstChild)?.element.id ?? null, id).toBeNull();
+        }
     });
 });
 

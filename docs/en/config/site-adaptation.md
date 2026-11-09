@@ -15,6 +15,8 @@ Some sites keep author names, timestamps, votes, and navigation unchanged while 
 
 Explicit topic tags stay in their original language, including `chatgpt` and `rate-limit` on the OpenAI community and standard tag links on other forums and blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
 
+In the OpenAI Developer Community, category names such as `API`, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
+
 ## Translate every time—or leave it alone
 
 Open **Settings → Tools & learning → Website rules → Site preferences**:

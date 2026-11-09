@@ -1,15 +1,31 @@
 [
   {
     "id": "openai-community",
-    "name": "OpenAI 社区帖子标题",
+    "name": "OpenAI 社区阅读区",
     "match": {"hosts": ["community.openai.com"]},
     "allScopes": true,
     "mode": "augment",
+    "exclude": [
+      ".d-header",
+      ".sidebar-container",
+      ".list-controls",
+      ".topic-list > thead",
+      ".badge-category__wrapper",
+      ".badge-wrapper",
+      ".topic-list-item :is(.link-bottom-line, .topic-item-stats)",
+      ".topic-list-item > :is(td.posters, td.posts, td.replies, td.views, td.activity)",
+      "body.crawler .topic-list-item > td:last-child:not(.main-link)"
+    ],
     "content": [
       {
-        "css": [".topic-list-item .link-top-line"],
+        "css": [".topic-list-item .link-top-line", ".topic-list-item .main-link > a.raw-topic-link"],
         "resolve": "closest",
         "key": "openai-community:topic-title"
+      },
+      {
+        "css": [".topic-list-item .topic-excerpt", ".topic-list-item p.excerpt"],
+        "resolve": "closest",
+        "key": "openai-community:topic-excerpt"
       }
     ]
   },

@@ -365,7 +365,7 @@ describe('术语库与真实翻译编排协作', () => {
     });
     it('摘要里的 emoji 不进入正文保护策略或摘要 token，正文原子仍独立保护', async () => {
         const h = harness();h.config.enableAIContext = true;
-        await h.request({origin:'agent',pageContext:'This page explains delivery 🚚 workflows and field 👩🏽‍🔬 observations.'});
+        await h.request({origin:'agent',pageContext:'This page explains delivery 🚚 workflows and field 👩🏽‍🔬 observations.'.repeat(20)});
         const summary = h.calls.find(call=>call.message.summaryPrompt)!;
         expect(summary).toBeDefined();expect(summary.snapshot.glossaryProtectedTokens).toBeUndefined();
         expect(h.identities.every(identity=>!('emojiLiteralProtection' in identity))).toBe(true);

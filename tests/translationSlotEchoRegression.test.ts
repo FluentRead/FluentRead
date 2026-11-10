@@ -608,7 +608,7 @@ describe('真实 broker 的全文单条槽协议', () => {
         h.config.enableAIContext = true;
         const sources = [first, second, third];
         const packet = serializeTranslationSlots(sources);
-        const pageContext = 'This page explains document translation, computer network settings, and application storage.';
+        const pageContext = 'This page explains document translation, computer network settings, and application storage.'.repeat(20);
         const summary = '页面介绍文档翻译、网络设置和应用存储。';
         const leaked = '<webpage_context>仅用于参考的页面上下文被泄漏。</webpage_context>';
         const partial = renderPacket(packet, [translated[0]!, leaked, translated[2]!]);
@@ -895,5 +895,47 @@ describe('frontend 区分原生数组、机器逐槽与 AI 槽协议的会话边
         expect(h.provider).toHaveBeenCalledTimes(2);
         expect(h.cacheSet).not.toHaveBeenCalled();
         expect(session.translationSlotCache.size).toBe(0);
+    });
+
+    it('跨段批次的空槽补译失败不会触发前端整批降级或重新发送良槽', async () => {
+        const h = createHarness();
+        connectFrontend(h);
+        const session = {active: true, translationSlotCache: new Map(), ...createFullPageRequestSessionState()};
+        const invocation = {...snapshot, enableAIMultiSegment: true};
+        const packet = serializeTranslationSlots([first, second]);
+        h.provider.mockResolvedValueOnce(renderPacket(packet, ['', translated[1]!])).mockResolvedValueOnce('');
+        try {
+            const outcomes = await Promise.allSettled([
+                translateTextSlots([first], invocation, undefined, undefined, session),
+                translateTextSlots([second], invocation, undefined, undefined, session),
+            ]);
+            expect(outcomes).toEqual([
+                {status: 'rejected', reason: expect.objectContaining({code: 'AI_MULTI_SEGMENT_REPAIR_FAILED'})},
+                {status: 'rejected', reason: expect.objectContaining({code: 'AI_MULTI_SEGMENT_REPAIR_FAILED'})},
+            ]);
+            expect(ports.batch).toHaveBeenCalledOnce();
+            expect(ports.single).not.toHaveBeenCalled();
+            expect(h.provider.mock.calls.map(([message]) => message.origin)).toEqual([packet.payload, first]);
+            expect(h.cacheSet).not.toHaveBeenCalled();
+        } finally {
+            disposeFullPageRequestSession(session, new Error('test complete'));
+        }
+    });
+
+    it.each(['abort', 'deadline'] as const)('多段局部恢复沿用外层 %s，不发送迟到补译或写缓存', async stop => {
+        let now = 0;
+        const h = createHarness({now: () => now});
+        const controller = new AbortController();
+        const packet = serializeTranslationSlots([first, second]);
+        h.provider.mockImplementationOnce(async () => {
+            if (stop === 'abort') controller.abort();
+            else now = 10_001;
+            return renderPacket(packet, ['', translated[1]!]);
+        });
+        await expect(h.broker.translateWithCache(attachTranslationRequestControl({origin: [first, second], aiMultiSegment: true,
+            requestTimeoutMs: 10_000}, {signal: controller.signal, ownershipKey: 'partial-repair'})))
+            .rejects.toMatchObject(stop === 'abort' ? {name: 'AbortError'} : {name: 'TranslationProviderDeadlineError'});
+        expect(h.provider).toHaveBeenCalledOnce();
+        expect(h.cacheSet).not.toHaveBeenCalled();
     });
 });

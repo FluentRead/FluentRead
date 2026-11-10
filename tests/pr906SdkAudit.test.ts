@@ -185,7 +185,7 @@ describe('PR #906 actual SDK settlement and effective pending policy', () => {
       } else if (entry === 'summary') {
         message = {
           origin: `The synthetic translation paragraph ${sequence}.`, ...options,
-          pageContext: 'The shared synthetic page context for summarization.',
+          pageContext: 'The shared synthetic page context for summarization.'.repeat(30),
         };
       } else {
         message = {origin: 'The shared synthetic source paragraph.', ...options};

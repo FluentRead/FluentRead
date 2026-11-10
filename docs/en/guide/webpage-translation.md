@@ -45,6 +45,8 @@ Open **Translation services → AI context** in the extension popup, enable the 
 
 Context has a length limit and may not include the entire article. It does not guarantee correct interpretation. The feature is off by default; enabling it sends additional page text to your selected service and may increase requests and cost. Ordinary machine translation and some specialized translation models do not support it; the popup explains the current state.
 
+Short page references are used directly, without an extra AI summary request. Longer references are summarized; with translation caching enabled, matching page material, model, and request settings can reuse summaries and validated translations. AI multi-segment translation can share instructions and references across adjacent passages. Actual usage and speed depend on the content and service. Provider prompt caching is separate from FluentRead's local translation cache.
+
 For fixed terminology or words that should stay untranslated, use [Glossaries](/en/guide/glossary), which work with both machine and AI translation.
 
 ## Section translation

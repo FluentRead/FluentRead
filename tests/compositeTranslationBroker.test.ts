@@ -448,7 +448,7 @@ describe('组合翻译真实 broker 接入', () => {
             reportTranslationModelUsage(message, {usageAvailability: 'reported', totalTokens: 3});
             return message.summaryPrompt ? 'This page explains translation.' : translatedText;
         });
-        await expect(h.broker.translateWithCache({origin: sourceText, pageContext: 'A page about translation services.', useCache: false}))
+        await expect(h.broker.translateWithCache({origin: sourceText, pageContext: 'A page about translation services.'.repeat(40), useCache: false}))
             .resolves.toBe(translatedText);
         expect(h.providers.openai).toHaveBeenCalledTimes(2);
         expect(h.recordUsage.mock.calls.flatMap(call => call[0]).map(event => [event.serviceId, event.purpose]))

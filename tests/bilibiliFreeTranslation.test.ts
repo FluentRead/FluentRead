@@ -93,6 +93,46 @@ describe('B站官方免费翻译', () => {
         expect(texts.map(text => Array.from(text).length)).toEqual([1998, 3, 5]);
     });
 
+    it('预算内的多段帖子只请求一次，按原顺序恢复段落间距与边缘空白', async () => {
+        const paragraphs = [
+            'このページには複数の段落があります。',
+            '翻訳したあとも、段落の順序と空白を保ちます。',
+            '最後にもう一度、表示を確認します。',
+        ];
+        const source = ` ${paragraphs[0]}\r\n\r\n\t${paragraphs[1]}  \n \n${paragraphs[2]}\n`;
+        const fetch = vi.fn().mockImplementation(async () => reply('本页包含多个段落。\n\n译后保留段落顺序和空白。\n最后再检查一次显示效果。'));
+        setRuntimeFetch(fetch);
+
+        await expect(translateBilibiliFree(request(source, {sourceLanguage: 'ja'})))
+            .resolves.toBe(' 本页包含多个段落。\r\n\r\n\t译后保留段落顺序和空白。  \n \n最后再检查一次显示效果。\n');
+        expect(fetch).toHaveBeenCalledOnce();
+        const prompt = JSON.parse(fetch.mock.calls[0][1].body).messages[0].content;
+        expect(prompt).toContain(source.trim());
+    });
+
+    it.each([
+        {case: '行数不匹配', content: '合在一起的译文。', finish: 'stop'},
+        {case: '截断', content: '未译完', finish: 'length'},
+        {case: '空译文', content: ' \n ', finish: 'stop'},
+    ])('整段响应为 $case 时回退逐行翻译并保留空行', async ({content, finish}) => {
+        const fetch = vi.fn().mockResolvedValueOnce(reply(content, finish))
+            .mockResolvedValueOnce(reply('第一段。')).mockResolvedValueOnce(reply('第二段。'));
+        setRuntimeFetch(fetch);
+
+        await expect(translateBilibiliFree(request('First paragraph.\n\nSecond paragraph.')))
+            .resolves.toBe('第一段。\n\n第二段。');
+        expect(fetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('整段请求遇到限流时保留原错误，不拆出更多请求', async () => {
+        const fetch = vi.fn().mockResolvedValue(new Response('rate limited', {status: 429, headers: {'Retry-After': '12'}}));
+        setRuntimeFetch(fetch);
+
+        await expect(translateBilibiliFree(request('First paragraph.\nSecond paragraph.')))
+            .rejects.toMatchObject({statusCode: 429, retryAfterMs: 12000});
+        expect(fetch).toHaveBeenCalledOnce();
+    });
+
     it('内部文本槽保留原命名空间，标记不发送给模型', async () => {
         const fetch = vi.fn().mockResolvedValueOnce(reply('一')).mockResolvedValueOnce(reply('二'));
         setRuntimeFetch(fetch);

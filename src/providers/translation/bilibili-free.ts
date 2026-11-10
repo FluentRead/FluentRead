@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/bilibili-free.ts
  * 文件职责：适配 B站 Index-Translate 官方匿名文本翻译 API。
- * 主要内容：按码点预算且不切术语标记，固定模型与端点、关闭思考输出，按 Unicode 码点有界分块，保护全文文本槽、换行和边缘空白，拒绝截断、空值及损坏响应并透传取消和 HTTP 状态；取消或错误响应主动终止未读正文，不让错误页或清理 Promise 长期占用共享容量。
+ * 主要内容：固定模型与端点、关闭思考输出；预算内的多行文本优先整段翻译并恢复原换行，行数不匹配、译文为空或截断时回退到保留术语标记的有界分块。保护文本槽和边缘空白，透传取消和 HTTP 状态，主动终止未读的错误正文。
  * 模块边界：仅通过 runtimeFetch 请求官方服务，不读取用户密钥、Cookie、代理或可编辑请求体；Origin 兼容由扩展后台网络层处理，独立入口与免费池共用协议，调度与换线由上层编排负责。
  */
 import {translateFreeTextChunks} from './freeTextChunks';
@@ -28,10 +28,8 @@ function languageName(code: string): string {
     return name;
 }
 
-async function translateChunk(text: string, source: string, target: string, signal?: AbortSignal): Promise<string> {
+async function translateChunk(text: string, sourceName: string, targetName: string, signal?: AbortSignal, allowLayoutFallback = false): Promise<string> {
     checkAbort(signal);
-    const sourceName = source === 'auto' ? '' : languageName(source);
-    const targetName = languageName(target);
     const response = await runtimeFetch(BILIBILI_FREE_TRANSLATION_URL, {
         method: 'POST', credentials: 'omit', signal,
         headers: {'Content-Type': 'application/json'},
@@ -49,18 +47,31 @@ async function translateChunk(text: string, source: string, target: string, sign
         checkAbort(signal);
         const choice = data?.choices?.[0];
         const content = choice?.message?.content;
+        // 合并请求达到输出上限时由逐行路径恢复，不使用已截断的译文。
+        if (allowLayoutFallback && choice?.finish_reason === 'length') return '';
         if (choice?.finish_reason === 'length' || typeof content !== 'string') throw new Error('B站翻译返回的译文不完整');
         // 兼容供应商偶发的完整思考块；未闭合思考块不能作为译文返回。
         const result = content.replace(/<think>[\s\S]*?<\/think>/gu, '').trim();
-        if (!result || result.includes('<think>') || result.includes('</think>')) throw new Error('B站翻译没有返回有效译文');
+        if ((!result && !allowLayoutFallback) || result.includes('<think>') || result.includes('</think>')) throw new Error('B站翻译没有返回有效译文');
         return result;
     } finally {
         cancelUnreadResponseBody(response);
     }
 }
 
-async function translatePlain(text: string, source: string, target: string, signal?: AbortSignal): Promise<string> {
-    return translateFreeTextChunks(text, MAX_CHUNK_CODEPOINTS, chunk => translateChunk(chunk, source, target, signal), signal);
+async function translatePlain(text: string, sourceName: string, targetName: string, signal?: AbortSignal): Promise<string> {
+    const content = text.trim();
+    if (/[\r\n]/u.test(content) && Array.from(content).length <= MAX_CHUNK_CODEPOINTS) {
+        const translation = await translateChunk(content, sourceName, targetName, signal, true);
+        const nonemptyLine = /\S[^\r\n]*/gu;
+        const translatedLines = translation.match(nonemptyLine);
+        if (translatedLines && translatedLines.length === content.match(nonemptyLine)?.length) {
+            // 用同一条逐行回填路径恢复源文本空白，不把模型生成的空行写回。
+            let index = 0;
+            return translateFreeTextChunks(text, text.length, async () => translatedLines[index++]!.trimEnd(), signal);
+        }
+    }
+    return translateFreeTextChunks(text, MAX_CHUNK_CODEPOINTS, chunk => translateChunk(chunk, sourceName, targetName, signal), signal);
 }
 
 export async function translateBilibiliFree(request: TranslationProviderRequest<string>): Promise<string> {
@@ -70,13 +81,13 @@ export async function translateBilibiliFree(request: TranslationProviderRequest<
     const source = sourceLanguage || 'auto';
     const target = targetLanguage || 'zh-Hans';
     // 先校验语言，避免发出一部分分块后才发现配置无效。
-    if (source !== 'auto') languageName(source);
-    languageName(target);
+    const sourceName = source === 'auto' ? '' : languageName(source);
+    const targetName = languageName(target);
     if (source === target) return origin;
     const slots = getTranslationGlossarySourceSlots(origin);
-    if (!slots) return translatePlain(origin, source, target, abortSignal);
+    if (!slots) return translatePlain(origin, sourceName, targetName, abortSignal);
     const translated: string[] = [];
-    for (const slot of slots.texts) translated.push(await translatePlain(slot, source, target, abortSignal));
+    for (const slot of slots.texts) translated.push(await translatePlain(slot, sourceName, targetName, abortSignal));
     const result = rebuildTranslationSlots(slots.packet, translated);
     if (result === null) throw new Error('B站翻译返回的文本槽结构无效');
     return result;

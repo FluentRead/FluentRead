@@ -1,6 +1,7 @@
 /**
  * @file src/services/translation/broker.ts
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
+ * 用量控制：短参考直接复用；完整 AI 批次中的少数空槽或原文回显只恢复对应槽，整包回显仍触发原有降级。
  * 网页术语：独立的常用词槽在本地原位保留，正文沿用用户词条优先的占位回填，摘要、字幕和图像请求保持各自的保护范围。
  * Emoji 兼容：硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
  *
@@ -128,6 +129,8 @@ interface PendingCacheValue {
 
 const PAGE_SUMMARY_CACHE_SIZE = 8;
 const PAGE_SUMMARY_LIMIT = 1200;
+// 仅一至两句短参考直接发送；不能使用摘要输出上限作阈值，否则长页逐段重复输入反而更贵。
+const DIRECT_PAGE_CONTEXT_LIMIT = 240;
 type PageSummaryResult = {context: string; summarized: boolean};
 
 class AIMultiSegmentResponseError extends Error {
@@ -149,6 +152,18 @@ class TranslationSlotResponseError extends Error {
     constructor() {
         super('翻译服务返回空译文，请重试或切换服务');
         this.name = 'TranslationSlotResponseError';
+    }
+}
+
+/** 已消耗逐槽恢复预算，前端不能再将整个批次降级重发。 */
+class AIMultiSegmentRepairError extends Error {
+    readonly kind = 'response';
+    readonly retryable = false;
+    readonly code = 'AI_MULTI_SEGMENT_REPAIR_FAILED';
+
+    constructor() {
+        super('AI 多段翻译的异常段落重试后仍无有效译文，请重试或切换服务');
+        this.name = 'AIMultiSegmentRepairError';
     }
 }
 
@@ -737,6 +752,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         context = '',
         validationPageContext = '',
         usedContextFreeRequest = false,
+        recoverEmpty = false,
     ): Promise<string> {
         const protocol = getSingleSlotProtocol(message);
         if (protocol) {
@@ -767,10 +783,10 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 `${protocol.packet.starts[index]}${translation}${protocol.packet.ends[index]}`).join('\n');
         }
         if (!hasTranslationContent(message.origin) && !getTranslationImageInput(message)) return message.origin;
-        requireTranslationContent(result);
+        if (!recoverEmpty) requireTranslationContent(result);
         if (execution.acceptUnchangedResult && isUnchangedTranslationResponse(message.origin, result)) return result;
         if (isGlossaryOnlyResult(execution.config, message.origin, result)) return result;
-        if (!isLikelyUntranslatedResponse(message.origin, result, execution.targetLanguage)
+        if (hasTranslationContent(result) && !isLikelyUntranslatedResponse(message.origin, result, execution.targetLanguage)
             && !isClearlyWrongLanguageResponse(message.origin, result, execution.targetLanguage)) return result;
         const retried = requireSingleResult(await callProviderWithinDeadline(
             execution,
@@ -779,7 +795,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (isDefiniteRecoveryPageContextLeak(
             execution, message.origin, retried, validationPageContext, message.modelOverride,
         )) throw new AIContextRecoveryResponseError();
-        if (!hasTranslationContent(retried)) throw new TranslationSlotResponseError();
+        if (!hasTranslationContent(retried)) throw recoverEmpty ? new AIMultiSegmentRepairError() : new TranslationSlotResponseError();
         if (execution.acceptUnchangedResult && isUnchangedTranslationResponse(message.origin, retried)) return retried;
         if (isGlossaryOnlyResult(execution.config, message.origin, retried)) return retried;
         if (isLikelyUntranslatedResponse(message.origin, retried, execution.targetLanguage)) {
@@ -907,10 +923,16 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             )) throw new AIContextRecoveryResponseError();
         }
 
-        if (!parsed || parsed.length !== message.origin.length
-            || parsed.some((value, index) => !hasTranslationContent(value) && Boolean(message.origin[index]?.trim()))) {
+        if (!parsed || parsed.length !== message.origin.length) {
             throw new AIMultiSegmentResponseError();
         }
+
+        // 所有槽均为空或回显原文时没有可复用成果，交给既有批次熔断；不能边重试边放大坏协议。
+        const needsRepair = (result: string, index: number) => !hasTranslationContent(result)
+            || (!(execution.acceptUnchangedResult && isUnchangedTranslationResponse(message.origin[index], result))
+                && !isGlossaryOnlyResult(execution.config, message.origin[index], result)
+                && isLikelyUntranslatedResponse(message.origin[index], result, execution.targetLanguage));
+        if (parsed.every(needsRepair)) throw new AIMultiSegmentResponseError();
 
         // 若协议完整但只有个别段落误译了页面上下文，只对这些段落做极简单段重译，
         // 已正确的同批结果继续复用，避免整批再次消耗。
@@ -942,18 +964,17 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             );
         }
         const finalized = Array.from(parsed);
-        if (finalized.some((result, index) => !(execution.acceptUnchangedResult && isUnchangedTranslationResponse(message.origin[index], result))
-            && !isGlossaryOnlyResult(execution.config, message.origin[index], result) && isLikelyUntranslatedResponse(
-            message.origin[index], result, execution.targetLanguage,
-        ))) throw new AIMultiSegmentResponseError();
         for (let index = 0; index < finalized.length; index += 1) {
             const origin = message.origin[index];
-            if ((execution.acceptUnchangedResult && isUnchangedTranslationResponse(origin, finalized[index]))
-                || isGlossaryOnlyResult(execution.config, origin, finalized[index])
-                || !isClearlyWrongLanguageResponse(origin, finalized[index], execution.targetLanguage)) continue;
+            if (!needsRepair(finalized[index], index)
+                && !isClearlyWrongLanguageResponse(origin, finalized[index], execution.targetLanguage)) continue;
             finalized[index] = await recoverInvalidResult(
-                execution, {...message, origin}, finalized[index], requestDeadline, '', pageContext,
+                execution, {...message, origin}, finalized[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
             );
+            // 单槽恢复不能把上一次完整协议包当作译文；来源已避让本包标记，出现即表示串槽。
+            if ([...packet.starts, ...packet.ends].some(marker => finalized[index].includes(marker))) {
+                throw new AIMultiSegmentRepairError();
+            }
         }
         return finalized;
     }
@@ -1181,6 +1202,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         requestTimeoutMs?: number,
     ): Promise<PageSummaryResult> {
         if (!isAIContextEnabled(execution, modelOverride) || !pageContext.trim()) return {context: '', summarized: false};
+
+        // 很短的参考省掉一次付费调用及首段串行等待；更长材料仍摘要并复用，控制整页累计输入。
+        if (pageContext.trim().length <= DIRECT_PAGE_CONTEXT_LIMIT) return {context: pageContext.trim(), summarized: false};
 
         const key = buildPageSummaryCacheKey(execution, pageContext, modelOverride);
         if (useCache) {

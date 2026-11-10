@@ -511,7 +511,11 @@ export const models = new Map<string, Array<string>>([
 
     // 支持的 OpenAI 兼容平台。列表只放各家稳定的公开编号，
     // 平台上新更快，用户可以随时用“自定义模型”补充。
-    [services.mistral, [defaultModelIds[services.mistral], "mistral-large-4", "mistral-medium-latest", "mistral-large-latest", "magistral-small-latest", "open-mistral-nemo", customModelString]],
+    [services.mistral, [
+        defaultModelIds[services.mistral], "mistral-large-4", "mistral-medium-latest",
+        "mistral-large-latest", "magistral-small-latest", "open-mistral-nemo",
+        "zai-glm-5-3", "zai-glm-5-3-flash", "deepseek-v4-1-flash-1017", customModelString,
+    ]],
     [services.cohere, [defaultModelIds[services.cohere], "command-a-03-2025", "command-r7b-12-2024", "command-r-plus", customModelString]],
     [services.cerebras, [defaultModelIds[services.cerebras], currentModelIds.groqLarge, "qwen-3-32b", "llama-3.3-70b", customModelString]],
     [services.togetherai, [defaultModelIds[services.togetherai], "Qwen/Qwen3.8-27B", "Qwen/Qwen3.5-35B-A3B", "deepseek-ai/DeepSeek-V3.2", "meta-llama/Llama-3.3-70B-Instruct-Turbo", customModelString]],

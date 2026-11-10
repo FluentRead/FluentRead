@@ -1665,7 +1665,7 @@ export const zhCNMessages = {
     'settings.translation.fullPage': '全文翻译',
     "quickTranslation.heading.section": "更多局部翻译快捷键",
     "quickTranslation.action.section": "局部翻译",
-    "quickTranslation.sectionDescription": "按快捷键后进入选择模式，划选要翻译的区域，再用该方案的设置翻译这段文字。",
+    "quickTranslation.sectionDescription": "按快捷键进入选择模式，划选区域并确认，即可用此方案翻译。",
     'quickTranslation.heading.hover': '更多悬浮快捷键',
     'quickTranslation.heading.fullPage': '更多全文快捷键',
     'quickTranslation.description': "需要不同的服务、模型或语言时再添加",

@@ -1410,7 +1410,7 @@ export const koKRMessages = {
     'settings.translation.fullPage': '전체 페이지 번역',
     "quickTranslation.heading.section": "부분 번역 단축키 추가",
     "quickTranslation.action.section": "부분 번역",
-    "quickTranslation.sectionDescription": "단축키를 누르고 선택 모드에서 번역할 영역을 드래그하면 이 설정으로 영역 안의 텍스트를 번역합니다.",
+    "quickTranslation.sectionDescription": "단축키를 누르고 영역을 선택한 뒤 확인하면 이 설정으로 번역합니다.",
     'quickTranslation.heading.hover': '추가 마우스 오버 번역 단축키',
     'quickTranslation.heading.fullPage': '추가 전체 페이지 번역 단축키',
     'quickTranslation.description': '서비스, 모델 또는 언어를 다르게 설정할 때 추가하세요.',

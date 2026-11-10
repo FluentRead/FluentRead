@@ -1410,7 +1410,7 @@ export const esESMessages = {
     'settings.translation.fullPage': 'Traducción de página completa',
     "quickTranslation.heading.section": "Más atajos de traducción de sección",
     "quickTranslation.action.section": "Sección",
-    "quickTranslation.sectionDescription": "Pulsa el atajo para entrar en modo de selección, dibuja el área que quieras traducir y traduce su texto con los ajustes de este perfil.",
+    "quickTranslation.sectionDescription": "Pulsa el atajo, selecciona un área y confirma para traducir con este perfil.",
     'quickTranslation.heading.hover': 'Más atajos para traducir al pasar el ratón',
     'quickTranslation.heading.fullPage': 'Más atajos para traducir páginas completas',
     'quickTranslation.description': 'Añade un perfil solo si necesitas otro servicio, modelo o idioma.',

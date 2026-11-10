@@ -103,9 +103,17 @@ Corrections stay on this device, with limits of 1,000 records and 100 projects. 
 
 ### Page floating ball
 
-**Settings → General → Page helpers → Full-page translation ball** is off by default. Enable it, then hover, focus with the keyboard, or tap to expand. Click its translation button to translate, and again to restore. Hold and drag to either side; its position is saved.
+**Settings → General → Page helpers → Full-page translation ball** is off by default. Once enabled, it rests halfway behind the desktop screen edge by default. Hover or focus it to slide it out. On touchscreens, the whole button remains visible and expands on tap. By default, clicking the main icon translates the page. Click it again to restore the original. Hold and drag it to either side to save its position.
 
-The gear opens the quick panel for the current page. In translation services, **Esc** goes back one level at a time. From the main screen, press **Esc** to close the panel. You can also click outside to close it. Advanced settings control hover or always-visible buttons, delay, click behavior, size, opacity, and sites where it stays hidden. Disabling the ball leaves Alt+T and context-menu translation available.
+The gear opens the quick panel for the current page. In translation services, **Esc** goes back one level at a time. From the main screen, press **Esc** or click outside to close the panel. Advanced settings control tool visibility, delay, click behavior, size, opacity, and edge margins.
+
+Expand the floating button and click **×** at the upper-right corner of the main icon to choose where to hide it.
+
+- **Hide until reload** applies to the open page. Reload the page to show the button according to your settings.
+- **Hide on this site** applies to the current site and its subdomains. Remove the site from the hidden sites list in **Floating button settings** to show it again.
+- **Hide on all sites** turns off the global floating button switch. Turn it back on under **Settings → General → Page helpers**.
+
+In the userscript, **×** hides the button until reload. Other translation controls remain available while the floating button is hidden.
 
 ### Context-menu translation
 

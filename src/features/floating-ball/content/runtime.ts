@@ -1,14 +1,14 @@
 /**
  * @file src/features/floating-ball/content/runtime.ts
  * 文件职责：协调悬浮球组件在网页中的创建、恢复位置、显隐、全屏避让、高级外观同步、权威翻译状态同步和卸载，并向组件注入全文翻译、漫画连续翻译切换与打开扩展快捷面板的动作。
- * 主要内容：维护单例 Shadow UI 与迟到挂载 requestId；管理站点、全屏、配置及全文/漫画状态订阅，并将可信文字入口转发到漫画已有面板；拖动坐标作为同一补丁保存，卸载释放订阅但不恢复全文会话。
+ * 主要内容：维护单例 Shadow UI 与迟到挂载 requestId；本次隐藏只作用于当前文档，网站和全局隐藏复用现有配置；拖动坐标作为同一补丁保存，卸载释放订阅但不恢复全文会话。
  * 模块边界：运行时只拥有挂载和桥接职责，不实现拖拽视觉、外观归一化或全文翻译算法；FloatingBall.vue 负责交互，core/config 负责字段归一化，full-page feature 提供翻译动作，配置持久化通过 services/config 完成。
  */
 import FloatingBall from '@/src/features/floating-ball/ui/FloatingBall.vue';
-import type {FloatingBallPresentation} from '@/src/features/floating-ball/types';
+import type {FloatingBallHideScope, FloatingBallPresentation} from '@/src/features/floating-ball/types';
 import {config, requestConfigPatch, subscribeConfig} from '@/src/services/config/store';
 import type {Config} from '@/src/core/config/model';
-import {isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
+import {getSiteBaseDomain, isFloatingBallDisabledOnSite} from '@/src/core/site-rules/domain';
 import {reactive} from 'vue';
 import {subscribeMangaTranslation, openMangaEntry, openMangaReading, subscribeMangaReading, type MangaTranslationStatus} from '@/src/features/image-translation/public';
 import browser from 'webextension-polyfill';
@@ -38,6 +38,7 @@ interface FloatingBallExposed {
 
 let floatingBallInstance: FloatingBallExposed | null = null;
 let floatingBallUi: ShadowRootContentScriptUi<VueShadowMount> | null = null;
+let hiddenForDocument = false;
 let mountingPromise: Promise<FloatingBallExposed | null> | null = null;
 let mountRequestId = 0;
 let unfinishedMounts = 0;
@@ -76,7 +77,7 @@ function announceMountWait(): void {
     const reveal = () => {
       if (!active || document.visibilityState === 'hidden') return;
       detachMountWaitVisibility();
-      if (config.on !== false && !config.disableFloatingBall && !floatingBallUi) show();
+      if (config.on !== false && !config.disableFloatingBall && !floatingBallUi && isFloatingBallAllowedOnPage()) show();
     };
     document.addEventListener('visibilitychange', reveal);
     removeMountWaitVisibility = () => {active = false; document.removeEventListener('visibilitychange', reveal);};
@@ -109,9 +110,32 @@ function currentPageHref(): string {
     return typeof location === 'undefined' ? '' : location.href;
 }
 
-/** 悬浮球禁用网站只隐藏入口，扩展其余能力和快捷键仍然可用。 */
+/** 当前文档的临时隐藏与网站规则只影响悬浮球，其他翻译入口仍然可用。 */
 export function isFloatingBallAllowedOnPage(href: string = currentPageHref()): boolean {
-    return !isFloatingBallDisabledOnSite(href, config.floatingBallDisabledDomains);
+    return !hiddenForDocument && !isFloatingBallDisabledOnSite(href, config.floatingBallDisabledDomains);
+}
+
+async function hideFloatingBall(scope: FloatingBallHideScope, event: MouseEvent): Promise<void> {
+    if (!event.isTrusted) return;
+    if (scope === 'page') {
+        hiddenForDocument = true;
+        unmountFloatingBall();
+        return;
+    }
+    if (import.meta.env.BROWSER === 'userscript') return;
+
+    const domain = scope === 'site' ? getSiteBaseDomain(currentPageHref()) : null;
+    if (scope === 'site' && !domain) return;
+    const patch = domain ? {floatingBallDisabledDomains: [...config.floatingBallDisabledDomains, domain]}
+        : {disableFloatingBall: true};
+    try {
+        await requestConfigPatch(patch, browser.runtime.sendMessage.bind(browser.runtime));
+    } catch (error) {
+        console.error('[FluentRead] 保存悬浮球隐藏设置失败', error);
+        if (!contentScriptContext?.isInvalid) {
+            showPageNotice(translate('floatingBall.hide.saveFailed', normalizeUiLanguage(config.uiLanguage)), 'error');
+        }
+    }
 }
 
 function openPopup(event: MouseEvent): void {
@@ -216,6 +240,11 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
       onMangaToggle: (event: MouseEvent) => { if (event.isTrusted) openMangaEntry(); },
       onMangaReading: (event: MouseEvent) => {if(event.isTrusted)openMangaReading(event);},
       onSettingsClick: (event: MouseEvent) => openPopup(event),
+      ...(import.meta.env.BROWSER === 'userscript' ? {} : {
+        canHideOnSite: getSiteBaseDomain(currentPageHref()) !== null,
+        onHideMenuOpen: () => anchoredPopup?.close(),
+      }),
+      onHide: hideFloatingBall,
       // 两个坐标字段必须一起提交，避免连续拖动或跨页面保存时只留下其中一个。
       onPositionChanged: (newPosition: 'left' | 'right', verticalPosition: number) => {
         if (import.meta.env.BROWSER !== 'userscript') anchoredPopup?.close();

@@ -1410,7 +1410,7 @@ export const jaJPMessages = {
     'settings.translation.fullPage': 'ページ全体の翻訳',
     "quickTranslation.heading.section": "部分翻訳の追加ショートカット",
     "quickTranslation.action.section": "部分翻訳",
-    "quickTranslation.sectionDescription": "ショートカットを押してページ内の範囲を選択すると、この設定で範囲内のテキストを翻訳します。",
+    "quickTranslation.sectionDescription": "ショートカットを押して選択モードに入り、翻訳したい範囲をドラッグで選ぶと、この設定でその範囲のテキストを翻訳します。",
     'quickTranslation.heading.hover': '追加のホバー翻訳ショートカット',
     'quickTranslation.heading.fullPage': '追加のページ全体翻訳ショートカット',
     'quickTranslation.description': 'サービス、モデル、言語を個別に設定したい場合に追加します。',

@@ -1410,7 +1410,7 @@ export const frFRMessages = {
     'settings.translation.fullPage': 'Traduction de page complète',
     "quickTranslation.heading.section": "Autres raccourcis de traduction de zone",
     "quickTranslation.action.section": "Zone",
-    "quickTranslation.sectionDescription": "Appuyez sur le raccourci, sélectionnez une zone de la page, puis traduisez son texte avec ce profil.",
+    "quickTranslation.sectionDescription": "Appuyez sur le raccourci pour entrer en mode de sélection, délimitez la zone à traduire, puis traduisez son texte avec les paramètres de ce profil.",
     'quickTranslation.heading.hover': 'Autres raccourcis de traduction au survol',
     'quickTranslation.heading.fullPage': 'Autres raccourcis de traduction de page complète',
     'quickTranslation.description': 'Ajoutez un profil uniquement si vous avez besoin d’un autre service, modèle ou d’une autre langue.',

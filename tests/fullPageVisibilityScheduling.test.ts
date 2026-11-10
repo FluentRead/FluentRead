@@ -4515,6 +4515,18 @@ describe("全文翻译可见性锚点", () => {
             expect(runtime.requestOptions.every(options => options.enableNativeBatch === false && options.aiMultiSegment !== true)).toBe(true);
         },
     );
+
+    it('打开 AI 多段时，B站正文仍交给独立适配器处理', async () => {
+        const snapshot = translationSnapshot({service: 'bilibili', enableAIMultiSegment: true});
+        const session = {active: true, translationSlotCache: new Map()};
+        await expect(Promise.all([
+            translateTextSlots(['First\n\nSecond'], snapshot, undefined, undefined, session),
+            translateTextSlots(['Next'], snapshot, undefined, undefined, session),
+        ])).resolves.toEqual([['译:First\n\nSecond'], ['译:Next']]);
+        expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['First\n\nSecond'], ['Next']]);
+        expect(runtime.requestOptions.every(options => options.serviceOverride === 'bilibili' && options.aiMultiSegment !== true)).toBe(true);
+    });
+
     it('网页原生偏好按服务捕获且不改变既有会话的冻结快照', () => {
         runtime.config.nativeBatchTranslationEnabled = {microsoft: false};
         const first = captureFullPageTranslationConfig();
@@ -5648,6 +5660,26 @@ describe("全文翻译可见性锚点", () => {
         ]));
     });
 
+    it('AI 多段逐槽回退立即发布先完成的候选，不等待较慢的邻段', async () => {
+        const session = {active: true, translationSlotCache: new Map()};
+        const snapshot = translationSnapshot({service: 'ai', enableAIMultiSegment: true});
+        const slow = deferred<string[]>();
+        const onReady = vi.fn();
+        runtime.requests.mockRejectedValueOnce({kind: 'response', code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'});
+        runtime.requests.mockReturnValueOnce(slow.promise);
+        const first = translateTextSlots(['Slow'], snapshot, undefined, undefined, session);
+        const second = translateTextSlots(['Ready'], snapshot, undefined, undefined, session).then(onReady);
+        try {
+            await vi.advanceTimersByTimeAsync(32);
+            expect(runtime.requests.mock.calls.map(([texts]) => texts)).toEqual([['Slow', 'Ready'], ['Slow'], ['Ready']]);
+            expect(onReady).toHaveBeenCalledExactlyOnceWith(['译:Ready']);
+        } finally {
+            slow.resolve(['慢译文']);
+            await Promise.all([first, second]);
+        }
+        await expect(first).resolves.toEqual(['慢译文']);
+    });
+
     it('AI 多段协议回退隔离已取消候选并分别发布成功与失败结果', async () => {
         const session = {active: true, translationSlotCache: new Map()};
         const enabled = translationSnapshot({
@@ -5676,25 +5708,15 @@ describe("全文翻译可见性锚点", () => {
             if (origins[0] === 'Broken') throw new Error('fallback slot failed');
             return origins.map((origin) => `译:${origin}`);
         });
-        const nativeAllSettled = Promise.allSettled.bind(Promise);
-        const allSettledSpy = vi.spyOn(Promise, 'allSettled').mockImplementation(async (values) => [
-            ...await nativeAllSettled(values),
-            {status: 'fulfilled', value: []},
-        ] as never);
+        const cancelled = translateTextSlots(['Cancelled'], enabled, stagedSignal, undefined, session);
+        const broken = translateTextSlots(['Broken'], enabled, undefined, undefined, session);
+        const healthy = translateTextSlots(['Healthy'], enabled, undefined, undefined, session);
+        await expect(collectAIRequest(broken)).rejects.toThrow('fallback slot failed');
+        await expect(collectAIRequest(healthy)).resolves.toEqual(['译:Healthy']);
+        expect(runtime.requests).toHaveBeenCalledTimes(3);
 
-        try {
-            const cancelled = translateTextSlots(['Cancelled'], enabled, stagedSignal, undefined, session);
-            const broken = translateTextSlots(['Broken'], enabled, undefined, undefined, session);
-            const healthy = translateTextSlots(['Healthy'], enabled, undefined, undefined, session);
-            await expect(collectAIRequest(broken)).rejects.toThrow('fallback slot failed');
-            await expect(collectAIRequest(healthy)).resolves.toEqual(['译:Healthy']);
-            expect(runtime.requests).toHaveBeenCalledTimes(3);
-
-            abortListener?.();
-            await expect(collectAIRequest(cancelled)).rejects.toMatchObject({name: 'AbortError'});
-        } finally {
-            allSettledSpy.mockRestore();
-        }
+        abortListener?.();
+        await expect(collectAIRequest(cancelled)).rejects.toMatchObject({name: 'AbortError'});
     });
 
     it('逐槽回退在兄弟失败和调用方取消时终止整个队列', async () => {

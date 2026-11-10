@@ -214,6 +214,7 @@ const UI_LANGUAGE_LABELS = new Map<unknown, string>([
     ['es-ES', 'Español'],
 ]);
 const INTERFACE_SKIN_LABELS = labelsFor(interfaceSkinOptions);
+const SIDEPANEL_SCOPE_LABELS = new Map<unknown, string>([['tab', '仅当前标签页'], ['window', '整个窗口']]);
 const INTERFACE_FONT_LABELS = new Map<unknown, string>([
     ['inter', 'Inter · 推荐'],
     ['system', '系统字体'],
@@ -520,6 +521,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     interfaceFont: {group: 'general', label: '界面字体', format: (value) => formatEnum(value, INTERFACE_FONT_LABELS)},
     interfaceVisibility: {group: 'general', label: '界面栏目', format: formatInterfaceVisibility},
     popupModuleOrder: {group: 'general', label: '菜单栏布局顺序', format: formatPopupModuleOrder},
+    translationSidepanelScope: {group: 'general', label: '侧边栏显示范围', format: (value) => formatEnum(value, SIDEPANEL_SCOPE_LABELS)},
     popupQuickFeatureVisibility: {group: 'general', label: '快捷功能卡片', format: formatPopupQuickFeatureVisibility},
     popupQuickFeatureOrder: {group: 'general', label: '快捷功能顺序', format: formatPopupQuickFeatureOrder},
 

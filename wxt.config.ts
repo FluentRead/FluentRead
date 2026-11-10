@@ -339,6 +339,8 @@ export default defineConfig({
         'build:manifestGenerated': (wxt, manifest) => {
             configureSafariBackgroundPage(wxt.config, manifest);
             configureStableContentUiResources(wxt.config, manifest);
+            // 保留 WXT 构建的侧边栏页面及权限，显示范围由打开操作注册。
+            if (wxt.config.browser === 'chrome' || wxt.config.browser === 'edge') delete manifest.side_panel;
         },
         'zip:extension:done': async (wxt, zipPath) => {
             await finalizeExtensionZip(wxt.config.browser, zipPath);

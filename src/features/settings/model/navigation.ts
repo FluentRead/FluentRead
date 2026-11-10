@@ -283,7 +283,7 @@ export const settingsPagePanels: Readonly<Record<string, readonly SettingsPagePa
   'settings-interface': [
     {"id": "translation", "labelKey": "options.panel.translation", "searchTerms": "译文 样式 颜色 字号 高亮", "targetIds": ["translation-appearance-panel", "translation-sentence-highlight-style"]},
     {"id": "skin", "labelKey": "options.panel.skin", "searchTerms": "弹窗 皮肤 界面风格", "targetIds": []},
-    {"id": "layout", "labelKey": "options.panel.layout", "searchTerms": "菜单栏 布局 栏目 排序", "targetIds": []},
+    {"id": "layout", "labelKey": "options.panel.layout", "searchTerms": "菜单栏 布局 栏目 排序 侧边栏显示范围 sidebar scope", "targetIds": []},
     {id: 'video-learning', labelKey: 'video.learningAppearance.title', searchTerms: '完整句学习 视频学习 面板样式 紧凑 舒适 不透明度 默认位置', targetIds: ['video-sentence-learning-appearance']},
     {"id": "motion", "labelKey": "options.panel.motion", "searchTerms": "动画 加载", "targetIds": []},
     {"id": "font", "labelKey": "options.panel.font", "searchTerms": "字体 font Inter Noto Sans Roboto Manrope WenKai", "targetIds": []},

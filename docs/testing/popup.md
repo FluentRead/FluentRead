@@ -4,7 +4,7 @@
 
 ## 原生侧边栏文本翻译（issue #1160）
 
-`translationSidepanel`、`sidepanelBootstrap`、`sidepanelApp`、`translationCenterComponent` 和 `popupAppLifecycle` 验证原生打开保留点击手势、错误重试、配置准备、页面退出取消与共享工作台。新版 Chromium 可能缓存关闭的面板，工作台在进入 hidden 时停止请求；同一实例重开保留输入与已有结果，不自动重启翻译。页面销毁或刷新后内容消失，不写入配置。`verify:extension-manifests` 同时检查 Chrome 的 `side_panel` 与唯一 `sidePanel` 权限，以及 Firefox 的 `sidebar_action`、安装时不自动展开和不声明 Chromium 权限。
+`translationSidepanel`、`sidepanelBootstrap`、`sidepanelApp`、`translationCenterComponent` 和 `popupAppLifecycle` 验证按标签页或窗口原生打开、点击手势、错误重试、配置准备、页面退出取消与共享工作台。新版 Chromium 可能缓存关闭的面板，工作台在进入 hidden 时停止请求；同一实例重开保留输入与已有结果，不自动重启翻译。页面销毁或刷新后内容消失，不写入配置。`verify:extension-manifests` 同时检查 Chrome 的唯一 `sidePanel` 权限和无全局默认注册，以及 Firefox 的 `sidebar_action`、安装时不自动展开和不声明 Chromium 权限。
 
 侧栏专用布局只由原生入口引入。`userscriptTranslationCenterBuild` 使用真实 SFC 验证构建时保留设置页的多服务对比、裁剪不可用的原生展示，并检查文字、注释和其它组件不被改写；交付还需执行 `pnpm test:userscript:standalone`，沿用现有体积上限。
 
@@ -21,6 +21,8 @@ node scripts/testing/run-sidepanel-translation-test.cjs \
 ```
 
 新版 Chrome 使用 `--load-via-cdp`，由调试 API 载入扩展；支持启动参数加载扩展的 Edge 不加该参数。两者均使用第二屏正常尺寸后台窗口和临时 profile。专项从扩展页面中的真实点击打开原生面板，验证输入、翻译、受控复制、停止与关闭时中断上游请求、迟到结果隔离、重试、切换网页保持内容、缓存实例重开不自动继续请求、原生尺寸与 320×480 仿真视口。多服务场景配置 16 个本地供应商，验证模型搜索、多选保存、3 份译文的服务/模型归属、逐份复制、菜单内部滚动，以及设置页重开后保留同一份选择。复制端口只记录文本，不改系统剪贴板；翻译使用本地 HTTP 供应商，不代表在线翻译质量、原生工具栏 popup 或 Firefox 实机验收。
+
+加 `--scope-only` 可专项验证 #1297：切换标签页时隐藏、返回时恢复或手动重新打开、设置持久化、窗口内共用面板，以及切回标签页模式时清理旧窗口面板。Edge 的自动恢复限制见 [Microsoft 文档](https://learn.microsoft.com/microsoft-edge/extensions/developer-guide/sidebar)。
 
 浅色与深色同时检查 DOM 配色和截图像素。部分旧版 macOS Edge 曾出现[原生侧栏强制反色问题](https://github.com/microsoft/MicrosoftEdge-Extensions/discussions/204)，不能仅凭计算样式正确就判定通过。原生面板从 target 被发现时开始附着诊断，附着前的启动空窗和所测浏览器版本必须保留在报告中。
 

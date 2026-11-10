@@ -143,12 +143,13 @@ async function focusedServiceSearchAtCompact(scrollTop = 22, naturalTop = 92) {
 }
 function growServiceViewport(height=263){Object.assign(viewport,{height});viewport.dispatchEvent(new win.Event('resize'));flushViewport()}
 describe('实际 Popup 缓存模板与页面操作',()=>{
-  it('点击侧边栏入口在当前窗口内立即打开，等待期间去重，成功后关闭弹窗',async()=>{
+  it.each(['tab','window'] as const)('点击侧边栏入口传递 %s 范围和当前目标，等待期间去重，成功后关闭弹窗',async scope=>{
+    config.translationSidepanelScope=scope
     fixture.capabilities.sidepanel=true;await mount();const pending=deferred<void>();openSidepanel.mockReturnValueOnce(pending.promise)
     const entry=button('sidebar-translation');expect(entry.closest('.header-actions')).not.toBeNull();expect(entry.closest('.hero-card')).toBeNull()
     const donation=document.querySelector('.donation-button')!;expect(donation.nextElementSibling).toBe(entry);expect(entry.nextElementSibling).toBe(document.querySelector('.settings-button'))
     expect(donation.textContent?.trim()).toBe('');expect(donation.getAttribute('aria-label')).toBe('popup.donationTitle')
-    expect(entry.getAttribute('aria-label')).toBe('sidepanel.title');expect(entry.textContent?.trim()).toBe('');eventOf(entry)();expect(openSidepanel).toHaveBeenCalledWith(3)
+    expect(entry.getAttribute('aria-label')).toBe('sidepanel.title');expect(entry.textContent?.trim()).toBe('');eventOf(entry)();expect(openSidepanel).toHaveBeenCalledWith({scope,tabId:7,windowId:3},expect.any(Function))
     eventOf(entry)();expect(openSidepanel).toHaveBeenCalledOnce();expect(close).not.toHaveBeenCalled()
     pending.resolve();await drain();expect(close).toHaveBeenCalledOnce()
   })

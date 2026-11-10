@@ -8,6 +8,12 @@ function group(result: ReturnType<typeof buildConfigDiff>, id: string) {
 }
 
 describe('配置差异预览', () => {
+    it('用可读选项展示侧边栏范围', () => {
+        const result = buildConfigDiff({translationSidepanelScope: 'tab'}, {translationSidepanelScope: 'window'});
+        expect(group(result, 'general')?.changes).toEqual([
+            {key: 'translationSidepanelScope', label: '侧边栏显示范围', before: '仅当前标签页', after: '整个窗口'},
+        ]);
+    });
     it('词典来源在历史与同步预览中显示可读选项', () => {
         expect(group(buildConfigDiff({selectionDictionarySource: 'auto'}, {selectionDictionarySource: 'free-dictionary'}), 'translation')?.changes).toEqual([
             {key: 'selectionDictionarySource', label: '词典来源', before: '默认（自动选择）', after: 'Free Dictionary API'},

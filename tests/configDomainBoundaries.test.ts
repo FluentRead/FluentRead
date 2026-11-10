@@ -69,6 +69,11 @@ describe('配置领域边界与防御分支', () => {
             expect(normalizeConfig({translationScope}).translationScope).toBe('content');
         }
     });
+    it('保留侧边栏窗口偏好，旧配置及非法范围默认仅当前标签页', () => {
+        expect(normalizeConfig({}).translationSidepanelScope).toBe('tab');
+        expect(normalizeConfig({translationSidepanelScope: 'window'}).translationSidepanelScope).toBe('window');
+        expect(normalizeConfig({translationSidepanelScope: 'invalid'}).translationSidepanelScope).toBe('tab');
+    });
 
     it('全局和工具语言按书写体系迁移历史别名并保留自定义非中文语言', () => {
         for (const [language, canonical] of [

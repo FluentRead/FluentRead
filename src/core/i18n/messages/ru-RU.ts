@@ -1410,7 +1410,7 @@ export const ruRUMessages = {
     'settings.translation.fullPage': 'Перевод всей страницы',
     "quickTranslation.heading.section": "Дополнительные сочетания для перевода области",
     "quickTranslation.action.section": "Область",
-    "quickTranslation.sectionDescription": "Нажмите сочетание клавиш, выберите область страницы и переведите её текст с этим профилем.",
+    "quickTranslation.sectionDescription": "Нажмите сочетание клавиш, выберите область и подтвердите перевод с этим профилем.",
     'quickTranslation.heading.hover': 'Дополнительные сочетания для перевода при наведении',
     'quickTranslation.heading.fullPage': 'Дополнительные сочетания для перевода всей страницы',
     'quickTranslation.description': 'Добавьте профиль, если нужен другой сервис, модель или язык.',

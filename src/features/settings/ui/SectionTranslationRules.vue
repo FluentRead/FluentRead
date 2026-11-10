@@ -112,7 +112,9 @@ function saveDraft(): void {
 </script>
 
 <style scoped>
-.section-rules { display: grid; gap: 8px; border-top: 1px solid var(--fr-card-border, var(--line)); }
+/* 记住的区域面板：改为与设置页一致的行式结构，不再自建圆角卡片；列表行与编辑表单统一消费平台皮肤 token。 */
+.section-rules { display: grid; gap: 16px; border-top: 1px solid var(--fr-card-border, var(--line)); }
+/* 有列表或编辑器时补底部间距，与设置页行式节奏统一。 */
 .section-rules:has(> :is(.rules-list, .rules-no-results, .rule-editor)) { padding-bottom: var(--fr-settings-row-padding-block, 14px); }
 .rules-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .rules-title { margin: 0; font: inherit; }
@@ -120,17 +122,18 @@ function saveDraft(): void {
 .rules-filter, .rules-no-results, .rules-list, .rule-editor { margin-inline: var(--fr-card-padding-inline, 20px); }
 .section-rules > .rules-filter { width: auto; }
 .rules-no-results { margin-block: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.rules-list { display: grid; border: 1px solid var(--line, #e7e9f0); border-radius: 10px; overflow: hidden; }
-.rule-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line, #e7e9f0); }
+.rules-list { display: grid; }
+.rule-row { display: flex; align-items: center; gap: 10px; padding: var(--fr-settings-row-padding-block, 14px) 0; border-top: 1px solid var(--fr-card-border, var(--line)); }
 .rule-row:first-child { border-top: 0; }
 .rule-row.is-disabled .rule-main { opacity: .55; }
 .rule-main { flex: 1; min-width: 0; }
-.rule-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 28px; color: var(--ink, #172033); }
+.rule-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 1.5; color: var(--ink, #172033); }
 .rule-profile-missing { font-size: 11px; line-height: 1.5; color: var(--el-color-warning, #a66a00); }
 .rule-mode { flex: 0 0 144px; width: 144px; }
 .rule-actions { display: flex; gap: 4px; align-items: center; }
 .rule-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.rule-editor { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px; padding: 14px; background: var(--surface-soft, rgba(128, 135, 150, .05)); border: 1px solid var(--line, #e7e9f0); border-radius: 10px; }
+/* 编辑表单改为行式：顶部分隔线取代圆角卡片，与列表共用皮肤 token。 */
+.rule-editor { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px; padding-top: 14px; border-top: 1px solid var(--fr-card-border, var(--line)); }
 .rule-editor label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--ink, #172033); }
 .profile-editor, .rule-advanced, .rule-error, .editor-actions { grid-column: 1 / -1; }
 .rule-advanced { min-width: 0; }

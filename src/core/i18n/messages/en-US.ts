@@ -1670,7 +1670,7 @@ export const enUSMessages = {
     'settings.translation.fullPage': 'Full-page translation',
     "quickTranslation.heading.section": "More section shortcuts",
     "quickTranslation.action.section": "Section",
-    "quickTranslation.sectionDescription": "Press the shortcut, select a page container, then translate its text with this profile.",
+    "quickTranslation.sectionDescription": "Press the shortcut, select an area, then confirm to translate with this profile.",
     'quickTranslation.heading.hover': 'More hover shortcuts',
     'quickTranslation.heading.fullPage': 'More full-page shortcuts',
     'quickTranslation.description': 'Add one when you need a different service, model, or language.',

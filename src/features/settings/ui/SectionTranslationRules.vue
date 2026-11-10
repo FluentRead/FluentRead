@@ -112,25 +112,25 @@ function saveDraft(): void {
 </script>
 
 <style scoped>
-.section-rules { display: grid; gap: 8px; border-top: 1px solid var(--fr-card-border, var(--line)); }
-.section-rules:has(> :is(.rules-list, .rules-no-results, .rule-editor)) { padding-bottom: var(--fr-settings-row-padding-block, 14px); }
+.section-rules { display: grid; border-top: 1px solid var(--fr-card-border, var(--line)); }
 .rules-heading { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .rules-title { margin: 0; font: inherit; }
 .rules-title > strong { display: block; }
-.rules-filter, .rules-no-results, .rules-list, .rule-editor { margin-inline: var(--fr-card-padding-inline, 20px); }
-.section-rules > .rules-filter { width: auto; }
-.rules-no-results { margin-block: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.rules-list { display: grid; border: 1px solid var(--line, #e7e9f0); border-radius: 10px; overflow: hidden; }
-.rule-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line, #e7e9f0); }
-.rule-row:first-child { border-top: 0; }
+.section-rules > .rules-filter { width: auto; margin: 0 var(--fr-card-padding-inline, 20px) var(--fr-settings-row-padding-block, 14px); }
+.rules-no-results, .rule-row, .rule-editor {
+    padding: var(--fr-settings-row-padding-block, 14px) var(--fr-card-padding-inline, 20px);
+    border-top: 1px solid var(--fr-card-border, var(--line));
+}
+.rules-no-results { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.rule-row { display: flex; align-items: center; gap: 10px; min-height: var(--fr-settings-row-min-height, 66px); }
 .rule-row.is-disabled .rule-main { opacity: .55; }
 .rule-main { flex: 1; min-width: 0; }
-.rule-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 28px; color: var(--ink, #172033); }
+.rule-main strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; line-height: 1.5; color: var(--ink, #172033); }
 .rule-profile-missing { font-size: 11px; line-height: 1.5; color: var(--el-color-warning, #a66a00); }
 .rule-mode { flex: 0 0 144px; width: 144px; }
 .rule-actions { display: flex; gap: 4px; align-items: center; }
 .rule-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.rule-editor { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px; padding: 14px; background: var(--surface-soft, rgba(128, 135, 150, .05)); border: 1px solid var(--line, #e7e9f0); border-radius: 10px; }
+.rule-editor { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 12px; }
 .rule-editor label { display: grid; gap: 6px; min-width: 0; font-size: 12px; color: var(--ink, #172033); }
 .profile-editor, .rule-advanced, .rule-error, .editor-actions { grid-column: 1 / -1; }
 .rule-advanced { min-width: 0; }

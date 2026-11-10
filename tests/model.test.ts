@@ -224,7 +224,7 @@ describe('AI 模型编号列表', () => {
             [services.siliconCloud]: ['deepseek-ai/DeepSeek-V4.1-Flash', 'Qwen/Qwen3.8-27B'],
             [services.groq]: ['qwen/qwen3.8-27b'],
             [services.openrouter]: ['qwen/qwen3.8-flash', 'google/gemini-4-argon', 'openai/gpt-6-luna', 'openai/gpt-6.1-sol', 'anthropic/claude-haiku-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-opus-5.5', 'stepfun/step-3.7-flash'],
-            [services.mistral]: ['mistral-large-4'],
+            [services.mistral]: ['mistral-large-4', 'zai-glm-5-3', 'zai-glm-5-3-flash', 'deepseek-v4-1-flash-1017'],
             [services.togetherai]: ['Qwen/Qwen3.8-27B'],
             [services.deepinfra]: ['Qwen/Qwen3.8-27B'],
             [services.ollama]: ['qwen3.8:27b', 'qwen3.8-flash-next:125b-a6b-q4_K_M', 'qwen3.8-flash-next:125b-mlx'],

@@ -32,9 +32,8 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// On Node 22.23.4, main e081256b3 measures 3,642,078 bytes and the dependency
-// patch build measures 3,652,010 bytes. Retain roughly 1 KB of headroom.
-// The Greasy Fork artifact retains its separate 2 MB platform limit.
-const maxBytes = 3_655_000;
+// Floating button dismissal and localized copy bring this build to about 3,657 KB.
+// Retain roughly 1 KB of headroom. The Greasy Fork artifact has its own limit.
+const maxBytes = 3_658_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

@@ -185,6 +185,77 @@ describe('悬浮球 content runtime', () => {
     expect(runtime.toggleFloatingBallTranslation()).toBe(false);
   });
 
+  it('本次隐藏要求可信点击，卸载入口后同一文档无法重新挂载', async () => {
+    const mounted = ui();
+    mocks.createVueShadowUi.mockResolvedValue(mounted);
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    await runtime.mountFloatingBall({} as never);
+    const {onHide} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    await onHide('page', {isTrusted: false});
+    expect(mounted.remove).not.toHaveBeenCalled();
+    await onHide('page', {isTrusted: true});
+    expect(mounted.remove).toHaveBeenCalledOnce();
+    expect(runtime.isFloatingBallAllowedOnPage()).toBe(false);
+    expect(runtime.mountFloatingBall()).toBeNull();
+    expect(mocks.createVueShadowUi).toHaveBeenCalledOnce();
+    expect(mocks.requestConfigPatch).not.toHaveBeenCalled();
+    expect(mocks.restoreOriginalContent).not.toHaveBeenCalled();
+  });
+
+  it('网站和全局隐藏通过各自的配置字段保存，并保留已有网站', async () => {
+    vi.stubGlobal('location', {href: 'https://docs.example.com/article'});
+    mocks.config.floatingBallDisabledDomains = ['other.net'];
+    mocks.createVueShadowUi.mockResolvedValue(ui());
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    await runtime.mountFloatingBall({} as never);
+    const {onHide, canHideOnSite} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    expect(canHideOnSite).toBe(true);
+    await onHide('site', {isTrusted: true});
+    expect(mocks.requestConfigPatch).toHaveBeenLastCalledWith(
+      {floatingBallDisabledDomains: ['other.net', 'example.com']}, expect.any(Function),
+    );
+    expect(runtime.isFloatingBallAllowedOnPage()).toBe(false);
+    await onHide('global', {isTrusted: true});
+    expect(mocks.requestConfigPatch).toHaveBeenLastCalledWith({disableFloatingBall: true}, expect.any(Function));
+    expect(mocks.config.on).toBe(true);
+    runtime.unmountFloatingBall();
+  });
+
+  it('没有可保存的站点时不提供网站隐藏，也不写入规则', async () => {
+    vi.stubGlobal('location', {href: 'file:///reading.html'});
+    mocks.createVueShadowUi.mockResolvedValue(ui());
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    await runtime.mountFloatingBall({} as never);
+    const {onHide, canHideOnSite} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    expect(canHideOnSite).toBe(false);
+    await onHide('site', {isTrusted: true});
+    expect(mocks.requestConfigPatch).not.toHaveBeenCalled();
+    runtime.unmountFloatingBall();
+  });
+
+  it.each([false, true])('隐藏设置保存失败后保留入口并仅在有效页面提示，失效=%s', async invalid => {
+    const mounted = ui();
+    const context = {isInvalid: false};
+    const error = new Error('save unavailable');
+    mocks.createVueShadowUi.mockResolvedValue(mounted);
+    mocks.requestConfigPatch.mockRejectedValueOnce(error);
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    try {
+      await runtime.mountFloatingBall(context as never);
+      context.isInvalid = invalid;
+      const {onHide} = mocks.createVueShadowUi.mock.calls[0][1].props;
+      await onHide('global', {isTrusted: true});
+      expect(consoleError).toHaveBeenCalledExactlyOnceWith('[FluentRead] 保存悬浮球隐藏设置失败', error);
+      expect(mounted.remove).not.toHaveBeenCalled();
+      if (invalid) expect(mocks.showPageNotice).not.toHaveBeenCalled();
+      else expect(mocks.showPageNotice).toHaveBeenCalledExactlyOnceWith('无法保存悬浮球隐藏设置，请重试。', 'error');
+    } finally {
+      runtime.unmountFloatingBall();
+      consoleError.mockRestore();
+    }
+  });
+
   it('通过关闭 Shadow DOM 组装交互，卸载只清理入口并保留全文会话', async () => {
     const toggleTranslation = vi.fn();
     const setTranslationState = vi.fn();
@@ -422,12 +493,22 @@ describe('悬浮球 content runtime', () => {
     mocks.createVueShadowUi.mockResolvedValueOnce(ui({toggleTranslation: vi.fn()}));
     const runtime = await import('@/src/features/floating-ball/content/runtime');
     await runtime.mountFloatingBall({} as never);
-    mocks.createVueShadowUi.mock.calls[0][1].props.onSettingsClick({isTrusted: true, currentTarget: document.createElement('button')});
+    const {onSettingsClick, onHide, onPositionChanged, presentation} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    onSettingsClick({isTrusted: true, currentTarget: document.createElement('button')});
     await Promise.resolve();
     expect(mocks.sendMessage).toHaveBeenCalledWith({type: 'openOptionsPage'});
+    await onHide('global', {isTrusted: true});
+    expect(mocks.requestConfigPatch).not.toHaveBeenCalled();
+    onPositionChanged('left', 0.4);
+    expect(mocks.requestConfigPatch).toHaveBeenCalledWith(
+      {floatingBallPosition: 'left', floatingBallVerticalPosition: 0.4}, expect.any(Function),
+    );
+    mocks.subscribeConfig.mock.calls[0][0]({...mocks.config, floatingBallCompact: true});
+    expect(presentation.compact).toBe(true);
+    expect(mocks.createAnchoredPopup).not.toHaveBeenCalled();
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mocks.sendMessage.mockRejectedValueOnce(new Error('settings unavailable'));
-    mocks.createVueShadowUi.mock.calls[0][1].props.onSettingsClick({isTrusted: true});
+    onSettingsClick({isTrusted: true});
     await Promise.resolve();
     expect(consoleError).toHaveBeenCalledWith('[FluentRead] 打开设置页失败', expect.any(Error)); consoleError.mockRestore();
     runtime.unmountFloatingBall();
@@ -455,7 +536,9 @@ describe('悬浮球 content runtime', () => {
     mocks.createVueShadowUi.mockResolvedValueOnce(ui({toggleTranslation: vi.fn(), setPopupOpen}));
     const runtime = await import('@/src/features/floating-ball/content/runtime');
     await runtime.mountFloatingBall({} as never);
-    const click = mocks.createVueShadowUi.mock.calls[0][1].props.onSettingsClick;
+    const {onSettingsClick: click, onHideMenuOpen} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    onHideMenuOpen();
+    expect(mocks.closePopup).not.toHaveBeenCalled();
     const button = document.createElement('button');
     click({isTrusted: false, currentTarget: button});
     expect(mocks.createAnchoredPopup).not.toHaveBeenCalled();
@@ -472,6 +555,8 @@ describe('悬浮球 content runtime', () => {
     expect(mocks.sendMessage).toHaveBeenLastCalledWith({type: 'requestFloatingPopup'});
     ports.onOpenChange(true);
     expect(setPopupOpen).toHaveBeenCalledWith(true);
+    onHideMenuOpen();
+    expect(mocks.closePopup).toHaveBeenCalledOnce();
     runtime.unmountFloatingBall();
     expect(mocks.closePopup).toHaveBeenCalled();
     consoleError.mockRestore();
@@ -572,6 +657,32 @@ describe('悬浮球 content runtime', () => {
     expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);expect(runtime.mountFloatingBall()).toBe(newer!);
     first.resolve(stale);await older;expect(stale.remove).toHaveBeenCalledOnce();expect(runtime.mountFloatingBall()).toBe(newer!);
     second.resolve(live);await newer!;expect(runtime.toggleFloatingBallTranslation()).toBe(true);runtime.unmountFloatingBall();
+  });
+
+  it('keeps the newer presentation when a superseded creation fails synchronously', async () => {
+    const live = ui({toggleTranslation: vi.fn()});
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    const context = {} as never;
+    const error = new Error('superseded creation failed');
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    let current: ReturnType<typeof runtime.mountFloatingBall>;
+    mocks.createVueShadowUi.mockImplementationOnce(() => {
+      runtime.unmountFloatingBall();
+      current = runtime.mountFloatingBall(context);
+      throw error;
+    }).mockResolvedValueOnce(live);
+    try {
+      await expect(runtime.mountFloatingBall(context)).resolves.toBeNull();
+      await current!;
+      expect(consoleError).toHaveBeenCalledExactlyOnceWith('[FluentRead] 悬浮球挂载失败', error);
+      const {presentation} = mocks.createVueShadowUi.mock.calls[1][1].props;
+      mocks.subscribeConfig.mock.calls[0][0]({...mocks.config, floatingBallCompact: true});
+      expect(presentation.compact).toBe(true);
+      expect(live.remove).not.toHaveBeenCalled();
+    } finally {
+      runtime.unmountFloatingBall();
+      consoleError.mockRestore();
+    }
   });
 
   it('bounds synchronously reentered creation and resumes the latest intent when a slot frees', async () => {

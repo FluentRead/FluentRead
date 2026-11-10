@@ -18,7 +18,7 @@ let componentErrors: ReturnType<typeof vi.fn> | undefined;
 afterEach(() => {
   app?.unmount(); app = undefined;
   expect(componentErrors).not.toHaveBeenCalled(); componentErrors = undefined;
-  vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();
+  vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers();
 });
 
 type BallApi = {setTranslationState(value: boolean): void; setTranslationStatus(value: string): void;
@@ -110,6 +110,23 @@ function mountBall(initial: Record<string, unknown> = {}, navigatorPort: {maxTou
 async function flush() {await Vue.nextTick(); await Vue.nextTick();}
 
 describe('FloatingBall actual SFC lifecycle', () => {
+  it.each(['left', 'right'] as const)('tucks the default hover margins at the %s edge and respects an equal custom pair', async side => {
+    const port = mountBall({position: side, presentation: {defaultMargin: 0, popoutMargin: 20}});
+    const margin = () => port.ball().style.getPropertyValue(side);
+    await flush();
+    expect(margin()).toContain('var(--fr-ball-tucked-margin)');
+    port.ball().dispatchEvent(port.event('mouseenter'));
+    await flush();
+    expect(margin()).toContain('20px');
+    port.ball().dispatchEvent(port.event('mouseleave'));
+    await flush();
+    expect(margin()).toContain('var(--fr-ball-tucked-margin)');
+    port.props.presentation.popoutMargin = 0;
+    await flush();
+    expect(margin()).not.toContain('var(--fr-ball-tucked-margin)');
+    expect(margin()).toContain('0px');
+  });
+
   it.each(['left','right'])('keeps equal signed margins stationary at the %s dock and updates unequal hover margins', async side => {
     const port = mountBall({position:side,presentation:{toolsDisplay:'hover',hoverDelay:0,defaultMargin:-18,popoutMargin:-18}});await flush();
     const initial = port.ball().style.getPropertyValue(side);
@@ -281,6 +298,61 @@ describe('FloatingBall actual SFC lifecycle', () => {
     port.props.presentation = {toolsDisplay: 'always'};await flush();expect(expanded()).toBe(true);
     port.ball().dispatchEvent(port.event('mouseenter'));port.ball().dispatchEvent(port.event('mouseleave'));port.main().dispatchEvent(port.event('focusin'));await flush();expect(expanded()).toBe(true);expect(vi.getTimerCount()).toBe(0);
     port.props.presentation = {toolsDisplay: 'hover', hoverDelay: 0};await flush();port.ball().dispatchEvent(port.event('mouseenter'));await flush();expect(expanded()).toBe(true);
+  });
+
+  it('keeps hide choices open while moving into the panel and dismisses them without hiding the ball', async () => {
+    const onHide = vi.fn();
+    const port = mountBall({onHide, canHideOnSite: true, presentation: {toolsDisplay: 'hidden', clickAction: 'none'}});
+    await flush();
+    const hide = port.ball().querySelector<HTMLButtonElement>('.floating-ball-hide')!;
+    const controls = hide.parentElement!;
+    Object.defineProperty(controls, 'getBoundingClientRect', {value: () => ({left: 906, right: 940, top: 390, bottom: 418})});
+    const panel = () => port.ball().querySelector('.floating-ball-hide-panel');
+    port.ball().dispatchEvent(port.event('mouseenter'));
+    port.click(hide);
+    await flush();
+    port.ball().dispatchEvent(port.event('mouseleave'));
+    await flush();
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);
+    expect(panel()?.querySelectorAll('button')).toHaveLength(3);
+    port.document.dispatchEvent(port.event('keydown', {key: 'Escape'}));
+    await flush();
+    expect(panel()).toBeNull();
+    expect(onHide).not.toHaveBeenCalled();
+
+    port.click(hide);
+    await flush();
+    port.click(panel()!.querySelectorAll('button')[1]);
+    await flush();
+    expect(panel()).toBeNull();
+    expect(onHide).toHaveBeenCalledExactlyOnceWith('site', expect.anything());
+    expect(port.translate).not.toHaveBeenCalled();
+    expect(port.savePosition).not.toHaveBeenCalled();
+  });
+
+  it('releases touch expansion when the quick panel closes', async () => {
+    const port = mountBall({presentation: {clickAction: 'settings'}});
+    port.pointer('pointerdown');
+    port.pointer('pointerup');
+    port.exposed.value!.setPopupOpen(true);
+    await flush();
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(true);
+    port.exposed.value!.setPopupOpen(false);
+    await flush();
+    expect(port.ball().classList.contains('floating-ball-expanded')).toBe(false);
+  });
+
+  it('hides until reload directly in the userscript', async () => {
+    vi.stubEnv('BROWSER', 'userscript');
+    const onHide = vi.fn();
+    const port = mountBall({onHide, canHideOnSite: true});
+    await flush();
+    const button = port.ball().querySelector<HTMLButtonElement>('.floating-ball-hide')!;
+    expect(button.getAttribute('aria-label')).toBe('floatingBall.hide.page');
+    port.click(button);
+    await flush();
+    expect(onHide).toHaveBeenCalledExactlyOnceWith('page', expect.anything());
+    expect(port.ball().querySelector('.floating-ball-hide-panel')).toBeNull();
   });
   it('keeps manga controls available during current keyboard focus, resets mouse idle delay, and reports progress or errors without new translation', async () => {
     const port = mountBall({manga: {available: true, active: false, pending: false, errors: 0}});await flush();

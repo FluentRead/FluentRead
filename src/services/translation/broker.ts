@@ -131,6 +131,8 @@ const PAGE_SUMMARY_CACHE_SIZE = 8;
 const PAGE_SUMMARY_LIMIT = 1200;
 // 仅一至两句短参考直接发送；不能使用摘要输出上限作阈值，否则长页逐段重复输入反而更贵。
 const DIRECT_PAGE_CONTEXT_LIMIT = 240;
+// 已消耗逐槽恢复预算时使用独立错误码，前端不能再将整个批次降级重发。
+const AI_MULTI_SEGMENT_REPAIR_FAILED = 'AI_MULTI_SEGMENT_REPAIR_FAILED';
 type PageSummaryResult = {context: string; summarized: boolean};
 
 class AIMultiSegmentResponseError extends Error {
@@ -147,23 +149,10 @@ class AIMultiSegmentResponseError extends Error {
 class TranslationSlotResponseError extends Error {
     readonly kind = 'response';
     readonly retryable = false;
-    readonly code = 'TRANSLATION_SLOT_RESPONSE_INVALID';
 
-    constructor() {
+    constructor(readonly code = 'TRANSLATION_SLOT_RESPONSE_INVALID') {
         super('翻译服务返回空译文，请重试或切换服务');
         this.name = 'TranslationSlotResponseError';
-    }
-}
-
-/** 已消耗逐槽恢复预算，前端不能再将整个批次降级重发。 */
-class AIMultiSegmentRepairError extends Error {
-    readonly kind = 'response';
-    readonly retryable = false;
-    readonly code = 'AI_MULTI_SEGMENT_REPAIR_FAILED';
-
-    constructor() {
-        super('AI 多段翻译的异常段落重试后仍无有效译文，请重试或切换服务');
-        this.name = 'AIMultiSegmentRepairError';
     }
 }
 
@@ -795,7 +784,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         if (isDefiniteRecoveryPageContextLeak(
             execution, message.origin, retried, validationPageContext, message.modelOverride,
         )) throw new AIContextRecoveryResponseError();
-        if (!hasTranslationContent(retried)) throw recoverEmpty ? new AIMultiSegmentRepairError() : new TranslationSlotResponseError();
+        if (!hasTranslationContent(retried)) throw new TranslationSlotResponseError(recoverEmpty ? AI_MULTI_SEGMENT_REPAIR_FAILED : undefined);
         if (execution.acceptUnchangedResult && isUnchangedTranslationResponse(message.origin, retried)) return retried;
         if (isGlossaryOnlyResult(execution.config, message.origin, retried)) return retried;
         if (isLikelyUntranslatedResponse(message.origin, retried, execution.targetLanguage)) {
@@ -923,7 +912,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             )) throw new AIContextRecoveryResponseError();
         }
 
-        if (!parsed || parsed.length !== message.origin.length) {
+        // 严格解析器已经校验标记数量、顺序和每槽唯一性。
+        if (!parsed) {
             throw new AIMultiSegmentResponseError();
         }
 
@@ -963,20 +953,19 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 pageContext,
             );
         }
-        const finalized = Array.from(parsed);
-        for (let index = 0; index < finalized.length; index += 1) {
+        for (let index = 0; index < parsed.length; index += 1) {
             const origin = message.origin[index];
-            if (!needsRepair(finalized[index], index)
-                && !isClearlyWrongLanguageResponse(origin, finalized[index], execution.targetLanguage)) continue;
-            finalized[index] = await recoverInvalidResult(
-                execution, {...message, origin}, finalized[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
+            if (!needsRepair(parsed[index], index)
+                && !isClearlyWrongLanguageResponse(origin, parsed[index], execution.targetLanguage)) continue;
+            parsed[index] = await recoverInvalidResult(
+                execution, {...message, origin}, parsed[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
             );
             // 单槽恢复不能把上一次完整协议包当作译文；来源已避让本包标记，出现即表示串槽。
-            if ([...packet.starts, ...packet.ends].some(marker => finalized[index].includes(marker))) {
-                throw new AIMultiSegmentRepairError();
+            if ([...packet.starts, ...packet.ends].some(marker => parsed[index].includes(marker))) {
+                throw new TranslationSlotResponseError(AI_MULTI_SEGMENT_REPAIR_FAILED);
             }
         }
-        return finalized;
+        return parsed;
     }
 
     async function callBatchProviderWithContextRecovery(

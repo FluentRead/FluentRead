@@ -8,7 +8,7 @@
 
 /** 参考材料不能提前关闭外层数据区域；只转义保留标签，不改写正文和内层证据格式。 */
 export function escapePageContextDelimiters(value: string): string {
-    return value.replace(/<\/?webpage_context\b[^<>]*>/giu, tag => tag.replace(/</gu, '&lt;').replace(/>/gu, '&gt;'));
+    return value.replace(/<\/?webpage_context\b[^<>]*>/giu, tag => `&lt;${tag.slice(1, -1)}&gt;`);
 }
 
 /** 构造 AI 智能上下文的一次性网页摘要提示词。 */

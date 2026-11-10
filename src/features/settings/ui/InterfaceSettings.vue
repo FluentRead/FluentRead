@@ -2,6 +2,7 @@
  * @file src/features/settings/ui/InterfaceSettings.vue
  * 文件职责：组织译文样式、界面风格、动画加载效果、菜单栏布局与界面字体及逐句高亮、完整句学习外观分组，其中网页译文样式排在第一位，完整句学习外观紧随菜单栏布局。
  * 主要内容：连续展示译文样式、与真实菜单栏同宽的皮肤预览、菜单栏布局、动画及紧凑字体卡片，风格选择以名称和配色缩略图组成可比较网格，仅单独展示当前选择的说明，其余说明保留在可访问名称与悬停提示中；单选组只保留选中项的 Tab 入口并支持方向键及首尾定位，窄屏优先展示选择网格再展示完整预览，通过预览和显隐列表编排区域与快捷入口；字体标题、描述和样例使用包内字形子集，未下载和离线时也可预览真实样式；字体下载、重试和逐项清除都在对应字体卡片内完成，清除按钮展示排除共享文件后的可释放容量；清除确认框绑定当前页面、配置及选中字体，隐藏、缓存停用或配置变更时关闭，迟到结果不写回新配置或显示旧反馈。
+ * 侧边栏：在菜单栏布局中为支持原生侧边栏的 Chromium 宿主提供显示范围选择。
  * 模块边界：本组件只负责界面配置的展示与双向绑定，不直接读写浏览器存储、不负责主题模式，也不关闭翻译功能本身；界面皮肤由 Options composition root 统一应用，译文样式的细节由 TranslationStyleSettings 负责。
 -->
 <template>
@@ -94,6 +95,7 @@
     :title="t('settings.interface.popupLayout.label')"
     :description="t('settings.interface.popupLayout.description')"
   >
+    <SidepanelScopeSetting v-if="SidepanelScopeSetting" :config="props.config" :active="layoutEditorActive" />
     <div class="interface-layout-settings">
       <div class="popup-layout-workbench" data-popup-layout-workbench>
         <div class="popup-layout-tabs" role="tablist" :aria-label="t('settings.interface.popupLayout.label')" @keydown="handleLayoutTabKeydown">
@@ -287,7 +289,7 @@
 import './interface-font-previews.css'
 import SettingsPanel from './components/SettingsPanel.vue'
 import VideoSentenceLearningAppearanceSettings from './VideoSentenceLearningAppearanceSettings.vue'
-import {computed, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue'
+import {computed, defineAsyncComponent, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue'
 import {ElMessage} from 'element-plus'
 import type {Config} from '@/src/core/config/model'
 import {
@@ -309,6 +311,7 @@ import {
 import {useUiI18n} from '@/src/ui/i18n'
 import {getClearableInterfaceFontAssets} from '@/src/core/config/interfaceFontAssets'
 import {browserCapabilities} from '@/src/platform/browser/capabilities'
+import {canOpenTranslationSidepanel} from '@/src/platform/browser/translationSidepanel'
 import {availableInterfaceFonts, cachedInterfaceFonts, clearInterfaceFont, interfaceFontLoadState, refreshInterfaceFontAvailability, retryInterfaceFont} from '@/src/ui/interfaceAppearance'
 import InterfaceSkinPreview from './components/InterfaceSkinPreview.vue'
 import PopupLayoutPreview from './components/PopupLayoutPreview.vue'
@@ -318,6 +321,9 @@ import TranslationStyleSettings from './TranslationStyleSettings.vue'
 import SentenceHighlightStyleSettings from './SentenceHighlightStyleSettings.vue'
 import SettingsGroup from './components/SettingsGroup.vue'
 import SettingsItem from './components/SettingsItem.vue'
+const SidepanelScopeSetting = import.meta.env.BROWSER === 'userscript'
+  || browserCapabilities.browser === 'firefox' || !canOpenTranslationSidepanel()
+  ? null : defineAsyncComponent(() => import('./components/SidepanelScopeSetting.vue'))
 
 const props = withDefaults(defineProps<{
   config: Config

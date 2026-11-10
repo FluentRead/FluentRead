@@ -16,6 +16,7 @@ import {
 import {parseCustomBody} from '@/src/core/config/customBody';
 import {getDeepLXEndpoints} from '@/src/core/config/deeplx';
 import {
+    Config,
     DEFAULT_TRANSLATION_BACKOFF_BASE_MS,
     DEFAULT_TRANSLATION_BACKOFF_MAX_MS,
     DEFAULT_API_KEY_RECOVERY_MS,
@@ -68,6 +69,17 @@ describe('配置领域边界与防御分支', () => {
         for (const translationScope of ['content', undefined, null, '', 'ALL', 'future', true, 1, {}, ['all']]) {
             expect(normalizeConfig({translationScope}).translationScope).toBe('content');
         }
+    });
+    it('保留侧边栏窗口偏好，旧配置及非法范围默认仅当前标签页', () => {
+        expect(new Config().translationSidepanelScope).toBe('tab');
+        expect(normalizeConfig({}).translationSidepanelScope).toBe('tab');
+        expect(normalizeConfig({translationSidepanelScope: 'window'}).translationSidepanelScope).toBe('window');
+        expect(normalizeConfig({translationSidepanelScope: 'invalid'}).translationSidepanelScope).toBe('tab');
+    });
+
+    it('导入配置时省略空的自定义模型列表并保留有效模型', () => {
+        const config = normalizeConfig({customModels: {openai: [], gemini: ['gemini-user-model']}});
+        expect(config.customModels).toEqual({gemini: ['gemini-user-model']});
     });
 
     it('全局和工具语言按书写体系迁移历史别名并保留自定义非中文语言', () => {

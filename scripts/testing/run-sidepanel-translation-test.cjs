@@ -13,6 +13,7 @@ const artifactsDir = path.resolve(arg('artifacts-dir'));
 const browserPathIndex = process.argv.indexOf('--browser-path');
 const browserPath = browserPathIndex < 0 ? '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' : arg('browser-path');
 const loadViaCdp = process.argv.includes('--load-via-cdp');
+const scopeOnly = process.argv.includes('--scope-only');
 const {chromium} = require(path.join(arg('playwright-root'), 'playwright'));
 const {PNG} = require(path.join(arg('playwright-root'), 'pngjs'));
 const {launchFocusSafePersistentContext, newPageWithoutForeground, activateExtensionTabWithoutForeground} = require(arg('focus-safe-helper'));
@@ -80,7 +81,12 @@ async function attachNative(target) {
 }
 async function openNative() {
     await popup.locator('[data-testid="sidebar-translation"]:not(:disabled)').click();
-    let target;await until(async () => {target = (await browserSession.send('Target.getTargets')).targetInfos.find(item => item.url === `${origin}/sidepanel.html`);return target;}, 'native target');
+    let target;await until(async () => {
+        const [notice] = await popup.locator('.notice.error').allTextContents();
+        if (notice) throw new Error(`Opening native sidebar failed: ${notice}`);
+        target = (await browserSession.send('Target.getTargets')).targetInfos.find(item => item.url === `${origin}/sidepanel.html`);
+        return target;
+    }, 'native target');
     native = await attachNative(target);
     try {await until(() => native.evaluate(() => Boolean(document.querySelector('.translation-center.is-sidebar .translate-primary-button'))), 'native Vue mount');}
     catch (error) {report.nativeMountFailure = await native.evaluate(() => ({url: location.href, ready: document.readyState, body: document.body.innerText, app: document.querySelector('#app')?.innerHTML.slice(0, 1500)}));throw error;}
@@ -96,6 +102,86 @@ async function nativeClick(selector) {
 async function input(text, selector = 'textarea') {
     await native.evaluate(selector => {const node = document.querySelector(selector);node.focus();node.value = '';node.dispatchEvent(new Event('input', {bubbles: true}));}, selector);
     await native.send('Input.insertText', {text});
+}
+async function verifyDisplayScope(content, sourceTab) {
+    report.phase = 'display-scope';diagnostics.setPhase(report.phase);
+    const other = await page(providerUrl + '/other');
+    const otherTab = await control.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url), other.url());
+    assert.equal(otherTab.windowId, sourceTab.windowId);
+    const settings = await page(`${origin}/options.html?target=layout#settings-interface`);
+    const scope = settings.getByRole('radiogroup', {name: '侧边栏显示范围'});
+    const tabOption = scope.getByRole('radio', {name: '仅当前标签页'});
+    const windowOption = scope.getByRole('radio', {name: '整个窗口'});
+    await scope.waitFor();
+    const activate = tabId => control.evaluate(tabId => chrome.tabs.update(tabId, {active: true}), tabId);
+    const width = page => page.evaluate(() => innerWidth);
+    const currentPanel = tabId => control.evaluate(async tabId => chrome.sidePanel.getOptions(tabId === undefined ? {} : {tabId}), tabId);
+    const switchScope = async (option, value) => {
+        await option.click();
+        await until(async () => (await readConfig()).translationSidepanelScope === value, `persist ${value} scope`);
+        await settings.reload();
+        await until(async () => await option.getAttribute('aria-checked') === 'true', `reload ${value} scope`);
+    };
+
+    assert.equal(await tabOption.getAttribute('aria-checked'), 'true');
+    await activate(otherTab.id);const otherWidth = await width(other);
+    await activate(sourceTab.id);const sourceWidth = await width(content);
+    await openNative();
+    await until(async () => await width(content) < sourceWidth, 'source tab displays panel');
+    const isEdge = /\bEdg\//.test(report.userAgent);
+    assert.equal((await currentPanel(sourceTab.id)).tabId, sourceTab.id);
+    assert.notEqual((await currentPanel(otherTab.id)).enabled, true);
+    await input('Current tab text');
+    await activate(otherTab.id);
+    await until(async () => await width(other) === otherWidth, 'other tab hides panel');
+    await activate(sourceTab.id);
+    const restored = await content.waitForFunction(before => innerWidth < before, sourceWidth, {timeout: 3000}).then(() => true, error => {
+        if (!isEdge || error.name !== 'TimeoutError') throw error;
+        return false;
+    });
+    if (restored) {
+        assert.equal(await native.evaluate(() => document.querySelector('textarea').value), 'Current tab text');
+    } else {
+        // Microsoft documents that Edge may require a new user click after returning to the tab.
+        report.browserLimitations = ['Edge did not restore the tab panel on return. Reopening from the extension entry was required.'];
+        await native.dispose();native = undefined;
+        await openNative();
+        await until(async () => await width(content) < sourceWidth, 'manually reopen Edge tab panel');
+        assert.equal((await currentPanel(sourceTab.id)).tabId, sourceTab.id);
+    }
+    report.cases.push({name: 'default panel hides on another tab and remains specific to its source tab', automaticRestore: restored, passed: true});
+
+    await switchScope(windowOption, 'window');
+    await activate(sourceTab.id);
+    const settingsShot = path.join(artifactsDir, 'sidebar-scope-setting.png');
+    await scope.locator('..').locator('..').screenshot({path: settingsShot});report.screenshots.push(settingsShot);
+    await native.dispose();native = undefined;
+    await openNative();
+    assert.equal((await currentPanel()).enabled, true);
+    await until(async () => await width(content) < sourceWidth, 'window panel is visible in the previously scoped tab');
+    await input('Shared window text');
+    await activate(otherTab.id);
+    await until(async () => await width(other) < otherWidth, 'window panel follows the other tab');
+    await until(() => native.evaluate(() => document.visibilityState === 'visible'), 'same window panel is visible in the other tab');
+    assert.equal(await native.evaluate(() => document.querySelector('textarea').value), 'Shared window text');
+    await activate(sourceTab.id);
+    await until(async () => await width(content) < sourceWidth, 'window panel follows back to the source tab');
+    await until(() => native.evaluate(() => document.visibilityState === 'visible'), 'same window panel is visible back in the source tab');
+    assert.equal(await native.evaluate(() => document.querySelector('textarea').value), 'Shared window text');
+    report.cases.push({name: 'window option persists and shares the same native panel across tabs', passed: true});
+
+    await switchScope(tabOption, 'tab');
+    await activate(sourceTab.id);
+    await native.dispose();native = undefined;
+    await openNative();
+    assert.equal((await currentPanel()).enabled, false);
+    await until(async () => await width(content) < sourceWidth, 'source tab displays the new tab panel');
+    await activate(otherTab.id);
+    await until(async () => await width(other) === otherWidth, 'switching back hides the old window panel');
+    await activate(sourceTab.id);
+    if (restored) await until(async () => await width(content) < sourceWidth, 'tab panel restores after scope change');
+    report.cases.push({name: 'switching back to tab scope clears the previous window panel', passed: true});
+    await settings.close();await other.close();
 }
 async function screenshot(name) {
     (report.themeState ||= {})[name] = await native.evaluate(async () => {
@@ -158,20 +244,23 @@ async function main() {
     try {
         await new Promise((resolve, reject) => {server.once('error', reject);server.listen(0, '127.0.0.1', resolve);});providerUrl = `http://127.0.0.1:${server.address().port}`;
         const manifest = JSON.parse(fs.readFileSync(path.join(extensionDir, 'manifest.json')));
-        assert.equal(manifest.side_panel.default_path, 'sidepanel.html');assert(manifest.permissions.includes('sidePanel'));
-        report.manifest = {version: manifest.version, sidebar: manifest.side_panel.default_path, permission: 'sidePanel'};
+        assert.equal(manifest.side_panel, undefined);assert(manifest.permissions.includes('sidePanel'));
+        assert(fs.existsSync(path.join(extensionDir, 'sidepanel.html')));
+        report.manifest = {version: manifest.version, sidebar: 'sidepanel.html', permission: 'sidePanel'};
         launched = await launchFocusSafePersistentContext({chromium, profileDir, background: true, headless: false,
             browserPath, viewport: {width: 1280, height: 900}, displayTarget: 'secondary', timeout: 30000,
             browserArgs: [...(loadViaCdp ? ['--enable-unsafe-extension-debugging'] : [`--disable-extensions-except=${extensionDir}`, `--load-extension=${extensionDir}`]), '--no-first-run', '--no-default-browser-check']});
         ({context} = launched);Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
         assert.equal(report.windowPlacement.browserFrontmost, false);await diagnostics.start(context);
         browserSession = await context.browser().newBrowserCDPSession();
-        assert(manifest.key, 'This production fixture needs the fixed manifest public key');
+        // macOS Chromium uses the unpacked path when the manifest has no fixed public key.
+        const extensionKey = manifest.key ? Buffer.from(manifest.key, 'base64') : fs.realpathSync(extensionDir);
         const id = loadViaCdp ? (await browserSession.send('Extensions.loadUnpacked', {path: extensionDir})).id
-            : createHash('sha256').update(Buffer.from(manifest.key, 'base64')).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, hex => String.fromCharCode(97 + parseInt(hex, 16)));
+            : createHash('sha256').update(extensionKey).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, hex => String.fromCharCode(97 + parseInt(hex, 16)));
         diagnostics.setExtensionId(id);origin = `chrome-extension://${id}`;control = await page(`${origin}/popup.html`);
         await until(async () => (await readConfig())?.service, 'configuration');const initial = await readConfig();
         await patch({on: true, uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true, theme: 'light', interfaceSkin: 'default', animations: false,
+            ...(scopeOnly ? {} : {translationSidepanelScope: 'window'}),
             service, translationCenterServices: [service], translationCenterSourceLanguage: 'en', translationCenterTargetLanguage: 'zh-Hans', translationCenterLayout: 'grid',
             model: {...initial.model, ...Object.fromEntries(fixtures.map(item => [item.id, item.model]))}, token: Object.fromEntries(fixtures.map(item => [item.id, 'synthetic-local-fixture'])),
             user_role: {...initial.user_role, ...Object.fromEntries(fixtures.map(item => [item.id, 'SOURCE_BEGIN{{origin}}SOURCE_END']))},
@@ -184,6 +273,13 @@ async function main() {
         popup = await newPageWithoutForeground(context, 30000);await diagnostics.attachPage(popup);
         await popup.addInitScript(() => {window.close = () => {window.__popupClosed = true;};});
         await popup.goto(`${origin}/popup.html?sourceTabId=${sourceTab.id}`);await popup.locator('.popup-shell[data-config-ready="true"]').waitFor();
+        if (scopeOnly) {
+            await verifyDisplayScope(content, sourceTab);
+            assert.equal(report.nativeDiagnostics.length, 0, JSON.stringify(report.nativeDiagnostics));
+            await newPageWithoutForeground(context, 30000);
+            await diagnostics.flush();diagnostics.assertClean();report.ok = true;
+            return;
+        }
         for (const skin of ['default', 'minimal', 'compact']) {
             await patch({interfaceSkin: skin});
             await popup.locator(`.popup-shell[data-interface-skin="${skin}"]`).waitFor();

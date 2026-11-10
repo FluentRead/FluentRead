@@ -21,7 +21,7 @@ const PROJECT_ROOT = resolve(__dirname, '..');
 describe('native translation sidepanel artifact contract', () => {
     it.each(['Chrome', 'Firefox'])('%s validates its own final native panel declaration', async browser => {
         const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
-        const manifest = browser === 'Chrome' ? {side_panel: {default_path: 'sidepanel.html'}, permissions: ['sidePanel']}
+        const manifest = browser === 'Chrome' ? {permissions: ['sidePanel']}
             : {sidebar_action: {default_panel: 'sidepanel.html', open_at_install: false}, permissions: []};
         expect(() => verifyTranslationSidepanelManifest(manifest, ['sidepanel.html'], browser)).not.toThrow();
         expect(() => verifyTranslationSidepanelManifest(manifest, [], browser)).toThrow('缺少');
@@ -31,9 +31,9 @@ describe('native translation sidepanel artifact contract', () => {
             expect(() => verifyTranslationSidepanelManifest({...manifest, web_accessible_resources}, ['sidepanel.html'], browser)).toThrow('不得向网页公开');
         }
     });
-    it('rejects a missing Chrome declaration and Firefox installation-time opening', async () => {
+    it('rejects a Chrome global default panel and Firefox installation-time opening', async () => {
         const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
-        expect(() => verifyTranslationSidepanelManifest({permissions: ['sidePanel']}, ['sidepanel.html'], 'Chrome')).toThrow('清单');
+        expect(() => verifyTranslationSidepanelManifest({permissions: ['sidePanel'], side_panel: {default_path: 'sidepanel.html'}}, ['sidepanel.html'], 'Chrome')).toThrow('全局默认面板');
         expect(() => verifyTranslationSidepanelManifest({sidebar_action: {default_panel: 'sidepanel.html', open_at_install: true}}, ['sidepanel.html'], 'Firefox')).toThrow('安装');
     });
 });

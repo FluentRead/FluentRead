@@ -269,8 +269,8 @@ export function findUnexpectedCurrentVersionArchives(outputFiles, version, expec
 export function verifyTranslationSidepanelManifest(manifest, files, browser) {
     assert(files.includes('sidepanel.html'), `${browser} 缺少原生翻译面板页面`);
     if (browser === 'Chrome') {
-        assert(manifest.side_panel?.default_path === 'sidepanel.html' && !manifest.sidebar_action,
-            'Chrome 翻译面板清单无效');
+        assert(!manifest.side_panel && !manifest.sidebar_action,
+            'Chrome 翻译面板清单不得注册全局默认面板');
         assert(countPermission(manifest, 'sidePanel') === 1, 'Chrome 必须且只能声明一次 sidePanel 权限');
     } else {
         assert(manifest.sidebar_action?.default_panel === 'sidepanel.html' && manifest.sidebar_action.open_at_install === false && !manifest.side_panel,
@@ -413,7 +413,7 @@ async function main() {
         chrome: {
             manifestVersion: 3,
             offscreenPermission: true,
-            sidepanel: chromeManifest.side_panel.default_path,
+            sidepanel: 'sidepanel.html',
             runtimeCapabilityMarker: chromeBuildMarker,
             metadataLocales: chromeMetadataLocales,
             artifacts: chromeArtifacts,

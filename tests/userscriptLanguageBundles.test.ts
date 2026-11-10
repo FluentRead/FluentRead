@@ -21,6 +21,17 @@ const source = readFileSync(resolve(languageDir, fileName), 'utf8');
 const resourceCommit = '70d3d901033a579e32a5bf5e6af14555f0d140bb';
 
 describe('embedded language columns', () => {
+    it('keeps the unavailable menu layout title and preview labels without native sidebar or editing copy', () => {
+        for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
+            const original = extensionBundles[language].messages;
+            const projected = currentUserscriptLanguageBundle(language).messages;
+            for (const key of ['settings.interface.popupLayout.label', 'settings.interface.popupLayout.modules.translation.label']) {
+                expect(projected[key]).toBe(original[key]);
+            }
+            expect(projected['sidepanel.scope.label']).toBeUndefined();
+            expect(projected['settings.interface.popupLayout.handleAria']).toBeUndefined();
+        }
+    });
     it('omits the extension popup support description while keeping support labels used in settings', () => {
         for (const language of Object.keys(extensionBundles) as Array<keyof typeof extensionBundles>) {
             const original = extensionBundles[language].messages;

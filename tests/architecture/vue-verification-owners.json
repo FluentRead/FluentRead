@@ -417,6 +417,13 @@
       ],
       "scenario": "真实锚点导航、键盘与清理"
     },
+    "src/features/settings/ui/components/SidepanelScopeSetting.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/interfaceSettingsLifecycle.test.ts"
+      ],
+      "scenario": "真实范围控件默认选中当前标签页，切换与停用后的迟到点击"
+    },
     "src/features/settings/ui/services/ApiKeyList.vue": {
       "kind": "behavior",
       "tests": [

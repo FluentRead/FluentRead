@@ -6,6 +6,7 @@
  * 悬浮球边距：默认与悬停展开分别保存有符号 px 值，旧配置缺失时补齐默认值，读取和导入统一按范围及整数步长规范化。
  * 服务可用性：新增 disabledTranslationServices 持久化列表，默认空数组；导入时去重并约束标识长度。
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
+ * 侧边栏：保存原生翻译侧边栏的显示范围，旧配置与非法值默认使用当前标签页。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
  * AI 多段预算：默认每批最多 8 个可翻译片段、2000 原文字符，关闭功能保留预算，读取与导入时共享有界数字规范化。
@@ -227,6 +228,7 @@ export * from './aiRequestTimeout';
 export type DeepSeekApiType = 'auto' | 'responses' | 'chat';
 export type DeepSeekThinkingMode = 'enabled' | 'disabled';
 export type VideoSubtitleDisplayMode = 'bilingual' | 'translation-only' | 'original-only';
+export type TranslationSidepanelScope = 'tab' | 'window';
 export type VideoLocalTranscriptionModel = 'tiny' | 'base' | 'small';
 export type VideoTranscriptionProvider = 'browser' | 'native-qwen';
 export type FullPageTranslationMode = 'viewport' | 'all';
@@ -464,6 +466,7 @@ export class Config {
     interfaceFont: InterfaceFont; // 设置页和扩展弹窗使用的字体方案
     interfaceVisibility: InterfaceVisibility; // Popup 栏目可见性
     popupModuleOrder: PopupModuleId[]; // Popup 可编排模块的显示顺序
+    translationSidepanelScope: TranslationSidepanelScope; // Chromium 原生侧边栏的显示范围
     popupQuickFeatureOrder: PopupQuickFeatureId[]; // 快捷功能卡片的显示顺序
     popupQuickFeatureVisibility: PopupQuickFeatureVisibility; // 单张快捷功能卡片的可见性
     useCache: boolean; // 是否使用缓存
@@ -685,6 +688,7 @@ export class Config {
         this.interfaceFont = DEFAULT_INTERFACE_FONT; // 默认使用现代无衬线字体栈
         this.interfaceVisibility = {...DEFAULT_INTERFACE_VISIBILITY};
         this.popupModuleOrder = [...DEFAULT_POPUP_MODULE_ORDER];
+        this.translationSidepanelScope = 'tab';
         this.popupQuickFeatureOrder = [...DEFAULT_POPUP_QUICK_FEATURE_ORDER];
         this.popupQuickFeatureVisibility = {...DEFAULT_POPUP_QUICK_FEATURE_VISIBILITY};
         this.useCache = true; // 默认开启缓存
@@ -1467,6 +1471,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.interfaceFont = normalizeInterfaceFont(source.interfaceFont);
     normalized.interfaceVisibility = normalizeInterfaceVisibility(source.interfaceVisibility);
     normalized.popupModuleOrder = normalizePopupModuleOrder(source.popupModuleOrder);
+    normalized.translationSidepanelScope = source.translationSidepanelScope === 'window' ? 'window' : 'tab';
     normalized.popupQuickFeatureOrder = normalizePopupQuickFeatureOrder(source.popupQuickFeatureOrder);
     normalized.popupQuickFeatureVisibility = normalizePopupQuickFeatureVisibility(source.popupQuickFeatureVisibility);
 

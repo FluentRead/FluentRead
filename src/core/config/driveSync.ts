@@ -202,6 +202,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     inputBoxTranslationInterval: '输入框翻译触发间隔',
     interfaceSkin: '界面皮肤', interfaceFont: '界面字体', interfaceVisibility: '界面栏目',
     popupModuleOrder: '菜单栏布局顺序', popupQuickFeatureVisibility: '快捷功能卡片', popupQuickFeatureOrder: '快捷功能顺序',
+    translationSidepanelScope: '侧边栏显示范围',
     translationAppearance: '译文外观', browserDefaultTranslationFont: '浏览器默认译文字体', translationStyleProfiles: '译文样式', activeTranslationStyleProfileId: '译文样式',
     siteAdaptation: '网站规则', alwaysTranslateDomains: '网站规则', disabledExtensionDomains: '网站规则', translationOnlyDomains: '网站规则',
     excludedLanguages: '跳过翻译的语言', videoSubtitleAppearance: '视频字幕外观',

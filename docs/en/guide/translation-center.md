@@ -15,7 +15,9 @@ Your selected services receive the text. Input and results remain in the current
 
 ## Sidebar translation
 
-In Chrome, Edge, and desktop Firefox, use the **sidebar translation** icon at the top of the extension popup, or choose FluentRead from the browser's sidebar menu.
+In Chrome, Edge, and desktop Firefox, use the **sidebar translation** icon at the top of the extension popup. In desktop Firefox, you can also choose FluentRead from the browser's sidebar menu.
+
+In Chrome and Edge, **Current tab only** is the default. The panel hides when you switch tabs. Chrome restores the panel when you switch back. In Edge, you may need to reopen it manually. To share one panel across tabs in the same window, select **Entire window** in **Settings → Interface style → Menu layout → Sidebar scope**, then open the sidebar again from the popup.
 
 In the sidebar, press **Enter** to translate and **Shift + Enter** for a new line. **⌘ + Enter** and **Ctrl + Enter** also work. The button at the top right opens Translation Center in settings. The sidebar and settings page share language and service choices; input and results stay in the current panel and are not saved to settings.
 

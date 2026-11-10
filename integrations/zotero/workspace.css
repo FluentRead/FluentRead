@@ -2,21 +2,20 @@
 :root {font: 14px/1.6 system-ui, -apple-system, "PingFang SC", sans-serif; color-scheme: light dark;
   --bg: #f4f6f8; --panel: #fff; --text: #1c2938; --muted: #617184; --line: #dce3ea;
   --accent: #176a5c; --tint: #e7f3ef; --danger: #b13a3a; background: var(--bg); color: var(--text);}
-* {box-sizing: border-box;} body {margin: 0;} button,input,select,textarea {font: inherit;}
+* {box-sizing: border-box;} body {margin: 0;} button,input,textarea {font: inherit;}
 button {cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px;
   background: var(--panel); color: var(--text);} button:hover {border-color: var(--accent);}
 button:disabled {opacity: .5; cursor: default;} :focus-visible {outline: 3px solid var(--accent); outline-offset: 3px;}
 button.primary {background: var(--accent); color: #fff; border-color: var(--accent);}
 button.quiet {border: 0; background: transparent; color: var(--muted);} button.danger {color: var(--danger);}
-input,select,textarea {border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
+input,textarea {border: 1px solid var(--line); border-radius: 7px; padding: 6px 9px;
   background: var(--panel); color: var(--text); max-width: 100%;} textarea {width: 100%; resize: vertical;}
 input[type=checkbox] {accent-color: var(--accent);} h1,h2,p {margin: 0;} h1 {font-size: 22px; letter-spacing: -.5px;}
 h2 {font-size: 16px;} .app {max-width: 1200px; margin: auto; padding: 26px;}
 .header,.toolbar,.row,.actions {display: flex; align-items: center; gap: 10px; flex-wrap: wrap;}
 .header {justify-content: space-between; margin-bottom: 20px;} .subtitle,.muted {color: var(--muted); font-size: 12px;}
 .toolbar {padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); margin-bottom: 12px;}
-.toolbar label,.check {display: flex; gap: 7px; align-items: center;} .toolbar label {font-size: 12px; color: var(--muted);}
-.toolbar select {max-width: 190px;}
+.dropdown-field,.check {display: flex; gap: 7px; align-items: center;} .toolbar .dropdown-field {font-size: 12px; color: var(--muted);}
 .privacy {font-size: 12px; color: var(--muted); margin: 8px 2px 18px;}
 .notice {padding: 9px 12px; border-radius: 9px; background: var(--tint); margin-bottom: 12px; overflow-wrap: anywhere;}
 .notice.error {color: var(--danger); background: var(--panel); border: 1px solid var(--danger);}
@@ -41,12 +40,11 @@ progress {width: 100%; height: 5px; accent-color: var(--accent); display: block;
 @media(prefers-reduced-motion: reduce) {* {scroll-behavior: auto;}}
 
 /* 自绘下拉：Windows 下 Zotero 内容窗口原生 <select> 弹层渲染异常的替代方案 */
-.dropdown {position: relative;}
+.dropdown {position: relative; min-width: 0;}
 .dropdown-toggle {display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
   min-width: 96px; max-width: 100%; text-align: left;}
 .dropdown-label {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
 .dropdown-caret {font-size: 10px; color: var(--muted); flex-shrink: 0;}
-.dropdown-backdrop {position: fixed; inset: 0; z-index: 40;}
 .dropdown-menu {position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; margin: 0; padding: 4px;
   list-style: none; background: var(--panel); color: var(--text); border: 1px solid var(--line);
   border-radius: 8px; box-shadow: 0 10px 28px rgba(15, 25, 35, .16); min-width: 100%;
@@ -54,4 +52,5 @@ progress {width: 100%; height: 5px; accent-color: var(--accent); display: block;
 .dropdown-menu li {padding: 6px 10px; border-radius: 6px; cursor: pointer;}
 .dropdown-menu li:hover {background: var(--tint);}
 .dropdown-menu li.active {color: var(--accent); font-weight: 600;}
+.dropdown-menu li.focused {outline: 2px solid var(--accent); outline-offset: -2px;}
 .toolbar .dropdown-toggle {max-width: 190px;}

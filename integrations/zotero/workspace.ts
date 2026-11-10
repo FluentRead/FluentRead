@@ -1,10 +1,10 @@
 /**
  * @file integrations/zotero/workspace.ts
  * 文件职责：在 Zotero 独立内容窗口中组装 Vue 工作台，提供任务、服务设置与划词双语笔记。
- * 主要内容：设置保存先于入队；使用不可变服务快照续译，重启任务等待用户继续；界面只以文本显示原文与服务结果。
+ * 主要内容：键盘可操作的设置下拉，先保存设置再入队，使用不可变服务快照续译，界面以文本显示原文和服务结果。
  * 模块边界：通过 window.arguments 注入宿主端口，PDF 与网络交给引擎，文件与数据库交给 ZoteroHost。
  */
-import {createApp, h, ref} from 'vue';
+import {createApp, h, nextTick, ref} from 'vue';
 import {translationLanguageOptions} from '../../src/core/language/catalog';
 import type {AttachmentSource, TaskSettings, TranslationSettings, TranslationTask, ZoteroHost} from './contracts';
 import {createZoteroEngine} from './engine';
@@ -49,7 +49,7 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
     const engine = createZoteroEngine({pdfFontLoader: host.fontCache ? createZoteroFontLoader(host.fontCache) : undefined});
     const queue = new ZoteroTaskQueue(host, engine, () => ({...persistedSettings}));
     const revision = ref(0);
-    const openSelect = ref('');       // Windows 下 Zotero 内容窗口的原生 <select> 弹层渲染异常，改为自绘下拉
+    const openSelect = ref<{key: keyof TranslationSettings; index: number}>();
     const notice = ref(''); const errorNotice = ref(false); const showSettings = ref(false);
     const busy = ref(false); const selection = ref<SelectionRequest | null>(initial.selection || null);
     const selectionResult = ref(''); const selectionBusy = ref(false);
@@ -179,22 +179,85 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
     if (windowClosed || ownWindow.closed) {unsubscribe(); await queue.dispose(); return;}
 
     function selectField(key: keyof TranslationSettings, title: string, values: Array<{value: string; label: string}>) {
-        const current = values.find(option => option.value === settings.value[key]);
-        const isOpen = openSelect.value === key;
-        return h('label', [h('span', title), h('div', {class: 'dropdown'}, [
-            h('button', {type: 'button', class: 'dropdown-toggle', 'aria-haspopup': 'listbox', 'aria-expanded': isOpen,
-                onClick: () => {openSelect.value = isOpen ? '' : key;}},
-                [h('span', {class: 'dropdown-label'}, String(current?.label ?? settings.value[key])), h('span', {class: 'dropdown-caret'}, '▾')]),
-            isOpen ? h('div', {class: 'dropdown-backdrop', onClick: () => {openSelect.value = '';}}) : null,
-            isOpen ? h('ul', {class: 'dropdown-menu', role: 'listbox', 'aria-label': title},
-                values.map(option => h('li', {key: option.value, role: 'option',
-                    'aria-selected': option.value === settings.value[key],
-                    class: option.value === settings.value[key] ? 'active' : '',
-                    onClick: (event: MouseEvent) => {
-                        event.preventDefault();      // 阻止 label 转发点击到按钮导致重新展开
-                        update(key, option.value);
-                        openSelect.value = '';
-                    }}, option.label))) : null,
+        const selected = values.findIndex(option => option.value === settings.value[key]);
+        const active = openSelect.value?.key === key ? openSelect.value.index : undefined;
+        const isOpen = active !== undefined;
+        const controlId = `zotero-setting-${key}`;
+        const listId = `${controlId}-options`;
+        const optionId = (index: number) => `${listId}-${index}`;
+        const close = () => {
+            if (openSelect.value?.key === key) openSelect.value = undefined;
+        };
+        const choose = (index: number) => {
+            update(key, values[index].value);
+            close();
+        };
+        const move = (index: number) => {
+            openSelect.value = {key, index};
+            void nextTick(() => {
+                if (openSelect.value?.key === key && openSelect.value.index === index) {
+                    mount.ownerDocument.getElementById(optionId(index))?.scrollIntoView?.({block: 'nearest'});
+                }
+            });
+        };
+        const onKeydown = (event: KeyboardEvent) => {
+            if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+            switch (event.key) {
+                case 'ArrowDown':
+                case 'ArrowUp': {
+                    event.preventDefault();
+                    const index = isOpen ? active + (event.key === 'ArrowDown' ? 1 : -1) : selected;
+                    move(Math.max(0, Math.min(values.length - 1, index)));
+                    return;
+                }
+                case 'Home':
+                case 'End':
+                    event.preventDefault();
+                    move(event.key === 'Home' ? 0 : values.length - 1);
+                    return;
+                case 'Enter':
+                case ' ':
+                    event.preventDefault();
+                    if (isOpen) choose(active);
+                    else move(Math.max(0, selected));
+                    return;
+                case 'Escape':
+                    if (isOpen) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        close();
+                    }
+                    return;
+            }
+            if (event.key.length !== 1) return;
+            const prefix = event.key.toLocaleLowerCase();
+            const startsWith = (option: {label: string}) => option.label.toLocaleLowerCase().startsWith(prefix);
+            const afterActive = values.findIndex((option, index) => index > (active ?? selected) && startsWith(option));
+            const match = afterActive >= 0 ? afterActive : values.findIndex(startsWith);
+            if (match >= 0) {
+                event.preventDefault();
+                move(match);
+            }
+        };
+        return h('div', {class: 'dropdown-field'}, [h('label', {for: controlId}, title), h('div', {class: 'dropdown'}, [
+            h('button', {id: controlId, type: 'button', class: 'dropdown-toggle', role: 'combobox',
+                'aria-expanded': isOpen, 'aria-controls': isOpen ? listId : undefined,
+                'aria-activedescendant': isOpen ? optionId(active) : undefined,
+                onBlur: close, onKeydown,
+                onClick: (event: MouseEvent) => {
+                    (event.currentTarget as HTMLButtonElement).focus();
+                    if (isOpen) close();
+                    else move(Math.max(0, selected));
+                }},
+                [h('span', {class: 'dropdown-label'}, values[selected]?.label ?? String(settings.value[key])),
+                    h('span', {class: 'dropdown-caret', 'aria-hidden': 'true'}, '▾')]),
+            isOpen ? h('ul', {id: listId, class: 'dropdown-menu', role: 'listbox', 'aria-label': title},
+                values.map((option, index) => h('li', {id: optionId(index), key: option.value, role: 'option',
+                    'aria-selected': index === selected,
+                    class: {active: index === selected, focused: index === active},
+                    // 保留触发按钮的焦点，让鼠标点选不会先触发失焦关闭。
+                    onMousedown: (event: MouseEvent) => event.preventDefault(),
+                    onClick: () => choose(index)}, option.label))) : null,
         ])]);
     }
     const button = (text: string, operation: () => Promise<unknown>, className = '', disabled = false) =>

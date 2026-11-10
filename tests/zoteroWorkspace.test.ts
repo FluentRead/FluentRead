@@ -1,7 +1,7 @@
 /**
  * @file tests/zoteroWorkspace.test.ts
  * 文件职责：在 Linkedom 中执行真实 Vue Zotero 工作台，验证设置、队列和选区笔记的用户流程。
- * 主要内容：只替换 PDF/网络引擎与 Zotero 文件端口；覆盖先保存再翻译、安全文本渲染、重复点击、选区交接和卸载取消。
+ * 主要内容：只替换 PDF/网络引擎与 Zotero 文件端口，覆盖设置下拉、先保存再翻译、安全文本渲染、选区交接和卸载取消。
  * 模块边界：不启动 Zotero、不联网、不写入实际文献库，不把 DOM 测试当作原生客户端验收。
  */
 import {parseHTML} from 'linkedom';
@@ -32,11 +32,33 @@ const namedButton = (text: string): HTMLButtonElement => {
     const result = Array.from(doc.querySelectorAll<HTMLButtonElement>('button')).find(button => button.textContent === text);
     expect(result, `button ${text}`).toBeDefined(); return result!;
 };
-function click(button: HTMLButtonElement) {button.dispatchEvent(new win.Event('click', {bubbles: true}));}
-async function select(label: string, value: string) {
-    const element = doc.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
-    expect(element, label).not.toBeNull(); element.value = value;
-    element.dispatchEvent(new win.Event('change', {bubbles: true})); await settle();
+function click(element: Element) {element.dispatchEvent(new win.Event('click', {bubbles: true}));}
+function selectControl(label: string): HTMLButtonElement {
+    const title = Array.from(doc.querySelectorAll('label[for]')).find(element => element.textContent === label);
+    expect(title, label).toBeDefined();
+    const control = doc.getElementById(title!.getAttribute('for')!) as HTMLButtonElement;
+    expect(control?.getAttribute('role')).toBe('combobox');
+    return control;
+}
+function selectValue(label: string) {
+    return selectControl(label).querySelector('.dropdown-label')?.textContent;
+}
+async function select(label: string, optionLabel: string) {
+    const control = selectControl(label);
+    click(control);
+    await settle();
+    const menu = doc.getElementById(control.getAttribute('aria-controls')!)!;
+    const option = Array.from(menu.querySelectorAll('[role="option"]')).find(element => element.textContent === optionLabel);
+    expect(option, optionLabel).toBeDefined();
+    click(option!);
+    await settle();
+}
+async function press(control: HTMLButtonElement, key: string) {
+    const event = new win.Event('keydown', {bubbles: true, cancelable: true});
+    Object.defineProperty(event, 'key', {value: key});
+    control.dispatchEvent(event);
+    await settle();
+    return event;
 }
 function input(label: string, value: string) {
     const element = Array.from(doc.querySelectorAll('label')).find(element => element.querySelector('span')?.textContent === label)?.querySelector('input');
@@ -55,17 +77,6 @@ beforeEach(() => {
     vi.resetModules();
     const parsed = parseHTML('<html><body><div id="fluentread-workspace"></div></body></html>');
     win = parsed.window; doc = win.document;
-    // Linkedom 的 select.value 只有 getter；为真实 Vue DOM renderer 补标准的可写选中值。
-    const prototype = win.HTMLSelectElement.prototype;
-    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-    if (!descriptor?.set) Object.defineProperty(prototype, 'value', {configurable: true,
-        get: descriptor?.get,
-        set(value: string) {
-            for (const option of this.options) option.removeAttribute('selected');
-            const selected = Array.from(this.options as HTMLOptionElement[]).find(option => option.value === String(value));
-            selected?.setAttribute('selected', '');
-        },
-    });
     for (const [key, value] of Object.entries({window: win, document: doc, Element: win.Element,
         HTMLElement: win.HTMLElement, SVGElement: win.SVGElement, Node: win.Node, Event: win.Event})) vi.stubGlobal(key, value);
     fixture.engine = {
@@ -90,19 +101,55 @@ afterEach(async () => {
 });
 
 describe('Zotero Vue workspace user flows', () => {
+    it('navigates and confirms settings by keyboard, keeping the current choice on dismissal', async () => {
+        await attach();
+        const output = selectControl('输出');
+        const activeOption = (control: HTMLButtonElement) =>
+            doc.getElementById(control.getAttribute('aria-activedescendant')!)?.textContent;
+
+        await press(output, 'Enter');
+        expect(output.getAttribute('aria-expanded')).toBe('true');
+        expect(activeOption(output)).toBe('双语 PDF');
+        await press(output, 'End');
+        expect(activeOption(output)).toBe('仅译文 PDF');
+        expect(selectValue('输出')).toBe('双语 PDF');
+        await press(output, 'Escape');
+        expect(output.getAttribute('aria-expanded')).toBe('false');
+        expect(output.hasAttribute('aria-activedescendant')).toBe(false);
+        expect(selectValue('输出')).toBe('双语 PDF');
+
+        await press(output, 'Home');
+        await press(output, 'ArrowDown');
+        await press(output, 'ArrowUp');
+        expect(activeOption(output)).toBe('双语 PDF');
+        await press(output, 'ArrowDown');
+        await press(output, ' ');
+        expect(selectValue('输出')).toBe('仅译文 PDF');
+        expect(doc.querySelector('[role="listbox"]')).toBeNull();
+
+        const target = selectControl('译文');
+        await press(target, 'f');
+        expect(activeOption(target)).toBe('Français');
+        expect((await press(target, 'Tab')).defaultPrevented).toBe(false);
+        target.dispatchEvent(new win.Event('blur'));
+        await settle();
+        expect(target.getAttribute('aria-expanded')).toBe('false');
+        expect(selectValue('译文')).toBe('简体中文');
+    });
+
     it.each(['settings-save', 'attachment-read'])('keeps accepted selection settings across %s and later draft edits', async stage => {
         const saving = deferred<void>(), reading = deferred<AttachmentSource>();
         if (stage === 'settings-save') vi.mocked(host.saveSettings).mockReturnValueOnce(saving.promise);
         else vi.mocked(host.readAttachment).mockReturnValueOnce(reading.promise);
         await attach({selection: {attachmentID: 12, text: 'Accepted source', page: 2}});
-        await select('译文', 'ja');
+        await select('译文', '日本語');
         click(namedButton('翻译选中文字')); await settle();
         expect(host.saveSettings).toHaveBeenCalledWith(expect.objectContaining({targetLanguage: 'ja'}));
         if (stage === 'attachment-read') expect(host.readAttachment).toHaveBeenCalledOnce();
-        await select('译文', 'fr');
+        await select('译文', 'Français');
         saving.resolve(); reading.resolve(source()); await settle();
         expect(fixture.engine!.selection).toHaveBeenCalledWith('Accepted source', expect.objectContaining({targetLanguage: 'ja'}), expect.any(AbortSignal));
-        expect(doc.querySelector<HTMLSelectElement>('select[aria-label="译文"]')?.value).toBe('fr');
+        expect(selectValue('译文')).toBe('Français');
         click(namedButton('保存为双语笔记')); await settle();
         expect(vi.mocked(host.saveNote).mock.calls[0][1].settings.targetLanguage).toBe('ja');
     });
@@ -111,22 +158,22 @@ describe('Zotero Vue workspace user flows', () => {
         const selecting = deferred<AttachmentSource[]>(), saving = deferred<void>();
         vi.mocked(host.selectedAttachments).mockReturnValueOnce(selecting.promise);
         vi.mocked(host.saveSettings).mockReturnValueOnce(saving.promise);
-        await attach(); await select('译文', 'ja');
+        await attach(); await select('译文', '日本語');
         click(namedButton('翻译所选文献')); await settle();
-        await select('译文', 'fr'); selecting.resolve([source()]); await settle();
-        await select('译文', 'de'); saving.resolve(); await settle();
+        await select('译文', 'Français'); selecting.resolve([source()]); await settle();
+        await select('译文', 'Deutsch / German / 德语'); saving.resolve(); await settle();
         await vi.waitFor(() => expect(host.saveOutput).toHaveBeenCalledOnce());
         expect(host.saveSettings).toHaveBeenCalledWith(expect.objectContaining({targetLanguage: 'ja'}));
         expect(vi.mocked(fixture.engine!.translate).mock.calls[0][1].targetLanguage).toBe('ja');
-        expect(doc.querySelector<HTMLSelectElement>('select[aria-label="译文"]')?.value).toBe('de');
+        expect(selectValue('译文')).toBe('Deutsch / German / 德语');
     });
 
     it('keeps a document action snapshot when a later settings save commits first', async () => {
         const saving = deferred<void>();
         vi.mocked(host.saveSettings).mockReturnValueOnce(saving.promise);
-        await attach(); await select('译文', 'ja');
+        await attach(); await select('译文', '日本語');
         click(namedButton('翻译所选文献')); await settle();
-        await select('译文', 'fr'); click(namedButton('翻译设置')); await settle();
+        await select('译文', 'Français'); click(namedButton('翻译设置')); await settle();
         click(namedButton('保存设置')); await settle();
         saving.resolve(); await settle();
         await vi.waitFor(() => expect(host.saveOutput).toHaveBeenCalledOnce());
@@ -168,7 +215,7 @@ describe('Zotero Vue workspace user flows', () => {
         await attach();
         expect(doc.querySelector('h1')?.textContent).toBe('流畅阅读');
         expect(doc.body.textContent).toContain('从一篇论文开始');
-        expect(doc.querySelector<HTMLSelectElement>('select[aria-label="译文"]')?.value).toBe('zh-Hans');
+        expect(selectValue('译文')).toBe('简体中文');
         expect(host.selectedAttachments).not.toHaveBeenCalled();
         expect(fixture.engine!.selection).not.toHaveBeenCalled();
         expect(fixture.engine!.translate).not.toHaveBeenCalled();
@@ -176,9 +223,9 @@ describe('Zotero Vue workspace user flows', () => {
 
     it('persists normalized language and service settings before translating selected literature', async () => {
         await attach();
-        await select('原文', 'en'); await select('译文', 'ja');
+        await select('原文', 'English'); await select('译文', '日本語');
         click(namedButton('翻译设置')); await settle();
-        await select('翻译服务', 'compatible');
+        await select('翻译服务', '自定义兼容模型');
         input('模型服务地址', 'https://model.example/v1'); input('模型名称', 'academic-model');
         input('API 密钥（仅保存在本机）', 'workspace-test-key');
         const saving = deferred<void>(); vi.mocked(host.saveSettings).mockReturnValueOnce(saving.promise);

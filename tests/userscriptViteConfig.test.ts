@@ -927,7 +927,10 @@ describe('userscript browser shim injection', () => {
         const readerDialogKeys = ['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].map(name => `document.pdfReading.${name}`);
         const safariPermissionKeys = Object.keys(extension).filter(key => key.startsWith('safari.freePool.'));
         expect(safariPermissionKeys).toHaveLength(8);
-        const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError'].map(name => `sidepanel.${name}`);
+        const sidepanelKeys = ['title', 'openCenter', 'keyboardHint', 'openError', 'settingsError', 'startupError',
+            'scope.label', 'scope.tab', 'scope.window', 'scope.description'].map(name => `sidepanel.${name}`);
+        const popupLayoutEditingKeys = Object.keys(extension).filter(key => key.startsWith('settings.interface.popupLayout.')
+            && key !== 'settings.interface.popupLayout.label' && !key.startsWith('settings.interface.popupLayout.modules.'));
         const popupOnlyKeys = Object.keys(extension).filter(key => key.startsWith('popup.aiContext.status.') || key.startsWith('popup.aiContext.description.')
             || key.startsWith('popup.quickSettings.') || key.startsWith('popup.quickTranslation.'));
         const pageFontKeys = Object.keys(extension).filter(key => key.startsWith('popup.pageFont.'));
@@ -935,7 +938,7 @@ describe('userscript browser shim injection', () => {
             'hint', 'loading', 'unavailable', 'readError', 'changeError', 'retry'].map(name => `popup.pageFont.${name}`);
         expect([...pageFontKeys].sort()).toEqual([...expectedPageFontKeys].sort());
         expect(Object.keys(projected).filter(key => key.startsWith('popup.pageFont.'))).toEqual([]);
-        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...pageFontKeys, ...popupOnlyKeys]) {
+        for (const key of [...diagnosticKeys, ...readerDialogKeys, ...safariPermissionKeys, ...sidepanelKeys, ...popupLayoutEditingKeys, ...pageFontKeys, ...popupOnlyKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
@@ -959,6 +962,7 @@ describe('userscript browser shim injection', () => {
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
             && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)
+            && !popupLayoutEditingKeys.includes(key)
             && key !== 'popup.donationButton' && key !== 'popup.donationDescription' && key !== 'popup.compact.translate' && key !== 'popup.compact.restore' && !key.startsWith('popup.displayMode.'));
         expect(Object.keys(projected)).toHaveLength(retainedKeys.length);
         for (const key of retainedKeys) expect(projected[key]).toBe(extension[key]);

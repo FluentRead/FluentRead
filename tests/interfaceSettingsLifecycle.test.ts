@@ -8,7 +8,11 @@ vi.mock('@/src/platform/browser/translationSidepanel', () => ({canOpenTranslatio
 import * as runtime from 'vue'
 import InterfaceSettings from '@/src/features/settings/ui/InterfaceSettings.vue'
 import PopupPreview from '@/src/features/settings/ui/components/PopupPreview.vue'
+import SegmentedControl from '@/src/features/settings/ui/components/SegmentedControl.vue'
+import {Config} from '@/src/core/config/model'
+import {useUiI18n} from '@/src/ui/i18n'
 import {popupQuickFeatureIconPaths} from '@/src/ui/popupQuickFeatureIcons'
+import {compileVueInlineFixture} from './helpers/compiledVueFixture'
 let document: Document, win: any, host: HTMLElement
 let app: import('vue').App, state: Record<string, any>
 let props: {config: Record<string, any>; active: boolean; activePanel?: string}, visible: import('vue').Ref<boolean>
@@ -90,6 +94,51 @@ beforeEach(async () => {
   configure(app);host=mountPoint();app.mount(host);await settle()
 })
 afterEach(async () => {app?.unmount();vi.restoreAllMocks();vi.unstubAllGlobals();vi.unstubAllEnvs()})
+
+it('侧边栏默认仅当前标签页，活跃时可切换范围，停用时拒绝迟到点击', async () => {
+  const fixture = compileVueInlineFixture('src/features/settings/ui/components/SidepanelScopeSetting.vue', {id: 'sidepanel-scope'})
+  const {default: SettingsItem} = await vi.importActual<{default: runtime.Component}>('@/src/features/settings/ui/components/SettingsItem.vue')
+  const modules: Record<string, unknown> = {
+    vue: runtime,
+    '@/src/ui/i18n': {useUiI18n},
+    './SegmentedControl.vue': {__esModule: true, default: SegmentedControl},
+    './SettingsItem.vue': {__esModule: true, default: SettingsItem},
+  }
+  const compiled: {default?: runtime.Component} = {}
+  new Function('require', 'exports', fixture.code)((name: string) => {
+    if (!Object.hasOwn(modules, name)) throw new Error(`Unexpected scope setting dependency: ${name}`)
+    return modules[name]
+  }, compiled)
+  expect(compiled.default).toBeDefined()
+  const input = runtime.reactive({config: new Config(), active: true})
+  const root = mountPoint()
+  const scopeApp = createTestRenderer().createApp({render: () => runtime.h(compiled.default!, input)})
+  scopeApp.mount(root)
+  try {
+    const [tab, windowOption] = root.querySelectorAll('[role="radio"]')
+    expect(tab.getAttribute('aria-checked')).toBe('true')
+    expect(windowOption.getAttribute('aria-checked')).toBe('false')
+    windowOption.dispatchEvent(new win.Event('click'))
+    await settle()
+    expect(input.config.translationSidepanelScope).toBe('window')
+    expect(windowOption.getAttribute('aria-checked')).toBe('true')
+
+    input.active = false
+    await settle()
+    expect(tab.hasAttribute('disabled')).toBe(true)
+    tab.dispatchEvent(new win.Event('click'))
+    expect(input.config.translationSidepanelScope).toBe('window')
+
+    input.active = true
+    await settle()
+    tab.dispatchEvent(new win.Event('click'))
+    await settle()
+    expect(input.config.translationSidepanelScope).toBe('tab')
+    expect(tab.getAttribute('aria-checked')).toBe('true')
+  } finally {
+    scopeApp.unmount()
+  }
+})
 
 describe('实际界面字体设置与所属确认', () => {
   it('取消和重复打开不清除缓存、不改字体，重复请求只保留一次确认', async () => {

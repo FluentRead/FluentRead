@@ -14,6 +14,14 @@ describe('配置差异预览', () => {
             {key: 'translationSidepanelScope', label: '侧边栏显示范围', before: '仅当前标签页', after: '整个窗口'},
         ]);
     });
+    it('独立比较共享配置节点在另一份配置中的各个副本', () => {
+        const shared = {scope: 'tab'};
+        const before = {futurePreferences: {first: shared, second: shared}};
+        const after = {futurePreferences: {first: {scope: 'tab'}, second: {scope: 'tab'}}};
+        expect(buildConfigDiff(before, after).changeCount).toBe(0);
+        after.futurePreferences.first.scope = 'window';
+        expect(buildConfigDiff(before, after).changeCount).toBe(1);
+    });
     it('词典来源在历史与同步预览中显示可读选项', () => {
         expect(group(buildConfigDiff({selectionDictionarySource: 'auto'}, {selectionDictionarySource: 'free-dictionary'}), 'translation')?.changes).toEqual([
             {key: 'selectionDictionarySource', label: '词典来源', before: '默认（自动选择）', after: 'Free Dictionary API'},

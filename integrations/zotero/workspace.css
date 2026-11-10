@@ -39,3 +39,19 @@ progress {width: 100%; height: 5px; accent-color: var(--accent); display: block;
 @media(prefers-color-scheme: dark) {:root {--bg: #171c22; --panel: #20272f; --text: #e3eaf1; --muted: #a5b4c4;
   --line: #374552; --accent: #70c9b0; --tint: #233c35; --danger: #ffaaaa;} button.primary {color: #14271f;}}
 @media(prefers-reduced-motion: reduce) {* {scroll-behavior: auto;}}
+
+/* 自绘下拉：Windows 下 Zotero 内容窗口原生 <select> 弹层渲染异常的替代方案 */
+.dropdown {position: relative;}
+.dropdown-toggle {display: inline-flex; align-items: center; justify-content: space-between; gap: 8px;
+  min-width: 96px; max-width: 100%; text-align: left;}
+.dropdown-label {overflow: hidden; text-overflow: ellipsis; white-space: nowrap;}
+.dropdown-caret {font-size: 10px; color: var(--muted); flex-shrink: 0;}
+.dropdown-backdrop {position: fixed; inset: 0; z-index: 40;}
+.dropdown-menu {position: absolute; top: calc(100% + 4px); left: 0; z-index: 50; margin: 0; padding: 4px;
+  list-style: none; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 10px 28px rgba(15, 25, 35, .16); min-width: 100%;
+  max-height: 264px; overflow: auto; white-space: nowrap;}
+.dropdown-menu li {padding: 6px 10px; border-radius: 6px; cursor: pointer;}
+.dropdown-menu li:hover {background: var(--tint);}
+.dropdown-menu li.active {color: var(--accent); font-weight: 600;}
+.toolbar .dropdown-toggle {max-width: 190px;}

@@ -1,7 +1,7 @@
 /**
  * @file src/features/selection-translation/core.ts
  * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点和语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
 import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
@@ -502,9 +502,18 @@ function hasNonZeroClientRect(element: Element): boolean {
     return containsNonZeroClientRect(contentRange.getClientRects());
 }
 
+/** 跨段选区经过的空 SVG/隐藏装饰不代表选中了受保护文字；控件和编辑宿主仍严格排除。 */
+function isTextlessSelectionDecoration(element: Element): boolean {
+    const tag = getElementTagName(element);
+    return (tag === 'svg' || element.getAttribute('aria-hidden') === 'true' && !isSelectionExcludedTagName(tag))
+        && !selectionExcludedRoles.has(element.getAttribute('role')?.trim().toLowerCase() ?? '')
+        && !isEditableSelectionElement(element)
+        && !element.textContent?.trim();
+}
+
 /**
  * 划词翻译处理用户主动选中的正文与代码文字，不处理交互控件；显式启用编辑区时只放行
- * 完整位于同一宿主内的选区。这里同时检查选区两端与实时 DOM 中相交且具有可见几何的排除元素。
+ * 完整位于同一宿主内的选区。检查两端与实时 DOM 中相交且具有可见几何的排除元素，跳过空装饰图标。
  */
 export function shouldIgnoreSelection(range: Range, allowEditableSelection = false): boolean {
     const editableRoot = allowEditableSelection ? getSharedEditableSelectionRoot(range) : null;
@@ -525,6 +534,7 @@ export function shouldIgnoreSelection(range: Range, allowEditableSelection = fal
                     !isSelectionNonMarkerExcluded(element, editableRoot)) continue;
                 if (!isSelectionExcludedElement(element, editableRoot)) continue;
                 if (isInlineSelectionFormulaPart(element)) continue;
+                if (isTextlessSelectionDecoration(element)) continue;
                 if (range.intersectsNode(element) && hasNonZeroClientRect(element)) return true;
             } catch {
                 // 单个失效节点不能阻止后续仍有效的受保护内容被识别。

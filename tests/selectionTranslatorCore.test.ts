@@ -192,7 +192,7 @@ describe('issue #704 inline code in prose selections', () => {
     }
 
     it('allows prose crossing highlighted code and freezes exact code text without host attributes', () => {
-        const {paragraph, range} = fixture('Run <code class="host" onclick="alert(1)"><span> a  &lt;b&gt; </span></code> now.');
+        const {paragraph, range} = fixture('Run <code class="host" onclick="alert(1)"><span> a  &lt;b&gt; </span></code> <em>now.</em>');
         const before = paragraph.outerHTML;
         expect(shouldIgnoreSelection(range)).toBe(false);
         expect(readSelectionParts(range, 'browser text')).toEqual([
@@ -437,6 +437,59 @@ describe('selection range traversal scope and cost', () => {
         return {startContainer: start, startOffset, endContainer: end, endOffset,
             commonAncestorContainer: root ?? common!, intersectsNode: () => true} as unknown as Range;
     }
+
+    function changelogFixture(decoration = '<svg aria-hidden="true" width="16" height="16"><path d="M0 0h16v16H0z"/></svg>') {
+        const {document} = parseHTML(`<html><body><main><h2>Latest from our changelog</h2><ul>
+            <li>${decoration}<div><time>Nov 11, 2026</time><a id="first">First changelog entry.</a></div></li>
+            <li>${decoration}<div><time>Nov 10, 2026</time><a id="last">Second changelog entry.</a></div></li>
+        </ul><a id="all">View changelog</a></main></body></html>`);
+        document.querySelectorAll('*').forEach(element => {
+            element.getClientRects = () => [{width: 16, height: 16}] as unknown as DOMRectList;
+        });
+        const first = document.querySelector('#first')!.firstChild!;
+        const last = document.querySelector('#last')!.firstChild!;
+        return {document, first, last};
+    }
+
+    it.each([false, true])('issue #1317 allows cross-entry and whole-block selections past decorative SVGs (editable=%s)', allowEditable => {
+        const {document, first, last} = changelogFixture();
+        const title = document.querySelector('h2')!.firstChild!;
+        const all = document.querySelector('#all')!.firstChild!;
+        const time = document.querySelector('time')!.firstChild!;
+        for (const [start, end] of [[first, first], [title, title], [time, first], [first, last], [title, all]]) {
+            expect(shouldIgnoreSelection(rangeIn(document, start, 0, end, end.textContent!.length), allowEditable)).toBe(false);
+        }
+    });
+
+    it.each([
+        '<svg width="16" height="16"><path d="M0 0h16v16H0z"/></svg>',
+        '<span aria-hidden="true"><svg><path d="M0 0h16v16H0z"/></svg></span>',
+        '<span aria-hidden="true"> \n </span>',
+    ])('issue #1317 allows textless decoration between selected entries: %s', decoration => {
+        const {document, first, last} = changelogFixture(decoration);
+        expect(shouldIgnoreSelection(rangeIn(document, first, 0, last, last.textContent!.length))).toBe(false);
+    });
+
+    it.each([
+        '<button>Protected action</button>',
+        '<span role="button">Protected action</span>',
+        '<span translate="no">Protected text</span>',
+        '<span class="notranslate">Protected text</span>',
+        '<span data-notranslate="true">Protected text</span>',
+        '<span aria-hidden="true">Protected text</span>',
+        '<svg aria-hidden="true"><text>Protected text</text></svg>',
+        '<span data-fluent-read-ui>Extension text</span>',
+        '<span contenteditable="true">Editor text</span>',
+        '<button aria-hidden="true"></button>',
+        '<svg role="button"></svg>',
+        '<span role="textbox" aria-hidden="true"></span>',
+    ])('issue #1317 still rejects protected content after a decorative icon: %s', protectedHtml => {
+        const {document, first, last} = changelogFixture();
+        const entry = document.querySelectorAll('li')[1];
+        entry.insertAdjacentHTML('afterbegin', protectedHtml);
+        entry.firstElementChild!.getClientRects = () => [{width: 30, height: 20}] as unknown as DOMRectList;
+        expect(shouldIgnoreSelection(rangeIn(document, first, 0, last, last.textContent!.length), true)).toBe(true);
+    });
 
     it('short cross-paragraph selections never query or visit thousands of unselected sibling subtrees', () => {
         const {document} = parseHTML(`<html><body><main><aside id="before">${'<button>Before</button>'.repeat(5000)}</aside><p id="a">Selected first.</p><p id="b">Selected second.</p><aside id="after">${'<button>After</button>'.repeat(5000)}</aside></main></body></html>`);
@@ -1176,6 +1229,7 @@ describe('selection translator text and speech language normalization', () => {
         expect(edgeTtsVoiceCandidatesForLanguage(normalizeSpeechLanguage(spanish))).toContain('es-ES-TristanMultilingualNeural');
         expect(normalizeSpeechLanguage(undefined, 'fr-FR')).toBe('fr-FR');
         expect(normalizeSpeechLanguage('auto', 'zh-CN')).toBe('zh-CN');
+        expect(normalizeSpeechLanguage('und', 'zh-CN')).toBe('zh-CN');
         expect(normalizeSpeechLanguage('en-GB')).toBe('en-GB');
         expect(normalizeSpeechLanguage('invalid value')).toBe('en-US');
     });

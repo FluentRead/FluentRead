@@ -70,6 +70,12 @@ GitHub 仓库列表和 Issue 列表同时保留旧容器与当前结构的保护
 
 网页与微软批量响应为本地确定性夹具；此专项不代表真实供应商翻译质量或 Zen/Firefox 扩展运行时验证。
 
+## 跨条目划词与装饰图标（issue #1317）
+
+跨标签、跨行的正文选区经过无文本的 SVG 或 `aria-hidden` 装饰元素时应显示划词入口。选区两端的保护规则不变；选区内部的按钮、编辑宿主、显式禁译文字、隐藏文字和扩展 UI 文字仍排除。零几何控件继续放行，`display:contents` 控件仍按内容几何检查。
+
+`tests/selectionTranslatorCore.test.ts` 覆盖类 GitHub changelog 结构的单链接、日期到链接、跨条目和整块选区，以及空装饰之后的受保护内容。生产构建后运行 `node scripts/run-selection-trigger-test.cjs --decoration-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <fluentread-browser-translation-test>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`，在隔离 Edge 后台窗口验证正反向拖选、重复翻译、两点选取、右键选区丢失后的恢复、动态保护内容移除、宿主 DOM 不变和清除/离开页面。网页与翻译响应使用本地夹具；右键命令经生产内容消息重放，不代表原生菜单项点击、GitHub 登录页、外部服务或 Firefox 运行时验收。
+
 ## 编辑器内显式选区（issue #1237）
 
 `tests/selectionTranslatorCore.test.ts` 验证选区完整位于同一局部 `contenteditable` 或文本框宿主时可显示划词入口，同时拒绝跨出编辑区的范围、原生输入控件、扩展 UI、隐藏内容和显式禁译区域。`tests/selectionTranslatorLifecycle.test.ts` 验证编辑器右键菜单复用同一宿主的已核验 Range，并拒绝右键目标与页面陈旧选区不匹配的情况；`tests/contentHotkeyRuntime.test.ts` 检查编辑器内选区也可作为划词快捷键候选。编辑器内选区只读取用户明确选中的文本，不从原生输入框值或浏览器提供的裸文本构造来源。

@@ -1,10 +1,11 @@
 /**
  * @file src/features/full-page-translation/content/state.ts
  * 文件职责：维护每个被翻译 DOM 节点的可恢复状态、请求代次、译文工件和共享布局覆盖所有权，确保重复翻译、宿主变更和移除节点都能安全收敛。
- * 主要内容：包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、兼容字体标记与链接提示的译文复验及有界重挂、离线模板仅省略外层属性自比较并保留内容与复制工件复验、双语重放对象的纯组装与扩展源语言边界、已提交译文的前后位置及骨架重放换行快照、保留请求代次的显示工件切换、含固定高度 line-clamp 的共享样式租约、同批布局与来源保护读数复用及写入失效（释放最后一个旧祖先租约也立即失效）、窗口及外观变化后的手册缩进和栏宽复核并同步可信模板、祖先观察器引用计数、文本槽回写、按钮型 input 标签属性的原值记录与回滚、逐父节点单次读取子列表的移除子树所有者枚举、按真实状态变更发布增量阶段通知、清除通知携带旧来源以协调延迟区域任务，以及沿用当前 owner 快照并保护各滚动面的全量恢复。
+ * 主要内容：来源结构与保护复验沿用当前范围的精确禁译覆盖，包含 WeakMap 状态索引、begin/complete/error/discard 状态机、spinner/译文/retry/仅译文槽节点登记、无主槽原文解包、兼容字体标记与链接提示的译文复验及有界重挂、离线模板仅省略外层属性自比较并保留内容与复制工件复验、双语重放对象的纯组装与扩展源语言边界、已提交译文的前后位置及骨架重放换行快照、保留请求代次的显示工件切换、含固定高度 line-clamp 的共享样式租约、同批布局与来源保护读数复用及写入失效（释放最后一个旧祖先租约也立即失效）、窗口及外观变化后的手册缩进和栏宽复核并同步可信模板、祖先观察器引用计数、文本槽回写、按钮型 input 标签属性的原值记录与回滚、逐父节点单次读取子列表的移除子树所有者枚举、按真实状态变更发布增量阶段通知、清除通知携带旧来源以协调延迟区域任务，以及沿用当前 owner 快照并保护各滚动面的全量恢复。
  * 模块边界：该模块不发现候选、不请求翻译也不生成译文 HTML；来源指纹、合成段归档及漂移比对使用惰性文档副本，实际重挂仍保持真实页面节点；自动应用外壳许可随状态保存并在提交、修复和独立观察时向核心复验；runtime 负责会话编排，renderer 负责内容创建，本文件仅拥有 DOM 状态与可逆样式资源，重挂时撤下旧译文尺寸隔离并同步可信模板，避免跨 session 误删新结果。
  */
 import {getTranslatableControlValueAttribute, isTranslationTooltip} from "@/src/core/translation/dom";
+import {getSiteAdapterAttributeFilter} from '@/src/core/site-adaptation/compiler';
 import {cloneTranslationElementInert} from '@/src/core/translation/inertClone';
 import {getInlineCodeClass, inlineCodeNodesAreAllowed} from '@/src/core/translation/inlineCodeProtocol';
 import {isIdentifierLikeText, isTranslationTextNodeProtected} from "@/src/core/translation/text";
@@ -142,10 +143,10 @@ export function inlineCodeReplaySourceIsCurrent(node: HTMLElement, state: Transl
     }
     const core = getCurrentTranslationCore(state.scope);
     return inlineCodeNodesAreAllowed(node, texts, codes, core.shouldStayOriginal, {
-        protectionOptions: {
+        protectionOptions: core.textOptions({
             ...(state.allowTopLevelApplicationShell === true ? {allowTopLevelApplicationShell: true, protectedElement: node} : {}),
             ...(hosts.length ? {sourceTextSlotHosts: new Set(hosts.map(({host}) => host))} : {}),
-        },
+        }),
     });
 }
 
@@ -369,9 +370,9 @@ export function getTranslationSourceStructureSignature(
         tokens.push(token);
         return true;
     };
-    const protectionOptions = allowTopLevelApplicationShell
-        ? {allowTopLevelApplicationShell: true, protectedElement: node}
-        : {protectedElement: node};
+    const protectionOptions = getCurrentTranslationCore(scope).textOptions({
+        allowTopLevelApplicationShell, protectedElement: node,
+    });
     const translatableTextNodes = sourceTextNodes ? new WeakSet(sourceTextNodes) : undefined;
     const shouldStayOriginal = getCurrentTranslationCore(scope).shouldStayOriginal;
     const preservesWhitespace = (text: Text): boolean => {
@@ -1014,9 +1015,9 @@ function currentBilingualSourceStructureMatches(
             node,
             getCurrentTranslationCore(state.scope).shouldStayOriginal,
             node,
-            state.allowTopLevelApplicationShell === true
-                ? {allowTopLevelApplicationShell: true, protectedElement: node}
-                : {protectedElement: node},
+            getCurrentTranslationCore(state.scope).textOptions({
+                allowTopLevelApplicationShell: state.allowTopLevelApplicationShell, protectedElement: node,
+            }),
         ).map((slot) => slot.node);
     }
     const matches = getTranslationSourceStructureSignature(
@@ -1327,9 +1328,9 @@ function isWithinTranslationArtifact(node: Node, state: TranslationState): boole
 }
 
 function rebindOverflowSourceTextNodes(owner: HTMLElement, state: TranslationState): void {
-    const protectionOptions = state.allowTopLevelApplicationShell === true
-        ? {allowTopLevelApplicationShell: true, protectedElement: owner}
-        : {protectedElement: owner};
+    const protectionOptions = getCurrentTranslationCore(state.scope).textOptions({
+        allowTopLevelApplicationShell: state.allowTopLevelApplicationShell, protectedElement: owner,
+    });
     state.sourceTextNodes = collectLiveTranslationTextSlots(
         owner,
         getCurrentTranslationCore(state.scope).shouldStayOriginal,
@@ -1409,9 +1410,9 @@ function currentTranslationOwnerIsProtected(
 ): boolean {
     const identityOwner = state.syntheticSegment ? state.syntheticHost : owner;
     if (!identityOwner?.isConnected || !isTranslationApplicationShellPolicyCurrent(identityOwner, state)) return true;
-    const options = state.allowTopLevelApplicationShell === true
-        ? {allowTopLevelApplicationShell: true, protectedElement: identityOwner}
-        : {protectedElement: identityOwner};
+    const options = getCurrentTranslationCore(state.scope).textOptions({
+        allowTopLevelApplicationShell: state.allowTopLevelApplicationShell, protectedElement: identityOwner,
+    });
     let current: Element | null = identityOwner;
     let depth = 0;
     while (current && depth < SOURCE_MUTATION_ANCESTOR_DEPTH_BUDGET) {
@@ -1424,6 +1425,8 @@ function currentTranslationOwnerIsProtected(
 
 function mutationChangesDescendantEligibility(mutation: MutationRecord): boolean {
     if (mutation.type !== 'attributes' || mutation.target.nodeType !== 1) return false;
+    // 站点覆盖选择器也可依赖普通 class/style；不能只比较通用语义类名。
+    if (getCurrentTranslationCore().adapters.some(adapter => adapter.forceTranslate?.length)) return true;
     if (mutation.attributeName === 'class') {
         return semanticStructureClasses(mutation.oldValue) !==
             semanticStructureClasses((mutation.target as Element).getAttribute('class'));
@@ -1563,12 +1566,16 @@ function createTranslationLayoutRootObserver(root: TranslationLayoutObserverRoot
             }
         });
     });
+    const attributeFilter = getSiteAdapterAttributeFilter(
+        getCurrentTranslationCore().adapters.filter(adapter => adapter.forceTranslate?.length),
+        ["style", "class", "id", ...SOURCE_STRUCTURE_ATTRIBUTES],
+    );
     observer.observe(target, {
         childList: true,
         subtree: true,
         attributes: true,
         attributeOldValue: true,
-        attributeFilter: ["style", "class", "id", ...SOURCE_STRUCTURE_ATTRIBUTES],
+        ...(attributeFilter ? {attributeFilter} : {}),
         characterData: true,
     });
     // 只在有活动译文时响应真实窗口尺寸变化；不轮询、不观察尺寸写入，避免布局反馈循环。

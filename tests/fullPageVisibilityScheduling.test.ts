@@ -292,6 +292,7 @@ vi.mock("@/src/core/translation/public", async (importOriginal) => {
         isTranslationTextElementProtected: (element: Element) => isProtected(element),
         getCurrentTranslationCore: (scope = "content") => runtime.realCore ?? ({
             adapters: runtime.adapters,
+            textOptions: (options?: import('@/src/core/translation/public').TranslationTextProtectionOptions) => options,
             shouldStayOriginal: (element: Element) => (scope !== "all" && Boolean(element.closest("[data-content-excluded]"))) || runtime.adapters.some(adapter =>
                 adapter.shouldStayOriginal?.(element, {url: new URL('https://example.com')})),
             shouldIgnoreMutation: runtime.ignoreMutation,

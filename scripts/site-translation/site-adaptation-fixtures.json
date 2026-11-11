@@ -421,6 +421,56 @@
     "forbidden": [
       "#navigation",
       "#protected"
+    ],
+    "variants": [
+      {
+        "name": "comments-no-translate",
+        "url": "https://milkshakeplusplus.itch.io/mousetraptab/comments",
+        "html": "<main><div id=\"game_comments_react_fixture_Game-Comments_root\" translate=\"no\"><div class=\"post_body user_formatted\"><p id=\"body1\">The first public comment describes a helpful game feature with <code id=\"protected\">KEEP_ORIGINAL_TOKEN</code> preserved.</p><p id=\"body2\">The second public comment remains independently translatable after repeated requests.</p><p id=\"local-protected\" translate=\"no\">This nested local marker stays original.</p><textarea id=\"editor\">Unsent private draft</textarea></div></div><p id=\"outside\" translate=\"no\">Unrelated protected text.</p><nav id=\"navigation\">Keep navigation original.</nav></main>",
+        "required": [
+          "#body1",
+          "#body2"
+        ],
+        "forbidden": [
+          "#protected",
+          "#local-protected",
+          "#editor",
+          "#outside",
+          "#navigation"
+        ],
+        "restoreSelectors": [
+          "#game_comments_react_fixture_Game-Comments_root"
+        ],
+        "sourceAssertions": {
+          "required": [
+            "The first public comment describes",
+            "The second public comment remains"
+          ],
+          "forbidden": [
+            "KEEP_ORIGINAL_TOKEN",
+            "Unsent private draft",
+            "This nested local marker",
+            "Unrelated protected text"
+          ]
+        },
+        "dynamic": {
+          "appendHtml": [
+            {
+              "selector": ".post_body",
+              "html": "<p id=\"dynamic-comment\">A newly loaded comment is translated through the same marked shell.</p>",
+              "required": [
+                "#dynamic-comment"
+              ],
+              "sourceIncludes": [
+                "A newly loaded comment"
+              ]
+            }
+          ],
+          "noiseSelector": "#local-protected",
+          "noiseText": "Nested marker remains protected after host updates",
+          "remountSelector": "#game_comments_react_fixture_Game-Comments_root"
+        }
+      }
     ]
   },
   {

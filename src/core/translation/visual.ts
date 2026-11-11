@@ -2,7 +2,7 @@
  * @file src/core/translation/visual.ts
  *
  * 文件职责：为缺少语义段落边界的大型网页容器选择有界的悬浮翻译文本范围。
- * 主要内容：从光标命中的 Text 向前后按节点跳数和字符预算收集局部窗口，保留原始文本偏移，按句子、词边界和视觉间距组合至多 1600 字符的文本块，硬边界不拆开代理对；过滤受保护文本并输出可由渲染层物化的 range。
+ * 主要内容：沿用当前网站规则的精确禁译覆盖，从光标命中的 Text 向前后按节点跳数和字符预算收集局部窗口，保留原始文本偏移，按句子、词边界和视觉间距组合至多 1600 字符的文本块，硬边界不拆开代理对；过滤受保护文本并输出可由渲染层物化的 range。
  * 模块边界：本文件只读取页面 DOM 和布局信息，不改写宿主节点、不读取配置、不调用 provider；临时 wrapper 的创建与恢复由渲染和状态模块负责。
  */
 
@@ -13,6 +13,7 @@ import {
 } from './dom';
 import {createTranslationTextProtectionCache, isTranslationTextNodeProtected, normalizeTranslationText} from './text';
 import type {TranslationCandidate, TranslationTextRange} from './types';
+import type {TranslationTextProtectionOptions} from './dom';
 
 const HOVER_REFINEMENT_THRESHOLD = 4096;
 const HOVER_CHUNK_LIMIT = 1600;
@@ -85,10 +86,11 @@ function collectTextEntries(
     anchor: Text,
     pointOffset: number,
     shouldStayOriginal?: (element: Element) => boolean,
+    protectionOptions?: TranslationTextProtectionOptions,
 ): {entries: TextEntry[]; caret: number; anchorRange: SentenceRange; cropped: boolean} | null {
     const protectionCache = createTranslationTextProtectionCache();
     const readable = (node: Text) => !isTextInNestedTranslationTooltip(node, owner) &&
-        !isTranslationTextNodeProtected(node, shouldStayOriginal, undefined, undefined, protectionCache);
+        !isTranslationTextNodeProtected(node, shouldStayOriginal, undefined, protectionOptions, protectionCache);
     if (!readable(anchor)) return null;
     const anchorText = anchor.data;
     if (!anchorText) return null;
@@ -162,7 +164,8 @@ function segmentSentences(text: string): SentenceRange[] {
     let match: RegExpExecArray | null;
     while ((match = boundary.exec(text))) {
         const end = match.index + match[0].length;
-        if (normalizeTranslationText(text.slice(start, end))) ranges.push({start, end});
+        // 正则命中至少一个句末标点，截取范围必定包含非空白字符。
+        ranges.push({start, end});
         start = end;
     }
     if (start < text.length && normalizeTranslationText(text.slice(start))) {
@@ -312,12 +315,13 @@ export function resolveVisualTranslationRange(
     x: number,
     y: number,
     shouldStayOriginal?: (element: Element) => boolean,
+    protectionOptions?: TranslationTextProtectionOptions,
 ): VisualTranslationRangeResult | null {
     if (!isRefinableCandidate(candidate)) return null;
     const owner = candidate.element;
     const point = findTextPointAtPoint(root, x, y);
     if (!point || point.node.nodeType !== 3 || !owner.contains(point.node)) return null;
-    const collected = collectTextEntries(owner, point.node as Text, point.offset, shouldStayOriginal);
+    const collected = collectTextEntries(owner, point.node as Text, point.offset, shouldStayOriginal, protectionOptions);
     if (!collected) return null;
     const {entries, caret, anchorRange, cropped} = collected;
     const text = entries.map((entry) => entry.value).join('');

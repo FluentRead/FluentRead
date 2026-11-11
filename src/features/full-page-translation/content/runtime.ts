@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/runtime.ts
  * 文件职责：实现全文翻译的页面级会话引擎，负责候选发现、可见性调度、批量请求、动态 DOM 重扫、失败重试、缓存复用和恢复原文；显式翻译与增量扫描共用 man7 手册段落准备，完整恢复与卸载清理对应包装。
- * 主要内容：已提交与在途结果复用原译文槽同步当前网站或全局显示模式，显式快捷覆盖保持冻结；精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；以增量计数发布完成与失败摘要，仅对本会话失败目标重试和定位；维护 FullPageSession、AbortController、Intersection/Mutation 观察器、弹窗优先调度、精确属性写入过滤、候选所有权和生命周期重试；对变化来源等待安静窗口、跳过持续变化的计数，并清理延迟重扫，只有真实宿主删除启动候选与断连观察根回收，重连前保留已排队 DOM 记录，实际翻译 owner 通过公共端口为其开放根安装译文样式，SPA 切换刷新全部活观察根的站点属性依赖，同批重复属性变化只处理一次；按时间片派发并在全文结果提交前让出主线程，合并同段 DOM 写入并在重挂时复用同批布局读数与单文本来源快照；合成行内段在延迟 loading 前后都按精确来源节点、HTML 和 Text 槽识别自身迁移；已拥有状态的发现候选直接登记复验，取消记录命中后才提取原文，避免整批重扫重复计算熔断签名；连续滚动时限频派发当前可见候选，空闲后恢复预取，按阅读进度撤回离开预取区的待派发候选，冻结请求/展示配置与识别范围，在弹窗关闭后继续正文，按实际节点阶段发布进度及工具栏结果；悬浮按候选停留而非每次移动计时，同段复用冻结的独立服务与快捷方案配置，到期复验最新命中并在路由切换取消；同目标预检单独读取受保护规则约束的行内代码语言上下文，发送与渲染仍只使用可翻译文本槽；恢复单个所有者或全文时重置篇章证据，统一恢复原文并清理重挂预算及孤儿产物；向局部翻译开放单候选 translateTarget 与单个译文所有者的恢复入口。
+ * 主要内容：请求与重试按候选范围读取当前网站禁译覆盖；已提交与在途结果复用原译文槽同步当前网站或全局显示模式，显式快捷覆盖保持冻结；精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；以增量计数发布完成与失败摘要，仅对本会话失败目标重试和定位；维护 FullPageSession、AbortController、Intersection/Mutation 观察器、弹窗优先调度、精确属性写入过滤、候选所有权和生命周期重试；对变化来源等待安静窗口、跳过持续变化的计数，并清理延迟重扫，只有真实宿主删除启动候选与断连观察根回收，重连前保留已排队 DOM 记录，实际翻译 owner 通过公共端口为其开放根安装译文样式，SPA 切换刷新全部活观察根的站点属性依赖，同批重复属性变化只处理一次；按时间片派发并在全文结果提交前让出主线程，合并同段 DOM 写入并在重挂时复用同批布局读数与单文本来源快照；合成行内段在延迟 loading 前后都按精确来源节点、HTML 和 Text 槽识别自身迁移；已拥有状态的发现候选直接登记复验，取消记录命中后才提取原文，避免整批重扫重复计算熔断签名；连续滚动时限频派发当前可见候选，空闲后恢复预取，按阅读进度撤回离开预取区的待派发候选，冻结请求/展示配置与识别范围，在弹窗关闭后继续正文，按实际节点阶段发布进度及工具栏结果；悬浮按候选停留而非每次移动计时，同段复用冻结的独立服务与快捷方案配置，到期复验最新命中并在路由切换取消；同目标预检单独读取受保护规则约束的行内代码语言上下文，发送与渲染仍只使用可翻译文本槽；恢复单个所有者或全文时重置篇章证据，统一恢复原文并清理重挂预算及孤儿产物；向局部翻译开放单候选 translateTarget 与单个译文所有者的恢复入口。
  * 模块边界：这是 content 侧编排层，不实现 provider 协议、纯候选算法或底层状态存储；自动应用外壳许可在重试重新解析和所有者切换时保留来源，不降级为手动解析；翻译调用经 app client，发现规则来自 core/translation，渲染与状态分别交给 renderer、liveTextRender 和 state。
  * 动态保护：按钮标签属性变化重判来源，类型或提交名称失去资格时立即恢复和取消旧请求；合成段 loading 来源复验在惰性文档中复制子节点，只比较 HTML 并保留真实节点身份；独立扫描根按各自冷却就绪执行，新增就绪根可提前唤醒等待，扫描与选择均遵守时间片。
  * 多段准备：AI 多段开启时为一批相邻候选保留最小准备容量，实际网络请求并发继续由 client 队列和后台调度器约束。
@@ -470,7 +470,7 @@ async function renderTranslation(
         const freshSnapshot = createTranslationSourceSnapshot(
             node, core.shouldStayOriginal,
             getTranslationStateProtectionBoundary(node, state),
-            getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+            getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
             core.shouldOmitFromTranslation,
         );
         const freshSources = freshSnapshot.slots.map((slot) => slot.source);
@@ -859,7 +859,7 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
         node,
         core.shouldStayOriginal,
         synthetic ? node : undefined,
-        getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node),
+        getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope),
     ).map((slot) => slot.node);
     const attempt = beginTranslation(
         node,
@@ -881,7 +881,7 @@ export async function translateTarget(candidate: TranslationCandidate, displayMo
     }
     // 请求必须在 spinner 插入前创建；微软 HTML 克隆和文本节点快照不能把
     // 插件自己的 loading 元素送到服务端。
-    const requestProtectionOptions = getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node);
+    const requestProtectionOptions = getTranslationTextProtectionOptions(candidate.allowTopLevelApplicationShell, node, candidate.scope);
     const queueSession = createTranslationQueueSession();
     const signal = attempt.state.controller.signal;
     const releaseRequestSession = bindFullPageRequestSessionAttempt(requestSession, attempt.state.controller);
@@ -1276,7 +1276,7 @@ function upgradeFullPageTargetScope(session: FullPageSession, target: HTMLElemen
     const previousNodes = new Set(state.sourceTextNodes);
     const expandsText = collectLiveTranslationTextSlots(target, core.shouldStayOriginal,
         getTranslationStateProtectionBoundary(target, state),
-        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, target),
+        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, target, state.scope),
     ).some((slot) => !previousNodes.has(slot.node));
     if (!changesKind && !expandsText) return false;
     const root = state.syntheticSegment ? target.parentElement : target;

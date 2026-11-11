@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/translationStability.ts
  * 文件职责：提供动态页面翻译的语义稳定性判断、轻量完成证据复验和实时文本槽重绑定，隔离 React/虚拟列表重建造成的生命周期噪声。
- * 主要内容：判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；仅译文复验读取本代精确来源槽，避免数字邻接文字时误判父节点为纯数值；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
+ * 主要内容：按候选和状态的实际范围合并当前网站禁译覆盖，判断原文与译文工件是否仍完整，排队行内候选逐一复验全部来源节点及顺序，在保留宿主链接焦点管理的前提下决定是否保留当前翻译 generation，并在逐槽核对当前来源后把异步结果映射到实时 Text 节点与空白边界；仅译文复验读取本代精确来源槽，避免数字邻接文字时误判父节点为纯数值；同值完成证明排除同步语言跳过和符合补充检测资格的长未知正文，避免将本地原文回填认证为供应商结果；重挂提取原文和文本槽时共享单文本读取，多槽仍保留独立的链接标识符与属性标签提取政策；按钮型 input 的译文写在标签属性上，另按已记录属性值复验其时效与自身写入。
  * 模块边界：本文件不读取配置、不监听 DOM、不执行 provider 请求；回退来源 HTML 比对只在惰性文档中复制，不激活来源资源；自动应用外壳候选和轻量完成证据必须重新认证原策略，runtime 通过回调提供当前来源与槽位快照。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -142,7 +142,7 @@ export function readAcceptedUnchangedCompletion(owner: HTMLElement, record: Full
             ...(proof.allowTopLevelApplicationShell ? {allowTopLevelApplicationShell: true} : {})})) return unavailable;
     const core = getCurrentTranslationCore(proof.scope);
     const slots = collectLiveTranslationTextSlots(owner, core.shouldStayOriginal, undefined,
-        getTranslationTextProtectionOptions(proof.allowTopLevelApplicationShell, owner));
+        getTranslationTextProtectionOptions(proof.allowTopLevelApplicationShell, owner, proof.scope));
     if (slots.length !== proof.sourceNodes.length || slots.some((slot, i) =>
         slot.node !== proof.sourceNodes[i] || slot.source !== proof.sources[i]) ||
         getTranslationSourceStructureSignature(owner, proof.allowTopLevelApplicationShell, proof.sourceNodes,
@@ -183,10 +183,11 @@ export function isTranslationStateSourceCurrent(node: HTMLElement, state: Transl
 export function getTranslationTextProtectionOptions(
     allowTopLevelApplicationShell: boolean | undefined,
     protectedElement: Element,
+    scope?: TranslationScope,
 ): TranslationTextProtectionOptions | undefined {
-    return allowTopLevelApplicationShell === true
+    return getCurrentTranslationCore(scope).textOptions(allowTopLevelApplicationShell === true
         ? {allowTopLevelApplicationShell: true, protectedElement}
-        : undefined;
+        : undefined);
 }
 
 export function getTranslationStateProtectionBoundary(
@@ -202,6 +203,7 @@ export function getCandidateTranslationTextProtectionOptions(
     return getTranslationTextProtectionOptions(
         candidate.allowTopLevelApplicationShell,
         candidate.element,
+        candidate.scope,
     );
 }
 
@@ -304,7 +306,7 @@ export function getCurrentTranslationStateSourceText(node: HTMLElement, state: T
         node,
         getCurrentTranslationCore(state.scope).shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
-        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
     );
 }
 
@@ -316,7 +318,7 @@ export function getCurrentTranslationStateTextNodes(
         node,
         getCurrentTranslationCore(state.scope).shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
-        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+        getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
         state.syntheticSegment || state.allowTopLevelApplicationShell === true ? undefined : protectionCache,
     ).map((slot) => slot.node);
 }
@@ -410,7 +412,7 @@ export function statefulSourceAndTextSlotsAreCurrent(
         // 数字旁的原文可能已移入本代译文槽。复验祖先时必须读取这些精确来源，
         // 否则跳过槽后只剩数字，祖先会被误判成无需翻译的实时数值。
         const options = {
-            ...getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node),
+            ...getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
             sourceTextSlotHosts: sourceSlotHostSet(slotHosts),
         };
         const protectionCache = createTranslationTextProtectionCache();

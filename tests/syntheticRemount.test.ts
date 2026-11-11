@@ -11,6 +11,8 @@ vi.mock('@/src/core/translation/public', async (importOriginal) => {
     return {
         ...actual,
         getCurrentTranslationCore: () => ({
+            adapters: [],
+            textOptions: (options?: import('@/src/core/translation/public').TranslationTextProtectionOptions) => options,
             resolve: translationCore.resolve,
             shouldStayOriginal: translationCore.shouldStayOriginal,
         }),

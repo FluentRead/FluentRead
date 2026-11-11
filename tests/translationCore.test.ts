@@ -1979,7 +1979,9 @@ describe('translation candidate core', () => {
             value: () => ({offsetNode: text, offset: 1}),
         });
         const restoreRange = installRangeStub(document, text, (startOffset) =>
-            startOffset > breakOffset ? [{top: 100, bottom: 110, height: 10}] : [{top: 0, bottom: 10, height: 10}],
+            startOffset > breakOffset
+                ? [{top: 102, bottom: 112, height: 10}, {top: 100, bottom: 110, height: 10}]
+                : [{top: 2, bottom: 12, height: 10}, {top: 0, bottom: 10, height: 10}],
         );
         try {
             const candidate = core.resolveAtPoint(document, 10, 20);
@@ -5196,4 +5198,26 @@ describe('整块请求的整段原文重建', () => {
     it('被快照省略的隐藏文字与图标不阻止整块请求', () => {
         expect(source('<p>Open <span hidden>secret</span> the <b>door</b></p>')).toBe('Open the door');
     });
+});
+
+
+describe('候选扫描的失效 DOM 边界', () => {
+    it('跳过入口枚举中已经失效的 collection 条目', () => {
+        const {core} = page('<p>Readable paragraph.</p>');
+        const root = {nodeType: 11, children: {length: 1, item: () => null}} as unknown as Node;
+        expect([...core.discoverSteps(root)]).toEqual([]);
+    });
+
+    it('开放根发现跳过宿主 walker 返回的非元素节点', () => {
+        const {document} = page('<article-card></article-card>');
+        const host = document.querySelector('article-card')!;
+        const shadow = host.attachShadow({mode: 'open'});
+        Object.defineProperty(document, 'createTreeWalker', {value: () => {
+            const nodes = [document.createTextNode('Unexpected walker text'), host];
+            return {nextNode: () => nodes.shift() ?? null};
+        }});
+        expect(getOpenShadowRoots(document)).toEqual([shadow]);
+    });
+
+
 });

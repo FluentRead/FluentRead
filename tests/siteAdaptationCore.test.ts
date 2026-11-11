@@ -9,11 +9,106 @@ import type {SiteRule, SiteRulePack} from '@/src/core/site-adaptation/types';
 import {asHTMLElement, createMutationRescanSelector, createTranslationMutationObserverOptions} from '@/src/features/full-page-translation/content/mutationObservation';
 import {createTranslationSourceSnapshot} from '@/src/core/translation/serialization';
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
+import {collectLiveTranslationTextSlots} from '@/src/core/translation/serialization';
 
 const rule = (extra: Partial<SiteRule> = {}): SiteRule => ({
     id: 'example', name: 'Example', match: {hosts: ['example.test']}, ...extra,
 });
 const pack = (rules: SiteRule[] = [rule()]): SiteRulePack => ({version: 1, rules});
+
+describe('issue #1251: explicit no-translate overrides', () => {
+    const url = new URL('https://example.test/comments');
+    const custom = () => pack([rule({forceTranslate: ['#comments'], content: [{css: ['.post_body p']}], protect: ['.author']})]);
+    function fixture(marker = 'translate="no"') {
+        return parseHTML(`<html><body><main><div id="comments" ${marker}>
+            <div class="post_body"><p id="first">Public readable comment with <code>keep_code()</code> and <span class="author">Private author name</span>.</p>
+            <p id="second">Another independent readable comment.</p>
+            <p id="nested" translate="no">Local protected comment.</p>
+            <textarea id="draft">Unsent private draft</textarea></div></div>
+            <p id="outside" translate="no">Unrelated protected paragraph.</p></main></body></html>`);
+    }
+    it.each(['translate="no"', 'class="notranslate"', 'data-notranslate="true"'])('overrides only the matching %s element without editing host DOM', marker => {
+        const {document} = fixture(marker);
+        const before = document.body.innerHTML;
+        const adapters = compileSiteRulePack(custom());
+        const core = new TranslationCandidateCore({url, adapters});
+        expect([...new TranslationCandidateCore({url}).discover(document)]).toHaveLength(0);
+        const candidates = [...core.discover(document)];
+        expect(candidates.map(c => c.element.id)).toEqual(['first', 'second']);
+        for (const candidate of candidates) {
+            expect(core.resolve(candidate.element.firstChild)?.element).toBe(candidate.element);
+            const options = core.textOptions();
+            const source = collectLiveTranslationTextSlots(candidate.element, core.shouldStayOriginal, undefined, options).map(slot => slot.source).join(' ');
+            expect(source).not.toMatch(/keep_code|Private author|Local protected|Unsent/);
+            expect(createTranslationSourceSnapshot(candidate.element, core.shouldStayOriginal, undefined, options).slots.map(slot => slot.source).join(' ')).toContain('comment');
+        }
+        expect(core.resolve(document.getElementById('nested'))).toBeNull();
+        expect(core.inspect(document.getElementById('outside')!).candidate).toBeNull();
+        expect(document.body.innerHTML).toBe(before);
+        document.getElementById('comments')!.id = 'revoked';
+        expect([...core.discover(document)]).toHaveLength(0);
+        expect(collectLiveTranslationTextSlots(document.getElementById('first')!, core.shouldStayOriginal, undefined, core.textOptions())).toHaveLength(0);
+    });
+    it.each(['contenteditable="true"', 'hidden', 'inert', 'aria-hidden="true"', 'class="fluent-read-loading"', 'class="katex"'])('retains the other protection on the overridden shell: %s', protection => {
+        const {document} = parseHTML(`<html><body><div id="comments" translate="no" ${protection}><div class="post_body"><p>Protected readable text.</p></div></div></body></html>`);
+        const core = new TranslationCandidateCore({url, adapters: compileSiteRulePack(custom())});
+        expect([...core.discover(document)]).toHaveLength(0);
+        expect(core.resolve(document.querySelector('p'))).toBeNull();
+        expect(collectLiveTranslationTextSlots(document.querySelector('p')!, core.shouldStayOriginal, undefined, core.textOptions())).toHaveLength(0);
+    });
+    it('requires an override for each marked ancestor and keeps exclusions authoritative', () => {
+        const {document} = fixture();
+        const innerOnly = pack([rule({forceTranslate: ['.post_body'], content: [{css: ['p']}]})]);
+        expect([...new TranslationCandidateCore({url, adapters: compileSiteRulePack(innerOnly)}).discover(document)]).toHaveLength(0);
+        const excluded = custom(); excluded.rules[0]!.exclude = ['.post_body'];
+        expect([...new TranslationCandidateCore({url, adapters: compileSiteRulePack(excluded)}).discover(document)]).toHaveLength(0);
+    });
+    it('reuses normalized templates, selector diagnostics, scope and disable/replace semantics', () => {
+        const value: SiteRulePack = {version: 1, profiles: {comments: {forceTranslate: ['#comments[data-ready="yes"]']}}, rules: [rule({profile: 'comments', forceTranslate: ['#comments']})]};
+        const parsed = parseSiteRulePack(value);
+        expect(parsed.ok).toBe(true);
+        const settings = normalizeSiteAdaptationSettings({custom: value});
+        expect(settings.custom).toEqual(value);
+        expect(resolveSiteRule(value, value.rules[0]!).forceTranslate).toEqual(['#comments[data-ready="yes"]', '#comments']);
+        expect(getSiteRuleObservedAttributes(resolveSiteRule(value, value.rules[0]!))).toContain('data-ready');
+        const {document} = fixture();
+        const adapters = composeSiteAdapters(value, normalizeSiteAdaptationSettings({}));
+        expect([...new TranslationCandidateCore({url, adapters}).discover(document)]).not.toHaveLength(0);
+        expect([...new TranslationCandidateCore({url, adapters, scope: 'all'}).discover(document)]).toHaveLength(0);
+        value.rules[0]!.allScopes = true;
+        expect([...new TranslationCandidateCore({url, adapters: compileSiteRulePack(value), scope: 'all'}).discover(document)]).not.toHaveLength(0);
+        for (const disabled of [normalizeSiteAdaptationSettings({enabled: false}), normalizeSiteAdaptationSettings({disabledRuleIds: ['example']}), normalizeSiteAdaptationSettings({custom: pack([rule()])})]) {
+            expect([...new TranslationCandidateCore({url, adapters: composeSiteAdapters(value, disabled)}).discover(document)]).toHaveLength(0);
+        }
+        expect(parseSiteRulePack(pack([rule({forceTranslate: []})])).ok).toBe(false);
+        expect(parseSiteRulePack(pack([rule({forceTranslate: 1 as unknown as string[]})])).ok).toBe(false);
+        expect(validateSelectors(pack([rule({forceTranslate: ['[invalid']})]), document)).toContainEqual(expect.objectContaining({path: '$.rules[0].forceTranslate[0]'}));
+        const invalid = new TranslationCandidateCore({url, adapters: compileSiteRulePack(pack([rule({forceTranslate: ['[invalid']})]))});
+        expect([...invalid.discover(document)]).toHaveLength(0);
+    });
+    it('keeps foreign translations protected when an older DOM cannot match :has', () => {
+        const {document} = fixture();
+        const shell = document.getElementById('comments')!;
+        const matches = shell.matches.bind(shell);
+        Object.defineProperty(shell, 'matches', {value: (selector: string) => {
+            if (selector.startsWith(':has(')) throw new Error('Unsupported :has');
+            return matches(selector);
+        }});
+        const foreign = document.createElement('p'); foreign.id = 'foreign';
+        foreign.innerHTML = 'Already translated source.<font class="immersive-translate-target-wrapper">已有外部译文</font>';
+        document.querySelector('.post_body')!.append(foreign);
+        const core = new TranslationCandidateCore({url, adapters: compileSiteRulePack(custom())});
+        expect([...core.discover(document)].map(candidate => candidate.element.id)).toEqual(['first', 'second']);
+        expect(core.resolve(foreign.firstChild)).toBeNull();
+        expect(foreign.innerHTML).toContain('已有外部译文');
+    });
+    it('makes the built-in itch.io nested React comment shell discoverable', () => {
+        const {document} = fixture();
+        document.getElementById('comments')!.id = 'game_comments_react_123_Game-Comments_root';
+        const core = new TranslationCandidateCore({url: new URL('https://milkshakeplusplus.itch.io/mousetraptab/comments'), adapters: composeSiteAdapters(builtinSiteRulePack, normalizeSiteAdaptationSettings({}))});
+        expect([...core.discover(document)].map(c => c.element.id)).toEqual(['first', 'second']);
+    });
+});
 
 describe('mutation rescan readiness', () => {
     function fixture() {

@@ -5,7 +5,7 @@ const runtime = vi.hoisted(() => ({
     translations: [] as string[],
     translateTextSlots: vi.fn(),
     tryTranslateInlineCodeSentence: vi.fn(),
-    getCurrentTranslationCore: vi.fn(() => ({shouldStayOriginal: () => false})),
+    getCurrentTranslationCore: vi.fn(() => ({shouldStayOriginal: () => false, textOptions: (options?: import('@/src/core/translation/public').TranslationTextProtectionOptions) => options})),
 }));
 
 vi.mock('@/src/core/translation/public', async (importOriginal) => {
@@ -22,6 +22,9 @@ vi.mock('@/src/core/translation/public', async (importOriginal) => {
         createInlineCodePacket: actual.createInlineCodePacket,
     };
 });
+
+// 请求单元测试不启动浏览器配置存储；个人校订另有真实请求套件。
+vi.mock('@/src/services/config/store', () => ({config: {personalCorrectionsEnabled: false}}));
 
 vi.mock('@/src/features/full-page-translation/content/translationRequest', () => ({
     translateTextSlots: runtime.translateTextSlots,

@@ -187,6 +187,40 @@ describe('full page site attribute boundary lifecycle', () => {
         globals.clear();
     });
 
+    it.each(['resolve', 'reject'] as const)('issue #1251 discards a late %s after forceTranslate loses its selector, then allows a new translation after permission returns', async outcome => {
+        document.body.innerHTML = `<main><div id="comments" translate="no" data-ready="yes"><p id="owner">${source}<code>KEEP_CODE_PRIVATE</code></p></div></main>`;
+        const shell = document.querySelector<HTMLElement>('#comments')!;
+        const owner = document.querySelector<HTMLElement>('#owner')!;
+        const originalHTML = document.body.innerHTML;
+        Object.defineProperty(owner, 'getClientRects', {configurable: true, value: () => [{width: 600, height: 60}]});
+        fixture.core = new TranslationCandidateCore({url: new URL('https://example.com/comments'), adapters: compileSiteRulePack({version: 1, rules: [{
+            id: 'comments', name: 'Comments', match: {hosts: ['example.com']},
+            forceTranslate: ['#comments[data-ready="yes"]'], mode: 'focus', content: [{css: ['#owner']}],
+        }]})});
+        const pending = deferred<string[]>(); fixture.requests.mockReturnValueOnce(pending.promise);
+        autoTranslateEnglishPage(); await vi.advanceTimersByTimeAsync(60);
+        const state = getTranslationState(owner)!;
+        expect(state.phase).toBe('loading');
+        expect(fixture.requests.mock.calls[0]![0]).toEqual([source]);
+        const observer = FixtureMutationObserver.instances.at(-1)!;
+        observer.emit([epochAttribute(shell, 'data-ready', 'no')]);
+        await vi.advanceTimersByTimeAsync(100);
+        if (outcome === 'resolve') pending.resolve(['迟到的译文不能提交。']);
+        else pending.reject(new Error('Controlled provider rejection after permission loss'));
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(owner.querySelector('.fluent-read-bilingual-content,.fluent-read-retry-wrapper')).toBeNull();
+        expect(getTranslationState(owner)).toBeUndefined();
+        expect(state.controller.signal.aborted).toBe(true);
+        restoreOriginalContent();
+        shell.setAttribute('data-ready', 'yes');
+        autoTranslateEnglishPage();
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(owner.querySelector('.fluent-read-bilingual-content')).not.toBeNull();
+        expect(shell.getAttribute('translate')).toBe('no');
+        restoreOriginalContent();
+        expect(document.body.innerHTML).toBe(originalHTML);
+    });
+
     it.each(['div', 'span'] as const)('HN %s opening survives actual source-move records before the deferred full-page spinner', async tag => {
         document.body.innerHTML = `<${tag} class="commtext c00" id="comment">The lede is being missed imo.<p>First independent paragraph.</p><p>Second independent paragraph.</p><p>Third independent paragraph.</p><p>Fourth independent paragraph.</p></${tag}>`;
         fixture.core = createTranslationCore({url: new URL('https://news.ycombinator.com/item?id=44800746')});

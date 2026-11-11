@@ -1,4 +1,5 @@
 import {parseHTML} from 'linkedom';
+import {statefulSourceAndTextSlotsAreCurrent} from '@/src/features/full-page-translation/content/translationStability';
 import {describe, expect, it} from 'vitest';
 import {inlineCodeReplaySourceIsCurrent, type TranslationState} from '@/src/features/full-page-translation/content/state';
 
@@ -23,6 +24,7 @@ describe('inline code whole-sentence replay source', () => {
         const first = f.owner.querySelector('code')!;
         first.textContent = 'changed()';
         expect(inlineCodeReplaySourceIsCurrent(f.owner, f.state)).toBe(false);
+        expect(statefulSourceAndTextSlotsAreCurrent(f.owner, f.state)).toBe(false);
         first.textContent = 'fetch()';
         first.setAttribute('title', 'new');
         expect(inlineCodeReplaySourceIsCurrent(f.owner, f.state)).toBe(false);

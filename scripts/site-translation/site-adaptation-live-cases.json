@@ -99,5 +99,10 @@
     "id": "go-docs",
     "url": "https://go.dev/doc/effective_go",
     "selector": "main p"
+  },
+  {
+    "id": "itch-games",
+    "url": "https://milkshakeplusplus.itch.io/mousetraptab/comments",
+    "selector": ".post_body p"
   }
 ]

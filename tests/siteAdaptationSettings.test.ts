@@ -40,7 +40,7 @@ describe('site adaptation settings persistence and editor behavior', () => {
     it('roundtrips advanced content, CSS commas and inherited template behavior through the visual form', () => {
         const source: SiteRulePack = {version: 1, profiles: {base: {
             mode: 'focus', content: [{css: [':is(article, main) p'], atomic: false, resolve: 'closest', splitOnBr: true, key: 'paragraph'}],
-            protect: ['pre'], omit: ['.private'], literalLabels: ['b'], literalTokens: ['code'],
+            protect: ['pre'], omit: ['.private'], literalLabels: ['b'], literalTokens: ['code'], forceTranslate: ['#comments'],
         }}, rules: [rule('advanced', {profile: 'base', allScopes: true, content: undefined,
             match: {hosts: ['example.com'], paths: ['/read/*'], excludePaths: ['/read/private/*']}, watchIgnore: ['.clock'], exclude: ['nav']})]};
         const expanded = resolveSiteRule(source, source.rules[0]!);
@@ -48,7 +48,7 @@ describe('site adaptation settings persistence and editor behavior', () => {
         form.name = 'User name'; form.protect += '\nbutton'; form.priority = 25;
         const rebuilt = buildSiteRuleFromForm(form, expanded);
         expect(rebuilt).toMatchObject({name: 'User name', allScopes: true, mode: 'focus', priority: 25,
-            omit: ['.private'], literalLabels: ['b'], literalTokens: ['code'], protect: ['pre', 'button']});
+            omit: ['.private'], literalLabels: ['b'], literalTokens: ['code'], forceTranslate: ['#comments'], protect: ['pre', 'button']});
         expect(rebuilt.content).toEqual(expanded.content);
         expect(rebuilt.match).toEqual(expanded.match);
         expect(rebuilt).not.toHaveProperty('profile');

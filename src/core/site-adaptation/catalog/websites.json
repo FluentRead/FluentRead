@@ -4740,11 +4740,15 @@
       ]
     },
     "profile": "product",
+    "forceTranslate": ["div[id^='game_comments_react_'][id*='_Game-Comments_']"],
     "content": [
       {
         "css": [
           ".formatted_description p",
-          ".formatted_description li"
+          ".formatted_description li",
+          ".post_body",
+          ".post_body p",
+          ".post_body li"
         ],
         "atomic": false
       }

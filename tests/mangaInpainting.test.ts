@@ -16,11 +16,79 @@ const pixels=()=>new Uint8ClampedArray(128*128*4).fill(255);
 const zero=(patch:{width:number;height:number})=>new Float32Array(patch.width*patch.height*3);
 const deferred=<T,>()=>{let resolve!:(value:T)=>void;const promise=new Promise<T>(done=>{resolve=done;});return {promise,resolve};};
 const tick=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
+const gradientPixels=()=>{const result=pixels();for(let y=0;y<128;y++)for(let x=0;x<128;x++)result.set([40+x,50+y,80+Math.round((x+y)/2),255],(y*128+x)*4);return result;};
+
+/** 与按矩形投影的实现独立：逐个输出格检查源面积相交，并核对色彩积分和补齐边界。 */
+function assertPatchFootprints(input:Uint8ClampedArray,width:number,height:number,candidate:Parameters<typeof createMangaPatch>[3],mapping:ReturnType<typeof createMangaPatch>) {
+    const {patch,left,top,sourceWidth,sourceHeight,contentWidth,contentHeight}=mapping,count=patch.width*patch.height;
+    expect(contentWidth).toBeLessThanOrEqual(sourceWidth);expect(contentHeight).toBeLessThanOrEqual(sourceHeight);
+    expect(Math.max(patch.width,patch.height)).toBeLessThanOrEqual(512);
+    expect(patch.width%64).toBe(0);expect(patch.height%64).toBe(0);
+    const boxes=mangaMaskBoxes(candidate,width,height),sum=[0,0,0],original=[0,0,0];
+    let maskErrors=0,paddingErrors=0,identityErrors=0,invalidColors=0;
+    const reflect=(index:number,length:number)=>{while(index<0||index>=length)index=index<0?-index-1:2*length-index-1;return index;};
+    for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){
+        const cx=reflect(x,contentWidth),cy=reflect(y,contentHeight),index=y*patch.width+x;
+        const x0=left+cx*sourceWidth/contentWidth,x1=left+(cx+1)*sourceWidth/contentWidth;
+        const y0=top+cy*sourceHeight/contentHeight,y1=top+(cy+1)*sourceHeight/contentHeight;
+        if(patch.mask[index]!==Number(boxes.some(box=>x0<box.x1&&box.x0<x1&&y0<box.y1&&box.y0<y1)))maskErrors++;
+        for(let channel=0;channel<3;channel++){
+            const value=patch.image[channel*count+index];if(!Number.isFinite(value)||value<0||value>1)invalidColors++;
+            if(x<contentWidth&&y<contentHeight)sum[channel]+=value;
+            if(x>=contentWidth||y>=contentHeight){if(value!==patch.image[channel*count+cy*patch.width+cx])paddingErrors++;}
+            else if(contentWidth===sourceWidth&&contentHeight===sourceHeight)
+                if(Math.round(value*255)!==input[((top+y)*width+left+x)*4+channel])identityErrors++;
+        }
+    }
+    expect({maskErrors,paddingErrors,identityErrors,invalidColors}).toEqual({maskErrors:0,paddingErrors:0,identityErrors:0,invalidColors:0});
+    for(let y=top;y<top+sourceHeight;y++)for(let x=left;x<left+sourceWidth;x++)for(let channel=0;channel<3;channel++)
+        original[channel]+=input[(y*width+x)*4+channel]/255;
+    for(let channel=0;channel<3;channel++)expect(sum[channel]/(contentWidth*contentHeight)).toBeCloseTo(original[channel]/(sourceWidth*sourceHeight),7);
+}
 beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.gpu.mockResolvedValue({available:false,info:''});mocks.load.mockResolvedValue(new ArrayBuffer(1));mocks.background.mockReturnValue({uniform:false,color:'rgb(255,255,255)'});mocks.release.mockResolvedValue(undefined);mocks.create.mockResolvedValue({run:mocks.run,release:mocks.release});mocks.run.mockResolvedValue({inpainted:{data:new Float32Array([0.25]),dispose:mocks.outputDispose}});vi.stubGlobal('chrome',{runtime:{getURL:(p:string)=>'chrome-extension://test'+p}});
     mocks.workerPrepare.mockReset().mockResolvedValue(undefined);mocks.workerRequest.mockReset().mockImplementation(async({patch})=>zero(patch));mocks.workerRelease.mockReset().mockResolvedValue(undefined);
 });
 afterEach(async()=>{await mangaInpaintingRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('漫画局部神经修补',()=>{
+    it('完整验证的渐变直接恢复原背景，不初始化模型、不改源缓冲或延长模型驻留',async()=>{
+        const clean=gradientPixels(),input=clean.slice();
+        for(let y=35;y<65;y++)for(let x=35;x<85;x++)input.set([0,0,0,255],(y*128+x)*4);
+        const original=input.slice(),create=vi.fn(),preparing=vi.fn(),runtime=createMangaInpaintingRuntime(create);
+        const result=await runtime.repair(input,128,128,[region],undefined,preparing,undefined,[{uniform:false,color:'rgb(128,128,128)'}],{reuseUniformPixels:true});
+        expect(result).not.toBe(input);expect(input).toEqual(original);expect(create).not.toHaveBeenCalled();expect(preparing).not.toHaveBeenCalled();
+        const boxes=mangaMaskBoxes(region,128,128);let maxError=0,outsideChanges=0;
+        for(let y=0;y<128;y++)for(let x=0;x<128;x++)for(let channel=0;channel<4;channel++){
+            const at=(y*128+x)*4+channel;
+            if(boxes.some(b=>x>=b.x0&&x<b.x1&&y>=b.y0&&y<b.y1))maxError=Math.max(maxError,Math.abs(result[at]-clean[at]));
+            else if(result[at]!==original[at])outsideChanges++;
+        }
+        expect(maxError).toBeLessThanOrEqual(1);expect(outsideChanges).toBe(0);expect(vi.getTimerCount()).toBe(0);await runtime.dispose();
+    });
+    it('另一页模型仍在运行时，渐变页无需排队；与均匀区域混排不新增模型工作',async()=>{
+        const native=deferred<Float32Array>(),port={run:vi.fn((_patch:{width:number;height:number})=>native.promise),release:vi.fn()},create=vi.fn(async()=>port),runtime=createMangaInpaintingRuntime(create);
+        const first=runtime.repair(pixels(),128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#fff'}]);
+        await tick();expect(port.run).toHaveBeenCalledOnce();
+        const empty={...region,sourceBoxes:[]},input=gradientPixels();
+        const fast=await runtime.repair(input,128,128,[region,empty],undefined,undefined,undefined,[{uniform:false,color:'#fff'},{uniform:true,color:'#fff'}]);
+        expect(fast).not.toBe(input);expect(port.run).toHaveBeenCalledOnce();
+        native.resolve(zero(port.run.mock.calls[0][0]));await first;await runtime.dispose();
+    });
+    it('同页渐变与真实纹理分开处理，只有纹理进入模型并保持其原始输入',async()=>{
+        const input=gradientPixels(),first={...region,fontSize:10,bbox:{x0:10,y0:10,x1:40,y1:30}},second={...region,fontSize:10,bbox:{x0:90,y0:80,x1:110,y1:110}};
+        for(let y=76;y<115;y++)for(let x=86;x<115;x++){const value=(x+y)%2*255;input.set([value,value,value,255],(y*128+x)*4);}
+        const original=input.slice(),port={run:vi.fn(async patch=>zero(patch)),release:vi.fn()},runtime=createMangaInpaintingRuntime(async()=>port);
+        const result=await runtime.repair(input,128,128,[first,second],undefined,undefined,undefined,[{uniform:false,color:'#fff'},{uniform:false,color:'#fff'}]);
+        expect(port.run).toHaveBeenCalledOnce();expect(input).toEqual(original);
+        expect(result[(95*128+100)*4]).toBe(0);expect(result[(20*128+20)*4]).toBe(60);
+        await runtime.dispose();
+    });
+    it('未修改的同色区域和没有清字蒙版的补绘不需要模型，已取消的渐变页不发布结果',async()=>{
+        const create=vi.fn(),runtime=createMangaInpaintingRuntime(create),input=gradientPixels();
+        expect(await runtime.repair(input,128,128,[{...region,sourceBoxes:[]}],undefined,undefined,undefined,[{uniform:false,color:'#fff'}])).toEqual(input);
+        const controller=new AbortController();controller.abort();
+        await expect(runtime.repair(input,128,128,[region],controller.signal,undefined,undefined,[{uniform:false,color:'#fff'}])).rejects.toMatchObject({name:'AbortError'});
+        expect(create).not.toHaveBeenCalled();await runtime.dispose();
+    });
     it.each([false,true])('共享全局保护在重叠的未知外周区域仍跳过全部RGBA，写入反序=%s',async reverse=>{
         const input=pixels(),other={...region,bbox:{x0:40,y0:40,x1:100,y1:80}};
         input.set([211,31,171,96],(50*128+50)*4);input.set([0,0,0,0],(50*128+51)*4);
@@ -153,7 +221,7 @@ describe('漫画局部神经修补',()=>{
         const edge={...region,fontSize:1,bbox:{x0:0,y0:0,x1:4,y1:4}},edgeMapping=createMangaPatch(pixels(),128,128,edge);
         applyMangaPatch(pixels(),128,edge,edgeMapping,zero(edgeMapping.patch));
     });
-    it('按行段生成的蒙版在上下采样、分数框、重叠框和补丁外框中与源坐标逐像素包含相同',()=>{
+    it('面积蒙版覆盖分数框、重叠框和边界框，补齐前后保持色彩积分与原始网格',()=>{
         for (const [width,height] of [[19,31],[127,139],[613,977],[1200,200]]) {
             const input = new Uint8ClampedArray(width*height*4);
             for (let index=0;index<input.length;index++) input[index]=(index*37+11)%256;
@@ -164,18 +232,8 @@ describe('漫画局部神经修补',()=>{
                 [{x0:-20,y0:-20,x1:2,y1:2},{x0:width+10,y0:0,x1:width+30,y1:height},
                     {x0:0,y0:height+10,x1:width,y1:height+30}, {x0:width/3,y0:height/3,x1:width/2,y1:height/2}]]) {
                 const candidate={...region,fontSize:13.5,bbox:{x0:width/5+.3,y0:height/6+.7,x1:width*.8-.2,y1:height*.9-.4},sourceBoxes};
-                const mapping=createMangaPatch(input,width,height,candidate), {patch,left,top,sourceWidth,sourceHeight}=mapping;
-                const boxes=mangaMaskBoxes(candidate,width,height), count=patch.width*patch.height;
-                const expectedImage=new Float32Array(count*3), expectedMask=new Float32Array(count);
-                for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){
-                    const sx=left+Math.min(sourceWidth-1,Math.floor(x*sourceWidth/patch.width));
-                    const sy=top+Math.min(sourceHeight-1,Math.floor(y*sourceHeight/patch.height));
-                    const index=y*patch.width+x, source=(sy*width+sx)*4;
-                    for(let channel=0;channel<3;channel++) expectedImage[channel*count+index]=input[source+channel]/255;
-                    expectedMask[index]=Number(boxes.some(box=>sx>=box.x0&&sx<box.x1&&sy>=box.y0&&sy<box.y1));
-                }
-                expect(Buffer.from(patch.image.buffer).equals(Buffer.from(expectedImage.buffer))).toBe(true);
-                expect(Buffer.from(patch.mask.buffer).equals(Buffer.from(expectedMask.buffer))).toBe(true);
+                const mapping=createMangaPatch(input,width,height,candidate);
+                assertPatchFootprints(input,width,height,candidate,mapping);
             }
         }
     });
@@ -187,20 +245,48 @@ describe('漫画局部神经修补',()=>{
         const input=new Uint8ClampedArray(width*height*4);
         for(let y=0;y<height;y++)for(let x=0;x<width;x++) input.set([(x*11+y*3)%256,(x*7+y*13)%256,(x+y*17)%256,alpha],(y*width+x)*4);
         const original=input.slice(),candidate={...region,fontSize:13.5,bbox,sourceBoxes:[sourceBox]};
-        const mapping=createMangaPatch(input,width,height,candidate),{patch,left,top,sourceWidth,sourceHeight}=mapping,count=patch.width*patch.height;
-        const expectedImage=new Float32Array(count*3),expectedMask=new Float32Array(count);
-        const margin=3,box={x0:Math.max(0,Math.floor(sourceBox.x0)-margin),y0:Math.max(0,Math.floor(sourceBox.y0)-margin),x1:Math.min(width,Math.ceil(sourceBox.x1)+margin),y1:Math.min(height,Math.ceil(sourceBox.y1)+margin)};
-        for(let y=0;y<patch.height;y++)for(let x=0;x<patch.width;x++){
-            const sx=left+Math.min(sourceWidth-1,Math.floor(x*sourceWidth/patch.width));
-            const sy=top+Math.min(sourceHeight-1,Math.floor(y*sourceHeight/patch.height));
-            const position=y*patch.width+x,source=(sy*width+sx)*4;
-            for(let channel=0;channel<3;channel++)expectedImage[channel*count+position]=input[source+channel]/255;
-            expectedMask[position]=Number(sx>=box.x0&&sx<box.x1&&sy>=box.y0&&sy<box.y1);
-        }
-        expect(Buffer.from(patch.image.buffer).equals(Buffer.from(expectedImage.buffer))).toBe(true);
-        expect(Buffer.from(patch.mask.buffer).equals(Buffer.from(expectedMask.buffer))).toBe(true);
+        const mapping=createMangaPatch(input,width,height,candidate);
+        assertPatchFootprints(input,width,height,candidate,mapping);
         expect(mapping.alpha).toBe(expectedAlpha);
         expect(input).toEqual(original);
+    });
+    it.each([[137,91],[512,509],[1,7]])('小补丁 %s×%s 使用恒等模型时逐字节还原，补齐不能拉伸或平移纹理', (width,height)=>{
+        const input=new Uint8ClampedArray(width*height*4);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)input.set([(x*17+y*31)%256,(x*11+y*3)%256,(x+y*7)%256,255],(y*width+x)*4);
+        const candidate={...region,fontSize:12,bbox:{x0:0,y0:0,x1:width,y1:height}},mapping=createMangaPatch(input,width,height,candidate);
+        expect([mapping.contentWidth,mapping.contentHeight]).toEqual([width,height]);
+        const result=input.slice();applyMangaPatch(result,width,candidate,mapping,mapping.patch.image);
+        expect(result).toEqual(input);
+    });
+    it('二倍缩小一像素棋盘时保持平均颜色，不把交替纹理采成纯黑或纯白',()=>{
+        const width=1024,height=1024,input=new Uint8ClampedArray(width*height*4);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){const value=(x+y)%2*255;input.set([value,value,value,255],(y*width+x)*4);}
+        const mapping=createMangaPatch(input,width,height,{...region,bbox:{x0:0,y0:0,x1:width,y1:height}});
+        expect([mapping.contentWidth,mapping.contentHeight]).toEqual([512,512]);
+        expect(mapping.patch.image.every(value=>value===.5)).toBe(true);
+    });
+    it('扩大模型渐变按像素中心连续回填，忽略补齐区错误颜色且不写蒙版以外',()=>{
+        const width=1000,height=160,input=new Uint8ClampedArray(width*height*4).fill(255);
+        const candidate={...region,fontSize:10,bbox:{x0:20,y0:20,x1:980,y1:140}},mapping=createMangaPatch(input,width,height,candidate);
+        const {patch,contentWidth,contentHeight,left,top,sourceWidth,sourceHeight}=mapping,count=patch.width*patch.height;
+        const output=new Float32Array(count*3).fill(1);
+        for(let y=0;y<contentHeight;y++)for(let x=0;x<contentWidth;x++){
+            const index=y*patch.width+x;output[index]=.1+.6*(x+.5)/contentWidth;output[count+index]=.1+.5*(y+.5)/contentHeight;output[count*2+index]=.4;
+        }
+        const result=input.slice();applyMangaPatch(result,width,candidate,mapping,output);
+        const boxes=mangaMaskBoxes(candidate,width,height);
+        let maxError=0,outsideChanges=0,alphaChanges=0;
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+            const at=(y*width+x)*4;
+            if(!boxes.some(b=>x>=b.x0&&x<b.x1&&y>=b.y0&&y<b.y1)){for(let channel=0;channel<4;channel++)if(result[at+channel]!==input[at+channel])outsideChanges++;}
+            else{
+                const expected=[(.1+.6*(x-left+.5)/sourceWidth)*255,(.1+.5*(y-top+.5)/sourceHeight)*255,.4*255];
+                for(let channel=0;channel<3;channel++)maxError=Math.max(maxError,Math.abs(result[at+channel]-expected[channel]));
+                if(result[at+3]!==255)alphaChanges++;
+            }
+        }
+        expect(maxError).toBeLessThanOrEqual(.51);
+        expect({outsideChanges,alphaChanges}).toEqual({outsideChanges:0,alphaChanges:0});
     });
     it('不透明补丁沿用原始行的 RGB，图外和行间画面与 alpha 完全不变',()=>{
         const input=pixels(),result=new Uint8ClampedArray(input),r={...region,sourceBoxes:[{x0:30,y0:30,x1:60,y1:50}]},mapping=createMangaPatch(input,128,128,r);

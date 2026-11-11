@@ -396,10 +396,18 @@ describe('图片译文排版与绘制', () => {
 });
 
 describe('图片译文颜色', () => {
+    it('主色桶返回实际采样颜色，纯色和少量色彩噪声不会被粗色阶替换', () => {
+        const pixels=new Uint8ClampedArray(10*10*4);
+        for(let at=0;at<pixels.length;at+=4)pixels.set([128,218,184,255],at);
+        expect(getImageTextBackgroundColor(pixels,10,10,{x0:3,y0:3,x1:7,y1:7})).toBe('rgb(128,218,184)');
+        // 两个样本落在同一桶，返回真实均值；透明样本和另一少数桶不参与该均值。
+        pixels.fill(0);pixels.set([201,220,241,255],0);pixels.set([203,222,243,255],4);pixels.set([16,16,16,255],8);
+        expect(getImageTextBackgroundColor(pixels,10,10,{x0:3,y0:3,x1:7,y1:7})).toBe('rgb(202,221,242)');
+    });
     it('透明外围不会把背景主色误判为黑色，整图没有外围时使用可读兜底', () => {
         const pixels = new Uint8ClampedArray(8 * 8 * 4);
         pixels.set([200, 220, 240, 255], 0);
-        expect(getImageTextBackgroundColor(pixels, 8, 8, {x0: 3, y0: 3, x1: 5, y1: 5})).toBe('rgb(208,224,240)');
+        expect(getImageTextBackgroundColor(pixels, 8, 8, {x0: 3, y0: 3, x1: 5, y1: 5})).toBe('rgb(200,220,240)');
         expect(getImageTextBackgroundColor(pixels, 8, 8, {x0: 0, y0: 0, x1: 8, y1: 8})).toBe('rgb(255,255,255)');
         expect(getImageTextBackgroundColor(new Uint8ClampedArray(16), 2, 2, {x0: 1, y0: 1, x1: 2, y1: 2}))
             .toBe('rgb(255,255,255)');

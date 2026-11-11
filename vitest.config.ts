@@ -176,6 +176,6 @@ export default defineConfig({
         clearMocks: false,
         fileParallelism: false,
         // 页内样式契约执行实际 CSS，避免空 inline 样式掩盖命名、对比度或所有权回归。
-        css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|translation-loading-indicator|bilingual-sentence-highlight|vocabulary-reencounter)|src\/features\/image-translation\/ui\/image-text-reader)\.css(?:\?|$)/]},
+        css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|translation-loading-indicator|bilingual-sentence-highlight|vocabulary-reencounter)|src\/features\/image-translation\/ui\/image-(?:text-reader|controls))\.css(?:\?|$)/]},
     },
 });

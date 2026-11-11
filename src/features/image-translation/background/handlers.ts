@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
- * 同图语境：AI 上下文开启且模型支持时，逐位置提供前后各两段 OCR 原文，通过既有篇章证据通道送达提示词、隔离缓存并跳过摘要；重复短句保留各自邻文，正文、回填位置与取消所有权不变。其他服务沿用原生批译或标题参考。
+ * 同图语境：AI 上下文开启且模型支持时，逐位置提供前后各两段 OCR 原文，通过既有篇章证据通道送达提示词、隔离缓存并跳过摘要；Google 批次附加不可序列化的同图标记并保留重复位置，由 adapter 进行有界邻文和严格回填。其他服务沿用原生批译或标题参考，取消所有权不变。
  * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
  * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
@@ -27,6 +27,7 @@ import {
     getTranslationGlossaryContext,
     markTranslationRemainingBudget,
     allowUnchangedTranslationResult,
+    markImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
 
 export const IMAGE_TRANSLATE_MESSAGE_TYPE = 'fluentReadImageTranslate' as const;
@@ -367,9 +368,11 @@ async function translateImageTexts(
     if (uniqueTexts.length === 0) return [...texts];
     const service = dependencies.getTranslationService();
     const useImageContext = dependencies.isTextContextEnabled?.(service) === true;
+    const batchTranslation = dependencies.supportsBatchTranslation(service) && !useImageContext;
+    const orderedRegions = useImageContext || (service === 'google' && batchTranslation);
     const translatedSources = new Set(uniqueTexts);
-    const sourceIndexes = useImageContext ? texts.flatMap((text, index) => translatedSources.has(text) ? [index] : []) : [];
-    const requestTexts = useImageContext ? sourceIndexes.map(index => texts[index]) : uniqueTexts;
+    const sourceIndexes = orderedRegions ? texts.flatMap((text, index) => translatedSources.has(text) ? [index] : []) : [];
+    const requestTexts = orderedRegions ? sourceIndexes.map(index => texts[index]) : uniqueTexts;
     const imageDetectionText = uniqueTexts.join('\n');
     // 只借用可靠、单一文字体系的同图上下文；混合语种不能把短外语词误判成目标语言而漏译。
     const useImageDetectionText = service === 'localTranslation'
@@ -399,6 +402,7 @@ async function translateImageTexts(
         return remaining;
     };
     const controlledRequest = <T extends ImageTextTranslationRequest>(request: T) => {
+        if (service === 'google' && Array.isArray(request.origin)) markImageTextBatch(request);
         const controlled = attachTranslationRequestControl(allowUnchangedTranslationResult(markTranslationRemainingBudget(request)), {
             signal: controller.signal, ownershipKey: `image:${options.requestId}`,
         });
@@ -406,12 +410,12 @@ async function translateImageTexts(
     };
     try {
         let translations: string[];
-        if (dependencies.supportsBatchTranslation(service) && !useImageContext) {
+        if (batchTranslation) {
             try {
                 const result = await dependencies.translateTexts(controlledRequest({
-                    ...baseRequest, origin: uniqueTexts, requestTimeoutMs: remainingBudget(),
+                    ...baseRequest, origin: requestTexts, requestTimeoutMs: remainingBudget(),
                 }));
-                if (!Array.isArray(result) || result.length !== uniqueTexts.length
+                if (!Array.isArray(result) || result.length !== requestTexts.length
                     || !result.every(value => typeof value === 'string' && value.trim())) {
                     throw new Error('provider 未返回等长非空字符串数组');
                 }
@@ -427,7 +431,7 @@ async function translateImageTexts(
             const worker = async () => {
                 while (cursor < requestTexts.length && !failed) {
                     const index = cursor++;
-                    const sourceIndex = useImageContext ? sourceIndexes[index] : texts.indexOf(requestTexts[index]);
+                    const sourceIndex = orderedRegions ? sourceIndexes[index] : texts.indexOf(requestTexts[index]);
                     try {
                         const translation = await dependencies.translateTexts(controlledRequest({
                             ...baseRequest, origin: requestTexts[index], requestTimeoutMs: remainingBudget(),
@@ -449,7 +453,7 @@ async function translateImageTexts(
             await Promise.all(Array.from({length: Math.min(3, requestTexts.length)}, worker));
         }
         if (controller.signal.aborted) throw imageAbortError(false);
-        if (useImageContext) {
+        if (orderedRegions) {
             const result = [...texts];
             sourceIndexes.forEach((sourceIndex, index) => {result[sourceIndex] = translations[index];});
             return result;

@@ -64,6 +64,7 @@ export default defineConfig({
                 'src/features/full-page-translation/content/visibilityAnchor.ts',
                 'src/app/background/areaRuntime.ts',
                 'src/providers/translation/googleErrorBody.ts',
+                'src/providers/translation/googleImageContext.ts',
                 'src/shared/text/htmlEntities.ts',
                 'src/core/config/aiMultiSegment.ts',
                 'src/features/settings/ui/AiMultiSegmentSettings.vue',

@@ -15,6 +15,8 @@ import {
     createTranslationProviderConfigSnapshot,
     getTranslationGlossaryTerms,
     getTranslationProviderConfig,
+    markImageTextBatch,
+    isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
 import type {TranslationRequestMessage, TranslationProviderConfigSnapshot} from '@/src/services/translation/types';
 
@@ -85,7 +87,7 @@ function harness(service = 'openai', model = 'model-fixture', now?: () => number
     const get = vi.fn(async (key: string) => cache.get(key) ?? null);
     const broker = createTranslationBroker({
         ready: Promise.resolve(), getConfig: () => config, now,
-        providers: {openai: provider, microsoft: provider, tongyi: provider, custom: provider, siliconCloud: provider},
+        providers: {openai: provider, microsoft: provider, google: provider, tongyi: provider, custom: provider, siliconCloud: provider},
         cache: {get, set: async (key, value) => {cache.set(key, value); return true;}, clear: async () => {cache.clear();}, cleanup: async () => {}},
         serviceTypes: servicesType,
         endpointResolver: {resolveOpenAICompatibleEndpoint: () => ({endpoint: 'https://fixture.invalid/v1'}),
@@ -396,6 +398,25 @@ describe('术语库与真实翻译编排协作', () => {
         expect(String(h.calls[0].message.origin)).not.toContain('agent');
         await expect(h.request({origin: 'agent', serviceOverride: 'microsoft', glossaryRevision: 'old-version'}))
             .rejects.toMatchObject({code: 'GLOSSARY_REVISION_CHANGED'});
+    });
+    it('Google 同图语境和部分缓存重算保留每个位置的术语保护，错位标记仍拒绝发布', async () => {
+        const h = harness('google');
+        const request = markImageTextBatch({origin: ['agent, agent!', 'unrelated', 'agent, agent!']});
+        await expect(h.request(request)).resolves.toEqual(['智能体, 智能体!', '此条不该发送', '智能体, 智能体!']);
+        expect(h.provider).toHaveBeenCalledOnce();
+        expect(isImageTextBatch(h.calls[0].message)).toBe(true);
+        expect(h.calls[0].message.origin).toHaveLength(3);
+        expect(String(h.calls[0].message.origin)).not.toContain('agent');
+        const lastSlot = [...h.cache.keys()].find(key => JSON.parse(key).sourceText[0] === 'slot:2')!;
+        expect(lastSlot).toBeDefined(); h.cache.delete(lastSlot);
+        await expect(h.request(request)).resolves.toEqual(['智能体, 智能体!', '此条不该发送', '智能体, 智能体!']);
+        expect(h.provider).toHaveBeenCalledTimes(2);
+        expect(h.provider.mock.calls[1][0].origin).toHaveLength(3);
+        const invalid = harness('google');
+        invalid.provider.mockImplementation(async message => [...message.origin as string[]].reverse());
+        await expect(invalid.request(markImageTextBatch({origin: ['agent', 'unrelated']})))
+            .rejects.toMatchObject({code: 'GLOSSARY_PLACEHOLDER_INVALID'});
+        expect(invalid.cache.size).toBe(0);
     });
 
     it('服务损坏或重复标记时不显示或缓存残缺译文，重新翻译能恢复', async () => {

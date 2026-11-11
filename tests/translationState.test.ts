@@ -2492,3 +2492,45 @@ describe('独立双语状态机的观察器与恢复边界', () => {
         } finally {restoreTranslation(owner);}
     });
 });
+
+
+describe('issue #1251：强制翻译的来源与独立 observer', () => {
+    it.each(['data-ready', 'class'])('覆盖选择器依赖 %s 时，失效会恢复原文并取消旧状态', async attribute => {
+        const {document} = parseHTML('<html><body><main><div id="comments" class="ready" data-ready="yes" translate="no"><p id="post">A readable public comment remains the exact source.</p></div></main></body></html>');
+        const owner = document.querySelector<HTMLElement>('#post')!;
+        const shell = document.querySelector<HTMLElement>('#comments')!;
+        const originalHTML = shell.outerHTML;
+        const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'location');
+        const flush = async () => {await Promise.resolve(); await Promise.resolve(); await new Promise(resolve => setTimeout(resolve, 0));};
+        try {
+            Object.defineProperty(globalThis, 'location', {configurable: true, value: {href: 'https://example.test/comments'}});
+            setCurrentTranslationAdapters(composeSiteAdapters({version: 1, rules: [{id: 'comments', name: 'Comments', match: {hosts: ['example.test']}, forceTranslate: [attribute === 'class' ? '#comments.ready' : '#comments[data-ready="yes"]']}]}, normalizeSiteAdaptationSettings({})));
+            const core = getCurrentTranslationCore();
+            const slots = collectLiveTranslationTextSlots(owner, core.shouldStayOriginal, undefined, core.textOptions());
+            expect(slots).toHaveLength(1);
+            const source = slots[0]!.node;
+            const attempt = beginTranslation(owner, 'bilingual', 'content', false, slots[0]!.source, [source])!;
+            const wrapper = document.createElement('span');
+            wrapper.className = 'fluent-read-bilingual-content'; wrapper.setAttribute('data-fr-translation-owned', 'true');
+            wrapper.textContent = '可读的公开评论译文。'; owner.append(wrapper); setBilingualContent(owner, wrapper);
+            expect(markTranslationComplete(owner, attempt.state, attempt.generation, false)).toBe(true);
+            expect(ensureTranslationTruncationLayout(owner)).toBe(true);
+            await flush();
+            expect(getTranslationState(owner)).toBe(attempt.state);
+            expect(getCurrentTranslationStateTextNodes(owner, attempt.state)).toEqual([source]);
+            shell.setAttribute(attribute, attribute === 'class' ? 'revoked' : 'no');
+            await flush();
+            expect(getTranslationState(owner)).toBeUndefined();
+            expect(attempt.state.controller.signal.aborted).toBe(true);
+            expect(wrapper.parentNode).toBeNull();
+            expect(owner.firstChild).toBe(source);
+            shell.setAttribute(attribute, attribute === 'class' ? 'ready' : 'yes');
+            expect(shell.outerHTML).toBe(originalHTML);
+        } finally {
+            restoreTranslation(owner); await flush();
+            setCurrentTranslationAdapters(defaultTranslationAdapters);
+            if (descriptor) Object.defineProperty(globalThis, 'location', descriptor);
+            else Reflect.deleteProperty(globalThis, 'location');
+        }
+    });
+});

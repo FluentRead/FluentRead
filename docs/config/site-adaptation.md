@@ -41,3 +41,24 @@
 熟悉网页结构时，可按[自定义网站规则](/guide/custom-site-rules)操作，修改前先导出备份。也可到 [GitHub Issues](https://github.com/FluentRead/FluentRead/issues)提供可公开的网址、浏览器版本和去除隐私信息的截图，说明希望翻译与保留的区域。
 
 完整字段见[规则参考文档](https://github.com/FluentRead/FluentRead/blob/main/docs/maintainers/product-reference/site-adaptation-20260906.md)。
+
+## 指定区域被禁译标记阻挡
+
+在正文适配的高级 JSON 中添加 `forceTranslate`，选择**携带禁译标记的元素本身**。例如 itch.io 评论外壳：
+
+```json
+{
+  "version": 1,
+  "rules": [{
+    "id": "itch-comments",
+    "name": "itch.io 评论",
+    "match": {"hosts": ["*.itch.io"]},
+    "forceTranslate": ["div[id^='game_comments_react_'][id*='_Game-Comments_']"],
+    "content": [{"css": [".post_body", ".post_body p", ".post_body li"], "atomic": false}]
+  }]
+}
+```
+
+`forceTranslate` 只覆盖匹配元素自身的 `translate="no"`、`.notranslate` 和 `data-notranslate="true"`，不修改网页属性。嵌套区域若有自己的禁译标记，仍保留原文；编辑区、代码、隐藏内容，以及规则中的 `protect`、`exclude` 继续受保护。需要穿过多层禁译容器时，应分别匹配每一层。
+
+保存规则后，全文、悬浮和局部翻译使用相同边界。此字段也可写入模板，复制、导出及停用规则时一同处理；默认遵循正文范围，需要适用于全部节点时显式设置 `allScopes: true`。itch.io 内置规则已包含上述评论外壳例外。

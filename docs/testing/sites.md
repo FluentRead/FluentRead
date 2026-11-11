@@ -270,3 +270,10 @@ node scripts/testing/run-codeforces-translation-test.cjs \
 专项创建临时 Edge profile 与第二屏后台可见窗口，先检查 Kagi 原生展开/收起以确认页面水合，再验证正文/全部节点范围的双语标题、普通按钮原位替换、上下排版、点击与 Enter/空格、动态插入、仅译文闭合 Shadow 文本、恢复重译、Control 悬浮切换和真实分类切换。DOM、截图和报告写入证据目录；结束后关闭本次浏览器并删除临时 profile。翻译使用确定性微软响应，仅证明真实站点 DOM 与生产扩展的兼容性，不代表在线供应商质量或 Firefox 实机验收。
 
 
+
+
+## 网站禁译标记的精确覆盖（issue #1251）
+
+`siteAdaptationCore.test.ts` 验证 `forceTranslate` 的字段校验、模板展开、导出边界、范围、停用与同 ID 覆盖，以及三个禁译标记只在匹配元素自身被覆盖。嵌套禁译、代码、隐藏节点、编辑器和用户排除仍受保护。`translationState.test.ts` 用真实 MutationObserver 验证自定义属性与普通 class 失去匹配后恢复原文并取消旧状态。
+
+网站夹具 `itch-games` 的 `comments-no-translate` 变体模拟 issue 提供的嵌套 React 评论外壳，运行悬浮与全文的翻译、恢复、重复触发、新增评论、等价重建和保护区变化，并检查实际供应商请求及精确恢复。用 `scripts/run-site-adaptation-test.cjs --cases itch-games --skip-settings-ui` 限定范围；测试供应商应返回目标语言正文，旧的英文回显假译文会被目标语言检查拒绝。按浏览器共同契约额外采集内容脚本隔离世界与后台诊断。夹具和本地供应商结果不能代替实站或在线服务验收。

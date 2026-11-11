@@ -41,3 +41,22 @@ Content rules select article and protected areas by domain, path, and CSS select
 If you know webpage structure, follow [Custom site rules](/en/guide/custom-site-rules) and export a backup first. Otherwise, report a public URL, browser version, and a screenshot with private information removed on [GitHub Issues](https://github.com/FluentRead/FluentRead/issues). Explain which areas should translate and which should stay original.
 
 Detailed fields are in the [rule reference](https://github.com/FluentRead/FluentRead/blob/main/docs/maintainers/product-reference/site-adaptation-20260906.md).
+
+## Content blocked by a no-translate marker
+
+In the advanced JSON editor, use `forceTranslate` with CSS selectors matching the **element carrying the marker**, for example:
+
+```json
+{
+  "version": 1,
+  "rules": [{
+    "id": "itch-comments",
+    "name": "itch.io comments",
+    "match": {"hosts": ["*.itch.io"]},
+    "forceTranslate": ["div[id^='game_comments_react_'][id*='_Game-Comments_']"],
+    "content": [{"css": [".post_body", ".post_body p", ".post_body li"], "atomic": false}]
+  }]
+}
+```
+
+This overrides only the matched element's `translate="no"`, `.notranslate`, or `data-notranslate="true"` marker without editing page attributes. Separate markers on descendants, editors, code, hidden content, and `protect`/`exclude` rules remain protected. Match every marked ancestor you intend to override. Full-page, hover, and section translation share the result. Templates, export, overrides, and disabled rules retain the same behavior. Rules apply to content scope by default; set `allScopes: true` explicitly for all-node scope. The built-in itch.io rule includes this comment-shell exception.

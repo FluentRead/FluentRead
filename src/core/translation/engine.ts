@@ -2,7 +2,7 @@
  * @file src/core/translation/engine.ts
  *
  * 文件职责：实现 DOM 节点到 TranslationCandidate 的核心解析引擎，协调安全守卫、站点适配器、布局边界和文本有效性；为显式非原子行内容器保留直属正文与独立子段落的一致发现和悬浮边界。
- * 主要内容：按正文/全部节点范围协调候选；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
+ * 主要内容：按正文/全部节点范围协调候选，统一发现、悬浮与请求取词的精确禁译覆盖；定义 TranslationCandidateCore、候选优选与键值函数，记录发现步骤和原因，按站点规则把显式换行拆为两种入口一致的内联候选，处理编辑器坐标命中屏障、hover 屏障、适配优先级、快照省略、缓存及坐标命中；局部脏内联子树仅在完整保护检查通过后回到最近显式非原子祖先重扫，不把每个正文子节点重定向成重复整段请求；发现强制目标时仅在当前 enter 的同步检查中复用既有决策和祖先选择器 miss，不跨生成器让出缓存；同步只读批量解析复用全部范围及无站点适配/应用外壳例外的普通正文祖先守卫和文本保护，涉及显式外壳权限或站点重定向目标时独立解析；无元素子节点的非文档表面不重复探测不可能成立的内联分段，仍由完整候选分类复验文本和保护；悬浮命中独立后代的包裹层时禁止回退吞并整个容器，让独立 tooltip 不抢占外层控件候选，保证全文与悬浮共享决策。 可核对的公开符号包括 TranslationCoreInspection、TranslationDiscoveryStep、getTranslationCandidateKey、selectPreferredTranslationCandidate、TranslationCandidateCore。
  * 模块边界：本文件属于可独立测试的 core 候选领域；内置站点提供的应用外壳正文入口仍须经过显式目标、局部保护与去重检查，不改变通用发现守卫；可以读取传入 DOM 以计算结果，坐标命中栈与祖先守卫只在单次同步解析中复用，不跨手势缓存；不访问配置存储、不调用 provider、不注册页面监听器，也不负责译文渲染或 feature 生命周期。
  */
 
@@ -19,6 +19,7 @@ import {
     isExtensionElementSelf,
     isTopLevelApplicationShell,
     maxComposedAncestorDepth,
+    safeMatches,
 } from './dom';
 import type {HardGuardResult} from './dom';
 import type {TranslationTextProtectionOptions} from './dom';
@@ -52,8 +53,6 @@ import type {
 import {
     findAdapterPrunedAncestor,
     inheritCachedFlag,
-    partitionInlineRunAtBarriers,
-    readCachedFlagOr,
 } from './internal';
 import {resolveVisualTranslationRange} from './visual';
 
@@ -211,6 +210,20 @@ export class TranslationCandidateCore {
         this.context = {url: this.url};
     }
 
+    /** 候选发现、请求取词及状态复验使用同一份精确禁译覆盖；无规则时保持原参数。 */
+    textOptions(options?: TranslationTextProtectionOptions): TranslationTextProtectionOptions | undefined {
+        return this.adapters.some(adapter => adapter.forceTranslate?.length)
+            ? {...options, allowNoTranslate: this.allowNoTranslate}
+            : options;
+    }
+
+    private allowNoTranslate = (element: Element): boolean => this.adapters.some(adapter =>
+        adapter.forceTranslate?.some(selector => safeMatches(element, selector)) === true);
+
+    private newContext(options?: TranslationTextProtectionOptions): ResolutionEvaluationContext {
+        return createResolutionEvaluationContext(this.textOptions(options));
+    }
+
     private structuralRegionOptions(): StructuralRegionOptions | undefined {
         return this.includeSidebarRegions ? {includeSidebarRegions: true} : undefined;
     }
@@ -326,7 +339,7 @@ export class TranslationCandidateCore {
         element: Element,
         evaluationContext: ResolutionEvaluationContext,
     ): HardGuardResult {
-        const guard = evaluateElementHardGuard(element);
+        const guard = evaluateElementHardGuard(element, evaluationContext.textProtectionOptions);
         const protectionOptions = evaluationContext.textProtectionOptions;
         if (guard.reason === 'inherited-no-translate' &&
             protectionOptions?.allowTopLevelApplicationShell === true &&
@@ -431,15 +444,12 @@ export class TranslationCandidateCore {
         evaluationContext: ResolutionEvaluationContext,
     ): boolean {
         this.primeResolutionAncestry(element, evaluationContext);
-        return readCachedFlagOr(
-            evaluationContext.structuralAncestors,
-            element,
-            () => hasStructuralAncestor(element, this.structuralRegionOptions()),
-        );
+        // 调用者已通过硬守卫；prime 已完整写入当前节点的结构祖先结果。
+        return evaluationContext.structuralAncestors.get(element) === true;
     }
 
     inspect(element: Element, textProtectionOptions?: TranslationTextProtectionOptions): TranslationCoreInspection {
-        const evaluationContext = createResolutionEvaluationContext(textProtectionOptions);
+        const evaluationContext = this.newContext(textProtectionOptions);
         // 只在此同步只读 inspect 生效；resolve/discover 与不同 owner 不共享。
         evaluationContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
         return this.inspectWithTextProtectionCache(
@@ -478,7 +488,7 @@ export class TranslationCandidateCore {
                 [target],
                 shouldStayOriginal,
                 textProtectionCache,
-                evaluationContext?.textProtectionOptions,
+                evaluationContext.textProtectionOptions,
             ) ||
                 this.hardGuard(target, evaluationContext).prune) {
                 return {candidate: null};
@@ -507,7 +517,7 @@ export class TranslationCandidateCore {
             shouldStayOriginal,
             evaluationContext !== undefined,
             textProtectionCache,
-            evaluationContext?.textProtectionOptions,
+            evaluationContext.textProtectionOptions,
             this.scope,
             this.structuralRegionOptions(),
         );
@@ -537,7 +547,7 @@ export class TranslationCandidateCore {
         const runs = getDirectInlineRuns(
             candidate.element, this.shouldStayOriginal, true,
             (child) => child.localName === 'br' || isTranslationControlElement(child),
-            textProtectionCache, evaluationContext?.textProtectionOptions, this.scope,
+            textProtectionCache, evaluationContext?.textProtectionOptions ?? this.textOptions(), this.scope,
             false, this.structuralRegionOptions(),
         );
         return runs.map((nodes) => ({...candidate, nodes, sourceLine: true}));
@@ -554,7 +564,7 @@ export class TranslationCandidateCore {
         if (!this.allowsGenericCandidates() && !explicitContainer) return [];
         const candidates: TranslationCandidate[] = [];
         const atomicTargetCache = new WeakMap<Element, boolean>();
-        const protectionOptions = evaluationContext?.textProtectionOptions;
+        const protectionOptions = evaluationContext?.textProtectionOptions ?? this.textOptions();
         const isAtomicAdapterTarget = (candidate: Element): boolean => {
             const cached = atomicTargetCache.get(candidate);
             if (cached !== undefined) return cached;
@@ -570,7 +580,9 @@ export class TranslationCandidateCore {
             (this.scope === 'all' && isTranslationTextElementProtected(
                 candidate, this.shouldStayOriginal, textProtectionCache, protectionOptions,
             ));
-        for (const run of getDirectInlineRuns(
+        // 直接 run 已使用同一屏障函数分段并通过文本检查；此处没有 DOM 写入或让出，
+        // 沿用这份同步结果，避免对同一批节点重复分段和取词。
+        for (const nodes of getDirectInlineRuns(
             element,
             this.shouldStayOriginal,
             skipStructuralAncestorCheck,
@@ -581,27 +593,14 @@ export class TranslationCandidateCore {
             explicitContainer,
             this.structuralRegionOptions(),
         )) {
-            const partitions = partitionInlineRunAtBarriers(
-                run,
-                (node) => isElementNode(node) && isDirectRunBarrier(node),
-            );
-            for (const nodes of partitions) {
-                if (hasMeaningfulTranslationTextInNodes(
-                    nodes,
-                    this.shouldStayOriginal,
-                    textProtectionCache,
-                    protectionOptions,
-                )) {
-                    candidates.push({
-                        element: element as HTMLElement,
-                        nodes,
-                        kind: this.scope === 'all' ? getAllScopeCandidateKind(element)
-                            : findTranslationControlOwner(element) ? 'control' : 'content',
-                        reason: 'generic-inline-run',
-                        ...this.candidateResolutionMetadata(evaluationContext),
-                    });
-                }
-            }
+            candidates.push({
+                element: element as HTMLElement,
+                nodes,
+                kind: this.scope === 'all' ? getAllScopeCandidateKind(element)
+                    : findTranslationControlOwner(element) ? 'control' : 'content',
+                reason: 'generic-inline-run',
+                ...this.candidateResolutionMetadata(evaluationContext),
+            });
         }
         return candidates;
     }
@@ -618,7 +617,7 @@ export class TranslationCandidateCore {
             this.shouldStayOriginal,
             true,
             textProtectionCache,
-            undefined,
+            this.textOptions(),
             this.scope,
             this.structuralRegionOptions(),
         );
@@ -735,7 +734,7 @@ export class TranslationCandidateCore {
 
     /** 仅在同一同步只读阶段复用；写 DOM 或让出任务后必须重新创建。 */
     createSynchronousResolver(): (start: Node | null | undefined) => TranslationCandidate | null {
-        const context = createResolutionEvaluationContext();
+        const context = this.newContext();
         const shellAncestry = new WeakMap<Element, boolean>();
         return start => {
             if (this.scope === 'all') return this.resolveWithContext(start, context);
@@ -767,7 +766,7 @@ export class TranslationCandidateCore {
             ? (start as Text).parentElement
             : isElementNode(start) ? start : null;
         if (!current) return null;
-        const evaluationContext = sharedContext ?? createResolutionEvaluationContext(this.scope === 'content' ? {
+        const evaluationContext = sharedContext ?? this.newContext(this.scope === 'content' ? {
             allowTopLevelApplicationShell: true,
             protectedElement: current,
         } : undefined);
@@ -907,13 +906,13 @@ export class TranslationCandidateCore {
             // 正文候选，因此局部重扫应回到同一控件边界；被明确保护的脏子树不能提升。
             const controlOwner = findTranslationControlOwner(root);
             let scanRoot = controlOwner && controlOwner !== root &&
-                !evaluateHardGuard(root).prune && !this.hasAdapterPrunedAncestor(root)
+                !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root)
                 ? controlOwner : root;
             if (promoteExplicitOwner && scanRoot === root && !controlOwner && this.scope === 'content' && this.adapters.length > 0) {
                 initialAdapter = this.adapterDecision(root);
                 if (initialAdapter.decision.kind === 'pass' &&
-                    !evaluateHardGuard(root).prune && !this.hasAdapterPrunedAncestor(root) &&
-                    !isTranslationTextElementProtected(root, this.shouldStayOriginal, textProtectionCache)) {
+                    !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root) &&
+                    !isTranslationTextElementProtected(root, this.shouldStayOriginal, textProtectionCache, this.textOptions())) {
                     // 硬守卫已验证整条 composed 祖先链不超过预算。这里只走 light DOM，
                     // 不跨 ShadowRoot；遇到最近显式决策即停止，不越过原子目标或重定向。
                     // 仅入口提升扫描根，完整遍历的子 frame 仍以自身决定边界和首段 run。
@@ -970,10 +969,11 @@ export class TranslationCandidateCore {
                         frame.element,
                         this.shouldStayOriginal,
                         textProtectionCache,
+                        this.textOptions(),
                     );
                     const hardGuard = frame.checkAncestors
-                        ? evaluateHardGuard(frame.element)
-                        : evaluateElementHardGuard(frame.element);
+                        ? evaluateHardGuard(frame.element, this.textOptions())
+                        : evaluateElementHardGuard(frame.element, this.textOptions());
                     // 入口探测与第一 enter 之间没有 yield；复用刚读取的自有决策后立即
                     // 释放，后续节点或下一次扫描不会继承这次初始结果。
                     const ownAdapter = initialAdapter ?? this.adapterDecision(frame.element);
@@ -988,7 +988,7 @@ export class TranslationCandidateCore {
                     if (ownAdapter.decision.kind === 'force-target' && !hardGuard.prune) {
                         // 本段检查在 enter 的 yield 之前完成；不把缓存放入 frame，
                         // 后续节点仍读取让出后可能变化的宿主属性和站点决策。
-                        const forceContext = createResolutionEvaluationContext();
+                        const forceContext = this.newContext();
                         forceContext.adapterContext = {...this.context, closestSelectorMisses: new WeakMap()};
                         forceContext.adapterDecisions.set(frame.element, ownAdapter);
                         frame.forcedCandidate = this.inspectWithTextProtectionCache(
@@ -1152,7 +1152,7 @@ export class TranslationCandidateCore {
             hitRoots.add(hitRoot);
             const hit: Element | undefined = elementsAtPoint(hitRoot)[0];
             if (!hit) break;
-            const guard = evaluateHardGuard(hit);
+            const guard = evaluateHardGuard(hit, this.textOptions());
             if (guard.reason === 'contenteditable' ||
                 guard.reason === 'protected-tag:textarea' ||
                 guard.reason === 'protected-tag:select' ||
@@ -1193,7 +1193,7 @@ export class TranslationCandidateCore {
         x: number,
         y: number,
     ): TranslationCandidate {
-        const visual = resolveVisualTranslationRange(candidate, root, x, y, this.shouldStayOriginal);
+        const visual = resolveVisualTranslationRange(candidate, root, x, y, this.shouldStayOriginal, this.textOptions());
         return visual ? {
             ...candidate,
             visualRange: visual.range,

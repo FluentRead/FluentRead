@@ -371,7 +371,7 @@
           </template>
           <el-switch v-model="floatingBallEnabled" class="settings-toggle" :aria-label="t('settings.general.floatingBall')" />
         </SettingsItem>
-        <ToolbarClickSetting v-if="ToolbarClickSetting && browserCapabilities.browser !== 'userscript' && browserCapabilities.browser !== 'thunderbird'" :config="config" />
+        <ToolbarClickSetting v-if="ToolbarClickSetting" :config="config" />
         <SettingsItem :label="t('settings.general.progressPanel')" :description="t('settings.general.progressPanelDescription')">
           <el-switch v-model="config.translationProgressPanelEnabled" class="settings-toggle" :aria-label="t('settings.general.progressPanel')" @change="handleTranslationProgressPanelChange" />
         </SettingsItem>
@@ -662,7 +662,8 @@ const ClickSelectionSettings = defineAsyncComponent(() => import('./ClickSelecti
 const SelectionSettings = defineAsyncComponent(() => import('./SelectionSettings.vue'));
 const GlossarySettings = defineAsyncComponent(() => import('@/src/features/glossary/public').then(module => module.GlossarySettings));
 const FloatingBallSettings = defineAsyncComponent(() => import('./FloatingBallSettings.vue'));
-const ToolbarClickSetting = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./components/ToolbarClickSetting.vue'));
+import ToolbarClickSettingComponent from './components/ToolbarClickSetting.vue';
+const ToolbarClickSetting = import.meta.env.BROWSER === 'userscript' || import.meta.env.BROWSER === 'thunderbird' ? null : ToolbarClickSettingComponent;
 const SiteAdaptationSettings = defineAsyncComponent(() => import('./SiteAdaptationSettings.vue'));
 const SitePreferencesSettings = defineAsyncComponent(() => import('./SitePreferencesSettings.vue'));
 const SiteRulePreview = defineAsyncComponent(() => import('./SiteRulePreview.vue'));

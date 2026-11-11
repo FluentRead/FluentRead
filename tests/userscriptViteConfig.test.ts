@@ -906,7 +906,11 @@ describe('userscript browser shim injection', () => {
         }
         const subtitleAppearanceKeys = Object.keys(extension).filter(key => key.startsWith('video.appearance.'));
         expect(subtitleAppearanceKeys).toHaveLength(8);
-        for (const key of subtitleAppearanceKeys) {
+        const learningAppearanceKeys = Object.keys(extension).filter(key => key.startsWith('video.learningAppearance.'));
+        expect(learningAppearanceKeys).toHaveLength(19);
+        const subtitleExportKeys = Object.keys(extension).filter(key => key.startsWith('video.export'));
+        expect(subtitleExportKeys).toHaveLength(10);
+        for (const key of [...subtitleAppearanceKeys, ...learningAppearanceKeys, ...subtitleExportKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
@@ -960,7 +964,7 @@ describe('userscript browser shim injection', () => {
         for (const key of extensionOnlyUndoKeys) expect(Object.hasOwn(projected,key)).toBe(false);
         const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !key.startsWith('informationHighlight.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
-            && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !videoAsrKeys.includes(key) && !readerRecoveryKeys.includes(key)
+            && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !learningAppearanceKeys.includes(key) && !subtitleExportKeys.includes(key) && !videoAsrKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
             && key !== 'video.nativeFullscreenHint'
             && !safariPermissionKeys.includes(key) && !sidepanelKeys.includes(key) && !toolbarKeys.includes(key) && !pageFontKeys.includes(key) && !popupOnlyKeys.includes(key)

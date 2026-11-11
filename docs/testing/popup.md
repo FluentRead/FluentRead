@@ -60,6 +60,12 @@ Popup 赞赏窗口内的微信二维码点击后原位从 164px 放大到 200px�
 
 测试页只替换工具栏 Popup 的 active-tab 查询，返回一个真实本地网页标签；翻译使用本地确定性 OpenAI 兼容端点，错误分支和 GitHub 导航使用明确标注的响应夹具。不证明外部翻译服务、Firefox 实机或商店发布。完成后检查报告中的全部截图，并保存逐项复核结论；见[本次报告](../reports/popup-ui-restoration-20260930/README.md)。
 
+## 工具栏一键翻译（issue #1315）
+
+在通用设置选择“翻译 / 显示原文”，确认关闭并重开设置页后仍保留选择，原生 `getPopup` 返回空字符串。通过 `action.onClicked` 生产监听验证翻译、恢复、连续点击、独立标签页和后台冷启动；普通网页仅向顶层 frame 发送既有全文命令，关闭悬浮球或网页右键菜单仍可使用。导航后不能执行旧文档的排队动作。原生 PDF 沿用文档阅读器，扩展关闭或网页不可注入时保留面板入口。
+
+右键工具栏图标的“打开快捷面板”独立于网页右键菜单开关，以 `sourceTabId` 绑定发起网页。测试需核对打开面板后的来源与翻译目标；切回“打开快捷面板”后原生 popup 恢复。Firefox 使用 `browserAction` 与 `browser_action` 菜单上下文；单元测试和构建不代表 Firefox 原生工具栏实机通过。
+
 ## 工具栏翻译状态
 
 `node scripts/testing/run-toolbar-status-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-toolbar-status` 使用生产扩展、临时 Edge profile 和第二屏后台窗口，检查原文、等待、完成、恢复、服务失败、原地重试、标签页切换和刷新。页面与供应商响应均为本地夹具，不代表外部服务质量。

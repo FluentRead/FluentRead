@@ -34,6 +34,11 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const esESMessages = {
+    "toolbar.click.label": "Clic en el icono de la barra",
+    "toolbar.click.description": "En el modo de traducción con un clic, haz clic derecho en el icono para abrir el panel rápido.",
+    "toolbar.click.popup": "Abrir panel rápido",
+    "toolbar.click.translate": "Traducir / Restaurar",
+    "toolbar.openPopup": "Abrir panel rápido",
     "settings.backup.includeContext": "Incluir el contexto del vocabulario",
     "feedback.serviceHint": "Revisa la conexión o el modelo del servicio seleccionado e inténtalo de nuevo.",
     "feedback.retryHint": "Vuelve a intentarlo en un momento. Se conservarán el texto original y la selección.",

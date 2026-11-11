@@ -95,6 +95,7 @@ pnpm compile
 | <span id="统一下拉选择器"></span>统一下拉选择器 | [查看](testing/settings.md#统一下拉选择器) |
 | <span id="多语言界面布局"></span>多语言界面布局 | [查看](testing/settings.md#多语言界面布局) |
 | <span id="公告优先与关闭后续译"></span>公告优先与关闭后续译 | [查看](testing/webpage.md#公告优先与关闭后续译) |
+| 工具栏一键翻译（issue #1315） | [查看](testing/popup.md#工具栏一键翻译-issue-1315) |
 | <span id="工具栏翻译状态"></span>工具栏翻译状态 | [查看](testing/popup.md#工具栏翻译状态) |
 | <span id="ai-sdk-共享限流冷却"></span>AI SDK 共享限流冷却 | [查看](testing/popup.md#ai-sdk-共享限流冷却) |
 | <span id="覆盖率定义"></span>覆盖率定义 | [查看](testing/contracts.md#覆盖率定义) |

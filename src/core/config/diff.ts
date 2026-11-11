@@ -521,6 +521,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     interfaceFont: {group: 'general', label: '界面字体', format: (value) => formatEnum(value, INTERFACE_FONT_LABELS)},
     interfaceVisibility: {group: 'general', label: '界面栏目', format: formatInterfaceVisibility},
     popupModuleOrder: {group: 'general', label: '菜单栏布局顺序', format: formatPopupModuleOrder},
+    toolbarClickAction: {group: 'general', label: '工具栏图标点击行为', format: value => formatEnum(value, new Map([['popup', '打开快捷面板'], ['translate', '翻译/显示原文']]))},
     translationSidepanelScope: {group: 'general', label: '侧边栏显示范围', format: (value) => formatEnum(value, SIDEPANEL_SCOPE_LABELS)},
     popupQuickFeatureVisibility: {group: 'general', label: '快捷功能卡片', format: formatPopupQuickFeatureVisibility},
     popupQuickFeatureOrder: {group: 'general', label: '快捷功能顺序', format: formatPopupQuickFeatureOrder},

@@ -6,6 +6,22 @@ import * as ts from 'typescript';
 import { Config, normalizeConfig } from '@/src/core/config/model';
 import {options} from '@/src/core/config/catalog';
 import {GLOSSARY_LIMITS} from '@/src/core/glossary';
+describe('工具栏点击行为配置', () => {
+    it('旧配置保持打开面板，显式翻译偏好可导入导出且不影响悬浮球', () => {
+        expect(new Config().toolbarClickAction).toBe('popup');
+        for (const value of [undefined, null, '', 'unknown', true, 1, {}, []]) {
+            expect(normalizeConfig({toolbarClickAction: value}).toolbarClickAction).toBe('popup');
+        }
+        for (const toolbarClickAction of ['popup', 'translate'] as const) {
+            const original = {toolbarClickAction, floatingBallClickAction: 'settings'};
+            const normalized = normalizeConfig(original);
+            expect(normalized.toolbarClickAction).toBe(toolbarClickAction);
+            expect(normalizeConfig(JSON.parse(JSON.stringify(normalized))).toolbarClickAction).toBe(toolbarClickAction);
+            expect(normalized.floatingBallClickAction).toBe('settings');
+            expect(original).toEqual({toolbarClickAction, floatingBallClickAction: 'settings'});
+        }
+    });
+});
 describe('翻译服务启用状态配置', () => {
     it('全部内置关闭时依次使用已启用自定义或组合，全部关闭的备份仍保留一个默认服务', () => {
         const disabledTranslationServices = options.services.filter(item => !item.disabled).map(item => item.value);

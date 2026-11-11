@@ -553,6 +553,7 @@
       "tests/areaTranslationTrigger.test.ts",
       "tests/areaVisionRecognition.test.ts",
       "tests/backgroundBadgeRuntime.test.ts",
+      "tests/toolbarActionRuntime.test.ts",
       "tests/backgroundGoogleDriveSync.test.ts",
       "tests/bilingualSentenceHighlight.test.ts",
       "tests/chatgptPlanHarness.test.ts",

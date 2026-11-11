@@ -625,6 +625,135 @@ describe('selection range traversal scope and cost', () => {
     });
 });
 
+describe('issue #1317 textless decoration in cross-tag selections', () => {
+    const titles = [
+        'GitHub App support for Enterprise Copilot seat management',
+        'Gemini 4 Carbon in GitHub Copilot',
+        'C++ language server now auto-configures MSBuild builds',
+        'Dependabot alerts will pause on inactive repositories',
+    ];
+
+    function fixture(extra = '') {
+        const items = titles.map((title, index) => `
+            <li>
+              <div class="TimelineItem-badge">
+                <svg aria-hidden="true" width="16" height="16"><path d="M8 4a4 4 0 1 1 0 8Z"></path></svg>
+              </div>
+              <div class="TimelineItem-body">
+                <div><relative-time>Nov 1${index}, 2026</relative-time></div>
+                ${index === 1 ? extra : ''}
+                <a href="/changelog/${index}">${title}</a>
+              </div>
+            </li>`).join('');
+        const {document} = parseHTML(`<html><body><div id="changelog">
+            <h2 id="title">Latest from our changelog</h2>
+            <ul id="list">${items}</ul>
+            <a id="view-all" href="/changelog">View changelog</a>
+        </div></body></html>`);
+        const root = document.querySelector('#changelog')!;
+        const list = document.querySelector('#list')!;
+        const links = Array.from(list.querySelectorAll('a'));
+        // Every candidate is visibly laid out; the fix must not hide behind the zero-geometry exception.
+        for (const element of Array.from(root.querySelectorAll('*'))) {
+            element.getClientRects = () => [{width: 16, height: 16}] as unknown as DOMRectList;
+        }
+        const rangeBetween = (start: Node, end: Node, ancestor: Element = list) => mockRange(start, end, {
+            commonAncestor: ancestor,
+            intersectingNodes: Array.from(ancestor.querySelectorAll('*')),
+        });
+        const linkText = (index: number) => links[index].firstChild!;
+        return {document, root, links, rangeBetween, linkText};
+    }
+
+    it('allows cross-item and whole-block selections crossing visible textless octicons', () => {
+        const {document, root, rangeBetween, linkText} = fixture();
+        const geometry = Array.from(root.querySelectorAll('svg')).map(svg => vi.spyOn(svg, 'getClientRects'));
+        const ranges = [
+            rangeBetween(linkText(0), linkText(1)),
+            rangeBetween(linkText(0), linkText(3)),
+            rangeBetween(document.querySelector('#title')!.firstChild!, document.querySelector('#view-all')!.firstChild!, root),
+        ];
+        for (const range of ranges) {
+            expect(shouldIgnoreSelection(range, true)).toBe(false);
+            expect(shouldIgnoreSelection(range)).toBe(false);
+        }
+        // Decorations are skipped before the geometry probe, not merely because they lack a box.
+        expect(geometry.reduce((count, spy) => count + spy.mock.calls.length, 0)).toBe(0);
+        expect(readSelectionParts(ranges[1], 'First line.\n\nSecond line.')).toEqual([
+            {kind: 'text', text: 'First line.\n\nSecond line.'},
+        ]);
+    });
+
+    it.each([
+        '<button>Run action</button>',
+        '<span translate="no">Private text</span>',
+        '<span class="notranslate">Private text</span>',
+        '<span aria-hidden="true">Hidden private text</span>',
+        '<svg aria-hidden="true"><text>Icon label</text></svg>',
+        '<svg aria-hidden="true"><title>Icon label</title></svg>',
+        '<span data-fluent-read-ui="true">Extension UI text</span>',
+        '<span contenteditable="true">Editor text</span>',
+    ])('keeps actively selected protected text excluded: %s', html => {
+        const {rangeBetween, linkText} = fixture(html);
+        const range = rangeBetween(linkText(0), linkText(3));
+        expect(shouldIgnoreSelection(range, true)).toBe(true);
+        expect(shouldIgnoreSelection(range)).toBe(true);
+    });
+
+    it.each([
+        '<svg aria-hidden="true" role="button"><path d="M0 0"></path></svg>',
+        '<svg aria-hidden="true" data-fluent-read-ui="true"><path d="M0 0"></path></svg>',
+        '<svg aria-hidden="true" class="notranslate"><path d="M0 0"></path></svg>',
+        '<svg aria-hidden="true" translate="no"><path d="M0 0"></path></svg>',
+    ])('keeps textless interactive or protected decorations excluded: %s', html => {
+        const {rangeBetween, linkText} = fixture(html);
+        expect(shouldIgnoreSelection(rangeBetween(linkText(0), linkText(3)), true)).toBe(true);
+    });
+
+    it.each([
+        '<svg aria-hidden="true" role="img"><path d="M0 0"></path></svg>',
+        '<svg aria-hidden="true" role="presentation"><path d="M0 0"></path></svg>',
+        '<img aria-hidden="true" alt="decorative">',
+        '<picture aria-hidden="true"><img alt="decorative"></picture>',
+    ])('allows textless decorations with noninteractive semantics: %s', html => {
+        const {rangeBetween, linkText} = fixture(html);
+        expect(shouldIgnoreSelection(rangeBetween(linkText(0), linkText(3)), true)).toBe(false);
+    });
+
+    it.each([
+        '<iframe title="embedded"></iframe>',
+        '<input value="typed">',
+        '<select><option>Chosen</option></select>',
+        '<span role="textbox"></span>',
+        '<svg aria-hidden="true" role="graphics-symbol"><path d="M0 0"></path></svg>',
+        '<svg aria-hidden="true" contenteditable="true"><path d="M0 0"></path></svg>',
+    ])('keeps textless native controls and protected decorations excluded: %s', html => {
+        const {rangeBetween, linkText} = fixture(html);
+        expect(shouldIgnoreSelection(rangeBetween(linkText(0), linkText(3)), true)).toBe(true);
+    });
+
+    it('rejects a selection that mixes decorations with actively selected protected text', () => {
+        const {rangeBetween, linkText} = fixture('<button>Run action</button><svg aria-hidden="true"><path d="M0 0"></path></svg>');
+        expect(shouldIgnoreSelection(rangeBetween(linkText(0), linkText(3)), true)).toBe(true);
+    });
+
+    it('keeps the conservative endpoint rule when a boundary sits inside a decoration', () => {
+        const {document, rangeBetween, linkText} = fixture('<span id="decoration"><svg aria-hidden="true"><path d="M0 0"></path></svg></span>');
+        const path = document.querySelector('#decoration path')!;
+        expect(shouldIgnoreSelection(rangeBetween(path, linkText(3)), true)).toBe(true);
+    });
+
+    it('keeps single-node and same-item ranges unchanged', () => {
+        const {document, links, rangeBetween, linkText} = fixture();
+        const titleText = document.querySelector('#title')!.firstChild!;
+        expect(shouldIgnoreSelection(mockRange(titleText, titleText, {commonAncestor: titleText}), true)).toBe(false);
+        expect(shouldIgnoreSelection(mockRange(linkText(0), linkText(0), {commonAncestor: linkText(0)}), true)).toBe(false);
+        const body = links[0].parentElement!;
+        const dateText = body.querySelector('relative-time')!.firstChild!;
+        expect(shouldIgnoreSelection(rangeBetween(dateText, linkText(0), body), true)).toBe(false);
+    });
+});
+
 describe('selection translator core geometry', () => {
     const rects = [
         { top: 100, right: 300, bottom: 124, left: 80, width: 220, height: 24 },

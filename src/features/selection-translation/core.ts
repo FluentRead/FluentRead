@@ -1,7 +1,7 @@
 /**
  * @file src/features/selection-translation/core.ts
  * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点和语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除（放行无文字装饰图标）及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
 import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
@@ -503,8 +503,29 @@ function hasNonZeroClientRect(element: Element): boolean {
 }
 
 /**
+ * 无文字的装饰图标（如列表项前的 svg[aria-hidden] octicon）不贡献选区文本，跨标签选区
+ * 经过它们时不应整段拒绝。豁免只适用于不含任何文字、非交互、非可编辑、未显式禁译的
+ * 替换元素；按钮、输入框、扩展自身 UI 与带文字的隐藏内容仍由原有规则保护。
+ */
+const selectionTextlessDecorationSelector = 'svg,img,picture,canvas,video,audio,[aria-hidden="true"]';
+const selectionHardProtectedSelector = [
+    'button', 'input', 'select', 'textarea', 'option', 'iframe', 'object', 'embed', 'template', 'math',
+    '[contenteditable]', '[data-fluent-read-ui]',
+    '.fluent-read-bilingual-content', '.fluent-read-loading', '.fluent-read-retry-wrapper',
+    '.notranslate', '[translate="no"]', '[data-notranslate="true"]',
+].join(',');
+
+function isTextlessDecorationSelectionElement(element: Element): boolean {
+    if (!element.matches(selectionTextlessDecorationSelector) || element.textContent?.trim()) return false;
+    if (element.matches(selectionHardProtectedSelector) || (element as HTMLElement).isContentEditable) return false;
+    const role = element.getAttribute('role')?.trim().toLowerCase() ?? '';
+    return !role || role === 'img' || role === 'presentation' || role === 'none';
+}
+
+/**
  * 划词翻译处理用户主动选中的正文与代码文字，不处理交互控件；显式启用编辑区时只放行
- * 完整位于同一宿主内的选区。这里同时检查选区两端与实时 DOM 中相交且具有可见几何的排除元素。
+ * 完整位于同一宿主内的选区。这里同时检查选区两端与实时 DOM 中相交且具有可见几何的排除元素，
+ * 但放行选区内部无文字的纯装饰元素，避免一个可见图标否决跨标签的整段正文。
  */
 export function shouldIgnoreSelection(range: Range, allowEditableSelection = false): boolean {
     const editableRoot = allowEditableSelection ? getSharedEditableSelectionRoot(range) : null;
@@ -525,6 +546,7 @@ export function shouldIgnoreSelection(range: Range, allowEditableSelection = fal
                     !isSelectionNonMarkerExcluded(element, editableRoot)) continue;
                 if (!isSelectionExcludedElement(element, editableRoot)) continue;
                 if (isInlineSelectionFormulaPart(element)) continue;
+                if (isTextlessDecorationSelectionElement(element)) continue;
                 if (range.intersectsNode(element) && hasNonZeroClientRect(element)) return true;
             } catch {
                 // 单个失效节点不能阻止后续仍有效的受保护内容被识别。

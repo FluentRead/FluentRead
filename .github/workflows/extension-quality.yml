@@ -62,6 +62,10 @@ jobs:
       - name: Install audit tools
         run: |
           if ! command -v rg >/dev/null 2>&1; then
+            # The runner's Azure mirror can fail DNS resolution; keep Ubuntu's signed archive as the source.
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              printf '%s\n' 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt >/dev/null
+            fi
             sudo apt-get update
             sudo apt-get install --yes --no-install-recommends ripgrep
           fi

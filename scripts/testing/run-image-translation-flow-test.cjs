@@ -28,6 +28,7 @@ const diagnostics = diagnosticsHelper && require(path.resolve(diagnosticsHelper)
 const xLightbox = process.argv.includes('--x-lightbox');
 const xSurface = process.argv.includes('--x-surface') || xLightbox;
 const recoveryOnly = process.argv.includes('--recovery-only');
+const transformedImages = process.argv.includes('--transformed-images');
 const liveTranslation = process.argv.includes('--live-translation');
 const multilingual = process.argv.includes('--multilingual');
 const harFixture = process.argv.includes('--har-fixture');
@@ -40,6 +41,8 @@ if (unchangedFixture && liveTranslation) throw new Error('--unchanged-fixture re
 const paragraphImage = arg('paragraph-image', null);
 const denseParagraphs = process.argv.includes('--dense-paragraphs');
 const manyLineTranslation = process.argv.includes('--many-line-translation');
+if (transformedImages && (xSurface || recoveryOnly || liveTranslation || multilingual || harFixture || unchangedFixture || paragraphImage || denseParagraphs))
+    throw new Error('--transformed-images requires the standard deterministic image fixture');
 if (manyLineTranslation && (!denseParagraphs || liveTranslation))
     throw new Error('--many-line-translation requires --dense-paragraphs and deterministic transport');
 if (!playwrightRoot || !focusHelper)
@@ -216,6 +219,146 @@ function assertGeometry(snapshot) {
     assertRectClose(snapshot.bitmapVisible, snapshot.sourceVisible, 'visible image');
     assert.deepEqual(snapshot.bitmap.intrinsic, snapshot.source.intrinsic);
     assert.equal(snapshot.bitmapIdentity, 'retained');
+}
+
+/** 直接比较浏览器排版后的四角，旋转或透视时不能用轴对齐外接矩形代替。 */
+async function readNativeImageBoxes() {
+    const tree = await cdp.send('DOM.getDocument', {depth: -1, pierce: true});
+    let source, bitmap;
+    function visit(node) {
+        const attributes = Object.fromEntries(Array.from({length: (node.attributes || []).length / 2},
+            (_, i) => [node.attributes[i * 2], node.attributes[i * 2 + 1]]));
+        if (attributes.id === 'sample') source = node;
+        if ((attributes.class || '').split(/\s+/).includes('fluent-read-image-translation-bitmap')) bitmap = node;
+        for (const child of [...(node.children || []), ...(node.shadowRoots || [])]) visit(child);
+    }
+    visit(tree.root);
+    if (!source || !bitmap) return null;
+    const boxes = await Promise.all([source, bitmap].map(node => cdp.send('DOM.getBoxModel', {backendNodeId: node.backendNodeId})));
+    return {source: boxes[0].model, bitmap: boxes[1].model, bitmapNode: bitmap.backendNodeId};
+}
+
+async function verifyTransformedImages({worker, ui, wait, shot}) {
+    const requestsBefore = await worker.evaluate(() => globalThis.__imageFixture.requests.length);
+    const initial = await readNativeImageBoxes();
+    const cases = [
+        {name: 'own-rotation', image: {transform: 'rotate(9deg)', transformOrigin: '25% 70%'}},
+        {name: 'own-scale-skew', image: {transform: 'scale(.83, .91) skewX(12deg)'}},
+        {name: 'independent-transforms', image: {rotate: '-7deg', scale: '.82 .93', translate: '18px -9px'}},
+        {name: 'ancestor-transform', card: {transform: 'rotate(-6deg) scale(.9)', transformOrigin: '15% 40%'}},
+        {name: 'combined-transforms', card: {transform: 'scale(.85) rotate(-4deg)'}, image: {transform: 'rotate(11deg)'}},
+        {name: 'ancestor-perspective', card: {perspective: '800px'}, image: {transform: 'rotateY(22deg) rotateX(8deg)'}},
+        {name: 'fractional-box', image: {width: '601.375px', height: '323.625px', transform: 'rotate(4deg)'}},
+        {name: 'transformed-scroll-clip', card: {transform: 'rotate(-3deg)', width: '470px', height: '230px', overflow: 'auto'}, scroll: true},
+        {name: 'own-transform-content-box', image: {transform: 'rotate(7deg) scale(.9)', transformBox: 'content-box', transformOrigin: '30% 70%'}},
+        {name: 'content-box-pixel-origin', image: {transform: 'rotate(-5deg)', transformBox: 'content-box', transformOrigin: '50px 70px'}},
+        {name: 'mirrored-image', image: {transform: 'scaleX(-1) rotate(5deg)'}},
+        {name: 'ancestor-zoom', card: {zoom: '.85'}, image: {transform: 'rotate(4deg)'}},
+        {name: 'own-zoom', image: {zoom: '.9', transform: 'rotate(3deg)'}},
+        {name: 'rotated-image-under-menu', image: {transform: 'rotate(7deg)'}, cover: true},
+        {name: 'fixed-positive-scale', image: {position:'fixed', left:'80px', top:'230px', transform:'translate(12px, 8px) scale(.9)'}},
+        {name: 'fixed-transform-reader-fallback', image: {position:'fixed', left:'80px', top:'230px', transform:'rotate(5deg)'}, fallback:true},
+        {name: 'back-to-normal'},
+    ];
+    const failures = [];
+    report.transformedImages = [];
+    const originals = await page.evaluate(() => ['#sample', '.card'].map(selector => {
+        const node = document.querySelector(selector);
+        return {selector, css: [...node.style].filter(name => !['opacity', 'transition', 'transition-property'].includes(name))
+            .map(name => [name, node.style.getPropertyValue(name), node.style.getPropertyPriority(name)])};
+    }));
+    try {
+        for (const fixture of cases) {
+            currentCase = `native image corners: ${fixture.name}`;
+            await page.evaluate(({fixture, originals}) => {
+                for (const {selector, css} of originals) {
+                    const node = document.querySelector(selector);
+                    for (const name of [...node.style]) if (!['opacity', 'transition', 'transition-property'].includes(name)) node.style.removeProperty(name);
+                    for (const [name, value, priority] of css) node.style.setProperty(name, value, priority);
+                }
+                const image = document.querySelector('#sample'), card = document.querySelector('.card');
+                document.querySelector('#transform-cover')?.remove();
+                Object.assign(image.style, {width:'620px', height:'340px', boxSizing:'content-box', padding:'9px 16px 21px 28px',
+                    border:'5px solid #637fad', objectFit:'cover', objectPosition:'30% 65%', ...fixture.image});
+                Object.assign(card.style, fixture.card || {});
+                card.scrollLeft = fixture.scroll ? 48 : 0; card.scrollTop = fixture.scroll ? 31 : 0;
+                window.scrollTo(0, 0);
+                if (fixture.cover) {
+                    const rect = image.getBoundingClientRect(), cover = document.createElement('div');
+                    cover.id = 'transform-cover';
+                    cover.style.cssText = `position:fixed;z-index:100;background:rgb(11,22,33);width:90px;height:70px;left:${rect.x+rect.width/2-45}px;top:${rect.y+rect.height/2-35}px`;
+                    document.body.append(cover);
+                }
+            }, {fixture, originals});
+            let snapshot, failure;
+            await wait(async () => {
+                try {
+                    if (fixture.fallback) {
+                        assert.equal(await page.locator('#sample').evaluate(node => getComputedStyle(node).opacity), '1');
+                        const fallback = await ui(`const bitmap=(paintRoot||this).querySelector('.fluent-read-image-translation-bitmap');const warning=this.querySelector('.fr-image-warning-button');return {hidden:bitmap&&getComputedStyle(bitmap).visibility==='hidden',retained:bitmap?.dataset.probeIdentity==='retained',warning:warning&&!warning.hidden&&warning.getClientRects().length>0&&warning.title.includes('当前布局无法覆盖')};`, true);
+                        assert.deepEqual(fallback, {hidden:true, retained:true, warning:true});
+                        return true;
+                    }
+                    snapshot = await readNativeImageBoxes();
+                    assert.ok(snapshot);
+                    assert.equal(snapshot.bitmapNode, initial.bitmapNode, 'CSS 改变必须复用同一译图');
+                    for (const box of ['border', 'padding', 'content']) for (let i = 0; i < 8; i++)
+                        assert.ok(Math.abs(snapshot.source[box][i] - snapshot.bitmap[box][i]) <= 0.75,
+                            `${box}[${i}]: source=${snapshot.source[box][i]}, bitmap=${snapshot.bitmap[box][i]}`);
+                    assert.equal(await page.locator('#sample').evaluate(node => getComputedStyle(node).opacity), '0');
+                    return true;
+                } catch (error) { failure = error.message; return false; }
+            }, 1800).catch(() => failures.push({name:fixture.name, failure}));
+            const layout = await page.evaluate(() => {
+                const read = node => {
+                    if (!node) return null;
+                    const style = getComputedStyle(node), rect = node.getBoundingClientRect();
+                    return {rect:rect.toJSON(), offsetParent:node.offsetParent?.tagName, offsetLeft:node.offsetLeft, offsetTop:node.offsetTop,
+                        width:style.width, height:style.height, boxSizing:style.boxSizing, transform:style.transform,
+                        transformOrigin:style.transformOrigin, transformBox:style.transformBox, css:node.style.cssText};
+                };
+                return {source:read(document.querySelector('#sample')), host:read(document.querySelector('[data-fluent-read-ui="image-translation-bitmap"]'))};
+            });
+            const idleStyleWrites = await page.evaluate(async () => {
+                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                const host = document.querySelector('[data-fluent-read-ui="image-translation-bitmap"]');
+                if (!host) return 0;
+                let count = 0;
+                const observer = new MutationObserver(records => {count += records.length;});
+                observer.observe(host, {attributes:true, attributeFilter:['style']});
+                await new Promise(resolve => setTimeout(resolve, 250)); observer.disconnect(); return count;
+            });
+            assert.equal(idleStyleWrites, 0, '稳定布局不能持续改写样式并触发下一帧');
+            report.transformedImages.push({name:fixture.name, snapshot, layout, idleStyleWrites, failure: failures.at(-1)?.name === fixture.name ? failure : undefined});
+            if (fixture.cover) {
+                const png = await page.screenshot();
+                const pixel = await page.evaluate(async data => {
+                    const image = new Image(); image.src = data; await image.decode();
+                    const canvas = document.createElement('canvas'); canvas.width = image.width; canvas.height = image.height;
+                    const context = canvas.getContext('2d'); context.drawImage(image, 0, 0);
+                    const rect = document.querySelector('#transform-cover').getBoundingClientRect();
+                    return [...context.getImageData(Math.round((rect.x+rect.width/2)*image.width/innerWidth),
+                        Math.round((rect.y+rect.height/2)*image.height/innerHeight), 1, 1).data];
+                }, `data:image/png;base64,${png.toString('base64')}`);
+                assert.deepEqual(pixel, [11,22,33,255], '译图不得盖住宿主菜单的真实像素');
+                report.transformedImages.at(-1).foregroundPixel = pixel;
+            }
+            await shot(`native-corners-${fixture.name}`);
+        }
+        assert.equal(await worker.evaluate(() => globalThis.__imageFixture.requests.length), requestsBefore);
+        assert.deepEqual(failures, [], '真实浏览器译图四角必须与原图一致');
+        report.cases.push(`${cases.filter(item => !item.fallback).length} image border/padding/content quads match; fixed transform preserves the original and reader; no extra OCR or translation`);
+    } finally {
+        await page.evaluate(originals => {
+            document.querySelector('#transform-cover')?.remove();
+            for (const {selector, css} of originals) {
+                const node = document.querySelector(selector);
+                for (const name of [...node.style]) if (!['opacity', 'transition', 'transition-property'].includes(name)) node.style.removeProperty(name);
+                for (const [name, value, priority] of css) node.style.setProperty(name, value, priority);
+                node.scrollLeft = 0; node.scrollTop = 0;
+            }
+        }, originals);
+    }
 }
 
 async function verifyGeometryCases({worker, ui, wait, shot}) {
@@ -1068,6 +1211,11 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     }
     await wait(() => ui("return this.querySelectorAll('.fr-image-controls').length === 1"));
     await verifyGeometryCases({worker, ui, wait, shot});
+    if (transformedImages) {
+        await verifyTransformedImages({worker, ui, wait, shot});
+        report.success = true;
+        return;
+    }
     currentCase = 'dynamic source, cancellation and retry';
     await popup.evaluate(async () => {
         const read = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});

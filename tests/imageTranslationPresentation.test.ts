@@ -87,6 +87,17 @@ describe('image presentation foreground ownership', () => {
         expect(isImagePresentationOccluded(image, visible, null)).toBe(false);
     });
 
+    it('skips empty corners of a transformed bounding box only after a native source hit', () => {
+        const {image, document} = fixture(), outside = document.createElement('p'), cover = document.createElement('div');
+        Object.assign(document, {elementsFromPoint: (x: number) => x === 220 ? [image] : [outside]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(false);
+        expect(isImagePresentationOccluded(image, visible, null)).toBe(true);
+        Object.assign(document, {elementsFromPoint: (x: number) => x === 220 ? [cover, image] : [outside]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(true);
+        Object.assign(document, {elementsFromPoint: () => [cover]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(true);
+    });
+
     it('keeps a background surface visible under its own transparent source img, including during translation', () => {
         const env = fixture({opacity: '0', background: 'url("https://pbs.twimg.com/media/source.png")'});
         Object.assign(env.document, {elementsFromPoint: () => [env.image, env.paint]});

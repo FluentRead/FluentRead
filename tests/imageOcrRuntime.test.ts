@@ -32,6 +32,20 @@ describe('图片 OCR 处理与结果缓存', () => {
     let context: {drawImage: Mock; getImageData: Mock; putImageData: Mock; fillRect: Mock; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
 
+    it('缓存命中的竖排列框与每个调用独立，外部修改不能污染后续清字范围',async()=>{
+        const boxes=[{x0:54,y0:20,x1:68,y1:80},{x0:28,y0:20,x1:42,y1:80}];
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:boxes.map((bbox,i)=>({text:i?'左列':'右列',bbox,
+            baseline:{x0:bbox.x0,y0:20,x1:bbox.x0,y1:80}}))}]}]}});
+        const first=await recognizeImage('vertical-cache','ja');
+        expect(first[0].sourceBoxes).toEqual(boxes);
+        first[0].sourceBoxes![0].x0=-100;
+        const second=await recognizeImage('vertical-cache','ja');
+        expect(second[0].sourceBoxes).toEqual(boxes);
+        second[0].sourceBoxes!.pop();
+        expect((await recognizeImage('vertical-cache','ja'))[0].sourceBoxes).toEqual(boxes);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
     it.each(['invalid','too-many'] as const)('只读圈选忽略 %s 的低分数字噪声，正常返回正文',async problem=>{
         const word={text:'HELLO',bbox:{x0:30,y0:30,x1:90,y1:50},confidence:99};
         const noisy=problem==='invalid'?[{text:'90%',bbox:{x0:NaN,y0:20,x1:30,y1:30},confidence:20}]

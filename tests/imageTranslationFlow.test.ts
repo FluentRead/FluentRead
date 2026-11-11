@@ -21,6 +21,35 @@ function setup(extra = {}) {
     const handlers=createImageTranslationBackgroundHandlers(dependencies);
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
+
+it('单段翻译携带相邻原文参考，保留已是目标语言的标题且不混入待译正文', async () => {
+    const current = setup({getGlossaryConfig: () => ({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
+    const texts = ['银行服务', 'Account', 'Close', 'Your account will be closed.', 'Contact support', 'Unrelated footer'];
+    const response = await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Bank settings'});
+    expect(response).toMatchObject({success:true});
+    const requests = current.dependencies.translateTexts.mock.calls.map(call => call[0]) as unknown as Array<{origin:string;context:string;pageContext:string}>;
+    const close = requests.find(request => request.origin === 'Close')!;
+    expect(close.context).toBe('Bank settings\nOther text from the same image (reference only):\n银行服务\nAccount\nYour account will be closed.\nContact support');
+    expect(close.pageContext).toBe('');
+    expect(requests.some(request => request.origin === '银行服务')).toBe(false);
+    expect(close.context).not.toContain('Unrelated footer');
+});
+
+it('图片上下文限制为四个邻段和标题，批译不重复附送整图正文', async () => {
+    const current = setup();
+    const texts = Array.from({length:8},(_,index)=>`Sentence ${index}: `+'word '.repeat(600));
+    await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'T'.repeat(1000)});
+    for (const [request] of current.dependencies.translateTexts.mock.calls as unknown as Array<[{context:string}]>) {
+        expect(request.context.length).toBeLessThanOrEqual(2300);
+        expect(request.context.startsWith('T'.repeat(320)+'\n')).toBe(true);
+    }
+    const batch = setup({supportsBatchTranslation:()=>true,translateTexts:vi.fn(async(request:{origin:string[]})=>request.origin.map(text=>'译:'+text))});
+    await batch.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['One','Two'],title:'Title'});
+    expect(batch.dependencies.translateTexts).toHaveBeenCalledWith(expect.objectContaining({origin:['One','Two'],context:'Title'}));
+    const single = setup();
+    await single.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['One'],title:''});
+    expect(single.dependencies.translateTexts).toHaveBeenCalledWith(expect.objectContaining({origin:'One',context:''}));
+});
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();

@@ -1,5 +1,6 @@
 /**
  * @file src/features/image-translation/services/mangaViewWordBoundary.ts
+ * 布局交接：实际采用且唯一对应的区域额外保存原局部对象身份；段落消费者复核当前快照和仅空格变化后复用原几何，克隆区域没有此身份。
  * 文件职责：以本页原像素核对两个已识别拉丁字行的空格边界，避免可靠局部视图无条件覆盖另一视图中受物理支持的边界。
  * 主要内容：限制同字符、高重叠横行与页级六十四次/两百万像素预算，借用有界原 ROI；仅不透明近灰墨浅底、低两层完整稳定字形及显著间隙可选择既有候选；高层抗锯齿仅可连合至多两像素的词内间隔，并须保留词隙与字符索引；证明绑定本页原对象、完整快照、尺寸和 ROI，局部候选原样胜出时复用其原对象以保留同帧布局证明，采用整页候选时保留局部几何并复制所选原文与置信度；实际去重采用后才确认选中对象，并在分组输入与输出源框唯一对应时用内部 WeakMap 保存双视图来历。
  * 模块边界：不运行模型、不修改字符、不合成第三种空格文本、不访问 Canvas；reader 由当前原图 owner 提供，未知纹理、无法核对字符归属的字形连接、多墨色、透明或失配均不提供证明。物理间隙不能保证语义词界，不能将证明作为字形擦除蒙版或通用语言分词。
@@ -18,6 +19,7 @@ export interface MangaViewWordBoundaryProof {
 export interface MangaViewWordBoundaryProvenance {whole:Snapshot;local:Snapshot;textView:'whole'|'local';geometryView:'local'}
 const VERSION='manga-view-word-boundary-v1',MAX_PAIRS=64,MAX_PIXELS=2_000_000,MAX_ROI=65_536;
 const provenance=new WeakMap<object,readonly MangaViewWordBoundaryProvenance[]>();
+const geometrySources=new WeakMap<object,MangaViewWordBoundaryProof>();
 function snapshot(item:MangaOcrItem):Snapshot {return{text:item.text,confidence:item.confidence,box:{...item.box}};}
 function same(a:Snapshot,b:Snapshot):boolean {return a.text===b.text&&a.confidence===b.confidence&&['x','y','width','height'].every(key=>a.box[key as keyof Snapshot['box']]===b.box[key as keyof Snapshot['box']]);}
 function texts(whole:unknown,local:unknown):{letters:string;whole:number[];local:number[]}|undefined {
@@ -145,7 +147,7 @@ export function createMangaViewWordBoundaryConsumer(wholeItems:MangaOcrItem[],bu
         for(const item of sourceItems){const key=itemKey(item);sources.set(key,sources.has(key)?null:item);}
         for(const region of regions)for(const box of region.sourceBoxes??[region.bbox]){const key=boxKey(box);outputs.set(key,(outputs.get(key)??0)+1);}
         for(const region of regions){
-            const matches:MangaViewWordBoundaryProof[]=[];provenance.delete(region);
+            const matches:MangaViewWordBoundaryProof[]=[];provenance.delete(region);geometrySources.delete(region);
             for(const box of region.sourceBoxes??[region.bbox]){
                 const key=boxKey(box),item=sources.get(key);if(!item||acceptedSources.get(key)!==item)continue;
                 const proof=adopted.get(item);
@@ -155,9 +157,15 @@ export function createMangaViewWordBoundaryConsumer(wholeItems:MangaOcrItem[],bu
                 matches.push(proof);
             }
             if(matches.length)provenance.set(region,matches.map(proof=>({whole:proof.wholeSnapshot,local:proof.localSnapshot,textView:proof.preferred,geometryView:'local'})));
+            if(matches.length===1)geometrySources.set(region,matches[0]);
         }
         return regions;
     }};
 }
 /** 内部可核验来历不作为区域属性序列化，也不进入用户阅读面板。 */
 export function getMangaViewWordBoundaryProvenance(region:object):readonly MangaViewWordBoundaryProvenance[]|undefined {return provenance.get(region);}
+/** 仅当前已采用区域可交还原始局部对象身份，不能从同框或克隆区域推断。 */
+export function getMangaViewWordBoundaryGeometrySource(region:object):MangaOcrItem|undefined {
+    const proof=geometrySources.get(region);
+    return proof&&same(proof.wholeSnapshot,proof.whole)&&same(proof.localSnapshot,proof.local)?proof.local:undefined;
+}

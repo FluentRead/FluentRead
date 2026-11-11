@@ -21,7 +21,7 @@ import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import {createImageTextSegmentationInput,createImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
 import { recognizeImage } from './ocrRuntime';
-import { getImageTextBackgroundColor, drawTranslatedImageText,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import { getImageTextBackgroundColor, drawTranslatedImageText,getImageTextDirection,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
 import {mangaOcrRuntime} from './mangaOcr';
 import {createMangaBlankLayoutBudget, drawMangaTranslations, planMangaBlankTranslation, sampleMangaBackgrounds} from './mangaRendering';
@@ -253,6 +253,7 @@ function prepareImageAlphaTextLayout(context:CanvasRenderingContext2D,text:strin
     const contentWidth=width-paddingX*2,contentHeight=height-paddingY*2;
     context.save();
     try {
+        context.direction=getImageTextDirection(text);
         // 词拆分及每次原生度量均预付UTF-16工作量，不能以巨长译文绕过调用次数上限。
         if(budget&&(--budget.remaining<0||(budget.characters-=text.length)<0))throw new MangaAlphaProtectionLimitError();
         const layout=layoutImageTranslationText(text,contentWidth,contentHeight,(line,size)=>{

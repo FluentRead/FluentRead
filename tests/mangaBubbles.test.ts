@@ -1,7 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {findMangaBubbles,findMangaBubbleLayout,assignMangaLayoutBubbles,collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
 import {bindImageParagraphGapEvidence,getImageParagraphGapEvidence,produceImageParagraphGapProofs} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
-import {createMangaViewWordBoundaryBudget} from '@/src/features/image-translation/services/mangaViewWordBoundary';
+import {createMangaViewWordBoundaryBudget,getMangaViewWordBoundaryGeometrySource} from '@/src/features/image-translation/services/mangaViewWordBoundary';
 import {normalizeMangaSourceText} from '@/src/features/image-translation/services/mangaRegions';
 const image=(w:number,h:number)=>new Uint8ClampedArray(w*h*4);
 function rect(p:Uint8ClampedArray,w:number,x:number,y:number,width:number,height:number,color=[255,255,255,255]){for(let yy=y;yy<y+height;yy++)for(let xx=x;xx<x+width;xx++)p.set(color,(yy*w+xx)*4);}
@@ -38,7 +38,7 @@ describe('实际普通图片物理行的段落证明采用',()=>{
         }
     });
     it('漫画只按同帧静区证明合并整页远距物理行，并保留每个真实修补框',()=>{
-        const f=fixture(),separate=text('Separate caption',145,130,45,12),page={results:[f.first,f.second,separate]},before=structuredClone(page.results);
+        const f=fixture(),separate=text('Separate',145,130,45,12),continuation=text('caption',145,145,45,12),page={results:[f.first,f.second,separate,continuation]},before=structuredClone(page.results);
         const proofs=produceImageParagraphGapProofs(page,f.width,f.height,f.pixels);
         expect(proofs).toHaveLength(1);
         expect(collectMangaRegions({...page,imageParagraphGapProofs:proofs},'en',f.width,f.height,'manga')).toHaveLength(3);
@@ -47,13 +47,13 @@ describe('实际普通图片物理行的段落证明采用',()=>{
         expect(regions[0]).toMatchObject({text:'First complete line Second complete line',sourceBoxes:[
             {x0:40,y0:40,x1:130,y1:54},{x0:40,y0:74,x1:130,y1:88},
         ]});
-        expect(regions[1]).toMatchObject({text:'Separate caption',sourceBoxes:[{x0:145,y0:130,x1:190,y1:142}]});
+        expect(regions[1]).toMatchObject({text:'Separate caption',sourceBoxes:[{x0:145,y0:130,x1:190,y1:142},{x0:145,y0:145,x1:190,y1:157}]});
         const invalid=proofs.map(proof=>({...proof,previousSnapshot:{...proof.previousSnapshot,text:'stale source'}}));
         const unchanged=collectMangaRegions({...page,imageParagraphGapProofs:invalid},'en',f.width,f.height,'manga','same-source-image');
         expect(unchanged).toHaveLength(3);expect(unchanged.map(region=>region.text)).toEqual(['First complete line','Second complete line','Separate caption']);
         expect(page.results).toEqual(before);
     });
-    it('词界选择产生的新物理行保留原文，却不继承原始端点的间距许可',()=>{
+    it('已验证词界只在原局部对象和同一物理框仍有效时衔接段落',()=>{
         const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height);
         const first=text('AB CD',40,40,33,18),local={...first,text:'ABCD',box:{...first.box}},second=text('Next line',40,80,33,18);
         let x=42;for(const gap of [2,9,2,0]){rect(pixels,width,x,43,4,12,[20,20,20,255]);x+=4+gap;}
@@ -68,7 +68,11 @@ describe('实际普通图片物理行的段落证明采用',()=>{
         const adopted=collectMangaRegions({...page,imageParagraphGapProofs:gaps,wordBoundaryProofs:[words]},'en',width,height,'image');
         expect(adopted.map(region=>region.text)).toEqual(['AB CD','Next line']);
         bindImageParagraphGapEvidence(adopted,'same',width,height);
-        expect(getImageParagraphGapEvidence(adopted,'same',width,height)).toBeUndefined();
+        expect(getImageParagraphGapEvidence(adopted,'same',width,height)?.successor(adopted[0])).toBe(adopted[1]);
+        expect(getMangaViewWordBoundaryGeometrySource(adopted[0])).toBe(local);
+        expect(getMangaViewWordBoundaryGeometrySource({...adopted[0]})).toBeUndefined();
+        first.text='changed';expect(getMangaViewWordBoundaryGeometrySource(adopted[0])).toBeUndefined();
+        first.text='AB CD';local.text='changed';expect(getMangaViewWordBoundaryGeometrySource(adopted[0])).toBeUndefined();
     });
 });
 

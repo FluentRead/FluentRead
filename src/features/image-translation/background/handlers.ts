@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
+ * 同图语境：逐段请求最多附带前后各两段识别原文，作为既有不可信参考上下文；正文、顺序、取消与批译协议不变，不增加摘要调用。
  * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
  * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
@@ -261,7 +262,8 @@ export function createImageOperationRegistry(legacyPrefix = 'image'): ImageOpera
                 });
             } finally {
                 clearTimeout(timer);
-                if (activeOperations.get(requestId) === controller) activeOperations.delete(requestId);
+                // 同ID在此槽释放前一律拒绝重入；取消只abort，不会提前删除或转授所有权。
+                activeOperations.delete(requestId);
             }
         },
         cancel(requestIdValue) {
@@ -300,6 +302,15 @@ function parseObjectResult(value: unknown, operation: string): Record<string, un
 
 function getErrorMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/** 单段供应商保留同图相邻段落作为有界参考；不拼入待译正文，也不触发额外摘要请求。 */
+function imageTextContext(texts: string[], text: string, title: string): string {
+    const index = texts.indexOf(text);
+    const nearby = texts.slice(Math.max(0, index - 2), index + 3)
+        .filter(value => value !== text).map(value => value.slice(0, 480));
+    if (!nearby.length) return title;
+    return [title.slice(0, 320), 'Other text from the same image (reference only):', ...nearby].filter(Boolean).join('\n');
 }
 
 async function translateImageTexts(
@@ -390,6 +401,7 @@ async function translateImageTexts(
                     try {
                         const translation = await dependencies.translateTexts(controlledRequest({
                             ...baseRequest, origin: uniqueTexts[index], requestTimeoutMs: remainingBudget(),
+                            context: imageTextContext(texts, uniqueTexts[index], title),
                             ...(useImageDetectionText && identifyTextLanguage(uniqueTexts[index]).status === 'unknown'
                                 ? {sourceLanguageDetectionText: imageDetectionText} : {}),
                         }));

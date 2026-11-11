@@ -220,7 +220,7 @@ function assertGeometry(snapshot) {
 
 async function verifyGeometryCases({worker, ui, wait, shot}) {
     const requestsBefore = await worker.evaluate(() => globalThis.__imageFixture.requests.length);
-    const properties = ['width', 'height', 'box-sizing', 'padding', 'border', 'object-fit', 'object-position'];
+    const properties = ['width', 'height', 'box-sizing', 'padding', 'border', 'object-fit', 'object-position', 'clip-path', 'image-rendering'];
     // 只恢复本夹具修改的属性，保留图片 runtime 正在持有的 opacity 租约。
     const originalStyles = await page.locator('#sample').evaluate((image, properties) =>
         properties.map(property => [property, image.style.getPropertyValue(property), image.style.getPropertyPriority(property)]), properties);
@@ -228,6 +228,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         {name: 'contain-padding-border', fit: 'contain', position: '25% 75%'},
         {name: 'cover-padding-border', fit: 'cover', position: '70% 30%'},
         {name: 'none-padding-border', fit: 'none', position: '25% 75%'},
+        {name: 'image-shape-pixelated', fit: 'contain', position: '50% 50%', shape: 'inset(5% round 36px)'},
         {name: 'ancestor-clipping', fit: 'cover', position: '50% 50%', clipped: true},
         {name: 'ancestor-scroll-clipping', fit: 'contain', position: '50% 50%', clipped: true, scroll: true},
     ];
@@ -240,6 +241,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
                     width: '620px', height: '390px', boxSizing: 'content-box',
                     padding: '12px 18px 24px 30px', border: '6px solid #637fad',
                     objectFit: fixture.fit, objectPosition: fixture.position,
+                    clipPath: fixture.shape || 'none', imageRendering: fixture.shape ? 'pixelated' : 'auto',
                 });
                 if (fixture.clipped) {
                     let clip = document.querySelector('#geometry-clip');
@@ -264,6 +266,9 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
                 snapshot = await ui(`return (${readGeometry.toString()}).call(this)`);
                 try {
                     assertGeometry(snapshot);
+                    const appearance = await ui(`const source=getComputedStyle(document.querySelector('#sample'));const bitmap=getComputedStyle(this.querySelector('.fluent-read-image-translation-bitmap'));return {sourceClip:source.clipPath,bitmapClip:bitmap.clipPath,sourceSampling:source.imageRendering,bitmapSampling:bitmap.imageRendering};`);
+                    assert.equal(appearance.bitmapClip, appearance.sourceClip);
+                    assert.equal(appearance.bitmapSampling, appearance.sourceSampling);
                     if (fixture.clipped) {
                         assert.ok(snapshot.ancestorClipCount > 0, '祖先裁切夹具未生效');
                         assert.ok(snapshot.insets.some(value => value > 0), '译图必须发生实际裁切');

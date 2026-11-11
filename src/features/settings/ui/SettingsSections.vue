@@ -9,7 +9,7 @@
  * 多段预算：全文页使用独立紧凑组件编辑片段与字符上限，每次预算更新由父组件原子交接现有配置队列。
  * 请求数值归属：高级页的 AI 超时、重试次数、密钥恢复与退避等待共用活跃配置身份；分区、缓存状态、配置同步或卸载会同步失效旧控件回调，秒/分钟确认后交接毫秒配置，退避上下限一次提交完整快照。缓存管理表单保留实例和未保存限额，通过 active 传递高级页及缓存面板归属，离开时结束旧等待、返回时刷新统计。
  * 设置同步：Safari 仅保存权威配置，由后台通知实际 content 接收者同步功能；其他浏览器保留合并后的即时标签页广播，卸载后不继续投递。
- * 通用设置：提供工具栏图标打开面板或一键翻译的选择，脚本与邮件宿主不显示该浏览器选项。
+ * 通用设置：提供工具栏图标打开面板或一键翻译的选择，脚本与邮件宿主不显示该浏览器选项；脚本构建在编译期排除该设置组件。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内；ChatGPT 登录模块在公开构建中隐藏，旧默认或深链接只回退编辑目标，不迁移或删除用户数据；脚本入口已拦截的扩展专属分区在构建期不引入其子 UI，原入口提示与数据接口保持。
  -->
 <template>
@@ -371,7 +371,7 @@
           </template>
           <el-switch v-model="floatingBallEnabled" class="settings-toggle" :aria-label="t('settings.general.floatingBall')" />
         </SettingsItem>
-        <ToolbarClickSetting v-if="browserCapabilities.browser !== 'userscript' && browserCapabilities.browser !== 'thunderbird'" :config="config" />
+        <ToolbarClickSetting v-if="ToolbarClickSetting && browserCapabilities.browser !== 'userscript' && browserCapabilities.browser !== 'thunderbird'" :config="config" />
         <SettingsItem :label="t('settings.general.progressPanel')" :description="t('settings.general.progressPanelDescription')">
           <el-switch v-model="config.translationProgressPanelEnabled" class="settings-toggle" :aria-label="t('settings.general.progressPanel')" @change="handleTranslationProgressPanelChange" />
         </SettingsItem>
@@ -662,7 +662,7 @@ const ClickSelectionSettings = defineAsyncComponent(() => import('./ClickSelecti
 const SelectionSettings = defineAsyncComponent(() => import('./SelectionSettings.vue'));
 const GlossarySettings = defineAsyncComponent(() => import('@/src/features/glossary/public').then(module => module.GlossarySettings));
 const FloatingBallSettings = defineAsyncComponent(() => import('./FloatingBallSettings.vue'));
-const ToolbarClickSetting = defineAsyncComponent(() => import('./components/ToolbarClickSetting.vue'));
+const ToolbarClickSetting = import.meta.env.BROWSER === 'userscript' ? null : defineAsyncComponent(() => import('./components/ToolbarClickSetting.vue'));
 const SiteAdaptationSettings = defineAsyncComponent(() => import('./SiteAdaptationSettings.vue'));
 const SitePreferencesSettings = defineAsyncComponent(() => import('./SitePreferencesSettings.vue'));
 const SiteRulePreview = defineAsyncComponent(() => import('./SiteRulePreview.vue'));

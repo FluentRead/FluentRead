@@ -1,7 +1,7 @@
 /**
  * @file userscript/languageBundles.ts
  * 文件职责：构建 userscript 的中英内嵌词典并引用已发布的五种固定远程词典。
- * 主要内容：按脚本能力裁剪当前词典，包括不挂载的原生侧栏、菜单栏布局编辑提示、浏览器弹窗专有提示、视频字幕外观、不可用的本地字幕识别及漫画面板筛选文案；远程资源直接使用固定提交中的原始 JSON，构建时自动比较当前词典并生成新增与更新的稳定 key、旧文案和模板增量。增量由现有 gzip 静态资源机制携带，注册时合并，不再维护平行的手写补丁表。
+ * 主要内容：按脚本能力裁剪当前词典，包括不挂载的原生侧栏、浏览器工具栏、菜单栏布局编辑提示、浏览器弹窗专有提示、视频字幕外观、不可用的本地字幕识别及漫画面板筛选文案；远程资源直接使用固定提交中的原始 JSON，构建时自动比较当前词典并生成新增与更新的稳定 key、旧文案和模板增量。增量由现有 gzip 静态资源机制携带，注册时合并，不再维护平行的手写补丁表。
  * 发布兼容：扩展已删除的旧说明仅保留在五份已发布远程 JSON 中；中英内嵌词典使用当前扩展文案，不恢复退役说明。
  * 模块边界：只供构建期和资源验证使用；不将远程完整 JSON 打进脚本，不改扩展词典、固定文件摘要或发布提交。
  */
@@ -27,6 +27,7 @@ export function userscriptMessages<T extends Record<string, string>>(messages: T
         && !['waitingTranslation', 'crossPageContext', 'fullPassage', 'closePassage'].some(name => key === `document.pdfReading.${name}`)
         && !key.startsWith('safari.freePool.')
         && !key.startsWith('sidepanel.')
+        && !key.startsWith('toolbar.')
         && (!key.startsWith('settings.interface.popupLayout.')
             || key === 'settings.interface.popupLayout.label' || key.startsWith('settings.interface.popupLayout.modules.'))
         && key !== 'popup.donationButton' && !key.startsWith('popup.aiContext.status.') && !key.startsWith('popup.aiContext.description.')

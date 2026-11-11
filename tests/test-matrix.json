@@ -103,6 +103,7 @@
       "tests/backgroundConfigAutoBackup.test.ts",
       "tests/backgroundFeatureHandlers.test.ts",
       "tests/backgroundImageServices.test.ts",
+      "tests/imageTranslationRuntimeComposition.test.ts",
       "tests/configDomainBoundaries.test.ts",
       "tests/configHarness.test.ts",
       "tests/configAutoBackupDomain.test.ts",

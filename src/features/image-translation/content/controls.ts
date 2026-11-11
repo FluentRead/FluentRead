@@ -10,9 +10,9 @@ import {normalizeImageProgress} from '../progress';
 import brandIcon from '../../../../public/icon/32.png?inline';
 
 export type ImageControlPhase = 'idle' | 'loading' | 'translated' | 'error';
-// 沿用 ui/styles/tokens.css 的品牌、文字与表面色；在所属 Shadow UI 内声明，避免继承宿主变量。
+// 基础颜色和字体由 reader CSS 在所属 Shadow UI 内统一声明，避免重复打包及宿主变量串入。
 export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
-.fr-image-controls,.fr-image-feedback {--fr-image-brand:#dc315f;--fr-image-brand-soft:#fff0f4;--fr-image-ink:#172033;--fr-image-muted:#737c8f;--fr-image-line:#e5e8ef;--fr-image-surface:#fff;color:var(--fr-image-ink);font:13px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-sizing:border-box;}
+.fr-image-controls,.fr-image-feedback {--fr-image-muted:#737c8f;}
 .fr-image-controls {position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:auto;z-index:2;}
 .fr-image-feedback {position:absolute;left:50%;top:50%;width:max-content;display:flex;flex-direction:column;gap:8px;transform:translate(-50%,-50%);padding:12px 14px;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 8px 28px rgba(27,36,57,.12),0 2px 6px rgba(27,36,57,.04);pointer-events:none;}
 .fr-image-controls[hidden],.fr-image-feedback[hidden],.fr-image-controls [hidden],.fr-image-feedback [hidden] {display:none!important;}
@@ -21,9 +21,7 @@ export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
 .fr-image-spinner {width:12px;height:12px;flex:0 0 auto;box-sizing:border-box;border:1.5px solid #b9aab333;border-top-color:#947985;border-radius:50%;animation:fr-image-spin .75s linear infinite;}
 .fr-image-spinner[data-animated=false] {animation:none;}
 .fr-image-actions {display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:2px;border:1px solid #ffffff66;border-radius:9px;background:rgba(250,251,253,.62);backdrop-filter:blur(6px);box-shadow:0 1px 5px rgba(27,36,57,.06);}
-.fr-image-controls button,.fr-image-feedback button {all:unset;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:24px;padding:3px 7px;border-radius:6px;cursor:pointer;color:inherit;font:inherit;font-size:11px;font-weight:500;white-space:nowrap;}
-.fr-image-controls button:hover,.fr-image-feedback button:hover {background:var(--fr-image-brand-soft);color:var(--fr-image-brand);}
-.fr-image-controls button:focus-visible,.fr-image-feedback button:focus-visible {outline:2px solid var(--fr-image-brand);outline-offset:2px;}
+.fr-image-controls button,.fr-image-feedback button {min-height:24px;padding:3px 7px;font-size:11px;font-weight:500;white-space:nowrap;}
 
 .fr-image-controls .fr-image-actions {opacity:.48;transition:opacity 120ms ease,background-color 120ms ease;}
 .fr-image-controls[data-phase=idle] .fr-image-actions {opacity:.28;padding:0;border:0;background:transparent;box-shadow:none;backdrop-filter:none;}

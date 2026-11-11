@@ -54,8 +54,8 @@ const openMangaReading = (event: MouseEvent) => mangaReadingOpener?.(event) ?? f
 
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
 const IMAGE_TRANSLATION_ROOT = 'fluent-read-image-translation-root';
-const IMAGE_BITMAP_CSS = '.fluent-read-image-translation-bitmap { position: absolute !important; inset: var(--fluent-read-bitmap-inset, 0) !important; display: block !important; box-sizing: border-box !important; width: var(--fluent-read-bitmap-width, 100%) !important; height: var(--fluent-read-bitmap-height, 100%) !important; max-width: none !important; max-height: none !important; pointer-events: none !important; }';
-const imageStyleWrites = new WeakMap<CSSStyleDeclaration, Map<string, {requested: string; serialized: string; priority: string}>>();
+const IMAGE_BITMAP_CSS = '.fluent-read-image-translation-bitmap{position:absolute!important;inset:var(--fluent-read-bitmap-inset,0)!important;display:block!important;box-sizing:border-box!important;width:var(--fluent-read-bitmap-width,100%)!important;height:var(--fluent-read-bitmap-height,100%)!important;max-width:none!important;max-height:none!important;pointer-events:none!important}';
+const imageStyleWrites = new WeakMap<CSSStyleDeclaration, Map<string, [requested: string, serialized: string]>>();
 const MIN_IMAGE_WIDTH = 80;
 const MIN_IMAGE_HEIGHT = 40;
 const IMAGE_READ_TIMEOUT_MS = 15_000;
@@ -703,11 +703,6 @@ function imageBoxMatches(box: DOMRect, rect: DOMRect): boolean {
         && Math.abs(box.width - rect.width) <= 0.5 && Math.abs(box.height - rect.height) <= 0.5;
 }
 
-function sharesBitmapBox(host: HTMLElement, parent: HTMLElement, offsetParent: Element | null, rect: DOMRect): boolean {
-    if (host.parentElement !== parent || host.offsetParent !== offsetParent) return false;
-    return imageBoxMatches(host.getBoundingClientRect(), rect);
-}
-
 function updateImageStyle(style: CSSStyleDeclaration, property: string, value: string, priority = ''): void {
     value ??= '';
     const current = style.getPropertyValue(property) || '', currentPriority = style.getPropertyPriority?.(property) || '';
@@ -715,11 +710,11 @@ function updateImageStyle(style: CSSStyleDeclaration, property: string, value: s
     const previous = imageStyleWrites.get(style)?.get(property);
     // 浏览器会折叠 calc 和截断 CSS 小数；不把规范化结果误认为宿主改写，避免
     // 自有 style mutation 反复安排下一帧。宿主真正改写值或优先级时仍重新应用。
-    if (previous?.requested === value && previous.serialized === current && previous.priority === priority && currentPriority === priority) return;
+    if (previous?.[0] === value && previous[1] === current && currentPriority === priority) return;
     style.setProperty(property, value, priority);
     let writes = imageStyleWrites.get(style);
     if (!writes) imageStyleWrites.set(style, writes = new Map());
-    writes.set(property, {requested: value, serialized: style.getPropertyValue(property) || '', priority});
+    writes.set(property, [value, style.getPropertyValue(property) || '']);
 }
 
 function hasImageLayoutTransform(style: CSSStyleDeclaration): boolean {
@@ -746,29 +741,30 @@ function imageBorderWidth(value: string, scale: number, local: boolean): string 
     const width = (Number.parseFloat(value) || 0) * scale;
     // CSSOM 会截断已经量化的 zoom 边框小数；千分之一 CSS 像素防止二次向下量化，
     // 不改变可见边框宽度，零宽边框保持为零。
-    return local && width > 0 ? `calc(${width}px + 0.001px)` : `${width}px`;
+    return `${width + (local && width > 0 ? 0.001 : 0)}px`;
 }
 
 /** offsetParent 在不同 zoom 层可能不等于绝对定位包含块；只在失配时校准，最多两轮。 */
 function alignTransformedImageHost(host: HTMLElement, rect: DOMRect): boolean {
+    const style = host.style;
     for (let attempt = 0; attempt < 2; attempt++) {
         const current = host.getBoundingClientRect();
         if (imageBoxMatches(current, rect)) return true;
-        const left = Number.parseFloat(host.style.left), top = Number.parseFloat(host.style.top);
-        updateImageStyle(host.style, 'left', `${left + 1}px`, 'important');
+        const left = Number.parseFloat(style.left), top = Number.parseFloat(style.top);
+        updateImageStyle(style, 'left', `${left + 1}px`, 'important');
         const x = host.getBoundingClientRect();
-        updateImageStyle(host.style, 'left', `${left}px`, 'important');
-        updateImageStyle(host.style, 'top', `${top + 1}px`, 'important');
+        updateImageStyle(style, 'left', `${left}px`, 'important');
+        updateImageStyle(style, 'top', `${top + 1}px`, 'important');
         const y = host.getBoundingClientRect();
-        updateImageStyle(host.style, 'top', `${top}px`, 'important');
+        updateImageStyle(style, 'top', `${top}px`, 'important');
         const a = x.left - current.left, b = y.left - current.left, c = x.top - current.top, d = y.top - current.top;
         const determinant = a * d - b * c;
         if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) return false;
         const dx = rect.left - current.left, dy = rect.top - current.top;
         const nextLeft = left + (d * dx - b * dy) / determinant, nextTop = top + (a * dy - c * dx) / determinant;
         if (!Number.isFinite(nextLeft) || !Number.isFinite(nextTop)) return false;
-        updateImageStyle(host.style, 'left', `${nextLeft}px`, 'important');
-        updateImageStyle(host.style, 'top', `${nextTop}px`, 'important');
+        updateImageStyle(style, 'left', `${nextLeft}px`, 'important');
+        updateImageStyle(style, 'top', `${nextTop}px`, 'important');
     }
     return imageBoxMatches(host.getBoundingClientRect(), rect);
 }
@@ -799,9 +795,10 @@ function placeLocalBitmap(state: ImageTranslationState, surface: HTMLElement, re
     state.localBitmapFailure = {parent, offsetParent, geometry};
     const existing = state.localBitmapHost;
     const host = existing || document.createElement('div');
+    const hostStyle = host.style;
     if (!existing) {
         host.dataset.fluentReadUi = 'image-translation-bitmap';
-        host.style.cssText = 'all: initial !important; position: absolute !important; display: block !important; pointer-events: none !important';
+        hostStyle.cssText = 'all: initial !important; position: absolute !important; display: block !important; pointer-events: none !important';
     }
     if (transformed) {
         const edges = (axis: 'width' | 'height') => (axis === 'width' ? ['Left', 'Right'] : ['Top', 'Bottom'])
@@ -811,38 +808,39 @@ function placeLocalBitmap(state: ImageTranslationState, surface: HTMLElement, re
         const boxWidth = Number.isFinite(width) ? width + (style.boxSizing === 'border-box' ? 0 : edges('width')) : surface.offsetWidth;
         const boxHeight = Number.isFinite(height) ? height + (style.boxSizing === 'border-box' ? 0 : edges('height')) : surface.offsetHeight;
         if (!existing || state.localBitmapGeometry !== geometry) {
-            updateImageStyle(host.style, 'inset', 'auto', 'important');
-            updateImageStyle(host.style, 'left', `${surface.offsetLeft}px`, 'important');
-            updateImageStyle(host.style, 'top', `${surface.offsetTop}px`, 'important');
+            updateImageStyle(hostStyle, 'inset', 'auto', 'important');
+            updateImageStyle(hostStyle, 'left', `${surface.offsetLeft}px`, 'important');
+            updateImageStyle(hostStyle, 'top', `${surface.offsetTop}px`, 'important');
         }
-        updateImageStyle(host.style, 'width', `${boxWidth}px`, 'important');
-        updateImageStyle(host.style, 'height', `${boxHeight}px`, 'important');
-        updateImageStyle(host.style, 'box-sizing', 'border-box', 'important');
+        updateImageStyle(hostStyle, 'width', `${boxWidth}px`, 'important');
+        updateImageStyle(hostStyle, 'height', `${boxHeight}px`, 'important');
+        updateImageStyle(hostStyle, 'box-sizing', 'border-box', 'important');
         for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
-            updateImageStyle(host.style, `padding-${side.toLowerCase()}`, style[`padding${side}`] || '0px', 'important');
+            updateImageStyle(hostStyle, `padding-${side.toLowerCase()}`, style[`padding${side}`] || '0px', 'important');
             const borderWidth = imageBorderWidth(style[`border${side}Width`], 1, true);
-            updateImageStyle(host.style, `border-${side.toLowerCase()}`, `${borderWidth} solid transparent`, 'important');
+            updateImageStyle(hostStyle, `border-${side.toLowerCase()}`, `${borderWidth} solid transparent`, 'important');
         }
         for (const property of ['transform', 'translate', 'rotate', 'scale', 'transform-box', 'backface-visibility', 'zoom']) {
-            updateImageStyle(host.style, property, style.getPropertyValue(property), 'important');
+            updateImageStyle(hostStyle, property, style.getPropertyValue(property), 'important');
         }
-        updateImageStyle(host.style, 'transform-origin', transformOrigin, 'important');
+        updateImageStyle(hostStyle, 'transform-origin', transformOrigin, 'important');
         // host 的边框和内边距只建立与源图相同的变换参考盒，实际像素由位图绘制一次。
-        updateImageStyle(host.style, '--fluent-read-bitmap-inset', `${-(Number.parseFloat(style.borderTopWidth) || 0)}px auto auto ${-(Number.parseFloat(style.borderLeftWidth) || 0)}px`);
-        updateImageStyle(host.style, '--fluent-read-bitmap-width', `${boxWidth}px`);
-        updateImageStyle(host.style, '--fluent-read-bitmap-height', `${boxHeight}px`);
+        updateImageStyle(hostStyle, '--fluent-read-bitmap-inset', `${-(Number.parseFloat(style.borderTopWidth) || 0)}px auto auto ${-(Number.parseFloat(style.borderLeftWidth) || 0)}px`);
+        updateImageStyle(hostStyle, '--fluent-read-bitmap-width', `${boxWidth}px`);
+        updateImageStyle(hostStyle, '--fluent-read-bitmap-height', `${boxHeight}px`);
     } else {
-        if (existing && host.style.getPropertyValue('--fluent-read-bitmap-width')) {
+        if (existing && hostStyle.getPropertyValue('--fluent-read-bitmap-width')) {
             detachLocalBitmapHost(state);
             state.overlay.prepend(bitmap);
             return false;
         }
-        updateImageStyle(host.style, 'inset', '0', 'important');
+        updateImageStyle(hostStyle, 'inset', '0', 'important');
     }
     // 与原显示面共用层级及相邻绘制顺序，避免落到原图下面的宿主遮片之后。
-    updateImageStyle(host.style, 'z-index', style.zIndex || 'auto', 'important');
+    updateImageStyle(hostStyle, 'z-index', style.zIndex || 'auto', 'important');
     if (!existing) surface.after(host);
-    const aligned = transformed ? alignTransformedImageHost(host, rect) : sharesBitmapBox(host, parent, offsetParent, rect);
+    const aligned = transformed ? alignTransformedImageHost(host, rect) : host.parentElement === parent && host.offsetParent === offsetParent
+        && imageBoxMatches(host.getBoundingClientRect(), rect);
     if (!aligned || !imageBoxMatches(surface.getBoundingClientRect(), rect)) {
         if (existing) { detachLocalBitmapHost(state); state.overlay.prepend(bitmap); }
         else host.remove();
@@ -888,23 +886,24 @@ function ignorePreviewInputLayer(viewer: HTMLElement): (element: Element) => boo
 
 function updateBitmapAppearance(bitmap: TranslatedSurface, presentation: ImagePresentation, style: CSSStyleDeclaration,
                                 opacity: number, scaleX = 1, scaleY = 1, local = false): void {
+    const bitmapStyle = bitmap.style;
     const fitting = presentation.kind === 'background' ? surfaceStyleToBitmap(style)
         : {objectFit: style.objectFit || 'fill', objectPosition: style.objectPosition || '50% 50%'};
-    updateImageStyle(bitmap.style, 'object-fit', fitting.objectFit);
-    updateImageStyle(bitmap.style, 'object-position', fitting.objectPosition);
-    updateImageStyle(bitmap.style, 'border-radius', style.borderRadius);
-    updateImageStyle(bitmap.style, 'clip-path', style.clipPath);
-    updateImageStyle(bitmap.style, 'image-rendering', style.imageRendering);
-    updateImageStyle(bitmap.style, 'background-color', style.backgroundColor);
-    updateImageStyle(bitmap.style, 'opacity', String(opacity));
-    updateImageStyle(bitmap.style, 'filter', style.filter);
+    updateImageStyle(bitmapStyle, 'object-fit', fitting.objectFit);
+    updateImageStyle(bitmapStyle, 'object-position', fitting.objectPosition);
+    updateImageStyle(bitmapStyle, 'border-radius', style.borderRadius);
+    updateImageStyle(bitmapStyle, 'clip-path', style.clipPath);
+    updateImageStyle(bitmapStyle, 'image-rendering', style.imageRendering);
+    updateImageStyle(bitmapStyle, 'background-color', style.backgroundColor);
+    updateImageStyle(bitmapStyle, 'opacity', String(opacity));
+    updateImageStyle(bitmapStyle, 'filter', style.filter);
     for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
         const scale = side === 'Left' || side === 'Right' ? scaleX : scaleY;
         const property = side.toLowerCase();
-        updateImageStyle(bitmap.style, `padding-${property}`, `${(Number.parseFloat(style[`padding${side}`]) || 0) * scale}px`);
-        updateImageStyle(bitmap.style, `border-${property}-width`, imageBorderWidth(style[`border${side}Width`], scale, local));
-        updateImageStyle(bitmap.style, `border-${property}-style`, style[`border${side}Style`]);
-        updateImageStyle(bitmap.style, `border-${property}-color`, style[`border${side}Color`]);
+        updateImageStyle(bitmapStyle, `padding-${property}`, `${(Number.parseFloat(style[`padding${side}`]) || 0) * scale}px`);
+        updateImageStyle(bitmapStyle, `border-${property}-width`, imageBorderWidth(style[`border${side}Width`], scale, local));
+        updateImageStyle(bitmapStyle, `border-${property}-style`, style[`border${side}Style`]);
+        updateImageStyle(bitmapStyle, `border-${property}-color`, style[`border${side}Color`]);
     }
 }
 
@@ -1014,24 +1013,26 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
         if (occluded) state.controls.hideReader();
         return;
     }
-    updateImageStyle(state.overlay.style, 'display', 'block');
+    const overlayStyle = state.overlay.style, controlStyle = state.controls.element.style, feedback = state.controls.feedback;
+    const feedbackStyle = feedback.style;
+    updateImageStyle(overlayStyle, 'display', 'block');
     // 有 transform 的原生模态框会为 fixed 译层建立局部坐标系。
     const localHost = imageOverlayHost?.parentElement !== document.documentElement ? imageOverlayHost : null;
     const hostRect = localHost?.getBoundingClientRect();
     const hostScaleX = (hostRect && localHost?.offsetWidth && hostRect.width / localHost.offsetWidth) || 1;
     const hostScaleY = (hostRect && localHost?.offsetHeight && hostRect.height / localHost.offsetHeight) || 1;
-    updateImageStyle(state.overlay.style, 'left', `${(rect.left - (hostRect?.left ?? 0)) / hostScaleX}px`);
-    updateImageStyle(state.overlay.style, 'top', `${(rect.top - (hostRect?.top ?? 0)) / hostScaleY}px`);
-    updateImageStyle(state.overlay.style, 'width', `${rect.width / hostScaleX}px`);
-    updateImageStyle(state.overlay.style, 'height', `${rect.height / hostScaleY}px`);
-    updateImageStyle(state.overlay.style, 'clip-path', `inset(${(top - rect.top) / hostScaleY}px ${(rect.right - right) / hostScaleX}px ${(rect.bottom - bottom) / hostScaleY}px ${(left - rect.left) / hostScaleX}px)`);
-    updateImageStyle(state.controls.element.style, 'left', `${(left - rect.left + 8) / hostScaleX}px`, 'important');
-    updateImageStyle(state.controls.element.style, 'bottom', `${(rect.bottom - bottom + 8) / hostScaleY}px`, 'important');
-    const edgeFeedback = (state.manga && (state.phase === 'loading' || state.phase === 'error')) || state.controls.feedback.dataset.warning === 'true';
-    updateImageStyle(state.controls.feedback.style, 'left', `${(edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left) / hostScaleX}px`);
-    updateImageStyle(state.controls.feedback.style, 'top', `${(edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top) / hostScaleY}px`);
-    updateImageStyle(state.controls.feedback.style, 'max-height', `${Math.max(0, bottom - top - 16) / hostScaleY}px`);
-    updateImageStyle(state.controls.feedback.style, 'max-width', `${Math.max(0, right - left - 16) / hostScaleX}px`);
+    updateImageStyle(overlayStyle, 'left', `${(rect.left - (hostRect?.left ?? 0)) / hostScaleX}px`);
+    updateImageStyle(overlayStyle, 'top', `${(rect.top - (hostRect?.top ?? 0)) / hostScaleY}px`);
+    updateImageStyle(overlayStyle, 'width', `${rect.width / hostScaleX}px`);
+    updateImageStyle(overlayStyle, 'height', `${rect.height / hostScaleY}px`);
+    updateImageStyle(overlayStyle, 'clip-path', `inset(${(top - rect.top) / hostScaleY}px ${(rect.right - right) / hostScaleX}px ${(rect.bottom - bottom) / hostScaleY}px ${(left - rect.left) / hostScaleX}px)`);
+    updateImageStyle(controlStyle, 'left', `${(left - rect.left + 8) / hostScaleX}px`, 'important');
+    updateImageStyle(controlStyle, 'bottom', `${(rect.bottom - bottom + 8) / hostScaleY}px`, 'important');
+    const edgeFeedback = (state.manga && (state.phase === 'loading' || state.phase === 'error')) || feedback.dataset.warning === 'true';
+    updateImageStyle(feedbackStyle, 'left', `${(edgeFeedback ? left - rect.left + 8 : (left + right) / 2 - rect.left) / hostScaleX}px`);
+    updateImageStyle(feedbackStyle, 'top', `${(edgeFeedback ? top - rect.top + 8 : (top + bottom) / 2 - rect.top) / hostScaleY}px`);
+    updateImageStyle(feedbackStyle, 'max-height', `${Math.max(0, bottom - top - 16) / hostScaleY}px`);
+    updateImageStyle(feedbackStyle, 'max-width', `${Math.max(0, right - left - 16) / hostScaleX}px`);
     if (!bitmap) return;
     const localBitmap = placeLocalBitmap(state, surface, rect, style, bitmap, transformed);
     const layoutFallback = requiresTransformHost && !localBitmap;

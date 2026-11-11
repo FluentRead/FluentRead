@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/background/handlers.ts
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
- * 同图语境：逐段请求最多附带前后各两段识别原文，作为既有不可信参考上下文；正文、顺序、取消与批译协议不变，不增加摘要调用。
+ * 同图语境：AI 上下文开启且模型支持时，逐位置提供前后各两段 OCR 原文，通过既有篇章证据通道送达提示词、隔离缓存并跳过摘要；重复短句保留各自邻文，正文、回填位置与取消所有权不变。其他服务沿用原生批译或标题参考。
  * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
  * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
@@ -98,6 +98,8 @@ type ImageTextTranslationRequestBase = {
     glossaryRevision?: string;
     sourceLanguage?: string;
     targetLanguage?: string;
+    discourseContext?: string;
+    enableAIContext?: true;
 };
 
 type ImageTextTranslationRequest = ImageTextTranslationRequestBase & (
@@ -120,6 +122,8 @@ export interface ImageTranslationBackgroundDependencies {
     readonly assertImageSource?: (url: string, options: ImageOperationOptions, context: ImageProgressContext) => Promise<void>;
     readonly getTranslationService: () => string;
     readonly supportsBatchTranslation: (service: string) => boolean;
+    /** 组合根冻结用户上下文开关和所选模型的提示词能力；不能由消息体自报开启。 */
+    readonly isTextContextEnabled?: (service: string) => boolean;
     /** 明确的用户固定译名优先于标识跳过策略；组合根只提供当前配置。 */
     readonly getGlossaryConfig?: () => {glossaryEnabled: boolean; glossaryLibraries: GlossaryLibrary[]; from: string; to: string};
     readonly translateTexts: (request: ImageTextTranslationRequest) => Promise<string | string[]>;
@@ -305,12 +309,33 @@ function getErrorMessage(error: unknown): string {
 }
 
 /** 单段供应商保留同图相邻段落作为有界参考；不拼入待译正文，也不触发额外摘要请求。 */
-function imageTextContext(texts: string[], text: string, title: string): string {
-    const index = texts.indexOf(text);
-    const nearby = texts.slice(Math.max(0, index - 2), index + 3)
-        .filter(value => value !== text).map(value => value.slice(0, 480));
+function imageTextContext(texts: string[], index: number, title: string): string {
+    const start = Math.max(0, index - 2);
+    const nearby = texts.slice(start, index + 3)
+        .filter((_value, offset) => start + offset !== index).map(value => value.slice(0, 480));
     if (!nearby.length) return title;
     return [title.slice(0, 320), 'Other text from the same image (reference only):', ...nearby].filter(Boolean).join('\n');
+}
+
+/** 每个邻段同时限制原文长度和 JSON 编码长度，保留完整 Unicode 码点。 */
+function imageContextSnippet(text: string): string {
+    let value = '', encodedLength = 0;
+    for (const character of text) {
+        const encoded = JSON.stringify(character).length - 2;
+        if (value.length + character.length > 240 || encodedLength + encoded > 384) break;
+        value += character;
+        encodedLength += encoded;
+    }
+    return value;
+}
+
+/** 使用原图位置选邻文；同一句话在不同气泡出现时不得复用第一次出现处的语境。 */
+function imageTextDiscourse(texts: string[], sourceIndex: number): string {
+    const neighbors = [];
+    for (let index = Math.max(0, sourceIndex - 2); index <= Math.min(texts.length - 1, sourceIndex + 2); index++) {
+        if (index !== sourceIndex) neighbors.push({region: index + 1, text: imageContextSnippet(texts[index])});
+    }
+    return neighbors.length ? JSON.stringify({source: 'neighboring image OCR', currentRegion: sourceIndex + 1, neighbors}) : '';
 }
 
 async function translateImageTexts(
@@ -341,6 +366,10 @@ async function translateImageTexts(
     // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。
     if (uniqueTexts.length === 0) return [...texts];
     const service = dependencies.getTranslationService();
+    const useImageContext = dependencies.isTextContextEnabled?.(service) === true;
+    const translatedSources = new Set(uniqueTexts);
+    const sourceIndexes = useImageContext ? texts.flatMap((text, index) => translatedSources.has(text) ? [index] : []) : [];
+    const requestTexts = useImageContext ? sourceIndexes.map(index => texts[index]) : uniqueTexts;
     const imageDetectionText = uniqueTexts.join('\n');
     // 只借用可靠、单一文字体系的同图上下文；混合语种不能把短外语词误判成目标语言而漏译。
     const useImageDetectionText = service === 'localTranslation'
@@ -377,7 +406,7 @@ async function translateImageTexts(
     };
     try {
         let translations: string[];
-        if (dependencies.supportsBatchTranslation(service)) {
+        if (dependencies.supportsBatchTranslation(service) && !useImageContext) {
             try {
                 const result = await dependencies.translateTexts(controlledRequest({
                     ...baseRequest, origin: uniqueTexts, requestTimeoutMs: remainingBudget(),
@@ -391,18 +420,20 @@ async function translateImageTexts(
                 throw createImageTranslationFailure(`图片文字批量翻译失败：${getErrorMessage(error)}`, error);
             }
         } else {
-            translations = new Array<string>(uniqueTexts.length);
+            translations = new Array<string>(requestTexts.length);
             let cursor = 0;
             let failed = false;
-            // 窗口最多三条，实际供应商并发仍由共享 broker 限流；保序且重复文案只翻译一次。
+            // 窗口最多三条，实际供应商并发仍由共享 broker 限流；有语境的重复文本按位置处理。
             const worker = async () => {
-                while (cursor < uniqueTexts.length && !failed) {
+                while (cursor < requestTexts.length && !failed) {
                     const index = cursor++;
+                    const sourceIndex = useImageContext ? sourceIndexes[index] : texts.indexOf(requestTexts[index]);
                     try {
                         const translation = await dependencies.translateTexts(controlledRequest({
-                            ...baseRequest, origin: uniqueTexts[index], requestTimeoutMs: remainingBudget(),
-                            context: imageTextContext(texts, uniqueTexts[index], title),
-                            ...(useImageDetectionText && identifyTextLanguage(uniqueTexts[index]).status === 'unknown'
+                            ...baseRequest, origin: requestTexts[index], requestTimeoutMs: remainingBudget(),
+                            context: imageTextContext(texts, sourceIndex, title),
+                            ...(useImageContext ? {enableAIContext: true as const, discourseContext: imageTextDiscourse(texts, sourceIndex)} : {}),
+                            ...(useImageDetectionText && identifyTextLanguage(requestTexts[index]).status === 'unknown'
                                 ? {sourceLanguageDetectionText: imageDetectionText} : {}),
                         }));
                         if (typeof translation !== 'string') throw new Error('provider 未返回字符串译文');
@@ -411,13 +442,18 @@ async function translateImageTexts(
                     } catch (error) {
                         failed = true;
                         controller.abort();
-                        throw createImageTranslationFailure(`图片第 ${texts.indexOf(uniqueTexts[index]) + 1} 段文字翻译失败：${getErrorMessage(error)}`, error);
+                        throw createImageTranslationFailure(`图片第 ${sourceIndex + 1} 段文字翻译失败：${getErrorMessage(error)}`, error);
                     }
                 }
             };
-            await Promise.all(Array.from({length: Math.min(3, uniqueTexts.length)}, worker));
+            await Promise.all(Array.from({length: Math.min(3, requestTexts.length)}, worker));
         }
         if (controller.signal.aborted) throw imageAbortError(false);
+        if (useImageContext) {
+            const result = [...texts];
+            sourceIndexes.forEach((sourceIndex, index) => {result[sourceIndex] = translations[index];});
+            return result;
+        }
         const byText = new Map(uniqueTexts.map((text, index) => [text, translations[index]]));
         return texts.map(text => byText.get(text) ?? text);
     } finally {

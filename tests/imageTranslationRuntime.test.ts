@@ -730,7 +730,7 @@ describe('图片翻译前台交互与生命周期', () => {
         const bitmap = env.roots[1].querySelector<HTMLElement>('.fluent-read-image-translation-bitmap')!;
         expect(host.style.getPropertyValue('transform-origin')).toBe('50% 50%');
         expect(host.style.left).toBe('20px'); expect(host.style.top).toBe('40px');
-        expect(bitmap.style.getPropertyValue('border-left-width')).toBe('calc(4px + 0.001px)');
+        expect(bitmap.style.getPropertyValue('border-left-width')).toBe('4.001px');
         expect(env.image.style.opacity).toBe('0');
         const cover = document.createElement('div'); document.body.append(cover);
         Object.assign(document, {elementsFromPoint: () => [cover, env.image]});

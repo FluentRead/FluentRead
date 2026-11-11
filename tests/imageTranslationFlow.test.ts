@@ -50,6 +50,88 @@ it('图片上下文限制为四个邻段和标题，批译不重复附送整图�
     await single.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['One'],title:''});
     expect(single.dependencies.translateTexts).toHaveBeenCalledWith(expect.objectContaining({origin:'One',context:''}));
 });
+
+it('AI 图片邻文走篇章通道，重复短句保留各自位置且已是目标语言的正文不重译', async () => {
+    const translateTexts = vi.fn(async (request: {origin:string;discourseContext:string}) => {
+        const reference = JSON.parse(request.discourseContext);
+        return `译区${reference.currentRegion}`;
+    });
+    const current = setup({getTranslationService:()=> 'openai',supportsBatchTranslation:()=>true,isTextContextEnabled:()=>true,translateTexts,
+        getGlossaryConfig:()=>({glossaryEnabled:false,glossaryLibraries:[],from:'en',to:'zh-CN'})});
+    const texts = ['路线说明', 'TURN TOWARD THE EAST.', 'RIGHT.', 'LATER AT THE QUIZ.', 'IS YOUR ANSWER CORRECT?', 'RIGHT.'];
+    await expect(current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Unrelated webpage title'}))
+        .resolves.toMatchObject({success:true,translations:['路线说明','译区2','译区3','译区4','译区5','译区6']});
+    const calls = translateTexts.mock.calls.map(([request])=>request);
+    expect(calls.filter(request=>request.origin==='RIGHT.')).toHaveLength(2);
+    expect(JSON.parse(calls[1].discourseContext)).toEqual({source:'neighboring image OCR',currentRegion:3,neighbors:[
+        {region:1,text:'路线说明'},{region:2,text:'TURN TOWARD THE EAST.'},{region:4,text:'LATER AT THE QUIZ.'},{region:5,text:'IS YOUR ANSWER CORRECT?'}]});
+    expect(JSON.parse(calls[4].discourseContext)).toEqual({source:'neighboring image OCR',currentRegion:6,neighbors:[
+        {region:4,text:'LATER AT THE QUIZ.'},{region:5,text:'IS YOUR ANSWER CORRECT?'}]});
+    for (const request of calls) {
+        expect(request).toMatchObject({pageContext:'',enableAIContext:true});
+        expect(request.discourseContext).not.toContain('Unrelated webpage title');
+    }
+});
+
+it('图片篇章证据限制 JSON 编码预算且不截断 Unicode 码点，单独一段不添加参考', async () => {
+    const translateTexts = vi.fn(async () => '译文');
+    const current = setup({isTextContextEnabled:()=>true,translateTexts});
+    const texts = ['Emoji '+ '😀'.repeat(500), 'Control '+ '\u0001'.repeat(500), 'CURRENT SENTENCE.', 'Long '+ 'x'.repeat(500), 'Short text.'];
+    await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts});
+    for (const [request] of translateTexts.mock.calls as unknown as Array<[{discourseContext:string}]>) {
+        expect(request.discourseContext.length).toBeLessThan(2200);
+        const reference = JSON.parse(request.discourseContext);
+        for (const row of reference.neighbors) {
+            expect(row.text.length).toBeLessThanOrEqual(240);
+            expect(/[\uD800-\uDBFF]$/u.test(row.text)).toBe(false);
+        }
+    }
+    translateTexts.mockClear();
+    await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['Only one sentence.']});
+    expect(translateTexts).toHaveBeenCalledWith(expect.objectContaining({discourseContext:'',pageContext:''}));
+});
+
+it('图片上下文开关在任务开始读取一次，关闭时继续原生数组与重复去重', async () => {
+    let enabled = false;
+    const isTextContextEnabled = vi.fn(()=>enabled);
+    const translateTexts = vi.fn(async (request: {origin:string|string[]}) => {
+        enabled = false;
+        return Array.isArray(request.origin) ? request.origin.map(()=> '译文') : '译文';
+    });
+    const current = setup({supportsBatchTranslation:()=>true,isTextContextEnabled,translateTexts});
+    const message = {type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['First sentence.','Second sentence.','First sentence.']};
+    await current.handler(message.type).handle(message);
+    expect(translateTexts).toHaveBeenCalledWith(expect.objectContaining({origin:['First sentence.','Second sentence.']}));
+    expect(translateTexts.mock.calls[0][0]).not.toHaveProperty('discourseContext');
+    translateTexts.mockClear(); isTextContextEnabled.mockClear(); enabled = true;
+    await current.handler(message.type).handle(message);
+    expect(translateTexts).toHaveBeenCalledTimes(3); expect(isTextContextEnabled).toHaveBeenCalledOnce();
+    for (const [request] of translateTexts.mock.calls) expect(request).toHaveProperty('discourseContext');
+});
+
+it('AI 相同短句按位置乱序完成仍正确回填，失败显示真实位置并取消同一图片余下请求', async () => {
+    const waits = new Map<number,ReturnType<typeof deferred<string>>>(), requests: object[] = [];
+    const translateTexts = vi.fn((request: {discourseContext:string}) => {
+        const index = JSON.parse(request.discourseContext).currentRegion;
+        const wait = deferred<string>(); waits.set(index,wait); requests.push(request); return wait.promise;
+    });
+    const current = setup({supportsBatchTranslation:()=>true,isTextContextEnabled:()=>true,translateTexts});
+    const message = {type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['RIGHT.','QUESTION ONE.','RIGHT.','QUESTION TWO.','RIGHT.']};
+    const pending = current.handler(message.type).handle(message);
+    await vi.waitFor(()=>expect(waits.size).toBe(3));
+    waits.get(3)!.resolve('第三处'); await vi.waitFor(()=>expect(waits.has(4)).toBe(true));
+    waits.get(1)!.resolve('第一处'); await vi.waitFor(()=>expect(waits.has(5)).toBe(true));
+    waits.get(5)!.resolve('第五处'); waits.get(4)!.resolve('问题二'); waits.get(2)!.resolve('问题一');
+    await expect(pending).resolves.toMatchObject({success:true,translations:['第一处','问题一','第三处','问题二','第五处']});
+    waits.clear(); requests.length = 0;
+    const failure = current.handler(message.type).handle(message);
+    await vi.waitFor(()=>expect(waits.size).toBe(3));
+    waits.get(3)!.reject(new Error('provider failure'));
+    await expect(failure).rejects.toThrow('图片第 3 段文字翻译失败');
+    for (const request of requests) expect(getTranslationRequestControl(request)!.signal.aborted).toBe(true);
+    waits.get(1)!.resolve('迟到'); waits.get(2)!.resolve('迟到');
+    expect(waits.size).toBe(3);
+});
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
@@ -1012,6 +1094,20 @@ it.each(['hide','dispose'] as const)('文字入口通知同步 %s 本面板时�
     expect(onInspect).toHaveBeenCalledOnce();
     if(action==='hide'){expect(ui.reader.hidden).toBe(true);expect(inspect.getAttribute('aria-expanded')).toBe('false');ui.dispose();}
     else expect(ui.element.isConnected).toBe(false);
+});
+
+it('关闭阅读器归还焦点时若同步卸载，不再改写已经失效的操作条',()=>{
+    const {document,window}=parseHTML('<html><body></body></html>');vi.stubGlobal('document',document);
+    const ui=createImageControls({onAction(){},onPrepare(){}});document.body.append(ui.element,ui.feedback);
+    ui.setLines([{text:'译文'}]);ui.update('translated','完成');
+    const inspect=ui.element.querySelector<HTMLButtonElement>('[aria-expanded]')!;
+    const click=new window.Event('click',{bubbles:true});Object.defineProperty(click,'isTrusted',{value:true});inspect.dispatchEvent(click);
+    ui.setHovered(false);
+    Object.defineProperty(document,'activeElement',{configurable:true,get:()=>ui.reader});
+    const focus=vi.spyOn(inspect,'focus').mockImplementation(()=>{ui.dispose();ui.element.hidden=true;});
+    const close=new window.Event('keydown',{bubbles:true,cancelable:true});Object.defineProperties(close,{isTrusted:{value:true},key:{value:'Escape'}});
+    ui.reader.dispatchEvent(close);
+    expect(focus).toHaveBeenCalledOnce();expect(ui.element.isConnected).toBe(false);expect(ui.element.hidden).toBe(true);
 });
 
 describe('图片文字面板嵌套 ShadowRoot 所有权',()=>{

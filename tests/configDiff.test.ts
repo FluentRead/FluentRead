@@ -8,6 +8,11 @@ function group(result: ReturnType<typeof buildConfigDiff>, id: string) {
 }
 
 describe('配置差异预览', () => {
+    it('工具栏点击行为在历史预览中显示可读选择', () => {
+        expect(group(buildConfigDiff({toolbarClickAction: 'popup'}, {toolbarClickAction: 'translate'}), 'general')?.changes).toEqual([
+            {key: 'toolbarClickAction', label: '工具栏图标点击行为', before: '打开快捷面板', after: '翻译/显示原文'},
+        ]);
+    });
     it('用可读选项展示侧边栏范围', () => {
         const result = buildConfigDiff({translationSidepanelScope: 'tab'}, {translationSidepanelScope: 'window'});
         expect(group(result, 'general')?.changes).toEqual([

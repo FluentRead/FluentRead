@@ -10,6 +10,7 @@ import {createRenderer, h, defineComponent, nextTick, shallowReactive, markRaw, 
 import {afterEach, beforeEach, expect, it, vi} from 'vitest';
 import WebDavBackup from '@/src/features/settings/ui/WebDavBackup.vue';
 import ParagraphHandlingSettings from '@/src/features/settings/ui/ParagraphHandlingSettings.vue';
+import ToolbarClickSetting from '@/src/features/settings/ui/components/ToolbarClickSetting.vue';
 import SelectionSettings from '@/src/features/settings/ui/SelectionSettings.vue';
 import ReadingAssistanceSettings from '@/src/features/settings/ui/ReadingAssistanceSettings.vue';
 import ExcludedLanguageSettings from '@/src/features/settings/ui/ExcludedLanguageSettings.vue';
@@ -89,6 +90,16 @@ function mount(component:Component, initial:Record<string,any>, wrapperClass='')
 function button(host:Element,text:string){const found=[...host.querySelectorAll('button')].find(node=>node.textContent===text);expect(found).toBeTruthy();return found!;}
 async function click(node:Element){expect(node.hasAttribute('disabled')).toBe(false);node.dispatchEvent(new win.Event('click',{bubbles:true,cancelable:true}));await flush();}
 async function input(node:Element,value:string){(node as HTMLInputElement).value=value;node.dispatchEvent(new win.Event('input',{bubbles:true}));await flush();}
+
+it('changes toolbar click behavior through the settings control and follows external drafts', async () => {
+  const config = reactive(new Config());const ui = mount(ToolbarClickSetting, {config});
+  expect(config.toolbarClickAction).toBe('popup');
+  await click(button(ui.host, 'toolbar.click.translate'));expect(config.toolbarClickAction).toBe('translate');
+  await click(button(ui.host, 'toolbar.click.popup'));expect(config.toolbarClickAction).toBe('popup');
+  const replacement = reactive(new Config());ui.props.config = replacement;await flush();
+  await click(button(ui.host, 'toolbar.click.translate'));expect(replacement.toolbarClickAction).toBe('translate');expect(config.toolbarClickAction).toBe('popup');
+  ui.unmount();
+});
 
 
 it('normalizes paragraph thresholds and changes paragraph layout through real template events',async()=>{

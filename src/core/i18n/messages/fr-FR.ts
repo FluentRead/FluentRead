@@ -34,6 +34,11 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const frFRMessages = {
+    "toolbar.click.label": "Clic sur l’icône de la barre d’outils",
+    "toolbar.click.description": "En mode traduction en un clic, faites un clic droit sur l’icône pour ouvrir le panneau rapide.",
+    "toolbar.click.popup": "Ouvrir le panneau rapide",
+    "toolbar.click.translate": "Traduire / Restaurer",
+    "toolbar.openPopup": "Ouvrir le panneau rapide",
     "settings.backup.includeContext": "Inclure le contexte du vocabulaire",
     "feedback.serviceHint": "Vérifiez la connexion ou le modèle du service choisi, puis réessayez.",
     "feedback.retryHint": "Réessayez dans un instant. Le texte source et votre sélection restent disponibles.",

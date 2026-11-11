@@ -28,11 +28,45 @@ beforeEach(() => {
     state.language.mockResolvedValue(undefined);state.action.mockResolvedValue({handled: false});
     const event = () => ({addListener: vi.fn()});
     api = {contextMenus: {create: vi.fn().mockResolvedValue(undefined), removeAll: vi.fn().mockResolvedValue(undefined), update: vi.fn().mockResolvedValue(undefined), onClicked: event()},
-        tabs: {query: vi.fn(async () => [{id: active}]), sendMessage: vi.fn().mockResolvedValue(neutral), onActivated: event(), onUpdated: event(), onRemoved: event()}};
+        runtime: {getManifest: () => ({manifest_version: 3}), getURL: (path: string) => `chrome-extension://fixture${path}`},
+        tabs: {create: vi.fn().mockResolvedValue({id: 100}), query: vi.fn(async () => [{id: active}]), sendMessage: vi.fn().mockResolvedValue(neutral), onActivated: event(), onUpdated: event(), onRemoved: event()}};
     vi.stubGlobal('browser', api);
 });
 afterEach(() => {vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('右键菜单原生写入的异步归属', () => {
+    it('没有原生菜单的宿主仍清理导航状态，不发送菜单写入', async () => {
+        state.capabilities.browser = 'thunderbird';const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+        try {
+            await install();await settle();
+            api.tabs.onActivated.addListener.mock.calls[0][0]({tabId: 9});
+            api.tabs.onUpdated.addListener.mock.calls[0][0](9, {status: 'loading'});
+            api.tabs.onRemoved.addListener.mock.calls[0][0](9);await settle();
+            expect(api.contextMenus.update).not.toHaveBeenCalled();expect(log).toHaveBeenCalledWith('不支持右键菜单');
+        } finally {state.capabilities.browser = 'chrome';}
+    });
+    it.each([2, 3])('一键翻译的面板入口独立于网页右键菜单和总开关，manifest %s 使用对应上下文', async version => {
+        Object.assign(state.config, {toolbarClickAction: 'translate', contextMenuEnabled: false, on: false});
+        api.runtime.getManifest = () => ({manifest_version: version});await install();await settle();
+        expect(api.contextMenus.create).toHaveBeenCalledExactlyOnceWith({id: 'fluentread-toolbar-quick-panel', title: '打开快捷面板', contexts: [version === 3 ? 'action' : 'browser_action']});
+        const click = api.contextMenus.onClicked.addListener.mock.calls[0][0];
+        click({menuItemId: 'fluentread-toolbar-quick-panel'}, {id: 9});await settle();
+        expect(api.tabs.create).toHaveBeenCalledExactlyOnceWith({url: 'chrome-extension://fixture/popup.html?sourceTabId=9'});
+        for (const tab of [undefined, {}, {id: -1}]) click({menuItemId: 'fluentread-toolbar-quick-panel'}, tab);
+        await settle();expect(api.tabs.create).toHaveBeenCalledOnce();
+        change({toolbarClickAction: 'popup'});await settle();
+        click({menuItemId: 'fluentread-toolbar-quick-panel'}, {id: 9});await settle();
+        expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(2);expect(api.tabs.create).toHaveBeenCalledOnce();
+    });
+
+    it('工具栏面板菜单冷启动等待配置，并保留打开失败的诊断', async () => {
+        const hydration = deferred<void>();state.ready = hydration.promise;
+        await install();const click = api.contextMenus.onClicked.addListener.mock.calls[0][0];
+        click({menuItemId: 'fluentread-toolbar-quick-panel'}, {id: 9});await settle();expect(api.tabs.create).not.toHaveBeenCalled();
+        state.config.toolbarClickAction = 'translate';hydration.resolve();await settle();expect(api.tabs.create).toHaveBeenCalledOnce();
+        const error = new Error('panel failed'), log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        api.tabs.create.mockRejectedValueOnce(error);click({menuItemId: 'fluentread-toolbar-quick-panel'}, {id: 9});await settle();
+        expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] 快捷面板打开失败', error);
+    });
     it('结构创建后的活动页查询遇到配置变化时不回源，也不拖住菜单关闭', async () => {
         const query = deferred();
         api.tabs.query.mockReturnValueOnce(query.promise);

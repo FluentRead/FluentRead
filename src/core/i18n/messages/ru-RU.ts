@@ -34,6 +34,11 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const ruRUMessages = {
+    "toolbar.click.label": "Нажатие на значок панели",
+    "toolbar.click.description": "В режиме перевода одним нажатием щёлкните значок правой кнопкой, чтобы открыть быструю панель.",
+    "toolbar.click.popup": "Открыть быструю панель",
+    "toolbar.click.translate": "Перевести / Оригинал",
+    "toolbar.openPopup": "Открыть быструю панель",
     "settings.backup.includeContext": "Включить контекст слов",
     "feedback.serviceHint": "Проверьте подключение или модель выбранного сервиса и повторите попытку.",
     "feedback.retryHint": "Повторите попытку чуть позже. Исходный текст и выделенная область сохранятся.",

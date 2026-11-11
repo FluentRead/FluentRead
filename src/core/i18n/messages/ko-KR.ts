@@ -34,6 +34,11 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const koKRMessages = {
+    "toolbar.click.label": "도구 모음 아이콘 클릭",
+    "toolbar.click.description": "원클릭 번역 모드에서는 아이콘을 오른쪽 클릭하여 빠른 패널을 열 수 있습니다.",
+    "toolbar.click.popup": "빠른 패널 열기",
+    "toolbar.click.translate": "번역 / 원문 보기",
+    "toolbar.openPopup": "빠른 패널 열기",
     "settings.backup.includeContext": "단어 문맥 포함",
     "feedback.serviceHint": "선택한 서비스의 연결 또는 모델 설정을 확인한 후 다시 시도하세요.",
     "feedback.retryHint": "잠시 후 다시 시도하세요. 원문과 현재 선택 영역은 유지됩니다.",

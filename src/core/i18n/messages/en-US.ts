@@ -35,6 +35,11 @@ import {personalCorrectionMessages} from './personalCorrections';
 import countForms from './count-forms.json';
 
 export const enUSMessages = {
+    "toolbar.click.label": "Toolbar icon click",
+    "toolbar.click.description": "In one-click mode, right-click the icon to open the quick panel.",
+    "toolbar.click.popup": "Open quick panel",
+    "toolbar.click.translate": "Translate / Restore",
+    "toolbar.openPopup": "Open quick panel",
     "settings.backup.includeContext": "Include vocabulary context",
     "feedback.serviceHint": "Check the selected service’s connection or model settings, then try again.",
     "feedback.retryHint": "Try again shortly. Your source text and selection will stay available.",

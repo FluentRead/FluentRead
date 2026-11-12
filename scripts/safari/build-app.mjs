@@ -51,15 +51,62 @@ function applyLayeredIcon(appPath) {
     } finally {
         rmSync(out, {recursive: true, force: true});
     }
-    // 只重签外层 App：--deep 会把内嵌 appex 的授权（app-sandbox 等）一并抹掉，
-    // 导致 Safari 无法稳定保留扩展。嵌套代码保持 Xcode 的原始签名。
+    resign(appPath);
+    console.log('[safari] 已应用分层图标（浅色/深色）并重新签名');
+}
+
+/**
+ * 选择签名身份。
+ *
+ * Safari 的「允许未签名的扩展」在退出浏览器时会被重置（Apple 官方文档明确说明），
+ * 因此 ad-hoc 签名（`-`）只能用于临时调试。一旦本机存在开发者证书，就用它签名，
+ * 扩展的启用状态才能跨重启保留。
+ *
+ * 优先读 FLUENTREAD_SIGN_IDENTITY，其次取钥匙串里第一个可用于代码签名的身份。
+ */
+function resolveSigningIdentity() {
+    if (process.env.FLUENTREAD_SIGN_IDENTITY) return process.env.FLUENTREAD_SIGN_IDENTITY;
+    try {
+        const out = execFileSync('security', ['find-identity', '-v', '-p', 'codesigning'], {encoding: 'utf8'});
+        const match = out.match(/"([^"]+)"/);
+        if (match) return match[1];
+    } catch {
+        // 没有证书时按 ad-hoc 处理。
+    }
+    return '-';
+}
+
+/**
+ * 重签应用。
+ *
+ * 内层先签、外层后签，且不使用 --deep：`--deep` 会把内嵌 appex 的授权
+ * （app-sandbox 等）一并抹掉，导致 Safari 无法稳定保留扩展。
+ */
+function resign(appPath) {
+    const identity = resolveSigningIdentity();
+    if (identity !== '-') {
+        const pluginDir = path.join(appPath, 'Contents', 'PlugIns');
+        if (existsSync(pluginDir)) {
+            for (const name of readdirSync(pluginDir).filter(entry => entry.endsWith('.appex'))) {
+                execFileSync('codesign', [
+                    '--force', '--sign', identity,
+                    '--preserve-metadata=entitlements,flags',
+                    '--timestamp=none',
+                    path.join(pluginDir, name),
+                ], {stdio: 'inherit'});
+            }
+        }
+    }
     execFileSync('codesign', [
-        '--force', '--sign', '-',
+        '--force', '--sign', identity,
         '--preserve-metadata=entitlements,flags',
+        '--timestamp=none',
         appPath,
     ], {stdio: 'inherit'});
     execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], {stdio: 'inherit'});
-    console.log('[safari] 已应用分层图标（浅色/深色）并重新签名');
+    console.log(identity === '-'
+        ? '[safari] ad-hoc 签名：Safari 每次启动都需重新勾选「允许未签名的扩展」'
+        : `[safari] 已用证书签名：${identity}`);
 }
 
 function findProject() {

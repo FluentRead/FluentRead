@@ -80,6 +80,13 @@ safari/流畅阅读/流畅阅读/AppIcon.icon/
 - 容器应用：`Resources/Icon.png` 与 `Icon-dark.png`，`Style.css` 里同样按外观切换（`content` 的相对地址以样式表目录为基准，不能写 `../`）；
 - 清单图标（Safari 设置里的扩展列表）是静态资源，由系统渲染，不随外观变化。
 
+#### 清单图标要自己烘焙圆角
+
+Safari 把清单 `icons` 里的位图**原样**画进扩展列表，不施加任何遮罩，所以方形 PNG 会显示成直角方块。`public/icon/**` 与手机端不同，需要预先画好圆角（半径取边长 22.5%，边缘做 1px 抗锯齿）。
+
+这与应用图标是两套规则，别混用：`AppIcon.icon` 的图层必须是**未遮罩的方形**（HIG 要求，圆角由系统施加），而清单图标必须自带圆角。
+
+
 ### 工具栏按钮
 
 Safari 按模板渲染工具栏按钮：只取轮廓，颜色由工具栏明暗决定。因此工具栏不能复用带底色的应用图标（会被压成灰底方块），而是单独提供 `public/icon/action/{16,19,32,38}.png` —— 透明底、纯黑字形，通过清单 `action.default_icon` 指定（仅 Safari 产物），`badgeRuntime` 切换状态图标时也走这套资源。
@@ -94,6 +101,20 @@ codesign --verify --deep --strict <app>
 ```
 
 嵌套 appex 保持 Xcode 的原始签名即可。可用 `codesign -d --entitlements :- <appex>` 复核授权是否还在。
+
+### 签名身份：决定扩展能否跨重启保留
+
+Apple 官方文档明确写着：**「允许未签名的扩展」在退出 Safari 时会被重置**，下次启动需要重新勾选。ad-hoc 签名（`codesign -s -`）对 Safari 而言就是未签名，因此 ad-hoc 构建只能用于临时调试。
+
+要让扩展的启用状态跨重启保留，必须用 Apple 签发的开发证书签名。`build-app.mjs` 会自动探测：优先取 `FLUENTREAD_SIGN_IDENTITY`，否则读钥匙串里第一个可用于代码签名的身份，都没有才回落到 ad-hoc。
+
+```sh
+# 有证书时（内层 appex 先签，外层再签，均保留授权）
+FLUENTREAD_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" pnpm safari:app
+```
+
+免费 Apple ID 也能获得 Apple Development 证书：Xcode → Settings → Accounts 添加账号 → Manage Certificates → `+` → Apple Development。免费个人团队的描述文件 7 天到期，需要定期重签；付费开发者账号（Developer ID）没有这个限制。
+
 
 构建时由 `build-app.mjs` 在复制产物后执行：
 

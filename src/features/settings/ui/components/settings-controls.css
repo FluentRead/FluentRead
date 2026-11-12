@@ -5,7 +5,7 @@
  * 模块边界：只改变明确加入设置控件范围的外观，不修改开关值、可访问名称、键盘行为或业务状态，也不要求复用方挂载完整 Options 页面骨架。
  */
 :is(.settings-app .settings-card, .fr-settings-controls) :is(.el-input__wrapper, .el-select__wrapper) { border-radius: 8px; box-shadow: none; }
-:is(.settings-app .settings-card, .fr-settings-controls) .el-switch { --el-switch-on-color: var(--brand); --el-switch-off-color: var(--muted); min-width: 52px; width: auto !important; height: 44px !important; gap: 8px; justify-content: flex-end; border-radius: 8px; }
+:is(.settings-app .settings-card, .fr-settings-controls) .el-switch { --el-switch-on-color: var(--brand); min-width: 52px; width: auto !important; height: 44px !important; gap: 8px; justify-content: flex-end; border-radius: 8px; }
 :is(.settings-app .settings-card, .fr-settings-controls) .el-switch__core { min-width: 48px !important; width: 48px !important; height: 28px !important; border-radius: 999px; }
 :is(.settings-app .settings-card, .fr-settings-controls) .el-switch__action { left: 3px; width: 20px; height: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
 :is(.settings-app .settings-card, .fr-settings-controls) .el-switch.is-checked .el-switch__action { left: calc(100% - 23px); }

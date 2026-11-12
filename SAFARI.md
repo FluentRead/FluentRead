@@ -80,6 +80,10 @@ safari/流畅阅读/流畅阅读/AppIcon.icon/
 - 容器应用：`Resources/Icon.png` 与 `Icon-dark.png`，`Style.css` 里同样按外观切换（`content` 的相对地址以样式表目录为基准，不能写 `../`）；
 - 清单图标（Safari 设置里的扩展列表）是静态资源，由系统渲染，不随外观变化。
 
+### 工具栏按钮
+
+Safari 按模板渲染工具栏按钮：只取轮廓，颜色由工具栏明暗决定。因此工具栏不能复用带底色的应用图标（会被压成灰底方块），而是单独提供 `public/icon/action/{16,19,32,38}.png` —— 透明底、纯黑字形，通过清单 `action.default_icon` 指定（仅 Safari 产物），`badgeRuntime` 切换状态图标时也走这套资源。
+
 构建时由 `build-app.mjs` 在复制产物后执行：
 
 ```sh

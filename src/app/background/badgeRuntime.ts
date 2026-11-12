@@ -8,6 +8,7 @@ import {TabTranslationStateStore} from './tabTranslationState';
 import {createTabTranslationStateReader} from './tabTranslationQuery';
 import {normalizeTranslationToolbarStatus, type TranslationToolbarStatus} from '@/src/features/full-page-translation/toolbarStatus';
 import {setActionIcon} from '@/src/platform/browser/actionIcon';
+import {browserCapabilities} from '@/src/platform/browser/capabilities';
 
 interface BadgeActionApi {
     setBadgeText(details: {tabId: number; text: string}): Promise<void> | void;
@@ -20,7 +21,11 @@ export interface BackgroundBadgeRuntime {
     update(tabId: number): Promise<void>;
 }
 
-const iconPaths = Object.fromEntries([16, 32, 48, 64, 128].map(size => [size, `icon/${size}.png`]));
+// Safari 的工具栏按钮按模板渲染，只保留字形轮廓；用整块方形图标会被压成一个灰底方块，
+// 因此 Safari 走透明底的模板图标，其余浏览器保留带底色的应用图标。
+const iconPaths = browserCapabilities.browser === 'safari'
+    ? Object.fromEntries([16, 19, 32, 38].map(size => [size, `icon/action/${size}.png`]))
+    : Object.fromEntries([16, 32, 48, 64, 128].map(size => [size, `icon/${size}.png`]));
 const badges = {
     translating: {text: '…', color: '#2563eb'},
     translated: {text: '✓', color: '#15803d'},

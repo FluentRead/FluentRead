@@ -135,6 +135,16 @@ export function createExtensionManifest(
     // Safari 16.4 起支持 MV3 与模块化 service worker；17 起 offscreen 依赖的后台标签页行为稳定。
     const safariManifest = env.browser === 'safari' ? {
         browser_specific_settings: {safari: {strict_min_version: '17.0'}},
+        // Safari 按模板渲染工具栏按钮，只取图形的轮廓；提供带底色的应用图标会被压成灰底方块，
+        // 因此单独给一套透明底的模板图标，让工具栏只显示 A/中 字形。
+        action: {
+            default_icon: {
+                16: 'icon/action/16.png',
+                19: 'icon/action/19.png',
+                32: 'icon/action/32.png',
+                38: 'icon/action/38.png',
+            },
+        },
     } : {};
     // Safari 的扩展页面使用系统默认 CSP；自定义 extension_pages 只对 Chromium/Firefox 有意义。
     const contentSecurityPolicy = env.browser === 'safari' ? undefined : {

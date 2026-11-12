@@ -5,6 +5,7 @@
  * 模块边界：样式仅服务 DocumentApp 的 class 结构，不解析文档、不控制翻译状态，也不覆盖 content 宿主页面；跨页面基础视觉 token 仍由 src/ui/styles/tokens.css 管理。
  */
 @import "../../ui/styles/feedback.css";
+@import "../../ui/styles/brand-icon.css";
 /* 文档翻译页面样式跟随 app 页面边界。 */
 :root {
   font-family: Inter, "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;

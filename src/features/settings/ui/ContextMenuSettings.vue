@@ -19,7 +19,7 @@
         <div class="context-menu-preview-menu" aria-live="polite">
           <ul v-if="previewEntries.length" class="context-menu-preview-list">
             <li v-for="item in previewEntries" :key="item.id" :data-context-menu-action="item.id" :class="{'is-site-action': item.id === 'toggleSite'}">
-              <img :src="iconUrl" width="16" height="16" alt="" aria-hidden="true" />
+              <img class="brand-icon" :src="iconUrl" width="16" height="16" alt="" aria-hidden="true" />
               <span>{{ item.title }}</span>
             </li>
           </ul>

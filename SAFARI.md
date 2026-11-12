@@ -71,6 +71,15 @@ safari/流畅阅读/流畅阅读/AppIcon.icon/
 
 深色配色对齐系统应用（快捷指令、密码等）：近黑底板 + 品牌色字形。两套图层由系统按外观自动选择，不需要运行时判断。字形高度约占画布 64%。
 
+### 界面里的品牌图标
+
+扩展自有页面（弹窗、设置、文档翻译）与容器应用引导页共用同一套配色：
+
+- 资源：`public/icon/appearance/{light,dark}-{16..128}.png`，构建后进入扩展包；
+- 切换：`src/ui/styles/brand-icon.css` 用 `img.brand-icon { content: url(...) }` 配合 `prefers-color-scheme`，不写脚本；
+- 容器应用：`Resources/Icon.png` 与 `Icon-dark.png`，`Style.css` 里同样按外观切换（`content` 的相对地址以样式表目录为基准，不能写 `../`）；
+- 清单图标（Safari 设置里的扩展列表）是静态资源，由系统渲染，不随外观变化。
+
 构建时由 `build-app.mjs` 在复制产物后执行：
 
 ```sh

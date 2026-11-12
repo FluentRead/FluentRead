@@ -14,7 +14,7 @@
   >
     <header class="preview-header" aria-hidden="true">
       <span class="preview-brand">
-        <img class="preview-logo" :src="iconUrl" alt="" width="32" height="32" />
+        <img class="preview-logo brand-icon" :src="iconUrl" alt="" width="32" height="32" />
         <span><strong>{{ t('common.brand') }}</strong><small>v{{ version }}</small></span>
       </span>
       <span class="preview-header-actions">

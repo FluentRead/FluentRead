@@ -66,6 +66,15 @@ body {
 
 .brand img {
     border-radius: 12px;
+    /* 引导页品牌图标随系统外观切换：浅色用粉底白字，深色用近黑底 + 品牌粉字。
+       content 中的相对地址以本样式表所在目录为基准，不能写 ../。 */
+    content: url("Icon.png");
+}
+
+@media (prefers-color-scheme: dark) {
+    .brand img {
+        content: url("Icon-dark.png");
+    }
 }
 
 .brand-copy {

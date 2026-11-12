@@ -29,7 +29,7 @@
     <div v-show="!showLanguageOnboarding" class="popup-content" :inert="showLanguageOnboarding">
     <header class="popup-header">
       <div class="brand">
-        <img src="/icon/128.png" alt="" />
+        <img class="brand-icon" src="/icon/128.png" alt="" />
         <div>
           <strong>流畅阅读</strong>
           <small class="brand-version" data-testid="popup-version">v{{ version }}</small>

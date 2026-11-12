@@ -50,6 +50,7 @@ import 'element-plus/es/components/color-picker/style/css'
 import '@/src/features/settings/ui/settings-page.css'
 import {createUiI18nPlugin} from '@/src/ui/i18n'
 import '@/src/ui/styles/interface-skins.css'
+import '@/src/ui/styles/brand-icon.css'
 import {config, configReady} from '@/src/services/config/store'
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles'
 

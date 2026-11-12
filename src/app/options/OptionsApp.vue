@@ -8,7 +8,7 @@
   <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}">
     <aside class="sidebar">
       <a class="brand" :href="websiteUrl" target="_blank" rel="noopener noreferrer" :aria-label="t('options.aboutWebsite')" :title="t('options.aboutWebsite')">
-        <img :src="iconUrl" alt="" />
+        <img class="brand-icon" :src="iconUrl" alt="" />
         <div class="brand-copy">
           <strong data-i18n-ignore>{{ t('common.brand') }}</strong>
           <p class="sidebar-tagline" data-testid="brand-tagline" data-i18n-ignore>{{ t('brand.tagline') }}</p>
@@ -87,7 +87,7 @@
           <header class="about-hero">
             <div class="about-intro">
               <div class="about-identity">
-                <img class="about-logo" :src="iconUrl" alt="流畅阅读图标" />
+                <img class="about-logo brand-icon" :src="iconUrl" alt="流畅阅读图标" />
                 <div>
                   <strong>{{ t('common.brand') }}</strong>
                   <span class="about-version">V{{ version }} · {{ t('options.aboutHeroDescription') }}</span>

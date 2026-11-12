@@ -1,0 +1,17 @@
+/**
+ * @file src/ui/styles/brand-icon.css
+ * 文件职责：让扩展自有页面里的品牌图标随系统深浅色外观切换。
+ * 主要内容：为 img.brand-icon 指定浅色/深色两套图标资源，使用 prefers-color-scheme 让浏览器自动选择，
+ * 不依赖脚本或配置；图标按 128px 提供，由使用处按需缩放。
+ * 模块边界：只处理品牌图标的资源替换，不定义尺寸、圆角或布局，也不影响宿主网页中的内容脚本 UI。
+ */
+
+img.brand-icon {
+    content: url('/icon/appearance/light-128.png');
+}
+
+@media (prefers-color-scheme: dark) {
+    img.brand-icon {
+        content: url('/icon/appearance/dark-128.png');
+    }
+}

@@ -11,7 +11,7 @@
     <button v-if="parsedDocument && focusMode" class="focus-exit" type="button" @click="setFocusMode(false)">{{ translateLegacy('退出专注阅读') }}<kbd>Esc</kbd></button>
     <header v-if="!parsedDocument && !restoring" class="document-header">
       <div class="document-brand" aria-label="流畅阅读文档翻译">
-        <img src="/icon/128.png" alt="" />
+        <img class="brand-icon" src="/icon/128.png" alt="" />
         <span>
           <strong>流畅阅读</strong>
           <small>文档翻译</small>
@@ -127,7 +127,7 @@
         <section class="document-taskbar" :class="{'has-pdf-controls': readerTab === 'read' && isPdfDocument}" aria-label="当前文档与翻译任务">
           <div class="workspace-heading">
             <button class="sidebar-toggle" type="button" :class="{active: sidebarOpen}" :aria-expanded="sidebarOpen" :aria-label="translateLegacy('文件与目录')" :title="translateLegacy('文件与目录')" @click="sidebarOpen = !sidebarOpen"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.4"/></svg><small v-if="documentQueue.length > 1">{{ documentQueue.length }}</small></button>
-            <img class="taskbar-logo" src="/icon/128.png" alt="" />
+            <img class="taskbar-logo brand-icon" src="/icon/128.png" alt="" />
             <div class="file-heading"><div><h1 data-i18n-ignore :title="parsedDocument.fileName">{{ parsedDocument.fileName }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="hasTranslation"> · {{ completedSegments }} / {{ parsedDocument.segments.length }}</span></p></div></div>
           </div>
           <div class="reader-toolbar">

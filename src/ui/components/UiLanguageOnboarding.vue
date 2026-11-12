@@ -27,7 +27,7 @@
 
         <div v-else-if="step === 'welcome'" key="welcome" class="onboarding-welcome" data-testid="onboarding-welcome">
           <div class="onboarding-brand">
-            <img src="/icon/128.png" alt="" />
+            <img class="brand-icon" src="/icon/128.png" alt="" />
             <strong>{{ onboardingProductNames[selectedLanguage] }}</strong>
           </div>
 

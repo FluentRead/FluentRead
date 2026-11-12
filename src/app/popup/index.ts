@@ -7,6 +7,7 @@
 import './popup.css';
 import 'element-plus/es/components/base/style/css';
 import '@/src/ui/styles/interface-skins.css';
+import '@/src/ui/styles/brand-icon.css';
 import {isEmbeddedPopup, isPopupSurfaceActive, observeEmbeddedPopupSize, preparePopupSurface} from './embedded';
 type PopupRuntime = {
   sendMessage(message: unknown, callback?: (response: unknown) => void): Promise<unknown> | void;

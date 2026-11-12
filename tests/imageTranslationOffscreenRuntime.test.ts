@@ -5,12 +5,12 @@ import {recordMangaBubblePlacement,bindMangaBubblePlacements} from '@/src/featur
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 import type {ImageViewport} from '@/src/shared/image/types';
 
-const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn()}));
+const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn(), setBackend:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',async importOriginal=>({...await importOriginal<typeof import('@/src/features/image-translation/services/mangaAlphaProtection')>(),planMangaAlphaProtection:mocks.alphaProtection}));
 vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeImageCanvas:mocks.encode}));
 vi.mock('@/src/features/image-translation/services/mangaOcr',()=>({mangaOcrRuntime:{recognize:mocks.mangaRecognize}}));
 vi.mock('@/src/features/image-translation/services/mangaInpainting',()=>({mangaInpaintingRuntime:{repair:mocks.repair}}));
-vi.mock('@/src/features/image-translation/services/mangaInferenceClient',()=>({mangaInferenceClient:{prepareTextSegmentation:vi.fn(async()=>false),segmentText:vi.fn()}}));
+vi.mock('@/src/features/image-translation/services/mangaInferenceClient',()=>({mangaInferenceClient:{prepareTextSegmentation:vi.fn(async()=>false),segmentText:vi.fn(),setBackend:mocks.setBackend}}));
 vi.mock('@/src/features/image-translation/services/mangaRendering',async importOriginal=>({...await importOriginal<typeof import('@/src/features/image-translation/services/mangaRendering')>(),drawMangaTranslations:mocks.mangaDraw,sampleMangaBackgrounds:mocks.sampleManga}));
 vi.mock('@/src/features/image-translation/services/ocrRuntime', () => ({recognizeImage: mocks.recognize}));
 vi.mock('@/src/features/image-translation/services/inpainting', async importOriginal => ({...(await importOriginal()), inpaintTextRegions: mocks.inpaint}));
@@ -338,6 +338,14 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(result.image).toBe('');expect(result.mangaPatches).toMatchObject({width: 32, height: 16});
         expect(result.lines[0]).toMatchObject({sourceText: 'Hello', text: '你好'});
         expect(images[0].src).toBe('');expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true);
+    });
+    it.each(['auto', 'cpu'] as const)('本地后端 %s 在任何图片识别前交给既有客户端', async backend => {
+        mocks.mangaRecognize.mockImplementationOnce(async () => {
+            expect(mocks.setBackend).toHaveBeenLastCalledWith(backend);
+            return [];
+        });
+        await translateImageInOffscreen('image', 'en', 'Page', undefined, 'backend', false, 'paddle', undefined, backend);
+        expect(mocks.setBackend).toHaveBeenCalledWith(backend);
     });
     it('单图选择 PaddleOCR 只替换识别引擎，仍返回完整译图与文本，不启动漫画修补', async () => {
         mocks.mangaRecognize.mockResolvedValue(lines);

@@ -271,6 +271,22 @@ describe('audit 49 E actual translation and cache entries', () => {
 });
 
 describe('audit 49 E real Vue client model settings', () => {
+    it('运行信息按模型状态显示阶段、会话后端和自动回退，旧状态不出现空面板', async () => {
+        vi.useFakeTimers();
+        let inference: Record<string, unknown> | undefined;
+        ports.message.mockImplementation(async () => ({success: true, ready: true, inpaintingReady: true, bytes: 30, ...(inference ? {inference} : {})}));
+        const {container} = await mount(MangaModelSettings);
+        expect(container.querySelector('.manga-inference-diagnostics')).toBeNull();
+        const labels = {idle: '等待任务', preparing: '正在准备资源', initializing: '正在初始化本地模型…', recognizing: '正在处理图片', completed: '处理完成', canceled: '已取消', error: '处理失败'};
+        for (const [stage, label] of Object.entries(labels)) {
+            inference = {preference: 'auto', stage, executionProviders: stage === 'idle' ? [] : ['wasm'], cpuFallback: stage === 'error'};
+            await vi.advanceTimersByTimeAsync(1500); await settle();
+            const details = container.querySelector<HTMLDetailsElement>('.manga-inference-diagnostics')!;
+            expect(details.open).toBe(false); expect(details.textContent).toContain(label);
+            expect(details.textContent).toContain(stage === 'idle' ? '—' : 'wasm');
+            expect(details.textContent!.includes('已自动回退 CPU（WASM）')).toBe(stage === 'error');
+        }
+    });
     it('keeps optional segmentation within management and independent from the main OCR readiness', async () => {
         vi.useFakeTimers();const first=deferred<unknown>();ports.message.mockReturnValueOnce(first.promise);
         const {container,props}=await mount(MangaModelSettings,{imageRecognition:true,showInpainting:false});
@@ -514,7 +530,8 @@ describe('audit 49 E real Vue client model settings', () => {
         }
         const select = async (label: string, value: string) => {container.querySelector<HTMLButtonElement>(`[aria-label="${label}"] [data-option-value="${value}"]`)!.click(); await settle();};
         await select('area.settings.sourceLanguage', 'en'); await select('漫画目标语言', 'ja'); await select('漫画翻译服务', 'fixture'); await select('图片识别方式', 'tesseract');
-        expect(props.settings).toMatchObject({from: 'en', to: 'ja', imageTranslationService: 'fixture', imageTranslationOcrEngine: 'tesseract'});
+        await select('本地处理后端', 'cpu');
+        expect(props.settings).toMatchObject({from: 'en', to: 'ja', imageTranslationService: 'fixture', imageTranslationOcrEngine: 'tesseract', imageTranslationInferenceBackend: 'cpu'});
         container.querySelector<HTMLButtonElement>('[role="switch"][aria-label="网页图片翻译"]')!.click(); await settle(); expect(imageChanged).toHaveBeenCalledWith(true);
         props.imageEnabled = true; await settle();
         for (const label of ['image.hover', 'image.context', '漫画连续翻译', '独立漫画按钮']) {container.querySelector<HTMLButtonElement>(`[role="switch"][aria-label="${label}"]`)!.click(); await settle();}

@@ -177,6 +177,7 @@ const VISIBLE_FIELDS: Record<string, string> = {
     sectionTranslationRules: '记住的翻译区域',
     selectionAreaEnabled: '圈选翻译',
     imageTranslationMangaEnabled: '漫画连续翻译入口',
+    imageTranslationInferenceBackend: '本地处理后端',
     imageTranslationMangaPromptEnabled: '独立漫画按钮',
     imageTranslationMangaDownloadConfirmed: '已了解漫画资源下载',
     imageTranslationMangaSites: '自定义漫画网站',

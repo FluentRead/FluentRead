@@ -321,6 +321,21 @@ describe('Offscreen 消息静态路由', () => {
         expect(mocks.translateImage.mock.calls[0]).toHaveLength(mangaViewport===undefined?7:8);
     });
 
+    it.each(['auto', 'cpu'] as const)('后端 %s 向运行时第九参数透传，不改变可选 viewport', async inferenceBackend => {
+        const message = {type: 'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN', image: 'data:image/png,x', sourceLanguage: 'en', requestId: 'cpu-router', inferenceBackend};
+        await dispatch(message);
+        expect(mocks.translateImage).toHaveBeenLastCalledWith('data:image/png,x', 'en', '', expect.any(AbortSignal), 'cpu-router', false, 'tesseract', undefined, inferenceBackend);
+        const viewport = {x: 0, y: 0, width: 100, height: 100};
+        await dispatch({...message, manga: true, mangaViewport: viewport});
+        expect(mocks.translateImage).toHaveBeenLastCalledWith('data:image/png,x', 'en', '', expect.any(AbortSignal), 'cpu-router', true, 'tesseract', viewport, inferenceBackend);
+        const calls = mocks.translateImage.mock.calls.length;
+        for (const invalid of [null, '', 'gpu', 1, {}]) {
+            const result = await dispatch({...message, inferenceBackend: invalid});
+            expect(result.response).toMatchObject({success: false, error: '图片处理后端无效'});
+        }
+        expect(mocks.translateImage).toHaveBeenCalledTimes(calls);
+    });
+
     it('单图识别方式只能使用明确枚举，不接受任意引擎或隐式漫画模式', async () => {
         const message={type:'FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN',image:'data:image/png,x',sourceLanguage:'en',ocrEngine:'paddle'};
         await dispatch(message);

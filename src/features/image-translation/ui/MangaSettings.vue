@@ -1,5 +1,6 @@
 <!--
  * @file src/features/image-translation/ui/MangaSettings.vue
+ * 图片与漫画共用的本地处理后端通过父配置保存；选择本身不下载或初始化模型。
  * 文件职责：组织漫画连续阅读的设置，优先展示公共语言与翻译服务、单图识别方式和漫画提前翻译；直接呈现入口、缓存、资源状态和可搜索的完整网站清单。
  * 主要内容：图片识别方式和图片入口、漫画提前翻译和按钮及缓存分别归入对应预览右侧，漫画开关独立于单张图片和悬浮球；共享资源在单层设置框中按用途分隔，自定义网站规则按精确地址与图片选择器添加和删除，非法输入给出就地反馈；主要模块标记页内导航目标，备用模型、语言包管理、离线导入和自定义规则按需展开。
  * 模块边界：编辑父级配置副本，由既有设置持久化负责保存；不调用漫画翻译、不扫描其他网站、不访问会员或章节接口。
@@ -10,6 +11,7 @@
       <SettingsItem :label="t('area.settings.sourceLanguage')"><UiSelect v-model="settings.from" :aria-label="t('area.settings.sourceLanguage')"><el-option v-for="item in sourceLanguages" :key="item.value" :value="item.value" :label="t(item.label)" /></UiSelect></SettingsItem>
       <SettingsItem :label="t('翻译成')"><UiSelect v-model="settings.to" :aria-label="t('漫画目标语言')"><el-option v-for="item in targetLanguages" :key="item.value" :value="item.value" :label="t(item.label)" data-i18n-ignore>{{ t(item.label) }}</el-option></UiSelect></SettingsItem>
       <SettingsItem :label="t('翻译服务')"><UiSelect v-model="settings.imageTranslationService" :empty-values="[null, undefined]" :placeholder="t('跟随网页翻译服务')" :aria-label="t('漫画翻译服务')"><el-option value="" :label="t('跟随网页翻译服务')" /><el-option v-for="item in serviceOptions" :key="item.value" :value="item.value" :disabled="item.disabled" :label="t(item.label)" data-i18n-ignore>{{ t(item.label) }}</el-option></UiSelect></SettingsItem>
+      <SettingsItem :label="t('本地处理后端')" :description="t('图片与漫画共用。浏览器卡顿时可选 CPU（WASM），下次处理生效。')"><UiSelect v-model="settings.imageTranslationInferenceBackend" :disabled="!available" :aria-label="t('本地处理后端')"><el-option value="auto" :label="t('自动')" /><el-option value="cpu" :label="t('CPU（WASM）')" /></UiSelect></SettingsItem>
     </SettingsGroup>
     <SettingsGroup class="image-recognition-settings" data-testid="image-recognition-settings" data-settings-anchor="image" :data-settings-anchor-label="t('网页图片翻译')">
       <FeatureEnableCard :model-value="imageEnabled" :disabled="!available" :title="t('网页图片翻译')" :description="t('悬停图片或右键翻译，随时对照原图。')" @update:model-value="emit('update:imageEnabled', $event)" />

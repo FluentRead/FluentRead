@@ -36,6 +36,14 @@ function mockProgressClient(sendMessage: ReturnType<typeof vi.fn>) {
 }
 
 describe('图片失败恢复和控件可见性', () => {
+    it.each(['auto', 'cpu'] as const)('图片与漫画从后台配置读取 %s 后端，不接受页面覆盖', async inferenceBackend => {
+        for (const manga of [false, true]) {
+            const {dependencies, handler} = setup({getImageInferenceBackend: () => inferenceBackend});
+            await handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type: IMAGE_TRANSLATE_MESSAGE_TYPE, image: 'data:image/png,x', sourceLanguage: 'en', manga,
+                inferenceBackend: inferenceBackend === 'cpu' ? 'auto' : 'cpu'} as never);
+            expect(dependencies.translateImage).toHaveBeenCalledWith('data:image/png,x', 'en', '', expect.objectContaining({inferenceBackend}));
+        }
+    });
     it.each([undefined,{x:2,y:3,width:100,height:50},null,0,false])('handler只透传viewport原值，普通图片模式与请求预算不变 %#',async mangaViewport=>{
         const {dependencies,handler}=setup();
         await expect(handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',

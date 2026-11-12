@@ -2,6 +2,7 @@
  * @file src/features/image-translation/services/mangaInference.worker.ts
  * 文件职责：在独立 Worker 中执行 PaddleOCR、气泡分析、LaMa 和可选离线 CTD 分割，保持 Offscreen 音频与消息线程响应。
  * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；CTD 只读已导入缓存，验证固定输入和全部输出元数据，量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
+ * 诊断：会话创建成功后报告该会话配置的执行提供程序；不推断混合后端中每个算子的实际设备，也不传输模型或图片内容。
  * 模块边界：不读取网页、不翻译文本、不播放音频；取消和超时由 Worker 外部 owner 硬终止。
  */
 import * as ort from 'onnxruntime-web/webgpu';
@@ -27,11 +28,18 @@ export function startMangaInferenceWorker(): void {
     let painter: Awaited<ReturnType<typeof createBrowserMangaInpainter>> | undefined;
     let segmenter:ort.InferenceSession|undefined;
     let tail: Promise<void> = Promise.resolve(), creating: Promise<void> = Promise.resolve();
+    let currentRequestId = 0;
     const create = ort.InferenceSession.create.bind(ort.InferenceSession);
     ort.InferenceSession.create = ((...args: Parameters<typeof create>) => {
         const result = creating.then(() => paceLocalInitialization(() => create(...args)));
         creating = result.then(() => undefined, () => undefined);
-        return result;
+        return result.then(session => {
+            const options = args.at(-1) as ort.InferenceSession.SessionOptions | undefined;
+            const executionProviders = options?.executionProviders?.map(value => typeof value === 'string' ? value : value.name)
+                .filter((value): value is 'webgpu' | 'wasm' => value === 'webgpu' || value === 'wasm');
+            if (executionProviders?.length) post({requestId: currentRequestId, executionProviders});
+            return session;
+        });
     }) as typeof create;
     const scope = self as unknown as {postMessage(message: MangaInferenceResponse, transfer: Transferable[]): void};
     const post = (response: MangaInferenceResponse) => {
@@ -90,6 +98,7 @@ export function startMangaInferenceWorker(): void {
     }
     async function handle(message: MangaInferenceMessage) {
         const requestId = message.requestId;
+        currentRequestId = requestId;
         try {
             if (message.cpu) {forceSingleThreadInference(); Object.defineProperty(navigator, 'gpu', {value: undefined, configurable: true});}
             const progress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => post({requestId, stage, percent});

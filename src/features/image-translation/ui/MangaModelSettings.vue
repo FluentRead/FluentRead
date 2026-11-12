@@ -1,5 +1,6 @@
 <!--
  * @file src/features/image-translation/ui/MangaModelSettings.vue
+ * 运行信息按需显示当前阶段、最近成功会话配置的执行提供程序与自动 CPU 回退状态。
  * 文件职责：提供图片与漫画共用本地模型的准备状态、真实进度、离线导入和缓存清理。
  * 主要内容：供漫画与单图共用，突出当前资源用途和准备状态，离线导入及清理收进次要入口；关闭漫画时只展示识别资源；图片识别的可选文字分割模型只在管理入口说明离线导入和就绪状态，不计入基础资源准备条件；定时读取后台模型缓存和下载快照，下载期间加快读取并显示进度条、百分比和已下载体积，错误会展开管理入口，离线文件经过资源服务校验才入库，保留部分成功并显示错误反馈；自动下载的来源与回退细节不进入用户界面。
  * 模块边界：不运行 OCR/修补、不下载远程代码、不上传选中文件；页面关闭只清理状态订阅，正在处理漫画的任务仍由 Offscreen 和页面取消入口管理。
@@ -29,6 +30,12 @@
       <div class="manga-model-controls"><button type="button" :disabled="busy || downloading" @click="input?.click()">{{ translateLegacy('导入已下载文件') }}</button><input ref="input" hidden type="file" multiple accept=".onnx,.txt" @change="importFiles" /></div>
       <div v-if="status?.bytes" class="manga-model-storage"><small>{{ translateLegacy('已占用空间') }} · {{ Math.round(status.bytes / 1048576) }} MB</small><button type="button" :disabled="busy || downloading" @click="remove">{{ translateLegacy('清除已下载资源') }}</button></div>
     </details>
+    <details v-if="status?.inference" class="manga-inference-diagnostics">
+      <summary>{{ translateLegacy('运行信息') }}</summary>
+      <p>{{ translateLegacy('当前处理阶段') }} · {{ translateLegacy(stageLabel) }}</p>
+      <p>{{ translateLegacy('最近会话后端') }} · <span data-i18n-ignore>{{ status.inference.executionProviders.join(' / ') || '—' }}</span></p>
+      <p v-if="status.inference.cpuFallback">{{ translateLegacy('已自动回退 CPU（WASM）') }}</p>
+    </details>
   </section>
 </template>
 <script setup lang="ts">
@@ -36,15 +43,17 @@ import {computed,onBeforeUnmount,onMounted,ref} from 'vue';
 import browser from 'webextension-polyfill';
 import {useUiI18n} from '@/src/ui/i18n';
 import {importMangaModel,MANGA_TEXT_SEGMENTATION_ASSET,type MangaDownloadState} from '../services/mangaOcrAssets';
+import type {MangaInferenceDiagnostics} from '../services/mangaInferenceClient';
 withDefaults(defineProps<{showInpainting?: boolean; embedded?: boolean; imageRecognition?: boolean}>(),{showInpainting:true,embedded:false,imageRecognition:true});
 const {translateLegacy}=useUiI18n();
-const status=ref<{ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState}|null>(null);
+const status=ref<{ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics}|null>(null);
+const stageLabel=computed(()=>({idle:'等待任务',preparing:'正在准备资源',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'处理完成',canceled:'已取消',error:'处理失败'}[status.value?.inference?.stage ?? 'idle']));
 const busy=ref(false),error=ref(''),statusError=ref(''),input=ref<HTMLInputElement>();
 const downloading=computed(()=>['downloading','verifying'].includes(status.value?.download?.phase??''));
 const phaseLabel=computed(()=>({downloading:'正在下载漫画模型',verifying:'正在校验漫画模型',paused:'漫画模型下载已暂停',error:'漫画模型下载未完成'}[status.value?.download?.phase??'downloading']));
 let disposed=false,timer:ReturnType<typeof setTimeout>|undefined;
 async function load(){
-  const response=await browser.runtime.sendMessage({type:'fluentReadMangaModelStatus'}) as {success?:boolean;error?:string;ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState};
+  const response=await browser.runtime.sendMessage({type:'fluentReadMangaModelStatus'}) as {success?:boolean;error?:string;ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics};
   if(!response?.success)throw new Error(response?.error||'漫画识别模型状态读取失败');
   if(!disposed){
     status.value=response;statusError.value='';

@@ -80,6 +80,9 @@ describe('配置差异预览', () => {
         expect(group(buildConfigDiff({imageTranslationOcrEngine: 'tesseract'}, {imageTranslationOcrEngine: 'paddle'}), 'imageTranslation')?.changes).toEqual([
             {key: 'imageTranslationOcrEngine', label: '图片识别方式', before: 'Tesseract（轻量模型）', after: 'PaddleOCR（标准模型）'},
         ]);
+        expect(group(buildConfigDiff({imageTranslationInferenceBackend: 'auto'}, {imageTranslationInferenceBackend: 'cpu'}), 'imageTranslation')?.changes).toEqual([
+            {key: 'imageTranslationInferenceBackend', label: '本地处理后端', before: '自动', after: 'CPU（WASM）'},
+        ]);
     });
     it('云备份只能获得已知设置名称；词库选择和功能偏好保持可辨认摘要', () => {
         expect(configDiffFieldLabel('hotkey')).toBe('鼠标悬浮快捷键');

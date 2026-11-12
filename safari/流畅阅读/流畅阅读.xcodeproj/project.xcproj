@@ -127,7 +127,7 @@
         "ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME": "AccentColor",
         "CODE_SIGN_STYLE": "Automatic",
         "COMBINE_HIDPI_IMAGES": "YES",
-        "CURRENT_PROJECT_VERSION": "2",
+        "CURRENT_PROJECT_VERSION": "3",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_OUTGOING_NETWORK_CONNECTIONS": "YES",
@@ -143,7 +143,7 @@
           "$(inherited)",
           "@executable_path/../Frameworks",
         ],
-        "MARKETING_VERSION": "0.0.38",
+        "MARKETING_VERSION": "0.0.39",
         "OTHER_LDFLAGS": [
           "-framework",
           "SafariServices",
@@ -172,7 +172,7 @@
       ],
       "build-settings": {
         "CODE_SIGN_STYLE": "Automatic",
-        "CURRENT_PROJECT_VERSION": "2",
+        "CURRENT_PROJECT_VERSION": "3",
         "ENABLE_APP_SANDBOX": "YES",
         "ENABLE_HARDENED_RUNTIME": "YES",
         "ENABLE_USER_SELECTED_FILES": "readonly",
@@ -186,7 +186,7 @@
           "@executable_path/../../../../Frameworks",
         ],
         "MACOSX_DEPLOYMENT_TARGET": "12.0",
-        "MARKETING_VERSION": "0.0.38",
+        "MARKETING_VERSION": "0.0.39",
         "OTHER_LDFLAGS": [
           "-framework",
           "SafariServices",

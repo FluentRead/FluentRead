@@ -13,7 +13,10 @@ const hooks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/src/services/translation/client', () => ({translateText: hooks.translateText}));
-vi.mock('@/src/core/language/detect', () => ({shouldSkipTranslationForTarget: hooks.shouldSkip}));
+vi.mock('@/src/core/language/detect', () => ({
+    shouldSkipTranslationForTarget: hooks.shouldSkip,
+    shouldSkipChineseTargetParagraph: () => false,
+}));
 vi.mock('@/src/features/full-page-translation/content/translationRequest', () => ({
     createSnapshotTranslateOptions: (snapshot: unknown, options: unknown) => ({snapshot, ...(options as object)}),
 }));

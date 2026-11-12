@@ -1,7 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {translate, translateLegacyText, type UiLanguage} from '@/src/core/i18n';
-import {createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
+import {createImageOperationRegistry, createImageTranslationBackgroundHandlers, IMAGE_TRANSLATE_MESSAGE_TYPE, IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, IMAGE_CANCEL_MESSAGE_TYPE} from '@/src/features/image-translation/background/handlers';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress} from '@/src/features/image-translation/progress';
 import {createOpenOptionsPageHandler} from '@/src/features/settings/background';
 import {IMAGE_LOCAL_FAILURES, imageLocalFailureMessage, imageTranslationFailureCode, imageTranslationFailureResponse, createImageTranslationFailure} from '@/src/features/image-translation/failure';
@@ -36,6 +36,32 @@ function mockProgressClient(sendMessage: ReturnType<typeof vi.fn>) {
 }
 
 describe('图片失败恢复和控件可见性', () => {
+    it.each(['resolve','reject'] as const)('重复身份被拒绝，取消后的迟到 %s 不释放重试任务', async outcome => {
+        const registry = createImageOperationRegistry(), old = deferred<unknown>(), next = deferred<unknown>();
+        const request = {requestId: 'registry-reuse'};
+        const first = registry.run(request, () => old.promise);
+        const duplicate = vi.fn(async () => 'duplicate');
+        await expect(registry.run(request, duplicate)).rejects.toThrow('正在执行');
+        expect(duplicate).not.toHaveBeenCalled();
+        const canceled = expect(first).rejects.toMatchObject({name: 'AbortError'});
+        registry.cancel(request.requestId); await canceled;
+        let signal!: AbortSignal;
+        const retry = registry.run(request, options => {signal = options.signal; return next.promise;});
+        if (outcome === 'resolve') old.resolve('stale'); else old.reject(new Error('stale failure'));
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+        expect(signal.aborted).toBe(false);
+        const canceledRetry = expect(retry).rejects.toMatchObject({name: 'AbortError'});
+        registry.cancel(request.requestId); await canceledRetry;
+        expect(signal.aborted).toBe(true); next.resolve('late retry');
+    });
+    it.each(['auto', 'cpu'] as const)('图片与漫画从后台配置读取 %s 后端，不接受页面覆盖', async inferenceBackend => {
+        for (const manga of [false, true]) {
+            const {dependencies, handler} = setup({getImageInferenceBackend: () => inferenceBackend});
+            await handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type: IMAGE_TRANSLATE_MESSAGE_TYPE, image: 'data:image/png,x', sourceLanguage: 'en', manga,
+                inferenceBackend: inferenceBackend === 'cpu' ? 'auto' : 'cpu'} as never);
+            expect(dependencies.translateImage).toHaveBeenCalledWith('data:image/png,x', 'en', '', expect.objectContaining({inferenceBackend}));
+        }
+    });
     it.each([undefined,{x:2,y:3,width:100,height:50},null,0,false])('handler只透传viewport原值，普通图片模式与请求预算不变 %#',async mangaViewport=>{
         const {dependencies,handler}=setup();
         await expect(handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_MESSAGE_TYPE,image:'data:image/png,x',sourceLanguage:'en',

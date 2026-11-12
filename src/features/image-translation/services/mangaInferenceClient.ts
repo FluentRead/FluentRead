@@ -2,6 +2,7 @@
  * @file src/features/image-translation/services/mangaInferenceClient.ts
  * 文件职责：在 Offscreen 外部看守独立漫画推理 Worker，隔离 GPU 初始化挂起与原生推理阻塞。
  * 主要内容：串行请求和真实阶段转发；取消立即结束调用方等待，已开始的模型准备继续暖机、推理仅允许短暂收尾；错误与超时仍硬终止并仅重建一次 CPU Worker，复用共享并行预算；可选缓存分割先准备再按次构造并转移独占张量，CPU 重试重新取输入；分割端口独立三分钟空闲释放，旧消息不能影响新请求。
+ * 后端选择：CPU 偏好从首次消息采用单线程 WASM 与 CPU 超时预算；偏好变化在串行边界重建 Worker，保留逻辑端口；仅记录当前阶段和最近成功会话的执行提供程序，不记录图片或文字。
  * 模块边界：不处理图片像素、不下载模型、不操作宿主页；静态 Worker 只读取同源缓存和包内代码。
  */
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
@@ -12,7 +13,13 @@ export interface MangaPatch {image: Float32Array; mask: Float32Array; width: num
 export type MangaInferenceProgress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => void;
 export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; tensor?:Float32Array};
 export type MangaInferenceMessage = MangaInferenceRequest & {requestId: number; cpu: boolean};
-export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; success?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
+export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; executionProviders?: Array<'webgpu' | 'wasm'>; success?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
+export interface MangaInferenceDiagnostics {
+    preference: 'auto' | 'cpu';
+    cpuFallback: boolean;
+    stage: Parameters<MangaInferenceProgress>[0] | 'idle' | 'completed' | 'canceled' | 'error';
+    executionProviders: Array<'webgpu' | 'wasm'>;
+}
 
 /** 协议/缓存完整性错误不能被误判为 GPU 故障后重复读取或分配输入。 */
 export class MangaSegmentationProtocolError extends Error { override name='MangaSegmentationProtocolError'; }
@@ -26,6 +33,10 @@ export function mangaExtensionUrl(path: string): string {
 
 export function createMangaInferenceClient(createWorker: () => Worker) {
     let worker: Worker | undefined, cpu = false, sequence = 0;
+    let preference: 'auto' | 'cpu' = 'auto';
+    let workerPreference: 'auto' | 'cpu' = 'auto';
+    let stage: MangaInferenceDiagnostics['stage'] = 'idle';
+    let executionProviders: MangaInferenceDiagnostics['executionProviders'] = [];
     let tail: Promise<void> = Promise.resolve();
     let active: {reject(error: Error): void} | undefined;
     let generation = 0;
@@ -41,7 +52,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             return operation();
         });
     }
-    function terminate() { clearWarmIdle();clearSegIdle();ports.delete('seg'); orphanWarm = false; const current = worker; worker = undefined; current?.terminate(); }
+    function terminate() { clearWarmIdle();clearSegIdle();ports.delete('seg'); orphanWarm = false; const current = worker; worker = undefined; executionProviders = []; current?.terminate(); }
     function keepSegWarm(){
         clearSegIdle();const current=worker,epoch=segEpoch;
         if(!current||!ports.has('seg'))return;
@@ -67,7 +78,10 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
     function attempt<T>(message: MangaInferenceRequest, signal?: AbortSignal, progress?: MangaInferenceProgress): Promise<T> {
         if (signal?.aborted) return Promise.reject(new DOMException('漫画处理已取消', 'AbortError'));
         clearWarmIdle();
+        if (!worker) { cpu = cpu || preference === 'cpu'; workerPreference = preference; }
         const current = worker ??= createWorker(), requestId = ++sequence;
+        if (ports.has('seg') && !segIdle) keepSegWarm();
+        if (!message.type.startsWith('dispose')) stage = message.type.startsWith('prepare') ? 'preparing' : 'initializing';
         return new Promise<T>((resolve, reject) => {
             let timeout: ReturnType<typeof setTimeout>;
             let drain: ReturnType<typeof setTimeout> | undefined;
@@ -89,10 +103,12 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                     keepWarm(current);
                 }
                 if (canceled) error = new DOMException('漫画处理已取消', 'AbortError');
+                if (!message.type.startsWith('dispose')) stage = canceled ? 'canceled' : error ? 'error' : 'completed';
                 error ? reject(error) : resolve(result as T);
             }
             const abort = () => {
                 canceled = true;
+                stage = 'canceled';
                 // prepare 没有页面推理，可复用正在进行的下载和初始化；原有阶段看守仍生效。
                 // 原生推理无法中断，仅给已执行任务短暂收尾，不能一直阻挡新页面。
                 if (!message.type.startsWith('prepare')) drain = setTimeout(() => finish(undefined, true), CANCEL_DRAIN_MS);
@@ -101,7 +117,12 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             current.onmessage = (event: MessageEvent<MangaInferenceResponse>) => {
                 if (settled || worker !== current || event.data?.requestId !== requestId) return;
                 const response = event.data;
+                if (response.executionProviders) {
+                    executionProviders = response.executionProviders.filter(value => value === 'webgpu' || value === 'wasm');
+                    if (!response.stage && response.success === undefined) return;
+                }
                 if (response.stage) {
+                    if (!canceled) stage = response.stage;
                     // 下载是网络等待；不能因为大模型超过 15 秒就误判为 GPU 挂起并重复下载。
                     watch(response.stage === 'preparing' ? 120_000 : cpu ? 120_000 : response.stage === 'initializing' ? 15_000 : 60_000);
                     if (!canceled) progress?.(response.stage, response.percent); return;
@@ -123,6 +144,13 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
         const owner = generation;
         const result = tail.then(() => withLocalInferenceBudget(async () => {
             if(owner !== generation) throw new DOMException('漫画处理已取消','AbortError');
+            if (workerPreference !== preference) {
+                // 只在上一请求结束后切换；已有代理端口由新 Worker 按需重建真实会话。
+                const segmented = ports.has('seg');
+                terminate();
+                if (segmented) ports.add('seg');
+                cpu = preference === 'cpu'; workerPreference = preference;
+            }
             // 工厂异常保持原对象，且不进入设备重试；排队取消/代次失效不会分配张量。
             const input=()=>{
                 if(!inputFactory)return message;
@@ -148,6 +176,10 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
         });
     }
     return {
+        setBackend(value: 'auto' | 'cpu') { preference = value; },
+        getDiagnostics(): MangaInferenceDiagnostics {
+            return {preference, cpuFallback: preference === 'auto' && cpu, stage, executionProviders: [...executionProviders]};
+        },
         async prepare(kind: 'ocr' | 'inpaint', signal?: AbortSignal, progress?: MangaInferenceProgress) {
             const owner = generation;
             await request({type: `prepare-${kind}`}, signal, progress);
@@ -172,7 +204,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             finally{if(owner===generation)keepSegWarm();}
         },
         async release(kind: 'ocr' | 'inpaint'|'seg') { if(kind==='seg')clearSegIdle();ports.delete(kind); if (worker) await request({type: `dispose-${kind}`});if(kind==='seg')ports.delete(kind); if (!ports.size) { terminate(); cpu = false; } },
-        dispose() { generation++; active?.reject(new DOMException('漫画处理已取消', 'AbortError')); terminate(); ports.clear(); cpu = false; },
+        dispose() { generation++; active?.reject(new DOMException('漫画处理已取消', 'AbortError')); terminate(); ports.clear(); cpu = false; stage = 'idle'; },
     };
 }
 

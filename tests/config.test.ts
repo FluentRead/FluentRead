@@ -75,6 +75,19 @@ describe('单图本地识别方式配置', () => {
         }
     });
 });
+describe('图片本地处理后端配置兼容', () => {
+    it('旧配置与非法值使用自动，CPU 选择在序列化和归一后保留', () => {
+        expect(new Config().imageTranslationInferenceBackend).toBe('auto');
+        for (const value of [undefined, null, 'webgpu', true, {}, 1]) {
+            expect(normalizeConfig({imageTranslationInferenceBackend: value}).imageTranslationInferenceBackend).toBe('auto');
+        }
+        for (const backend of ['cpu', 'auto'] as const) {
+            const config = normalizeConfig({imageTranslationInferenceBackend: backend});
+            expect(config.imageTranslationInferenceBackend).toBe(backend);
+            expect(normalizeConfig(JSON.parse(JSON.stringify(config))).imageTranslationInferenceBackend).toBe(backend);
+        }
+    });
+});
 describe('多语种视频模型配置兼容', () => {
     it('新配置、已有缺失字段和非法选择统一使用 Small 默认', () => {
         expect(new Config().videoLocalModel).toBe('small');

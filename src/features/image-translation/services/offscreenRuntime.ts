@@ -1,5 +1,6 @@
 /**
  * @file src/features/image-translation/services/offscreenRuntime.ts
+ * 后台选择的本地后端在加载图片前交给已有推理客户端，在串行任务边界生效。
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页或预排版；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，从原 RGBA 构造独占输入，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
@@ -622,7 +623,9 @@ export async function translateImageInOffscreen(
     manga = false,
     ocrEngine: 'tesseract' | 'paddle' = 'tesseract',
     mangaViewport?:ImageViewport,
+    inferenceBackend?: 'auto' | 'cpu',
 ): Promise<OffscreenImageTranslationResult> {
+    if (inferenceBackend !== undefined) mangaInferenceClient.setBackend(inferenceBackend);
     // 提前验证输出预算，避免巨大输入完成 OCR 和付费翻译后才在生成译图时失败。
     const source = await loadImage(image, signal);
     try {

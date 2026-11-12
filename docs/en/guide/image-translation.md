@@ -1,5 +1,9 @@
 # Image translation
 
+In **Settings → Image / Manga Translation**, **Local processing backend** defaults to **Auto**. If image processing stalls the browser, choose **CPU (WASM)**. Subsequent PaddleOCR, LaMa and imported optional text segmentation sessions skip WebGPU from their first initialization and use single-threaded WASM with CPU timeouts. Switching does not download models. An active inference finishes or times out before the Worker switches at a request boundary; Cancel immediately ends the page’s wait. This setting does not change Tesseract recognition.
+
+**Recognition resources → Runtime details** shows the current stage and the providers configured for the latest successfully initialized session. `wasm` means CPU only; `webgpu / wasm` allows ONNX Runtime to assign operators to either provider and does not prove that every operator ran on the GPU. Automatic CPU fallback is shown separately.
+
 Read translations over a webpage image, or open its text panel to compare and copy the recognized text.
 
 <GuideVisual kind="image" en />

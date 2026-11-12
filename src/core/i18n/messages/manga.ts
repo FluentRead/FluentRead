@@ -1,11 +1,20 @@
 /**
  * @file src/core/i18n/messages/manga.ts
+ * 包含共享 CPU/WASM 后端设置及会话运行信息的七语界面文案。
  * 文件职责：提供漫画入口、首次资源说明和图片共享识别设置的产品文案，避免新增界面在非中文语言下显示中文。
  * 主要内容：英文完整回退目录与各语言核心操作文案，包含未绘制译文的快照筛选及全文复制；当前资源用途与准备状态优先展示，备用识别、可选文字分割的离线导入、语言包及下载管理采用简短入口。
  * 模块边界：静态界面词典，不翻译漫画内容、不读取配置、不调用服务。
  */
 const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 const rows: Array<readonly [string, string, string, string, string, string, string]> = [
+  ['本地处理后端','Local processing backend','ローカル処理バックエンド','로컬 처리 백엔드','Moteur de traitement local','Локальный вычислительный бэкенд','Motor de procesamiento local'],
+  ['图片与漫画共用。浏览器卡顿时可选 CPU（WASM），下次处理生效。','Shared by images and manga. If the browser stalls, choose CPU (WASM) for subsequent processing.','画像と漫画で共通です。ブラウザーが停止する場合は CPU（WASM）を選択してください。次の処理から適用されます。','이미지와 만화가 함께 사용합니다. 브라우저가 멈추면 CPU(WASM)를 선택하세요. 다음 처리부터 적용됩니다.','Commun aux images et aux mangas. Si le navigateur se bloque, choisissez CPU (WASM) pour les traitements suivants.','Общий для изображений и манги. Если браузер зависает, выберите CPU (WASM) для последующей обработки.','Compartido por imágenes y manga. Si el navegador se bloquea, elige CPU (WASM) para los siguientes procesos.'],
+  ['CPU（WASM）','CPU (WASM)','CPU (WASM)','CPU(WASM)','CPU (WASM)','CPU (WASM)','CPU (WASM)'],
+  ['运行信息','Runtime details','実行情報','실행 정보','Informations d’exécution','Сведения о выполнении','Información de ejecución'],
+  ['当前处理阶段','Current processing stage','現在の処理段階','현재 처리 단계','Étape de traitement actuelle','Текущий этап обработки','Etapa de procesamiento actual'],
+  ['最近会话后端','Latest session providers','直近のセッションのバックエンド','최근 세션 백엔드','Moteurs de la dernière session','Бэкенды последнего сеанса','Motores de la última sesión'],
+  ['已自动回退 CPU（WASM）','Automatically fell back to CPU (WASM)','CPU（WASM）に自動切り替えしました','CPU(WASM)로 자동 전환되었습니다','Basculement automatique vers CPU (WASM)','Автоматический переход на CPU (WASM)','Se cambió automáticamente a CPU (WASM)'],
+  ['正在处理图片','Processing image','画像を処理中','이미지 처리 중','Traitement de l’image','Обработка изображения','Procesando imagen'],
   ['精确文字分割（可选）','Precise text segmentation (optional)','精密な文字分割（任意）','정밀 텍스트 분할(선택 사항)','Segmentation précise du texte (facultative)','Точное выделение текста (необязательно)','Segmentación precisa del texto (opcional)'],
   ['约 90 MB · 仅离线导入','About 90 MB · Offline import only','約 90 MB · オフライン取り込みのみ','약 90 MB · 오프라인 가져오기만 가능','Environ 90 Mo · Importation hors ligne uniquement','Около 90 МБ · Только импорт из файла','Unos 90 MB · Solo importación sin conexión'],
   ['未导入','Not imported','未取り込み','가져오지 않음','Non importé','Не импортировано','Sin importar'],

@@ -1,5 +1,6 @@
 /**
  * @file src/features/image-translation/background/offscreenAdapter.ts
+ * 通过既有消息透传本地后端偏好和不含原文的会话诊断，不建立额外通信通道。
  * 文件职责：把跨域图片读取、图片识别、整图翻译和 OCR 语言包下载请求适配为平台 Offscreen 消息，并校验隔离文档返回的结构后交还后台 handlers。
  * 主要内容：回查原页面当前图片任务的短期授权；透传单图本地识别方式，校验模型状态并兼容旧响应中缺省的可选文字分割状态；包含 OffscreenResponse 解析、data:image 与 lines 数组验证、译图 image/lines 和普通图片保留原图状态（含合法空识别）及仅属于未绘制译文的私有缺资源重试标记结果收窄，以及 createImageTranslationOffscreenAdapter 和默认 extensionDomClient 实例。
  * 模块边界：可选漫画可见范围原样透传，不在中间层授予额外绘制范围；适配器不创建 Offscreen document、不执行 OCR/绘制，也不读取配置；文档生命周期属于 platform/offscreen，实际运算在 services/offscreenRuntime 与 ocrRuntime 中完成。
@@ -9,6 +10,7 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {extensionDomClient} from '@/src/platform/offscreen/extensionClient';
 import {withPixivImageReferrer} from './pixivImageReferrer';
 import type {MangaDownloadState, MangaModelSource} from '../services/mangaOcrAssets';
+import type {MangaInferenceDiagnostics} from '../services/mangaInferenceClient';
 import type {ImageProgressContext} from './handlers';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
 import type {ImageOcrLanguageCode} from '@/src/features/image-translation/ocrLanguages';
@@ -33,6 +35,7 @@ interface OffscreenResponse {
 
 export interface ImageOffscreenOperationOptions {
     readonly ocrEngine?: 'paddle';
+    readonly inferenceBackend?: 'auto' | 'cpu';
     readonly documentUrl?: string;
     readonly manga?: true;
     readonly mangaViewport?: ImageViewport;
@@ -87,12 +90,13 @@ function parseImageDataResult(response: OffscreenResponse | undefined, fallback:
 export function createImageTranslationOffscreenAdapter(client: OffscreenClient = extensionDomClient) {
     return {
         async getMangaModelStatus() {
-            const response = await client.send<{success?:boolean;ready?:boolean;bytes?:number;inpaintingReady?:boolean;segmentationReady?:boolean;error?:string;source?:MangaModelSource;download?:MangaDownloadState}>({type:'FLUENT_READ_MANGA_MODEL_STATUS_OFFSCREEN'});
+            const response = await client.send<{success?:boolean;ready?:boolean;bytes?:number;inpaintingReady?:boolean;segmentationReady?:boolean;error?:string;source?:MangaModelSource;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics}>({type:'FLUENT_READ_MANGA_MODEL_STATUS_OFFSCREEN'});
             if (!response?.success || typeof response.ready !== 'boolean' || typeof response.inpaintingReady !== 'boolean'
                 || (response.segmentationReady !== undefined && typeof response.segmentationReady !== 'boolean')
                 || typeof response.bytes !== 'number' || !Number.isSafeInteger(response.bytes) || response.bytes < 0) throw new Error(errorMessage(response,'漫画识别模型状态读取失败'));
             return {ready:response.ready,bytes:response.bytes,inpaintingReady:response.inpaintingReady,
                 ...(response.segmentationReady === undefined ? {} : {segmentationReady:response.segmentationReady}),
+                ...(response.inference ? {inference:response.inference} : {}),
                 ...(response.source ? {source:response.source} : {}),...(response.download ? {download:response.download} : {})};
         },
         async removeMangaModels() {
@@ -113,6 +117,7 @@ export function createImageTranslationOffscreenAdapter(client: OffscreenClient =
                 ...(options?.manga ? {manga: true} : {}),
                 ...(options?.mangaViewport !== undefined ? {mangaViewport: options.mangaViewport} : {}),
                 ...(options?.ocrEngine ? {ocrEngine: options.ocrEngine} : {}),
+                ...(options?.inferenceBackend ? {inferenceBackend: options.inferenceBackend} : {}),
                 ...(options ? {requestId: options.requestId} : {}),
             } as const;
             const response = options

@@ -72,6 +72,23 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('漫画推理 Worker 消息处理器', () => {
+    it('仅在会话成功创建后报告该次配置的执行后端，不暴露图片和模型内容', async () => {
+        mocks.createOcr.mockImplementationOnce(async () => {
+            await mocks.session.create('det.onnx', {executionProviders: ['webgpu', {name: 'wasm'}, 'unknown']});
+            await mocks.session.create('rec.onnx', {});
+            return ocr;
+        });
+        await send({requestId: 99, type: 'prepare-ocr'});
+        expect(scope.postMessage).toHaveBeenCalledWith({requestId: 99, executionProviders: ['webgpu', 'wasm']}, []);
+        expect(scope.postMessage.mock.calls.filter(([message]) => message.executionProviders)).toHaveLength(1);
+        mocks.create.mockRejectedValueOnce(new Error('session failed'));
+        mocks.createPainter.mockImplementationOnce(async () => {
+            await mocks.session.create('lama.onnx', {executionProviders: ['wasm']}); return painter;
+        });
+        const failed = await send({requestId: 100, type: 'prepare-inpaint'});
+        expect(failed).toMatchObject({success: false, error: 'session failed'});
+        expect(scope.postMessage.mock.calls.filter(([message]) => message.executionProviders)).toHaveLength(1);
+    });
     it('普通图片可请求真实检测侧车，仅转移owned bit bytes，不把模型Float32概率张量转移',async()=>{
         const bits=new Uint8Array([1,2]),originalProbability=new Float32Array([.9,.1]);
         ocr.recognize.mockResolvedValue({results:[],imageDetectionFrames:[{pageWidth:4,pageHeight:4,x:0,y:0,width:4,height:4,bits}]});
@@ -543,7 +560,7 @@ describe('可选缓存 CTD Worker 端口',()=>{
 });
 
 it('缺失元数据必须协议拒绝；清理多故障也保留首个undefined并释放其余张量',async()=>{
-    const unknown=segSession();Object.assign(unknown,{inputMetadata:undefined});mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));mocks.create.mockResolvedValueOnce(unknown);
+    const unknown=segSession();unknown.release.mockRejectedValueOnce(new Error('release secondary'));Object.assign(unknown,{inputMetadata:undefined});mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));mocks.create.mockResolvedValueOnce(unknown);
     expect(await send({type:'prepare-seg',requestId:99})).toMatchObject({errorKind:'protocol'});expect(unknown.release).toHaveBeenCalledOnce();
     const session=await prepareSeg(),output=segOutput();output.blk.dispose.mockImplementationOnce(()=>{throw undefined;});output.seg.dispose.mockImplementationOnce(()=>{throw new Error('secondary');});session.run.mockResolvedValue(output);
     expect(await send({type:'segment',requestId:101,tensor:new Float32Array(3*1024*1024)})).toMatchObject({errorKind:'execution',error:'undefined'});expect(output.det.dispose).toHaveBeenCalledOnce();

@@ -1,5 +1,6 @@
 /**
  * @file src/app/offscreen/messageRouter.ts
+ * 图片任务严格校验自动或 CPU 后端枚举，并在保持 viewport 参数位置的同时向本地运行时传递。
  * 文件职责：解析并分派发送到扩展自有 DOM 页面的可信运行时消息，为 Chrome 翻译、本地模型、TTS、远程图片读取、OCR 语言包、整图和区域翻译提供统一响应纪律。
  * 主要内容：以共享 DTO 和字段守卫连接视频转写、本地翻译及 TTS 的发送与执行端；读音标注仅接受后台代理并处理先取消后启动及单次响应；智能高亮消息携带所选模型，模型下载与状态互相独立、推理共用单 Worker 预算；校验并传递单图本地识别方式；提供 ready 与 TTS 一次性许可握手，在播放器前拒绝失效 PLAY，校验文本、语言码、图片与 OCR 语言包请求并分派依赖；验证 TTS 播放控制来自同扩展且不属于网页 tab，以共用的可取消请求表管理取消与单次回复，校验本地语音句段时间并保留 Chrome 待准备语言对、模型不可用和本地 TTS 错误码。
  * 模块边界：可选漫画可见范围保留异常原值传给实际绘制端，不以缺省值扩大补绘范围；路由器不创建 Audio/Worker、不调用 browser.offscreen，也不实现翻译算法；资源实例由 offscreen runtime 构造，具体能力来自 translation、ttsPlayback 和 feature services。
@@ -54,6 +55,7 @@ export interface OffscreenMessageDependencies {
         manga?: boolean,
         ocrEngine?: 'tesseract' | 'paddle',
         mangaViewport?: ImageViewport,
+        inferenceBackend?: 'auto' | 'cpu',
     ) => Promise<unknown>;
     readonly translateArea: (
         image: string,
@@ -261,7 +263,8 @@ function runCancellableRequest<T>(
         if (settled) return;
         settled = true;
         controller.signal.removeEventListener('abort', handleAbort);
-        if (active.get(requestId) === controller) active.delete(requestId);
+        // 准入拒绝重复身份，Map 只在这里释放；settled 阻止迟到结果清理复用该身份的新任务。
+        active.delete(requestId);
         sendResponse(response);
     };
     const handleAbort = () => finish({success: false, cancelled: true, requestId, error: cancelledError});
@@ -613,6 +616,10 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                     sendResponse,
                     (signal, requestId) => {
                         if (message.ocrEngine !== undefined && message.ocrEngine !== 'tesseract' && message.ocrEngine !== 'paddle') throw new Error('图片识别方式无效');
+                        if (message.inferenceBackend !== undefined && message.inferenceBackend !== 'auto' && message.inferenceBackend !== 'cpu') throw new Error('图片处理后端无效');
+                        const inferenceOptions: [mangaViewport?: ImageViewport, inferenceBackend?: 'auto' | 'cpu'] = message.inferenceBackend !== undefined
+                            ? [message.mangaViewport as ImageViewport | undefined, message.inferenceBackend]
+                            : message.mangaViewport === undefined ? [] : [message.mangaViewport as ImageViewport];
                         return dependencies.translateImage(
                             requiredImage(message.image),
                             requiredSourceLanguage(message.sourceLanguage),
@@ -621,7 +628,7 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                             requestId,
                             message.manga === undefined ? false : requiredBoolean(message.manga,'manga'),
                             message.ocrEngine === 'paddle' ? 'paddle' : 'tesseract',
-                            ...(message.mangaViewport === undefined ? [] as const : [message.mangaViewport as ImageViewport] as const),
+                            ...inferenceOptions,
                         );
                     },
                     (result) => ({...resultRecord(result, '图片翻译'), success: true}),

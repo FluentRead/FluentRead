@@ -60,6 +60,106 @@ afterEach(() => {
     vi.doUnmock('@/src/features/image-translation/services/mangaInpainting');
 });
 
+describe('图片 CPU/WASM 偏好和诊断', () => {
+    it('已到期但迟到的暖机清理回调不能关闭新任务持有的 Worker', async () => {
+        const timer = vi.spyOn(globalThis, 'setTimeout');
+        const {client, workers} = harness(), abort = new AbortController();
+        const canceled = observe(client.prepare('ocr', abort.signal)); await flush(); abort.abort();
+        await canceled; workers[0].emit(); await flush();
+        const idle = timer.mock.calls.find(([, delay]) => delay === 180_000)![0] as () => void;
+        const active = client.request({type: 'recognize'}); await flush(); idle();
+        expect(workers[0].terminate).not.toHaveBeenCalled(); workers[0].emit(); await active;
+    });
+    it('切换后可选分割保持逻辑就绪并重新获得空闲释放期限', async () => {
+        const h = harness(); await prepareText(h);
+        h.client.setBackend('cpu');
+        const recognize = h.client.request({type: 'recognize'}); await flush();
+        expect(h.workers[1].latest.cpu).toBe(true); h.workers[1].emit(); await recognize;
+        const segment = h.client.segmentText(inputText); await flush();
+        h.workers[1].emit({success: true, result: outputText()}); await segment;
+        await vi.advanceTimersByTimeAsync(180_000);
+        expect(h.workers[1].latest.type).toBe('dispose-seg'); h.workers[1].emit(); await flush();
+        expect(h.workers[1].terminate).toHaveBeenCalledOnce();
+    });
+    it('取消 CPU 准备立即发布取消状态，迟到初始化不恢复页面状态', async () => {
+        const {client, workers} = harness(), abort = new AbortController(); client.setBackend('cpu');
+        const pending = observe(client.prepare('ocr', abort.signal)); await flush(); abort.abort();
+        await expect(pending).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        workers[0].emit({stage: 'initializing'}); expect(client.getDiagnostics().stage).toBe('canceled');
+        workers[0].emit(); await flush(); expect(client.getDiagnostics().stage).toBe('canceled');
+    });
+    it.each(['prepare-ocr', 'prepare-inpaint', 'prepare-seg', 'recognize', 'inpaint'] as const)('%s 首条消息即 CPU，初始化和推理从首次采用 120 秒预算，失败不再重试', async type => {
+        const {client, workers} = harness();
+        client.setBackend('cpu');
+        const pending = observe(client.request({type}));
+        await flush();
+        expect(workers[0].latest.cpu).toBe(true);
+        expect(client.getDiagnostics()).toMatchObject({preference: 'cpu', cpuFallback: false});
+        await vi.advanceTimersByTimeAsync(60_001);
+        expect(workers).toHaveLength(1);
+        for (const stage of ['initializing', 'recognizing'] as const) {
+            workers[0].emit({stage});
+            expect(client.getDiagnostics().stage).toBe(stage);
+            await vi.advanceTimersByTimeAsync(119_999);
+            expect(workers[0].terminate).not.toHaveBeenCalled();
+        }
+        await vi.advanceTimersByTimeAsync(1);
+        await expect(pending).resolves.toMatchObject({status: 'rejected', reason: {message: expect.stringContaining('超时')}});
+        expect(workers).toHaveLength(1);
+        expect(client.getDiagnostics()).toMatchObject({stage: 'error', executionProviders: []});
+    });
+
+    it('切换只在串行请求边界重建，CPU 与自动可往返且旧响应不能覆盖新诊断', async () => {
+        const {client, workers} = harness();
+        expect(client.getDiagnostics()).toEqual({preference: 'auto', cpuFallback: false, stage: 'idle', executionProviders: []});
+        const first = client.prepare('ocr'); await flush();
+        const stale = workers[0].onmessage!;
+        workers[0].emit({executionProviders: ['webgpu', 'wasm']});
+        expect(client.getDiagnostics().executionProviders).toEqual(['webgpu', 'wasm']);
+        const snapshot = client.getDiagnostics(); snapshot.executionProviders.length = 0;
+        expect(client.getDiagnostics().executionProviders).toHaveLength(2);
+        client.setBackend('cpu');
+        const next = client.request({type: 'recognize', image: 'next'});
+        await flush(); expect(workers[0].terminate).not.toHaveBeenCalled();
+        workers[0].emit(); await first; await flush();
+        expect(workers[0].terminate).toHaveBeenCalledOnce();
+        expect(workers[1].latest.cpu).toBe(true);
+        stale({data: {requestId: 1, executionProviders: ['webgpu'], stage: 'initializing'}} as MessageEvent<MangaInferenceResponse>);
+        workers[1].emit({stage: 'recognizing', executionProviders: ['wasm']});
+        expect(client.getDiagnostics()).toMatchObject({stage: 'recognizing', executionProviders: ['wasm']});
+        workers[1].emit({success: true, result: {results: []}}); await next;
+        expect(client.getDiagnostics().stage).toBe('completed');
+        client.setBackend('auto');
+        const back = client.prepare('inpaint'); await flush();
+        expect(workers[2].latest.cpu).toBe(false); workers[2].emit(); await back;
+        client.dispose(); expect(client.getDiagnostics().stage).toBe('idle');
+    });
+
+    it('CPU 偏好跨释放和重新创建保留，自动回退可诊断，旧请求阶段不泄漏', async () => {
+        const {client, workers} = harness();
+        const first = client.request({type: 'recognize'}); await flush();
+        workers[0].fail('GPU failure'); await flush();
+        expect(client.getDiagnostics().cpuFallback).toBe(true);
+        workers[1].emit({executionProviders: ['wasm']}); workers[1].emit(); await first;
+        client.setBackend('cpu'); client.dispose();
+        const prepare = client.prepare('ocr'); await flush(); workers[2].emit(); await prepare;
+        const release = client.release('ocr'); await flush(); workers[2].emit(); await release;
+        const again = client.prepare('ocr'); await flush();
+        expect(workers[3].latest.cpu).toBe(true); workers[3].emit(); await again;
+        expect(client.getDiagnostics().cpuFallback).toBe(false);
+    });
+
+    it('切换偏好前已取消的排队请求不终止当前端口，也不创建新 Worker', async () => {
+        const {client, workers} = harness();
+        const first = client.prepare('ocr'); await flush();
+        client.setBackend('cpu');
+        const abort = new AbortController(), queued = observe(client.request({type: 'recognize'}, abort.signal));
+        abort.abort(); workers[0].emit(); await first;
+        await expect(queued).resolves.toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        await flush(); expect(workers).toHaveLength(1); expect(workers[0].terminate).not.toHaveBeenCalled();
+    });
+});
+
 describe('漫画独立 Worker 客户端', () => {
     it('解析同源资源 URL，并延迟创建模块 Worker', async () => {
         expect(module.mangaExtensionUrl('../worker.js')).toBe('https://extension.test/worker.js');

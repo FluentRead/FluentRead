@@ -14,6 +14,7 @@ import {
     cropAreaInOffscreen,
     translateImageInOffscreen,
     mangaOcrModelStatus,
+    mangaInferenceClient,
     removeMangaModels,
     disposeMangaModels,
 } from './imageTranslation';
@@ -114,7 +115,7 @@ export function startOffscreenApp(): void {
             onProgress => downloadImageOcrLanguages(languages, undefined, onProgress),
         ),
         removeOcrLanguages: removeImageOcrLanguages,
-        mangaModelStatus:mangaOcrModelStatus,
+        mangaModelStatus:async () => ({...await mangaOcrModelStatus(), inference:mangaInferenceClient.getDiagnostics()}),
         removeMangaModels,
         videoAi: {
             transcribe: (request) => transcribeLocalVideoAudio(request),

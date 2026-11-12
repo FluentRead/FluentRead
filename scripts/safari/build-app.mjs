@@ -146,16 +146,25 @@ function main() {
     const schemes = listSchemes(project);
     if (schemes.length === 0) throw new Error('Xcode 工程中没有可用的 scheme');
     mkdirSync(OUT_DIR, {recursive: true});
+    // 有开发者团队时交给 Xcode 自动签名：沙盒应用需要配套的描述文件，
+    // 手工 codesign 只能重签已有产物，无法生成 profile。
+    const team = process.env.FLUENTREAD_DEVELOPMENT_TEAM;
+    const signingArgs = team
+        ? [
+            'CODE_SIGN_STYLE=Automatic',
+            `DEVELOPMENT_TEAM=${team}`,
+            'CODE_SIGN_IDENTITY=Apple Development',
+            '-allowProvisioningUpdates',
+        ]
+        : ['CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_REQUIRED=YES', 'CODE_SIGNING_ALLOWED=YES'];
     for (const scheme of schemes) {
-        console.log(`[safari] 构建 scheme: ${scheme}`);
+        console.log(`[safari] 构建 scheme: ${scheme}${team ? `（团队 ${team}）` : '（ad-hoc）'}`);
         execFileSync('xcodebuild', [
             '-project', project,
             '-scheme', scheme,
             '-configuration', 'Release',
             '-derivedDataPath', DERIVED,
-            'CODE_SIGN_IDENTITY=-',
-            'CODE_SIGNING_REQUIRED=YES',
-            'CODE_SIGNING_ALLOWED=YES',
+            ...signingArgs,
             'build',
         ], {cwd: ROOT, stdio: 'inherit'});
     }

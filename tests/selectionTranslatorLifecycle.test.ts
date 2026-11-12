@@ -3447,7 +3447,9 @@ describe('selection card bounded layout work', () => {
         class GestureElement {
             dataset = {resizeEdge: edge};
             clientLeft = 0;
+            clientTop = 0;
             clientWidth = 388;
+            clientHeight = 232;
             captured = false;
             getBoundingClientRect = vi.fn(() => ({left: 200, top: 100, right: 588, bottom: 340, width: 388, height: 240}));
             closest(selector: string) {return selector === '.fr-study-navigation' ? this : null;}
@@ -3504,16 +3506,18 @@ describe('selection card bounded layout work', () => {
     });
 
     it.each([
-        ['horizontal tab scrollbar', 'fr-study-toolbar', 300, 132],
+        ['horizontal tab scrollbar', 'fr-study-toolbar', 300, 336],
         ['learning menu blank space', 'fr-reading-tool-list', 250, 145],
         ['vertical learning menu scrollbar', 'fr-reading-tool-list', 380, 175],
     ] as const)('keeps native %s pointer handling without dragging the card', async (_label, className, x, y) => {
         const {state, element, frames, pointer} = await gestureFixture();
         state.stopPopupGesture();
         element.getBoundingClientRect.mockClear();
-        // 非交互导航后代仍属于顶栏，但滚动条与菜单空白必须保留原生指针行为。
+        // 顶栏空白可拖，但滚动条与阅读菜单必须保留原生指针行为。
         const target = Object.assign(Object.create(Object.getPrototypeOf(element)), {
             dataset: {},
+            clientLeft: 0, clientTop: 0, clientWidth: 388, clientHeight: 232,
+            getBoundingClientRect: () => ({left: 200, top: 100, right: 588, bottom: 340, width: 388, height: 240}),
             matches: (selector: string) => selector.split(',').some(part => part.trim() === `.${className}`),
             closest: (selector: string) => selector === '.fr-study-navigation' ? element : null,
         });
@@ -3526,6 +3530,84 @@ describe('selection card bounded layout work', () => {
         expect(state.manualPopupPosition).toEqual({left: 200, top: 100});
         expect(frames.size).toBe(0);
         expect(element.getBoundingClientRect).not.toHaveBeenCalled();
+    });
+
+    it('starts a card drag from non-interactive header chrome such as the brand icon and button gaps', async () => {
+        const {state, element, pointer} = await gestureFixture();
+        state.stopPopupGesture();
+        // 图标、按钮间隙与动作区都不是 .fr-study-navigation 自身；旧判定用 matches 会把它们全部漏掉。
+        const target = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {},
+            matches: (selector: string) => selector.split(',').some(part => part.trim() === '.fr-tooltip-actions'),
+            closest: (selector: string) => selector === '.fr-study-navigation' ? element : null,
+        });
+        const down = {...pointer('pointerdown', 250, 110), target};
+        state.beginPopupGesture(down);
+        expect(down.preventDefault).toHaveBeenCalledOnce();
+        expect(element.captured).toBe(true);
+        expect(state.popupManipulating).toBe(true);
+    });
+
+    it('drags from the original text <pre> whitespace but keeps each speech word span selectable', async () => {
+        const {state, element, pointer} = await gestureFixture();
+        state.stopPopupGesture();
+        const pre = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {}, clientLeft: 0, clientTop: 0, clientWidth: 388, clientHeight: 232,
+            getBoundingClientRect: () => ({left: 200, top: 100, right: 588, bottom: 340, width: 388, height: 240}),
+            matches: (selector: string) => selector.split(',').some(part => part.trim() === 'pre'),
+            closest: () => null,
+        });
+        const down = {...pointer('pointerdown', 250, 160), target: pre};
+        state.beginPopupGesture(down);
+        expect(down.preventDefault).toHaveBeenCalledOnce();
+        expect(element.captured).toBe(true);
+        state.stopPopupGesture();
+        const word = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {}, matches: () => false, closest: () => null,
+        });
+        const wordDown = {...pointer('pointerdown', 250, 160), target: word};
+        state.beginPopupGesture(wordDown);
+        expect(wordDown.preventDefault).not.toHaveBeenCalled();
+        expect(element.captured).toBe(false);
+    });
+
+    it('still leaves the header buttons to their own click handlers', async () => {
+        const {state, element, pointer} = await gestureFixture();
+        state.stopPopupGesture();
+        const target = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {}, matches: () => false,
+            closest: (selector: string) => selector.includes('button') ? element : null,
+        });
+        const down = {...pointer('pointerdown', 250, 110), target};
+        state.beginPopupGesture(down);
+        expect(down.preventDefault).not.toHaveBeenCalled();
+        expect(element.captured).toBe(false);
+        expect(state.popupManipulating).toBe(false);
+    });
+
+    it('starts a card drag from the tab strip background while its buttons keep native clicks', async () => {
+        const {state, element, pointer} = await gestureFixture();
+        state.stopPopupGesture();
+        const strip = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {},
+            clientLeft: 0, clientTop: 0, clientWidth: 388, clientHeight: 232,
+            getBoundingClientRect: () => ({left: 200, top: 100, right: 588, bottom: 340, width: 388, height: 240}),
+            matches: (selector: string) => selector.split(',').some(part => part.trim() === '.fr-study-toolbar'),
+            closest: (selector: string) => selector === '.fr-study-navigation' ? element : null,
+        });
+        const down = {...pointer('pointerdown', 300, 130), target: strip};
+        state.beginPopupGesture(down);
+        expect(down.preventDefault).toHaveBeenCalledOnce();
+        expect(element.captured).toBe(true);
+        expect(state.popupManipulating).toBe(true);
+    });
+
+    it('paints the move cursor only where the card can actually be dragged', () => {
+        const source = readFileSync('src/features/selection-translation/ui/SelectionTranslator.vue', 'utf8');
+        expect(source).toMatch(/\.fr-study-navigation \{[^}]*cursor: move;/);
+        expect(source).toMatch(/\.fr-study-reading-tools \{[^}]*cursor: default;/);
+        expect(source).not.toContain('.fr-translation-tooltip > .fr-study-navigation { cursor: move; }');
+        expect(source).toContain("!target.closest('.fr-study-navigation') && !blank");
     });
 
     it('coalesces trusted pointer moves and paints only the last point without re-reading card geometry', async () => {

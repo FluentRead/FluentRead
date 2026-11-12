@@ -931,11 +931,11 @@ function beginPopupGesture(event: PointerEvent): void {
   // 触摸正文应滚动或选词，不让空白拖动吞掉原生平移；触摸仅从明确的标题栏移动卡片。
   if (event.pointerType === 'touch' && (edge || blank)) return;
   if (!edge && !target.closest('.fr-study-navigation') && !blank) return;
-  // 不截获横向/纵向滚动条上的按下。
+  // client 尺寸未经过卡片缩放；换到指针坐标后保留横向/纵向滚动条。
   if (!edge && blank) {
     const box = target.getBoundingClientRect();
-    if (event.clientX >= box.left + target.clientLeft + target.clientWidth
-      || event.clientY >= box.top + target.clientTop + target.clientHeight) return;
+    if (event.clientX >= box.left + (target.clientLeft + target.clientWidth) * popupScale.value
+      || event.clientY >= box.top + (target.clientTop + target.clientHeight) * popupScale.value) return;
   }
   event.preventDefault();
   stopPopupGesture();

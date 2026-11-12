@@ -3610,6 +3610,29 @@ describe('selection card bounded layout work', () => {
         expect(source).toContain("!target.closest('.fr-study-navigation') && !blank");
     });
 
+    it.each([0.5, 1, 2])('keeps blank drags and native scrollbar gutters aligned at popup scale %s', async scale => {
+        const {state, element, pointer} = await gestureFixture();
+        state.stopPopupGesture();
+        state.pageZoom = 1 / scale;
+        const target = Object.assign(Object.create(Object.getPrototypeOf(element)), {
+            dataset: {}, clientLeft: 1, clientTop: 1, clientWidth: 378, clientHeight: 230,
+            getBoundingClientRect: () => ({left: 200, top: 100, width: 388 * scale, height: 240 * scale}),
+            matches: (selector: string) => selector.split(',').some(part => part.trim() === 'pre'),
+            closest: () => null,
+        });
+        const blank = {...pointer('pointerdown', 200 + 378 * scale, 100 + 230 * scale), target};
+        state.beginPopupGesture(blank);
+        expect(blank.preventDefault).toHaveBeenCalledOnce();
+        expect(element.captured).toBe(true);
+        state.stopPopupGesture();
+        for (const [x, y] of [[385, 50], [50, 237]]) {
+            const scrollbar = {...pointer('pointerdown', 200 + x * scale, 100 + y * scale), target};
+            state.beginPopupGesture(scrollbar);
+            expect(scrollbar.preventDefault).not.toHaveBeenCalled();
+            expect(element.captured).toBe(false);
+        }
+    });
+
     it('coalesces trusted pointer moves and paints only the last point without re-reading card geometry', async () => {
         const {state, element, frames, pointer, flush} = await gestureFixture();
         for (let i = 1; i <= 30; i++) state.movePopupGesture(pointer('pointermove', 205 + i, 110 + i));

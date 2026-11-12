@@ -84,6 +84,17 @@ safari/流畅阅读/流畅阅读/AppIcon.icon/
 
 Safari 按模板渲染工具栏按钮：只取轮廓，颜色由工具栏明暗决定。因此工具栏不能复用带底色的应用图标（会被压成灰底方块），而是单独提供 `public/icon/action/{16,19,32,38}.png` —— 透明底、纯黑字形，通过清单 `action.default_icon` 指定（仅 Safari 产物），`badgeRuntime` 切换状态图标时也走这套资源。
 
+### 重新签名时的坑
+
+替换 `Assets.car` 后必须重签外层 App，但**不要加 `--deep`**：`--deep` 会连内嵌 appex 一起重签，并把它原本的授权（`com.apple.security.app-sandbox` 等）抹掉。扩展失去授权后 Safari 无法稳定保留，表现为每次启动 Safari 都要重新启用扩展。
+
+```sh
+codesign --force --sign - --preserve-metadata=entitlements,flags <app>
+codesign --verify --deep --strict <app>
+```
+
+嵌套 appex 保持 Xcode 的原始签名即可。可用 `codesign -d --entitlements :- <appex>` 复核授权是否还在。
+
 构建时由 `build-app.mjs` 在复制产物后执行：
 
 ```sh

@@ -135,6 +135,15 @@ export function createExtensionManifest(
     // Safari 16.4 起支持 MV3 与模块化 service worker；17 起 offscreen 依赖的后台标签页行为稳定。
     const safariManifest = env.browser === 'safari' ? {
         browser_specific_settings: {safari: {strict_min_version: '17.0'}},
+        // Safari 设置里的扩展列表图标由系统直接渲染清单图标，不支持按外观切换，
+        // 因此 Safari 产物固定使用深色版（近黑底 + 品牌粉字形），与深色系统一致。
+        icons: {
+            16: 'icon/appearance/dark-16.png',
+            32: 'icon/appearance/dark-32.png',
+            48: 'icon/appearance/dark-48.png',
+            64: 'icon/appearance/dark-64.png',
+            128: 'icon/appearance/dark-128.png',
+        },
         // Safari 按模板渲染工具栏按钮，只取图形的轮廓；提供带底色的应用图标会被压成灰底方块，
         // 因此单独给一套透明底的模板图标，让工具栏只显示 A/中 字形。
         action: {

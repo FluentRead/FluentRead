@@ -51,7 +51,13 @@ function applyLayeredIcon(appPath) {
     } finally {
         rmSync(out, {recursive: true, force: true});
     }
-    execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], {stdio: 'inherit'});
+    // 只重签外层 App：--deep 会把内嵌 appex 的授权（app-sandbox 等）一并抹掉，
+    // 导致 Safari 无法稳定保留扩展。嵌套代码保持 Xcode 的原始签名。
+    execFileSync('codesign', [
+        '--force', '--sign', '-',
+        '--preserve-metadata=entitlements,flags',
+        appPath,
+    ], {stdio: 'inherit'});
     execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], {stdio: 'inherit'});
     console.log('[safari] 已应用分层图标（浅色/深色）并重新签名');
 }

@@ -113,7 +113,30 @@ Apple 官方文档明确写着：**「允许未签名的扩展」在退出 Safar
 FLUENTREAD_SIGN_IDENTITY="Apple Development: Your Name (TEAMID)" pnpm safari:app
 ```
 
-免费 Apple ID 也能获得 Apple Development 证书：Xcode → Settings → Accounts 添加账号 → Manage Certificates → `+` → Apple Development。免费个人团队的描述文件 7 天到期，需要定期重签；付费开发者账号（Developer ID）没有这个限制。
+免费 Apple ID 也能获得 Apple Development 证书：Xcode → Settings → Accounts 添加账号 → Manage Certificates → `+` → Apple Development。
+
+#### 证书生成后仍显示 0 valid identities
+
+钥匙串里常缺 WWDR **G3** 中间证书（系统只自带旧版 WWDR CA，链到 `Apple Root CA`），此时
+`security find-identity -p codesigning` 能列出身份，但 `-v`（仅有效）为空，`verify-cert`
+报 `CSSMERR_TP_NOT_TRUSTED`。
+
+Xcode 自带这份中间证书，直接导入即可，不需要联网下载：
+
+```sh
+security import "/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/AppleWWDRCA-2030.cer" \
+  -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign
+```
+
+#### 为什么不用 xcodebuild 自动签名
+
+命令行下 `-allowProvisioningUpdates` 取不到 Xcode 的账号库，会直接报 `No Accounts`；macOS
+目标还会被要求 "Mac Development" 证书。本工程没有需要描述文件的受限能力（只有 app-sandbox
+与网络客户端），因此固定 ad-hoc 构建 + 事后重签，签名链为
+`Apple Development → WWDR CA → Apple Root CA`，`app-sandbox` 授权保留。
+
+注意：用个人证书签名的产物只适合自用，不要发布到 Release——证书与团队绑定，换机即失效。
+
 
 
 构建时由 `build-app.mjs` 在复制产物后执行：

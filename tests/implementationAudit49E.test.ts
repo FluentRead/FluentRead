@@ -277,7 +277,7 @@ describe('audit 49 E real Vue client model settings', () => {
         ports.message.mockImplementation(async () => ({success: true, ready: true, inpaintingReady: true, bytes: 30, ...(inference ? {inference} : {})}));
         const {container} = await mount(MangaModelSettings);
         expect(container.querySelector('.manga-inference-diagnostics')).toBeNull();
-        const labels = {idle: '等待任务', preparing: '正在准备资源', initializing: '正在初始化本地模型…', recognizing: '正在处理图片', completed: '处理完成', canceled: '已取消', error: '处理失败'};
+        const labels = {idle: '等待中', preparing: '正在准备…', initializing: '正在初始化本地模型…', recognizing: '正在处理图片', completed: '已完成', canceled: '已取消', error: '失败'};
         for (const [stage, label] of Object.entries(labels)) {
             inference = {preference: 'auto', stage, executionProviders: stage === 'idle' ? [] : ['wasm'], cpuFallback: stage === 'error'};
             await vi.advanceTimersByTimeAsync(1500); await settle();

@@ -369,7 +369,7 @@ describe('standalone manga reading panel prototype',()=>{
     registerAllUiLanguageBundles();const keys=Object.keys(mangaReadingLegacyMessages['en-US']);expect(keys.length).toBeGreaterThan(20);
     for (const language of ['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const) {
       expect(Object.keys(mangaReadingLegacyMessages[language]).sort()).toEqual([...keys].sort());
-      for(const source of keys) {const translated=translateLegacyText(source,language);expect(translated.trim(),`${language}: ${source}`).not.toBe('');expect(translated,`${language}: ${source}`).not.toBe(source);}
+      for(const source of [...keys,'等待中','正在准备…','已完成','失败']) {const translated=translateLegacyText(source,language);expect(translated.trim(),`${language}: ${source}`).not.toBe('');expect(translated,`${language}: ${source}`).not.toBe(source);}
     }
   });
   it.each(['en-US','ja-JP','ko-KR','fr-FR','ru-RU','es-ES'] as const)('renders the real %s dialog and candidate labels',async language=>{

@@ -47,7 +47,7 @@ import type {MangaInferenceDiagnostics} from '../services/mangaInferenceClient';
 withDefaults(defineProps<{showInpainting?: boolean; embedded?: boolean; imageRecognition?: boolean}>(),{showInpainting:true,embedded:false,imageRecognition:true});
 const {translateLegacy}=useUiI18n();
 const status=ref<{ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics}|null>(null);
-const stageLabels={idle:'等待任务',preparing:'正在准备资源',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'处理完成',canceled:'已取消',error:'处理失败'} as const;
+const stageLabels={idle:'等待中',preparing:'正在准备…',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'已完成',canceled:'已取消',error:'失败'} as const;
 const busy=ref(false),error=ref(''),statusError=ref(''),input=ref<HTMLInputElement>();
 const downloading=computed(()=>['downloading','verifying'].includes(status.value?.download?.phase??''));
 const phaseLabel=computed(()=>({downloading:'正在下载漫画模型',verifying:'正在校验漫画模型',paused:'漫画模型下载已暂停',error:'漫画模型下载未完成'}[status.value?.download?.phase??'downloading']));

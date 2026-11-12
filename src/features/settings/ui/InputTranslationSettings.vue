@@ -381,19 +381,20 @@ const workflowDescription = computed(() => {
 .input-translation-field-help,
 .input-translation-credential-warning { color: var(--muted); font-size: 11px; line-height: 1.5; }
 
-.input-translation-prompt-options { border-top: 1px solid var(--line); }
+/* 与 SettingsItem 行共用卡片内边距令牌，保证提示词区块与上方配置行共享同一内容边界；底部留白与卡片标题节奏一致，折叠态也不贴边。 */
+.input-translation-prompt-options { border-top: 1px solid var(--line); padding-inline: var(--fr-card-padding-inline, 20px); padding-bottom: var(--fr-card-heading-padding-block, 16px); }
 .input-translation-prompt-toggle { display: flex; align-items: center; gap: 12px; width: 100%; padding: 16px 0 0; border: 0; color: var(--muted); background: transparent; cursor: pointer; font: inherit; text-align: left; }
 .input-translation-prompt-toggle strong { color: var(--ink); font-size: 12.5px; font-weight: 600; }
 .input-translation-prompt-toggle span { margin-left: auto; font-size: 11px; }
 .input-translation-prompt-toggle .el-icon { flex: none; transition: transform 160ms ease; }
 .input-translation-prompt-toggle[aria-expanded="true"] .el-icon { transform: rotate(180deg); }
-.input-translation-prompts { display: grid; gap: 20px; padding-top: 20px; }
+.input-translation-prompts { display: grid; gap: 24px; padding-top: 20px; }
 .input-translation-prompt-section { display: grid; min-width: 0; gap: 8px; }
 .input-translation-prompt-section > .input-translation-text-button { justify-self: start; }
 .input-translation-prompts :deep(.prompt-template-field) { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .input-translation-prompts :deep(.prompt-role-badge) { display: none; }
-.input-translation-prompts :deep(.prompt-template-textarea) { box-sizing: border-box; min-height: 100px; height: 116px; margin-top: 8px; border-color: var(--line); border-radius: 10px; font-size: 12px; }
-.input-translation-prompts :deep(.prompt-template-footer) { flex-wrap: wrap; align-items: flex-start; }
+.input-translation-prompts :deep(.prompt-template-textarea) { box-sizing: border-box; min-height: 100px; height: 116px; margin-top: 12px; border-color: var(--line); border-radius: 10px; font-size: 12px; }
+.input-translation-prompts :deep(.prompt-template-footer) { flex-wrap: wrap; margin-top: 8px; }
 .input-translation-prompts :deep(.prompt-token-list) { justify-content: flex-start; }
 .input-translation-prompt-warning { display: flex; align-items: flex-start; gap: 6px; margin: 0; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .input-translation-prompt-warning .el-icon { flex: none; margin-top: 2px; color: var(--brand-strong); }

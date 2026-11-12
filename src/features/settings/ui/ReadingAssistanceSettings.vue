@@ -71,7 +71,7 @@ const currentStyleLabel = computed(() => {
 .reading-assistance-workspace { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 24px; padding: 20px; }
 .reading-assistance-example { display: grid; min-width: 0; gap: 12px; }
 .reading-assistance-controls { min-width: 0; }
-.reading-assistance-controls :deep(.settings-item) { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; min-height: 0; padding: 0 0 18px; }
+.reading-assistance-controls :deep(.settings-item) { grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; min-height: 0; padding: 9px 0; }
 .reading-assistance-controls :deep(.settings-item-control > .settings-navigation-link) { width: auto; max-width: 220px; }
 .reading-assistance-controls .settings-navigation-link > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .reading-assistance-note { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; color: var(--muted); font-size: 12px; }

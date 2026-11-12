@@ -33,12 +33,12 @@
         </el-select>
       </SettingsItem>
       <SettingsItem label="输出语言">
-        <el-select v-model="config.writing.language" class="writing-default-language" data-i18n-ignore :aria-label="translateLegacy('输出语言')" filterable>
+        <el-select v-model="config.writing.language" class="writing-default-language" data-i18n-ignore :aria-label="translateLegacy('输出语言')" :wrap-label="false" filterable>
           <el-option v-for="item in WRITING_LANGUAGES" :key="item.value" data-i18n-ignore :value="item.value" :label="item.value === 'target' ? t('writing.experience.inheritTargetLanguage', {language: targetLanguageLabel}) : getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />
         </el-select>
       </SettingsItem>
       <SettingsItem :label="t('writing.referenceLanguage')">
-        <el-select v-model="config.writing.referenceLanguage" class="writing-default-language" data-i18n-ignore :aria-label="t('writing.referenceLanguage')" filterable>
+        <el-select v-model="config.writing.referenceLanguage" class="writing-default-language" data-i18n-ignore :aria-label="t('writing.referenceLanguage')" :wrap-label="false" filterable>
           <el-option value="ui" data-i18n-ignore :label="t('writing.interfaceLanguage')" />
           <el-option value="off" data-i18n-ignore :label="t('writing.referenceDisabled')" />
           <el-option v-for="item in WRITING_LANGUAGES.filter(item => item.value !== 'target')" :key="item.value" data-i18n-ignore :value="item.value" :label="getMultilingualTargetLanguageLabel(item.value, item.label, uiLanguage)" />

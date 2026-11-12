@@ -52,12 +52,40 @@ pnpm safari:app       # 同步扩展资源 + xcodebuild → build/dist/流畅阅
 - **本地模型**：本地翻译、本地 TTS、视频转写依赖 WebGPU/WASM 与大体积模型下载，未在 Safari 上做逐机型验证。
 - **快捷键**：Safari 的扩展快捷键受系统与 Safari 设置约束，扩展内配置可能被拦截。
 
+## 应用图标（macOS 26 外观）
+
+macOS 26 会按外观重绘资源目录里的位图图标：深色外观下，`.appiconset` 的底色被系统底板替换，品牌粉变成近似黑色，并出现浅色描边。因此应用图标改用 Icon Composer 的分层格式：
+
+```
+safari/流畅阅读/流畅阅读/AppIcon.icon/
+├── icon.json            # fill + 浅色/深色图层声明
+└── Assets/
+    ├── light.png        # 满幅品牌粉 + 白色 A/中 字形
+    └── dark.png         # 同构图，底色降到 90% 亮度
+```
+
+构建时由 `build-app.mjs` 在复制产物后执行：
+
+```sh
+xcrun actool Assets.xcassets AppIcon.icon \
+  --compile <tmp> --platform macosx --minimum-deployment-target 12.0 \
+  --app-icon AppIcon --output-partial-info-plist <tmp>/partial.plist
+```
+
+用产物覆盖 `Contents/Resources/Assets.car` 并重新做临时签名（资源替换会让原签名失效）。
+
+注意事项：
+
+- `.icon` 目录名必须与 `--app-icon` 名称一致（`AppIcon.icon`），否则 `actool` 会静默不产出 `Assets.car`。
+- 图层必须是**满幅**图像。只放字形、指望 `fill` 提供底色时，深色外观会用系统黑底覆盖 `fill`。
+- `Assets.xcassets` 与 `.icon` 一起传给 `actool`，可同时保留 `AccentColor` 等条目。
+
 ## 目录
 
 ```
 scripts/safari/convert.mjs     # 清单校验、safari-web-extension-converter 封装、资源同步
-scripts/safari/build-app.mjs   # 同步资源 + xcodebuild + 复制 .app
-safari/                        # 生成的 Xcode 工程（含定制引导界面）
+scripts/safari/build-app.mjs   # 同步资源 + xcodebuild + 复制 .app + 分层图标编译与重签
+safari/                        # 生成的 Xcode 工程（含定制引导界面与 AppIcon.icon）
 src/platform/offscreen/safariDocument.ts   # Safari 后台标签页文档容器
 build/dist/流畅阅读.app        # 可安装产物
 ```

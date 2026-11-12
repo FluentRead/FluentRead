@@ -6,7 +6,8 @@
  * 在“开发”菜单打开“允许未签名的扩展”，详见 SAFARI.md。
  */
 import {execFileSync} from 'node:child_process';
-import {cpSync, existsSync, mkdirSync, readdirSync, rmSync} from 'node:fs';
+import {cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
@@ -15,6 +16,41 @@ import {convert, patchXcodeProject, syncExtensionResources, BUNDLE_ID, XCODE_PRO
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT_DIR = path.join(ROOT, 'build', 'dist');
 const DERIVED = path.join(ROOT, 'build', 'safari');
+const ICON_BUNDLE = path.join(ROOT, 'safari', '流畅阅读', '流畅阅读', 'AppIcon.icon');
+const ASSET_CATALOG = path.join(ROOT, 'safari', '流畅阅读', '流畅阅读', 'Assets.xcassets');
+const MACOS_DEPLOYMENT_TARGET = '12.0';
+
+/**
+ * 用 Icon Composer 的分层图标重新编译 Assets.car。
+ * macOS 26 会按外观重绘 .appiconset 里的位图：深色外观下底色被系统底板替换，
+ * 品牌粉变成黑色。只有 .icon（浅色/深色图层）能保证两种外观都用品牌底色，
+ * 因此在拷贝产物后覆盖 Assets.car，并重新做临时签名。
+ */
+function applyLayeredIcon(appPath) {
+    if (!existsSync(ICON_BUNDLE)) {
+        console.warn(`[safari] 未找到 ${path.relative(ROOT, ICON_BUNDLE)}，跳过分层图标`);
+        return;
+    }
+    const out = mkdtempSync(path.join(tmpdir(), 'fluentread-icon-'));
+    try {
+        execFileSync('xcrun', [
+            'actool', ASSET_CATALOG, ICON_BUNDLE,
+            '--compile', out,
+            '--platform', 'macosx',
+            '--minimum-deployment-target', MACOS_DEPLOYMENT_TARGET,
+            '--app-icon', 'AppIcon',
+            '--output-partial-info-plist', path.join(out, 'partial.plist'),
+        ], {cwd: ROOT, stdio: ['ignore', 'ignore', 'inherit']});
+        const car = path.join(out, 'Assets.car');
+        if (!existsSync(car)) throw new Error('actool 未生成 Assets.car，无法应用分层图标');
+        cpSync(car, path.join(appPath, 'Contents', 'Resources', 'Assets.car'));
+    } finally {
+        rmSync(out, {recursive: true, force: true});
+    }
+    execFileSync('codesign', ['--force', '--deep', '--sign', '-', appPath], {stdio: 'inherit'});
+    execFileSync('codesign', ['--verify', '--deep', '--strict', appPath], {stdio: 'inherit'});
+    console.log('[safari] 已应用分层图标（浅色/深色）并重新签名');
+}
 
 function findProject() {
     const safariDir = path.join(ROOT, 'safari');
@@ -73,6 +109,7 @@ function main() {
         const target = path.join(OUT_DIR, app);
         rmSync(target, {recursive: true, force: true});
         cpSync(path.join(products, app), target, {recursive: true});
+        applyLayeredIcon(target);
         console.log(`[safari] 已生成 ${path.relative(ROOT, target)}`);
     }
 }

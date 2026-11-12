@@ -1,0 +1,41 @@
+{
+  "fill": {
+    "automatic-gradient": "srgb:0.91765,0.20392,0.45882,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "Light",
+          "image-name": "light.png",
+          "hidden-specializations": [
+            {
+              "appearance": "dark",
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "Dark",
+          "image-name": "dark.png",
+          "hidden-specializations": [
+            {
+              "appearance": "light",
+              "value": true
+            },
+            {
+              "appearance": "tinted",
+              "value": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": "shared"
+  }
+}

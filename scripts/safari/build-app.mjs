@@ -44,6 +44,10 @@ function applyLayeredIcon(appPath) {
         const car = path.join(out, 'Assets.car');
         if (!existsSync(car)) throw new Error('actool 未生成 Assets.car，无法应用分层图标');
         cpSync(car, path.join(appPath, 'Contents', 'Resources', 'Assets.car'));
+        // 同时替换旧式 .icns：部分系统界面（Dock、启动台缓存）会走 .icns 路径，
+        // 两套表示保持一致，避免同一应用在不同界面显示不同图标。
+        const icns = path.join(out, 'AppIcon.icns');
+        if (existsSync(icns)) cpSync(icns, path.join(appPath, 'Contents', 'Resources', 'AppIcon.icns'));
     } finally {
         rmSync(out, {recursive: true, force: true});
     }

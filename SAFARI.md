@@ -60,8 +60,8 @@ macOS 26 会按外观重绘资源目录里的位图图标：深色外观下，`.
 safari/流畅阅读/流畅阅读/AppIcon.icon/
 ├── icon.json            # fill + 浅色/深色图层声明
 └── Assets/
-    ├── light.png        # 满幅品牌粉 + 白色 A/中 字形
-    └── dark.png         # 同构图，底色降到 90% 亮度
+    ├── light.png        # 满幅品牌粉 + 白色 A/中 字形（字形高约占画布 64%）
+    └── dark.png         # 同构图，底色 90%、字形 95% 亮度
 ```
 
 构建时由 `build-app.mjs` 在复制产物后执行：
@@ -72,12 +72,13 @@ xcrun actool Assets.xcassets AppIcon.icon \
   --app-icon AppIcon --output-partial-info-plist <tmp>/partial.plist
 ```
 
-用产物覆盖 `Contents/Resources/Assets.car` 并重新做临时签名（资源替换会让原签名失效）。
+用产物的 `Assets.car` 与 `AppIcon.icns` 覆盖应用资源，并重新做临时签名（资源替换会让原签名失效）。
 
 注意事项：
 
-- `.icon` 目录名必须与 `--app-icon` 名称一致（`AppIcon.icon`），否则 `actool` 会静默不产出 `Assets.car`。
-- 图层必须是**满幅**图像。只放字形、指望 `fill` 提供底色时，深色外观会用系统黑底覆盖 `fill`。
+- `.icon` 目录名必须与 `--app-icon` 名称一致（`AppIcon.icon`），否则 `actool` 会静默不产出 `Assets.car`（exit code 仍为 0）。
+- **图层必须满幅**。图层若自带透明外圈，深色外观下系统底板会从外圈透出，形成黑框；只放字形、指望 `fill` 提供底色时，`fill` 在深色下同样不生效。
+- **视觉尺寸由字形占比决定，不是画布**。macOS 会把图层铺满图标区域，所以“图标比同类大”通常意味着字形过大。本项目按同屏第三方应用（字形包围盒约 54% × 64%）把字形缩到高 64%，其余留作底色。
 - `Assets.xcassets` 与 `.icon` 一起传给 `actool`，可同时保留 `AccentColor` 等条目。
 
 ## 目录

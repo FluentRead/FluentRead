@@ -925,12 +925,18 @@ function beginPopupGesture(event: PointerEvent): void {
   if (isShortViewport() || !event.isTrusted || !event.isPrimary || event.button !== 0 || !element || !(target instanceof HTMLElement)) return;
   if (target.closest('button, summary, a, input, textarea, select, [contenteditable]')) return;
   const edge = target.dataset.resizeEdge ?? '';
-  const blank = target.matches('.fr-translation-tooltip, .fr-tooltip-content, .fr-translation-container, .fr-text-block');
+  // 阅读工具菜单保留原生指针；顶栏空白（含 tab 条背景）与正文 <pre> 空白都可拖。
+  if (target.matches('.fr-reading-tool-list') || target.closest('.fr-study-reading-tools')) return;
+  const blank = target.matches('.fr-translation-tooltip, .fr-tooltip-content, .fr-translation-container, .fr-text-block, pre, .fr-study-toolbar');
   // 触摸正文应滚动或选词，不让空白拖动吞掉原生平移；触摸仅从明确的标题栏移动卡片。
   if (event.pointerType === 'touch' && (edge || blank)) return;
-  if (!edge && !target.matches('.fr-study-navigation') && !blank) return;
-  // 不截获内容滚动条上的按下。
-  if (!edge && blank && event.clientX >= target.getBoundingClientRect().left + target.clientLeft + target.clientWidth) return;
+  if (!edge && !target.closest('.fr-study-navigation') && !blank) return;
+  // client 尺寸未经过卡片缩放；换到指针坐标后保留横向/纵向滚动条。
+  if (!edge && blank) {
+    const box = target.getBoundingClientRect();
+    if (event.clientX >= box.left + (target.clientLeft + target.clientWidth) * popupScale.value
+      || event.clientY >= box.top + (target.clientTop + target.clientHeight) * popupScale.value) return;
+  }
   event.preventDefault();
   stopPopupGesture();
   // 用户开始拖动或调整尺寸后，解除自动锚点的限高，仍由视口边缘约束手动卡片。
@@ -2905,7 +2911,6 @@ onBeforeUnmount(() => {
 .fr-selection-indicator-glyph { font-size: 12px; font-weight: 700; line-height: 1; }
 .fr-translation-tooltip, .fr-translation-tooltip * { box-sizing: border-box; }
 .fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(35, 35, 43, .12); border-radius: 11px; background: #fff; box-shadow: 0 5px 20px rgba(35, 33, 43, .12); -webkit-user-select: none; user-select: none; }
-.fr-translation-tooltip > .fr-study-navigation { cursor: move; }
 .fr-popup-manipulating, .fr-popup-manipulating * { cursor: grabbing !important; user-select: none !important; }
 .fr-popup-resize-handle { position: absolute; z-index: 2; touch-action: none; }
 .fr-popup-resize-n, .fr-popup-resize-s { left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
@@ -2923,10 +2928,10 @@ onBeforeUnmount(() => {
 /* 自动卡用内在高度收拢；达到外框上限后将收缩量传给真正的阅读滚动区。 */
 .fr-reading-content > :deep(.fr-reading) { flex: 1; height: auto; }
 .fr-pos-label { display:flex; gap:6px; align-items:center; }
-.fr-study-navigation { flex: none; display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--fr-border, #eeedf0); }
+.fr-study-navigation { flex: none; display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--fr-border, #eeedf0); cursor: move; }
 .fr-tooltip-brand-icon { display:block; flex:none; width:18px; height:18px; border-radius:4px; object-fit:contain; opacity:1; pointer-events:none; }
 .fr-study-toolbar { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; gap: 3px; }
-.fr-study-reading-tools { flex: none; }
+.fr-study-reading-tools { flex: none; cursor: default; }
 .fr-study-toolbar button { flex:none; white-space:nowrap; font:inherit; font-size:11px; border:0; background:transparent; color:#62616c; border-radius:5px; padding:5px 8px; cursor:pointer; }
 /* 状态环向内绘制，避开滚动裁剪边界并保持按钮尺寸。 */
 .fr-study-toolbar button[aria-pressed=true], .fr-study-toolbar button:hover, .fr-study-toolbar button:focus-visible { background:#f4f0f3; color:#8e4867; outline:1px solid #dcc3d0; outline-offset:-1px; }

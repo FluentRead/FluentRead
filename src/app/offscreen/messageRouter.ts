@@ -263,7 +263,8 @@ function runCancellableRequest<T>(
         if (settled) return;
         settled = true;
         controller.signal.removeEventListener('abort', handleAbort);
-        if (active.get(requestId) === controller) active.delete(requestId);
+        // 准入拒绝重复身份，Map 只在这里释放；settled 阻止迟到结果清理复用该身份的新任务。
+        active.delete(requestId);
         sendResponse(response);
     };
     const handleAbort = () => finish({success: false, cancelled: true, requestId, error: cancelledError});

@@ -9,7 +9,7 @@ const locales = ['en-US', 'ja-JP', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const;
 const rows: Array<readonly [string, string, string, string, string, string, string]> = [
   ['本地处理后端','Local processing backend','ローカル処理バックエンド','로컬 처리 백엔드','Moteur de traitement local','Локальный вычислительный бэкенд','Motor de procesamiento local'],
   ['图片与漫画共用。浏览器卡顿时可选 CPU（WASM），下次处理生效。','Shared by images and manga. If the browser stalls, choose CPU (WASM) for subsequent processing.','画像と漫画で共通です。ブラウザーが停止する場合は CPU（WASM）を選択してください。次の処理から適用されます。','이미지와 만화가 함께 사용합니다. 브라우저가 멈추면 CPU(WASM)를 선택하세요. 다음 처리부터 적용됩니다.','Commun aux images et aux mangas. Si le navigateur se bloque, choisissez CPU (WASM) pour les traitements suivants.','Общий для изображений и манги. Если браузер зависает, выберите CPU (WASM) для последующей обработки.','Compartido por imágenes y manga. Si el navegador se bloquea, elige CPU (WASM) para los siguientes procesos.'],
-  ['CPU（WASM）','CPU (WASM)','CPU（WASM）','CPU(WASM)','CPU (WASM)','CPU (WASM)','CPU (WASM)'],
+  ['CPU（WASM）','CPU (WASM)','CPU (WASM)','CPU(WASM)','CPU (WASM)','CPU (WASM)','CPU (WASM)'],
   ['运行信息','Runtime details','実行情報','실행 정보','Informations d’exécution','Сведения о выполнении','Información de ejecución'],
   ['当前处理阶段','Current processing stage','現在の処理段階','현재 처리 단계','Étape de traitement actuelle','Текущий этап обработки','Etapa de procesamiento actual'],
   ['最近会话后端','Latest session providers','直近のセッションのバックエンド','최근 세션 백엔드','Moteurs de la dernière session','Бэкенды последнего сеанса','Motores de la última sesión'],

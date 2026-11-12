@@ -264,7 +264,8 @@ export function createImageOperationRegistry(legacyPrefix = 'image'): ImageOpera
                 });
             } finally {
                 clearTimeout(timer);
-                if (activeOperations.get(requestId) === controller) activeOperations.delete(requestId);
+                // 重复身份在准入时拒绝；本次 run 退出并释放身份后，重试才能成为新的 owner。
+                activeOperations.delete(requestId);
             }
         },
         cancel(requestIdValue) {

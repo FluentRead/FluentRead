@@ -328,11 +328,26 @@ describe('audit 49 E real Vue client model settings', () => {
         expect(second.container.querySelector('[data-testid="manga-optional-segmentation"] .ready')!.textContent).toBe('已就绪');
         second.app.unmount();apps.delete(second.app);await settle();expect(vi.getTimerCount()).toBe(0);
     });
-    it('does not restart model polling when the pending status completes after unmount',async()=>{
+    it.each(['resolve','reject'] as const)('does not restart model polling when the pending status %s after unmount',async outcome=>{
         vi.useFakeTimers();const pending=deferred<unknown>();ports.message.mockReturnValueOnce(pending.promise);
         const {app}=await mount(MangaModelSettings);app.unmount();apps.delete(app);
-        pending.resolve({success:true,ready:true,inpaintingReady:true,segmentationReady:true,bytes:100});await settle();
+        if(outcome==='resolve')pending.resolve({success:true,ready:true,inpaintingReady:true,segmentationReady:true,bytes:100});
+        else pending.reject(new Error('status failed after unmount'));
+        await settle();
         expect(vi.getTimerCount()).toBe(0);expect(ports.message).toHaveBeenCalledOnce();
+    });
+    it('finishes a failed file import and status refresh after unmount without keeping a picker or poller alive',async()=>{
+        vi.useFakeTimers();const pending=deferred<void>();
+        const {container,app}=await mount(MangaModelSettings);
+        const input=container.querySelector<HTMLInputElement>('input[type="file"]')!;
+        Object.defineProperty(input,'files',{configurable:true,value:[{name:MANGA_TEXT_SEGMENTATION_ASSET.file,size:MANGA_TEXT_SEGMENTATION_ASSET.bytes,
+            arrayBuffer:async()=>{await pending.promise;throw new Error('file became unavailable');}}]});
+        input.dispatchEvent(new Event('change'));await settle();
+        app.unmount();apps.delete(app);
+        ports.message.mockRejectedValueOnce(new Error('status failed after import'));
+        pending.resolve();await settle();
+        expect(ports.message).toHaveBeenCalledTimes(2);expect(vi.getTimerCount()).toBe(0);
+        expect(container.childNodes).toHaveLength(0);
     });
     it('pauses hidden model polling and renders verifying, paused and failed download snapshots',async()=>{
         vi.useFakeTimers();(document as any).visibilityState='hidden';

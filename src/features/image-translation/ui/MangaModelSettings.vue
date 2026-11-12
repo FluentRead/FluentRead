@@ -32,7 +32,7 @@
     </details>
     <details v-if="status?.inference" class="manga-inference-diagnostics">
       <summary>{{ translateLegacy('运行信息') }}</summary>
-      <p>{{ translateLegacy('当前处理阶段') }} · {{ translateLegacy(stageLabel) }}</p>
+      <p>{{ translateLegacy('当前处理阶段') }} · {{ translateLegacy(stageLabels[status.inference.stage]) }}</p>
       <p>{{ translateLegacy('最近会话后端') }} · <span data-i18n-ignore>{{ status.inference.executionProviders.join(' / ') || '—' }}</span></p>
       <p v-if="status.inference.cpuFallback">{{ translateLegacy('已自动回退 CPU（WASM）') }}</p>
     </details>
@@ -47,7 +47,7 @@ import type {MangaInferenceDiagnostics} from '../services/mangaInferenceClient';
 withDefaults(defineProps<{showInpainting?: boolean; embedded?: boolean; imageRecognition?: boolean}>(),{showInpainting:true,embedded:false,imageRecognition:true});
 const {translateLegacy}=useUiI18n();
 const status=ref<{ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics}|null>(null);
-const stageLabel=computed(()=>({idle:'等待任务',preparing:'正在准备资源',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'处理完成',canceled:'已取消',error:'处理失败'}[status.value?.inference?.stage ?? 'idle']));
+const stageLabels={idle:'等待任务',preparing:'正在准备资源',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'处理完成',canceled:'已取消',error:'处理失败'} as const;
 const busy=ref(false),error=ref(''),statusError=ref(''),input=ref<HTMLInputElement>();
 const downloading=computed(()=>['downloading','verifying'].includes(status.value?.download?.phase??''));
 const phaseLabel=computed(()=>({downloading:'正在下载漫画模型',verifying:'正在校验漫画模型',paused:'漫画模型下载已暂停',error:'漫画模型下载未完成'}[status.value?.download?.phase??'downloading']));

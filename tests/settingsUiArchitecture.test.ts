@@ -1295,6 +1295,14 @@ describe('options UI composition architecture', () => {
     expect(tokens).toContain('--surface-soft: var(--fr-color-surface-soft);')
   })
 
+  it('keeps the off switch neutral instead of reusing a foreground text token', () => {
+    const controls = sourceBody('src/features/settings/ui/components/settings-controls.css')
+    const switchRule = controls.match(/:is\([^)]*\) \.el-switch \{([^}]*)\}/u)?.[1] ?? ''
+
+    expect(switchRule).toContain('--el-switch-on-color: var(--brand);')
+    expect(switchRule).not.toMatch(/--el-switch-off-color:\s*var\(--(?:muted|ink|brand)/u)
+  })
+
   it('keeps the desktop navigation scroll boundary stable while hovering its final item', () => {
     const pageStyles = sourceBody('src/features/settings/ui/settings-page.css')
 

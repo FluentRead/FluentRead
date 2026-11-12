@@ -68,8 +68,10 @@ function resolveSigningIdentity() {
     if (process.env.FLUENTREAD_SIGN_IDENTITY) return process.env.FLUENTREAD_SIGN_IDENTITY;
     try {
         const out = execFileSync('security', ['find-identity', '-v', '-p', 'codesigning'], {encoding: 'utf8'});
-        const match = out.match(/"([^"]+)"/);
-        if (match) return match[1];
+        const appleDevelopment = out.match(/"([^"]*Apple Development[^"]*)"/);
+        if (appleDevelopment) return appleDevelopment[1];
+        const any = out.match(/"([^"]+)"/);
+        if (any) return any[1];
     } catch {
         // 没有证书时按 ad-hoc 处理。
     }
@@ -146,25 +148,19 @@ function main() {
     const schemes = listSchemes(project);
     if (schemes.length === 0) throw new Error('Xcode 工程中没有可用的 scheme');
     mkdirSync(OUT_DIR, {recursive: true});
-    // 有开发者团队时交给 Xcode 自动签名：沙盒应用需要配套的描述文件，
-    // 手工 codesign 只能重签已有产物，无法生成 profile。
-    const team = process.env.FLUENTREAD_DEVELOPMENT_TEAM;
-    const signingArgs = team
-        ? [
-            'CODE_SIGN_STYLE=Automatic',
-            `DEVELOPMENT_TEAM=${team}`,
-            'CODE_SIGN_IDENTITY=Apple Development',
-            '-allowProvisioningUpdates',
-        ]
-        : ['CODE_SIGN_IDENTITY=-', 'CODE_SIGNING_REQUIRED=YES', 'CODE_SIGNING_ALLOWED=YES'];
+    // 一律先用 ad-hoc 构建，构建完成后再用解析到的身份重签（见 resign）。
+    // 不走 xcodebuild 的自动签名：命令行下取不到 Xcode 的账号库，会直接报
+    // “No Accounts”；而且本工程没有需要描述文件的受限能力，重签足够。
     for (const scheme of schemes) {
-        console.log(`[safari] 构建 scheme: ${scheme}${team ? `（团队 ${team}）` : '（ad-hoc）'}`);
+        console.log(`[safari] 构建 scheme: ${scheme}`);
         execFileSync('xcodebuild', [
             '-project', project,
             '-scheme', scheme,
             '-configuration', 'Release',
             '-derivedDataPath', DERIVED,
-            ...signingArgs,
+            'CODE_SIGN_IDENTITY=-',
+            'CODE_SIGNING_REQUIRED=YES',
+            'CODE_SIGNING_ALLOWED=YES',
             'build',
         ], {cwd: ROOT, stdio: 'inherit'});
     }

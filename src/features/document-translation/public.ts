@@ -24,6 +24,8 @@ export {generateDocumentArchive} from './services/archive';
 export * from './services/history';
 export {createDocumentHistoryCommitter} from './services/historyCommitter';
 export * from './services/pdfOcr';
+export * from './services/pdfSourceEdits';
+export {createPdfSourcePreview} from './ui/pdfSourcePreview';
 export {
     createPdfPagePreview,
     releasePdfDocument,

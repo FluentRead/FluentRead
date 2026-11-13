@@ -545,6 +545,88 @@ async function waitForSourceTextLayers(root: ParentNode, count: number): Promise
 }
 
 describe('PDF reader color readback performance', () => {
+    it('keeps the bottom reading anchor when a toolbar notice reduces viewport height', async () => {
+        const reader = mountReader(model(2)); await componentFlush();
+        const {viewport, state} = reader;
+        Object.defineProperty(viewport, 'scrollHeight', {value: state.totalHeight, configurable: true});
+        state.viewportHeight = 1000; viewport.scrollTop = state.totalHeight - 1000;
+        Object.assign(viewport, {clientHeight: 600});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames();
+        expect(viewport.scrollTop).toBe(state.totalHeight - 600); expect(state.currentPage).toBe(2);
+        viewport.scrollTop = 30; Object.assign(viewport, {clientHeight: 500});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames();
+        expect(viewport.scrollTop).toBe(30);
+    });
+    it('places uncertain OCR markers on original page coordinates and leaves translation and selection surfaces separate', async () => {
+        const source = model();
+        if (source.binary?.kind !== 'pdf') throw new Error('PDF fixture required');
+        source.binary.pages[0].ocrReviewRegions = [{x: 42, y: 80, width: 8, height: 6}];
+        const reader = mountReader(source, 'bilingual', ['Translated paragraph']);
+        await componentFlush();
+        const markers = () => [...reader.root.querySelectorAll<HTMLElement>('.pdf-ocr-review')];
+        expect(markers()).toHaveLength(1); expect(markers()[0].style.left).toBe('42px'); expect(markers()[0].style.top).toBe('80px');
+        expect(markers()[0].style.width).toBe('8px'); expect(markers()[0].getAttribute('aria-hidden')).toBe('true');
+        expect(markers()[0].closest('figure')?.getAttribute('aria-label')).toBe('document.pdfReading.original');
+        reader.state.scale = 1.5; await componentFlush(); expect(markers()[0].style.left).toBe('42px');
+        reader.currentMode.value = 'translated'; await componentFlush(); expect(markers()).toHaveLength(0);
+        reader.currentMode.value = 'source'; await componentFlush(); expect(markers()).toHaveLength(1);
+    });
+    it('keeps the reading position and existing canvases when OCR adds a same-source checkpoint', async () => {
+        const source = documentModel(4);
+        const reader = mountReader(source);
+        await waitForSourceTextLayers(reader.root, 4);
+        reader.state.jumpTo(3); flushFrames(); await componentFlush();
+        await vi.waitFor(() => expect(reader.state.currentPage).toBe(3));
+        await componentFlush();
+        const beforeTop = reader.viewport.scrollTop;
+        const beforeCanvas = reader.root.querySelector('[data-page-number="3"] canvas');
+        const beforeRenders = pdfPage.render.mock.calls.length;
+        const binary = source.binary as Extract<ParsedDocument['binary'], {kind: 'pdf'}>;
+        reader.currentDocument.value = {...source, binary: {...binary, pages: binary.pages.map(page => ({...page, scanned: false}))}};
+        await componentFlush(); flushFrames(); await componentFlush();
+        expect(reader.viewport.scrollTop).toBe(beforeTop);
+        expect(reader.state.currentPage).toBe(3);
+        expect(reader.root.querySelector('[data-page-number="3"] canvas')).toBe(beforeCanvas);
+        expect(pdfPage.render).toHaveBeenCalledTimes(beforeRenders);
+    });
+
+    it('adds selectable OCR lines to the resident source layer without redrawing the page and preserves them on zoom or another checkpoint', async () => {
+        const source = documentModel(4), reader = mountReader(source);
+        await waitForSourceTextLayers(reader.root, 4);
+        reader.state.jumpTo(3); flushFrames(); await componentFlush();
+        const beforeCanvas = reader.root.querySelector('[data-page-number="3"] canvas'), beforeRenders = pdfPage.render.mock.calls.length;
+        const binary = source.binary as Extract<ParsedDocument['binary'], {kind: 'pdf'}>;
+        const checkpoint = {...source, binary: {...binary, pages: binary.pages.map(page => page.pageNumber === 3 ? {...page, scanned: false, ocrRecognized: true,
+            blocks: page.blocks.map(block => ({...block, lines: [{text: 'Scanned source 3,700', x: 50, y: 70, width: 180, height: 12}]}))} : page)}};
+        reader.currentDocument.value = checkpoint; await componentFlush(); flushFrames(); await componentFlush();
+        const layer = reader.root.querySelector('[data-page-number="3"] [data-fluentread-pdf-text]')!;
+        const span = layer.querySelector('[data-pdf-ocr-line]')!;
+        expect(span.textContent).toBe('Scanned source 3,700');
+        expect(layer.getAttribute('data-fluentread-pdf-page-text')).toBe('Scanned source 3,700');
+        expect(reader.root.querySelector('[data-page-number="3"] canvas')).toBe(beforeCanvas);
+        expect(pdfPage.render).toHaveBeenCalledTimes(beforeRenders);
+        reader.state.zoom = '1.25'; await componentFlush(); flushFrames(); await componentFlush();
+        reader.currentDocument.value = {...checkpoint, binary: {...checkpoint.binary, pages: checkpoint.binary.pages.map(page => ({...page}))}};
+        await componentFlush(); flushFrames(); await componentFlush();
+        expect(layer.querySelector('[data-pdf-ocr-line]')).toBe(span);
+        expect(reader.state.currentPage).toBe(3);
+    });
+
+    it('evicts removed or changed page geometry when updating scheduler models and uses new models on the next render', async () => {
+        const pages = [pageModel(1), pageModel(2)], render = vi.fn(async (_page: PdfDocumentPage) => output()), changed = vi.fn();
+        const scheduler = new PdfReaderScheduler(pages, {render, dispose: vi.fn()}, changed);
+        scheduler.update([0, 1], () => settings()); await settle();
+        const results = await Promise.all(render.mock.results.map(result => result.value));
+        for (const replacement of [pageModel(9), pageModel(9, 700), pageModel(9, 700, 900)]) {
+            scheduler.update([0], () => settings(), [replacement]); await settle();
+            expect(render.mock.calls.at(-1)?.[0]).toBe(replacement);
+        }
+        expect(results.every(result => vi.mocked(result.dispose).mock.calls.length === 1)).toBe(true);
+        expect(changed).toHaveBeenCalledWith(2);
+        scheduler.dispose();
+        scheduler.update([], () => settings(), []);
+    });
+
     function coloredContext() {
         const canvas = {width: 1224, height: 1584};
         const getImageData = vi.fn((left: number, top: number, width: number, height: number) => {

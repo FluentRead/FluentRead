@@ -136,7 +136,9 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
             const pdf = snapshot?.binary?.kind === 'pdf' ? snapshot.binary : undefined;
             // 解析版本相同仍不足以复用 PDF：快照必须属于当前记录的原始文件，否则从记录字节重新读取。
             const invalidPdf = (record.format === 'pdf' || snapshot?.format === 'pdf' || pdf !== undefined) && (!pdf || !(pdf.bytes instanceof Uint8Array)
-                || pdf.bytes.length !== record.bytes.length || pdf.bytes !== record.bytes && pdf.bytes.some((byte, index) => byte !== record.bytes[index]));
+                || pdf.bytes.length !== record.bytes.length || pdf.bytes !== record.bytes && pdf.bytes.some((byte, index) => byte !== record.bytes[index])
+                // 旧版把 OCR 空结果标成 scanned:false；重新检查原图，恢复这类历史记录的重试入口。
+                || !Array.isArray(pdf.pages) || pdf.pages.some(page => !page || !Array.isArray(page.blocks) || page.scanned === false && page.blocks.length === 0));
             if (!snapshot?.segments || invalidPdf) {await readFiles([file], record.sourceUrl, operation);return;}
             const task = ports.createTask(file, record.sourceUrl);
             Object.assign(task, {document: snapshot, historyId: record.id, historyVersion: result.version, bytes: record.bytes, mimeType: record.mimeType,

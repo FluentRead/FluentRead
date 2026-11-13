@@ -16,6 +16,7 @@ function isAutomaticMathLiteral(entry: GlossaryProtectionEntry): boolean {
     const glyph = /[\u{1D400}-\u{1D7FF}]|(?=\p{Math})[\u2100-\u214F]/u;
     const identifier = /^(?:[\p{Script=Greek}\p{M}\u{1D400}-\u{1D7FF}0-9_]|(?!\p{Script=Greek})(?=\p{Math})[\u2100-\u214F])+$/u;
     return operator.test(source) || glyph.test(source) && identifier.test(source)
+        || /^(?:\d{1,32}(?:\.\d{1,16})?|[A-Za-z\p{Script=Greek}])?[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻₀₁₂₃₄₅₆₇₈₉₊₋]{1,12}$/u.test(source)
         || /^√[A-Za-z][A-Za-z0-9_]*$/u.test(source)
         || /^[\[(][ \t]*[-+]?[\p{L}\p{N}\p{M}_.∞]{1,32}[ \t]*,[ \t]*[-+]?[\p{L}\p{N}\p{M}_.∞]{1,32}[ \t]*[\])]$/u.test(source);
 }

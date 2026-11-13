@@ -1,0 +1,82 @@
+{
+  "source": "ARGUS 2606.20374v2 page 2, rasterized at 300 dpi; only numeric token and measured OCR geometry retained",
+  "width": 2550,
+  "height": 3300,
+  "word": {
+    "text": "3,700",
+    "confidence": 17,
+    "bbox": {
+      "x0": 1982,
+      "y0": 814,
+      "x1": 2092,
+      "y1": 844
+    },
+    "symbols": [
+      {
+        "bbox": {
+          "x0": 1982,
+          "y0": 814,
+          "x1": 1997,
+          "y1": 839
+        },
+        "text": "3",
+        "confidence": 99,
+        "is_superscript": 0,
+        "is_subscript": 0,
+        "is_dropcap": 0
+      },
+      {
+        "bbox": {
+          "x0": 2001,
+          "y0": 835,
+          "x1": 2006,
+          "y1": 844
+        },
+        "text": ",",
+        "confidence": 99,
+        "is_superscript": 0,
+        "is_subscript": 0,
+        "is_dropcap": 0
+      },
+      {
+        "bbox": {
+          "x0": 2011,
+          "y0": 814,
+          "x1": 2027,
+          "y1": 840
+        },
+        "text": "7",
+        "confidence": 99,
+        "is_superscript": 0,
+        "is_subscript": 0,
+        "is_dropcap": 0
+      },
+      {
+        "bbox": {
+          "x0": 2030,
+          "y0": 814,
+          "x1": 2046,
+          "y1": 839
+        },
+        "text": "0",
+        "confidence": 99,
+        "is_superscript": 0,
+        "is_subscript": 0,
+        "is_dropcap": 0
+      },
+      {
+        "bbox": {
+          "x0": 2050,
+          "y0": 814,
+          "x1": 2092,
+          "y1": 839
+        },
+        "text": "0",
+        "confidence": 88,
+        "is_superscript": 0,
+        "is_subscript": 0,
+        "is_dropcap": 0
+      }
+    ]
+  }
+}

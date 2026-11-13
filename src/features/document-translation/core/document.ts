@@ -91,6 +91,8 @@ export interface PdfDocumentBlock {
     source?: string;
     /** 从原文字形单独识别的列表前缀；不送去翻译，重排文字保留其列表语义。 */
     listMarker?: string;
+    /** 列表前缀的原始位置，供扫描页的透明选择层保留圆点及其与正文的顺序。 */
+    listMarkerRun?: PdfDocumentRun;
     /** PDF 在缩放比例 1、页面旋转 0 下的左上角内容坐标；页面展示旋转由 PdfDocumentPage.rotation 决定。 */
     x: number;
     y: number;
@@ -113,6 +115,8 @@ export interface PdfDocumentBlock {
     /** 图文卡片底框约束译文和遮罩范围；原文字形位置仍来自 lines。 */
     panelBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
     lines?: PdfDocumentLine[];
+    /** 用户逐行核对后的原文；备份最近一次未校订的识别文字、行位置及核对框，供显式撤销。 */
+    sourceCorrection?: {source: string; lines: PdfDocumentLine[]; reviewRegions: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>};
 }
 
 export interface PdfDocumentPage {
@@ -129,8 +133,12 @@ export interface PdfDocumentPage {
     preservedRegions?: PdfPreservedRegion[];
     /** 细分隔线只限制原位译文的可用空白，不作为重排阅读的图形区域。 */
     layoutBoundaries?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
-    /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；识别之后不再标记。 */
+    /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；成功识别后取消标记，空结果和失败仍保留以便重试。 */
     scanned?: boolean;
+    /** 文字与版面来自扫描识别；用于原文选择和显式重新识别，原始 PDF bytes 仍保持不变。 */
+    ocrRecognized?: boolean;
+    /** 需要核对的脚标、低分数字或表格原图区域，使用页面展示坐标，供阅读时定位核对。 */
+    ocrReviewRegions?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
 }
 
 export interface EpubDocumentChapter {

@@ -691,10 +691,10 @@ describe('PDF visible graphics geometry', () => {
         ]);
     });
     it('uses the PDF.js 6 combined paint operation and ignores clip-only and empty paths', () => {
-        const list = {fnArray: [ops.constructPath, ops.constructPath, ops.constructPath, ops.constructPath],
+        const list = {fnArray: [ops.constructPath, ops.constructPath, ops.constructPath, ops.constructPath, ops.constructPath],
             argsArray: [[ops.fill, [new Float32Array()], new Float32Array([20, 30, 40, 50])],
                 [ops.endPath, [new Float32Array()], new Float32Array([1, 1, 90, 90])],
-                [ops.stroke, [null], null], null]};
+                [ops.stroke, [null], null], null, [[], [], null]]};
         expect(extractPdfGraphicsShapes(list, ops, {width: 100, height: 100, transform: [1, 0, 0, 1, 0, 0]}))
             .toEqual([{kind: 'path', x: 20, y: 30, width: 20, height: 20}]);
     });
@@ -2135,6 +2135,53 @@ it('keeps actual p995 three-column index entries separate despite offset baselin
 
 
 describe('open-table and stroke evidence boundaries', () => {
+    it.each([false, true])('binds a root to the nearest eligible radicand with a baseline tie-break (%s)', tied => {
+        const source = [atom('√', 50, 100, 8), atom('a', tied ? 58 : 59, 108, 5), atom('b', 58, 106, 5)];
+        const lines = pdfLayoutLines(source);
+        expect(lines.flatMap(line => line.runs).find(run => run.text === '√')?.baseline).toBe(106);
+        expect(source[0].baseline).toBe(100);
+    });
+
+    it('uses the first aligned table caption and keeps later records outside the open table', () => {
+        const text = [atom('Table 1.1 Measurements', 50, 210, 150), atom('Table 1.2 Later records', 50, 290, 150),
+            ...[140, 160, 180, 250].flatMap((baseline, index) => [atom(String(index + 1), 60, baseline, 10), atom('Recorded observation', 160, baseline, 140)])];
+        const result = analyze(text, [{kind: 'path', x: 50, y: 100, width: 100, height: 20}, {kind: 'path', x: 150, y: 100, width: 200, height: 20},
+            {kind: 'path', x: 50, y: 120, width: 300, height: 0}]);
+        const table = result.preservedRegions.find(region => region.kind === 'table');
+        expect(table).toBeDefined(); expect(table!.y + table!.height).toBeLessThan(202);
+        expect(result.blocks.filter(block => block.y > 230).every(block => block.kind !== 'table')).toBe(true);
+    });
+
+    it('attaches the nearest short label above a figure without expanding to an earlier label', () => {
+        const result = analyze([atom('Earlier label', 150, 275, 60), atom('Nearest label', 150, 285, 60), atom('Ordinary prose is outside the diagram.', 50, 500, 300)],
+            [{kind: 'image', x: 100, y: 300, width: 180, height: 80}]);
+        const figure = result.preservedRegions.find(region => region.kind === 'figure');
+        expect(figure?.y).toBe(277);
+        expect(result.blocks.find(block => block.source === 'Earlier label')?.preserveSource).toBe(false);
+    });
+
+    it('does not extend a table to a lone vertical decoration below its last horizontal rule', () => {
+        const result = analyze([atom('Heading', 60, 120, 70), atom('Value', 160, 120, 40)], [
+            {kind: 'path', x: 50, y: 100, width: 200, height: 0}, {kind: 'path', x: 50, y: 140, width: 200, height: 0},
+            {kind: 'path', x: 50, y: 100, width: 0, height: 90},
+        ]);
+        const table = result.preservedRegions.find(region => region.kind === 'table');
+        expect(table).toBeDefined(); expect(table!.y + table!.height).toBeLessThan(150);
+    });
+
+    it('keeps a continuation with the closest existing text thread rather than a later-created older neighbor', () => {
+        const source = [atom('Alpha', 50, 100, 48, 16), atom('Beta', 98, 112, 48, 16), atom('after', 50, 124, 40, 16), atom('continued', 66, 136, 112, 16)]
+            .map(run => ({...run, y: run.baseline - 10, height: 10}));
+        expect(analyze(source).blocks.map(block => block.source)).toEqual(['Alpha after continued', 'Beta']);
+    });
+
+    it('keeps an isolated stretched delimiter on its own baseline without borrowing a distant text anchor', () => {
+        const delimiter = {...atom('|', 50, 100, 2, 22), layoutFontSize: 10};
+        const lines = pdfLayoutLines([delimiter, atom('unrelated', 300, 300, 80)]);
+        expect(lines).toHaveLength(2);
+        expect(lines.flatMap(line => line.runs).find(run => run.text === '|')).toMatchObject({baseline: 100, fontSize: 22});
+    });
+
     it.each(['single header', 'missing rule', 'misaligned caption', 'only two numerical rows', 'unreadable descriptions'] as const)('does not invent an open table from %s', mode => {
         const atoms = [atom('Table 1.1 Measurements', mode === 'misaligned caption' ? 400 : 50, 210, 150),
             ...[140, 160, 180].flatMap((baseline, index) => [atom(mode === 'only two numerical rows' && index === 2 ? '?' : String(index + 1), 60, baseline, 10),

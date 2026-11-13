@@ -3,6 +3,7 @@ import {createPdfPagePreview, paintPdfTranslation, rasterizePdfReadingPages, ras
 import type {ParsedDocument} from '@/src/features/document-translation/core/document';
 
 const pdf = vi.hoisted(() => ({width: 600, height: 800, render: vi.fn(), cleanup: vi.fn()}));
+vi.mock('@/src/features/document-translation/ui/pdfScanPreview', () => ({readPdfScanGraphics: async () => [], cropPdfScanRegions: () => []}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
     GlobalWorkerOptions: {},
     getDocument: () => ({promise: Promise.resolve({getPage: async () => ({
@@ -280,10 +281,17 @@ describe('PDF rasterizer resource lifecycle', () => {
         failEncoding = fails;
         const work = renderPdfPageImage(new Uint8Array([1]), 1, 300);
         if (fails) await expect(work).rejects.toThrow('fixture canvas encoding failure');
-        else await expect(work).resolves.toMatchObject({image: 'data:image/png;base64,AQID', width: 1440, height: 1920});
+        else await expect(work).resolves.toMatchObject({image: 'data:image/png;base64,AQID', width: 2500, height: 3333});
         expect(canvases[0].toDataURL).toHaveBeenCalledWith('image/png');
-        expect(sizes).toEqual([[1440, 1920]]); expect(canvases[0]).toMatchObject({width: 0, height: 0});
+        expect(sizes).toEqual([[2500, 3333]]); expect(canvases[0]).toMatchObject({width: 0, height: 0});
         expect(pdf.cleanup).toHaveBeenCalledOnce();
+    });
+    it.each([[6000, 8000], [500, 20000]])('bounds the OCR canvas for an oversized %s x %s page', async (width, height) => {
+        pdf.width = width; pdf.height = height;
+        const result = await renderPdfPageImage(new Uint8Array([1]), 1, width);
+        expect(result.width * result.height).toBeLessThanOrEqual(9_000_000);
+        expect(Math.max(result.width, result.height)).toBeLessThanOrEqual(4096);
+        expect(canvases[0]).toMatchObject({width: 0, height: 0});
     });
     it.each(['短译文\n', '\n短译文\r\n \t\r\n'])('does not add a continuation note for boundary blank lines: %j', async text => {
         const model = previewDocument();

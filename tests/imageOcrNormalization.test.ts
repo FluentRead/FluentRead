@@ -15,6 +15,13 @@ import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '@/src/features/im
 import {inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
 import {groupMangaOcrLines} from '@/src/features/image-translation/services/mangaRegions';
 
+it('坐标回映同时保留物理清字框、扫描文档基线和字号，不丢失任一用途的元数据',()=>{
+    const line={text:'SOURCE',bbox:{x0:20,y0:20,x1:80,y1:40},sourceBoxes:[{x0:20,y0:20,x1:35,y1:40},{x0:55,y0:20,x1:80,y1:40}],baseline:35,fontSize:15,documentReview:true as const};
+    const before=structuredClone(line),result=restoreOcrLineCoordinates([line],200,300,100,100,10);
+    expect(result).toEqual([{text:'SOURCE',bbox:{x0:20,y0:30,x1:140,y1:90},sourceBoxes:[{x0:20,y0:30,x1:50,y1:90},{x0:90,y0:30,x1:140,y1:90}],baseline:75,fontSize:45,documentReview:true}]);
+    expect(line).toEqual(before);expect(result[0].sourceBoxes).not.toBe(line.sourceBoxes);
+});
+
 it('Tesseract竖排合段保留各列清字范围，缩放后不擦除列间图案或放大漫画字号',()=>{
     const boxes=[{x0:54,y0:20,x1:68,y1:80},{x0:28,y0:20,x1:42,y1:80}];
     const recognized=normalizeOcrLines([{paragraphs:[{lines:boxes.map((bbox,i)=>({text:i?'左列':'右列',bbox,
@@ -540,6 +547,10 @@ describe('图片 OCR 有界尺寸和可信文本', () => {
         expect(getOcrImageSize(8000, 1000)).toEqual({width: 4096, height: 512});
         expect(getOcrImageSize(4000, 3000)).toEqual({width: 2828, height: 2121});
         expect(getOcrImageSize(1, 100_000)).toEqual({width: 1, height: 4096});
+        expect(getOcrImageSize(2480, 3508, 'document')).toEqual({width: 2480, height: 3508});
+        const document = getOcrImageSize(8000, 9000, 'document');
+        expect(document.width * document.height).toBeLessThanOrEqual(9_000_000);
+        expect(Math.max(document.width, document.height)).toBeLessThanOrEqual(4096);
     });
 
     it.each([[0, 10], [-1, 10], [10, 0], [10, -1], [Infinity, 10], [10, Infinity], [NaN, 10]])(

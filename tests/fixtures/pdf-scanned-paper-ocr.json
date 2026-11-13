@@ -1,0 +1,1536 @@
+{
+  "width": 2480,
+  "height": 3508,
+  "blocks": [
+    {
+      "bbox": {
+        "x0": 201,
+        "y0": 243,
+        "x1": 1290,
+        "y1": 307
+      },
+      "text": "Recognition of Scientific Documents\n\n",
+      "confidence": 96,
+      "blocktype": 1,
+      "paragraphs": [
+        {
+          "bbox": {
+            "x0": 201,
+            "y0": 243,
+            "x1": 1290,
+            "y1": 307
+          },
+          "text": "Recognition of Scientific Documents\n\n",
+          "confidence": 96,
+          "is_ltr": 1,
+          "lines": [
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 243,
+                "x1": 1290,
+                "y1": 307
+              },
+              "text": "Recognition of Scientific Documents\n\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 64,
+                "descenders": 15,
+                "ascenders": 15
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 292,
+                "x1": 1290,
+                "y1": 293
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 243,
+                    "x1": 560,
+                    "y1": 307
+                  },
+                  "text": "Recognition",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 582,
+                    "y0": 243,
+                    "x1": 644,
+                    "y1": 293
+                  },
+                  "text": "of",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 660,
+                    "y0": 243,
+                    "x1": 935,
+                    "y1": 293
+                  },
+                  "text": "Scientific",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 954,
+                    "y0": 245,
+                    "x1": 1290,
+                    "y1": 293
+                  },
+                  "text": "Documents",
+                  "confidence": 96
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "bbox": {
+        "x0": 200,
+        "y0": 363,
+        "x1": 845,
+        "y1": 401
+      },
+      "text": "A controlled two-column paper fixture\n\n",
+      "confidence": 93,
+      "blocktype": 1,
+      "paragraphs": [
+        {
+          "bbox": {
+            "x0": 200,
+            "y0": 363,
+            "x1": 845,
+            "y1": 401
+          },
+          "text": "A controlled two-column paper fixture\n\n",
+          "confidence": 93,
+          "is_ltr": 1,
+          "lines": [
+            {
+              "bbox": {
+                "x0": 200,
+                "y0": 363,
+                "x1": 845,
+                "y1": 401
+              },
+              "text": "A controlled two-column paper fixture\n\n",
+              "confidence": 93,
+              "rowAttributes": {
+                "rowHeight": 39,
+                "descenders": 9,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 200,
+                "y0": 393,
+                "x1": 845,
+                "y1": 392
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 200,
+                    "y0": 363,
+                    "x1": 230,
+                    "y1": 392
+                  },
+                  "text": "A",
+                  "confidence": 91
+                },
+                {
+                  "bbox": {
+                    "x0": 242,
+                    "y0": 363,
+                    "x1": 410,
+                    "y1": 393
+                  },
+                  "text": "controlled",
+                  "confidence": 93
+                },
+                {
+                  "bbox": {
+                    "x0": 420,
+                    "y0": 363,
+                    "x1": 621,
+                    "y1": 393
+                  },
+                  "text": "two-column",
+                  "confidence": 90
+                },
+                {
+                  "bbox": {
+                    "x0": 631,
+                    "y0": 372,
+                    "x1": 725,
+                    "y1": 401
+                  },
+                  "text": "paper",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 736,
+                    "y0": 363,
+                    "x1": 845,
+                    "y1": 393
+                  },
+                  "text": "fixture",
+                  "confidence": 95
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "bbox": {
+        "x0": 200,
+        "y0": 596,
+        "x1": 2218,
+        "y1": 1309
+      },
+      "text": "Left column begins with a controlled experiment. We                  Right column begins with independent results. The\nmeasured the response of twenty samples under identical            accuracy increased from 81.5 percent to 94.2 percent\nconditions. Each measurement was repeated three times              with 128 training examples. These values must remain\nto estimate uncertainty.                                                            unchanged during recognition.\n\nThe method preserves local structure and separates                    In conclusion, the observed improvement supports the\nadjacent columns. Paragraph boundaries matter because a            proposed method. Further experiments should examine\ntranslation must preserve the relationship between                      smaller samples and more difficult conditions before\nobservations and conclusions.                                                    applying the result elsewhere.\n\n",
+      "confidence": 96,
+      "blocktype": 6,
+      "paragraphs": [
+        {
+          "bbox": {
+            "x0": 200,
+            "y0": 596,
+            "x1": 2210,
+            "y1": 809
+          },
+          "text": "Left column begins with a controlled experiment. We                  Right column begins with independent results. The\nmeasured the response of twenty samples under identical            accuracy increased from 81.5 percent to 94.2 percent\nconditions. Each measurement was repeated three times              with 128 training examples. These values must remain\nto estimate uncertainty.                                                            unchanged during recognition.\n\n",
+          "confidence": 96,
+          "is_ltr": 1,
+          "lines": [
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 596,
+                "x1": 2150,
+                "y1": 634
+              },
+              "text": "Left column begins with a controlled experiment. We                  Right column begins with independent results. The\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 38,
+                "descenders": 9,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 625,
+                "x1": 2150,
+                "y1": 625
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 596,
+                    "x1": 270,
+                    "y1": 626
+                  },
+                  "text": "Left",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 281,
+                    "y0": 596,
+                    "x1": 405,
+                    "y1": 626
+                  },
+                  "text": "column",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 415,
+                    "y0": 596,
+                    "x1": 523,
+                    "y1": 634
+                  },
+                  "text": "begins",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 535,
+                    "y0": 596,
+                    "x1": 609,
+                    "y1": 625
+                  },
+                  "text": "with",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 620,
+                    "y0": 605,
+                    "x1": 638,
+                    "y1": 625
+                  },
+                  "text": "a",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 649,
+                    "y0": 596,
+                    "x1": 817,
+                    "y1": 626
+                  },
+                  "text": "controlled",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 829,
+                    "y0": 596,
+                    "x1": 1023,
+                    "y1": 634
+                  },
+                  "text": "experiment.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1036,
+                    "y0": 597,
+                    "x1": 1089,
+                    "y1": 626
+                  },
+                  "text": "We",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1301,
+                    "y0": 596,
+                    "x1": 1393,
+                    "y1": 634
+                  },
+                  "text": "Right",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1405,
+                    "y0": 596,
+                    "x1": 1529,
+                    "y1": 626
+                  },
+                  "text": "column",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1539,
+                    "y0": 596,
+                    "x1": 1646,
+                    "y1": 634
+                  },
+                  "text": "begins",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1658,
+                    "y0": 596,
+                    "x1": 1732,
+                    "y1": 626
+                  },
+                  "text": "with",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1744,
+                    "y0": 596,
+                    "x1": 1946,
+                    "y1": 634
+                  },
+                  "text": "independent",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1957,
+                    "y0": 596,
+                    "x1": 2073,
+                    "y1": 626
+                  },
+                  "text": "results.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2088,
+                    "y0": 596,
+                    "x1": 2150,
+                    "y1": 626
+                  },
+                  "text": "The",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 200,
+                "y0": 654,
+                "x1": 2183,
+                "y1": 692
+              },
+              "text": "measured the response of twenty samples under identical            accuracy increased from 81.5 percent to 94.2 percent\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39,
+                "descenders": 9,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 200,
+                "y0": 684,
+                "x1": 2183,
+                "y1": 683
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 200,
+                    "y0": 654,
+                    "x1": 360,
+                    "y1": 684
+                  },
+                  "text": "measured",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 371,
+                    "y0": 654,
+                    "x1": 420,
+                    "y1": 684
+                  },
+                  "text": "the",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 432,
+                    "y0": 663,
+                    "x1": 576,
+                    "y1": 692
+                  },
+                  "text": "response",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 589,
+                    "y0": 654,
+                    "x1": 627,
+                    "y1": 684
+                  },
+                  "text": "of",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 633,
+                    "y0": 658,
+                    "x1": 746,
+                    "y1": 692
+                  },
+                  "text": "twenty",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 759,
+                    "y0": 654,
+                    "x1": 890,
+                    "y1": 692
+                  },
+                  "text": "samples",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 901,
+                    "y0": 654,
+                    "x1": 997,
+                    "y1": 684
+                  },
+                  "text": "under",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1008,
+                    "y0": 654,
+                    "x1": 1150,
+                    "y1": 684
+                  },
+                  "text": "identical",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1302,
+                    "y0": 663,
+                    "x1": 1449,
+                    "y1": 692
+                  },
+                  "text": "accuracy",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 1460,
+                    "y0": 654,
+                    "x1": 1617,
+                    "y1": 684
+                  },
+                  "text": "increased",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1628,
+                    "y0": 654,
+                    "x1": 1708,
+                    "y1": 684
+                  },
+                  "text": "from",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1721,
+                    "y0": 654,
+                    "x1": 1788,
+                    "y1": 683
+                  },
+                  "text": "81.5",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1801,
+                    "y0": 658,
+                    "x1": 1924,
+                    "y1": 692
+                  },
+                  "text": "percent",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1935,
+                    "y0": 658,
+                    "x1": 1966,
+                    "y1": 684
+                  },
+                  "text": "to",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1979,
+                    "y0": 654,
+                    "x1": 2049,
+                    "y1": 684
+                  },
+                  "text": "94.2",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2060,
+                    "y0": 658,
+                    "x1": 2183,
+                    "y1": 692
+                  },
+                  "text": "percent",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 713,
+                "x1": 2210,
+                "y1": 751
+              },
+              "text": "conditions. Each measurement was repeated three times              with 128 training examples. These values must remain\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 38,
+                "descenders": 9,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 742,
+                "x1": 2210,
+                "y1": 742
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 713,
+                    "x1": 381,
+                    "y1": 743
+                  },
+                  "text": "conditions.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 395,
+                    "y0": 713,
+                    "x1": 478,
+                    "y1": 743
+                  },
+                  "text": "Each",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 489,
+                    "y0": 717,
+                    "x1": 711,
+                    "y1": 743
+                  },
+                  "text": "measurement",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 721,
+                    "y0": 722,
+                    "x1": 784,
+                    "y1": 743
+                  },
+                  "text": "was",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 796,
+                    "y0": 713,
+                    "x1": 938,
+                    "y1": 751
+                  },
+                  "text": "repeated",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 948,
+                    "y0": 713,
+                    "x1": 1030,
+                    "y1": 743
+                  },
+                  "text": "three",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1042,
+                    "y0": 713,
+                    "x1": 1130,
+                    "y1": 743
+                  },
+                  "text": "times",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1301,
+                    "y0": 713,
+                    "x1": 1375,
+                    "y1": 742
+                  },
+                  "text": "with",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1390,
+                    "y0": 713,
+                    "x1": 1445,
+                    "y1": 742
+                  },
+                  "text": "128",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1458,
+                    "y0": 713,
+                    "x1": 1587,
+                    "y1": 751
+                  },
+                  "text": "training",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1599,
+                    "y0": 713,
+                    "x1": 1763,
+                    "y1": 751
+                  },
+                  "text": "examples.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1777,
+                    "y0": 713,
+                    "x1": 1875,
+                    "y1": 743
+                  },
+                  "text": "These",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1886,
+                    "y0": 713,
+                    "x1": 1991,
+                    "y1": 743
+                  },
+                  "text": "values",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2003,
+                    "y0": 717,
+                    "x1": 2084,
+                    "y1": 743
+                  },
+                  "text": "must",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2095,
+                    "y0": 713,
+                    "x1": 2210,
+                    "y1": 743
+                  },
+                  "text": "remain",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 200,
+                "y0": 771,
+                "x1": 1808,
+                "y1": 809
+              },
+              "text": "to estimate uncertainty.                                                            unchanged during recognition.\n\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39,
+                "descenders": 9,
+                "ascenders": 10
+              },
+              "baseline": {
+                "x0": 200,
+                "y0": 800,
+                "x1": 1808,
+                "y1": 801
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 200,
+                    "y0": 775,
+                    "x1": 231,
+                    "y1": 801
+                  },
+                  "text": "to",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 244,
+                    "y0": 771,
+                    "x1": 381,
+                    "y1": 801
+                  },
+                  "text": "estimate",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 392,
+                    "y0": 771,
+                    "x1": 585,
+                    "y1": 809
+                  },
+                  "text": "uncertainty.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1300,
+                    "y0": 771,
+                    "x1": 1481,
+                    "y1": 809
+                  },
+                  "text": "unchanged",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1493,
+                    "y0": 771,
+                    "x1": 1600,
+                    "y1": 809
+                  },
+                  "text": "during",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1611,
+                    "y0": 771,
+                    "x1": 1808,
+                    "y1": 809
+                  },
+                  "text": "recognition.",
+                  "confidence": 96
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 200,
+            "y0": 1096,
+            "x1": 2218,
+            "y1": 1309
+          },
+          "text": "The method preserves local structure and separates                    In conclusion, the observed improvement supports the\nadjacent columns. Paragraph boundaries matter because a            proposed method. Further experiments should examine\ntranslation must preserve the relationship between                      smaller samples and more difficult conditions before\nobservations and conclusions.                                                    applying the result elsewhere.\n\n",
+          "confidence": 96,
+          "is_ltr": 1,
+          "lines": [
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 1096,
+                "x1": 2203,
+                "y1": 1134
+              },
+              "text": "The method preserves local structure and separates                    In conclusion, the observed improvement supports the\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39.325283,
+                "descenders": 9.325284,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 1126,
+                "x1": 2203,
+                "y1": 1126
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 1096,
+                    "x1": 264,
+                    "y1": 1126
+                  },
+                  "text": "The",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 276,
+                    "y0": 1096,
+                    "x1": 401,
+                    "y1": 1126
+                  },
+                  "text": "method",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 410,
+                    "y0": 1105,
+                    "x1": 567,
+                    "y1": 1134
+                  },
+                  "text": "preserves",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 580,
+                    "y0": 1096,
+                    "x1": 659,
+                    "y1": 1126
+                  },
+                  "text": "local",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 672,
+                    "y0": 1100,
+                    "x1": 815,
+                    "y1": 1126
+                  },
+                  "text": "structure",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 828,
+                    "y0": 1096,
+                    "x1": 887,
+                    "y1": 1126
+                  },
+                  "text": "and",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 899,
+                    "y0": 1100,
+                    "x1": 1048,
+                    "y1": 1134
+                  },
+                  "text": "separates",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1301,
+                    "y0": 1097,
+                    "x1": 1335,
+                    "y1": 1125
+                  },
+                  "text": "In",
+                  "confidence": 94
+                },
+                {
+                  "bbox": {
+                    "x0": 1347,
+                    "y0": 1096,
+                    "x1": 1535,
+                    "y1": 1132
+                  },
+                  "text": "conclusion,",
+                  "confidence": 94
+                },
+                {
+                  "bbox": {
+                    "x0": 1547,
+                    "y0": 1096,
+                    "x1": 1597,
+                    "y1": 1126
+                  },
+                  "text": "the",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1609,
+                    "y0": 1096,
+                    "x1": 1759,
+                    "y1": 1126
+                  },
+                  "text": "observed",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1770,
+                    "y0": 1096,
+                    "x1": 1992,
+                    "y1": 1134
+                  },
+                  "text": "improvement",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2004,
+                    "y0": 1100,
+                    "x1": 2142,
+                    "y1": 1134
+                  },
+                  "text": "supports",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2154,
+                    "y0": 1096,
+                    "x1": 2203,
+                    "y1": 1126
+                  },
+                  "text": "the",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 1154,
+                "x1": 2218,
+                "y1": 1192
+              },
+              "text": "adjacent columns. Paragraph boundaries matter because a            proposed method. Further experiments should examine\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39.325283,
+                "descenders": 9.325284,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 1184,
+                "x1": 2218,
+                "y1": 1183
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 1154,
+                    "x1": 339,
+                    "y1": 1192
+                  },
+                  "text": "adjacent",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 350,
+                    "y0": 1154,
+                    "x1": 498,
+                    "y1": 1184
+                  },
+                  "text": "columns.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 512,
+                    "y0": 1154,
+                    "x1": 680,
+                    "y1": 1192
+                  },
+                  "text": "Paragraph",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 690,
+                    "y0": 1154,
+                    "x1": 872,
+                    "y1": 1184
+                  },
+                  "text": "boundaries",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 884,
+                    "y0": 1158,
+                    "x1": 991,
+                    "y1": 1184
+                  },
+                  "text": "matter",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1001,
+                    "y0": 1154,
+                    "x1": 1132,
+                    "y1": 1184
+                  },
+                  "text": "because",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1145,
+                    "y0": 1163,
+                    "x1": 1162,
+                    "y1": 1183
+                  },
+                  "text": "a",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1300,
+                    "y0": 1154,
+                    "x1": 1454,
+                    "y1": 1192
+                  },
+                  "text": "proposed",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1464,
+                    "y0": 1154,
+                    "x1": 1596,
+                    "y1": 1184
+                  },
+                  "text": "method.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1610,
+                    "y0": 1154,
+                    "x1": 1733,
+                    "y1": 1184
+                  },
+                  "text": "Further",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1744,
+                    "y0": 1154,
+                    "x1": 1945,
+                    "y1": 1192
+                  },
+                  "text": "experiments",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1959,
+                    "y0": 1154,
+                    "x1": 2068,
+                    "y1": 1184
+                  },
+                  "text": "should",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 2080,
+                    "y0": 1154,
+                    "x1": 2218,
+                    "y1": 1184
+                  },
+                  "text": "examine",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 200,
+                "y0": 1213,
+                "x1": 2178,
+                "y1": 1251
+              },
+              "text": "translation must preserve the relationship between                      smaller samples and more difficult conditions before\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39,
+                "descenders": 9,
+                "ascenders": 10
+              },
+              "baseline": {
+                "x0": 200,
+                "y0": 1242,
+                "x1": 2178,
+                "y1": 1243
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 200,
+                    "y0": 1213,
+                    "x1": 376,
+                    "y1": 1243
+                  },
+                  "text": "translation",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 387,
+                    "y0": 1217,
+                    "x1": 468,
+                    "y1": 1243
+                  },
+                  "text": "must",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 478,
+                    "y0": 1222,
+                    "x1": 618,
+                    "y1": 1251
+                  },
+                  "text": "preserve",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 630,
+                    "y0": 1213,
+                    "x1": 679,
+                    "y1": 1243
+                  },
+                  "text": "the",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 691,
+                    "y0": 1213,
+                    "x1": 886,
+                    "y1": 1251
+                  },
+                  "text": "relationship",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 898,
+                    "y0": 1213,
+                    "x1": 1037,
+                    "y1": 1243
+                  },
+                  "text": "between",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1302,
+                    "y0": 1213,
+                    "x1": 1424,
+                    "y1": 1243
+                  },
+                  "text": "smaller",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1435,
+                    "y0": 1213,
+                    "x1": 1566,
+                    "y1": 1251
+                  },
+                  "text": "samples",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1580,
+                    "y0": 1213,
+                    "x1": 1639,
+                    "y1": 1243
+                  },
+                  "text": "and",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1649,
+                    "y0": 1222,
+                    "x1": 1733,
+                    "y1": 1243
+                  },
+                  "text": "more",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1746,
+                    "y0": 1213,
+                    "x1": 1878,
+                    "y1": 1243
+                  },
+                  "text": "difficult",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1890,
+                    "y0": 1213,
+                    "x1": 2061,
+                    "y1": 1243
+                  },
+                  "text": "conditions",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 2073,
+                    "y0": 1213,
+                    "x1": 2178,
+                    "y1": 1243
+                  },
+                  "text": "before",
+                  "confidence": 96
+                }
+              ]
+            },
+            {
+              "bbox": {
+                "x0": 201,
+                "y0": 1271,
+                "x1": 1795,
+                "y1": 1309
+              },
+              "text": "observations and conclusions.                                                    applying the result elsewhere.\n\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 39,
+                "descenders": 9,
+                "ascenders": 9
+              },
+              "baseline": {
+                "x0": 201,
+                "y0": 1301,
+                "x1": 1795,
+                "y1": 1300
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 201,
+                    "y0": 1271,
+                    "x1": 409,
+                    "y1": 1301
+                  },
+                  "text": "observations",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 423,
+                    "y0": 1271,
+                    "x1": 482,
+                    "y1": 1301
+                  },
+                  "text": "and",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 493,
+                    "y0": 1271,
+                    "x1": 696,
+                    "y1": 1301
+                  },
+                  "text": "conclusions.",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1302,
+                    "y0": 1271,
+                    "x1": 1446,
+                    "y1": 1309
+                  },
+                  "text": "applying",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1457,
+                    "y0": 1271,
+                    "x1": 1507,
+                    "y1": 1301
+                  },
+                  "text": "the",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1518,
+                    "y0": 1271,
+                    "x1": 1611,
+                    "y1": 1301
+                  },
+                  "text": "result",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 1622,
+                    "y0": 1271,
+                    "x1": 1795,
+                    "y1": 1301
+                  },
+                  "text": "elsewhere.",
+                  "confidence": 95
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "bbox": {
+        "x0": 202,
+        "y0": 3142,
+        "x1": 1092,
+        "y1": 3173
+      },
+      "text": "Small footnote: measurements were collected at room temperature.\n",
+      "confidence": 96,
+      "blocktype": 1,
+      "paragraphs": [
+        {
+          "bbox": {
+            "x0": 202,
+            "y0": 3142,
+            "x1": 1092,
+            "y1": 3173
+          },
+          "text": "Small footnote: measurements were collected at room temperature.\n",
+          "confidence": 96,
+          "is_ltr": 1,
+          "lines": [
+            {
+              "bbox": {
+                "x0": 202,
+                "y0": 3142,
+                "x1": 1092,
+                "y1": 3173
+              },
+              "text": "Small footnote: measurements were collected at room temperature.\n",
+              "confidence": 96,
+              "rowAttributes": {
+                "rowHeight": 30,
+                "descenders": 7,
+                "ascenders": 7
+              },
+              "baseline": {
+                "x0": 202,
+                "y0": 3166,
+                "x1": 1092,
+                "y1": 3166
+              },
+              "words": [
+                {
+                  "bbox": {
+                    "x0": 202,
+                    "y0": 3143,
+                    "x1": 277,
+                    "y1": 3166
+                  },
+                  "text": "Small",
+                  "confidence": 95
+                },
+                {
+                  "bbox": {
+                    "x0": 287,
+                    "y0": 3143,
+                    "x1": 404,
+                    "y1": 3166
+                  },
+                  "text": "footnote:",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 415,
+                    "y0": 3146,
+                    "x1": 605,
+                    "y1": 3166
+                  },
+                  "text": "measurements",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 614,
+                    "y0": 3150,
+                    "x1": 678,
+                    "y1": 3166
+                  },
+                  "text": "were",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 688,
+                    "y0": 3142,
+                    "x1": 808,
+                    "y1": 3166
+                  },
+                  "text": "collected",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 817,
+                    "y0": 3146,
+                    "x1": 840,
+                    "y1": 3166
+                  },
+                  "text": "at",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 848,
+                    "y0": 3150,
+                    "x1": 919,
+                    "y1": 3166
+                  },
+                  "text": "room",
+                  "confidence": 96
+                },
+                {
+                  "bbox": {
+                    "x0": 927,
+                    "y0": 3146,
+                    "x1": 1092,
+                    "y1": 3173
+                  },
+                  "text": "temperature.",
+                  "confidence": 96
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

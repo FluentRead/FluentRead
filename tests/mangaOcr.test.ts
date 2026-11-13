@@ -175,6 +175,98 @@ describe('原批次结束后的检测核心接纳',()=>{
     });
 });
 
+describe('原识别完成后的弱连接检测框补救',()=>{
+    const options={flatten:true as const,noCache:true as const,strategy:'per-box' as const};
+    function fixture(ink=true){
+        const data=new Float32Array(224*224),pixels=new Uint8ClampedArray(200*200*4);
+        for(let y=0;y<200;y++)for(let x=0;x<200;x++)pixels.set([245,240,221,255],(y*200+x)*4);
+        for(let y=20;y<180;y++)for(let x=20;x<180;x++)data[y*224+x]=.1;
+        for(let y=70;y<82;y++)for(let x=40;x<136;x++){
+            data[y*224+x]=.9;
+            if(ink&&(x-40)%8<4)pixels.set([30,30,30,255],(y*200+x)*4);
+        }
+        const run=vi.fn(async()=>({probability:{dims:[1,1,224,224],data}}));mocks.sessions=[{run,outputNames:['probability']}];
+        mocks.createProcessor.mockImplementation(()=>({findRegions:vi.fn(()=>[{bbox:{x0:20,y0:20,x1:180,y1:180},area:25600}])}));
+        mocks.detectionRun.mockImplementation(async function(this:any,canvas:any){
+            await this.session.run({x:{type:'float32',dims:[1,3,224,224]}});
+            return this.platform.canvas.createProcessor({width:224,height:224}).findRegions({padding:{vertical:.1,horizontal:.2},scale:1})
+                .map(({bbox:b}:any)=>({x:b.x0,y:b.y0,width:Math.min(b.x1,canvas.width)-b.x0,height:Math.min(b.y1,canvas.height)-b.y0}));
+        });
+        let service:any,raw:any[]=[];
+        mocks.recognize.mockImplementation(async function(this:any,canvas:any){
+            service=this;raw=(await this.detector.run(canvas)).map((box:any)=>({text:'O HE C N T',confidence:.69,box}));return {results:raw};
+        });
+        const factory=vi.mocked(document.createElement).getMockImplementation()!;
+        vi.mocked(document.createElement).mockImplementation(()=>{const canvas=factory('canvas');mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});return canvas;});
+        mocks.retryRecognition.mockImplementation(async(_canvas,boxes)=>[{text:'CHECK THE SOUTH GATE',confidence:.997,box:boxes[0]}]);
+        return{pixels,data,run,get raw(){return raw;},get service(){return service;}};
+    }
+    it('原检测与原批次不变，双裁图一致后才替换巨大错框，复用原像素且释放所有画布',async()=>{
+        const f=fixture(),pixels=f.pixels.slice(),probabilities=f.data.slice(),port=await createBrowserMangaOcr();
+        const page=await port.recognize('bridged title',options);
+        expect(page.results).toEqual([{text:'CHECK THE SOUTH GATE',confidence:.997,box:{x:36,y:66,width:104,height:20}}]);
+        expect(f.raw).toEqual([{text:'O HE C N T',confidence:.69,box:{x:0,y:4,width:200,height:192}}]);
+        expect(f.run).toHaveBeenCalledOnce();expect(mocks.recognize).toHaveBeenCalledOnce();
+        expect(mocks.retryRecognition.mock.calls.map(call=>[call[1],call[3],call[4]])).toEqual([
+            [[{x:0,y:0,width:104,height:20}],'per-box',{recBatchSize:1}],
+            [[{x:0,y:0,width:108,height:24}],'per-box',{recBatchSize:1}],
+        ]);
+        expect(mocks.contexts.flatMap(ctx=>ctx.getImageData.mock.calls)).toEqual([[0,0,200,200]]);
+        expect(mocks.contexts[1].drawImage).toHaveBeenCalledWith(mocks.canvases[0],36,66,104,20,0,0,104,20);
+        expect(mocks.contexts[2].drawImage).toHaveBeenCalledWith(mocks.canvases[0],34,64,108,24,0,0,108,24);
+        expect(f.pixels).toEqual(pixels);expect(f.data).toEqual(probabilities);expect(f.service.detector.detectionCore.takeRefinements()).toEqual([]);
+        expect(mocks.canvases).toHaveLength(3);expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);expect(mocks.bitmapClose).toHaveBeenCalledOnce();await port.destroy();
+    });
+    it('没有完整源墨迹时不发起附加推理，保留原结果及其身份',async()=>{
+        const f=fixture(false),port=await createBrowserMangaOcr(),page=await port.recognize('blank source',options);
+        expect(page.results[0]).toBe(f.raw[0]);expect(mocks.retryRecognition).not.toHaveBeenCalled();expect(mocks.canvases).toHaveLength(1);await port.destroy();
+    });
+    it.each([false,true])('新增数值复核仍进入保护，不丢已有保护证据：existing=%s',async existing=>{
+        const f=fixture(),number={text:'18',confidence:.99,box:{x:170,y:10,width:10,height:10}},original=mocks.recognize.getMockImplementation()!;
+        mocks.recognize.mockImplementation(async function(this:any,...args:unknown[]){const page=await original.apply(this,args);return {...page,...(existing?{numericEvidence:[number]}:{})};});
+        mocks.retryRecognition.mockImplementation(async(_canvas,boxes)=>[{text:'42',confidence:.998,box:boxes[0]}]);
+        const port=await createBrowserMangaOcr(),page=await port.recognize('bridged number',options);
+        expect(page.results[0]).toMatchObject({text:'42',box:{x:36,y:66,width:104,height:20}});
+        expect(page.numericEvidence).toEqual([...(existing?[number]:[]),page.results[0]]);expect(f.run).toHaveBeenCalledOnce();await port.destroy();
+    });
+    it('局部气泡和局部数字均阻止补救盖过已有文字，数字保护超限前不修改页对象',async()=>{
+        const f=fixture(),port=await createBrowserMangaOcr();await port.recognize('capture service',options);
+        const core=f.service.detector.detectionCore,record={core:{x0:40,y0:70,x1:136,y1:82},crop:{x0:36,y0:66,x1:140,y1:86},parent:{x0:0,y0:4,x1:200,y1:196},area:1152,pageWidth:200,pageHeight:200};
+        vi.spyOn(core,'takeRefinements').mockImplementation(()=>[record]);
+        const candidate={text:'existing',confidence:.99,box:{x:40,y:70,width:96,height:12}},canvas={width:200,height:200};
+        mocks.retryRecognition.mockClear();
+        for(const bubble of [{results:[candidate]},{results:[],numericEvidence:[candidate]}]){
+            const page={results:f.raw};await f.service.recoverDetectionFrames(canvas,f.pixels,page,[bubble]);expect(page.results).toBe(f.raw);
+        }
+        expect(mocks.retryRecognition).not.toHaveBeenCalled();
+        mocks.retryRecognition.mockImplementation(async(_canvas,boxes)=>[{text:'42',confidence:.998,box:boxes[0]}]);
+        const numericEvidence=Array(4096).fill({text:'18',confidence:.99,box:{x:170,y:10,width:10,height:10}}),page={results:f.raw,numericEvidence};
+        await expect(f.service.recoverDetectionFrames(canvas,f.pixels,page,[])).rejects.toThrow('数字保护区域过于复杂');
+        expect(page.results).toBe(f.raw);expect(page.numericEvidence).toBe(numericEvidence);expect(mocks.retryRecognition).toHaveBeenCalledTimes(2);await port.destroy();
+    });
+    it.each(['cancel','throw','sdk-swallowed','no-context'])('补救失败仍报告首因并释放资源，同一会话下一页可重试：%s',async stage=>{
+        const f=fixture(),controller=new AbortController(),failure=new Error('refinement inference failed');
+        const recognitionSession={run:vi.fn().mockRejectedValue(failure),release:vi.fn()};mocks.sessions.push(recognitionSession);
+        if(stage==='no-context'){
+            const factory=vi.mocked(document.createElement).getMockImplementation()!;
+            vi.mocked(document.createElement).mockImplementation(()=>{const canvas=factory('canvas') as HTMLCanvasElement;if(mocks.canvases.length===2)vi.mocked(canvas.getContext).mockReturnValue(null);return canvas;});
+        }
+        mocks.retryRecognition.mockImplementationOnce(async()=>{
+            if(stage==='cancel')controller.abort();
+            if(stage==='throw')throw failure;
+            if(stage==='sdk-swallowed')try{await recognitionSession.run(recognitionFeeds());}catch{}
+            return [];
+        });
+        const port=await createBrowserMangaOcr(),pending=port.recognize('failed supplement',{...options,signal:controller.signal});
+        if(stage==='cancel')await expect(pending).rejects.toMatchObject({name:'AbortError'});
+        else if(stage==='no-context')await expect(pending).rejects.toThrow('浏览器不支持图片处理');
+        else await expect(pending).rejects.toBe(failure);
+        expect(f.service.detector.detectionCore.takeRefinements()).toEqual([]);expect(mocks.canvases.every(c=>c.width===0&&c.height===0)).toBe(true);expect(mocks.bitmapClose).toHaveBeenCalledOnce();
+        mocks.retryRecognition.mockReset().mockImplementation(async(_canvas,boxes)=>[{text:'CHECK THE SOUTH GATE',confidence:.997,box:boxes[0]}]);
+        expect((await port.recognize('next page',options)).results[0].text).toBe('CHECK THE SOUTH GATE');await port.destroy();
+    });
+});
+
 it('两个独立注音候选按实际墨迹量排序，不以正文左右顺序占用优先位置',()=>{
     const pixels=new Uint8ClampedArray(400*400*4).fill(255);
     for(const [x0,y0,x1,y1]of [[80,28,88,55],[280,108,284,122]])for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)pixels.set([0,0,0,255],(y*400+x)*4);
@@ -1502,7 +1594,7 @@ describe('漫画本地神经 OCR 会话',()=>{
         expect(cpu.run).toHaveBeenCalledOnce();expect(cpu.run).toHaveBeenCalledWith(feeds);await port.destroy();
     });
 
-    it('硬件 GPU 执行失败时沿用当前请求切换 CPU，取消期间不留下新会话',async()=>{
+    it.each([false,true])('硬件 GPU 执行失败时沿用当前请求切换 CPU，取消期间不留下新会话；释放失败=%s',async releaseFails=>{
         mocks.gpu.mockResolvedValue({available:true,info:'hardware'});
         const detection={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};
         mocks.sessions=[detection,undefined];
@@ -1514,6 +1606,7 @@ describe('漫画本地神经 OCR 会话',()=>{
         expect(mocks.cpuCreate).toHaveBeenCalledWith(assets.detection,{executionProviders:['wasm'],graphOptimizationLevel:'all'});await port.destroy();
         const controller=new AbortController(),second={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};mocks.sessions=[undefined,second];
         const next=await createBrowserMangaOcr();mocks.cpuCreate.mockImplementationOnce(async()=>{controller.abort();return cpu;});
+        if(releaseFails)cpu.release.mockRejectedValueOnce(new Error('late session cleanup failed'));
         mocks.recognize.mockImplementationOnce(async()=>second.run(recognitionFeeds()));
         await expect(next.recognize('image',{flatten:true,noCache:true,strategy:'per-box',signal:controller.signal})).rejects.toMatchObject({name:'AbortError'});expect(cpu.release).toHaveBeenCalledOnce();
         const pending=new AbortController(),third={run:vi.fn().mockRejectedValue(new Error('GPU')),release:vi.fn(async()=>{})};mocks.sessions=[third,third];

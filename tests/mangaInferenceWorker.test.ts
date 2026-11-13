@@ -6,6 +6,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {MangaInferenceMessage, MangaInferenceProgress, MangaInferenceResponse} from '@/src/features/image-translation/services/mangaInferenceClient';
+import type {ImageTextSegmentationSource} from '@/src/features/image-translation/services/imageTextSegmentation';
 
 const mocks = vi.hoisted(() => {
     const create = vi.fn();
@@ -472,6 +473,7 @@ async function prepareSeg(session=segSession()){
     mocks.loadSeg.mockResolvedValue(new ArrayBuffer(3));mocks.create.mockResolvedValue(session);
     expect(await send({type:'prepare-seg',requestId:100})).toMatchObject({success:true,result:true});return session;
 }
+const segSource=():ImageTextSegmentationSource=>({width:1,height:1,pixels:new Uint8ClampedArray([191,63,31,255])});
 
 describe('可选缓存 CTD Worker 端口',()=>{
     it('缺失只报告 false，不创建会话或读取输入；缓存异常归为不可重试协议错误',async()=>{
@@ -482,16 +484,19 @@ describe('可选缓存 CTD Worker 端口',()=>{
         expect(await send({type:'prepare-seg',requestId:102})).toMatchObject({errorKind:'protocol',error:'hash mismatch'});
         expect(await send({type:'prepare-seg',requestId:103})).toMatchObject({errorKind:'protocol',error:'cache unavailable'});
     });
-    it('固定模型仅懒创建一次，RGB输入原buffer，seg用float32乘法截断并转移owned bytes，所有张量均释放',async()=>{
+    it('固定模型仅懒创建一次，Worker从RGBA构造RGB张量，seg量化后转移owned bytes并释放所有张量',async()=>{
         const session=await prepareSeg(),output=segOutput();
         output.seg.data.set([0,1,.5,127.999/255,128/255,254.999/255]);session.run.mockResolvedValue(output);
-        const source=new Float32Array(3*1024*1024);source[0]=.75;
-        const result=await send({type:'segment',requestId:101,tensor:source});
+        const source=segSource(),before=source.pixels.slice();
+        const result=await send({type:'segment',requestId:101,source});
         const seg=result!.result as Uint8Array;
         expect(Array.from(seg.subarray(0,6))).toEqual([0,255,127,127,128,254]);
         expect(seg).toHaveLength(1024*1024);expect(seg.buffer).not.toBe(output.seg.data.buffer);
         expect(session.run).toHaveBeenCalledWith({images:mocks.inputs[0]});
-        expect(mocks.inputs[0].data).toBe(source);expect(mocks.inputs[0].data[0]).toBe(.75);
+        expect(source.pixels).toEqual(before);expect(mocks.inputs[0].data).toHaveLength(3*1024*1024);
+        expect(mocks.inputs[0].data[0]).toBe(Math.fround(191/255));
+        expect(mocks.inputs[0].data[1024*1024]).toBe(Math.fround(63/255));
+        expect(mocks.inputs[0].data[2*1024*1024]).toBe(Math.fround(31/255));
         expect(mocks.inputs[0].type).toBe('float32');expect(mocks.inputs[0].dims).toEqual([1,3,1024,1024]);
         for(const value of [...Object.values(output),...mocks.inputs])expect(value.dispose).toHaveBeenCalledOnce();
         expect(scope.postMessage.mock.calls.find(([message])=>message===result)![1]).toEqual([seg.buffer]);
@@ -522,14 +527,14 @@ describe('可选缓存 CTD Worker 端口',()=>{
         expect(await send({type:'prepare-seg',requestId:100})).toMatchObject({success:false,errorKind:'protocol'});
         expect(session.release).toHaveBeenCalledOnce();expect(session.run).not.toHaveBeenCalled();
     });
-    it.each(['absent','short','offset','shared','nan','negative','over'] as const)('%s输入不可推理，保持会话可重试',async fault=>{
-        const session=await prepareSeg();let input:Float32Array|undefined=new Float32Array(3*1024*1024);
-        if(fault==='absent')input=undefined;
-        if(fault==='short')input=new Float32Array(1);
-        if(fault==='offset')input=new Float32Array(new ArrayBuffer((3*1024*1024+1)*4),4);
-        if(fault==='shared')input=new Float32Array(new SharedArrayBuffer(3*1024*1024*4));
-        if(fault==='nan')input![0]=NaN;if(fault==='negative')input![0]=-.01;if(fault==='over')input![0]=1.01;
-        expect(await send({type:'segment',requestId:101,tensor:input})).toMatchObject({success:false,errorKind:'protocol'});
+    it.each(['absent','short','offset','shared','nan','negative','over'] as const)('%s原图不可推理，保持会话可重试',async fault=>{
+        const session=await prepareSeg();let source:ImageTextSegmentationSource|undefined=segSource();
+        if(fault==='short')source.pixels=new Uint8ClampedArray(1);
+        if(fault==='offset')source.pixels=new Uint8ClampedArray(new ArrayBuffer(5),1);
+        if(fault==='shared')source.pixels=new Uint8ClampedArray(new SharedArrayBuffer(4));
+        if(fault==='nan')source.width=NaN;if(fault==='negative')source.height=-1;if(fault==='over')source.width=8193;
+        if(fault==='absent')source=undefined;
+        expect(await send({type:'segment',requestId:101,source})).toMatchObject({success:false,errorKind:'protocol'});
         expect(session.run).not.toHaveBeenCalled();expect(mocks.inputs).toHaveLength(0);
     });
     it.each(['missing','extra','dtype','shape','data','length','nan','negative','over'] as const)('%s输出保留失败且释放unused blk/det和输入',async fault=>{
@@ -541,21 +546,21 @@ describe('可选缓存 CTD Worker 端口',()=>{
         if(fault==='length')outputs.seg.data=new Float32Array(2);
         if(fault==='nan')outputs.seg.data[0]=NaN;if(fault==='negative')outputs.seg.data[0]=-.1;if(fault==='over')outputs.seg.data[0]=1.1;
         session.run.mockResolvedValue(outputs);
-        expect(await send({type:'segment',requestId:101,tensor:new Float32Array(3*1024*1024)})).toMatchObject({success:false,errorKind:'protocol'});
+        expect(await send({type:'segment',requestId:101,source:segSource()})).toMatchObject({success:false,errorKind:'protocol'});
         expect(mocks.inputs[0].dispose).toHaveBeenCalledOnce();
         for(const value of Object.values(outputs))expect(value.dispose).toHaveBeenCalledOnce();
         if(fault==='missing')expect(originals[1].dispose).not.toHaveBeenCalled(); // ORT 未返回的对象不是 worker 所有。
     });
     it('run首因不被dispose故障覆盖，其他输出仍释放；成功后的清理故障也不可发布',async()=>{
-        const session=await prepareSeg(),source=new Float32Array(3*1024*1024);
+        const session=await prepareSeg(),source=segSource();
         session.run.mockRejectedValueOnce(new Error('native run'));
-        expect(await send({type:'segment',requestId:101,tensor:source})).toMatchObject({errorKind:'execution',error:'native run'});
+        expect(await send({type:'segment',requestId:101,source})).toMatchObject({errorKind:'execution',error:'native run'});
         expect(mocks.inputs[0].dispose).toHaveBeenCalledOnce();
         const output=segOutput();output.seg.data[0]=NaN;output.blk.dispose.mockImplementationOnce(()=>{throw new Error('dispose secondary');});session.run.mockResolvedValueOnce(output);
-        expect(await send({type:'segment',requestId:102,tensor:source})).toMatchObject({errorKind:'protocol',error:'图片分割概率无效'});
+        expect(await send({type:'segment',requestId:102,source})).toMatchObject({errorKind:'protocol',error:'图片分割概率无效'});
         expect(output.det.dispose).toHaveBeenCalledOnce();
         const valid=segOutput();valid.blk.dispose.mockImplementationOnce(()=>{throw new Error('dispose primary');});session.run.mockResolvedValueOnce(valid);
-        expect(await send({type:'segment',requestId:103,tensor:source})).toMatchObject({errorKind:'execution',error:'dispose primary'});expect(valid.det.dispose).toHaveBeenCalledOnce();
+        expect(await send({type:'segment',requestId:103,source})).toMatchObject({errorKind:'execution',error:'dispose primary'});expect(valid.det.dispose).toHaveBeenCalledOnce();
     });
 });
 
@@ -563,5 +568,5 @@ it('缺失元数据必须协议拒绝；清理多故障也保留首个undefined�
     const unknown=segSession();unknown.release.mockRejectedValueOnce(new Error('release secondary'));Object.assign(unknown,{inputMetadata:undefined});mocks.loadSeg.mockResolvedValue(new ArrayBuffer(1));mocks.create.mockResolvedValueOnce(unknown);
     expect(await send({type:'prepare-seg',requestId:99})).toMatchObject({errorKind:'protocol'});expect(unknown.release).toHaveBeenCalledOnce();
     const session=await prepareSeg(),output=segOutput();output.blk.dispose.mockImplementationOnce(()=>{throw undefined;});output.seg.dispose.mockImplementationOnce(()=>{throw new Error('secondary');});session.run.mockResolvedValue(output);
-    expect(await send({type:'segment',requestId:101,tensor:new Float32Array(3*1024*1024)})).toMatchObject({errorKind:'execution',error:'undefined'});expect(output.det.dispose).toHaveBeenCalledOnce();
+    expect(await send({type:'segment',requestId:101,source:segSource()})).toMatchObject({errorKind:'execution',error:'undefined'});expect(output.det.dispose).toHaveBeenCalledOnce();
 });

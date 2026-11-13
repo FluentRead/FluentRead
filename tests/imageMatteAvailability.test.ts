@@ -6,6 +6,7 @@
  */
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+import type {ImageTextSegmentationSource} from '@/src/features/image-translation/services/imageTextSegmentation';
 
 const mocks=vi.hoisted(()=>({recognize:vi.fn(),encode:vi.fn(),mangaRecognize:vi.fn(),repair:vi.fn(),prepareSeg:vi.fn(),segment:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/ocrRuntime',()=>({recognizeImage:mocks.recognize}));
@@ -271,9 +272,10 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         const f=install(fixture(224));evidenceMode='empty';mocks.prepareSeg.mockResolvedValue(true);
         // This controlled runtime returns broad learned support, not an erasure
         // mask. Real color/component/page gates must still preserve every art pixel.
-        mocks.segment.mockImplementation(async(factory:()=>Float32Array)=>{
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
             expect(canvases[0].context.measureText).toHaveBeenCalled();expect(canvases[0].writes).toBe(0);
-            const tensor=factory();expect(tensor.length).toBe(3*1024*1024);expect(tensor.buffer.byteLength).toBe(12_582_912);
+            const snapshot=factory();expect(snapshot.width).toBe(f.width);expect(snapshot.height).toBe(f.height);
+            expect(snapshot.pixels).toEqual(f.pixels);expect(snapshot.pixels.byteLength).toBe(f.width*f.height*4);
             return new Uint8Array(1024*1024).fill(255);
         });
         expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).toHaveBeenCalledOnce();
@@ -293,7 +295,7 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
     it.each(['prepare','input','result']as const)('可选分割%s阶段取消保持零上传并释放本次提案',async stage=>{
         install(fixture(224));evidenceMode='empty';const controller=new AbortController();
         mocks.prepareSeg.mockImplementation(async()=>{if(stage==='prepare')controller.abort();return true;});
-        mocks.segment.mockImplementation(async(factory:()=>Float32Array)=>{
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
             if(stage==='input')controller.abort();factory();if(stage==='result')controller.abort();return new Uint8Array(1024*1024).fill(255);
         });
         await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});preserved();

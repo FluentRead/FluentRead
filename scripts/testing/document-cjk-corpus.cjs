@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 // 自拟中文扫描语料：真 OCR、双栏、低清和倾斜页面；使用主运行器的临时浏览器及诊断。
 const {PDFDocument}=require('pdf-lib');
-module.exports=async function runCorpus({page,load,openSettings,shot,report,fixture,artifactsDir}){
+module.exports=async function runCorpus({page,load,openSettings,shot,report,fixture,artifactsDir,pdfPageTexts}){
   const changeConfig=async patch=>{
     const result=await page.evaluate(async patch=>{
       const stored=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});if(!stored.success)throw new Error(stored.error);
@@ -78,6 +78,8 @@ module.exports=async function runCorpus({page,load,openSettings,shot,report,fixt
     await page.mouse.move(box.x+box.width-.2,box.y+box.height/2,{steps:12});await page.mouse.up();
     assert.equal(await page.evaluate(()=>getSelection().toString().trim()),expected.trim(),'实际鼠标应选到复核后的中文原文');
     await shot(`corpus-${cases[index].name}`);await page.evaluate(()=>getSelection().removeAllRanges());
+    const tableTitle=page.locator(`.pdf-page-row[data-page-number="${index+1}"] [data-pdf-ocr-line]`).filter({hasText:/表1/}).first();
+    await tableTitle.scrollIntoViewIfNeeded();await shot(`table-${cases[index].name}`);
   }
   assert.equal(fixture.state.requests.length,0,'识别本身不应发送翻译请求');
 
@@ -88,10 +90,43 @@ module.exports=async function runCorpus({page,load,openSettings,shot,report,fixt
     if(index===3)for(const [number,prefix]of ['本研究','在相同','图像由','结果显示'].entries()){
       const segment=entry.segments.find(segment=>segment.source.startsWith(prefix));assert(segment&&normalized(segment.source).length>=normalized(paragraphs[number]).length*.98,`倾斜扫描应保留完整段落 ${prefix}`);
     }
+    const table=entry.page.blocks.filter(block=>block.kind==='table');
+    assert.equal(table.length,16,'四列四行无边框表格必须保持独立单元格');
+    assert.deepEqual(table.filter(block=>/^\d/u.test(block.source)).map(block=>block.source),['128','0.12','25.4','128','0.18','20.1','256','0.09','38.6'],'表格必须先行后列且保留数值');
+    assert(table.filter(block=>/^\d/u.test(block.source)).every(block=>block.preserveSource),'纯数字单元格保持原样');
+    assert(table.every(block=>block.cellBounds&&block.x>=block.cellBounds.x&&block.x+block.width<=block.cellBounds.x+block.cellBounds.width),'文字应在推导单元格内');
+    const caption=entry.page.blocks.findIndex(block=>block.source.startsWith('表1'));
+    assert.equal(entry.page.blocks[caption].kind,'caption');
+    assert.equal(entry.page.blocks.indexOf(table[0]),caption+1,'表题应紧邻表格');
+    assert(entry.page.blocks.findIndex(block=>block.source.startsWith('结果显示'))<caption,'先读完双栏正文再读表格');
     const cells=entry.page.blocks.map(block=>block.source);for(const value of ['128','256','0.12','0.18','0.09','25.4','20.1','38.6'])assert(cells.includes(value),`第 ${index+1} 页数值丢失 ${value}`);
     for(const block of entry.page.blocks.filter(block=>['方法两','方法己'].includes(block.source)))assert(entry.page.ocrReviewRegions.some(r=>r.x<block.x+block.width&&r.x+r.width>block.x&&r.y<block.y+block.height&&r.y+r.height>block.y),'未确认的方法标签必须显示核对位置');
   }
   assert(report.ocrPages[2].page.ocrReviewRegions.length>0,'低清页必须保留不确定位置');
+  fixture.state.englishOnly=true;
+  fixture.state.englishLabels={'方法':'Method','样本数量':'Samples','平均误差':'Mean error','耗时(ms)':'Time (ms)','方法甲':'Method A','方法乙':'Method B','方法丙':'Method C','方法两':'Method label','方法己':'Method label'};
+  await page.getByRole('button',{name:'开始翻译',exact:true}).click();
+  await page.waitForFunction(()=>/翻译完成|翻译中断/.test(document.querySelector('.document-status')?.textContent||''),undefined,{timeout:180000});
+  assert.match(await page.locator('.document-status').innerText(),/翻译完成/);
+  let translated;for(let attempt=0;attempt<60;attempt++){translated=await read();if(translated.pages.every(p=>p.blocks.filter(b=>b.kind==='table'&&b.segmentIndex>=0).every(b=>translated.translations[b.segmentIndex])))break;await page.waitForTimeout(250);}
+  for(const p of translated.pages)for(const block of p.blocks.filter(b=>b.kind==='table'&&b.segmentIndex>=0))assert(translated.translations[block.segmentIndex],'每个文本单元格都应获得译文');
+  await pageInput.fill('1');await pageInput.press('Enter');await page.getByLabel('阅读方式',{exact:true}).getByRole('button',{name:'双语',exact:true}).click();
+  const tableBlocks=translated.pages[0].blocks.filter(b=>b.kind==='table'&&b.segmentIndex>=0);
+  for(const block of tableBlocks){
+    const element=page.locator(`.pdf-page-row[data-page-number="1"] .pdf-translation-block[data-pdf-segment-index="${block.segmentIndex}"]`);
+    await element.waitFor();const bounds=await element.evaluate(el=>{const r=el.getBoundingClientRect(),p=el.closest('.pdf-page-frame').getBoundingClientRect();return{x:(r.x-p.x)/p.width*595,y:(r.y-p.y)/p.height*842,width:r.width/p.width*595,height:r.height/p.height*842};});
+    assert(bounds.x>=block.cellBounds.x-1&&bounds.y>=block.cellBounds.y-1&&bounds.x+bounds.width<=block.cellBounds.x+block.cellBounds.width+1&&bounds.y+bounds.height<=block.cellBounds.y+block.cellBounds.height+1,'表格译文必须限制在本单元格');
+  }
+  await page.locator(`.pdf-page-row[data-page-number="1"] .pdf-translation-block[data-pdf-segment-index="${tableBlocks[0].segmentIndex}"]`).scrollIntoViewIfNeeded();await shot('table-translated');
+  await page.locator('.download-button').click();const panel=page.locator('#document-download-panel[open]');await panel.locator('input[value="bilingual"]').check();
+  const [downloaded]=await Promise.all([page.waitForEvent('download',{timeout:120000}),panel.locator('.download-submit').click()]);
+  const exported=path.join(artifactsDir,'chinese-bilingual.pdf');await downloaded.saveAs(exported);report.downloads.push(exported);
+  const exportedBytes=fs.readFileSync(exported),texts=await pdfPageTexts(exportedBytes,true),output=await PDFDocument.load(exportedBytes);
+  const mapping=require('./pdf-output-pages.cjs').mapPdfLayoutPages(4,texts.texts.map((text,index)=>({text,label:texts.labels?.[index]})));
+  fs.writeFileSync(path.join(artifactsDir,'exported-text.json'),JSON.stringify(texts,null,2));
+  assert(mapping.ok,'导出应包含四张原图并保持续页归属');assert(texts.texts.some(text=>/Mean\s+error/u.test(text)),'导出文字层应包含表格译文');
+  report.tableTranslation={textCells:tableBlocks.length,withinCells:true,exportedPages:output.getPageCount(),originalPages:mapping.indices.length,service:'deterministic local English fixture; not provider semantics'};
+  fs.writeFileSync(path.join(artifactsDir,'translated-corpus.json'),JSON.stringify(translated,null,2));
   report.cases.push('four self-authored Chinese paper scans captured through explicit real OCR: 300 dpi, compressed 150 dpi, low-contrast 100 dpi and 0.7-degree skew');
-  report.qualityAssessment={cleanAnd150dpiBodyComplete:true,skewedParagraphsComplete:true,headersRestored:true,correctedChinesePointerSelection:true,tableNumericCellsPreserved:true,lowQualityReviewVisible:true,borderlessTableReadingOrder:'separate unresolved work; not claimed as passed'};
+  report.qualityAssessment={cleanAnd150dpiBodyComplete:true,skewedParagraphsComplete:true,headersRestored:true,correctedChinesePointerSelection:true,tableNumericCellsPreserved:true,lowQualityReviewVisible:true,borderlessTableReadingOrder:'four rows, four columns, caption after both body columns'};
 };

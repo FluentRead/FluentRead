@@ -2,6 +2,7 @@
  * @file src/features/document-translation/core/pdfLayoutAnalysis.ts
  * 文件职责：从 PDF 原始字形和绘图操作推导阅读顺序、段落与必须保留的公式、表格、插图区域。
  * 主要内容：在未旋转内容坐标中追踪绘图矩阵；按相邻行共同让出的竖带识别栏间距，松散的两端对齐行不被拆散；页眉页脚、数字/罗马数字/字母编号的标题、中英文题注与公式碎片分别归类，分栏由并排的正文段落确定、同栏内缩进不同的块按稳定基线组织阅读，字体顶边修正不打乱相邻栏的行序；图形在题注处断开，幻灯片内容框、段落底色和标题色带这类装文字的容器不算插图，原位重复描画的文字只读一次，表格碎横边先连接、按真实单元格及合并行边界切分并逐行阅读，含词语的单元格可以翻译；先按局部字形端点及父链关联上下标、避免跨表头基线吸附，以赋值、紧邻左花括号、多行值及同基线数学条件共同确认分段公式，保留其右侧条件和有几何/近邻证据的 TeX 大算符，已关联根号的下伸矩形覆盖相邻被开方字符，以同基线的冒号和纯符号箭头类型、或细线两端的数学节点及直接由数学节点支撑的正交短边确认独立数学标签，两端不复用支撑节点，有限 U 形返回箭头还须匹配同页已确认的类型函数名，先识别图表和独立公式，再按列与段落边界组织正文，仅对同段相邻行中以斜杠结束的 HTTP(S) 地址和含斜杠及数字的路径首词省去人工行间空格；重排保留列表符号并清理排版软连字符，保留逐行字形几何供阅读和导出使用。
+ * 无边框数据表：独立表题、文字表头及重复数值列共同确认逻辑单元格，表题与整表一起参与分栏，先读完前方双栏正文再逐行读表，不绘制不存在的表线。
  * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
  * 章节标题：已有章节名的字距化样式须有同栏正文支持；仅构造分类键，不压缩原文字串，公式、表格和作者区仍受保护。
  * 提示框边界：宽框内的正文项目列表与框顶大标题共同确认文字容器，编号后的竖分隔符不让章节标题吸附到插图。
@@ -13,6 +14,7 @@
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
  */
 import type {PdfDocumentBlock, PdfDocumentLine, PdfDocumentRun, PdfPreservedRegion} from './document';
+import {findBorderlessTables} from './pdfBorderlessTable';
 
 type Rectangle = Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
 type Matrix = readonly number[];
@@ -747,7 +749,8 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     // 项目符号是单独的一个字形：符号字体里的圆点方块常被读成 n、u、l 这样的字母。它留在原页上不参与翻译，
     // 所在的行从符号之后算起，并且总是另起一段。
     // 可见竖线比词距推断更可靠；紧挨分隔线的两格文字也不能串成一个段落。
-    const captionedTables = captionedTableGeometry(input.atoms, input.graphics, input.width);
+    const borderlessTables = findBorderlessTables(input.atoms, input.graphics, input.width);
+    const captionedTables = [...captionedTableGeometry(input.atoms, input.graphics, input.width), ...borderlessTables];
     const tableDividers = captionedTables.flatMap(table => table.dividers);
     const dividerCandidates = input.graphics.filter(shape => shape.kind === 'path' && shape.width <= 2 && shape.height >= 4);
     // 只索引细笔画的连接端点；无关路径或重复描边不参与逐项全表扫描。
@@ -775,7 +778,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             && diagonal.height >= shape.height * 1.2 && diagonal.height <= shape.height * 1.6
             && Math.abs(diagonal.x - right(shape)) <= .5 && Math.abs(bottom(diagonal) - bottom(shape)) <= .5
             && nearPaths(pathStarts, right(diagonal), diagonal.y).some(top => top.width >= diagonal.width * 2
-                && Math.abs(top.x - right(diagonal)) <= .5 && Math.abs(top.y - diagonal.y) <= .5)))), ...tableDividers];
+                && Math.abs(top.x - right(diagonal)) <= .5 && Math.abs(top.y - diagonal.y) <= .5)))), ...tableDividers.filter(divider => divider.width <= 2)];
     // 只有两端均有跨线竖边支撑的横线才限制单元格行；孤立分数线、根号横笔与装饰线不能成为行边界。
     let horizontalCellDividers: Rectangle[] = [];
     if (input.atoms.some(atom => largeOperator.test(atom.text))) {
@@ -878,6 +881,8 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     const loose = bodyGaps.length >= 3 ? Math.max(1, median(bodyGaps) / (font * 1.25)) : 1;
     // 题注开头：“Figure 1.”“Fig. 2:”“Table 3.”，IEEE 版式独占一行的“TABLE I”，以及中文的“图 1 ……”“表 2-1 ……”。正文里的“Table 2 shows”没有紧随的标点，不算题注。
     const captionStart = /^(?:(?:[Ff]igure|FIGURE|[Tt]able|TABLE|[Ff]ig\.|FIG\.)\s+\d+[.:]|TABLE\s+[IVXLC]+$|[图表]\s*\d+(?:[-.．]\d+)*[\s:：.．])/u;
+    const borderlessCaptions = new Set(lines.filter(line => borderlessTables.some(table => line.text === table.caption.text
+        && Math.abs(line.x - table.caption.x) <= 1 && Math.abs(line.y - table.caption.y) <= 1)));
     // 幻灯片的内容框、笔记的段落底色和标题色带都是“装文字的容器”而不是插图：成句的文字占去框内三成以上面积，
     // 或者框占页面三分之一以上且框内多半是成句的行、或字号明显大于图内标注时，框内文字按正文处理。
     const container = (box: Rectangle) => {
@@ -1037,7 +1042,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const header = bottom(line) < input.height * 0.065, trailer = line.y > input.height * 0.945;
         if ((header || trailer) && line.fontSize <= font * 1.05 && line.text.length < 120
             && !lines.some(near => header ? near.y >= bottom(line) - 1 && near.y - bottom(line) < font * 1.2 : bottom(near) <= line.y + 1 && line.y - bottom(near) < font * 1.2)) return 'footer';
-        if (captionStart.test(line.text)) return 'caption';
+        if (captionStart.test(line.text) || borderlessCaptions.has(line)) return 'caption';
         // 标题下方的作者署名字号常大于正文，但它是人名与单位标记，既不该翻译也不该出现在目录里。
         if (line.y < input.height * 0.45 && byline.test(line.text) && lines.some(above => above.baseline < line.baseline && above.fontSize > line.fontSize * 1.1)) return 'metadata';
         // 字距化的 Abstract 等短标题不因单字母被当作公式；正文、位置与保护区共同约束，不能把字母枚举提升为章节。
@@ -1263,9 +1268,17 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         if (table) {const cells = tableGroups.get(table) ?? []; cells.push(block); tableGroups.set(table, cells);}
     }
     const tableUnits = new Map<PdfLayoutBlock, PdfLayoutBlock[]>();
+    const tableCaptions = new Map<PdfLayoutBlock, PdfLayoutBlock>();
     const readingBlocks = blocks.filter(block => !blockTables.has(block));
     for (const [region, cells] of tableGroups) {
         const unit: PdfLayoutBlock = {...cells[0], ...region, source: '', kind: 'table'};
+        const title = readingBlocks.find(block => block.lines!.some(line => borderlessCaptions.has(line as LayoutLine))
+            && borderlessTables.some(table => table.bounds.x === region.x && table.bounds.y === region.y && table.caption.text === block.source));
+        if (title) {
+            readingBlocks.splice(readingBlocks.indexOf(title), 1);
+            unit.y = Math.min(title.y, region.y); unit.height = bottom(region) - unit.y;
+            tableCaptions.set(unit, title);
+        }
         tableUnits.set(unit, cells); readingBlocks.push(unit);
     }
     // 每个连续排版带先读左列再读右列；通栏标题/正文充当列带之间的分隔。
@@ -1307,8 +1320,10 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         // 这些单元格均由 table 草稿创建，cellBounds 在登记 blockTables 前已经生成。
         const rows = uniqueEdges(cells.map(cell => cell.cellBounds!.y));
         const rowOf = new Map(cells.map(cell => [cell, rows.findIndex(y => Math.abs(y - cell.cellBounds!.y) < .6)]));
-        return cells.sort((a, b) => rowOf.get(a)! - rowOf.get(b)!
+        const sorted = cells.sort((a, b) => rowOf.get(a)! - rowOf.get(b)!
             || a.cellBounds!.x - b.cellBounds!.x || a.y - b.y).map(cell => {cell.column = block.column; return cell;});
+        const title = tableCaptions.get(block);
+        return title ? [title, ...sorted] : sorted;
     });
     reading.forEach(block => {block.readingOrder = readingOrder++;});
     // 同一图带中的左右子图可能顶边不齐，按重叠高度识别同带后从左向右阅读。

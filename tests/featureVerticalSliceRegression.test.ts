@@ -42,9 +42,14 @@ describe('划词、圈选和图片翻译纵向切片回归', () => {
     it('扩展后台和 offscreen 从 app 层进入图片翻译，userscript 精确替换不支持的浏览器功能', () => {
         const background = source('entrypoints/background.ts');
         const messageRuntime = source('src/app/background/messageRuntime.ts');
+        const imageRuntime = source('src/app/background/imageTranslationRuntime.ts');
         expect(background).toContain("@/src/app/background/runtime");
         expect(messageRuntime).toContain("from './handlers/imageTranslation'");
-        expect(messageRuntime).toContain("@/src/features/image-translation/background/offscreenAdapter");
+        expect(messageRuntime).toContain("from './imageTranslationRuntime'");
+        expect(messageRuntime).toContain('imageTranslation: () => createImageTranslationRuntime(imageOcrLanguageRepository)');
+        expect(messageRuntime).not.toContain("@/src/features/image-translation/background/offscreenAdapter");
+        expect(imageRuntime).toContain("from './handlers/imageTranslation'");
+        expect(imageRuntime).toContain("@/src/features/image-translation/background/offscreenAdapter");
         expect(messageRuntime).toContain("from './areaRuntime'");
         expect(source('src/app/background/areaRuntime.ts')).toContain("@/src/features/area-translation/background/offscreenAdapter");
         expect(source('src/app/background/areaRuntime.ts')).toContain('prepareAreaVisionRecognition(config, language, title,');

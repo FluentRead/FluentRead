@@ -89,13 +89,13 @@ async function main() {
   const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-experience'));
   const suite = arg('suite', 'full');
-  assert(['full', 'formats', 'archives', 'experience', 'pdf-export', 'scanned'].includes(suite), 'suite 仅支持 full、formats、archives、experience、pdf-export 或 scanned');
+  assert(['full', 'formats', 'archives', 'experience', 'pdf-export', 'scanned', 'scanned-cjk'].includes(suite), 'suite 仅支持 full、formats、archives、experience、pdf-export、scanned 或 scanned-cjk');
   const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json').split(',');
   const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
   const packages = arg('playwright-root');
   const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'));
   const diagnosticsPath = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);
-  if (suite === 'scanned') assert(diagnosticsPath, '扫描件验收需要 --runtime-diagnostics-helper 采集扩展页和后台诊断');
+  if (['scanned', 'scanned-cjk'].includes(suite)) assert(diagnosticsPath, '扫描件验收需要 --runtime-diagnostics-helper 采集扩展页和后台诊断');
   const diagnostics = diagnosticsPath ? require(path.resolve(diagnosticsPath)).createRuntimeDiagnostics() : null;
   assert(packages && helperPath, '需要 Playwright 和 focus-safe helper');
   const requireRuntime = createRequire(path.join(packages, 'document-runner.cjs'));
@@ -151,7 +151,7 @@ async function main() {
           enableAIContext: false, enableAIMultiSegment: false,
           disableSelectionTranslator: disableSelection || current.disableSelectionTranslator,
         }});
-    }, {service, endpoint: fixture.url, disableSelection: suite === 'scanned'});
+    }, {service, endpoint: fixture.url, disableSelection: ['scanned', 'scanned-cjk'].includes(suite)});
     assert.equal(seeded.success, true, seeded.error);
     const shot = async name => { const file = path.join(artifactsDir, `${name}.png`); await page.screenshot({path: file, animations: 'disabled'}); report.screenshots.push(file); };
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, '页面不得横向溢出');
@@ -270,6 +270,12 @@ async function main() {
       await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
       await noOverflow(); await shot('pdf-100-export-mobile');
       report.cases.push('100-page bilingual and translated-only downloads reopen with every original page, translated pages and original page dimensions');
+      assert.equal(report.consoleErrors.length, 0);
+      report.ok = true;
+      return;
+    }
+    if (suite === 'scanned-cjk') {
+      await require('./testing/document-cjk-corpus.cjs')({page, load, openSettings, shot, report, fixture, artifactsDir});
       assert.equal(report.consoleErrors.length, 0);
       report.ok = true;
       return;

@@ -3,6 +3,7 @@ import {createSharedOcrTasks} from '@/src/features/image-translation/services/sh
 import scannedPaper from './fixtures/pdf-scanned-paper-ocr.json';
 import lowScoreNumber from './fixtures/pdf-scanned-low-score-number.json';
 import bulletPixels from './fixtures/pdf-scanned-bullet-pixels.json';
+import cjkFixture from './fixtures/pdf-scanned-cjk-ocr.json';
 import {recognizePdfDocument} from '@/src/features/document-translation/services/pdfOcr';
 
 const {recognize, ensureLanguages, clearModels, disposeWorker, removeFiles, createRuntime, tesseractCreateWorker, prefetchModels} = vi.hoisted(() => ({
@@ -18,7 +19,7 @@ vi.mock('@/src/features/image-translation/services/ocrWorkerRuntime', () => ({
     createOcrWorkerRuntime: createRuntime,
 }));
 vi.mock('@/src/features/image-translation/services/ocrModelCache', () => ({removeOcrModelFiles: removeFiles}));
-vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {AUTO: 3, SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6, SINGLE_WORD: 8}}));
+vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {AUTO: 3, SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6, SINGLE_LINE: 7, SINGLE_WORD: 8}}));
 
 const blockResult = () => ({data: {blocks: [{paragraphs: [{lines: [{
     text: 'hello', bbox: {x0: 10, y0: 10, x1: 50, y1: 30},
@@ -222,6 +223,45 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(paragraphOrder.every((at, index) => at >= 0 && (index === 0 || at > paragraphOrder[index - 1]))).toBe(true);
     });
 
+    it('uses slanted row geometry without letting inferred word boxes turn small Chinese footnotes into body text',async()=>{
+        dimensions={width:2479,height:3508};
+        const lines=[...structuredClone(cjkFixture.skewParagraph),structuredClone(cjkFixture.skewFootnote)];
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines}]}]}}).mockResolvedValue({data:{text:'',confidence:0}});
+        const result=(await recognizeImage('skewed-chinese-metrics','zh-Hans',undefined,{profile:'document'})).filter(l=>l.text);
+        expect(result).toHaveLength(4);
+        for(const line of result.slice(0,3)){expect(line.fontSize).toBeGreaterThan(44);expect(line.fontSize).toBeLessThan(51);}
+        expect(result[3].fontSize).toBeLessThan(39);
+        const page={pageNumber:1,width:595,height:842,blocks:[],segmentIndexes:[],scanned:true};
+        const parsed=await recognizePdfDocument({fileName:'skew.pdf',format:'pdf',label:'PDF',parts:[],segments:[],binary:{kind:'pdf',bytes:new Uint8Array([1]),pages:[page]}},async()=>result.map(l=>({text:l.text,x:l.bbox.x0*595/2479,y:l.bbox.y0*842/3508,width:(l.bbox.x1-l.bbox.x0)*595/2479,height:(l.bbox.y1-l.bbox.y0)*842/3508,fontSize:l.fontSize!*842/3508,baseline:l.baseline!*842/3508})));
+        expect(parsed.segments).toHaveLength(2);expect(parsed.segments[0].source.replace(/\s/gu,'')).toBe(cjkFixture.skewParagraph.map(l=>l.text).join('').replace(/\s/gu,''));
+    });
+    it('rechecks low Chinese glyphs at two smaller sizes while keeping real source coordinates and shared cleanup',async()=>{
+        dimensions={width:2480,height:3508};const title=structuredClone(cjkFixture.cases.find(c=>c.name==='title')!.line);
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[title]}]}]}}).mockResolvedValue({data:{text:'扫描论文识别与翻译实验',confidence:95}});
+        const result=await recognizeImage('chinese-title','zh-Hans',undefined,{profile:'document'});
+        expect(result.map(l=>l.text)).toEqual(['扫描论文识别与翻译实验']);expect(result[0].bbox).toEqual(title.bbox);
+        expect(recognize.mock.calls.map(call=>call[3])).toEqual([3,7,7]);expect(result.some(l=>l.documentReview)).toBe(false);
+        expect(sources.every(source=>!source.src)).toBe(true);expect(canvas.width+canvas.height).toBe(0);
+    });
+    it.each(['context','draw','abort'])('cleans Chinese crop resources after %s failure',async failure=>{
+        dimensions={width:2480,height:3508};const title=structuredClone(cjkFixture.cases.find(c=>c.name==='title')!.line),controller=new AbortController();
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[title]}]}]}}).mockImplementation(async()=>{controller.abort();return {data:{text:'扫描论文识别与翻译实验',confidence:95}};});
+        if(failure==='context')canvas.getContext.mockReturnValueOnce(context).mockReturnValue(null);
+        if(failure==='draw')context.drawImage.mockImplementationOnce(()=>{}).mockImplementation(()=>{throw new Error('crop draw failed');});
+        await expect(recognizeImage(`chinese-${failure}`,'zh-Hans',controller.signal,{profile:'document'})).rejects.toThrow();
+        expect(sources.every(source=>!source.src)).toBe(true);expect(canvas.width+canvas.height).toBe(0);
+    });
+    it.each(['left','top','right','bottom','wide','tall','fallback'])('keeps an unconfirmed Chinese source when its crop is %s',async kind=>{
+        dimensions={width:3000,height:3000};const title=structuredClone(cjkFixture.cases.find(c=>c.name==='title')!.line);
+        const sx=kind==='wide'?6:1,sy=kind==='tall'?12:1,dx=kind==='left'?-200:kind==='right'?2900:0,dy=kind==='top'?-200:kind==='bottom'?2900:0;
+        for(const b of [title.bbox,title.baseline,...title.words.map(w=>w.bbox)]){b.x0=b.x0*sx+dx;b.x1=b.x1*sx+dx;b.y0=b.y0*sy+dy;b.y1=b.y1*sy+dy;}
+        title.rowAttributes.rowHeight*=sy;
+        if(kind==='fallback')onImageCreated=()=>{if(sources.length===2)Object.assign(sources[1],{naturalWidth:0,naturalHeight:0});};
+        recognize.mockResolvedValueOnce({data:{blocks:[{paragraphs:[{lines:[title]}]}]}}).mockResolvedValue({data:{text:'扫摘论文识别与翻译实验',confidence:75}});
+        const result=await recognizeImage(`chinese-boundary-${kind}`,'zh-Hans',undefined,{profile:'document'});
+        if(['right','bottom'].includes(kind))expect(result).toEqual([]);else expect(result.some(l=>l.documentReview)).toBe(true);
+        expect(sources.every(source=>!source.src)).toBe(true);expect(canvas.width+canvas.height).toBe(0);
+    });
     it('keeps dense document resolution, chooses automatic columns, and isolates its cache from image OCR', async () => {
         dimensions = {width: 2480, height: 3508};
         recognize.mockResolvedValue(blockResult());

@@ -404,7 +404,10 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             const gap = next.bbox[main.start] - previous.bbox[main.end];
             const sameLine = crossOverlap >= Math.min(previousThickness, getAxisSize(next.bbox, cross)) * 0.35;
             // 英文单词间距可能接近一个字高；同一 OCR 行内合并，跨控件的大间距仍保持分开。
-            if (sameLine && gap <= Math.max(6, previousThickness * 4)) {
+            const adjacentHan = /\p{Script=Han}$/u.test(previous.text) && /^\p{Script=Han}/u.test(next.text);
+            // “一”只有一条横线，不能用它的墨迹高度把同一汉语词中的下一字误拆为另一行。
+            const hanGap = adjacentHan ? Math.max(previousThickness, getAxisSize(next.bbox, cross)) * .75 : 0;
+            if (sameLine && gap <= Math.max(6, previousThickness * 4, hanGap)) {
                 current.push(next);
             } else {
                 flush();

@@ -222,7 +222,7 @@
     <section v-if="hasVisitedSection('settings-video')" v-show="props.activeSection === 'settings-video'" id="settings-video" class="settings-section">
       <SettingsPanel name="general" :active="props.activePanel">
       <SettingsGroup>
-        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" description="翻译 YouTube、X、哔哩哔哩、Udemy、edX、Disney+ 视频和 Teams、Zoom、Google Meet 网页会议中的字幕，不上传音频或视频内容"  />
+        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" :description="t('video.description')" />
         <SettingsItem :label="t('video.course.auto')" :disabled="!config.videoTranslationEnabled">
           <div class="video-course-auto-sites" role="group" :aria-label="t('video.course.auto')">
             <div v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" class="video-course-auto-site">

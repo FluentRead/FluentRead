@@ -1,4 +1,5 @@
 {
+  "video.description": "動画やウェブ会議の字幕を翻訳します。音声や動画はアップロードしません。",
   "video.learning.title": "文単位で学習",
   "video.learning.close": "学習を閉じる",
   "video.learning.fragment": "字幕断片",

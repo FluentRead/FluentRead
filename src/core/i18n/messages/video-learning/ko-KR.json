@@ -1,4 +1,5 @@
 {
+  "video.description": "동영상과 웹 회의의 자막을 번역합니다. 오디오와 동영상은 업로드하지 않습니다.",
   "video.learning.title": "문장 학습",
   "video.learning.close": "학습 닫기",
   "video.learning.fragment": "자막 조각",

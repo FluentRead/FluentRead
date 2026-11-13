@@ -162,6 +162,7 @@ function verifySharedFrameEntrypoint(manifest, files, browser) {
     const shared = entries.filter(entry => entry.js?.includes('content-scripts/supportedFrame.js'));
     const expectedMatches = [
         'https://*.hf.space/*',
+        'https://courses.edx.org/*',
         'https://disqus.com/embed/comments/*',
         'https://mail.qq.com/cgi-bin/readmail*',
         'https://www.kaggleusercontent.com/kf/*/__results__.html*',

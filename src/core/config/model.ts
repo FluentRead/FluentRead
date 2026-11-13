@@ -9,6 +9,7 @@
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 侧边栏：保存原生翻译侧边栏的显示范围，旧配置与非法值默认使用当前标签页。
  * 工具栏：保存图标点击后打开快捷面板或直接翻译的偏好，旧配置与非法值保留面板默认行为。
+ * 课程字幕：B 站、Udemy、edX 分别保存自动开启偏好，新接入站点默认关闭，Udemy 延续既有开启状态。
  * 两点选取：默认关闭，独立保存单次启动快捷键，非法组合回到带修饰键的默认值。
  * 局部区域记忆：默认空列表，按专用 schema 保留网站/路径、有限 CSS 定位、自动/提醒模式和可选快捷方案引用，不保存网页文字或请求凭据。
  * AI 多段预算：默认每批最多 8 个可翻译片段、2000 原文字符，关闭功能保留预算，读取与导入时共享有界数字规范化。
@@ -194,6 +195,7 @@ import {
     normalizeMinTranslationTextLength,
 } from './pageTranslation';
 import {normalizeWritingPreferences, type WritingPreferences} from './writing';
+import {normalizeVideoCourseAutoStart, type VideoCourseAutoStart} from './videoCourse';
 import {DEFAULT_HARNESS_PREFERENCES, normalizeHarnessPreferences, type HarnessPreferences} from './harness';
 import {
     DEFAULT_VIDEO_SUBTITLE_APPEARANCE,
@@ -420,6 +422,7 @@ export class Config {
     documentCustomModel: IMapping; // 文档翻译按服务保存的独立自定义模型
     videoTranslationEnabled: boolean; // 是否启用视频字幕翻译 Beta
     videoMeetingAutoEnabled: boolean; // 自动开启会议平台的本地字幕显示
+    videoCourseAutoStart: VideoCourseAutoStart; // 每个课程站点分别决定新视频是否自动翻译
     videoPreferHumanSubtitles: boolean; // 优先使用目标语言人工字幕
     videoService: string; // 字幕服务，空值跟随网页默认
     videoLocalModel: VideoLocalTranscriptionModel; // X 无原生字幕时使用的本地 Whisper 模型
@@ -642,6 +645,7 @@ export class Config {
         this.documentCustomModel = {};
         this.videoTranslationEnabled = true; // 默认开启视频字幕翻译
         this.videoMeetingAutoEnabled = true;
+        this.videoCourseAutoStart = normalizeVideoCourseAutoStart(undefined);
         this.videoPreferHumanSubtitles = true;
         this.videoService = ''; // 默认跟随网页服务
         this.videoLocalModel = 'small';
@@ -1348,6 +1352,7 @@ export function normalizeConfig(value: unknown): Config {
         normalized.videoTranslationEnabled = true;
     }
     normalized.videoMeetingAutoEnabled = typeof source.videoMeetingAutoEnabled === 'boolean' ? source.videoMeetingAutoEnabled : true;
+    normalized.videoCourseAutoStart = normalizeVideoCourseAutoStart(source.videoCourseAutoStart);
     normalized.videoPreferHumanSubtitles = typeof source.videoPreferHumanSubtitles === 'boolean' ? source.videoPreferHumanSubtitles : true;
     // 缺失或非法选择统一使用质量默认；明确保存的 Tiny/Base/Small 继续保留。
     if (normalized.videoLocalModel !== 'tiny' && normalized.videoLocalModel !== 'base' && normalized.videoLocalModel !== 'small') {

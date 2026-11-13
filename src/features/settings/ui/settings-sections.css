@@ -2,6 +2,7 @@
  * @file src/features/settings/ui/settings-sections.css
  * 文件职责：定义 SettingsSections 各业务分区的专属样式，覆盖通用设置、网站规则、视频、连接配置和能力禁用提示。
  * 主要内容：包含通用页默认服务与配置按钮的自适应排列、设置行、服务窗口加载反馈、endpoint 提示、深色主题与响应式调整；译文样式预览已移至界面风格页，并直接复用网页的 translation-display.css。
+ * 课程字幕：三个独立开关在同一设置行自然排列，颜色和密度复用主题变量，窄屏保持站点名称与其开关成组。
  * 模块边界：该样式表只描述设置分区的视觉，不应改变配置行为或宿主网页；Options 页面骨架由 settings-page.css 管理，图片 OCR 等独立组件保留自己的 scoped CSS。
  */
 
@@ -215,6 +216,12 @@
 
 /* 请求限制的三项数值由独立组件渲染，补上它与后续设置行之间的分隔线。 */
 .request-limit-fields + .settings-item { border-top: 1px solid var(--line); }
+
+.video-course-auto-sites { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 4px 16px; }
+.video-course-auto-site { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; color: var(--ink); font-size: 12px; }
+@media (max-width: 700px) {
+  .video-course-auto-sites { width: 100%; justify-content: flex-start; gap: 4px 20px; }
+}
 .request-retry-settings { border-top: 1px solid var(--line); }
 .request-retry-settings > summary { padding: 14px 20px; color: var(--ink); font-size: 13px; cursor: pointer; }
 .request-retry-settings[open] > summary { border-bottom: 1px solid var(--line); }

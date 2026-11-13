@@ -66,14 +66,17 @@ function configSource(overrides: Partial<TranslationConfigSource> = {}): Transla
 }
 
 describe('translation provider request config snapshot', () => {
-    it('同图批次只由内部标记启用，复制后保留，JSON、自报字段和逐条回退不能启用', () => {
-        const request = markImageTextBatch({origin: ['First.', 'Second.']});
-        for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {
-            expect(isImageTextBatch(internal)).toBe(true);
-        }
-        for (const ordinary of [JSON.parse(JSON.stringify(request)), {origin: request.origin, imageTextBatch: true}, {...request, origin: 'First.'}]) {
-            expect(isImageTextBatch(ordinary)).toBe(false);
-        }
+    it.each(['chrome', 'firefox', 'userscript'])('%s 同图批次受平台和内部标记共同约束，JSON、自报字段和逐条回退不能启用', browser => {
+        vi.stubEnv('BROWSER', browser);
+        try {
+            const request = markImageTextBatch({origin: ['First.', 'Second.']});
+            for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {
+                expect(isImageTextBatch(internal)).toBe(browser !== 'userscript');
+            }
+            for (const ordinary of [JSON.parse(JSON.stringify(request)), {origin: request.origin, imageTextBatch: true}, {...request, origin: 'First.'}]) {
+                expect(isImageTextBatch(ordinary)).toBe(false);
+            }
+        } finally {vi.unstubAllEnvs();}
     });
     it('图片原样响应策略随内部快照和展开保留，公开字段与 JSON 无法附加策略', () => {
         const request = allowUnchangedTranslationResult({origin: 'Original English sentence.'});

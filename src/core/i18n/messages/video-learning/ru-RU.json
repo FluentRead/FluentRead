@@ -1,4 +1,5 @@
 {
+  "video.description": "Переводит субтитры видео и веб-встреч без загрузки аудио или видео.",
   "video.learning.title": "Учить по предложениям",
   "video.learning.close": "Закрыть",
   "video.learning.fragment": "Фрагмент субтитров",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "Объяснить снова",
   "video.learning.start": "Начать изучение предложений",
   "video.learning.appearance": "Настроить вид панели обучения",
-  "video.learning.drag": "Перетащите заголовок для перемещения панели"
+  "video.learning.drag": "Перетащите заголовок для перемещения панели",
+  "video.course.toggle": "Субтитры FluentRead",
+  "video.course.auto": "Переводить при открытии видео",
+  "video.course.off": "Субтитры выключены",
+  "video.course.loading": "Загрузка субтитров…",
+  "video.course.error": "Не удалось загрузить субтитры",
+  "video.course.empty": "Нет субтитров",
+  "video.course.bilibiliEmpty": "Нет субтитров",
+  "video.course.ready": "Субтитры готовы",
+  "video.course.waiting": "Ожидание субтитров…",
+  "video.course.download": "Скачать исходный SRT",
+  "video.course.downloadFailed": "Ошибка загрузки файла"
 }

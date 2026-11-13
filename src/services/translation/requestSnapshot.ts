@@ -67,7 +67,7 @@ export function markImageTextBatch<T extends object>(message: T): T {
 }
 
 export function isImageTextBatch(message: {origin: string | string[]}): boolean {
-    return Array.isArray(message.origin)
+    return import.meta.env.BROWSER !== 'userscript' && Array.isArray(message.origin)
         && (message as {[TRANSLATION_IMAGE_TEXT_BATCH]?: unknown})[TRANSLATION_IMAGE_TEXT_BATCH] === true;
 }
 

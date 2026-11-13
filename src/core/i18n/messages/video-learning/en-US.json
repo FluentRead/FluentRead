@@ -1,4 +1,5 @@
 {
+  "video.description": "Translate captions in videos and web meetings. No audio or video is uploaded.",
   "video.learning.title": "Sentence learning",
   "video.learning.close": "Close learning",
   "video.learning.fragment": "Caption fragment",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "Explain again",
   "video.learning.start": "Start sentence learning",
   "video.learning.appearance": "Customize learning panel",
-  "video.learning.drag": "Drag the title to move the panel"
+  "video.learning.drag": "Drag the title to move the panel",
+  "video.course.toggle": "FluentRead subtitles",
+  "video.course.auto": "Translate when a video opens",
+  "video.course.off": "Subtitles are off",
+  "video.course.loading": "Loading subtitles…",
+  "video.course.error": "Could not load subtitles",
+  "video.course.empty": "No subtitles",
+  "video.course.bilibiliEmpty": "No subtitles",
+  "video.course.ready": "Subtitles are ready",
+  "video.course.waiting": "Waiting for subtitles…",
+  "video.course.download": "Download original SRT",
+  "video.course.downloadFailed": "Download failed"
 }

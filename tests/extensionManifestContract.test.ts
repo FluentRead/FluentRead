@@ -126,7 +126,7 @@ describe('frame UI CSS artifact contract', () => {
         scripts: Record<string, string>;
     };
     const neteaseMatches = ['https://*.mail.126.com/*', 'https://*.mail.163.com/*', 'https://*.mail.yeah.net/*'];
-    const sharedMatches = ['https://*.hf.space/*', 'https://disqus.com/embed/comments/*',
+    const sharedMatches = ['https://*.hf.space/*', 'https://courses.edx.org/*', 'https://disqus.com/embed/comments/*',
         'https://mail.qq.com/cgi-bin/readmail*', 'https://www.kaggleusercontent.com/kf/*/__results__.html*'];
     const jsFile = (name: string) => `content-scripts/${name}.js`;
     const cssFile = (name: string) => `content-scripts/${name}.css`;

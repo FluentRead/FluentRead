@@ -1,4 +1,5 @@
 {
+  "video.description": "동영상과 웹 회의의 자막을 번역합니다. 오디오와 동영상은 업로드하지 않습니다.",
   "video.learning.title": "문장 학습",
   "video.learning.close": "학습 닫기",
   "video.learning.fragment": "자막 조각",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "다시 설명",
   "video.learning.start": "문장 학습 시작",
   "video.learning.appearance": "학습 패널 모양 조정",
-  "video.learning.drag": "제목을 드래그하여 패널 이동"
+  "video.learning.drag": "제목을 드래그하여 패널 이동",
+  "video.course.toggle": "FluentRead 자막",
+  "video.course.auto": "동영상을 열면 번역",
+  "video.course.off": "자막이 꺼져 있습니다",
+  "video.course.loading": "자막 로딩 중…",
+  "video.course.error": "자막 로딩 실패",
+  "video.course.empty": "자막 없음",
+  "video.course.bilibiliEmpty": "자막 없음",
+  "video.course.ready": "자막이 준비되었습니다",
+  "video.course.waiting": "자막 대기 중…",
+  "video.course.download": "원문 SRT 다운로드",
+  "video.course.downloadFailed": "다운로드 실패"
 }

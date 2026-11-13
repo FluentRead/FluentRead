@@ -81,6 +81,21 @@ describe('Google 批量传输与换线', () => {
         const {markImageTextBatch} = await import('@/src/services/translation/requestSnapshot');
         return api.default(withProviderSnapshot(markImageTextBatch({origin, sourceLanguage: 'en', targetLanguage: 'zh-Hans', ...options}), {from: 'en', to: 'zh-Hans'}));
     }
+    it('userscript 即使收到内部图片标记或显式邻文选项，也保留普通网页批次和原始换行', async () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        try {
+            fetchMock.mockImplementation(async (url, init) => successfulResponse(url,
+                requestData(url, init).texts.map(text => text.replace('FIRST.', '第一。').replace('SECOND.', '第二。'))));
+            const sources = ['FIRST.\nSECOND.', 'SECOND.'];
+            await expect(flush(imageRequest(sources))).resolves.toEqual(['第一。\n第二。', '第二。']);
+            await expect(flush(api.translateGoogleTexts(sources, 'en', 'zh-Hans', undefined, undefined, true, undefined, true)))
+                .resolves.toEqual(['第一。\n第二。', '第二。']);
+            expect(fetchMock).toHaveBeenCalledTimes(2);
+            for (const [url, init] of fetchMock.mock.calls) {
+                expect(requestData(url, init).texts).toEqual(['<pre>FIRST.\nSECOND.</pre>', '<pre>SECOND.</pre>']);
+            }
+        } finally {vi.unstubAllEnvs();}
+    });
     it('同图文字不进入收集窗，保留重复位置、标题和转义纯文本', async () => {
         const started = Date.now();
         fetchMock.mockImplementation(async (url, init) => {

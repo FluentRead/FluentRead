@@ -1,4 +1,5 @@
 {
+  "video.description": "Traduit les sous-titres des vidéos et réunions web, sans envoyer l’audio ni la vidéo.",
   "video.learning.title": "Apprendre par phrase",
   "video.learning.close": "Fermer",
   "video.learning.fragment": "Fragment de sous-titre",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "Expliquer à nouveau",
   "video.learning.start": "Commencer l’apprentissage des phrases",
   "video.learning.appearance": "Personnaliser le panneau d’apprentissage",
-  "video.learning.drag": "Déplacer le panneau en faisant glisser le titre"
+  "video.learning.drag": "Déplacer le panneau en faisant glisser le titre",
+  "video.course.toggle": "Sous-titres FluentRead",
+  "video.course.auto": "Traduire à l’ouverture d’une vidéo",
+  "video.course.off": "Sous-titres désactivés",
+  "video.course.loading": "Chargement…",
+  "video.course.error": "Échec du chargement",
+  "video.course.empty": "Aucun sous-titre",
+  "video.course.bilibiliEmpty": "Aucun sous-titre",
+  "video.course.ready": "Sous-titres prêts",
+  "video.course.waiting": "En attente…",
+  "video.course.download": "Télécharger le SRT original",
+  "video.course.downloadFailed": "Échec du téléchargement"
 }

@@ -49,6 +49,7 @@ const EXPECTED_PROVIDER_FILES = [
     'gemini.ts',
     'google.ts',
     'googleErrorBody.ts',
+    'googleImageContext.ts',
     'googleRequestGate.ts',
     'hunyuan-translation.ts',
     'local-translation.ts',

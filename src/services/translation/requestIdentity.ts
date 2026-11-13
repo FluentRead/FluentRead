@@ -1,7 +1,7 @@
 /**
  * @file src/services/translation/requestIdentity.ts
  * 字幕身份：实际消费的相邻 cue 参考及泄漏校验策略参与结果身份，网页摘要关闭时仍隔离不同字幕上下文。
- * 文件职责：根据已冻结的请求配置构建翻译结果缓存身份，并统一模型、实际端点与上下文资格的纯策略。
+ * 文件职责：根据已冻结的请求配置构建翻译结果缓存身份，并统一模型、实际端点与上下文资格的纯策略；同图邻文批次拥有独立协议版本和位置指纹，不能复用普通分项缓存。
  * 主要内容：维护单条、文本槽、原生批次与 AI 多段的身份维度，按实际消费的端点、合批偏好、图片原样成功策略、术语、文档保护、提示词、上下文泄漏门禁和自动识别样本隔离缓存；仅含 emoji 的正文增加字素恢复策略，摘要沿用独立身份；通过注入端口复用既有模型和端点解析。
  * 模块边界：不读取全局配置、不发起 provider 请求、不操作缓存仓库或在途去重，也不持有取消、调度或统计状态；broker 使用本模块生成结果身份，传输和 pending 生命周期仍由 broker 负责。
  */
@@ -17,7 +17,7 @@ import {getDeepLEndpoint} from '@/src/core/config/deepl';
 import {hasEmojiLiterals} from '@/src/core/translation/emojiLiterals';
 import {SUBTITLE_CONTEXT_LIMIT} from '@/src/core/translation/subtitleContext';
 
-export type CacheRequestMode = 'single' | 'slot-protocol' | 'inline-code-v1' | 'batch' | 'ai-multi-segment';
+export type CacheRequestMode = 'single' | 'slot-protocol' | 'inline-code-v1' | 'batch' | 'ai-multi-segment' | 'image-context-v1';
 
 export interface TranslationRequestIdentityContext {
     readonly config: TranslationProviderConfigSnapshot;

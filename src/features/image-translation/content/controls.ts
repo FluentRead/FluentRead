@@ -7,75 +7,13 @@
  */
 import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
 import {normalizeImageProgress} from '../progress';
+import imageControlsCss from '../ui/image-controls.css?inline';
 import brandIcon from '../../../../public/icon/32.png?inline';
 
 export type ImageControlPhase = 'idle' | 'loading' | 'translated' | 'error';
 // 基础颜色和字体由 reader CSS 在所属 Shadow UI 内统一声明，避免重复打包及宿主变量串入。
-export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS + `
-.fr-image-controls,.fr-image-feedback {--fr-image-muted:#737c8f;}
-.fr-image-controls {position:absolute;left:8px;bottom:8px;max-width:calc(100% - 16px);display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:auto;z-index:2;}
-.fr-image-feedback {position:absolute;left:50%;top:50%;width:max-content;display:flex;flex-direction:column;gap:8px;transform:translate(-50%,-50%);padding:12px 14px;border:1px solid var(--fr-image-line);border-radius:12px;background:var(--fr-image-surface);box-shadow:0 8px 28px rgba(27,36,57,.12),0 2px 6px rgba(27,36,57,.04);pointer-events:none;}
-.fr-image-controls[hidden],.fr-image-feedback[hidden],.fr-image-controls [hidden],.fr-image-feedback [hidden] {display:none!important;}
-.fr-image-feedback-title {font-size:14px;line-height:1.4;font-weight:650;}
-.fr-image-status {display:flex;align-items:center;gap:9px;min-width:0;overflow-wrap:anywhere;white-space:normal;}
-.fr-image-spinner {width:12px;height:12px;flex:0 0 auto;box-sizing:border-box;border:1.5px solid #b9aab333;border-top-color:#947985;border-radius:50%;animation:fr-image-spin .75s linear infinite;}
-.fr-image-spinner[data-animated=false] {animation:none;}
-.fr-image-actions {display:flex;align-items:center;flex-wrap:wrap;gap:2px;padding:2px;border:1px solid #ffffff66;border-radius:9px;background:rgba(250,251,253,.62);backdrop-filter:blur(6px);box-shadow:0 1px 5px rgba(27,36,57,.06);}
-.fr-image-controls button,.fr-image-feedback button {min-height:24px;padding:3px 7px;font-size:11px;font-weight:500;white-space:nowrap;}
-
-.fr-image-controls .fr-image-actions {opacity:.48;transition:opacity 120ms ease,background-color 120ms ease;}
-.fr-image-controls[data-phase=idle] .fr-image-actions {opacity:.28;padding:0;border:0;background:transparent;box-shadow:none;backdrop-filter:none;}
-.fr-image-controls[data-phase=idle] .fluent-read-image-translation-button::before {filter:grayscale(1);}
-.fr-image-controls[data-phase=idle]:hover .fluent-read-image-translation-button::before,.fr-image-controls[data-phase=idle]:focus-within .fluent-read-image-translation-button::before {filter:none;}
-.fr-image-controls[data-phase=idle] .fr-image-actions:hover,.fr-image-controls[data-phase=idle]:focus-within .fr-image-actions,.fr-image-controls .fr-image-actions:hover,.fr-image-controls:focus-within .fr-image-actions {opacity:1;background:rgba(250,251,253,.92);}
-.fr-image-controls[data-animations=false] .fr-image-actions {transition:none;}
-.fr-image-controls[data-phase=idle] .fluent-read-image-translation-button {width:24px;height:24px;padding:5px;font-size:0;}
-.fr-image-controls .fluent-read-image-translation-button::before {content:"";display:block;width:14px;height:14px;flex:0 0 auto;margin-right:5px;background:url("${brandIcon}") center/contain no-repeat;}
-.fr-image-controls[data-phase=idle] .fluent-read-image-translation-button::before {margin-right:0;}
-.fr-image-feedback-title::before {content:"";display:inline-block;width:16px;height:16px;margin-right:6px;vertical-align:-2px;background:url("${brandIcon}") center/contain no-repeat;}
-.fr-image-feedback[data-phase=loading] {padding:6px 9px;border-color:#ffffff66;border-radius:9px;background:rgba(250,251,253,.6);backdrop-filter:blur(5px);box-shadow:0 1px 5px rgba(27,36,57,.06);color:#475569;font-size:11px;opacity:.8;}
-.fr-image-feedback[data-phase=loading] .fr-image-status {gap:6px;}
-.fr-image-feedback[data-phase=error] {width:340px;padding:16px;pointer-events:auto;overflow:auto;overscroll-behavior:contain;}
-.fr-image-feedback[data-phase=error] .fr-image-status {color:#536074;}
-.fr-image-feedback[data-phase=error] {padding:20px;gap:12px;}
-.fr-image-feedback .fr-image-actions > button {background:var(--fr-image-brand);color:#fff;font-weight:650;}
-.fr-image-feedback .fr-image-actions > button:hover {background:#c62752;color:#fff;}
-.fr-image-more > summary {display:flex;align-items:center;gap:6px;min-height:36px;padding:0 4px;color:var(--fr-image-muted);font-size:12px;cursor:pointer;list-style:none;}
-.fr-image-more > summary::-webkit-details-marker {display:none;}
-.fr-image-more > summary::after {content:'';width:5px;height:5px;border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(45deg);}
-.fr-image-more[open] > summary::after {transform:rotate(225deg);}
-.fr-image-more > div {display:flex;flex-wrap:wrap;gap:6px;padding-top:6px;}
-.fr-image-feedback .fr-image-more button {background:transparent;color:var(--fr-image-muted);font-weight:500;}
-.fr-image-feedback .fr-image-service-settings {order:-1;}
-.fr-image-error-details {font-size:11px;color:var(--fr-image-muted);overflow-wrap:anywhere;}
-.fr-image-error-details summary {cursor:pointer;}
-.fr-image-error-details p {margin:6px 0 0;}
-.fr-image-feedback .fr-image-actions {flex-shrink:0;padding:4px 0 0;border:0;border-radius:0;box-shadow:none;gap:8px;background:transparent;}
-.fr-image-feedback[data-phase=error] .fr-image-error-details {min-height:0;overflow:auto;overscroll-behavior:contain;}
-.fr-image-feedback button {min-height:32px;max-width:100%;padding:6px 12px;white-space:normal;text-align:center;overflow-wrap:anywhere;}
-.fr-image-feedback .fr-image-dismiss,.fr-image-feedback[data-preparation=true] .fluent-read-image-translation-button {color:var(--fr-image-muted);}
- .fr-image-feedback[data-manga=true][data-phase=loading] {flex-direction:row;align-items:center;gap:6px;transform:none;min-width:0;padding:6px 9px;font-size:11px;pointer-events:none;animation:fr-manga-feedback .12s ease .15s both;}
-.fr-image-feedback[data-warning=true] {flex-direction:row;transform:none;min-width:0;max-height:24px;padding:0;border:0;font-size:11px;pointer-events:auto;}
-.fr-image-feedback[data-warning=true] .fr-image-warning-button {min-height:24px;padding:3px 6px;white-space:nowrap;}
-.fr-image-feedback[data-manga=false][data-warning=true] .fr-image-warning-button {min-width:24px;font-weight:700;}
-.fr-image-feedback[data-manga=true][data-warning=true] .fr-image-status>span:last-child {white-space:normal;overflow-wrap:anywhere;}
-.fr-image-feedback[data-manga=true] .fr-image-status {gap:6px;min-width:0;}
-.fr-image-feedback[data-manga=true] .fr-image-status>span:last-child {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.fr-image-feedback[data-manga=true][data-phase=loading][data-queued=true] {pointer-events:auto;}
-.fr-image-feedback[data-manga=true][data-queued=true] .fr-image-actions {padding:0;gap:0;}
-.fr-image-feedback[data-manga=true][data-queued=true] .fluent-read-image-translation-button {min-height:24px;padding:3px 7px;background:transparent;color:inherit;font-weight:500;}
-.fr-image-feedback[data-manga=true][data-phase=error] {width:280px;max-width:280px;transform:none;gap:5px;padding:8px 10px;border-color:#ffffff99;background:rgba(250,251,253,.94);box-shadow:0 2px 8px rgba(27,36,57,.08);font-size:11px;}
-.fr-image-feedback[data-manga=true][data-phase=error] .fr-image-status>span:last-child {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal;min-width:0;flex:1;}
-.fr-image-feedback[data-manga=true][data-phase=error] .fr-image-actions {gap:4px;padding:0;}
-.fr-image-feedback[data-manga=true][data-phase=error] button {min-height:28px;padding:4px 7px;font-size:11px;}
-.fr-image-progress {height:2px;width:36px;flex:0 0 36px;border-radius:2px;background:#47556930;overflow:hidden;}
-.fr-image-progress>span {display:block;height:100%;background:#947985;border-radius:inherit;}
-@keyframes fr-manga-feedback {from {opacity:0;} to {opacity:1;}}
-@keyframes fr-image-spin {to {transform:rotate(360deg);}}
-@media (prefers-reduced-motion: reduce) {.fr-image-spinner {animation:none;}.fr-image-controls .fr-image-actions {transition:none;}}
-@media (prefers-reduced-motion: reduce) {.fr-image-feedback[data-manga=true][data-phase=loading] {animation-duration:0s;}}
-.fr-image-feedback[data-manga=true][data-phase=loading][data-animations=false] {animation-duration:0s;}
-`;
+export const IMAGE_CONTROLS_CSS = IMAGE_READER_CSS
+    + `.fr-image-controls,.fr-image-feedback{--fr-image-icon:url("${brandIcon}")}` + imageControlsCss;
 
 export type ImageSettingsSection = 'settings-services' | 'settings-image-translation';
 

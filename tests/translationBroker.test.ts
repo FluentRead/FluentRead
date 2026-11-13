@@ -33,6 +33,8 @@ import {
     markTranslationRemainingBudget,
     reportTranslationModelUsage,
     allowUnchangedTranslationResult,
+    markImageTextBatch,
+    isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
 
 // 摘要专项使用超过压缩阈值的页面材料；短参考另有“不调用摘要”的真实回归。
@@ -2061,6 +2063,64 @@ describe('translation broker', () => {
         expect(mocks.service.mock.calls.map(([message]) => message.origin)).toEqual(['Alpha', 'Beta']);
         expect(mocks.cacheGet).not.toHaveBeenCalled();
         expect(mocks.cacheSet).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])('Google 同图批次 cache=%s 保留重复位置及完整语境，并按整组隔离缓存', async useCache => {
+        mocks.config.service = 'google';
+        mocks.service.mockImplementation(async ({origin}: {origin: string[]}) => origin.map((text, index) =>
+            text === 'Right.' ? (index === 0 ? '对。' : '右边。') : text === 'Turn.' ? '转弯。' : '继续。'));
+        const request = markImageTextBatch({origin: ['Right.', 'Turn.', 'Right.'], useCache});
+        await expect(translateWithCache(request)).resolves.toEqual(['对。', '转弯。', '右边。']);
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(request.origin);
+        expect(isImageTextBatch(mocks.service.mock.calls[0][0])).toBe(true);
+        await flushMicrotasks();
+        mocks.service.mockClear();
+        await expect(translateWithCache(request)).resolves.toEqual(['对。', '转弯。', '右边。']);
+        expect(mocks.service).toHaveBeenCalledTimes(useCache ? 0 : 1);
+        mocks.service.mockClear();
+        await expect(translateWithCache(markImageTextBatch({...request, origin: ['Right.', 'Continue.', 'Right.']})))
+            .resolves.toEqual(['对。', '继续。', '右边。']);
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(['Right.', 'Continue.', 'Right.']);
+    });
+
+    it('Google 同图批次部分缓存丢失时重算完整邻文，普通批译不复用同图槽缓存', async () => {
+        mocks.config.service = 'google';
+        mocks.service.mockImplementation(async ({origin}: {origin: string[]}) => origin.map((_, index) => `第${index + 1}句。`));
+        const request = markImageTextBatch({origin: ['First.', 'Second.', 'Third.']});
+        await translateWithCache(request);
+        await flushMicrotasks();
+        const keys = [...mocks.cacheStore.keys()].filter(key => JSON.parse(key).requestMode === 'image-context-v1');
+        expect(keys).toHaveLength(3);
+        mocks.cacheStore.delete(keys[1]);
+        mocks.service.mockClear();
+        await expect(translateWithCache(request)).resolves.toEqual(['第1句。', '第2句。', '第3句。']);
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(request.origin);
+        mocks.service.mockClear();
+        await translateWithCache({origin: request.origin});
+        expect(mocks.service).toHaveBeenCalledOnce();
+        expect(isImageTextBatch(mocks.service.mock.calls[0][0])).toBe(false);
+    });
+
+    it('关闭 Google 原生合批时同图标记不覆盖偏好，也不启用有邻文的缓存身份', async () => {
+        mocks.config.service = 'google';
+        mocks.config.nativeBatchTranslationEnabled = {google: false};
+        mocks.service.mockImplementation(async ({origin}: {origin: string}) => origin === 'Right.' ? '对。' : '转弯。');
+        await expect(translateWithCache(markImageTextBatch({origin: ['Right.', 'Turn.', 'Right.']})))
+            .resolves.toEqual(['对。', '转弯。', '对。']);
+        expect(mocks.service.mock.calls.map(([message]) => message.origin)).toEqual(['Right.', 'Turn.']);
+        expect(mocks.buildTranslationCacheKey.mock.calls.some(([identity]) => (identity as CacheIdentity).requestMode === 'image-context-v1')).toBe(false);
+    });
+
+    it('Google 同图批次去掉空白槽后保留其余位置，结构失败逐条回退不再附加邻文', async () => {
+        mocks.config.service = 'google';
+        mocks.service.mockImplementation(async ({origin}: {origin: string | string[]}) => {
+            if (Array.isArray(origin)) throw new NativeBatchResponseError('invalid slots');
+            return origin === 'Right.' ? '对。' : '转弯。';
+        });
+        await expect(translateWithCache(markImageTextBatch({origin: ['Right.', ' ', 'Turn.', 'Right.'], useCache: false})))
+            .resolves.toEqual(['对。', ' ', '转弯。', '对。']);
+        expect(mocks.service.mock.calls[0][0].origin).toEqual(['Right.', 'Turn.', 'Right.']);
+        expect(mocks.service.mock.calls.slice(1).every(([message]) => !isImageTextBatch(message))).toBe(true);
     });
 
     it('无缓存去重只合并完全相同的原文，不合并大小写或空白不同的文本', async () => {

@@ -2,6 +2,7 @@
  * @file src/services/translation/broker.ts
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
  * 用量控制：短参考直接复用；完整 AI 批次中的少数空槽或原文回显只恢复对应槽，整包回显仍触发原有降级。
+ * 同图 Google：可信且启用原生合批的图片请求保留重复位置，以整组有序指纹隔离缓存；部分缺失重算完整邻文，逐条回退仍受原截止时间和取消所有权约束。
  * 网页术语：独立的常用词槽在本地原位保留，正文沿用用户词条优先的占位回填，摘要、字幕和图像请求保持各自的保护范围。
  * Emoji 兼容：硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
  *
@@ -37,6 +38,7 @@ import {
     getTranslationImageInput,
     attachTranslationImageInput,
     isUnchangedTranslationResultAllowed,
+    isImageTextBatch,
 } from './requestSnapshot';
 import {TRANSLATION_REMAINING_BUDGET, type TranslationRouteObservation} from './types';
 import {DEFAULT_PROVIDER_TIMEOUT_MS, getExplicitTranslationBudget, normalizeDeadlineTimeoutMs,
@@ -239,6 +241,10 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     const {getSelectedModel, getEffectiveRequestModel, isPromptBasedAI, isAIContextEnabled,
         getProviderEndpoint, buildCacheKey} = createTranslationIdentityPolicy(deps);
 
+    function usesImageTextContext(execution: TranslationRequestExecution, message: TranslationBatchRequestMessage): boolean {
+        return execution.service === 'google' && execution.nativeBatchEnabled && isImageTextBatch(message);
+    }
+
     function buildBatchItemCacheKey(
         execution: TranslationRequestExecution,
         origin: string,
@@ -250,9 +256,9 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         modelOverride?: string,
         subtitleContext?: string,
     ): string {
-        // AI 多段结果会受同批邻段影响，不能只按当前 origin 复用到另一种组合。
+        // AI 多段和同图语境结果受同批邻段影响，不能只按当前 origin 复用到另一种组合。
         // 把槽位序号和当前项放在首位，再携带完整有序批次的摘要；同批重复原文也不会被错误折叠。
-        const sourceIdentity = mode === 'ai-multi-segment'
+        const sourceIdentity = mode === 'ai-multi-segment' || mode === 'image-context-v1'
             ? [`slot:${itemIndex}`, origin, `batch:${batchFingerprint}`]
             : origin;
         return buildCacheKey(
@@ -997,8 +1003,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         );
         const nativeBatch = supportsNativeTranslationBatch(execution.service);
         // 去重不依赖持久缓存；全文批次或关闭缓存的显式数组也只发送一份相同原文。
-        // AI 多段的同文槽可能受各自邻段影响，须保留完整有序输入。
-        if (!(message.aiMultiSegment === true && promptBasedAI && !nativeBatch)) {
+        // AI 多段和同图语境中的同文槽可能受各自邻段影响，须保留完整有序输入。
+        if (!(message.aiMultiSegment === true && promptBasedAI && !nativeBatch) && !usesImageTextContext(execution, message)) {
             const uniqueIndexes = new Map<string, number>();
             for (const origin of message.origin) {
                 if (!uniqueIndexes.has(origin)) uniqueIndexes.set(origin, uniqueIndexes.size);
@@ -1362,7 +1368,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         pendingBudgetMs: number,
         recoverSharedDeadline = true,
     ): Promise<string[]> {
-        const cacheMode: CacheRequestMode = message.aiMultiSegment === true && !supportsNativeTranslationBatch(execution.service)
+        const cacheMode: CacheRequestMode = usesImageTextContext(execution, message) ? 'image-context-v1'
+            : message.aiMultiSegment === true && !supportsNativeTranslationBatch(execution.service)
             ? 'ai-multi-segment'
             : 'batch';
         const batchKey = buildCacheKey(
@@ -1375,8 +1382,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             undefined,
             message.subtitleContext,
         );
-        // 完整批次身份只计算一次；AI 分项用定长摘要保留邻段和槽位语义，避免逐项携带整个批次。
-        const batchFingerprint = cacheMode === 'ai-multi-segment' ? sha256Hex(batchKey) : '';
+        // 完整批次身份只计算一次；有语境的分项用定长摘要保留邻段和槽位语义，避免逐项携带整个批次。
+        const batchFingerprint = cacheMode !== 'batch' ? sha256Hex(batchKey) : '';
         const pendingKey = `${buildPendingRequestKey(batchKey, pendingBudgetMs, requestGeneration)}:cache:${useCache ? 'on' : 'off'}${pendingIdentitySuffix(execution, message.modelOverride)}${pendingAnonymousConfigSuffix(execution)}${pendingCloudConfigSuffix(execution)}${import.meta.env.BROWSER !== 'userscript' && message.documentBatch === true ? ':document-batch' : ''}${recoverSharedDeadline ? '' : `:recovery-deadline:${requestDeadline}ms`}`;
         const existing = pendingBatches.get(pendingKey);
         if (existing) {
@@ -1438,8 +1445,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
 
             const missingEntries = missingIndexes.map((index) => ({index, origin: message.origin[index]}));
             const normalMissingIndexes = missingIndexes.filter((index) => !leakedCachedIndexes.has(index));
-            if (cacheMode === 'ai-multi-segment' && normalMissingIndexes.length > 0) {
-                // AI 合批的邻段本身就是翻译输入。只要有普通 miss，必须用完整原批次重算，
+            if (cacheMode !== 'batch' && normalMissingIndexes.length > 0) {
+                // 有语境批次的邻段本身就是翻译输入。只要有普通 miss，必须用完整原批次重算，
                 // 否则“完整批次指纹”会缓存一份实际没看到邻段的结果。
                 const translated = await callBatchProviderWithContextRecovery(
                     execution,

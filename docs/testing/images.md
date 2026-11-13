@@ -157,6 +157,10 @@ node scripts/testing/run-image-translation-flow-test.cjs \
 
 `node scripts/testing/run-image-context-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <path> --focus-safe-helper <path> --runtime-diagnostics-helper <path> --artifacts-dir <path>` 验证图片邻文经过生产后台、broker 与 AI SDK 到达实际 loopback HTTP 请求。覆盖开关与公开字段不能越权开启、重复短句按原图位置取邻文、相同语境缓存复用、变更邻文局部失效、单区域不添加参考、JSON/Unicode 预算和共享并发上限，并要求没有额外摘要请求。仅在临时后台 Edge 中使用无鉴权本机确定性服务，不读取凭据或访问线上 AI；报告中的译文证明请求和缓存映射，不代表模型的真实翻译水平。实际 OCR 与译图视觉验证仍使用前述完整流程。
 
+Google 同图邻文的纯协议由 `googleImageContext.test.ts` 验证标题隔离、四句/1200 字符合并窗口、大小写与实体保留、乱序和重复位置恢复，以及标签污染、缺项、重复编号和语气改变的拒绝。超过窗口的单句保持完整且单独处理，不截断原文。`google.test.ts` 覆盖真实 provider 入口的独占批次、普通接口回退、大小边界、取消、截止时间和迟到网络租约；broker 和图片入口回归覆盖全组缓存身份、部分命中重算、目标语言过滤与原生合批偏好。在线公开夹具对照属于有限语义证据，不能由确定性协议测试推断任意图片的翻译准确率。
+
+`node scripts/testing/run-google-image-context-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <path> --focus-safe-helper <path> --runtime-diagnostics-helper <path> --artifacts-dir <path>` 在隔离后台 Edge 中运行生产图片入口、broker 和 Google adapter，并将所有翻译 HTTP 明确改送自有 loopback 服务；其他外部后台 fetch 直接拒绝。它验证合法分组响应成功回填、重复位置、标题隔离、整组缓存失效、句末或缺项异常回退，以及关闭原生合批；保存真实请求正文、诊断与临时 profile 清理结果，不访问在线 Google、不读取凭据或上传图片，也不证明真实服务的语义准确率。
+
 `pnpm exec vitest run tests/mangaEntryComponentLifecycle.test.ts tests/mangaCompositor.test.ts` 定向验证漫画入口和合成器。入口测试通过真实 Vue SFC 的客户端模板与 renderer 执行资源确认、按钮事件、焦点、闲置计时器、换章和卸载后的迟到响应；资源检查与保存由注入端口提供，不是实际模型下载或扩展配置持久化。`vitest.config.ts` 仅为该组件测试使用客户端转换，并断言真实 render 已生成，避免 Node 默认 SSR 转换让模板未执行。原生 DOM、闭合 Shadow Root、CSS、加载动画、触摸和窄屏仍须隔离浏览器验证。
 
 漫画合成器的绘制和全部图块解码共用从调用开始计算的 15 秒截止时间，每块只使用剩余预算。测试验证多块等待、最后一次绘制、取消、迟到位图关闭和独立调用的预算。同步原生 Canvas 绘制无法中途抢占；返回后检测耗时并停止后续工作、释放自有画布，不把该预算描述为主线程阻塞的硬上限。

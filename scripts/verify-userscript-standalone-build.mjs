@@ -21,6 +21,7 @@ const assertions = [
     [!/^\/\/ @require\s/gmu.test(metadata), 'Standalone installation must not need remote JavaScript'],
     [source.includes('fluentread-userscript-settings'), 'Full Options route is missing'],
     [!source.includes('fluent-read-writing-assistant'), 'Writing assistant runtime must be excluded'],
+    [!source.includes('data-fr-slot'), 'Extension-only image context protocol must be excluded'],
     [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'Userscript browser capability marker is missing'],
     [source.includes('pako 2.1.0 —'), 'Bundled gzip fallback or license notice is missing'],
     [source.includes(`@vue/runtime-dom ${vueVersion} — MIT`), 'Bundled Vue or license notice is missing'],

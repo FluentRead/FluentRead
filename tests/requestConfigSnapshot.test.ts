@@ -21,6 +21,8 @@ import {
     getTranslationGlossarySourceSlots,
     allowUnchangedTranslationResult,
     isUnchangedTranslationResultAllowed,
+    markImageTextBatch,
+    isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
 import {TRANSLATION_MODEL_USAGE_OBSERVER, TRANSLATION_PROVIDER_CONFIG, TRANSLATION_REQUEST_CONTROL, TRANSLATION_REQUEST_SCHEDULER, TRANSLATION_ROUTE_OBSERVER, TRANSLATION_REMAINING_BUDGET} from '@/src/services/translation/types';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -64,6 +66,18 @@ function configSource(overrides: Partial<TranslationConfigSource> = {}): Transla
 }
 
 describe('translation provider request config snapshot', () => {
+    it.each(['chrome', 'firefox', 'userscript'])('%s 同图批次受平台和内部标记共同约束，JSON、自报字段和逐条回退不能启用', browser => {
+        vi.stubEnv('BROWSER', browser);
+        try {
+            const request = markImageTextBatch({origin: ['First.', 'Second.']});
+            for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {
+                expect(isImageTextBatch(internal)).toBe(browser !== 'userscript');
+            }
+            for (const ordinary of [JSON.parse(JSON.stringify(request)), {origin: request.origin, imageTextBatch: true}, {...request, origin: 'First.'}]) {
+                expect(isImageTextBatch(ordinary)).toBe(false);
+            }
+        } finally {vi.unstubAllEnvs();}
+    });
     it('图片原样响应策略随内部快照和展开保留，公开字段与 JSON 无法附加策略', () => {
         const request = allowUnchangedTranslationResult({origin: 'Original English sentence.'});
         for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {

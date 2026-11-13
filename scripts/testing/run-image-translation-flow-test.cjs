@@ -4,6 +4,7 @@
  * 图片翻译生产产物回归：真实 Tesseract、可信点击、与当前 Google 批量协议一致的确定性翻译 transport。
  * 所有用例复用同一自动临时配置，由 focus-safe helper 保持正常尺寸、后台且不抢焦点。
  * --unchanged-fixture 仅验证原样响应成功、保留原图、文字阅读与恢复后缓存复用。
+ * --trace-typography 在标准48px Arial源图的真实离屏操作中记录原文字形与最终字体，不发送额外翻译请求。
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -29,6 +30,7 @@ const xLightbox = process.argv.includes('--x-lightbox');
 const xSurface = process.argv.includes('--x-surface') || xLightbox;
 const recoveryOnly = process.argv.includes('--recovery-only');
 const transformedImages = process.argv.includes('--transformed-images');
+const traceTypography = process.argv.includes('--trace-typography');
 const liveTranslation = process.argv.includes('--live-translation');
 const multilingual = process.argv.includes('--multilingual');
 const harFixture = process.argv.includes('--har-fixture');
@@ -45,6 +47,8 @@ if (transformedImages && (xSurface || recoveryOnly || liveTranslation || multili
     throw new Error('--transformed-images requires the standard deterministic image fixture');
 if (manyLineTranslation && (!denseParagraphs || liveTranslation))
     throw new Error('--many-line-translation requires --dense-paragraphs and deterministic transport');
+if(traceTypography&&(xSurface||recoveryOnly||transformedImages||liveTranslation||multilingual||harFixture||unchangedFixture||paragraphImage||denseParagraphs))
+    throw new Error('--trace-typography requires the standard deterministic 48px Arial source fixture');
 if (!playwrightRoot || !focusHelper)
     throw new Error('必须提供 --playwright-root 与 --focus-safe-helper');
 const { chromium } = require(path.join(playwrightRoot, 'playwright'));
@@ -467,6 +471,56 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     }
 }
 
+/** 在真实操作前观察已创建的离屏页，记录实际 Canvas 字体；不改原文、译文或请求归属。 */
+async function recordSourceTypography(context,popup,worker,action){
+    const bridge=await context.newCDPSession(popup),pending=new Map();let next=0,session,actionTask;
+    const receive=event=>{if(event.sessionId!==session)return;const data=JSON.parse(event.message),slot=pending.get(data.id);if(!slot)return;
+        pending.delete(data.id);clearTimeout(slot.timer);data.error?slot.reject(new Error(data.error.message)):slot.resolve(data.result);};
+    bridge.on('Target.receivedMessageFromTarget',receive);
+    const command=(method,params={})=>new Promise((resolve,reject)=>{
+        const id=++next,timer=setTimeout(()=>{pending.delete(id);reject(new Error('Typography CDP timed out: '+method));},15000);
+        pending.set(id,{resolve,reject,timer});
+        bridge.send('Target.sendMessageToTarget',{sessionId:session,message:JSON.stringify({id,method,params})}).catch(error=>{clearTimeout(timer);pending.delete(id);reject(error);});
+    });
+    try{
+        const expectedOffscreen=`chrome-extension://${new URL(worker.url()).host}/offscreen.html`;
+        const isOffscreen=info=>info.url===expectedOffscreen||info.url.startsWith(expectedOffscreen+'?');
+        const {targetInfos}=await bridge.send('Target.getTargets');let target=targetInfos.find(isOffscreen);
+        if(!target){
+            let remove;
+            const created=new Promise((resolve,reject)=>{
+                const timer=setTimeout(()=>{remove();reject(new Error('The real offscreen document did not appear'));},15000);
+                const observe=({targetInfo})=>{if(isOffscreen(targetInfo)){remove();resolve(targetInfo);}};
+                remove=()=>{clearTimeout(timer);bridge.off('Target.targetCreated',observe);bridge.off('Target.targetInfoChanged',observe);};
+                bridge.on('Target.targetCreated',observe);bridge.on('Target.targetInfoChanged',observe);
+            });
+            await bridge.send('Target.setDiscoverTargets',{discover:true});
+            actionTask=action();
+            try{target=await Promise.race([created,actionTask.then(()=>{throw new Error('Translation completed before its offscreen document was observed');})]);}finally{remove();}
+        }
+        session=(await bridge.send('Target.attachToTarget',{targetId:target.targetId,flatten:false})).sessionId;
+        await command('Runtime.enable');
+        await command('Runtime.evaluate',{expression:`(()=>{const p=CanvasRenderingContext2D.prototype,original=p.fillText;globalThis.__typographyDraws=[];globalThis.__restoreTypography=()=>p.fillText=original;
+            p.fillText=function(...args){if(this.canvas.width===1400&&this.canvas.height===700&&globalThis.__typographyDraws.length<32){const m=this.measureText(args[0]);globalThis.__typographyDraws.push({text:args[0],font:this.font,fill:this.fillStyle,x:args[1],y:args[2],ascent:m.actualBoundingBoxAscent,descent:m.actualBoundingBoxDescent,left:m.actualBoundingBoxLeft,right:m.actualBoundingBoxRight});}return original.apply(this,args);};})()`});
+        await (actionTask??action());
+        const captured=await worker.evaluate(()=>globalThis.__imageFixture.typographyResult);
+        assert.ok(captured,'Capture the actual offscreen response');assert.equal(captured.lines.length,3);
+        const evaluated=await command('Runtime.evaluate',{expression:'globalThis.__typographyDraws',returnByValue:true});
+        if(evaluated.exceptionDetails)throw new Error(evaluated.exceptionDetails.text);
+        const draws=evaluated.result.value;assert.equal(draws.length,3,'Each complete translated line is actually drawn once');
+        const sourceMetrics=await popup.evaluate(lines=>{
+            const ctx=document.createElement('canvas').getContext('2d');ctx.textBaseline='alphabetic';ctx.textAlign='left';ctx.font='400 100px Arial';
+            return lines.map(line=>{const m=ctx.measureText(line.sourceText);return {text:line.sourceText,bbox:line.bbox,widthAt100:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,heightAt100:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent};});
+        },captured.lines);
+        const image=path.join(artifacts,'typography-translated.png');assert.ok(captured.image.startsWith('data:image/png;base64,'));fs.writeFileSync(image,Buffer.from(captured.image.split(',')[1],'base64'));
+        report.typography={scope:'Same 48px Arial source, real OCR, original production offscreen response and native fillText; deterministic translated text.',sourceMetrics,draws,image};
+    }finally{
+        if(session)await command('Runtime.evaluate',{expression:'globalThis.__restoreTypography?.()'}).catch(error=>report.cleanupErrors.push('Typography instrumentation restore: '+error.message));
+        for(const slot of pending.values())clearTimeout(slot.timer);
+        await bridge.detach();
+    }
+}
+
 (async () => {
     await new Promise((resolve, reject) => {
         server.once('error', reject);
@@ -637,10 +691,18 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
         report.modelCache.importedIntoTemporaryProfile = true;
         await popup.goto(`chrome-extension://${new URL(worker.url()).host}/popup.html`);
     }
-    await worker.evaluate(({liveTranslation, paragraphFixture, xLightbox, manyLineTranslation, unchangedFixture}) => {
+    await worker.evaluate(({liveTranslation, paragraphFixture, xLightbox, manyLineTranslation, unchangedFixture, traceTypography}) => {
         const originalFetch = globalThis.fetch.bind(globalThis);
         // Keep the real OCR path intact while giving the loading controls enough time to sample.
         const fixture = globalThis.__imageFixture = {requests: [], endpointHosts: [], rejectPrimaryXsrf: false, operationIds: [], delay: 1800, replayProgress: false, progressTimer: null, progressRequestId: null};
+        if(traceTypography){
+            const send=chrome.runtime.sendMessage.bind(chrome.runtime);
+            chrome.runtime.sendMessage=function(...args){
+                const message=args[0],observe=response=>{if(message?.type==='FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN'&&response?.success&&Array.isArray(response.lines))fixture.typographyResult={lines:response.lines,image:response.image};return response;};
+                const last=args.length-1,callback=args[last];if(typeof callback==='function')args[last]=response=>callback(observe(response));
+                const result=send(...args);return typeof callback!=='function'&&result?.then?result.then(observe):result;
+            };
+        }
         const clearProgress = () => {
             if (fixture.progressTimer !== null) clearInterval(fixture.progressTimer);
             fixture.progressTimer = null;
@@ -749,7 +811,7 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
             // OCR worker、wasm 和语言包仍沿真实生产路径加载，不 mock Tesseract。
             return originalFetch(input, options);
         };
-    }, {liveTranslation, paragraphFixture: Boolean(paragraphImage), xLightbox, manyLineTranslation, unchangedFixture});
+    }, {liveTranslation, paragraphFixture: Boolean(paragraphImage), xLightbox, manyLineTranslation, unchangedFixture, traceTypography});
     if (harFixture) {
         if (liveTranslation) throw new Error('--har-fixture 只用于确定性响应验证');
         currentCase = 'HAR identifier filtering and Google XSRF cooldown';
@@ -1155,9 +1217,9 @@ async function verifyGeometryCases({worker, ui, wait, shot}) {
     await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='error'"));
     await shot('01-language-preparation');
     report.cases.push('missing languages exposes preparation action');
-    await click('下载语言包并翻译');
     const began = Date.now();
-    await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"), 300000);
+    const translatePreparedImage=async()=>{await click('下载语言包并翻译');await wait(() => ui("return this.querySelector('.fr-image-controls')?.dataset.phase==='translated'"), 300000);};
+    if(traceTypography)await recordSourceTypography(context,popup,worker,translatePreparedImage);else await translatePreparedImage();
     report.coldPreparationAndTranslationMs = Date.now() - began;
     report.progress = await ui('return this.__progress');
     assert.ok(report.progress.some(t => t.includes('识别图片文字')));

@@ -507,7 +507,8 @@ describe('完整RGBA matte救援只在已证源墨上写入，整页通过才发
         const f=install(fixture(255));for(const r of f.art)fill(f.pixels,f.width,r,f.matte);
         f.line={text:'SOURCE',fontSize:16,bbox:{x0:12,y0:12,x1:116,y1:64},sourceBoxes:[{x0:12,y0:12,x1:116,y1:64}]};setRegions([f.line]);
         const fullCopies:number[]=[];vi.stubGlobal('Uint8ClampedArray',class extends Pixels{constructor(value:number|ArrayLike<number>){if(typeof value==='number')super(value);else super(value);if(this.length===f.width*f.height*4)fullCopies.push(this.length);}});
-        expect((await translate()).image).toBeTruthy();completeGlyphs();expect(canvases).toHaveLength(1);expect(canvases[0].reads).toEqual([[0,0,128,80]]);expect(canvases[0].uploads).toHaveLength(1);expect(canvases[0].uploads[0].args).toBe(3);expect(canvases[0].context.measureText).toHaveBeenCalledTimes(2);expect(fullCopies).toEqual([]);released();
+        expect((await translate()).image).toBeTruthy();completeGlyphs();expect(canvases).toHaveLength(1);expect(canvases[0].reads).toEqual([[0,0,128,80]]);expect(canvases[0].uploads).toHaveLength(1);expect(canvases[0].uploads[0].args).toBe(3);expect(canvases[0].context.measureText).toHaveBeenCalledTimes(3); // 一次有界原文字号校验，另两次为译文字形度量。
+        expect(fullCopies).toEqual([]);released();
     });
 });
 

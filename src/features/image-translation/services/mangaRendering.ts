@@ -2,7 +2,7 @@
  * @file src/features/image-translation/services/mangaRendering.ts
  * 文件职责：在整段漫画区域中绘制适合阅读的译文，避免整行逐框放大和复杂背景扩散条纹。
  * 背景颜色：均匀性判定继续使用原量化桶及透明度门禁，实际填色使用采样均值，减少粗色阶导致的可见色块。
- * 原图样式：修补前验证完整绘字区域的背景与共同墨色，可靠且对比充分时沿用源字色；已证纯色文字区域用同底色细描边，清字分类与原掩码独立保持。
+ * 原图样式：修补前验证完整绘字区域的背景与共同墨色，可靠且对比充分时沿用源字色；已证纯色文字区域用同底色细描边，渐变源色用细对比描边，清字分类与原掩码独立保持。
  * 双向文字：按整段译文首个强方向字符统一度量和绘制，数字、括号及换行后的弱方向内容继承该段方向；缓存键包含方向，避免混合语言段落串用指标，结束后恢复原画布状态。
  * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
  * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；白底旁置规划只消费调用方已证明的候选，保持完整译文和源字号下限，不提供像素或清字授权；完整原图仍可通过现有按钮对照。
@@ -16,7 +16,7 @@ import {planMangaTextFlow} from './mangaTextFlow';
 import {createMangaGlyphRasterLedger,rasterizeMangaGlyphs} from './mangaGlyphRaster';
 import {observeImageSourceAppearances} from './sourceAppearance';
 
-export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string}
+export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string; foregroundOutline?:string}
 type Box=MangaRegion['bbox'];
 type MangaMeasure=(text:string,size:number)=>{width:number;ascent:number;descent:number};
 export interface MangaBlankLayoutBudget {readonly remainingMeasurements:number;readonly remainingCharacters:number}
@@ -133,7 +133,7 @@ export function sampleMangaBackgrounds(pixels: Uint8ClampedArray, width: number,
     const appearances=observeImageSourceAppearances(pixels,width,height,regions);
     return regions.map(region => {
         const background=mangaRegionBackground(pixels,width,height,region.bbox),appearance=appearances.get(region);
-        return appearance?{...background,...(appearance.foreground?{foreground:appearance.foreground}:{}),textBackground:`rgb(${appearance.background.slice(0,3).join(',')})`}:background;
+        return appearance?{...background,...(appearance.foreground?{foreground:appearance.foreground}:{}),...(appearance.background?{textBackground:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance.outline?{foregroundOutline:appearance.outline}:{})}:background;
     });
 }
 
@@ -163,6 +163,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
         const background = sampled.uniform ? sampled.color : 'rgb(255,255,255)';
         const textBackground=sampled.textBackground??(sampled.uniform?background:'#ffffff');
         const flatTextBackground=sampled.textBackground!==undefined||sampled.uniform;
+        const textOutline=sampled.foregroundOutline??textBackground;
         context.save();
         try {
             if (sampled.uniform || !repaired) {
@@ -198,7 +199,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                 if (measurements.size < 8192 && cachedCharacters + logicalCharacters <= 131072) {measurements.set(key,value); cachedCharacters += logicalCharacters;}
                 return value;
             };
-            const lineWidth = (size:number)=>Math.max(.5,size*(flatTextBackground ? .035 : .14));
+            const lineWidth = (size:number)=>Math.max(.5,size*(flatTextBackground||sampled.foregroundOutline ? .035 : .14));
             const fit=(bounds:MangaRegion['bbox'])=>fitMangaTranslation(region.text,bounds,maxSize,display,lineWidth,measure);
             const bounds={x0:left,y0:top,x1:right,y1:bottom};
             const available=protection?mangaAlphaClearRects(protection,bounds,alphaLayoutBudget):[bounds];
@@ -220,7 +221,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                         },safety);
                         if(!plan.accepted)break;
                         const raster=rasterizeMangaGlyphs(plan,bounds,protection!.rectangles,{
-                            fillStyle:ink==='#111827'?'#111111':ink,strokeStyle:textBackground,
+                            fillStyle:ink==='#111827'?'#111111':ink,strokeStyle:textOutline,
                         },glyphLedger??=createMangaGlyphRasterLedger());
                         if(raster.kind==='accepted'){
                             let drawn=false;
@@ -287,7 +288,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             context.textAlign = 'center';context.textBaseline = layout.ink ? 'alphabetic' : 'middle';context.lineJoin = 'round';
             const ink = sampled.foreground??(flatTextBackground ? getImageTextColor(textBackground) : '#111111');
             context.fillStyle = ink === '#111827' ? '#111111' : ink;
-            context.strokeStyle = textBackground;
+            context.strokeStyle = textOutline;
             context.lineWidth = lineWidth(layout.fontSize);
             const firstLine = top + (bottom-top-layout.lines.length*layout.lineHeight)/2 + layout.lineHeight/2;
             layout.lines.forEach((text,line)=>{

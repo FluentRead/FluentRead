@@ -37,6 +37,12 @@ describe('原文墨迹与字体尺度',()=>{
         drawTranslatedImageText(context as never,'TEXT',0,0,200,60,'rgb(255,255,255)',20,'left',undefined,'rgb(25,48,75)');
         expect(colors).toEqual(['rgb(25,48,75)']);
     });
+    it('渐变的源色使用细对比描边，保留全文与原裁切范围',()=>{
+        const context=canvasContext(),styles:unknown[]=[];
+        context.fillText.mockImplementation(()=>{const c=context as unknown as CanvasRenderingContext2D;styles.push([c.fillStyle,c.strokeStyle,c.lineWidth]);});
+        drawTranslatedImageText(context as never,'TITLE',10,15,200,60,'rgb(120,80,180)',20,'left',undefined,'rgb(245,245,250)','#111827');
+        expect(styles).toEqual([['rgb(245,245,250)','#111827',.5]]);expect(context.fillText.mock.calls[0][0]).toBe('TITLE');expect(context.rect).toHaveBeenCalledWith(10,15,200,60);
+    });
     const source=(text='SOURCE',width=192,height=35)=>({text,bbox:{x0:10,y0:10,x1:10+width,y1:10+height}});
     it('相同48px文字的x高度、大写和下伸笔画不会变成不同字号',()=>{
         const context=canvasContext();

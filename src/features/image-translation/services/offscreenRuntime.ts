@@ -2,11 +2,11 @@
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 后台选择的本地后端在加载图片前交给已有推理客户端，在串行任务边界生效。
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页或预排版；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
- * 字号尺度：普通图先通过透明准入，再用原文单行做有界字体尺度校验；不会拿译文字形反推源字号，不扩大原清字或绘字框。
+ * 字号尺度与原色：普通图先通过透明准入，再按原文单行校验字号、在原图中观察背景与字色；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。漫画修补前保存源色供后续绘制，不从修补结果反推样式。
  * 空识别：普通图片仅在 OCR 真正返回空数组时使用轻量原图保留协议，不分配译图画布；非空结果经保护或置信过滤后不可读仍报错，漫画维持既有空页协议。
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
@@ -24,7 +24,8 @@ import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import {createImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
 import { recognizeImage } from './ocrRuntime';
-import { getImageTextBackgroundColor, drawTranslatedImageText,getImageTextDirection,getImageSourceFontLimit,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import { getImageTextBackgroundColor, drawTranslatedImageText,getImageTextDirection,getImageSourceFontLimit,getImageSingleLineHeight,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
 import {mangaOcrRuntime} from './mangaOcr';
 import {createMangaBlankLayoutBudget, drawMangaTranslations, planMangaBlankTranslation, sampleMangaBackgrounds} from './mangaRendering';
@@ -562,12 +563,37 @@ async function prepareTranslatedImage(
         const protection=planMaskAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines,imageAlphaSamplingAndWriteBoxes,{requireConfirmedTransparency:true});
         const fontLimits=new Map<ImageTextRegion,number>();
         for(const candidate of candidates)if(!skipped.has(candidate.index))fontLimits.set(candidate.translated,getImageSourceFontLimit(context,candidate.original));
-        const drawing=protection?new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout}>():undefined;
+        const selected=candidates.filter(candidate=>!skipped.has(candidate.index));
+        const baseBounds=new Map(lines.map(line=>[line,imageDrawBounds(line,canvas.width,canvas.height)]));
+        const appearances=observeImageSourceAppearances(sourcePixels.data,canvas.width,canvas.height,selected.map(c=>c.original),line=>baseBounds.get(line)!);
+        const drawing=new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout;foreground?:string;background?:string}>();
+        const expansionBudget={remaining:262_144};
+        function* otherTextBoxes(owner:ImageTextRegion){
+            for(const line of lines)if(line!==owner){
+                yield baseBounds.get(line)!;
+                for(let index=-1;index<(line.sourceBoxes?.length??0);index++){
+                    const box=index<0?line.bbox:line.sourceBoxes![index];
+                    yield {x0:Math.max(0,Math.floor(box.x0)-2),y0:Math.max(0,Math.floor(box.y0)-2),
+                        x1:Math.min(canvas.width,Math.ceil(box.x1)+2),y1:Math.min(canvas.height,Math.ceil(box.y1)+2)};
+                }
+            }
+        }
+        for(const candidate of selected){
+            const original=candidate.original,appearance=appearances.get(original),limit=fontLimits.get(candidate.translated)!;
+            let bounds=baseBounds.get(original)!;
+            if(appearance&&!original.vertical&&!original.ruby?.length&&(!original.sourceBoxes||original.sourceBoxes.length===1)
+                &&limit!==(original.fontSize??original.bbox.y1-original.bbox.y0)*1.2){
+                const required=getImageSingleLineHeight(context,candidate.translated.text,bounds.x1-bounds.x0,limit);
+                if(required!==undefined&&required>bounds.y1-bounds.y0)bounds=expandImageTextBounds(sourcePixels.data,canvas.width,canvas.height,bounds,required,appearance,
+                    otherTextBoxes(original),expansionBudget);
+            }
+            baseBounds.set(original,bounds);drawing.set(candidate.translated,{bounds,...(appearance?{background:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance?.foreground?{foreground:appearance.foreground}:{})});
+        }
         if(protection){
             const budget={remaining:1_048_576};
             for(const line of translatedLines){
                 throwIfImageOperationAborted(signal);
-                const original=imageDrawBounds(line,canvas.width,canvas.height),available=mangaAlphaClearRects(protection,original,budget);
+                const original=drawing.get(line)!.bounds,available=mangaAlphaClearRects(protection,original,budget);
                 let bounds:OcrLine['bbox']|undefined,area=0;
                 for(const candidate of available){const size=(candidate.x1-candidate.x0)*(candidate.y1-candidate.y0);if(size>area){bounds=candidate;area=size;}}
                 if(!bounds)throw new ImageAlphaProtectionUnavailableError();
@@ -575,7 +601,7 @@ async function prepareTranslatedImage(
                 const maxFontSize=fontLimits.get(line)!;
                 const prepared=changed?prepareImageAlphaTextLayout(context,line.text,bounds,maxFontSize,line.vertical?'center':line.textAlign??'left'):undefined;
                 if(changed&&!prepared)throw new ImageAlphaProtectionUnavailableError();
-                drawing!.set(line,{bounds,prepared});
+                drawing.set(line,{...drawing.get(line)!,bounds,prepared});
             }
         }
         // 全文布局先全部通过才擦除；保护点不可写也不可当作已知背景，无法完整修补时撤回。
@@ -587,14 +613,16 @@ async function prepareTranslatedImage(
 
         const renderedLines = translatedLines.map(line => ({
             ...line,
-            backgroundColor: getImageTextBackgroundColor(pixels, canvas.width, canvas.height, line.bbox),
-            drawing:drawing?.get(line),
+            backgroundColor: drawing.get(line)!.background??getImageTextBackgroundColor(pixels, canvas.width, canvas.height, line.bbox),
+            drawing:drawing.get(line)!,
             maxFontSize:fontLimits.get(line)!,
         }));
         for(const line of renderedLines){
             throwIfImageOperationAborted(signal);
-            const plan=line.drawing,bounds=plan?.bounds??imageDrawBounds(line,canvas.width,canvas.height);
-            if(plan?.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+            const plan=line.drawing,bounds=plan.bounds;
+            if(plan.foreground)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left',plan.prepared,plan.foreground);
+            else if(plan.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
                 line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left',plan.prepared);
             else drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
                 line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left');

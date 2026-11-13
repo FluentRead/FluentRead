@@ -688,6 +688,7 @@
       "tests/mangaViewWordBoundary.test.ts",
       "tests/imageParagraphs.test.ts",
       "tests/imageRuby.test.ts",
+      "tests/imageSourceAppearance.test.ts",
       "tests/mangaCanvas.test.ts",
       "tests/mangaColorQualityCorpus.test.ts",
       "tests/mangaCompositor.test.ts",

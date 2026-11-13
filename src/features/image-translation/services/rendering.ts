@@ -3,6 +3,7 @@
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
  * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，估计不可靠时沿用原上限；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
+ * 原色与余量：接收调用方已验证的前景色，并提供局部RGB对比度与单行实际高度度量；这些度量本身不授予新增像素或清字权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
@@ -60,12 +61,18 @@ export function getImageTextBackgroundColor(
     return `rgb(${best})`;
 }
 
-function relativeLuminance(channels: number[]): number {
+function relativeLuminance(channels: readonly number[]): number {
     const linear = channels.map(channel => {
         const value = Math.max(0, Math.min(255, channel)) / 255;
         return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
     });
     return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
+}
+
+/** 仅比较不透明 RGB 的相对亮度，不把这一个局部数值当作整页可访问性结论。 */
+export function getImageRgbContrast(foreground:readonly number[],background:readonly number[]):number {
+    const a=relativeLuminance(foreground),b=relativeLuminance(background);
+    return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 }
 
 /** 选择与背景对比度较高的深色或白色，避免饱和色被简单灰度阈值误判。 */
@@ -105,6 +112,20 @@ export function getImageSourceFontLimit(context:CanvasRenderingContext2D,line:Im
         if(![inkWidth,inkHeight].every(value=>Number.isFinite(value)&&value>0))return fallback;
         const byWidth=width/inkWidth*100,byHeight=height/inkHeight*100,estimate=(byWidth+byHeight)/2;
         return Math.max(byWidth,byHeight)<=Math.min(byWidth,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5?estimate:fallback;
+    }finally{context.restore();}
+}
+
+/** 只有整段可在当前宽度以源字号保持一行时，返回实际墨迹与描边所需的高度。 */
+export function getImageSingleLineHeight(context:CanvasRenderingContext2D,text:string,width:number,fontSize:number):number|undefined {
+    if(!text.trim()||text.length>256||/[\r\n]/u.test(text)||![width,fontSize].every(n=>Number.isFinite(n)&&n>0))return;
+    context.save();
+    try{
+        context.font=`400 ${fontSize}px ${IMAGE_TEXT_FONT}`;context.textAlign='left';context.textBaseline='alphabetic';context.direction=getImageTextDirection(text);
+        const m=context.measureText(text),inkWidth=m.actualBoundingBoxLeft+m.actualBoundingBoxRight,inkHeight=m.actualBoundingBoxAscent+m.actualBoundingBoxDescent;
+        if(![m.width,inkWidth,inkHeight].every(Number.isFinite)||inkWidth<=0||inkHeight<=0)return;
+        const stroke=Math.max(.35,fontSize*.06);
+        if(Math.max(m.width,inkWidth)+stroke>width-Math.min(2,width*.03)*2)return;
+        return Math.ceil(inkHeight+stroke+2);
     }finally{context.restore();}
 }
 /** 离屏文档的默认方向不能决定译文中的数字与标点；预检和绘制使用同一首强字符方向。 */
@@ -318,6 +339,7 @@ export function drawTranslatedImageText(
     maxFontSize = Infinity,
     textAlign: 'left' | 'center' | 'right' = 'center',
     prepared?: ImageTranslationTextLayout,
+    foregroundColor?: string,
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -362,7 +384,7 @@ export function drawTranslatedImageText(
         context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
         context.textAlign = layout.ink ? 'left' : textAlign;
         context.textBaseline = layout.ink ? 'alphabetic' : 'middle';
-        context.fillStyle = getImageTextColor(backgroundColor);
+        context.fillStyle = foregroundColor ?? getImageTextColor(backgroundColor);
         context.strokeStyle = backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * 0.06);
         context.lineJoin = 'round';

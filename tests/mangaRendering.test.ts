@@ -1,5 +1,5 @@
 import {describe,expect,it,vi} from 'vitest';
-import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTranslation} from '@/src/features/image-translation/services/mangaRendering';
+import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTranslation,sampleMangaBackgrounds} from '@/src/features/image-translation/services/mangaRendering';
 import {findMangaBlankSpaces} from '@/src/features/image-translation/services/mangaBlankSpaces';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 
@@ -29,6 +29,18 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it('源色与实际文字底色独立于原清字分类，绘字采用细底色描边',()=>{
+        const pixels=new Uint8ClampedArray(W*H*4).fill(255),r=region('SOURCE');
+        for(let y=105;y<115;y++)for(let x=520;x<570;x++)pixels.set([25,48,75,255],(y*W+x)*4);
+        const sampled=sampleMangaBackgrounds(pixels,W,H,[r]);
+        expect(sampled[0]).toMatchObject({foreground:'rgb(25,48,75)',textBackground:'rgb(255,255,255)'});
+        const c=context(),styles:Array<unknown>=[];c.fillText.mockImplementation((text,x,y)=>{styles.push({fill:c.fillStyle,stroke:c.strokeStyle,lineWidth:c.lineWidth});return {text,x,y,font:c.font};});
+        drawMangaTranslations(c as never,pixels,W,H,[r],true,[{...sampled[0],uniform:false}]);
+        expect(styles[0]).toMatchObject({fill:'rgb(25,48,75)',stroke:'rgb(255,255,255)'});expect((styles[0] as {lineWidth:number}).lineWidth).toBeLessThan(1);
+        for(let y=105;y<115;y++)for(let x=520;x<570;x++)pixels.set([190,190,190,255],(y*W+x)*4);
+        expect(sampleMangaBackgrounds(pixels,W,H,[r])[0]).toMatchObject({textBackground:'rgb(255,255,255)'});
+        expect(sampleMangaBackgrounds(pixels,W,H,[r])[0]).not.toHaveProperty('foreground');
+    });
     it('返回独立位置且清空清字源框，全文和源字号基准不变，度量后恢复context且不绘制',()=>{
         const c=context(),before=snapshot(c),r=region(),spaces=[box()],original=structuredClone(r);
         Object.freeze(r.bbox);Object.freeze(r.sourceBoxes![0]);Object.freeze(r.sourceBoxes);Object.freeze(r);Object.freeze(spaces[0]);Object.freeze(spaces);

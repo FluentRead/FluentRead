@@ -687,6 +687,7 @@ export default defineConfig({
                 'src/features/image-translation/services/documentOcrBullets.ts',
                 'src/features/image-translation/services/offscreenRuntime.ts',
                 'src/features/image-translation/services/rendering.ts',
+                'src/features/image-translation/services/sourceAppearance.ts',
                 'src/features/image-translation/services/remoteImage.ts',
                 'src/features/input-translation/content/index.ts',
                 'src/features/input-translation/content/inputBox.ts',

@@ -364,7 +364,9 @@ export default defineConfig({
             // 纯代码分别增加3,951和3,843bytes，各增加4kB门槛；课程预算仍单独累加，无新模型或依赖。
             // 注音归属与独立清字余量使 Chrome 从66,375,556增至66,380,053bytes，Firefox 从66,029,740增至66,034,157bytes；仅 offscreen 和推理 Worker 代码改变。
             // 使用原余量后门槛分别增加4kB和5kB，课程预算仍独立累加，不新增模型或依赖。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_210_000 : 66_009_000;
+            // 原色与安全留白排版使 Chrome 从66,380,850增至66,385,831bytes，Firefox 从66,034,936增至66,039,887bytes，仅 offscreen 代码改变。
+            // 分别增加4,981和4,951bytes，各增加5kB门槛；不新增模型或依赖，课程预算不变。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_215_000 : 66_014_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

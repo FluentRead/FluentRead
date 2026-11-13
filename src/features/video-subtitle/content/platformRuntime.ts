@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/platformRuntime.ts
  * 文件职责：在会议、B 站、Udemy、edX 与 Disney+ 网页中挂载隔离的双语字幕，复用现有视频配置及翻译缓存。
- * 课程字幕：复用 YouTube/X 的品牌图标、分段模式、读音、下载折叠与字幕选项菜单，字幕背景按文字收拢；完整原文轨道绑定分 P、小节及所选语言，按站点自动开启；播放器菜单保留关闭后的入口，最近播放的视频暂停后仍保持归属，原文导出与有界预取复用已读取时间轴。
+ * 课程字幕：复用 YouTube/X 的品牌图标与紧凑菜单，按原生按钮可见内容对齐，处理悬停留白及全屏切换；B 站绑定主播放器，推荐预览不能抢占；单语隐藏顺序行，读音只保留开关和短标题，来源状态使用简短提示；完整原文轨道绑定分 P、小节及所选语言，原文导出与有界预取复用已读取时间轴。
  * 主要内容：观察原生字幕、读取浏览器字幕轨、自动开启明确的会议字幕按钮、优先目标语言人工轨，按保存的双语顺序排列稳定节点并让读音紧跟原文；可选读音行独立请求与取消，不等待译文，每轮只测量各视频一次，按当前文本、读音、顺序、尺寸和字体输入去重布局；长读音保留可读字号并在自有区域提供键盘和触摸滚动，失败句在退避期再次出现仍保留重试入口，处理全屏、动态页面与所有权恢复。
  * 模块边界：只通过注入端口读取配置、翻译和保存设置；布局记录仅属于当前挂载，位置每轮重新读取，字体加载与卸载清除适配状态，不采集音频、不访问账号接口，不修改网站播放器实现。
  */
@@ -148,11 +148,16 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     const syncCourseControls = () => {
         const root = playerRoot();
         if (!course || !root || !config.on || !config.videoTranslationEnabled) { removeCourseControls(); return; }
-        const bar = root.querySelector<HTMLElement>(course === 'bilibili' ? '.bpx-player-control-bottom-right'
-            : course === 'edx' ? '.secondary-controls' : '[data-purpose="video-control-bar"]');
-        const anchor = bar?.querySelector<HTMLElement>(course === 'bilibili' ? '.bpx-player-ctrl-subtitle, .bpx-player-ctrl-setting, .bpx-player-ctrl-full'
+        const barSelector = course === 'bilibili' ? '.bpx-player-control-bottom-right'
+            : course === 'edx' ? '.secondary-controls' : '[data-purpose="video-control-bar"]';
+        const nativeSelector = course === 'bilibili' ? '.bpx-player-ctrl-subtitle, .bpx-player-ctrl-setting, .bpx-player-ctrl-full'
             : course === 'udemy' ? '[data-purpose="captions-dropdown-button"], [data-purpose="fullscreen-button"]'
-                : '.toggle-captions, .toggle-fullscreen, [data-role="fullscreen"]') || null;
+                : '.toggle-captions, .toggle-fullscreen, [data-role="fullscreen"]';
+        const bars = Array.from(root.querySelectorAll<HTMLElement>(barSelector));
+        const anchors = bars.flatMap(bar => Array.from(bar.querySelectorAll<HTMLElement>(nativeSelector)));
+        // 退出全屏后可能保留隐藏旧栏；跟随当前可见控件，不把入口留在旧容器中。
+        const anchor = anchors.find(node => { const bounds = node.getBoundingClientRect(); return bounds.width > 0 && bounds.height > 0 && window.getComputedStyle(node).visibility !== 'hidden'; }) || anchors[0] || null;
+        const bar = anchor?.closest<HTMLElement>(barSelector) || bars[0] || null;
         const nativeFallback = Boolean(video?.controls && !anchor && !bar?.querySelector('button, [role="button"], .bpx-player-ctrl'));
         const controls = nativeFallback ? root : anchor?.parentElement || bar || root;
         if (!controlsHost) {
@@ -161,7 +166,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             const shadow = controlsHost.attachShadow({mode: 'open'});
             // 与 YouTube/X 共用品牌图标、菜单构造器及整份样式，课程只适配来源与可用动作。
             const style = document.createElement('style');
-            style.textContent = `:host{all:initial;display:inline-flex;position:relative;flex:0 0 auto;align-self:center;z-index:1000}
+            style.textContent = `:host{all:initial;display:inline-flex;position:relative;flex:0 0 auto;align-self:auto;z-index:1000}
                 #${VIDEO_TRANSLATION_MENU_ID}[data-course] .fluent-read-video-menu-downloads{grid-template-columns:minmax(0,1fr)!important}
                 #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-course-auto{justify-content:space-between!important;gap:12px!important}
                 #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-switch{width:30px!important;height:18px!important;min-height:18px!important;border-radius:9px!important;position:relative!important;background:var(--fr-video-menu-control-hover)!important;padding:0!important}
@@ -180,6 +185,10 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             courseMenu = createVideoPlayerMenu(config.uiLanguage, true);
             courseMenu.dataset.course = course;
             courseMenu.setAttribute('popover', 'manual');
+            courseMenu.querySelector('[data-subtitle-order-hint]')!.remove();
+            // 课程菜单保留读音开关，不在悬停时展开下载体积、语言清单和示例说明。
+            courseMenu.querySelector('[data-reading-help]')!.removeAttribute('popover');
+            courseMenu.querySelector('[data-action="toggle-reading-annotation"]')!.removeAttribute('aria-describedby');
             for (const selector of ['.fluent-read-video-menu-primary-ai', '.fluent-read-video-menu-secondary-ai', '[data-action="select-ai-model"]', '[data-action="regenerate-ai-subtitle"]', '[data-action="open-sentence-learning"]', '.fluent-read-video-model-prompt', '[data-action="download-translated-subtitles"]', '[data-action="download-bilingual-subtitles"]']) {
                 courseMenu.querySelector(selector)?.remove();
             }
@@ -239,10 +248,25 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         if (controlsHost.parentElement !== controls || (anchor && controlsHost.nextSibling !== anchor)) {
             setCourseMenuOpen(false); controls.insertBefore(controlsHost, anchor);
         }
-        // 使用字幕按钮所在行的实际高度；原生 HTML video 的兜底入口放在按钮行，避开底部进度条。
-        const controlHeight = Math.max(24, Math.min(48, anchor?.offsetHeight || (controls !== root ? controls.clientHeight : 32) || 32));
+        // B 站按钮悬停后会增加不对称留白；对齐可见文字/SVG，不能用整栏或扩大的命中外框。
+        const marker = anchor && Array.from(anchor.querySelectorAll<HTMLElement>('.bpx-player-ctrl-subtitle-result, svg'))
+            .find(node => node.getBoundingClientRect().height > 0);
+        const anchorStyle = anchor ? window.getComputedStyle(anchor) : null;
+        const topInset = (Number.parseFloat(anchorStyle?.paddingTop || '') || 0) + (Number.parseFloat(anchorStyle?.borderTopWidth || '') || 0);
+        const bottomInset = (Number.parseFloat(anchorStyle?.paddingBottom || '') || 0) + (Number.parseFloat(anchorStyle?.borderBottomWidth || '') || 0);
+        const anchorScale = anchor?.offsetHeight ? anchor.getBoundingClientRect().height / anchor.offsetHeight || 1 : 1;
+        const nativeHeight = marker ? marker.getBoundingClientRect().height / anchorScale : (anchor?.offsetHeight || 0) - topInset - bottomInset;
+        const controlHeight = Math.max(16, Math.min(48, nativeHeight || (controls !== root ? controls.clientHeight : 32) || 32));
         controlsHost.style.cssText = controls === root ? `position:absolute;right:${nativeFallback ? 152 : 8}px;bottom:${nativeFallback ? 32 : 8}px;height:${controlHeight}px` : `height:${controlHeight}px`;
         for (const property of ['width', 'height']) setStyleIfChanged(courseButton!.style, property, `${controlHeight}px`, 'important');
+        if (anchor) {
+            const nativeBounds = (marker || anchor).getBoundingClientRect(), ownBounds = controlsHost.getBoundingClientRect();
+            if (nativeBounds.height && ownBounds.height) {
+                const scale = ownBounds.height / controlHeight;
+                const nativeCenter = nativeBounds.top + nativeBounds.height / 2 + (marker ? 0 : (topInset - bottomInset) * anchorScale / 2);
+                setStyleIfChanged(controlsHost.style, 'top', `${(nativeCenter - ownBounds.top - ownBounds.height / 2) / scale}px`);
+            }
+        }
         const enabled = captionsEnabled();
         courseButton!.setAttribute('aria-label', courseText('toggle')); courseButton!.title = courseText('toggle');
         const available = timeline.status === 'ready' || Boolean(sourceTrack?.cues?.length) || nativeNodes().some(node => node.textContent?.trim());
@@ -251,6 +275,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         if (menuLocale !== locale) { refreshVideoUiText(courseMenu!, config.uiLanguage); menuLocale = locale; }
         renderVideoMenuMode(courseMenu!, enabled ? config.videoSubtitleDisplayMode : 'off', false, '');
         renderVideoSubtitleOrder(courseMenu!, config.videoSubtitleAppearance.bilingualOrder, !enabled, config.videoSubtitleDisplayMode === 'bilingual');
+        courseMenu!.querySelector<HTMLElement>('.fluent-read-video-menu-order-setting')!.hidden = !enabled || config.videoSubtitleDisplayMode !== 'bilingual';
         renderVideoSubtitleTiming(courseMenu!, config.videoSubtitleOffsetMs, enabled && timeline.status === 'ready', config.uiLanguage);
         const service = courseMenu!.querySelector<HTMLElement>('[data-service-label]')!;
         const serviceText = ports.label(getVideoServiceLabel(config.videoService || config.service, config.customOpenAIProviders, config.compositeTranslationProviders));
@@ -272,6 +297,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         const reading = courseMenu!.querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]')!;
         reading.hidden = !browserCapabilities.extensionDom;
         reading.setAttribute('aria-pressed', String(config.videoSubtitleAppearance.readingAnnotation));
+        reading.title = reading.getAttribute('aria-label') || '';
         positionCourseMenu();
     };
 
@@ -400,7 +426,9 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
 
     const selectVideo = () => {
         let selected: {video: HTMLVideoElement; bounds: DOMRect; paused: boolean; area: number} | null = null;
+        const mainBilibiliPlayer = course === 'bilibili' ? document.querySelector('#bilibili-player') : null;
         for (const node of document.querySelectorAll<HTMLVideoElement>('video')) {
+            if (course === 'bilibili' && (node.closest('.v-recommend-inline-player') || (mainBilibiliPlayer && !mainBilibiliPlayer.contains(node)))) continue;
             const bounds = node.getBoundingClientRect();
             if (!(bounds.width > 0 && bounds.height > 0) || node.closest('[hidden], [aria-hidden="true"]')) continue;
             if (course && node === lastPlayedVideo) return {video: node, bounds, paused: node.paused, area: bounds.width * bounds.height};

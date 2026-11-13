@@ -55,12 +55,12 @@
   "video.course.toggle": "Субтитры FluentRead",
   "video.course.auto": "Переводить при открытии видео",
   "video.course.off": "Субтитры выключены",
-  "video.course.loading": "Загрузка исходных субтитров…",
-  "video.course.error": "Не удалось загрузить субтитры. Повторите попытку.",
-  "video.course.empty": "Для этого видео нет доступных субтитров.",
-  "video.course.bilibiliEmpty": "Нет доступных субтитров. Bilibili обычно требует входа.",
+  "video.course.loading": "Загрузка субтитров…",
+  "video.course.error": "Не удалось загрузить субтитры",
+  "video.course.empty": "Нет субтитров",
+  "video.course.bilibiliEmpty": "Нет субтитров",
   "video.course.ready": "Субтитры готовы",
-  "video.course.waiting": "Ожидание субтитров плеера…",
+  "video.course.waiting": "Ожидание субтитров…",
   "video.course.download": "Скачать исходный SRT",
-  "video.course.downloadFailed": "Не удалось скачать. Повторите попытку."
+  "video.course.downloadFailed": "Ошибка загрузки файла"
 }

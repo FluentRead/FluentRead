@@ -55,12 +55,12 @@
   "video.course.toggle": "流畅阅读字幕",
   "video.course.auto": "打开视频就翻译",
   "video.course.off": "字幕已关闭",
-  "video.course.loading": "正在读取原文字幕…",
-  "video.course.error": "字幕读取失败，请重试。",
-  "video.course.empty": "这个视频没有可读取的字幕。",
-  "video.course.bilibiliEmpty": "没有可读取的字幕；B 站字幕通常需要登录。",
+  "video.course.loading": "读取字幕…",
+  "video.course.error": "字幕读取失败",
+  "video.course.empty": "暂无字幕",
+  "video.course.bilibiliEmpty": "暂无字幕",
   "video.course.ready": "字幕已就绪",
-  "video.course.waiting": "等待播放器字幕…",
+  "video.course.waiting": "等待字幕…",
   "video.course.download": "下载原文 SRT",
-  "video.course.downloadFailed": "字幕下载失败，请重试。"
+  "video.course.downloadFailed": "下载失败"
 }

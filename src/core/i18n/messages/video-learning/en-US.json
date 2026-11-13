@@ -55,12 +55,12 @@
   "video.course.toggle": "FluentRead subtitles",
   "video.course.auto": "Translate when a video opens",
   "video.course.off": "Subtitles are off",
-  "video.course.loading": "Loading original subtitles…",
-  "video.course.error": "Could not load subtitles. Try again.",
-  "video.course.empty": "No readable subtitles for this video.",
-  "video.course.bilibiliEmpty": "No readable subtitles. Bilibili usually requires sign-in.",
+  "video.course.loading": "Loading subtitles…",
+  "video.course.error": "Could not load subtitles",
+  "video.course.empty": "No subtitles",
+  "video.course.bilibiliEmpty": "No subtitles",
   "video.course.ready": "Subtitles are ready",
-  "video.course.waiting": "Waiting for player subtitles…",
+  "video.course.waiting": "Waiting for subtitles…",
   "video.course.download": "Download original SRT",
-  "video.course.downloadFailed": "Download failed. Try again."
+  "video.course.downloadFailed": "Download failed"
 }

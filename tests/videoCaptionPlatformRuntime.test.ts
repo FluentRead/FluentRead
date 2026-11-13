@@ -537,12 +537,32 @@ describe('完整课程字幕公共挂载', () => {
         if (platform === 'bilibili') caption.className = 'bpx-player-ctrl-subtitle';
         else if (platform === 'udemy') caption.dataset.purpose = 'captions-dropdown-button';
         else caption.className = 'toggle-captions';
-        Object.defineProperty(caption, 'offsetHeight', {value: 40});
+        // B 站悬停命中外框增加留白，可见文字仍是 22px。
+        let visualHeight = 40;
+        if (platform === 'bilibili') {
+            const label = f.document.createElement('span'); label.className = 'bpx-player-ctrl-subtitle-result'; label.textContent = '字幕'; caption.appendChild(label);
+            Object.defineProperty(label, 'getBoundingClientRect', {value: () => ({top: 0, height: 22})});
+            Object.defineProperty(caption, 'getBoundingClientRect', {value: () => ({top: 0, height: 35})});
+            Object.defineProperty(caption, 'offsetHeight', {value: 35}); visualHeight = 22;
+        } else Object.defineProperty(caption, 'offsetHeight', {value: visualHeight});
         row.append(caption, fullscreen); bar.appendChild(row); f.start();
         const host = f.document.getElementById('fluent-read-course-controls')!;
         expect(host.parentElement).toBe(row); expect(host.nextSibling).toBe(caption); expect(caption.nextSibling).toBe(fullscreen);
-        expect(Number.parseFloat(f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.style.height)).toBe(caption.offsetHeight);
+        expect(Number.parseFloat(f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.style.height)).toBe(visualHeight);
         expect(host.style.position).not.toBe('absolute');
+    });
+
+    it('单语隐藏顺序及说明，读音图标只保留短标题，双语恢复顺序', async () => {
+        const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true;
+        f.config.videoSubtitleDisplayMode = 'original-only'; f.start(); await vi.advanceTimersByTimeAsync(350);
+        const order = f.menu().querySelector<HTMLElement>('.fluent-read-video-menu-order-setting')!;
+        const reading = f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]')!;
+        expect(order.hidden).toBe(true);
+        expect(f.menu().querySelector('[data-subtitle-order-hint]')).toBeNull();
+        expect(f.menu().querySelector('[data-reading-help]')!.hasAttribute('popover')).toBe(false);
+        expect(reading.title).toBe(reading.getAttribute('aria-label'));
+        expect(reading.hasAttribute('aria-describedby')).toBe(false);
+        f.choose('bilingual'); expect(order.hidden).toBe(false);
     });
 
     it('原生 video 控件不把入口挂到空的伪控制栏', () => {
@@ -550,6 +570,33 @@ describe('完整课程字幕公共挂载', () => {
         const host = f.document.getElementById('fluent-read-course-controls')!;
         expect(host.parentElement).toBe(f.video.parentElement);
         expect(f.document.querySelectorAll('#fluent-read-course-controls')).toHaveLength(1);
+    });
+
+    it('退出全屏保留隐藏旧栏时，将同一入口迁入新原生控件所在行', async () => {
+        const f = courseFixture('bilibili');
+        const old = f.document.querySelector<HTMLElement>('.bpx-player-control-bottom-right')!;
+        const caption = f.document.createElement('button'); caption.className = 'bpx-player-ctrl-subtitle'; old.appendChild(caption);
+        f.start(); const host = f.document.getElementById('fluent-read-course-controls')!;
+        const next = f.document.createElement('div'); next.className = old.className; old.after(next);
+        next.appendChild(caption); old.style.display = 'none'; await vi.advanceTimersByTimeAsync(350);
+        expect(f.document.getElementById('fluent-read-course-controls')).toBe(host);
+        expect(host.parentElement).toBe(next); expect(host.nextSibling).toBe(caption);
+        expect(f.document.querySelectorAll('#fluent-read-course-controls')).toHaveLength(1);
+    });
+
+    it('B 站主视频暂停时，自动播放的推荐预览不能抢走入口', async () => {
+        const f = courseFixture('bilibili'); f.video.parentElement!.id = 'bilibili-player'; f.start();
+        const preview = f.document.createElement('aside'); preview.className = 'v-recommend-inline-player';
+        const root = f.document.createElement('div'); root.className = 'bpx-player-container';
+        const clip = f.document.createElement('video') as unknown as HTMLVideoElement;
+        clip.getBoundingClientRect = () => ({width: 142, height: 80}) as DOMRect;
+        Object.assign(clip, {paused: false, currentTime: .5, ended: false, seeking: false});
+        const controls = f.document.createElement('div'); controls.className = 'bpx-player-control-bottom-right';
+        root.append(clip, controls); preview.append(root); f.document.body.appendChild(preview);
+        clip.dispatchEvent(new f.window.Event('play', {bubbles: true})); await vi.advanceTimersByTimeAsync(500);
+        const host = f.document.getElementById('fluent-read-course-controls')!;
+        expect(host.closest('#bilibili-player')).toBe(f.video.parentElement);
+        expect(preview.querySelector('#fluent-read-course-controls')).toBeNull();
     });
 });
 

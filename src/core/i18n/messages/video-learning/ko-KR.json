@@ -55,12 +55,12 @@
   "video.course.toggle": "FluentRead 자막",
   "video.course.auto": "동영상을 열면 번역",
   "video.course.off": "자막이 꺼져 있습니다",
-  "video.course.loading": "원문 자막을 불러오는 중…",
-  "video.course.error": "자막을 불러올 수 없습니다. 다시 시도하세요.",
-  "video.course.empty": "읽을 수 있는 자막이 없습니다.",
-  "video.course.bilibiliEmpty": "읽을 수 있는 자막이 없습니다. Bilibili는 보통 로그인이 필요합니다.",
+  "video.course.loading": "자막 로딩 중…",
+  "video.course.error": "자막 로딩 실패",
+  "video.course.empty": "자막 없음",
+  "video.course.bilibiliEmpty": "자막 없음",
   "video.course.ready": "자막이 준비되었습니다",
-  "video.course.waiting": "플레이어 자막을 기다리는 중…",
+  "video.course.waiting": "자막 대기 중…",
   "video.course.download": "원문 SRT 다운로드",
-  "video.course.downloadFailed": "다운로드하지 못했습니다. 다시 시도하세요."
+  "video.course.downloadFailed": "다운로드 실패"
 }

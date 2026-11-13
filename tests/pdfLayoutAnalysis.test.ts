@@ -2283,7 +2283,9 @@ describe('display-operator baseline ownership beside prose', () => {
         const program = `
 const fs = require('node:fs'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
 const source = fs.readFileSync(${JSON.stringify(sourcePath)}, 'utf8'), exportsPort = {};
-new Function('exports', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exportsPort);
+const dependencySource = fs.readFileSync(require('node:path').join(require('node:path').dirname(${JSON.stringify(sourcePath)}), 'pdfBorderlessTable.ts'), 'utf8'), dependencyExports = {};
+new Function('exports', ts.transpileModule(dependencySource, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(dependencyExports);
+new Function('require', 'exports', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id => {if (id === './pdfBorderlessTable') return dependencyExports; throw new Error('Unexpected import: ' + id);}, exportsPort);
 console.log('loaded-before-call:' + crypto.createHash('sha256').update(source).digest('hex'));
 const cases = ${JSON.stringify(cases)}, before = JSON.stringify(cases);
 const results = cases.map(atoms => exportsPort.pdfLayoutLines(atoms));

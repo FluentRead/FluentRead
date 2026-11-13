@@ -3,11 +3,12 @@
  * 文件职责：在整段漫画区域中绘制适合阅读的译文，避免整行逐框放大和复杂背景扩散条纹。
  * 背景颜色：均匀性判定继续使用原量化桶及透明度门禁，实际填色使用采样均值，减少粗色阶导致的可见色块。
  * 原图样式：修补前验证完整绘字区域的背景与共同墨色，可靠且对比充分时沿用源字色；已证纯色文字区域用同底色细描边，清字分类与原掩码独立保持。
+ * 双向文字：按整段译文首个强方向字符统一度量和绘制，数字、括号及换行后的弱方向内容继承该段方向；缓存键包含方向，避免混合语言段落串用指标，结束后恢复原画布状态。
  * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
  * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；白底旁置规划只消费调用方已证明的候选，保持完整译文和源字号下限，不提供像素或清字授权；完整原图仍可通过现有按钮对照。
  */
 import type {MangaRegion} from './mangaRegions';
-import {getImageTextColor, getImageTextBackgroundColor} from './rendering';
+import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection} from './rendering';
 import {createMangaTranslationSearch, layoutMangaTranslationText, MANGA_TEXT_FONT} from './mangaTypography';
 import {mangaMaskBoxes} from '../mangaPatchResult';
 import {mangaAlphaClearRects,type MangaAlphaProtection} from './mangaAlphaProtection';
@@ -68,7 +69,7 @@ export function planMangaBlankTranslation(context:CanvasRenderingContext2D,regio
     context.save();
     let failed=false,firstError:unknown;
     try {
-        context.textBaseline='alphabetic';context.textAlign='left';
+        context.textBaseline='alphabetic';context.textAlign='left';context.direction=getImageTextDirection(region.text);
         let measuredSize=NaN,validMetrics=true;
         const measure:MangaMeasure=(text,size)=>{
             // 每次逻辑度量都扣费；不能用缓存命中规避文字遍历成本，也不因候选失败或原生异常退款。
@@ -140,7 +141,7 @@ export function sampleMangaBackgrounds(pixels: Uint8ClampedArray, width: number,
 export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels: Uint8ClampedArray,
     width: number, height: number, regions: Array<MangaRegion & {sourceText?: string}>, repaired = false, backgrounds?: MangaBackground[],protection?:MangaAlphaProtection) {
     if (![width, height].every(value => Number.isSafeInteger(value) && value > 0) || pixels.length < width * height * 4) return;
-    // 本次绘制的字体族固定；短键保留字重、实际字号和全文，不跨页面或设备复用。
+    // 本次绘制的字体族固定；短键保留段落方向、字重、实际字号和全文，不跨页面或设备复用。
     const measurements = new Map<string, {width:number;ascent:number;descent:number;actualBoundingBoxLeft:number;actualBoundingBoxRight:number}>();
     let cachedCharacters = 0;
     const alphaLayoutBudget={remaining:1_048_576};let additionalLayouts=0,flowRegions=0;
@@ -178,11 +179,12 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             const maxSize = Math.min(region.fontSize * 1.05,width * (display ? .10 : .034));
             // 保留横向余量；OCR 框是字形边界，竖向空间由实际字形和描边适配，不再重复扣除内边距。
             let measuredFont = '', keyFontSize = NaN, font = '', keyPrefix = '', logicalPrefixLength = 0;
-            context.textBaseline = 'alphabetic';context.textAlign = 'left';
+            const direction=getImageTextDirection(region.text);
+            context.textBaseline = 'alphabetic';context.textAlign = 'left';context.direction=direction;
             const measure = (text:string,size:number) => {
                 if (keyFontSize !== size) {
                     keyFontSize = size; font = `${weight} ${size}px ${MANGA_TEXT_FONT}`;
-                    keyPrefix = `${weight}|${size}|`; logicalPrefixLength = font.length + 1;
+                    keyPrefix = `${direction}|${weight}|${size}|`; logicalPrefixLength = font.length + direction.length + 2;
                 }
                 const key = keyPrefix + text;
                 const cached = measurements.get(key);

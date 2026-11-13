@@ -2,7 +2,7 @@
 /**
  * @file scripts/testing/run-manga-translation-test.cjs
  * 文件职责：在临时 profile 中用可信点击和真实模型验证生产漫画翻译、滚动及缓存行为。
- * 主要内容：固定模型文件经校验后由既有 UI 导入；性能模式测量冷/热推理，质量 manifest 检查真实 OCR 锚点、画面保护与原/译切换。
+ * 主要内容：固定模型文件经校验后由既有 UI 导入；性能模式测量冷/热推理，质量 manifest 检查真实 OCR 锚点、画面保护与原/译切换；受控阿拉伯语、希伯来语目标可记录实际字形方向，不能据此声称真实供应商翻译准确。
  * 模块边界：仅替换夹具的文字服务传输；不修改生产 OCR/修补结果，不访问日常浏览器 profile，浏览器启动与页面创建均走不抢焦点 helper。
  */
 const fs = require('node:fs');
@@ -169,7 +169,7 @@ const readerSelector=(errorRecoveryTest&&errorRecoverySurface!=='image'?recovery
 const sourceLanguage=arg('source-language',pixiv||surfaceReaderTest?'ja':'en');
 assert.ok(['en','ja','ko','ru','auto'].includes(sourceLanguage),'Use a supported sample source language');
 const targetLanguage=arg('target-language','zh-Hans');
-assert.ok(['zh-Hans','en'].includes(targetLanguage),'Use a bounded sample target language');
+assert.ok(['zh-Hans','en','ar','he'].includes(targetLanguage),'Use a bounded sample target language');
 const canvasContentPixels=process.argv.includes('--canvas-content-pixels');
 if(canvasContentPixels)assert.ok(canvasReaderTest&&liveSite&&explicitCanvasSelector,'Content-world pixel diagnostics require an explicit live public canvas reader');
 const canvasFirstSpreadOnly=process.argv.includes('--canvas-first-spread-only');
@@ -1991,7 +1991,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         const boxes=new WeakMap(),rect=CanvasRenderingContext2D.prototype.rect,draw=CanvasRenderingContext2D.prototype.fillText;
         CanvasRenderingContext2D.prototype.rect=function(x,y,width,height){boxes.set(this,{x,y,width,height});return rect.call(this,x,y,width,height);};
         CanvasRenderingContext2D.prototype.fillText=function(text,x,y,...args){
-            if(this.font.includes('Noto Sans')&&samples.length<1024)samples.push({text,x,y,font:this.font,fill:this.fillStyle,stroke:this.strokeStyle,lineWidth:this.lineWidth,canvas:{width:this.canvas.width,height:this.canvas.height},box:boxes.get(this)});
+            if(this.font.includes('Noto Sans')&&samples.length<1024)samples.push({text,x,y,font:this.font,direction:this.direction,fill:this.fillStyle,stroke:this.strokeStyle,lineWidth:this.lineWidth,canvas:{width:this.canvas.width,height:this.canvas.height},box:boxes.get(this)});
             return draw.call(this,text,x,y,...args);
         };
     })()`});

@@ -305,6 +305,9 @@ async function main() {
           const context = canvas.getContext('2d'); context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
           context.fillStyle = '#111111'; context.font = '44px Georgia, serif';
           lines.forEach((line, index) => context.fillText(line, 130, 300 + index * 170));
+          context.fillStyle='#e2edf5';context.fillRect(130,700,500,240);context.strokeStyle='#376a8a';context.lineWidth=3;context.strokeRect(130,700,500,240);
+          context.beginPath();context.moveTo(180,880);context.lineTo(300,760);context.lineTo(450,850);context.lineTo(580,740);context.stroke();
+          context.fillStyle='#111';context.font='24px Georgia, serif';context.fillText('Figure 1. Rotated graphic.',130,980);
           return canvas.toDataURL('image/png').split(',')[1];
         }, {lines: turned.lines, landscape: turned.landscape});
         const turnedPage = scan.addPage([595, 842]);
@@ -337,6 +340,21 @@ async function main() {
           ctx.font = `${raised ? 7 : 10}px Times New Roman`;
           ctx.fillText(text, scientificX, raised ? 386 : 390); scientificX += ctx.measureText(text).width;
         }
+        // 连通图示与有文字单元格的表格并排；图内标签不送翻，表格文字仍可翻译且受单元格约束。
+        const nodes = [{x:48,y:450,w:65,text:'Prepare'}, {x:150,y:450,w:95,text:'Measure'},
+          {x:48,y:515,w:65,text:'Compare'}, {x:150,y:515,w:95,text:'Summarize'}];
+        ctx.lineWidth = .8; ctx.strokeStyle = '#376a8a';
+        for (const node of nodes) {ctx.fillStyle='#e2edf5';ctx.fillRect(node.x,node.y,node.w,30);ctx.strokeRect(node.x,node.y,node.w,30);}
+        ctx.beginPath();ctx.moveTo(113,465);ctx.lineTo(150,465);ctx.moveTo(197.5,480);ctx.lineTo(197.5,515);ctx.moveTo(150,530);ctx.lineTo(113,530);ctx.stroke();
+        ctx.fillStyle='#111';ctx.font='9px Times New Roman';ctx.textAlign='center';
+        for (const node of nodes) ctx.fillText(node.text,node.x+node.w/2,node.y+19);
+        ctx.textAlign='left';ctx.font='8px Times New Roman';ctx.fillText('Figure 1. Workflow overview.',48,565);
+        ctx.fillStyle='#eeeeee';ctx.fillRect(312,450,231,22);ctx.strokeStyle='#111';ctx.lineWidth=.7;
+        ctx.beginPath();for(const y of [450,472,494,516,538]){ctx.moveTo(312,y);ctx.lineTo(543,y);}
+        for(const x of [312,389,466,543]){ctx.moveTo(x,450);ctx.lineTo(x,538);}ctx.stroke();
+        ctx.fillStyle='#111';const table=[['Group','Samples','Accuracy'],['Alpha','128','94.2%'],['Beta','256','95.1%'],['Gamma','512','96.4%']];
+        table.forEach((row,r)=>row.forEach((text,c)=>ctx.fillText(text,318+c*77,465+r*22)));
+        ctx.fillText('Table 1. Measured results.',312,558);
         ctx.font = '8px Times New Roman'; ctx.fillText('Small footnote: measurements were collected at room temperature.', 48, 760);
         ctx.fillText('7', 290, 812);
         return canvas.toDataURL('image/png').split(',')[1];
@@ -377,6 +395,17 @@ async function main() {
       assert(requestedSources.some(source => source.includes('Scientific counts') && source.includes('__FRTERM_') && !source.includes('10⁴')), '已确认指数必须经过真实翻译保护链');
       assert(recognizedModel.translations[scientific.id]?.includes('10⁴') && recognizedModel.translations[scientific.id].includes('10⁵'), '译文必须恢复确认后的科学计数法');
       assert.equal(recognizedModel.pages[6].ocrReviewRegions.length, 0, '本样本的数字均可确认，不应误标正文逗号');
+      const paperPage = recognizedModel.pages[6];
+      assert(paperPage.preservedRegions.some(region=>region.kind==='figure'&&region.x<=48.5&&region.x+region.width>=244.5&&region.y<=450.5&&region.y+region.height>=544.5), '扫描图示必须完整保留四个节点与连接线');
+      const diagramLabels = ['Prepare','Measure','Compare','Summarize'];
+      for(const label of diagramLabels){
+        assert(paperPage.blocks.filter(block=>block.source===label).every(block=>block.preserveSource&&block.segmentIndex<0), `已识别图内标签须保留原图：${label}`);
+        assert(!recognized.includes(label), `不能把图内短标签误当正文送翻：${label}`);
+      }
+      assert(recognized.some(source=>source.startsWith('Figure 1.')), '插图题注仍须参与翻译');
+      const tableBlocks = paperPage.blocks.filter(block=>block.cellBounds&&block.y>440&&block.y<545);
+      for(const label of ['Group','Samples','Accuracy','Alpha','Beta','Gamma']) assert(tableBlocks.some(block=>block.source===label&&block.segmentIndex>=0), `表格文字仍须参与翻译：${label}`);
+      assert(tableBlocks.some(block=>block.source==='128'&&block.preserveSource), '纯数字单元格保留原图');
       // 识别允许个别字符有出入，但三句印刷文字都必须被认出并送去翻译。
       for (const phrase of [/scanned pages carry/iu, /recognition must find/iu, /translated page keeps/iu]) assert(recognized.some(source => phrase.test(source)), `识别结果缺少印刷文字 ${phrase}：${JSON.stringify(recognized)}`);
       assert(recognized.includes(typed), `带文字层的页应照常翻译：${JSON.stringify(recognized)}`);
@@ -409,7 +438,16 @@ async function main() {
         await shot(`scanned-rotated-${turned.angle}-translated`);
         assert(turnedBlocks.length >= 2, `旋转 ${turned.angle} 度的扫描页上应有两段译文：${JSON.stringify(turnedBlocks)}`);
         assert(turnedBlocks.every(block => block.text && block.inside && block.upright && block.landscape === turned.landscape), `旋转 ${turned.angle} 度的扫描页，译文必须横排、摆正并留在页面内：${JSON.stringify(turnedBlocks)}`);
-        turnedReport.push({angle: turned.angle, blocks: turnedBlocks.length});
+        const graphic=recognizedModel.pages[number-1].preservedRegions.find(region=>region.kind==='figure');
+        assert(graphic&&Math.abs(graphic.x-62.4)<2&&Math.abs(graphic.y-336)<2&&Math.abs(graphic.width-240)<3&&Math.abs(graphic.height-115.2)<3,`旋转 ${turned.angle} 度的图形应使用摆正后的页面坐标`);
+        await page.getByRole('button',{name:'显示方式',exact:true}).click();await page.getByRole('option',{name:'重排阅读',exact:true}).click();
+        await pageInput.fill(String(number));await pageInput.press('Enter');
+        const regionCanvas=page.locator(`.pdf-page-row[data-page-number="${number}"] [data-pdf-region-kind="figure"] canvas`).first();await regionCanvas.waitFor();
+        const crop=await regionCanvas.evaluate(canvas=>({width:canvas.width,height:canvas.height,pixel:[...canvas.getContext('2d').getImageData(Math.floor(canvas.width*.1),Math.floor(canvas.height*.1),1,1).data]}));
+        assert(crop.width>0&&crop.height>0&&Math.abs(crop.width/crop.height-500/240)<.08&&crop.pixel[2]>crop.pixel[0]+10,`旋转 ${turned.angle} 度的重排图形必须裁到原图：${JSON.stringify(crop)}`);
+        await shot(`scanned-rotated-${turned.angle}-readable`);
+        await page.getByRole('button',{name:'显示方式',exact:true}).click();await page.getByRole('option',{name:'原版排版',exact:true}).click();
+        turnedReport.push({angle: turned.angle, blocks: turnedBlocks.length, graphic, readableCrop:crop});
       }
       const normalizedSources = recognized.map(source => source.replace(/\s+/gu, ' ').trim());
       const paperIndexes = paperParagraphs.map(paragraph => normalizedSources.indexOf(paragraph));
@@ -419,6 +457,17 @@ async function main() {
       assert(normalizedSources.findIndex(source => source.startsWith('Small footnote:')) > paperIndexes.at(-1), '页底脚注必须排在两栏正文之后');
       await pageInput.fill('7'); await pageInput.press('Enter');
       await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').first().waitFor();
+      const cellPlacement = await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').evaluateAll((elements, cells) => elements.flatMap(element => {
+        const cell=cells.find(cell=>cell.segmentIndex===Number(element.getAttribute('data-pdf-segment-index'))); if(!cell)return [];
+        const style=element.style, left=parseFloat(style.left), top=parseFloat(style.top), width=parseFloat(style.width), height=parseFloat(style.height), bounds=cell.cellBounds;
+        return [{source:cell.source,inside:left>=bounds.x-.6&&top>=bounds.y-.6&&left+width<=bounds.x+bounds.width+.6&&top+height<=bounds.y+bounds.height+.6}];
+      }), tableBlocks);
+      assert(cellPlacement.length>=6&&cellPlacement.every(cell=>cell.inside), `表格译文框须留在单元格内：${JSON.stringify(cellPlacement)}`);
+      const captionPlacement = await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block[data-pdf-role="caption"]').evaluateAll(elements=>elements.map(element=>({
+        source:element.getAttribute('data-pdf-source-text'),x:parseFloat(element.style.left),y:parseFloat(element.style.top),width:parseFloat(element.style.width),height:parseFloat(element.style.height),
+      })));
+      const figureCaption=captionPlacement.find(caption=>caption.source.startsWith('Figure 1.')),tableCaption=captionPlacement.find(caption=>caption.source.startsWith('Table 1.'));
+      assert(figureCaption&&tableCaption&&figureCaption.x+figureCaption.width<tableCaption.x,'不同基线的相邻长题注也不能横向覆盖');
       await shot('scanned-two-column-paper');
       await page.locator('.download-button').click();
       const scanDownload = page.locator('#document-download-panel[open]');
@@ -437,9 +486,10 @@ async function main() {
       await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor();
       assert.equal(await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count'), segmentCount, '刷新应恢复已识别的全部段落');
       assert.equal(fixture.state.requests.length, requestsBeforeReload, '恢复已完成历史不能重新翻译');
-      report.scanned = {pages: 7, scannedPages: 6, scientificSource: scientific.source, scientificTranslation: recognizedModel.translations[scientific.id], paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
+      report.scanned = {pages: 7, scannedPages: 6, scientificSource: scientific.source, scientificTranslation: recognizedModel.translations[scientific.id], diagramLabels, tableCellPlacement:cellPlacement, captionPlacement, paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
       report.cases.push('a PDF with one typed page, two scanned pages and three rotated scanned pages (90, 180 and 270 degrees) opens without requests, recognises the scanned pages when translation starts, translates the typed page as usual and shows upright translations inside the scanned pages');
       report.cases.push('10 pt two-column paragraphs and an 8 pt footnote retain text and order; all seven bilingual pages export with a translation text layer and survive history reload without new translation requests');
+      report.cases.push('a scanned linked diagram stays intact; regional recognition restores all twelve table cells, translates six text cells within their bounds, and preserves numeric cells');
       assert.equal(report.consoleErrors.length, 0);
       report.ok = true;
       return;

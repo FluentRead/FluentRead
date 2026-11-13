@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
- * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
+ * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
@@ -60,7 +60,7 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
 const MAX_CACHED_OCR_IMAGES = 3;
 const MAX_CACHED_OCR_BYTES = 12 * 1024 * 1024;
 const OCR_IMAGE_DECODE_TIMEOUT_MS = 15_000;
-export type OcrRecognitionOptions = {profile?: 'image' | 'area' | 'document'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
+export type OcrRecognitionOptions = {profile?: 'image' | 'area' | 'document'; documentLayout?: 'auto' | 'sparse'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
 type RecognitionViews = {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]};
 const sharedRecognition = createSharedOcrTasks<RecognitionViews>();
 const completedRecognitionCache = new Map<string, {views: RecognitionViews; bytes: number}>();
@@ -252,8 +252,8 @@ export async function recognizeImage(
     // PSM 11 不做竖排判定，会把竖列逐行横读成乱序；PSM 12 在同样的稀疏分割上按版面判定方向，
     // 竖排页交给 *_vert 模型，横排页结果与 PSM 11 一致。缺少 osd 模型只跳过文字方向旋转检测。
     const profile = options.profile ?? 'image';
-    const layoutMode = profile === 'document' ? PSM.AUTO : models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
-    const cacheKey = `${profile}\0${languages}\0${image}`;
+    const layoutMode = profile === 'document' ? options.documentLayout === 'sparse' ? PSM.SPARSE_TEXT : PSM.AUTO : models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
+    const cacheKey = `${profile}${profile === 'document' ? `:${layoutMode}` : ''}\0${languages}\0${image}`;
     const cached = completedRecognitionCache.get(cacheKey);
     if (cached) {
         completedRecognitionCache.delete(cacheKey);
@@ -279,7 +279,7 @@ export async function recognizeImage(
             };
         };
         let views = await readLines(result);
-        if (!views.ordinary.some(line => line.text.trim()) && (profile === 'document' || profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
+        if (!views.ordinary.some(line => line.text.trim()) && (profile === 'document' ? layoutMode !== PSM.SPARSE_TEXT : profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
             // 文档可能只含少量独立标题，自动分栏为空时试一次稀疏文字；其它用途维持原有单块回退。
             const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, profile === 'document' ? PSM.SPARSE_TEXT : PSM.SINGLE_BLOCK);
             if (signal?.aborted) throw abortRecognition();

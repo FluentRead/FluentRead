@@ -53,6 +53,7 @@ vi.mock('@/src/ui/components/UiSelect.vue', () => ({default: {
 vi.mock('@/src/ui/components/GlossaryLibrarySelect.vue', () => ({default: {setup: () => () => h('div')}}));
 vi.mock('element-plus/es/components/select/style/css', () => ({}));
 vi.mock('element-plus', () => ({ElOption: {props: ['label', 'value'], setup: (props: any) => () => h('option', {value: props.value}, props.label)}}));
+vi.mock('@/src/features/document-translation/ui/pdfScanPreview', () => ({readPdfScanGraphics: async () => [], cropPdfScanRegions: () => []}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({GlobalWorkerOptions: {}, OPS: {constructPath: 1, fill: 2}, getDocument: (options: any) => {
     const task = {role: options.disableFontFace ? 'parse' : 'preview', destroy: vi.fn(async () => {}), page: {
         getViewport: ({scale}: {scale: number}) => ({width: 100 * scale, height: 100 * scale, transform: [1, 0, 0, 1, 0, 0]}),

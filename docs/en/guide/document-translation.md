@@ -55,6 +55,8 @@ For scanned papers, recognition uses higher-resolution page images and automatic
 
 Numeric superscripts and subscripts are checked using enlarged crops and their positions on the original page. Confirmed scientific notation and numeric subscripts are kept unchanged during translation. If a candidate cannot be confirmed, **Check original** opens the source page with dashed markers. This check does not guarantee that every formula or symbol is correct.
 
+Scanned diagrams stay as original images when their boundaries can be identified; captions remain translatable. Tables with clear rules and text cells receive a separate recognition pass to fill omissions. Text is translated within each cell, while numeric cells stay unchanged. Conflicting readings keep the first result and show a review marker. Full-passage controls and continuation pages keep long translations available.
+
 If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.
 
 You can select, copy, and translate original-page text. Selection uses your separate selection translation service; the whole document uses the document service. In the browser's own PDF viewer, select text and choose **Translate selected text** from the context menu to open a separate result window. Enable selection translation and its context-menu entry first. The limit is 4096 characters per selection.

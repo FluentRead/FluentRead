@@ -1,17 +1,21 @@
 /**
  * @file src/features/document-translation/services/pdfOcr.ts
  * 文件职责：让没有文字层的扫描版 PDF 也能进入同一套版面分析与翻译流程：把逐页文字识别的结果换算成版面分析所需的字形，重建各页的段落与待翻译片段。
- * 主要内容：按阅读位置逐页识别扫描页，校验有限且位于页内的文字框，再复用论文版面分析；每完成一页可提交不可变检查点，暂停或后续页失败时保留已完成页，空结果仍可重试；按未识别页的页码、块位置及原文迁移已有译文和人工确认；旋转页在展示坐标识别，原角度另记给导出。输入文档始终不被修改。
+ * 主要内容：按阅读位置逐页识别扫描页，校验有限且位于页内的文字框，再复用论文版面分析；同源扫描图形与经文字单元格确认的网格交回既有图表规则，保留插图、继续翻译题注与表格文字；区域复核只补遗漏单元格，跨格文字或读数冲突保留原结果并提示核对；每完成一页可提交不可变检查点，暂停或后续页失败时保留已完成页，空结果仍可重试；按未识别页的页码、块位置及原文迁移已有译文和人工确认；旋转页在展示坐标识别，原角度另记给导出。输入文档始终不被修改。
  * 模块边界：不渲染页面、不加载识别引擎、不发起翻译；应用层注入展示方向的识别结果，此处适配文字框、逐页检查点和扫描页脚注顺序，通用版面规则归 core/pdfLayoutAnalysis。
  */
 import type {DocumentSegment, ParsedDocument, PdfDocumentPage} from '../core/document';
 import {analyzePdfPageLayout, type PdfLayoutAtom} from '../core/pdfLayoutAnalysis';
 import {pdfPageSegments} from './binary';
+import {pdfScanLayoutGraphics, type PdfScanGraphic} from '../core/pdfScanGraphics';
 
 /** 一行识别出的文字及其在页面上的位置（PDF 点，原点在页面左上角）。 */
 export interface PdfOcrLine {text: string; x: number; y: number; width: number; height: number; baseline?: number; fontSize?: number; needsReview?: boolean}
 export interface PdfPageRecognitionInput {bytes: Uint8Array; pageNumber: number; width: number; height: number; signal?: AbortSignal}
-export type PdfPageRecognizer = (input: PdfPageRecognitionInput) => Promise<readonly PdfOcrLine[]>;
+export interface PdfRegionRecognition {graphicIndex: number; lines?: readonly PdfOcrLine[]}
+export interface PdfPageRecognition {lines: readonly PdfOcrLine[]; graphics: readonly PdfScanGraphic[]; regions?: readonly PdfRegionRecognition[]}
+/** 纯文字识别端口仍可返回行数组；扫描页适配器同时提交同一原图的图形边界。 */
+export type PdfPageRecognizer = (input: PdfPageRecognitionInput) => Promise<readonly PdfOcrLine[] | PdfPageRecognition>;
 export interface RecognizePdfOptions {
     signal?: AbortSignal;
     /** 希望先识别的页（从 0 开始），例如正在阅读的那一页；其余页按原顺序接在后面。 */
@@ -86,6 +90,47 @@ function orderOcrFootnotes(layout: ReturnType<typeof analyzePdfPageLayout>, heig
     layout.blocks.forEach((block, index) => {block.readingOrder = index;});
 }
 
+/** 只补足已由文字单元格确认的表格；两次读数相异或原行跨越多个单元格时保留原文并标记核对。 */
+function mergeRegionLines(recognition: PdfPageRecognition, width: number, height: number): readonly PdfOcrLine[] {
+    const lines = [...recognition.lines];
+    const within = (line: PdfOcrLine, box: {x: number; y: number; width: number; height: number}) =>
+        line.x + line.width / 2 > box.x && line.x + line.width / 2 < box.x + box.width
+        && line.y + line.height / 2 > box.y && line.y + line.height / 2 < box.y + box.height;
+    const normalized = (values: readonly PdfOcrLine[]) => [...values].sort((a,b)=>a.y-b.y||a.x-b.x).map(line=>line.text).join(' ').replace(/\s+/gu,' ').trim();
+    for (const region of recognition.regions ?? []) {
+        const graphic = recognition.graphics[region.graphicIndex];
+        if (!graphic) continue;
+        const candidates = region.lines?.filter(line => within(line, graphic)) ?? [];
+        const shapes = pdfScanLayoutGraphics([graphic], ocrAtoms([...lines, ...candidates], width, height));
+        if (shapes.some(shape => shape.kind !== 'path')) continue;
+        if (!candidates.some(line => line.text.trim())) {lines.push({...graphic, text:'', needsReview:true}); continue;}
+        lines.push(...candidates.filter(line=>line.needsReview).map(line=>({...line,text:''})));
+        const horizontal = graphic.rules.filter(rule=>rule.width>0).map(rule=>rule.y).sort((a,b)=>a-b);
+        const vertical = graphic.rules.filter(rule=>rule.height>0).map(rule=>rule.x).sort((a,b)=>a-b);
+        // 只遍历实际有识别结果的单元格，不构造稠密网格的行列笛卡尔积。
+        const cells=new Map<string,{cell:{x:number;y:number;width:number;height:number};next:PdfOcrLine[]}>();
+        for(const line of candidates){
+            if(!line.text.trim())continue;
+            const x=line.x+line.width/2,y=line.y+line.height/2;
+            const row=horizontal.findIndex((edge,index)=>index+1<horizontal.length&&y>edge&&y<horizontal[index+1]);
+            const col=vertical.findIndex((edge,index)=>index+1<vertical.length&&x>edge&&x<vertical[index+1]);
+            if(row<0||col<0)continue;
+            const key=`${row}:${col}`, existing=cells.get(key);
+            if(existing)existing.next.push(line);
+            else cells.set(key,{cell:{x:vertical[col],y:horizontal[row],width:vertical[col+1]-vertical[col],height:horizontal[row+1]-horizontal[row]},next:[line]});
+        }
+        for (const {cell,next} of cells.values()) {
+            const previous=lines.filter(line=>within(line,cell));
+            const previousText=normalized(previous), nextText=normalized(next);
+            const crossing=next.some(line=>line.x<cell.x-1||line.x+line.width>cell.x+cell.width+1)||lines.some(line=>line.text.trim()&&within(line,{x:graphic.x,y:cell.y,width:graphic.width,height:cell.height})
+                && line.x<cell.x+cell.width&&line.x+line.width>cell.x&&(line.x<cell.x-1||line.x+line.width>cell.x+cell.width+1));
+            if (crossing || previousText && previousText!==nextText) {lines.push({...cell,text:'',needsReview:true});continue;}
+            if (!previousText) lines.push(...next);
+        }
+    }
+    return lines;
+}
+
 /**
  * 逐页识别扫描页并返回带有新片段的文档；原文档对象保持不变。没有需要识别的页时原样返回。
  */
@@ -101,9 +146,12 @@ export async function recognizePdfDocument(document: ParsedDocument, recognize: 
     for (const [attempt, index] of order.entries()) {
         options.signal?.throwIfAborted();
         const page = binary.pages[index];
-        const lines = await recognize({bytes: binary.bytes, pageNumber: page.pageNumber, width: page.width, height: page.height, signal: options.signal});
+        const recognition = await recognize({bytes: binary.bytes, pageNumber: page.pageNumber, width: page.width, height: page.height, signal: options.signal});
         options.signal?.throwIfAborted();
-        const layout = analyzePdfPageLayout({atoms: ocrAtoms(lines, page.width, page.height), graphics: [], width: page.width, height: page.height});
+        const lines = 'lines' in recognition ? mergeRegionLines(recognition, page.width, page.height) : recognition;
+        const atoms = ocrAtoms(lines, page.width, page.height);
+        const graphics = 'lines' in recognition ? pdfScanLayoutGraphics(recognition.graphics, atoms) : [];
+        const layout = analyzePdfPageLayout({atoms, graphics, width: page.width, height: page.height});
         orderOcrFootnotes(layout, page.height);
         // 空结果不能把扫描页变成“完成”；保留原页和重试入口，也不删掉原生页眉页脚。
         if (layout.blocks.length) {

@@ -1,6 +1,6 @@
 /**
  * @file src/core/i18n/messages/pdfReading.ts
- * 文件职责：维护 arXiv 论文入口、PDF 在线导入、分页阅读、缩放、划词提示、提取文字异常提醒、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
+ * 文件职责：维护 arXiv 论文入口、PDF 在线导入、分页阅读、缩放、划词提示、提取文字异常及识别复核提醒、真实段落进度、失败续译和扫描件文字识别的七种界面语言文案。
  * 主要内容：提供简短的重试、更换服务、暂时中断和按需展开详情文案，按七种语言独立导出静态目录，让默认中文界面直接引用中文资源；保留七语汇总对象供构建期资源生成、userscript 与其他 locale 复用。
  * 模块边界：仅提供静态资源，不读取文档、网络或用户配置；运行时消费者按语言引用独立常量，避免把非当前语言文案打进默认目录。
  */
@@ -37,7 +37,7 @@ export const pdfReadingChineseMessages = {
     "document.pdfReading.ocrEmpty": "没有识别出文字，请确认页面清晰并已选择正确的源语言",
     "document.pdfReading.ocrIncomplete": "仍有 {count} 页未识别出文字。其余页面已保留，可检查源语言和扫描清晰度后重试。",
     "document.pdfReading.sourceCharacterWarning": "此 PDF 的提取文字包含无法识别的字符，请对照原文校对。",
-    "document.pdfReading.ocrReview": "有 {count} 页存在未确认的上下标，请对照原页标记核对。",
+    "document.pdfReading.ocrReview": "有 {count} 页存在待核对的识别内容，请查看原页标记。",
     "document.pdfReading.reviewOriginal": "核对原文",
     "document.pdfReading.exportBilingualHint": "原文与译文左右对照",
     "document.pdfReading.waitingTranslation": "等待翻译…",
@@ -130,7 +130,7 @@ export const pdfReadingEnglishMessages = {
     "document.pdfReading.ocrEmpty": "No text was recognized. Check that the pages are legible and the source language is correct.",
     "document.pdfReading.ocrIncomplete": "{count} pages still have no recognized text. Other pages are kept. Check the source language and scan quality, then retry.",
     "document.pdfReading.sourceCharacterWarning": "The text extracted from this PDF contains unrecognized characters. Please check it against the original.",
-    "document.pdfReading.ocrReview": "Uncertain superscripts or subscripts on {count} pages. Check the marked areas on the original.",
+    "document.pdfReading.ocrReview": "Recognized content on {count} pages needs review. Check the marked areas on the original.",
     "document.pdfReading.reviewOriginal": "Check original",
     "document.pdfReading.exportBilingualHint": "Original and translation side by side",
     "document.pdfReading.waitingTranslation": "Waiting for translation…",
@@ -223,7 +223,7 @@ export const pdfReadingJapaneseMessages = {
     "document.pdfReading.ocrEmpty": "文字を認識できませんでした。ページの鮮明さと原文の言語を確認してください。",
     "document.pdfReading.ocrIncomplete": "{count} ページの文字を認識できませんでした。他のページは保存されています。原文の言語と画質を確認して再試行してください。",
     "document.pdfReading.sourceCharacterWarning": "この PDF から抽出したテキストに認識できない文字が含まれています。原文と照らし合わせて確認してください。",
-    "document.pdfReading.ocrReview": "{count} ページの上付き・下付き文字を確認できませんでした。原本のマーク箇所を確認してください。",
+    "document.pdfReading.ocrReview": "{count} ページの認識内容に確認が必要です。原本のマーク箇所を確認してください。",
     "document.pdfReading.reviewOriginal": "原本を確認",
     "document.pdfReading.exportBilingualHint": "原文と訳文を左右に表示",
     "document.pdfReading.waitingTranslation": "翻訳を待っています…",
@@ -316,7 +316,7 @@ export const pdfReadingKoreanMessages = {
     "document.pdfReading.ocrEmpty": "인식된 글자가 없습니다. 페이지가 선명한지, 원문 언어가 맞는지 확인하세요.",
     "document.pdfReading.ocrIncomplete": "{count}개 페이지의 글자를 인식하지 못했습니다. 다른 페이지는 유지됩니다. 원문 언어와 화질을 확인한 후 다시 시도하세요.",
     "document.pdfReading.sourceCharacterWarning": "이 PDF에서 추출한 텍스트에 인식할 수 없는 문자가 있습니다. 원문과 대조하여 확인해 주세요.",
-    "document.pdfReading.ocrReview": "{count}페이지의 위첨자 또는 아래첨자를 확인할 수 없습니다. 원문의 표시된 부분을 확인하세요.",
+    "document.pdfReading.ocrReview": "{count}페이지의 인식 내용을 검토해야 합니다. 원문의 표시된 부분을 확인하세요.",
     "document.pdfReading.reviewOriginal": "원문 확인",
     "document.pdfReading.exportBilingualHint": "원문과 번역을 좌우로 표시",
     "document.pdfReading.waitingTranslation": "번역 대기 중…",
@@ -409,7 +409,7 @@ export const pdfReadingFrenchMessages = {
     "document.pdfReading.ocrEmpty": "Aucun texte reconnu. Vérifiez la lisibilité des pages et la langue source.",
     "document.pdfReading.ocrIncomplete": "Le texte de {count} pages reste non reconnu. Les autres pages sont conservées. Vérifiez la langue source et la qualité du scan, puis réessayez.",
     "document.pdfReading.sourceCharacterWarning": "Le texte extrait de ce PDF contient des caractères non reconnus. Vérifiez-le en le comparant à l’original.",
-    "document.pdfReading.ocrReview": "Exposants ou indices incertains sur {count} pages. Vérifiez les zones marquées dans l’original.",
+    "document.pdfReading.ocrReview": "Le texte reconnu sur {count} pages doit être vérifié. Consultez les zones marquées dans l’original.",
     "document.pdfReading.reviewOriginal": "Vérifier l’original",
     "document.pdfReading.exportBilingualHint": "Original et traduction côte à côte",
     "document.pdfReading.waitingTranslation": "En attente de traduction…",
@@ -502,7 +502,7 @@ export const pdfReadingSpanishMessages = {
     "document.pdfReading.ocrEmpty": "No se reconoció texto. Comprueba que las páginas sean legibles y el idioma de origen.",
     "document.pdfReading.ocrIncomplete": "Quedan {count} páginas sin texto reconocido. Las demás se conservan. Comprueba el idioma y la calidad del escaneo y vuelve a intentarlo.",
     "document.pdfReading.sourceCharacterWarning": "El texto extraído de este PDF contiene caracteres no reconocidos. Revísalo comparándolo con el original.",
-    "document.pdfReading.ocrReview": "Superíndices o subíndices dudosos en {count} páginas. Revise las zonas marcadas del original.",
+    "document.pdfReading.ocrReview": "El texto reconocido en {count} páginas requiere revisión. Consulte las zonas marcadas del original.",
     "document.pdfReading.reviewOriginal": "Revisar original",
     "document.pdfReading.exportBilingualHint": "Original y traducción lado a lado",
     "document.pdfReading.waitingTranslation": "Esperando la traducción…",
@@ -595,7 +595,7 @@ export const pdfReadingRussianMessages = {
     "document.pdfReading.ocrEmpty": "Текст не распознан. Проверьте чёткость страниц и исходный язык.",
     "document.pdfReading.ocrIncomplete": "На {count} страницах текст не распознан. Остальные страницы сохранены. Проверьте исходный язык и качество скана, затем повторите попытку.",
     "document.pdfReading.sourceCharacterWarning": "В тексте, извлечённом из этого PDF, есть нераспознанные символы. Сверьте его с оригиналом.",
-    "document.pdfReading.ocrReview": "Неуверенно распознаны верхние или нижние индексы на {count} стр. Проверьте отмеченные области оригинала.",
+    "document.pdfReading.ocrReview": "Распознанный текст на {count} стр. требует проверки. Посмотрите отмеченные области оригинала.",
     "document.pdfReading.reviewOriginal": "Проверить оригинал",
     "document.pdfReading.exportBilingualHint": "Оригинал и перевод рядом",
     "document.pdfReading.waitingTranslation": "Ожидание перевода…",

@@ -156,6 +156,17 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(recognize.mock.calls.map(call => call[3])).toEqual([3, 11]);
     });
 
+    it('isolates a regional sparse document pass from whole-page cache and never repeats the same empty pass',async()=>{
+        recognize.mockResolvedValue(blockResult());
+        await recognizeImage('grid','en',undefined,{profile:'document'});
+        await recognizeImage('grid','en',undefined,{profile:'document',documentLayout:'sparse'});
+        await recognizeImage('grid','en',undefined,{profile:'document',documentLayout:'sparse'});
+        expect(recognize.mock.calls.map(call=>call[3])).toEqual([3,11]);
+        recognize.mockReset().mockResolvedValue({data:{blocks:[]}});
+        expect(await recognizeImage('empty-grid','en',undefined,{profile:'document',documentLayout:'sparse'})).toEqual([]);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
     it('preserves validated document row metrics across short ink boxes, scaling and cached copies', async () => {
         dimensions = {width: 4960, height: 7016};
         const line = {text: 'observations and conclusions.', bbox: {x0: 20, y0: 300, x1: 200, y1: 321},

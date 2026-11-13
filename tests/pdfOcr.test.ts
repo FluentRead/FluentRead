@@ -16,6 +16,62 @@ const pdf = (pages: PdfDocumentPage[], sources: string[] = []): ParsedDocument =
 const paragraph = (tag: string): PdfOcrLine[] => [0, 1, 2].map(row => ({text: `${tag} line ${row} is a complete recognised line of ordinary body text`, x: 60, y: 100 + row * 14, width: 440, height: 12}));
 
 describe('scanned PDF recognition', () => {
+    const tableGraphic=()=>({x:40,y:50,width:300,height:150,rules:[
+        ...[50,100,150,200].map(y=>({kind:'path' as const,x:40,y,width:300,height:0})),
+        ...[40,140,240,340].map(x=>({kind:'path' as const,x,y:50,width:0,height:150})),
+    ]});
+    const tableLine=(text:string,row:number,col:number):PdfOcrLine=>({text,x:50+col*100,y:70+row*50,width:40,height:10});
+    const initialTable=()=>[tableLine('Alpha',1,0),tableLine('128',1,1),tableLine('Gamma',2,0),tableLine('512',2,1)];
+    it('fills omitted table cells from a regional read, keeps prior readings and ignores pixels outside the region',async()=>{
+        const lines=initialTable(),before=structuredClone(lines);
+        const result=await recognizePdfDocument(pdf([page(1)]),async()=>({lines,graphics:[tableGraphic()],regions:[{graphicIndex:99},{graphicIndex:0,lines:[
+            tableLine('Group',0,0),tableLine('Count',0,1),tableLine('Rate',0,2),tableLine('Alpha',1,0),tableLine('128',1,1),tableLine('94%',1,2),tableLine('Gamma',2,0),tableLine('512',2,1),tableLine('98%',2,2),
+            {...tableLine('outside',0,0),x:900}, {...tableLine('',0,0),x:55,y:50}, {...tableLine('',0,0),x:35,width:10},
+        ]}]}));
+        expect(result.segments.map(segment=>segment.source)).toEqual(['Group','Count','Rate','Alpha','Gamma']);
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].ocrReviewRegions).toEqual([]);expect(lines).toEqual(before);
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].blocks.some(block=>block.source==='94%'&&block.preserveSource)).toBe(true);
+    });
+    it('keeps conflicting cell values and original spanning rows for review rather than duplicating or replacing them',async()=>{
+        const lines=initialTable();
+        const result=await recognizePdfDocument(pdf([page(1)]),async()=>({lines,graphics:[tableGraphic()],regions:[{graphicIndex:0,lines:[tableLine('Beta',1,0),tableLine('129',1,1),tableLine('Group',0,0)]}]}));
+        expect(result.segments.map(segment=>segment.source)).toContain('Alpha');expect(result.segments.map(segment=>segment.source)).not.toContain('Beta');
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].ocrReviewRegions).toEqual([{x:40,y:100,width:100,height:50},{x:140,y:100,width:100,height:50}]);
+        const spanning=await recognizePdfDocument(pdf([page(1)]),async()=>({lines:[...initialTable(),{...tableLine('Original spanning row',0,0),width:275}],graphics:[tableGraphic()],regions:[{graphicIndex:0,lines:[tableLine('Group',0,0),tableLine('Count',0,1),tableLine('Rate',0,2)]}]}));
+        expect(spanning.segments.map(segment=>segment.source)).toContain('Original spanning row');expect(spanning.segments.map(segment=>segment.source)).not.toContain('Group');
+        expect(spanning.binary?.kind==='pdf'&&spanning.binary.pages[0].ocrReviewRegions).toHaveLength(3);
+    });
+    it.each([undefined,[],[{text:'outside',x:900,y:0,width:20,height:10}]])('marks an unprocessed or empty confirmed table for review without discarding whole-page text (%#)',async regionLines=>{
+        const result=await recognizePdfDocument(pdf([page(1)]),async()=>({lines:initialTable(),graphics:[tableGraphic()],regions:[{graphicIndex:0,lines:regionLines}]}));
+        expect(result.segments.map(segment=>segment.source)).toEqual(['Alpha','Gamma']);
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].ocrReviewRegions).toEqual([{x:40,y:50,width:300,height:150}]);
+    });
+    it('does not promote chart labels into table content and retains equivalent multi-line cell readings',async()=>{
+        const graphic=tableGraphic();
+        const source=[tableLine('Chart label',0,0)];
+        const chart=await recognizePdfDocument(pdf([page(1)]),async()=>({lines:source,graphics:[graphic],regions:[{graphicIndex:0,lines:[tableLine('Invented cell',1,0)]}]}));
+        expect(chart.segments.some(segment=>segment.source.includes('Invented'))).toBe(false);
+        const lines=initialTable();lines[0]={...lines[0],text:'Alpha',width:30};lines.push({...tableLine('team',1,0),x:90,width:20});
+        const review={text:'',x:280,y:75,width:4,height:4,needsReview:true};
+        const result=await recognizePdfDocument(pdf([page(1)]),async()=>({lines,graphics:[graphic],regions:[{graphicIndex:0,lines:[
+            {...tableLine('Alpha',1,0),width:30},{...tableLine('team',1,0),x:90,width:20},review,
+            {...tableLine('boundary row',0,0),x:90,y:145,height:10},{...tableLine('boundary column',0,0),x:135,y:120,width:10},
+        ]}]}));
+        expect(result.segments.map(segment=>segment.source)).toContain('Alpha team');
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].ocrReviewRegions).toEqual([{x:280,y:75,width:4,height:4}]);
+    });
+    it('preserves detected diagram pixels while keeping its caption and surrounding prose translatable', async () => {
+        const source=pdf([page(1)]);
+        const result=await recognizePdfDocument(source,async()=>({graphics:[{x:40,y:50,width:260,height:100,rules:[]}],lines:[
+            {text:'Collect data',x:50,y:70,width:70,height:8},{text:'Analyze data',x:180,y:70,width:70,height:8},
+            {text:'Figure 1. The observed process.',x:40,y:160,width:250,height:10},...paragraph('Body').map(line=>({...line,y:line.y+200})),
+        ]}));
+        expect(result.segments.some(segment=>segment.source==='Collect data')).toBe(false);
+        expect(result.segments.some(segment=>segment.source.startsWith('Figure 1.'))).toBe(true);
+        expect(result.segments.some(segment=>segment.source.startsWith('Body'))).toBe(true);
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].preservedRegions?.[0].kind).toBe('figure');
+        expect(result.binary?.kind==='pdf'&&result.binary.pages[0].scanned).toBe(false);
+    });
     it('persists finite page-bounded review geometry independently from translatable text', async () => {
         const region = {text: '', x: 100, y: 50, width: 10, height: 8, needsReview: true};
         const source = pdf([page(1)]);

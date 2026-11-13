@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/ui/pdfPreview.ts
  * 文件职责：在浏览器 Canvas 环境中生成 PDF 预览和原版译页；显式重排导出按嵌入字体分页，仅公式图表编码为图像，由二进制服务绘制可复制文字。
- * 主要内容：共用 PDF.js 与有界单页 Canvas；扫描文档使用独立的 300 dpi、九百万像素渲染预算；导出每页一次像素读回，阅读器每个新段只读回包含取样边缘的局部快照；重排的光栅与文字导出共用原图旋转裁剪，复用保护筛选、表格裁剪和有界拟合，超长译文返回完整批注与逐行搜索层，缺字或离线时可用带相同 Unicode 文字层的有界光栅续页；下载分批绘制并优先 JPEG 编码，预览和重排图表使用 PNG；取消、失败与完成释放画布，租约隔离阅读器与导出，迟到加载不能复活已释放资源。
+ * 主要内容：共用 PDF.js 与有界单页 Canvas；扫描文档使用独立的 300 dpi、九百万像素渲染预算，并从有界缩略图中补足图形边界；导出每页一次像素读回，阅读器每个新段只读回包含取样边缘的局部快照；重排的光栅与文字导出共用原图旋转裁剪，复用保护筛选、表格裁剪和有界拟合，超长译文返回完整批注与逐行搜索层，缺字或离线时可用带相同 Unicode 文字层的有界光栅续页；下载分批绘制并优先 JPEG 编码，预览和重排图表使用 PNG；取消、失败与完成释放画布，租约隔离阅读器与导出，迟到加载不能复活已释放资源。
  * 模块边界：这里负责视觉光栅化而不决定片段翻译或文件结构；单元格与图文卡片沿用解析边界，PDF 文本块来自 binary 服务，静态地址来自 pdfResources，Canvas/PDF.js 仅在文档 UI 环境调用。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -24,6 +24,8 @@ import type {
 } from '@/src/features/document-translation/services/binary';
 import {paginatePdfReadingPlan, type PdfReadingRegionDraw} from '../core/pdfTextLayout';
 import {fitPdfBlockText, pdfOverlayBlocks} from '../core/pdfBlockFit';
+import {readPdfScanGraphics, cropPdfScanRegions, type PdfScanRegionImage} from './pdfScanPreview';
+import type {PdfScanGraphic} from '../core/pdfScanGraphics';
 
 export type {PdfPageRasterizer, PdfRasterPageInput};
 
@@ -496,13 +498,16 @@ export async function createPdfPagePreview(
     }
 }
 
-/** 以 300 dpi 渲染论文小字，限制九百万像素及 4096 长边；用完释放画布，只返回图像与像素尺寸。 */
-export async function renderPdfPageImage(bytes: Uint8Array, pageNumber: number, width: number, signal?: AbortSignal): Promise<{image: string; width: number; height: number}> {
+/** 以 300 dpi 渲染论文小字，限制九百万像素及 4096 长边；在有界缩略图上补图形边界，用完释放画布。 */
+export async function renderPdfPageImage(bytes: Uint8Array, pageNumber: number, width: number, signal?: AbortSignal): Promise<{image: string; width: number; height: number; graphics: PdfScanGraphic[]; regions: PdfScanRegionImage[]}> {
     const canvas = await renderPdfSourceCanvas(bytes, pageNumber, width, signal, true);
     try {
         // 渲染 Promise 结算后仍可能收到取消，避免继续同步编码数百万像素的过期页面。
         signal?.throwIfAborted();
-        return {image: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height};
+        const graphics = await readPdfScanGraphics(canvas, width, signal);
+        signal?.throwIfAborted();
+        const regions = cropPdfScanRegions(canvas, graphics, width, signal);
+        return {image: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height, graphics, regions};
     } finally {
         canvas.width = canvas.height = 0;
     }

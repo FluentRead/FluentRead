@@ -3,6 +3,7 @@ import {createPdfPagePreview, paintPdfTranslation, rasterizePdfReadingPages, ras
 import type {ParsedDocument} from '@/src/features/document-translation/core/document';
 
 const pdf = vi.hoisted(() => ({width: 600, height: 800, render: vi.fn(), cleanup: vi.fn()}));
+vi.mock('@/src/features/document-translation/ui/pdfScanPreview', () => ({readPdfScanGraphics: async () => [], cropPdfScanRegions: () => []}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({
     GlobalWorkerOptions: {},
     getDocument: () => ({promise: Promise.resolve({getPage: async () => ({

@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
+ * 竖排边界：合列保留各物理列框，坐标恢复同时缩放、去除边框并校验每个源框，防止清字误用整段包络擦掉列间画面。
  * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
  * 文档保真：允许文档适配器按原词对象显式保留有字形证据的数字候选，不抬高其原始置信度；适配器同时负责核对提示，普通图片调用维持原来的过滤策略。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
@@ -67,14 +68,17 @@ export function restoreOcrLineCoordinates(
     ocrHeight: number,
     padding = 0,
 ): OcrLine[] {
+    const restoreBox = (box: OcrLine['bbox']) => ({
+        x0: Math.max(0, Math.floor((box.x0 - padding) * sourceWidth / ocrWidth)),
+        y0: Math.max(0, Math.floor((box.y0 - padding) * sourceHeight / ocrHeight)),
+        x1: Math.min(sourceWidth, Math.ceil((box.x1 - padding) * sourceWidth / ocrWidth)),
+        y1: Math.min(sourceHeight, Math.ceil((box.y1 - padding) * sourceHeight / ocrHeight)),
+    });
     return lines.flatMap(line => {
-        const bbox = {
-            x0: Math.max(0, Math.floor((line.bbox.x0 - padding) * sourceWidth / ocrWidth)),
-            y0: Math.max(0, Math.floor((line.bbox.y0 - padding) * sourceHeight / ocrHeight)),
-            x1: Math.min(sourceWidth, Math.ceil((line.bbox.x1 - padding) * sourceWidth / ocrWidth)),
-            y1: Math.min(sourceHeight, Math.ceil((line.bbox.y1 - padding) * sourceHeight / ocrHeight)),
-        };
-        return isValidOcrBox(bbox) ? [{...line, bbox,
+        const bbox = restoreBox(line.bbox);
+        const sourceBoxes = line.sourceBoxes?.map(restoreBox).filter(isValidOcrBox);
+        return isValidOcrBox(bbox) && (!sourceBoxes || sourceBoxes.length > 0) ? [{...line, bbox,
+            ...(sourceBoxes ? {sourceBoxes} : {}),
             ...(line.baseline === undefined ? {} : {baseline: (line.baseline - padding) * sourceHeight / ocrHeight}),
             ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * sourceHeight / ocrHeight}),
         }] : [];
@@ -149,6 +153,7 @@ function joinVerticalColumns(members: OcrLine[]): OcrLine {
         text: ordered.map(line => line.text).reduce(joinOcrWords, ''),
         bbox: unionOcrBoxes(ordered.map(line => line.bbox)),
         vertical: true,
+        sourceBoxes: ordered.map(line => ({...line.bbox})),
     };
 }
 
@@ -516,7 +521,8 @@ export function normalizeOcrLineViews(blocks: OcrBlocks): {ordinary: OcrLine[]; 
     if(fast.noNumeric&&parsed.every(line=>!line.guardOnly)){
         const manga=finalizeOcrLines(parsed,true);
         // 非数字时两视图的合列和去重完全相同；逐行/框复制仍保证缓存调用者互不污染。
-        const ordinary=manga.map(({numericConfidence:_confidence,...line})=>({...line,bbox:{...line.bbox}}));
+        const ordinary=manga.map(({numericConfidence:_confidence,...line})=>({...line,bbox:{...line.bbox},
+            ...(line.sourceBoxes?{sourceBoxes:line.sourceBoxes.map(box=>({...box}))}:{})}));
         return {ordinary,manga};
     }
     // finalize 可能删除置信字段或替换框，因此普通视图必须拥有独立行对象。

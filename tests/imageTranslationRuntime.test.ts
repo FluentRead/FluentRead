@@ -1367,6 +1367,14 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(bitmap.parentElement!.style.top).toBe('10px');
         env.imageStyle.objectFit = 'none'; env.resizeObservers[0].callback([], {} as ResizeObserver); env.runFrames();
         expect(bitmap.style.objectFit).toBe('none'); expect(env.draw).toHaveBeenCalledOnce();
+        Object.assign(env.imageStyle,{clipPath:'inset(10% round 20px)',imageRendering:'pixelated'});
+        env.notify('style');env.runFrames();
+        expect(bitmap.style.clipPath).toBe('inset(10% round 20px)');
+        expect(bitmap.style.imageRendering).toBe('pixelated');
+        Object.assign(env.imageStyle,{clipPath:'none',imageRendering:'auto'});
+        env.notify('style');env.runFrames();
+        expect(bitmap.style.clipPath).toBe('none');
+        expect(client.translate).toHaveBeenCalledOnce();
     });
 
     it('祖先滚动裁切、隐藏、图片移除与卸载完整清理，未完成响应不能重新挂载', async () => {

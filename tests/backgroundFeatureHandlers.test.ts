@@ -1040,9 +1040,9 @@ describe('后台 feature handlers', () => {
             translations: ['译:first', '译:second', '译:third'],
         });
         expect(translateTexts.mock.calls.map(([request]) => request)).toEqual([
-            {origin: 'first', context: 'Page', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
-            {origin: 'second', context: 'Page', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
-            {origin: 'third', context: 'Page', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
+            {origin: 'first', context: 'Page\nOther text from the same image (reference only):\nsecond\nthird', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
+            {origin: 'second', context: 'Page\nOther text from the same image (reference only):\nfirst\nthird', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
+            {origin: 'third', context: 'Page\nOther text from the same image (reference only):\nfirst\nsecond', pageContext: '', useCache: true, serviceOverride: 'google', requestTimeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS},
         ].map(request => allowUnchangedTranslationResult(request)));
 
         translateTexts.mockReset()

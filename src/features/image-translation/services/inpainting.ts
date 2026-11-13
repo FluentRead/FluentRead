@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/inpainting.ts
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
- * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；无保护点分割蒙版的纯色边界仍省去队列；默认保留输入，也可显式复用调用方独占的像素缓冲。
+ * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；纯色边界省去队列，独立不透明矩形在完整边界符合平滑渐变时重建渐变，避免扩散造成条纹；默认保留输入，也可显式复用调用方独占的像素缓冲。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -162,6 +162,11 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
         return;
     }
 
+    // 只使用真实四边，且逐像素验证；边缘被裁切、透明孔、相接多框和纹理继续原来的扩散路径。
+    if (!protection && rectangles.length === 1 && bounds.left > 0 && bounds.top > 0
+        && bounds.right < imageWidth && bounds.bottom < imageHeight
+        && repairGradientRectangle(result, imageWidth, left, top, width, height)) return;
+
     const queue = new Uint32Array(maskedCount);
     let tail = 0;
     for (const rectangle of rectangles) {
@@ -258,6 +263,35 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
         }
     }
     if (protection && tail !== maskedCount) throw new ImageAlphaProtectionUnavailableError('透明保护区隔离了无法修补的原文字，已保留原图');
+}
+
+/** 四角确定双线性背景；完整外周任一 RGB 偏差超过量化误差即拒绝，不修改原像素。 */
+function repairGradientRectangle(pixels: Uint8ClampedArray, imageWidth: number,
+    left: number, top: number, width: number, height: number): boolean {
+    const offset = (x: number, y: number) => ((top + y) * imageWidth + left + x) * 4;
+    const corners = [offset(0, 0), offset(width - 1, 0), offset(0, height - 1), offset(width - 1, height - 1)];
+    if (corners.some(index => pixels[index + 3] !== 255)) return false;
+    const value = (x: number, y: number, channel: number) => {
+        const u = x / (width - 1), v = y / (height - 1);
+        return (pixels[corners[0] + channel] * (1 - u) + pixels[corners[1] + channel] * u) * (1 - v)
+            + (pixels[corners[2] + channel] * (1 - u) + pixels[corners[3] + channel] * u) * v;
+    };
+    const matches = (x: number, y: number) => {
+        const index = offset(x, y);
+        if (pixels[index + 3] !== 255) return false;
+        for (let channel = 0; channel < 3; channel++) {
+            if (Math.abs(pixels[index + channel] - value(x, y, channel)) > 1) return false;
+        }
+        return true;
+    };
+    for (let x = 0; x < width; x++) if (!matches(x, 0) || !matches(x, height - 1)) return false;
+    for (let y = 1; y < height - 1; y++) if (!matches(0, y) || !matches(width - 1, y)) return false;
+    for (let y = 1; y < height - 1; y++) for (let x = 1; x < width - 1; x++) {
+        const index = offset(x, y);
+        for (let channel = 0; channel < 3; channel++) pixels[index + channel] = Math.round(value(x, y, channel));
+        pixels[index + 3] = 255;
+    }
+    return true;
 }
 
 /** 并集的八邻域边界等于成员矩形一像素外周扣除并集；跳过重叠周、保留内孔，仅按周长检查相同 RGBA。 */

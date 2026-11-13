@@ -257,6 +257,16 @@ const expected = {
 } as const;
 
 describe('OCR dual views preserve the pre-optimization output', () => {
+  it('竖排合列的两视图与缩放输出不共享物理源框',()=>{
+    const input=blocks([vert('右列',box(54,20,68,80),99),vert('左列',box(28,20,42,80),99)]);
+    const views=normalizeOcrLineViews(input);
+    const before=structuredClone(views.manga);
+    const restored=restoreOcrLineCoordinates(views.ordinary,200,200,100,100);
+    restored[0].sourceBoxes![0].x0=-20;
+    expect(views.ordinary[0].sourceBoxes![0].x0).toBe(54);
+    views.ordinary[0].sourceBoxes![0].x0=-10;
+    expect(views.manga).toEqual(before);
+  });
   it('无数字合列快路径保持两视图、原始输入与返回框隔离',()=>{
     const input=[{paragraphs:[{lines:Array.from({length:1000},(_,i)=>{
       const bbox={x0:i*20,y0:0,x1:i*20+10,y1:15},text=i%2?'Hello':'你好';
@@ -289,11 +299,13 @@ describe('OCR dual views preserve the pre-optimization output', () => {
   it.each(Object.entries(fixtures))('%s retains both views, ordering and scaled boxes', (name, input) => {
     const expectedViews = expected[name as keyof typeof expected];
     const result = normalizeOcrLineViews(input);
-    expect(result.ordinary).toEqual(expectedViews.ordinary);
-    expect(result.manga).toEqual(expectedViews.manga);
-    expect(normalizeOcrLines(input)).toEqual(expectedViews.ordinary);
-    expect(normalizeOcrLines(input,true)).toEqual(expectedViews.manga);
-    expect(restoreOcrLineCoordinates(result.manga,300,300,150,150,3)).toEqual(expectedViews.scaled);
+    // 冻结的旧文字/坐标契约保持不变；新增物理源框由独立隔离与清字回归验证。
+    const legacy=(lines:ReturnType<typeof normalizeOcrLines>)=>lines.map(({sourceBoxes:_sourceBoxes,...line})=>line);
+    expect(legacy(result.ordinary)).toEqual(expectedViews.ordinary);
+    expect(legacy(result.manga)).toEqual(expectedViews.manga);
+    expect(legacy(normalizeOcrLines(input))).toEqual(expectedViews.ordinary);
+    expect(legacy(normalizeOcrLines(input,true))).toEqual(expectedViews.manga);
+    expect(legacy(restoreOcrLineCoordinates(result.manga,300,300,150,150,3))).toEqual(expectedViews.scaled);
   });
   it('keeps ordinary and manga bounding boxes independent in both directions', () => {
     const first = normalizeOcrLineViews(fixtures.horizontal_mixed);

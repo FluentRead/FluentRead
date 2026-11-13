@@ -196,6 +196,17 @@ const report = {site: liveSite ? 'live MANGA Plus' : 'controlled MANGA Plus read
     translation: liveTranslation ? `live ${translationService}` : 'deterministic Google text transport',
     imageTranslationService,
     ocr: ordinaryImageQuality ? 'real production PaddleOCR ordinary-image profile' : ['ru','ko'].includes(sourceLanguage) ? 'real production Tesseract with manga cleanup and typesetting' : 'real production PaddleOCR', qualityProfile, cases: [], screenshots: [], errors: [], hostErrors: [], pageErrors: [], consoleErrors: []};
+const javascriptFiles=[];
+function collectJavaScript(directory){
+    for(const entry of fs.readdirSync(directory,{withFileTypes:true})){
+        const file=path.join(directory,entry.name);
+        if(entry.isDirectory())collectJavaScript(file);else if(file.endsWith('.js'))javascriptFiles.push(file);
+    }
+}
+collectJavaScript(extensionDir);
+const javascriptHash=createHash('sha256');
+for(const file of javascriptFiles.sort())javascriptHash.update(path.relative(extensionDir,file)).update('\0').update(fs.readFileSync(file));
+report.javascriptAssetsSha256=javascriptHash.digest('hex');
 if(errorRecoveryTest){
     report.site=`controlled ${errorRecoverySurface} recovery fixture using production reader discovery`;
     report.errorRecovery={surface:errorRecoverySurface,fixtureUrl:targetUrl,sourceSelector:readerSelector,
@@ -678,13 +689,15 @@ async function toggle() {
         assert.ok(point.hit&&point.x>=0&&point.x<point.viewport.width&&point.y>=0&&point.y<point.viewport.height,'Ordinary action is visible and hit-testable');
         await page.mouse.click(point.x,point.y);return;
     }
-    const point=await ball(`const b=this.querySelector('.floating-ball-manga');if(!b)return null;const r=b.getBoundingClientRect(),clipped=getComputedStyle(b).clipPath!=='none',left=this.querySelector('.fr-floating-ball').dataset.position==='left';return {x:r.x+r.width*(clipped?(left ? .75 : .25):.5),y:r.y+r.height/2}`);
+    const point=await ball(`const b=this.querySelector('.floating-ball-manga');if(!b)return null;const r=b.getBoundingClientRect(),clipped=getComputedStyle(b).clipPath!=='none',left=this.querySelector('.fr-floating-ball').dataset.position==='left',x0=Math.max(0,r.left),x1=Math.min(innerWidth,r.right);return {x:x0+(x1-x0)*(clipped?(left ? .75 : .25):.5),y:(Math.max(0,r.top)+Math.min(innerHeight,r.bottom))/2}`);
     assert.ok(point,'Manga button exists');await page.mouse.move(point.x,point.y);
     await wait(async()=>await ball('return this.querySelector(".fr-floating-ball").classList.contains("floating-ball-expanded")'),3000);
     await page.waitForTimeout(500);
-    const expanded=await ball(`const r=this.querySelector('.floating-ball-manga').getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2}`);
-    await page.mouse.move(expanded.x,expanded.y);await page.waitForTimeout(150);
+    const expanded=await ball(`const b=this.querySelector('.floating-ball-manga'),r=b.getBoundingClientRect(),x=(Math.max(0,r.left)+Math.min(innerWidth,r.right))/2,y=(Math.max(0,r.top)+Math.min(innerHeight,r.bottom))/2,hit=this.elementFromPoint(x,y);return {x,y,hit:hit===b||b.contains(hit),pressed:b.getAttribute('aria-pressed'),rect:{left:r.left,top:r.top,right:r.right,bottom:r.bottom},viewport:{width:innerWidth,height:innerHeight}}`);
+    report.toggleInteractions??=[];report.toggleInteractions.push(expanded);
+    assert.ok(expanded.hit&&expanded.x>=0&&expanded.x<expanded.viewport.width&&expanded.y>=0&&expanded.y<expanded.viewport.height,'Expanded manga action is visible and hit-testable');
     await page.mouse.click(expanded.x,expanded.y);
+    await wait(async()=>await ball(`return this.querySelector('.floating-ball-manga')?.getAttribute('aria-pressed') === ${JSON.stringify(expanded.pressed === 'true' ? 'false' : 'true')}`),3000);
 }
 async function ops() {return worker.evaluate(()=>globalThis.__mangaTest.operations.length);}
 async function setInputFilesUsingLocalPaths(locator,ownerPage,files,browserContext) {

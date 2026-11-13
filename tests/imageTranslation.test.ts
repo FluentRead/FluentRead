@@ -230,7 +230,7 @@ describe('图片翻译 OCR 工具', () => {
         pixels[2] = 16;
 
         expect(getImageTextBackgroundColor(pixels, 3, 3, {x0: 1, y0: 1, x1: 2, y1: 2}))
-            .toBe('rgb(240,240,240)');
+            .toBe('rgb(245,245,245)');
         expect(getImageTextBackgroundColor(new Uint8ClampedArray(), 0, 0, {x0: 0, y0: 0, x1: 0, y1: 0}))
             .toBe('rgb(255,255,255)');
         expect(getImageTextColor('rgb(240,240,240)')).toBe('#111827');

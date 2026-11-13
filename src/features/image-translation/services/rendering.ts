@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，按实际回退字体的墨迹、描边和基线适配上下边界，保留正文对齐及字号上限并隔离 Canvas 状态。
+ * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，按实际回退字体的墨迹、描边和基线适配上下边界，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -23,7 +23,7 @@ export function getImageTextBackgroundColor(
     const y0 = Math.max(0, Math.min(imageHeight, Math.floor(bbox.y0)));
     const x1 = Math.max(x0, Math.min(imageWidth, Math.ceil(bbox.x1)));
     const y1 = Math.max(y0, Math.min(imageHeight, Math.ceil(bbox.y1)));
-    const colors = new Map<string, number>();
+    const colors = new Map<string, number[]>();
     const sample = (x: number, y: number) => {
         const offset = (y * imageWidth + x) * 4;
         if (pixels[offset + 3] < 128) return;
@@ -31,7 +31,9 @@ export function getImageTextBackgroundColor(
         const green = Math.min(255, Math.round(pixels[offset + 1] / 16) * 16);
         const blue = Math.min(255, Math.round(pixels[offset + 2] / 16) * 16);
         const key = `${red},${green},${blue}`;
-        colors.set(key, (colors.get(key) || 0) + 1);
+        const group = colors.get(key) ?? [0,0,0,0];
+        for (let channel = 0; channel < 3; channel++) group[channel] += pixels[offset + channel];
+        group[3]++; colors.set(key, group);
     };
     const left = Math.max(0, x0 - 4);
     const right = Math.min(imageWidth, x1 + 4);
@@ -47,10 +49,11 @@ export function getImageTextBackgroundColor(
     }
     let best = '255,255,255';
     let bestCount = 0;
-    colors.forEach((count, color) => {
-        if (count > bestCount) {
-            best = color;
-            bestCount = count;
+    colors.forEach(group => {
+        if (group[3] > bestCount) {
+            // 色阶只负责聚类；用实际样本均值填色，纯色图片不能凭空出现 8 级色差。
+            best = group.slice(0,3).map(value => Math.round(value / group[3])).join(',');
+            bestCount = group[3];
         }
     });
     return `rgb(${best})`;

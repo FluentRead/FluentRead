@@ -33,6 +33,8 @@ Single horizontal lines use both the source text's width and ink height to check
 
 On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.
 
+Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Uncertain mixed colors and textures keep their existing handling.
+
 Manga translations use the direction of their paragraph when measuring and drawing text. This helps keep numbers, brackets and punctuation in Arabic and Hebrew text from following an unrelated default canvas direction.
 
 Small Japanese reading annotations above horizontal text or to the right of vertical text are attached to the body when their size, position and ownership are clear. This avoids translating the reading as a separate text block. The body and annotation keep their original erasure bounds, with padding based on the annotation's own size. Ambiguous annotations, independent small text and already grouped recognition regions retain their existing handling.

@@ -138,6 +138,16 @@ beforeEach(() => {
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it('普通图渐变源色与描边沿用旧绘字框和清字框',async()=>{
+    const width=240,height=120,pixels=new Uint8ClampedArray(width*height*4),source={text:'SOURCE',bbox:{x0:40,y0:40,x1:160,y1:64}};
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([30+x*.2,40+y*.1,70,255],(y*width+x)*4);
+    for(let y=45;y<60;y++)for(let x=50;x<100;x++)pixels.set([245,245,250,255],(y*width+x)*4);
+    ordinaryAlphaCanvas(width,height,pixels);mocks.recognize.mockResolvedValueOnce([source]);
+    const result=await translateImageInOffscreen('gradient-style','en','Page');expect(result.image).toBeTruthy();
+    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['你好',38,36,124,32,'rgb(240,240,240)',28.799999999999997,'left',undefined,'rgb(245,245,250)','#111827']);
+    expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);
+});
+
 it.each(['clear','art','retained','retained-physical','far-retained','fits','wrap'] as const)('普通图源色与空白行高的实际编排：%s',async mode=>{
     const width=240,height=120,pixels=new Uint8ClampedArray(width*height*4).fill(255);
     for(let y=45;y<60;y++)for(let x=50;x<100;x++)pixels.set([25,48,75,255],(y*width+x)*4);
@@ -163,15 +173,19 @@ it.each(['clear','art','retained','retained-physical','far-retained','fits','wra
     expect(result.lines.find(line=>line.sourceText==='SOURCE')).not.toHaveProperty('renderSkipped');
 });
 
-it('竖排原色沿用居中和原有绘字范围，不借横排单行高度规则扩框',async()=>{
+it.each(['flat','gradient'] as const)('竖排原色沿用居中和原有绘字范围，不借横排单行高度规则扩框：%s',async background=>{
     const width=120,height=140,pixels=new Uint8ClampedArray(width*height*4).fill(255);
-    for(let y=35;y<80;y++)for(let x=45;x<60;x++)pixels.set([25,48,75,255],(y*width+x)*4);
+    if(background==='gradient')for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([30+x*.2,40+y*.1,70,255],(y*width+x)*4);
+    const ink=background==='gradient'?[245,245,250,255]:[25,48,75,255];
+    for(let y=35;y<80;y++)for(let x=45;x<60;x++)pixels.set(ink,(y*width+x)*4);
     const source={text:'風',bbox:{x0:40,y0:20,x1:64,y1:100},vertical:true as const},before=pixels.slice();
     ordinaryAlphaCanvas(width,height,pixels);mocks.recognize.mockResolvedValueOnce([source]);
     sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['风']}:undefined));
     const result=await translateImageInOffscreen('vertical-source-style','ja','Page');
     expect(result.image).toBeTruthy();expect(mocks.draw).toHaveBeenCalledOnce();
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['风',37,18,30,84,'rgb(255,255,255)',Infinity,'center',undefined,'rgb(25,48,75)']);
+    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(background==='gradient'
+        ?['风',37,18,30,84,'rgb(240,240,240)',Infinity,'center',undefined,'rgb(245,245,250)','#111827']
+        :['风',37,18,30,84,'rgb(255,255,255)',Infinity,'center',undefined,'rgb(25,48,75)']);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);expect(pixels).toEqual(before);
 });
 

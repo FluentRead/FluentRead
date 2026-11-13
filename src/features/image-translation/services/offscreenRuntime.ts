@@ -6,7 +6,7 @@
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
- * 字号尺度与原色：普通图先通过透明准入，再按原文单行校验字号、在原图中观察背景与字色；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。漫画修补前保存源色供后续绘制，不从修补结果反推样式。
+ * 字号尺度与原色：普通图先通过透明准入，再按原文单行校验字号、在原图中观察背景与字色；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。可确认的渐变字色只携带细对比描边，不借此扩框。漫画修补前保存源色供后续绘制，不从修补结果反推样式。
  * 空识别：普通图片仅在 OCR 真正返回空数组时使用轻量原图保留协议，不分配译图画布；非空结果经保护或置信过滤后不可读仍报错，漫画维持既有空页协议。
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
@@ -566,7 +566,7 @@ async function prepareTranslatedImage(
         const selected=candidates.filter(candidate=>!skipped.has(candidate.index));
         const baseBounds=new Map(lines.map(line=>[line,imageDrawBounds(line,canvas.width,canvas.height)]));
         const appearances=observeImageSourceAppearances(sourcePixels.data,canvas.width,canvas.height,selected.map(c=>c.original),line=>baseBounds.get(line)!);
-        const drawing=new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout;foreground?:string;background?:string}>();
+        const drawing=new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout;foreground?:string;background?:string;outline?:string}>();
         const expansionBudget={remaining:262_144};
         function* otherTextBoxes(owner:ImageTextRegion){
             for(const line of lines)if(line!==owner){
@@ -581,13 +581,13 @@ async function prepareTranslatedImage(
         for(const candidate of selected){
             const original=candidate.original,appearance=appearances.get(original),limit=fontLimits.get(candidate.translated)!;
             let bounds=baseBounds.get(original)!;
-            if(appearance&&!original.vertical&&!original.ruby?.length&&(!original.sourceBoxes||original.sourceBoxes.length===1)
+            if(appearance?.background&&!original.vertical&&!original.ruby?.length&&(!original.sourceBoxes||original.sourceBoxes.length===1)
                 &&limit!==(original.fontSize??original.bbox.y1-original.bbox.y0)*1.2){
                 const required=getImageSingleLineHeight(context,candidate.translated.text,bounds.x1-bounds.x0,limit);
                 if(required!==undefined&&required>bounds.y1-bounds.y0)bounds=expandImageTextBounds(sourcePixels.data,canvas.width,canvas.height,bounds,required,appearance,
                     otherTextBoxes(original),expansionBudget);
             }
-            baseBounds.set(original,bounds);drawing.set(candidate.translated,{bounds,...(appearance?{background:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance?.foreground?{foreground:appearance.foreground}:{})});
+            baseBounds.set(original,bounds);drawing.set(candidate.translated,{bounds,...(appearance?.background?{background:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance?.foreground?{foreground:appearance.foreground}:{}),...(appearance?.outline?{outline:appearance.outline}:{})});
         }
         if(protection){
             const budget={remaining:1_048_576};
@@ -620,7 +620,9 @@ async function prepareTranslatedImage(
         for(const line of renderedLines){
             throwIfImageOperationAborted(signal);
             const plan=line.drawing,bounds=plan.bounds;
-            if(plan.foreground)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+            if(plan.outline)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left',plan.prepared,plan.foreground,plan.outline);
+            else if(plan.foreground)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
                 line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left',plan.prepared,plan.foreground);
             else if(plan.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
                 line.backgroundColor,line.maxFontSize,line.vertical?'center':line.textAlign??'left',plan.prepared);

@@ -29,6 +29,16 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it('渐变只提供字色与细对比描边，不把原复杂背景降成纯色清字',()=>{
+        const pixels=new Uint8ClampedArray(W*H*4),r=region('SOURCE');
+        for(let y=0;y<H;y++)for(let x=0;x<W;x++)pixels.set([20+x*.15,30+y*.1,70,255],(y*W+x)*4);
+        for(let y=105;y<115;y++)for(let x=520;x<570;x++)pixels.set([245,245,250,255],(y*W+x)*4);
+        const sampled=sampleMangaBackgrounds(pixels,W,H,[r]);
+        expect(sampled[0]).toMatchObject({uniform:false,foreground:'rgb(245,245,250)',foregroundOutline:'#111827'});expect(sampled[0]).not.toHaveProperty('textBackground');
+        const c=context(),styles:unknown[]=[];c.fillText.mockImplementation((text,x,y)=>{styles.push([c.fillStyle,c.strokeStyle,c.lineWidth]);return {text,x,y,font:c.font};});
+        drawMangaTranslations(c as never,pixels,W,H,[r],true,sampled);
+        expect(c.fillRect).not.toHaveBeenCalled();expect(styles).toEqual([['rgb(245,245,250)','#111827',.7350000000000001]]);
+    });
     it.each([['(2.0) مرحبا بكم!','rtl'],['(42) שלום לכם!','rtl'],['(2.0) Hello world!','ltr']])('整段 %s 的度量和绘制不继承错误画布方向',(text,direction)=>{
         const c=context(),before=snapshot(c),measured:string[]=[],drawn:string[]=[],base=c.measureText.getMockImplementation()!;
         c.measureText.mockImplementation(value=>{measured.push(c.direction);return base(value);});

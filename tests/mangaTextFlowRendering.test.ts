@@ -84,4 +84,9 @@ describe('漫画绕孔位图与连续矩形编排',()=>{
         draw(context(),[region],protection(),[{uniform:false,color:'rgb(255,0,0)',foreground:'rgb(25,48,75)',textBackground:'rgb(255,255,255)'}]);
         expect(raster.mock.calls[0][3]).toEqual({fillStyle:'rgb(25,48,75)',strokeStyle:'rgb(255,255,255)'});
     });
+    it('渐变字色的细对比描边完整交给受审计的绕孔字形',()=>{
+        draw(context(),[region],protection(),[{uniform:false,color:'rgb(120,80,180)',foreground:'rgb(245,245,250)',foregroundOutline:'#111827'}]);
+        expect(raster.mock.calls[0][3]).toEqual({fillStyle:'rgb(245,245,250)',strokeStyle:'#111827'});
+        const ref=plan.mock.calls[0][1];expect(ref.lineWidth).toBeCloseTo(Math.max(.5,ref.fontSize*.035));
+    });
 });

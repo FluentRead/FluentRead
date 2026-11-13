@@ -3,7 +3,7 @@
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
  * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，估计不可靠时沿用原上限；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
- * 原色与余量：接收调用方已验证的前景色，并提供局部RGB对比度与单行实际高度度量；这些度量本身不授予新增像素或清字权限。
+ * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
@@ -68,6 +68,9 @@ function relativeLuminance(channels: readonly number[]): number {
     });
     return linear[0] * 0.2126 + linear[1] * 0.7152 + linear[2] * 0.0722;
 }
+
+/** 同一源色可预先计算亮度，避免渐变观察重复对前景执行幂运算。 */
+export {relativeLuminance as getImageRgbLuminance};
 
 /** 仅比较不透明 RGB 的相对亮度，不把这一个局部数值当作整页可访问性结论。 */
 export function getImageRgbContrast(foreground:readonly number[],background:readonly number[]):number {
@@ -340,6 +343,7 @@ export function drawTranslatedImageText(
     textAlign: 'left' | 'center' | 'right' = 'center',
     prepared?: ImageTranslationTextLayout,
     foregroundColor?: string,
+    outlineColor?: string,
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -385,8 +389,8 @@ export function drawTranslatedImageText(
         context.textAlign = layout.ink ? 'left' : textAlign;
         context.textBaseline = layout.ink ? 'alphabetic' : 'middle';
         context.fillStyle = foregroundColor ?? getImageTextColor(backgroundColor);
-        context.strokeStyle = backgroundColor;
-        context.lineWidth = Math.max(0.35, layout.fontSize * 0.06);
+        context.strokeStyle = outlineColor ?? backgroundColor;
+        context.lineWidth = Math.max(0.35, layout.fontSize * (outlineColor ? 0.025 : 0.06));
         context.lineJoin = 'round';
         const firstLine = textAlign === 'center'
             ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2

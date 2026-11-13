@@ -3132,6 +3132,71 @@ describe('translation candidate core', () => {
         expect(core.resolveAtPoint(document, 10, 20)).toBeNull();
     });
 
+    it.each(['content', 'all'] as const)('protects GitHub repository breadcrumb and author identities in %s scope', scope => {
+        // Public /Niko1221/Strata/pulls DOM observed on 2026-11-13; hashed classes are deliberately omitted.
+        const {document} = page(`
+            <header><nav data-component="Breadcrumbs" aria-label="Breadcrumbs"><ol>
+                <li><a id="owner" data-component="Breadcrumbs.Item" href="/Niko1221"><span>Niko1221</span></a></li>
+                <li><a id="repository" data-component="Breadcrumbs.Item" href="/Niko1221/Strata"><span>Strata</span></a></li>
+            </ol></nav><nav><a id="code" href="/Niko1221/Strata">Code</a><a id="pulls" href="/Niko1221/Strata/pulls">Pull requests</a></nav></header>
+            <main><h3><a id="title" data-testid="listitem-title-link" href="/Niko1221/Strata/pull/1">Improve the translation of repository discussions</a></h3>
+                <ul data-listview-component="items-list"><li id="identities"><a id="pr-author" data-testid="author-filter-link" href="/Niko1221/Strata/pulls?author=FixtureAuthor"><span>Fixture Author</span></a>
+                    <a id="profile-user" data-hovercard-type="user" href="/FixtureUser">Fixture User</a>
+                    <a id="profile-org" data-hovercard-type="organization" href="/FixtureOrg">Fixture Organization</a>
+                    <a id="profile-repo" data-hovercard-type="repository" href="/FixtureOrg/FixtureRepo">Fixture Repository</a>
+                    <a id="missing-href" data-hovercard-type="user">A readable example without a user destination</a></li></ul>
+                <article class="markdown-body"><p id="prose">A readable explanation links to <a id="reading-link" href="/Niko1221">the project author</a>.</p>
+                <p><a id="body-profile" data-hovercard-type="user" href="/Niko1221">An ordinary reading link inside the discussion</a></p>
+                <header><nav data-component="Breadcrumbs"><a id="example" data-component="Breadcrumbs.Item" href="/example">A breadcrumb example inside a discussion remains readable</a></nav></header></article>
+            </main>
+        `, 'https://github.com/Niko1221/Strata/pulls');
+        const core = createTranslationCore({url: new URL('https://github.com/Niko1221/Strata/pulls'), scope});
+        const before = new TranslationCandidateCore({url: core.url, scope,
+            adapters: core.adapters.filter(adapter => adapter.id !== 'github-repository-identity')});
+        expect(before.shouldStayOriginal(document.getElementById('owner')!)).toBe(false);
+        const header = document.querySelector<HTMLElement>('header')!;
+        const original = header.outerHTML;
+        const checkIdentity = (id: string) => {
+            const element = document.getElementById(id)!;
+            for (const target of [element, ...element.querySelectorAll('*')]) {
+                expect(core.shouldStayOriginal(target), id).toBe(true);
+                expect(core.shouldOmitFromTranslation(target), id).toBe(true);
+                expect(core.shouldIgnoreMutation(target), id).toBe(true);
+                expect(core.resolve(target.firstChild), id).toBeNull();
+            }
+            expect(core.discover(element), id).toEqual([]);
+        };
+        checkIdentity('owner');
+        checkIdentity('repository');
+        checkIdentity('pr-author');
+        const identities = document.querySelector<HTMLElement>('#identities')!;
+        const identitySnapshot = createTranslationSourceSnapshot(identities, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation);
+        expect(identitySnapshot.slots.map(slot => slot.source).join(' ')).not.toContain('Fixture Author');
+        for (const id of ['code', 'pulls', 'reading-link', 'profile-user', 'profile-org', 'profile-repo', 'body-profile', 'missing-href', 'example']) {
+            expect(core.shouldStayOriginal(document.getElementById(id)!), id).toBe(false);
+        }
+        for (const id of ['title', 'prose']) {
+            const element = document.getElementById(id)!;
+            expect(core.discover(document).some(candidate => candidate.element.contains(element)), id).toBe(true);
+            expect(core.resolve(element.firstChild)?.element.contains(element), id).toBe(true);
+        }
+        for (let pass = 0; pass < 2; pass += 1) {
+            const snapshot = createTranslationSourceSnapshot(header, core.shouldStayOriginal, undefined, undefined, core.shouldOmitFromTranslation);
+            const source = snapshot.slots.map(slot => slot.source).join(' ');
+            expect(source).not.toContain('Niko1221');
+            expect(source).not.toContain('Strata');
+            applyTranslationsToSnapshot(snapshot, snapshot.slots.map(() => '导航译文'));
+            expect(header.outerHTML).toBe(original);
+        }
+        header.querySelector('ol')!.insertAdjacentHTML('beforeend', '<li><a id="new-owner" data-component="Breadcrumbs.Item" href="/NewOwner"><span>New Owner</span></a></li>');
+        checkIdentity('new-owner');
+        document.querySelector('#repository span')!.textContent = 'AnotherRepository';
+        checkIdentity('repository');
+        expect(document.getElementById('repository')!.getAttribute('href')).toBe('/Niko1221/Strata');
+        const elsewhere = createTranslationCore({url: new URL('https://example.com/article'), scope});
+        expect(elsewhere.shouldStayOriginal(document.getElementById('owner')!)).toBe(false);
+    });
+
     it('translates GitHub PR titles instead of pruning repository-content', () => {
         const {document, core} = page(`
             <main id="repo-content-pjax-container" class="repository-content">

@@ -112,6 +112,22 @@
     ]
   },
   {
+    "id": "github-repository-identity",
+    "name": "GitHub 用户名与仓库名",
+    "allScopes": true,
+    "match": {"hosts": ["github.com"]},
+    "priority": 600,
+    "mode": "augment",
+    "watchIgnore": [
+      "header nav[data-component=\"Breadcrumbs\"] a[data-component=\"Breadcrumbs.Item\"][href]:not(.markdown-body):not(.markdown-body *)",
+      "main [data-listview-component=items-list] a[data-testid=author-filter-link][href]:not(.markdown-body *)"
+    ],
+    "omit": [
+      "header nav[data-component=\"Breadcrumbs\"] a[data-component=\"Breadcrumbs.Item\"][href]:not(.markdown-body):not(.markdown-body *)",
+      "main [data-listview-component=items-list] a[data-testid=author-filter-link][href]:not(.markdown-body *)"
+    ]
+  },
+  {
     "id": "github-code-lines",
     "name": "GitHub 代码行",
     "allScopes": true,

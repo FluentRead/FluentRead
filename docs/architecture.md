@@ -402,6 +402,8 @@ userscript 没有跨站点共享的原子后台，因此计数采用每个顶层
 
 本地翻译、TTS、Whisper 的 Worker 契约分别位于 `local-translation/workerProtocol.ts`、`local-tts/protocol.ts`、`video-subtitle/workerProtocol.ts`。拥有者和执行端共用请求、回复解析器，实际事件载荷从 `unknown` 开始，先校验请求编号并定位在途任务，再解析响应；非法或已结束的编号不关联请求，损坏的已知请求回包走拒绝和清理路径。契约模块不创建 Worker、不加载模型或拥有取消状态。可选诊断与语音时间标记沿用已有规范化规则，业务结果与生命周期继续由各自运行时处理。
 
+普通 Tesseract OCR 在自身串行队列内复用同一 Offscreen 推理预算，避免独立 Worker 绕过全局并发上限。可选图片文字分割只把本帧有界 RGBA 快照交给现有漫画 Worker；低通缩放和 12 MiB 张量构造都在该 Worker 中完成，离屏主线程不扫描浮点张量。原像素不转移所有权，继续用于原图保护、绘字与单次 CPU 重试；消息额外像素快照最多 64 MiB，返回的量化分割结果仍转移所有权。
+
 ## CSS 与 Vue
 
 - 全局颜色、间距、层级进入 `src/ui/styles/tokens.css`。

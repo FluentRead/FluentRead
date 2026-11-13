@@ -1,17 +1,18 @@
 /**
  * @file src/features/image-translation/services/mangaInferenceClient.ts
  * 文件职责：在 Offscreen 外部看守独立漫画推理 Worker，隔离 GPU 初始化挂起与原生推理阻塞。
- * 主要内容：串行请求和真实阶段转发；取消立即结束调用方等待，已开始的模型准备继续暖机、推理仅允许短暂收尾；错误与超时仍硬终止并仅重建一次 CPU Worker，复用共享并行预算；可选缓存分割先准备再按次构造并转移独占张量，CPU 重试重新取输入；分割端口独立三分钟空闲释放，旧消息不能影响新请求。
+ * 主要内容：串行请求和真实阶段转发；取消立即结束调用方等待，已开始的模型准备继续暖机、推理仅允许短暂收尾；错误与超时仍硬终止并仅重建一次 CPU Worker，复用共享并行预算；可选缓存分割先准备再按次借读有界 RGBA，由消息克隆快照，缩放与张量构造归 Worker；CPU 重试重新核对原图归属，分割端口独立三分钟空闲释放，旧消息不能影响新请求。
  * 后端选择：CPU 偏好从首次消息采用单线程 WASM 与 CPU 超时预算；偏好变化在串行边界重建 Worker，保留逻辑端口；仅记录当前阶段和最近成功会话的执行提供程序，不记录图片或文字。
  * 模块边界：不处理图片像素、不下载模型、不操作宿主页；静态 Worker 只读取同源缓存和包内代码。
  */
 import {withLocalInferenceBudget} from '@/src/shared/onnx/resources';
 import {withMangaModelAdmission} from './mangaOcrAssets';
 import type {MangaOcrPage} from './mangaBubbles';
+import {isImageTextSegmentationSource,type ImageTextSegmentationSource} from './imageTextSegmentation';
 export interface MangaPatch {image: Float32Array; mask: Float32Array; width: number; height: number}
 
 export type MangaInferenceProgress = (stage: 'preparing' | 'initializing' | 'recognizing', percent?: number) => void;
-export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; tensor?:Float32Array};
+export type MangaInferenceRequest = {type: 'prepare-ocr' | 'recognize' | 'prepare-inpaint' | 'inpaint' | 'dispose-ocr' | 'dispose-inpaint' | 'prepare-seg' | 'segment' | 'dispose-seg'; image?: string; patch?: MangaPatch;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true; source?:ImageTextSegmentationSource};
 export type MangaInferenceMessage = MangaInferenceRequest & {requestId: number; cpu: boolean};
 export interface MangaInferenceResponse {requestId: number; stage?: Parameters<MangaInferenceProgress>[0]; percent?: number; executionProviders?: Array<'webgpu' | 'wasm'>; success?: boolean; result?: MangaOcrPage | Float32Array | Uint8Array | boolean; error?: string; errorKind?:'protocol'|'execution'}
 export interface MangaInferenceDiagnostics {
@@ -136,11 +137,12 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
             current.onerror = event => { if (worker === current) finish(new Error(event.message || '漫画推理 Worker 已停止'), true); };
             signal?.addEventListener('abort', abort, {once: true});
             watch(message.type.startsWith('dispose') ? 10_000 : cpu || message.type.startsWith('prepare') ? 120_000 : 60_000);
-            try { const command={...message,requestId,cpu};if(message.type==='segment')current.postMessage(command,[message.tensor!.buffer as ArrayBuffer]);else current.postMessage(command); }
+            // RGBA 仍供原图保护和绘字使用；消息克隆快照，不能转移它的 buffer。
+            try { current.postMessage({...message,requestId,cpu}); }
             catch (error) { finish(error instanceof Error ? error : new Error(String(error)), true); }
         });
     }
-    function request<T>(message: MangaInferenceRequest, signal?: AbortSignal, progress?: MangaInferenceProgress,inputFactory?:()=>Float32Array): Promise<T> {
+    function request<T>(message: MangaInferenceRequest, signal?: AbortSignal, progress?: MangaInferenceProgress,inputFactory?:()=>ImageTextSegmentationSource): Promise<T> {
         const owner = generation;
         const result = tail.then(() => withLocalInferenceBudget(async () => {
             if(owner !== generation) throw new DOMException('漫画处理已取消','AbortError');
@@ -151,13 +153,13 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 if (segmented) ports.add('seg');
                 cpu = preference === 'cpu'; workerPreference = preference;
             }
-            // 工厂异常保持原对象，且不进入设备重试；排队取消/代次失效不会分配张量。
+            // 工厂异常保持原对象，且不进入设备重试；排队取消/代次失效不读取原图。
             const input=()=>{
                 if(!inputFactory)return message;
                 if(signal?.aborted)throw new DOMException('漫画处理已取消','AbortError');
-                const tensor=inputFactory();
-                if(!(tensor instanceof Float32Array)||tensor.length!==3*1024*1024||tensor.byteOffset!==0||!(tensor.buffer instanceof ArrayBuffer)||tensor.byteLength!==tensor.buffer.byteLength||!tensor.every(value=>Number.isFinite(value)&&value>=0&&value<=1))throw new MangaSegmentationProtocolError('图片分割输入无效');
-                return {...message,tensor};
+                const source=inputFactory();
+                if(!isImageTextSegmentationSource(source))throw new MangaSegmentationProtocolError('图片分割输入无效');
+                return {...message,source};
             };
             const initial=input();
             try { return await attempt<T>(initial, signal, progress); }
@@ -196,7 +198,7 @@ export function createMangaInferenceClient(createWorker: () => Worker) {
                 return ready;
             }finally{if(owner===generation)keepSegWarm();}
         },
-        async segmentText(inputFactory:()=>Float32Array,signal?:AbortSignal,progress?:MangaInferenceProgress):Promise<Uint8Array>{
+        async segmentText(inputFactory:()=>ImageTextSegmentationSource,signal?:AbortSignal,progress?:MangaInferenceProgress):Promise<Uint8Array>{
             clearSegIdle();
             if(!ports.has('seg'))throw new MangaSegmentationProtocolError('图片分割尚未准备');
             const owner=generation;

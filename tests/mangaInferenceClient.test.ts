@@ -6,6 +6,7 @@
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {MangaInferenceMessage, MangaInferenceResponse} from '@/src/features/image-translation/services/mangaInferenceClient';
+import type {ImageTextSegmentationSource} from '@/src/features/image-translation/services/imageTextSegmentation';
 
 type ClientModule = typeof import('@/src/features/image-translation/services/mangaInferenceClient');
 type Client = ReturnType<ClientModule['createMangaInferenceClient']>;
@@ -848,7 +849,7 @@ describe('漫画推理阶段超时契约', () => {
 async function prepareText(h:ReturnType<typeof harness>,ready=true){
     const pending=h.client.prepareTextSegmentation();await flush();h.workers.at(-1)!.emit({success:true,result:ready});await pending;
 }
-const inputText=()=>new Float32Array(3*1024*1024);
+const inputText=():ImageTextSegmentationSource=>({width:4,height:4,pixels:new Uint8ClampedArray(4*4*4)});
 const outputText=()=>new Uint8Array(1024*1024);
 
 describe('可选离线 CTD 客户端',()=>{
@@ -860,21 +861,26 @@ describe('可选离线 CTD 客户端',()=>{
         await expect(ready).resolves.toBe(false);await expect(h.client.segmentText(factory)).rejects.toThrow('尚未准备');
         expect(factory).not.toHaveBeenCalled();h.client.dispose();expect(vi.getTimerCount()).toBe(0);
     });
-    it('真实transfer使旧buffer detached，CPU一次重试重新调用工厂并转移另一完整buffer',async()=>{
-        const workers:ControlledWorker[]=[],transferred:Float32Array[]=[];
+    it('RGBA消息真实克隆快照而不detach原图，CPU一次重试重新核对归属并获得独立快照',async()=>{
+        const workers:ControlledWorker[]=[],snapshots:ImageTextSegmentationSource[]=[];
         const client=module.createMangaInferenceClient(()=>{
             const worker=new ControlledWorker();workers.push(worker);
             worker.postMessage.mockImplementation((message,transfer)=>{
-                if(transfer){const copy=structuredClone(message,{transfer});transferred.push(copy.tensor!);}
+                expect(transfer).toBeUndefined();
+                const copy=structuredClone(message);
+                if(copy.source)snapshots.push(copy.source);
             });return worker as unknown as Worker;
         });clients.push(client);
         let pending=client.prepareTextSegmentation();await flush();workers[0].emit({success:true,result:true});await pending;
-        const built:Float32Array[]=[],factory=vi.fn(()=>{const data=inputText();data[0]=.25;built.push(data);return data;});
+        const source=inputText();source.pixels[0]=64;const original=source.pixels.slice(),factory=vi.fn(()=>source);
         const result=client.segmentText(factory);await flush();
-        expect(built[0].byteLength).toBe(0);expect(transferred[0][0]).toBe(.25);
+        expect(source.pixels).toEqual(original);expect(snapshots[0].pixels[0]).toBe(64);
+        expect(snapshots[0].pixels.buffer).not.toBe(source.pixels.buffer);
+        snapshots[0].pixels[0]=128;expect(source.pixels[0]).toBe(64);
         workers[0].emit({success:false,error:'GPU native failure',errorKind:'execution'});await flush();
         expect(workers).toHaveLength(2);expect(workers[1].latest.cpu).toBe(true);expect(factory).toHaveBeenCalledTimes(2);
-        expect(built[1].byteLength).toBe(0);expect(transferred[1]).toHaveLength(3*1024*1024);expect(transferred[1][0]).toBe(.25);
+        expect(source.pixels).toEqual(original);expect(snapshots[1].pixels).toEqual(original);
+        expect(snapshots[1].pixels.buffer).not.toBe(snapshots[0].pixels.buffer);
         workers[1].emit({success:true,result:outputText()});await expect(result).resolves.toHaveLength(1024*1024);
         const release=client.release('seg');await flush();expect(workers[1].latest.type).toBe('dispose-seg');workers[1].emit();await release;
         expect(workers[1].terminate).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
@@ -887,18 +893,22 @@ describe('可选离线 CTD 客户端',()=>{
         await expect(result).resolves.toMatchObject({status:'rejected',reason:{name:'MangaSegmentationProtocolError',message:'invalid model SHA'}});
         expect(h.workers).toHaveLength(1);expect(h.workers[0].terminate).toHaveBeenCalledOnce();expect(factory).toHaveBeenCalledTimes(stage==='prepare'?0:1);
     });
-    it('工厂异常保持原对象且不重试，未转移input不终止已有OCR/seg会话',async()=>{
+    it('原图工厂异常保持原对象且不重试，不终止已有OCR/seg会话',async()=>{
         const h=harness();await prepareText(h);const failure=new Error('source owner vanished'),factory=vi.fn(()=>{throw failure;});
         await expect(h.client.segmentText(factory)).rejects.toBe(failure);expect(factory).toHaveBeenCalledOnce();
         expect(h.createWorker).toHaveBeenCalledOnce();expect(h.workers[0].postMessage).toHaveBeenCalledOnce();expect(h.workers[0].terminate).not.toHaveBeenCalled();
     });
-    it.each(['short','offset','shared','nan','negative','over','wrong'] as const)('%s工厂输出早拒，不发Worker或CPU重试',async fault=>{
-        const h=harness();await prepareText(h);let source:Float32Array=inputText();
-        if(fault==='short')source=new Float32Array(1);
-        if(fault==='offset')source=new Float32Array(new ArrayBuffer((3*1024*1024+1)*4),4);
-        if(fault==='shared')source=new Float32Array(new SharedArrayBuffer(source.byteLength));
-        if(fault==='nan')source[0]=NaN;if(fault==='negative')source[0]=-.1;if(fault==='over')source[0]=1.1;
-        if(fault==='wrong')source={} as Float32Array;
+    it.each(['short','offset','shared','nan','negative','over','wrong','hidden','type','fraction','area','absent'] as const)('%s原图早拒，不发Worker或CPU重试',async fault=>{
+        const h=harness();await prepareText(h);let source:ImageTextSegmentationSource=inputText();
+        if(fault==='short')source.pixels=new Uint8ClampedArray(1);
+        if(fault==='offset')source.pixels=new Uint8ClampedArray(new ArrayBuffer(65),1);
+        if(fault==='shared')source.pixels=new Uint8ClampedArray(new SharedArrayBuffer(64));
+        if(fault==='nan')source.width=NaN;if(fault==='negative')source.height=-1;if(fault==='over')source.width=8193;
+        if(fault==='wrong')source={} as ImageTextSegmentationSource;
+        if(fault==='hidden')source.pixels=new Uint8ClampedArray(new ArrayBuffer(65),0,64);
+        if(fault==='type')source.pixels=new Uint8Array(64) as unknown as Uint8ClampedArray;
+        if(fault==='fraction')source.height=4.5;if(fault==='area'){source.width=8192;source.height=8192;}
+        if(fault==='absent')source=undefined as unknown as ImageTextSegmentationSource;
         await expect(h.client.segmentText(()=>source)).rejects.toBeInstanceOf(module.MangaSegmentationProtocolError);
         expect(h.workers[0].postMessage).toHaveBeenCalledOnce();expect(h.createWorker).toHaveBeenCalledOnce();
     });

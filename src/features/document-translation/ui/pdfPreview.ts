@@ -40,7 +40,7 @@ function median(values: number[]): number {
     return sorted.length % 2 === 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle];
 }
 
-function canvasToImageBytes(canvas: HTMLCanvasElement, signal?: AbortSignal, format: 'png' | 'jpeg' = 'png'): Promise<Uint8Array> {
+export function canvasToImageBytes(canvas: HTMLCanvasElement, signal?: AbortSignal, format: 'png' | 'jpeg' = 'png'): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
         let finished = false;
         const finish = (error: unknown, bytes?: Uint8Array) => {
@@ -157,7 +157,7 @@ function awaitPdfTask<T>(promise: Promise<T>, signal: AbortSignal, releaseLateVa
     });
 }
 
-async function renderPdfSourceCanvas(bytes: Uint8Array, pageNumber: number, width: number, signal?: AbortSignal, forOcr = false): Promise<HTMLCanvasElement> {
+export async function renderPdfSourceCanvas(bytes: Uint8Array, pageNumber: number, width: number, signal?: AbortSignal, forOcr = false): Promise<HTMLCanvasElement> {
     if (typeof globalThis.document === 'undefined' || typeof globalThis.window === 'undefined') {
         throw new Error('当前环境无法渲染 PDF 页面，请在浏览器扩展中打开');
     }

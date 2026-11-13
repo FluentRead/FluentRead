@@ -79,11 +79,11 @@ export async function createDocumentDownload(
  * 识别引擎体积较大，只在真正需要识别时才载入。
  */
 export function createPdfPageRecognizer(sourceLanguage: string): (input: PdfPageRecognitionInput) => Promise<PdfPageRecognition> {
-    return async ({bytes, pageNumber, width, height, signal}) => {
+    return async ({bytes, pageNumber, width, height, signal, useCache}) => {
         const rendered = await renderPdfPageImage(bytes, pageNumber, width, signal);
         const {recognizeImageText} = await import('@/src/features/image-translation/ocr');
         signal?.throwIfAborted();
-        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal, {profile: 'document'});
+        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal, {profile: 'document', ...(useCache === false ? {useCache: false} : {})});
         const scaleX = width / rendered.width, scaleY = height / rendered.height;
         const toPage = <T extends {x: number; y: number; width: number; height: number}>(box: T): T => ({...box,
             x: box.x * scaleX, y: box.y * scaleY, width: box.width * scaleX, height: box.height * scaleY});
@@ -95,7 +95,7 @@ export function createPdfPageRecognizer(sourceLanguage: string): (input: PdfPage
         const regions: PdfRegionRecognition[] = [];
         for (const region of rendered.regions) {
             signal?.throwIfAborted();
-            const recognized = region.image ? await recognizeImageText(region.image, sourceLanguage, signal, {profile:'document',documentLayout:'sparse'}) : undefined;
+            const recognized = region.image ? await recognizeImageText(region.image, sourceLanguage, signal, {profile:'document',documentLayout:'sparse', ...(useCache === false ? {useCache: false} : {})}) : undefined;
             signal?.throwIfAborted();
             regions.push({graphicIndex:region.graphicIndex,...(recognized ? {lines:mapLines(recognized,region.x,region.y)} : {})});
         }

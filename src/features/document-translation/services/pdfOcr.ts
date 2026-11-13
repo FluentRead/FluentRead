@@ -11,13 +11,15 @@ import {pdfScanLayoutGraphics, type PdfScanGraphic} from '../core/pdfScanGraphic
 
 /** 一行识别出的文字及其在页面上的位置（PDF 点，原点在页面左上角）。 */
 export interface PdfOcrLine {text: string; x: number; y: number; width: number; height: number; baseline?: number; fontSize?: number; needsReview?: boolean}
-export interface PdfPageRecognitionInput {bytes: Uint8Array; pageNumber: number; width: number; height: number; signal?: AbortSignal}
+export interface PdfPageRecognitionInput {bytes: Uint8Array; pageNumber: number; width: number; height: number; signal?: AbortSignal; useCache?: boolean}
 export interface PdfRegionRecognition {graphicIndex: number; lines?: readonly PdfOcrLine[]}
 export interface PdfPageRecognition {lines: readonly PdfOcrLine[]; graphics: readonly PdfScanGraphic[]; regions?: readonly PdfRegionRecognition[]}
 /** 纯文字识别端口仍可返回行数组；扫描页适配器同时提交同一原图的图形边界。 */
 export type PdfPageRecognizer = (input: PdfPageRecognitionInput) => Promise<readonly PdfOcrLine[] | PdfPageRecognition>;
 export interface RecognizePdfOptions {
     signal?: AbortSignal;
+    /** 用户显式重新识别的页下标；只处理这些页，空结果、取消或失败不覆盖已有内容。 */
+    pageIndexes?: readonly number[];
     /** 希望先识别的页（从 0 开始），例如正在阅读的那一页；其余页按原顺序接在后面。 */
     startPage?: number;
     onProgress?: (progress: {completed: number; total: number}) => void;
@@ -135,7 +137,9 @@ function mergeRegionLines(recognition: PdfPageRecognition, width: number, height
  * 逐页识别扫描页并返回带有新片段的文档；原文档对象保持不变。没有需要识别的页时原样返回。
  */
 export async function recognizePdfDocument(document: ParsedDocument, recognize: PdfPageRecognizer, options: RecognizePdfOptions = {}): Promise<ParsedDocument> {
-    const pending = pdfPagesNeedingOcr(document);
+    const pageCount = document.binary?.kind === 'pdf' ? document.binary.pages.length : 0;
+    const pending = options.pageIndexes === undefined ? pdfPagesNeedingOcr(document)
+        : [...new Set(options.pageIndexes)].filter(index => Number.isInteger(index) && index >= 0 && index < pageCount).sort((a, b) => a - b);
     if (document.binary?.kind !== 'pdf' || !pending.length) return document;
     const binary = document.binary;
     const start = pending.findIndex(index => index >= (options.startPage ?? 0));
@@ -146,7 +150,7 @@ export async function recognizePdfDocument(document: ParsedDocument, recognize: 
     for (const [attempt, index] of order.entries()) {
         options.signal?.throwIfAborted();
         const page = binary.pages[index];
-        const recognition = await recognize({bytes: binary.bytes, pageNumber: page.pageNumber, width: page.width, height: page.height, signal: options.signal});
+        const recognition = await recognize({bytes: binary.bytes, pageNumber: page.pageNumber, width: page.width, height: page.height, signal: options.signal, ...(options.pageIndexes === undefined ? {} : {useCache: false})});
         options.signal?.throwIfAborted();
         const lines = 'lines' in recognition ? mergeRegionLines(recognition, page.width, page.height) : recognition;
         const atoms = ocrAtoms(lines, page.width, page.height);

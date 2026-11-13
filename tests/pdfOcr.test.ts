@@ -16,6 +16,19 @@ const pdf = (pages: PdfDocumentPage[], sources: string[] = []): ParsedDocument =
 const paragraph = (tag: string): PdfOcrLine[] => [0, 1, 2].map(row => ({text: `${tag} line ${row} is a complete recognised line of ordinary body text`, x: 60, y: 100 + row * 14, width: 440, height: 12}));
 
 describe('scanned PDF recognition', () => {
+    it('uses only explicit page indexes, deduplicates valid selections and allows replacing native or previously recognized text', async () => {
+        const source=pdf([page(1,[block(0)]),page(2,[block(1)],{ocrRecognized:true}),page(3)],['Native','Old OCR']);
+        const read=vi.fn(async({pageNumber}:{pageNumber:number})=>paragraph(`Page${pageNumber}`));
+        const result=await recognizePdfDocument(source,read,{pageIndexes:[1,-1,1,4,1.5,NaN,0],startPage:1});
+        expect(read.mock.calls.map(([input])=>input.pageNumber)).toEqual([2,1]);
+        expect(read.mock.calls.every(([input])=>(input as any).useCache===false)).toBe(true);
+        expect(result.segments.map(s=>s.source.split(' ')[0])).toEqual(['Page1','Page2']);
+        expect(pdfPagesNeedingOcr(result)).toEqual([2]);expect(source.segments.map(s=>s.source)).toEqual(['Native','Old OCR']);
+        expect(await recognizePdfDocument(source,read,{pageIndexes:[]})).toBe(source);
+        expect(await recognizePdfDocument({...source,binary:undefined},read,{pageIndexes:[0]})).toMatchObject({binary:undefined});
+        expect(await recognizePdfDocument(source,async()=>[],{pageIndexes:[0]})).toBe(source);
+    });
+
     const tableGraphic=()=>({x:40,y:50,width:300,height:150,rules:[
         ...[50,100,150,200].map(y=>({kind:'path' as const,x:40,y,width:300,height:0})),
         ...[40,140,240,340].map(x=>({kind:'path' as const,x,y:50,width:0,height:150})),

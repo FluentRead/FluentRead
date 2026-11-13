@@ -482,6 +482,8 @@
       "tests/documentHistory.test.ts",
       "tests/richPreviewSync.test.ts",
       "tests/pdfOcr.test.ts",
+      "tests/pdfSourceEdits.test.ts",
+      "tests/pdfSourcePreview.test.ts",
       "tests/documentHtmlInline.test.ts",
       "tests/documentMarkdownSentences.test.ts",
       "tests/documentLiteralProtection.test.ts",

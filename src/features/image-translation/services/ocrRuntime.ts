@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
- * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
+ * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口；显式重新识别跳过已完成缓存及在途合并，并保留独立取消身份。
  * 文档源文保真：低置信度数字词在字形和出现位置完整对应时保留原读数，并附原页核对框；列表圆点须经重复缩进与原像素确认，再独立交给 PDF 段落分析；两者都复用按需解码源，未确认候选不缓存为可靠结果。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
@@ -63,7 +63,7 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
 const MAX_CACHED_OCR_IMAGES = 3;
 const MAX_CACHED_OCR_BYTES = 12 * 1024 * 1024;
 const OCR_IMAGE_DECODE_TIMEOUT_MS = 15_000;
-export type OcrRecognitionOptions = {profile?: 'image' | 'area' | 'document'; documentLayout?: 'auto' | 'sparse'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
+export type OcrRecognitionOptions = {useCache?: boolean; profile?: 'image' | 'area' | 'document'; documentLayout?: 'auto' | 'sparse'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
 type RecognitionViews = {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]};
 const sharedRecognition = createSharedOcrTasks<RecognitionViews>();
 const completedRecognitionCache = new Map<string, {views: RecognitionViews; bytes: number}>();
@@ -136,6 +136,7 @@ async function readDocumentLines(image: string, result: TesseractRecognitionResu
     }
 }
 let cachedRecognitionBytes = 0;
+let uncachedRecognitionSequence = 0;
 
 function abortRecognition(): Error {
     const error = new Error('图片 OCR 请求已取消');
@@ -276,14 +277,16 @@ export async function recognizeImage(
     const profile = options.profile ?? 'image';
     const layoutMode = profile === 'document' ? options.documentLayout === 'sparse' ? PSM.SPARSE_TEXT : PSM.AUTO : models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
     const cacheKey = `${profile}${profile === 'document' ? `:${layoutMode}` : ''}\0${languages}\0${image}`;
-    const cached = completedRecognitionCache.get(cacheKey);
+    const cached = options.useCache === false ? undefined : completedRecognitionCache.get(cacheKey);
     if (cached) {
         completedRecognitionCache.delete(cacheKey);
         completedRecognitionCache.set(cacheKey, cached);
         return copyOcrLines(options.includeMangaNumericConfidence ? cached.views.manga : cached.views.ordinary, options.includeMangaNumericConfidence === true);
     }
 
-    const views = await sharedRecognition.run(cacheKey, async (signal, onProgress) => {
+    // 显式重识别拥有独立操作身份，不复用缓存或同图在途任务，也不覆盖正在使用的普通缓存。
+    const operationKey = options.useCache === false ? `${cacheKey}\0fresh:${++uncachedRecognitionSequence}` : cacheKey;
+    const views = await sharedRecognition.run(operationKey, async (signal, onProgress) => {
         const {recognitionImage, sourceWidth, sourceHeight, size} = await prepareOcrImage(image, profile, signal, options.decodedImage);
         if (signal?.aborted) throw abortRecognition();
         const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, layoutMode, onProgress);
@@ -307,7 +310,7 @@ export async function recognizeImage(
             if(views.manga.filter(line=>line.guardOnly).length>4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
         }
         // 空结果不是稳定成功；用户重试时应重新识别，避免暂时失败被负缓存永久复用。
-        if (views.ordinary.some(line => line.text.trim()) && !views.ordinary.some(line => line.documentReview)) cacheRecognition(cacheKey, views);
+        if (options.useCache !== false && views.ordinary.some(line => line.text.trim()) && !views.ordinary.some(line => line.documentReview)) cacheRecognition(cacheKey, views);
         return views;
     }, signal, options.onProgress);
     return copyOcrLines(options.includeMangaNumericConfidence ? views.manga : views.ordinary, options.includeMangaNumericConfidence === true);

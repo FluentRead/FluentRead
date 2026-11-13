@@ -76,6 +76,11 @@ describe('scanned PDF page recogniser', () => {
         expect(mocks.recognize).toHaveBeenLastCalledWith('crop','en',undefined,{profile:'document',documentLayout:'sparse'});
         expect(result.regions).toEqual([{graphicIndex:0,lines:[{text:'Cell',x:55,y:110,width:30,height:10,baseline:117.5,fontSize:10}]},{graphicIndex:1}]);
     });
+    it('bypasses completed and in-flight OCR reuse for both the current page and its table crops',async()=>{
+        mocks.render.mockResolvedValue({image:'full',width:600,height:800,graphics:[],regions:[{graphicIndex:0,image:'crop',x:0,y:0}]});mocks.recognize.mockResolvedValue([]);
+        await createPdfPageRecognizer('en')({bytes:new Uint8Array([1]),pageNumber:1,width:600,height:800,useCache:false});
+        expect(mocks.recognize.mock.calls.map(call=>call[3])).toEqual([{profile:'document',useCache:false},{profile:'document',documentLayout:'sparse',useCache:false}]);
+    });
     it('rejects a late cancelled regional result instead of publishing a partial page',async()=>{
         const controller=new AbortController();
         mocks.render.mockResolvedValue({image:'full',width:600,height:800,graphics:[],regions:[{graphicIndex:0,image:'crop',x:0,y:0}]});

@@ -115,6 +115,8 @@ export interface PdfDocumentBlock {
     /** 图文卡片底框约束译文和遮罩范围；原文字形位置仍来自 lines。 */
     panelBounds?: Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
     lines?: PdfDocumentLine[];
+    /** 用户逐行核对后的原文；备份最近一次未校订的识别文字、行位置及核对框，供显式撤销。 */
+    sourceCorrection?: {source: string; lines: PdfDocumentLine[]; reviewRegions: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>};
 }
 
 export interface PdfDocumentPage {

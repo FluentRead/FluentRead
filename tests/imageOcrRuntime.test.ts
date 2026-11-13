@@ -237,6 +237,20 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(canvas.width).toBe(0);
     });
 
+
+    it('re-recognizes cached pages independently and does not join another pending read',async()=>{
+        recognize.mockResolvedValue(blockResult());
+        await recognizeImage('explicit-page','en',undefined,{profile:'document'});
+        await recognizeImage('explicit-page','en',undefined,{profile:'document',useCache:false});
+        expect(recognize).toHaveBeenCalledTimes(2);
+        let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+        recognize.mockImplementation(async()=>{await gate;return blockResult();});
+        const normal=recognizeImage('pending-page','en',undefined,{profile:'document'});
+        await vi.waitFor(()=>expect(recognize).toHaveBeenCalledTimes(3));
+        const fresh=recognizeImage('pending-page','en',undefined,{profile:'document',useCache:false});
+        await vi.waitFor(()=>expect(recognize).toHaveBeenCalledTimes(4));release();await Promise.all([normal,fresh]);
+        await recognizeImage('explicit-page','en',undefined,{profile:'document'});expect(recognize).toHaveBeenCalledTimes(4);
+    });
     it('retries an empty document once with sparse layout, never single-block column concatenation', async () => {
         recognize.mockResolvedValueOnce({data: {blocks: []}}).mockResolvedValueOnce(blockResult());
         expect(await recognizeImage('sparse-paper', 'en', undefined, {profile: 'document'})).toHaveLength(1);

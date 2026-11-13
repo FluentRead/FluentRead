@@ -18,8 +18,8 @@
       <template v-if="retainedOpen">
         <p class="editor-note">{{ t('document.retainedRevisions.hint') }}</p>
         <article v-for="(revision, index) in retainedRevisions.slice(0, retainedLimit)" :key="index" class="segment-edit-row">
-          <div class="segment-position"><span data-i18n-ignore>{{ revision.contextLabel }}</span></div>
-          <div class="segment-edit-columns"><div><span class="segment-column-label">原文</span><p dir="auto" class="document-source" data-i18n-ignore>{{ revision.source }}</p></div><div><span class="segment-column-label">{{ t('document.retainedRevisions.revision') }}</span><p dir="auto" class="document-translation" data-i18n-ignore>{{ revision.translation }}</p></div></div>
+          <div class="segment-position"><span v-if="revision.pageNumber && revision.blockNumber">{{ t('document.sourceEdit.location', {page: revision.pageNumber, block: revision.blockNumber}) }}</span><span data-i18n-ignore>{{ revision.contextLabel }}</span></div>
+          <div class="segment-edit-columns"><div><span class="segment-column-label">{{ revision.kind === 'source' ? t('document.sourceEdit.sourceRevision') : translateLegacy('原文') }}</span><p dir="auto" class="document-source" data-i18n-ignore>{{ revision.source }}</p></div><div v-if="revision.translation"><span class="segment-column-label">{{ t('document.retainedRevisions.revision') }}</span><p dir="auto" class="document-translation" data-i18n-ignore>{{ revision.translation }}</p></div></div>
         </article>
         <button v-if="retainedLimit < retainedRevisions.length" type="button" class="ghost-button" @click="retainedLimit += 40">{{ translateLegacy('显示更多') }}</button>
       </template>
@@ -28,7 +28,7 @@
     <article v-for="segment in visibleSegments" :key="segment.id" class="segment-edit-row" :data-segment-id="segment.id">
       <div class="segment-position"><strong>#{{ segment.id + 1 }}</strong><span data-i18n-ignore>{{ generatedPositionLabels.get(segment.id) || segment.pathLabel || segment.contextLabel || (segment.timeStart ? `${segment.timeStart} → ${segment.timeEnd}` : translateLegacy('正文')) }}</span><small :class="{ pending: !translations[segment.id]?.trim() }">{{ translations[segment.id]?.trim() ? '已有译文' : '未翻译' }}</small></div>
       <div class="segment-edit-columns">
-        <div><span class="segment-column-label">原文</span><p dir="auto" class="document-source" data-i18n-ignore>{{ sourceText(segment) }}</p></div>
+        <div><span class="segment-column-label">原文</span><p dir="auto" class="document-source" data-i18n-ignore>{{ sourceText(segment) }}</p><button v-if="editableSourceIds.has(segment.id)" type="button" class="ghost-button" :disabled="disabled" @click="emit('source-edit', segment.id)">{{ t('document.sourceEdit.open') }}</button></div>
         <label v-if="!translations[segment.id]?.trim() || hasDistinctTranslation(sourceText(segment), formatDocumentReaderText(document.format, translations[segment.id])) || editingSameId === segment.id"><span class="segment-column-label">译文</span><textarea dir="auto" class="document-translation" :value="translations[segment.id] || ''" :aria-label="t('document.segmentTranslation', {number: segment.id + 1})" :disabled="disabled" @focus="editingId = segment.id" @blur="editingId = null" :rows="Math.min(12, Math.max(3, Math.ceil((translations[segment.id]?.length || segment.source.length) / 55)))" placeholder="译文会出现在这里，也可以手动填写" @input="emit('update', segment.id, ($event.target as HTMLTextAreaElement).value)" /><small v-if="hasDocumentPlaceholder(translations[segment.id])" class="segment-placeholder-hint">{{ translateLegacy('<g1>…</g1> 这类标记对应原文里的链接、加粗等格式，保留它们，译文才带有这些格式。') }}</small></label>
         <button v-else type="button" :disabled="disabled" @click="editingSameId = segment.id">{{ translateLegacy('校订译文') }}</button>
       </div>
@@ -51,7 +51,10 @@ import {computed, ref, watch} from 'vue';
 import {documentSegmentMarkupSources, formatDocumentReaderText, hasDocumentPlaceholder, type DocumentSegment, type DocumentRetainedRevision, type ParsedDocument} from '@/src/features/document-translation/public';
 import {getDocumentGeneratedPositionLabels} from '@/src/features/document-translation/ui/presentation';
 const props = defineProps<{document: ParsedDocument; translations: string[]; retainedRevisions?: DocumentRetainedRevision[]; disabled: boolean}>();
-const emit = defineEmits<{update: [index: number, value: string]}>();
+const emit = defineEmits<{update: [index: number, value: string]; 'source-edit': [index: number]}>();
+const editableSourceIds = computed(() => new Set(props.document.binary?.kind === 'pdf' ? props.document.binary.pages
+  .filter(page => !page.scanned && (page.ocrRecognized || page.ocrReviewRegions !== undefined))
+  .flatMap(page => page.blocks.filter(block => block.segmentIndex >= 0 && block.lines?.length).map(block => block.segmentIndex)) : []));
 // 整句送翻的片段，原文列显示替换成占位符之前的文字。
 const markupSources = computed(() => documentSegmentMarkupSources(props.document));
 const generatedPositionLabels = computed(() => getDocumentGeneratedPositionLabels(props.document, page => t('document.pageNumber', {page}), translateLegacy));

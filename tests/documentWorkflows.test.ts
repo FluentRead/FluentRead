@@ -351,6 +351,12 @@ describe('document recognition workflow ownership', () => {
         const options = {sourceLanguage: 'en', startPage: 2, signal: parent.signal, isCurrent: () => current};
         return {ports, workflow, parent, options, supersede: () => {current = false;}};
     }
+
+    it('copies explicitly selected pages before passing them to the OCR operation',async()=>{
+        const f=fixture(),indexes=[1,3];await f.workflow.recognize(document(),{...f.options,pageIndexes:indexes});
+        const received=vi.mocked(f.ports.recognize).mock.calls[0][2]!.pageIndexes;
+        expect(received).toEqual([1,3]);expect(received).not.toBe(indexes);indexes.push(8);expect(received).toEqual([1,3]);
+    });
     it.each(['cancel', 'dispose', 'parent', 'supersede'] as const)('commits completed pages but rejects checkpoints arriving after %s', async action => {
         const f = fixture(), gate = pending(document()), onCheckpoint = vi.fn();
         vi.mocked(f.ports.recognize).mockReturnValueOnce(gate.promise);

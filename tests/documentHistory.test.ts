@@ -308,6 +308,21 @@ describe('document history PDF geometry migration', () => {
 });
 
 describe('document history scanned-PDF migration', () => {
+    it('keeps explicit OCR corrections on originally native pages across a parser upgrade and round-trips source-only revisions',async()=>{
+        const current=pdf([['Native text']]), previous=pdf([['Manually corrected OCR']]);
+        Object.assign(previous.binary.pages[0],{scanned:false,ocrRecognized:true});
+        const correction={source:'Raw OCR',lines:[{text:'Raw OCR',x:1,y:2,width:40,height:10}],reviewRegions:[]};
+        Object.assign(previous.binary.pages[0].blocks[0],{sourceCorrection:correction});
+        const retainedRevisions=[{source:'Older source correction',translation:'',kind:'source' as const,pageNumber:1,blockNumber:1}];
+        const saved=record('native-ocr',1,{bytes:previous.binary.bytes,parsed:previous,retainedRevisions,translations:['Human translation']});
+        const history=createDocumentHistory(new IDBFactory());expect(await history.save(saved)).toBe(true);
+        const loaded=(await history.load('native-ocr'))!;expect(loaded.retainedRevisions).toEqual(retainedRevisions);
+        const restored=restoreDocumentHistoryPdfOcr(loaded,current);
+        expect(restored.document.segments[0].source).toBe('Manually corrected OCR');
+        expect(restored.document.binary?.kind==='pdf'&&restored.document.binary.pages[0].blocks[0].sourceCorrection).toEqual(correction);
+        expect(restored.document.binary?.bytes).toBe(current.binary.bytes);expect(restored.segmentOrigins).toEqual([0]);
+    });
+
     it('reuses recognized scans in page order while keeping newly parsed native pages and original current bytes', () => {
         const current = pdf([['New native'], null, null]);
         current.binary.pages[2] = {...current.binary.pages[2], rotation: 90} as any;

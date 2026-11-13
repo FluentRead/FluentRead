@@ -24,7 +24,7 @@ export function createDocumentRecognitionWorkflow(ports: DocumentRecognitionPort
         if (!disposed) ports.onProgress(null);
     }
     return {
-        async recognize(document: ParsedDocument, options: {sourceLanguage: string; startPage: number; signal: AbortSignal; isCurrent(): boolean; onCheckpoint?(document: ParsedDocument): void}): Promise<ParsedDocument | null> {
+        async recognize(document: ParsedDocument, options: {sourceLanguage: string; startPage: number; pageIndexes?: readonly number[]; signal: AbortSignal; isCurrent(): boolean; onCheckpoint?(document: ParsedDocument): void}): Promise<ParsedDocument | null> {
             if (disposed || options.signal.aborted || !options.isCurrent()) return null;
             cancel();
             const controller = new AbortController(), request = generation;
@@ -38,6 +38,7 @@ export function createDocumentRecognitionWorkflow(ports: DocumentRecognitionPort
             try {
                 const recognized = await ports.recognize(document, ports.createRecognizer(options.sourceLanguage), {
                     signal: controller.signal, startPage: options.startPage,
+                    ...(options.pageIndexes === undefined ? {} : {pageIndexes: [...options.pageIndexes]}),
                     onProgress: progress => {if (current()) ports.onProgress(progress);},
                     onCheckpoint: checkpoint => {if (current()) options.onCheckpoint?.(checkpoint);},
                 });

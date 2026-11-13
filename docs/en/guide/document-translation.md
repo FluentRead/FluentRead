@@ -55,6 +55,10 @@ For scanned papers, recognition uses higher-resolution page images and automatic
 
 Numeric superscripts and subscripts are checked using enlarged crops and their positions on the original page. Confirmed scientific notation and numeric subscripts are kept unchanged during translation. If a candidate cannot be confirmed, **Check original** opens the source page with dashed markers. This check does not guarantee that every formula or symbol is correct.
 
+After recognition, choose **Correct recognized text** in document settings to compare each line with the scan. You can also open the matching passage from the translation editor. Saving clears only the translations whose source text changed; previous translations remain available in saved revisions. **Restore recognition** undoes the source correction and keeps the manual source text in saved revisions.
+
+Choose **Recognize this page again** to reread only the current page without starting translation. Matching manual corrections are kept; edits that cannot be matched remain in saved revisions. The original PDF file stays unchanged.
+
 Numbers with low word confidence but complete matching glyph evidence retain their original reading with a review marker, instead of being silently dropped. These candidates can still contain misread or missing symbols; compare important values with the source image.
 
 Scanned list bullets are checked against their original shape and repeated indentation. Confirmed items are translated separately, and selecting the source keeps the bullets. Uncertain markers remain flagged for review; ordinary letters are not automatically treated as list symbols.

@@ -332,7 +332,9 @@
     },
     "src/features/settings/ui/SiteRulePreview.vue": {
       "kind": "behavior",
-      "tests": ["tests/sitePreferencesLifecycle.test.ts"],
+      "tests": [
+        "tests/sitePreferencesLifecycle.test.ts"
+      ],
       "scenario": "真实SFC检查网址、解释网站与全局显示优先级、响应外部偏好、提示过期输入、显示适配范围并发出规则检查事件"
     },
     "src/features/settings/ui/TranslationCacheSettings.vue": {
@@ -626,6 +628,13 @@
         "scope": "生产学习材料界面、权威记录关联与独立清空、文章定位、视频时间、本地PDF/DOCX/EPUB与宽窄屏深色",
         "limitation": "本地确定性素材；不代表线上供应商、Firefox、Safari或移动真机验收"
       }
+    },
+    "src/app/document-translation/PdfSourceEditor.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/documentAppLifecycle.test.ts"
+      ],
+      "scenario": "真实原文校订对话框的逐行输入、确认与撤销事件、预览取消和 URL 释放；父页面持久化、显式重识别及迟到结果隔离"
     }
   }
 }

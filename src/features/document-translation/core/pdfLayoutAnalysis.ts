@@ -427,6 +427,27 @@ const cjkLine = (text: string) => (text.match(cjkGlyphs)?.length ?? 0) * 2 >= te
 /** 上一行以中日韩文字或全角标点结尾、下一行以它们开头时，折行处不应补空格。 */
 const cjkLineEnd = new RegExp(`[${CJK}，。、；：！？（）《》“”]$`, 'u');
 const cjkLineStart = new RegExp(`^[${CJK}，。、；：！？（）《》“”]`, 'u');
+/** 复用已确认同属一块的逐行原文拼接规则；人工 OCR 校对与首次解析使用同一文字契约。 */
+export function joinPdfSourceLines(lines: readonly PdfDocumentLine[], kind?: PdfDocumentBlock['kind']): string {
+    if (!lines.length) return '';
+    const joined = lines.reduce((text, line, index) => {
+        if (!text) return line.text;
+        // 段落/分栏关联已确认两行同属一块；只有 URL 尾斜杠和带数字的路径首词共同确认续行，后续正文空白不变。
+        const path = line.text.match(/^[A-Za-z0-9._~%/?#&=+-]+(?=\s|$)/u)?.[0];
+        if (/(?:^|[\s(["'])https?:\/\/[^\s<>"'`，。、；：！？（）【】《》「」“”‘’]+\/$/u.test(lines[index - 1].text)
+            && path?.includes('/') && /\d/u.test(path)) return text + line.text;
+        return /[-‐‑\u00AD]$/u.test(text) && /^[a-z]/u.test(line.text) ? text.slice(0, -1) + line.text
+            : cjkLineEnd.test(text) && cjkLineStart.test(line.text) ? text + line.text : `${text} ${line.text}`;
+    }, '');
+    // 标题末尾抬高的小字是脚注标记（☆、*、a），不属于标题文字。
+    const lastLine = lines.at(-1)!, runs = lastLine.runs ?? [], mark = runs.at(-1) as PdfLayoutAtom;
+    const marked = kind === 'heading' && runs.length > 1 && mark.fontSize <= lastLine.fontSize! * 0.8 && mark.baseline < lastLine.baseline! - lastLine.fontSize! * 0.15
+        && /^[\p{L}\d*†‡⇑☆]{1,2}$/u.test(mark.text.trim()) && joined.endsWith(mark.text.trim());
+    // 两端撑开排版的中文在每个字之间都留了空；逐字带空格的原文会被当成一串单字来翻译。
+    const spaced = joined.match(/[\p{Script=Han}] (?=[\p{Script=Han}])/gu)?.length ?? 0;
+    return (spaced >= 3 && spaced >= (joined.match(/[\p{Script=Han}]/gu)!.length - 1) * 0.6 ? joined.replace(/(?<=[\p{Script=Han}，。、；：（）]) (?=[\p{Script=Han}，。、；：（）])/gu, '') : marked ? joined.slice(0, -mark.text.trim().length).trimEnd() : joined).replace(/\u00AD/gu, '');
+}
+
 /** 作者署名：以逗号分隔的多个“名 姓”，或带单位标记（上标字母、数字、星号等）的人名；只用 and 连接的两个词组更像标题，不算署名。 */
 const byline = /^(?=.*(?:,|[*†‡⇑]|\s[a-z\d]\b))(?:(?:[A-Z][\p{L}.'’-]*\s+){1,3}[A-Z][\p{L}'’-]+(?:\s*[a-z\d*†‡⇑](?:\s*,\s*[a-z\d*†‡⇑])*)?\s*(?:,|\band\b|&|$)\s*)+$/u;
 /** 一行的“词数”：按空白分出的词，加上不用空格分词的中日韩文字（两个字约合一个词）。 */
@@ -1210,22 +1231,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     const blockTables = new Map<PdfLayoutBlock, PdfPreservedRegion>();
     const blocks: PdfLayoutBlock[] = drafts.map(draft => {
         const first = draft.lines[0];
-        const joined = draft.lines.reduce((text, line, index) => {
-            if (!text) return line.text;
-            // 段落/分栏关联已确认两行同属一块；只有 URL 尾斜杠和带数字的路径首词共同确认续行，后续正文空白不变。
-            const path = line.text.match(/^[A-Za-z0-9._~%/?#&=+-]+(?=\s|$)/u)?.[0];
-            if (/(?:^|[\s(["'])https?:\/\/[^\s<>"'`，。、；：！？（）【】《》「」“”‘’]+\/$/u.test(draft.lines[index - 1].text)
-                && path?.includes('/') && /\d/u.test(path)) return text + line.text;
-            return /[-‐‑\u00AD]$/u.test(text) && /^[a-z]/u.test(line.text) ? text.slice(0, -1) + line.text
-                : cjkLineEnd.test(text) && cjkLineStart.test(line.text) ? text + line.text : `${text} ${line.text}`;
-        }, '');
-        // 标题末尾抬高的小字是脚注标记（☆、*、a），不属于标题文字。
-        const lastLine = draft.lines.at(-1)!, mark = lastLine.runs.at(-1) as PdfLayoutAtom;
-        const marked = draft.kind === 'heading' && lastLine.runs.length > 1 && mark.fontSize <= lastLine.fontSize * 0.8 && mark.baseline < lastLine.baseline - lastLine.fontSize * 0.15
-            && /^[\p{L}\d*†‡⇑☆]{1,2}$/u.test(mark.text.trim()) && joined.endsWith(mark.text.trim());
-        // 两端撑开排版的中文在每个字之间都留了空；逐字带空格的原文会被当成一串单字来翻译。
-        const spaced = joined.match(/[\p{Script=Han}] (?=[\p{Script=Han}])/gu)?.length ?? 0;
-        const source = (spaced >= 3 && spaced >= (joined.match(/[\p{Script=Han}]/gu)!.length - 1) * 0.6 ? joined.replace(/(?<=[\p{Script=Han}，。、；：（）]) (?=[\p{Script=Han}，。、；：（）])/gu, '') : marked ? joined.slice(0, -mark.text.trim().length).trimEnd() : joined).replace(/\u00AD/gu, '');
+        const source = joinPdfSourceLines(draft.lines, draft.kind);
         const leading = draft.lines.slice(1).map((line, index) => line.baseline - draft.lines[index].baseline);
         const center = draft.bounds.x + draft.bounds.width / 2;
         const centered = draft.panel?.centered || (draft.kind === 'heading' || draft.kind === 'metadata' || draft.kind === 'footer') && Math.abs(center - input.width / 2) <= input.width * 0.045;

@@ -625,6 +625,8 @@ export default defineConfig({
                 'src/features/document-translation/services/history.ts',
                 'src/features/document-translation/ui/richPreviewSync.ts',
                 'src/features/document-translation/services/pdfOcr.ts',
+                'src/features/document-translation/services/pdfSourceEdits.ts',
+                'src/features/document-translation/ui/pdfSourcePreview.ts',
                 'src/features/document-translation/core/pdfScanGraphics.ts',
                 'src/features/document-translation/ui/pdfScanPreview.ts',
                 'src/features/document-translation/ui/pdfOcrTextLayer.ts',

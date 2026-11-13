@@ -475,6 +475,16 @@ describe('controlled provider attribution', () => {
     expect(encodeControlledTranslation('  \n')).toBe('  \n');
     expect(() => encodeControlledTranslation(null)).toThrow('requires a string');
   });
+  it('proves comment-split numbers next to glossary terms without allowing missing, changed or untranslated prose', () => {
+    const source = 'Mac M5 LLM benchmarks';
+    const output = encodeControlledTranslation('Mac M') + '5 测试译文：LLM ' + encodeControlledTranslation('benchmarks');
+    expect(isControlledTranslationForSource(output, source)).toBe(true);
+    expect(isControlledTranslationForSource(output.replace('5', '6'), source)).toBe(false);
+    expect(isControlledTranslationForSource(output.replace('5', '55'), source)).toBe(false);
+    expect(isControlledTranslationForSource(output.replace('LLM', 'CPU'), source)).toBe(false);
+    expect(isControlledTranslationForSource(output.replace(encodeControlledTranslation('Mac M'), 'Mac M'), source)).toBe(false);
+    expect(isControlledTranslationForSource(output.replace(encodeControlledTranslation('benchmarks'), ''), source)).toBe(false);
+  });
   it('preserves inline slot delimiters and literal entities through the real Microsoft escaping boundary', async () => {
     const {api} = await setup();
     try {

@@ -7,7 +7,7 @@ import {compileSiteRulePack, composeSiteAdapters, getSiteAdapterAttributeFilter,
 import {normalizeSiteAdaptationSettings, parseSiteRulePack, SITE_RULE_LIMITS, validateSelectors} from '@/src/core/site-adaptation/schema';
 import type {SiteRule, SiteRulePack} from '@/src/core/site-adaptation/types';
 import {asHTMLElement, createMutationRescanSelector, createTranslationMutationObserverOptions} from '@/src/features/full-page-translation/content/mutationObservation';
-import {createTranslationSourceSnapshot} from '@/src/core/translation/serialization';
+import {applyTranslationsToSnapshot, createTranslationSourceSnapshot} from '@/src/core/translation/serialization';
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
 import {collectLiveTranslationTextSlots} from '@/src/core/translation/serialization';
 
@@ -260,6 +260,82 @@ describe('Kagi News content-bearing buttons', () => {
         })])});
         const {core, label} = fixture('content', settings);
         expect(core.resolve(label.firstChild)).toBeNull();
+    });
+});
+
+describe('Llamaperf Mac benchmark introduction', () => {
+    function fixture(href = 'https://llamaperf.com/mac/m5?utm_source=chatgpt.com', settings = normalizeSiteAdaptationSettings(undefined)) {
+        // The live Next.js page splits sentences and counters with comment nodes inside an article header.
+        const {document} = parseHTML(`<html lang="en"><body>
+            <header><nav><p id="navigation">Browse hardware and submit a benchmark.</p></nav></header>
+            <main id="main-content"><div><header>
+                <h1 id="title">Mac M<!-- -->5<!-- --> LLM benchmarks</h1>
+                <p id="intro">Compare every M<!-- -->5<!-- --> configuration, its memory and the speeds reported by readers.</p>
+                <p id="counts">13<!-- --> configuration<!-- -->s<!-- --> · <!-- -->235<!-- --> report<!-- -->s</p>
+                <div><p id="summary">As of <!-- -->13 Nov 2026<!-- -->, these models have the most reports for each configuration.</p>
+                    <ul><li id="benchmark-card"><a href="/gpu/m5-max-48gb">M5 Max 48GB</a><div>64.2 t/s at 4-bit · 2 runs</div></li></ul>
+                </div>
+                <p id="protected" translate="no">Keep this local paragraph original.</p>
+            </header><section><header><p id="report-metadata">M5 Max 48GB · Ollama · 8192 ctx</p></header></section></div></main>
+            <footer><p id="footer">Manage your account and privacy settings.</p></footer>
+        </body></html>`);
+        const url = new URL(href);
+        const core = new TranslationCandidateCore({url, adapters: composeSiteAdapters(builtinSiteRulePack, settings)});
+        return {document, core, url};
+    }
+
+    it('discovers complete header paragraphs in full and hover modes without selecting benchmark cards or site chrome', () => {
+        const {document, core, url} = fixture();
+        expect(new TranslationCandidateCore({url}).discover(document).map(candidate => candidate.element.id)).toEqual(['title']);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title', 'intro', 'counts', 'summary']);
+        for (const id of ['intro', 'counts', 'summary']) {
+            const paragraph = document.getElementById(id)!;
+            expect(core.resolve(paragraph.lastChild)).toMatchObject({element: paragraph, adapterId: 'llamaperf-mac'});
+            const snapshot = createTranslationSourceSnapshot(paragraph, core.shouldStayOriginal);
+            const rendered = applyTranslationsToSnapshot(snapshot, snapshot.slots.map(slot => slot.source));
+            const restored = document.createElement('p');
+            restored.innerHTML = rendered;
+            expect(restored.textContent).toBe(paragraph.textContent);
+        }
+        for (const id of ['navigation', 'benchmark-card', 'report-metadata', 'protected', 'footer']) {
+            expect(core.resolve(document.getElementById(id)!.firstChild), id).toBeNull();
+        }
+    });
+
+    it('rediscovers a replaced summary while retaining code and local no-translate boundaries', () => {
+        const {document, core} = fixture();
+        const summary = document.getElementById('summary')!;
+        const replacement = summary.cloneNode(true) as HTMLElement;
+        replacement.innerHTML = 'A freshly loaded summary with <code>KEEP_CODE()</code> and <span translate="no">KEEP_LABEL</span> stays readable.';
+        summary.replaceWith(replacement);
+        expect(core.discover(replacement).map(candidate => candidate.element)).toEqual([replacement]);
+        expect(core.resolve(replacement.lastChild)?.element).toBe(replacement);
+        const snapshot = createTranslationSourceSnapshot(replacement, core.shouldStayOriginal);
+        const source = snapshot.slots.map(slot => slot.source).join('');
+        expect(source).toContain('A freshly loaded summary');
+        expect(source).not.toMatch(/KEEP_CODE|KEEP_LABEL/);
+        expect(replacement.querySelector('code')?.textContent).toBe('KEEP_CODE()');
+    });
+
+    it.each(['https://llamaperf.com/mac/m4', 'https://llamaperf.com/mac/m5/'])('applies the shared Mac overview structure on %s', href => {
+        const {document, core} = fixture(href);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toContain('intro');
+    });
+
+    it('preserves the option to translate navigation regions', () => {
+        const {document, url} = fixture();
+        const core = new TranslationCandidateCore({url, adapters: compileSiteRulePack(builtinSiteRulePack), includeSidebarRegions: true});
+        expect(core.discover(document).map(candidate => candidate.element.id)).toContain('navigation');
+    });
+
+    it.each(['https://llamaperf.com/gpu/m5-max-48gb', 'https://llamaperf.com/login', 'https://llamaperf.com.evil.test/mac/m5'])('keeps ordinary header filtering outside Mac overview URLs: %s', href => {
+        const {document, core} = fixture(href);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title']);
+    });
+
+    it.each([{enabled: false}, {disabledRuleIds: ['llamaperf-mac']}])('withdraws the exception through site-adaptation settings: %j', overrides => {
+        const {document, core} = fixture(undefined, {...normalizeSiteAdaptationSettings(undefined), ...overrides});
+        expect(core.resolve(document.getElementById('intro')!.firstChild)).toBeNull();
     });
 });
 

@@ -628,6 +628,7 @@
       "tests/imageOcrRuntime.test.ts",
       "tests/documentOcrScripts.test.ts",
       "tests/documentOcrNumbers.test.ts",
+      "tests/documentOcrCjk.test.ts",
       "tests/documentOcrBullets.test.ts",
       "tests/imageOcrStatusCancellation.test.ts",
       "tests/imageSourceAuthorization.test.ts",

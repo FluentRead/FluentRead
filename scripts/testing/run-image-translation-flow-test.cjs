@@ -350,17 +350,20 @@ async function verifyTransformedImages({worker, ui, wait, shot}) {
                 const clipping = await page.evaluate(async data => {
                     const screenshot = new Image(); screenshot.src = data; await screenshot.decode();
                     const canvas = document.createElement('canvas'); canvas.width = screenshot.width; canvas.height = screenshot.height;
-                    const context = canvas.getContext('2d'); context.drawImage(screenshot, 0, 0);
+                    const context = canvas.getContext('2d', {willReadFrequently:true}); context.drawImage(screenshot, 0, 0);
                     const card = document.querySelector('.card'), rect = card.getBoundingClientRect();
                     const point = {x:rect.right + 90, y:rect.top + 110};
-                    const expected = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number).slice(0, 3).concat(255);
-                    const actual = [...context.getImageData(Math.round(point.x * screenshot.width / innerWidth),
+                    const control = {x:innerWidth - 30, y:point.y};
+                    const cssBackground = getComputedStyle(document.body).backgroundColor.match(/\d+/g).map(Number).slice(0, 3).concat(255);
+                    const read = point => [...context.getImageData(Math.round(point.x * screenshot.width / innerWidth),
                         Math.round(point.y * screenshot.height / innerHeight), 1, 1).data];
-                    return {point, expected, actual, cardPosition:getComputedStyle(card).position, overflow:getComputedStyle(card).overflow,
+                    // macOS 截图经颜色配置转换后可能与 CSS 字面色相差 1 级；比较同图空白背景仍要求逐字节一致。
+                    return {point, control, cssBackground, expected:read(control), actual:read(point), cardPosition:getComputedStyle(card).position, overflow:getComputedStyle(card).overflow,
                         sourceOffsetParent:document.querySelector('#sample').offsetParent?.tagName};
                 }, `data:image/png;base64,${png.toString('base64')}`);
                 report.transformedImages.at(-1).clippingProbe = clipping;
                 fs.writeFileSync(path.join(artifacts, `clipping-${fixture.name}.png`), png);
+                assert.ok(clipping.expected.every((value, index) => Math.abs(value - clipping.cssBackground[index]) <= 1), '裁切参照点必须仍为空白背景');
                 assert.deepEqual(clipping.actual, clipping.expected, '译图不得越过原图祖先的溢出裁切');
             }
             await shot(`native-corners-${fixture.name}`);

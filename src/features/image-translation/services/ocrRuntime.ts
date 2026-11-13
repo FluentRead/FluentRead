@@ -3,10 +3,11 @@
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
  * 返回值隔离：缓存命中和在途共享均独立复制段落框及合并前的物理列框，调用方不能污染其他视图或后续清字坐标。
  * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口；显式重新识别跳过已完成缓存及在途合并，并保留独立取消身份。
- * 文档源文保真：低置信度数字词在字形和出现位置完整对应时保留原读数，并附原页核对框；列表圆点须经重复缩进与原像素确认，再独立交给 PDF 段落分析；两者都复用按需解码源，未确认候选不缓存为可靠结果。
+ * 文档源文保真：低分汉字在实际行框中以两种缩小倍率复核，只接受同长度、低分汉字位置的高分一致修改；未确认内容保留原读数和核对框。低置信度数字词在字形和出现位置完整对应时保留原读数，并附原页核对框；列表圆点须经重复缩进与原像素确认，再独立交给 PDF 段落分析；两者都复用按需解码源，未确认候选不缓存为可靠结果。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
+import {recoverDocumentOcrCjk} from './documentOcrCjk';
 import {
     getAreaOcrImageSize,
     getOcrImageSize,
@@ -70,20 +71,28 @@ const sharedRecognition = createSharedOcrTasks<RecognitionViews>();
 const completedRecognitionCache = new Map<string, {views: RecognitionViews; bytes: number}>();
 /** 识别框只包住实际墨迹，缺少 g/p/y 的末行会偏矮；文档分段使用引擎行指标，不能据框高误判小字。 */
 function documentLineMetrics(lines: OcrLine[], result: TesseractRecognitionResult): OcrLine[] {
-    const rows: Array<{bbox: OcrLine['bbox']; baseline: number; fontSize: number}> = [];
+    const rows: Array<{bbox: OcrLine['bbox']; baseline: number; fontSize: number; slack: number}> = [];
     for (const block of result.data.blocks ?? []) for (const paragraph of block.paragraphs) for (const line of paragraph.lines) {
         const row = line.rowAttributes?.rowHeight, baseline = line.baseline;
         if (!row || !baseline || ![row, baseline.y0, baseline.y1].every(Number.isFinite)) continue;
         const height = line.bbox.y1 - line.bbox.y0;
-        if (row < height * .7 || row > height * 2.5 || Math.abs(baseline.y1 - baseline.y0) > row * .3
+        const characters = Array.from(line.text.trim()), hanCount = characters.filter(character => /\p{Script=Han}/u.test(character)).length;
+        // 汉字词框可含推导伸部；长行按斜率允许轻微倾斜，拉丁文沿用既有严格边界。
+        const baselineSlack = hanCount ? Math.max(row * .3, (line.bbox.x1 - line.bbox.x0) * .035) : row * .3;
+        if (row < height * .7 || row > height * 2.5 || Math.abs(baseline.y1 - baseline.y0) > baselineSlack
             || baseline.y0 < line.bbox.y0 || baseline.y0 > line.bbox.y1 + height * .3) continue;
-        rows.push({bbox: line.bbox, baseline: (baseline.y0 + baseline.y1) / 2, fontSize: row * .85});
+        // 长汉语行的可见字宽可约束字号；词框的推导上下伸部不能把小字脚注放大成正文。
+        const units = characters.reduce((total, character) => total + (/\s/u.test(character) ? .3 : /[\p{Script=Han}\u3000-\u303f\uff00-\uffef]/u.test(character) ? 1 : .55), 0);
+        const fontSize = hanCount >= 6 ? Math.min(row * .85, (line.bbox.x1 - line.bbox.x0) / units * 1.12) : row * .85;
+        rows.push({bbox: line.bbox, baseline: (baseline.y0 + baseline.y1) / 2, fontSize, slack: hanCount ? row * .425 : 0});
     }
     return lines.map(line => {
         if (line.vertical) return line;
         // 同一引擎行可能横跨两栏；规范化会按词间距拆开，子行仍使用唯一包含它的原始行指标。
-        const candidates = rows.filter(row => row.bbox.x0 <= line.bbox.x0 && row.bbox.x1 >= line.bbox.x1
-            && row.bbox.y0 <= line.bbox.y0 && row.bbox.y1 >= line.bbox.y1);
+        const candidates = rows.filter(row => row.bbox.x0 - row.slack <= line.bbox.x0 && row.bbox.x1 + row.slack >= line.bbox.x1
+            && row.bbox.y0 - row.slack <= line.bbox.y0 && row.bbox.y1 + row.slack >= line.bbox.y1
+            && Math.min(row.bbox.y1, line.bbox.y1) - Math.max(row.bbox.y0, line.bbox.y0)
+                >= Math.min(row.bbox.y1 - row.bbox.y0, line.bbox.y1 - line.bbox.y0) * .7);
         return candidates.length === 1 ? {...line, baseline: candidates[0].baseline, fontSize: candidates[0].fontSize} : line;
     });
 }
@@ -129,6 +138,22 @@ async function readDocumentLines(image: string, result: TesseractRecognitionResu
             context.drawImage(source, x, y, width, height, 0, 0, width, height);
             return context.getImageData(0, 0, width, height);
         }, signal);
+        views.ordinary = await recoverDocumentOcrCjk(recovered.blocks, views.ordinary, async (box, scale) => {
+            signal.throwIfAborted(); source ??= await loadOcrImage(image, signal); signal.throwIfAborted();
+            const width = box.x1 - box.x0, height = box.y1 - box.y0;
+            const sourceWidth = source.naturalWidth || source.width, sourceHeight = source.naturalHeight || source.height;
+            const outside = box.x0 < 0 || box.y0 < 0 || box.x1 > sourceWidth || box.y1 > sourceHeight;
+            if (outside || width * scale > 2048 || height * scale > 384) return {text: '', confidence: 0};
+            canvas ??= document.createElement('canvas'); canvas.width = Math.ceil(width * scale) + 32; canvas.height = Math.ceil(height * scale) + 32;
+            const context = canvas.getContext('2d', {alpha: false, willReadFrequently: true});
+            if (!context) throw new Error('浏览器不支持图片处理');
+            context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
+            context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high';
+            context.drawImage(source, box.x0, box.y0, width, height, 16, 16, width * scale, height * scale);
+            const recognized = await ocrWorkerRuntime.recognize(await encodeImageCanvas(canvas, signal), languages, signal, PSM.SINGLE_LINE);
+            return {text: recognized.data.text, confidence: recognized.data.confidence};
+        }, signal);
+        views.ordinary = documentLineMetrics(views.ordinary, result);
         for (const bbox of recovered.unresolved) views.ordinary.push({text: '', bbox, documentReview: true});
         return views;
     } finally {

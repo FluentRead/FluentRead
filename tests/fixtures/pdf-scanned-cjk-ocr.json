@@ -1,0 +1,4408 @@
+{
+  "source": "Self-authored Chinese corpus; real Tesseract 4.0.0_best_int chi_sim+eng, 300dpi document profile. See workspace-data/evidence/scanned-pdf-corpus-20261113/browser-initial.",
+  "cases": [
+    {
+      "name": "title",
+      "page": 1,
+      "line": {
+        "text": "扫摘论文识别与翻译实验\n",
+        "confidence": 69,
+        "bbox": {
+          "x0": 191,
+          "y0": 178,
+          "x1": 1010,
+          "y1": 248
+        },
+        "baseline": {
+          "x0": 191,
+          "y0": 247,
+          "x1": 1010,
+          "y1": 245
+        },
+        "rowAttributes": {
+          "rowHeight": 92,
+          "descenders": 23,
+          "ascenders": 23
+        },
+        "words": [
+          {
+            "bbox": {
+              "x0": 191,
+              "y0": 178,
+              "x1": 282,
+              "y1": 247
+            },
+            "text": "扫",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "扫",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 191,
+                  "y0": 178,
+                  "x1": 282,
+                  "y1": 247
+                },
+                "text": "扫",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 291,
+              "y0": 178,
+              "x1": 364,
+              "y1": 247
+            },
+            "text": "摘",
+            "confidence": 0,
+            "choices": [
+              {
+                "text": "摘",
+                "confidence": 0
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 291,
+                  "y0": 178,
+                  "x1": 364,
+                  "y1": 247
+                },
+                "text": "摘",
+                "confidence": 78,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 363,
+              "y0": 178,
+              "x1": 516,
+              "y1": 248
+            },
+            "text": "论文",
+            "confidence": 95,
+            "choices": [
+              {
+                "text": "论文",
+                "confidence": 95
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 363,
+                  "y0": 178,
+                  "x1": 484,
+                  "y1": 248
+                },
+                "text": "论",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 491,
+                  "y0": 179,
+                  "x1": 516,
+                  "y1": 245
+                },
+                "text": "文",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 527,
+              "y0": 178,
+              "x1": 674,
+              "y1": 248
+            },
+            "text": "识别",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "识别",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 527,
+                  "y0": 181,
+                  "x1": 603,
+                  "y1": 248
+                },
+                "text": "识",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 610,
+                  "y0": 178,
+                  "x1": 674,
+                  "y1": 247
+                },
+                "text": "别",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 715,
+              "y0": 179,
+              "x1": 749,
+              "y1": 247
+            },
+            "text": "与",
+            "confidence": 65,
+            "choices": [
+              {
+                "text": "与",
+                "confidence": 65
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 715,
+                  "y0": 179,
+                  "x1": 749,
+                  "y1": 247
+                },
+                "text": "与",
+                "confidence": 95,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 749,
+              "y0": 178,
+              "x1": 901,
+              "y1": 248
+            },
+            "text": "翻译",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "翻译",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 749,
+                  "y0": 179,
+                  "x1": 860,
+                  "y1": 248
+                },
+                "text": "翻",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 868,
+                  "y0": 178,
+                  "x1": 901,
+                  "y1": 248
+                },
+                "text": "译",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 939,
+              "y0": 178,
+              "x1": 1010,
+              "y1": 247
+            },
+            "text": "实验",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "实验",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 939,
+                  "y0": 182,
+                  "x1": 967,
+                  "y1": 247
+                },
+                "text": "实",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 966,
+                  "y0": 178,
+                  "x1": 1010,
+                  "y1": 245
+                },
+                "text": "验",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "method",
+      "page": 1,
+      "line": {
+        "text": "方法两             256\n\n",
+        "confidence": 81,
+        "bbox": {
+          "x0": 236,
+          "y0": 2285,
+          "x1": 1014,
+          "y1": 2325
+        },
+        "baseline": {
+          "x0": 236,
+          "y0": 2325,
+          "x1": 1014,
+          "y1": 2321
+        },
+        "rowAttributes": {
+          "rowHeight": 44,
+          "descenders": 11,
+          "ascenders": 10.999999
+        },
+        "words": [
+          {
+            "bbox": {
+              "x0": 236,
+              "y0": 2285,
+              "x1": 319,
+              "y1": 2325
+            },
+            "text": "方法",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "方法",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 236,
+                  "y0": 2285,
+                  "x1": 290,
+                  "y1": 2325
+                },
+                "text": "方",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 290,
+                  "y0": 2285,
+                  "x1": 319,
+                  "y1": 2325
+                },
+                "text": "法",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 338,
+              "y0": 2287,
+              "x1": 362,
+              "y1": 2325
+            },
+            "text": "两",
+            "confidence": 55,
+            "choices": [
+              {
+                "text": "两",
+                "confidence": 55
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 338,
+                  "y0": 2287,
+                  "x1": 362,
+                  "y1": 2325
+                },
+                "text": "两",
+                "confidence": 93,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 940,
+              "y0": 2289,
+              "x1": 1014,
+              "y1": 2322
+            },
+            "text": "256",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "256",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 940,
+                  "y0": 2289,
+                  "x1": 961,
+                  "y1": 2321
+                },
+                "text": "2",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 966,
+                  "y0": 2289,
+                  "x1": 988,
+                  "y1": 2322
+                },
+                "text": "5",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 992,
+                  "y0": 2289,
+                  "x1": 1014,
+                  "y1": 2322
+                },
+                "text": "6",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "lowBody",
+      "page": 3,
+      "line": {
+        "text": "李研究比较不同采样频率下的测量误差。实验共\n\n",
+        "confidence": 82,
+        "bbox": {
+          "x0": 189,
+          "y0": 492,
+          "x1": 1149,
+          "y1": 537
+        },
+        "baseline": {
+          "x0": 189,
+          "y0": 537,
+          "x1": 1149,
+          "y1": 534
+        },
+        "rowAttributes": {
+          "rowHeight": 58.266666,
+          "descenders": 14.566667,
+          "ascenders": 14.566667
+        },
+        "words": [
+          {
+            "bbox": {
+              "x0": 189,
+              "y0": 492,
+              "x1": 231,
+              "y1": 537
+            },
+            "text": "李",
+            "confidence": 0,
+            "choices": [
+              {
+                "text": "李",
+                "confidence": 0
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 189,
+                  "y0": 492,
+                  "x1": 231,
+                  "y1": 537
+                },
+                "text": "李",
+                "confidence": 85,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 244,
+              "y0": 495,
+              "x1": 279,
+              "y1": 534
+            },
+            "text": "研",
+            "confidence": 37,
+            "choices": [
+              {
+                "text": "研",
+                "confidence": 37
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 244,
+                  "y0": 495,
+                  "x1": 279,
+                  "y1": 534
+                },
+                "text": "研",
+                "confidence": 91,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 299,
+              "y0": 492,
+              "x1": 324,
+              "y1": 537
+            },
+            "text": "究",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "究",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 299,
+                  "y0": 492,
+                  "x1": 324,
+                  "y1": 537
+                },
+                "text": "究",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 346,
+              "y0": 492,
+              "x1": 369,
+              "y1": 534
+            },
+            "text": "比",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "比",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 346,
+                  "y0": 492,
+                  "x1": 369,
+                  "y1": 534
+                },
+                "text": "比",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 393,
+              "y0": 492,
+              "x1": 417,
+              "y1": 537
+            },
+            "text": "较",
+            "confidence": 90,
+            "choices": [
+              {
+                "text": "较",
+                "confidence": 90
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 393,
+                  "y0": 492,
+                  "x1": 417,
+                  "y1": 537
+                },
+                "text": "较",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 440,
+              "y0": 495,
+              "x1": 487,
+              "y1": 537
+            },
+            "text": "不",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "不",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 440,
+                  "y0": 495,
+                  "x1": 487,
+                  "y1": 537
+                },
+                "text": "不",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 486,
+              "y0": 488,
+              "x1": 525,
+              "y1": 556
+            },
+            "text": "同",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "同",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 486,
+                  "y0": 488,
+                  "x1": 525,
+                  "y1": 556
+                },
+                "text": "同",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 525,
+              "y0": 492,
+              "x1": 623,
+              "y1": 537
+            },
+            "text": "采样",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "采样",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 525,
+                  "y0": 492,
+                  "x1": 552,
+                  "y1": 534
+                },
+                "text": "采",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 555,
+                  "y0": 492,
+                  "x1": 623,
+                  "y1": 537
+                },
+                "text": "样",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 622,
+              "y0": 488,
+              "x1": 690,
+              "y1": 556
+            },
+            "text": "频率",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "频率",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 622,
+                  "y0": 488,
+                  "x1": 666,
+                  "y1": 556
+                },
+                "text": "频",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 648,
+                  "y0": 492,
+                  "x1": 690,
+                  "y1": 537
+                },
+                "text": "率",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 707,
+              "y0": 495,
+              "x1": 735,
+              "y1": 537
+            },
+            "text": "下",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "下",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 707,
+                  "y0": 495,
+                  "x1": 735,
+                  "y1": 537
+                },
+                "text": "下",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 750,
+              "y0": 492,
+              "x1": 780,
+              "y1": 537
+            },
+            "text": "的",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "的",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 750,
+                  "y0": 492,
+                  "x1": 780,
+                  "y1": 537
+                },
+                "text": "的",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 801,
+              "y0": 492,
+              "x1": 899,
+              "y1": 537
+            },
+            "text": "测量",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "测量",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 801,
+                  "y0": 492,
+                  "x1": 825,
+                  "y1": 537
+                },
+                "text": "测",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 831,
+                  "y0": 492,
+                  "x1": 899,
+                  "y1": 534
+                },
+                "text": "量",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 899,
+              "y0": 488,
+              "x1": 984,
+              "y1": 556
+            },
+            "text": "误差",
+            "confidence": 56,
+            "choices": [
+              {
+                "text": "误差",
+                "confidence": 56
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 899,
+                  "y0": 488,
+                  "x1": 955,
+                  "y1": 556
+                },
+                "text": "误",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 972,
+                  "y0": 525,
+                  "x1": 984,
+                  "y1": 537
+                },
+                "text": "差",
+                "confidence": 93,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 992,
+              "y0": 488,
+              "x1": 1027,
+              "y1": 556
+            },
+            "text": "。",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "。",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 992,
+                  "y0": 488,
+                  "x1": 1027,
+                  "y1": 556
+                },
+                "text": "。",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1014,
+              "y0": 492,
+              "x1": 1149,
+              "y1": 537
+            },
+            "text": "实",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "实",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1014,
+                  "y0": 492,
+                  "x1": 1149,
+                  "y1": 537
+                },
+                "text": "实",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1077,
+              "y0": 488,
+              "x1": 1116,
+              "y1": 556
+            },
+            "text": "验",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "验",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1077,
+                  "y0": 488,
+                  "x1": 1116,
+                  "y1": 556
+                },
+                "text": "验",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1115,
+              "y0": 488,
+              "x1": 1150,
+              "y1": 556
+            },
+            "text": "共",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "共",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1115,
+                  "y0": 488,
+                  "x1": 1150,
+                  "y1": 556
+                },
+                "text": "共",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "thinHan",
+      "page": 1,
+      "line": {
+        "text": "方法乙为0.18。误差降低不代表计算成本一定减\n",
+        "confidence": 93,
+        "bbox": {
+          "x0": 190,
+          "y0": 1147,
+          "x1": 1142,
+          "y1": 1190
+        },
+        "baseline": {
+          "x0": 190,
+          "y0": 1189,
+          "x1": 1142,
+          "y1": 1188
+        },
+        "rowAttributes": {
+          "rowHeight": 55.75,
+          "descenders": 13.9375,
+          "ascenders": 13.9375
+        },
+        "words": [
+          {
+            "bbox": {
+              "x0": 190,
+              "y0": 1147,
+              "x1": 474,
+              "y1": 1190
+            },
+            "text": "方法",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "方法",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 190,
+                  "y0": 1147,
+                  "x1": 247,
+                  "y1": 1189
+                },
+                "text": "方",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 247,
+                  "y0": 1147,
+                  "x1": 474,
+                  "y1": 1190
+                },
+                "text": "法",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 303,
+              "y0": 1143,
+              "x1": 353,
+              "y1": 1208
+            },
+            "text": "乙",
+            "confidence": 89,
+            "choices": [
+              {
+                "text": "乙",
+                "confidence": 89
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 303,
+                  "y0": 1143,
+                  "x1": 353,
+                  "y1": 1208
+                },
+                "text": "乙",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 352,
+              "y0": 1143,
+              "x1": 394,
+              "y1": 1208
+            },
+            "text": "为",
+            "confidence": 94,
+            "choices": [
+              {
+                "text": "为",
+                "confidence": 94
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 352,
+                  "y0": 1143,
+                  "x1": 394,
+                  "y1": 1208
+                },
+                "text": "为",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 393,
+              "y0": 1147,
+              "x1": 474,
+              "y1": 1190
+            },
+            "text": "0.18。",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "0.18。",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 393,
+                  "y0": 1147,
+                  "x1": 406,
+                  "y1": 1190
+                },
+                "text": "0",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 405,
+                  "y0": 1147,
+                  "x1": 426,
+                  "y1": 1190
+                },
+                "text": ".",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 425,
+                  "y0": 1147,
+                  "x1": 446,
+                  "y1": 1190
+                },
+                "text": "1",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 446,
+                  "y0": 1147,
+                  "x1": 471,
+                  "y1": 1190
+                },
+                "text": "8",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 470,
+                  "y0": 1147,
+                  "x1": 474,
+                  "y1": 1190
+                },
+                "text": "。",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 511,
+              "y0": 1148,
+              "x1": 547,
+              "y1": 1190
+            },
+            "text": "误",
+            "confidence": 89,
+            "choices": [
+              {
+                "text": "误",
+                "confidence": 89
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 511,
+                  "y0": 1148,
+                  "x1": 547,
+                  "y1": 1190
+                },
+                "text": "误",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 567,
+              "y0": 1147,
+              "x1": 591,
+              "y1": 1188
+            },
+            "text": "差",
+            "confidence": 89,
+            "choices": [
+              {
+                "text": "差",
+                "confidence": 89
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 567,
+                  "y0": 1147,
+                  "x1": 591,
+                  "y1": 1188
+                },
+                "text": "差",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 616,
+              "y0": 1147,
+              "x1": 655,
+              "y1": 1190
+            },
+            "text": "降",
+            "confidence": 92,
+            "choices": [
+              {
+                "text": "降",
+                "confidence": 92
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 616,
+                  "y0": 1147,
+                  "x1": 655,
+                  "y1": 1190
+                },
+                "text": "降",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 661,
+              "y0": 1148,
+              "x1": 711,
+              "y1": 1190
+            },
+            "text": "低",
+            "confidence": 91,
+            "choices": [
+              {
+                "text": "低",
+                "confidence": 91
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 661,
+                  "y0": 1148,
+                  "x1": 711,
+                  "y1": 1190
+                },
+                "text": "低",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 733,
+              "y0": 1147,
+              "x1": 747,
+              "y1": 1190
+            },
+            "text": "不",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "不",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 733,
+                  "y0": 1147,
+                  "x1": 747,
+                  "y1": 1190
+                },
+                "text": "不",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 750,
+              "y0": 1147,
+              "x1": 821,
+              "y1": 1189
+            },
+            "text": "代表",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "代表",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 750,
+                  "y0": 1147,
+                  "x1": 775,
+                  "y1": 1189
+                },
+                "text": "代",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 779,
+                  "y0": 1147,
+                  "x1": 821,
+                  "y1": 1189
+                },
+                "text": "表",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 831,
+              "y0": 1147,
+              "x1": 942,
+              "y1": 1190
+            },
+            "text": "计算",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "计算",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 831,
+                  "y0": 1147,
+                  "x1": 867,
+                  "y1": 1190
+                },
+                "text": "计",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              },
+              {
+                "bbox": {
+                  "x0": 871,
+                  "y0": 1147,
+                  "x1": 942,
+                  "y1": 1190
+                },
+                "text": "算",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 962,
+              "y0": 1147,
+              "x1": 987,
+              "y1": 1190
+            },
+            "text": "成",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "成",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 962,
+                  "y0": 1147,
+                  "x1": 987,
+                  "y1": 1190
+                },
+                "text": "成",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 986,
+              "y0": 1143,
+              "x1": 1023,
+              "y1": 1208
+            },
+            "text": "本",
+            "confidence": 96,
+            "choices": [
+              {
+                "text": "本",
+                "confidence": 96
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 986,
+                  "y0": 1143,
+                  "x1": 1023,
+                  "y1": 1208
+                },
+                "text": "本",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1022,
+              "y0": 1166,
+              "x1": 1050,
+              "y1": 1170
+            },
+            "text": "一",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "一",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1022,
+                  "y0": 1166,
+                  "x1": 1050,
+                  "y1": 1170
+                },
+                "text": "一",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1071,
+              "y0": 1147,
+              "x1": 1110,
+              "y1": 1189
+            },
+            "text": "定",
+            "confidence": 93,
+            "choices": [
+              {
+                "text": "定",
+                "confidence": 93
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1071,
+                  "y0": 1147,
+                  "x1": 1110,
+                  "y1": 1189
+                },
+                "text": "定",
+                "confidence": 99,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          },
+          {
+            "bbox": {
+              "x0": 1116,
+              "y0": 1147,
+              "x1": 1142,
+              "y1": 1189
+            },
+            "text": "减",
+            "confidence": 88,
+            "choices": [
+              {
+                "text": "减",
+                "confidence": 88
+              }
+            ],
+            "font_name": "",
+            "symbols": [
+              {
+                "bbox": {
+                  "x0": 1116,
+                  "y0": 1147,
+                  "x1": 1142,
+                  "y1": 1189
+                },
+                "text": "减",
+                "confidence": 98,
+                "is_superscript": 0,
+                "is_subscript": 0,
+                "is_dropcap": 0
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "skewParagraph": [
+    {
+      "text": "本研究比较不同采样频率下的测量误差。实验共\n\n",
+      "confidence": 94,
+      "bbox": {
+        "x0": 204,
+        "y0": 480,
+        "x1": 1163,
+        "y1": 534
+      },
+      "baseline": {
+        "x0": 204,
+        "y0": 523,
+        "x1": 1163,
+        "y1": 535
+      },
+      "rowAttributes": {
+        "rowHeight": 57.066666,
+        "descenders": 14.266666,
+        "ascenders": 14.266666
+      },
+      "words": [
+        {
+          "bbox": {
+            "x0": 204,
+            "y0": 480,
+            "x1": 246,
+            "y1": 524
+          },
+          "text": "本",
+          "confidence": 95,
+          "choices": [
+            {
+              "text": "本",
+              "confidence": 95
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 204,
+                "y0": 480,
+                "x1": 246,
+                "y1": 524
+              },
+              "text": "本",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 263,
+            "y0": 482,
+            "x1": 362,
+            "y1": 524
+          },
+          "text": "研究",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "研究",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 263,
+                "y0": 483,
+                "x1": 293,
+                "y1": 524
+              },
+              "text": "研",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 297,
+                "y0": 482,
+                "x1": 362,
+                "y1": 524
+              },
+              "text": "究",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 363,
+            "y0": 482,
+            "x1": 430,
+            "y1": 526
+          },
+          "text": "比较",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "比较",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 363,
+                "y0": 482,
+                "x1": 384,
+                "y1": 524
+              },
+              "text": "比",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 388,
+                "y0": 482,
+                "x1": 430,
+                "y1": 526
+              },
+              "text": "较",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 452,
+            "y0": 485,
+            "x1": 475,
+            "y1": 526
+          },
+          "text": "不",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "不",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 452,
+                "y0": 485,
+                "x1": 475,
+                "y1": 526
+              },
+              "text": "不",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 497,
+            "y0": 485,
+            "x1": 520,
+            "y1": 527
+          },
+          "text": "同",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "同",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 497,
+                "y0": 485,
+                "x1": 520,
+                "y1": 527
+              },
+              "text": "同",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 537,
+            "y0": 484,
+            "x1": 613,
+            "y1": 528
+          },
+          "text": "采样",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "采样",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 537,
+                "y0": 484,
+                "x1": 567,
+                "y1": 527
+              },
+              "text": "采",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 570,
+                "y0": 485,
+                "x1": 613,
+                "y1": 528
+              },
+              "text": "样",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 636,
+            "y0": 486,
+            "x1": 704,
+            "y1": 529
+          },
+          "text": "频率",
+          "confidence": 95,
+          "choices": [
+            {
+              "text": "频率",
+              "confidence": 95
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 636,
+                "y0": 486,
+                "x1": 660,
+                "y1": 528
+              },
+              "text": "频",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 663,
+                "y0": 486,
+                "x1": 704,
+                "y1": 529
+              },
+              "text": "率",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 722,
+            "y0": 488,
+            "x1": 750,
+            "y1": 530
+          },
+          "text": "下",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "下",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 722,
+                "y0": 488,
+                "x1": 750,
+                "y1": 530
+              },
+              "text": "下",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 767,
+            "y0": 487,
+            "x1": 810,
+            "y1": 530
+          },
+          "text": "的",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "的",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 767,
+                "y0": 487,
+                "x1": 810,
+                "y1": 530
+              },
+              "text": "的",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 816,
+            "y0": 488,
+            "x1": 907,
+            "y1": 531
+          },
+          "text": "测量",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "测量",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 816,
+                "y0": 488,
+                "x1": 842,
+                "y1": 531
+              },
+              "text": "测",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 846,
+                "y0": 488,
+                "x1": 907,
+                "y1": 530
+              },
+              "text": "量",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 911,
+            "y0": 489,
+            "x1": 999,
+            "y1": 534
+          },
+          "text": "误差",
+          "confidence": 91,
+          "choices": [
+            {
+              "text": "误差",
+              "confidence": 91
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 911,
+                "y0": 489,
+                "x1": 979,
+                "y1": 531
+              },
+              "text": "误",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 986,
+                "y0": 521,
+                "x1": 999,
+                "y1": 534
+              },
+              "text": "差",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1010,
+            "y0": 476,
+            "x1": 1046,
+            "y1": 548
+          },
+          "text": "。",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "。",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1010,
+                "y0": 476,
+                "x1": 1046,
+                "y1": 548
+              },
+              "text": "。",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1030,
+            "y0": 490,
+            "x1": 1163,
+            "y1": 534
+          },
+          "text": "实",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "实",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1030,
+                "y0": 490,
+                "x1": 1163,
+                "y1": 534
+              },
+              "text": "实",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1091,
+            "y0": 476,
+            "x1": 1132,
+            "y1": 548
+          },
+          "text": "验",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "验",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1091,
+                "y0": 476,
+                "x1": 1132,
+                "y1": 548
+              },
+              "text": "验",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1131,
+            "y0": 476,
+            "x1": 1168,
+            "y1": 548
+          },
+          "text": "共",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "共",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1131,
+                "y0": 476,
+                "x1": 1168,
+                "y1": 548
+              },
+              "text": "共",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "包含128个样本，每个样本重复测量3次。所有结\n",
+      "confidence": 94,
+      "bbox": {
+        "x0": 204,
+        "y0": 551,
+        "x1": 1172,
+        "y1": 606
+      },
+      "baseline": {
+        "x0": 204,
+        "y0": 594,
+        "x1": 1172,
+        "y1": 606
+      },
+      "rowAttributes": {
+        "rowHeight": 57.533333,
+        "descenders": 14.383333,
+        "ascenders": 14.383333
+      },
+      "words": [
+        {
+          "bbox": {
+            "x0": 204,
+            "y0": 551,
+            "x1": 516,
+            "y1": 600
+          },
+          "text": "包含",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "包含",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 204,
+                "y0": 551,
+                "x1": 244,
+                "y1": 594
+              },
+              "text": "包",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 249,
+                "y0": 552,
+                "x1": 516,
+                "y1": 600
+              },
+              "text": "含",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 308,
+            "y0": 547,
+            "x1": 380,
+            "y1": 619
+          },
+          "text": "128",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "128",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 308,
+                "y0": 547,
+                "x1": 326,
+                "y1": 619
+              },
+              "text": "1",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 326,
+                "y0": 547,
+                "x1": 344,
+                "y1": 619
+              },
+              "text": "2",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 344,
+                "y0": 547,
+                "x1": 380,
+                "y1": 619
+              },
+              "text": "8",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 380,
+            "y0": 547,
+            "x1": 439,
+            "y1": 619
+          },
+          "text": "个",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "个",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 380,
+                "y0": 547,
+                "x1": 439,
+                "y1": 619
+              },
+              "text": "个",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 438,
+            "y0": 547,
+            "x1": 520,
+            "y1": 619
+          },
+          "text": "样本",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "样本",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 438,
+                "y0": 547,
+                "x1": 488,
+                "y1": 619
+              },
+              "text": "样",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 488,
+                "y0": 547,
+                "x1": 520,
+                "y1": 619
+              },
+              "text": "本",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 519,
+            "y0": 547,
+            "x1": 565,
+            "y1": 619
+          },
+          "text": "，",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "，",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 519,
+                "y0": 547,
+                "x1": 565,
+                "y1": 619
+              },
+              "text": "，",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 564,
+            "y0": 556,
+            "x1": 619,
+            "y1": 599
+          },
+          "text": "每",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "每",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 564,
+                "y0": 556,
+                "x1": 619,
+                "y1": 599
+              },
+              "text": "每",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 643,
+            "y0": 556,
+            "x1": 668,
+            "y1": 600
+          },
+          "text": "个",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "个",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 643,
+                "y0": 556,
+                "x1": 668,
+                "y1": 600
+              },
+              "text": "个",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 668,
+            "y0": 547,
+            "x1": 731,
+            "y1": 619
+          },
+          "text": "样本",
+          "confidence": 95,
+          "choices": [
+            {
+              "text": "样本",
+              "confidence": 95
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 668,
+                "y0": 547,
+                "x1": 709,
+                "y1": 619
+              },
+              "text": "样",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 689,
+                "y0": 558,
+                "x1": 731,
+                "y1": 601
+              },
+              "text": "本",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 749,
+            "y0": 558,
+            "x1": 844,
+            "y1": 602
+          },
+          "text": "重复",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "重复",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 749,
+                "y0": 558,
+                "x1": 777,
+                "y1": 600
+              },
+              "text": "重",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 781,
+                "y0": 558,
+                "x1": 844,
+                "y1": 602
+              },
+              "text": "复",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 856,
+            "y0": 560,
+            "x1": 934,
+            "y1": 602
+          },
+          "text": "测量",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "测量",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 856,
+                "y0": 560,
+                "x1": 868,
+                "y1": 602
+              },
+              "text": "测",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 872,
+                "y0": 560,
+                "x1": 934,
+                "y1": 602
+              },
+              "text": "量",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 945,
+            "y0": 560,
+            "x1": 974,
+            "y1": 603
+          },
+          "text": "3",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "3",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 945,
+                "y0": 560,
+                "x1": 974,
+                "y1": 603
+              },
+              "text": "3",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 995,
+            "y0": 592,
+            "x1": 1008,
+            "y1": 604
+          },
+          "text": "次",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "次",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 995,
+                "y0": 592,
+                "x1": 1008,
+                "y1": 604
+              },
+              "text": "次",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1037,
+            "y0": 562,
+            "x1": 1055,
+            "y1": 604
+          },
+          "text": "。",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "。",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1037,
+                "y0": 562,
+                "x1": 1055,
+                "y1": 604
+              },
+              "text": "。",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1056,
+            "y0": 562,
+            "x1": 1080,
+            "y1": 605
+          },
+          "text": "所",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "所",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1056,
+                "y0": 562,
+                "x1": 1080,
+                "y1": 605
+              },
+              "text": "所",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1095,
+            "y0": 562,
+            "x1": 1125,
+            "y1": 605
+          },
+          "text": "有",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "有",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1095,
+                "y0": 562,
+                "x1": 1125,
+                "y1": 605
+              },
+              "text": "有",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1136,
+            "y0": 563,
+            "x1": 1172,
+            "y1": 606
+          },
+          "text": "结",
+          "confidence": 90,
+          "choices": [
+            {
+              "text": "结",
+              "confidence": 90
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1136,
+                "y0": 563,
+                "x1": 1172,
+                "y1": 606
+              },
+              "text": "结",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "text": "果均保留原始单位，不对缺失数值进行推断。\n\n",
+      "confidence": 93,
+      "bbox": {
+        "x0": 203,
+        "y0": 623,
+        "x1": 1089,
+        "y1": 676
+      },
+      "baseline": {
+        "x0": 203,
+        "y0": 665,
+        "x1": 1089,
+        "y1": 676
+      },
+      "rowAttributes": {
+        "rowHeight": 57.533333,
+        "descenders": 14.383333,
+        "ascenders": 14.383333
+      },
+      "words": [
+        {
+          "bbox": {
+            "x0": 203,
+            "y0": 624,
+            "x1": 245,
+            "y1": 666
+          },
+          "text": "果",
+          "confidence": 89,
+          "choices": [
+            {
+              "text": "果",
+              "confidence": 89
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 203,
+                "y0": 624,
+                "x1": 245,
+                "y1": 666
+              },
+              "text": "果",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 261,
+            "y0": 623,
+            "x1": 308,
+            "y1": 666
+          },
+          "text": "均",
+          "confidence": 88,
+          "choices": [
+            {
+              "text": "均",
+              "confidence": 88
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 261,
+                "y0": 623,
+                "x1": 308,
+                "y1": 666
+              },
+              "text": "均",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 309,
+            "y0": 624,
+            "x1": 408,
+            "y1": 668
+          },
+          "text": "保留",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "保留",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 309,
+                "y0": 626,
+                "x1": 336,
+                "y1": 667
+              },
+              "text": "保",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 342,
+                "y0": 624,
+                "x1": 408,
+                "y1": 668
+              },
+              "text": "留",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 432,
+            "y0": 625,
+            "x1": 506,
+            "y1": 669
+          },
+          "text": "原始",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "原始",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 432,
+                "y0": 625,
+                "x1": 448,
+                "y1": 667
+              },
+              "text": "原",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 447,
+                "y0": 626,
+                "x1": 506,
+                "y1": 669
+              },
+              "text": "始",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 523,
+            "y0": 626,
+            "x1": 580,
+            "y1": 672
+          },
+          "text": "单位",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "单位",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 523,
+                "y0": 626,
+                "x1": 566,
+                "y1": 670
+              },
+              "text": "单",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 572,
+                "y0": 659,
+                "x1": 580,
+                "y1": 672
+              },
+              "text": "位",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 593,
+            "y0": 619,
+            "x1": 630,
+            "y1": 690
+          },
+          "text": "，",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "，",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 593,
+                "y0": 619,
+                "x1": 630,
+                "y1": 690
+              },
+              "text": "，",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 629,
+            "y0": 630,
+            "x1": 657,
+            "y1": 671
+          },
+          "text": "不",
+          "confidence": 92,
+          "choices": [
+            {
+              "text": "不",
+              "confidence": 92
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 629,
+                "y0": 630,
+                "x1": 657,
+                "y1": 671
+              },
+              "text": "不",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 673,
+            "y0": 628,
+            "x1": 703,
+            "y1": 671
+          },
+          "text": "对",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "对",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 673,
+                "y0": 628,
+                "x1": 703,
+                "y1": 671
+              },
+              "text": "对",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 722,
+            "y0": 628,
+            "x1": 794,
+            "y1": 672
+          },
+          "text": "缺失",
+          "confidence": 88,
+          "choices": [
+            {
+              "text": "缺失",
+              "confidence": 88
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 722,
+                "y0": 628,
+                "x1": 749,
+                "y1": 672
+              },
+              "text": "缺",
+              "confidence": 98,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 752,
+                "y0": 629,
+                "x1": 794,
+                "y1": 672
+              },
+              "text": "失",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 811,
+            "y0": 630,
+            "x1": 886,
+            "y1": 673
+          },
+          "text": "数值",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "数值",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 811,
+                "y0": 630,
+                "x1": 840,
+                "y1": 672
+              },
+              "text": "数",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 844,
+                "y0": 630,
+                "x1": 886,
+                "y1": 673
+              },
+              "text": "值",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 909,
+            "y0": 631,
+            "x1": 1003,
+            "y1": 675
+          },
+          "text": "进行",
+          "confidence": 96,
+          "choices": [
+            {
+              "text": "进行",
+              "confidence": 96
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 909,
+                "y0": 631,
+                "x1": 932,
+                "y1": 674
+              },
+              "text": "进",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 935,
+                "y0": 632,
+                "x1": 1003,
+                "y1": 675
+              },
+              "text": "行",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1028,
+            "y0": 619,
+            "x1": 1074,
+            "y1": 690
+          },
+          "text": "推断",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "推断",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1028,
+                "y0": 632,
+                "x1": 1070,
+                "y1": 676
+              },
+              "text": "推",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            },
+            {
+              "bbox": {
+                "x0": 1051,
+                "y0": 619,
+                "x1": 1074,
+                "y1": 690
+              },
+              "text": "断",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        },
+        {
+          "bbox": {
+            "x0": 1076,
+            "y0": 664,
+            "x1": 1089,
+            "y1": 676
+          },
+          "text": "。",
+          "confidence": 93,
+          "choices": [
+            {
+              "text": "。",
+              "confidence": 93
+            }
+          ],
+          "font_name": "",
+          "symbols": [
+            {
+              "bbox": {
+                "x0": 1076,
+                "y0": 664,
+                "x1": 1089,
+                "y1": 676
+              },
+              "text": "。",
+              "confidence": 99,
+              "is_superscript": 0,
+              "is_subscript": 0,
+              "is_dropcap": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "skewFootnote": {
+    "text": "注: 本文所有样本、数字和结论均为自拟测试内容，不代表真实研究结果。\n\n",
+    "confidence": 93,
+    "bbox": {
+      "x0": 174,
+      "y0": 2972,
+      "x1": 1252,
+      "y1": 3016
+    },
+    "baseline": {
+      "x0": 174,
+      "y0": 3002,
+      "x1": 1252,
+      "y1": 3016
+    },
+    "rowAttributes": {
+      "rowHeight": 41.511112,
+      "descenders": 10.377778,
+      "ascenders": 10.377778
+    },
+    "words": [
+      {
+        "bbox": {
+          "x0": 174,
+          "y0": 2972,
+          "x1": 216,
+          "y1": 3002
+        },
+        "text": "注",
+        "confidence": 92,
+        "choices": [
+          {
+            "text": "注",
+            "confidence": 92
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 174,
+              "y0": 2972,
+              "x1": 216,
+              "y1": 3002
+            },
+            "text": "注",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 212,
+          "y0": 2968,
+          "x1": 226,
+          "y1": 3024
+        },
+        "text": ":",
+        "confidence": 87,
+        "choices": [
+          {
+            "text": ":",
+            "confidence": 87
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 212,
+              "y0": 2968,
+              "x1": 226,
+              "y1": 3024
+            },
+            "text": ":",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 250,
+          "y0": 2973,
+          "x1": 271,
+          "y1": 3004
+        },
+        "text": "本",
+        "confidence": 91,
+        "choices": [
+          {
+            "text": "本",
+            "confidence": 91
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 250,
+              "y0": 2973,
+              "x1": 271,
+              "y1": 3004
+            },
+            "text": "本",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 289,
+          "y0": 2973,
+          "x1": 321,
+          "y1": 3004
+        },
+        "text": "文",
+        "confidence": 87,
+        "choices": [
+          {
+            "text": "文",
+            "confidence": 87
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 289,
+              "y0": 2973,
+              "x1": 321,
+              "y1": 3004
+            },
+            "text": "文",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 327,
+          "y0": 2974,
+          "x1": 338,
+          "y1": 3004
+        },
+        "text": "所",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "所",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 327,
+              "y0": 2974,
+              "x1": 338,
+              "y1": 3004
+            },
+            "text": "所",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 352,
+          "y0": 2974,
+          "x1": 391,
+          "y1": 3005
+        },
+        "text": "有",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "有",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 352,
+              "y0": 2974,
+              "x1": 391,
+              "y1": 3005
+            },
+            "text": "有",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 407,
+          "y0": 2975,
+          "x1": 451,
+          "y1": 3006
+        },
+        "text": "样本",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "样本",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 407,
+              "y0": 2975,
+              "x1": 438,
+              "y1": 3006
+            },
+            "text": "样",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 443,
+              "y0": 2998,
+              "x1": 451,
+              "y1": 3006
+            },
+            "text": "本",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 453,
+          "y0": 2968,
+          "x1": 485,
+          "y1": 3024
+        },
+        "text": "、",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "、",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 453,
+              "y0": 2968,
+              "x1": 485,
+              "y1": 3024
+            },
+            "text": "、",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 485,
+          "y0": 2976,
+          "x1": 504,
+          "y1": 3006
+        },
+        "text": "数",
+        "confidence": 92,
+        "choices": [
+          {
+            "text": "数",
+            "confidence": 92
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 485,
+              "y0": 2976,
+              "x1": 504,
+              "y1": 3006
+            },
+            "text": "数",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 520,
+          "y0": 2976,
+          "x1": 537,
+          "y1": 3007
+        },
+        "text": "字",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "字",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 520,
+              "y0": 2976,
+              "x1": 537,
+              "y1": 3007
+            },
+            "text": "字",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 548,
+          "y0": 2976,
+          "x1": 570,
+          "y1": 3007
+        },
+        "text": "和",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "和",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 548,
+              "y0": 2976,
+              "x1": 570,
+              "y1": 3007
+            },
+            "text": "和",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 579,
+          "y0": 2976,
+          "x1": 638,
+          "y1": 3008
+        },
+        "text": "结论",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "结论",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 579,
+              "y0": 2976,
+              "x1": 618,
+              "y1": 3008
+            },
+            "text": "结",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 616,
+              "y0": 2977,
+              "x1": 638,
+              "y1": 3008
+            },
+            "text": "论",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 653,
+          "y0": 2977,
+          "x1": 670,
+          "y1": 3008
+        },
+        "text": "均",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "均",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 653,
+              "y0": 2977,
+              "x1": 670,
+              "y1": 3008
+            },
+            "text": "均",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 688,
+          "y0": 2978,
+          "x1": 723,
+          "y1": 3009
+        },
+        "text": "为",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "为",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 688,
+              "y0": 2978,
+              "x1": 723,
+              "y1": 3009
+            },
+            "text": "为",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 723,
+          "y0": 2968,
+          "x1": 755,
+          "y1": 3024
+        },
+        "text": "自",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "自",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 723,
+              "y0": 2968,
+              "x1": 755,
+              "y1": 3024
+            },
+            "text": "自",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 754,
+          "y0": 2978,
+          "x1": 780,
+          "y1": 3010
+        },
+        "text": "拟",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "拟",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 754,
+              "y0": 2978,
+              "x1": 780,
+              "y1": 3010
+            },
+            "text": "拟",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 786,
+          "y0": 2979,
+          "x1": 856,
+          "y1": 3011
+        },
+        "text": "测试",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "测试",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 786,
+              "y0": 2979,
+              "x1": 838,
+              "y1": 3010
+            },
+            "text": "测",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 841,
+              "y0": 2979,
+              "x1": 856,
+              "y1": 3011
+            },
+            "text": "试",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 856,
+          "y0": 2968,
+          "x1": 888,
+          "y1": 3024
+        },
+        "text": "内",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "内",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 856,
+              "y0": 2968,
+              "x1": 888,
+              "y1": 3024
+            },
+            "text": "内",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 887,
+          "y0": 2980,
+          "x1": 914,
+          "y1": 3013
+        },
+        "text": "容",
+        "confidence": 92,
+        "choices": [
+          {
+            "text": "容",
+            "confidence": 92
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 887,
+              "y0": 2980,
+              "x1": 914,
+              "y1": 3013
+            },
+            "text": "容",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 919,
+          "y0": 2968,
+          "x1": 947,
+          "y1": 3024
+        },
+        "text": "，",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "，",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 919,
+              "y0": 2968,
+              "x1": 947,
+              "y1": 3024
+            },
+            "text": "，",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 947,
+          "y0": 2982,
+          "x1": 982,
+          "y1": 3013
+        },
+        "text": "不",
+        "confidence": 91,
+        "choices": [
+          {
+            "text": "不",
+            "confidence": 91
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 947,
+              "y0": 2982,
+              "x1": 982,
+              "y1": 3013
+            },
+            "text": "不",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 982,
+          "y0": 2981,
+          "x1": 1037,
+          "y1": 3012
+        },
+        "text": "代表",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "代表",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 982,
+              "y0": 2982,
+              "x1": 1004,
+              "y1": 3012
+            },
+            "text": "代",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 1007,
+              "y0": 2981,
+              "x1": 1037,
+              "y1": 3012
+            },
+            "text": "表",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 1052,
+          "y0": 2982,
+          "x1": 1122,
+          "y1": 3014
+        },
+        "text": "真实",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "真实",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 1052,
+              "y0": 2982,
+              "x1": 1103,
+              "y1": 3014
+            },
+            "text": "真",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 1106,
+              "y0": 2984,
+              "x1": 1122,
+              "y1": 3014
+            },
+            "text": "实",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 1122,
+          "y0": 2968,
+          "x1": 1170,
+          "y1": 3024
+        },
+        "text": "研究",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "研究",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 1122,
+              "y0": 2968,
+              "x1": 1154,
+              "y1": 3024
+            },
+            "text": "研",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 1141,
+              "y0": 2983,
+              "x1": 1170,
+              "y1": 3015
+            },
+            "text": "究",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 1185,
+          "y0": 2983,
+          "x1": 1237,
+          "y1": 3015
+        },
+        "text": "结果",
+        "confidence": 93,
+        "choices": [
+          {
+            "text": "结果",
+            "confidence": 93
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 1185,
+              "y0": 2983,
+              "x1": 1204,
+              "y1": 3015
+            },
+            "text": "结",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 1207,
+              "y0": 2985,
+              "x1": 1237,
+              "y1": 3015
+            },
+            "text": "果",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 1243,
+          "y0": 3007,
+          "x1": 1252,
+          "y1": 3016
+        },
+        "text": "。",
+        "confidence": 88,
+        "choices": [
+          {
+            "text": "。",
+            "confidence": 88
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 1243,
+              "y0": 3007,
+              "x1": 1252,
+              "y1": 3016
+            },
+            "text": "。",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      }
+    ]
+  }
+}

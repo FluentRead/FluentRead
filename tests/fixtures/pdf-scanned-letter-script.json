@@ -1,0 +1,543 @@
+{
+  "source": "Self-authored scan: An exponent x with a raised min followed by needs source review. Actual Tesseract result from scanned-pdf-structure-20261113/scientific-glyphs-ocr.json.",
+  "line": {
+    "bbox": {
+      "x0": 200,
+      "y0": 1720,
+      "x1": 844,
+      "y1": 1760
+    },
+    "text": "An exponent x™\" needs source review.\n\n",
+    "confidence": 88,
+    "rowAttributes": {
+      "rowHeight": 40,
+      "descenders": 9,
+      "ascenders": 11
+    },
+    "baseline": {
+      "x0": 200,
+      "y0": 1751,
+      "x1": 844,
+      "y1": 1751
+    },
+    "words": [
+      {
+        "bbox": {
+          "x0": 200,
+          "y0": 1722,
+          "x1": 251,
+          "y1": 1751
+        },
+        "text": "An",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "An",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 200,
+              "y0": 1722,
+              "x1": 230,
+              "y1": 1751
+            },
+            "text": "A",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 231,
+              "y0": 1731,
+              "x1": 251,
+              "y1": 1751
+            },
+            "text": "n",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 263,
+          "y0": 1726,
+          "x1": 414,
+          "y1": 1760
+        },
+        "text": "exponent",
+        "confidence": 92,
+        "choices": [
+          {
+            "text": "exponent",
+            "confidence": 92
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 263,
+              "y0": 1731,
+              "x1": 279,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 281,
+              "y0": 1731,
+              "x1": 300,
+              "y1": 1751
+            },
+            "text": "x",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 301,
+              "y0": 1731,
+              "x1": 320,
+              "y1": 1760
+            },
+            "text": "p",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 323,
+              "y0": 1731,
+              "x1": 341,
+              "y1": 1751
+            },
+            "text": "o",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 343,
+              "y0": 1731,
+              "x1": 363,
+              "y1": 1751
+            },
+            "text": "n",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 365,
+              "y0": 1731,
+              "x1": 381,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 382,
+              "y0": 1731,
+              "x1": 402,
+              "y1": 1751
+            },
+            "text": "n",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 403,
+              "y0": 1726,
+              "x1": 414,
+              "y1": 1751
+            },
+            "text": "t",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 425,
+          "y0": 1720,
+          "x1": 490,
+          "y1": 1751
+        },
+        "text": "x™\"",
+        "confidence": 53,
+        "choices": [
+          {
+            "text": "x™\"",
+            "confidence": 53
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 425,
+              "y0": 1731,
+              "x1": 445,
+              "y1": 1751
+            },
+            "text": "x",
+            "confidence": 97,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 446,
+              "y0": 1720,
+              "x1": 468,
+              "y1": 1734
+            },
+            "text": "™",
+            "confidence": 98,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 469,
+              "y0": 1720,
+              "x1": 490,
+              "y1": 1734
+            },
+            "text": "\"",
+            "confidence": 93,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 502,
+          "y0": 1721,
+          "x1": 595,
+          "y1": 1751
+        },
+        "text": "needs",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "needs",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 502,
+              "y0": 1731,
+              "x1": 522,
+              "y1": 1751
+            },
+            "text": "n",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 523,
+              "y0": 1731,
+              "x1": 539,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 542,
+              "y0": 1731,
+              "x1": 558,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 560,
+              "y0": 1721,
+              "x1": 580,
+              "y1": 1751
+            },
+            "text": "d",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 582,
+              "y0": 1731,
+              "x1": 595,
+              "y1": 1751
+            },
+            "text": "s",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 608,
+          "y0": 1731,
+          "x1": 714,
+          "y1": 1751
+        },
+        "text": "source",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "source",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 608,
+              "y0": 1731,
+              "x1": 621,
+              "y1": 1751
+            },
+            "text": "s",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 624,
+              "y0": 1731,
+              "x1": 642,
+              "y1": 1751
+            },
+            "text": "o",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 644,
+              "y0": 1731,
+              "x1": 660,
+              "y1": 1751
+            },
+            "text": "u",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 644,
+              "y0": 1731,
+              "x1": 679,
+              "y1": 1751
+            },
+            "text": "r",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 680,
+              "y0": 1731,
+              "x1": 696,
+              "y1": 1751
+            },
+            "text": "c",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 698,
+              "y0": 1731,
+              "x1": 714,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      },
+      {
+        "bbox": {
+          "x0": 726,
+          "y0": 1721,
+          "x1": 844,
+          "y1": 1751
+        },
+        "text": "review.",
+        "confidence": 96,
+        "choices": [
+          {
+            "text": "review.",
+            "confidence": 96
+          }
+        ],
+        "font_name": "",
+        "symbols": [
+          {
+            "bbox": {
+              "x0": 726,
+              "y0": 1731,
+              "x1": 740,
+              "y1": 1751
+            },
+            "text": "r",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 741,
+              "y0": 1731,
+              "x1": 757,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 759,
+              "y0": 1731,
+              "x1": 779,
+              "y1": 1751
+            },
+            "text": "v",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 780,
+              "y0": 1721,
+              "x1": 790,
+              "y1": 1751
+            },
+            "text": "i",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 792,
+              "y0": 1731,
+              "x1": 808,
+              "y1": 1751
+            },
+            "text": "e",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 809,
+              "y0": 1731,
+              "x1": 839,
+              "y1": 1751
+            },
+            "text": "w",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          },
+          {
+            "bbox": {
+              "x0": 839,
+              "y0": 1746,
+              "x1": 844,
+              "y1": 1751
+            },
+            "text": ".",
+            "confidence": 99,
+            "is_superscript": 0,
+            "is_subscript": 0,
+            "is_dropcap": 0
+          }
+        ]
+      }
+    ]
+  }
+}

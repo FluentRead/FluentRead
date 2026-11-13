@@ -2,7 +2,7 @@
  * @file src/app/document-translation/runtime.ts
  * 字幕能力：通用提示词模型及含已启用 AI 成员的组合可消费相邻 cue；专用 MT 模型沿用原协议。
  * 文件职责：把通用翻译客户端、配置 store 与文档 feature 的纯服务连接起来，为页面提供可直接调用的分段翻译和文件下载适配器。
- * 主要内容：按固定服务和模型提供文档默认批量、可关闭的翻译流程，注入客户端原有单次超时和文档总预算，不改写全局 AI 多段开关；为扫描版 PDF 组装“渲染页面 → 文字识别 → 换算坐标”的页面识别器；为默认原版导出注入 JPEG 绘制器，为显式重排导出注入可复制文字与图表端口，并持有、释放本次导出的 PDF.js 租约。
+ * 主要内容：按固定服务和模型提供文档默认批量、可关闭的翻译流程，注入客户端原有单次超时和文档总预算，不改写全局 AI 多段开关；为扫描版 PDF 组装“渲染页面 → 文字识别 → 换算坐标”的页面识别器，图形候选按序串行复核，文字、图形边界与区域读数共同回映到页面；为默认原版导出注入 JPEG 绘制器，为显式重排导出注入可复制文字与图表端口，并持有、释放本次导出的 PDF.js 租约。
  * 模块边界：本文件是 app adapter，不解析源文件、不维护页面进度，也不实现 PDF/EPUB/DOCX 编码；业务算法归 document-translation feature，网络请求归 translation client。
  */
 import {getTranslationTimeout, translateText, translateTextBatch} from '@/src/services/translation/client';
@@ -15,7 +15,7 @@ import {
 } from '@/src/features/document-translation/services/binary';
 import {createDocumentSegmentTranslator} from '@/src/features/document-translation/services/translation';
 import {acquirePdfDocument, renderPdfReadingPages, rasterizePdfReadingPages, rasterizePdfTranslationPage, renderPdfPageImage} from '@/src/features/document-translation/ui/pdfPreview';
-import type {PdfPageRecognizer} from '@/src/features/document-translation/services/pdfOcr';
+import type {PdfPageRecognition, PdfPageRecognitionInput, PdfRegionRecognition} from '@/src/features/document-translation/services/pdfOcr';
 import {config, configReady} from '@/src/services/config/store';
 import {supportsNativeTranslationBatch} from '@/src/services/translation/capabilities';
 import {hasCompositeTranslationAIContext} from '@/src/core/config/compositeTranslation';
@@ -78,12 +78,27 @@ export async function createDocumentDownload(
  * 扫描版 PDF 的页面识别器：把一页渲染成图像，交给图片翻译已有的文字识别运行时，再把识别框从图像像素换算回页面坐标。
  * 识别引擎体积较大，只在真正需要识别时才载入。
  */
-export function createPdfPageRecognizer(sourceLanguage: string): PdfPageRecognizer {
-    return async ({bytes, pageNumber, width, signal}) => {
+export function createPdfPageRecognizer(sourceLanguage: string): (input: PdfPageRecognitionInput) => Promise<PdfPageRecognition> {
+    return async ({bytes, pageNumber, width, height, signal, useCache}) => {
         const rendered = await renderPdfPageImage(bytes, pageNumber, width, signal);
         const {recognizeImageText} = await import('@/src/features/image-translation/ocr');
-        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal);
-        const scale = width / rendered.width;
-        return lines.map(line => ({text: line.text, x: line.bbox.x0 * scale, y: line.bbox.y0 * scale, width: (line.bbox.x1 - line.bbox.x0) * scale, height: (line.bbox.y1 - line.bbox.y0) * scale}));
+        signal?.throwIfAborted();
+        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal, {profile: 'document', ...(useCache === false ? {useCache: false} : {})});
+        const scaleX = width / rendered.width, scaleY = height / rendered.height;
+        const toPage = <T extends {x: number; y: number; width: number; height: number}>(box: T): T => ({...box,
+            x: box.x * scaleX, y: box.y * scaleY, width: box.width * scaleX, height: box.height * scaleY});
+        const mapLines = (values: typeof lines, x=0, y=0) => values.map(line => ({text: line.text, x: (line.bbox.x0+x) * scaleX, y: (line.bbox.y0+y) * scaleY, width: (line.bbox.x1 - line.bbox.x0) * scaleX, height: (line.bbox.y1 - line.bbox.y0) * scaleY,
+            ...(line.baseline === undefined ? {} : {baseline: (line.baseline+y) * scaleY}),
+            ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * scaleY}),
+            ...(line.documentReview ? {needsReview: true} : {}),
+        }));
+        const regions: PdfRegionRecognition[] = [];
+        for (const region of rendered.regions) {
+            signal?.throwIfAborted();
+            const recognized = region.image ? await recognizeImageText(region.image, sourceLanguage, signal, {profile:'document',documentLayout:'sparse', ...(useCache === false ? {useCache: false} : {})}) : undefined;
+            signal?.throwIfAborted();
+            regions.push({graphicIndex:region.graphicIndex,...(recognized ? {lines:mapLines(recognized,region.x,region.y)} : {})});
+        }
+        return {graphics: rendered.graphics.map(({rules, ...box}) => ({...toPage(box), rules: rules.map(toPage)})), lines:mapLines(lines),regions};
     };
 }

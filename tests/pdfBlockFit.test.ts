@@ -14,6 +14,29 @@ const page = (blocks: PdfDocumentBlock[], extra: Partial<PdfDocumentPage> = {}):
 const monospace = (text: string, fontSize: number) => Array.from(text).length * fontSize;
 
 describe('PDF layout overlay block selection', () => {
+    it('keeps neighbouring long captions inside their own figure widths even when their baselines differ',()=>{
+        const left=block(0,48,559,96,7,{kind:'caption',lineCount:1,fontSize:6.12}),right=block(1,312,552,83,6,{kind:'caption',lineCount:1,fontSize:6.12});
+        const regions=[{id:'figure',kind:'figure' as const,x:47.5,y:449,width:198,height:97},{id:'table',kind:'table' as const,x:311.5,y:449,width:232,height:90}];
+        const [a,b]=pdfOverlayBlocks(page([left,right],{preservedRegions:regions}));
+        expect(a.block.x+a.block.width+a.spaceRight).toBeLessThanOrEqual(245.5);expect(b.block.x+b.block.width+b.spaceRight).toBeLessThanOrEqual(543.5);
+        expect(b.spaceRight).toBeGreaterThan(130);expect(a.block.width).toBe(96);expect(b.block.width).toBe(83);
+        expect(a.block.x+a.block.width+a.spaceRight).toBeLessThan(b.block.x);
+    });
+    it('chooses the nearest matching graphic above or below a caption without shrinking its original width',()=>{
+        const caption=block(0,40,105,100,10,{kind:'caption',lineCount:1});
+        const above={id:'above',kind:'figure' as const,x:40,y:40,width:200,height:60};
+        const below={id:'below',kind:'figure' as const,x:40,y:128,width:300,height:60};
+        const [near]=pdfOverlayBlocks(page([caption],{preservedRegions:[below,above]}));
+        expect(near.block.x+near.block.width+near.spaceRight).toBeGreaterThan(230);expect(near.block.x+near.block.width+near.spaceRight).toBeLessThanOrEqual(240);
+        const [top]=pdfOverlayBlocks(page([caption],{preservedRegions:[below]}));
+        expect(top.block.x+top.block.width+top.spaceRight).toBeGreaterThan(330);expect(top.block.x+top.block.width+top.spaceRight).toBeLessThanOrEqual(340);
+        const wide={...caption,width:250};const [kept]=pdfOverlayBlocks(page([wide],{preservedRegions:[above]}));
+        expect(kept.block.width).toBe(250);expect(kept.spaceRight).toBe(0);
+        const ordinary=pdfOverlayBlocks(page([caption]))[0];
+        for(const graphic of [{...above,y:400},{...above,x:300},{...above,x:0,width:20},{...above,y:100,height:50}]) {
+            expect(pdfOverlayBlocks(page([caption],{preservedRegions:[graphic]}))[0].spaceRight).toBe(ordinary.spaceRight);
+        }
+    });
     it('replaces ordinary prose only and keeps protected kinds, preserved regions and empty geometry as source pixels', () => {
         const blocks = [
             block(0, 40, 40, 200, 24),

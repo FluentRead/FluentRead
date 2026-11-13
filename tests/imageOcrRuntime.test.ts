@@ -1,5 +1,9 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createSharedOcrTasks} from '@/src/features/image-translation/services/sharedOcrTasks';
+import scannedPaper from './fixtures/pdf-scanned-paper-ocr.json';
+import lowScoreNumber from './fixtures/pdf-scanned-low-score-number.json';
+import bulletPixels from './fixtures/pdf-scanned-bullet-pixels.json';
+import {recognizePdfDocument} from '@/src/features/document-translation/services/pdfOcr';
 
 const {recognize, ensureLanguages, clearModels, disposeWorker, removeFiles, createRuntime, tesseractCreateWorker, prefetchModels} = vi.hoisted(() => ({
     clearModels: vi.fn(async (remove: () => Promise<void>) => remove()), removeFiles: vi.fn(async () => {}), recognize: vi.fn(), ensureLanguages: vi.fn(), createRuntime: vi.fn(), tesseractCreateWorker: vi.fn(),
@@ -14,7 +18,7 @@ vi.mock('@/src/features/image-translation/services/ocrWorkerRuntime', () => ({
     createOcrWorkerRuntime: createRuntime,
 }));
 vi.mock('@/src/features/image-translation/services/ocrModelCache', () => ({removeOcrModelFiles: removeFiles}));
-vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6}}));
+vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {AUTO: 3, SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6, SINGLE_WORD: 8}}));
 
 const blockResult = () => ({data: {blocks: [{paragraphs: [{lines: [{
     text: 'hello', bbox: {x0: 10, y0: 10, x1: 50, y1: 30},
@@ -31,6 +35,265 @@ describe('图片 OCR 处理与结果缓存', () => {
     let sourcePixels: Uint8ClampedArray;
     let context: {drawImage: Mock; getImageData: Mock; putImageData: Mock; fillRect: Mock; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
+
+    const scriptResult = () => {
+        const bbox = {x0: 10, y0: 6, x1: 51, y1: 40};
+        const word = {text: '10%', bbox, confidence: 99, symbols: [
+            {text: '1', confidence: 99, bbox: {x0: 10, y0: 15, x1: 20, y1: 40}},
+            {text: '0', confidence: 99, bbox: {x0: 23, y0: 15, x1: 35, y1: 40}},
+            {text: '%', confidence: 96, bbox: {x0: 38, y0: 6, x1: 51, y1: 25}},
+        ]};
+        return {data: {blocks: [{paragraphs: [{lines: [{...word, words: [word], baseline: {x0: 10, y0: 40, x1: 51, y1: 40}, rowAttributes: {rowHeight: 30}}]}]}]}};
+    };
+
+    const bulletResult = () => ({data: {blocks: [{paragraphs: [{lines: [16, 86].map(y => ({text: 'e We test.', bbox: {x0: 5, y0: y - 11, x1: 160, y1: y + 28},
+        words: [{text: 'e', confidence: 43, bbox: {x0: 5, y0: y, x1: 20, y1: y + 15}}, {text: 'We', confidence: 99, bbox: {x0: 36, y0: y - 9, x1: 90, y1: y + 18}},
+            {text: 'test.', confidence: 99, bbox: {x0: 100, y0: y - 11, x1: 160, y1: y + 28}}],
+        baseline: {x0: 5, y0: y + 18, x1: 160, y1: y + 18}, rowAttributes: {rowHeight: 39}}))}]}]}});
+    const filledBullet = () => ({width: 15, height: 15, data: Uint8ClampedArray.from(bulletPixels.rows.flatMap(row => Array.from(row).flatMap(value => value === '#' ? [0, 0, 0, 255] : [255, 255, 255, 255])))});
+
+    it.each(['e', '0'])('verifies a list marker read as %s from shared pixels without extra worker requests and caches immutable results', async label => {
+        dimensions = {width: 200, height: 200}; const raw = bulletResult();
+        for (const row of raw.data.blocks[0].paragraphs[0].lines) {row.words[0].text = label; row.words[0].confidence = 10; row.text = `${label} We test.`;}
+        recognize.mockResolvedValue(raw);
+        const read = context.getImageData.getMockImplementation()!;
+        context.getImageData.mockImplementation((...args: number[]) => args[2] === 15 ? filledBullet() : read(...args));
+        const first = await recognizeImage('paper-list', 'en', undefined, {profile: 'document'});
+        expect(first.map(line => line.text)).toEqual(['•', 'We test.', '•', 'We test.']);
+        expect(first.some(line => line.documentReview)).toBe(false);
+        expect(recognize).toHaveBeenCalledOnce(); expect(sources).toHaveLength(2);
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 5, 16, 15, 15, 0, 0, 15, 15);
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.width).toBe(0);
+        first[0].bbox.x0 = 999;
+        const cached = await recognizeImage('paper-list', 'en', undefined, {profile: 'document'});
+        expect(cached[0].bbox.x0).toBe(5); expect(recognize).toHaveBeenCalledOnce();
+    });
+
+    it.each(['image', 'area'] as const)('does not apply list interpretation to the %s profile', async profile => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult());
+        const lines = await recognizeImage('ordinary-list', 'en', undefined, {profile});
+        expect(lines.some(line => line.text === '•')).toBe(false); expect(sources).toHaveLength(1);
+    });
+
+    it('retains ambiguous list markers as review evidence and allows retry', async () => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult());
+        const lines = await recognizeImage('ambiguous-list', 'en', undefined, {profile: 'document'});
+        expect(lines.filter(line => line.documentReview)).toHaveLength(2);
+        await recognizeImage('ambiguous-list', 'en', undefined, {profile: 'document'}); expect(recognize).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['canvas', 'pixels', 'abort'] as const)('releases list crop resources on %s failure', async failure => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult()); const controller = new AbortController();
+        if (failure === 'canvas') canvas.getContext.mockReturnValueOnce(context).mockReturnValue(null);
+        else context.getImageData.mockImplementationOnce(() => ({data: sourcePixels, width: 200, height: 200})).mockImplementation(() => {
+            if (failure === 'pixels') throw new Error('list pixels failed');
+            controller.abort(); return filledBullet();
+        });
+        await expect(recognizeImage(`list-${failure}`, 'en', controller.signal, {profile: 'document'})).rejects.toThrow();
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.width).toBe(0);
+    });
+
+    it.each(['left', 'top', 'right', 'bottom', 'wide', 'tall', 'fallback-size'] as const)('bounds marker crops using the decoded source (%s)', async kind => {
+        dimensions = {width: 1000, height: 1000}; const raw = bulletResult();
+        for (const row of raw.data.blocks[0].paragraphs[0].lines) {
+            const sx = kind === 'wide' ? 5 : kind === 'tall' ? 4 : 1, sy = ['wide', 'tall'].includes(kind) ? 5 : 1;
+            const dx = kind === 'left' ? -10 : kind === 'right' ? 995 : 0, dy = kind === 'top' ? -150 : kind === 'bottom' ? 995 : 0;
+            for (const box of [row.bbox, row.baseline, ...row.words.map(word => word.bbox)]) {
+                box.x0 = box.x0 * sx + dx; box.x1 = box.x1 * sx + dx; box.y0 = box.y0 * sy + dy; box.y1 = box.y1 * sy + dy;
+            }
+            row.rowAttributes.rowHeight *= sy;
+        }
+        if (kind === 'fallback-size') onImageCreated = () => {if (sources.length === 2) Object.assign(sources[1], {naturalWidth: 0, naturalHeight: 0});};
+        recognize.mockResolvedValue(raw);
+        await recognizeImage(`list-crop-${kind}`, 'en', undefined, {profile: 'document'});
+        expect(recognize.mock.calls.map(call => call[3])).toEqual(['top', 'right', 'bottom'].includes(kind) ? [3, 11] : [3]);
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.height).toBe(0);
+    });
+
+    it('keeps a low-score paper number with exact glyph evidence and a review location, without caching it as confirmed', async () => {
+        dimensions = {width: lowScoreNumber.width, height: lowScoreNumber.height};
+        const word = structuredClone(lowScoreNumber.word);
+        const raw = {data: {blocks: [{paragraphs: [{lines: [{text: word.text, bbox: word.bbox, words: [word]}]}]}]}};
+        recognize.mockResolvedValue(raw);
+        const lines = await recognizeImage('low-score-paper-number', 'en', undefined, {profile: 'document'});
+        expect(lines).toContainEqual({text: '3,700', bbox: word.bbox});
+        expect(lines).toContainEqual({text: '', bbox: word.bbox, documentReview: true});
+        expect(raw.data.blocks[0].paragraphs[0].lines[0].words[0].confidence).toBe(17);
+        await recognizeImage('low-score-paper-number', 'en', undefined, {profile: 'document'});
+        expect(recognize).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['image', 'area'] as const)('keeps low-score document number retention out of the %s profile', async profile => {
+        dimensions = {width: lowScoreNumber.width, height: lowScoreNumber.height};
+        const word = structuredClone(lowScoreNumber.word);
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [{text: word.text, bbox: word.bbox, words: [word]}]}]}]}});
+        expect(await recognizeImage('low-score-nondocument-number', 'en', undefined, {profile})).toEqual([]);
+    });
+
+    it('recovers scripts from the same source pixels at two scales and caches only confirmed results', async () => {
+        recognize.mockResolvedValueOnce(scriptResult()).mockResolvedValue({data: {text: '4\n', confidence: 95}});
+        const lines = await recognizeImage(ENCODED_PNG, 'en', undefined, {profile: 'document'});
+        expect(lines.map(line => line.text)).toEqual(['10⁴']);
+        expect(recognize.mock.calls.map(call => call[3])).toEqual([3, 8, 8]);
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 34, 46);
+        expect(canvas.getContext).toHaveBeenCalledWith('2d', {alpha: false, willReadFrequently: true});
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 68, 92);
+        expect(encodedSizes).toEqual([{width: 66, height: 78}, {width: 100, height: 124}]);
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+        expect(await recognizeImage(ENCODED_PNG, 'en', undefined, {profile: 'document'})).toEqual(lines);
+        expect(recognize).toHaveBeenCalledTimes(3);
+    });
+
+    it('retains unconfirmed source and review coordinates and permits a fresh retry', async () => {
+        recognize.mockImplementation(async (_image, _language, _signal, mode) => mode === 8 ? {data: {text: 'x', confidence: 99}} : scriptResult());
+        const lines = await recognizeImage('uncertain-script', 'en', undefined, {profile: 'document'});
+        expect(lines).toContainEqual({text: '', bbox: {x0: 38, y0: 6, x1: 51, y1: 25}, documentReview: true});
+        expect(lines[0].text).toBe('10%');
+        await recognizeImage('uncertain-script', 'en', undefined, {profile: 'document'});
+        expect(recognize).toHaveBeenCalledTimes(6);
+    });
+
+    it.each(['image', 'area'] as const)('keeps %s recognition separate from document script recovery', async profile => {
+        recognize.mockResolvedValue(scriptResult());
+        await recognizeImage('non-document', 'en', undefined, {profile});
+        expect(recognize).toHaveBeenCalledOnce(); expect(sources).toHaveLength(1);
+    });
+
+    it('releases crop resources and rejects the page on worker failure', async () => {
+        recognize.mockResolvedValueOnce(scriptResult()).mockRejectedValueOnce(new Error('crop worker failed'));
+        await expect(recognizeImage('crop-failed', 'en', undefined, {profile: 'document'})).rejects.toThrow('crop worker failed');
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+    });
+
+    it('rejects unsupported crop canvas without leaking the decoded page', async () => {
+        canvas.getContext.mockReturnValueOnce(context).mockReturnValue(null);
+        recognize.mockResolvedValueOnce(scriptResult());
+        await expect(recognizeImage('no-crop-canvas', 'en', undefined, {profile: 'document'})).rejects.toThrow('浏览器不支持图片处理');
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.height).toBe(0);
+    });
+
+    it.each(['outside', 'oversized'] as const)('returns review geometry without submitting an %s crop', async kind => {
+        const raw = scriptResult();
+        if (kind === 'oversized') {
+            dimensions = {width: 1000, height: 100};
+            const row = raw.data.blocks[0].paragraphs[0].lines[0]; row.words[0].symbols[2].bbox.x1 = 600;
+            row.bbox.x1 = 600;
+        } else {
+            onImageCreated = () => {if (sources.length === 2) Object.assign(sources.at(-1)!, {naturalWidth: 0, naturalHeight: 0, width: 40, height: 100});};
+        }
+        recognize.mockResolvedValue(raw);
+        const lines = await recognizeImage(`crop-${kind}`, 'en', undefined, {profile: 'document'});
+        expect(lines.some(line => line.documentReview)).toBe(true); expect(recognize).toHaveBeenCalledOnce();
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+    });
+
+    it('leaves empty, vertical and ambiguous document row metrics unguessed', async () => {
+        dimensions = {width: 200, height: 220};
+        recognize.mockResolvedValue({data: {blocks: null}});
+        expect(await recognizeImage('empty-metrics', 'en', undefined, {profile: 'document'})).toEqual([]);
+        const vertical = {text: '縦書き', bbox: {x0: 10, y0: 20, x1: 30, y1: 200}, baseline: {x0: 20, y0: 20, x1: 20, y1: 200}};
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [vertical]}]}]}});
+        expect(await recognizeImage('vertical-metrics', 'ja', undefined, {profile: 'document'})).toEqual([{text: '縦書き', bbox: vertical.bbox, vertical: true}]);
+        const line = {text: 'Same text', bbox: {x0: 10, y0: 10, x1: 100, y1: 30}, baseline: {x0: 10, y0: 25, x1: 100, y1: 25}, rowAttributes: {rowHeight: 20}};
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [line, {...line, rowAttributes: {rowHeight: 22}}]}]}]}});
+        expect(await recognizeImage('ambiguous-metrics', 'en', undefined, {profile: 'document'})).toEqual([{text: 'Same text', bbox: line.bbox}]);
+    });
+
+    it('retains real row metrics when the engine joins columns and normalization splits their word boxes', async () => {
+        dimensions = {width: scannedPaper.width, height: scannedPaper.height};
+        recognize.mockResolvedValue({data: {blocks: scannedPaper.blocks}});
+        const lines = await recognizeImage('real-paper', 'en', undefined, {profile: 'document'});
+        const last = lines.find(line => line.text === 'observations and conclusions.')!;
+        expect(last).toBeDefined();
+        expect(last.fontSize).toBeCloseTo(39 * .85);
+        expect(last.baseline).toBe(1300.5);
+        expect(last.bbox.x1).toBeLessThan(1000);
+        expect(lines.some(line => line.text.startsWith('Right column') && line.bbox.x0 > 1200)).toBe(true);
+        const page = {pageNumber: 1, width: 595, height: 842, scanned: true, blocks: [], segmentIndexes: []};
+        const parsed = await recognizePdfDocument({fileName: 'paper.pdf', format: 'pdf', label: 'PDF', parts: [], segments: [],
+            binary: {kind: 'pdf', bytes: new Uint8Array([1]), pages: [page]}}, async () => lines.map(line => ({
+                text: line.text, x: line.bbox.x0 * 595 / 2480, y: line.bbox.y0 * 842 / 3508,
+                width: (line.bbox.x1 - line.bbox.x0) * 595 / 2480, height: (line.bbox.y1 - line.bbox.y0) * 842 / 3508,
+                fontSize: line.fontSize! * 842 / 3508, baseline: line.baseline! * 842 / 3508,
+            })));
+        const sources = parsed.segments.map(segment => segment.source);
+        expect(sources).toContain('The method preserves local structure and separates adjacent columns. Paragraph boundaries matter because a translation must preserve the relationship between observations and conclusions.');
+        const paragraphOrder = ['Left column', 'The method', 'Right column', 'In conclusion', 'Small footnote'].map(prefix => sources.findIndex(source => source.startsWith(prefix)));
+        expect(paragraphOrder.every((at, index) => at >= 0 && (index === 0 || at > paragraphOrder[index - 1]))).toBe(true);
+    });
+
+    it('keeps dense document resolution, chooses automatic columns, and isolates its cache from image OCR', async () => {
+        dimensions = {width: 2480, height: 3508};
+        recognize.mockResolvedValue(blockResult());
+        await recognizeImage('paper', 'en', undefined, {profile: 'document'});
+        expect(context.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, 2480, 3508);
+        expect(recognize).toHaveBeenLastCalledWith('paper', 'eng', expect.any(AbortSignal), 3, expect.any(Function));
+        await recognizeImage('paper', 'en', undefined, {profile: 'document'});
+        expect(recognize).toHaveBeenCalledOnce();
+        await recognizeImage('paper', 'en');
+        expect(recognize).toHaveBeenCalledTimes(2);
+        expect(recognize.mock.calls[1][3]).toBeUndefined();
+        expect(encodedSizes[0].width * encodedSizes[0].height).toBeLessThanOrEqual(6_000_000);
+        expect(canvas.width).toBe(0);
+    });
+
+
+    it('re-recognizes cached pages independently and does not join another pending read',async()=>{
+        recognize.mockResolvedValue(blockResult());
+        await recognizeImage('explicit-page','en',undefined,{profile:'document'});
+        await recognizeImage('explicit-page','en',undefined,{profile:'document',useCache:false});
+        expect(recognize).toHaveBeenCalledTimes(2);
+        let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+        recognize.mockImplementation(async()=>{await gate;return blockResult();});
+        const normal=recognizeImage('pending-page','en',undefined,{profile:'document'});
+        await vi.waitFor(()=>expect(recognize).toHaveBeenCalledTimes(3));
+        const fresh=recognizeImage('pending-page','en',undefined,{profile:'document',useCache:false});
+        await vi.waitFor(()=>expect(recognize).toHaveBeenCalledTimes(4));release();await Promise.all([normal,fresh]);
+        await recognizeImage('explicit-page','en',undefined,{profile:'document'});expect(recognize).toHaveBeenCalledTimes(4);
+    });
+    it('retries an empty document once with sparse layout, never single-block column concatenation', async () => {
+        recognize.mockResolvedValueOnce({data: {blocks: []}}).mockResolvedValueOnce(blockResult());
+        expect(await recognizeImage('sparse-paper', 'en', undefined, {profile: 'document'})).toHaveLength(1);
+        expect(recognize.mock.calls.map(call => call[3])).toEqual([3, 11]);
+    });
+
+    it('isolates a regional sparse document pass from whole-page cache and never repeats the same empty pass',async()=>{
+        recognize.mockResolvedValue(blockResult());
+        await recognizeImage('grid','en',undefined,{profile:'document'});
+        await recognizeImage('grid','en',undefined,{profile:'document',documentLayout:'sparse'});
+        await recognizeImage('grid','en',undefined,{profile:'document',documentLayout:'sparse'});
+        expect(recognize.mock.calls.map(call=>call[3])).toEqual([3,11]);
+        recognize.mockReset().mockResolvedValue({data:{blocks:[]}});
+        expect(await recognizeImage('empty-grid','en',undefined,{profile:'document',documentLayout:'sparse'})).toEqual([]);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
+    it('preserves validated document row metrics across short ink boxes, scaling and cached copies', async () => {
+        dimensions = {width: 4960, height: 7016};
+        const line = {text: 'observations and conclusions.', bbox: {x0: 20, y0: 300, x1: 200, y1: 321},
+            baseline: {x0: 20, y0: 320, x1: 200, y1: 320}, rowAttributes: {rowHeight: 30, ascenders: 5, descenders: -5}};
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [line]}]}]}});
+        const first = await recognizeImage('paper-metrics', 'en', undefined, {profile: 'document'});
+        const scaleY = dimensions.height / encodedSizes[0].height;
+        expect(first[0].baseline).toBeCloseTo(320 * scaleY);
+        expect(first[0].fontSize).toBeCloseTo(25.5 * scaleY);
+        first[0].baseline = -1;
+        const cached = await recognizeImage('paper-metrics', 'en', undefined, {profile: 'document'});
+        expect(cached[0].baseline).toBeCloseTo(320 * scaleY);
+        expect(recognize).toHaveBeenCalledOnce();
+    });
+
+    it.each([
+        {rowHeight: NaN, y0: 25, y1: 25}, {rowHeight: 0, y0: 25, y1: 25},
+        {rowHeight: 2, y0: 25, y1: 25}, {rowHeight: 100, y0: 25, y1: 25},
+        {rowHeight: 20, y0: 20, y1: 30}, {rowHeight: 20, y0: 0, y1: 0},
+        {rowHeight: 20, y0: 50, y1: 50},
+    ])('rejects implausible document row metrics without discarding readable text: %j', metrics => {
+        dimensions = {width: 200, height: 100};
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [{text: 'Readable text', bbox: {x0: 10, y0: 10, x1: 150, y1: 30},
+            baseline: {x0: 10, y0: metrics.y0, x1: 150, y1: metrics.y1}, rowAttributes: {rowHeight: metrics.rowHeight}}]}]}]}});
+        return expect(recognizeImage('invalid-metrics', 'en', undefined, {profile: 'document'})).resolves.toEqual([{text: 'Readable text', bbox: {x0: 10, y0: 10, x1: 150, y1: 30}}]);
+    });
 
     it.each(['invalid','too-many'] as const)('只读圈选忽略 %s 的低分数字噪声，正常返回正文',async problem=>{
         const word={text:'HELLO',bbox:{x0:30,y0:30,x1:90,y1:50},confidence:99};

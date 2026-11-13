@@ -514,6 +514,10 @@ describe('图片 OCR 有界尺寸和可信文本', () => {
         expect(getOcrImageSize(8000, 1000)).toEqual({width: 4096, height: 512});
         expect(getOcrImageSize(4000, 3000)).toEqual({width: 2828, height: 2121});
         expect(getOcrImageSize(1, 100_000)).toEqual({width: 1, height: 4096});
+        expect(getOcrImageSize(2480, 3508, 'document')).toEqual({width: 2480, height: 3508});
+        const document = getOcrImageSize(8000, 9000, 'document');
+        expect(document.width * document.height).toBeLessThanOrEqual(9_000_000);
+        expect(Math.max(document.width, document.height)).toBeLessThanOrEqual(4096);
     });
 
     it.each([[0, 10], [-1, 10], [10, 0], [10, -1], [Infinity, 10], [10, Infinity], [NaN, 10]])(

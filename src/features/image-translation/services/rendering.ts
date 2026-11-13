@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，按实际回退字体的墨迹、描边和基线适配上下边界，保留正文对齐及字号上限并隔离 Canvas 状态。
+ * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，估计不可靠时沿用原上限；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type {OcrLine} from '@/src/shared/image/types';
+import type {ImageTextRegion} from '../paragraphs';
 import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
 
 /** 从 OCR 框外围采样主色，忽略透明像素且不遍历框内面积。 */
@@ -86,6 +87,26 @@ export interface ImageTranslationTextLayout {
 }
 
 export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
+
+/** 单个横排物理行的字号上限：宽度与墨迹高度独立推算一致时，才采用参考字体的 em 估计。
+ * OCR 框不是字体行框；含下伸笔画的行不能仅因框更高就变成大字。未知字体形状、合段和长文本保留旧上限。
+ * 这里只估计尺度，不声称识别字体族；最终译文仍须用设备实际回退字体的完整墨迹适配。
+ */
+export function getImageSourceFontLimit(context:CanvasRenderingContext2D,line:ImageTextRegion):number {
+    if(line.vertical)return Infinity;
+    const b=line.bbox,height=b.y1-b.y0,width=b.x1-b.x0,fallback=(line.fontSize??height)*1.2;
+    if(line.sourceBoxes&&line.sourceBoxes.length!==1||line.ruby?.length||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text)
+        ||![width,height].every(value=>Number.isFinite(value)&&value>0))return fallback;
+    context.save();
+    try{
+        context.font='400 100px Arial, sans-serif';context.textAlign='left';context.textBaseline='alphabetic';context.direction=getImageTextDirection(line.text);
+        const metrics=context.measureText(line.text),inkWidth=metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight,
+            inkHeight=metrics.actualBoundingBoxAscent+metrics.actualBoundingBoxDescent;
+        if(![inkWidth,inkHeight].every(value=>Number.isFinite(value)&&value>0))return fallback;
+        const byWidth=width/inkWidth*100,byHeight=height/inkHeight*100,estimate=(byWidth+byHeight)/2;
+        return Math.max(byWidth,byHeight)<=Math.min(byWidth,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5?estimate:fallback;
+    }finally{context.restore();}
+}
 /** 离屏文档的默认方向不能决定译文中的数字与标点；预检和绘制使用同一首强字符方向。 */
 export function getImageTextDirection(text:string):CanvasDirection {
     const firstLetter=text.match(/\p{Letter}/u)?.[0]??'';
@@ -262,8 +283,10 @@ export function layoutImageTranslationText(
     const fits = (layout: ImageTranslationTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
         && layout.lines.every(line => textWidth(line, layout.fontSize) <= width);
 
-    let high = Math.min(height / lineSpacing, maxFontSize);
-    const largest = wrap(high);
+    // 有真实墨迹时，外侧不需要额外占一个完整 CSS 行高；行距只用于多行之间。
+    let high = Math.min(measureInk?Math.min(Number.MAX_VALUE,height*2):height/lineSpacing, maxFontSize);
+    let largest = wrap(high);
+    if(measureInk&&!largest.ink){high=Math.min(height/lineSpacing,maxFontSize);largest=wrap(high);}
     if (fits(largest)) return largest;
     // 根据完整段落在 1px 字号的宽度推导可容纳下限；极长译文可缩小但始终保留全部文字。
     // 行数来自完整译文，不展开成函数参数，也不为取最大值另建宽度数组。

@@ -5,10 +5,55 @@ import {
     drawTranslatedImageText,
     getImageTextBackgroundColor,
     getImageTextColor,
+    getImageSourceFontLimit,
     layoutImageTranslationText,
 } from '@/src/features/image-translation/services/rendering';
 
 const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+
+describe('原文墨迹与字体尺度',()=>{
+    const source=(text='SOURCE',width=192,height=35)=>({text,bbox:{x0:10,y0:10,x1:10+width,y1:10+height}});
+    it('相同48px文字的x高度、大写和下伸笔画不会变成不同字号',()=>{
+        const context=canvasContext();
+        for(const inkHeight of [50,70,95]){
+            context.measureText.mockReturnValue({actualBoundingBoxLeft:0,actualBoundingBoxRight:400,actualBoundingBoxAscent:inkHeight-10,actualBoundingBoxDescent:10,width:400} as never);
+            expect(getImageSourceFontLimit(context as never,source('SAME FONT',192,inkHeight*.48))).toBeCloseTo(48,10);
+        }
+        expect(context.save).toHaveBeenCalledTimes(3);expect(context.restore).toHaveBeenCalledTimes(3);
+    });
+    it('字号层级跟随原图尺度，而不是把邻近文字统一缩成小字',()=>{
+        const context=canvasContext();context.measureText.mockReturnValue({actualBoundingBoxLeft:2,actualBoundingBoxRight:398,actualBoundingBoxAscent:70,actualBoundingBoxDescent:10,width:403} as never);
+        for(const size of [18,42,52,96])expect(getImageSourceFontLimit(context as never,source('TITLE',size*4,size*.8))).toBeCloseTo(size);
+    });
+    it('只用一个物理行估计，竖排、附属注音、多行与复杂段落不猜字体',()=>{
+        const context=canvasContext(),a=source();
+        expect(getImageSourceFontLimit(context as never,{...a,vertical:true})).toBe(Infinity);
+        for(const change of [{sourceBoxes:[]},{sourceBoxes:[a.bbox,a.bbox]},{ruby:[{text:'かな',bbox:a.bbox}]},{text:'A'},{text:'A'.repeat(257)},{text:'A\nB'},
+            {bbox:{...a.bbox,x1:10}},{bbox:{...a.bbox,y1:10}},{bbox:{...a.bbox,x1:NaN}}])
+            expect(getImageSourceFontLimit(context as never,{...a,fontSize:30,...change})).toBe(36);
+        expect(context.measureText).not.toHaveBeenCalled();
+    });
+    it.each([
+        {w:0,h:80},{w:NaN,h:80},{w:400,h:Infinity},{w:400,h:0},
+        {w:200,h:80},{w:400,h:30},{w:400,h:140},
+    ])('度量不完整、形状不符或不合理墨迹比例保留原上限 %j',({w,h})=>{
+        const context=canvasContext();context.measureText.mockReturnValue({actualBoundingBoxLeft:0,actualBoundingBoxRight:w,actualBoundingBoxAscent:h,actualBoundingBoxDescent:0,width:w} as never);
+        const height=h===30||h===140?h*.48:38.4;
+        expect(getImageSourceFontLimit(context as never,{...source('SOURCE',192,height),fontSize:30,sourceBoxes:[source().bbox]})).toBe(36);
+        expect(context.restore).toHaveBeenCalledOnce();
+    });
+    it('原生度量异常仍恢复Canvas状态且传播错误',()=>{
+        const context=canvasContext();context.measureText.mockImplementation(()=>{throw new Error('metrics unavailable');});
+        expect(()=>getImageSourceFontLimit(context as never,source())).toThrow('metrics unavailable');expect(context.restore).toHaveBeenCalledOnce();
+    });
+    it('单行实际墨迹可用满高度，不重复扣除CSS行高；无真实度量仍走旧行框',()=>{
+        const measure=(text:string,size:number)=>text.length*size*.5,ink=(_text:string,size:number)=>({ascent:size*.7,descent:size*.1});
+        const real=layoutImageTranslationText('FIT',500,40,measure,48,ink);
+        expect(real.fontSize).toBe(48);expect(real.ink!.height).toBeCloseTo(38.4);
+        const missing=layoutImageTranslationText('FIT',500,40,measure,48,()=>({ascent:NaN,descent:NaN}));
+        expect(missing).toEqual(layoutImageTranslationText('FIT',500,40,measure,48));
+    });
+});
 const measure = (text: string, fontSize: number) => Array.from(segmenter.segment(text)).length * fontSize;
 
 function canvasContext() {

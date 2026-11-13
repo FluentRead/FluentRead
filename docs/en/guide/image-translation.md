@@ -29,6 +29,8 @@ Recognized decomposed Hangul, extended Han characters, and their variation selec
 
 Ordinary images use the actual glyph bounds of your device's fonts to reduce clipping of accents, ascenders and descenders. Merged Tesseract vertical text keeps each column's erasure bounds, preserving artwork between columns. For opaque text regions whose complete boundary matches a smooth gradient, ordinary image and manga repair continue that gradient. Complex textures or translucent backgrounds may still show repair artifacts; switch to the original to compare.
 
+Single horizontal lines use both the source text's width and ink height to check its font scale, reducing size differences caused by letter shapes. Unreliable estimates and complex paragraphs keep their existing limits. Translations still fit their complete glyphs within the available area; this does not recover the original font family or every decorative style.
+
 Small Japanese reading annotations above horizontal text or to the right of vertical text are attached to the body when their size, position and ownership are clear. This avoids translating the reading as a separate text block. The body and annotation keep their original erasure bounds, with padding based on the annotation's own size. Ambiguous annotations, independent small text and already grouped recognition regions retain their existing handling.
 
 Individual translation requests include bounded neighboring text from the same image as reference for services that support context. Batch requests continue to process their existing paragraphs together. Translated images follow the original image's shape clipping and pixel scaling settings.

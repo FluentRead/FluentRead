@@ -254,7 +254,8 @@ describe('普通译图真实修补与绘制保留原始 alpha 证据',()=>{
     it.each(['missing','zero'] as const)('opaque原路径不因%s墨迹指标触发alpha预检或丢完整译文',async kind=>{
         source=scene(255,false);metrics=kind;
         expect((await translate()).image).toBeTruthy();completeGlyphs();
-        expect(canvases[0].context.measureText).toHaveBeenCalledTimes(2);released();
+        expect(canvases[0].context.measureText).toHaveBeenCalledTimes(3); // 一次有界原文字号校验，另两次为译文字形度量。
+        released();
     });
     it('空白行保留合法留白，不能按空墨迹拒绝整段译文或挤掉两端完整行',async()=>{
         translations=['A\n\nB'];const result=await translate();expect(result.image).toBeTruthy();
@@ -290,7 +291,7 @@ describe('普通译图真实修补与绘制保留原始 alpha 证据',()=>{
         });
         expect((await translate()).image).toBeTruthy();completeGlyphs();
         expect(canvases).toHaveLength(1);expect(canvases[0].reads).toEqual([[0,0,128,80]]);expect(canvases[0].writes).toBe(1);
-        expect(canvases[0].context.measureText).toHaveBeenCalledTimes(2);
+        expect(canvases[0].context.measureText).toHaveBeenCalledTimes(3); // 一次有界原文字号校验，另两次为译文字形度量。
         expect(copies.filter(n=>n===128*80*4)).toEqual([]);released();
     });
     it.each([255,96])('已知matte=%i在孔附近不被RGBA扩散稀释，原ink及新glyph之外逐像素保持实心底',async matte=>{

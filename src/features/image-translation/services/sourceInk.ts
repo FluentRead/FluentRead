@@ -12,8 +12,8 @@ type Box=OcrLine['bbox'];
 export interface ImageSourceInk {background?:ImageMattePalette['background'];foreground?:string;outline?:string}
 const TOLERANCE=1.5;
 
-/** 每个颜色通道必须共享同一个覆盖率；色差不是字形或擦除证明。 */
-function sameInk(pixel:readonly number[],background:readonly number[],ink:readonly number[]):boolean {
+/** 每个颜色通道必须共享同一个覆盖率；可供只读样式和识别投影复核，不能证明字形、词界或擦除归属。 */
+export function matchesImageSourceInk(pixel:readonly number[],background:readonly number[],ink:readonly number[]):boolean {
     let low=0,high=1;
     for(let c=0;c<3;c++){
         const delta=ink[c]-background[c],offset=pixel[c]-background[c];
@@ -68,7 +68,7 @@ export function observeImageSourceInk(pixels:Uint8ClampedArray,width:number,heig
     const ink=[candidate&255,candidate>>>8&255,candidate>>>16&255];
     for(let i=0;i<inkCount;i++){
         const x=inkPixels[i]%w,y=Math.floor(inkPixels[i]/w);
-        if(!sameInk(read(x,y),background(x,y),ink))return;
+        if(!matchesImageSourceInk(read(x,y),background(x,y),ink))return;
     }
     const foreground=`rgb(${ink.join(',')})`;
     if(flat)return {background:[...corners[0]] as ImageMattePalette['background'],...(getImageRgbContrast(ink,corners[0])>=4.5?{foreground}:{})};

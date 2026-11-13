@@ -90,7 +90,7 @@ describe('图片/漫画测试模型共享文件缓存',()=>{
         await fs.writeFile(path.join(playwright,'index.js'),'module.exports={chromium:{}};');
         const helper=path.join(f.root,'focus-helper.cjs');await fs.writeFile(helper,'module.exports={launchFocusSafePersistentContext:()=>{throw Error("UNEXPECTED_BROWSER_LAUNCH")}};');
         const script=path.resolve('scripts/testing/run-manga-translation-test.cjs');
-        const args=[process.execPath,script,'--playwright-root',f.root,'--focus-safe-helper',helper,'--preload-text-seg'];
+        const args=[process.execPath,script,'--playwright-root',f.root,'--focus-safe-helper',helper,'--extension-dir',path.join(f.root,'missing-extension'),'--preload-text-seg'];
         await expect(childRun(`process.argv=${JSON.stringify(args)};require(${JSON.stringify(script)});`)).rejects.toThrow('requires --model-cache-no-download');
         for(const conflict of [['--baseline'],['--preload-models-dir',f.root],['--offline-models-dir',f.root],['--blocked-official'],['--blocked-all-model-sources']]){
             await expect(childRun(`process.argv=${JSON.stringify([...args,'--model-cache-no-download',...conflict])};require(${JSON.stringify(script)});`)).rejects.toThrow('requires the shared model cache');
@@ -100,6 +100,20 @@ describe('图片/漫画测试模型共享文件缓存',()=>{
         const report=JSON.parse(await fs.readFile(path.join(artifacts,'report.json'),'utf8'));
         expect(report.profileRemoved).toBe(false);expect(report.failure).toContain('unavailable in offline cache');
         expect(await allFiles(f.directory)).toEqual([]);
+    });
+
+    it('缺少扩展构建时写入失败报告，不创建 profile 或启动浏览器',async()=>{
+        const f=await fixture(),playwright=path.join(f.root,'playwright');await fs.mkdir(playwright);
+        await fs.writeFile(path.join(playwright,'index.js'),'module.exports={chromium:{}};');
+        const helper=path.join(f.root,'focus-helper.cjs');await fs.writeFile(helper,'module.exports={launchFocusSafePersistentContext:()=>{throw Error("UNEXPECTED_BROWSER_LAUNCH")}};');
+        const script=path.resolve('scripts/testing/run-manga-translation-test.cjs'),extension=path.join(f.root,'missing-extension'),artifacts=path.join(f.root,'artifacts');
+        const args=[process.execPath,script,'--playwright-root',f.root,'--focus-safe-helper',helper,'--extension-dir',extension,'--artifacts-dir',artifacts];
+        await expect(childRun(`process.argv=${JSON.stringify(args)};require(${JSON.stringify(script)});`)).rejects.toThrow('ENOENT');
+        const report=JSON.parse(await fs.readFile(path.join(artifacts,'report.json'),'utf8'));
+        expect(report).toMatchObject({status:'failed',profileRemoved:false,cleanupErrors:[]});
+        expect(report.failure).toContain(extension);expect(report.failure).not.toContain('UNEXPECTED_BROWSER_LAUNCH');
+        expect(report.javascriptAssetsSha256).toBeUndefined();
+        await expect(fs.stat(extension)).rejects.toMatchObject({code:'ENOENT'});
     });
     it('从生产固定清单读取三个 OCR 文件和可选 LaMa，不复制版本或权威哈希',()=>{
         const assets=readImageTranslationModelManifest();

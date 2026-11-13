@@ -203,10 +203,6 @@ function collectJavaScript(directory){
         if(entry.isDirectory())collectJavaScript(file);else if(file.endsWith('.js'))javascriptFiles.push(file);
     }
 }
-collectJavaScript(extensionDir);
-const javascriptHash=createHash('sha256');
-for(const file of javascriptFiles.sort())javascriptHash.update(path.relative(extensionDir,file)).update('\0').update(fs.readFileSync(file));
-report.javascriptAssetsSha256=javascriptHash.digest('hex');
 if(errorRecoveryTest){
     report.site=`controlled ${errorRecoverySurface} recovery fixture using production reader discovery`;
     report.errorRecovery={surface:errorRecoverySurface,fixtureUrl:targetUrl,sourceSelector:readerSelector,
@@ -1839,6 +1835,11 @@ async function verifyReadAhead() {
 (async()=>{
     // 显式可选 CTD 在任何 profile、扩展副本或浏览器创建前验证；缺失/损坏不改缓存、不联网。
     if(preloadTextSeg)await prepareModelFilesForTest();
+    // 先报告可选模型预检结果，再绑定原始构建指纹；缺少构建也进入统一报告和清理路径。
+    collectJavaScript(extensionDir);
+    const javascriptHash=createHash('sha256');
+    for(const file of javascriptFiles.sort())javascriptHash.update(path.relative(extensionDir,file)).update('\0').update(fs.readFileSync(file));
+    report.javascriptAssetsSha256=javascriptHash.digest('hex');
 if (process.argv.includes('--worker-diagnostics')) {
     diagnosticFixture=fs.mkdtempSync('/private/tmp/fluentread-manga-diagnostics-');
     fs.cpSync(extensionDir,diagnosticFixture,{recursive:true});extensionDir=diagnosticFixture;

@@ -51,5 +51,16 @@
   "video.learning.explanationAgain": "再度解説",
   "video.learning.start": "文の学習を開始",
   "video.learning.appearance": "学習パネルの表示を調整",
-  "video.learning.drag": "タイトルをドラッグして移動"
+  "video.learning.drag": "タイトルをドラッグして移動",
+  "video.course.toggle": "FluentRead 字幕",
+  "video.course.auto": "動画を開いたら翻訳",
+  "video.course.off": "字幕はオフです",
+  "video.course.loading": "原文字幕を読み込み中…",
+  "video.course.error": "字幕を読み込めません。再試行してください。",
+  "video.course.empty": "読み取れる字幕がありません。",
+  "video.course.bilibiliEmpty": "読み取れる字幕がありません。Bilibili は通常ログインが必要です。",
+  "video.course.ready": "字幕の準備ができました",
+  "video.course.waiting": "字幕を待っています…",
+  "video.course.download": "原文 SRT をダウンロード",
+  "video.course.downloadFailed": "ダウンロードに失敗しました。再試行してください。"
 }

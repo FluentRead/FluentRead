@@ -51,5 +51,16 @@
   "video.learning.explanationAgain": "Expliquer à nouveau",
   "video.learning.start": "Commencer l’apprentissage des phrases",
   "video.learning.appearance": "Personnaliser le panneau d’apprentissage",
-  "video.learning.drag": "Déplacer le panneau en faisant glisser le titre"
+  "video.learning.drag": "Déplacer le panneau en faisant glisser le titre",
+  "video.course.toggle": "Sous-titres FluentRead",
+  "video.course.auto": "Traduire à l’ouverture d’une vidéo",
+  "video.course.off": "Sous-titres désactivés",
+  "video.course.loading": "Chargement des sous-titres originaux…",
+  "video.course.error": "Impossible de charger les sous-titres. Réessayez.",
+  "video.course.empty": "Aucun sous-titre lisible pour cette vidéo.",
+  "video.course.bilibiliEmpty": "Aucun sous-titre lisible. Bilibili demande généralement une connexion.",
+  "video.course.ready": "Sous-titres prêts",
+  "video.course.waiting": "En attente des sous-titres…",
+  "video.course.download": "Télécharger le SRT original",
+  "video.course.downloadFailed": "Échec du téléchargement. Réessayez."
 }

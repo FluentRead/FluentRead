@@ -51,5 +51,16 @@
   "video.learning.explanationAgain": "Объяснить снова",
   "video.learning.start": "Начать изучение предложений",
   "video.learning.appearance": "Настроить вид панели обучения",
-  "video.learning.drag": "Перетащите заголовок для перемещения панели"
+  "video.learning.drag": "Перетащите заголовок для перемещения панели",
+  "video.course.toggle": "Субтитры FluentRead",
+  "video.course.auto": "Переводить при открытии видео",
+  "video.course.off": "Субтитры выключены",
+  "video.course.loading": "Загрузка исходных субтитров…",
+  "video.course.error": "Не удалось загрузить субтитры. Повторите попытку.",
+  "video.course.empty": "Для этого видео нет доступных субтитров.",
+  "video.course.bilibiliEmpty": "Нет доступных субтитров. Bilibili обычно требует входа.",
+  "video.course.ready": "Субтитры готовы",
+  "video.course.waiting": "Ожидание субтитров плеера…",
+  "video.course.download": "Скачать исходный SRT",
+  "video.course.downloadFailed": "Не удалось скачать. Повторите попытку."
 }

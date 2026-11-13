@@ -51,5 +51,16 @@
   "video.learning.explanationAgain": "重新讲解",
   "video.learning.start": "开始完整句学习",
   "video.learning.appearance": "调整学习面板样式",
-  "video.learning.drag": "拖动标题移动面板"
+  "video.learning.drag": "拖动标题移动面板",
+  "video.course.toggle": "流畅阅读字幕",
+  "video.course.auto": "打开视频就翻译",
+  "video.course.off": "字幕已关闭",
+  "video.course.loading": "正在读取原文字幕…",
+  "video.course.error": "字幕读取失败，请重试。",
+  "video.course.empty": "这个视频没有可读取的字幕。",
+  "video.course.bilibiliEmpty": "没有可读取的字幕；B 站字幕通常需要登录。",
+  "video.course.ready": "字幕已就绪",
+  "video.course.waiting": "等待播放器字幕…",
+  "video.course.download": "下载原文 SRT",
+  "video.course.downloadFailed": "字幕下载失败，请重试。"
 }

@@ -131,6 +131,7 @@ export function mountVideoSubtitleTranslation(): () => void {
     translate: translateVideoText,
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),
+    download: (srt, language) => downloadSubtitleSrt(srt, language),
   });
   // X 是 SPA：内容脚本可能先在 /home 加载，之后才无刷新进入 /status。
   // 在 X 域常驻控制器，信息流、个人主页和帖子共用当前视频定位。

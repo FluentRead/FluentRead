@@ -48,7 +48,7 @@ function fixture(url: string, html: string, translate = vi.fn().mockResolvedValu
     const ports = {document: document as unknown as Document, window: window as unknown as Window, config, translate, patch, subscribe, label: (text: string) => text};
     const start = () => { const dispose = mountPlatformCaptions(ports); disposals.push(dispose); return dispose; };
     const shadow = () => document.getElementById('fluent-read-platform-captions')?.shadowRoot;
-    return {document, window, config, translate, patch, subscribe, start, shadow, change: () => subscription?.()};
+    return {document, window, config, translate, patch, subscribe, ports, start, shadow, change: () => subscription?.()};
 }
 const sentence = 'This is the first sentence in the meeting.';
 
@@ -373,6 +373,115 @@ function videoFixture(url: string, translate?: Mock) {
     Object.defineProperty(video, 'textTracks', {value: [source, target], configurable: true});
     return {...f, video, source, target};
 }
+
+function courseFixture(platform: 'bilibili' | 'udemy' | 'edx') {
+    const url = {bilibili: 'https://www.bilibili.com/video/BV1xx411c7mD/?p=1',
+        udemy: 'https://business.udemy.com/course/demo/learn/lecture/123/', edx: 'https://courses.edx.org/courseware/unit'}[platform];
+    const metadata = JSON.stringify({transcriptLanguage: 'en', transcriptTranslationUrl: '/transcript/__lang__'});
+    const html = platform === 'bilibili' ? '<main class="bpx-player-container"><video src="one.mp4"></video><div class="bpx-player-subtitle-wrap">Native caption</div><div class="bpx-player-control-bottom-right"></div></main>'
+        : platform === 'udemy' ? '<main data-purpose="shaka-video-player"><video src="one.mp4"></video><div data-purpose="captions-cue-text">Machine translated caption</div><div data-purpose="video-control-bar"></div></main>'
+        : `<main class="video" data-block-id="first" data-metadata='${metadata}'><video src="one.mp4"></video><div class="closed-captions">Native caption</div><div class="secondary-controls"></div></main>`;
+    const f = fixture(url, html);
+    const video = f.document.querySelector('video')! as unknown as HTMLVideoElement;
+    video.getBoundingClientRect = () => ({left: 50, top: 50, width: 800, height: 450}) as DOMRect;
+    Object.assign(video, {currentTime: .5, paused: true, ended: false, seeking: false, playbackRate: 1});
+    Object.defineProperty(video, 'textTracks', {value: []});
+    const source = 'This is the original course sentence.';
+    const fetch = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        const data = platform === 'bilibili' ? url.includes('hdslb.com') ? {body: [{from: 0, to: 1, content: source}]}
+            : {data: {cid: 456, subtitle: {subtitles: [{lan: 'en', subtitle_url: '//aisubtitle.hdslb.com/subtitles.json'}]}}}
+            : platform === 'udemy' ? url.includes('/courses/') ? {id: 77, locale: {locale: 'en_US'}}
+                : {asset: {captions: [{status: 1, source: 'manual', locale_id: 'en_US', url: 'https://captions.udemycdn.com/source.vtt'}]}}
+                : {start: [0], end: [1000], text: [source]};
+        return platform === 'udemy' && url.includes('udemycdn.com') ? new Response(`WEBVTT\n\n00:00.000 --> 00:01.000\n${source}\n`) : new Response(JSON.stringify(data));
+    });
+    const download = vi.fn(), manifest = vi.fn(async () => 456);
+    Object.assign(f.ports, {captionSource: {fetch, manifest, resources: () => []}, download});
+    const menu = () => f.document.getElementById('fluent-read-course-controls')!.shadowRoot!;
+    const choose = (value: string) => { const select = menu().querySelector('select')!; select.value = value; select.dispatchEvent(new f.window.Event('change')); };
+    return {...f, video, fetch, manifest, download, source, menu, choose};
+}
+
+describe('完整课程字幕公共挂载', () => {
+    it('B 站自动开关默认关闭且不请求，手动开启后严格遵循空档、校时和关闭后的入口', async () => {
+        const f = courseFixture('bilibili'); const dispose = f.start();
+        expect(f.fetch).not.toHaveBeenCalled(); expect(f.manifest).not.toHaveBeenCalled();
+        const button = f.menu().querySelector('button')!; expect(button.getAttribute('aria-pressed')).toBe('false');
+        button.click(); expect(button.getAttribute('aria-expanded')).toBe('true');
+        f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('测试译文');
+        expect(button.getAttribute('aria-pressed')).toBe('true'); expect(f.translate).toHaveBeenCalledOnce();
+        const native = f.document.querySelector<HTMLElement>('.bpx-player-subtitle-wrap')!;
+        expect(native.style.getPropertyValue('visibility')).toBe('hidden');
+        f.video.currentTime = 1; await vi.advanceTimersByTimeAsync(300);
+        expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        expect(native.style.getPropertyValue('visibility')).toBe('');
+        f.config.videoSubtitleOffsetMs = 500; f.change(); await vi.advanceTimersByTimeAsync(100);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
+        f.menu().querySelectorAll('button')[2].click();
+        expect(f.download).toHaveBeenCalledWith(expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'en');
+        f.choose('off'); expect(f.config.videoSubtitleVisible).toBe(true); expect(f.document.getElementById('fluent-read-course-controls')).not.toBeNull();
+        expect(native.style.getPropertyValue('visibility')).toBe('');
+        f.choose('original-only'); await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('');
+        expect(f.translate).toHaveBeenCalledOnce();
+        const auto = f.menu().querySelector('input')!; auto.checked = true; auto.dispatchEvent(new f.window.Event('change'));
+        expect(f.config.videoCourseAutoStart).toEqual({bilibili: true, udemy: true, edx: false});
+        dispose(); expect(f.document.getElementById('fluent-read-course-controls')).toBeNull();
+    });
+
+    it('Udemy 原文从完整轨加载，不翻译页面的机器译文；切课取消旧字幕并保留菜单', async () => {
+        const f = courseFixture('udemy'); f.start(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
+        expect(f.translate).toHaveBeenCalledWith(f.source, expect.any(AbortSignal));
+        const count = f.fetch.mock.calls.length;
+        f.window.location.hash = '#overview'; await vi.advanceTimersByTimeAsync(300); expect(f.fetch).toHaveBeenCalledTimes(count);
+        f.video.currentTime = .8; await vi.advanceTimersByTimeAsync(300); expect(f.fetch).toHaveBeenCalledTimes(count);
+        f.video.currentTime = 2; await vi.advanceTimersByTimeAsync(300);
+        f.video.currentTime = .5; await vi.advanceTimersByTimeAsync(300); expect(f.translate).toHaveBeenCalledOnce();
+        f.window.location.pathname = '/course/demo/learn/lecture/124/'; f.video.setAttribute('src', 'two.mp4');
+        await vi.advanceTimersByTimeAsync(350);
+        expect(f.fetch.mock.calls.some(([url]) => String(url).includes('/lectures/124/'))).toBe(true);
+        expect(f.document.querySelectorAll('#fluent-read-course-controls')).toHaveLength(1);
+        f.config.videoTranslationEnabled = false; f.change(); expect(f.document.getElementById('fluent-read-course-controls')).toBeNull();
+        f.config.videoTranslationEnabled = true; f.change(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.document.querySelectorAll('#fluent-read-course-controls')).toHaveLength(1);
+    });
+
+    it('edX 跟随最后开始播放的视频，暂停保持归属，切字幕语言重新读取', async () => {
+        const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true;
+        const other = f.document.createElement('main'); other.className = 'video'; other.dataset.blockId = 'second';
+        other.dataset.metadata = JSON.stringify({transcriptLanguage: 'en', transcriptTranslationUrl: '/second/__lang__'});
+        other.innerHTML = '<video src="second.mp4"></video><div class="closed-captions">Other caption</div><div class="secondary-controls"></div><div class="langs-list"><button class="is-active" data-lang-code="en"></button></div>';
+        const video = other.querySelector('video') as unknown as HTMLVideoElement;
+        Object.assign(video, {currentTime: .5, paused: true, ended: false, seeking: false, playbackRate: 1});
+        video.getBoundingClientRect = () => ({left: 50, top: 500, width: 500, height: 281}) as DOMRect;
+        Object.defineProperty(video, 'textTracks', {value: []}); f.document.body.appendChild(other);
+        f.start(); await vi.advanceTimersByTimeAsync(350);
+        video.dispatchEvent(new f.window.Event('play', {bubbles: true})); await vi.advanceTimersByTimeAsync(350);
+        expect(f.document.getElementById('fluent-read-course-controls')?.parentElement?.parentElement).toBe(other);
+        const count = f.fetch.mock.calls.length; await vi.advanceTimersByTimeAsync(1000); expect(f.fetch).toHaveBeenCalledTimes(count);
+        other.querySelector('button')!.setAttribute('data-lang-code', 'es'); await vi.advanceTimersByTimeAsync(350);
+        expect(f.fetch.mock.calls.at(-1)![0]).toBe('https://courses.edx.org/second/es');
+        other.remove(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.document.getElementById('fluent-read-course-controls')?.parentElement?.parentElement?.dataset.blockId).toBe('first');
+    });
+
+    it('课程请求失败就地重试；原文模式不调用翻译，切换显示不会重复读取轨道', async () => {
+        const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true; f.config.videoSubtitleDisplayMode = 'original-only';
+        f.fetch.mockRejectedValueOnce(new Error('offline'));
+        f.start(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.menu().querySelector('[role="status"]')?.textContent).toContain('失败'); expect(f.translate).not.toHaveBeenCalled();
+        f.menu().querySelectorAll('button')[1].click(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source); expect(f.translate).not.toHaveBeenCalled();
+        const count = f.fetch.mock.calls.length; f.choose('bilingual'); await vi.advanceTimersByTimeAsync(100);
+        expect(f.translate).toHaveBeenCalledOnce(); expect(f.fetch).toHaveBeenCalledTimes(count);
+        f.config.uiLanguage = 'en-US'; f.change();
+        expect(f.menu().querySelector('[role="status"]')?.textContent).toBe('Subtitles are ready');
+    });
+});
 
 describe('Udemy 与 Disney+ 原生人工字幕', () => {
     it('读音优先使用原轨语言，人工译文与读音分别显示且更换媒体清空读音缓存', async () => {

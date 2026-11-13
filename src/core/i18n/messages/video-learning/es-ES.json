@@ -51,5 +51,16 @@
   "video.learning.explanationAgain": "Explicar de nuevo",
   "video.learning.start": "Iniciar aprendizaje de frases",
   "video.learning.appearance": "Personalizar el panel de aprendizaje",
-  "video.learning.drag": "Arrastra el título para mover el panel"
+  "video.learning.drag": "Arrastra el título para mover el panel",
+  "video.course.toggle": "Subtítulos de FluentRead",
+  "video.course.auto": "Traducir al abrir un vídeo",
+  "video.course.off": "Subtítulos desactivados",
+  "video.course.loading": "Cargando subtítulos originales…",
+  "video.course.error": "No se pudieron cargar los subtítulos. Reinténtalo.",
+  "video.course.empty": "Este vídeo no tiene subtítulos legibles.",
+  "video.course.bilibiliEmpty": "No hay subtítulos legibles. Bilibili suele requerir iniciar sesión.",
+  "video.course.ready": "Subtítulos listos",
+  "video.course.waiting": "Esperando los subtítulos…",
+  "video.course.download": "Descargar SRT original",
+  "video.course.downloadFailed": "La descarga falló. Reinténtalo."
 }

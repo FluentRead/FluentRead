@@ -221,7 +221,10 @@
     <section v-if="hasVisitedSection('settings-video')" v-show="props.activeSection === 'settings-video'" id="settings-video" class="settings-section">
       <SettingsPanel name="general" :active="props.activePanel">
       <SettingsGroup>
-        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" description="翻译 YouTube、X、Udemy、Disney+ 视频和 Teams、Zoom、Google Meet 网页会议中的字幕，不上传音频或视频内容"  />
+        <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" description="翻译 YouTube、X、哔哩哔哩、Udemy、edX、Disney+ 视频和 Teams、Zoom、Google Meet 网页会议中的字幕，不上传音频或视频内容"  />
+        <SettingsItem v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" :label="courseSiteLabels[site]" :description="t('video.course.auto')" :disabled="!config.videoTranslationEnabled">
+          <el-switch v-model="config.videoCourseAutoStart[site]" class="settings-toggle" :aria-label="`${courseSiteLabels[site]} ${t('video.course.auto')}`" :data-video-course-auto="site" :disabled="!config.videoTranslationEnabled" />
+        </SettingsItem>
         <SettingsItem label="会议平台自动开启双语字幕" description="在 Teams、Zoom、Google Meet 网页会议中自动开启可用字幕；平台或主持人需允许字幕" :disabled="!config.videoTranslationEnabled">
           <el-switch v-model="config.videoMeetingAutoEnabled" class="settings-toggle" aria-label="会议平台自动开启双语字幕" :disabled="!config.videoTranslationEnabled" />
         </SettingsItem>
@@ -572,6 +575,8 @@
 
 <script lang="ts" setup>
 import SettingsPanel from './components/SettingsPanel.vue';
+import {VIDEO_COURSE_PLATFORMS} from '@/src/core/config/videoCourse';
+const courseSiteLabels = {bilibili: 'Bilibili', udemy: 'Udemy', edx: 'edX'};
 import ServiceRepairReturn from './services/ServiceRepairReturn.vue';
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 

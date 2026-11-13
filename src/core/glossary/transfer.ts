@@ -40,9 +40,16 @@ export function decodeGlossaryText(buffer: ArrayBufferLike): string {
     }
 }
 
+interface TableRow {
+    cells: string[];
+    startLine: number;
+}
+
 /** RFC 4180 的引号状态机同样用于 TSV，确保引号内的换行与分隔符不会产生伪条目。 */
-function parseRows(text: string, separator: string, errors: string[]): string[][] {
-    const rows: string[][] = [];
+function parseRows(text: string, separator: string, errors: string[]): TableRow[] {
+    const rows: TableRow[] = [];
+    let line = 1;
+    let startLine = 1;
     let row: string[] = [];
     let field = '';
     let quoted = false;
@@ -50,23 +57,31 @@ function parseRows(text: string, separator: string, errors: string[]): string[][
     const finishField = () => { row.push(field); field = ''; closed = false; };
     const finishRow = () => {
         finishField();
-        if (row.some((cell) => cell.trim())) rows.push(row);
+        if (row.some((cell) => cell.trim())) rows.push({cells: row, startLine});
         row = [];
     };
     for (let index = 0; index < text.length; index += 1) {
         const char = text[index];
+        if (char === '\r' || char === '\n') {
+            const newline = char === '\r' && text[index + 1] === '\n' ? '\r\n' : char;
+            index += newline.length - 1;
+            line += 1;
+            if (quoted) field += newline;
+            else {
+                finishRow();
+                startLine = line;
+            }
+            continue;
+        }
         if (quoted) {
             if (char === '"') {
                 if (text[index + 1] === '"') { field += '"'; index += 1; }
                 else { quoted = false; closed = true; }
             } else field += char;
         } else if (char === separator) finishField();
-        else if (char === '\r' || char === '\n') {
-            if (char === '\r' && text[index + 1] === '\n') index += 1;
-            finishRow();
-        } else if (char === '"' && !field && !closed) quoted = true;
+        else if (char === '"' && !field && !closed) quoted = true;
         else if (char === '"' || (closed && char.trim())) {
-            errors.push(`第 ${rows.length + 1} 行引号格式错误。`);
+            errors.push(`第 ${line} 行引号格式错误。`);
             return [];
         } else if (!closed) field += char;
     }
@@ -89,9 +104,9 @@ function headerName(value: string): string {
     return Object.hasOwn(HEADER_NAMES, key) ? HEADER_NAMES[key] : '';
 }
 
-function tableLibraries(rows: string[][], preview: GlossaryImportPreview): unknown[] {
+function tableLibraries(rows: TableRow[], preview: GlossaryImportPreview): unknown[] {
     if (!rows.length) return [];
-    const possible = rows[0].map(headerName);
+    const possible = rows[0].cells.map(headerName);
     const hasHeader = possible.includes('source') && possible.includes('target');
     const headers = hasHeader ? possible : ['source', 'target'];
     if (hasHeader && new Set(headers.filter(Boolean)).size !== headers.filter(Boolean).length) {
@@ -99,9 +114,8 @@ function tableLibraries(rows: string[][], preview: GlossaryImportPreview): unkno
     }
     if (hasHeader && headers.includes('')) preview.warnings.push('未识别的表格列不会导入。');
     const groups = new Map<string, {name: string; sourceLanguage: string; targetLanguage: string; entries: unknown[]}>();
-    rows.slice(hasHeader ? 1 : 0).forEach((row, index) => {
+    rows.slice(hasHeader ? 1 : 0).forEach(({cells: row, startLine: line}) => {
         preview.totalEntries += 1;
-        const line = index + (hasHeader ? 2 : 1);
         if (row.length !== headers.length) { preview.errors.push(`第 ${line} 行列数与表头不一致。`); return; }
         const values: Record<string, string> = {};
         headers.forEach((header, column) => { values[header] = row[column]; });

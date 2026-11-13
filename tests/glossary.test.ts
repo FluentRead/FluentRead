@@ -340,6 +340,17 @@ describe('术语文件预览与导出', () => {
         }
     });
 
+    it.each(['\n', '\r\n', '\r'])('按原文件行号定位引号和记录错误（换行符 %j）', (newline) => {
+        const csv = ['source,target', '', 'API,接口', 'Bad,错"字'].join(newline);
+        expect(parseGlossaryImport(csv, 'csv').errors).toEqual(['第 4 行引号格式错误。']);
+
+        const quoted = ['source\ttarget', '', '"first', 'second"x\t译文'].join(newline);
+        expect(parseGlossaryImport(quoted, 'tsv').errors).toEqual(['第 4 行引号格式错误。']);
+
+        const wrongColumns = ['source,target', '"first', 'second",译文', '', '"too', 'few"'].join(newline);
+        expect(parseGlossaryImport(wrongColumns, 'csv').errors).toEqual(['第 5 行列数与表头不一致。']);
+    });
+
     it('非法大小写和语言代码产生错误，不悄悄扩大作用范围', () => {
         expect(parseGlossaryImport('source,target,caseSensitive\nAPI,接口,maybe', 'csv').errors.join('')).toContain('true 或 false');
         expect(parseGlossaryImport('source,target,tgt_lng,src_lng\nAPI,接口,not a code,bad!', 'csv').errors.join('')).toContain('语言代码无效');

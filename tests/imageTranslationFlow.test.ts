@@ -91,14 +91,14 @@ it('图片篇章证据限制 JSON 编码预算且不截断 Unicode 码点，单�
     expect(translateTexts).toHaveBeenCalledWith(expect.objectContaining({discourseContext:'',pageContext:''}));
 });
 
-it('图片上下文开关在任务开始读取一次，关闭时继续原生数组与重复去重', async () => {
+it('AI 图片上下文开关在任务开始读取一次，关闭时继续数组与重复去重', async () => {
     let enabled = false;
     const isTextContextEnabled = vi.fn(()=>enabled);
     const translateTexts = vi.fn(async (request: {origin:string|string[]}) => {
         enabled = false;
         return Array.isArray(request.origin) ? request.origin.map(()=> '译文') : '译文';
     });
-    const current = setup({supportsBatchTranslation:()=>true,isTextContextEnabled,translateTexts});
+    const current = setup({getTranslationService:()=> 'openai',supportsBatchTranslation:()=>true,isTextContextEnabled,translateTexts});
     const message = {type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['First sentence.','Second sentence.','First sentence.']};
     await current.handler(message.type).handle(message);
     expect(translateTexts).toHaveBeenCalledWith(expect.objectContaining({origin:['First sentence.','Second sentence.']}));
@@ -455,7 +455,7 @@ describe('图片翻译流程优化',()=>{
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type: IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, texts}))
             .resolves.toEqual({success: true, translations: ['—', '1', 'docs.sglang.io/cookbook', '译:Decisions API', 'SGLang 0.5.21', '译:Decisions API', '译:Read docs.sglang.io/cookbook']});
         expect(translateTexts).toHaveBeenCalledOnce();
-        expect(translateTexts.mock.calls[0][0].origin).toEqual(['Decisions API', 'Read docs.sglang.io/cookbook']);
+        expect(translateTexts.mock.calls[0][0].origin).toEqual(['Decisions API', 'Decisions API', 'Read docs.sglang.io/cookbook']);
     });
     it('只有不可翻译标识时无需请求供应商，重试也保留全部原文', async () => {
         const {handler, dependencies} = setup();
@@ -519,7 +519,7 @@ describe('图片翻译流程优化',()=>{
     });
     it('batch 去重仍恢复原行映射，并检查取消后返回',async()=>{
         const wait=deferred<string[]>(); const translateTexts=vi.fn(()=>wait.promise);
-        const {handler}=setup({supportsBatchTranslation:()=>true,translateTexts});
+        const {handler}=setup({getTranslationService:()=> 'microsoft',supportsBatchTranslation:()=>true,translateTexts});
         const pending=handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts:['a','a'],requestId:'batch'});
         await vi.waitFor(()=>expect(translateTexts).toHaveBeenCalledOnce());
         expect((translateTexts.mock.calls[0] as any)[0].origin).toEqual(['a']);

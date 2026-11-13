@@ -222,6 +222,7 @@
       "tests/quickTranslationContentFeature.test.ts",
       "tests/quickTranslationRuntime.test.ts",
       "tests/requestConfigSnapshot.test.ts",
+      "tests/googleImageContext.test.ts",
       "tests/documentTranslationPresentation.test.ts",
       "tests/documentZoom.test.ts",
       "tests/selectionTranslatorCore.test.ts",

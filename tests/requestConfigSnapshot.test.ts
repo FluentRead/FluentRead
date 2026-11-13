@@ -21,6 +21,8 @@ import {
     getTranslationGlossarySourceSlots,
     allowUnchangedTranslationResult,
     isUnchangedTranslationResultAllowed,
+    markImageTextBatch,
+    isImageTextBatch,
 } from '@/src/services/translation/requestSnapshot';
 import {TRANSLATION_MODEL_USAGE_OBSERVER, TRANSLATION_PROVIDER_CONFIG, TRANSLATION_REQUEST_CONTROL, TRANSLATION_REQUEST_SCHEDULER, TRANSLATION_ROUTE_OBSERVER, TRANSLATION_REMAINING_BUDGET} from '@/src/services/translation/types';
 import {createTranslationRequestScheduler} from '@/src/services/translation/requestScheduler';
@@ -64,6 +66,15 @@ function configSource(overrides: Partial<TranslationConfigSource> = {}): Transla
 }
 
 describe('translation provider request config snapshot', () => {
+    it('同图批次只由内部标记启用，复制后保留，JSON、自报字段和逐条回退不能启用', () => {
+        const request = markImageTextBatch({origin: ['First.', 'Second.']});
+        for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {
+            expect(isImageTextBatch(internal)).toBe(true);
+        }
+        for (const ordinary of [JSON.parse(JSON.stringify(request)), {origin: request.origin, imageTextBatch: true}, {...request, origin: 'First.'}]) {
+            expect(isImageTextBatch(ordinary)).toBe(false);
+        }
+    });
     it('图片原样响应策略随内部快照和展开保留，公开字段与 JSON 无法附加策略', () => {
         const request = allowUnchangedTranslationResult({origin: 'Original English sentence.'});
         for (const internal of [request, {...request}, createTranslationRequestSnapshot(request)]) {

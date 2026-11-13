@@ -294,6 +294,13 @@ describe('全文翻译的中文目标段落预检', () => {
         '价格：免费 | 语言：中文 | 平台：Windows / macOS / Linux',
         '这是中文段落。This is a full English sentence embedded in it. 这句又是中文。',
         '这些算法使用 AI，可以降低成本，但是 Please translate this sentence.',
+        // 表情或 emoji 开头的评论短句：句末标点提供完整句架，两个汉字即可确认。
+        '🤔🤔🤔移动？',
+        '🤔🤔🤔移动?',
+        '好的。',
+        '这个可以吗？',
+        // 有句号的完整中文短句。
+        '转载请注明出处。',
     ])('中文目标的混合与未知正文段落不再翻译 %#', text => {
         expect(shouldSkipChineseTargetParagraph(text, 'zh-Hans')).toBe(true);
         expect(shouldSkipChineseTargetParagraph(text, 'zh-CN')).toBe(true);
@@ -306,7 +313,6 @@ describe('全文翻译的中文目标段落预检', () => {
         ['中', 'zh-Hans'],
         // 八字阈值之下保持 fail-open：短词可能是日文汉字、繁体短语或界面残片。
         ['—— 本文完 ——', 'zh-Hans'],
-        ['转载请注明出处。', 'zh-Hans'],
         ['時間', 'zh-Hans'],
         ['日本国立大学', 'zh-Hans'],
         ['趨勢', 'zh-Hans'],

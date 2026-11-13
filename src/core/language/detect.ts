@@ -56,14 +56,15 @@ export function shouldSkipTranslationForTarget(
 }
 
 /**
- * 全文翻译的中文目标段落预检：段落正文含至少八个汉字、无假名或谚文且不与目标
+ * 全文翻译的中文目标段落预检：段落正文含足够汉字、无假名或谚文且不与目标
  * 书写体系的专属字形冲突时直接保留原文，不再发给供应商，避免识别为混合或未知的
  * 中文段落（中文夹英文术语、链接、代码、版权行等 fail-open 文本）被再翻一遍后
- * 双语区域显示两遍中文。八字阈值与 identify.ts 的可信中文正文门槛同源，两三个
- * 汉字的短词可能是日文汉字或繁体短语，保持 fail-open 继续翻译；出现假名或谚文
- * 正文的日文、韩文段落仍需翻译；与目标体系相反的简繁字形保留简繁转换；代码、
- * 数字与拉丁正文不受影响。本规则只服务整段候选、文本槽与标题的全文预检，
- * 划词、输入框等局部翻译不使用，用户显式请求的局部翻译不受影响。
+ * 双语区域显示两遍中文。八字阈值与 identify.ts 的可信中文正文门槛同源；表情或
+ * emoji 开头的评论短句按句末标点放宽到两个汉字，如「🤔🤔🤔移动？」。无句末
+ * 标点的两三个汉字短词可能是日文汉字或繁体短语，保持 fail-open 继续翻译；
+ * 出现假名或谚文正文的日文、韩文段落仍需翻译；与目标体系相反的简繁字形保留
+ * 简繁转换；代码、数字与拉丁正文不受影响。本规则只服务整段候选、文本槽与
+ * 标题的全文预检，划词、输入框等局部翻译不使用，用户显式请求的局部翻译不受影响。
  */
 export function shouldSkipChineseTargetParagraph(origin: string, targetLanguage: string): boolean {
     const targetScript = getChineseScript(targetLanguage);
@@ -73,7 +74,11 @@ export function shouldSkipChineseTargetParagraph(origin: string, targetLanguage:
     for (const character of origin) {
         if (/\p{Script=Han}/u.test(character)) hanCount += 1;
     }
-    if (hanCount < 8) return false;
+    if (hanCount === 0) return false;
+    // 有完整句末标点的短句是评论或聊天正文，两个汉字即可确认；无标点短词
+    // （日本国立大学、趨勢、時間）仍按八字可信门槛保持 fail-open。
+    const minimum = (/[？?！!。]$/u).test(origin.trim()) ? 2 : 8;
+    if (hanCount < minimum) return false;
     return !hasOppositeChineseScriptForms(origin, targetScript);
 }
 

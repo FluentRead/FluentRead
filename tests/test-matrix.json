@@ -588,6 +588,7 @@
       "tests/documentPdfRasterizer.test.ts",
       "tests/pdfScanGraphics.test.ts",
       "tests/pdfScanPreview.test.ts",
+      "tests/pdfOcrTextLayer.test.ts",
       "tests/documentTranslation.test.ts",
       "tests/documentTranslationApi.test.ts",
       "tests/documentTranslationBinary.test.ts",

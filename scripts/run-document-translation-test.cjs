@@ -137,7 +137,7 @@ async function main() {
     await page.locator('.file-drop-zone').waitFor();
     recordScripts('initial');
     const service = 'custom:document-fixture';
-    const seeded = await page.evaluate(async ({service, endpoint}) => {
+    const seeded = await page.evaluate(async ({service, endpoint, disableSelection}) => {
       const stored = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
       if (!stored.success) throw new Error(stored.error);
       const current = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
@@ -149,8 +149,9 @@ async function main() {
           requireApiKey: {[`v2:${JSON.stringify([service, 'document-fixture'])}`]: false},
           user_role: {...current.user_role, [service]: 'SOURCE_BEGIN{{origin}}SOURCE_END'},
           enableAIContext: false, enableAIMultiSegment: false,
+          disableSelectionTranslator: disableSelection || current.disableSelectionTranslator,
         }});
-    }, {service, endpoint: fixture.url});
+    }, {service, endpoint: fixture.url, disableSelection: suite === 'scanned'});
     assert.equal(seeded.success, true, seeded.error);
     const shot = async name => { const file = path.join(artifactsDir, `${name}.png`); await page.screenshot({path: file, animations: 'disabled'}); report.screenshots.push(file); };
     const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, '页面不得横向溢出');
@@ -409,8 +410,33 @@ async function main() {
       // 识别允许个别字符有出入，但三句印刷文字都必须被认出并送去翻译。
       for (const phrase of [/scanned pages carry/iu, /recognition must find/iu, /translated page keeps/iu]) assert(recognized.some(source => phrase.test(source)), `识别结果缺少印刷文字 ${phrase}：${JSON.stringify(recognized)}`);
       assert(recognized.includes(typed), `带文字层的页应照常翻译：${JSON.stringify(recognized)}`);
+      const verifyScannedSourceSelection = async (number, zoom = false, prefix) => {
+        const candidates = page.locator(`.pdf-page-row[data-page-number="${number}"] [data-pdf-ocr-line]`);
+        const line = (prefix ? candidates.filter({hasText: prefix}) : candidates).first();
+        await line.waitFor(); await line.scrollIntoViewIfNeeded();
+        const expected = await line.textContent(), bounds = await line.boundingBox(), handle = await line.elementHandle();
+        assert(bounds && bounds.width > bounds.height * 3, '扫描原文须按显示方向横排');
+        const frame = await line.locator('xpath=ancestor::div[contains(@class,"pdf-page-frame")]').boundingBox();
+        assert(bounds.x >= frame.x - 1 && bounds.y >= frame.y - 1 && bounds.x + bounds.width <= frame.x + frame.width + 2, 'OCR 选择层须位于原页');
+        await page.mouse.move(bounds.x + .2, bounds.y + bounds.height / 2); await page.mouse.down();
+        await page.mouse.move(bounds.x + bounds.width - .2, bounds.y + bounds.height / 2, {steps: 12}); await page.mouse.up();
+        const selected = await page.evaluate(() => getSelection()?.toString().trim());
+        assert.equal(selected, expected.trim(), '鼠标必须选择到实际 OCR 原文');
+        await shot(`scanned-source-${number}-selected`);
+        if (zoom) {
+          const previous = Number(await page.locator('[data-pdf-scroll]').getAttribute('data-reader-zoom'));
+          await page.keyboard.down('Control'); await page.mouse.wheel(0, -100); await page.keyboard.up('Control');
+          await page.waitForFunction(value => Number(document.querySelector('[data-pdf-scroll]').dataset.readerZoom) > value, previous);
+          assert.equal(await page.evaluate(() => getSelection()?.toString().trim()), selected, '缩放必须保留扫描原文选区');
+          assert(await line.evaluate((current, before) => current === before, handle), '缩放不替换 OCR 文字节点');
+          await shot(`scanned-source-${number}-selected-zoomed`);
+          await page.keyboard.down('Control'); await page.mouse.wheel(0, 100); await page.keyboard.up('Control');
+        }
+        await page.evaluate(() => getSelection()?.removeAllRanges()); await handle.dispose();
+      };
       await pageInput.fill('2'); await pageInput.press('Enter');
       await page.locator('.pdf-page-row[data-page-number="2"] .pdf-translation-block').first().waitFor();
+      await verifyScannedSourceSelection(2, true);
       const scannedBlocks = await page.locator('.pdf-page-row[data-page-number="2"] .pdf-translation-block').evaluateAll(blocks => blocks.map(block => {
         const frame = block.closest('.pdf-page-frame, .pdf-page-column').getBoundingClientRect(), box = block.getBoundingClientRect();
         return {text: block.innerText.trim(), inside: box.left >= frame.left - 2 && box.right <= frame.right + 2 && box.top >= frame.top - 2 && box.bottom <= frame.bottom + 2};
@@ -436,6 +462,7 @@ async function main() {
             inside: box.left >= frame.left - 2 && box.right <= frame.right + 2 && box.top >= frame.top - 2 && box.bottom <= frame.bottom + 2};
         }));
         await shot(`scanned-rotated-${turned.angle}-translated`);
+        await verifyScannedSourceSelection(number);
         assert(turnedBlocks.length >= 2, `旋转 ${turned.angle} 度的扫描页上应有两段译文：${JSON.stringify(turnedBlocks)}`);
         assert(turnedBlocks.every(block => block.text && block.inside && block.upright && block.landscape === turned.landscape), `旋转 ${turned.angle} 度的扫描页，译文必须横排、摆正并留在页面内：${JSON.stringify(turnedBlocks)}`);
         const graphic=recognizedModel.pages[number-1].preservedRegions.find(region=>region.kind==='figure');
@@ -457,6 +484,18 @@ async function main() {
       assert(normalizedSources.findIndex(source => source.startsWith('Small footnote:')) > paperIndexes.at(-1), '页底脚注必须排在两栏正文之后');
       await pageInput.fill('7'); await pageInput.press('Enter');
       await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').first().waitFor();
+      await verifyScannedSourceSelection(7, false, 'Left column');
+      const sourceLines = page.locator('.pdf-page-row[data-page-number="7"] [data-pdf-ocr-line]');
+      const rows = await sourceLines.evaluateAll(elements => {
+        const start = elements.findIndex(element => element.textContent.startsWith('Left column'));
+        return elements.slice(start, start + 3).map(element => {const box = element.getBoundingClientRect(); return {text: element.textContent, x: box.x, y: box.y, width: box.width, height: box.height};});
+      });
+      await page.mouse.move(rows[0].x + .2, rows[0].y + rows[0].height / 2); await page.mouse.down();
+      await page.mouse.move(rows[2].x + rows[2].width - .2, rows[2].y + rows[2].height / 2, {steps: 20}); await page.mouse.up();
+      assert.equal(await page.evaluate(() => getSelection().toString().replace(/\s+/gu, ' ').trim()), rows.map(row => row.text).join(' ').replace(/\s+/gu, ' ').trim(), '小字双栏的跨行选择应只包含当前栏的实际行');
+      await shot('scanned-paper-multiline-source'); await page.evaluate(() => getSelection().removeAllRanges());
+      await verifyScannedSourceSelection(7, false, 'Small footnote:');
+
       const cellPlacement = await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').evaluateAll((elements, cells) => elements.flatMap(element => {
         const cell=cells.find(cell=>cell.segmentIndex===Number(element.getAttribute('data-pdf-segment-index'))); if(!cell)return [];
         const style=element.style, left=parseFloat(style.left), top=parseFloat(style.top), width=parseFloat(style.width), height=parseFloat(style.height), bounds=cell.cellBounds;
@@ -486,6 +525,8 @@ async function main() {
       await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor();
       assert.equal(await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count'), segmentCount, '刷新应恢复已识别的全部段落');
       assert.equal(fixture.state.requests.length, requestsBeforeReload, '恢复已完成历史不能重新翻译');
+      await pageInput.fill('2'); await pageInput.press('Enter'); await verifyScannedSourceSelection(2);
+      report.cases.push('scanned source supports real mouse selection; zoom retains text nodes and selection; rotated source and history reload stay selectable');
       report.scanned = {pages: 7, scannedPages: 6, scientificSource: scientific.source, scientificTranslation: recognizedModel.translations[scientific.id], diagramLabels, tableCellPlacement:cellPlacement, captionPlacement, paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
       report.cases.push('a PDF with one typed page, two scanned pages and three rotated scanned pages (90, 180 and 270 degrees) opens without requests, recognises the scanned pages when translation starts, translates the typed page as usual and shows upright translations inside the scanned pages');
       report.cases.push('10 pt two-column paragraphs and an 8 pt footnote retain text and order; all seven bilingual pages export with a translation text layer and survive history reload without new translation requests');

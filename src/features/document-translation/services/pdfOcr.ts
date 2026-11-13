@@ -180,7 +180,7 @@ function rebuildRecognizedPdf(document: ParsedDocument, binary: Extract<ParsedDo
             // 识别在展示方向上进行，版面块已是展示坐标：去掉 rotation，原页的旋转角留给导出。
             const {rotation, ...upright} = page;
             return {...upright, ...(rotation ? {sourceRotation: rotation} : {}), ...pdfPageSegments(layout.blocks, page.pageNumber, segments), preservedRegions: layout.preservedRegions,
-                ocrReviewRegions: layout.ocrReviewRegions, scanned: false};
+                ocrReviewRegions: layout.ocrReviewRegions, ocrRecognized: true, scanned: false};
         }
         const segmentIndexes: number[] = [];
         const blocks = page.blocks.map(block => {

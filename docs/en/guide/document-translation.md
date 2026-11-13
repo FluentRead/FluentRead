@@ -49,7 +49,7 @@ PDFs default to **Original layout**. Bilingual pages appear side by side, transl
 
 Proofreading, full-passage comparisons, outline titles, and search terms each follow their own text direction, while the source and translation columns keep their order.
 
-Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
+Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. After recognition, you can select and copy text over the source image. Text positions are estimated from recognition; use the image when checking accuracy. Recognition, formulas, and technical terms can still be wrong; review important passages.
 
 For scanned papers, recognition uses higher-resolution page images and automatic column detection. Completed pages are saved as recognition proceeds. After pausing or a failure, continuation recognizes only the remaining scanned pages and keeps existing translations and edits. Pages with no recognized text remain available for retry and do not count as fully translated.
 

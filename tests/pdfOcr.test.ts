@@ -180,6 +180,7 @@ describe('scanned PDF recognition', () => {
         expect(pages[2].blocks.find(entry => entry.segmentIndex === 3)?.kind).toBe('heading');
         // 识别过的页不再是扫描页，已有文字的页与空白页的标记不变。
         expect(pages.map(entry => entry.scanned)).toEqual([false, undefined, false, false]);
+        expect(pages.map(entry => entry.ocrRecognized)).toEqual([true, undefined, true, undefined]);
         expect(pages.map(entry => [entry.rotation, entry.sourceRotation])).toEqual([[undefined, undefined], [undefined, undefined], [undefined, undefined], [180, undefined]]);
         expect(pdfPagesNeedingOcr(result)).toEqual([]);
         expect(JSON.stringify(source)).toBe(before);

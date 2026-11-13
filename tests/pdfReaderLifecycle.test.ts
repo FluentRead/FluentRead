@@ -590,6 +590,28 @@ describe('PDF reader color readback performance', () => {
         expect(pdfPage.render).toHaveBeenCalledTimes(beforeRenders);
     });
 
+    it('adds selectable OCR lines to the resident source layer without redrawing the page and preserves them on zoom or another checkpoint', async () => {
+        const source = documentModel(4), reader = mountReader(source);
+        await waitForSourceTextLayers(reader.root, 4);
+        reader.state.jumpTo(3); flushFrames(); await componentFlush();
+        const beforeCanvas = reader.root.querySelector('[data-page-number="3"] canvas'), beforeRenders = pdfPage.render.mock.calls.length;
+        const binary = source.binary as Extract<ParsedDocument['binary'], {kind: 'pdf'}>;
+        const checkpoint = {...source, binary: {...binary, pages: binary.pages.map(page => page.pageNumber === 3 ? {...page, scanned: false, ocrRecognized: true,
+            blocks: page.blocks.map(block => ({...block, lines: [{text: 'Scanned source 3,700', x: 50, y: 70, width: 180, height: 12}]}))} : page)}};
+        reader.currentDocument.value = checkpoint; await componentFlush(); flushFrames(); await componentFlush();
+        const layer = reader.root.querySelector('[data-page-number="3"] [data-fluentread-pdf-text]')!;
+        const span = layer.querySelector('[data-pdf-ocr-line]')!;
+        expect(span.textContent).toBe('Scanned source 3,700');
+        expect(layer.getAttribute('data-fluentread-pdf-page-text')).toBe('Scanned source 3,700');
+        expect(reader.root.querySelector('[data-page-number="3"] canvas')).toBe(beforeCanvas);
+        expect(pdfPage.render).toHaveBeenCalledTimes(beforeRenders);
+        reader.state.zoom = '1.25'; await componentFlush(); flushFrames(); await componentFlush();
+        reader.currentDocument.value = {...checkpoint, binary: {...checkpoint.binary, pages: checkpoint.binary.pages.map(page => ({...page}))}};
+        await componentFlush(); flushFrames(); await componentFlush();
+        expect(layer.querySelector('[data-pdf-ocr-line]')).toBe(span);
+        expect(reader.state.currentPage).toBe(3);
+    });
+
     it('evicts removed or changed page geometry when updating scheduler models and uses new models on the next render', async () => {
         const pages = [pageModel(1), pageModel(2)], render = vi.fn(async (_page: PdfDocumentPage) => output()), changed = vi.fn();
         const scheduler = new PdfReaderScheduler(pages, {render, dispose: vi.fn()}, changed);

@@ -33,6 +33,8 @@ FLUENTREAD_PDF_CORPUS=/path/to/papers pnpm exec vitest run tests/pdfPaperLayouts
 
 ## 扫描版 PDF 识别
 
+`tests/pdfLayoutAnalysis.test.ts` 重放真实 OCR 的稀疏长行距句尾，验证未结束正文只在左对齐、同字号和小写短续行共同成立时合段，并保留新段、列表与标题边界。
+
 `tests/pdfOcr.test.ts` 覆盖“识别结果 → 版面段落 → 片段编号”，`tests/documentPageRecognizer.test.ts` 覆盖页面识别器的坐标换算。真实浏览器里的整条流程是文档翻译脚本的一个单独套件，它会现场生成一份“一页文字 + 两页扫描 + 三页旋转扫描（90、180、270 度）图像”的 PDF，核对打开时不发请求、开始翻译后先识别扫描页再翻译、文字页照常翻译、三句印刷文字都被认出、译文块落在扫描页内：
 
 ```bash

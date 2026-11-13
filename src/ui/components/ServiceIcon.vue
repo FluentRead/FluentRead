@@ -97,7 +97,7 @@ const tone = computed(() => {
   if (['deepseek', 'deepL', 'deeplx', 'microsoft', 'freeTranslation', 'myMemory'].includes(props.service)) return 'blue'
   if (['gemini', 'google', 'chromeTranslator', 'localTranslation', 'ollama', 'googleCloudTranslation'].includes(props.service)) return 'green'
   if (['azureTranslator', 'tencent', 'baiduTranslation'].includes(props.service)) return 'blue'
-  if (['mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel'].includes(props.service)) return 'violet'
+  if (['mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'onetag'].includes(props.service)) return 'violet'
   return 'rose'
 })
 

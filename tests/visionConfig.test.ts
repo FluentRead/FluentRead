@@ -129,6 +129,7 @@ it('automatically routes verified native models to vision and respects explicit 
     expect(resolveModelVisionCapability(service, model, {[service]: {[model]: false}})).toBe('unsupported');
   }
   expect(resolveModelVisionCapability('deepseek', 'deepseek-v4-pro')).toBe('unsupported');
+  expect(resolveModelVisionCapability('onetag', 'onetag')).toBe('unsupported');
   expect(resolveModelVisionCapability('freeTranslation', '')).toBe('unsupported');
   expect(resolveModelVisionCapability('deepseek', 'unconfirmed-flash')).toBe('unknown');
   expect(resolveModelVisionCapability('custom:team', 'deepseek-flash')).toBe('unknown');

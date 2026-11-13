@@ -44,7 +44,7 @@ const expectedProviderServices = [
 ];
 const expectedPlatformServices = [
   'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
-  'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'ollama',
+  'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'onetag', 'ollama',
 ];
 const expectedFreeCandidates = [
   'microsoft', 'transmart', 'volcengineFree', 'google', 'youdaoFree', 'icibaFree', 'yandexFree', 'deeplx', 'myMemory',

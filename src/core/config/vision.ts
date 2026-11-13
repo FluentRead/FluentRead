@@ -75,6 +75,9 @@ const VERIFIED_VISION_MODELS: Readonly<Record<string, ReadonlySet<string>>> = {
 // https://api-docs.deepseek.com/zh-cn/quick_start/pricing/
 const VERIFIED_TEXT_ONLY_MODELS: Readonly<Record<string, ReadonlySet<string>>> = {
   deepseek: new Set(['deepseek-v4-pro']),
+  // OneTag AI 只接受文本消息，图片输入返回 400 unsupported；圈选识图应回退 OCR。
+  // https://onetagai.com/docs#openai
+  onetag: new Set(['onetag']),
 };
 
 export function supportsVisionTransport(service: string, _model?: string): boolean {

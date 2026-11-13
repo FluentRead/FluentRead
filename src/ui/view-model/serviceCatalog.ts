@@ -72,6 +72,7 @@ const serviceWebsites = {
   cloudgpu: 'https://cloudgpu.app/api/console',
   cheaperinference: 'https://cheaperinference.com',
   cheapaimodel: 'https://console.cheapaimodel.ai/keys',
+  onetag: 'https://onetagai.com',
 } satisfies Record<keyof typeof services, string>
 
 /**

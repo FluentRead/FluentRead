@@ -296,6 +296,7 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
   it.each([
     {service: services.cheaperinference, model: 'gpt-5.4-mini', endpoint: 'https://api.cheaperinference.com/v1/chat/completions'},
     {service: services.cheapaimodel, model: 'deepseek-v4-1-flash', endpoint: 'https://api.cheapaimodel.ai/v1/chat/completions'},
+    {service: services.onetag, model: 'onetag', endpoint: 'https://onetagai.com/v1/chat/completions'},
   ].flatMap(provider => ['', 'https://gateway.example/v1/chat/completions'].map(proxy => ({
     ...provider,
     proxy,

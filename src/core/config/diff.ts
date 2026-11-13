@@ -664,6 +664,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
 
     videoTranslationEnabled: {group: 'videoSubtitles', label: '视频字幕翻译', format: formatBoolean},
     videoMeetingAutoEnabled: {group: 'videoSubtitles', label: '会议平台自动开启双语字幕', format: formatBoolean},
+    videoCourseAutoStart: {group: 'videoSubtitles', label: '课程网站自动翻译'},
     videoPreferHumanSubtitles: {group: 'videoSubtitles', label: '优先使用人工字幕', format: formatBoolean},
     videoService: {group: 'videoSubtitles', label: '视频翻译服务', format: formatService},
     videoSourceLanguage: {group: 'videoSubtitles', label: '视频原语言'},

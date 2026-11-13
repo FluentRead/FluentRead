@@ -1,10 +1,10 @@
 /**
  * @file src/features/video-subtitle/content/platforms.ts
  * 文件职责：定义会议及课程视频的站点边界、字幕节点与明确开启控件，并选择目标语言人工轨。
- * 主要内容：按域名识别 Teams、Zoom、Meet、Udemy 和 Disney+；规范化语言别名并排除自动生成或机器翻译轨。
+ * 主要内容：按域名识别 Teams、Zoom、Meet、B 站、Udemy、edX 和 Disney+；规范化语言别名并排除自动生成或机器翻译轨。
  * 模块边界：只处理传入的位置、轨道和节点，不读取配置、请求网络或修改宿主页面。
  */
-export type CaptionPlatform = 'meet' | 'teams' | 'zoom' | 'udemy' | 'disney';
+export type CaptionPlatform = 'meet' | 'teams' | 'zoom' | 'bilibili' | 'udemy' | 'edx' | 'disney';
 
 export function getCaptionPlatform(location: Pick<Location, 'hostname' | 'pathname'>): CaptionPlatform | null {
     const host = location.hostname.toLowerCase();
@@ -12,6 +12,8 @@ export function getCaptionPlatform(location: Pick<Location, 'hostname' | 'pathna
     if (['teams.microsoft.com', 'teams.live.com', 'teams.cloud.microsoft'].includes(host)) return 'teams';
     if (/(^|\.)zoom\.(us|com)$/.test(host) && /^\/wc(?:\/|$)/.test(location.pathname)) return 'zoom';
     if (/(^|\.)udemy\.com$/.test(host)) return 'udemy';
+    if (host === 'bilibili.com' || host === 'www.bilibili.com') return 'bilibili';
+    if (/(^|\.)edx\.org$/.test(host)) return 'edx';
     if (/(^|\.)disneyplus\.com$/.test(host)) return 'disney';
     return null;
 }
@@ -25,6 +27,8 @@ export const PLATFORM_CAPTION_SELECTORS: Record<CaptionPlatform, string> = {
     teams: '[data-tid="closed-caption-text"]',
     zoom: '.live-transcription-subtitle__item',
     udemy: '[data-purpose="captions-cue-text"], .shaka-text-container',
+    bilibili: '.bpx-player-subtitle-wrap',
+    edx: '.closed-captions',
     disney: '.dss-hls-subtitle-overlay, .hive-subtitle-renderer, .shaka-text-container',
 };
 

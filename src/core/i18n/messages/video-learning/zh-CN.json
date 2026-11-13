@@ -1,4 +1,5 @@
 {
+  "video.description": "翻译视频和网页会议字幕，不上传音视频。",
   "video.learning.title": "完整句学习",
   "video.learning.close": "关闭学习",
   "video.learning.fragment": "字幕片段",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "重新讲解",
   "video.learning.start": "开始完整句学习",
   "video.learning.appearance": "调整学习面板样式",
-  "video.learning.drag": "拖动标题移动面板"
+  "video.learning.drag": "拖动标题移动面板",
+  "video.course.toggle": "流畅阅读字幕",
+  "video.course.auto": "打开视频就翻译",
+  "video.course.off": "字幕已关闭",
+  "video.course.loading": "读取字幕…",
+  "video.course.error": "字幕读取失败",
+  "video.course.empty": "暂无字幕",
+  "video.course.bilibiliEmpty": "暂无字幕",
+  "video.course.ready": "字幕已就绪",
+  "video.course.waiting": "等待字幕…",
+  "video.course.download": "下载原文 SRT",
+  "video.course.downloadFailed": "下载失败"
 }

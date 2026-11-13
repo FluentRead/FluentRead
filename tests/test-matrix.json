@@ -548,7 +548,8 @@
       "tests/imageDetectionSnapshot.test.ts",
       "tests/imageMattePageOwnership.test.ts",
       "tests/pdfSourceOcrSuggestion.test.ts",
-      "tests/pdfSourceRecoveryWorkflow.test.ts"
+      "tests/pdfSourceRecoveryWorkflow.test.ts",
+      "tests/videoCourseCaptions.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -908,7 +909,8 @@
       "tests/translationSidepanel.test.ts",
       "tests/sidepanelBootstrap.test.ts",
       "tests/sidepanelApp.test.ts",
-      "tests/imageMatteAvailability.test.ts"
+      "tests/imageMatteAvailability.test.ts",
+      "tests/videoCourseFrame.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

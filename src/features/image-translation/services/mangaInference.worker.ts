@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaInference.worker.ts
  * 文件职责：在独立 Worker 中执行 PaddleOCR、气泡分析、LaMa 和可选离线 CTD 分割，保持 Offscreen 音频与消息线程响应。
- * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；CTD 只读已导入缓存，验证固定输入和全部输出元数据，量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
+ * 主要内容：按需复用已校验模型端口，真实下载和初始化阶段转发，CPU 重建锁定后端；CTD 只读已导入缓存，接收有界 RGBA 快照并在本线程执行低通缩放与张量构造，验证固定模型元数据，量化独占 seg 后释放所有 ORT 张量；串行会话创建避免同一 Asyncify 运行时交错初始化。
  * 诊断：会话创建成功后报告该会话配置的执行提供程序；不推断混合后端中每个算子的实际设备，也不传输模型或图片内容。
  * 模块边界：不读取网页、不翻译文本、不播放音频；取消和超时由 Worker 外部 owner 硬终止。
  */
@@ -12,6 +12,7 @@ import {createBrowserMangaOcr} from './mangaOcr';
 import {createBrowserMangaInpainter} from './mangaInpainting';
 import type {MangaInferenceMessage, MangaInferenceResponse} from './mangaInferenceClient';
 import {loadMangaTextSegmentationAsset} from './mangaOcrAssets';
+import {createImageTextSegmentationInput,isImageTextSegmentationSource,type ImageTextSegmentationSource} from './imageTextSegmentation';
 
 class SegmentationProtocolError extends Error {}
 const SEG_SIZE=1024*1024;
@@ -73,8 +74,9 @@ export function startMangaInferenceWorker(): void {
         }
         segmenter=created;return true;
     }
-    async function segment(tensor:Float32Array):Promise<Uint8Array>{
-        if(!(tensor instanceof Float32Array)||tensor.length!==3*SEG_SIZE||tensor.byteOffset!==0||!(tensor.buffer instanceof ArrayBuffer)||tensor.byteLength!==tensor.buffer.byteLength||!tensor.every(value=>Number.isFinite(value)&&value>=0&&value<=1))throw new SegmentationProtocolError('图片分割输入无效');
+    async function segment(source:ImageTextSegmentationSource):Promise<Uint8Array>{
+        if(!isImageTextSegmentationSource(source))throw new SegmentationProtocolError('图片分割输入无效');
+        const tensor=createImageTextSegmentationInput(source.pixels,source.width,source.height);
         const input=new ort.Tensor('float32',tensor,[1,3,1024,1024]);
         let outputs:ort.InferenceSession.ReturnType|undefined,owned:Uint8Array|undefined,failure:unknown,failed=false;
         try{
@@ -109,7 +111,7 @@ export function startMangaInferenceWorker(): void {
             else if(message.type==='prepare-seg'||message.type==='segment'){
                 const ready=await prepareSeg(progress,message.cpu);
                 if(message.type==='prepare-seg')result=ready;
-                else {if(!ready)throw new SegmentationProtocolError('图片分割模型未导入');progress('recognizing');result=await segment(message.tensor!);}
+                else {if(!ready)throw new SegmentationProtocolError('图片分割模型未导入');progress('recognizing');result=await segment(message.source!);}
             }
             else if (message.type === 'prepare-ocr' || message.type === 'recognize') {
                 ocr ??= await createBrowserMangaOcr(undefined, progress);

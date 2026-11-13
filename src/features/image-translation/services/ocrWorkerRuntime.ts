@@ -1,11 +1,11 @@
 /**
  * @file src/features/image-translation/services/ocrWorkerRuntime.ts
  * 文件职责：实现与具体 OCR 引擎无关的 Worker 生命周期和串行任务队列，保证识别、参数设置、语言切换及销毁不会在并发请求间交叉污染。
- * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用 Worker 并串行重新初始化语言与分割参数；累计模型超过五个时重建以限制内存，按设备内存限制空闲驻留；排队取消及时移除待处理任务并清理所有权，仍在运行的识别和模型清理保持互斥；显式销毁立即取消全部任务，迟到的语言切换不得污染后续任务；提供任务隔离的真实进度、识别和语言预加载。
+ * 主要内容：定义 OcrWorkerPort、依赖与 runtime 契约，复用 Worker 并串行重新初始化语言与分割参数；识别同时遵守 Offscreen 的共享推理预算，避免与本地字幕和朗读争抢计算；累计模型超过五个时重建以限制内存，按设备内存限制空闲驻留；排队取消及时移除待处理任务并清理所有权，仍在运行的识别和模型清理保持互斥；显式销毁立即取消全部任务，迟到的语言切换不得污染后续任务；提供任务隔离的真实进度、识别和语言预加载。
  * 模块边界：此层不依赖 Tesseract.js 类型、浏览器 storage 或图片翻译 UI；具体 worker 工厂由 ocrRuntime 注入，语言状态记录和 Offscreen 消息编排位于其他模块。
  */
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
-import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import {createLocalInferenceBudget,withLocalInferenceBudget} from '@/src/shared/onnx/resources';
 
 /**
  * OCR Worker 的最小能力边界。
@@ -162,7 +162,8 @@ export function createOcrWorkerRuntime<TResult>(
                     throw createOcrAbortError();
                 }
             };
-            const previousWorker = await previousWorkerPromise.catch(() => null);
+            // 创建者负责失败清理；保留初始化首因，不将失败当作空 Worker 继续切换。
+            const previousWorker = await previousWorkerPromise;
             assertTransitionOwnership();
             const nextLanguages = new Set([...loadedLanguages, ...languages.split('+')]);
             if (previousWorker?.reinitialize && nextLanguages.size <= 5) {
@@ -221,7 +222,7 @@ export function createOcrWorkerRuntime<TResult>(
             });
         },
         recognize(image, languages, signal, pageSegmentationMode = dependencies.sparseTextMode, onProgress) {
-            return runExclusive(async signal => {
+            return runExclusive(signal => withLocalInferenceBudget(async () => {
                 const worker = await runAbortable(getWorker(normalizeLanguages(languages)), signal);
                 if (configuredWorker !== worker || configuredMode !== pageSegmentationMode) {
                     // 设置失败时不再认为旧参数可信；下一任务必须重新配置。
@@ -242,7 +243,7 @@ export function createOcrWorkerRuntime<TResult>(
                 } finally {
                     activeProgress = null;
                 }
-            }, signal);
+            }, signal), signal);
         },
         ensureLanguages(languages, signal) {
             if (languages.length === 0) return Promise.resolve();

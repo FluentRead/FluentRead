@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageTextSegmentation.ts
- * 文件职责：在已完成整页颜色、归属与完整字形预检后，借读原 RGBA 构造可选文字分割输入，并把本次分割输出投影为有界局部支持。
- * 主要内容：固定白底 RGB、像素中心三角低通重采样、右底黑色补齐及 Float32 CHW；中间水平行按需缓存而不复制整页。输出先量化再逐轴重采样，只为 H8 观察区与两像素邻域预付面积和位图预算，不把分割支持本身当成擦除权限。
+ * 文件职责：为文字分割提供有界 RGBA 消息校验、Worker 内的输入构造，以及量化结果的局部支持投影。
+ * 主要内容：消息只接受完整且非共享的有界 RGBA 视图，常数时间检查不扫描像素；在 Worker 内按固定白底 RGB、像素中心三角低通、右底黑色补齐构造 Float32 CHW，中间水平行按需缓存。输出先量化再逐轴重采样，只为 H8 观察区与两像素邻域预付面积和位图预算，不把分割支持本身当成擦除权限。
  * 模块边界：纯像素算法，不下载或运行模型，不读 Canvas，不改变原像素、OCR 框或文字；调用方负责同一请求、源像素所有权与取消，最终写入仍须经过整页 matte 授权。
  */
 import type {ImageDetectionObservation,ImageDetectionSourceBox,ImageDetectionSupport} from './imageDetectionEvidence';
@@ -13,9 +13,23 @@ const MAX_PROJECTION_SAMPLES=16_777_216;
 const PRECISION=4_194_304;
 interface Weight {start:number;values:number[]}
 
+function validDimensions(width:number,height:number):boolean {
+    return Number.isSafeInteger(width)&&Number.isSafeInteger(height)&&width>0&&height>0
+        &&width<=MAX_SIDE&&height<=MAX_SIDE&&width*height<=MAX_PIXELS;
+}
+
+export interface ImageTextSegmentationSource {pixels:Uint8ClampedArray;width:number;height:number}
+
+/** 原像素仍归调用方；postMessage 只克隆一次，不能 transfer 后破坏后续绘字或 CPU 重试。 */
+export function isImageTextSegmentationSource(source:unknown):source is ImageTextSegmentationSource {
+    const value=source as Partial<ImageTextSegmentationSource>|null|undefined;
+    return !!value&&validDimensions(value.width!,value.height!)&&value.pixels instanceof Uint8ClampedArray
+        &&value.pixels.length===value.width!*value.height!*4&&value.pixels.byteOffset===0
+        &&value.pixels.buffer instanceof ArrayBuffer&&value.pixels.byteLength===value.pixels.buffer.byteLength;
+}
+
 function geometry(width:number,height:number):{width:number;height:number} {
-    if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<=0||height<=0
-        ||width>MAX_SIDE||height>MAX_SIDE||width*height>MAX_PIXELS)throw new Error('文字分割图片尺寸无效');
+    if(!validDimensions(width,height))throw new Error('文字分割图片尺寸无效');
     const ratio=SIDE/Math.max(width,height);
     return {width:Math.max(1,Math.round(width*ratio)),height:Math.max(1,Math.round(height*ratio))};
 }
@@ -36,7 +50,7 @@ function weights(input:number,output:number,index:number):Weight {
 
 function rounded(sum:number):number {return Math.max(0,Math.min(255,Math.floor((sum+PRECISION/2)/PRECISION)));}
 
-/** 缓存窗口最多覆盖一次垂直低通所需的源行；返回的自有 12MiB 输入只允许逐 attempt 创建并转移一次。 */
+/** 在推理 Worker 内构造 12MiB 自有输入；缓存窗口最多覆盖一次垂直低通所需的源行。 */
 export function createImageTextSegmentationInput(pixels:Uint8ClampedArray,width:number,height:number):Float32Array {
     const size=geometry(width,height);
     if(!(pixels instanceof Uint8ClampedArray)||pixels.length!==width*height*4)throw new Error('文字分割原始像素无效');

@@ -276,6 +276,27 @@
     "fullPageHotkey": "Alt+T",
     "service": "freeTranslation"
   },
+  "github-repository-identities": {
+    "url": "https://github.com/Niko1221/Strata/pulls",
+    "hoverSelector": "main [data-listview-component='items-list'] > li:first-child h3:has(a[data-testid='listitem-title-link'])",
+    "hoverTargets": [
+      {"name": "pr-title", "selector": "main [data-listview-component='items-list'] > li:first-child h3:has(a[data-testid='listitem-title-link'])", "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "requiredSelectors": ["main [data-listview-component='items-list'] > li:first-child h3:has(a[data-testid='listitem-title-link'])"],
+    "coverageRules": [
+      {"name": "pr-title", "selector": "main [data-listview-component='items-list'] > li:first-child h3:has(a[data-testid='listitem-title-link'])", "kind": "content", "minInitial": 1, "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "forbiddenSelectors": ["header nav[data-component='Breadcrumbs'] a[data-component='Breadcrumbs.Item'][href]", "main a[data-testid='author-filter-link']"],
+    "interactionSelectors": ["header nav[data-component='Breadcrumbs'] a[data-component='Breadcrumbs.Item'][href]", "main a[data-testid='author-filter-link']"],
+    "modes": ["hover", "full"],
+    "tier": "quarantine",
+    "quarantineReason": "Live hover passes, but strict full-page source-owner checks fail when GitHub remounts the native title. Generic H1 coverage also does not recognize its in-place UI translation in detect-all-nodes mode. Retain this case for explicit investigation; saved native-DOM replay passes the reported identity and PR-title restore/retranslate checks.",
+    "fullPageScope": "initial-corpus",
+    "hoverHotkey": "Control",
+    "fullPageHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "notes": "Preserve the native repository owner, repository breadcrumb links and PR author names while translating the first pull request title. Run with --include-quarantine --controlled-provider; the title is not pinned because this is the live pull request list. Detect-all-nodes configuration must be verified separately from the default content scope."
+  },
   "github-project-pr": {
     "url": "https://github.com/FluentRead/FluentRead/pull/243",
     "hoverSelector": "main h1",

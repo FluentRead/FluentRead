@@ -5,6 +5,7 @@
  * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
  * 章节标题：已有章节名的字距化样式须有同栏正文支持；仅构造分类键，不压缩原文字串，公式、表格和作者区仍受保护。
  * 提示框边界：宽框内的正文项目列表与框顶大标题共同确认文字容器，编号后的竖分隔符不让章节标题吸附到插图。
+ * 稀疏折行：只有未结束的普通正文、同字号左对齐且更短的小写续行，才允许在有界较大行距内继续；标题、列表和图表不扩大拼接范围。
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
  * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 整页矢量容器：跳过覆盖页高的 Form 外框及其同边界底色，图中文字需要独立图形支持；同一装饰底框内连续对齐的正文先独立归行，避免与邻框文字串接。
@@ -1158,8 +1159,16 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         }
         return false;
     };
+    const unfinished = (draft: Draft) => draft.kind === 'text' && !draft.region
+        && !bulleted.has(draft.lines[0]) && !tocEntries.has(draft.lines[0])
+        && !/^(?:[•●◦▪▫‣⁃]|\d+[.)])\s/u.test(draft.lines[0].text)
+        && !/[.!?:;。！？：；]["')\]}]*$/u.test(draft.lines.at(-1)!.text);
     for (const [lineIndex, line] of lines.entries()) {
-        active = active.filter(draft => line.baseline - draft.lines.at(-1)!.baseline <= Math.max(font, draft.lines.at(-1)!.fontSize) * 1.7 * loose);
+        // 页面只有一对折行时无法估计全页行距；保留未结束正文的短期候选，实际拼接仍须下方的几何和字串证据。
+        active = active.filter(draft => {
+            const last = draft.lines.at(-1)!;
+            return line.baseline - last.baseline <= Math.max(Math.max(font, last.fontSize) * 1.7 * loose, unfinished(draft) ? last.fontSize * 2.4 : 0);
+        });
         const region = regions.find(region => inRegion(region, line));
         const panel = panelLines.get(line);
         if (panel && !region) {
@@ -1179,6 +1188,9 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
                 const last = draft.lines.at(-1)!;
                 if (tocEntries.has(last)) continue;
                 const gap = line.baseline - last.baseline;
+                if (gap > Math.max(font, last.fontSize) * 1.7 * loose && !(unfinished(draft) && kind === 'text'
+                    && Math.abs(line.x - last.x) <= 1 && line.width < last.width * .8 && last.width >= last.fontSize * 20
+                    && /^\p{Ll}/u.test(line.text) && gap <= last.fontSize * 2.4)) continue;
                 // 紧排大标题即使各行长短不同也属于同一标题；普通正文或另起编号仍不能借此并入。
                 const tightHeading = kind === 'heading' && Math.abs(line.fontSize - last.fontSize) <= 0.2
                     && Math.abs(line.x - last.x) <= 1 && gap <= last.fontSize * 1.05;

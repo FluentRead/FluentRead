@@ -19,6 +19,11 @@ function draw(c=context(),items=[region],p:MangaAlphaProtection|undefined=protec
 beforeEach(()=>{vi.clearAllMocks();plan.mockReset().mockImplementation((_text,ref)=>({accepted:true,font:`${ref.style} ${ref.fontSize}px ${ref.family}`,fontSize:ref.fontSize,lineWidth:ref.lineWidth,chunks:[]}));raster.mockReset().mockImplementation(accepted);ledger.mockReset().mockReturnValue({shared:true});});
 
 describe('漫画绕孔位图与连续矩形编排',()=>{
+    it('透明避让改变原文字框时不沿用原边线提示',()=>{
+        plan.mockReturnValue({accepted:false,reason:'unsupported-bidi-or-context-script'});
+        const baseline=draw(),aligned=draw(context(),[region],protection(),[{...backgrounds[0],textAlign:'left'}]);
+        expect(aligned.fillText.mock.calls).toEqual(baseline.fillText.mock.calls);
+    });
     it('普通图片和框外保护区不进入额外布局或创建栅格账本',()=>{
         const a=context(),b=draw(context(),[region],protection([{x0:1,y0:1,x1:5,y1:5}]));
         drawMangaTranslations(a as any,pixels,width,height,[region],true,backgrounds);

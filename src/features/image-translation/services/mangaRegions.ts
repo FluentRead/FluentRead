@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRegions.ts
  * 文件职责：把漫画专用 OCR 和通用 OCR 行转换成可整段翻译与修补的气泡或旁白区域。
- * 合列输入：通用 OCR 已合并区域继续保留全部物理源框，并按各源列或源行的中位厚度估计字号，后续合段不能丢失这些擦除边界。
+ * 合列输入：通用 OCR 已合并区域继续保留全部物理源框，并按各源列或源行的中位厚度估计字号，后续合段不能丢失这些擦除边界。明确附属的日文注音随正文修补，识别记录另存，避免将读音单独翻译和重复绘字。
  * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期、货币金额、百分数、小数、分数和温度，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 保留连续合法韩文 Jamo，并从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，按有界 Unicode 码点边界连接东亚文字，不插入原文没有的空格，保留硬连字符且只移除行末软连字符；仅明确归属的气泡使用较宽横排行距，整页横排行距保持严格、竖列间距上限为字宽的1.8倍，额外续行必须来自同帧像素对空隙与遮挡的有界证明。
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
@@ -10,6 +10,7 @@ import {endsEastAsianText, startsEastAsianText} from '../textBoundary';
 import type {NumericEvidenceOcrLine} from '../core';
 import {numericInformation} from './mangaNumeric';
 import type {ImageParagraphContinuations} from '../paragraphs';
+import {attachImageRuby} from '../ruby';
 
 export interface MangaOcrItem {
     text: string;
@@ -86,9 +87,10 @@ export function groupMangaText(items: MangaOcrItem[], sourceLanguage: string, wi
     });
     // 只有已有明确归属的独立气泡才允许较宽横排行距；整页竖列最多放宽至1.8倍字宽，
     // 避免把邻近旁白或不同说话者误并成一句。
-    if (!protectNumeric) return mergeMangaLines(lines, context === 'bubble' ? 1.5 : 0.8, context === 'bubble' ? 3.5 : 1.8);
+    const annotated=attachImageRuby(lines).lines;
+    if (!protectNumeric) return mergeMangaLines(annotated, context === 'bubble' ? 1.5 : 0.8, context === 'bubble' ? 3.5 : 1.8);
     const numeric = lines.filter(line => numericInformation(line.text));
-    const others = lines.filter(line => !numericInformation(line.text));
+    const others = annotated.filter(line => !numericInformation(line.text));
     return [...mergeMangaLines(others, context === 'bubble' ? 1.5 : 0.8, context === 'bubble' ? 3.5 : 1.8),
         ...numeric.map(line => ({...line, sourceBoxes: [line.bbox]}))].sort(readingOrder);
 }
@@ -120,7 +122,7 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
             ...(line.vertical ? {vertical: true as const} : {})}];
     });
     const numeric = regions.filter(line => numericInformation(line.text));
-    const others = regions.filter(line => !numericInformation(line.text));
+    const others = attachImageRuby(regions).lines.filter(line => !numericInformation(line.text));
     return [...mergeMangaLines(others), ...numeric.map(line => ({...line, sourceBoxes: [line.bbox]}))].sort(readingOrder);
 }
 
@@ -159,6 +161,7 @@ function mergeMangaLines(lines: MangaRegion[], lineGap = 0.8, columnGap = 0.8): 
         return {text,
             bbox: members.map(member => member.bbox).reduce(union), fontSize: sizes[Math.floor(sizes.length / 2)],
             sourceBoxes: members.flatMap(member => (member.sourceBoxes ?? [member.bbox]).map(box => ({...box}))),
+            ...(members.some(member=>member.ruby)?{ruby:members.flatMap(member=>member.ruby??[])}:{}),
             ...(members[0].vertical ? {vertical: true as const} : {})};
     }).sort(readingOrder);
 }

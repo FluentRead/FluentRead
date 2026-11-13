@@ -1894,7 +1894,7 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
             chrome.runtime.sendMessage=function(...args){
                 const message=args[0],observe=response=>{
                     if(message?.type==='FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN'&&Array.isArray(response?.lines)&&test.layoutResults.length<layoutTraceLimit)
-                        test.layoutResults.push({requestId:message.requestId,noBitmap:response.success===true&&(response.imageUnchanged===true||message.manga===true&&(Array.isArray(response.mangaPatches?.patches)&&response.mangaPatches.patches.length===0||response.lines.length===0&&typeof response.image==='string'&&response.image===message.image)),lines:response.lines.map(({text,sourceText,bbox,fontSize,sourceBoxes,vertical,renderSkipped,numericUncertain})=>({text,sourceText,bbox,fontSize,sourceBoxes,vertical,renderSkipped,numericUncertain}))});
+                        test.layoutResults.push({requestId:message.requestId,noBitmap:response.success===true&&(response.imageUnchanged===true||message.manga===true&&(Array.isArray(response.mangaPatches?.patches)&&response.mangaPatches.patches.length===0||response.lines.length===0&&typeof response.image==='string'&&response.image===message.image)),lines:response.lines.map(({text,sourceText,bbox,fontSize,sourceBoxes,vertical,ruby,renderSkipped,numericUncertain})=>({text,sourceText,bbox,fontSize,sourceBoxes,vertical,ruby,renderSkipped,numericUncertain}))});
                     return response;
                 };
                 const last=args.length-1,callback=args[last];

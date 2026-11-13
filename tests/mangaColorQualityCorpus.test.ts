@@ -24,6 +24,8 @@ const alphaRoot=new URL('./fixtures/manga-alpha/',import.meta.url);
 const recordedRoot=new URL('./fixtures/manga-paragraph-recordings/',import.meta.url);
 const sha=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 const characterKey=(text:string)=>Array.from(text.normalize('NFKC').toUpperCase().replace(/[^\p{L}\p{N}]/gu,'')).sort().join('');
+// 冻结语料的注音仍是独立识别锚点；此项验证源文本保存和段落续行，不把注音算作独立翻译请求。
+const sourceInventory=(lines:Array<{text:string;ruby?:Array<{text:string}>}>)=>lines.flatMap(line=>[line.text,...(line.ruby??[]).map(ruby=>ruby.text)]);
 const markHighContrastPixel=(pixels:Uint8ClampedArray,offset:number)=>{
     const average=(pixels[offset]!+pixels[offset+1]!+pixels[offset+2]!)/3,value=average<128?255:0;
     pixels.set([value,value,value,255],offset);
@@ -146,13 +148,13 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             }
             const baseline=collectMangaRegions(page,fixture.sourceLanguage,fixture.width,fixture.height,'manga');
             const actual=collectMangaRegions({...page,imageParagraphGapProofs:proofs},fixture.sourceLanguage,fixture.width,fixture.height,'manga',fixture.name);
-            const before=evaluateQualityReadingOrder(fixture,baseline.map(line=>line.text)).qualityFailures;
-            const after=evaluateQualityReadingOrder(fixture,actual.map(line=>line.text)).qualityFailures;
+            const before=evaluateQualityReadingOrder(fixture,sourceInventory(baseline)).qualityFailures;
+            const after=evaluateQualityReadingOrder(fixture,sourceInventory(actual)).qualityFailures;
             expect(proofs.length,fixture.name).toBe(expected[fixture.name].proofs);
             expect(before.length,`${fixture.name} baseline`).toBe(expected[fixture.name].before);
             expect(after.length,`${fixture.name} with pixel proof`).toBe(expected[fixture.name].after);
             expect(after.length,`${fixture.name} has no new paragraph failures`).toBeLessThanOrEqual(before.length);
-            expect(characterKey(actual.map((line:any)=>line.text).join('')),fixture.name).toBe(characterKey(results.map((line:any)=>line.text).join('')));
+            expect(characterKey(sourceInventory(actual).join('')),fixture.name).toBe(characterKey(results.map((line:any)=>line.text).join('')));
         }
     });
 
@@ -254,7 +256,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             expect(before.length,`${fixture.name} baseline`).toBe(expected[fixture.name].before);
             expect(after.length,`${fixture.name} with pixel proof`).toBe(expected[fixture.name].after);
             expect(after.length,`${fixture.name} adds no paragraph failures`).toBeLessThanOrEqual(before.length);
-            expect(characterKey(actual.map((line:any)=>line.text).join('')),fixture.name).toBe(characterKey(results.map((item:any)=>item.text).join('')));
+            expect(characterKey(sourceInventory(actual).join('')),fixture.name).toBe(characterKey(results.map((item:any)=>item.text).join('')));
             for(const proof of proofs){
                 const a=proof.previous.box,b=proof.next.box,x0=Math.max(a.x,b.x),x1=Math.min(a.x+a.width,b.x+b.width),y=Math.ceil(a.y+a.height)+Math.floor((b.y-(a.y+a.height))/2);
                 expect(x1).toBeGreaterThan(x0);expect(y).toBeGreaterThanOrEqual(0);expect(y).toBeLessThan(fixture.height);
@@ -308,11 +310,11 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             const proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,pixels);
             const before=collectMangaRegions(page,fixture.sourceLanguage,fixture.width,fixture.height,'manga');
             const after=collectMangaRegions({...page,imageParagraphGapProofs:proofs},fixture.sourceLanguage,fixture.width,fixture.height,'manga',scene.name);
-            const beforeFailures=evaluateQualityReadingOrder(fixture,before.map((line:any)=>line.text)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
-            const afterFailures=evaluateQualityReadingOrder(fixture,after.map((line:any)=>line.text)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
+            const beforeFailures=evaluateQualityReadingOrder(fixture,sourceInventory(before)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
+            const afterFailures=evaluateQualityReadingOrder(fixture,sourceInventory(after)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
             baselineFailures+=beforeFailures.length;replayFailures+=afterFailures.length;
             expect(afterFailures.length,`${scene.name} adds no paragraph failure`).toBeLessThanOrEqual(beforeFailures.length);
-            expect(characterKey(after.map((line:any)=>line.text).join('')),scene.name).toBe(characterKey(before.map((line:any)=>line.text).join('')));
+            expect(characterKey(sourceInventory(after).join('')),scene.name).toBe(characterKey(sourceInventory(before).join('')));
             for(const proof of proofs)for(const text of [proof.previous.text,proof.next.text]){
                 const source=scene.lines.find((line:any)=>line.text===text);expect(source,`${scene.name}: recorded line ${text}`).toBeDefined();
                 expect(source.sourceBoxes,`${scene.name}: proof endpoint is one original source box`).toEqual([source.bbox]);

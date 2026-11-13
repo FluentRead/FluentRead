@@ -1,10 +1,25 @@
 import {describe, it, expect, vi} from 'vitest';
-import {parseMangaPatchPacket, mangaPatchRects, mangaMaskBoxes, compressMangaPage, createMangaLightCache} from '@/src/features/image-translation/mangaPatchResult';
+import {parseMangaPatchPacket, mangaPatchRects, mangaMaskBoxes, mangaMaskBoxIntersects, createMangaMaskFontResolver, compressMangaPage, createMangaLightCache} from '@/src/features/image-translation/mangaPatchResult';
 import {normalizeMangaCachePages, mangaCachePixelBudget} from '@/src/core/config/manga';
 const region = (x0=10,y0=10,x1=20,y1=20,fontSize=10) => ({text:'Hello',bbox:{x0,y0,x1,y1},fontSize});
 const packet = () => ({width:100,height:100,patches:[{x:1,y:2,width:10,height:20,image:'data:image/png;base64,AQID'}]});
 const lines = [{text:'译文',sourceText:'Hello',bbox:{x0:1,y0:2,x1:11,y1:22},backgroundColor:'transparent'}];
 describe('漫画局部结果与有界轻量缓存',()=>{
+    it('注音清字和碰撞使用同一原字号，复制坐标仍匹配，其他框保留正文字号',()=>{
+        const main=region(20,20,60,100,40),box={x0:65,y0:20,x1:85,y1:50};
+        const joined={...main,sourceBoxes:[main.bbox,box],ruby:[{text:'かぜ',bbox:{...box},fontSize:20}]};
+        const resolve=createMangaMaskFontResolver(joined);
+        expect(resolve({...box})).toBe(20);expect(resolve(main.bbox)).toBe(40);
+        for(const property of ['x0','y0','x1','y1'] as const)expect(resolve({...box,[property]:box[property]+1})).toBe(40);
+        expect(mangaMaskBoxes(joined,200,200)).toEqual([{x0:12,y0:12,x1:68,y1:108},{x0:61,y0:16,x1:89,y1:54}]);
+        expect(mangaMaskBoxIntersects(box,resolve(box),200,200,{x0:89,y0:20,x1:95,y1:40})).toBe(false);
+        expect(mangaMaskBoxIntersects(box,resolve(box),200,200,{x0:88,y0:20,x1:95,y1:40})).toBe(true);
+        expect(createMangaMaskFontResolver({...main,ruby:[]})(box)).toBe(40);
+    });
+    it.each([undefined,NaN,Infinity,0,-1])('旧记录缺少有效注音字号 %s 时沿用已有余量',fontSize=>{
+        const main=region(),r={...main,ruby:[{text:'かぜ',bbox:{...main.bbox},fontSize}]};
+        expect(mangaMaskBoxes(r,100,100)).toEqual(mangaMaskBoxes(main,100,100));
+    });
     it('容量淘汰通知抛错不阻止新缓存或破坏上限',()=>{
         const page=compressMangaPage(packet(),lines),evicted=vi.fn(()=>{throw Error('observer failure');});
         const cache=createMangaLightCache(1,10000,evicted);expect(cache.put('a',page)).toBe(true);

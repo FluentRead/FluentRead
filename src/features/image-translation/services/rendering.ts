@@ -4,10 +4,12 @@
  * 主要内容：按周长用量化色阶聚类主色，但返回桶内真实颜色均值，避免纯色修补的固定色差；依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，单个源行按参考字体的宽度与墨迹高度一致性估计尺度，估计不可靠时沿用原上限；按实际回退字体的墨迹、描边和基线适配上下边界，单行不重复扣除完整行高，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
+ * 行缘标点：在既有词界及可证明的字素边界上绑定开闭标点与日文行首禁排字符；长词拆分后重新绑定，保留显式换行和完整正文，不以删字或越框解决孤立标点。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
 import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
+import {bindImageTextPunctuation} from './imageTextPunctuation';
 
 /** 从 OCR 框外围采样主色，忽略透明像素且不遍历框内面积。 */
 export function getImageTextBackgroundColor(
@@ -148,12 +150,6 @@ function isSimpleImageText(text: string): boolean {
     return SIMPLE_IMAGE_TEXT.test(text) && !IMAGE_TEXT_EXTEND.test(text);
 }
 
-function graphemes(text: string): string[] {
-    if (graphemeSegmenter) return Array.from(graphemeSegmenter.segment(text), part => part.segment);
-    // 不模拟不完整的 UAX29：复杂词组保持整体，宁可缩小字号，也不拆开字素。
-    return isSimpleImageText(text) ? Array.from(text) : [text];
-}
-
 /** 缺少 Segmenter 时按固定 Unicode 17 属性，只在 ASCII 空格的安全两侧分开词组。 */
 function fallbackTokens(paragraph: string): Array<string | null> {
     const words = paragraph.replace(/\s+/gu, ' ').split(' ');
@@ -229,7 +225,18 @@ export function layoutImageTranslationText(
         return { lines: [], fontSize: 0, lineHeight: 0 };
     }
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
-    const tokens = paragraphs.map(tokenize);
+    const rawSegments = new Map<string, string[]>();
+    const split = (token:string):string[]|undefined => {
+        // 不模拟不完整的UAX29；缺少分割器时只拆已证明安全的简单文本。
+        if(!graphemeSegmenter&&!isSimpleImageText(token))return;
+        let parts=rawSegments.get(token);
+        if(!parts){
+            parts=graphemeSegmenter?Array.from(graphemeSegmenter.segment(token),part=>part.segment):Array.from(token);
+            rawSegments.set(token,parts);
+        }
+        return parts;
+    };
+    const tokens = paragraphs.map(paragraph=>bindImageTextPunctuation(tokenize(paragraph),split));
     const segments = new Map<string, string[]>();
     let measuredSize = 0;
     const widths = new Map<string, number>();
@@ -253,7 +260,7 @@ export function layoutImageTranslationText(
             let current = '';
             let space = '';
             for (const token of paragraph) {
-                if (token === null) {
+                if (token === ' ') {
                     space = ' ';
                     continue;
                 }
@@ -273,7 +280,8 @@ export function layoutImageTranslationText(
                 }
                 let parts = segments.get(token);
                 if (!parts) {
-                    parts = graphemes(token);
+                    const raw=split(token);
+                    parts = raw?bindImageTextPunctuation(raw.map(part=>/^\s+$/u.test(part)?null:part),()=>undefined):[token];
                     segments.set(token, parts);
                 }
                 for (const part of parts) {

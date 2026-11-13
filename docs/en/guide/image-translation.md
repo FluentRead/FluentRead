@@ -27,6 +27,8 @@ Press **Escape** inside the text panel to close it and return to an available en
 
 Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
 
+During automatic wrapping in ordinary images, closing punctuation stays with the preceding character and opening punctuation with the following text. Small Japanese kana and prolonged sound marks also stay attached. Explicit line breaks are preserved.
+
 Ordinary images use the actual glyph bounds of your device's fonts to reduce clipping of accents, ascenders and descenders. Merged Tesseract vertical text keeps each column's erasure bounds, preserving artwork between columns. For opaque text regions whose complete boundary matches a smooth gradient, ordinary image and manga repair continue that gradient. Complex textures or translucent backgrounds may still show repair artifacts; switch to the original to compare.
 
 Single horizontal lines use both the source text's width and ink height to check its font scale, reducing size differences caused by letter shapes. Unreliable estimates and complex paragraphs keep their existing limits. Translations still fit their complete glyphs within the available area; this does not recover the original font family or every decorative style.

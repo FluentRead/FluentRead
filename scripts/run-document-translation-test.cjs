@@ -49,7 +49,9 @@ async function fixtureServer() {
       state.requests.push(source);
       const protocol = /(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/giu;
       // 富文本的每段行内正文也必须实际改变；仅在整段前添加前缀会触发生产端未翻译正文保护。
-      const translate = text => state.chineseOnly
+      const translate = text => state.englishOnly
+        ? `${state.englishLabels?.[text.trim()] ?? 'Controlled translated text.'} ${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')} ${[...text.replace(/__FRTERM_[a-z0-9_]+?__/giu, '').matchAll(/(?<![\p{N}_.])[0-9]+(?:[,._][0-9]+)*(?![\p{N}_.])/gu)].map(match => match[0]).join(' ')}`
+        : state.chineseOnly
         ? `本地测试译文：扫描文档的文字经过识别后，按段落进行翻译。原始图像仍保留，阅读器展示对应的中文内容。${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')}`
         : `测试译文：${text.replace(/<(g\d+)>([\s\S]*?)<\/\1>/gu, (_match, tag, inner) => `<${tag}>测试译文：${inner}</${tag}>`)}`;
       const translation = protocol.test(source) ? source.replace(protocol, (_match, begin, _nonce, _index, text, end) => `${begin}${translate(text)}${end}`) : translate(source);
@@ -275,7 +277,7 @@ async function main() {
       return;
     }
     if (suite === 'scanned-cjk') {
-      await require('./testing/document-cjk-corpus.cjs')({page, load, openSettings, shot, report, fixture, artifactsDir});
+      await require('./testing/document-cjk-corpus.cjs')({page, load, openSettings, shot, report, fixture, artifactsDir, pdfPageTexts});
       assert.equal(report.consoleErrors.length, 0);
       report.ok = true;
       return;

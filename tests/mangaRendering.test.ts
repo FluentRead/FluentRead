@@ -8,8 +8,8 @@ const region=(text='whole translated sentence'):MangaRegion=>({text,fontSize:20,
 const box=(x0=10,y0=10,x1=410,y1=70)=>({x0,y0,x1,y1});
 function context(){
     const stack:Array<Record<string,unknown>>=[];
-    const c={font:'italic 17px serif',textAlign:'right',textBaseline:'bottom',lineWidth:7,fillStyle:'orange',strokeStyle:'purple',lineJoin:'bevel',
-        save:vi.fn(function(){stack.push(Object.fromEntries(['font','textAlign','textBaseline','lineWidth','fillStyle','strokeStyle','lineJoin'].map(key=>[key,c[key as keyof typeof c]])));}),
+    const c={font:'italic 17px serif',direction:'inherit',textAlign:'right',textBaseline:'bottom',lineWidth:7,fillStyle:'orange',strokeStyle:'purple',lineJoin:'bevel',
+        save:vi.fn(function(){stack.push(Object.fromEntries(['font','direction','textAlign','textBaseline','lineWidth','fillStyle','strokeStyle','lineJoin'].map(key=>[key,c[key as keyof typeof c]])));}),
         restore:vi.fn(function(){Object.assign(c,stack.pop());}),
         measureText:vi.fn(function(text:string){const size=Number(c.font.match(/ ([\d.e+-]+)px/)![1]);return {width:Array.from(text).length*size*.6,actualBoundingBoxAscent:text?size*.7:0,actualBoundingBoxDescent:text?size*.2:0,actualBoundingBoxLeft:0,actualBoundingBoxRight:Array.from(text).length*size*.6};}),
         beginPath:vi.fn(),rect:vi.fn(),clip:vi.fn(),fillRect:vi.fn(),strokeText:vi.fn(),
@@ -18,7 +18,7 @@ function context(){
     return c;
 }
 const plan=(c:ReturnType<typeof context>,r=region(),spaces=[box()],width=W,height=H)=>planMangaBlankTranslation(c as unknown as CanvasRenderingContext2D,r,width,height,spaces);
-const snapshot=(c:ReturnType<typeof context>)=>({font:c.font,textAlign:c.textAlign,textBaseline:c.textBaseline,lineWidth:c.lineWidth,fillStyle:c.fillStyle,strokeStyle:c.strokeStyle,lineJoin:c.lineJoin});
+const snapshot=(c:ReturnType<typeof context>)=>({font:c.font,direction:c.direction,textAlign:c.textAlign,textBaseline:c.textBaseline,lineWidth:c.lineWidth,fillStyle:c.fillStyle,strokeStyle:c.strokeStyle,lineJoin:c.lineJoin});
 function draw(c:ReturnType<typeof context>,r:MangaRegion){drawMangaTranslations(c as unknown as CanvasRenderingContext2D,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{color:'rgb(255,255,255)',uniform:true}]);}
 function fragmentedSpaces(){
     const pixels=new Uint8ClampedArray(220*220*4),set=(x:number,y:number,value:number)=>pixels.set([value,value,value,255],(y*220+x)*4);
@@ -29,6 +29,21 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it.each([['(2.0) مرحبا بكم!','rtl'],['(42) שלום לכם!','rtl'],['(2.0) Hello world!','ltr']])('整段 %s 的度量和绘制不继承错误画布方向',(text,direction)=>{
+        const c=context(),before=snapshot(c),measured:string[]=[],drawn:string[]=[],base=c.measureText.getMockImplementation()!;
+        c.measureText.mockImplementation(value=>{measured.push(c.direction);return base(value);});
+        c.fillText.mockImplementation((value,x,y)=>{drawn.push(c.direction);return {text:value,x,y,font:c.font};});
+        const selected=plan(c,region(text));expect(selected).toBeDefined();expect(snapshot(c)).toEqual(before);
+        draw(c,selected!);expect(measured.length).toBeGreaterThan(0);expect(measured.every(value=>value===direction)).toBe(true);
+        expect(drawn.length).toBeGreaterThan(0);expect(drawn.every(value=>value===direction)).toBe(true);expect(snapshot(c)).toEqual(before);
+    });
+    it('同页弱方向数字行按各自段落方向分别度量，不串用另一方向的缓存',()=>{
+        const c=context(),seen=new Set<string>(),base=c.measureText.getMockImplementation()!;
+        c.measureText.mockImplementation(text=>{if(text==='2026 (2.0)')seen.add(c.direction);const result=base(text);return {...result,width:result.width+(c.direction==='rtl'?7:0)};});
+        const items=[region('Hello\n2026 (2.0)'),region('مرحبا\n2026 (2.0)')];
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,items,true,items.map(()=>({uniform:true,color:'rgb(255,255,255)'})));
+        expect(seen).toEqual(new Set(['ltr','rtl']));expect(c.direction).toBe('inherit');
+    });
     it('源色与实际文字底色独立于原清字分类，绘字采用细底色描边',()=>{
         const pixels=new Uint8ClampedArray(W*H*4).fill(255),r=region('SOURCE');
         for(let y=105;y<115;y++)for(let x=520;x<570;x++)pixels.set([25,48,75,255],(y*W+x)*4);

@@ -361,7 +361,7 @@ describe('原图背景与字体层次',()=>{
             const separate=make();drawMangaTranslations(separate as any,pixels,width,height,[item],true,[backgrounds[index]]);return separate.fillText.mock.calls;
         }));
     });
-    it('短键节约字符串也仍按原完整字体键计费，缓存容量不因缩键扩大',()=>{
+    it('短键仍按完整字体及方向计费，缓存容量不因缩键扩大',()=>{
         const caches:Array<Map<string,{width:number;ascent:number;descent:number}>>=[];
         class ObservedMap extends Map<string,any>{override set(key:string,value:any){
             if(value&&typeof value==='object'&&'width'in value&&'ascent'in value&&'descent'in value&&!caches.includes(this))caches.push(this);
@@ -372,8 +372,8 @@ describe('原图背景与字体层次',()=>{
         try{drawMangaTranslations(c as any,pixels,width,height,[{...region,text}]);}finally{vi.unstubAllGlobals();}
         expect(caches).toHaveLength(1);const cache=caches[0];let logicalCharacters=0,storedCharacters=0;
         for(const key of cache.keys()){
-            const match=/^(600|800)\|([^|]+)\|/u.exec(key)!;
-            logicalCharacters+=`${match[1]} ${match[2]}px ${MANGA_TEXT_FONT}|${key.slice(match[0].length)}`.length;storedCharacters+=key.length;
+            const match=/^(ltr|rtl)\|(600|800)\|([^|]+)\|/u.exec(key)!;
+            logicalCharacters+=`${match[1]}|${match[2]} ${match[3]}px ${MANGA_TEXT_FONT}|${key.slice(match[0].length)}`.length;storedCharacters+=key.length;
         }
         expect(logicalCharacters).toBeGreaterThan(130000);expect(logicalCharacters).toBeLessThanOrEqual(131072);
         expect(cache.size).toBeLessThanOrEqual(8192);expect(storedCharacters).toBeLessThan(logicalCharacters/2);

@@ -1,4 +1,33 @@
 {
+  "llamaperf-mac-m5": {
+    "url": "https://llamaperf.com/mac/m5?utm_source=chatgpt.com",
+    "hoverSelector": "#main-content > div > header:has(> h1) > p",
+    "hoverTargets": [
+      {"name": "page-title", "selector": "#main-content > div > header > h1"},
+      {"name": "mac-introduction", "selector": "#main-content > div > header:has(> h1) > p", "index": 0, "sourcePartition": {"excludeSelectors": []}},
+      {"name": "configuration-counts", "selector": "#main-content > div > header:has(> h1) > p", "index": 1, "sourcePartition": {"excludeSelectors": []}},
+      {"name": "benchmark-summary", "selector": "#main-content > div > header:has(> h1) > div > p", "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "requiredSelectors": [
+      "#main-content > div > header > h1",
+      "#main-content > div > header:has(> h1) > p",
+      "#main-content > div > header:has(> h1) > div > p"
+    ],
+    "coverageRules": [
+      {"name": "page-title", "selector": "#main-content > div > header > h1", "kind": "heading", "minInitial": 1},
+      {"name": "mac-introduction-and-counts", "selector": "#main-content > div > header:has(> h1) > p", "kind": "content", "minInitial": 2, "sourcePartition": {"excludeSelectors": []}},
+      {"name": "benchmark-summary", "selector": "#main-content > div > header:has(> h1) > div > p", "kind": "content", "minInitial": 1, "sourcePartition": {"excludeSelectors": []}}
+    ],
+    "forbiddenSelectors": ["body > header nav[aria-label='Primary']", "#main-content > div > header:has(> h1) > div > ul"],
+    "interactionSelectors": ["#main-content > div > header:has(> h1) > div > ul a[href]", "body > header a[href='/login']"],
+    "modes": ["hover", "full"],
+    "tier": "required",
+    "fullPageScope": "initial-corpus",
+    "hoverHotkey": "Control",
+    "fullPageHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "notes": "Mac overview places its introduction, configuration/report counts and dated benchmark summary inside header. Verify all three complete paragraphs, including Next.js comment-split text, while retaining benchmark cards and top-level navigation. Controlled-provider runs verify source transport, hover/full restoration and repeated translation; live provider quality is separate."
+  },
   "jetbrains-idea-whatsnew": {
     "url": "https://www.jetbrains.com/idea/whatsnew/2026-3/",
     "prepareScrollSelector": "#agents-models-subscriptions > header h3",

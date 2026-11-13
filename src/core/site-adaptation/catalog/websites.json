@@ -1,5 +1,24 @@
 [
   {
+    "id": "llamaperf-mac",
+    "name": "Llamaperf Mac 基准测试",
+    "match": {
+      "hosts": ["llamaperf.com"],
+      "paths": ["/mac/*"]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          "#main-content > div > header:has(> h1) > p",
+          "#main-content > div > header:has(> h1) > div > p"
+        ],
+        "resolve": "closest"
+      }
+    ],
+    "protect": ["code", "pre", "input", "textarea"]
+  },
+  {
     "id": "englio-article",
     "name": "Englio 英语分级阅读",
     "match": {

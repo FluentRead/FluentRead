@@ -80,7 +80,11 @@ function isControlledTranslationForSource(output, source, sourceParts = [source]
   let allowedTerms;
   const decoded = decodeControlledTranslationText(output, literal => {
     const {hasOnlyCommonWebTerms, matchCommonWebTerms} = loadOriginalSlotPolicies();
-    if (!hasOnlyCommonWebTerms(literal)) return false;
+    // Comment-split numeric Text nodes may sit immediately beside a protected term.
+    // Digits are already legal literals; still require every word to be an actual
+    // source glossary term and compare the entire decoded source below.
+    const words = literal.match(/[\p{L}\p{N}\p{M}_]+/gu);
+    if (!words?.every(word => /^\d+$/u.test(word) || hasOnlyCommonWebTerms(word))) return false;
     allowedTerms ??= new Set(matchCommonWebTerms(inputs).map(term => term.source));
     return matchCommonWebTerms(literal).every(term => allowedTerms.has(term.source));
   });

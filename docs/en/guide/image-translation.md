@@ -49,6 +49,8 @@ Ordinary rotated, scaled, mirrored and perspective images follow the page's nati
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
+On solid backgrounds, scaling can connect an English word and an identifier. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`. Existing letters, digits and source bounds stay unchanged.
+
 On a continuous gradient, neighboring lines with clearly different sizes and verified text colors retain separate regions. This helps preserve a heading and subtitle as distinct styles. Same-image context still follows the selected translation service and settings.
 
 In manga mode, neighboring gradient headings with a clear shared left or right edge can keep that alignment for single-line translations. This helps short translations preserve the original hierarchy. Centered text, wrapping, transparency avoidance or insufficient space retain the existing layout.

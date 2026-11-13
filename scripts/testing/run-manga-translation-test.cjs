@@ -3,7 +3,7 @@
  * @file scripts/testing/run-manga-translation-test.cjs
  * 文件职责：在临时 profile 中用可信点击和真实模型验证生产漫画翻译、滚动及缓存行为。
  * 主要内容：固定模型文件经校验后由既有 UI 导入；性能模式测量冷/热推理，质量 manifest 检查真实 OCR 锚点、画面保护与原/译切换；可选角色补充绑定原manifest，正文、注音和视觉分区独立验收并保留旧分数；受控阿拉伯语、希伯来语目标可记录实际字形方向，不能据此声称真实供应商翻译准确。
- * 模块边界：受控模式仅替换夹具的文字服务传输；真实模式逐次记录原文白名单匹配、HTTP状态及耗时，不把测试器拒绝误报为真实服务回退；不修改生产 OCR/修补结果，不访问日常浏览器 profile，浏览器启动与页面创建均走不抢焦点 helper。
+ * 模块边界：受控模式仅替换夹具的 Google 文字传输，微软翻译路径和未知 Google 请求直接失败，不能回到原 fetch 联网；真实模式逐次记录原文白名单匹配、HTTP状态及耗时，不把测试器拒绝误报为真实服务回退；后台API明确就绪后才操作扩展页，记录启动状态变化，超时仍失败；不修改生产 OCR/修补结果，不访问日常浏览器 profile，浏览器启动与页面创建均走不抢焦点 helper。
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -1892,6 +1892,13 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
     const ownWorker=w=>w.url().startsWith(loadedExtensionId?`chrome-extension://${loadedExtensionId}/`:'chrome-extension://');
     worker=context.serviceWorkers().find(ownWorker)||await context.waitForEvent('serviceworker',{predicate:ownWorker,timeout:30000});
     const extensionId=new URL(worker.url()).host;
+    report.backgroundApiReadiness=[];
+    await wait(async()=>{
+        const state=await worker.evaluate(()=>({tabsGet:typeof globalThis.chrome?.tabs?.get==='function',storageGet:typeof globalThis.chrome?.storage?.local?.get==='function',runtimeId:globalThis.chrome?.runtime?.id??null}));
+        const previous=report.backgroundApiReadiness.at(-1);
+        if(!previous||JSON.stringify(previous.state)!==JSON.stringify(state))report.backgroundApiReadiness.push({at:Date.now(),state});
+        return state.tabsGet&&state.storageGet&&state.runtimeId===extensionId;
+    },10000);
 
     popup=context.pages()[0];
     diagnostics?.setExtensionId(extensionId);
@@ -1940,6 +1947,8 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         globalThis.fetch=async(input,options)=>{
             const url=String(typeof input==='string'?input:input.url||input);
             const endpoint=new URL(url);
+            if(!live&&endpoint.hostname==='edge.microsoft.com'&&endpoint.pathname.startsWith('/translate/'))
+                throw new Error('Unexpected Microsoft fixture transport');
             const html=endpoint.hostname==='translate-pa.googleapis.com'&&endpoint.pathname==='/v1/translateHtml';
             const list=endpoint.hostname==='translate.googleapis.com'&&endpoint.pathname==='/translate_a/t';
             const rpc=['translate.google.com','translate.google.co.uk'].includes(endpoint.hostname)&&endpoint.pathname==='/_/TranslateWebserverUi/data/batchexecute';

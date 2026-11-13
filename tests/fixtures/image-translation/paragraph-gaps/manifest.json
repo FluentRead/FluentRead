@@ -1,0 +1,87 @@
+{
+  "source": "../../manga-natural/rain-market-color.png",
+  "sourceSha256": "c50a4cb34c25787ce22164f45340dd1e078e776b9aa4827cc77e40026db4e003",
+  "scope": "Unmodified source pixel crops. Physical coordinates captured from production PaddleOCR on 2026-11-11; transcription labels checked against the source. Confidence is a controlled high-confidence input, not a recorded model score.",
+  "fixtures": [
+    {
+      "name": "rain-white",
+      "file": "rain-white.rgba.gz",
+      "crop": [
+        40,
+        60,
+        220,
+        145
+      ],
+      "width": 180,
+      "height": 85,
+      "rgbaSha256": "0644bf1ef7ebf794cedfbf08c986b545af7c6651e40249902bfe73a0cd72419d",
+      "rows": [
+        {
+          "text": "THE LAST",
+          "confidence": 0.99,
+          "box": {
+            "x": 38,
+            "y": 21.333333333333343,
+            "width": 109.66666666666669,
+            "height": 15.333333333333329
+          }
+        },
+        {
+          "text": "BUS IS LATE.",
+          "confidence": 0.99,
+          "box": {
+            "x": 21.66666666666667,
+            "y": 47.66666666666666,
+            "width": 144.33333333333331,
+            "height": 15.0
+          }
+        }
+      ]
+    },
+    {
+      "name": "rain-blue",
+      "file": "rain-blue.rgba.gz",
+      "crop": [
+        800,
+        510,
+        960,
+        620
+      ],
+      "width": 160,
+      "height": 110,
+      "rgbaSha256": "17a45bd4482d72be881ba11f068ea7f9babafcf9311642baa2d51c9e45f11d7b",
+      "rows": [
+        {
+          "text": "FOLLOW",
+          "confidence": 0.99,
+          "box": {
+            "x": 36,
+            "y": 18,
+            "width": 92,
+            "height": 19
+          }
+        },
+        {
+          "text": "THE BLUE",
+          "confidence": 0.99,
+          "box": {
+            "x": 30,
+            "y": 45,
+            "width": 105,
+            "height": 15
+          }
+        },
+        {
+          "text": "LANTERNS.",
+          "confidence": 0.99,
+          "box": {
+            "x": 21,
+            "y": 70,
+            "width": 119,
+            "height": 16
+          }
+        }
+      ]
+    }
+  ]
+}

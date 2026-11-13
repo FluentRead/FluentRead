@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/services/mangaRegions.ts
  * 文件职责：把漫画专用 OCR 和通用 OCR 行转换成可整段翻译与修补的气泡或旁白区域。
+ * 合列输入：通用 OCR 已合并区域继续保留全部物理源框，并按各源列或源行的中位厚度估计字号，后续合段不能丢失这些擦除边界。
  * 主要内容：校验并夹紧坐标，过滤纯符号和源语言不符的短片段；神经 OCR 保留置信度策略，语言无关地保留高置信多位数字、合法时间日期、货币金额、百分数、小数、分数和温度，只为判定执行 NFKC 而保留原文；仅独立气泡容许高置信度大单字，通用 OCR 保留连续合法韩文 Jamo，并从行框补足字号与原始修补框；按方向、字号、重叠与间距合并相邻行，按有界 Unicode 码点边界连接东亚文字，不插入原文没有的空格，保留硬连字符且只移除行末软连字符；仅明确归属的气泡使用较宽横排行距，整页横排行距保持严格、竖列间距上限为字宽的1.8倍，额外续行必须来自同帧像素对空隙与遮挡的有界证明。
  * 模块边界：纯数据算法，不运行模型、不读取 DOM 或配置，也不修补图片；只输出可核对的识别原文和区域，不推测缺失文字。
  */
@@ -109,7 +110,13 @@ export function groupMangaOcrLines(lines: NumericEvidenceOcrLine[], sourceLangua
         if (!numeric && !native && text.replace(/[^a-z]/giu, '').length < 4) return [];
         const bbox = {x0: Math.max(0, x0), y0: Math.max(0, y0), x1: Math.min(width, x1), y1: Math.min(height, y1)};
         if (bbox.x1 <= bbox.x0 || bbox.y1 <= bbox.y0) return [];
-        return [{text, bbox, fontSize: line.vertical ? bbox.x1 - bbox.x0 : bbox.y1 - bbox.y0,
+        const sourceBoxes = line.sourceBoxes?.map(box => ({x0: Math.max(0, box.x0), y0: Math.max(0, box.y0),
+            x1: Math.min(width, box.x1), y1: Math.min(height, box.y1)}))
+            .filter(box => [box.x0,box.y0,box.x1,box.y1].every(Number.isFinite) && box.x1 > box.x0 && box.y1 > box.y0);
+        if (sourceBoxes && !sourceBoxes.length) return [];
+        const sizes = (sourceBoxes ?? [bbox]).map(box => line.vertical ? box.x1 - box.x0 : box.y1 - box.y0).sort((a,b)=>a-b);
+        return [{text, bbox, fontSize: sizes[Math.floor(sizes.length / 2)],
+            ...(sourceBoxes ? {sourceBoxes} : {}),
             ...(line.vertical ? {vertical: true as const} : {})}];
     });
     const numeric = regions.filter(line => numericInformation(line.text));
@@ -151,7 +158,7 @@ function mergeMangaLines(lines: MangaRegion[], lineGap = 0.8, columnGap = 0.8): 
         }, '');
         return {text,
             bbox: members.map(member => member.bbox).reduce(union), fontSize: sizes[Math.floor(sizes.length / 2)],
-            sourceBoxes: members.map(member => ({...member.bbox})),
+            sourceBoxes: members.flatMap(member => (member.sourceBoxes ?? [member.bbox]).map(box => ({...box}))),
             ...(members[0].vertical ? {vertical: true as const} : {})};
     }).sort(readingOrder);
 }

@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
+ * 返回值隔离：缓存命中和在途共享均独立复制段落框及合并前的物理列框，调用方不能污染其他视图或后续清字坐标。
  * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口；显式重新识别跳过已完成缓存及在途合并，并保留独立取消身份。
  * 文档源文保真：低置信度数字词在字形和出现位置完整对应时保留原读数，并附原页核对框；列表圆点须经重复缩进与原像素确认，再独立交给 PDF 段落分析；两者都复用按需解码源，未确认候选不缓存为可靠结果。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
@@ -146,6 +147,7 @@ function abortRecognition(): Error {
 
 function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): NumericEvidenceOcrLine[] {
     return lines.map(({numericConfidence, ...line}) => ({...line, bbox: {...line.bbox},
+        ...(line.sourceBoxes ? {sourceBoxes:line.sourceBoxes.map(box=>({...box}))} : {}),
         ...(includeEvidence && numericConfidence !== undefined ? {numericConfidence} : {})}));
 }
 

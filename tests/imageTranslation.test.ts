@@ -91,8 +91,10 @@ describe('图片翻译 OCR 工具', () => {
             ]}]},
         ]}];
         expect(normalizeOcrLines(blocks)).toEqual([
-            {text: 'お前はもう死んでいる。覚悟しろ', bbox: box(104, 111, 258, 296), vertical: true},
-            {text: '今日は楽しい', bbox: box(689, 401, 762, 520), vertical: true},
+            {text: 'お前はもう死んでいる。覚悟しろ', bbox: box(104, 111, 258, 296), vertical: true,
+                sourceBoxes: [box(215,113,258,279),box(162,111,207,296),box(104,111,155,268)]},
+            {text: '今日は楽しい', bbox: box(689, 401, 762, 520), vertical: true,
+                sourceBoxes: [box(733,401,762,435),box(734,462,761,520),box(689,401,716,500)]},
             {text: '第三話', bbox: box(61, 58, 137, 82)},
         ]);
         // 单独一列同样标记为竖排，只有 word 数据缺失时回退整行文本。
@@ -114,7 +116,8 @@ describe('图片翻译 OCR 工具', () => {
             baseline: {x0: position * 100, x1: position * 100, y0: 0, y1: 100}}));
         const input = [{paragraphs: [{lines: columns}]}];
         const before = structuredClone(input);
-        expect(normalizeOcrLines(input)).toEqual([{text: 'B C D E F A', bbox: {x0: 0, y0: 0, x1: 560, y1: 100}, vertical: true}]);
+        expect(normalizeOcrLines(input)).toEqual([{text: 'B C D E F A', bbox: {x0: 0, y0: 0, x1: 560, y1: 100}, vertical: true,
+            sourceBoxes: [5,4,3,2,1,0].map(position=>({x0:position*100,x1:position*100+60,y0:0,y1:100}))}]);
         expect(input).toEqual(before);
     });
 

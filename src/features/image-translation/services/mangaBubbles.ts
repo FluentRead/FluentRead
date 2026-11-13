@@ -1,5 +1,6 @@
 /**
  * @file src/features/image-translation/services/mangaBubbles.ts
+ * 普通图片分组前先登记已采用的词界来历，再衔接物理行的段落证据，避免可靠空格修正打断同一对白。
  * 文件职责：从漫画像素定位封闭浅色气泡，让小字以局部高分辨率识别并排除绘画噪声。
  * 主要内容：以扫描行四邻域填充亮色连通区域，按待处理行段增长轻量栈，不为整图预分配逐像素队列；最多二十四个小裁图参与局部识别，大型曲边浅底组件只提供保守内接区域且不增加推理；用上下边缘占比、行包络实心度、密度和面积界限排除大型矩形或多洞面板，行跨度数组按高度有界复用；同次扫描为大气泡记录最多一百二十八处内部独立浅色岛，超限撤回新增归属，仅排除完整落在岛内的物理框且不传输排除元数据；从已有原像素核对候选边缘浅底，成员绑定原 OCR 结果索引，角落与独立旁白维持原分组；按最小局部候选优先消除嵌套候选对同一物理行的重复，逐行以可靠局部识别替换重叠的全页结果，保留局部漏行与失败时的全页回退；漫画在最紧的所属气泡内合并局部及回退行并保留气泡外可靠旁白，整页仍按严格间距分组且只采纳同帧像素证实的额外续行；普通图片保留物理行供独立段落策略处理；漫画与图片均保留冲突数字证据并合并重复数字保护框。
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
@@ -238,8 +239,9 @@ export function collectMangaRegions(page:MangaOcrPage,language:string,width:numb
                 const physical=groupMangaText([item],language,width,height,context(item))
                 // 数字不能随普通正文合段，否则将来无法单独阻止翻译和保护原图。
                     .map(({sourceBoxes: _boxes, ...line}) => numericInformation(line.text) ? {...line,sourceBoxes:[line.bbox]} : line);
+                wordBoundaries.record(physical,[item]);
                 physical.forEach(line=>paragraphGaps.record(item,line));
-                return wordBoundaries.record(physical,[item]);
+                return physical;
             })
             .sort((a,b) => a.bbox.y0-b.bbox.y0 || a.bbox.x0-b.bbox.x0);
         const regions=appendUncoveredNumericGuards(mergeNumericRegions(lines),guards,guardEvidence);

@@ -43,7 +43,7 @@ node scripts/run-document-translation-test.cjs --suite scanned --playwright-root
 
 这个套件需要联网下载一次英文识别语言包，所以不包含在默认的 `full` 套件里。
 
-扫描专项还包含一页自拟的 10 pt 双栏论文正文、8 pt 脚注与数字：真实 OCR 后核对完整段落、先左栏后右栏、脚注后置及逐页检查点不改变当前阅读页；随后导出双语 PDF，核对所有源页与译文文字层，并刷新页面验证历史恢复不重复翻译。`recognized-layout.json` 保存识别版面，扩展页与后台的完整诊断另存。翻译使用本机确定性中文响应，不能据此推断在线供应商翻译质量。`tests/fixtures/pdf-scanned-paper-ocr.json` 是同一自拟页面的锁定 Tesseract 原始记录，用于重放“跨栏引擎行被分栏后仍需保留行基线/字号”的回归。
+扫描专项还包含一页自拟的 10 pt 双栏论文正文、8 pt 脚注、数字与小号字母上标；后者误读为商标/引号组合时必须在原图上标出核对区域，不猜测其字母内容。真实 OCR 后核对完整段落、先左栏后右栏、脚注后置及逐页检查点不改变当前阅读页；随后导出双语 PDF，核对所有源页与译文文字层，并刷新页面验证历史恢复不重复翻译。`recognized-layout.json` 保存识别版面，扩展页与后台的完整诊断另存。翻译使用本机确定性中文响应，不能据此推断在线供应商翻译质量。`tests/fixtures/pdf-scanned-paper-ocr.json` 是同一自拟页面的锁定 Tesseract 原始记录，用于重放“跨栏引擎行被分栏后仍需保留行基线/字号”的回归。
 
 `pdfOcr`、`documentWorkflows`、`documentAppLifecycle` 与 `documentHistory` 定向测试覆盖逐页检查点、暂停/失败后续识别、空页重试、历史空结果恢复和已有校订的身份迁移。`pdfReaderLifecycle` 验证同源识别更新保留画布与阅读位置；这些测试不代表模糊扫描、手写或所有论文版式的识别准确率。
 

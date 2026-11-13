@@ -1,5 +1,6 @@
 import {describe, expect, it, vi} from 'vitest';
 import type {Bbox, Block, Line, Symbol as OcrSymbol, Word} from 'tesseract.js';
+import letterScript from './fixtures/pdf-scanned-letter-script.json';
 import {recoverDocumentOcrScripts} from '@/src/features/image-translation/services/documentOcrScripts';
 
 const box = (x0: number, y0: number, x1: number, y1: number): Bbox => ({x0, y0, x1, y1});
@@ -13,6 +14,30 @@ const sampleWord = () => word([glyph('1', box(10, 15, 20, 40)), glyph('0', box(2
 const resultLine = (result: Awaited<ReturnType<typeof recoverDocumentOcrScripts>>) => result.blocks![0].paragraphs[0].lines[0];
 
 describe('document OCR script recovery', () => {
+    it('marks the actual misread raised letter cluster without inventing a reading or sending numeric crop requests', async () => {
+        const source = blocks([structuredClone(letterScript.line) as unknown as Line]), before = structuredClone(source), recognize = reads();
+        const result = await recoverDocumentOcrScripts(source, recognize);
+        expect(result.blocks).toBe(source); expect(source).toEqual(before); expect(recognize).not.toHaveBeenCalled();
+        expect(result.unresolved).toEqual([box(446, 1720, 490, 1734)]);
+    });
+    it.each(['trusted','invalid','single','ordinary','tiny','large','wideGap','backwards','notVariable','wordPrefix'])('does not flag %s punctuation as an unknown letter script', async reason => {
+        const base = glyph('x', box(10, 20, 30, 40)), a = glyph('™', box(31, 8, 43, 22)), b = glyph('"', box(44, 8, 56, 22));
+        let symbols = [base, a, b], confidence = 53;
+        if (reason === 'trusted') confidence = 95;
+        if (reason === 'invalid') confidence = NaN;
+        if (reason === 'single') symbols = [base, a];
+        if (reason === 'ordinary') {a.bbox.y0 = 25; a.bbox.y1 = 39;}
+        if (reason === 'tiny') a.bbox.y1 = 10;
+        if (reason === 'large') a.bbox.y0 = 0;
+        if (reason === 'wideGap') {a.bbox.x0 += 20; a.bbox.x1 += 20; b.bbox.x0 += 20; b.bbox.x1 += 20;}
+        if (reason === 'backwards') a.bbox.x0 = 29;
+        if (reason === 'notVariable') base.text = '2';
+        if (reason === 'wordPrefix') symbols = [glyph('a', box(0,20,8,40)), ...symbols];
+        const source = blocks([line([word(symbols, confidence)], 40, 30)]), recognize = reads();
+        const result = await recoverDocumentOcrScripts(source, recognize);
+        expect(result.unresolved).toEqual([]); expect(result.blocks).toBe(source); expect(recognize).not.toHaveBeenCalled();
+    });
+
     it('recovers real paper glyph geometry without copying or guessing its surrounding prose', async () => {
         const first = word([glyph('1', box(948, 1350, 960, 1375)), glyph('0', box(965, 1350, 980, 1375)), glyph('%', box(983, 1341, 996, 1360), 96)]);
         const second = word([glyph('1', box(1057, 1350, 1069, 1375)), glyph('0', box(1074, 1350, 1089, 1375)), glyph('°', box(1094, 1341, 1104, 1360))]);

@@ -2,6 +2,7 @@
  * @file src/features/image-translation/services/documentOcrScripts.ts
  * 文件职责：依据原页字形位置识别文档中的数字上下标，通过两种缩放下的局部识别恢复其文字与上下标结构。
  * 主要内容：只接受行、词与字形文字完全对应且几何有效的结果；以邻近正文字符为基准找出小号上移或下移字形，不把普通百分号、度数、标点或短横线当成指数；局部识别必须在两种缩放下给出一致且有足够置信度的数字，成功后按原始出现位置不可变地改写词和行，低置信度整词只有其余字形均可信时才恢复；逐项检查取消并限制每页局部识别数量，未确认部分返回原位置以供核对。
+ * 未知字母脚标：低分单字母变量后、连续小号上移的商标与引号组合可能是误读的字母脚标；仅保留原读数并提示核对，不把它猜成数字或字母。普通引号、独立商标和可信词不扩大识别范围。
  * 模块边界：不加载图片、不创建 Canvas/Worker、不猜测符号内容，也不修改输入的识别对象；裁剪与实际 OCR 由现有 OCR 运行时注入，文档坐标及提醒由文档 feature 处理。
  */
 import type {Bbox, Block, Line, Symbol as OcrSymbol, Word} from 'tesseract.js';
@@ -48,6 +49,20 @@ function planLine(line: Line): LinePlan | undefined {
             const symbol = symbols[index];
             if (isBase(symbol, y, row)) {base = symbol; continue;}
             let kind = base && scriptKind(symbol, base, y);
+            // min 等小号字母可能整体误读为 ™ 和引号，单个符号本身不足以推断指数。
+            if (!kind && base && index === 1 && /^\p{L}$/u.test(base.text)
+                && Number.isFinite(word.confidence) && word.confidence >= 0 && word.confidence < 75) {
+                const size = height(base.bbox), box = {...symbol.bbox};
+                let end = index, previousEnd = base.bbox.x1;
+                while (end < symbols.length) {
+                    const next = symbols[end], b = next.bbox;
+                    if (!/^[™®℠"”'’]$/u.test(next.text) || height(b) < size * .45 || height(b) > size * .9
+                        || b.y1 >= y - size * .25 || b.x0 < previousEnd || b.x0 - previousEnd > size * .6) break;
+                    box.x1 = b.x1; box.y0 = Math.min(box.y0, b.y0); box.y1 = Math.max(box.y1, b.y1);
+                    previousEnd = b.x1; end++;
+                }
+                if (end - index >= 2) {groups.push({word, first: index, end, box, kind: 'sup'}); index = end - 1; continue;}
+            }
             if (!kind && base && /^[+\-−–—]$/u.test(symbol.text) && index + 1 < symbols.length) {
                 const next = symbols[index + 1], nextKind = scriptKind(next, base, y, true);
                 const center = (symbol.bbox.y0 + symbol.bbox.y1) / 2, size = height(base.bbox);

@@ -176,7 +176,7 @@ export default defineConfig({
         maxWorkers,
         clearMocks: false,
         fileParallelism: false,
-        // 页内样式契约执行四份实际 CSS，避免空 inline 样式掩盖命名或所有权回归。
-        css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|translation-loading-indicator|bilingual-sentence-highlight|vocabulary-reencounter))\.css(?:\?|$)/]},
+        // 页内样式契约执行实际 CSS，避免空 inline 样式掩盖命名、对比度或所有权回归。
+        css: {include: [/(?:src\/app\/content\/page|src\/ui\/styles\/(?:translation-display|translation-loading-indicator|bilingual-sentence-highlight|vocabulary-reencounter)|src\/features\/image-translation\/ui\/image-text-reader)\.css(?:\?|$)/]},
     },
 });

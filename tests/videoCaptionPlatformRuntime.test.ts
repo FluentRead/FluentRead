@@ -8,6 +8,7 @@ registerAllUiLanguageBundles();
 const readingPort = vi.hoisted(() => ({annotate: vi.fn()}));
 vi.mock('@/src/features/video-subtitle/content/readingAnnotationClient', () => ({annotateVideoReading: readingPort.annotate}));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {extensionDom: true}}));
+vi.mock('@/src/services/config/store', () => ({config: {uiLanguage: 'zh-CN'}}));
 const disposals: Array<() => void> = [];
 beforeEach(() => {
     vi.useFakeTimers();
@@ -42,10 +43,12 @@ function fixture(url: string, html: string, translate = vi.fn().mockResolvedValu
     Object.defineProperty(window, 'innerHeight', {value: 900, configurable: true});
     window.getComputedStyle = () => ({display: 'block', visibility: 'visible'}) as CSSStyleDeclaration;
     vi.stubGlobal('MutationObserver', window.MutationObserver);
+    vi.stubGlobal('document', document); vi.stubGlobal('window', window);
+    vi.stubGlobal('Node', window.Node); vi.stubGlobal('HTMLElement', window.HTMLElement); vi.stubGlobal('Element', window.Element);
     let subscription: (() => void) | undefined;
     const patch = vi.fn((value: Partial<Config>) => { Object.assign(config, value); subscription?.(); });
     const subscribe = vi.fn((listener: () => void) => { subscription = listener; return vi.fn(); });
-    const ports = {document: document as unknown as Document, window: window as unknown as Window, config, translate, patch, subscribe, label: (text: string) => text};
+    const ports = {document: document as unknown as Document, window: window as unknown as Window, config, translate, patch, subscribe, iconUrl: 'chrome-extension://fixture/icon/128.png', openSettings: vi.fn(), label: (text: string) => text};
     const start = () => { const dispose = mountPlatformCaptions(ports); disposals.push(dispose); return dispose; };
     const shadow = () => document.getElementById('fluent-read-platform-captions')?.shadowRoot;
     return {document, window, config, translate, patch, subscribe, ports, start, shadow, change: () => subscription?.()};
@@ -399,7 +402,7 @@ function courseFixture(platform: 'bilibili' | 'udemy' | 'edx') {
     const download = vi.fn(), manifest = vi.fn(async () => 456);
     Object.assign(f.ports, {captionSource: {fetch, manifest, resources: () => []}, download});
     const menu = () => f.document.getElementById('fluent-read-course-controls')!.shadowRoot!;
-    const choose = (value: string) => { const select = menu().querySelector('select')!; select.value = value; select.dispatchEvent(new f.window.Event('change')); };
+    const choose = (value: string) => menu().querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)!.click();
     return {...f, video, fetch, manifest, download, source, menu, choose};
 }
 
@@ -407,12 +410,14 @@ describe('完整课程字幕公共挂载', () => {
     it('B 站自动开关默认关闭且不请求，手动开启后严格遵循空档、校时和关闭后的入口', async () => {
         const f = courseFixture('bilibili'); const dispose = f.start();
         expect(f.fetch).not.toHaveBeenCalled(); expect(f.manifest).not.toHaveBeenCalled();
-        const button = f.menu().querySelector('button')!; expect(button.getAttribute('aria-pressed')).toBe('false');
+        const button = f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!; expect(button.classList.contains('fluent-read-video-subtitle-active')).toBe(false);
+        expect(button.querySelector('img')?.getAttribute('src')).toBe('chrome-extension://fixture/icon/128.png');
+        expect(button.textContent).toBe(''); expect(f.menu().querySelector('select')).toBeNull();
         button.click(); expect(button.getAttribute('aria-expanded')).toBe('true');
         f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
         expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('测试译文');
-        expect(button.getAttribute('aria-pressed')).toBe('true'); expect(f.translate).toHaveBeenCalledOnce();
+        expect(f.menu().querySelector('[data-mode="bilingual"]')?.getAttribute('aria-checked')).toBe('true'); expect(f.translate).toHaveBeenCalledOnce();
         const native = f.document.querySelector<HTMLElement>('.bpx-player-subtitle-wrap')!;
         expect(native.style.getPropertyValue('visibility')).toBe('hidden');
         f.video.currentTime = 1; await vi.advanceTimersByTimeAsync(300);
@@ -420,14 +425,16 @@ describe('完整课程字幕公共挂载', () => {
         expect(native.style.getPropertyValue('visibility')).toBe('');
         f.config.videoSubtitleOffsetMs = 500; f.change(); await vi.advanceTimersByTimeAsync(100);
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
-        f.menu().querySelectorAll('button')[2].click();
+        f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.click();
+        f.menu().querySelector<HTMLButtonElement>('[data-action="download-subtitles"]')!.click();
         expect(f.download).toHaveBeenCalledWith(expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'en');
         f.choose('off'); expect(f.config.videoSubtitleVisible).toBe(true); expect(f.document.getElementById('fluent-read-course-controls')).not.toBeNull();
         expect(native.style.getPropertyValue('visibility')).toBe('');
         f.choose('original-only'); await vi.advanceTimersByTimeAsync(350);
         expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('');
         expect(f.translate).toHaveBeenCalledOnce();
-        const auto = f.menu().querySelector('input')!; auto.checked = true; auto.dispatchEvent(new f.window.Event('change'));
+        f.menu().querySelector<HTMLButtonElement>('[data-action="open-subtitle-tools"]')!.click();
+        f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-course-auto"]')!.click();
         expect(f.config.videoCourseAutoStart).toEqual({bilibili: true, udemy: true, edx: false});
         dispose(); expect(f.document.getElementById('fluent-read-course-controls')).toBeNull();
     });
@@ -473,13 +480,76 @@ describe('完整课程字幕公共挂载', () => {
         const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true; f.config.videoSubtitleDisplayMode = 'original-only';
         f.fetch.mockRejectedValueOnce(new Error('offline'));
         f.start(); await vi.advanceTimersByTimeAsync(350);
-        expect(f.menu().querySelector('[role="status"]')?.textContent).toContain('失败'); expect(f.translate).not.toHaveBeenCalled();
-        f.menu().querySelectorAll('button')[1].click(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.menu().querySelector('[data-source-status]')?.textContent).toContain('失败'); expect(f.translate).not.toHaveBeenCalled();
+        f.menu().querySelector<HTMLButtonElement>('[data-action="retry-course-source"]')!.click(); await vi.advanceTimersByTimeAsync(350);
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source); expect(f.translate).not.toHaveBeenCalled();
         const count = f.fetch.mock.calls.length; f.choose('bilingual'); await vi.advanceTimersByTimeAsync(100);
         expect(f.translate).toHaveBeenCalledOnce(); expect(f.fetch).toHaveBeenCalledTimes(count);
         f.config.uiLanguage = 'en-US'; f.change();
-        expect(f.menu().querySelector('[role="status"]')?.textContent).toBe('Subtitles are ready');
+        expect(f.menu().querySelector('.fluent-read-video-menu-source')?.hasAttribute('hidden')).toBe(true);
+        expect(f.menu().querySelector('[data-mode="bilingual"]')?.textContent).toBe('Both');
+    });
+
+    it('复用播放器菜单的分段按钮和折叠层级，Escape 逐层返回，外部点击关闭', async () => {
+        const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true;
+        f.start(); await vi.advanceTimersByTimeAsync(350);
+        const button = f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!;
+        const menu = f.menu().querySelector<HTMLElement>('#fluent-read-video-subtitle-menu')!;
+        button.click();
+        expect(menu.classList.contains('fluent-read-video-subtitle-menu')).toBe(true);
+        expect(menu.querySelectorAll('[role="menuitemradio"][data-mode]')).toHaveLength(4);
+        expect(menu.querySelector('[data-action="toggle-ai-subtitle"]')).toBeNull();
+        expect(menu.querySelector('[data-action="open-sentence-learning"]')).toBeNull();
+        expect(menu.querySelector<HTMLElement>('[data-subtitle-downloads]')!.hidden).toBe(true);
+        expect(menu.querySelector<HTMLElement>('.fluent-read-video-menu-tools')!.hidden).toBe(true);
+        menu.querySelector<HTMLButtonElement>('[data-action="open-subtitle-tools"]')!.click();
+        expect(menu.querySelector<HTMLElement>('.fluent-read-video-menu-tools')!.hidden).toBe(false);
+        menu.dispatchEvent(Object.assign(new f.window.Event('keydown', {bubbles: true}), {key: 'Escape'}));
+        expect(menu.hidden).toBe(false); expect(menu.dataset.panel).toBe('watch');
+        menu.querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.click();
+        expect(menu.querySelector<HTMLElement>('[data-subtitle-downloads]')!.hidden).toBe(false);
+        menu.dispatchEvent(Object.assign(new f.window.Event('keydown', {bubbles: true}), {key: 'Escape'}));
+        expect(menu.hidden).toBe(false); expect(menu.querySelector<HTMLElement>('[data-subtitle-downloads]')!.hidden).toBe(true);
+        menu.dispatchEvent(Object.assign(new f.window.Event('keydown', {bubbles: true}), {key: 'Escape'})); expect(menu.hidden).toBe(true);
+        button.click(); f.document.dispatchEvent(new f.window.Event('pointerdown', {bubbles: true})); expect(menu.hidden).toBe(true);
+    });
+
+    it('课程翻译失败在菜单重试，字幕画面保留原文并按原句复用重试结果', async () => {
+        const f = courseFixture('edx'); f.config.videoCourseAutoStart.edx = true;
+        f.translate.mockRejectedValueOnce(new Error('offline'));
+        f.start(); await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('');
+        expect(f.shadow()?.querySelector<HTMLElement>('.tools')?.hidden).toBe(true);
+        expect(f.menu().querySelector('[data-source-status]')?.textContent).toBe('这句翻译失败');
+        f.menu().querySelector<HTMLButtonElement>('[data-action="retry-subtitle-translation"]')!.click();
+        await vi.advanceTimersByTimeAsync(350);
+        expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('测试译文');
+        expect(f.menu().querySelector<HTMLElement>('.fluent-read-video-menu-source')!.hidden).toBe(true);
+        expect(f.translate).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['bilibili', 'udemy', 'edx'] as const)('%s 挂到字幕按钮的同一父容器并保持原控件顺序和高度', platform => {
+        const f = courseFixture(platform);
+        const bar = f.document.querySelector(platform === 'bilibili' ? '.bpx-player-control-bottom-right' : platform === 'udemy' ? '[data-purpose="video-control-bar"]' : '.secondary-controls')!;
+        const row = f.document.createElement('div');
+        const caption = f.document.createElement('button'), fullscreen = f.document.createElement('button');
+        if (platform === 'bilibili') caption.className = 'bpx-player-ctrl-subtitle';
+        else if (platform === 'udemy') caption.dataset.purpose = 'captions-dropdown-button';
+        else caption.className = 'toggle-captions';
+        Object.defineProperty(caption, 'offsetHeight', {value: 40});
+        row.append(caption, fullscreen); bar.appendChild(row); f.start();
+        const host = f.document.getElementById('fluent-read-course-controls')!;
+        expect(host.parentElement).toBe(row); expect(host.nextSibling).toBe(caption); expect(caption.nextSibling).toBe(fullscreen);
+        expect(Number.parseFloat(f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.style.height)).toBe(caption.offsetHeight);
+        expect(host.style.position).not.toBe('absolute');
+    });
+
+    it('原生 video 控件不把入口挂到空的伪控制栏', () => {
+        const f = courseFixture('bilibili'); f.video.controls = true; f.start();
+        const host = f.document.getElementById('fluent-read-course-controls')!;
+        expect(host.parentElement).toBe(f.video.parentElement);
+        expect(f.document.querySelectorAll('#fluent-read-course-controls')).toHaveLength(1);
     });
 });
 
@@ -690,7 +760,7 @@ describe('平台字幕布局操作预算与失效边界', () => {
         let fail!: (reason: Error) => void, finish!: (text: string) => void;
         const translate = vi.fn().mockImplementationOnce(() => new Promise<string>((_, reject) => { fail = reject; }))
             .mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
-        const f = videoFixture('https://www.udemy.com/course/demo/learn/', translate);
+        const f = videoFixture('https://www.disneyplus.com/video/demo', translate);
         f.config.videoPreferHumanSubtitles = false;
         f.start(); await vi.advanceTimersByTimeAsync(100);
         const panel = f.shadow()!.querySelector<HTMLElement>('.panel')!;

@@ -5,6 +5,7 @@
  * 模块边界：限定 courses.edx.org 子 frame，不读取父 frame DOM，不实现字幕来源、翻译 provider 或平行配置存储。
  */
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
+import browser from 'webextension-polyfill';
 import {config, configReady, subscribeConfig, requestConfigPatch} from '@/src/services/config/store';
 import {ensureUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {sendRuntimeMessage} from '@/src/platform/browser/runtimeMessages';
@@ -34,6 +35,8 @@ export async function startCourseCaptionFrameApp(ctx: ContentScriptContext): Pro
         unmount = mountPlatformCaptions({document, window, config, subscribe: subscribeConfig, translate: translateVideoText,
             patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
             label: text => translateLegacyText(text, config.uiLanguage),
+            iconUrl: browser.runtime.getURL('icon/128.png'),
+            openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
             download: (srt, language) => { downloadTextFile(`${sanitizeSubtitleFilename(document.title)}-${sanitizeSubtitleFilename(language)}.srt`, srt, 'application/x-subrip;charset=utf-8'); },
         });
     };

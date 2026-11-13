@@ -12,6 +12,7 @@ const ports = vi.hoisted(() => ({config: {} as Record<string, unknown>, listener
 }));
 vi.mock('@/src/services/config/store', () => ({config: ports.config, configReady: Promise.resolve(),
     subscribeConfig: (fn: () => void) => {ports.listeners.add(fn);return () => ports.listeners.delete(fn);}, requestConfigPatch: ports.patch}));
+vi.mock('webextension-polyfill', () => ({default: {runtime: {getURL: (path: string) => `chrome-extension://fixture/${path}`}}}));
 vi.mock('@/src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: ports.language}));
 vi.mock('@/src/platform/browser/runtimeMessages', () => ({sendRuntimeMessage: ports.send}));
 vi.mock('@/src/services/translation/client', () => ({translateVideoText: vi.fn()}));
@@ -35,7 +36,7 @@ beforeEach(() => {
     Object.assign(ports.config, new Config(), {on: true, videoTranslationEnabled: true, uiLanguage: 'en-US'});
     ports.listeners.clear(); ports.suspended = false; ports.actions = null;
     ports.mount.mockReset().mockReturnValue(ports.unmount); ports.unmount.mockReset();
-    ports.language.mockReset().mockResolvedValue(true); ports.patch.mockReset().mockResolvedValue(undefined); ports.download.mockReset(); globals();
+    ports.language.mockReset().mockResolvedValue(true); ports.patch.mockReset().mockResolvedValue(undefined); ports.download.mockReset(); ports.send.mockReset().mockResolvedValue(undefined); globals();
 });
 afterEach(() => { ports.actions?.dispose(); vi.unstubAllGlobals(); });
 const changed = () => ports.listeners.forEach(fn => fn());
@@ -55,6 +56,10 @@ describe('edX 课程 frame 组合根', () => {
         options.patch({videoSubtitleOffsetMs: 500}); await Promise.resolve();
         expect(ports.patch).toHaveBeenCalledWith({videoSubtitleOffsetMs: 500}, ports.send);
         ports.patch.mockRejectedValueOnce(new Error('closed')); options.patch({videoSubtitleOffsetMs: 0}); await Promise.resolve();
+        options.openSettings(); await Promise.resolve(); expect(ports.send).toHaveBeenCalledWith({type: 'openOptionsPage', section: 'settings-video'});
+        ports.send.mockRejectedValueOnce(new Error('background closed')); options.openSettings(); await Promise.resolve();
+        expect(ports.mount).toHaveBeenCalledOnce();
+        expect(options.iconUrl).toBe('chrome-extension://fixture/icon/128.png');
         options.download('SRT source', 'en'); expect(ports.download).toHaveBeenCalledWith(expect.stringMatching(/\.srt$/), 'SRT source', 'application/x-subrip;charset=utf-8');
         ports.config.videoTranslationEnabled = false; changed(); expect(ports.unmount).toHaveBeenCalledOnce();
         ports.config.videoTranslationEnabled = true; ports.config.on = false; changed();

@@ -10,6 +10,7 @@
  * 请求数值归属：高级页的 AI 超时、重试次数、密钥恢复与退避等待共用活跃配置身份；分区、缓存状态、配置同步或卸载会同步失效旧控件回调，秒/分钟确认后交接毫秒配置，退避上下限一次提交完整快照。缓存管理表单保留实例和未保存限额，通过 active 传递高级页及缓存面板归属，离开时结束旧等待、返回时刷新统计。
  * 设置同步：Safari 仅保存权威配置，由后台通知实际 content 接收者同步功能；其他浏览器保留合并后的即时标签页广播，卸载后不继续投递。
  * 通用设置：提供工具栏图标打开面板或一键翻译的选择，脚本与邮件宿主不显示该浏览器选项；脚本构建在编译期排除该设置组件。
+ * 课程字幕：站点自动开启开关合并在同一设置行，保留各自保存状态，复用既有主题和紧凑开关。
  * 模块边界：该组件负责设置 UI 编排但不实现 provider 网络、配置仓库或 feature 运行时；校验与迁移来自 core/config，持久化经 services/config，复杂子界面保持在各自 feature/组件内；ChatGPT 登录模块在公开构建中隐藏，旧默认或深链接只回退编辑目标，不迁移或删除用户数据；脚本入口已拦截的扩展专属分区在构建期不引入其子 UI，原入口提示与数据接口保持。
  -->
 <template>
@@ -222,8 +223,13 @@
       <SettingsPanel name="general" :active="props.activePanel">
       <SettingsGroup>
         <FeatureEnableCard v-model="config.videoTranslationEnabled" title="视频字幕翻译" description="翻译 YouTube、X、哔哩哔哩、Udemy、edX、Disney+ 视频和 Teams、Zoom、Google Meet 网页会议中的字幕，不上传音频或视频内容"  />
-        <SettingsItem v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" :label="courseSiteLabels[site]" :description="t('video.course.auto')" :disabled="!config.videoTranslationEnabled">
-          <el-switch v-model="config.videoCourseAutoStart[site]" class="settings-toggle" :aria-label="`${courseSiteLabels[site]} ${t('video.course.auto')}`" :data-video-course-auto="site" :disabled="!config.videoTranslationEnabled" />
+        <SettingsItem :label="t('video.course.auto')" :disabled="!config.videoTranslationEnabled">
+          <div class="video-course-auto-sites" role="group" :aria-label="t('video.course.auto')">
+            <div v-for="site in VIDEO_COURSE_PLATFORMS" :key="site" class="video-course-auto-site">
+              <span>{{ courseSiteLabels[site] }}</span>
+              <el-switch v-model="config.videoCourseAutoStart[site]" size="small" class="settings-toggle" :aria-label="`${courseSiteLabels[site]} ${t('video.course.auto')}`" :data-video-course-auto="site" :disabled="!config.videoTranslationEnabled" />
+            </div>
+          </div>
         </SettingsItem>
         <SettingsItem label="会议平台自动开启双语字幕" description="在 Teams、Zoom、Google Meet 网页会议中自动开启可用字幕；平台或主持人需允许字幕" :disabled="!config.videoTranslationEnabled">
           <el-switch v-model="config.videoMeetingAutoEnabled" class="settings-toggle" aria-label="会议平台自动开启双语字幕" :disabled="!config.videoTranslationEnabled" />

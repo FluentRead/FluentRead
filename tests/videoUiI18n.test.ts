@@ -334,18 +334,23 @@ describe('video player menu composition', () => {
     }
   });
 
-  it('keeps help during pointer transfers and retained focus, then closes when both leave', () => {
+  it.each(['document', 'shadow'] as const)('keeps help during pointer transfers and retained %s focus, then closes when both leave', rootKind => {
     vi.useFakeTimers();
     const {document, window} = parseHTML('<!doctype html><body></body>');
     vi.stubGlobal('document', document);
     vi.stubGlobal('Node', window.Node);
     const menu = createVideoPlayerMenu('en-US', false);
+    const host = document.createElement('div'); document.body.appendChild(host);
+    const root = rootKind === 'shadow' ? host.attachShadow({mode: 'open'}) : document;
+    (rootKind === 'shadow' ? root : host).appendChild(menu);
     menu.hidden = false;
     const popover = mockReadingHelpPopover(menu);
     const toggle = menu.querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]')!;
     const help = menu.querySelector<HTMLElement>('[data-reading-help]')!;
     let active: Element | null = null;
-    Object.defineProperty(document, 'activeElement', {configurable: true, get: () => active});
+    // LinkeDOM 的 focus() 不更新 activeElement；只补齐根节点焦点这一浏览器端口。
+    Object.defineProperty(root, 'activeElement', {configurable: true, get: () => active});
+    if (rootKind === 'shadow') Object.defineProperty(document, 'activeElement', {configurable: true, value: host});
     const leave = (element: HTMLElement, relatedTarget?: Node) => {
       const event = new window.Event('pointerleave');
       if (relatedTarget) Object.defineProperty(event, 'relatedTarget', {value: relatedTarget});
@@ -353,6 +358,8 @@ describe('video player menu composition', () => {
     };
     const open = () => toggle.dispatchEvent(new window.Event('pointerenter'));
     open();
+    open();
+    expect(popover.show).toHaveBeenCalledOnce();
     leave(toggle, help);
     leave(menu, help.querySelector('p')!);
     leave(help, toggle);
@@ -362,6 +369,7 @@ describe('video player menu composition', () => {
     leave(toggle, document.body);
     leave(help, document.body);
     menu.dispatchEvent(new window.Event('pointerleave'));
+    vi.advanceTimersByTime(120);
     expect(help.hidden).toBe(false);
     active = null;
     leave(toggle);
@@ -384,6 +392,24 @@ describe('video player menu composition', () => {
     expect(help.hidden).toBe(true);
     expect(popover.hide).toHaveBeenCalledTimes(3);
     expect(toggle.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('keeps modes usable when a host omits optional reading and download sections', () => {
+    const {document} = parseHTML('<!doctype html><body><div id="player"></div></body>');
+    vi.stubGlobal('document', document);
+    const menu = createVideoPlayerMenu('en-US', true);
+    const player = document.getElementById('player')!;
+    player.appendChild(menu); menu.hidden = false;
+    Object.defineProperties(player, {clientWidth: {value: 800}, clientHeight: {value: 450}});
+    menu.querySelector('.fluent-read-video-menu-reading')!.remove();
+    const downloadGroup = menu.querySelector('[data-download-group]')!;
+    downloadGroup.replaceWith(...downloadGroup.childNodes);
+    const modes = menu.querySelector('[data-mode="bilingual"]')!;
+    expect(() => setVideoMenuToolsOpen(menu, false)).not.toThrow();
+    expect(() => syncVideoPlayerMenuLayout(menu)).not.toThrow();
+    expect(menu.querySelector('[data-mode="bilingual"]')).toBe(modes);
+    expect(modes.closest('[hidden], [inert]')).toBeNull();
+    expect(closeVideoMenuDisclosure(menu)).toBe(false);
   });
 
   it('opens and closes the top-layer reading help without measuring the player menu', () => {

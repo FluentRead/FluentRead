@@ -88,6 +88,7 @@ export function createPdfPageRecognizer(sourceLanguage: string): PdfPageRecogniz
         return lines.map(line => ({text: line.text, x: line.bbox.x0 * scaleX, y: line.bbox.y0 * scaleY, width: (line.bbox.x1 - line.bbox.x0) * scaleX, height: (line.bbox.y1 - line.bbox.y0) * scaleY,
             ...(line.baseline === undefined ? {} : {baseline: line.baseline * scaleY}),
             ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * scaleY}),
+            ...(line.documentReview ? {needsReview: true} : {}),
         }));
     };
 }

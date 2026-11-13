@@ -621,6 +621,7 @@
       "tests/imageModelTestCache.test.ts",
       "tests/imageLoads.test.ts",
       "tests/imageOcrRuntime.test.ts",
+      "tests/documentOcrScripts.test.ts",
       "tests/imageOcrStatusCancellation.test.ts",
       "tests/imageSourceAuthorization.test.ts",
       "tests/imageTargetLanguage.test.ts",

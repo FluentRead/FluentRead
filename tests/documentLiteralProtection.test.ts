@@ -23,6 +23,26 @@ const documentConfig = () => ({...createTranslationProviderConfigSnapshot(new Co
     glossaryMatchContext: {context: 'document' as const, sourceLanguage: 'en', targetLanguage: 'zh-hans'}});
 
 describe('document literal protection', () => {
+    it('restores numeric scripts alongside an OCR trademark-like symbol in the same serialized batch', () => {
+        const original = serializeTranslationSlots(['Scientific counts range from 10⁴ to 10⁵ samples.', 'An exponent x™" needs source review.'], 'scanned_scripts').payload;
+        const request = prepareGlossaryRequest({origin: original}, documentConfig());
+        const translated = (request.message.origin as string).replace(/(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/giu,
+            (_match, begin, _nonce, _index, text, end) => `${begin}本地测试译文：此段保留经过检查的数学与原文符号。${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')}${end}`);
+        const result = request.restore(translated) as string;
+        expect(result).toContain('10⁴'); expect(result).toContain('10⁵'); expect(result).toContain('™');
+        expect(() => request.restore(`${translated}__FRTERM_foreign`)).toThrow('未完整保留术语');
+    });
+    it('protects scientific powers and subscripts through provider output while keeping ordinary prose translatable', () => {
+        const current = documentConfig(), source = 'The method estimates 10⁴ samples and x₂ values at 25°C (note ²).';
+        const request = prepareGlossaryRequest({origin: source}, current);
+        const wire = request.message.origin as string;
+        expect(wire).toContain('The method'); expect(wire).toContain('estimates'); expect(wire).toContain('25°C');
+        expect(wire).not.toContain('10⁴'); expect(wire).not.toContain('x₂'); expect(wire).not.toContain('²');
+        const translated = wire.replace('The method', '方法').replace('estimates', '估算').replace('samples and', '个样本和').replace('values at', '的值，温度为');
+        expect(request.restore(translated)).toBe('方法 估算 10⁴ 个样本和 x₂ 的值，温度为 25°C (note ²).');
+        const token = getTranslationProviderConfig(request.message, current).glossaryProtectedTokens![0];
+        expect(() => request.restore(translated.replace(token, ''))).toThrow('未完整保留术语');
+    });
     it('coalesces automatic math separately in each native array packet and keeps serialized ownership unchanged', () => {
         const current = documentConfig();
         const origins = ['The relation 𝑓 ≃𝑆 𝑔 holds.', 'And 𝛾 ≃𝑆 𝛾′.'];

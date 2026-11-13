@@ -131,6 +131,8 @@ export interface PdfDocumentPage {
     layoutBoundaries?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
     /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；成功识别后取消标记，空结果和失败仍保留以便重试。 */
     scanned?: boolean;
+    /** 已识别但未能确认的数字脚标原图区域，使用页面展示坐标，供阅读时定位核对。 */
+    ocrReviewRegions?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
 }
 
 export interface EpubDocumentChapter {

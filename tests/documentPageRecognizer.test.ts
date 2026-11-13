@@ -52,4 +52,11 @@ describe('scanned PDF page recogniser', () => {
         mocks.render.mockRejectedValue(new Error('render failed'));
         await expect(createPdfPageRecognizer('auto')({bytes: new Uint8Array(), pageNumber: 1, width: 600, height: 800})).rejects.toThrow('render failed');
     });
+
+    it('carries uncertain script boxes into page coordinates without turning them into source text', async () => {
+        mocks.render.mockResolvedValue({image: 'data:', width: 1200, height: 1600});
+        mocks.recognize.mockResolvedValue([{text: '', bbox: {x0: 120, y0: 200, x1: 140, y1: 220}, documentReview: true}]);
+        expect(await createPdfPageRecognizer('en')({bytes: new Uint8Array([1]), pageNumber: 1, width: 600, height: 800}))
+            .toEqual([{text: '', x: 60, y: 100, width: 10, height: 10, needsReview: true}]);
+    });
 });

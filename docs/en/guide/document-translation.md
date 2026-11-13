@@ -51,6 +51,10 @@ Proofreading, full-passage comparisons, outline titles, and search terms each fo
 
 Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
 
+For scanned papers, recognition uses higher-resolution page images and automatic column detection. Completed pages are saved as recognition proceeds. After pausing or a failure, continuation recognizes only the remaining scanned pages and keeps existing translations and edits. Pages with no recognized text remain available for retry and do not count as fully translated.
+
+Numeric superscripts and subscripts are checked using enlarged crops and their positions on the original page. Confirmed scientific notation and numeric subscripts are kept unchanged during translation. If a candidate cannot be confirmed, **Check original** opens the source page with dashed markers. This check does not guarantee that every formula or symbol is correct.
+
 If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.
 
 You can select, copy, and translate original-page text. Selection uses your separate selection translation service; the whole document uses the document service. In the browser's own PDF viewer, select text and choose **Translate selected text** from the context menu to open a separate result window. Enable selection translation and its context-menu entry first. The limit is 4096 characters per selection.

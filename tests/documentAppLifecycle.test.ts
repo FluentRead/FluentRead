@@ -155,6 +155,25 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             expect(state.serviceOptions.some((item: {value: string}) => item.value === service)).toBe(false);
         }
     });
+    it('offers original-page navigation only for persisted OCR review regions without rewriting source or corrections', async () => {
+        await state.loadFiles([file('review.pdf'), file('clean.pdf')]);
+        const [review, clean] = state.documentQueue, document = state.parsedDocument;
+        state.parsedDocument = markRaw({...document, binary: {...document.binary, pages: document.binary.pages.map((page: PdfDocumentPage) => ({...page, ocrReviewRegions: [{x: 10, y: 10, width: 5, height: 5}]}))}});
+        state.editSegment(0, 'Kept correction'); state.previewMode = 'translated'; await flush();
+        const notices = () => walkHost(root).filter(entry => entry.props['data-testid'] === 'document-pdf-ocr-review');
+        expect(notices()).toHaveLength(1); expect(hostText(notices()[0])).toContain('document.pdfReading.reviewOriginal');
+        const resumePage = vi.fn(async () => {}); Object.assign(state.materialPdfReader, {resumePage});
+        await state.reviewPdfOcrSource();
+        expect(resumePage).toHaveBeenCalledWith(1); expect(state.previewMode).toBe('source'); expect(state.readerTab).toBe('read');
+        expect(state.translatedSegments[0]).toBe('Kept correction'); expect(state.parsedDocument.segments).toBe(document.segments);
+        state.selectDocument(clean); await flush(); expect(notices()).toHaveLength(0);
+        await state.reviewPdfOcrSource(); expect(resumePage).toHaveBeenCalledOnce();
+        state.selectDocument(review); await flush(); expect(notices()).toHaveLength(1);
+        Object.assign(state.materialPdfReader, {resumePage});
+        const pending = state.reviewPdfOcrSource(); state.selectDocument(clean); await pending;
+        expect(resumePage).toHaveBeenCalledOnce();
+    });
+
     it('shows one localized nonmodal notice for actual PDF extracted controls without changing source, geometry or corrections', async () => {
         ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items: [
             {str: 'Known \u0003 source \u007f text.', transform: [12, 0, 0, 12, 5, 50], width: 80, height: 12, fontName: 'body'},

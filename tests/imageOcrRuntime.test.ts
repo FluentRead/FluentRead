@@ -16,7 +16,7 @@ vi.mock('@/src/features/image-translation/services/ocrWorkerRuntime', () => ({
     createOcrWorkerRuntime: createRuntime,
 }));
 vi.mock('@/src/features/image-translation/services/ocrModelCache', () => ({removeOcrModelFiles: removeFiles}));
-vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {AUTO: 3, SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6}}));
+vi.mock('tesseract.js', () => ({createWorker: tesseractCreateWorker, PSM: {AUTO: 3, SPARSE_TEXT: 11, SPARSE_TEXT_OSD: 12, SINGLE_BLOCK: 6, SINGLE_WORD: 8}}));
 
 const blockResult = () => ({data: {blocks: [{paragraphs: [{lines: [{
     text: 'hello', bbox: {x0: 10, y0: 10, x1: 50, y1: 30},
@@ -33,6 +33,72 @@ describe('图片 OCR 处理与结果缓存', () => {
     let sourcePixels: Uint8ClampedArray;
     let context: {drawImage: Mock; getImageData: Mock; putImageData: Mock; fillRect: Mock; fillStyle: string; imageSmoothingEnabled: boolean; imageSmoothingQuality: string};
     let onImageCreated: (() => void) | undefined;
+
+    const scriptResult = () => {
+        const bbox = {x0: 10, y0: 6, x1: 51, y1: 40};
+        const word = {text: '10%', bbox, confidence: 99, symbols: [
+            {text: '1', confidence: 99, bbox: {x0: 10, y0: 15, x1: 20, y1: 40}},
+            {text: '0', confidence: 99, bbox: {x0: 23, y0: 15, x1: 35, y1: 40}},
+            {text: '%', confidence: 96, bbox: {x0: 38, y0: 6, x1: 51, y1: 25}},
+        ]};
+        return {data: {blocks: [{paragraphs: [{lines: [{...word, words: [word], baseline: {x0: 10, y0: 40, x1: 51, y1: 40}, rowAttributes: {rowHeight: 30}}]}]}]}};
+    };
+
+    it('recovers scripts from the same source pixels at two scales and caches only confirmed results', async () => {
+        recognize.mockResolvedValueOnce(scriptResult()).mockResolvedValue({data: {text: '4\n', confidence: 95}});
+        const lines = await recognizeImage(ENCODED_PNG, 'en', undefined, {profile: 'document'});
+        expect(lines.map(line => line.text)).toEqual(['10⁴']);
+        expect(recognize.mock.calls.map(call => call[3])).toEqual([3, 8, 8]);
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 34, 46);
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 68, 92);
+        expect(encodedSizes).toEqual([{width: 66, height: 78}, {width: 100, height: 124}]);
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+        expect(await recognizeImage(ENCODED_PNG, 'en', undefined, {profile: 'document'})).toEqual(lines);
+        expect(recognize).toHaveBeenCalledTimes(3);
+    });
+
+    it('retains unconfirmed source and review coordinates and permits a fresh retry', async () => {
+        recognize.mockImplementation(async (_image, _language, _signal, mode) => mode === 8 ? {data: {text: 'x', confidence: 99}} : scriptResult());
+        const lines = await recognizeImage('uncertain-script', 'en', undefined, {profile: 'document'});
+        expect(lines).toContainEqual({text: '', bbox: {x0: 38, y0: 6, x1: 51, y1: 25}, documentReview: true});
+        expect(lines[0].text).toBe('10%');
+        await recognizeImage('uncertain-script', 'en', undefined, {profile: 'document'});
+        expect(recognize).toHaveBeenCalledTimes(6);
+    });
+
+    it.each(['image', 'area'] as const)('keeps %s recognition separate from document script recovery', async profile => {
+        recognize.mockResolvedValue(scriptResult());
+        await recognizeImage('non-document', 'en', undefined, {profile});
+        expect(recognize).toHaveBeenCalledOnce(); expect(sources).toHaveLength(1);
+    });
+
+    it('releases crop resources and rejects the page on worker failure', async () => {
+        recognize.mockResolvedValueOnce(scriptResult()).mockRejectedValueOnce(new Error('crop worker failed'));
+        await expect(recognizeImage('crop-failed', 'en', undefined, {profile: 'document'})).rejects.toThrow('crop worker failed');
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+    });
+
+    it('rejects unsupported crop canvas without leaking the decoded page', async () => {
+        canvas.getContext.mockReturnValueOnce(context).mockReturnValue(null);
+        recognize.mockResolvedValueOnce(scriptResult());
+        await expect(recognizeImage('no-crop-canvas', 'en', undefined, {profile: 'document'})).rejects.toThrow('浏览器不支持图片处理');
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.height).toBe(0);
+    });
+
+    it.each(['outside', 'oversized'] as const)('returns review geometry without submitting an %s crop', async kind => {
+        const raw = scriptResult();
+        if (kind === 'oversized') {
+            dimensions = {width: 1000, height: 100};
+            const row = raw.data.blocks[0].paragraphs[0].lines[0]; row.words[0].symbols[2].bbox.x1 = 600;
+            row.bbox.x1 = 600;
+        } else {
+            onImageCreated = () => {if (sources.length === 2) Object.assign(sources.at(-1)!, {naturalWidth: 0, naturalHeight: 0, width: 40, height: 100});};
+        }
+        recognize.mockResolvedValue(raw);
+        const lines = await recognizeImage(`crop-${kind}`, 'en', undefined, {profile: 'document'});
+        expect(lines.some(line => line.documentReview)).toBe(true); expect(recognize).toHaveBeenCalledOnce();
+        expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);
+    });
 
     it('leaves empty, vertical and ambiguous document row metrics unguessed', async () => {
         dimensions = {width: 200, height: 220};

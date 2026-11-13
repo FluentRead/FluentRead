@@ -16,6 +16,16 @@ const pdf = (pages: PdfDocumentPage[], sources: string[] = []): ParsedDocument =
 const paragraph = (tag: string): PdfOcrLine[] => [0, 1, 2].map(row => ({text: `${tag} line ${row} is a complete recognised line of ordinary body text`, x: 60, y: 100 + row * 14, width: 440, height: 12}));
 
 describe('scanned PDF recognition', () => {
+    it('persists finite page-bounded review geometry independently from translatable text', async () => {
+        const region = {text: '', x: 100, y: 50, width: 10, height: 8, needsReview: true};
+        const source = pdf([page(1)]);
+        const result = await recognizePdfDocument(source, async () => [...paragraph('Readable'), region,
+            {...region, x: -1}, {...region, width: NaN}, {...region, width: 0}, {...region, y: 900}, {...region, x: 600},
+        ]);
+        expect(result.binary?.kind === 'pdf' && result.binary.pages[0].ocrReviewRegions).toEqual([{x: 100, y: 50, width: 10, height: 8}]);
+        expect(result.segments).toHaveLength(1); expect(result.segments[0].source).toContain('Readable');
+        expect(source.binary?.kind === 'pdf' && source.binary.pages[0].ocrReviewRegions).toBeUndefined();
+    });
     it.each([true, false])('keeps column paragraphs whole despite ink-height variation and orders separated small footnotes after body (note=%s)', async note => {
         const left = ['The method preserves local structure and separates', 'adjacent columns. Paragraph boundaries matter because a', 'translation must preserve the relationship between', 'observations and conclusions.'];
         const right = ['Right column begins with independent results and', 'compares experiments under several conditions.', 'The measurements remain available for inspection.', 'Future studies will examine different populations.'];

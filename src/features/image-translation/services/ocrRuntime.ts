@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
- * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割，图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
+ * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
@@ -24,6 +24,7 @@ import {createSharedOcrTasks} from './sharedOcrTasks';
 import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
 import {numericEvidenceKey} from './mangaNumeric';
+import {recoverDocumentOcrScripts} from './documentOcrScripts';
 
 function extensionAsset(path: string): string {
     const getRuntimeUrl = chrome.runtime.getURL as (assetPath: string) => string;
@@ -81,6 +82,36 @@ function documentLineMetrics(lines: OcrLine[], result: TesseractRecognitionResul
             && row.bbox.y0 <= line.bbox.y0 && row.bbox.y1 >= line.bbox.y1);
         return candidates.length === 1 ? {...line, baseline: candidates[0].baseline, fontSize: candidates[0].fontSize} : line;
     });
+}
+
+/** 只在发现数字脚标候选时解码页面；全页复用一个解码源，局部画布与编码在结束/失败/取消时释放。 */
+async function recoverDocumentScripts(image: string, result: TesseractRecognitionResult, languages: string, signal: AbortSignal) {
+    let source: HTMLImageElement | undefined;
+    let canvas: HTMLCanvasElement | undefined;
+    try {
+        return await recoverDocumentOcrScripts(result.data.blocks, async (box, scale) => {
+            signal.throwIfAborted();
+            source ??= await loadOcrImage(image, signal);
+            signal.throwIfAborted();
+            const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
+            const x = Math.max(0, box.x0 - 2), y = Math.max(0, box.y0 - 2);
+            const cropWidth = Math.min(width, box.x1 + 2) - x, cropHeight = Math.min(height, box.y1 + 2) - y;
+            if (box.x0 < 0 || box.y0 < 0 || box.x1 > width || box.y1 > height || cropWidth * scale > 992 || cropHeight * scale > 992) return {text: '', confidence: 0};
+            canvas ??= document.createElement('canvas');
+            canvas.width = Math.ceil(cropWidth * scale) + 32; canvas.height = Math.ceil(cropHeight * scale) + 32;
+            const context = canvas.getContext('2d', {alpha: false});
+            if (!context) throw new Error('浏览器不支持图片处理');
+            context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
+            context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high';
+            context.drawImage(source, x, y, cropWidth, cropHeight, 16, 16, cropWidth * scale, cropHeight * scale);
+            const crop = await encodeImageCanvas(canvas, signal);
+            const recognized = await ocrWorkerRuntime.recognize(crop, languages, signal, PSM.SINGLE_WORD);
+            return {text: recognized.data.text, confidence: recognized.data.confidence};
+        }, signal);
+    } finally {
+        if (source) source.src = '';
+        if (canvas) canvas.width = canvas.height = 0;
+    }
 }
 let cachedRecognitionBytes = 0;
 
@@ -235,26 +266,30 @@ export async function recognizeImage(
         if (signal?.aborted) throw abortRecognition();
         const result = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, layoutMode, onProgress);
         if (signal?.aborted) throw abortRecognition();
-        const readLines = (recognition: TesseractRecognitionResult): RecognitionViews => {
-            const views = normalizeOcrLineViews(recognition.data.blocks);
+        const readLines = async (recognition: TesseractRecognitionResult): Promise<RecognitionViews> => {
+            const recovered = profile === 'document' ? await recoverDocumentScripts(recognitionImage, recognition, languages, signal) : undefined;
+            const views = normalizeOcrLineViews(recovered ? recovered.blocks : recognition.data.blocks);
+            const ordinary = profile === 'document' ? documentLineMetrics(views.ordinary, recognition) : views.ordinary;
+            // 未确认的脚标只携带原图坐标，不伪装成可靠正文；文档页据此提示对照核对。
+            for (const bbox of recovered?.unresolved ?? []) ordinary.push({text: '', bbox, documentReview: true});
             return {
-                ordinary: restoreOcrLineCoordinates(profile === 'document' ? documentLineMetrics(views.ordinary, recognition) : views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
-                // 圈选只读文字不擦图，不需要数字物理保护门禁，避免噪声框阻断合法识别。
-                manga: deduplicateOcrGuards(restoreOcrLineCoordinates([...views.manga,...(profile==='area'?[]:collectRawNumericGuards(recognition.data.blocks,views.manga,{trustedWorkerData:true}))], sourceWidth, sourceHeight, size.width, size.height, size.padding)),
+                ordinary: restoreOcrLineCoordinates(ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+                // 圈选与文档只读文字，不需要图片擦除用的数字守卫；文档使用独立的原页核对框。
+                manga: deduplicateOcrGuards(restoreOcrLineCoordinates([...views.manga,...(profile==='image'?collectRawNumericGuards(recognition.data.blocks,views.manga,{trustedWorkerData:true}):[])], sourceWidth, sourceHeight, size.width, size.height, size.padding)),
             };
         };
-        let views = readLines(result);
-        if (views.ordinary.length === 0 && (profile === 'document' || profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
+        let views = await readLines(result);
+        if (!views.ordinary.some(line => line.text.trim()) && (profile === 'document' || profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
             // 文档可能只含少量独立标题，自动分栏为空时试一次稀疏文字；其它用途维持原有单块回退。
             const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, profile === 'document' ? PSM.SPARSE_TEXT : PSM.SINGLE_BLOCK);
             if (signal?.aborted) throw abortRecognition();
             const firstGuards=views.manga.filter(line=>line.guardOnly);
-            views = readLines(fallback);
+            views = await readLines(fallback);
             views.manga=deduplicateOcrGuards([...views.manga,...firstGuards]);
             if(views.manga.filter(line=>line.guardOnly).length>4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
         }
         // 空结果不是稳定成功；用户重试时应重新识别，避免暂时失败被负缓存永久复用。
-        if (views.ordinary.length > 0) cacheRecognition(cacheKey, views);
+        if (views.ordinary.some(line => line.text.trim()) && !views.ordinary.some(line => line.documentReview)) cacheRecognition(cacheKey, views);
         return views;
     }, signal, options.onProgress);
     return copyOcrLines(options.includeMangaNumericConfidence ? views.manga : views.ordinary, options.includeMangaNumericConfidence === true);

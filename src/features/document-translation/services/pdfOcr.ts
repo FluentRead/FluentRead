@@ -9,7 +9,7 @@ import {analyzePdfPageLayout, type PdfLayoutAtom} from '../core/pdfLayoutAnalysi
 import {pdfPageSegments} from './binary';
 
 /** 一行识别出的文字及其在页面上的位置（PDF 点，原点在页面左上角）。 */
-export interface PdfOcrLine {text: string; x: number; y: number; width: number; height: number; baseline?: number; fontSize?: number}
+export interface PdfOcrLine {text: string; x: number; y: number; width: number; height: number; baseline?: number; fontSize?: number; needsReview?: boolean}
 export interface PdfPageRecognitionInput {bytes: Uint8Array; pageNumber: number; width: number; height: number; signal?: AbortSignal}
 export type PdfPageRecognizer = (input: PdfPageRecognitionInput) => Promise<readonly PdfOcrLine[]>;
 export interface RecognizePdfOptions {
@@ -95,7 +95,7 @@ export async function recognizePdfDocument(document: ParsedDocument, recognize: 
     const binary = document.binary;
     const start = pending.findIndex(index => index >= (options.startPage ?? 0));
     const order = start > 0 ? [...pending.slice(start), ...pending.slice(0, start)] : pending;
-    const recognized = new Map<number, ReturnType<typeof analyzePdfPageLayout>>();
+    const recognized = new Map<number, ReturnType<typeof analyzePdfPageLayout> & {ocrReviewRegions: NonNullable<PdfDocumentPage['ocrReviewRegions']>}>();
     let result = document;
     options.onProgress?.({completed: 0, total: order.length});
     for (const [attempt, index] of order.entries()) {
@@ -107,7 +107,10 @@ export async function recognizePdfDocument(document: ParsedDocument, recognize: 
         orderOcrFootnotes(layout, page.height);
         // 空结果不能把扫描页变成“完成”；保留原页和重试入口，也不删掉原生页眉页脚。
         if (layout.blocks.length) {
-            recognized.set(index, layout);
+            const ocrReviewRegions = lines.filter(line => line.needsReview && [line.x, line.y, line.width, line.height].every(Number.isFinite)
+                && line.x >= 0 && line.y >= 0 && line.width > 0 && line.height > 0 && line.x + line.width <= page.width && line.y + line.height <= page.height)
+                .map(({x, y, width, height}) => ({x, y, width, height}));
+            recognized.set(index, {...layout, ocrReviewRegions});
             if (options.onCheckpoint) {
                 result = rebuildRecognizedPdf(document, binary, recognized);
                 options.onCheckpoint(result);
@@ -119,7 +122,7 @@ export async function recognizePdfDocument(document: ParsedDocument, recognize: 
     return recognized.size && !options.onCheckpoint ? rebuildRecognizedPdf(document, binary, recognized) : result;
 }
 
-function rebuildRecognizedPdf(document: ParsedDocument, binary: Extract<ParsedDocument['binary'], {kind: 'pdf'}>, recognized: ReadonlyMap<number, ReturnType<typeof analyzePdfPageLayout>>): ParsedDocument {
+function rebuildRecognizedPdf(document: ParsedDocument, binary: Extract<ParsedDocument['binary'], {kind: 'pdf'}>, recognized: ReadonlyMap<number, ReturnType<typeof analyzePdfPageLayout> & {ocrReviewRegions: NonNullable<PdfDocumentPage['ocrReviewRegions']>}>): ParsedDocument {
     // 已有文字的页保留原来的版面块，只把片段编号按全文顺序重排。
     const segments: DocumentSegment[] = [];
     const pages: PdfDocumentPage[] = binary.pages.map((page, index) => {
@@ -128,7 +131,8 @@ function rebuildRecognizedPdf(document: ParsedDocument, binary: Extract<ParsedDo
         if (layout) {
             // 识别在展示方向上进行，版面块已是展示坐标：去掉 rotation，原页的旋转角留给导出。
             const {rotation, ...upright} = page;
-            return {...upright, ...(rotation ? {sourceRotation: rotation} : {}), ...pdfPageSegments(layout.blocks, page.pageNumber, segments), preservedRegions: layout.preservedRegions, scanned: false};
+            return {...upright, ...(rotation ? {sourceRotation: rotation} : {}), ...pdfPageSegments(layout.blocks, page.pageNumber, segments), preservedRegions: layout.preservedRegions,
+                ocrReviewRegions: layout.ocrReviewRegions, scanned: false};
         }
         const segmentIndexes: number[] = [];
         const blocks = page.blocks.map(block => {

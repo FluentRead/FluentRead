@@ -545,6 +545,32 @@ async function waitForSourceTextLayers(root: ParentNode, count: number): Promise
 }
 
 describe('PDF reader color readback performance', () => {
+    it('keeps the bottom reading anchor when a toolbar notice reduces viewport height', async () => {
+        const reader = mountReader(model(2)); await componentFlush();
+        const {viewport, state} = reader;
+        Object.defineProperty(viewport, 'scrollHeight', {value: state.totalHeight, configurable: true});
+        state.viewportHeight = 1000; viewport.scrollTop = state.totalHeight - 1000;
+        Object.assign(viewport, {clientHeight: 600});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames();
+        expect(viewport.scrollTop).toBe(state.totalHeight - 600); expect(state.currentPage).toBe(2);
+        viewport.scrollTop = 30; Object.assign(viewport, {clientHeight: 500});
+        resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames();
+        expect(viewport.scrollTop).toBe(30);
+    });
+    it('places uncertain OCR markers on original page coordinates and leaves translation and selection surfaces separate', async () => {
+        const source = model();
+        if (source.binary?.kind !== 'pdf') throw new Error('PDF fixture required');
+        source.binary.pages[0].ocrReviewRegions = [{x: 42, y: 80, width: 8, height: 6}];
+        const reader = mountReader(source, 'bilingual', ['Translated paragraph']);
+        await componentFlush();
+        const markers = () => [...reader.root.querySelectorAll<HTMLElement>('.pdf-ocr-review')];
+        expect(markers()).toHaveLength(1); expect(markers()[0].style.left).toBe('42px'); expect(markers()[0].style.top).toBe('80px');
+        expect(markers()[0].style.width).toBe('8px'); expect(markers()[0].getAttribute('aria-hidden')).toBe('true');
+        expect(markers()[0].closest('figure')?.getAttribute('aria-label')).toBe('document.pdfReading.original');
+        reader.state.scale = 1.5; await componentFlush(); expect(markers()[0].style.left).toBe('42px');
+        reader.currentMode.value = 'translated'; await componentFlush(); expect(markers()).toHaveLength(0);
+        reader.currentMode.value = 'source'; await componentFlush(); expect(markers()).toHaveLength(1);
+    });
     it('keeps the reading position and existing canvases when OCR adds a same-source checkpoint', async () => {
         const source = documentModel(4);
         const reader = mountReader(source);

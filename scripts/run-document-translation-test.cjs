@@ -50,7 +50,7 @@ async function fixtureServer() {
       const protocol = /(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/giu;
       // 富文本的每段行内正文也必须实际改变；仅在整段前添加前缀会触发生产端未翻译正文保护。
       const translate = text => state.chineseOnly
-        ? '本地测试译文：扫描文档的文字经过识别后，按段落进行翻译。原始图像仍保留，阅读器展示对应的中文内容。'
+        ? `本地测试译文：扫描文档的文字经过识别后，按段落进行翻译。原始图像仍保留，阅读器展示对应的中文内容。${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')}`
         : `测试译文：${text.replace(/<(g\d+)>([\s\S]*?)<\/\1>/gu, (_match, tag, inner) => `<${tag}>测试译文：${inner}</${tag}>`)}`;
       const translation = protocol.test(source) ? source.replace(protocol, (_match, begin, _nonce, _index, text, end) => `${begin}${translate(text)}${end}`) : translate(source);
       await new Promise(resolve => setTimeout(resolve, state.delay));
@@ -332,6 +332,11 @@ async function main() {
           }
           ctx.fillText(line, x, y);
         }
+        let scientificX = 48;
+        for (const [text, raised] of [['Scientific counts range from 10', false], ['4', true], [' to 10', false], ['5', true], [' samples.', false]]) {
+          ctx.font = `${raised ? 7 : 10}px Times New Roman`;
+          ctx.fillText(text, scientificX, raised ? 386 : 390); scientificX += ctx.measureText(text).width;
+        }
         ctx.font = '8px Times New Roman'; ctx.fillText('Small footnote: measurements were collected at room temperature.', 48, 760);
         ctx.fillText('7', 290, 812);
         return canvas.toDataURL('image/png').split(',')[1];
@@ -352,19 +357,26 @@ async function main() {
       await page.locator('.document-status').filter({hasText: '正在识别文字'}).waitFor({timeout: 60000});
       assert.equal(fixture.state.requests.length, requestsBeforeScan, '识别进行中还没有可翻译的文字');
       await page.waitForFunction(() => /翻译完成|翻译中断/.test(document.querySelector('.document-status')?.textContent ?? ''), undefined, {timeout: 240000});
-      assert.match(await page.locator('.document-status').innerText(), /翻译完成/, await page.locator('.workspace-section').innerText());
-      assert.equal(await pageInput.inputValue(), '7', '逐页 OCR 检查点必须保留当前阅读页，不能跳回第一页');
-      const recognized = fixture.state.requests.slice(requestsBeforeScan).flatMap(requestSources);
+      const requestedSources = fixture.state.requests.slice(requestsBeforeScan).flatMap(requestSources);
       // 在断言前保存实际识别模型，失败时仍能离线重放分栏、分段及脚注顺序。
       const recognizedModel = await page.evaluate(async () => {
         const db = await new Promise((resolve, reject) => {const request = indexedDB.open('FluentReadDocumentHistory'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
         try {
           const records = await new Promise((resolve, reject) => {const request = db.transaction('documents').objectStore('documents').getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
           const model = records.find(record => record.name === 'scanned.pdf')?.parsed;
-          return model ? {segments: model.segments, pages: model.binary.pages} : null;
+          return model ? {segments: model.segments, pages: model.binary.pages, translations: records.find(record => record.name === 'scanned.pdf').translations} : null;
         } finally {db.close();}
       });
       if (recognizedModel) fs.writeFileSync(path.join(artifactsDir, 'recognized-layout.json'), JSON.stringify(recognizedModel, null, 2));
+      assert.match(await page.locator('.document-status').innerText(), /翻译完成/, await page.locator('.workspace-section').textContent());
+      assert.equal(await pageInput.inputValue(), '7', '逐页 OCR 检查点必须保留当前阅读页，不能跳回第一页');
+      assert(recognizedModel, '识别模型必须持久保存');
+      const recognized = recognizedModel.segments.map(segment => segment.source);
+      const scientific = recognizedModel.segments.find(segment => segment.source.includes('Scientific counts'));
+      assert(scientific?.source.includes('10⁴') && scientific.source.includes('10⁵'), `科学计数法须由实际扫描字形恢复：${scientific?.source}`);
+      assert(requestedSources.some(source => source.includes('Scientific counts') && source.includes('__FRTERM_') && !source.includes('10⁴')), '已确认指数必须经过真实翻译保护链');
+      assert(recognizedModel.translations[scientific.id]?.includes('10⁴') && recognizedModel.translations[scientific.id].includes('10⁵'), '译文必须恢复确认后的科学计数法');
+      assert.equal(recognizedModel.pages[6].ocrReviewRegions.length, 0, '本样本的数字均可确认，不应误标正文逗号');
       // 识别允许个别字符有出入，但三句印刷文字都必须被认出并送去翻译。
       for (const phrase of [/scanned pages carry/iu, /recognition must find/iu, /translated page keeps/iu]) assert(recognized.some(source => phrase.test(source)), `识别结果缺少印刷文字 ${phrase}：${JSON.stringify(recognized)}`);
       assert(recognized.includes(typed), `带文字层的页应照常翻译：${JSON.stringify(recognized)}`);
@@ -418,13 +430,14 @@ async function main() {
       const mapped = mapPdfLayoutPages(7, exported.texts.map((text, index) => ({text, label: exported.labels?.[index]})));
       assert(mapped.ok, '扫描件导出必须逐页保留七个原页，续页必须紧跟所属原页');
       assert(mapped.pages.every(value => value.text.includes('本地测试译文')), '每个导出页都必须含有译文文字层');
+      assert(exported.texts.some(text => text.includes('10⁴') && text.includes('10⁵')), '导出文字层必须保留科学计数法');
       const segmentCount = await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count');
       const requestsBeforeReload = fixture.state.requests.length;
       await page.reload({waitUntil: 'domcontentloaded'});
       await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor();
       assert.equal(await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count'), segmentCount, '刷新应恢复已识别的全部段落');
       assert.equal(fixture.state.requests.length, requestsBeforeReload, '恢复已完成历史不能重新翻译');
-      report.scanned = {pages: 7, scannedPages: 6, paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
+      report.scanned = {pages: 7, scannedPages: 6, scientificSource: scientific.source, scientificTranslation: recognizedModel.translations[scientific.id], paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
       report.cases.push('a PDF with one typed page, two scanned pages and three rotated scanned pages (90, 180 and 270 degrees) opens without requests, recognises the scanned pages when translation starts, translates the typed page as usual and shows upright translations inside the scanned pages');
       report.cases.push('10 pt two-column paragraphs and an 8 pt footnote retain text and order; all seven bilingual pages export with a translation text layer and survive history reload without new translation requests');
       assert.equal(report.consoleErrors.length, 0);
@@ -1066,6 +1079,7 @@ async function main() {
   } catch (error) {
     report.failure = error.stack || String(error);
     if (page) report.visibleUi = await page.evaluate(() => ({rootClass: document.querySelector('.document-app')?.className,
+      errorDetails: [...document.querySelectorAll('.recovery-error-detail')].map(element => element.textContent),
       activeDialogs: [...document.querySelectorAll('dialog[open]')].map(element => element.innerText),
       workspace: document.querySelector('.workspace-section')?.innerText})).catch(() => ({}));
     if (page) await page.screenshot({path: path.join(artifactsDir, 'failure.png')}).catch(() => {});

@@ -353,8 +353,8 @@ export default defineConfig({
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB；同时保留划词交互的 1 kB 余量。
-            // 扫描论文的逐页恢复、文档 OCR 行指标及七语提示相对 dc7bff026 的 66,108,402 bytes 基线增加约 5 kB。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_118_000 : 66_000_000;
+            // 扫描论文的逐页恢复、数字上下标局部复核及七语核对入口，相对 dc7bff026 的 66,108,402 bytes 基线实测增加约 15 kB。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_126_000 : 66_000_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

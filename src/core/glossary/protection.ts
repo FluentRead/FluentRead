@@ -4,6 +4,7 @@
  * 主要内容：共享词边界与大小写规则，规范写法只用于定位并映射回原文，保留未命中字符与空译法的原始写法；长词优先、重复出现独立编号，避开内部槽标记及调用方指定的语法范围，严格检查丢失、重复和未知占位符；可选观察器报告已经接受的匹配供文档纯算法复用，不再扫描正文。
  * 模块边界：纯文本转换，不接触宿主 DOM、存储或翻译服务；译法按字面填入，不再次参与替换。
  * 字面范围：调用方可提供原文范围保护键帽等不适用词边界的字素；既有术语匹配优先，槽标记和排除范围仍不可覆盖。
+ * 嵌套恢复：数学/术语保护后再叠加字素保护时，先精确移除原文已有的完整外层标记，再检查未知片段，避免把紧邻段落结束槽的合法标记误判为损坏。
  */
 import {findGlossaryMatches} from './match';
 import {sha256Hex} from '@/src/shared/function/sha256';
@@ -167,7 +168,8 @@ export function protectGlossaryText(
                 }
             }
             // 先确认没有损坏的同前缀标记；单次 callback 替换避免 $&、目标中的标记被再次解释。
-            const remainder = translated.replace(pattern, '');
+            let remainder = translated.replace(pattern, '');
+            for (const [known] of original.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)) remainder = remainder.replaceAll(known, '');
             if (remainder.includes(prefix) || [...remainder.matchAll(/__FRTERM_[a-z0-9_]+/giu)]
                 .some(([token]) => !original.includes(token))) throw new GlossaryPlaceholderError();
             return translated.replace(pattern, token => values.get(token)!);

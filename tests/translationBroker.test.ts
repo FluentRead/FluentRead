@@ -1232,6 +1232,44 @@ describe('translation broker', () => {
         expect(mocks.service).not.toHaveBeenCalled();
     });
 
+    it('图片 AI 邻文真正到达 provider，跳过摘要并按位置和邻文隔离缓存，关闭开关后恢复数组路径', async () => {
+        mocks.config.service = 'aiSdk'; mocks.config.enableAIContext = true;
+        mocks.config.from = 'en'; mocks.config.to = 'zh-Hans';
+        mocks.service.mockImplementation(async (request: {origin:string|string[];pageContext?:string}) => {
+            if (Array.isArray(request.origin)) return request.origin.map(()=> '无上下文的译文。');
+            const reference = JSON.parse(request.pageContext!.match(/<discourse_evidence>\n([\s\S]*?)\n<\/discourse_evidence>/u)![1]);
+            return request.origin === 'RIGHT.'
+                ? reference.currentRegion === 6 || reference.neighbors[0].text.startsWith('IS THE ANSWER') ? '没错。' : '右边。'
+                : '这是当前图中文字的译文。';
+        });
+        const handler = createImageTranslationBackgroundHandlers({
+            assertLanguagesDownloaded:async()=>{},translateImage:async()=>({}),fetchImage:async()=>'',
+            getTranslationService:()=> 'aiSdk',supportsBatchTranslation:()=>true,isTextContextEnabled:()=>mocks.config.enableAIContext,
+            translateTexts:request=>translateWithCache(request),downloadLanguages:async()=>{},markLanguagesDownloaded:async()=>[],
+        }).find(handler=>handler.type===IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE)!;
+        const texts = ['TURN TOWARD THE EAST.','RIGHT.','THE EXIT IS BESIDE THE DOOR.','LATER AT THE QUIZ.','IS YOUR ANSWER CORRECT?','RIGHT.'];
+        const message = {type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Do not use the unrelated page title as image reference'};
+        const result = await handler.handle(message) as {success:boolean;translations:string[]};
+        expect(result).toMatchObject({success:true}); expect(result.translations[1]).toBe('右边。'); expect(result.translations[5]).toBe('没错。');
+        expect(mocks.service).toHaveBeenCalledTimes(texts.length);
+        for (const [request] of mocks.service.mock.calls) {
+            expect(typeof request.origin).toBe('string'); expect(request.summaryPrompt).toBeUndefined();
+            expect(request.pageContext).toContain('neighboring image OCR'); expect(request.pageContext).not.toContain(message.title);
+        }
+        await flushMicrotasks();
+        const repeated = translationCacheIdentities().filter(identity=>identity.sourceText==='RIGHT.');
+        expect(repeated).toHaveLength(2); expect(new Set(repeated.map(identity=>identity.pageContext)).size).toBe(2);
+        mocks.service.mockClear();
+        await expect(handler.handle(message)).resolves.toEqual(result); expect(mocks.service).not.toHaveBeenCalled();
+        const changed = await handler.handle({...message,texts:['IS THE ANSWER CORRECT?',...texts.slice(1)]}) as typeof result;
+        expect(changed.translations[1]).toBe('没错。'); expect(changed.translations[5]).toBe('没错。');
+        expect(mocks.service).toHaveBeenCalledTimes(3);
+        mocks.service.mockClear(); mocks.config.enableAIContext = false;
+        const disabled = await handler.handle({...message,enableAIContext:true,discourseContext:'Untrusted public override'} as never) as typeof result;
+        expect(disabled.success).toBe(true); expect(mocks.service).toHaveBeenCalledOnce();
+        expect(mocks.service.mock.calls[0][0]).toMatchObject({origin:[...new Set(texts)],pageContext:''});
+    });
+
     it('图片原样结果的缓存不改变普通翻译判定，公开同名字段不能放宽校验', async () => {
         const origin = 'This English sentence still needs a Chinese translation.';
         mocks.service.mockResolvedValue(origin);

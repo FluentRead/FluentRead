@@ -113,6 +113,14 @@ describe('图片文字独立阅读面板', () => {
         language = 'en';reader.refreshLanguage();finish();await Promise.resolve();
         expect(feedback().textContent).toBe('Copied');
     });
+    it('复制完成后隐藏面板，反馈计时器不再改写隐藏内容，重开时显示当前状态', async () => {
+        reader.setLines([{text:'译文'}]); reader.open(); event(copy()); await Promise.resolve();
+        expect(feedback().textContent).toBe('已复制');
+        reader.element.hidden = true;
+        await vi.advanceTimersByTimeAsync(2500);
+        expect(feedback().textContent).toBe('已复制');
+        reader.open(); expect(feedback().textContent).toContain('本地 OCR');
+    });
     it('面板内部键盘与滚轮被隔离，Escape 和关闭按钮归还入口焦点', () => {
         reader.open();const host = vi.fn();document.body.addEventListener('wheel', host);
         event(body(), 'wheel');expect(host).not.toHaveBeenCalled();

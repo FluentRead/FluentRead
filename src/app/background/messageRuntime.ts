@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本、扩展面板导航和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
+ * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，图片邻文由已启用的 AI 上下文开关及当前模型的提示词能力决定，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} from './providerRuntime';
@@ -25,7 +25,8 @@ import {
     type FullPageBackgroundContext, type QQMailFrameBackgroundContext,
 } from './handlers/fullPageTranslationState';
 import {createNeteaseMailFrameBackgroundHandlers, type NeteaseMailFrameBackgroundContext} from '@/src/features/full-page-translation/background/neteaseMailFrameHandlers';
-import {createImageOcrLanguageRepository, createImageTranslationBackgroundHandlers} from './handlers/imageTranslation';
+import {createImageOcrLanguageRepository} from './handlers/imageTranslation';
+import {createImageTranslationRuntime} from './imageTranslationRuntime';
 import {createInputBoxTranslationHandler} from './handlers/inputTranslation';
 import {createLocalInsightsHandlers} from './localInsightsHandlers';
 import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWeights';
@@ -37,8 +38,6 @@ import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId, type TabTranslationStateStore} from './tabTranslationState';
 import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers, type VocabularyBackgroundContext} from './handlers/vocabulary';
 import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
-import {supportsTranslationBatch} from '@/src/services/translation/capabilities';
-import {imageTranslationOffscreenAdapter, imageTranslationProgressTransport, imageTranslationSourceTransport} from '@/src/features/image-translation/background/offscreenAdapter';
 import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
 import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
@@ -127,17 +126,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         createSelectionPageZoomHandler(selectionPageZoom.getZoom),
         ...imageGlossaryContext.wrap(createCapabilityGatedBackgroundHandlers<BackgroundRuntimeContext>(capabilities, {
             areaTranslation: () => createAreaTranslationRuntime(imageOcrLanguageRepository.assertDownloaded),
-            imageTranslation: () => createImageTranslationBackgroundHandlers({
-                assertLanguagesDownloaded: imageOcrLanguageRepository.assertDownloaded, getDownloadedLanguages: imageOcrLanguageRepository.getDownloaded,
-                ...imageTranslationOffscreenAdapter, ...imageTranslationSourceTransport,
-                translateTexts: translateWithCache,
-                getTranslationService: () => config.imageTranslationService || config.service, getGlossaryConfig: () => config,
-                getImageOcrEngine: () => config.imageTranslationOcrEngine, getImageInferenceBackend: () => config.imageTranslationInferenceBackend,
-                supportsBatchTranslation: supportsTranslationBatch,
-                markLanguagesDownloaded: imageOcrLanguageRepository.markDownloaded,
-                markLanguagesRemoved: imageOcrLanguageRepository.markRemoved,
-                ...imageTranslationProgressTransport,
-            }),
+            imageTranslation: () => createImageTranslationRuntime(imageOcrLanguageRepository),
         })),
         ...createSelectionTtsBackgroundHandlers({
             playbackStateSender: {runtimeId: browser.runtime.id, url: browser.runtime.getURL('/offscreen.html')},

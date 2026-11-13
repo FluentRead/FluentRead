@@ -123,7 +123,7 @@ const COMPLEXITY_DEBT_CEILINGS: Record<string, number> = {
     'entrypoints/shadowBridge.content.ts': 9,
     'entrypoints/youtubeBridge.content.ts': 9,
     'src/app/background/contextMenuRuntime.ts': 142,
-    'src/app/background/messageRuntime.ts': 173,
+    'src/app/background/messageRuntime.ts': 162,
     'src/app/background/runtime.ts': 25,
     'src/app/content/hotkeyRuntime.ts': 208,
     'src/app/content/messageRuntime.ts': 169,

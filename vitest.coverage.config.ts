@@ -658,6 +658,7 @@ export default defineConfig({
                 'src/features/quick-translation/content/index.ts',
                 'src/features/quick-translation/core.ts',
                 'src/features/image-translation/background/handlers.ts',
+                'src/app/background/imageTranslationRuntime.ts',
                 'src/features/image-translation/failure.ts',
                 'src/features/image-translation/background/offscreenAdapter.ts',
                 'src/features/image-translation/ui/MangaModelSettings.vue',

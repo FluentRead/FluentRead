@@ -31,6 +31,8 @@ Ordinary images use the actual glyph bounds of your device's fonts to reduce cli
 
 Individual translation requests include bounded neighboring text from the same image as reference for services that support context. Batch requests continue to process their existing paragraphs together. Translated images follow the original image's shape clipping and pixel scaling settings.
 
+With a prompt-based AI service (or a composite containing one) and **AI context** enabled, each text region can reference up to two recognized regions before and after it, without an extra summary request. Repeated short phrases retain their own positions and neighboring context; changed context cannot reuse a translation cached for another meaning. Turning the setting off keeps the existing translation behavior. Context can help resolve ambiguity, but recognition errors and model mistakes still require checking the original.
+
 Ordinary rotated, scaled, mirrored and perspective images follow the page's native transforms. Styling changes reuse the existing recognition and translation. If overlay alignment or shared ancestor clipping cannot be verified, the original stays visible with an entry to read the translated text. Examples include fixed positioning with rotation, or a rotated image inside an overflow-clipping container that does not establish its positioning reference. A supported layout can display the existing translation again.
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.

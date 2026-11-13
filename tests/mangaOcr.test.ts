@@ -137,6 +137,52 @@ beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.contexts=[];mocks.ca
 beforeEach(()=>{mocks.tensorConstruct.mockReset();});
 afterEach(async()=>{await mangaOcrRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks()});
 
+describe('原批次结束后的检测核心接纳',()=>{
+    function fixture(clone=false,transparent=false){
+        const data=new Float32Array(224*224).fill(.1);data[15*224+35]=.9;
+        const run=vi.fn(async()=>({probability:{dims:[1,1,224,224],data}})),session={run,outputNames:['probability']};mocks.sessions=[session];
+        const regions=[10,30,50].map(x=>({bbox:{x0:x,y0:10,x1:x+10,y1:20},area:100}));
+        mocks.createProcessor.mockImplementation(()=>({findRegions:vi.fn(()=>regions)}));
+        let boxes:any[]=[],raw:any[]=[];
+        mocks.detectionRun.mockImplementation(async function(this:any){
+            await this.session.run({x:{type:'float32',dims:[1,3,224,224]}});
+            const mapped=this.platform.canvas.createProcessor({width:224,height:224}).findRegions({padding:{vertical:.1,horizontal:.2},scale:1});
+            boxes=mapped.map(({bbox:b}:any)=>({x:b.x0,y:b.y0,width:b.x1-b.x0,height:b.y1-b.y0}));return boxes;
+        });
+        mocks.recognize.mockImplementation(async function(this:any,canvas:unknown){
+            const found=await this.detector.run(canvas);raw=found.map((box:any,index:number)=>({text:['SA','OK','17'][index],confidence:.99,box:clone?{...box}:box}));return {results:raw};
+        });
+        if(transparent){
+            const original=vi.mocked(document.createElement).getMockImplementation()!;let first=true;
+            vi.mocked(document.createElement).mockImplementation(()=>{const canvas=original('canvas');if(first){first=false;const pixels=opaquePixels();pixels[3]=0;mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});}return canvas;});
+        }
+        return{data,run,get boxes(){return boxes;},get raw(){return raw;}};
+    }
+    it('原检测框和识别批次全部保留，弱纹理不进入正文，原数字仍进入保护',async()=>{
+        const f=fixture(),before=f.data.slice(),port=await createBrowserMangaOcr();const page=await port.recognize('core',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(f.boxes).toHaveLength(3);expect(f.raw.map(x=>x.text)).toEqual(['SA','OK','17']);expect(page.results.map(x=>x.text)).toEqual(['OK']);
+        expect(page.results[0]).toBe(f.raw[1]);expect(page.numericEvidence).toEqual([f.raw[2]]);expect(f.run).toHaveBeenCalledOnce();expect(mocks.recognize).toHaveBeenCalledOnce();expect(f.data).toEqual(before);
+        expect(mocks.detectors[0].detectionCore.rejects(f.boxes[0])).toBe(false);await port.destroy();
+    });
+    it('返回的Box克隆没有原身份时保持全部原结果',async()=>{
+        const f=fixture(true),port=await createBrowserMangaOcr();const page=await port.recognize('cloned',{flatten:true,noCache:true,strategy:'per-box'});
+        expect(page.results).toEqual(f.raw);expect(page.results[0].box).not.toBe(f.boxes[0]);await port.destroy();
+    });
+    it('低于核心门槛的检测边缘仍原样进入透明修补侧车',async()=>{
+        const f=fixture(false,true),port=await createBrowserMangaOcr();const page=await port.recognize('alpha-core',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
+        expect(page.results.map(x=>x.text)).toEqual(['OK']);expect(page.numericEvidence?.[0].text).toBe('17');expect(page.imageDetectionFrames).toHaveLength(1);
+        const frame=page.imageDetectionFrames![0],index=15*200+15;expect(frame.bits[index>>3]&(1<<(index&7))).not.toBe(0);expect(f.data[15*224+15]).toBeCloseTo(.1);await port.destroy();
+    });
+});
+
+it('两个独立注音候选按实际墨迹量排序，不以正文左右顺序占用优先位置',()=>{
+    const pixels=new Uint8ClampedArray(400*400*4).fill(255);
+    for(const [x0,y0,x1,y1]of [[80,28,88,55],[280,108,284,122]])for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++)pixels.set([0,0,0,255],(y*400+x)*4);
+    const left={text:'天地玄黄',confidence:.99,box:{x:50,y:20,width:20,height:100}},right={text:'宇宙洪荒',confidence:.99,box:{x:250,y:100,width:20,height:100}};
+    const plans=planMangaRubyRescueCrops({results:[left,right]},400,400,pixels);
+    expect(plans.map(p=>p.inkPixels)).toEqual([216,56]);expect(plans.map(p=>p.side.x0)).toEqual([72,272]);
+});
+
 describe('普通图片的段落静区证明生产与实际结果绑定',()=>{
     function paragraphFixture(alpha=255){
         const pixels=new Uint8ClampedArray(200*200*4);
@@ -596,7 +642,7 @@ describe('漫画竖框的受限反向重试',()=>{
 
 describe('跨页竖向拉丁OCR框的窄区复核',()=>{
     const source={text:' O X I N',confidence:.654,box:{x:746,y:148,width:98,height:876}};
-    async function runTall(before?:(service:any)=>void){
+    async function runTall(before?:(service:any)=>void,initial=[source]){
         const factory=vi.mocked(document.createElement).getMockImplementation()!;
         vi.mocked(document.createElement).mockImplementation(()=>{
             const canvas=factory('canvas') as HTMLCanvasElement,context=mocks.contexts.at(-1)!;
@@ -605,7 +651,7 @@ describe('跨页竖向拉丁OCR框的窄区复核',()=>{
             });
             return canvas;
         });
-        mocks.recognize.mockReset().mockImplementationOnce(function(this:any){before?.(this);return Promise.resolve({results:[source]});});
+        mocks.recognize.mockReset().mockImplementationOnce(function(this:any){before?.(this);return Promise.resolve({results:initial});});
         mocks.retryRecognition.mockReset().mockResolvedValue([]);
         const bitmap={width:1100,height:1500,close:mocks.bitmapClose},port=await createBrowserMangaOcr();
         const page=await port.recognize('tall-latin',{flatten:true,noCache:true,strategy:'per-box',decodedImage:bitmap as any});
@@ -652,6 +698,19 @@ describe('跨页竖向拉丁OCR框的窄区复核',()=>{
         expect(noRetries.calls).toBe(1);expect(noRetries.page.results).toEqual([source]);
         const noPixels=await runTall(service=>{service.remainingPreprocessingPixels=0;});
         expect(noPixels.calls).toBe(1);expect(noPixels.page.results).toEqual([source]);
+    });
+    it('优先复核更细长的框，再按置信选择有检测核心的窄框',async()=>{
+        const weak={text:'INDEX 00',confidence:.999,box:{x:259,y:35,width:100,height:17}},good={text:'INDEX 09',confidence:.98,box:{x:259,y:35,width:100,height:17}},other={text:'INDEX 08',confidence:.95,box:{x:260,y:36,width:100,height:17}};
+        mocks.sessions=[{run:vi.fn(),outputNames:[]}];
+        const first={...source,box:{...source.box,width:110}},second={...source,box:{...source.box,x:500}},initial=[first,second];
+        const result=await runTall(service=>{
+            // 当前原数组在await期间可能被外部SDK复用；不得把迟到候选写进另一个对象。
+            mocks.recognize.mockReset().mockImplementationOnce(()=>{initial.splice(initial.indexOf(second),1);return Promise.resolve({results:[weak,other,good]});});
+            vi.spyOn(service.detector.detectionCore,'rejects').mockImplementation(box=>box===weak.box);
+            mocks.recognize.mockResolvedValueOnce({results:[other,good]});
+        },initial);
+        expect(result.page.results).toMatchObject([{text:'INDEX 09',box:{x:781,y:665,width:17,height:100}}]);
+        expect(mocks.recognize).toHaveBeenCalledTimes(2);
     });
     it('旋转裁框没有2D上下文时跳过复核并保留原OCR行',async()=>{
         vi.stubGlobal('createImageBitmap',vi.fn(async()=>({width:1100,height:1500,close:mocks.bitmapClose})));

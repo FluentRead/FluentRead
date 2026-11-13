@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "manifestSha256": "3ceb90f8fc34d3b261898ae5045d4002873ca471dd7ff8e57e72dee6274b444f",
+  "description": "Source-role supplement. Original manifest, images, texts, occurrence counts, semantic groups and historical scores remain unchanged. Titles are separate visual regions; kana readings belong to their declared Japanese body columns.",
+  "overrides": [
+    {
+      "scene": "prism-platform-gradient-signs",
+      "visualGroups": [["main-a"], ["main-b"], ["night"], ["route"]]
+    },
+    {
+      "scene": "rain-garden-vertical-ruby-sidebar",
+      "annotations": [
+        {"regionId": "ruby-right", "parentRegionIds": ["ja-right"]},
+        {"regionId": "ruby-left", "parentRegionIds": ["ja-left"]}
+      ]
+    }
+  ]
+}

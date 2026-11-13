@@ -1,0 +1,1012 @@
+{
+  "version": 1,
+  "scope": "Recorded production OCR layout from unchanged original fixtures with deterministic translations. Metadata replay only; not current live OCR or translation quality.",
+  "sourceManifestSha256": "3ceb90f8fc34d3b261898ae5045d4002873ca471dd7ff8e57e72dee6274b444f",
+  "commit": "3add7b43bd56bcc31cea7f1d5c0da9f9f9988752",
+  "profiles": {
+    "image": {
+      "javascriptAssetsSha256": "8222c20e7175c30915370473c8e0a4d2753bc66a16134d1dc07d912ec16a981e",
+      "scenes": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE FERRY LEAVES AT DAWN. BRING THE BLUE MAP.",
+              "bbox": {
+                "x0": 111,
+                "y0": 136,
+                "x1": 657,
+                "y1": 218
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 111,
+                  "y0": 136,
+                  "x1": 657,
+                  "y1": 160
+                },
+                {
+                  "x0": 112,
+                  "y0": 194,
+                  "x1": 516,
+                  "y1": 218
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "IWILL WAIT BY THE PIER. KEEP THE LANTERN LIT.",
+              "bbox": {
+                "x0": 803,
+                "y0": 335,
+                "x1": 1236,
+                "y1": 416
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 803,
+                  "y0": 335,
+                  "x1": 1236,
+                  "y1": 359
+                },
+                {
+                  "x0": 805,
+                  "y0": 394,
+                  "x1": 1217,
+                  "y1": 416
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "A QUIET MORNING ON THE CANAL",
+              "bbox": {
+                "x0": 357,
+                "y0": 856,
+                "x1": 872,
+                "y1": 878
+              },
+              "fontSize": 22
+            }
+          ]
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "FOLLOW THE EASTERN TRACK",
+              "bbox": {
+                "x0": 181,
+                "y0": 130,
+                "x1": 1003,
+                "y1": 167
+              },
+              "fontSize": 37
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE NEXT TRAIN IS ALMOST HERE",
+              "bbox": {
+                "x0": 179,
+                "y0": 205,
+                "x1": 894,
+                "y1": 233
+              },
+              "fontSize": 28
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "PLATFORM NINE IS OPEN",
+              "bbox": {
+                "x0": 831,
+                "y0": 480,
+                "x1": 1306,
+                "y1": 507
+              },
+              "fontSize": 27
+            },
+            {
+              "text": "ROUTEC4",
+              "sourceText": "ROUTEC4",
+              "bbox": {
+                "x0": 113,
+                "y0": 490,
+                "x1": 244,
+                "y1": 514
+              },
+              "fontSize": 24
+            }
+          ]
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "風の音を聞いて小道で待っている",
+              "bbox": {
+                "x0": 717,
+                "y0": 147,
+                "x1": 912,
+                "y1": 500
+              },
+              "fontSize": 51,
+              "sourceBoxes": [
+                {
+                  "x0": 830,
+                  "y0": 149,
+                  "x1": 880,
+                  "y1": 452
+                },
+                {
+                  "x0": 886,
+                  "y0": 147,
+                  "x1": 912,
+                  "y1": 211.33333333333331
+                },
+                {
+                  "x0": 717,
+                  "y0": 150,
+                  "x1": 768,
+                  "y1": 500
+                },
+                {
+                  "x0": 775,
+                  "y0": 150,
+                  "x1": 802,
+                  "y1": 217
+                }
+              ],
+              "vertical": true,
+              "ruby": [
+                {
+                  "text": "かぜ",
+                  "bbox": {
+                    "x0": 886,
+                    "y0": 147,
+                    "x1": 912,
+                    "y1": 211.33333333333331
+                  }
+                },
+                {
+                  "text": "こみち",
+                  "bbox": {
+                    "x0": 775,
+                    "y0": 150,
+                    "x1": 802,
+                    "y1": 217
+                  }
+                }
+              ]
+            },
+            {
+              "text": "沿着花园的小路慢慢走。雨停以后，我们在桥边见。",
+              "sourceText": "沿着花园的小路慢慢走。雨停以后，我们在桥边见。",
+              "bbox": {
+                "x0": 102,
+                "y0": 1017,
+                "x1": 534,
+                "y1": 1117
+              },
+              "fontSize": 33,
+              "sourceBoxes": [
+                {
+                  "x0": 102,
+                  "y0": 1017,
+                  "x1": 498,
+                  "y1": 1049
+                },
+                {
+                  "x0": 102,
+                  "y0": 1084,
+                  "x1": 534,
+                  "y1": 1117
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+              "bbox": {
+                "x0": 109.5234375,
+                "y0": 155.24539877300612,
+                "x1": 575.390625,
+                "y1": 242.11656441717793
+              },
+              "fontSize": 29.319018404907972,
+              "sourceBoxes": [
+                {
+                  "x0": 110.609375,
+                  "y0": 155.24539877300612,
+                  "x1": 575.390625,
+                  "y1": 184.5644171779141
+                },
+                {
+                  "x0": 109.5234375,
+                  "y0": 213.159509202454,
+                  "x1": 549.328125,
+                  "y1": 242.11656441717793
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE BOARD IS READY. I SAVED YOU A SEAT.",
+              "bbox": {
+                "x0": 733,
+                "y0": 158,
+                "x1": 1128,
+                "y1": 240
+              },
+              "fontSize": 27,
+              "sourceBoxes": [
+                {
+                  "x0": 737,
+                  "y0": 158,
+                  "x1": 1128,
+                  "y1": 184
+                },
+                {
+                  "x0": 733,
+                  "y0": 213,
+                  "x1": 1110,
+                  "y1": 240
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "lines": [
+            {
+              "text": "等天晴以后再出发。",
+              "sourceText": "等天晴以后再出发。",
+              "bbox": {
+                "x0": 98,
+                "y0": 95,
+                "x1": 481,
+                "y1": 177
+              },
+              "fontSize": 82
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "雨あがりの市場へ",
+              "bbox": {
+                "x0": 776,
+                "y0": 189,
+                "x1": 1100,
+                "y1": 281
+              },
+              "fontSize": 92
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE LANTERNS ARE STILL WARM. LET US WALK HOME TOGETHER.",
+              "bbox": {
+                "x0": 145,
+                "y0": 714,
+                "x1": 740,
+                "y1": 797
+              },
+              "fontSize": 25,
+              "sourceBoxes": [
+                {
+                  "x0": 145,
+                  "y0": 714,
+                  "x1": 740,
+                  "y1": 739
+                },
+                {
+                  "x0": 145,
+                  "y0": 772,
+                  "x1": 714,
+                  "y1": 797
+                }
+              ]
+            },
+            {
+              "text": "ADMIT ONE 18:30",
+              "sourceText": "ADMIT ONE 18:30",
+              "bbox": {
+                "x0": 1005,
+                "y0": 865,
+                "x1": 1185,
+                "y1": 899
+              },
+              "fontSize": 34
+            }
+          ]
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE RIVER IS CLEAR TODAY. PLEASE STEP ABOARD QUIETLY.",
+              "bbox": {
+                "x0": 175,
+                "y0": 212,
+                "x1": 765,
+                "y1": 299
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 177,
+                  "y0": 212,
+                  "x1": 717,
+                  "y1": 236
+                },
+                {
+                  "x0": 175,
+                  "y0": 276,
+                  "x1": 765,
+                  "y1": 299
+                }
+              ],
+              "renderSkipped": true
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "A SOFT BREEZE FROM THE WEST",
+              "bbox": {
+                "x0": 152,
+                "y0": 513,
+                "x1": 669,
+                "y1": 538
+              },
+              "fontSize": 25,
+              "renderSkipped": true
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "POSTCARD FROM THE FERRY",
+              "bbox": {
+                "x0": 301,
+                "y0": 891,
+                "x1": 667,
+                "y1": 907
+              },
+              "fontSize": 16,
+              "renderSkipped": true
+            }
+          ]
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "lines": [
+            {
+              "text": "新的叶子已经展开了。把水送到靠窗的一排。",
+              "sourceText": "新的叶子已经展开了。把水送到靠窗的一排。",
+              "bbox": {
+                "x0": 151,
+                "y0": 145,
+                "x1": 517,
+                "y1": 239
+              },
+              "fontSize": 31,
+              "sourceBoxes": [
+                {
+                  "x0": 151,
+                  "y0": 145,
+                  "x1": 516,
+                  "y1": 176
+                },
+                {
+                  "x0": 151,
+                  "y0": 208,
+                  "x1": 517,
+                  "y1": 239
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "ここなら星が見える。明日も一緒に育てよう。",
+              "bbox": {
+                "x0": 801,
+                "y0": 453,
+                "x1": 1194,
+                "y1": 547
+              },
+              "fontSize": 34,
+              "sourceBoxes": [
+                {
+                  "x0": 803,
+                  "y0": 453,
+                  "x1": 1161,
+                  "y1": 487
+                },
+                {
+                  "x0": 801,
+                  "y0": 514,
+                  "x1": 1194,
+                  "y1": 547
+                }
+              ]
+            },
+            {
+              "text": "SECTION 04",
+              "sourceText": "SECTION 04",
+              "bbox": {
+                "x0": 123,
+                "y0": 854,
+                "x1": 262,
+                "y1": 876
+              },
+              "fontSize": 22
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "窓を閉めてから戻る。",
+              "bbox": {
+                "x0": 501,
+                "y0": 972,
+                "x1": 784,
+                "y1": 998
+              },
+              "fontSize": 26
+            }
+          ]
+        },
+        {
+          "scene": "wordless-stained-glass-cutout-garden",
+          "lines": []
+        }
+      ]
+    },
+    "manga": {
+      "javascriptAssetsSha256": "8222c20e7175c30915370473c8e0a4d2753bc66a16134d1dc07d912ec16a981e",
+      "scenes": [
+        {
+          "scene": "harbor-same-red-channel-dialogue",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE FERRY LEAVES AT DAWN. BRING THE BLUE MAP.",
+              "bbox": {
+                "x0": 111,
+                "y0": 136,
+                "x1": 657,
+                "y1": 218
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 111,
+                  "y0": 136,
+                  "x1": 657,
+                  "y1": 160
+                },
+                {
+                  "x0": 112,
+                  "y0": 194,
+                  "x1": 516,
+                  "y1": 218
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "IWILL WAIT BY THE PIER. KEEP THE LANTERN LIT.",
+              "bbox": {
+                "x0": 803,
+                "y0": 335,
+                "x1": 1236,
+                "y1": 416
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 803,
+                  "y0": 335,
+                  "x1": 1236,
+                  "y1": 359
+                },
+                {
+                  "x0": 805,
+                  "y0": 394,
+                  "x1": 1217,
+                  "y1": 416
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "A QUIET MORNING ON THE CANAL",
+              "bbox": {
+                "x0": 357,
+                "y0": 856,
+                "x1": 872,
+                "y1": 878
+              },
+              "fontSize": 22,
+              "sourceBoxes": [
+                {
+                  "x0": 357,
+                  "y0": 856,
+                  "x1": 872,
+                  "y1": 878
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "prism-platform-gradient-signs",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "FOLLOW THE EASTERN TRACK THE NEXT TRAIN IS ALMOST HERE",
+              "bbox": {
+                "x0": 179,
+                "y0": 130,
+                "x1": 1003,
+                "y1": 233
+              },
+              "fontSize": 37,
+              "sourceBoxes": [
+                {
+                  "x0": 181,
+                  "y0": 130,
+                  "x1": 1003,
+                  "y1": 167
+                },
+                {
+                  "x0": 179,
+                  "y0": 205,
+                  "x1": 894,
+                  "y1": 233
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "PLATFORM NINE IS OPEN",
+              "bbox": {
+                "x0": 831,
+                "y0": 480,
+                "x1": 1306,
+                "y1": 507
+              },
+              "fontSize": 27,
+              "sourceBoxes": [
+                {
+                  "x0": 831,
+                  "y0": 480,
+                  "x1": 1306,
+                  "y1": 507
+                }
+              ]
+            },
+            {
+              "text": "ROUTEC4",
+              "sourceText": "ROUTEC4",
+              "bbox": {
+                "x0": 113,
+                "y0": 490,
+                "x1": 244,
+                "y1": 514
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 113,
+                  "y0": 490,
+                  "x1": 244,
+                  "y1": 514
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "rain-garden-vertical-ruby-sidebar",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "風の音を聞いて小道で待っている",
+              "bbox": {
+                "x0": 717,
+                "y0": 147,
+                "x1": 912,
+                "y1": 500
+              },
+              "fontSize": 51,
+              "sourceBoxes": [
+                {
+                  "x0": 830,
+                  "y0": 149,
+                  "x1": 880,
+                  "y1": 452
+                },
+                {
+                  "x0": 886,
+                  "y0": 147,
+                  "x1": 912,
+                  "y1": 211.33333333333331
+                },
+                {
+                  "x0": 717,
+                  "y0": 150,
+                  "x1": 768,
+                  "y1": 500
+                },
+                {
+                  "x0": 775,
+                  "y0": 150,
+                  "x1": 802,
+                  "y1": 217
+                }
+              ],
+              "vertical": true,
+              "ruby": [
+                {
+                  "text": "かぜ",
+                  "bbox": {
+                    "x0": 886,
+                    "y0": 147,
+                    "x1": 912,
+                    "y1": 211.33333333333331
+                  }
+                },
+                {
+                  "text": "こみち",
+                  "bbox": {
+                    "x0": 775,
+                    "y0": 150,
+                    "x1": 802,
+                    "y1": 217
+                  }
+                }
+              ]
+            },
+            {
+              "text": "沿着花园的小路慢慢走。雨停以后，我们在桥边见。",
+              "sourceText": "沿着花园的小路慢慢走。雨停以后，我们在桥边见。",
+              "bbox": {
+                "x0": 102,
+                "y0": 1017,
+                "x1": 534,
+                "y1": 1117
+              },
+              "fontSize": 33,
+              "sourceBoxes": [
+                {
+                  "x0": 102,
+                  "y0": 1017,
+                  "x1": 498,
+                  "y1": 1049
+                },
+                {
+                  "x0": 102,
+                  "y0": 1084,
+                  "x1": 534,
+                  "y1": 1117
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "chess-picnic-neighbor-inverse-bubbles",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "YOUR MOVE WAS CLEVER. LET US TRY ONCE MORE.",
+              "bbox": {
+                "x0": 109.5234375,
+                "y0": 155.24539877300612,
+                "x1": 575.390625,
+                "y1": 242.11656441717793
+              },
+              "fontSize": 29.319018404907972,
+              "sourceBoxes": [
+                {
+                  "x0": 110.609375,
+                  "y0": 155.24539877300612,
+                  "x1": 575.390625,
+                  "y1": 184.5644171779141
+                },
+                {
+                  "x0": 109.5234375,
+                  "y0": 213.159509202454,
+                  "x1": 549.328125,
+                  "y1": 242.11656441717793
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE BOARD IS READY. I SAVED YOU A SEAT.",
+              "bbox": {
+                "x0": 733,
+                "y0": 158,
+                "x1": 1128,
+                "y1": 240
+              },
+              "fontSize": 27,
+              "sourceBoxes": [
+                {
+                  "x0": 737,
+                  "y0": 158,
+                  "x1": 1128,
+                  "y1": 184
+                },
+                {
+                  "x0": 733,
+                  "y0": 213,
+                  "x1": 1110,
+                  "y1": 240
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "lantern-market-oblique-bilingual-captions",
+          "lines": [
+            {
+              "text": "等天晴以后再出发。",
+              "sourceText": "等天晴以后再出发。",
+              "bbox": {
+                "x0": 98,
+                "y0": 95,
+                "x1": 481,
+                "y1": 177
+              },
+              "fontSize": 82,
+              "sourceBoxes": [
+                {
+                  "x0": 98,
+                  "y0": 95,
+                  "x1": 481,
+                  "y1": 177
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "雨あがりの市場へ",
+              "bbox": {
+                "x0": 776,
+                "y0": 189,
+                "x1": 1100,
+                "y1": 281
+              },
+              "fontSize": 92,
+              "sourceBoxes": [
+                {
+                  "x0": 776,
+                  "y0": 189,
+                  "x1": 1100,
+                  "y1": 281
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE LANTERNS ARE STILL WARM. LET US WALK HOME TOGETHER.",
+              "bbox": {
+                "x0": 145,
+                "y0": 714,
+                "x1": 740,
+                "y1": 797
+              },
+              "fontSize": 25,
+              "sourceBoxes": [
+                {
+                  "x0": 145,
+                  "y0": 714,
+                  "x1": 740,
+                  "y1": 739
+                },
+                {
+                  "x0": 145,
+                  "y0": 772,
+                  "x1": 714,
+                  "y1": 797
+                }
+              ]
+            },
+            {
+              "text": "ADMIT ONE 18:30",
+              "sourceText": "ADMIT ONE 18:30",
+              "bbox": {
+                "x0": 1005,
+                "y0": 865,
+                "x1": 1185,
+                "y1": 899
+              },
+              "fontSize": 34,
+              "sourceBoxes": [
+                {
+                  "x0": 1005,
+                  "y0": 865,
+                  "x1": 1185,
+                  "y1": 899
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "watercolor-ferry-translucent-notification",
+          "lines": [
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "THE RIVER IS CLEAR TODAY. PLEASE STEP ABOARD QUIETLY.",
+              "bbox": {
+                "x0": 175,
+                "y0": 212,
+                "x1": 765,
+                "y1": 299
+              },
+              "fontSize": 24,
+              "sourceBoxes": [
+                {
+                  "x0": 177,
+                  "y0": 212,
+                  "x1": 717,
+                  "y1": 236
+                },
+                {
+                  "x0": 175,
+                  "y0": 276,
+                  "x1": 765,
+                  "y1": 299
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "A SOFT BREEZE FROM THE WEST",
+              "bbox": {
+                "x0": 152,
+                "y0": 513,
+                "x1": 669,
+                "y1": 538
+              },
+              "fontSize": 25,
+              "sourceBoxes": [
+                {
+                  "x0": 152,
+                  "y0": 513,
+                  "x1": 669,
+                  "y1": 538
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "POSTCARD FROM THE FERRY",
+              "bbox": {
+                "x0": 301,
+                "y0": 891,
+                "x1": 667,
+                "y1": 907
+              },
+              "fontSize": 16,
+              "sourceBoxes": [
+                {
+                  "x0": 301,
+                  "y0": 891,
+                  "x1": 667,
+                  "y1": 907
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "orbital-greenhouse-cutout-dialogue",
+          "lines": [
+            {
+              "text": "新的叶子已经展开了。把水送到靠窗的一排。",
+              "sourceText": "新的叶子已经展开了。把水送到靠窗的一排。",
+              "bbox": {
+                "x0": 151,
+                "y0": 145,
+                "x1": 517,
+                "y1": 239
+              },
+              "fontSize": 31,
+              "sourceBoxes": [
+                {
+                  "x0": 151,
+                  "y0": 145,
+                  "x1": 516,
+                  "y1": 176
+                },
+                {
+                  "x0": 151,
+                  "y0": 208,
+                  "x1": 517,
+                  "y1": 239
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "ここなら星が見える。明日も一緒に育てよう。",
+              "bbox": {
+                "x0": 801,
+                "y0": 453,
+                "x1": 1194,
+                "y1": 547
+              },
+              "fontSize": 34,
+              "sourceBoxes": [
+                {
+                  "x0": 803,
+                  "y0": 453,
+                  "x1": 1161,
+                  "y1": 487
+                },
+                {
+                  "x0": 801,
+                  "y0": 514,
+                  "x1": 1194,
+                  "y1": 547
+                }
+              ]
+            },
+            {
+              "text": "SECTION 04",
+              "sourceText": "SECTION 04",
+              "bbox": {
+                "x0": 123,
+                "y0": 854,
+                "x1": 262,
+                "y1": 876
+              },
+              "fontSize": 22,
+              "sourceBoxes": [
+                {
+                  "x0": 123,
+                  "y0": 854,
+                  "x1": 262,
+                  "y1": 876
+                }
+              ]
+            },
+            {
+              "text": "流畅阅读：看懂每一页漫画",
+              "sourceText": "窓を閉めてから戻る。",
+              "bbox": {
+                "x0": 501,
+                "y0": 972,
+                "x1": 784,
+                "y1": 998
+              },
+              "fontSize": 26,
+              "sourceBoxes": [
+                {
+                  "x0": 501,
+                  "y0": 972,
+                  "x1": 784,
+                  "y1": 998
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scene": "wordless-stained-glass-cutout-garden",
+          "lines": []
+        }
+      ]
+    }
+  }
+}

@@ -49,6 +49,8 @@ Ordinary rotated, scaled, mirrored and perspective images follow the page's nati
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
+On a continuous gradient, neighboring lines with clearly different sizes and verified text colors retain separate regions. This helps preserve a heading and subtitle as distinct styles. Same-image context still follows the selected translation service and settings.
+
 The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.

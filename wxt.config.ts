@@ -350,19 +350,20 @@ export default defineConfig({
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';
             const browser = wxt.config.browser;
+            // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
+            const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
             // GitHub 名称保护和 Mac 基准页面适配已在主线；扫描论文及原文校订单独实测比 dc7bff026 基线增加 66,822 bytes。
-            // 课程时间轴、共用菜单和 edX 子 frame 初次整合比汉字复核主线增加 170,913 bytes。
-            // 合入断句、表格、文字脚本复核及七语文案后，Chrome 实测 66,364,069 bytes，Firefox 为 66,018,676 bytes。
-            // 门槛只计入这些文本代码增量，各保留约 2–3 kB 余量。
-            // 模型、词典和其他二进制资源保持原有门禁。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_367_000 : 66_021_000;
+            // 图片 OCR 批次主线重新构建为 66,186,315 bytes；汉字复核合并后为 66,190,277 bytes，增加 3,962 bytes，保留约 1.7 kB 余量。
+            // 断句与无边框表格在上述主线增加 2,790 bytes；当前实测 66,193,067 bytes，门槛仅随代码增量调整。
+            // 扫描字母复核后的主线实测66,194,339bytes；原生图片变换与裁切守卫合并后66,199,309bytes，增加4,970bytes；只增加5kB代码预算，不新增模型或依赖。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_201_000 : 66_000_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget);
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

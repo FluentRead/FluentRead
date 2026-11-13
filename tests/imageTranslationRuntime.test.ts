@@ -704,6 +704,108 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(background.style.opacity).not.toBe('0');
     });
 
+    it('变换译图复用原生参考盒，失败布局不反复插入，样式改变后恢复且仍使用同一译图', async () => {
+        const env = setup();
+        const style = env.imageStyle as unknown as Record<string, unknown>;
+        Object.assign(style, {transform: 'matrix(1, 0.1, 0, 1, 0, 0)', width: '380px', height: '184px', boxSizing: 'content-box',
+            transformOrigin: '200px 100px', transformBox: 'content-box', getPropertyValue: (property: string) =>
+                String(style[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] || '')});
+        const offsetParent = document.body;
+        const typed = vi.fn((property: string) => property === 'transform-origin' ? '50% 50%' : property.startsWith('border-') ? '2px' : undefined);
+        Object.defineProperties(env.image, {offsetParent: {value: offsetParent}, offsetLeft: {value: 20}, offsetTop: {value: 40},
+            computedStyleMap: {value: () => ({get: typed})}});
+        let matches = true;
+        const hosts: HTMLElement[] = [], createElement = vi.mocked(document.createElement), create = createElement.getMockImplementation()!;
+        createElement.mockImplementation(((name: string) => {
+            const element = create(name);
+            if (name === 'div') {
+                hosts.push(element);
+                Object.defineProperty(element, 'offsetParent', {get: () => offsetParent});
+                element.getBoundingClientRect = () => ({...env.image.getBoundingClientRect(), width: matches ? 400 : 420});
+            }
+            return element;
+        }) as typeof document.createElement);
+        env.hover(); const button = env.button(); env.dispatch(button, 'click'); await flush();
+        const host = env.parent.querySelector<HTMLElement>('[data-fluent-read-ui="image-translation-bitmap"]')!;
+        const bitmap = env.roots[1].querySelector<HTMLElement>('.fluent-read-image-translation-bitmap')!;
+        expect(host.style.getPropertyValue('transform-origin')).toBe('50% 50%');
+        expect(host.style.left).toBe('20px'); expect(host.style.top).toBe('40px');
+        expect(bitmap.style.getPropertyValue('border-left-width')).toBe('calc(4px + 0.001px)');
+        expect(env.image.style.opacity).toBe('0');
+        const cover = document.createElement('div'); document.body.append(cover);
+        Object.assign(document, {elementsFromPoint: () => [cover, env.image]});
+        env.scroll(); env.runFrames();
+        expect(bitmap.style.visibility).toBe('visible'); expect(env.image.style.opacity).toBe('0');
+        expect(env.roots[0].querySelector<HTMLElement>('.fluent-read-image-translation-overlay')!.style.display).toBe('none');
+        cover.remove(); Object.assign(document, {elementsFromPoint: () => [env.image]});
+        matches = false; env.notify('style'); env.runFrames();
+        expect(host.isConnected).toBe(false); expect(bitmap.style.visibility).toBe('hidden');
+        expect(env.image.style.opacity).not.toBe('0');
+        const failedCount = hosts.filter(node => node.dataset.fluentReadUi === 'image-translation-bitmap').length;
+        for (let frame = 0; frame < 5; frame++) {env.notify('class'); env.runFrames();}
+        expect(hosts.filter(node => node.dataset.fluentReadUi === 'image-translation-bitmap')).toHaveLength(failedCount);
+        const warning = env.roots[0].querySelector<HTMLElement>('.fr-image-warning-button')!;
+        expect(warning.title).toContain('当前布局无法覆盖'); env.dispatch(warning, 'click');
+        expect(env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!.hidden).toBe(false);
+        expect(env.roots[0].querySelector('.fr-image-reader')!.textContent).toContain('完整译文');
+        matches = true; style.transform = 'matrix(1, 0.2, 0, 1, 0, 0)'; env.notify('style'); env.runFrames();
+        const replacement = env.parent.querySelector<HTMLElement>('[data-fluent-read-ui="image-translation-bitmap"]')!;
+        expect(replacement).not.toBe(host); expect(bitmap.style.visibility).toBe('visible'); expect(env.image.style.opacity).toBe('0');
+        expect(warning.hidden).toBe(true); expect(client.translate).toHaveBeenCalledOnce();
+        unmountImageTranslator(); expect(replacement.isConnected).toBe(false); expect(env.image.style.opacity).not.toBe('0');
+    });
+
+    it('静态裁切祖先阻止变换译图接管，定位容器恢复后沿用已有位图且可还原', async () => {
+        const env = setup();
+        const style = env.imageStyle as unknown as Record<string, unknown>;
+        Object.assign(style, {transform: 'matrix(1, 0.1, 0, 1, 0, 0)', width: '380px', height: '184px', boxSizing: 'content-box',
+            getPropertyValue: (property: string) => String(style[property.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase())] || '')});
+        let offsetParent = document.body;
+        Object.defineProperties(env.image, {offsetParent: {get: () => offsetParent}, offsetLeft: {value: 20}, offsetTop: {value: 40}});
+        env.parent.getBoundingClientRect = () => env.image.getBoundingClientRect();
+        Object.defineProperties(env.parent, {clientLeft: {value: 0}, clientWidth: {value: 400}, clientTop: {value: 0}, clientHeight: {value: 200}});
+        const createElement = vi.mocked(document.createElement), create = createElement.getMockImplementation()!;
+        createElement.mockImplementation(((name: string) => {
+            const element = create(name);
+            if (name === 'div') {
+                Object.defineProperty(element, 'offsetParent', {get: () => offsetParent});
+                element.getBoundingClientRect = () => env.image.getBoundingClientRect();
+            }
+            return element;
+        }) as typeof document.createElement);
+        env.hover(); const button = env.button(); env.dispatch(button, 'click'); await flush();
+        const host = env.parent.querySelector<HTMLElement>('[data-fluent-read-ui="image-translation-bitmap"]')!;
+        const bitmap = env.roots[1].querySelector<HTMLElement>('.fluent-read-image-translation-bitmap')!;
+        expect(host.isConnected).toBe(true); expect(env.image.style.opacity).toBe('0');
+        env.parentStyle.overflowX = 'hidden'; env.notify('style'); env.runFrames();
+        expect(host.isConnected).toBe(false); expect(bitmap.style.visibility).toBe('hidden');
+        expect(env.image.style.opacity).not.toBe('0');
+        const warning = env.roots[0].querySelector<HTMLElement>('.fr-image-warning-button')!;
+        expect(warning.hidden).toBe(false); env.dispatch(warning, 'click');
+        expect(env.roots[0].querySelector('.fr-image-reader')!.textContent).toContain('完整译文');
+        offsetParent = env.parent; env.notify('style'); env.runFrames();
+        const replacement = env.parent.querySelector<HTMLElement>('[data-fluent-read-ui="image-translation-bitmap"]')!;
+        expect(replacement.isConnected).toBe(true); expect(bitmap.style.visibility).toBe('visible');
+        expect(env.image.style.opacity).toBe('0'); expect(warning.hidden).toBe(true);
+        expect(client.translate).toHaveBeenCalledOnce();
+        env.dispatch(button, 'click');
+        expect(replacement.isConnected).toBe(false); expect(bitmap.isConnected).toBe(false);
+        expect(env.image.style.opacity).not.toBe('0');
+    });
+
+    it.each(['fixed', 'sticky'])('不支持的 %s 变换保留原图和译文入口，移除变换后直接恢复缓存译图', async position => {
+        const env = setup(); Object.assign(env.imageStyle, {position, transform: 'rotate(10deg)'});
+        Object.defineProperty(env.image, 'offsetParent', {value: env.parent});
+        env.hover(); env.click(); await flush();
+        const bitmap = env.bitmap() as HTMLElement;
+        expect(bitmap.style.visibility).toBe('hidden'); expect(env.image.style.opacity).not.toBe('0');
+        expect(env.roots[0].querySelector('.fr-image-warning-button')!.getAttribute('aria-label')).toContain('当前布局无法覆盖');
+        Object.assign(env.imageStyle, {transform: 'matrix(0.9, 0, 0, 0.9, 10, 20)'}); env.notify('style'); env.runFrames();
+        expect(bitmap.style.visibility).toBe('visible'); expect(env.image.style.opacity).toBe('0');
+        Object.assign(env.imageStyle, {transform: 'none'}); env.notify('style'); env.runFrames();
+        expect(bitmap.style.visibility).toBe('visible'); expect(env.image.style.opacity).toBe('0'); expect(client.translate).toHaveBeenCalledOnce();
+    });
+
     it('翻译后离开图片隐藏操作条，回到译图恢复入口且不重复翻译', async () => {
         const env = setup();env.hover();env.click();await flush();
         const controls = env.button().closest<HTMLElement>('.fr-image-controls')!;

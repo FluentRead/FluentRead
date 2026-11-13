@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/content/presentation.ts
  * 文件职责：解析网页图片的实际视觉承载面，兼容宿主把 img 设为透明、再由同级背景图绘制原图的实现。
- * 主要内容：在原图被宿主隐藏时，仅接受 URL、同级关系和几何尺寸都明确一致的唯一背景面，提供背景尺寸到译图 object-fit 的映射；可见区域命中测试识别该背景面的透明原 img 和对应媒体链接，保留真正的宿主遮挡检测。
+ * 主要内容：在原图被宿主隐藏时，仅接受 URL、同级关系和几何尺寸都明确一致的唯一背景面，提供背景尺寸到译图 object-fit 的映射；限定变换译图可共用的溢出裁切链，命中测试识别透明原 img 和对应媒体链接，变换图片仅在浏览器已证明至少一处命中原图时跳过外接框空角，整图遮挡仍按原规则处理。
  * 模块边界：本模块只读取当前 DOM、计算样式和几何，不写入页面、不管理翻译请求；runtime 负责保存返回的 element，避免租约隐藏原图后再次依赖 opacity 重新发现。
  */
 export type ImagePresentationKind = 'image' | 'background';
@@ -14,6 +14,18 @@ export interface ImagePresentation {
 export interface BitmapSurfaceStyle {
     objectFit: string;
     objectPosition: string;
+}
+
+/** 绝对定位译图可能越过定位容器以内的静态裁切祖先；不改变宿主布局来强行接管。 */
+export function canShareImageOverflowClipping(surface: HTMLElement, offsetParent: Element): boolean {
+    let ancestor = surface.parentElement;
+    for (let depth = 0; ancestor !== offsetParent && depth < 64; depth++) {
+        if (!ancestor) return false;
+        const style = getComputedStyle(ancestor);
+        if (/^(hidden|clip|auto|scroll)$/.test(style.overflowX) || /^(hidden|clip|auto|scroll)$/.test(style.overflowY)) return false;
+        ancestor = ancestor.parentElement;
+    }
+    return ancestor === offsetParent;
 }
 
 /** X 把图片放在 inert 容器内，由同一媒体链接的透明兄弟节点接收鼠标；它仍属于原图。 */
@@ -38,15 +50,19 @@ function isMediaLinkOverlay(surface: HTMLElement, foreground: Element): boolean 
 }
 
 /** 译层脱离宿主堆叠上下文，因此只在原图仍位于前景时交接显示权。 */
-export function isImagePresentationOccluded(surface: HTMLElement, visible: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>, overlayHost: HTMLElement | null, sourceImage?: HTMLImageElement, readingHost: HTMLElement | null = null, ignoreForeground?: (element: Element) => boolean): boolean {
+export function isImagePresentationOccluded(surface: HTMLElement, visible: Pick<DOMRect, 'left' | 'top' | 'right' | 'bottom'>, overlayHost: HTMLElement | null, sourceImage?: HTMLImageElement, readingHost: HTMLElement | null = null, ignoreForeground?: (element: Element) => boolean, transformed = false): boolean {
     const document = surface.ownerDocument;
     if (typeof document.elementsFromPoint !== 'function') return false;
     // 使用裁切后的区域；中心与四角任一被其他内容盖住，就撤下整个译层，避免压住弹窗或菜单。
     const samples = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]];
+    const hit = ([x, y]: number[]) => document.elementsFromPoint(visible.left + (visible.right - visible.left) * x,
+        visible.top + (visible.bottom - visible.top) * y);
+    const nativeHits = transformed ? samples.map(hit) : undefined;
+    const hasSourceHit = nativeHits?.some(hits => hits.includes(surface));
     const ownedForegrounds = new Map<Element, boolean>();
-    return samples.some(([x, y]) => {
-        const hits = document.elementsFromPoint(visible.left + (visible.right - visible.left) * x,
-            visible.top + (visible.bottom - visible.top) * y);
+    return samples.some((point, index) => {
+        const hits = nativeHits ? nativeHits[index] : hit(point);
+        if (hasSourceHit && !hits.includes(surface)) return false;
         const foreground = hits.find(hit => hit !== overlayHost && !overlayHost?.contains(hit) && hit !== readingHost && !readingHost?.contains(hit) && !ignoreForeground?.(hit));
         // 透明图片、pointer-events:none 图片和背景承载面可能命中其容器；自有控件不参与遮挡判定。
         if (!foreground || foreground === surface || surface.contains(foreground) || foreground.contains(surface)) return false;

@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
-import {isImagePresentationOccluded, presentationMatchesSource, resolveImagePresentation, surfaceStyleToBitmap} from '@/src/features/image-translation/content/presentation';
+import {canShareImageOverflowClipping, isImagePresentationOccluded, presentationMatchesSource, resolveImagePresentation, surfaceStyleToBitmap} from '@/src/features/image-translation/content/presentation';
 import {isNativeModal, isOpenImageViewer, samePreviewImage, visibleImageViewers} from '@/src/features/image-translation/content/imagePreview';
 
 type Style = Partial<CSSStyleDeclaration> & {backgroundImage?: string};
@@ -30,6 +30,53 @@ function fixture(options: {opacity?: string; visibility?: string; background?: s
 }
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe('image native overflow ownership', () => {
+    it('shares clipping from the positioning container without reading its style', () => {
+        const {image} = fixture();
+        const read = vi.fn(() => ({overflowX: 'hidden', overflowY: 'hidden'}));
+        vi.stubGlobal('getComputedStyle', read);
+        expect(canShareImageOverflowClipping(image, image.parentElement!)).toBe(true);
+        expect(read).not.toHaveBeenCalled();
+    });
+
+    it.each(['hidden', 'clip', 'auto', 'scroll'])('rejects an intervening %s clip on either axis', overflow => {
+        const {image, document, styles} = fixture();
+        for (const axis of ['overflowX', 'overflowY']) {
+            styles.set(image.parentElement!, {overflowX: 'visible', overflowY: 'visible', [axis]: overflow});
+            expect(canShareImageOverflowClipping(image, document.body)).toBe(false);
+        }
+    });
+
+    it('checks nested ancestors and rejects an unrelated or detached positioning container', () => {
+        const {image, document, styles} = fixture();
+        const middle = document.createElement('div');
+        image.parentElement!.append(middle); middle.append(image);
+        expect(canShareImageOverflowClipping(image, document.body)).toBe(true);
+        styles.set(middle.parentElement!, {overflowY: 'hidden'});
+        expect(canShareImageOverflowClipping(image, document.body)).toBe(false);
+        styles.clear();
+        expect(canShareImageOverflowClipping(image, document.createElement('div'))).toBe(false);
+        image.remove();
+        expect(canShareImageOverflowClipping(image, document.body)).toBe(false);
+    });
+
+    it('bounds style reads to 64 intermediate ancestors', () => {
+        const {image, document} = fixture();
+        let parent = document.body;
+        for (let depth = 0; depth < 64; depth++) {
+            const child = document.createElement('div'); parent.append(child); parent = child;
+        }
+        parent.append(image);
+        const read = vi.fn(() => ({overflowX: 'visible', overflowY: 'visible'}));
+        vi.stubGlobal('getComputedStyle', read);
+        expect(canShareImageOverflowClipping(image, document.body)).toBe(true);
+        expect(read).toHaveBeenCalledTimes(64);
+        const extra = document.createElement('div'); parent.append(extra); extra.append(image); read.mockClear();
+        expect(canShareImageOverflowClipping(image, document.body)).toBe(false);
+        expect(read).toHaveBeenCalledTimes(64);
+    });
+});
 
 describe('image presentation foreground ownership', () => {
     const visible = {left: 20, top: 40, right: 420, bottom: 240};
@@ -85,6 +132,17 @@ describe('image presentation foreground ownership', () => {
         dialog.setAttribute('role', 'dialog'); document.body.append(dialog); dialog.append(image);
         Object.assign(document, {elementsFromPoint: () => [image, dialog, document.body]});
         expect(isImagePresentationOccluded(image, visible, null)).toBe(false);
+    });
+
+    it('skips empty corners of a transformed bounding box only after a native source hit', () => {
+        const {image, document} = fixture(), outside = document.createElement('p'), cover = document.createElement('div');
+        Object.assign(document, {elementsFromPoint: (x: number) => x === 220 ? [image] : [outside]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(false);
+        expect(isImagePresentationOccluded(image, visible, null)).toBe(true);
+        Object.assign(document, {elementsFromPoint: (x: number) => x === 220 ? [cover, image] : [outside]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(true);
+        Object.assign(document, {elementsFromPoint: () => [cover]});
+        expect(isImagePresentationOccluded(image, visible, null, image, null, undefined, true)).toBe(true);
     });
 
     it('keeps a background surface visible under its own transparent source img, including during translation', () => {

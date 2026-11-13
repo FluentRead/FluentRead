@@ -3,6 +3,7 @@
  * 文件职责：组装播放器字幕菜单，以紧凑行呈现显示方式、字幕时间、本地 AI 字幕与下载与完整句学习入口，并在同一弹层内提供模型下载确认。
  * 主要内容：常驻标题与可滚动正文分离，显示、带示意的双语顺序、读音图标开关与校时先于次级学习入口；单语时保留顺序偏好并说明生效条件，读音说明支持悬停和键盘聚焦且不重测菜单，保留仅译文时显式切回双语的入口，低频字幕下载默认收起；触屏安全视口按可用宽度排布，极矮时只保留关闭并暂时隔离正文焦点，正常视口只滚动自有正文显露明确聚焦的操作，桌面按播放器高度收紧；X 首层聚焦显示方式和当前操作，模型选择、校时、导出和重新识别放在可返回的选项页，复用稳定节点呈现来源、故障恢复及识别/下载进度，生成预览期间不开放完整字幕导出。
  * 模块边界：只操作 FluentRead 自己的菜单节点，稳定文案不重复改写，仅在可切换的桌面布局上读取内容高度；运行时负责配置、请求、全局事件与清理。
+ * 课程复用：读音提示按控件所属 Document 或 ShadowRoot 识别焦点，支持课程菜单复用同一套结构和样式。
  */
 import type {VideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import type {VideoSubtitleDisplayMode} from '@/src/core/config/model';
@@ -307,7 +308,7 @@ function createReadingAnnotationRow(language: UiLanguage): HTMLElement {
     toggle.addEventListener('pointerenter', () => setReadingHelpOpen(row, true));
     toggle.addEventListener('pointerleave', event => {
         if (event.relatedTarget instanceof Node && explanation.contains(event.relatedTarget)) return;
-        if (document.activeElement !== toggle) scheduleReadingHelpClose(row);
+        if ((toggle.getRootNode() as Document | ShadowRoot).activeElement !== toggle) scheduleReadingHelpClose(row);
     });
     toggle.addEventListener('focus', () => setReadingHelpOpen(row, true));
     toggle.addEventListener('click', () => setReadingHelpOpen(row, false));
@@ -317,7 +318,7 @@ function createReadingAnnotationRow(language: UiLanguage): HTMLElement {
     explanation.addEventListener('pointerenter', () => cancelReadingHelpClose(row));
     explanation.addEventListener('pointerleave', event => {
         if (event.relatedTarget instanceof Node && toggle.contains(event.relatedTarget)) return;
-        if (document.activeElement !== toggle) scheduleReadingHelpClose(row);
+        if ((toggle.getRootNode() as Document | ShadowRoot).activeElement !== toggle) scheduleReadingHelpClose(row);
     });
     header.append(toggle);
     const status = createTextElement('span','fluent-read-video-menu-source-hint','');
@@ -341,7 +342,7 @@ function scheduleReadingHelpClose(row: HTMLElement): void {
     readingHelpCloseTimers.set(row, setTimeout(() => {
         readingHelpCloseTimers.delete(row);
         const toggle = row.querySelector<HTMLElement>('[data-action="toggle-reading-annotation"]')!;
-        if (document.activeElement !== toggle && !toggle.matches(':hover') && !help.matches(':hover')) setReadingHelpOpen(row, false);
+        if ((toggle.getRootNode() as Document | ShadowRoot).activeElement !== toggle && !toggle.matches(':hover') && !help.matches(':hover')) setReadingHelpOpen(row, false);
     }, 120));
 }
 

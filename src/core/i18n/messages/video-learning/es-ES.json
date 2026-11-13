@@ -1,4 +1,5 @@
 {
+  "video.description": "Traduce subtítulos de vídeos y reuniones web sin subir audio ni vídeo.",
   "video.learning.title": "Aprender por frases",
   "video.learning.close": "Cerrar",
   "video.learning.fragment": "Fragmento de subtítulo",
@@ -51,5 +52,16 @@
   "video.learning.explanationAgain": "Explicar de nuevo",
   "video.learning.start": "Iniciar aprendizaje de frases",
   "video.learning.appearance": "Personalizar el panel de aprendizaje",
-  "video.learning.drag": "Arrastra el título para mover el panel"
+  "video.learning.drag": "Arrastra el título para mover el panel",
+  "video.course.toggle": "Subtítulos de FluentRead",
+  "video.course.auto": "Traducir al abrir un vídeo",
+  "video.course.off": "Subtítulos desactivados",
+  "video.course.loading": "Cargando subtítulos…",
+  "video.course.error": "Error al cargar subtítulos",
+  "video.course.empty": "Sin subtítulos",
+  "video.course.bilibiliEmpty": "Sin subtítulos",
+  "video.course.ready": "Subtítulos listos",
+  "video.course.waiting": "Esperando subtítulos…",
+  "video.course.download": "Descargar SRT original",
+  "video.course.downloadFailed": "Error de descarga"
 }

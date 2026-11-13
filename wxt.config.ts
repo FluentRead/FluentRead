@@ -350,6 +350,8 @@ export default defineConfig({
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';
             const browser = wxt.config.browser;
+            // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
+            const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
@@ -358,12 +360,13 @@ export default defineConfig({
             // 断句与无边框表格在上述主线增加 2,790 bytes；当前实测 66,193,067 bytes，门槛仅随代码增量调整。
             // 扫描字母复核后的主线实测66,194,339bytes；原生图片变换与裁切守卫合并后66,199,309bytes，增加4,970bytes；只增加5kB代码预算，不新增模型或依赖。
             // AI 图片语境版本实测66,199,480bytes；Google 有序语境合并后66,201,032bytes，净增1,552bytes；Chrome/Edge 门槛增加1kB，Firefox 保持原门槛，无新模型或依赖。
-            // 背景实色均值、补丁采样与渐变修补合并后实测66,204,983bytes，净增3,951bytes；Chrome/Edge 门槛增加4kB，Firefox 门槛不变，模型仍按需加载。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_206_000 : 66_000_000;
+            // 整合课程字幕主线后，背景实色均值、补丁采样与渐变修补使 Chrome 从66,371,605增至66,375,556bytes，Firefox 从66,025,897增至66,029,740bytes。
+            // 纯代码分别增加3,951和3,843bytes，各增加4kB门槛；课程预算仍单独累加，无新模型或依赖。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_206_000 : 66_004_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget);
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -2,6 +2,12 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## B 站、Udemy 与 edX 课程字幕
+
+`videoCourseCaptions` 覆盖分 P 和小节身份、来源资源主机、原语言人工轨优先、JSON/VTT 时间轴、请求预算、关闭及切换后的迟到结果、只读播放器桥和独立站点配置。`videoCourseFrame` 验证 edX 子 frame 的权威配置水合、暂停恢复、禁用与上下文失效；`videoCaptionPlatformRuntime` 从真实挂载入口验证菜单、原文模式、翻译复用、原文 SRT、校时空档、动态播放器和 edX 多视频归属。
+
+先对上述三个文件及 `videoCaptionPlatforms` 运行相应分组的 `--dry-run`，再执行限定文件的行为测试；新增源码纳入四维 100% 覆盖率。生产浏览器专项必须包含 B 站延迟切 P、Udemy Business 换小节和播放器重建、edX 所选语言、`learning.edx.org` 嵌套 `courses.edx.org` 的跨源 iframe，以及三个独立开关的保存和刷新。应在 frame 视频导航前另行附加 CDP 诊断，不能只采集顶层。受控元数据、账号接口和翻译响应只证明接入及交互，不代表真实付费课程、登录态、在线翻译服务或 Firefox 实机验证。
+
 ## 读音状态与菜单稳定性
 
 `videoReadingPlayer` 覆盖准备、无适用读音、失败重试及显示模式切换。生产 Chrome 构建后，运行 `node scripts/testing/run-video-menu-ui-test.cjs --suite reading-stability --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --runtime-diagnostics <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <证据目录>`；将 suite 改为 `x-reading-stability` 可测试 X 缓存 AI 字幕菜单。专项在第二屏临时 Edge 后台窗口使用受控页面、媒体与字幕，连续切换韩语、无需标注的文字和空字幕，采样菜单及控件几何并保存截图；不代表真实网站、真实 AI 转写、Firefox 或辅助技术实机验收。

@@ -6,12 +6,37 @@ import {
     getImageTextBackgroundColor,
     getImageTextColor,
     getImageSourceFontLimit,
+    getImageSingleLineHeight,
+    getImageRgbContrast,
     layoutImageTranslationText,
 } from '@/src/features/image-translation/services/rendering';
 
 const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
 
 describe('原文墨迹与字体尺度',()=>{
+    it('对比度使用未取整的RGB相对亮度，并保持正反对称',()=>{
+        expect(getImageRgbContrast([0,0,0],[255,255,255])).toBe(21);
+        expect(getImageRgbContrast([255,255,255],[0,0,0])).toBe(21);
+        expect(getImageRgbContrast([118,118,118],[255,255,255])).toBeGreaterThan(4.5);
+        expect(getImageRgbContrast([119,119,119],[255,255,255])).toBeLessThan(4.5);
+    });
+    it('单行所需高度包含实际墨迹、描边和余量，放不下一行时不借此扩大段落',()=>{
+        const context=canvasContext();context.measureText.mockReturnValue({width:80,actualBoundingBoxLeft:2,actualBoundingBoxRight:78,actualBoundingBoxAscent:16,actualBoundingBoxDescent:4} as never);
+        expect(getImageSingleLineHeight(context as never,'TEXT',100,20)).toBe(24);
+        expect(getImageSingleLineHeight(context as never,'TEXT',80,20)).toBeUndefined();
+        for(const [text,width,size] of [[' ',100,20],['X'.repeat(257),100,20],['X\nY',100,20],['TEXT',NaN,20],['TEXT',100,0]] as const)
+            expect(getImageSingleLineHeight(context as never,text,width,size)).toBeUndefined();
+        expect(context.measureText).toHaveBeenCalledTimes(2);expect(context.save).toHaveBeenCalledTimes(2);expect(context.restore).toHaveBeenCalledTimes(2);
+    });
+    it.each([{width:NaN},{actualBoundingBoxLeft:NaN},{actualBoundingBoxRight:-2},{actualBoundingBoxAscent:-4}])('不完整单行指标不授予新增高度 %j',change=>{
+        const context=canvasContext();context.measureText.mockReturnValue({width:80,actualBoundingBoxLeft:2,actualBoundingBoxRight:78,actualBoundingBoxAscent:16,actualBoundingBoxDescent:4,...change} as never);
+        expect(getImageSingleLineHeight(context as never,'TEXT',100,20)).toBeUndefined();expect(context.restore).toHaveBeenCalledOnce();
+    });
+    it('实际绘字使用已确认源色，未提供源色时仍使用原对比度选择',()=>{
+        const context=canvasContext(),colors:string[]=[];context.fillText.mockImplementation(()=>{colors.push((context as unknown as CanvasRenderingContext2D).fillStyle as string);});
+        drawTranslatedImageText(context as never,'TEXT',0,0,200,60,'rgb(255,255,255)',20,'left',undefined,'rgb(25,48,75)');
+        expect(colors).toEqual(['rgb(25,48,75)']);
+    });
     const source=(text='SOURCE',width=192,height=35)=>({text,bbox:{x0:10,y0:10,x1:10+width,y1:10+height}});
     it('相同48px文字的x高度、大写和下伸笔画不会变成不同字号',()=>{
         const context=canvasContext();

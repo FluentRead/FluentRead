@@ -31,6 +31,8 @@ Ordinary images use the actual glyph bounds of your device's fonts to reduce cli
 
 Single horizontal lines use both the source text's width and ink height to check its font scale, reducing size differences caused by letter shapes. Unreliable estimates and complex paragraphs keep their existing limits. Translations still fit their complete glyphs within the available area; this does not recover the original font family or every decorative style.
 
+On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.
+
 Small Japanese reading annotations above horizontal text or to the right of vertical text are attached to the body when their size, position and ownership are clear. This avoids translating the reading as a separate text block. The body and annotation keep their original erasure bounds, with padding based on the annotation's own size. Ambiguous annotations, independent small text and already grouped recognition regions retain their existing handling.
 
 Individual translation requests include bounded neighboring text from the same image as reference for services that support context. Batch requests continue to process their existing paragraphs together. Translated images follow the original image's shape clipping and pixel scaling settings.

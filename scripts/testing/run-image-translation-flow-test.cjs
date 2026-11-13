@@ -500,8 +500,9 @@ async function recordSourceTypography(context,popup,worker,action){
         }
         session=(await bridge.send('Target.attachToTarget',{targetId:target.targetId,flatten:false})).sessionId;
         await command('Runtime.enable');
-        await command('Runtime.evaluate',{expression:`(()=>{const p=CanvasRenderingContext2D.prototype,original=p.fillText;globalThis.__typographyDraws=[];globalThis.__restoreTypography=()=>p.fillText=original;
-            p.fillText=function(...args){if(this.canvas.width===1400&&this.canvas.height===700&&globalThis.__typographyDraws.length<32){const m=this.measureText(args[0]);globalThis.__typographyDraws.push({text:args[0],font:this.font,fill:this.fillStyle,x:args[1],y:args[2],ascent:m.actualBoundingBoxAscent,descent:m.actualBoundingBoxDescent,left:m.actualBoundingBoxLeft,right:m.actualBoundingBoxRight});}return original.apply(this,args);};})()`});
+        await command('Runtime.evaluate',{expression:`(()=>{const p=CanvasRenderingContext2D.prototype,original=p.fillText,rect=p.rect,bounds=new WeakMap();globalThis.__typographyDraws=[];globalThis.__restoreTypography=()=>{p.fillText=original;p.rect=rect;};
+            p.rect=function(...args){bounds.set(this,args.slice());return rect.apply(this,args);};
+            p.fillText=function(...args){if(this.canvas.width===1400&&this.canvas.height===700&&globalThis.__typographyDraws.length<32){const m=this.measureText(args[0]);globalThis.__typographyDraws.push({text:args[0],font:this.font,fill:this.fillStyle,clip:bounds.get(this),x:args[1],y:args[2],ascent:m.actualBoundingBoxAscent,descent:m.actualBoundingBoxDescent,left:m.actualBoundingBoxLeft,right:m.actualBoundingBoxRight});}return original.apply(this,args);};})()`});
         await (actionTask??action());
         const captured=await worker.evaluate(()=>globalThis.__imageFixture.typographyResult);
         assert.ok(captured,'Capture the actual offscreen response');assert.equal(captured.lines.length,3);
@@ -513,7 +514,8 @@ async function recordSourceTypography(context,popup,worker,action){
             return lines.map(line=>{const m=ctx.measureText(line.sourceText);return {text:line.sourceText,bbox:line.bbox,widthAt100:m.actualBoundingBoxLeft+m.actualBoundingBoxRight,heightAt100:m.actualBoundingBoxAscent+m.actualBoundingBoxDescent};});
         },captured.lines);
         const image=path.join(artifacts,'typography-translated.png');assert.ok(captured.image.startsWith('data:image/png;base64,'));fs.writeFileSync(image,Buffer.from(captured.image.split(',')[1],'base64'));
-        report.typography={scope:'Same 48px Arial source, real OCR, original production offscreen response and native fillText; deterministic translated text.',sourceMetrics,draws,image};
+        const sourceImage=path.join(artifacts,'typography-source.png');assert.ok(captured.sourceImage.startsWith('data:image/png;base64,'));fs.writeFileSync(sourceImage,Buffer.from(captured.sourceImage.split(',')[1],'base64'));
+        report.typography={scope:'Same 48px Arial source, real OCR, original production offscreen response and native fillText; deterministic translated text.',sourceMetrics,draws,image,sourceImage};
     }finally{
         if(session)await command('Runtime.evaluate',{expression:'globalThis.__restoreTypography?.()'}).catch(error=>report.cleanupErrors.push('Typography instrumentation restore: '+error.message));
         for(const slot of pending.values())clearTimeout(slot.timer);
@@ -698,7 +700,7 @@ async function recordSourceTypography(context,popup,worker,action){
         if(traceTypography){
             const send=chrome.runtime.sendMessage.bind(chrome.runtime);
             chrome.runtime.sendMessage=function(...args){
-                const message=args[0],observe=response=>{if(message?.type==='FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN'&&response?.success&&Array.isArray(response.lines))fixture.typographyResult={lines:response.lines,image:response.image};return response;};
+                const message=args[0],observe=response=>{if(message?.type==='FLUENT_READ_IMAGE_TRANSLATE_OFFSCREEN'&&response?.success&&Array.isArray(response.lines))fixture.typographyResult={lines:response.lines,image:response.image,sourceImage:message.image};return response;};
                 const last=args.length-1,callback=args[last];if(typeof callback==='function')args[last]=response=>callback(observe(response));
                 const result=send(...args);return typeof callback!=='function'&&result?.then?result.then(observe):result;
             };

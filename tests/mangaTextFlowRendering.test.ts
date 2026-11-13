@@ -2,7 +2,7 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 const {plan,raster,ledger}=vi.hoisted(()=>({plan:vi.fn(),raster:vi.fn(),ledger:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaTextFlow',()=>({planMangaTextFlow:plan}));
 vi.mock('@/src/features/image-translation/services/mangaGlyphRaster',()=>({rasterizeMangaGlyphs:raster,createMangaGlyphRasterLedger:ledger}));
-import {drawMangaTranslations} from '@/src/features/image-translation/services/mangaRendering';
+import {drawMangaTranslations,type MangaBackground} from '@/src/features/image-translation/services/mangaRendering';
 import type {MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 
 const width=640,height=160,pixels=new Uint8ClampedArray(width*height*4).fill(255);
@@ -13,7 +13,7 @@ const backgrounds=[{uniform:false,color:'rgb(255,255,255)'}];
 function context(){return {font:'',lineWidth:0,textAlign:'start',save:vi.fn(),restore:vi.fn(),beginPath:vi.fn(),rect:vi.fn(),clip:vi.fn(),fillRect:vi.fn(),strokeText:vi.fn(),fillText:vi.fn(),drawImage:vi.fn(),
     measureText:vi.fn(function(this:{font:string},text:string){const size=Number(this.font.match(/ ([\d.e+-]+)px/)![1]);return {width:Array.from(text).length*size*.6,actualBoundingBoxLeft:0,actualBoundingBoxRight:Array.from(text).length*size*.6,actualBoundingBoxAscent:size*.7,actualBoundingBoxDescent:size*.2};})};}
 function accepted(){return {kind:'accepted',canvas:{},x:12,y:12,dispose:vi.fn()};}
-function draw(c=context(),items=[region],p:MangaAlphaProtection|undefined=protection(),bg=items.map(()=>backgrounds[0])){
+function draw(c=context(),items=[region],p:MangaAlphaProtection|undefined=protection(),bg:MangaBackground[]=items.map(()=>backgrounds[0])){
     drawMangaTranslations(c as any,pixels,width,height,items,true,bg,p);return c;
 }
 beforeEach(()=>{vi.clearAllMocks();plan.mockReset().mockImplementation((_text,ref)=>({accepted:true,font:`${ref.style} ${ref.fontSize}px ${ref.family}`,fontSize:ref.fontSize,lineWidth:ref.lineWidth,chunks:[]}));raster.mockReset().mockImplementation(accepted);ledger.mockReset().mockReturnValue({shared:true});});
@@ -79,5 +79,9 @@ describe('漫画绕孔位图与连续矩形编排',()=>{
     it('沿用原图确定的黑白笔色和均匀底描边，不使用试验固定颜色',()=>{
         draw(context(),[region],protection(),[{uniform:true,color:'rgb(0,0,0)'}]);expect(raster.mock.calls[0][3]).toEqual({fillStyle:'#ffffff',strokeStyle:'rgb(0,0,0)'});
         raster.mockClear();draw(context(),[region],protection(),[{uniform:true,color:'rgb(255,255,255)'}]);expect(raster.mock.calls[0][3]).toEqual({fillStyle:'#111111',strokeStyle:'rgb(255,255,255)'});
+    });
+    it('绕孔字形也保留修补前确认的源色与文字底色',()=>{
+        draw(context(),[region],protection(),[{uniform:false,color:'rgb(255,0,0)',foreground:'rgb(25,48,75)',textBackground:'rgb(255,255,255)'}]);
+        expect(raster.mock.calls[0][3]).toEqual({fillStyle:'rgb(25,48,75)',strokeStyle:'rgb(255,255,255)'});
     });
 });

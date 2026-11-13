@@ -3,6 +3,7 @@
  * 文件职责：在原文字框的八像素观察域内证明一致RGBA静区、完整墨迹与外部图案的几何分离。
  * 主要内容：最多八个实际像素色仅提出背景候选，完整静区闭环及整项共享的背景与墨色端点生成无写入权限的候选；旧准入API额外要求逐像素真实检测支持。同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
  * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；真实同帧模型支持由调用方验证并提供查询，不能从本mask反造支持。候选不含应用权限，也不证明语义分割；页规划必须在首次原图上预付共享预算，完成全页冲突、完整译字预检和真实支持授权后才应用，不能覆盖OCR框或扩大原文保护权限。
+ * 样式观察：不透明调色板只返回同一静区与共同墨色端点，不要求用于擦除的薄AA形状；它没有mask，不能替代修补准入。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -21,6 +22,8 @@ export interface ImageMatteRepair extends ImageMatteObservationBox {
 }
 /** 仅为布局观察提供静区与完整墨迹范围；没有修补mask或擦除权限。 */
 export interface ImageMatteGeometry extends ImageMatteObservationBox {background:Rgba;supportBox:Box}
+/** 仅观察同色背景与共同墨色端点；不要求墨迹薄边形状，也不提供任何修补 mask 或写入权限。 */
+export interface ImageMattePalette extends ImageMatteGeometry {ink:Rgba}
 const HORIZON=8,MAX_PIXELS=65_536,MAX_ENDPOINTS=64;
 
 /** 与实际读取完全相同的零扫描几何；调用方在尝试规划前按width*height收费。 */
@@ -144,7 +147,11 @@ function observeMoat(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:B
 }
 
 function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
-    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget):ImageMatteRepair|undefined {
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly:true):ImageMattePalette|undefined;
+function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly?:false):ImageMatteRepair|undefined;
+function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly=false):ImageMatteRepair|ImageMattePalette|undefined {
     const {labels,background,supportBox}=observed,area=colors.length,bgAlpha=background>>>24;
     let peak=0,largest=0;
     for(let index=0;index<area;index++)if(labels[index]===2){
@@ -192,6 +199,8 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         if(valid){fits=true;break;}
     }
     if(!fits)return;
+    if(paletteOnly)return {...roi,background:[background&255,(background>>>8)&255,(background>>>16)&255,bgAlpha],
+        ink:[peak&255,(peak>>>8)&255,(peak>>>16)&255,inkAlpha],supportBox:{...supportBox}};
     // 只对首个canonical有效共同端点跑一次薄边准入；不以64次距离变换穷举其他解释。
     // 中间coverage只能作薄AA，不能让与黑字同色线上的整块灰牌都被当成字擦掉。
     for(let y=0;y<roi.height;y++)for(let x=0;x<roi.width;x++){
@@ -240,6 +249,15 @@ export function observeImageMatteGeometry(pixels:Uint8ClampedArray,width:number,
     if(!observation)return;
     const {roi,result}=observation,background=result.background;
     return {...roi,background:[background&255,(background>>>8)&255,(background>>>16)&255,background>>>24],supportBox:{...result.supportBox}};
+}
+
+/** 只读不透明源图的颜色关系；与可擦除薄边证明分开，不能凭调色板授权清字。 */
+export function observeImageMattePalette(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
+    fitBudget:ImageMatteFitBudget):ImageMattePalette|undefined {
+    if(!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
+    const observation=observeCandidate(pixels,width,height,sourceBox);
+    if(!observation||observation.result.background>>>24!==255)return;
+    return finish(observation.colors,observation.roi,observation.box,observation.result,undefined,fitBudget,true);
 }
 
 function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,

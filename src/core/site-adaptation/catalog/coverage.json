@@ -60,6 +60,13 @@
   },
   "rules": [
     {
+      "id": "llamaperf-mac",
+      "category": "community",
+      "verification": "site-fixture",
+      "fixture": "tests/siteAdaptationCore.test.ts",
+      "liveVerification": "tests/browser-translation-cases.json#llamaperf-mac-m5"
+    },
+    {
       "id": "englio-article",
       "category": "documentation",
       "verification": "site-fixture",

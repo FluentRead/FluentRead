@@ -349,6 +349,11 @@ async function main() {
           ctx.font = `${raised ? 7 : 10}px Times New Roman`;
           ctx.fillText(text, scientificX, raised ? 386 : 390); scientificX += ctx.measureText(text).width;
         }
+        let letterScriptX = 48;
+        for (const [text, raised] of [['An exponent x', false], ['min', true], [' needs source review.', false]]) {
+          ctx.font = `${raised ? 7 : 10}px Times New Roman`;
+          ctx.fillText(text, letterScriptX, raised ? 416 : 420); letterScriptX += ctx.measureText(text).width;
+        }
         // 连通图示与有文字单元格的表格并排；图内标签不送翻，表格文字仍可翻译且受单元格约束。
         const nodes = [{x:48,y:450,w:65,text:'Prepare'}, {x:150,y:450,w:95,text:'Measure'},
           {x:48,y:515,w:65,text:'Compare'}, {x:150,y:515,w:95,text:'Summarize'}];
@@ -403,12 +408,16 @@ async function main() {
       assert.equal(await pageInput.inputValue(), '7', '逐页 OCR 检查点必须保留当前阅读页，不能跳回第一页');
       assert(recognizedModel, '识别模型必须持久保存');
       const recognized = recognizedModel.segments.map(segment => segment.source);
+      const paperPage = recognizedModel.pages[6];
       const scientific = recognizedModel.segments.find(segment => segment.source.includes('Scientific counts'));
+      const letterScript = recognizedModel.segments.find(segment => segment.source.startsWith('An exponent'));
+      assert(letterScript, '小号字母脚标所在句子仍须保留');
+      assert(paperPage.ocrReviewRegions.some(region => region.x < 112 && region.x + region.width > 108 && region.y < 416 && region.y + region.height > 412), '误读为商标/引号的小号字母脚标应在原图上明确核对');
+      report.letterScriptReview = {source: letterScript.source, reviewRegions: paperPage.ocrReviewRegions};
       assert(scientific?.source.includes('10⁴') && scientific.source.includes('10⁵'), `科学计数法须由实际扫描字形恢复：${scientific?.source}`);
       assert(requestedSources.some(source => source.includes('Scientific counts') && source.includes('__FRTERM_') && !source.includes('10⁴')), '已确认指数必须经过真实翻译保护链');
       assert(recognizedModel.translations[scientific.id]?.includes('10⁴') && recognizedModel.translations[scientific.id].includes('10⁵'), '译文必须恢复确认后的科学计数法');
-      assert.equal(recognizedModel.pages[6].ocrReviewRegions.length, 0, '本样本的数字均可确认，不应误标正文逗号');
-      const paperPage = recognizedModel.pages[6];
+      assert.equal(paperPage.ocrReviewRegions.length, 1, '本页只应核对未知字母脚标，确认的数字和普通标点不误标');
       assert(paperPage.preservedRegions.some(region=>region.kind==='figure'&&region.x<=48.5&&region.x+region.width>=244.5&&region.y<=450.5&&region.y+region.height>=544.5), '扫描图示必须完整保留四个节点与连接线');
       const diagramLabels = ['Prepare','Measure','Compare','Summarize'];
       for(const label of diagramLabels){

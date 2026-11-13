@@ -687,6 +687,7 @@
       "tests/mangaRendering.test.ts",
       "tests/mangaViewWordBoundary.test.ts",
       "tests/imageParagraphs.test.ts",
+      "tests/imageRuby.test.ts",
       "tests/mangaCanvas.test.ts",
       "tests/mangaColorQualityCorpus.test.ts",
       "tests/mangaCompositor.test.ts",

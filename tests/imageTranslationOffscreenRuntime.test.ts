@@ -522,6 +522,22 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(mocks.repair).not.toHaveBeenCalled();
     });
 
+    it.each(['tesseract','paddle'] as const)('%s 日文附属注音保留记录但不独立送译，正文只绘制一次',async engine=>{
+        imageOptions.push({width:300,height:300});
+        const right={text:'風の音を聞いて',bbox:{x0:100,y0:20,x1:140,y1:240},vertical:true as const};
+        const left={text:'小道で待っている',bbox:{x0:30,y0:20,x1:70,y1:240},vertical:true as const};
+        const a={text:'かぜ',bbox:{x0:145,y0:22,x1:165,y1:62},vertical:true as const};
+        const b={text:'こみち',bbox:{x0:75,y0:22,x1:95,y1:82},vertical:true as const};
+        const source=[a,right,b,left],before=structuredClone(source);
+        mocks.recognize.mockResolvedValue(source);mocks.mangaRecognize.mockResolvedValue(source);
+        const result=await translateImageInOffscreen('ruby','ja','Page',undefined,'ruby-image',false,engine);
+        const requests=sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts');
+        expect(requests).toHaveLength(1);expect(requests[0][0].texts).toEqual([right.text+left.text]);
+        expect(result.lines).toHaveLength(1);expect(result.lines[0].ruby).toEqual([{text:a.text,bbox:a.bbox,fontSize:20},{text:b.text,bbox:b.bbox,fontSize:20}]);
+        expect(mocks.draw).toHaveBeenCalledOnce();expect(mocks.inpaint.mock.calls[0][3][0].sourceBoxes).toEqual([right.bbox,a.bbox,left.bbox,b.bbox]);
+        expect(source).toEqual(before);expect(mocks.repair).not.toHaveBeenCalled();
+    });
+
     it('允许预算边界图像继续 OCR，natural 尺寸不可用时使用已解码尺寸', async () => {
         imageOptions.push({width: 4096, height: 4096});
         mocks.recognize.mockRejectedValueOnce(new Error('OCR reached'));
@@ -1389,6 +1405,21 @@ it.each(['forward','reverse'] as const)('一处需保留原文使相邻译文跳
     const result=await translateImageInOffscreen('chain','en','Page',undefined,'chain',true);
     expect(result.lines.map(line=>line.renderSkipped===true)).toEqual([true,true,false,false]);
     expect(mocks.repair.mock.calls[0][3].map((line:ImageTextRegion)=>line.text)).toEqual(['远']);
+});
+
+it.each([{x0:172,skipped:false},{x0:170,skipped:true}])('漫画原文保护沿用注音自己的清字余量：%j',async({x0,skipped})=>{
+    imageOptions.push({width:300,height:400});
+    const main={x0:100,y0:20,x1:140,y1:300},ruby={x0:145,y0:22,x1:165,y1:62};
+    const joined={text:'風の音を聞いて',bbox:{x0:100,y0:20,x1:165,y1:300},fontSize:40,vertical:true as const,
+        sourceBoxes:[main,ruby],ruby:[{text:'かぜ',bbox:{...ruby},fontSize:20}]};
+    const original={text:'BRAND',bbox:{x0,y0:30,x1:190,y1:50},fontSize:20};
+    mocks.mangaRecognize.mockResolvedValueOnce([joined,original]);
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['译文','BRAND']}:undefined));
+    mocks.repair.mockImplementationOnce(async pixels=>pixels);
+    const result=await translateImageInOffscreen('ruby-margin','ja','Page',undefined,'ruby-margin',true);
+    expect(result.lines[0].renderSkipped===true).toBe(skipped);
+    expect(result.lines[1]).toMatchObject({text:'BRAND',sourceText:'BRAND'});
+    expect(mocks.repair).toHaveBeenCalledTimes(skipped?0:1);
 });
 
 it('保留原文同时检查合并框和全部源框，包括源框超出合并框的防御情形',async()=>{

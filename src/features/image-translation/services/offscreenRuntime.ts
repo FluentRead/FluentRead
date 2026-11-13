@@ -5,6 +5,7 @@
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页或预排版；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
+ * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
  * 空识别：普通图片仅在 OCR 真正返回空数组时使用轻量原图保留协议，不分配译图画布；非空结果经保护或置信过滤后不可读仍报错，漫画维持既有空页协议。
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
@@ -33,7 +34,7 @@ import {groupMangaOcrLines, type MangaRegion} from './mangaRegions';
 import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
-import {mangaMaskBoxes, mangaMaskBoxIntersects, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
+import {mangaMaskBoxes, mangaMaskBoxIntersects, createMangaMaskFontResolver, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
 import {getMangaOcrEngine} from '../ocrLanguages';
 
 export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
@@ -388,7 +389,7 @@ async function prepareTranslatedImage(
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
     const skipped = new Set<number>();
     let protectionExhausted=false;
-    const candidates: Array<{index: number; original: ImageTextRegion; translated: ImageTextRegion}> = [];
+    const candidates: Array<{index: number; original: ImageTextRegion; translated: ImageTextRegion; maskFont?: ReturnType<typeof createMangaMaskFontResolver>}> = [];
     const originals: ImageTextRegion[] = [];
     lines.forEach((line,index) => {
         const changed = line.guardOnly || numericProtection(line.text) ? [] : selectChangedTranslations([line], [translations[index]]);
@@ -436,7 +437,7 @@ async function prepareTranslatedImage(
                     const source = sources ? sources[index] : box;
                     if (++work>1_000_000 || !validBox(source)) {exhausted=true;break;}
                     if ((work & 32767)===0) await checkImageCancellation(signal);
-                    hit=manga ? mangaMaskBoxIntersects(source,region.fontSize!,width,height,protectedBox)
+                    hit=manga ? mangaMaskBoxIntersects(source,(candidate.maskFont??=createMangaMaskFontResolver(region as MangaRegion))(source),width,height,protectedBox)
                         : imageMaskBoxIntersects(source,width,height,protectedBox);
                 }
                 if (hit) {skipped.add(candidate.index);await protect(candidate.original);}

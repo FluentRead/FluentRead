@@ -3,10 +3,12 @@
  * 文件职责：将普通图片的 OCR 物理行恢复成可整段翻译与回填的文本区域。
  * 主要内容：按行距、字号、对齐和遮挡关系合并连续正文，续行与扫描早停共用完整源像素间距，避免缩放还原的亚像素差异拆开相邻行；竖排以从右到左的列序复用相同的邻接与遮挡约束，保留逐列擦除框；大输入首次尝试合段时建立有界深度的遮挡索引，暂时排除当前段成员并在结束后恢复，跳过无关区域及成员子树；保留标题、列表、栏位边界、原始擦除框与字号上限，并按完整 Unicode 码点衔接两侧 CJK 续行。
  * 可选续行：只为私有同帧布局证据指定的当前真实后继延长扫描和豁免大行距，完整段成员、数字与其他物理遮挡仍须通过；缺失、失效、已使用或被过滤的目标沿用旧早停，竖排投影不继承此能力。
+ * 注音归属：明确附属的日文读音不重复进入正文，占用框参与相邻列的布局，正文与注音仍按原始物理框分别擦除并保留注音记录。
  * 模块边界：只处理原图坐标与识别文本，不运行 OCR、不调用翻译或 Canvas；漫画仍使用其气泡分组策略。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import {endsEastAsianText, startsEastAsianText} from './textBoundary';
+import {attachImageRuby} from './ruby';
 export interface ImageTextRegion extends OcrLine {
     sourceBoxes?: OcrLine['bbox'][];
     /** 不可信数值的物理保护框，不参与翻译或阅读。 */
@@ -65,8 +67,8 @@ function beyondLineGap(previousEnd: number, nextStart: number, size: number): bo
     const roundoff = 4 * Number.EPSILON * Math.max(1, Math.abs(previousEnd), Math.abs(nextStart));
     return Math.floor(nextStart - previousEnd + roundoff) > Math.floor(size * 0.65 + roundoff);
 }
-function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextRegion,permitGap?:()=>boolean): Metrics | undefined {
-    if (next.vertical || next.sourceBoxes || listStart.test(next.text))
+function continues(previous: ImageTextRegion, state: Metrics, next: ImageTextRegion,physical:Set<ImageTextRegion>,permitGap?:()=>boolean): Metrics | undefined {
+    if (next.vertical || (next.sourceBoxes&&!physical.has(next)) || listStart.test(next.text))
         return;
     const size = height(next), small = Math.min(state.minHeight, size);
     if (Math.max(state.maxHeight, size) > small * 1.3)
@@ -148,7 +150,7 @@ function createObstructionIndex(lines: ImageTextRegion[]) {
 }
 
 /** 未合并区域保持原契约；合并区域只扩大排版范围，擦除仍使用逐行源框。 */
-function groupHorizontalParagraphs(input: ImageTextRegion[],continuations?:ImageParagraphContinuations): ImageTextRegion[] {
+function groupHorizontalParagraphs(input: ImageTextRegion[],physical:Set<ImageTextRegion>,continuations?:ImageParagraphContinuations): ImageTextRegion[] {
     const lines = [...input].sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
     const lineSet=continuations?new Set(lines):undefined;
     const used = new Set<ImageTextRegion>();
@@ -162,7 +164,7 @@ function groupHorizontalParagraphs(input: ImageTextRegion[],continuations?:Image
         const members = [first];
         const memberSet = lines.length < 64 ? new Set(members) : undefined;
         let state = metrics(first), bbox = first.bbox;
-        if (!first.vertical && !first.sourceBoxes) {
+        if (!first.vertical && (!first.sourceBoxes||physical.has(first))) {
             obstructionIndex?.setIncluded(first, false);
             for (let cursor = index + 1; cursor < lines.length; cursor++) {
                 const next = lines[cursor], previous = members[members.length - 1];
@@ -170,12 +172,12 @@ function groupHorizontalParagraphs(input: ImageTextRegion[],continuations?:Image
                 if (beyondLineGap(previous.bbox.y1, next.bbox.y0, state.minHeight)){
                     const successor=continuations?.successor(previous);
                     if(!successor||!lineSet!.has(successor)||used.has(successor)||next.bbox.y0>successor.bbox.y0
-                        ||!continues(previous,state,successor,()=>true))break;
+                        ||!continues(previous,state,successor,physical,()=>true))break;
                 }
                 if (used.has(next))
                     continue;
                 let candidateBox:OcrLine['bbox']|undefined;
-                const proposed = continues(previous,state,next,continuations?()=>{
+                const proposed = continues(previous,state,next,physical,continuations?()=>{
                     if(continuations.successor(previous)!==next)return false;
                     candidateBox=union(bbox,next.bbox);
                     return continuations.permits(previous,next,members,candidateBox);
@@ -214,7 +216,8 @@ function groupHorizontalParagraphs(input: ImageTextRegion[],continuations?:Image
         }
         const sizes = members.map(height).sort((a, b) => a - b);
         result.push({ text: members.map(line => line.text).reduce(joinLines, ''),
-            bbox, sourceBoxes: members.map(line => ({ ...line.bbox })),
+            bbox, sourceBoxes: members.flatMap(line => (line.sourceBoxes??[line.bbox]).map(box=>({...box}))),
+            ...(members.some(line=>line.ruby)?{ruby:members.flatMap(line=>line.ruby??[])}:{}),
             fontSize: sizes[Math.floor(sizes.length / 2)], textAlign: alignment(state) });
     }
     return result;
@@ -231,18 +234,22 @@ function restoreVerticalBox(box: OcrLine['bbox']): OcrLine['bbox'] {
 
 /** 横排按行、东亚竖排按右到左的列整段翻译；不把另一方向或已合并区域当成续行。 */
 export function groupImageParagraphs(input: ImageTextRegion[],continuations?:ImageParagraphContinuations): ImageTextRegion[] {
-    const horizontal = groupHorizontalParagraphs(input,continuations);
-    if (horizontal.filter(line => line.vertical && !line.sourceBoxes).length < 2) return horizontal;
+    const ruby=attachImageRuby(input);
+    const horizontal = groupHorizontalParagraphs(ruby.lines,ruby.physical,continuations);
+    if (horizontal.filter(line => line.vertical && (!line.sourceBoxes||ruby.physical.has(line))).length < 2) return horizontal;
     const originals = new Map<ImageTextRegion, ImageTextRegion>();
+    const projectedPhysical=new Set<ImageTextRegion>();
     const projected = horizontal.map(line => {
         const candidate: ImageTextRegion = {...line, bbox: projectVerticalBox(line.bbox),
+            ...(line.sourceBoxes?{sourceBoxes:line.sourceBoxes.map(projectVerticalBox)}:{}),
             fontSize: line.vertical ? line.fontSize ?? line.bbox.x1 - line.bbox.x0 : line.fontSize,
             // 横排和已合并区域仍是遮挡，不能跨过它们连接竖列。
             vertical: line.vertical ? undefined : true};
         originals.set(candidate, line);
+        if(ruby.physical.has(line))projectedPhysical.add(candidate);
         return candidate;
     });
-    return groupHorizontalParagraphs(projected).map(line => originals.get(line) ?? {
+    return groupHorizontalParagraphs(projected,projectedPhysical).map(line => originals.get(line) ?? {
         ...line, bbox: restoreVerticalBox(line.bbox),
         sourceBoxes: line.sourceBoxes!.map(restoreVerticalBox), vertical: true as const, textAlign: 'center' as const,
     }).sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);

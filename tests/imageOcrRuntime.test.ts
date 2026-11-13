@@ -2,6 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest
 import {createSharedOcrTasks} from '@/src/features/image-translation/services/sharedOcrTasks';
 import scannedPaper from './fixtures/pdf-scanned-paper-ocr.json';
 import lowScoreNumber from './fixtures/pdf-scanned-low-score-number.json';
+import bulletPixels from './fixtures/pdf-scanned-bullet-pixels.json';
 import {recognizePdfDocument} from '@/src/features/document-translation/services/pdfOcr';
 
 const {recognize, ensureLanguages, clearModels, disposeWorker, removeFiles, createRuntime, tesseractCreateWorker, prefetchModels} = vi.hoisted(() => ({
@@ -45,6 +46,70 @@ describe('图片 OCR 处理与结果缓存', () => {
         return {data: {blocks: [{paragraphs: [{lines: [{...word, words: [word], baseline: {x0: 10, y0: 40, x1: 51, y1: 40}, rowAttributes: {rowHeight: 30}}]}]}]}};
     };
 
+    const bulletResult = () => ({data: {blocks: [{paragraphs: [{lines: [16, 86].map(y => ({text: 'e We test.', bbox: {x0: 5, y0: y - 11, x1: 160, y1: y + 28},
+        words: [{text: 'e', confidence: 43, bbox: {x0: 5, y0: y, x1: 20, y1: y + 15}}, {text: 'We', confidence: 99, bbox: {x0: 36, y0: y - 9, x1: 90, y1: y + 18}},
+            {text: 'test.', confidence: 99, bbox: {x0: 100, y0: y - 11, x1: 160, y1: y + 28}}],
+        baseline: {x0: 5, y0: y + 18, x1: 160, y1: y + 18}, rowAttributes: {rowHeight: 39}}))}]}]}});
+    const filledBullet = () => ({width: 15, height: 15, data: Uint8ClampedArray.from(bulletPixels.rows.flatMap(row => Array.from(row).flatMap(value => value === '#' ? [0, 0, 0, 255] : [255, 255, 255, 255])))});
+
+    it.each(['e', '0'])('verifies a list marker read as %s from shared pixels without extra worker requests and caches immutable results', async label => {
+        dimensions = {width: 200, height: 200}; const raw = bulletResult();
+        for (const row of raw.data.blocks[0].paragraphs[0].lines) {row.words[0].text = label; row.words[0].confidence = 10; row.text = `${label} We test.`;}
+        recognize.mockResolvedValue(raw);
+        const read = context.getImageData.getMockImplementation()!;
+        context.getImageData.mockImplementation((...args: number[]) => args[2] === 15 ? filledBullet() : read(...args));
+        const first = await recognizeImage('paper-list', 'en', undefined, {profile: 'document'});
+        expect(first.map(line => line.text)).toEqual(['•', 'We test.', '•', 'We test.']);
+        expect(first.some(line => line.documentReview)).toBe(false);
+        expect(recognize).toHaveBeenCalledOnce(); expect(sources).toHaveLength(2);
+        expect(context.drawImage).toHaveBeenCalledWith(sources[1], 5, 16, 15, 15, 0, 0, 15, 15);
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.width).toBe(0);
+        first[0].bbox.x0 = 999;
+        const cached = await recognizeImage('paper-list', 'en', undefined, {profile: 'document'});
+        expect(cached[0].bbox.x0).toBe(5); expect(recognize).toHaveBeenCalledOnce();
+    });
+
+    it.each(['image', 'area'] as const)('does not apply list interpretation to the %s profile', async profile => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult());
+        const lines = await recognizeImage('ordinary-list', 'en', undefined, {profile});
+        expect(lines.some(line => line.text === '•')).toBe(false); expect(sources).toHaveLength(1);
+    });
+
+    it('retains ambiguous list markers as review evidence and allows retry', async () => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult());
+        const lines = await recognizeImage('ambiguous-list', 'en', undefined, {profile: 'document'});
+        expect(lines.filter(line => line.documentReview)).toHaveLength(2);
+        await recognizeImage('ambiguous-list', 'en', undefined, {profile: 'document'}); expect(recognize).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['canvas', 'pixels', 'abort'] as const)('releases list crop resources on %s failure', async failure => {
+        dimensions = {width: 200, height: 200}; recognize.mockResolvedValue(bulletResult()); const controller = new AbortController();
+        if (failure === 'canvas') canvas.getContext.mockReturnValueOnce(context).mockReturnValue(null);
+        else context.getImageData.mockImplementationOnce(() => ({data: sourcePixels, width: 200, height: 200})).mockImplementation(() => {
+            if (failure === 'pixels') throw new Error('list pixels failed');
+            controller.abort(); return filledBullet();
+        });
+        await expect(recognizeImage(`list-${failure}`, 'en', controller.signal, {profile: 'document'})).rejects.toThrow();
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.width).toBe(0);
+    });
+
+    it.each(['left', 'top', 'right', 'bottom', 'wide', 'tall', 'fallback-size'] as const)('bounds marker crops using the decoded source (%s)', async kind => {
+        dimensions = {width: 1000, height: 1000}; const raw = bulletResult();
+        for (const row of raw.data.blocks[0].paragraphs[0].lines) {
+            const sx = kind === 'wide' ? 5 : kind === 'tall' ? 4 : 1, sy = ['wide', 'tall'].includes(kind) ? 5 : 1;
+            const dx = kind === 'left' ? -10 : kind === 'right' ? 995 : 0, dy = kind === 'top' ? -150 : kind === 'bottom' ? 995 : 0;
+            for (const box of [row.bbox, row.baseline, ...row.words.map(word => word.bbox)]) {
+                box.x0 = box.x0 * sx + dx; box.x1 = box.x1 * sx + dx; box.y0 = box.y0 * sy + dy; box.y1 = box.y1 * sy + dy;
+            }
+            row.rowAttributes.rowHeight *= sy;
+        }
+        if (kind === 'fallback-size') onImageCreated = () => {if (sources.length === 2) Object.assign(sources[1], {naturalWidth: 0, naturalHeight: 0});};
+        recognize.mockResolvedValue(raw);
+        await recognizeImage(`list-crop-${kind}`, 'en', undefined, {profile: 'document'});
+        expect(recognize.mock.calls.map(call => call[3])).toEqual(['top', 'right', 'bottom'].includes(kind) ? [3, 11] : [3]);
+        expect(sources.every(source => !source.src)).toBe(true); expect(canvas.height).toBe(0);
+    });
+
     it('keeps a low-score paper number with exact glyph evidence and a review location, without caching it as confirmed', async () => {
         dimensions = {width: lowScoreNumber.width, height: lowScoreNumber.height};
         const word = structuredClone(lowScoreNumber.word);
@@ -71,6 +136,7 @@ describe('图片 OCR 处理与结果缓存', () => {
         expect(lines.map(line => line.text)).toEqual(['10⁴']);
         expect(recognize.mock.calls.map(call => call[3])).toEqual([3, 8, 8]);
         expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 34, 46);
+        expect(canvas.getContext).toHaveBeenCalledWith('2d', {alpha: false, willReadFrequently: true});
         expect(context.drawImage).toHaveBeenCalledWith(sources[1], 36, 4, 17, 23, 16, 16, 68, 92);
         expect(encodedSizes).toEqual([{width: 66, height: 78}, {width: 100, height: 124}]);
         expect(sources.every(source => source.src === '')).toBe(true); expect(canvas.width).toBe(0);

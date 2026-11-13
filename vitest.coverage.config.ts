@@ -677,6 +677,7 @@ export default defineConfig({
                 'src/features/image-translation/services/ocrRuntime.ts',
                 'src/features/image-translation/services/documentOcrScripts.ts',
                 'src/features/image-translation/services/documentOcrNumbers.ts',
+                'src/features/image-translation/services/documentOcrBullets.ts',
                 'src/features/image-translation/services/offscreenRuntime.ts',
                 'src/features/image-translation/services/rendering.ts',
                 'src/features/image-translation/services/remoteImage.ts',

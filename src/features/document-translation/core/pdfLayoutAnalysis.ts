@@ -8,6 +8,7 @@
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
  * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 整页矢量容器：跳过覆盖页高的 Form 外框及其同边界底色，图中文字需要独立图形支持；同一装饰底框内连续对齐的正文先独立归行，避免与邻框文字串接。
+ * 列表前缀：识别后的前缀同时保留原始字形位置，正文分段不吞掉圆点，扫描页选择层可按原图位置复制完整条目。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
  */
 import type {PdfDocumentBlock, PdfDocumentLine, PdfDocumentRun, PdfPreservedRegion} from './document';
@@ -802,7 +803,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     const letterBullets = new Map<string, number>();
     for (const line of rawLines) {const glyph = bulletGlyph(line); if (letterBullet(line)) letterBullets.set(glyph, (letterBullets.get(glyph) ?? 0) + 1);}
     const bulleted = new Set<LayoutLine>();
-    const listMarkers = new Map<LayoutLine, string>();
+    const listMarkers = new Map<LayoutLine, {text: string; run: PdfLayoutAtom}>();
     // 目录行“标题……页码”里的引导点和页码留在原页上：这一行只算到标题文字为止，译文不会带着一串点，页码也不会被盖掉。
     const glyphWeight = (text: string) => Array.from(text).reduce((sum, character) => sum + (/[.．·…‥\s]/u.test(character) ? 0.55 : cjkGlyph.test(character) || /[\uFF00-\uFFEF《》（）]/u.test(character) ? 2 : 1), 0);
     // 每个目录条目自成一段，不与上下条目合并。
@@ -833,7 +834,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const runs = line.runs.slice(1), x = runs[0].x;
         const stripped = {...line, x, width: right(line) - x, runs, text: joinRuns(runs as PdfLayoutAtom[])};
         bulleted.add(stripped);
-        listMarkers.set(stripped, /^[•◦▪■□◆◇●○▶►➢➤❖·]$/u.test(glyph) ? glyph : '•');
+        listMarkers.set(stripped, {text: /^[•◦▪■□◆◇●○▶►➢➤❖·]$/u.test(glyph) ? glyph : '•', run: line.runs[0]});
         return stripped;
     }).map((line, index) => {
         const normalized = withoutLeader(line);
@@ -1230,7 +1231,8 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const centered = draft.panel?.centered || (draft.kind === 'heading' || draft.kind === 'metadata' || draft.kind === 'footer') && Math.abs(center - input.width / 2) <= input.width * 0.045;
         const cell = cellBounds(draft);
         const panel = draft.panel?.box;
-        const block: PdfLayoutBlock = {...draft.bounds, source, ...(listMarkers.has(first) ? {listMarker: listMarkers.get(first)} : {}), ...(cell ? {cellBounds: cell} : {}), fontSize: median(draft.lines.map(line => line.fontSize)), lineHeight: leading.length ? median(leading) : first.fontSize, lineCount: draft.lines.length, fontFamily: first.fontFamily, fontWeight: draft.kind === 'heading' ? 700 : 400, textAlign: centered ? 'center' : 'left', kind: draft.kind, preserveSource: (draft.region ? draft.region.kind !== 'table' || !readable(source) : false) || draft.kind === 'metadata' || draft.kind === 'footer' || draft.kind === 'formula', lines: draft.lines};
+        const marker = listMarkers.get(first);
+        const block: PdfLayoutBlock = {...draft.bounds, source, ...(marker ? {listMarker: marker.text, listMarkerRun: {...marker.run, text: marker.text}} : {}), ...(cell ? {cellBounds: cell} : {}), fontSize: median(draft.lines.map(line => line.fontSize)), lineHeight: leading.length ? median(leading) : first.fontSize, lineCount: draft.lines.length, fontFamily: first.fontFamily, fontWeight: draft.kind === 'heading' ? 700 : 400, textAlign: centered ? 'center' : 'left', kind: draft.kind, preserveSource: (draft.region ? draft.region.kind !== 'table' || !readable(source) : false) || draft.kind === 'metadata' || draft.kind === 'footer' || draft.kind === 'formula', lines: draft.lines};
         // 底框是不规则矢量形状的外接矩形；少量贴边字形需要保留现有擦除留边。
         if (panel) block.panelBounds = union(panel, {x: block.x - 1.5, y: block.y - 1.5, width: block.width + 3, height: block.height + 4});
         if (draft.region?.kind === 'table') blockTables.set(block, draft.region);

@@ -356,6 +356,10 @@ async function main() {
         ctx.fillStyle='#111';const table=[['Group','Samples','Accuracy'],['Alpha','128','94.2%'],['Beta','256','95.1%'],['Gamma','512','96.4%']];
         table.forEach((row,r)=>row.forEach((text,c)=>ctx.fillText(text,318+c*77,465+r*22)));
         ctx.fillText('Table 1. Measured results.',312,558);
+        ctx.font = '10px Times New Roman';
+        for (const [index, text] of ['Each observation is checked against its source.', 'Each correction remains attached to its paragraph.'].entries()) {
+          const y = 620 + index * 40; ctx.beginPath(); ctx.arc(49.8, y - 2.8, 1.8, 0, Math.PI * 2); ctx.fill(); ctx.fillText(text, 56, y);
+        }
         ctx.font = '8px Times New Roman'; ctx.fillText('Small footnote: measurements were collected at room temperature.', 48, 760);
         ctx.fillText('7', 290, 812);
         return canvas.toDataURL('image/png').split(',')[1];
@@ -404,6 +408,10 @@ async function main() {
         assert(!recognized.includes(label), `不能把图内短标签误当正文送翻：${label}`);
       }
       assert(recognized.some(source=>source.startsWith('Figure 1.')), '插图题注仍须参与翻译');
+      for (const text of ['Each observation is checked against its source.', 'Each correction remains attached to its paragraph.']) {
+        assert(paperPage.blocks.some(block => block.listMarker === '•' && block.listMarkerRun && recognizedModel.segments[block.segmentIndex]?.source === text), '扫描列表必须独立成段并保留符号坐标：' + text);
+      }
+
       const tableBlocks = paperPage.blocks.filter(block=>block.cellBounds&&block.y>440&&block.y<545);
       for(const label of ['Group','Samples','Accuracy','Alpha','Beta','Gamma']) assert(tableBlocks.some(block=>block.source===label&&block.segmentIndex>=0), `表格文字仍须参与翻译：${label}`);
       assert(tableBlocks.some(block=>block.source==='128'&&block.preserveSource), '纯数字单元格保留原图');
@@ -433,6 +441,19 @@ async function main() {
           await page.keyboard.down('Control'); await page.mouse.wheel(0, 100); await page.keyboard.up('Control');
         }
         await page.evaluate(() => getSelection()?.removeAllRanges()); await handle.dispose();
+      };
+      const verifyListSourceSelection = async (number, prefix) => {
+        const entries = page.locator(`.pdf-page-row[data-page-number="${number}"] [data-pdf-ocr-line]`);
+        await entries.filter({hasText: prefix}).first().scrollIntoViewIfNeeded();
+        const pair = await entries.evaluateAll((elements, prefix) => {
+          const index = elements.findIndex(element => element.textContent.startsWith(prefix));
+          return elements.slice(index - 1, index + 1).map(element => {const box = element.getBoundingClientRect(); return {text: element.textContent, x: box.x, y: box.y, width: box.width, height: box.height};});
+        }, prefix);
+        assert.equal(pair[0].text.trim(), '•', '选择层中的列表前缀不能遗漏');
+        await page.mouse.move(pair[0].x + .1, pair[0].y + pair[0].height / 2); await page.mouse.down();
+        await page.mouse.move(pair[1].x + pair[1].width - .2, pair[1].y + pair[1].height / 2, {steps: 15}); await page.mouse.up();
+        assert.equal(await page.evaluate(() => getSelection().toString().replace(/\s+/gu, ' ').trim()), pair.map(entry => entry.text.trim()).join(' '), '复制列表首行应保留原符号、空格和正文');
+        await shot(`scanned-list-source-${number}`); await page.evaluate(() => getSelection().removeAllRanges());
       };
       await pageInput.fill('2'); await pageInput.press('Enter');
       await page.locator('.pdf-page-row[data-page-number="2"] .pdf-translation-block').first().waitFor();
@@ -495,6 +516,8 @@ async function main() {
       assert.equal(await page.evaluate(() => getSelection().toString().replace(/\s+/gu, ' ').trim()), rows.map(row => row.text).join(' ').replace(/\s+/gu, ' ').trim(), '小字双栏的跨行选择应只包含当前栏的实际行');
       await shot('scanned-paper-multiline-source'); await page.evaluate(() => getSelection().removeAllRanges());
       await verifyScannedSourceSelection(7, false, 'Small footnote:');
+      await verifyListSourceSelection(7, 'Each observation');
+      await verifyListSourceSelection(7, 'Each correction');
 
       const cellPlacement = await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').evaluateAll((elements, cells) => elements.flatMap(element => {
         const cell=cells.find(cell=>cell.segmentIndex===Number(element.getAttribute('data-pdf-segment-index'))); if(!cell)return [];

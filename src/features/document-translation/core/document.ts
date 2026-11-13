@@ -91,6 +91,8 @@ export interface PdfDocumentBlock {
     source?: string;
     /** 从原文字形单独识别的列表前缀；不送去翻译，重排文字保留其列表语义。 */
     listMarker?: string;
+    /** 列表前缀的原始位置，供扫描页的透明选择层保留圆点及其与正文的顺序。 */
+    listMarkerRun?: PdfDocumentRun;
     /** PDF 在缩放比例 1、页面旋转 0 下的左上角内容坐标；页面展示旋转由 PdfDocumentPage.rotation 决定。 */
     x: number;
     y: number;

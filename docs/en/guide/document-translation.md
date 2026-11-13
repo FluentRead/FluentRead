@@ -57,6 +57,8 @@ Numeric superscripts and subscripts are checked using enlarged crops and their p
 
 Numbers with low word confidence but complete matching glyph evidence retain their original reading with a review marker, instead of being silently dropped. These candidates can still contain misread or missing symbols; compare important values with the source image.
 
+Scanned list bullets are checked against their original shape and repeated indentation. Confirmed items are translated separately, and selecting the source keeps the bullets. Uncertain markers remain flagged for review; ordinary letters are not automatically treated as list symbols.
+
 Scanned diagrams stay as original images when their boundaries can be identified; captions remain translatable. Tables with clear rules and text cells receive a separate recognition pass to fill omissions. Text is translated within each cell, while numeric cells stay unchanged. Conflicting readings keep the first result and show a review marker. Full-passage controls and continuation pages keep long translations available.
 
 If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.

@@ -47,6 +47,19 @@ describe('selectable scanned PDF source', () => {
         expect(canvases).toHaveLength(2);
     });
 
+    it('keeps an identified list marker at its original position and separates it from body text with a space', () => {
+        const {element} = setup(), model = page();
+        model.blocks[0].listMarker = '•';
+        updatePdfOcrTextLayer(element, model); expect(element.querySelectorAll('span')).toHaveLength(2);
+        model.blocks[0].listMarkerRun = {text: 'e', x: 30, y: 62, width: 4, height: 4};
+        updatePdfOcrTextLayer(element, model);
+        const spans = [...element.querySelectorAll('span')];
+        expect(spans.map(span => span.textContent)).toEqual(['• ', 'First line <safe>', '第二行 3,700']);
+        expect(spans[0].style.left).toBe('30px'); expect(spans[0].nextSibling).toBe(spans[1]);
+        expect(element.querySelectorAll('br')).toHaveLength(2);
+        expect(element.getAttribute('data-fluentread-pdf-page-text')).toBe('• First line <safe> 第二行 3,700');
+    });
+
     it('supports earlier OCR snapshots but leaves native or still-pending pages untouched', () => {
         const {element, canvases} = setup(), model = page(), previous = element.firstChild;
         delete model.ocrRecognized; updatePdfOcrTextLayer(element, model); expect(element.firstChild).toBe(previous);

@@ -1,6 +1,6 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
-import {imageMaskBoxes,inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
+import {imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 
 function solidPixels(width: number, height: number, color = [180, 200, 220, 255]): Uint8ClampedArray {
@@ -69,6 +69,32 @@ function knownHoleFixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it.each([
+        [0,1,1,4,4],[12,-1,1,4,4],[12,1,-1,4,4],[12,1,1,2,4],[12,1,1,4,2],
+        [12,10,1,4,4],[12,1,10,4,4],[12,1.5,1,4,4],[NaN,1,1,4,4],
+    ])('无效渐变范围不建立写入计划：%j',(...args:number[])=>{
+        expect(planImageGradientRepair(solidPixels(12,12),...args as [number,number,number,number,number])).toBeUndefined();
+    });
+    it('渐变计划不写原图，冻结四角颜色并限制目标尺寸和写入边界',()=>{
+        const width=16,height=16,source=solidPixels(width,height);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)source.set([30+x*4,40+y*3,90+x+y,255],(y*width+x)*4);
+        const clean=source.slice();source.set([0,0,0,255],(7*width+7)*4);
+        const original=source.slice(),repair=planImageGradientRepair(source,width,3,3,10,10,true)!;
+        expect(repair).toBeTypeOf('function');expect(source).toEqual(original);
+        const wrong=new Uint8ClampedArray(12).fill(37);expect(()=>repair(wrong)).toThrow('尺寸不一致');expect(wrong.every(value=>value===37)).toBe(true);
+        source.fill(0);const result=original.slice();repair(result);expect(result).toEqual(clean);
+    });
+    it.each([0,127,254])('内部 alpha=%s 时不能仅凭不透明渐变外周铺平透明图案',alpha=>{
+        const pixels=solidPixels(12,12);
+        for(let y=0;y<12;y++)for(let x=0;x<12;x++)pixels.set([50+x,70+y,90,255],(y*12+x)*4);
+        pixels[(6*12+6)*4+3]=alpha;const original=pixels.slice();
+        expect(planImageGradientRepair(pixels,12,2,2,8,8,true)).toBeUndefined();expect(pixels).toEqual(original);
+    });
+    it('已判为复杂的同色边界不被渐变专用准入降为纯色；普通修补仍可使用它',()=>{
+        const pixels=solidPixels(12,12);
+        expect(planImageGradientRepair(pixels,12,2,2,8,8,true)).toBeUndefined();
+        expect(planImageGradientRepair(pixels,12,2,2,8,8)).toBeTypeOf('function');
+    });
     it('渐变边界中存在透明变化时保持原有alpha扩散，不按不透明底色铺平',()=>{
         const width=64,height=48,pixels=solidPixels(width,height),region=line(16,16,48,32);
         for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([100+x,120+y,180,255],(y*width+x)*4);

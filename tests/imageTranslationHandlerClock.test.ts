@@ -120,7 +120,7 @@ function createFixture() {
 function assertControls(current: ReturnType<typeof fixture>, requestId: string, aborted = false) {
     const controls = current.calls.map(({request}) => {
         expect((request as ProviderRequest & TranslationRemainingBudgetContext)[TRANSLATION_REMAINING_BUDGET]).toBe(true);
-        expect(request).toMatchObject({context: 'Clock fixture', pageContext: '', useCache: true, serviceOverride: 'google'});
+        expect(request).toMatchObject({context: expect.stringContaining('Clock fixture'), pageContext: '', useCache: true, serviceOverride: 'google'});
         const control = getTranslationRequestControl(request);
         expect(control?.ownershipKey).toBe(`image:${requestId}`);
         expect(control?.signal.aborted).toBe(aborted);

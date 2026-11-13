@@ -36,10 +36,16 @@ FLUENTREAD_PDF_CORPUS=/path/to/papers pnpm exec vitest run tests/pdfPaperLayouts
 `tests/pdfOcr.test.ts` 覆盖“识别结果 → 版面段落 → 片段编号”，`tests/documentPageRecognizer.test.ts` 覆盖页面识别器的坐标换算。真实浏览器里的整条流程是文档翻译脚本的一个单独套件，它会现场生成一份“一页文字 + 两页扫描 + 三页旋转扫描（90、180、270 度）图像”的 PDF，核对打开时不发请求、开始翻译后先识别扫描页再翻译、文字页照常翻译、三句印刷文字都被认出、译文块落在扫描页内：
 
 ```bash
-node scripts/run-document-translation-test.cjs --suite scanned --playwright-root <playwright>/node_modules --artifacts-dir <目录>
+node scripts/run-document-translation-test.cjs --suite scanned --playwright-root <playwright>/node_modules --runtime-diagnostics-helper <浏览器测试技能>/scripts/runtime-diagnostics.cjs --artifacts-dir <目录>
 ```
 
 这个套件需要联网下载一次英文识别语言包，所以不包含在默认的 `full` 套件里。
+
+扫描专项还包含一页自拟的 10 pt 双栏论文正文、8 pt 脚注与数字：真实 OCR 后核对完整段落、先左栏后右栏、脚注后置及逐页检查点不改变当前阅读页；随后导出双语 PDF，核对所有源页与译文文字层，并刷新页面验证历史恢复不重复翻译。`recognized-layout.json` 保存识别版面，扩展页与后台的完整诊断另存。翻译使用本机确定性中文响应，不能据此推断在线供应商翻译质量。`tests/fixtures/pdf-scanned-paper-ocr.json` 是同一自拟页面的锁定 Tesseract 原始记录，用于重放“跨栏引擎行被分栏后仍需保留行基线/字号”的回归。
+
+`pdfOcr`、`documentWorkflows`、`documentAppLifecycle` 与 `documentHistory` 定向测试覆盖逐页检查点、暂停/失败后续识别、空页重试、历史空结果恢复和已有校订的身份迁移。`pdfReaderLifecycle` 验证同源识别更新保留画布与阅读位置；这些测试不代表模糊扫描、手写或所有论文版式的识别准确率。
+
+中文扫描专项使用 `--suite scanned-cjk`（其余参数同上）。现场生成 300 dpi、JPEG 压缩 150 dpi、低对比度 100 dpi 和倾斜 0.7° 的自拟论文页，以真实 OCR 核对标题、双栏段落、表格数字、低分文字核对位置及修正后汉字的实际鼠标选择。保存原图、ground truth、原始引擎结果、识别版面与运行时诊断；该专项只识别，不发送翻译请求。100 dpi 不要求正文逐字正确；无边框表格阅读顺序另行验收，不能用数值保留断言代替布局验证。
 
 ## PDF 在线与本地划词
 

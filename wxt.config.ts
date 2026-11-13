@@ -352,9 +352,11 @@ export default defineConfig({
             const browser = wxt.config.browser;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
-            // 课程字幕复用现有播放器菜单与样式，edX 子 frame 也使用同一份品牌控件；Chrome 实测约 66.28 MB。
-            // 共享菜单在独立内容脚本中的文本代码计入 66.29 MB 预算，模型、词典和其他二进制资源保持原有门禁。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_290_000 : 66_000_000;
+            // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
+            // GitHub 名称保护和 Mac 基准页面适配已在主线；扫描论文及原文校订单独实测比 dc7bff026 基线增加 66,822 bytes。
+            // 图片 OCR 与汉字复核主线为 66,190,277 bytes；课程时间轴、共用菜单和 edX 子 frame 整合后为 66,361,190 bytes。
+            // 课程文本代码增加 170,913 bytes，预算保留约 2.8 kB 余量；模型、词典和其他二进制资源保持原有门禁。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_364_000 : 66_000_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

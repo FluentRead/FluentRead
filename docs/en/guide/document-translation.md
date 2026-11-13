@@ -49,7 +49,23 @@ PDFs default to **Original layout**. Bilingual pages appear side by side, transl
 
 Proofreading, full-passage comparisons, outline titles, and search terms each follow their own text direction, while the source and translation columns keep their order.
 
-Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. Scanned text cannot be selected directly. Recognition, formulas, and technical terms can still be wrong; review important passages.
+Scanned PDFs and scanned pages within text PDFs are supported. Starting translation first recognizes text from the current page, then translates it. Missing recognition packs download automatically, so check the source language first. After recognition, you can select and copy text over the source image. Text positions are estimated from recognition; use the image when checking accuracy. Recognition, formulas, and technical terms can still be wrong; review important passages.
+
+For scanned papers, recognition uses higher-resolution page images and automatic column detection. Completed pages are saved as recognition proceeds. After pausing or a failure, continuation recognizes only the remaining scanned pages and keeps existing translations and edits. Pages with no recognized text remain available for retry and do not count as fully translated.
+
+Numeric superscripts and subscripts are checked using enlarged crops and their positions on the original page. Confirmed scientific notation and numeric subscripts are kept unchanged during translation. If a candidate cannot be confirmed, **Check original** opens the source page with dashed markers. This check does not guarantee that every formula or symbol is correct.
+
+After recognition, choose **Correct recognized text** in document settings to compare each line with the scan. You can also open the matching passage from the translation editor. Saving clears only the translations whose source text changed; previous translations remain available in saved revisions. **Restore recognition** undoes the source correction and keeps the manual source text in saved revisions.
+
+Choose **Recognize this page again** to reread only the current page without starting translation. Matching manual corrections are kept; edits that cannot be matched remain in saved revisions. The original PDF file stays unchanged.
+
+Numbers with low word confidence but complete matching glyph evidence retain their original reading with a review marker, instead of being silently dropped. These candidates can still contain misread or missing symbols; compare important values with the source image.
+
+Low-confidence Chinese characters receive two context reads at smaller scales. Automatic correction requires matching high-confidence results and changes confined to the original low-confidence Chinese character positions. Numbers, punctuation, and other text are kept. Unconfirmed readings remain marked for review; low-quality scans can still need manual correction.
+
+Scanned list bullets are checked against their original shape and repeated indentation. Confirmed items are translated separately, and selecting the source keeps the bullets. Uncertain markers remain flagged for review; ordinary letters are not automatically treated as list symbols.
+
+Scanned diagrams stay as original images when their boundaries can be identified; captions remain translatable. Tables with clear rules and text cells receive a separate recognition pass to fill omissions. Text is translated within each cell, while numeric cells stay unchanged. Conflicting readings keep the first result and show a review marker. Full-passage controls and continuation pages keep long translations available.
 
 If extracted PDF text contains anomalous characters, a notice asks you to check it against the original. The notice does not repair characters or change the source or translation.
 

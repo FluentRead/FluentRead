@@ -23,6 +23,53 @@ function canvasContext() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
 describe('图片译文排版与绘制', () => {
+    it.each([['(2.0) مرحبا بالعالم!','rtl'],['123 שלום עולם','rtl'],['English العربية','ltr'],['中文 123','ltr']])
+    ('混合数字与标点的 %s 使用首个强文字方向 %s', (text,direction)=>{
+        const context=canvasContext();
+        drawTranslatedImageText(context as unknown as CanvasRenderingContext2D,text,0,0,1000,80,'rgb(255,255,255)',20);
+        expect((context as unknown as CanvasRenderingContext2D).direction).toBe(direction);
+        expect(context.fillText.mock.calls.map(call=>call[0]).join('')).toBe(text);
+    });
+    it('真实字形布局保留空段且长文本度量缓存有界，不丢失尾部文字',()=>{
+        const context=canvasContext();
+        const original=context.measureText.getMockImplementation()!;
+        context.measureText.mockImplementation(text=>({...original(text),actualBoundingBoxLeft:0,
+            actualBoundingBoxRight:original(text).width,actualBoundingBoxAscent:8,actualBoundingBoxDescent:2}));
+        const text=Array.from({length:600},(_,i)=>`word${i}`).join(' ');
+        drawTranslatedImageText(context as unknown as CanvasRenderingContext2D,text+'\n\nEND',0,0,100_000,100,'rgb(255,255,255)',12);
+        expect(context.fillText.mock.calls.map(call=>call[0])).toEqual([text,'','END']);
+        expect(context.measureText.mock.calls.length).toBeLessThan(650);
+    });
+    it('实际字体上下界和描边决定基线，多行高组合符号不会相互覆盖', () => {
+        const layout=layoutImageTranslationText('ONE TWO THREE',45,80,(text,size)=>text.length*size*.5,20,
+            (_text,size)=>({ascent:size*1.1,descent:size*.4}));
+        expect(layout.lines.join(' ')).toBe('ONE TWO THREE');
+        expect(layout.ink).toBeDefined();
+        expect(layout.ink!.height).toBeLessThanOrEqual(80);
+        expect(layout.lineHeight).toBeGreaterThanOrEqual(layout.fontSize*1.5);
+        for(let i=0;i<layout.lines.length;i++){
+            expect(layout.ink!.baselines[i]-layout.fontSize*1.1).toBeGreaterThanOrEqual(-1e-10);
+            expect(layout.ink!.baselines[i]+layout.fontSize*.4).toBeLessThanOrEqual(80+1e-10);
+        }
+    });
+
+    it.each(['left','center','right'] as const)('真实墨迹 %s 对齐包含左右外伸与高变音符号',align=>{
+        const context=canvasContext();
+        context.measureText.mockImplementation((text:string)=>{
+            const size=Number(context.font.match(/([\d.]+)px/)![1]);
+            const width=text.length*size*.5;
+            return {width,actualBoundingBoxLeft:2,actualBoundingBoxRight:width+1,actualBoundingBoxAscent:size*1.1,actualBoundingBoxDescent:size*.4};
+        });
+        drawTranslatedImageText(context as unknown as CanvasRenderingContext2D,'test',10,20,100,30,'rgb(255,255,255)',30,align);
+        const size=Number(context.font.match(/([\d.]+)px/)![1]);
+        const [text,x,y]=context.fillText.mock.calls[0];
+        const bleed=Math.max(.35,size*.06)/2;
+        expect(text).toBe('test');
+        expect(x-2-bleed).toBeGreaterThanOrEqual(10);
+        expect(x+4*size*.5+1+bleed).toBeLessThanOrEqual(110);
+        expect(y-size*1.1-bleed).toBeGreaterThanOrEqual(20-1e-8);
+        expect(y+size*.4+bleed).toBeLessThanOrEqual(50+1e-8);
+    });
 
     it('Unicode17 空格阻断表逐标量对照独立官方属性 fixture，覆盖所有脚本', () => {
         const fixture = readFileSync(new URL('./fixtures/unicode-17.0.0/GraphemeBreakProperty.txt', import.meta.url), 'utf8');

@@ -1,7 +1,9 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
+ 扫描核对：原页按 OCR 返回的有效页面坐标显示待核对内容的虚线框；识别行叠加透明原文选择层，沿用划词、复制和页内定位，缩放或其他页更新时保留节点；原图与画布不因补入文字层而重建。
  文件职责：以左右对照的连续页面显示可划词的 PDF 原页和保持原版排版的译文页，每个新译文段落用一次有界局部像素读回匹配版面配色，并保留“重排阅读”作为可选的显示方式。
  主要内容：智能高亮按所选模型重新评分，模型切换传递固定请求身份；页面占满阅读区且不再附带逐页标题；原版排版在原页像素上按段落叠加可选择的译文文字层，译文逐段到达时只更新对应段落，等待中的段落显示设置中选定的翻译加载样式；公式、图表和页眉页脚保持原样，放不下的段落悬停展开并提供键盘可达的全文对照弹窗，拖选与原生选区保留期间保持展开，译文文字层接住段间空白且背景不拦截选择；悬停译文高亮对应原文；拖选原文时把选区终点钉在指针附近，避免划过空白选中整页；重排阅读使用同一实际计划组织正文与原图裁剪，区域身份或坐标变化才重裁剪，普通译文变化复用原像素并保持阅读位置；目录按阅读顺序列出识别到的章节标题并标出当前位置，点击即跳转，可自行展开或传送到页面侧栏；全文对照、目录标题和搜索词各自自动确定文字方向，不改变工具栏或原译文列顺序；触控板捏合与 Ctrl/Cmd 加减号只缩放阅读内容，保留指针所在页内坐标，捏合期间复用画布和文字层、停下后重绘；缩放与显示方式使用与页面一致的菜单而非浏览器原生下拉；搜索同时匹配原文与译文并逐处跳转，译文样式可调字号与字体；只挂载附近五页，目录开关、页码、缩放和显示方式控件可以传送到页面工具栏；卸载时释放全部页面资源；显式开启的信息高亮只评分真实可选文字，进度放在按钮提示里、只有出错才在工具栏显示并可重试，配置、页面和文档失效时取消旧绘制。
+ 扫描续读：同源 OCR 逐页检查点保留当前页、滚动位置与已就绪画布；只在实际几何变化时调整阅读锚点。
  缩放与排版：原版译文固定在 PDF 页面坐标系中排版，画布、原文文字层、译文和遮罩共享同一个视口变换；缩放结束后才请求可见页补足画布清晰度。
  材料续读：仅公开等待 DOM 提交并淘汰旧布局锚点的 resumePage 页码方法，供已验证文件身份的文档组合根调用；原页渲染与下载结构保持自身职责。
  原位遮罩：表格单元格和图文卡片共用解析阶段确认的边界，避免擦除相邻版块。
@@ -75,6 +77,7 @@
                   <div :ref="element => setPageHost(layout.page.pageNumber, 'source', element)" class="pdf-canvas-host" />
                   <i v-if="highlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight" :style="highlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
                   <i v-if="searchHighlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight search" :style="searchHighlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
+                  <i v-for="(region, index) in layout.page.ocrReviewRegions" :key="index" class="pdf-ocr-review" :style="{left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, height: `${region.height}px`}" data-fluentread-pdf-decoration aria-hidden="true" />
                 </div>
                 <span v-if="!states.has(layout.page.pageNumber) || states.get(layout.page.pageNumber)?.status === 'loading'" class="pdf-page-loading" data-fluentread-pdf-decoration role="status">{{ t('document.pdfReading.loadingSource') }}</span>
               </div>
@@ -136,6 +139,7 @@ import {fitPdfBlockText, pdfOverlayBlocks, type PdfBlockFit, type PdfOverlayBloc
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation, type PdfReadingRegionEntry, type PdfReadingTextEntry} from '@/src/features/document-translation/core/pdfReadingPlan';
 import {sampledPdfBlockColors} from '@/src/features/document-translation/ui/pdfPreview';
 import {createPdfReaderRenderPort, pdfReaderDisplayRect, pdfReaderPageKey, pdfReaderPageWindow, PdfReaderScheduler, type PdfReaderMode, type PdfReaderPageState} from '@/src/features/document-translation/ui/pdfReader';
+import {updatePdfOcrTextLayer} from './pdfOcrTextLayer';
 import {installInformationHighlight, type InformationHighlightController} from '@/src/features/information-highlight/public';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, type InformationHighlightPreferences} from '@/src/core/config/informationHighlight';
 import type {InformationHighlightModelId} from '@/src/core/config/informationHighlightModel';
@@ -738,6 +742,8 @@ function mountPage(pageNumber: number): void {
   const source = sourceHosts.get(pageNumber);
   const translated = translatedHosts.get(pageNumber);
   const sourceText = state.output.sourceText?.element;
+  const model = pages.value.find(page => page.pageNumber === pageNumber);
+  if (sourceText && model) updatePdfOcrTextLayer(sourceText, model);
   if (source && state.output.sourceCanvas && source.firstChild !== state.output.sourceCanvas) {
     if (sourceText?.parentNode === source) source.insertBefore(state.output.sourceCanvas, sourceText);
     else source.replaceChildren(state.output.sourceCanvas, ...(sourceText ? [sourceText] : []));
@@ -795,7 +801,7 @@ function updateViewport(): void {
     const regionEntries = readingPlans.value.get(page.pageNumber)?.entries.filter((entry): entry is PdfReadingRegionEntry => entry.kind === 'region');
     return {scale: rasterScale.value, mode: props.mode, presentation: renderPresentation, regionEntries, refine: !readable.value && visible.includes(pageIndex),
       key: pdfReaderPageKey(page, rasterScale.value, props.mode, renderPresentation, regionEntries)};
-  });
+  }, pages.value);
   lastReadingAnchor = captureReadingAnchor();
   emit('material-position-change');
 }
@@ -937,7 +943,18 @@ function createScheduler(): void {
   emit('page-change', 1);
   updateViewport();
 }
-watch(() => props.document, () => {fullPassageDialog.value?.close(); fullPassage.value = undefined; informationController?.setEnabled(false); informationWanted = false; if (mounted) {createScheduler(); syncInformationHighlight();}}, {flush: 'post'});
+watch(() => props.document, (document, previous) => {
+  fullPassageDialog.value?.close(); fullPassage.value = undefined;
+  informationController?.setEnabled(false); informationWanted = false;
+  if (!mounted) return;
+  if (document.binary?.kind === 'pdf' && previous.binary?.kind === 'pdf' && document.binary.bytes === previous.binary.bytes) {
+    // OCR 逐页补入文字时保持当前页、缩放和已有画布，不把读者拉回第一页。
+    materialNavigation.cancel(); materialRenderDocument = document;
+    updateViewport();
+    for (const pageNumber of sourceHosts.keys()) mountPage(pageNumber);
+  } else createScheduler();
+  syncInformationHighlight();
+}, {flush: 'post'});
 // 原版缩放保留文字节点与 Range；重排阅读或切换视图时再重新扫描正文。
 watch([() => readable.value ? zoom.value : undefined, presentation, () => props.mode], () => informationController?.refresh(), {flush: 'pre'});
 watch([presentation, () => props.mode, outlineOpen], () => {highlight.value = undefined; if (mounted) scheduleViewport();}, {flush: 'post'});
@@ -957,8 +974,13 @@ watch([readingPlans, zoom, presentation, viewportWidth, () => props.mode], () =>
   });
 }, {flush: 'pre'});
 // 必须在 DOM 改变总高度前读取旧页；否则切到较短的阅读模式时，浏览器已把 scrollTop 限制到新底部。
-watch(layouts, async (_next, previous) => {
+watch(layouts, async (next, previous) => {
   if (!mounted || closed) return;
+  if (next.length === previous.length && next.every((layout, index) => {
+    const old = previous[index];
+    return layout.page.pageNumber === old.page.pageNumber && layout.top === old.top && layout.rowHeight === old.rowHeight
+      && layout.width === old.width && layout.height === old.height;
+  })) {scheduleViewport(); return;}
   const generation = ++layoutUpdateGeneration, identity = documentIdentity.value;
   const anchor = readAnchor(previous);
   const zoomAnchor = pendingZoomAnchor;
@@ -988,9 +1010,14 @@ onMounted(() => {
   if (typeof ResizeObserver !== 'undefined' && viewport.value) {
     observer = new ResizeObserver(entries => {
       if (!pendingReadingAnchor && readable.value) pendingReadingAnchor = lastReadingAnchor;
+      const scroll = viewport.value;
+      // 末页比视口短时页码定位会停在滚动底部；工具栏提示压缩视口不能把读者退到前一页。
+      const keepBottom = scroll && scroll.scrollTop > 0 && scroll.scrollTop + viewportHeight.value >= scroll.scrollHeight - 1;
       viewportWidth.value = viewport.value?.clientWidth || 920;
       viewportHeight.value = viewport.value?.clientHeight || 720;
+      if (keepBottom) scroll.scrollTop = Math.max(0, scroll.scrollHeight - viewportHeight.value);
       measureReadingHeights(entries.map(entry => entry.target));
+      scheduleViewport();
       void nextTick(fitToolbarMenus);
     });
     observer.observe(viewport.value);
@@ -1075,6 +1102,7 @@ onBeforeUnmount(() => {
 .pdf-viewer-toolbar .pdf-style-fonts button {width: auto; height: 26px; padding: 0 11px; white-space: nowrap; border-radius: 6px; color: var(--muted); font-size: 12px;}
 .pdf-viewer-toolbar .pdf-style-fonts button.selected {color: var(--brand-strong); background: var(--surface); box-shadow: 0 1px 4px rgba(35, 47, 82, .1); font-weight: 700;}
 .pdf-source-highlight.search {background: color-mix(in srgb, #ffcf33, transparent 72%); outline: 2px solid #f0a800;}
+.pdf-ocr-review {position: absolute; z-index: 2; outline: 1px dashed #a85e00; outline-offset: 2px; border-radius: 2px; pointer-events: none;}
 .pdf-viewer-toolbar .pdf-menu-button {display: inline-flex; align-items: center; gap: 6px; width: auto; height: 28px; padding: 0 8px 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: inherit; font: inherit; font-size: 12px; white-space: nowrap;}
 .pdf-viewer-toolbar .pdf-menu-button:hover, .pdf-menu.open .pdf-menu-button {border-color: var(--brand); background: var(--surface);}
 .pdf-menu.open .pdf-menu-button {box-shadow: 0 0 0 3px var(--brand-soft);}

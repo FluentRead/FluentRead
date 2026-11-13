@@ -1,12 +1,13 @@
 import {describe,expect,it,vi} from 'vitest';
 import {readFileSync} from 'node:fs';
-import {inflateSync} from 'node:zlib';
+import {inflateSync,gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence,getImageParagraphGapEvidence,consumeImageParagraphGapEvidence,createImageParagraphWorkQueue,type ImageParagraphGapProof} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
 import {imageMatteObservationBox,observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
-import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+import {groupImageParagraphs,type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import type {MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
+import {mergeMangaParagraphContinuations,type MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 type Box=ImageTextRegion['bbox'];
 const bounds=(members:ImageTextRegion[])=>members.reduce((a,{bbox:b})=>({x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)}),{x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity});
 function basic(){
@@ -135,6 +136,62 @@ describe('低对比平滑间隙证明的生产消费',()=>{
     });
 });
 describe('段落间隙预算与画外墨迹回退',()=>{
+    it('不足两行空白像素的紧邻行不能产生颜色走廊证明',()=>{
+        const f=basic();f.page.results[0].box.height=2;f.page.results[1].box.height=2;f.page.results[1].box.y=44;
+        expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
+    });
+    it('自然图原始像素复现白底和深蓝气泡的小字断段，整段消费保留逐行擦除框',()=>{
+        const base=new URL('./fixtures/image-translation/paragraph-gaps/',import.meta.url);
+        const manifest=JSON.parse(readFileSync(new URL('manifest.json',base),'utf8'));
+        expect(createHash('sha256').update(readFileSync(new URL(manifest.source,base))).digest('hex')).toBe(manifest.sourceSha256);
+        for(const fixture of manifest.fixtures){
+            const bytes=gunzipSync(readFileSync(new URL(fixture.file,base)));
+            expect(createHash('sha256').update(bytes).digest('hex')).toBe(fixture.rgbaSha256);
+            const page:MangaOcrPage={results:fixture.rows};
+            const f={...basic(),width:fixture.width,height:fixture.height,pixels:new Uint8ClampedArray(bytes),page};
+            const {regions,support,proofs}=adopt(f);
+            expect(proofs.some(proof=>proof.mode==='tight-field')).toBe(true);
+            const grouped=groupImageParagraphs(regions,support);
+            expect(grouped).toHaveLength(1);
+            expect(grouped[0].text).toBe(fixture.rows.map((row:{text:string})=>row.text).join(' '));
+            expect(grouped[0].sourceBoxes).toEqual(regions.map(region=>region.bbox));
+            const manga=mergeMangaParagraphContinuations(regions as MangaRegion[],support);
+            expect(manga.flatMap(region=>region.sourceBoxes??[region.bbox])).toEqual(regions.map(region=>region.bbox));
+            const tight=proofs.find(proof=>proof.mode==='tight-field')!;
+            tight.previous.text+='.';tight.previousSnapshot.text+='.';
+            expect(adopt(f,[tight]).support).toBeUndefined();
+        }
+    });
+    it('共同气泡内的中等行距可续接未完句，但句末不借此跨段',()=>{
+        const f=basic();f.page.results[1].box.y=68;
+        f.page.bubbles=[{bbox:{x0:30,y0:30,x1:150,y1:110},results:[]}];
+        for(let y=43;y<51;y++)for(let x=20;x<30;x++)f.set(x,y);
+        expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels).map(proof=>proof.mode)).toEqual(['flat-owner']);
+        f.page.results[0].text+='.';
+        expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
+    });
+    it('同一气泡的小字短行按实际相邻关系连续合段，前后行不冒充竞争者',()=>{
+        const f=basic();
+        f.page.results=[
+            {text:'FOLLOW',confidence:.99,box:{x:40,y:40,width:90,height:14}},
+            {text:'THE BLUE',confidence:.99,box:{x:40,y:64,width:90,height:14}},
+            {text:'LANTERNS.',confidence:.99,box:{x:40,y:88,width:90,height:14}},
+        ];
+        f.page.bubbles=[{bbox:{x0:30,y0:30,x1:150,y1:120},results:[]}];
+        for(let i=0;i<f.pixels.length;i+=4)f.pixels.set([24,44,68,255],i);
+        for(const row of f.page.results)for(let y=row.box.y+3;y<row.box.y+11;y++)for(let x=43;x<46;x++)f.set(x,y);
+        // 原字体旁的图案使matte单框证明不可用，必须复核实际行间空白与共同气泡。
+        for(let y=43;y<51;y++)for(let x=20;x<30;x++)f.set(x,y);
+        const {regions,support}=adopt(f);
+        expect(support).toBeDefined();
+        const grouped=groupImageParagraphs(regions,support);
+        expect(grouped).toHaveLength(1);
+        expect(grouped[0].text).toBe('FOLLOW THE BLUE LANTERNS.');
+        expect(grouped[0].sourceBoxes).toHaveLength(3);
+        f.set(80,59);
+        const obstructed=adopt(f);
+        expect(groupImageParagraphs(obstructed.regions,obstructed.support)).toHaveLength(2);
+    });
     it('平色对话在同一气泡内依照段距续接，而画面边缘锚点和短平色采样不授权',()=>{
         const sameBubble=basic();sameBubble.page.results[1]!.box.y=80;
         sameBubble.page.bubbles=[{bbox:{x0:30,y0:30,x1:150,y1:110},results:[]}];

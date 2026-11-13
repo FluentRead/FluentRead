@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/content/runtime.ts
  * 文件职责：实现网页图片翻译的独立悬浮/右键入口、可信目标快照、异步请求所有权和单图及漫画连续模式的原图/译图切换，保持宿主图片与响应式图片资源不变。
+ * 页面外观：译图跟随源图的形状裁切与像素缩放规则，宿主动态改变外观时更新现有位图，不重新识别或翻译。
  * 主要内容：普通图片全部译文不可安全绘制时保留宿主原图，并在文字面板提供译文；仅缺可选分割资源的回退在用户再次操作时轻查状态，导入就绪才重入，取消与迟到回复保持同一图片所有权，任一模式关闭后复验准入并归还原图；单图失败提供模型与服务导航，译图操作条随指针隐藏并保留键盘入口；指针局部检查仅在本次调用内复用同图几何与样式读取，第二个重叠命中立即停止，下一帧重新定位；单图识别方式纳入缓存身份，切换后不复用旧结果；在封闭 Shadow DOM 中挂载原生译图，跟随图片盒模型与祖先裁切；合并布局更新，默认 12 张可配置的快速缓存和 100 页/16 MiB 二进制局部结果，靠近视口时直接预合成画布，无文字页只保留轻量完成标记；返页不复用已经取消的预合成，旧任务结束不能删除新任务；漫画状态以订阅快照发送并隔离同步异常，避免订阅变化重复递送或阻断请求和卸载；图片重载、独立服务及模型变化使结果失效；组合按所选成员的安全连接摘要建立响应式依赖，成员变更撤销旧任务与缓存，漫画返页复用结果不等待其他页推理；预合成不得撤下当前译图，单页反馈展示真实阶段与进度，漫画错误恢复跟随图片可见边缘，正常处理与完成隐藏操作条，换图、取消与卸载时释放资源。
  * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  * 分段旁置：仅分段载体提供已冻结的核心像素视窗，并随原漫画请求透传供完整补绘准入；普通图片与无视窗宿主不增加请求字段或读取布局。
@@ -772,6 +773,8 @@ function updateBitmapAppearance(bitmap: TranslatedSurface, presentation: ImagePr
     updateImageStyle(bitmap.style, 'object-fit', fitting.objectFit);
     updateImageStyle(bitmap.style, 'object-position', fitting.objectPosition);
     updateImageStyle(bitmap.style, 'border-radius', style.borderRadius);
+    updateImageStyle(bitmap.style, 'clip-path', style.clipPath);
+    updateImageStyle(bitmap.style, 'image-rendering', style.imageRendering);
     updateImageStyle(bitmap.style, 'background-color', style.backgroundColor);
     updateImageStyle(bitmap.style, 'opacity', String(opacity));
     updateImageStyle(bitmap.style, 'filter', style.filter);

@@ -181,6 +181,17 @@ describe('document history retained revisions', () => {
 });
 
 describe('document history PDF geometry migration', () => {
+    it('restores a three-line correction using the fresh baseline spacing and keeps the following slot separate', () => {
+        const {previous, current, oldBlocks, saved} = pdfTextSplit();
+        oldBlocks[0].lines!.push(...oldBlocks[1].lines!, ...oldBlocks[2].lines!);
+        oldBlocks[0].lineCount = 3;
+        previous.segments[0].source = 'Left Middle Right';
+        previous.binary.pages[0].blocks.splice(1, 2);
+        const {document, segmentOrigins} = restoreDocumentHistoryPdfOcr(saved, current);
+        expect(document.segments.map(segment => segment.source)).toEqual(['Left Middle Right', 'End']);
+        expect(segmentOrigins).toEqual([0, 3]);
+        expect(document.binary?.kind === 'pdf' && document.binary.pages[0].blocks[0]).toMatchObject({lineCount: 3, lineHeight: 14});
+    });
     it('keeps independent old slots using only corrected fresh lines and bounds', () => {
         const {previous, current, oldBlocks, freshBlock, saved} = pdfTextSplit();
         const before = JSON.stringify({previous, current, saved});
@@ -297,6 +308,21 @@ describe('document history PDF geometry migration', () => {
 });
 
 describe('document history scanned-PDF migration', () => {
+    it('keeps explicit OCR corrections on originally native pages across a parser upgrade and round-trips source-only revisions',async()=>{
+        const current=pdf([['Native text']]), previous=pdf([['Manually corrected OCR']]);
+        Object.assign(previous.binary.pages[0],{scanned:false,ocrRecognized:true});
+        const correction={source:'Raw OCR',lines:[{text:'Raw OCR',x:1,y:2,width:40,height:10}],reviewRegions:[]};
+        Object.assign(previous.binary.pages[0].blocks[0],{sourceCorrection:correction});
+        const retainedRevisions=[{source:'Older source correction',translation:'',kind:'source' as const,pageNumber:1,blockNumber:1}];
+        const saved=record('native-ocr',1,{bytes:previous.binary.bytes,parsed:previous,retainedRevisions,translations:['Human translation']});
+        const history=createDocumentHistory(new IDBFactory());expect(await history.save(saved)).toBe(true);
+        const loaded=(await history.load('native-ocr'))!;expect(loaded.retainedRevisions).toEqual(retainedRevisions);
+        const restored=restoreDocumentHistoryPdfOcr(loaded,current);
+        expect(restored.document.segments[0].source).toBe('Manually corrected OCR');
+        expect(restored.document.binary?.kind==='pdf'&&restored.document.binary.pages[0].blocks[0].sourceCorrection).toEqual(correction);
+        expect(restored.document.binary?.bytes).toBe(current.binary.bytes);expect(restored.segmentOrigins).toEqual([0]);
+    });
+
     it('reuses recognized scans in page order while keeping newly parsed native pages and original current bytes', () => {
         const current = pdf([['New native'], null, null]);
         current.binary.pages[2] = {...current.binary.pages[2], rotation: 90} as any;
@@ -318,7 +344,7 @@ describe('document history scanned-PDF migration', () => {
         expect(JSON.stringify(saved)).toBe(before);
         expect(current.binary.pages[1].scanned).toBe(true);
     });
-    it('retains a completed empty OCR result and accepts the equivalent older rotation field without another recognition', () => {
+    it('retries an old empty OCR result while keeping valid rotated OCR from history', () => {
         const current = pdf([null, null]);
         current.binary.pages[1] = {...current.binary.pages[1], sourceRotation: 90} as any;
         const previous = pdf([[], ['Rotated OCR']]);
@@ -326,7 +352,7 @@ describe('document history scanned-PDF migration', () => {
         previous.binary.pages[1] = {...previous.binary.pages[1], scanned: false, rotation: 90} as any;
         const {document: restored} = restoreDocumentHistoryPdfOcr(record('rotated', 1, {bytes: previous.binary.bytes, parsed: previous}), current);
         expect(restored.segments.map(segment => segment.source)).toEqual(['Rotated OCR']);
-        expect(restored.binary?.kind === 'pdf' && restored.binary.pages.every(page => page.scanned === false)).toBe(true);
+        expect(restored.binary?.kind === 'pdf' && restored.binary.pages.map(page => page.scanned)).toEqual([true, false]);
     });
     it('leaves non-PDF documents and already parsed native PDFs untouched', () => {
         const text = parsed(['Native']);
@@ -401,6 +427,33 @@ describe('document history identity', () => {
 });
 
 describe('document history storage', () => {
+    it('keeps generation metadata and save order when upgrading a database that already contains metadata', async () => {
+        const factory = new IDBFactory();
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = factory.open('FluentReadDocumentHistory', 1);
+            request.onupgradeneeded = () => {
+                request.result.createObjectStore('documents', {keyPath: 'id'});
+                const meta = request.result.createObjectStore('metadata', {keyPath: 'key'});
+                meta.put({key: 'generation', value: 'g:retained'}); meta.put({key: 'sequence', value: 41});
+            };
+            request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+        });
+        db.close();
+        const history = createDocumentHistory(factory);
+        expect(await history.save(record('upgraded', 1))).toBe(true);
+        expect((await history.load('upgraded'))?.storageOrder).toBe(42);
+    });
+
+    it('reports unfinished scans in history summaries without changing translated native segment counts', async () => {
+        const history = createDocumentHistory(new IDBFactory());
+        const parsed = pdf([['Native paragraph'], null, []]);
+        parsed.binary.pages[2].scanned = false;
+        await history.save(record('mixed', 1, {parsed, total: 1, completed: 1}));
+        expect(await history.list()).toMatchObject([{pendingOcrPages: 2, total: 1, completed: 1}]);
+        parsed.binary.pages = [parsed.binary.pages[0]];
+        await history.save(record('mixed', 2, {parsed, total: 1, completed: 1}));
+        expect((await history.list())[0]).not.toHaveProperty('pendingOcrPages');
+    });
     it('does not overwrite another tab after both successfully read the same record', async () => {
         const factory = new IDBFactory(), first = createDocumentHistory(factory), second = createDocumentHistory(factory);
         expect(await first.save(record('shared', 1, {translations: ['Original']}))).toBe(true);

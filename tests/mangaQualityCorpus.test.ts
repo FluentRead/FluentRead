@@ -18,12 +18,13 @@ const runnerAst=ts.createSourceFile('runner.cjs',readFileSync(new URL('../script
 describe('普通图片质量矩阵使用独立的真实入口',()=>{
     it('普通Paddle允许明确无字负控，同时拒绝真实站点、其他阅读模式和其他OCR引擎',()=>{
         const admission=runnerAst.statements.find(node=>ts.isIfStatement(node)&&node.expression.getText(runnerAst)==='ordinaryImageQuality')!.getText(runnerAst);
-        const base:any={assert:require('node:assert/strict'),ordinaryImageQuality:true,qualityManifest:{},qualityFixtures:[{sourceLanguage:'en'},{sourceLanguage:'ja'},{sourceLanguage:'auto'}],prefetchPages:0,offlineModels:null,preloadModels:null,blockedOfficial:false,blockedAll:false};
+        const base:any={assert:require('node:assert/strict'),ordinaryImageQuality:true,qualityManifest:{},qualityFixtures:[{sourceLanguage:'en'},{sourceLanguage:'ja'},{sourceLanguage:'auto'}],prefetchPages:0,offlineModels:null,preloadModels:null,blockedOfficial:false,blockedAll:false,liveTextAllowlist:null};
         const modes=['liveSite','liveTranslation','readerSmoke','surfaceReaderTest','segmentReaderTest','baseline','errorRecoveryTest','readAheadTest','scrollStabilityTest','scrollIntentTest','cacheNavigationTest','tieredCacheTest','pageFeedbackTest'];
         for(const mode of modes)base[mode]=false;
         expect(()=>runInNewContext(admission,base)).not.toThrow();
         expect(()=>runInNewContext(admission,{...base,qualityFixtures:[{sourceLanguage:'en',expectedNoText:true,regions:[],expectedSource:[],expectedAnchors:[]}]})).not.toThrow();
         for(const mode of modes)expect(()=>runInNewContext(admission,{...base,[mode]:true})).toThrow();
+        expect(()=>runInNewContext(admission,{...base,liveTranslation:true,liveTextAllowlist:['Public fixture text']})).not.toThrow();
         for(const overrides of [{qualityManifest:null},{prefetchPages:1},{offlineModels:'/fixed-models'},{preloadModels:'/fixed-models'},{blockedOfficial:true},{blockedAll:true},{qualityFixtures:[{sourceLanguage:'ru'}]},{qualityFixtures:[{sourceLanguage:'ko'}]}])
             expect(()=>runInNewContext(admission,{...base,...overrides})).toThrow();
         expect(()=>runInNewContext(admission,{...base,ordinaryImageQuality:false,liveSite:true,qualityManifest:null})).not.toThrow();
@@ -210,6 +211,33 @@ describe('通用独立段落门禁',()=>{
 });
 
 describe('真实漫画runner多轮layout采集的有界容量',()=>{
+    it('固定译文映射保留三种Google协议，未命中原文必须使验收失败',async()=>{
+        let observer='';
+        const visit=(node:ts.Node)=>{
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst)==='worker.evaluate'&&node.arguments[0]?.getText(runnerAst).startsWith('({live,trace,traceLayout,layoutTraceLimit,translationMap,liveTextAllowlist})=>'))observer=node.arguments[0].getText(runnerAst);
+            ts.forEachChild(node,visit);
+        };
+        visit(runnerAst);expect(observer).not.toBe('');
+        const sandbox:any={URL,URLSearchParams,Response,setTimeout:(callback:()=>void)=>callback(),
+            chrome:{runtime:{onMessage:{addListener:()=>undefined}}},fetch:()=>{throw new Error('Unexpected network');}};
+        runInNewContext(`(${observer})`,sandbox)({live:false,trace:false,traceLayout:false,layoutTraceLimit:10,translationMap:{A:'甲',B:'乙'}});
+        const html=await sandbox.fetch('https://translate-pa.googleapis.com/v1/translateHtml',{body:JSON.stringify([[['<pre>A</pre>','<pre>B</pre>']]])});
+        expect(await html.json()).toEqual([['<pre>甲</pre>','<pre>乙</pre>']]);
+        const list=await sandbox.fetch('https://translate.googleapis.com/translate_a/t',{body:new URLSearchParams([['q','A'],['q','B']]).toString()});
+        expect(await list.json()).toEqual(['甲','乙']);
+        const requests=['A','B'].map((source,index)=>['MkEWBc',JSON.stringify([[source]]),null,String(index)]);
+        const rpc=await sandbox.fetch('https://translate.google.com/_/TranslateWebserverUi/data/batchexecute',{body:new URLSearchParams({'f.req':JSON.stringify([requests])}).toString()});
+        const result=await rpc.json();
+        expect(result.map((row:any)=>JSON.parse(row[2]))).toEqual(['甲','乙'].map(text=>[null,[[[null,null,null,null,null,[[text]]]]]]));
+        await expect(sandbox.fetch('https://translate.googleapis.com/translate_a/t',{body:'q=missing'})).rejects.toThrow('Missing controlled image translation: missing');
+        const calls:string[]=[];
+        const liveSandbox:any={...sandbox,fetch:async(_url:string,options:{body:string})=>{calls.push(options.body);return new Response('[]');}};
+        runInNewContext(`(${observer})`,liveSandbox)({live:true,trace:false,traceLayout:false,layoutTraceLimit:10,liveTextAllowlist:['A B']});
+        await liveSandbox.fetch('https://translate.googleapis.com/translate_a/t',{body:'q=A+B'});
+        await liveSandbox.fetch('https://translate.googleapis.com/translate_a/t',{body:'q=AB'});
+        await expect(liveSandbox.fetch('https://translate.googleapis.com/translate_a/t',{body:'q=AB&q=private'})).rejects.toThrow('outside the explicit allowlist');
+        expect(calls).toEqual(['q=A+B','q=AB']);
+    });
     it('逐景资源轨迹具有独立文件名，多景同轮及同名图片不覆盖前次采样',()=>{
         let label:ts.Expression|undefined;
         const visit=(node:ts.Node)=>{
@@ -231,7 +259,7 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
         let initializer='',observer='';
         const visit=(node:ts.Node)=>{
             if(ts.isVariableDeclaration(node)&&node.name.getText(ast)==='layoutTraceLimit')initializer=node.initializer!.getText(ast);
-            if(ts.isCallExpression(node)&&node.expression.getText(ast)==='worker.evaluate'&&node.arguments[0]?.getText(ast).startsWith('({live,trace,traceLayout,layoutTraceLimit})=>'))observer=node.arguments[0].getText(ast);
+            if(ts.isCallExpression(node)&&node.expression.getText(ast)==='worker.evaluate'&&node.arguments[0]?.getText(ast).startsWith('({live,trace,traceLayout,layoutTraceLimit,translationMap,liveTextAllowlist})=>'))observer=node.arguments[0].getText(ast);
             ts.forEachChild(node,visit);
         };
         visit(ast);expect(initializer).not.toBe('');expect(observer).not.toBe('');
@@ -264,7 +292,7 @@ describe('真实漫画runner多轮layout采集的有界容量',()=>{
     it.each(['promise','callback'] as const)('真实observer的%s端口区分普通原图保留、失败与正常位图',async port=>{
         let observer='';
         const visit=(node:ts.Node)=>{
-            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst)==='worker.evaluate'&&node.arguments[0]?.getText(runnerAst).startsWith('({live,trace,traceLayout,layoutTraceLimit})=>'))observer=node.arguments[0].getText(runnerAst);
+            if(ts.isCallExpression(node)&&node.expression.getText(runnerAst)==='worker.evaluate'&&node.arguments[0]?.getText(runnerAst).startsWith('({live,trace,traceLayout,layoutTraceLimit,translationMap,liveTextAllowlist})=>'))observer=node.arguments[0].getText(runnerAst);
             ts.forEachChild(node,visit);
         };
         visit(runnerAst);expect(observer).not.toBe('');

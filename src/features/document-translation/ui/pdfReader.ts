@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/ui/pdfReader.ts
  * 文件职责：为 PDF 阅读器提供有界页面调度和浏览器原页渲染，使用锁定版本的 PDF.js TextLayer 让文字选择与原版面一致。
- * 主要内容：按可见页优先维护五页窗口与两项并发；原版阅读缩放复用已就绪的页面，可见页需要更高分辨率时在总像素预算内准备新画布并替换，原文文字层持续挂载；重排裁剪使用界面当前的原图区域，普通译文更新复用像素；译文页复制原页像素，译文文字由阅读器叠加；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
+ * 主要内容：按可见页优先维护五页窗口与两项并发，同源 OCR 检查点更新模型并复用底图；原版阅读缩放复用已就绪的页面，可见页需要更高分辨率时在总像素预算内准备新画布并替换，原文文字层持续挂载；重排裁剪使用界面当前的原图区域，普通译文更新复用像素；译文页复制原页像素，译文文字由阅读器叠加；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
  * 模块边界：调度器只调用注入的渲染端口；浏览器渲染端口依赖 PDF.js 和文档预览资源，不发起翻译请求、不修改原始文件或负责入口挂载。
  */
 import type {PDFPageProxy, TextLayer} from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -291,13 +291,19 @@ export class PdfReaderScheduler {
     private disposed = false;
 
     constructor(
-        private readonly pages: readonly PdfDocumentPage[],
+        private pages: readonly PdfDocumentPage[],
         private readonly port: PdfReaderRenderPort,
         private readonly onChange: (pageNumber: number, state?: PdfReaderPageState) => void,
     ) {}
 
-    update(priorityIndexes: readonly number[], settings: (index: number) => PdfReaderSettings): void {
+    update(priorityIndexes: readonly number[], settings: (index: number) => PdfReaderSettings, pages = this.pages): void {
         if (this.disposed) return;
+        // 同一源文件的 OCR 检查点只更新页面模型；相同页的底图不因段落编号变化重绘。
+        for (const [index, entry] of this.entries) {
+            const previous = this.pages[index], next = pages[index];
+            if (!next || previous.pageNumber !== next.pageNumber || previous.width !== next.width || previous.height !== next.height) this.evict(index, entry);
+        }
+        this.pages = pages;
         this.wanted = new Map([...new Set(priorityIndexes)].filter(index => this.pages[index]).slice(0, PDF_READER_MAX_RESIDENT_PAGES).map(index => [index, settings(index)]));
         for (const [index, entry] of this.entries) {
             if (this.wanted.get(index)?.key !== entry.key) this.evict(index, entry);

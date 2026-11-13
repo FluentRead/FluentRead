@@ -25,6 +25,8 @@ export interface DocumentHistorySummary {
     /** 片段总数与已有译文的片段数，用于在首页显示进度。 */
     total: number;
     completed: number;
+    /** 历史摘要从解析快照推导待识别页，避免原生段落译完时误报整份混合 PDF 完成。 */
+    pendingOcrPages?: number;
     updatedAt: number;
     /** 列表读取时观察到的本地写入身份，用于安全删除。 */
     historyVersion?: string;
@@ -47,7 +49,7 @@ export interface DocumentHistoryRecord extends DocumentHistorySummary {
     /** 单调保存次序，用于淘汰排序，独立于展示时间。 */
     storageOrder?: number;
 }
-export interface DocumentRetainedRevision {source: string; translation: string; contextLabel?: string;}
+export interface DocumentRetainedRevision {source: string; translation: string; contextLabel?: string; kind?: 'source'; pageNumber?: number; blockNumber?: number;}
 export type DocumentHistoryVersion = string | null;
 export function documentHistoryVersion(record: DocumentHistoryRecord | null): DocumentHistoryVersion {
     return record ? typeof record.storageVersion === 'string' && record.storageVersion.startsWith('v:') ? record.storageVersion : 'legacy' : null;
@@ -107,19 +109,22 @@ function matchDocumentHistoryTranslations(
 }
 
 /** 对已存资料和本次未消费的旧校订统一校验、复制并去重，不丢弃有效原文或译文中的空白。 */
-function retainedDocumentRevisions(values: readonly unknown[]): DocumentRetainedRevision[] {
+export function normalizeDocumentRetainedRevisions(values: readonly unknown[]): DocumentRetainedRevision[] {
     const retained: DocumentRetainedRevision[] = [];
     const seen = new Set<string>();
     for (const value of values) {
         if (!value || typeof value !== 'object') continue;
         const revision = value as Partial<DocumentRetainedRevision>;
         if (typeof revision.source !== 'string' || !revision.source.trim()
-            || typeof revision.translation !== 'string' || !revision.translation.trim()) continue;
+            || typeof revision.translation !== 'string' || revision.kind !== 'source' && !revision.translation.trim()) continue;
         const contextLabel = typeof revision.contextLabel === 'string' ? revision.contextLabel.trim() : '';
-        const key = JSON.stringify([revision.source, revision.translation, contextLabel]);
+        const kind = revision.kind === 'source' ? 'source' as const : undefined;
+        const located = Number.isSafeInteger(revision.pageNumber) && revision.pageNumber! > 0 && Number.isSafeInteger(revision.blockNumber) && revision.blockNumber! > 0;
+        const key = JSON.stringify([revision.source, revision.translation, contextLabel, kind, located ? [revision.pageNumber, revision.blockNumber] : null]);
         if (seen.has(key)) continue;
         seen.add(key);
-        retained.push({source: revision.source, translation: revision.translation, ...(contextLabel ? {contextLabel} : {})});
+        retained.push({source: revision.source, translation: revision.translation, ...(contextLabel ? {contextLabel} : {}), ...(kind ? {kind} : {}),
+            ...(located ? {pageNumber: revision.pageNumber, blockNumber: revision.blockNumber} : {})});
     }
     return retained;
 }
@@ -141,7 +146,7 @@ export function restoreDocumentHistoryRevisions(
         const slot = typeof segment.id === 'number' && Number.isInteger(segment.id) && segment.id >= 0 ? segment.id : index;
         return [{source: segment.source, translation: normalized.translations[slot], contextLabel: segment.contextLabel}];
     });
-    return {translations, retainedRevisions: retainedDocumentRevisions([...(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []), ...unused])};
+    return {translations, retainedRevisions: normalizeDocumentRetainedRevisions([...(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []), ...unused])};
 }
 
 export interface DocumentHistoryPdfOcrRestore {
@@ -248,7 +253,8 @@ export function restoreDocumentHistoryPdfOcr(
             || (cached.sourceRotation ?? cached.rotation ?? 0) !== (page.rotation ?? page.sourceRotation ?? 0)
             || !Array.isArray(cached.blocks) || !cached.blocks.every(block => block && typeof block === 'object'
                 && Number.isInteger(block.segmentIndex) && (block.segmentIndex < 0 || typeof oldSegments[block.segmentIndex]?.source === 'string'))) return undefined;
-        if (page.scanned) return cached.scanned === false ? {page: cached, origins: cached.blocks.map(block => block.segmentIndex >= 0 ? block.segmentIndex : undefined)} : undefined;
+        if (page.scanned || cached.ocrRecognized) return cached.scanned === false && cached.blocks.length > 0
+            ? {page: cached, origins: cached.blocks.map(block => block.segmentIndex >= 0 ? block.segmentIndex : undefined)} : undefined;
         return cached.scanned ? undefined : restorePdfTextSplits(page, cached, oldSegments, document.segments);
     });
     if (!restored.some(Boolean)) return {document};
@@ -288,7 +294,11 @@ function historyOrder(record: DocumentHistoryRecord): number {
 
 function summary(record: DocumentHistoryRecord): DocumentHistorySummary {
     const {id, name, format, size, sourceUrl, total, completed, updatedAt} = record;
-    return {id, name, format, size, ...(sourceUrl ? {sourceUrl} : {}), total, completed, updatedAt};
+    const binary = (record.parsed as Partial<ParsedDocument> | undefined)?.binary;
+    const pendingOcrPages = binary?.kind === 'pdf' && Array.isArray(binary.pages)
+        ? binary.pages.filter(page => page?.scanned === true || page?.scanned === false && Array.isArray(page.blocks) && page.blocks.length === 0).length : 0;
+    return {id, name, format, size, ...(sourceUrl ? {sourceUrl} : {}), total, completed, updatedAt,
+        ...(pendingOcrPages ? {pendingOcrPages} : {})};
 }
 
 /** 兼容旧记录；不把字符串、数字或其它 truthy 值当作用户确认的重译策略。 */
@@ -468,7 +478,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return {status: 'unavailable'};
         const version = `v:${globalThis.crypto.randomUUID()}`;
         const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: version, bytes: record.bytes.slice(), translations: [...record.translations],
-            retainedRevisions: retainedDocumentRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
+            retainedRevisions: normalizeDocumentRetainedRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
         let conflict = false;
         await write(signal, (target, meta) => readVersion(target, meta, record.id, (_current, actual) => {
             if (actual !== expected) {conflict = true;return;}
@@ -486,7 +496,7 @@ export function createDocumentHistory(factory: IDBFactory | undefined = globalTh
         save: record => guarded(false, async signal => {
             if (!record.id || record.bytes.byteLength > DOCUMENT_HISTORY_MAX_BYTES) return false;
             const saved = {...normalizeDocumentHistoryCachePolicy(record), storageVersion: `v:${globalThis.crypto.randomUUID()}`, bytes: record.bytes.slice(), translations: [...record.translations],
-                retainedRevisions: retainedDocumentRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
+                retainedRevisions: normalizeDocumentRetainedRevisions(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : [])};
             await write(signal, (target, meta) => nextOrder(target, meta, order => {target.put({...saved, storageOrder: order});enforceLimit(target, meta, record.id, signal);}));
             return true;
         }),

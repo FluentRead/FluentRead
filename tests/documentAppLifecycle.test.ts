@@ -12,12 +12,13 @@ import {getDocumentMimeType, parseDocument, type ParsedDocument, type PdfDocumen
 import * as binaryService from '@/src/features/document-translation/services/binary';
 import {createDocumentHistory, documentHistoryId} from '@/src/features/document-translation/services/history';
 import {acquirePdfDocument} from '@/src/features/document-translation/ui/pdfPreview';
-import {createDocumentDownload as createRuntimeDownload} from '@/src/app/document-translation/runtime';
+import {createDocumentDownload as createRuntimeDownload, translateDocumentSegments as translateWithDefaultService} from '@/src/app/document-translation/runtime';
 import DocumentApp from '@/src/app/document-translation/DocumentApp.vue';
 import {getDocumentDownloadCopy, getDocumentDownloadErrorCopy} from '@/src/app/document-translation/downloadCopy';
+import PdfSourceEditor from '@/src/app/document-translation/PdfSourceEditor.vue';
 import DocumentSegmentEditor from '@/src/app/document-translation/DocumentSegmentEditor.vue';
 
-const ports = vi.hoisted(() => ({privateContext: false, tasks: [] as any[], zoomBindings: [] as any[], renderPending: undefined as any, pagePending: undefined as any, pageProvider: undefined as undefined | ((pageNumber: number, page: any) => Promise<any>), pageCount: 1, fetchPdf: vi.fn(), i18n: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), batch: vi.fn(), recognize: vi.fn(), createRecognizer: vi.fn(), actualRecognize: undefined as any, actualCreateRecognizer: undefined as any, unsubscribe: vi.fn(), observer: undefined as any, config: undefined as any}));
+const ports = vi.hoisted(() => ({privateContext: false, tasks: [] as any[], zoomBindings: [] as any[], renderPending: undefined as any, pagePending: undefined as any, pageProvider: undefined as undefined | ((pageNumber: number, page: any) => Promise<any>), pageCount: 1, fetchPdf: vi.fn(), sourcePreview: vi.fn(), i18n: vi.fn(), sendMessage: vi.fn(), translate: vi.fn(), batch: vi.fn(), recognize: vi.fn(), createRecognizer: vi.fn(), actualRecognize: undefined as any, actualCreateRecognizer: undefined as any, unsubscribe: vi.fn(), observer: undefined as any, config: undefined as any}));
 vi.mock('@/src/features/document-translation/services/pdfOcr', async () => {
     const actual = await vi.importActual<typeof import('@/src/features/document-translation/services/pdfOcr')>('@/src/features/document-translation/services/pdfOcr');
     ports.actualRecognize = actual.recognizePdfDocument;
@@ -28,6 +29,7 @@ vi.mock('@/src/app/document-translation/runtime', async () => {
     ports.actualCreateRecognizer = actual.createPdfPageRecognizer;
     return {...actual, createPdfPageRecognizer: ports.createRecognizer};
 });
+vi.mock('@/src/features/document-translation/ui/pdfSourcePreview', () => ({createPdfSourcePreview: ports.sourcePreview}));
 vi.mock('@/src/features/document-translation/ui/documentZoom', () => ({installDocumentZoomGestures: (target: HTMLElement, options: unknown) => {
     const dispose = vi.fn(); ports.zoomBindings.push({target, options, dispose}); return dispose;
 }}));
@@ -53,6 +55,7 @@ vi.mock('@/src/ui/components/UiSelect.vue', () => ({default: {
 vi.mock('@/src/ui/components/GlossaryLibrarySelect.vue', () => ({default: {setup: () => () => h('div')}}));
 vi.mock('element-plus/es/components/select/style/css', () => ({}));
 vi.mock('element-plus', () => ({ElOption: {props: ['label', 'value'], setup: (props: any) => () => h('option', {value: props.value}, props.label)}}));
+vi.mock('@/src/features/document-translation/ui/pdfScanPreview', () => ({readPdfScanGraphics: async () => [], cropPdfScanRegions: () => []}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({GlobalWorkerOptions: {}, OPS: {constructPath: 1, fill: 2}, getDocument: (options: any) => {
     const task = {role: options.disableFontFace ? 'parse' : 'preview', destroy: vi.fn(async () => {}), page: {
         getViewport: ({scale}: {scale: number}) => ({width: 100 * scale, height: 100 * scale, transform: [1, 0, 0, 1, 0, 0]}),
@@ -111,6 +114,7 @@ async function loadMixedPdfWithCorrection(): Promise<ParsedDocument> {
 }
 
 beforeEach(async () => {
+    ports.sourcePreview.mockReset().mockResolvedValue(new Uint8Array([1, 2]));
     ports.privateContext = false;
     ports.tasks = []; ports.zoomBindings = []; ports.renderPending = undefined; ports.pagePending = undefined; ports.pageProvider = undefined; ports.pageCount = 1;
     ports.fetchPdf.mockReset().mockResolvedValue(file('online.pdf')); ports.i18n.mockClear();
@@ -136,6 +140,107 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('translates a recovered source through the configured default service when no document override is supplied',async()=>{
+        ports.config.service='microsoft';const onSegment=vi.fn();
+        await translateWithDefaultService([{id:0,source:'Recognized source.'}],{fileName:'scanned.pdf',batchTranslation:false,onSegment});
+        expect(onSegment).toHaveBeenCalledWith({id:0,translation:'translated'});
+        expect(ports.translate).toHaveBeenCalledWith('Recognized source.',expect.any(String),expect.objectContaining({serviceOverride:'microsoft'}));
+    });
+    async function loadRecognizedPdf() {
+        await state.loadFiles([file('correct-source.pdf')]);
+        const original = state.parsedDocument;
+        state.parsedDocument = markRaw({...original, binary: {...original.binary, pages: original.binary.pages.map((p: any) => ({...p, scanned: false, ocrRecognized: true, ocrReviewRegions: [{x:p.blocks[0].x,y:p.blocks[0].y,width:1,height:1}]}))}});
+        await flush(); return state.parsedDocument;
+    }
+
+    it('runs the actual source editor events and discards a late preview when the selected region changes',async()=>{
+        const original=await loadRecognizedPdf(),first=original.binary.pages[0].blocks[0];
+        const model={...original,binary:{...original.binary,pages:[{...original.binary.pages[0],blocks:[
+            {...first,sourceCorrection:{source:'Original',lines:first.lines,reviewRegions:[]}},
+            {...first,segmentIndex:-1,source:'123',lines:[{...first.lines[0],text:'123'}]},
+        ]}]}};
+        const pending=deferred<Uint8Array>();ports.sourcePreview.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(new Uint8Array([2]));
+        const apply=vi.fn(),restore=vi.fn(),close=vi.fn(),host=node('root');
+        const child=renderer.createApp(PdfSourceEditor,{document:model,pageNumber:1,blockIndex:0,disabled:false,onApply:apply,onRestore:restore,onClose:close});
+        child.mount(host);const editor=(child as any)._instance.setupState;
+        try {
+            await flush();const signal=ports.sourcePreview.mock.calls.at(-1)![3];
+            editor.lines=['Corrected text'];await flush();expect(walkHost(host).find(n=>n.type==='select')!.props.disabled).toBe(true);
+            walkHost(host).find(n=>n.type==='button'&&hostText(n)==='document.sourceEdit.save')!.props.onClick();expect(apply).toHaveBeenCalledWith(0,['Corrected text']);
+            walkHost(host).find(n=>n.type==='button'&&hostText(n)==='document.sourceEdit.restore')!.props.onClick();expect(restore).toHaveBeenCalledWith(0);
+            editor.lines=['Original'];editor.selected=1;await flush();expect(signal.aborted).toBe(true);expect(editor.lines).toEqual(['123']);
+            const count=createUrl.mock.calls.length;pending.resolve(new Uint8Array([9]));await flush();expect(createUrl.mock.calls).toHaveLength(count);
+            walkHost(host).find(n=>n.type==='button'&&hostText(n)==='document.sourceEdit.cancel')!.props.onClick();expect(close).toHaveBeenCalledOnce();
+        }finally{child.unmount();await flush();}
+        expect(revokeUrl).toHaveBeenCalled();
+    });
+    it('renders source-only retained revisions and offers source correction only on eligible OCR passages',async()=>{
+        const document=await loadRecognizedPdf(),host=node('root'),edit=vi.fn();
+        const current=ref(document), translations=ref<string[]>([]);const revisions=[{source:'Old source correction',translation:'',kind:'source' as const,pageNumber:1,blockNumber:1},{source:'Old raw',translation:'Old translated'}];
+        const child=renderer.createApp({setup:()=>()=>h(DocumentSegmentEditor,{document:current.value,translations:translations.value,retainedRevisions:revisions,disabled:false,'onSource-edit':edit})});child.mount(host);
+        try {
+            await flush();const button=walkHost(host).find(n=>n.type==='button'&&hostText(n)==='document.sourceEdit.open')!;button.props.onClick();expect(edit).toHaveBeenCalledWith(0);
+            translations.value=[document.segments[0].source];await flush();expect(walkHost(host).some(n=>n.type==='textarea')).toBe(false);
+            walkHost(host).find(n=>n.type==='button'&&hostText(n)==='校订译文')!.props.onClick();await flush();expect(walkHost(host).some(n=>n.type==='textarea')).toBe(true);
+            const details=walkHost(host).find(n=>n.type==='details')!;details.props.onToggle({target:{open:true}});await flush();
+            expect(hostText(details)).toContain('document.sourceEdit.sourceRevision');expect(hostText(details)).toContain('document.sourceEdit.location');
+            expect(walkHost(details).filter(n=>n.type==='p'&&n.props.class==='document-translation')).toHaveLength(1);
+            current.value={...document,binary:{...document.binary,pages:[{...document.binary.pages[0],ocrRecognized:false,ocrReviewRegions:undefined}]}};await flush();
+            expect(walkHost(host).some(n=>n.type==='button'&&hostText(n)==='document.sourceEdit.open')).toBe(false);
+        }finally{child.unmount();}
+    });
+    it('opens the line editor, saves and undoes source corrections without losing original bytes or old translations', async () => {
+        const original=await loadRecognizedPdf();state.editSegment(0,'Manual translation');
+        state.openSourceEditor(0);await vi.dynamicImportSettled();await flush();
+        expect(state.sourceEditTarget.document).toBe(original);expect(ports.sourcePreview).toHaveBeenCalledWith(original,1,0,expect.any(AbortSignal));
+        const modal=walkHost(root).find(n=>n.props.class==='pdf-source-editor')!;
+        expect(modal.showModal).toHaveBeenCalledOnce();expect(hostText(modal)).toContain('document.sourceEdit.save');
+        state.applySourceEdit(0,['Corrected original']);await flush();
+        expect(state.parsedDocument.segments[0].source).toBe('Corrected original');expect(state.translatedSegments[0]).toBe('');
+        expect(state.sourceEditTarget).toBeNull();expect(state.parsedDocument.binary.bytes).toBe(original.binary.bytes);
+        expect(state.activeTask.retainedRevisions[0]).toMatchObject({source:'Original',translation:'Manual translation',pageNumber:1});
+        expect(revokeUrl).toHaveBeenCalled();
+        state.openSourceEditor();await flush();state.restoreSourceEdit(0);await flush();
+        expect(state.parsedDocument.segments[0].source).toBe('Original');expect(state.activeTask.retainedRevisions.at(-1)).toMatchObject({source:'Corrected original',translation:'',kind:'source'});
+        expect(state.parsedDocument.binary.pages[0].ocrReviewRegions).toHaveLength(1);
+    });
+    it('cancels source previews and rejects stale source-editor submissions on file switches', async () => {
+        const original=await loadRecognizedPdf();await state.loadFiles([file('another.txt')]);state.selectDocument(state.documentQueue[0]);await flush();
+        const gate=deferred<Uint8Array>();ports.sourcePreview.mockReturnValueOnce(gate.promise);
+        state.openSourceEditor();await vi.dynamicImportSettled();await flush();
+        const count=createUrl.mock.calls.length, signal=ports.sourcePreview.mock.calls.at(-1)![3];
+        state.selectDocument(state.documentQueue[1]);await flush();
+        expect(state.sourceEditTarget).toBeNull();expect(signal.aborted).toBe(true);
+        state.applySourceEdit(0,['late write']);gate.resolve(new Uint8Array([9]));await flush();
+        expect(state.documentQueue[0].document).toBe(original);expect(createUrl.mock.calls).toHaveLength(count);
+    });
+    it('explicitly re-recognizes one completed page without provider credentials or automatic translation and retains matching edits', async () => {
+        await loadRecognizedPdf();state.openSourceEditor(0);state.applySourceEdit(0,['Corrected original']);state.editSegment(0,'Human translation');
+        const original=state.parsedDocument, b=original.binary.pages[0].blocks[0];
+        const next={...original,segments:[{...original.segments[0],source:'Fresh reading'}],binary:{...original.binary,pages:[{...original.binary.pages[0],blocks:[{...b,source:'Fresh reading',sourceCorrection:undefined,lines:[{...b.lines[0],text:'Fresh reading'}]}]}]}};
+        state.config.documentService='openai';state.config.openaiKey='';
+        ports.recognize.mockResolvedValueOnce(next);await state.rerecognizePdfPage();await flush();
+        expect(ports.recognize).toHaveBeenCalledWith(original,expect.any(Function),expect.objectContaining({pageIndexes:[0],startPage:0}));
+        expect(state.parsedDocument.segments[0].source).toBe('Corrected original');expect(state.translatedSegments).toEqual(['Human translation']);
+        expect(state.confirmedTranslationIds).toEqual([0]);expect(state.parsedDocument.binary.pages[0].blocks[0].sourceCorrection.source).toBe('Fresh reading');
+        expect(ports.translate).not.toHaveBeenCalled();expect(ports.batch).not.toHaveBeenCalled();expect(state.translating).toBe(false);
+    });
+    it.each(['pause','switch','unmount'] as const)('ignores a late explicit re-recognition after %s', async action => {
+        const original=await loadRecognizedPdf();await state.loadFiles([file('another.txt')]);state.selectDocument(state.documentQueue[0]);await flush();
+        const gate=deferred<any>();ports.recognize.mockReturnValueOnce(gate.promise);
+        const owner=state.documentQueue[0];const running=state.rerecognizePdfPage();await flush();const controls=ports.recognize.mock.calls.at(-1)![2];
+        if(action==='pause')state.pauseTranslation();else if(action==='switch')state.selectDocument(state.documentQueue[1]);else{app.unmount();app=undefined;}
+        expect(controls.signal.aborted).toBe(true);gate.resolve({...original,segments:[{id:0,source:'late'}]});await running;await flush();
+        expect(owner.document).toBe(original);expect(state.errorMessage).toBe('');
+    });
+    it('retains the original page after empty, mismatched or failed re-recognition',async()=>{
+        const original=await loadRecognizedPdf();state.editSegment(0,'Kept');
+        ports.recognize.mockResolvedValueOnce(original);await state.rerecognizePdfPage();expect(state.errorMessage).toBe('document.pdfReading.ocrEmpty');
+        ports.recognize.mockResolvedValueOnce({...original,binary:{...original.binary,bytes:new Uint8Array([99])}});await state.rerecognizePdfPage();expect(state.errorMessage).toBe('document.sourceEdit.applyFailed');
+        ports.recognize.mockRejectedValueOnce(new Error('read failed'));await state.rerecognizePdfPage();expect(state.errorMessage).toBe('read failed');
+        expect(state.parsedDocument).toBe(original);expect(state.translatedSegments).toEqual(['Kept']);expect(state.translating).toBe(false);
+    });
+
     it('removes disabled services from document choices, retains the saved selection and blocks translation until re-enabled', async () => {
         state.config.documentService = 'openai'; state.config.disabledTranslationServices = ['openai']; await flush();
         expect(state.serviceOptions.some((item: {value: string}) => item.value === 'openai')).toBe(false);
@@ -155,6 +260,25 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
             expect(state.serviceOptions.some((item: {value: string}) => item.value === service)).toBe(false);
         }
     });
+    it('offers original-page navigation only for persisted OCR review regions without rewriting source or corrections', async () => {
+        await state.loadFiles([file('review.pdf'), file('clean.pdf')]);
+        const [review, clean] = state.documentQueue, document = state.parsedDocument;
+        state.parsedDocument = markRaw({...document, binary: {...document.binary, pages: document.binary.pages.map((page: PdfDocumentPage) => ({...page, ocrReviewRegions: [{x: 10, y: 10, width: 5, height: 5}]}))}});
+        state.editSegment(0, 'Kept correction'); state.previewMode = 'translated'; await flush();
+        const notices = () => walkHost(root).filter(entry => entry.props['data-testid'] === 'document-pdf-ocr-review');
+        expect(notices()).toHaveLength(1); expect(hostText(notices()[0])).toContain('document.pdfReading.reviewOriginal');
+        const resumePage = vi.fn(async () => {}); Object.assign(state.materialPdfReader, {resumePage});
+        await state.reviewPdfOcrSource();
+        expect(resumePage).toHaveBeenCalledWith(1); expect(state.previewMode).toBe('source'); expect(state.readerTab).toBe('read');
+        expect(state.translatedSegments[0]).toBe('Kept correction'); expect(state.parsedDocument.segments).toBe(document.segments);
+        state.selectDocument(clean); await flush(); expect(notices()).toHaveLength(0);
+        await state.reviewPdfOcrSource(); expect(resumePage).toHaveBeenCalledOnce();
+        state.selectDocument(review); await flush(); expect(notices()).toHaveLength(1);
+        Object.assign(state.materialPdfReader, {resumePage});
+        const pending = state.reviewPdfOcrSource(); state.selectDocument(clean); await pending;
+        expect(resumePage).toHaveBeenCalledOnce();
+    });
+
     it('shows one localized nonmodal notice for actual PDF extracted controls without changing source, geometry or corrections', async () => {
         ports.pageProvider = async (_pageNumber, page) => ({...page, getTextContent: async () => ({items: [
             {str: 'Known \u0003 source \u007f text.', transform: [12, 0, 0, 12, 5, 50], width: 80, height: 12, fontName: 'body'},
@@ -374,6 +498,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         state.resetDocument(); await flush(); await state.refreshHistory(); await flush();
         await walkHost(root).find(entry => entry.type === 'button' && hostText(entry) === '清空记录')!.props.onClick(); await flush();
         expect(state.historyEntries).toEqual([]); expect(await history.list()).toEqual([]);
+    });
+
+    it('does not show a mixed-PDF history entry as complete while scan pages are still pending', () => {
+        const entry = {id: 'mixed', name: 'mixed.pdf', format: 'pdf', size: 1, total: 1, completed: 1, pendingOcrPages: 2, updatedAt: 1};
+        expect(state.historyStatus(entry)).toContain('document.pdfReading.scanned');
+        expect(state.historyStatus(entry)).not.toContain('翻译完成');
+        expect(state.historyStatus({...entry, pendingOcrPages: undefined})).toContain('翻译完成');
     });
 
     it('renders actual Word table cells and part headings, navigates their outline and preserves source and correction', async () => {
@@ -1800,6 +1931,15 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         } finally {reader.release();}
     });
 
+
+    it('avoids allocating an export worker for an orphaned legacy translation and preserves the export error',async()=>{
+        await state.loadFiles([file('legacy-source.pdf')]);
+        const document={...state.parsedDocument,segments:[]};
+        vi.spyOn(binaryService,'createDocumentDownload').mockRejectedValueOnce(new Error('legacy source cannot be exported'));
+        await expect(createRuntimeDownload(document,['Old translation'],'translated')).rejects.toThrow('legacy source cannot be exported');
+        await flush();const worker=ports.tasks.find(task=>task.role==='preview');
+        expect(worker).toBeUndefined();
+    });
     it.each(['unchanged', 'custom-layout', 'custom-readable', 'custom-text-readable'] as const)('does not preload a browser PDF worker for %s output', async kind => {
         await state.loadFiles([file('custom.pdf')]);
         const document = state.parsedDocument;
@@ -1890,6 +2030,36 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.batch.mock.calls.flatMap(([sources]: any) => sources)).not.toContain('Native alpha paragraph.');
     });
 
+    it.each(['pause', 'failure'] as const)('saves a real OCR checkpoint before %s and resumes only the remaining page', async outcome => {
+        const source = await loadMixedPdfWithCorrection();
+        const scan = (source.binary as any).pages[0];
+        const extended = markRaw({...source, binary: {...source.binary!, pages: [...(source.binary as any).pages, {...scan, pageNumber: 3}]}}) as ParsedDocument;
+        state.parsedDocument = extended;
+        const gate = deferred<any[]>();
+        const recognize = vi.fn(async ({pageNumber}: {pageNumber: number}) => pageNumber === 3 ? gate.promise
+            : [{text: 'First scanned paragraph.', x: 5, y: 5, width: 90, height: 12}]);
+        ports.createRecognizer.mockReturnValue(recognize);
+        const running = state.startTranslation();
+        await vi.waitFor(() => expect(recognize).toHaveBeenCalledTimes(2));
+        const checkpoint = state.parsedDocument;
+        expect(checkpoint).not.toBe(extended);
+        expect(checkpoint.binary.pages.map((page: PdfDocumentPage) => Boolean(page.scanned))).toEqual([false, false, true]);
+        expect(state.translatedSegments).toEqual(['', 'Human correction', '']);
+        expect(state.confirmedTranslationIds).toEqual([1]);
+        if (outcome === 'pause') {state.pauseTranslation(); gate.resolve([{text: 'Late page', x: 5, y: 5, width: 90, height: 12}]);}
+        else gate.reject(new Error('Last page temporarily unavailable'));
+        await running; await flush();
+        expect(state.parsedDocument).toBe(checkpoint);
+        expect(state.documentQueue[0].document).toBe(checkpoint);
+        const retry = vi.fn(async (_input: unknown) => [{text: 'Final scanned paragraph.', x: 5, y: 5, width: 90, height: 12}]);
+        ports.createRecognizer.mockReturnValue(retry);
+        await state.startTranslation(); await flush();
+        expect(retry).toHaveBeenCalledOnce();
+        expect(retry.mock.calls[0][0]).toMatchObject({pageNumber: 3});
+        expect(state.translatedSegments).toEqual(['译 First scanned paragraph.', 'Human correction', '译 Native beta paragraph.', '译 Final scanned paragraph.']);
+        expect(state.translationComplete).toBe(true);
+    });
+
     it.each(['pause', 'failure'] as const)('retains native corrections after mixed-PDF OCR %s and resumes them on retry', async outcome => {
         const source = await loadMixedPdfWithCorrection();
         const pending = deferred<ParsedDocument>();
@@ -1917,21 +2087,24 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         await state.startTranslation(); await flush();
         expect(state.translatedSegments).toEqual(['Human correction', '译 Native beta paragraph.']);
         expect(state.confirmedTranslationIds).toEqual([0]);
-        expect(state.needsOcr).toBe(false);
+        expect(state.needsOcr).toBe(true);
+        expect(state.translationComplete).toBe(false);
+        expect(state.batchCompletedCount).toBe(0);
+        expect(state.progress).toBe(99);
+        expect(state.runState).toBe('failed');
+        expect(state.errorMessage).toBe('document.pdfReading.ocrIncomplete');
     });
 
-    it('clears mixed-PDF corrections only after accepting the completed-document restart confirmation', async () => {
+    it('continues OCR without clearing corrections when every native segment is already translated', async () => {
         await loadMixedPdfWithCorrection();
         state.editSegment(1, 'Second human correction');
         ports.createRecognizer.mockReturnValue(async () => [{text: 'Scanned opening paragraph.', x: 5, y: 5, width: 90, height: 12}]);
         state.requestTranslation();
-        expect(state.pendingAction).toBe('restart');
-        expect(ports.recognize).not.toHaveBeenCalled();
+        expect(state.pendingAction).toBeNull();
         expect(state.translatedSegments).toEqual(['Human correction', 'Second human correction']);
-        state.confirmAction();
         await vi.waitFor(() => expect(state.translating).toBe(false));
-        expect(state.translatedSegments).toEqual(['译 Scanned opening paragraph.', '译 Native alpha paragraph.', '译 Native beta paragraph.']);
-        expect(state.confirmedTranslationIds).toEqual([]);
+        expect(state.translatedSegments).toEqual(['译 Scanned opening paragraph.', 'Human correction', 'Second human correction']);
+        expect(state.confirmedTranslationIds).toEqual([1, 2]);
     });
 
     it.each(['pause', 'switch', 'reset'] as const)('clears an in-flight OCR status on %s and ignores progress from the abandoned request', async action => {
@@ -2041,7 +2214,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.needsOcr).toBe(true);
     });
 
-    it('keeps an empty OCR result readable and shows its failure without requesting translation or repeating OCR', async () => {
+    it('keeps an empty OCR result readable and allows retry after correcting the scan or source language', async () => {
         await state.loadFiles([file('scanned.pdf')]);
         const original = state.parsedDocument;
         const scanned = markRaw({...original, segments: [], binary: {...original.binary,
@@ -2049,9 +2222,9 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }});
         state.parsedDocument = scanned;
         const recognized = {...scanned, binary: {...scanned.binary,
-            pages: scanned.binary.pages.map((page: PdfDocumentPage) => ({...page, scanned: false})),
+            pages: scanned.binary.pages.map((page: PdfDocumentPage) => ({...page, scanned: true})),
         }};
-        ports.recognize.mockResolvedValueOnce(recognized);
+        ports.recognize.mockResolvedValue(recognized);
 
         await state.startTranslation(); await flush();
 
@@ -2062,7 +2235,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.parsedDocument).toBe(recognized);
         expect(state.documentQueue[0].document).toBe(recognized);
         expect(state.parsedDocument.binary.bytes).toBe(original.binary.bytes);
-        expect(state.needsOcr).toBe(false);
+        expect(state.needsOcr).toBe(true);
         expect(state.translating).toBe(false);
         expect(state.recognitionProgress).toBe('');
         expect(state.batchCompletedCount).toBe(0);
@@ -2070,7 +2243,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(walkHost(recovery).find(entry => entry.props.class === 'recovery-error-detail')!.text).toBe('document.pdfReading.ocrEmpty');
         expect(walkHost(root).some(entry => entry.props['data-document-reader'] === 'pdf')).toBe(true);
         await state.startTranslation(); await flush();
-        expect(ports.recognize).toHaveBeenCalledOnce();
+        expect(ports.recognize).toHaveBeenCalledTimes(2);
         expect(ports.batch).not.toHaveBeenCalled();
         expect(ports.translate).not.toHaveBeenCalled();
         expect(state.runState).toBe('failed');

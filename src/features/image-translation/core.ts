@@ -1,7 +1,9 @@
 /**
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
- * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片与圈选各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
+ * 竖排边界：合列保留各物理列框，坐标恢复同时缩放、去除边框并校验每个源框，防止清字误用整段包络擦掉列间画面。
+ * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
+ * 文档保真：允许文档适配器按原词对象显式保留有字形证据的数字候选，不抬高其原始置信度；适配器同时负责核对提示，普通图片调用维持原来的过滤策略。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -32,11 +34,12 @@ export function selectChangedTranslations<T extends OcrLine>(lines: T[], transla
 }
 
 /** 限制识别内存和耗时；只缩小超大图片，不插值放大小字或更改最终图片分辨率。 */
-export function getOcrImageSize(width: number, height: number): {width: number; height: number} {
+export function getOcrImageSize(width: number, height: number, profile: 'image' | 'document' = 'image'): {width: number; height: number} {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
         throw new Error('图片尺寸无效');
     }
-    const ratio = Math.min(1, 4096 / Math.max(width, height), Math.sqrt(6_000_000 / width / height));
+    // 文档页保持 A4 300 dpi 的细节；仍逐页处理且限制最长边，不改变普通图片的预算。
+    const ratio = Math.min(1, 4096 / Math.max(width, height), Math.sqrt((profile === 'document' ? 9_000_000 : 6_000_000) / width / height));
     return {width: Math.max(1, Math.floor(width * ratio)), height: Math.max(1, Math.floor(height * ratio))};
 }
 
@@ -65,14 +68,20 @@ export function restoreOcrLineCoordinates(
     ocrHeight: number,
     padding = 0,
 ): OcrLine[] {
+    const restoreBox = (box: OcrLine['bbox']) => ({
+        x0: Math.max(0, Math.floor((box.x0 - padding) * sourceWidth / ocrWidth)),
+        y0: Math.max(0, Math.floor((box.y0 - padding) * sourceHeight / ocrHeight)),
+        x1: Math.min(sourceWidth, Math.ceil((box.x1 - padding) * sourceWidth / ocrWidth)),
+        y1: Math.min(sourceHeight, Math.ceil((box.y1 - padding) * sourceHeight / ocrHeight)),
+    });
     return lines.flatMap(line => {
-        const bbox = {
-            x0: Math.max(0, Math.floor((line.bbox.x0 - padding) * sourceWidth / ocrWidth)),
-            y0: Math.max(0, Math.floor((line.bbox.y0 - padding) * sourceHeight / ocrHeight)),
-            x1: Math.min(sourceWidth, Math.ceil((line.bbox.x1 - padding) * sourceWidth / ocrWidth)),
-            y1: Math.min(sourceHeight, Math.ceil((line.bbox.y1 - padding) * sourceHeight / ocrHeight)),
-        };
-        return isValidOcrBox(bbox) ? [{...line, bbox}] : [];
+        const bbox = restoreBox(line.bbox);
+        const sourceBoxes = line.sourceBoxes?.map(restoreBox).filter(isValidOcrBox);
+        return isValidOcrBox(bbox) && (!sourceBoxes || sourceBoxes.length > 0) ? [{...line, bbox,
+            ...(sourceBoxes ? {sourceBoxes} : {}),
+            ...(line.baseline === undefined ? {} : {baseline: (line.baseline - padding) * sourceHeight / ocrHeight}),
+            ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * sourceHeight / ocrHeight}),
+        }] : [];
     });
 }
 
@@ -144,6 +153,7 @@ function joinVerticalColumns(members: OcrLine[]): OcrLine {
         text: ordered.map(line => line.text).reduce(joinOcrWords, ''),
         bbox: unionOcrBoxes(ordered.map(line => line.bbox)),
         vertical: true,
+        sourceBoxes: ordered.map(line => ({...line.bbox})),
     };
 }
 
@@ -314,7 +324,7 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
 
 /** 将原始识别结果清洗和拆行；结果用于各视图独立去重，不改变输入。 */
 type ParsedOcrLine = NumericEvidenceOcrLine & {rawNumericText?: string; numericSourceBox?: OcrBox; numericRawConflict?: true; suppressNumericResidual?: true; hiddenNumericEvidence?: true};
-function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}): ParsedOcrLine[] {
+function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}, retainedDocumentWords?: ReadonlySet<object>): ParsedOcrLine[] {
     if (!blocks) return [];
 
     const normalized: ParsedOcrLine[] = [];
@@ -328,9 +338,9 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         const rawWords = (line.words || []).map(word => {
             const text=word.text.replace(/[\s\u3000]+/g, ' ').trim();
             if(fast&&/\p{N}/u.test(text))fast.noNumeric=false;
-            return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox};
+            return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox,retained:retainedDocumentWords?.has(word)};
         });
-        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && word.confidence >= 25
+        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && (word.confidence >= 25 || word.retained)
                 && isValidOcrBox(word.bbox))
             .sort((left, right) => left.bbox[main.start] - right.bbox[main.start]);
 
@@ -376,7 +386,8 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
                 if (Number.isFinite(confidence) && confidence >= 25) normalized.push({ text, bbox: line.bbox, ...orientation,
                     ...(includeNumericEvidence && validConfidence(line.confidence) ? {numericConfidence: line.confidence} : {}),
                     ...(numeric ? {rawNumericText:sourceText.trim(),numericSourceBox:line.bbox} : {}) });
-                else if (numeric) normalized.push({text,bbox:line.bbox,...orientation,rawNumericText:sourceText.trim(),numericSourceBox:line.bbox,hiddenNumericEvidence:true});
+                // 外层已保证置信度有效或为数字证据；走到此处只可能是后者。
+                else normalized.push({text,bbox:line.bbox,...orientation,rawNumericText:sourceText.trim(),numericSourceBox:line.bbox,hiddenNumericEvidence:true});
             }
             return;
         }
@@ -386,7 +397,8 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         const flush = () => {
             const bbox = unionOcrBoxes(current.map(word => word.bbox));
             const text = current.map(word => word.text).reduce(joinOcrWords, '');
-            if (text) normalized.push({ text, bbox, ...orientation });
+            // current 始终由已经过滤的非空词组成，joinOcrWords 不会删除文字。
+            normalized.push({ text, bbox, ...orientation });
         };
 
         for (let index = 1; index < words.length; index += 1) {
@@ -397,7 +409,10 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             const gap = next.bbox[main.start] - previous.bbox[main.end];
             const sameLine = crossOverlap >= Math.min(previousThickness, getAxisSize(next.bbox, cross)) * 0.35;
             // 英文单词间距可能接近一个字高；同一 OCR 行内合并，跨控件的大间距仍保持分开。
-            if (sameLine && gap <= Math.max(6, previousThickness * 4)) {
+            const adjacentHan = /\p{Script=Han}$/u.test(previous.text) && /^\p{Script=Han}/u.test(next.text);
+            // “一”只有一条横线，不能用它的墨迹高度把同一汉语词中的下一字误拆为另一行。
+            const hanGap = adjacentHan ? Math.max(previousThickness, getAxisSize(next.bbox, cross)) * .75 : 0;
+            if (sameLine && gap <= Math.max(6, previousThickness * 4, hanGap)) {
                 current.push(next);
             } else {
                 flush();
@@ -494,8 +509,9 @@ function restoreNumericRawText(lines:ParsedOcrLine[]):NumericEvidenceOcrLine[] {
     return lines;
 }
 
-export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false): NumericEvidenceOcrLine[] {
-    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence), includeNumericEvidence);
+/** 文档可按原词对象显式保留有字形证据的候选；原置信度不变，调用方必须附带核对位置。 */
+export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false, retainedDocumentWords?: ReadonlySet<object>): NumericEvidenceOcrLine[] {
+    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence, undefined, retainedDocumentWords), includeNumericEvidence);
 }
 
 /** 共享文本解析；每个视图独立去重和合列，坐标回映仍由调用方在合列之后执行。 */
@@ -505,7 +521,8 @@ export function normalizeOcrLineViews(blocks: OcrBlocks): {ordinary: OcrLine[]; 
     if(fast.noNumeric&&parsed.every(line=>!line.guardOnly)){
         const manga=finalizeOcrLines(parsed,true);
         // 非数字时两视图的合列和去重完全相同；逐行/框复制仍保证缓存调用者互不污染。
-        const ordinary=manga.map(({numericConfidence:_confidence,...line})=>({...line,bbox:{...line.bbox}}));
+        const ordinary=manga.map(({numericConfidence:_confidence,...line})=>({...line,bbox:{...line.bbox},
+            ...(line.sourceBoxes?{sourceBoxes:line.sourceBoxes.map(box=>({...box}))}:{})}));
         return {ordinary,manga};
     }
     // finalize 可能删除置信字段或替换框，因此普通视图必须拥有独立行对象。

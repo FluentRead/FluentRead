@@ -356,7 +356,8 @@ export default defineConfig({
             // GitHub 名称保护和 Mac 基准页面适配已在主线；扫描论文及原文校订单独实测比 dc7bff026 基线增加 66,822 bytes。
             // 图片 OCR 与汉字复核主线为 66,190,277 bytes；课程时间轴、共用菜单和 edX 子 frame 整合后为 66,361,190 bytes。
             // 课程文本代码增加 170,913 bytes，预算保留约 2.8 kB 余量；模型、词典和其他二进制资源保持原有门禁。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_364_000 : 66_000_000;
+            // Firefox 同一整合构建为 66,015,803 bytes，保留约 2.2 kB 余量。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_364_000 : 66_018_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

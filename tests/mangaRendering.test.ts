@@ -1,4 +1,6 @@
 import {describe,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
 import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTranslation,sampleMangaBackgrounds} from '@/src/features/image-translation/services/mangaRendering';
 import {findMangaBlankSpaces} from '@/src/features/image-translation/services/mangaBlankSpaces';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
@@ -29,6 +31,37 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it('冻结招牌的两个渐变标题保留共同左边线，独立平色标签不猜测对齐',()=>{
+        const pixels=new Uint8ClampedArray(gunzipSync(readFileSync(new URL('./fixtures/manga-color-quality/truth/prism-platform-gradient-signs.source-rgba.bin.gz',import.meta.url))));
+        const rows=[{text:'沿着东方的轨道',fontSize:37,bbox:{x0:181,y0:130,x1:1003,y1:167}},
+            {text:'下一班火车马上就到了。',fontSize:28,bbox:{x0:179,y0:205,x1:894,y1:233}},
+            {text:'九号站台已开放',fontSize:27,bbox:{x0:831,y0:480,x1:1306,y1:507}}].map(r=>({...r,sourceBoxes:[{...r.bbox}]}));
+        const sampled=sampleMangaBackgrounds(pixels,1600,900,rows);
+        expect(sampled.map(b=>b.textAlign)).toEqual(['left','left',undefined]);
+        expect(sampled.map(b=>b.foreground)).toEqual(['rgb(245,245,250)','rgb(18,26,45)','rgb(248,215,80)']);
+    });
+    it.each(['left','right'] as const)('单行 %s 对齐以真实墨迹边缘放置，包含描边且恢复画布状态',alignment=>{
+        for(const text of ['短标题','مرحبا','שלום'])for(const bearing of [2,-3]){
+            const c=context(),before=snapshot(c),base=c.measureText.getMockImplementation()!;
+            c.measureText.mockImplementation(value=>{const m=base(value);return {...m,actualBoundingBoxLeft:bearing,actualBoundingBoxRight:m.width-bearing};});
+            const seen:any[]=[];c.fillText.mockImplementation((value,x,y)=>{seen.push({value,x,y,font:c.font,align:c.textAlign,direction:c.direction,lineWidth:c.lineWidth});return {text:value,x,y,font:c.font};});
+            const r=region(text);drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{uniform:false,color:'#ffffff',foregroundOutline:'#111827',textAlign:alignment}]);
+            expect(seen).toHaveLength(1);expect(seen[0].align).toBe('left');expect(seen[0].direction).toBe(text==='短标题'?'ltr':'rtl');
+            const size=Number(seen[0].font.match(/ ([\d.e+-]+)px/)![1]),inset=Math.min(4,21*.1),padding=seen[0].lineWidth/2+.5,width=Array.from(text).length*size*.6;
+            const expected=alignment==='left'?500+inset+padding+bearing:800-inset-padding-(width-bearing);
+            expect(seen[0].x).toBeCloseTo(expected);expect(seen[0].x-bearing-padding).toBeGreaterThanOrEqual(500+inset-1e-9);
+            expect(seen[0].x+width-bearing+padding).toBeLessThanOrEqual(800-inset+1e-9);expect(snapshot(c)).toEqual(before);expect(c.fillRect).not.toHaveBeenCalled();
+        }
+    });
+    it('缺少字形边界、宽字形无法完整容纳及多行译文仍保持居中',()=>{
+        for(const ink of [{actualBoundingBoxLeft:NaN},{actualBoundingBoxRight:NaN},{actualBoundingBoxLeft:0,actualBoundingBoxRight:0},{actualBoundingBoxLeft:500,actualBoundingBoxRight:500}]){
+            const c=context(),base=c.measureText.getMockImplementation()!;c.measureText.mockImplementation(value=>({...base(value),...ink}));
+            drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[region('短标题')],true,[{uniform:true,color:'#ffffff',textAlign:'left'}]);
+            expect(c.fillText.mock.calls.map(c=>c[1])).toEqual([650]);
+        }
+        const c=context();drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[region('第一行\n第二行')],true,[{uniform:true,color:'#ffffff',textAlign:'right'}]);
+        expect(c.fillText.mock.calls).toHaveLength(2);expect(c.fillText.mock.calls.map(c=>c[1])).toEqual([650,650]);
+    });
     it('渐变只提供字色与细对比描边，不把原复杂背景降成纯色清字',()=>{
         const pixels=new Uint8ClampedArray(W*H*4),r=region('SOURCE');
         for(let y=0;y<H;y++)for(let x=0;x<W;x++)pixels.set([20+x*.15,30+y*.1,70,255],(y*W+x)*4);

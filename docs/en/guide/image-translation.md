@@ -51,6 +51,8 @@ Nearby centered small text uses the image's blank space and smooth background to
 
 On a continuous gradient, neighboring lines with clearly different sizes and verified text colors retain separate regions. This helps preserve a heading and subtitle as distinct styles. Same-image context still follows the selected translation service and settings.
 
+In manga mode, neighboring gradient headings with a clear shared left or right edge can keep that alignment for single-line translations. This helps short translations preserve the original hierarchy. Centered text, wrapping, transparency avoidance or insufficient space retain the existing layout.
+
 The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.

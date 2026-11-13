@@ -43,7 +43,7 @@ function tidalConsumers(preferred:'local'|'whole'='local'){
     const local=[{text:'HOLD THE ROPE',confidence:.959563475388747,box:{x:209,y:206,width:812,height:71}},
         {text:'I WILL GO FIRST',confidence:.9693169792493185,box:{x:204,y:379,width:797,height:74}}]
         .map(item=>({...item,box:{x:bbox.x0+item.box.x/sx,y:bbox.y0+item.box.y/sy,width:item.box.width/sx,height:item.box.height/sy}}));
-    // 反例只互换两个已观测候选的空格视图，验证真正替换local文字仍不继承原对象布局权限。
+    // 互换两个已观测词界视图，验证只有已采用的像素证明才能衔接原局部几何的布局关系。
     if(preferred==='whole')[results[3].text,local[1].text]=[local[1].text,results[3].text];
     const page:MangaOcrPage={results,bubbles:[{bbox,results:local}],numericEvidence:[results[6]]},before=JSON.stringify([results,page.bubbles]);
     const read=vi.fn((roi:{left:number;top:number;width:number;height:number},max:number)=>{
@@ -73,11 +73,11 @@ describe('词界选择与同帧段落证明共同消费真实Tidal原始graph',(
         expect(getMangaViewWordBoundaryProvenance(second)?.[0]).toMatchObject({textView:'local',geometryView:'local',whole:{text:'IWILL GO FIRST'},local:{text:'I WILL GO FIRST'}});
         expect(f.regions.find(line=>line.guardOnly)?.bbox).toEqual({x0:605,y0:741,x1:771,y1:876});
     });
-    it('whole词界真正替换local文字时保留原几何和来历，但撤回原local段落权限',()=>{
+    it('whole词界替换local空格后以已采用的真实来历衔接段落，保持原几何',()=>{
         const f=tidalConsumers('whole'),first=f.regions.find(line=>line.text==='HOLD THE ROPE')!;
-        expect(f.support?.successor(first)).toBeUndefined();
+        expect(f.support?.successor(first)?.text).toBe('I WILL GO FIRST');
         expect(f.paragraphs.filter(line=>!line.guardOnly).map(line=>line.text)).toEqual([
-            'WE CAN CROSS NOW THE TIDE IS FALLING','HOLD THE ROPE','I WILL GO FIRST','The channel before sunrise.',
+            'WE CAN CROSS NOW THE TIDE IS FALLING','HOLD THE ROPE I WILL GO FIRST','The channel before sunrise.',
         ]);
         const second=f.regions.find(line=>line.text==='I WILL GO FIRST')!;
         expect(second.bbox).toEqual(f.record.observedPhysicalLines[3].bbox);

@@ -354,7 +354,8 @@ export default defineConfig({
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
             // GitHub 名称保护与 Mac 基准页面适配合并后约 66.114 MB；新增 2 kB 规则预算，继续校验实际产物。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_114_000 : 66_000_000;
+            // 原始物理框、实际字形与渐变修补批次实测66,119,486字节，较同依赖最新main增加5,956字节；没有新增模型或依赖。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_120_000 : 66_000_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

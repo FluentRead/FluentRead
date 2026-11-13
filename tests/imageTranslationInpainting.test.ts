@@ -69,6 +69,30 @@ function knownHoleFixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it('渐变边界中存在透明变化时保持原有alpha扩散，不按不透明底色铺平',()=>{
+        const width=64,height=48,pixels=solidPixels(width,height),region=line(16,16,48,32);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([100+x,120+y,180,255],(y*width+x)*4);
+        const [box]=imageMaskBoxes(region,width,height);
+        for(let x=box.x0;x<box.x1;x++)pixels[(box.y1*width+x)*4+3]=120;
+        const result=inpaintTextRegions(pixels,width,height,[region]);
+        expect(result[((box.y1-1)*width+32)*4+3]).toBeLessThan(255);
+        expect(result[(box.y1*width+32)*4+3]).toBe(120);
+    });
+    it('二维渐变清字不产生扩散接缝，修复边界外逐字节不变', () => {
+        const width=160,height=100,clean=solidPixels(width,height);
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)clean.set([Math.round(30+x*.6+y*.3),Math.round(80+y*.5),Math.round(170-x*.2),255],(y*width+x)*4);
+        const source=clean.slice(),region=line(20,25,140,75);
+        for(let y=25;y<75;y++)for(let x=20;x<140;x++)if(x%12<6)source.set([5,5,5,255],(y*width+x)*4);
+        const result=inpaintTextRegions(source,width,height,[region]);
+        const [box]=imageMaskBoxes(region,width,height);
+        let maxError=0;
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)for(let channel=0;channel<4;channel++){
+            const index=(y*width+x)*4+channel;
+            if(x>=box.x0&&x<box.x1&&y>=box.y0&&y<box.y1)maxError=Math.max(maxError,Math.abs(result[index]-clean[index]));
+            else expect(result[index]).toBe(source[index]);
+        }
+        expect(maxError).toBeLessThanOrEqual(1);
+    });
     it('只读上下文的低alpha也不作为种子，纯色仍无队列且不改保护RGBA',()=>{
         const w=64,h=48,p=solidPixels(w,h,[232,219,191,96]),queues:number[]=[],Queue=Uint32Array;
         const r=line(20,20,40,28),hole=(22*w+42)*4;

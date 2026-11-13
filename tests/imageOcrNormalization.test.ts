@@ -12,6 +12,32 @@ import {
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
 import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '@/src/features/image-translation/ocrLanguages';
+import {inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
+import {groupMangaOcrLines} from '@/src/features/image-translation/services/mangaRegions';
+
+it('Tesseract竖排合段保留各列清字范围，缩放后不擦除列间图案或放大漫画字号',()=>{
+    const boxes=[{x0:54,y0:20,x1:68,y1:80},{x0:28,y0:20,x1:42,y1:80}];
+    const recognized=normalizeOcrLines([{paragraphs:[{lines:boxes.map((bbox,i)=>({text:i?'左列':'右列',bbox,
+        baseline:{x0:bbox.x0,y0:bbox.y0,x1:bbox.x0,y1:bbox.y1}}))}]}]);
+    expect(recognized).toHaveLength(1);expect(recognized[0].sourceBoxes).toEqual(boxes);
+    const restored=restoreOcrLineCoordinates(recognized,200,200,100,100);
+    const expected=boxes.map(b=>({x0:b.x0*2,y0:b.y0*2,x1:b.x1*2,y1:b.y1*2}));
+    expect(restored[0].sourceBoxes).toEqual(expected);
+    const region=groupImageParagraphs(restored)[0];
+    const manga=groupMangaOcrLines(restored,'ja',200,200)[0];
+    expect(manga.sourceBoxes).toEqual(expected);expect(manga.fontSize).toBe(28);
+    const pixels=new Uint8ClampedArray(200*200*4).fill(255);
+    const artwork=(90*200+96)*4;pixels.set([230,40,80,255],artwork);
+    for(const bbox of expected)for(let y=bbox.y0;y<bbox.y1;y++)for(let x=bbox.x0;x<bbox.x1;x++)pixels.set([0,0,0,255],(y*200+x)*4);
+    const result=inpaintTextRegions(pixels,200,200,[region]);
+    expect([...result.subarray(artwork,artwork+4)]).toEqual([230,40,80,255]);
+    expect([...result.subarray((90*200+65)*4,(90*200+65)*4+4)]).toEqual([255,255,255,255]);
+    for(const sourceBoxes of [[],[{x0:NaN,y0:1,x1:2,y1:2}],[{x0:-5,y0:-5,x1:-1,y1:-1}]]){
+        const bad=[{...restored[0],sourceBoxes}];
+        expect(restoreOcrLineCoordinates(bad,200,200,200,200)).toEqual([]);
+        expect(groupMangaOcrLines(bad,'ja',200,200)).toEqual([]);
+    }
+});
 
 describe('普通图片按完整段落翻译', () => {
     const line = (text: string, x0: number, y0: number, width = 200, h = 12): ImageTextRegion =>

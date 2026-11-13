@@ -25,4 +25,6 @@ export interface OcrLine {
     };
     /** 竖排文字区域：同一气泡的相邻竖列已按从右到左合并，绘制时不按细长列框的高度外扩留白。 */
     vertical?: true;
+    /** 合并前的物理文字框；擦除使用这些框，不能把列间或行间的画面当作文字。 */
+    sourceBoxes?: OcrLine['bbox'][];
 }

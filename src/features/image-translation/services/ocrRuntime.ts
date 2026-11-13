@@ -1,6 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
+ * 返回值隔离：缓存命中和在途共享均独立复制段落框及合并前的物理列框，调用方不能污染其他视图或后续清字坐标。
  * 主要内容：配置扩展语言资源、转发引擎任务进度与图片/圈选识别策略；保持竖排检测和空结果一次布局重试，坐标映回原图并按策略隔离有界缓存；合并同图在途任务并独立取消，预处理检查独占像素并为透明前景合成对比底色，不透明原尺寸 PNG 复用原编码，其他输入共用可取消的异步 PNG 编码，JPEG 以浏览器已应用 EXIF 的像素识别；整图借用预检已解码图片，其他路径限时解码，绘制后立即释放自有源像素；公开离屏页面销毁时的 Worker 与结果缓存清理入口。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
@@ -73,6 +74,7 @@ function abortRecognition(): Error {
 
 function copyOcrLines(lines: NumericEvidenceOcrLine[], includeEvidence = true): NumericEvidenceOcrLine[] {
     return lines.map(({numericConfidence, ...line}) => ({...line, bbox: {...line.bbox},
+        ...(line.sourceBoxes ? {sourceBoxes:line.sourceBoxes.map(box=>({...box}))} : {}),
         ...(includeEvidence && numericConfidence !== undefined ? {numericConfidence} : {})}));
 }
 

@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/rendering.ts
  * 文件职责：采样 OCR 框周边背景并在有限图片区域中排版、绘制完整译文，避免混合语言空格损坏、强制横向压缩和行数截断。
- * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，避免字号搜索中的重复工作，保留正文对齐及字号上限并隔离 Canvas 状态。
+ * 主要内容：按周长采样主色、依据亮度选择文字颜色、按单词与真实字素边界换行，无字素分割器时仅在已知安全的空格边界分开复杂词组；每次排版有界复用同字号测宽和字素分割，按实际回退字体的墨迹、描边和基线适配上下边界，保留正文对齐及字号上限并隔离 Canvas 状态。
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  */
 import type {OcrLine} from '@/src/shared/image/types';
@@ -78,9 +78,16 @@ export interface ImageTranslationTextLayout {
     lines: string[];
     fontSize: number;
     lineHeight: number;
+    /** 字体回退后的实际墨迹高度与字母基线；旧度量端口缺少指标时仍使用行框。 */
+    ink?: {height: number; baselines: number[]};
 }
 
-export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
+/** 离屏文档的默认方向不能决定译文中的数字与标点；预检和绘制使用同一首强字符方向。 */
+export function getImageTextDirection(text:string):CanvasDirection {
+    const firstLetter=text.match(/\p{Letter}/u)?.[0]??'';
+    return /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}]/u.test(firstLetter)?'rtl':'ltr';
+}
 // 补充平面汉字、假名与韩文 Jamo 要与英文分词，附着的组合标记和连接符仍属于前一字素。
 const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
 // 这些字符各自是完整字素：不含组合标记、连接符、韩文 Jamo、表情修饰符或 Prepend。
@@ -167,6 +174,7 @@ export function layoutImageTranslationText(
     height: number,
     measure: (text: string, fontSize: number) => number,
     maxFontSize = Infinity,
+    measureInk?: (text: string, fontSize: number) => {ascent: number; descent: number},
 ): ImageTranslationTextLayout {
     const normalized = text.replace(/\r\n?/g, '\n').trim();
     if (!normalized || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -230,9 +238,25 @@ export function layoutImageTranslationText(
             }
             lines.push(current);
         }
-        return { lines, fontSize, lineHeight: fontSize * lineSpacing };
+        const layout: ImageTranslationTextLayout = { lines, fontSize, lineHeight: fontSize * lineSpacing };
+        if (measureInk) {
+            const metrics = lines.map(line => line ? measureInk(line, fontSize) : {ascent: fontSize / 2, descent: fontSize / 2});
+            if (metrics.every(metric => Number.isFinite(metric.ascent) && Number.isFinite(metric.descent)
+                && metric.ascent + metric.descent > 0 && Number.isFinite(metric.ascent + metric.descent))) {
+                let top = Infinity, bottom = -Infinity;
+                for (const metric of metrics) layout.lineHeight = Math.max(layout.lineHeight, metric.ascent + metric.descent);
+                const baselines = metrics.map((metric, index) => {
+                    const baseline = index * layout.lineHeight;
+                    top = Math.min(top, baseline - metric.ascent);
+                    bottom = Math.max(bottom, baseline + metric.descent);
+                    return baseline;
+                });
+                layout.ink = {height: bottom - top, baselines: baselines.map(baseline => baseline - top)};
+            }
+        }
+        return layout;
     };
-    const fits = (layout: ImageTranslationTextLayout) => layout.lines.length * layout.lineHeight <= height
+    const fits = (layout: ImageTranslationTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
         && layout.lines.every(line => textWidth(line, layout.fontSize) <= width);
 
     let high = Math.min(height / lineSpacing, maxFontSize);
@@ -273,21 +297,45 @@ export function drawTranslatedImageText(
     const paddingY = Math.min(1, height * 0.05);
     context.save();
     try {
+        // 离屏文档通常是LTR，不能把这个默认方向施加到阿拉伯文、希伯来文及其数字/标点。
+        context.direction = getImageTextDirection(text);
         let measuredFont = 0;
-        const layout = prepared ?? layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2, (line, fontSize) => {
+        const metrics = new Map<string, TextMetrics>();
+        context.textAlign = 'left';
+        context.textBaseline = 'alphabetic';
+        const measure = (line: string, fontSize: number) => {
             if (fontSize !== measuredFont) {
                 context.font = `400 ${fontSize}px ${IMAGE_TEXT_FONT}`;
                 measuredFont = fontSize;
+                metrics.clear();
             }
-            return context.measureText(line).width;
-        }, maxFontSize);
+            let result = metrics.get(line);
+            if (!result) {
+                result = context.measureText(line);
+                if (metrics.size >= 512) metrics.clear();
+                metrics.set(line, result);
+            }
+            return result;
+        };
+        const bleed = (size: number) => Math.max(0.35, size * 0.06) / 2;
+        const layout = prepared ?? layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2,
+            (line, size) => {
+                const metric = measure(line, size);
+                const inkWidth = metric.actualBoundingBoxLeft + metric.actualBoundingBoxRight;
+                return Number.isFinite(inkWidth) ? Math.max(metric.width, inkWidth) + bleed(size) * 2 : metric.width;
+            }, maxFontSize, (line, size) => {
+                const metric = measure(line, size);
+                const valid = metric.actualBoundingBoxAscent + metric.actualBoundingBoxDescent > 0;
+                return {ascent: valid ? metric.actualBoundingBoxAscent + bleed(size) : NaN,
+                    descent: valid ? metric.actualBoundingBoxDescent + bleed(size) : NaN};
+            });
         if (layout.lines.length === 0) return;
         context.beginPath();
         context.rect(left, top, width, height);
         context.clip();
         context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
-        context.textAlign = textAlign;
-        context.textBaseline = 'middle';
+        context.textAlign = layout.ink ? 'left' : textAlign;
+        context.textBaseline = layout.ink ? 'alphabetic' : 'middle';
         context.fillStyle = getImageTextColor(backgroundColor);
         context.strokeStyle = backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * 0.06);
@@ -297,9 +345,17 @@ export function drawTranslatedImageText(
             : top + paddingY + layout.lineHeight / 2;
         const x = textAlign === 'left' ? left + paddingX : textAlign === 'right' ? left + width - paddingX : left + width / 2;
         layout.lines.forEach((line, index) => {
-            const y = firstLine + index * layout.lineHeight;
-            context.strokeText(line, x, y);
-            context.fillText(line, x, y);
+            const y = layout.ink
+                ? top + (textAlign === 'center' ? (height - layout.ink.height) / 2 : paddingY) + layout.ink.baselines[index]
+                : firstLine + index * layout.lineHeight;
+            const metric = layout.ink ? measure(line, layout.fontSize) : undefined;
+            const inkX = metric && Number.isFinite(metric.actualBoundingBoxLeft + metric.actualBoundingBoxRight)
+                ? textAlign === 'left' ? left + paddingX + metric.actualBoundingBoxLeft + bleed(layout.fontSize)
+                    : textAlign === 'right' ? left + width - paddingX - metric.actualBoundingBoxRight - bleed(layout.fontSize)
+                        : left + (width + metric.actualBoundingBoxLeft - metric.actualBoundingBoxRight) / 2
+                : x;
+            context.strokeText(line, inkX, y);
+            context.fillText(line, inkX, y);
         });
     } finally {
         context.restore();

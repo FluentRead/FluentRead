@@ -6,7 +6,7 @@
  * 模块边界：本运行时在读取预算内异步编码页面允许访问的 Canvas，污染画布先走网页 CORS，再按剩余预算授权后台读取当前任务图片；漫画语言包恢复由会话队列管理并按当前引擎准备；共用 PNG 编码器处理取消/迟到结果，识别、文本翻译、图像修复与语言包管理位于 background/services，控件交互由 controls 模块提供。
  * 分段旁置：仅分段载体提供已冻结的核心像素视窗，并随原漫画请求透传供完整补绘准入；普通图片与无视窗宿主不增加请求字段或读取布局。
  * 大图查看器：可信点击后预解码已有译图，待查看器开场动画结束再接管；透明手势层不打断接管，同图高清切换及查看器节点替换复用该结果。
- * 滚动呈现：普通译图优先在与原图重合的宿主定位容器内绘制，随宿主滚动与裁切；固定层继续管理操作条和无法就地绘制的译图。
+ * 滚动呈现：普通译图复用宿主定位容器；旋转、缩放和透视图片先确认共用裁切链，再以相邻的等尺寸原生盒子继承祖先变换，复制自身变换及参考盒，不把外接矩形当作原图；失败布局按几何身份去重，样式变化后可重试，固定层管理操作条和常规回退。
  * 滚动开销：纯滚动帧对离屏图跳过样式和裁切扫描，保留可安全随容器回到视口的译图；样式只在值变化时写入。
  */
 import {imageTranslationFailureCode, imageLocalFailureMessage, type ImageLocalFailure} from '../failure';
@@ -27,7 +27,7 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {fetchPageImageForOcr} from '@/src/features/image-translation/services/remoteImage';
 import {encodeImageCanvas} from '@/src/features/image-translation/services/imageEncoding';
 import {withImageSourceAuthorization} from './sourceAuthorization';
-import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, type ImagePresentation} from './presentation';
+import {resolveImagePresentation, surfaceStyleToBitmap, presentationMatchesSource, isImagePresentationOccluded, canShareImageOverflowClipping, type ImagePresentation} from './presentation';
 import {isNativeModal, isOpenImageViewer, samePreviewImage, samePreviewResource, visibleImageViewers, type PreviewImageSource} from './imagePreview';
 import {createImageControls, IMAGE_CONTROLS_CSS, type ImageControlPhase, type ImageSettingsSection} from './controls';
 import {isImageHoverEligible} from './hoverEligibility';
@@ -54,7 +54,8 @@ const openMangaReading = (event: MouseEvent) => mangaReadingOpener?.(event) ?? f
 
 const IMAGE_TRANSLATION_OVERLAY = 'fluent-read-image-translation-overlay';
 const IMAGE_TRANSLATION_ROOT = 'fluent-read-image-translation-root';
-const IMAGE_BITMAP_CSS = '.fluent-read-image-translation-bitmap { position: absolute !important; inset: 0 !important; display: block !important; box-sizing: border-box !important; width: 100% !important; height: 100% !important; max-width: none !important; max-height: none !important; pointer-events: none !important; }';
+const IMAGE_BITMAP_CSS = '.fluent-read-image-translation-bitmap { position: absolute !important; inset: var(--fluent-read-bitmap-inset, 0) !important; display: block !important; box-sizing: border-box !important; width: var(--fluent-read-bitmap-width, 100%) !important; height: var(--fluent-read-bitmap-height, 100%) !important; max-width: none !important; max-height: none !important; pointer-events: none !important; }';
+const imageStyleWrites = new WeakMap<CSSStyleDeclaration, Map<string, {requested: string; serialized: string; priority: string}>>();
 const MIN_IMAGE_WIDTH = 80;
 const MIN_IMAGE_HEIGHT = 40;
 const IMAGE_READ_TIMEOUT_MS = 15_000;
@@ -99,8 +100,10 @@ interface ImageTranslationState {
     waitingForImage: boolean;
     lines: ImageTranslationLine[];
     translatedImage: TranslatedSurface | null;
-    // undefined 表示当前译图尚未检查就地挂载，null 表示已选择固定层回退。
     localBitmapHost?: HTMLDivElement | null;
+    localBitmapFailure?: {parent: HTMLElement | null; offsetParent: Element | null; geometry: string};
+    localBitmapGeometry?: string;
+    layoutFallback?: boolean;
     imageUnchanged: boolean;
     retryWhenSegmentationReady?: true;
     resultIdentity: string | null;
@@ -193,6 +196,9 @@ function releaseSurface(state: ImageTranslationState): void {
     const surface = state.translatedImage; surface?.remove(); state.translatedImage = null;
     detachLocalBitmapHost(state);
     state.localBitmapHost = undefined;
+    state.localBitmapFailure = undefined;
+    state.localBitmapGeometry = undefined;
+    state.layoutFallback = false;
     if (surface?.tagName === 'CANVAS' && resultCache.get(state.image)?.translatedImage !== surface) {
         (surface as HTMLCanvasElement).width = 0; (surface as HTMLCanvasElement).height = 0;
     }
@@ -689,48 +695,163 @@ function detachLocalBitmapHost(state: ImageTranslationState): void {
     state.resizeObserver?.unobserve(host);
     host.remove();
     state.localBitmapHost = null;
+    state.localBitmapGeometry = undefined;
 }
 
-function sharesBitmapBox(host: HTMLElement, parent: HTMLElement, rect: DOMRect): boolean {
-    if (host.parentElement !== parent || host.offsetParent !== parent) return false;
-    const box = host.getBoundingClientRect();
+function imageBoxMatches(box: DOMRect, rect: DOMRect): boolean {
     return Math.abs(box.left - rect.left) <= 0.5 && Math.abs(box.top - rect.top) <= 0.5
         && Math.abs(box.width - rect.width) <= 0.5 && Math.abs(box.height - rect.height) <= 0.5;
 }
 
-function updateImageStyle(style: CSSStyleDeclaration, property: string, value: string, priority = ''): void {
-    value ??= '';
-    if ((style.getPropertyValue(property) || '') !== value || (style.getPropertyPriority?.(property) || '') !== priority) {
-        style.setProperty(property, value, priority);
-    }
+function sharesBitmapBox(host: HTMLElement, parent: HTMLElement, offsetParent: Element | null, rect: DOMRect): boolean {
+    if (host.parentElement !== parent || host.offsetParent !== offsetParent) return false;
+    return imageBoxMatches(host.getBoundingClientRect(), rect);
 }
 
-function placeLocalBitmap(state: ImageTranslationState, surface: HTMLElement, rect: DOMRect, style: CSSStyleDeclaration, bitmap: TranslatedSurface): boolean {
-    if (state.localBitmapHost === null) return false;
+function updateImageStyle(style: CSSStyleDeclaration, property: string, value: string, priority = ''): void {
+    value ??= '';
+    const current = style.getPropertyValue(property) || '', currentPriority = style.getPropertyPriority?.(property) || '';
+    if (current === value && currentPriority === priority) return;
+    const previous = imageStyleWrites.get(style)?.get(property);
+    // 浏览器会折叠 calc 和截断 CSS 小数；不把规范化结果误认为宿主改写，避免
+    // 自有 style mutation 反复安排下一帧。宿主真正改写值或优先级时仍重新应用。
+    if (previous?.requested === value && previous.serialized === current && previous.priority === priority && currentPriority === priority) return;
+    style.setProperty(property, value, priority);
+    let writes = imageStyleWrites.get(style);
+    if (!writes) imageStyleWrites.set(style, writes = new Map());
+    writes.set(property, {requested: value, serialized: style.getPropertyValue(property) || '', priority});
+}
+
+function hasImageLayoutTransform(style: CSSStyleDeclaration): boolean {
+    return [style.transform, style.translate, style.rotate, style.scale, style.perspective].some(value => value && value !== 'none')
+        || Boolean(style.zoom && !['1', 'normal'].includes(style.zoom));
+}
+
+/** 正向二维缩放和平移仍可由现有固定层表示；旋转、镜像、斜切及透视需要原生参考盒。 */
+function needsImageTransformHost(style: CSSStyleDeclaration): boolean {
+    if (style.perspective && style.perspective !== 'none') return true;
+    if (style.rotate && style.rotate !== 'none' && Number.parseFloat(style.rotate.split(/\s+/).at(-1)!) !== 0) return true;
+    if (style.scale && style.scale !== 'none' && style.scale.split(/\s+/).some(value => Number.parseFloat(value) <= 0)) return true;
+    if (!style.transform || style.transform === 'none') return false;
+    const matrix = /^matrix\(([^)]+)\)$/.exec(style.transform)?.[1].split(',').map(Number);
+    return !matrix || matrix.length !== 6 || matrix.some(value => !Number.isFinite(value))
+        || matrix[0] <= 0 || matrix[3] <= 0 || Math.abs(matrix[1]) > 1e-8 || Math.abs(matrix[2]) > 1e-8;
+}
+
+function imageComputedStyleMap(surface: HTMLElement): {get(property: string): unknown} | undefined {
+    return (surface as HTMLElement & {computedStyleMap?: () => {get(property: string): unknown}}).computedStyleMap?.();
+}
+
+function imageBorderWidth(value: string, scale: number, local: boolean): string {
+    const width = (Number.parseFloat(value) || 0) * scale;
+    // CSSOM 会截断已经量化的 zoom 边框小数；千分之一 CSS 像素防止二次向下量化，
+    // 不改变可见边框宽度，零宽边框保持为零。
+    return local && width > 0 ? `calc(${width}px + 0.001px)` : `${width}px`;
+}
+
+/** offsetParent 在不同 zoom 层可能不等于绝对定位包含块；只在失配时校准，最多两轮。 */
+function alignTransformedImageHost(host: HTMLElement, rect: DOMRect): boolean {
+    for (let attempt = 0; attempt < 2; attempt++) {
+        const current = host.getBoundingClientRect();
+        if (imageBoxMatches(current, rect)) return true;
+        const left = Number.parseFloat(host.style.left), top = Number.parseFloat(host.style.top);
+        updateImageStyle(host.style, 'left', `${left + 1}px`, 'important');
+        const x = host.getBoundingClientRect();
+        updateImageStyle(host.style, 'left', `${left}px`, 'important');
+        updateImageStyle(host.style, 'top', `${top + 1}px`, 'important');
+        const y = host.getBoundingClientRect();
+        updateImageStyle(host.style, 'top', `${top}px`, 'important');
+        const a = x.left - current.left, b = y.left - current.left, c = x.top - current.top, d = y.top - current.top;
+        const determinant = a * d - b * c;
+        if (!Number.isFinite(determinant) || Math.abs(determinant) < 1e-8) return false;
+        const dx = rect.left - current.left, dy = rect.top - current.top;
+        const nextLeft = left + (d * dx - b * dy) / determinant, nextTop = top + (a * dy - c * dx) / determinant;
+        if (!Number.isFinite(nextLeft) || !Number.isFinite(nextTop)) return false;
+        updateImageStyle(host.style, 'left', `${nextLeft}px`, 'important');
+        updateImageStyle(host.style, 'top', `${nextTop}px`, 'important');
+    }
+    return imageBoxMatches(host.getBoundingClientRect(), rect);
+}
+
+function placeLocalBitmap(state: ImageTranslationState, surface: HTMLElement, rect: DOMRect, style: CSSStyleDeclaration,
+                          bitmap: TranslatedSurface, transformed = false): boolean {
     const parent = surface.parentElement;
+    const offsetParent = surface.offsetParent;
     // 只复用宿主已建立的定位容器；不修改原图或父容器的定位方式。
-    const eligible = !state.manga && parent && parent.tagName !== 'PICTURE' && surface.offsetParent === parent
+    const eligible = !state.manga && parent && parent.tagName !== 'PICTURE' && offsetParent && (transformed || offsetParent === parent)
         && style.position !== 'fixed' && style.position !== 'sticky'
         && (style.position !== 'static' || !style.zIndex || style.zIndex === 'auto')
-        && [style.transform, style.translate, style.rotate, style.scale].every(value => !value || value === 'none');
-    if (state.localBitmapHost) {
-        if (eligible && state.localBitmapHost.previousElementSibling === surface && sharesBitmapBox(state.localBitmapHost, parent, rect)) {
-            updateImageStyle(state.localBitmapHost.style, 'z-index', style.zIndex || 'auto', 'important');
-            return true;
-        }
+        && (!transformed || canShareImageOverflowClipping(surface, offsetParent));
+    if (state.localBitmapHost && (!eligible || state.localBitmapHost.previousElementSibling !== surface)) {
         detachLocalBitmapHost(state);
         state.overlay.prepend(bitmap);
-        return false;
     }
-    state.localBitmapHost = null;
     if (!eligible) return false;
-    const host = document.createElement('div');
-    host.dataset.fluentReadUi = 'image-translation-bitmap';
-    host.style.cssText = 'all: initial !important; position: absolute !important; inset: 0 !important; display: block !important; pointer-events: none !important';
+    // Chromium 的 resolved transform-origin 会按 border-box 折算百分比，即使实际
+    // transform-box 是 content-box。Typed OM 保留百分比/长度语义，缺失时仍复核实际盒子。
+    const typedStyle = imageComputedStyleMap(surface);
+    const transformOrigin = String(typedStyle?.get('transform-origin') || style.transformOrigin || '');
+    const geometry = JSON.stringify([transformed, style.position, style.zIndex, surface.offsetLeft, surface.offsetTop,
+        style.width, style.height, style.boxSizing, rect.width, rect.height, parent.offsetWidth, parent.offsetHeight,
+        ...['Top', 'Right', 'Bottom', 'Left'].flatMap(side => [style[`padding${side}` as keyof CSSStyleDeclaration], style[`border${side}Width` as keyof CSSStyleDeclaration]]),
+        style.transform, style.translate, style.rotate, style.scale, transformOrigin, style.transformBox, style.zoom]);
+    const failed = state.localBitmapFailure;
+    if (!state.localBitmapHost && failed?.parent === parent && failed.offsetParent === offsetParent && failed.geometry === geometry) return false;
+    state.localBitmapFailure = {parent, offsetParent, geometry};
+    const existing = state.localBitmapHost;
+    const host = existing || document.createElement('div');
+    if (!existing) {
+        host.dataset.fluentReadUi = 'image-translation-bitmap';
+        host.style.cssText = 'all: initial !important; position: absolute !important; display: block !important; pointer-events: none !important';
+    }
+    if (transformed) {
+        const edges = (axis: 'width' | 'height') => (axis === 'width' ? ['Left', 'Right'] : ['Top', 'Bottom'])
+            .reduce((sum, side) => sum + (Number.parseFloat(style[`padding${side}` as keyof CSSStyleDeclaration] as string) || 0)
+                + (Number.parseFloat(style[`border${side}Width` as keyof CSSStyleDeclaration] as string) || 0), 0);
+        const width = Number.parseFloat(style.width), height = Number.parseFloat(style.height);
+        const boxWidth = Number.isFinite(width) ? width + (style.boxSizing === 'border-box' ? 0 : edges('width')) : surface.offsetWidth;
+        const boxHeight = Number.isFinite(height) ? height + (style.boxSizing === 'border-box' ? 0 : edges('height')) : surface.offsetHeight;
+        if (!existing || state.localBitmapGeometry !== geometry) {
+            updateImageStyle(host.style, 'inset', 'auto', 'important');
+            updateImageStyle(host.style, 'left', `${surface.offsetLeft}px`, 'important');
+            updateImageStyle(host.style, 'top', `${surface.offsetTop}px`, 'important');
+        }
+        updateImageStyle(host.style, 'width', `${boxWidth}px`, 'important');
+        updateImageStyle(host.style, 'height', `${boxHeight}px`, 'important');
+        updateImageStyle(host.style, 'box-sizing', 'border-box', 'important');
+        for (const side of ['Top', 'Right', 'Bottom', 'Left'] as const) {
+            updateImageStyle(host.style, `padding-${side.toLowerCase()}`, style[`padding${side}`] || '0px', 'important');
+            const borderWidth = imageBorderWidth(style[`border${side}Width`], 1, true);
+            updateImageStyle(host.style, `border-${side.toLowerCase()}`, `${borderWidth} solid transparent`, 'important');
+        }
+        for (const property of ['transform', 'translate', 'rotate', 'scale', 'transform-box', 'backface-visibility', 'zoom']) {
+            updateImageStyle(host.style, property, style.getPropertyValue(property), 'important');
+        }
+        updateImageStyle(host.style, 'transform-origin', transformOrigin, 'important');
+        // host 的边框和内边距只建立与源图相同的变换参考盒，实际像素由位图绘制一次。
+        updateImageStyle(host.style, '--fluent-read-bitmap-inset', `${-(Number.parseFloat(style.borderTopWidth) || 0)}px auto auto ${-(Number.parseFloat(style.borderLeftWidth) || 0)}px`);
+        updateImageStyle(host.style, '--fluent-read-bitmap-width', `${boxWidth}px`);
+        updateImageStyle(host.style, '--fluent-read-bitmap-height', `${boxHeight}px`);
+    } else {
+        if (existing && host.style.getPropertyValue('--fluent-read-bitmap-width')) {
+            detachLocalBitmapHost(state);
+            state.overlay.prepend(bitmap);
+            return false;
+        }
+        updateImageStyle(host.style, 'inset', '0', 'important');
+    }
     // 与原显示面共用层级及相邻绘制顺序，避免落到原图下面的宿主遮片之后。
     updateImageStyle(host.style, 'z-index', style.zIndex || 'auto', 'important');
-    surface.after(host);
-    if (!sharesBitmapBox(host, parent, rect)) { host.remove(); return false; }
+    if (!existing) surface.after(host);
+    const aligned = transformed ? alignTransformedImageHost(host, rect) : sharesBitmapBox(host, parent, offsetParent, rect);
+    if (!aligned || !imageBoxMatches(surface.getBoundingClientRect(), rect)) {
+        if (existing) { detachLocalBitmapHost(state); state.overlay.prepend(bitmap); }
+        else host.remove();
+        return false;
+    }
+    state.localBitmapFailure = undefined;
+    state.localBitmapGeometry = geometry;
+    if (existing) return true;
     const sheet = document.createElement('style');
     sheet.textContent = IMAGE_BITMAP_CSS;
     host.attachShadow({mode: 'closed'}).append(sheet, bitmap);
@@ -767,7 +888,7 @@ function ignorePreviewInputLayer(viewer: HTMLElement): (element: Element) => boo
 }
 
 function updateBitmapAppearance(bitmap: TranslatedSurface, presentation: ImagePresentation, style: CSSStyleDeclaration,
-                                opacity: number, scaleX = 1, scaleY = 1): void {
+                                opacity: number, scaleX = 1, scaleY = 1, local = false): void {
     const fitting = presentation.kind === 'background' ? surfaceStyleToBitmap(style)
         : {objectFit: style.objectFit || 'fill', objectPosition: style.objectPosition || '50% 50%'};
     updateImageStyle(bitmap.style, 'object-fit', fitting.objectFit);
@@ -782,7 +903,7 @@ function updateBitmapAppearance(bitmap: TranslatedSurface, presentation: ImagePr
         const scale = side === 'Left' || side === 'Right' ? scaleX : scaleY;
         const property = side.toLowerCase();
         updateImageStyle(bitmap.style, `padding-${property}`, `${(Number.parseFloat(style[`padding${side}`]) || 0) * scale}px`);
-        updateImageStyle(bitmap.style, `border-${property}-width`, `${(Number.parseFloat(style[`border${side}Width`]) || 0) * scale}px`);
+        updateImageStyle(bitmap.style, `border-${property}-width`, imageBorderWidth(style[`border${side}Width`], scale, local));
         updateImageStyle(bitmap.style, `border-${property}-style`, style[`border${side}Style`]);
         updateImageStyle(bitmap.style, `border-${property}-color`, style[`border${side}Color`]);
     }
@@ -835,8 +956,12 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
     let bottom = Math.min(window.innerHeight, rect.bottom);
     const sourceOpacity = Number.parseFloat(state.sourceStyleLease?.computedOpacity || style.opacity || '1');
     let opacity = sourceOpacity;
+    let transformed = !state.manga && hasImageLayoutTransform(style);
+    let requiresTransformHost = !state.manga && needsImageTransformHost(style);
     for (let ancestor = surface.parentElement; ancestor && right > left && bottom > top; ancestor = ancestor.parentElement) {
         const ancestorStyle = getComputedStyle(ancestor);
+        transformed ||= !state.manga && hasImageLayoutTransform(ancestorStyle);
+        requiresTransformHost ||= !state.manga && needsImageTransformHost(ancestorStyle);
         opacity *= Number.parseFloat(ancestorStyle.opacity || '1');
         // 根节点的 overflow 作用于视口，其 rect 会随整页滚动移走，不能再次作为普通容器裁切。
         // body 在 quirks 模式或根 overflow 为 visible 时也可能把滚动交给视口。
@@ -868,13 +993,25 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
         && style.visibility !== 'collapse' && style.display !== 'none' && opacity > 0;
     const visible = usable && right > left && bottom > top;
     const ignoreForeground = imagePreview?.state === state ? ignorePreviewInputLayer(imagePreview.viewer) : undefined;
-    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground);
+    const occluded = visible && isImagePresentationOccluded(surface, {left, top, right, bottom}, imageOverlayHost, state.image, null, ignoreForeground,
+        transformed && style.pointerEvents !== 'none');
     const bitmap = state.phase === 'translated' ? state.translatedImage : null;
     if (!visible || occluded) {
         // 非滚动帧仍复核离屏局部译图的盒子和样式。真正遮挡或失配时归还原图。
-        const keepLocal = Boolean(!occluded && usable && bitmap && state.localBitmapHost && placeLocalBitmap(state, surface, rect, style, bitmap));
+        // 变换后的外接框角点不一定落在图内。已验证的相邻译图保留原生堆叠和裁切，
+        // 即使操作条因命中测试隐藏，也不会借固定层盖住宿主菜单或丢失图片。
+        const keepLocal = Boolean((!occluded || transformed) && usable && bitmap && (state.localBitmapHost || (transformed && visible))
+            && placeLocalBitmap(state, surface, rect, style, bitmap, transformed));
         hideImageOverlay(state, keepLocal);
-        if (keepLocal && bitmap) updateBitmapAppearance(bitmap, state.presentation, style, sourceOpacity);
+        if (keepLocal && bitmap) {
+            if (state.layoutFallback) {
+                state.layoutFallback = false;
+                setButtonState(state, 'translated', translatedImageMessage(state));
+            }
+            updateBitmapAppearance(bitmap, state.presentation, style, sourceOpacity, 1, 1, true);
+            updateImageStyle(bitmap.style, 'visibility', 'visible');
+            hideOriginalImage(state);
+        }
         if (occluded) state.controls.hideReader();
         return;
     }
@@ -897,11 +1034,22 @@ function updateOverlayPosition(state: ImageTranslationState, scrollOnly = false)
     updateImageStyle(state.controls.feedback.style, 'max-height', `${Math.max(0, bottom - top - 16) / hostScaleY}px`);
     updateImageStyle(state.controls.feedback.style, 'max-width', `${Math.max(0, right - left - 16) / hostScaleX}px`);
     if (!bitmap) return;
-    const localBitmap = placeLocalBitmap(state, surface, rect, style, bitmap);
+    const localBitmap = placeLocalBitmap(state, surface, rect, style, bitmap, transformed);
+    const layoutFallback = requiresTransformHost && !localBitmap;
+    if (Boolean(state.layoutFallback) !== layoutFallback) {
+        state.layoutFallback = layoutFallback;
+        setButtonState(state, 'translated', translatedImageMessage(state));
+    }
+    if (layoutFallback) {
+        // 无法证明变换参考盒一致时保留原图，文字面板仍可阅读完整译文。
+        updateImageStyle(bitmap.style, 'visibility', 'hidden');
+        restoreOriginalImage(state);
+        return;
+    }
     const scaleX = !localBitmap && surface.offsetWidth ? rect.width / surface.offsetWidth / hostScaleX : 1;
     const scaleY = !localBitmap && surface.offsetHeight ? rect.height / surface.offsetHeight / hostScaleY : 1;
     // 原生 replaced element 负责 object-fit 与 object-position。就地挂载时祖先的透明度、缩放与裁切由浏览器应用。
-    updateBitmapAppearance(bitmap, state.presentation, style, localBitmap ? sourceOpacity : opacity, scaleX, scaleY);
+    updateBitmapAppearance(bitmap, state.presentation, style, localBitmap ? sourceOpacity : opacity, scaleX, scaleY, localBitmap);
     updateImageStyle(bitmap.style, 'visibility', 'visible');
     // 先挂载并布置已解码的译图，再在同一帧交接显示权；加载和不可见状态不隐藏原图。
     if (localHost && !localBitmap) {
@@ -1142,9 +1290,9 @@ function setButtonState(state: ImageTranslationState, phase: ImageControlPhase, 
     if (state.manga && phase === 'loading') publishMangaStatus({...mangaStatus, message, progress, stage});
     state.controls.update(phase, message, {
         prepare: phase === 'error' && state.needsPreparation, animations: config.animations, progress, quiet: state.manga === true,
-        warning: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+        warning: phase === 'translated' && (state.layoutFallback || state.lines.some(line => line.renderSkipped)
             || (!state.translatedImage && state.lines.length > 0)),
-        warningAction: phase === 'translated' && (state.lines.some(line => line.renderSkipped)
+        warningAction: phase === 'translated' && (state.layoutFallback || state.lines.some(line => line.renderSkipped)
             || (state.manga !== true && !state.translatedImage && state.lines.length > 0)),
         queued: phase === 'loading' && Boolean(state.queuedTranslation),
         retainedReading: state.manga !== true && state.retryWhenSegmentationReady === true,
@@ -1199,6 +1347,12 @@ function restoreOriginalImage(state: ImageTranslationState): void {
     state.sourceStyleLease = null;
 }
 
+function translatedImageMessage(state: ImageTranslationState): string {
+    return state.layoutFallback ? '当前布局无法覆盖，请查看译文' : state.lines.some(line => line.renderSkipped)
+        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !state.translatedImage && state.lines.length
+            ? '已识别文字，原图未改动' : state.translatedImage || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图';
+}
+
 function showTranslatedImage(state: ImageTranslationState): void {
     const image = state.translatedImage;
     if (image) {
@@ -1208,9 +1362,7 @@ function showTranslatedImage(state: ImageTranslationState): void {
         if (!state.localBitmapHost) state.overlay.prepend(image);
     }
     state.controls.setLines(state.lines);
-    setButtonState(state, 'translated', state.lines.some(line => line.renderSkipped)
-        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !image && state.lines.length
-            ? '已识别文字，原图未改动' : image || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图');
+    setButtonState(state, 'translated', translatedImageMessage(state));
     updateOverlayPosition(state);
 }
 

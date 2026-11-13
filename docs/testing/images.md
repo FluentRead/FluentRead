@@ -145,6 +145,8 @@ node scripts/testing/run-image-translation-flow-test.cjs \
 
 使用独立临时 Edge profile 与 focus-safe helper，第二屏可见且不抢焦点。该测试执行真实 Tesseract 语言包下载与 OCR，以确定性的翻译 transport 排除服务波动，覆盖准备语言、可见阶段、完整文字、恢复和缓存重显、取消后重试、动态换图、祖先裁切与 object-fit 盒模型。报告区分首次语言准备时间和缓存重显时间，后者不应新增翻译请求；不将本地 transport 的通过视为真实翻译服务可用性证明。
 
+标准夹具追加 `--transformed-images --runtime-diagnostics-helper <runtime-diagnostics.cjs 路径>`，在原有准备、恢复、缓存和盒模型检查后运行变换专项。直接使用 CDP 原生 border/padding/content 四角，逐坐标核对旋转、斜切、独立 translate/rotate/scale、祖先变换、透视、分数尺寸、滚动裁切、content-box 百分比与像素原点、镜像以及 CSS zoom；不能仅比较外接矩形。还读取截图像素证明译图未覆盖宿主菜单、未越过静态与定位裁切容器的边界，检查不支持的固定定位变换和静态裁切链保留原图和文字入口，恢复布局后复用原位图且没有新 OCR/翻译请求。每项保留几何、截图和运行时诊断。此专项使用 macOS Edge，不能据此声称 Firefox 实机或任意网页 CSS 组合均已通过。
+
 追加 `--x-surface` 验证 X 页面快照中的透明 img 与同级背景图结构，保留根节点视口高度并滚动超过 2000 像素，使用自动识别语言，检查左下入口、关闭悬浮后的可信右键目标、持久准备卡片、居中转圈、真实 OCR 百分比、日语推荐包、中英日界面切换、翻译和还原。此用例通过生产消息执行菜单动作，未自动点击操作系统原生菜单项。可追加 `--multilingual` 断言实际 OCR 请求包含简体、繁體与英文，或追加 `--original-image <图片URL>` 使用真实原图、`--live-translation` 使用在线 Google 翻译；原图及 DOM 结构夹具不等同于登录后的 X 页面测试。报告分别记录页面和 OCR 控制台诊断，并要求实际监听 dedicated Worker、没有子语言文件加载错误。
 
 追加 `--x-lightbox --model-cache-no-download --runtime-diagnostics-helper <runtime-diagnostics.cjs 路径>` 使用已缓存的 PaddleOCR 模型，在本地拦截的 X 页面结构中验证点击缩略图后自动显示已有译图。用例覆盖同地址、X 图片大小变体、还原后重开、查看器切图、带缩放的原生模态框内译图对齐和关闭后恢复缩略译图，并断言查看器阶段没有新增图片翻译操作或文本翻译请求。

@@ -45,6 +45,8 @@ node scripts/run-document-translation-test.cjs --suite scanned --playwright-root
 
 `pdfOcr`、`documentWorkflows`、`documentAppLifecycle` 与 `documentHistory` 定向测试覆盖逐页检查点、暂停/失败后续识别、空页重试、历史空结果恢复和已有校订的身份迁移。`pdfReaderLifecycle` 验证同源识别更新保留画布与阅读位置；这些测试不代表模糊扫描、手写或所有论文版式的识别准确率。
 
+中文扫描专项使用 `--suite scanned-cjk`（其余参数同上）。现场生成 300 dpi、JPEG 压缩 150 dpi、低对比度 100 dpi 和倾斜 0.7° 的自拟论文页，以真实 OCR 核对标题、双栏段落、表格数字、低分文字核对位置及修正后汉字的实际鼠标选择。保存原图、ground truth、原始引擎结果、识别版面与运行时诊断；该专项只识别，不发送翻译请求。100 dpi 不要求正文逐字正确；无边框表格阅读顺序另行验收，不能用数值保留断言代替布局验证。
+
 ## PDF 在线与本地划词
 
 原生在线 PDF 的右键划词交接可单独验证：

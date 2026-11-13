@@ -492,6 +492,7 @@
       "tests/documentTextWrappedParagraphs.test.ts",
       "tests/documentPageRecognizer.test.ts",
       "tests/pdfLayoutAnalysis.test.ts",
+      "tests/pdfBorderlessTable.test.ts",
       "tests/pdfPaperLayouts.test.ts",
       "tests/documentPdfLayoutParsing.test.ts",
       "tests/pdfSource.test.ts",

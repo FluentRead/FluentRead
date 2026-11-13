@@ -22,6 +22,37 @@ const atom = (text: string, x: number, baseline: number, width = text.length * 5
 const analyze = (atoms: PdfLayoutAtom[], graphics: Parameters<typeof analyzePdfPageLayout>[0]['graphics'] = [], width = 612, height = 792) => analyzePdfPageLayout({atoms, graphics, width, height});
 const ops = Object.fromEntries(['save', 'restore', 'transform', 'paintFormXObjectBegin', 'paintFormXObjectEnd', 'paintImageXObject', 'paintInlineImageXObject', 'paintImageMaskXObject', 'constructPath', 'stroke', 'closeStroke', 'fill', 'eoFill', 'fillStroke', 'eoFillStroke', 'closeFillStroke', 'closeEOFillStroke', 'endPath'].map((name, index) => [name, index + 1]));
 
+describe('isolated OCR sentence continuation', () => {
+    const first = () => atom('Correlation does not establish causation; the experiment cannot rule out an unmeasured', 45.60306575231949, 349.47320410490306, 467.551432029044, 9.38489167616876);
+    const tail = () => atom('confounder.', 45.36304961678096, 369.51510832383127, 61.44413069786204, 8.855156773061573);
+    it('retains a measured lower-case tail when sparse OCR rows cannot establish page-wide leading', () => {
+        const result = analyze([first(), tail()]);
+        expect(result.blocks.map(block => block.source)).toEqual([first().text + ' ' + tail().text]);
+        expect(result.blocks[0].lineCount).toBe(2);
+    });
+    it.each(['period', 'colon', 'uppercase', 'width', 'indent', 'gap', 'font', 'short', 'bullet', 'numbered'])('does not extend a paragraph across %s evidence', reason => {
+        const previous = first(), next = tail();
+        if (reason === 'period') previous.text += '.';
+        if (reason === 'colon') previous.text += ':';
+        if (reason === 'uppercase') next.text = 'Confounder.';
+        if (reason === 'width') next.width = previous.width;
+        if (reason === 'indent') next.x += 10;
+        if (reason === 'gap') {next.baseline += 10; next.y += 10;}
+        if (reason === 'font') next.fontSize = 5;
+        if (reason === 'short') previous.width = 100;
+        if (reason === 'bullet') previous.text = '• ' + previous.text;
+        if (reason === 'numbered') next.text = '1. Introduction';
+        expect(analyze([previous, next]).blocks).toHaveLength(2);
+    });
+    it('retains a candidate while reading an intervening peer column without crossing into it', () => {
+        const previous = {...first(), width: 220}, next = tail();
+        const peer = atom('Right column starts here', 330, 360, 220, 9.4);
+        const result = analyze([previous, peer, next]);
+        expect(result.blocks.some(block => block.source === previous.text + ' ' + next.text)).toBe(true);
+        expect(result.blocks.find(block => block.source === peer.text)?.lineCount).toBe(1);
+    });
+});
+
 describe('illustrated text inside a page-sized PDF form', () => {
     const frame = {x: 30, y: 0, width: 552, height: 792};
     const wrapper = [{...frame, kind: 'form' as const}, {...frame, x: 30.2, width: 551.8, kind: 'path' as const}];
@@ -2252,7 +2283,9 @@ describe('display-operator baseline ownership beside prose', () => {
         const program = `
 const fs = require('node:fs'), crypto = require('node:crypto'), ts = require(${JSON.stringify(typescriptPath)});
 const source = fs.readFileSync(${JSON.stringify(sourcePath)}, 'utf8'), exportsPort = {};
-new Function('exports', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exportsPort);
+const dependencySource = fs.readFileSync(require('node:path').join(require('node:path').dirname(${JSON.stringify(sourcePath)}), 'pdfBorderlessTable.ts'), 'utf8'), dependencyExports = {};
+new Function('exports', ts.transpileModule(dependencySource, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(dependencyExports);
+new Function('require', 'exports', ts.transpileModule(source, {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(id => {if (id === './pdfBorderlessTable') return dependencyExports; throw new Error('Unexpected import: ' + id);}, exportsPort);
 console.log('loaded-before-call:' + crypto.createHash('sha256').update(source).digest('hex'));
 const cases = ${JSON.stringify(cases)}, before = JSON.stringify(cases);
 const results = cases.map(atoms => exportsPort.pdfLayoutLines(atoms));

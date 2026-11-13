@@ -3,7 +3,7 @@
  服务启用：关闭的服务不进入候选，保留独立选择并提示重新启用，翻译动作沿现有可用性检查阻止发送。
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
  主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
- OCR 续译：混合 PDF 补入扫描段落时，按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。PDF 提取文字含异常控制字符时只提示核对原文，不改写原文或译文。
+ OCR 续译：逐页保存识别检查点，暂停或失败后只补剩余扫描页；空结果保留重试入口且不计为全文完成。混合 PDF 按原页和块身份迁移已有译文与人工确认；新增段落继续翻译，明确确认重译后才清空校订。PDF 提取文字含异常控制字符时只提示核对原文，不改写原文或译文。
  下载面板：紧邻工具栏用小幅版式示意选择双语或仅译文，在设置之后提供单一品牌下载主按钮；PDF 排版按需展开，复用现有分段控件并独立于阅读视图，原文件保留次级入口；不重复文件名，未完成时说明原文保留规则并确认一次，失败时保留校订、展示明确重试动作，技术详情默认收起。
  材料接入：按原文件内容指纹加入本机学习工作区，恢复文档页码与章节，重解析后只按唯一原句重新匹配位置；原文件记录缺失时重新选择并核对指纹，不把同名文件误认作原件。
  模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，草稿共享设置编辑会话并保留文档字段与模型映射的原子补丁，运行时适配由本目录 runtime 注入。
@@ -666,6 +666,7 @@ let nextDocumentId = 0;
 let batchGeneration = 0;
 const queueBusy = computed(() => translating.value || batchRunning.value || openingFile.value || downloadingPdf.value || preparingDownload.value);
 const completeItem = (item: DocumentQueueItem) => Boolean(item.document?.segments.length
+  && !pdfPagesNeedingOcr(item.document).length
   && !(item.id === activeDocumentId.value && translating.value)
   && item.document.segments.every(segment => item.translations[segment.id]?.trim()));
 const batchCompletedCount = computed(() => documentQueue.value.filter(completeItem).length);
@@ -699,7 +700,7 @@ function activateDocument(item: DocumentQueueItem): void {
 function queueProgress(item: DocumentQueueItem): number {
   if (item.id === activeDocumentId.value) return progress.value;
   const total = item.document?.segments.length || 0;
-  return total ? Math.floor(item.translations.filter(text => text?.trim()).length / total * 100) : 0;
+  return total ? Math.min(pdfPagesNeedingOcr(item.document).length ? 99 : 100, Math.floor(item.translations.filter(text => text?.trim()).length / total * 100)) : 0;
 }
 
 // 最近翻译：只在浏览器提供 IndexedDB 时启用；记录留在本机，重新打开同一份文件会接着上次的译文继续。
@@ -929,7 +930,7 @@ function historyFormat(entry: DocumentHistorySummary): string {
 }
 function historyStatus(entry: DocumentHistorySummary): string {
   const date = new Date(entry.updatedAt).toLocaleDateString(language.value, {month: 'short', day: 'numeric'});
-  return `${!entry.completed ? translateLegacy('尚未翻译') : entry.completed >= entry.total ? translateLegacy('翻译完成') : `${entry.completed} / ${entry.total}`} · ${date}`;
+  return `${entry.pendingOcrPages ? t('document.pdfReading.scanned') : !entry.completed ? translateLegacy('尚未翻译') : entry.completed >= entry.total ? translateLegacy('翻译完成') : `${entry.completed} / ${entry.total}`} · ${date}`;
 }
 
 const importWorkflow = createDocumentImportWorkflow({
@@ -1199,10 +1200,10 @@ const previewRows = computed(() => pageRows(parsedDocument.value?.segments || []
 const hasTranslation = computed(() => translatedSegments.value.some((item) => Boolean(item?.trim())));
 const completedSegments = computed(() => translating.value ? liveCompletedSegments.value
   : parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
-const translationComplete = computed(() => Boolean(!translating.value && parsedDocument.value?.segments.length && completedSegments.value === parsedDocument.value.segments.length));
+const translationComplete = computed(() => Boolean(!translating.value && !needsOcr.value && parsedDocument.value?.segments.length && completedSegments.value === parsedDocument.value.segments.length));
 // 只有已提交译文计入分子；请求和重试不增加进度，最后一段提交后仍等任务收敛才显示 100%。
 const progress = computed(() => parsedDocument.value?.segments.length
-  ? Math.min(translating.value ? 99 : 100, Math.floor(completedSegments.value / parsedDocument.value.segments.length * 100)) : 0);
+  ? Math.min(translating.value || needsOcr.value ? 99 : 100, Math.floor(completedSegments.value / parsedDocument.value.segments.length * 100)) : 0);
 const showTranslationProgress = computed(() => Boolean(parsedDocument.value?.segments.length && !recognitionProgress.value));
 const translationProgressLabel = computed(() => t('document.translationProgress.count', {
   completed: completedSegments.value, total: parsedDocument.value?.segments.length || 0, percent: progress.value,
@@ -1806,24 +1807,32 @@ async function startTranslation(restart = false): Promise<void> {
   abortController = controller;
   try {
     if (scanned) {
-      const source = document;
-      const recognized = await recognitionWorkflow.recognize(source, {
+      const commitRecognition = (recognized: ParsedDocument) => {
+        if (recognized === document) return;
+        const retained = remapPdfTranslationState(document!, recognized, translatedSegments.value, confirmedTranslationIds.value);
+        document = markRaw(recognized);
+        parsedDocument.value = document;
+        translatedSegments.value = retained.translations;
+        settledTranslations.value = [...retained.translations];
+        confirmedTranslationIds.value = retained.confirmedTranslationIds;
+        liveCompletedSegments.value = retained.translations.filter(value => value.trim()).length;
+        editRevision.value += 1;
+        scheduleHistorySave();
+      };
+      const recognized = await recognitionWorkflow.recognize(document, {
         sourceLanguage: settings.sourceLanguage, signal: controller.signal, startPage: pdfPage.value - 1,
-        isCurrent: () => requestId === translationRequestId && parsedDocument.value === source,
+        isCurrent: () => requestId === translationRequestId && parsedDocument.value === document,
+        onCheckpoint: commitRecognition,
       });
       if (!recognized) return;
       recognitionProgress.value = '';
-      const retained = remapPdfTranslationState(source, recognized, translatedSegments.value, confirmedTranslationIds.value);
-      // 识别结果成为这份文档新的解析结果；之后的翻译、校订、保存和下载都基于它。
-      document = markRaw(recognized);
-      parsedDocument.value = document;
-      translatedSegments.value = retained.translations;
-      settledTranslations.value = [...retained.translations];
-      confirmedTranslationIds.value = retained.confirmedTranslationIds;
-      liveCompletedSegments.value = retained.translations.filter(value => value.trim()).length;
+      commitRecognition(recognized);
       if (!document.segments.length) {
-        // 一个字也没认出来：仍然采用识别后的文档（扫描页不再反复识别），并说明原因。
         throw new Error(t('document.pdfReading.ocrEmpty'));
+      }
+      if (pdfPagesNeedingOcr(document).length) {
+        runState.value = 'failed';
+        showError(t('document.pdfReading.ocrIncomplete', {count: pdfPagesNeedingOcr(document).length}));
       }
     }
     const current = document;

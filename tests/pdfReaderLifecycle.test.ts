@@ -545,6 +545,40 @@ async function waitForSourceTextLayers(root: ParentNode, count: number): Promise
 }
 
 describe('PDF reader color readback performance', () => {
+    it('keeps the reading position and existing canvases when OCR adds a same-source checkpoint', async () => {
+        const source = documentModel(4);
+        const reader = mountReader(source);
+        await waitForSourceTextLayers(reader.root, 4);
+        reader.state.jumpTo(3); flushFrames(); await componentFlush();
+        await vi.waitFor(() => expect(reader.state.currentPage).toBe(3));
+        await componentFlush();
+        const beforeTop = reader.viewport.scrollTop;
+        const beforeCanvas = reader.root.querySelector('[data-page-number="3"] canvas');
+        const beforeRenders = pdfPage.render.mock.calls.length;
+        const binary = source.binary as Extract<ParsedDocument['binary'], {kind: 'pdf'}>;
+        reader.currentDocument.value = {...source, binary: {...binary, pages: binary.pages.map(page => ({...page, scanned: false}))}};
+        await componentFlush(); flushFrames(); await componentFlush();
+        expect(reader.viewport.scrollTop).toBe(beforeTop);
+        expect(reader.state.currentPage).toBe(3);
+        expect(reader.root.querySelector('[data-page-number="3"] canvas')).toBe(beforeCanvas);
+        expect(pdfPage.render).toHaveBeenCalledTimes(beforeRenders);
+    });
+
+    it('evicts removed or changed page geometry when updating scheduler models and uses new models on the next render', async () => {
+        const pages = [pageModel(1), pageModel(2)], render = vi.fn(async (_page: PdfDocumentPage) => output()), changed = vi.fn();
+        const scheduler = new PdfReaderScheduler(pages, {render, dispose: vi.fn()}, changed);
+        scheduler.update([0, 1], () => settings()); await settle();
+        const results = await Promise.all(render.mock.results.map(result => result.value));
+        for (const replacement of [pageModel(9), pageModel(9, 700), pageModel(9, 700, 900)]) {
+            scheduler.update([0], () => settings(), [replacement]); await settle();
+            expect(render.mock.calls.at(-1)?.[0]).toBe(replacement);
+        }
+        expect(results.every(result => vi.mocked(result.dispose).mock.calls.length === 1)).toBe(true);
+        expect(changed).toHaveBeenCalledWith(2);
+        scheduler.dispose();
+        scheduler.update([], () => settings(), []);
+    });
+
     function coloredContext() {
         const canvas = {width: 1224, height: 1584};
         const getImageData = vi.fn((left: number, top: number, width: number, height: number) => {

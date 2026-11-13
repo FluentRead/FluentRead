@@ -35,7 +35,7 @@ function requestSources(source) {
 }
 
 async function fixtureServer() {
-  const state = {requests: [], delay: 5, fail: false, holdSource: null, held: new Set()};
+  const state = {requests: [], delay: 5, fail: false, chineseOnly: false, holdSource: null, held: new Set()};
   const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Headers', '*');
@@ -49,7 +49,9 @@ async function fixtureServer() {
       state.requests.push(source);
       const protocol = /(___FLUENTREAD_([a-z0-9_-]+)_(\d+)_BEGIN___)([\s\S]*?)(___FLUENTREAD_\2_\3_END___)/giu;
       // 富文本的每段行内正文也必须实际改变；仅在整段前添加前缀会触发生产端未翻译正文保护。
-      const translate = text => `测试译文：${text.replace(/<(g\d+)>([\s\S]*?)<\/\1>/gu, (_match, tag, inner) => `<${tag}>测试译文：${inner}</${tag}>`)}`;
+      const translate = text => state.chineseOnly
+        ? '本地测试译文：扫描文档的文字经过识别后，按段落进行翻译。原始图像仍保留，阅读器展示对应的中文内容。'
+        : `测试译文：${text.replace(/<(g\d+)>([\s\S]*?)<\/\1>/gu, (_match, tag, inner) => `<${tag}>测试译文：${inner}</${tag}>`)}`;
       const translation = protocol.test(source) ? source.replace(protocol, (_match, begin, _nonce, _index, text, end) => `${begin}${translate(text)}${end}`) : translate(source);
       await new Promise(resolve => setTimeout(resolve, state.delay));
       if (state.holdSource?.test(source)) {
@@ -92,6 +94,9 @@ async function main() {
   const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
   const packages = arg('playwright-root');
   const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'));
+  const diagnosticsPath = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);
+  if (suite === 'scanned') assert(diagnosticsPath, '扫描件验收需要 --runtime-diagnostics-helper 采集扩展页和后台诊断');
+  const diagnostics = diagnosticsPath ? require(path.resolve(diagnosticsPath)).createRuntimeDiagnostics() : null;
   assert(packages && helperPath, '需要 Playwright 和 focus-safe helper');
   const requireRuntime = createRequire(path.join(packages, 'document-runner.cjs'));
   const {chromium} = requireRuntime('playwright');
@@ -99,7 +104,7 @@ async function main() {
   fs.mkdirSync(artifactsDir, {recursive: true});
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-document-flow-'));
   const report = {ok: false, extensionDir, artifactsDir, service: 'loopback deterministic fixture', suite, scriptsByStage: {}, cases: [], screenshots: [], downloads: [], consoleErrors: [], exampleLoads: {}};
-  let fixture, launched, page; let launchAttempted = false;
+  let fixture, launched, page; let launchAttempted = false, diagnosticsStarted = false;
   try {
     fixture = await fixtureServer();
     launchAttempted = true;
@@ -110,9 +115,12 @@ async function main() {
     guardBrowserClose(launched, profileDir);
     Object.assign(report, {launchMode: launched.launchMode, focusPolicy: launched.focusPolicy, windowPlacement: launched.windowPlacement});
     const context = launched.context;
+    if (diagnostics) {await diagnostics.start(context); diagnosticsStarted = true;}
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});
     const origin = /^chrome-extension:\/\/[^/]+/u.exec(worker.url())[0];
+    diagnostics?.setExtensionId(origin.split('//')[1]);
     page = await newPageWithoutForeground(context, 30000);
+    await diagnostics?.attachPage(page, 'document');
     page.setDefaultTimeout(30000);
     page.on('pageerror', error => report.consoleErrors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') report.consoleErrors.push(message.text()); });
@@ -266,6 +274,8 @@ async function main() {
       return;
     }
     if (suite === 'scanned') {
+      // 使用真正以中文为主的确定性响应，避免旧“中文前缀 + 英文原文”夹具被目标语言验证拒绝。
+      fixture.state.chineseOnly = true;
       // 扫描版 PDF：页面只有图像、没有文字层。本套件需要联网下载一次英文识别语言包，因此不在默认的 full 套件里。
       const {PDFDocument} = require('pdf-lib');
       const printed = ['Scanned pages carry no text layer at all.', 'Recognition must find these printed sentences.', 'The translated page keeps the original picture.'];
@@ -301,22 +311,64 @@ async function main() {
         turnedPage.drawImage(await scan.embedPng(Buffer.from(turnedPng, 'base64')), turned.place);
         turnedPage.setRotation(degrees(turned.angle));
       }
+      const paperParagraphs = [
+        'Left column begins with a controlled experiment. We measured the response of twenty samples under identical conditions. Each measurement was repeated three times to estimate uncertainty.',
+        'The method preserves local structure and separates adjacent columns. Paragraph boundaries matter because a translation must preserve the relationship between observations and conclusions.',
+        'Right column begins with independent results. The accuracy increased from 81.5 percent to 94.2 percent with 128 training examples. These values must remain unchanged during recognition.',
+        'In conclusion, the observed improvement supports the proposed method. Further experiments should examine smaller samples and more difficult conditions before applying the result elsewhere.',
+      ];
+      const paperPng = await page.evaluate(paragraphs => {
+        const canvas = document.createElement('canvas'); canvas.width = 2480; canvas.height = 3508;
+        const ctx = canvas.getContext('2d'); ctx.scale(canvas.width / 595, canvas.height / 842);
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 595, 842); ctx.fillStyle = '#111';
+        ctx.font = 'bold 17px Times New Roman'; ctx.fillText('Recognition of Scientific Documents', 48, 70);
+        ctx.font = '10px Times New Roman'; ctx.fillText('A controlled two-column paper fixture', 48, 94);
+        for (const [index, paragraph] of paragraphs.entries()) {
+          const x = index < 2 ? 48 : 312; let y = index % 2 === 0 ? 150 : 270; let line = '';
+          for (const word of paragraph.split(' ')) {
+            const next = line ? `${line} ${word}` : word;
+            if (ctx.measureText(next).width > 231) {ctx.fillText(line, x, y); y += 14; line = word;}
+            else line = next;
+          }
+          ctx.fillText(line, x, y);
+        }
+        ctx.font = '8px Times New Roman'; ctx.fillText('Small footnote: measurements were collected at room temperature.', 48, 760);
+        ctx.fillText('7', 290, 812);
+        return canvas.toDataURL('image/png').split(',')[1];
+      }, paperParagraphs);
+      scan.addPage([595, 842]).drawImage(await scan.embedPng(Buffer.from(paperPng, 'base64')), {x: 0, y: 0, width: 595, height: 842});
+      const scanBytes = Buffer.from(await scan.save());
+      fs.writeFileSync(path.join(artifactsDir, 'scanned-paper-fixture.pdf'), scanBytes);
       const requestsBeforeScan = fixture.state.requests.length;
-      await load('scanned.pdf', Buffer.from(await scan.save()));
+      await load('scanned.pdf', scanBytes);
       await page.locator('.pdf-page-row[data-page-number="1"]').waitFor();
       assert.match(await page.locator('.document-status').innerText(), /扫描件/, '没有文字层的 PDF 应提示开始翻译时先识别文字');
       assert.equal(await page.locator('.pdf-translation-block').count(), 0, '开始翻译之前不能有译文块');
       assert.equal(fixture.state.requests.length, requestsBeforeScan, '打开扫描件不得发送翻译请求');
       await shot('scanned-opened');
+      const pageInput = page.locator('.pdf-page-navigation input');
+      await pageInput.fill('7'); await pageInput.press('Enter');
       await page.locator('.translation-actions .translate-document-button').click();
       await page.locator('.document-status').filter({hasText: '正在识别文字'}).waitFor({timeout: 60000});
       assert.equal(fixture.state.requests.length, requestsBeforeScan, '识别进行中还没有可翻译的文字');
-      await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor({timeout: 240000});
-      const recognized = fixture.state.requests.slice(requestsBeforeScan);
+      await page.waitForFunction(() => /翻译完成|翻译中断/.test(document.querySelector('.document-status')?.textContent ?? ''), undefined, {timeout: 240000});
+      assert.match(await page.locator('.document-status').innerText(), /翻译完成/, await page.locator('.workspace-section').innerText());
+      assert.equal(await pageInput.inputValue(), '7', '逐页 OCR 检查点必须保留当前阅读页，不能跳回第一页');
+      const recognized = fixture.state.requests.slice(requestsBeforeScan).flatMap(requestSources);
+      // 在断言前保存实际识别模型，失败时仍能离线重放分栏、分段及脚注顺序。
+      const recognizedModel = await page.evaluate(async () => {
+        const db = await new Promise((resolve, reject) => {const request = indexedDB.open('FluentReadDocumentHistory'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
+        try {
+          const records = await new Promise((resolve, reject) => {const request = db.transaction('documents').objectStore('documents').getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
+          const model = records.find(record => record.name === 'scanned.pdf')?.parsed;
+          return model ? {segments: model.segments, pages: model.binary.pages} : null;
+        } finally {db.close();}
+      });
+      if (recognizedModel) fs.writeFileSync(path.join(artifactsDir, 'recognized-layout.json'), JSON.stringify(recognizedModel, null, 2));
       // 识别允许个别字符有出入，但三句印刷文字都必须被认出并送去翻译。
       for (const phrase of [/scanned pages carry/iu, /recognition must find/iu, /translated page keeps/iu]) assert(recognized.some(source => phrase.test(source)), `识别结果缺少印刷文字 ${phrase}：${JSON.stringify(recognized)}`);
       assert(recognized.includes(typed), `带文字层的页应照常翻译：${JSON.stringify(recognized)}`);
-      const pageInput = page.locator('.pdf-page-navigation input'); await pageInput.fill('2'); await pageInput.press('Enter');
+      await pageInput.fill('2'); await pageInput.press('Enter');
       await page.locator('.pdf-page-row[data-page-number="2"] .pdf-translation-block').first().waitFor();
       const scannedBlocks = await page.locator('.pdf-page-row[data-page-number="2"] .pdf-translation-block').evaluateAll(blocks => blocks.map(block => {
         const frame = block.closest('.pdf-page-frame, .pdf-page-column').getBoundingClientRect(), box = block.getBoundingClientRect();
@@ -347,8 +399,34 @@ async function main() {
         assert(turnedBlocks.every(block => block.text && block.inside && block.upright && block.landscape === turned.landscape), `旋转 ${turned.angle} 度的扫描页，译文必须横排、摆正并留在页面内：${JSON.stringify(turnedBlocks)}`);
         turnedReport.push({angle: turned.angle, blocks: turnedBlocks.length});
       }
-      report.scanned = {pages: 6, scannedPages: 5, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
+      const normalizedSources = recognized.map(source => source.replace(/\s+/gu, ' ').trim());
+      const paperIndexes = paperParagraphs.map(paragraph => normalizedSources.indexOf(paragraph));
+      assert(paperIndexes.every(index => index >= 0), `10 pt 论文正文必须完整成段识别：${JSON.stringify(normalizedSources)}`);
+      assert(paperIndexes.every((value, index) => index === 0 || value > paperIndexes[index - 1]), '双栏正文必须先读完整左栏，再读右栏');
+      assert(normalizedSources.some(source => source.includes('Small footnote: measurements were collected at room temperature.')), '8 pt 脚注不得遗漏');
+      assert(normalizedSources.findIndex(source => source.startsWith('Small footnote:')) > paperIndexes.at(-1), '页底脚注必须排在两栏正文之后');
+      await pageInput.fill('7'); await pageInput.press('Enter');
+      await page.locator('.pdf-page-row[data-page-number="7"] .pdf-translation-block').first().waitFor();
+      await shot('scanned-two-column-paper');
+      await page.locator('.download-button').click();
+      const scanDownload = page.locator('#document-download-panel[open]');
+      await scanDownload.locator('input[value="bilingual"]').check();
+      const [downloaded] = await Promise.all([page.waitForEvent('download', {timeout: 120000}), scanDownload.locator('.download-submit').click()]);
+      const exportedPath = path.join(artifactsDir, 'scanned-bilingual.pdf');
+      await downloaded.saveAs(exportedPath); report.downloads.push(exportedPath);
+      const exported = await pdfPageTexts(fs.readFileSync(exportedPath), true);
+      const mapped = mapPdfLayoutPages(7, exported.texts.map((text, index) => ({text, label: exported.labels?.[index]})));
+      assert(mapped.ok, '扫描件导出必须逐页保留七个原页，续页必须紧跟所属原页');
+      assert(mapped.pages.every(value => value.text.includes('本地测试译文')), '每个导出页都必须含有译文文字层');
+      const segmentCount = await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count');
+      const requestsBeforeReload = fixture.state.requests.length;
+      await page.reload({waitUntil: 'domcontentloaded'});
+      await page.locator('.document-status').filter({hasText: '翻译完成'}).waitFor();
+      assert.equal(await page.locator('.pdf-layout-viewer').getAttribute('data-segment-count'), segmentCount, '刷新应恢复已识别的全部段落');
+      assert.equal(fixture.state.requests.length, requestsBeforeReload, '恢复已完成历史不能重新翻译');
+      report.scanned = {pages: 7, scannedPages: 6, paperParagraphs, paperIndexes, rotatedScannedPages: turnedReport, recognizedSources: [...new Set(recognized)], blocksOnFirstScannedPage: scannedBlocks.length};
       report.cases.push('a PDF with one typed page, two scanned pages and three rotated scanned pages (90, 180 and 270 degrees) opens without requests, recognises the scanned pages when translation starts, translates the typed page as usual and shows upright translations inside the scanned pages');
+      report.cases.push('10 pt two-column paragraphs and an 8 pt footnote retain text and order; all seven bilingual pages export with a translation text layer and survive history reload without new translation requests');
       assert.equal(report.consoleErrors.length, 0);
       report.ok = true;
       return;
@@ -995,6 +1073,12 @@ async function main() {
   } finally {
     report.providerRequests = [...(fixture?.state.requests ?? [])];
     report.cleanupErrors = [];
+    if (diagnosticsStarted) {
+      try {await diagnostics.flush(); if (report.ok) diagnostics.assertClean();}
+      catch (error) {report.ok = false; report.failure ||= error.stack || String(error); process.exitCode = 1;}
+      try {diagnostics.write(artifactsDir, report);} catch (error) {report.cleanupErrors.push(`diagnostics write: ${error.message}`);}
+      try {await diagnostics.stop();} catch (error) {report.cleanupErrors.push(`diagnostics stop: ${error.message}`);}
+    }
     let closed = false;
     if (launched) {
       try {await launched.close(); closed = true;}

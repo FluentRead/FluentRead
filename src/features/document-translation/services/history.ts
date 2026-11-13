@@ -25,6 +25,8 @@ export interface DocumentHistorySummary {
     /** 片段总数与已有译文的片段数，用于在首页显示进度。 */
     total: number;
     completed: number;
+    /** 历史摘要从解析快照推导待识别页，避免原生段落译完时误报整份混合 PDF 完成。 */
+    pendingOcrPages?: number;
     updatedAt: number;
     /** 列表读取时观察到的本地写入身份，用于安全删除。 */
     historyVersion?: string;
@@ -248,7 +250,8 @@ export function restoreDocumentHistoryPdfOcr(
             || (cached.sourceRotation ?? cached.rotation ?? 0) !== (page.rotation ?? page.sourceRotation ?? 0)
             || !Array.isArray(cached.blocks) || !cached.blocks.every(block => block && typeof block === 'object'
                 && Number.isInteger(block.segmentIndex) && (block.segmentIndex < 0 || typeof oldSegments[block.segmentIndex]?.source === 'string'))) return undefined;
-        if (page.scanned) return cached.scanned === false ? {page: cached, origins: cached.blocks.map(block => block.segmentIndex >= 0 ? block.segmentIndex : undefined)} : undefined;
+        if (page.scanned) return cached.scanned === false && cached.blocks.length > 0
+            ? {page: cached, origins: cached.blocks.map(block => block.segmentIndex >= 0 ? block.segmentIndex : undefined)} : undefined;
         return cached.scanned ? undefined : restorePdfTextSplits(page, cached, oldSegments, document.segments);
     });
     if (!restored.some(Boolean)) return {document};
@@ -288,7 +291,11 @@ function historyOrder(record: DocumentHistoryRecord): number {
 
 function summary(record: DocumentHistoryRecord): DocumentHistorySummary {
     const {id, name, format, size, sourceUrl, total, completed, updatedAt} = record;
-    return {id, name, format, size, ...(sourceUrl ? {sourceUrl} : {}), total, completed, updatedAt};
+    const binary = (record.parsed as Partial<ParsedDocument> | undefined)?.binary;
+    const pendingOcrPages = binary?.kind === 'pdf' && Array.isArray(binary.pages)
+        ? binary.pages.filter(page => page?.scanned === true || page?.scanned === false && Array.isArray(page.blocks) && page.blocks.length === 0).length : 0;
+    return {id, name, format, size, ...(sourceUrl ? {sourceUrl} : {}), total, completed, updatedAt,
+        ...(pendingOcrPages ? {pendingOcrPages} : {})};
 }
 
 /** 兼容旧记录；不把字符串、数字或其它 truthy 值当作用户确认的重译策略。 */

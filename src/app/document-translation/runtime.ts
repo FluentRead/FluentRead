@@ -79,11 +79,15 @@ export async function createDocumentDownload(
  * 识别引擎体积较大，只在真正需要识别时才载入。
  */
 export function createPdfPageRecognizer(sourceLanguage: string): PdfPageRecognizer {
-    return async ({bytes, pageNumber, width, signal}) => {
+    return async ({bytes, pageNumber, width, height, signal}) => {
         const rendered = await renderPdfPageImage(bytes, pageNumber, width, signal);
         const {recognizeImageText} = await import('@/src/features/image-translation/ocr');
-        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal);
-        const scale = width / rendered.width;
-        return lines.map(line => ({text: line.text, x: line.bbox.x0 * scale, y: line.bbox.y0 * scale, width: (line.bbox.x1 - line.bbox.x0) * scale, height: (line.bbox.y1 - line.bbox.y0) * scale}));
+        signal?.throwIfAborted();
+        const lines = await recognizeImageText(rendered.image, sourceLanguage, signal, {profile: 'document'});
+        const scaleX = width / rendered.width, scaleY = height / rendered.height;
+        return lines.map(line => ({text: line.text, x: line.bbox.x0 * scaleX, y: line.bbox.y0 * scaleY, width: (line.bbox.x1 - line.bbox.x0) * scaleX, height: (line.bbox.y1 - line.bbox.y0) * scaleY,
+            ...(line.baseline === undefined ? {} : {baseline: line.baseline * scaleY}),
+            ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * scaleY}),
+        }));
     };
 }

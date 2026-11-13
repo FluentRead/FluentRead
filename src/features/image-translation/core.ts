@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
- * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片与圈选各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
+ * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -32,11 +32,12 @@ export function selectChangedTranslations<T extends OcrLine>(lines: T[], transla
 }
 
 /** 限制识别内存和耗时；只缩小超大图片，不插值放大小字或更改最终图片分辨率。 */
-export function getOcrImageSize(width: number, height: number): {width: number; height: number} {
+export function getOcrImageSize(width: number, height: number, profile: 'image' | 'document' = 'image'): {width: number; height: number} {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
         throw new Error('图片尺寸无效');
     }
-    const ratio = Math.min(1, 4096 / Math.max(width, height), Math.sqrt(6_000_000 / width / height));
+    // 文档页保持 A4 300 dpi 的细节；仍逐页处理且限制最长边，不改变普通图片的预算。
+    const ratio = Math.min(1, 4096 / Math.max(width, height), Math.sqrt((profile === 'document' ? 9_000_000 : 6_000_000) / width / height));
     return {width: Math.max(1, Math.floor(width * ratio)), height: Math.max(1, Math.floor(height * ratio))};
 }
 
@@ -72,7 +73,10 @@ export function restoreOcrLineCoordinates(
             x1: Math.min(sourceWidth, Math.ceil((line.bbox.x1 - padding) * sourceWidth / ocrWidth)),
             y1: Math.min(sourceHeight, Math.ceil((line.bbox.y1 - padding) * sourceHeight / ocrHeight)),
         };
-        return isValidOcrBox(bbox) ? [{...line, bbox}] : [];
+        return isValidOcrBox(bbox) ? [{...line, bbox,
+            ...(line.baseline === undefined ? {} : {baseline: (line.baseline - padding) * sourceHeight / ocrHeight}),
+            ...(line.fontSize === undefined ? {} : {fontSize: line.fontSize * sourceHeight / ocrHeight}),
+        }] : [];
     });
 }
 
@@ -376,7 +380,8 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
                 if (Number.isFinite(confidence) && confidence >= 25) normalized.push({ text, bbox: line.bbox, ...orientation,
                     ...(includeNumericEvidence && validConfidence(line.confidence) ? {numericConfidence: line.confidence} : {}),
                     ...(numeric ? {rawNumericText:sourceText.trim(),numericSourceBox:line.bbox} : {}) });
-                else if (numeric) normalized.push({text,bbox:line.bbox,...orientation,rawNumericText:sourceText.trim(),numericSourceBox:line.bbox,hiddenNumericEvidence:true});
+                // 外层已保证置信度有效或为数字证据；走到此处只可能是后者。
+                else normalized.push({text,bbox:line.bbox,...orientation,rawNumericText:sourceText.trim(),numericSourceBox:line.bbox,hiddenNumericEvidence:true});
             }
             return;
         }
@@ -386,7 +391,8 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         const flush = () => {
             const bbox = unionOcrBoxes(current.map(word => word.bbox));
             const text = current.map(word => word.text).reduce(joinOcrWords, '');
-            if (text) normalized.push({ text, bbox, ...orientation });
+            // current 始终由已经过滤的非空词组成，joinOcrWords 不会删除文字。
+            normalized.push({ text, bbox, ...orientation });
         };
 
         for (let index = 1; index < words.length; index += 1) {

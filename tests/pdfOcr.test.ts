@@ -1,7 +1,7 @@
 /**
  * @file tests/pdfOcr.test.ts
  * 文件职责：验证扫描版 PDF 的逐页文字识别结果能重建成可翻译的段落，并与已有文字的页一起得到连续的片段编号。
- * 主要内容：只识别标记为扫描页且未旋转的页（空白页不识别），识别后取消标记，从阅读位置开始并回绕；识别行经版面分析合并成段落；已有文字页的块与片段原样保留并重排编号；空白与无效识别行被丢弃；进度逐页上报；取消与识别失败不改动原文档；没有可识别的页或不是 PDF 时原样返回。
+ * 主要内容：只识别标记为扫描页的页（含旋转扫描页，空白页不识别），识别后取消标记，从阅读位置开始并回绕；识别行经版面分析合并成段落；已有文字页的块与片段原样保留并重排编号；空白与无效识别行被丢弃；进度逐页上报；取消与识别失败不改动原文档；没有可识别的页或不是 PDF 时原样返回。
  * 模块边界：识别器由测试注入，不渲染页面也不加载识别引擎；版面规则本身由版面分析测试覆盖。
  */
 import {describe, expect, it, vi} from 'vitest';
@@ -16,6 +16,73 @@ const pdf = (pages: PdfDocumentPage[], sources: string[] = []): ParsedDocument =
 const paragraph = (tag: string): PdfOcrLine[] => [0, 1, 2].map(row => ({text: `${tag} line ${row} is a complete recognised line of ordinary body text`, x: 60, y: 100 + row * 14, width: 440, height: 12}));
 
 describe('scanned PDF recognition', () => {
+    it.each([true, false])('keeps column paragraphs whole despite ink-height variation and orders separated small footnotes after body (note=%s)', async note => {
+        const left = ['The method preserves local structure and separates', 'adjacent columns. Paragraph boundaries matter because a', 'translation must preserve the relationship between', 'observations and conclusions.'];
+        const right = ['Right column begins with independent results and', 'compares experiments under several conditions.', 'The measurements remain available for inspection.', 'Future studies will examine different populations.'];
+        const lines: PdfOcrLine[] = [left, right].flatMap((text, column) => text.map((text, row) => ({text,
+            x: 48 + column * 264, y: 150 + row * 14, width: row === 3 ? 120 : 230, height: column === 0 && row === 3 ? 7 : 9,
+            fontSize: 9, baseline: 158 + row * 14,
+        })));
+        if (note) lines.push({text: 'Small footnote describes the experimental setting.', x: 48, y: 750, width: 220, height: 7, fontSize: 7, baseline: 756});
+        const result = await recognizePdfDocument(pdf([page(1)]), async () => lines);
+        const sources = result.segments.map(segment => segment.source);
+        expect(sources).toEqual([left.join(' '), right.join(' '), ...(note ? ['Small footnote describes the experimental setting.'] : [])]);
+    });
+
+    it('keeps valid page checkpoints across a later failure and retries only unfinished pages', async () => {
+        const source = pdf([page(1), page(2), page(3, [block(0)])], ['Native source']);
+        let checkpoint = source;
+        const onCheckpoint = vi.fn((value: ParsedDocument) => {checkpoint = value;});
+        const recognize = vi.fn(async ({pageNumber}: {pageNumber: number}) => {
+            if (pageNumber === 2) throw new Error('page two unavailable');
+            return paragraph('First');
+        });
+        await expect(recognizePdfDocument(source, recognize, {onCheckpoint})).rejects.toThrow('page two unavailable');
+        expect(onCheckpoint).toHaveBeenCalledOnce();
+        expect(pdfPagesNeedingOcr(checkpoint)).toEqual([1]);
+        expect(pdfPagesNeedingOcr(source)).toEqual([0, 1]);
+        const before = JSON.stringify(checkpoint);
+        const retry = vi.fn(async (_input: unknown) => paragraph('Second'));
+        const complete = await recognizePdfDocument(checkpoint, retry);
+        expect(retry).toHaveBeenCalledOnce();
+        expect(retry.mock.calls[0][0]).toMatchObject({pageNumber: 2});
+        expect(complete.segments.map(segment => segment.source.split(' ')[0])).toEqual(['First', 'Second', 'Native']);
+        expect(JSON.stringify(checkpoint)).toBe(before);
+        expect(remapPdfTranslationState(checkpoint, complete, ['OCR correction', 'Native correction'], [0, 1]))
+            .toEqual({translations: ['OCR correction', '', 'Native correction'], confirmedTranslationIds: [0, 2]});
+    });
+
+    it('publishes no canceled or invalid page, preserves empty pages and still reports attempted progress', async () => {
+        const source = pdf([page(1), page(2), page(3)]);
+        const progress = vi.fn(), checkpoint = vi.fn();
+        const result = await recognizePdfDocument(source, async ({pageNumber}) => pageNumber === 2 ? paragraph('Middle') : [
+            {text: 'bad', x: NaN, y: 0, width: 20, height: 10},
+            {text: 'bad', x: 0, y: 0, width: Infinity, height: 10},
+            {text: 'outside', x: 900, y: 900, width: 20, height: 10},
+        ], {onCheckpoint: checkpoint, onProgress: progress});
+        expect(pdfPagesNeedingOcr(result)).toEqual([0, 2]);
+        expect(checkpoint).toHaveBeenCalledOnce();
+        expect(result).toBe(checkpoint.mock.calls[0][0]);
+        expect(progress.mock.calls.map(([value]) => value.completed)).toEqual([0, 1, 2, 3]);
+        const abort = new AbortController();
+        await expect(recognizePdfDocument(source, async () => {abort.abort(); return paragraph('Late');},
+            {signal: abort.signal, onCheckpoint: checkpoint})).rejects.toMatchObject({name: 'AbortError'});
+        expect(checkpoint).toHaveBeenCalledOnce();
+        const blank = await recognizePdfDocument(source, async () => []);
+        expect(blank).toBe(source);
+    });
+
+    it('clips edge OCR geometry and keeps native margin corrections on still-empty scan pages', async () => {
+        const source = pdf([page(1), page(2, [block(0)], {scanned: true})], ['Native heading']);
+        const result = await recognizePdfDocument(source, async ({pageNumber}) => pageNumber === 1
+            ? [{text: 'Edge paragraph remains within its page', x: -5, y: -2, width: 610, height: 20}] : []);
+        const first = (result.binary as {pages: PdfDocumentPage[]}).pages[0].blocks[0];
+        expect(first.x).toBeGreaterThanOrEqual(0);
+        expect(first.x + first.width).toBeLessThanOrEqual(600);
+        expect(pdfPagesNeedingOcr(result)).toEqual([1]);
+        expect(remapPdfTranslationState(source, result, ['Confirmed heading'], [0]))
+            .toEqual({translations: ['Confirmed heading'], confirmedTranslationIds: [0]});
+    });
     it('lists scanned PDF pages, rotated ones included', () => {
         // 文字页和空白页不识别；夹在文字页之间的扫描页、旋转的扫描页都要识别。
         expect(pdfPagesNeedingOcr(pdf([page(1, [block(0)]), page(2), page(3, [], {rotation: 90}), page(4), page(5, [], {scanned: false})], ['kept']))).toEqual([1, 2, 3]);

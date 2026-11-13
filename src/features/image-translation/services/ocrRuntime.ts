@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
- * 主要内容：配置扩展语言资源、转发引擎任务进度与图片/圈选识别策略；保持竖排检测和空结果一次布局重试，坐标映回原图并按策略隔离有界缓存；合并同图在途任务并独立取消，预处理检查独占像素并为透明前景合成对比底色，不透明原尺寸 PNG 复用原编码，其他输入共用可取消的异步 PNG 编码，JPEG 以浏览器已应用 EXIF 的像素识别；整图借用预检已解码图片，其他路径限时解码，绘制后立即释放自有源像素；公开离屏页面销毁时的 Worker 与结果缓存清理入口。
+ * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割，图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
@@ -59,10 +59,29 @@ const ocrWorkerRuntime = createOcrWorkerRuntime<TesseractRecognitionResult>({
 const MAX_CACHED_OCR_IMAGES = 3;
 const MAX_CACHED_OCR_BYTES = 12 * 1024 * 1024;
 const OCR_IMAGE_DECODE_TIMEOUT_MS = 15_000;
-export type OcrRecognitionOptions = {profile?: 'image' | 'area'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
+export type OcrRecognitionOptions = {profile?: 'image' | 'area' | 'document'; onProgress?: (percent: number) => void; decodedImage?: HTMLImageElement; includeMangaNumericConfidence?: boolean};
 type RecognitionViews = {ordinary: OcrLine[]; manga: NumericEvidenceOcrLine[]};
 const sharedRecognition = createSharedOcrTasks<RecognitionViews>();
 const completedRecognitionCache = new Map<string, {views: RecognitionViews; bytes: number}>();
+/** 识别框只包住实际墨迹，缺少 g/p/y 的末行会偏矮；文档分段使用引擎行指标，不能据框高误判小字。 */
+function documentLineMetrics(lines: OcrLine[], result: TesseractRecognitionResult): OcrLine[] {
+    const rows: Array<{bbox: OcrLine['bbox']; baseline: number; fontSize: number}> = [];
+    for (const block of result.data.blocks ?? []) for (const paragraph of block.paragraphs) for (const line of paragraph.lines) {
+        const row = line.rowAttributes?.rowHeight, baseline = line.baseline;
+        if (!row || !baseline || ![row, baseline.y0, baseline.y1].every(Number.isFinite)) continue;
+        const height = line.bbox.y1 - line.bbox.y0;
+        if (row < height * .7 || row > height * 2.5 || Math.abs(baseline.y1 - baseline.y0) > row * .3
+            || baseline.y0 < line.bbox.y0 || baseline.y0 > line.bbox.y1 + height * .3) continue;
+        rows.push({bbox: line.bbox, baseline: (baseline.y0 + baseline.y1) / 2, fontSize: row * .85});
+    }
+    return lines.map(line => {
+        if (line.vertical) return line;
+        // 同一引擎行可能横跨两栏；规范化会按词间距拆开，子行仍使用唯一包含它的原始行指标。
+        const candidates = rows.filter(row => row.bbox.x0 <= line.bbox.x0 && row.bbox.x1 >= line.bbox.x1
+            && row.bbox.y0 <= line.bbox.y0 && row.bbox.y1 >= line.bbox.y1);
+        return candidates.length === 1 ? {...line, baseline: candidates[0].baseline, fontSize: candidates[0].fontSize} : line;
+    });
+}
 let cachedRecognitionBytes = 0;
 
 function abortRecognition(): Error {
@@ -137,7 +156,7 @@ function loadOcrImage(image: string, signal?: AbortSignal): Promise<HTMLImageEle
     });
 }
 
-async function prepareOcrImage(image: string, profile: 'image' | 'area', signal?: AbortSignal, decodedImage?: HTMLImageElement) {
+async function prepareOcrImage(image: string, profile: 'image' | 'area' | 'document', signal?: AbortSignal, decodedImage?: HTMLImageElement) {
     const source = decodedImage ?? await loadOcrImage(image, signal);
     try {
         if (signal?.aborted) throw abortRecognition();
@@ -145,7 +164,7 @@ async function prepareOcrImage(image: string, profile: 'image' | 'area', signal?
         const sourceHeight = source.naturalHeight || source.height;
         const size = profile === 'area'
             ? getAreaOcrImageSize(sourceWidth, sourceHeight)
-            : {...getOcrImageSize(sourceWidth, sourceHeight), padding: 0};
+            : {...getOcrImageSize(sourceWidth, sourceHeight, profile), padding: 0};
         let recognitionImage = image;
         // AVIF/WebP 等格式不一定被内核支持；JPEG 的 EXIF 解析也可能与浏览器不同。
         // PNG 之外复用已解码像素，统一格式并保持识别方向、尺寸和重绘坐标一致。
@@ -201,8 +220,8 @@ export async function recognizeImage(
     const languages = models.join('+');
     // PSM 11 不做竖排判定，会把竖列逐行横读成乱序；PSM 12 在同样的稀疏分割上按版面判定方向，
     // 竖排页交给 *_vert 模型，横排页结果与 PSM 11 一致。缺少 osd 模型只跳过文字方向旋转检测。
-    const layoutMode = models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
     const profile = options.profile ?? 'image';
+    const layoutMode = profile === 'document' ? PSM.AUTO : models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
     const cacheKey = `${profile}\0${languages}\0${image}`;
     const cached = completedRecognitionCache.get(cacheKey);
     if (cached) {
@@ -219,15 +238,15 @@ export async function recognizeImage(
         const readLines = (recognition: TesseractRecognitionResult): RecognitionViews => {
             const views = normalizeOcrLineViews(recognition.data.blocks);
             return {
-                ordinary: restoreOcrLineCoordinates(views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
+                ordinary: restoreOcrLineCoordinates(profile === 'document' ? documentLineMetrics(views.ordinary, recognition) : views.ordinary, sourceWidth, sourceHeight, size.width, size.height, size.padding),
                 // 圈选只读文字不擦图，不需要数字物理保护门禁，避免噪声框阻断合法识别。
                 manga: deduplicateOcrGuards(restoreOcrLineCoordinates([...views.manga,...(profile==='area'?[]:collectRawNumericGuards(recognition.data.blocks,views.manga,{trustedWorkerData:true}))], sourceWidth, sourceHeight, size.width, size.height, size.padding)),
             };
         };
         let views = readLines(result);
-        if (views.ordinary.length === 0 && (profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
-            // 圈选与小图片空结果才尝试单块分割，不给大型整页翻倍耗时，不降低噪声阈值。
-            const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, PSM.SINGLE_BLOCK);
+        if (views.ordinary.length === 0 && (profile === 'document' || profile === 'area' || (sourceWidth <= 1000 && sourceHeight <= 500))) {
+            // 文档可能只含少量独立标题，自动分栏为空时试一次稀疏文字；其它用途维持原有单块回退。
+            const fallback = await ocrWorkerRuntime.recognize(recognitionImage, languages, signal, profile === 'document' ? PSM.SPARSE_TEXT : PSM.SINGLE_BLOCK);
             if (signal?.aborted) throw abortRecognition();
             const firstGuards=views.manga.filter(line=>line.guardOnly);
             views = readLines(fallback);

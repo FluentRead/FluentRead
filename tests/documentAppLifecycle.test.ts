@@ -376,6 +376,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.historyEntries).toEqual([]); expect(await history.list()).toEqual([]);
     });
 
+    it('does not show a mixed-PDF history entry as complete while scan pages are still pending', () => {
+        const entry = {id: 'mixed', name: 'mixed.pdf', format: 'pdf', size: 1, total: 1, completed: 1, pendingOcrPages: 2, updatedAt: 1};
+        expect(state.historyStatus(entry)).toContain('document.pdfReading.scanned');
+        expect(state.historyStatus(entry)).not.toContain('翻译完成');
+        expect(state.historyStatus({...entry, pendingOcrPages: undefined})).toContain('翻译完成');
+    });
+
     it('renders actual Word table cells and part headings, navigates their outline and preserves source and correction', async () => {
         const zip = await JSZip.loadAsync(readFileSync('examples/document-translation/sample.docx'));
         const paragraph = (text: string, heading = false) => `<w:p>${heading ? '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' : ''}<w:r><w:t>${text}</w:t></w:r></w:p>`;
@@ -1890,6 +1897,36 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(ports.batch.mock.calls.flatMap(([sources]: any) => sources)).not.toContain('Native alpha paragraph.');
     });
 
+    it.each(['pause', 'failure'] as const)('saves a real OCR checkpoint before %s and resumes only the remaining page', async outcome => {
+        const source = await loadMixedPdfWithCorrection();
+        const scan = (source.binary as any).pages[0];
+        const extended = markRaw({...source, binary: {...source.binary!, pages: [...(source.binary as any).pages, {...scan, pageNumber: 3}]}}) as ParsedDocument;
+        state.parsedDocument = extended;
+        const gate = deferred<any[]>();
+        const recognize = vi.fn(async ({pageNumber}: {pageNumber: number}) => pageNumber === 3 ? gate.promise
+            : [{text: 'First scanned paragraph.', x: 5, y: 5, width: 90, height: 12}]);
+        ports.createRecognizer.mockReturnValue(recognize);
+        const running = state.startTranslation();
+        await vi.waitFor(() => expect(recognize).toHaveBeenCalledTimes(2));
+        const checkpoint = state.parsedDocument;
+        expect(checkpoint).not.toBe(extended);
+        expect(checkpoint.binary.pages.map((page: PdfDocumentPage) => Boolean(page.scanned))).toEqual([false, false, true]);
+        expect(state.translatedSegments).toEqual(['', 'Human correction', '']);
+        expect(state.confirmedTranslationIds).toEqual([1]);
+        if (outcome === 'pause') {state.pauseTranslation(); gate.resolve([{text: 'Late page', x: 5, y: 5, width: 90, height: 12}]);}
+        else gate.reject(new Error('Last page temporarily unavailable'));
+        await running; await flush();
+        expect(state.parsedDocument).toBe(checkpoint);
+        expect(state.documentQueue[0].document).toBe(checkpoint);
+        const retry = vi.fn(async (_input: unknown) => [{text: 'Final scanned paragraph.', x: 5, y: 5, width: 90, height: 12}]);
+        ports.createRecognizer.mockReturnValue(retry);
+        await state.startTranslation(); await flush();
+        expect(retry).toHaveBeenCalledOnce();
+        expect(retry.mock.calls[0][0]).toMatchObject({pageNumber: 3});
+        expect(state.translatedSegments).toEqual(['译 First scanned paragraph.', 'Human correction', '译 Native beta paragraph.', '译 Final scanned paragraph.']);
+        expect(state.translationComplete).toBe(true);
+    });
+
     it.each(['pause', 'failure'] as const)('retains native corrections after mixed-PDF OCR %s and resumes them on retry', async outcome => {
         const source = await loadMixedPdfWithCorrection();
         const pending = deferred<ParsedDocument>();
@@ -1917,21 +1954,24 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         await state.startTranslation(); await flush();
         expect(state.translatedSegments).toEqual(['Human correction', '译 Native beta paragraph.']);
         expect(state.confirmedTranslationIds).toEqual([0]);
-        expect(state.needsOcr).toBe(false);
+        expect(state.needsOcr).toBe(true);
+        expect(state.translationComplete).toBe(false);
+        expect(state.batchCompletedCount).toBe(0);
+        expect(state.progress).toBe(99);
+        expect(state.runState).toBe('failed');
+        expect(state.errorMessage).toBe('document.pdfReading.ocrIncomplete');
     });
 
-    it('clears mixed-PDF corrections only after accepting the completed-document restart confirmation', async () => {
+    it('continues OCR without clearing corrections when every native segment is already translated', async () => {
         await loadMixedPdfWithCorrection();
         state.editSegment(1, 'Second human correction');
         ports.createRecognizer.mockReturnValue(async () => [{text: 'Scanned opening paragraph.', x: 5, y: 5, width: 90, height: 12}]);
         state.requestTranslation();
-        expect(state.pendingAction).toBe('restart');
-        expect(ports.recognize).not.toHaveBeenCalled();
+        expect(state.pendingAction).toBeNull();
         expect(state.translatedSegments).toEqual(['Human correction', 'Second human correction']);
-        state.confirmAction();
         await vi.waitFor(() => expect(state.translating).toBe(false));
-        expect(state.translatedSegments).toEqual(['译 Scanned opening paragraph.', '译 Native alpha paragraph.', '译 Native beta paragraph.']);
-        expect(state.confirmedTranslationIds).toEqual([]);
+        expect(state.translatedSegments).toEqual(['译 Scanned opening paragraph.', 'Human correction', 'Second human correction']);
+        expect(state.confirmedTranslationIds).toEqual([1, 2]);
     });
 
     it.each(['pause', 'switch', 'reset'] as const)('clears an in-flight OCR status on %s and ignores progress from the abandoned request', async action => {
@@ -2041,7 +2081,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.needsOcr).toBe(true);
     });
 
-    it('keeps an empty OCR result readable and shows its failure without requesting translation or repeating OCR', async () => {
+    it('keeps an empty OCR result readable and allows retry after correcting the scan or source language', async () => {
         await state.loadFiles([file('scanned.pdf')]);
         const original = state.parsedDocument;
         const scanned = markRaw({...original, segments: [], binary: {...original.binary,
@@ -2049,9 +2089,9 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         }});
         state.parsedDocument = scanned;
         const recognized = {...scanned, binary: {...scanned.binary,
-            pages: scanned.binary.pages.map((page: PdfDocumentPage) => ({...page, scanned: false})),
+            pages: scanned.binary.pages.map((page: PdfDocumentPage) => ({...page, scanned: true})),
         }};
-        ports.recognize.mockResolvedValueOnce(recognized);
+        ports.recognize.mockResolvedValue(recognized);
 
         await state.startTranslation(); await flush();
 
@@ -2062,7 +2102,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.parsedDocument).toBe(recognized);
         expect(state.documentQueue[0].document).toBe(recognized);
         expect(state.parsedDocument.binary.bytes).toBe(original.binary.bytes);
-        expect(state.needsOcr).toBe(false);
+        expect(state.needsOcr).toBe(true);
         expect(state.translating).toBe(false);
         expect(state.recognitionProgress).toBe('');
         expect(state.batchCompletedCount).toBe(0);
@@ -2070,7 +2110,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(walkHost(recovery).find(entry => entry.props.class === 'recovery-error-detail')!.text).toBe('document.pdfReading.ocrEmpty');
         expect(walkHost(root).some(entry => entry.props['data-document-reader'] === 'pdf')).toBe(true);
         await state.startTranslation(); await flush();
-        expect(ports.recognize).toHaveBeenCalledOnce();
+        expect(ports.recognize).toHaveBeenCalledTimes(2);
         expect(ports.batch).not.toHaveBeenCalled();
         expect(ports.translate).not.toHaveBeenCalled();
         expect(state.runState).toBe('failed');

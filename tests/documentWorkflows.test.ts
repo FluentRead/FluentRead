@@ -225,6 +225,33 @@ describe('document import workflow ownership', () => {
         expect(f.tasks[0]).toMatchObject({bytes, translations: ['Kept correction'], savedRevision: 0}); expect(saved).toEqual(before);
     });
 
+    it('reparses an older empty OCR cache so a scanned page can be retried instead of remaining permanently complete', async () => {
+        const f = importFixture(); f.ports.history = f.history;
+        const bytes = new Uint8Array([4, 5, 6]);
+        const page = {pageNumber: 1, width: 600, height: 800, blocks: [], segmentIndexes: [], scanned: false};
+        const snapshot: ParsedDocument = {...document(), fileName: 'empty.pdf', format: 'pdf', segments: [], binary: {kind: 'pdf', bytes, pages: [page]}};
+        const saved = {...record(snapshot), bytes, mimeType: 'application/pdf', translations: []};
+        f.load.mockResolvedValue(saved);
+        const fresh: ParsedDocument = {...snapshot, binary: {kind: 'pdf', bytes, pages: [{...page, scanned: true}]}};
+        vi.mocked(f.ports.parseFile).mockResolvedValue(fresh);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).toHaveBeenCalledOnce();
+        expect(f.tasks[0].document).toBe(fresh);
+        expect(f.tasks[0].document?.binary).toMatchObject({pages: [{scanned: true}]});
+        expect(page.scanned).toBe(false);
+    });
+
+    it.each([undefined, [null], [{scanned: false}]])('reparses malformed PDF snapshot pages instead of losing the import: %j', pages => {
+        const f = importFixture(); f.ports.history = f.history;
+        const bytes = new Uint8Array([1]);
+        f.load.mockResolvedValue({...record(), format: 'pdf', name: 'malformed.pdf', bytes,
+            parsed: {...document(), format: 'pdf', binary: {kind: 'pdf', bytes, pages}} as any});
+        return f.workflow.openHistory('history').then(() => {
+            expect(f.ports.parseFile).toHaveBeenCalledOnce();
+            expect(f.tasks).toHaveLength(1);
+        });
+    });
+
     it('cancels a current-cache byte mismatch reparse and releases its late result without publishing an obsolete task', async () => {
         const f = importFixture(); f.ports.history = f.history;
         const snapshot: ParsedDocument = {...document(), fileName: 'cached.pdf', format: 'pdf', binary: {kind: 'pdf', bytes: new Uint8Array([1]), pages: []}};
@@ -324,6 +351,22 @@ describe('document recognition workflow ownership', () => {
         const options = {sourceLanguage: 'en', startPage: 2, signal: parent.signal, isCurrent: () => current};
         return {ports, workflow, parent, options, supersede: () => {current = false;}};
     }
+    it.each(['cancel', 'dispose', 'parent', 'supersede'] as const)('commits completed pages but rejects checkpoints arriving after %s', async action => {
+        const f = fixture(), gate = pending(document()), onCheckpoint = vi.fn();
+        vi.mocked(f.ports.recognize).mockReturnValueOnce(gate.promise);
+        const running = f.workflow.recognize(document(), {...f.options, onCheckpoint});
+        const controls = vi.mocked(f.ports.recognize).mock.calls[0][2]!;
+        const accepted = document('accepted.txt');
+        controls.onCheckpoint!(accepted);
+        expect(onCheckpoint).toHaveBeenCalledWith(accepted);
+        if (action === 'parent') f.parent.abort();
+        else if (action === 'supersede') f.supersede();
+        else f.workflow[action]();
+        controls.onCheckpoint!(document('late.txt'));
+        gate.resolve(document('late.txt'));
+        expect(await running).toBeNull();
+        expect(onCheckpoint).toHaveBeenCalledOnce();
+    });
     it('freezes recognizer settings and removes its parent listener after success or current failure', async () => {
         const f = fixture(), add = vi.spyOn(f.parent.signal, 'addEventListener'), remove = vi.spyOn(f.parent.signal, 'removeEventListener');
         const source = document();expect(await f.workflow.recognize(source, f.options)).toBe(source);

@@ -129,7 +129,7 @@ export interface PdfDocumentPage {
     preservedRegions?: PdfPreservedRegion[];
     /** 细分隔线只限制原位译文的可用空白，不作为重排阅读的图形区域。 */
     layoutBoundaries?: Array<Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>>;
-    /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；识别之后不再标记。 */
+    /** 整页是一张图像且没有任何文字（扫描页），等待文字识别；成功识别后取消标记，空结果和失败仍保留以便重试。 */
     scanned?: boolean;
 }
 

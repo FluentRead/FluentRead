@@ -7,6 +7,8 @@ import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixe
 import {imageMatteObservationBox,observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
 import {groupImageParagraphs,type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import type {MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
+import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
+import * as sourceInk from '@/src/features/image-translation/services/sourceInk';
 import {mergeMangaParagraphContinuations,type MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 type Box=ImageTextRegion['bbox'];
 const bounds=(members:ImageTextRegion[])=>members.reduce((a,{bbox:b})=>({x0:Math.min(a.x0,b.x0),y0:Math.min(a.y0,b.y0),x1:Math.max(a.x1,b.x1),y1:Math.max(a.y1,b.y1)}),{x0:Infinity,y0:Infinity,x1:-Infinity,y1:-Infinity});
@@ -37,6 +39,61 @@ function alphaLongFixture(){
     for(let y=93;y<101;y++)for(let x=43;x<46;x++)f.set(x,y,[230,240,250,255]);
     return f;
 }
+function styleGradient(firstHeight=25,secondColor=[18,26,45,255],third=false){
+    const width=320,height=240,pixels=new Uint8ClampedArray(width*height*4);
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([90+x*.3,110+x*.1,135,255],(y*width+x)*4);
+    const results=[{text:'FIRST HEADING',confidence:.99,box:{x:40,y:40,width:170,height:firstHeight}},
+        {text:'SECOND HEADING',confidence:.99,box:{x:40,y:100,width:170,height:20}},
+        ...(third?[{text:'THIRD HEADING',confidence:.99,box:{x:40,y:160,width:170,height:25}}]:[])];
+    for(const [i,item] of results.entries())for(let y=item.box.y+3;y<item.box.y+item.box.height-3;y++)for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x++)pixels.set(i===1?secondColor:[245,245,250,255],(y*width+x)*4);
+    return {width,height,pixels,page:{results} as MangaOcrPage};
+}
+describe('渐变上的标题样式边界',()=>{
+    it('冻结招牌的大小与字色差异保留两块完整标题，不借同背景强行合段',()=>{
+        const raw=gunzipSync(readFileSync(new URL('./fixtures/manga-color-quality/truth/prism-platform-gradient-signs.source-rgba.bin.gz',import.meta.url)));
+        const pixels=new Uint8ClampedArray(raw.buffer,raw.byteOffset,raw.byteLength),before=createHash('sha256').update(pixels).digest('hex');
+        const page:MangaOcrPage={results:[{text:'FOLLOW THE EASTERN TRACK',confidence:.98,box:{x:181,y:130,width:822,height:37}},
+            {text:'THE NEXT TRAIN IS ALMOST HERE',confidence:.98,box:{x:179,y:205,width:715,height:28}}]};
+        page.imageParagraphGapProofs=produceImageParagraphGapProofs(page,1600,900,pixels);expect(page.imageParagraphGapProofs).toEqual([]);
+        const grouped=collectMangaRegions(page,'en',1600,900,'manga','same-source');
+        expect(grouped.map(r=>r.text)).toEqual(page.results.map(r=>r.text));expect(grouped.map(r=>r.fontSize)).toEqual([37,28]);
+        expect(grouped.map(r=>r.sourceBoxes)).toEqual(grouped.map(r=>[r.bbox]));expect(createHash('sha256').update(pixels).digest('hex')).toBe(before);
+    });
+    it('字号差异与明确字色差异同时成立才撤回渐变续行',()=>{
+        const different=styleGradient();expect(produceImageParagraphGapProofs(different.page,different.width,different.height,different.pixels)).toEqual([]);
+        for(const f of [styleGradient(24),styleGradient(25,[245,245,250,255]),styleGradient(25,[230,230,235,255]),styleGradient(25,[130,140,155,255])])
+            expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels).map(p=>p.mode)).toEqual(['column-profile']);
+        const uncertain=styleGradient();uncertain.pixels.set([255,0,0,255],(45*uncertain.width+50)*4);
+        expect(produceImageParagraphGapProofs(uncertain.page,uncertain.width,uncertain.height,uncertain.pixels).map(p=>p.mode)).toEqual(['column-profile']);
+        const corridor=styleGradient(25,[245,245,250,255]);corridor.pixels[(80*corridor.width+100)*4]^=1;
+        expect(produceImageParagraphGapProofs(corridor.page,corridor.width,corridor.height,corridor.pixels)).toEqual([]);
+    });
+    it('同页共享行只观察一次，源色不明确的缓存也不重复扫描',()=>{
+        for(const color of [[245,245,250,255],[130,140,155,255]]){
+            const f=styleGradient(25,color,true),original=sourceInk.observeImageSourceInk,spy=vi.spyOn(sourceInk,'observeImageSourceInk').mockImplementation(original);
+            try{expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toHaveLength(2);expect(spy).toHaveBeenCalledTimes(3);}finally{spy.mockRestore();}
+        }
+    });
+    it('额外源色面积在整页共享收费，耗尽后保留原有候选规则',()=>{
+        const width=1000,height=2000,pixels=new Uint8ClampedArray(width*height*4),page:MangaOcrPage={results:[]};
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set([90+x%410*.3,125+x%410*.1,150,255],(y*width+x)*4);
+        for(let n=0;n<13;n++)for(const x of [40,450])for(const [dy,h] of [[0,25],[60,20]]){
+            const y=40+n*140+dy;page.results.push({text:'STYLE CONTROL',confidence:.99,box:{x,y,width:170,height:h}});
+            for(let yy=y+3;yy<y+h-3;yy++)for(let xx=x+4;xx<x+166;xx++)pixels.set([245,245,250,255],(yy*width+xx)*4);
+        }
+        const original=sourceInk.observeImageSourceInk;let paid=0;
+        const spy=vi.spyOn(sourceInk,'observeImageSourceInk').mockImplementation((...args)=>{const roi=imageMatteObservationBox(args[1],args[2],args[3])!;paid+=roi.width*roi.height*2;return original(...args);});
+        try{expect(produceImageParagraphGapProofs(page,width,height,pixels).length).toBeGreaterThan(10);expect(paid).toBeGreaterThan(240000);expect(paid).toBeLessThanOrEqual(262144);}finally{spy.mockRestore();}
+    });
+    it('源色观察后的快照漂移不发布旧关系，取消仍传播首因',()=>{
+        const f=styleGradient(25,[245,245,250,255]),original=sourceInk.observeImageSourceInk;
+        const spy=vi.spyOn(sourceInk,'observeImageSourceInk').mockImplementation((...args)=>{f.page.results[0].text='CHANGED';return original(...args);});
+        try{expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);}finally{spy.mockRestore();}
+        const g=styleGradient(),abort=new DOMException('cancelled','AbortError');let aborted=false;
+        const cancel=vi.spyOn(sourceInk,'observeImageSourceInk').mockImplementation((...args)=>{aborted=true;return original(...args);});
+        try{expect(()=>produceImageParagraphGapProofs(g.page,g.width,g.height,g.pixels,()=>{if(aborted)throw abort;})).toThrow(abort);}finally{cancel.mockRestore();}
+    });
+});
 describe('低对比平滑间隙证明的生产消费',()=>{
     it('精准微渐变可以逐列复核，陡变和半透明高对比带不能冒充平滑背景',()=>{
         const column=basic();

@@ -2,8 +2,8 @@
 /**
  * @file scripts/testing/run-manga-translation-test.cjs
  * 文件职责：在临时 profile 中用可信点击和真实模型验证生产漫画翻译、滚动及缓存行为。
- * 主要内容：固定模型文件经校验后由既有 UI 导入；性能模式测量冷/热推理，质量 manifest 检查真实 OCR 锚点、画面保护与原/译切换；受控阿拉伯语、希伯来语目标可记录实际字形方向，不能据此声称真实供应商翻译准确。
- * 模块边界：仅替换夹具的文字服务传输；不修改生产 OCR/修补结果，不访问日常浏览器 profile，浏览器启动与页面创建均走不抢焦点 helper。
+ * 主要内容：固定模型文件经校验后由既有 UI 导入；性能模式测量冷/热推理，质量 manifest 检查真实 OCR 锚点、画面保护与原/译切换；可选角色补充绑定原manifest，正文、注音和视觉分区独立验收并保留旧分数；受控阿拉伯语、希伯来语目标可记录实际字形方向，不能据此声称真实供应商翻译准确。
+ * 模块边界：受控模式仅替换夹具的文字服务传输；真实模式逐次记录原文白名单匹配、HTTP状态及耗时，不把测试器拒绝误报为真实服务回退；不修改生产 OCR/修补结果，不访问日常浏览器 profile，浏览器启动与页面创建均走不抢焦点 helper。
  */
 const fs = require('node:fs');
 const path = require('node:path');
@@ -13,6 +13,7 @@ const {execFileSync} = require('node:child_process');
 const {ensureImageTranslationModelFiles, defaultImageTranslationModelCacheDirectory, readImageTranslationModelManifest} = require('./image-model-cache.cjs');
 const {getMangaOrtModelCatalog, validateMangaOrtModelFiles} = require('./manga-ort-diagnostics.cjs');
 const {validateQualityFixtureExpectations,evaluateCapturedQualityFixture,evaluateQualityAlphaProbes} = require('./manga-quality-corpus.cjs');
+const {validateQualityRoleManifest,evaluateCapturedQualityRoles}=require('./manga-quality-roles.cjs');
 function arg(name, fallback) {const index = process.argv.indexOf(`--${name}`); return index < 0 ? fallback : process.argv[index + 1];}
 let extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 let diagnosticFixture;
@@ -89,8 +90,17 @@ const qualityProfile=arg('quality-profile','manga');
 assert.ok(['manga','image'].includes(qualityProfile),'Quality profile must be manga or image');
 const ordinaryImageQuality=qualityProfile==='image';
 assert.ok(!qualityManifestPath||!explicitPipelineInputs,'Choose either --quality-manifest or --pipeline-inputs');
-const qualityManifest=qualityManifestPath?JSON.parse(fs.readFileSync(path.resolve(qualityManifestPath),'utf8')):null;
+const qualityManifestBytes=qualityManifestPath?fs.readFileSync(path.resolve(qualityManifestPath)):null;
+const qualityManifest=qualityManifestBytes?JSON.parse(qualityManifestBytes.toString('utf8')):null;
 const qualityFixtures=qualityManifest?.fixtures;
+const qualityRolesPath=arg('quality-roles',null);
+let qualityRoles=null,qualityRoleProfile;
+if(qualityRolesPath){
+    assert.ok(qualityManifestBytes,'--quality-roles requires --quality-manifest');
+    const file=path.resolve(qualityRolesPath),stat=fs.statSync(file);assert.ok(stat.isFile()&&stat.size<=65536,'Quality role profile is a bounded regular file');
+    const bytes=fs.readFileSync(file),profile=JSON.parse(bytes.toString('utf8'));qualityRoles=validateQualityRoleManifest(qualityManifestBytes,profile);
+    qualityRoleProfile={path:file,sha256:createHash('sha256').update(bytes).digest('hex'),manifestSha256:profile.manifestSha256};
+}
 if(qualityManifest){
     assert.equal(qualityManifest.version,1,'Use a supported quality manifest version');
     assert.ok(Array.isArray(qualityFixtures)&&qualityFixtures.length>=1&&qualityFixtures.length<=32,'Quality corpus contains 1–32 bounded scenes');
@@ -215,6 +225,7 @@ report.prefetchPages=prefetchPages;
 report.sourceLanguage=sourceLanguage;report.readerOpenSelector=readerOpenSelector;report.readerScrollSelector=readerScrollSelector;
 report.targetLanguage=targetLanguage;
 if(qualityManifest)report.qualityManifest={path:path.resolve(qualityManifestPath),version:qualityManifest.version,scenes:qualityFixtures.map(({name,sourceLanguage,scene,expectedAnchors,expectedNoText,forbiddenRegions,protectedProbes})=>({name,sourceLanguage,scene,expectedAnchors,expectedNoText,forbiddenRegions,protectedProbes}))};
+if(qualityRoleProfile)report.qualityRoleProfile=qualityRoleProfile;
 if(translationMapPath)report.controlledTranslationMap={path:path.resolve(translationMapPath),sha256:createHash('sha256').update(fs.readFileSync(path.resolve(translationMapPath))).digest('hex'),entries:Object.keys(translationMap).length,scope:'Fixed source-to-target text for layout inspection; not a measurement of live translation quality. Missing sources fail the run.'};
 if(canvasContentPixels)report.canvasPixelWorld='own production extension content world; ordinary API, no prototype substitution';
 report.readerStartIndex=readerStartIndex;
@@ -1393,7 +1404,7 @@ async function verifyPipelinePerformance(extensionId) {
             result.expectedSource=fixture.expectedSource;
             assert.ok(layout,'Quality scene captures its actual offscreen OCR layout');result.ocrLines=layout.lines;result.observedNoBitmap=observedNoBitmap;
             // 正锚点、重复次数、负区域与无字页均保留失败，再完成后续场景；不以期望文字代替识别值。
-            Object.assign(result,evaluateCapturedQualityFixture(fixture,layout.lines));
+            Object.assign(result,qualityRoles?evaluateCapturedQualityRoles(qualityRoles.get(fixture.name),layout.lines):evaluateCapturedQualityFixture(fixture,layout.lines));
             if(fixture.expectedNoText) {
                 result.wordlessPage={noTextTransport:texts.length===0,noBitmap:!displayedBitmap,sourcePreserved:JSON.stringify(await page.locator('.zao-image').first().evaluate(image=>({src:image.src,srcset:image.getAttribute('srcset'),sizes:image.getAttribute('sizes'),style:image.getAttribute('style')})))===JSON.stringify(sourceState)};
                 if(!result.wordlessPage.noTextTransport||!result.wordlessPage.noBitmap||!result.wordlessPage.sourcePreserved)result.qualityFailures.push({type:'wordless-page-render',reason:'A wordless source must issue no text transport and remain visible without a translated bitmap',...result.wordlessPage});
@@ -1440,11 +1451,17 @@ async function verifyPipelinePerformance(extensionId) {
         const anchors=report.pipeline.flatMap(result=>result.anchors||[]);
         const failures=report.pipeline.flatMap(result=>(result.qualityFailures||[]).map(failure=>({scene:result.scene,round:result.round,...failure})));
         report.qualitySummary={completedScenes:report.pipeline.length,expectedScenes:qualityFixtures.length*pipelineRounds,anchors:{total:anchors.length,matched:anchors.filter(anchor=>anchor.found).length,failed:anchors.filter(anchor=>!anchor.found).length},negativeRegions:{declared:qualityFixtures.reduce((sum,fixture)=>sum+(fixture.forbiddenRegions?.length||0),0)*pipelineRounds,falsePositives:report.pipeline.reduce((sum,result)=>sum+(result.negativeDetections?.length||0),0)},wordlessPages:report.pipeline.filter(result=>result.wordlessPage).map(result=>({scene:result.scene,...result.wordlessPage})),failures,
-            normalization:'NFKC, uppercase, retain Unicode letters/numbers; count overlapping substring anchors in all captured OCR sourceText including preserved/untranslated lines; exact occurrence counts follow manifest metadata or source-proven unique anchors',
+            normalization:'NFKC, uppercase, retain Unicode letters/numbers; count overlapping substring anchors in all captured OCR sourceText including preserved/untranslated lines'+(qualityRoles?' and actual ruby metadata':'')+'; exact occurrence counts follow manifest metadata or source-proven unique anchors',
             scope:'Exact OCR anchors, source occurrence counts, declared reading order, excess source-character counts and wordless artwork false positives are aggregated independently. Character inventories do not prove absence of omissions or preserve order. Protected pixels, source restoration, cached bitmap and request counts remain immediate structural assertions. No CER or translation-provider quality claim.'};
+        if(qualityRoles){
+            report.qualitySummary.legacyFailures=report.pipeline.flatMap(result=>(result.legacyQuality?.qualityFailures??[]).map(failure=>({scene:result.scene,round:result.round,...failure})));
+            report.qualitySummary.annotations=report.pipeline.flatMap(result=>result.annotationChecks??[]);
+            report.qualitySummary.visualRegions=report.pipeline.flatMap(result=>result.paragraphGroups??[]);
+            report.qualitySummary.semanticSourceGroups=report.pipeline.flatMap(result=>result.semanticSourceGroups??[]);
+        }
     }
     auditPageErrors();assert.deepEqual(report.errors,[]);assert.deepEqual(report.consoleErrors,[]);
-    if(qualityManifest)assert.deepEqual(report.qualitySummary.failures,[],'All exact OCR quality anchors pass after completing every scene');
+    if(qualityManifest)assert.deepEqual(report.qualitySummary.failures,[],'All exact OCR anchors and declared source roles pass after completing every scene');
 }
 
 /** 仅此模式验证停留调度与初始化取消复用；真实模型推理，文字传输受控，不把返显时间当作 OCR 性能。 */
@@ -1929,14 +1946,19 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
             if(html||list||rpc){
                 const entries=rpc?JSON.parse(new URLSearchParams(options.body).get('f.req'))[0]:null;
                 const texts=html?JSON.parse(options.body)[0][0]:list?new URLSearchParams(options.body).getAll('q'):entries.map(entry=>JSON.parse(entry[1])[0][0]);
-                test.requests.push(...texts);test.transportRequests.push({endpoint:html?'translateHtml':list?'translate_a/t':'batchexecute',items:texts.length,live});
+                const attempt={endpoint:html?'translateHtml':list?'translate_a/t':'batchexecute',items:texts.length,live};
+                test.requests.push(...texts);test.transportRequests.push(attempt);
                 if(live){
                     if(liveTextAllowlist){
                         const plain=text=>String(text).replace(/^<pre>([\s\S]*)<\/pre>$/u,'$1').replace(/\s+/gu,'');
                         const allowed=new Set(liveTextAllowlist.map(plain));
-                        if(texts.some(text=>!allowed.has(plain(text))))throw new Error('Live image translation text is outside the explicit allowlist');
+                        attempt.allowlistMatched=texts.every(text=>allowed.has(plain(text)));
+                        if(!attempt.allowlistMatched)throw new Error('Live image translation text is outside the explicit allowlist');
                     }
-                    return original(input,options);
+                    const startedAt=Date.now();
+                    try{
+                        const response=await original(input,options);attempt.status=response.status;attempt.durationMs=Date.now()-startedAt;return response;
+                    }catch(error){attempt.errorName=error?.name||'Error';attempt.durationMs=Date.now()-startedAt;throw error;}
                 }
                 if(test.holdNext) {test.holdNext=false;await new Promise(resolve=>{test.releaseHeld=()=>{delete test.releaseHeld;resolve();};});}
                 await new Promise(resolve=>setTimeout(resolve,250));

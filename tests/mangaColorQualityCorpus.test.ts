@@ -33,6 +33,8 @@ const markHighContrastPixel=(pixels:Uint8ClampedArray,offset:number)=>{
 const original=readFileSync(new URL('manifest.json',fixtureRoot));
 const manifest=JSON.parse(original.toString());
 const {evaluateQualityFixture,evaluateQualityReadingOrder}=require('../scripts/testing/manga-quality-corpus.cjs');
+const {validateQualityRoleManifest,evaluateCapturedQualityRoles}=require('../scripts/testing/manga-quality-roles.cjs');
+const roles=validateQualityRoleManifest(original,JSON.parse(readFileSync(new URL('./fixtures/manga-color-quality-roles.json',import.meta.url),'utf8')));
 const run=(directory?:string)=>spawnSync(process.execPath,[fileURLToPath(checker),...(directory?['--fixture-dir',directory]:[])],{encoding:'utf8',timeout:30_000,maxBuffer:4*1024*1024});
 
 /** Decode only the frozen 8-bit RGBA, non-interlaced PNG profile; the pinned decoded-pixel digest is the oracle. */
@@ -120,7 +122,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
     it('八景用冻结原像素证明额外整页续行，无像素证据时保持严格分组',()=>{
         const expected:Record<string,{proofs:number;before:number;after:number}>={
             'harbor-same-red-channel-dialogue':{proofs:2,before:2,after:0},
-            'prism-platform-gradient-signs':{proofs:1,before:1,after:0},
+            'prism-platform-gradient-signs':{proofs:0,before:1,after:1},
             'rain-garden-vertical-ruby-sidebar':{proofs:1,before:1,after:0},
             'chess-picnic-neighbor-inverse-bubbles':{proofs:2,before:2,after:0},
             'lantern-market-oblique-bilingual-captions':{proofs:1,before:1,after:0},
@@ -137,9 +139,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             });
             const page={results},proofs=produceImageParagraphGapProofs(page,fixture.width,fixture.height,new Uint8ClampedArray(pixels));
             if(fixture.name==='prism-platform-gradient-signs'){
-                expect(proofs.map(proof=>proof.mode)).toEqual(['column-profile']);
-                const altered=new Uint8ClampedArray(pixels);altered[(180*fixture.width+500)*4]^=1;
-                expect(produceImageParagraphGapProofs(page,fixture.width,fixture.height,altered),'a single changed gap pixel revokes the gradient proof').toEqual([]);
+                expect(proofs,'different heading styles do not become one visual region merely because the background is continuous').toEqual([]);
             }
             if(fixture.name==='watercolor-ferry-translucent-notification'){
                 expect(proofs.map(proof=>proof.mode)).toEqual(['smooth-field']);
@@ -153,6 +153,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             expect(proofs.length,fixture.name).toBe(expected[fixture.name].proofs);
             expect(before.length,`${fixture.name} baseline`).toBe(expected[fixture.name].before);
             expect(after.length,`${fixture.name} with pixel proof`).toBe(expected[fixture.name].after);
+            expect(evaluateCapturedQualityRoles(roles.get(fixture.name),actual.map((line:any)=>({...line,sourceText:line.text}))).qualityFailures,`${fixture.name} body/annotation/visual roles`).toEqual([]);
             expect(after.length,`${fixture.name} has no new paragraph failures`).toBeLessThanOrEqual(before.length);
             expect(characterKey(sourceInventory(actual).join('')),fixture.name).toBe(characterKey(results.map((line:any)=>line.text).join('')));
         }
@@ -267,7 +268,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
         }
     });
 
-    it('14个已录制真实OCR场景按原图像素证明续行，恢复16项段落失败且不新增错误',()=>{
+    it('14个真实OCR记录保留原评分，继续恢复15项续行并单独保留混合样式标题',()=>{
         const recordBytes=readFileSync(new URL('recorded-v14.json',recordedRoot)),record=JSON.parse(recordBytes.toString());
         expect(sha(recordBytes)).toBe('937d02b27f85a1b4bd68bda5c664810e3d8c2a31cbcf1b10cd9a83e765f8ef16');
         expect(record).toMatchObject({version:1,provenance:{sceneCount:14,sourceStatus:'failed'}});expect(record.scenes).toHaveLength(14);
@@ -312,6 +313,7 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
             const after=collectMangaRegions({...page,imageParagraphGapProofs:proofs},fixture.sourceLanguage,fixture.width,fixture.height,'manga',scene.name);
             const beforeFailures=evaluateQualityReadingOrder(fixture,sourceInventory(before)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
             const afterFailures=evaluateQualityReadingOrder(fixture,sourceInventory(after)).qualityFailures.filter((failure:any)=>failure.type==='paragraph-order');
+            if(scene.name==='prism-platform-gradient-signs')expect(evaluateCapturedQualityRoles(roles.get(scene.name),after.map((line:any)=>({...line,sourceText:line.text}))).qualityFailures).toEqual([]);
             baselineFailures+=beforeFailures.length;replayFailures+=afterFailures.length;
             expect(afterFailures.length,`${scene.name} adds no paragraph failure`).toBeLessThanOrEqual(beforeFailures.length);
             expect(characterKey(sourceInventory(after).join('')),scene.name).toBe(characterKey(sourceInventory(before).join('')));
@@ -327,9 +329,10 @@ describe('彩色漫画源冻结和独立验收门禁',()=>{
                     `${scene.name}: a modified gap pixel revokes ${proof.previous.text} → ${proof.next.text}`).toBe(false);
             }
         }
-        expect(observedPairs).toEqual(resolvedPairs);
-        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(3);
-        expect(baselineFailures-replayFailures).toBe(16);
+        expect(resolvedPairs).toHaveLength(16); // 冻结的历史16项仍保留；标题现在按独立视觉角色验收。
+        expect(observedPairs).toEqual(resolvedPairs.filter(pair=>pair[0]!=='prism-platform-gradient-signs'));
+        expect(recordedFailures).toBe(20);expect(baselineFailures).toBe(19);expect(replayFailures).toBe(4);
+        expect(baselineFailures-replayFailures).toBe(15);
     });
 
     const rewrite=(directory:string,mutate:(data:any)=>void)=>{

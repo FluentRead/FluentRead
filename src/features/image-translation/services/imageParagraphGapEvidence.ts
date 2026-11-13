@@ -1,8 +1,9 @@
 /**
  * @file src/features/image-translation/services/imageParagraphGapEvidence.ts
- * 文件职责：用同次图片 OCR 已读取的扁平化像素，为少量紧邻小字和大行距物理行提供私有、可撤回的布局续行关系。
+ * 文件职责：用同次图片 OCR 已读取的原始RGBA，为少量紧邻小字和大行距物理行提供私有、可撤回的布局续行关系。
  * 小字续行：狭窄走廊保留至少两行实测像素，中心对齐的未完句同时验证两端前景与完整平滑间隙；相邻关系不受更早或更晚的段内行干扰。已被像素证明选中的空格视图可通过内部原对象来历保留几何关系，克隆、坐标或非空格文字变化仍拒绝。
  * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
+ * 样式边界：逐列渐变候选的行高差超过20%时，最多额外观察262,144像素面积并复用同页源色；两个已确认墨色的对比达到3时撤回额外续行，避免大标题与副标题因同底色被并成一种样式。未知字色沿用原规则，这项观察只撤回关系，不授予写入或新增合段权限。
  * 模块边界：不创建Canvas、不运行模型、不翻译或修改文字、不保留像素或擦除mask；缺失、歧义、预算不足及对象替换均回到原严格行距，静区布局不授权修补或绘字。普通图片可延迟给段落排版读取旁证；漫画可在结果收集时一次性消费旁证，仍需保留原始单行框。
  */
 import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
@@ -11,6 +12,8 @@ import {numericProtection} from './mangaNumeric';
 import {getMangaViewWordBoundaryGeometrySource,getMangaViewWordBoundaryProvenance} from './mangaViewWordBoundary';
 import {normalizeMangaSourceText} from './mangaRegions';
 import {imageMatteObservationBox,observeImageMatteGeometry,type ImageMatteGeometry,type ImageMatteObservationBox} from './imageMatteRepair';
+import {observeImageSourceInk} from './sourceInk';
+import {getImageRgbContrast} from './rendering';
 type Box=ImageTextRegion['bbox'];
 /** 只读取段落所需的物理行与归属；不反向依赖采用此证明的气泡消费者。 */
 interface ImageParagraphPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:Array<{bbox:Box}>;largeAlphaHoles?:true;imageParagraphGapProofs?:ImageParagraphGapProof[]}
@@ -307,7 +310,7 @@ function receiptPixels(receipt:TopologyReceipt|undefined,width:number,height:num
     return count;
 }
 
-/** 借同次OCR已有flattened RGBA；所有候选/失败观察先收费，返回仅含原对象与有界标量。 */
+/** 借同次OCR已有原始RGBA；所有候选/失败观察先收费，返回仅含原对象与有界标量。 */
 export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:number,height:number,pixels:Uint8ClampedArray,checkActive:()=>void=()=>{}):ImageParagraphGapProof[] {
     checkActive();const all=itemsOf(page);
     if(!pageSize(width,height)||!(pixels instanceof Uint8ClampedArray)||pixels.length!==width*height*4||!all)return [];
@@ -317,6 +320,16 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         endpointArea:number;windows:Box[];precheckedGap?:Box;topologyBackground?:number
     }> = [];
     const cache=new Map<MangaOcrItem,ImageMatteGeometry|undefined>();let attempts=0,charged=0,comparisons=0;
+    // 相同渐变底不能证明同一视觉段落。额外源色观察只撤回已有候选，不提供合段或清字权限。
+    const styleColors=new Map<MangaOcrItem,number[]|undefined>();let stylePixels=0;
+    const styleColor=(item:MangaOcrItem,roi:ImageMatteObservationBox)=>{
+        if(styleColors.has(item))return styleColors.get(item);
+        const cost=roi.width*roi.height*2;
+        if(stylePixels+cost>262_144)return;
+        stylePixels+=cost;checkActive();const box=boxOf(item);
+        const color=observeImageSourceInk(pixels,width,height,box,[box])?.foreground?.slice(4,-1).split(',').map(Number);
+        styleColors.set(item,color);checkActive();return color;
+    };
     let gapProfile:Uint32Array|undefined,gapPreviousRow:Uint32Array|undefined;
     const reserve=(count:number)=>{if(count>MAX_PIXELS-charged)return false;charged+=count;return true;};
     const proveSmoothGap=(previous:MangaOcrItem,next:MangaOcrItem,previousSnapshot:Snapshot,nextSnapshot:Snapshot,ordinal:number,
@@ -344,6 +357,10 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         }
         const own=new Set([previous,next]),envelope={x0:Math.min(a.x0,b.x0),x1:Math.max(a.x1,b.x1),y0:a.y0,y1:b.y1};
         if(physical.some(item=>!own.has(item)&&!intersects(boxOf(item),a)&&!intersects(boxOf(item),b)&&intersects(boxOf(item),envelope)))return false;
+        if(profile.mode==='column-profile'&&Math.max(a.y1-a.y0,b.y1-b.y0)>Math.min(a.y1-a.y0,b.y1-b.y0)*1.2){
+            const first=styleColor(previous,oa),second=styleColor(next,ob);
+            if(!sameItem(previous,previousSnapshot)||!sameItem(next,nextSnapshot)||first&&second&&getImageRgbContrast(first,second)>=3)return false;
+        }
         if(profile.mode==='flat-owner'){
             const previousOwner=owner(previous,page),nextOwner=owner(next,page),sameBubble=previousOwner!==undefined&&previousOwner===nextOwner;
             const lineHeight=Math.min(a.y1-a.y0,b.y1-b.y0),lineGap=b.y0-a.y1;

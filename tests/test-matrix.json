@@ -718,6 +718,7 @@
       "tests/mangaPatchResult.test.ts",
       "tests/mangaQuality.test.ts",
       "tests/mangaQualityCorpus.test.ts",
+      "tests/mangaQualityRoles.test.ts",
       "tests/mangaReader.test.ts",
       "tests/mangaRecognitionFailure.test.ts",
       "tests/mangaSessionFallback.test.ts",

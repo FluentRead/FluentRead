@@ -5,6 +5,7 @@
  * 模块边界：颜色和排版算法无浏览器副作用；绘制函数仅操作调用方传入的 Canvas context，不读取配置、不请求翻译、不修补背景或修改宿主图片元素。
  * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
  * 行缘标点：在既有词界及可证明的字素边界上绑定开闭标点与日文行首禁排字符；长词拆分后重新绑定，保留显式换行和完整正文，不以删字或越框解决孤立标点。
+ * 短末行：仅对有界短段落进行五次以内的行宽平衡，使用浏览器词边界与原字素/标点边界的交集，保留字号、行数和完整词；候选须重新通过实际墨迹高度及宽度检查，不扩大清字或绘字范围。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
@@ -143,8 +144,10 @@ const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])
 // 这些字符各自是完整字素：不含组合标记、连接符、韩文 Jamo、表情修饰符或 Prepend。
 const SIMPLE_IMAGE_TEXT = /^[\s\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7a3\uff01-\uff9d]*$/u;
 const IMAGE_TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
-const graphemeSegmenter = typeof Intl.Segmenter === 'function'
-    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : undefined;
+const ImageSegmenter = Intl.Segmenter;
+const graphemeSegmenter = typeof ImageSegmenter === 'function'
+    ? new ImageSegmenter(undefined, { granularity: 'grapheme' }) : undefined;
+let wordSegmenter: Intl.Segmenter | undefined;
 
 function isSimpleImageText(text: string): boolean {
     return SIMPLE_IMAGE_TEXT.test(text) && !IMAGE_TEXT_EXTEND.test(text);
@@ -254,9 +257,9 @@ export function layoutImageTranslationText(
         return result;
     };
     const lineSpacing = 1.18;
-    const wrap = (fontSize: number): ImageTranslationTextLayout => {
+    const wrap = (fontSize: number, limit = width, sourceTokens = tokens): ImageTranslationTextLayout => {
         const lines: string[] = [];
-        for (const paragraph of tokens) {
+        for (const paragraph of sourceTokens) {
             let current = '';
             let space = '';
             for (const token of paragraph) {
@@ -266,7 +269,7 @@ export function layoutImageTranslationText(
                 }
                 const candidate = current + space + token;
                 space = '';
-                if (textWidth(candidate, fontSize) <= width) {
+                if (textWidth(candidate, fontSize) <= limit) {
                     current = candidate;
                     continue;
                 }
@@ -315,11 +318,44 @@ export function layoutImageTranslationText(
     const fits = (layout: ImageTranslationTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
         && layout.lines.every(line => textWidth(line, layout.fontSize) <= width);
 
+    // 短段落末行过短时只收拢可用行宽，字号、行数、词和标点绑定保持不变。
+    // 不平衡作者换行、长正文或已经需要拆词的段落；最多五次候选，复用当前字号测宽缓存。
+    const balance = (layout: ImageTranslationTextLayout): ImageTranslationTextLayout => {
+        const count = layout.lines.length;
+        if (paragraphs.length !== 1 || count < 2 || count > 4 || normalized.length > 1024 || tokens[0].length > 128 || !graphemeSegmenter) return layout;
+        const lineWidths = layout.lines.map(line => textWidth(line, layout.fontSize));
+        const maximum = Math.max(...lineWidths);
+        if (lineWidths[count - 1] >= maximum * .55 || !lineWidths.every(value => Number.isFinite(value) && value > 0)
+            || tokens[0].some(token => textWidth(token, layout.fontSize) > width)) return layout;
+        // 只合并原安全token，不采用落在字素或已绑定标点内部的词界。
+        const boundaries = new Set<number>();
+        wordSegmenter ??= new ImageSegmenter(undefined, {granularity: 'word'});
+        for (const part of wordSegmenter.segment(tokens[0].join(''))) boundaries.add(part.index + part.segment.length);
+        const words: string[] = [];
+        let pending = '', offset = 0;
+        for (let index = 0; index < tokens[0].length; index++) {
+            const token = tokens[0][index]; pending += token; offset += token.length;
+            if (index === tokens[0].length - 1 || boundaries.has(offset)) {words.push(pending); pending = '';}
+        }
+        if (words.some(word => textWidth(word, layout.fontSize) > width)) return layout;
+        let low = 0, high = width, best = layout, spread = maximum - Math.min(...lineWidths);
+        for (let iteration = 0; iteration < 5; iteration++) {
+            const limit = (low + high) / 2, candidate = wrap(layout.fontSize, limit, [words]);
+            const lengths = candidate.lines.map(line => textWidth(line, layout.fontSize));
+            if (candidate.lines.length !== count || !lengths.every(value => Number.isFinite(value) && value > 0 && value <= limit)
+                || (layout.ink && !candidate.ink) || !fits(candidate)) { low = limit; continue; }
+            high = limit;
+            const difference = Math.max(...lengths) - Math.min(...lengths);
+            if (difference < spread) { best = candidate; spread = difference; }
+        }
+        return best;
+    };
+
     // 有真实墨迹时，外侧不需要额外占一个完整 CSS 行高；行距只用于多行之间。
     let high = Math.min(measureInk?Math.min(Number.MAX_VALUE,height*2):height/lineSpacing, maxFontSize);
     let largest = wrap(high);
     if(measureInk&&!largest.ink){high=Math.min(height/lineSpacing,maxFontSize);largest=wrap(high);}
-    if (fits(largest)) return largest;
+    if (fits(largest)) return balance(largest);
     // 根据完整段落在 1px 字号的宽度推导可容纳下限；极长译文可缩小但始终保留全部文字。
     // 行数来自完整译文，不展开成函数参数，也不为取最大值另建宽度数组。
     let paragraphWidth = 1;
@@ -335,7 +371,7 @@ export function layoutImageTranslationText(
             high = candidate.fontSize;
         }
     }
-    return best;
+    return balance(best);
 }
 
 /** 在原区域内绘制完整译文；使用真实字号适配而非 Canvas maxWidth 横向压扁。 */

@@ -47,7 +47,7 @@ describe('原词界上的标点归属',()=>{
 describe('字体搜索中继续遵守行缘约束',()=>{
     it('原生问题的比例模型保留字号与全文，将句号带到前字之后',()=>{
         const text='保持根部露出水面。',result=layout(text,8,3,measure,1);
-        expect(result.lines).toEqual(['保持根部露出水','面。']);expect(result.fontSize).toBe(1);expect(result.lines.join('')).toBe(text);
+        expect(result.lines).toEqual(['保持根部','露出水面。']);expect(result.fontSize).toBe(1);expect(result.lines.join('')).toBe(text);
     });
     it.each(['甲乙。','甲「乙丙」。','甲（乙丙）','甲きゃく。','甲𠀀\u{E0100}。','甲👨‍👩‍👧‍👦！','甲\u0600）。'])('窄框完整保留 %s 的字素与行缘约束',text=>{
         const result=layout(text,2,20,measure,1);expect(result.lines.join('')).toBe(text);expect(result.lines.every(x=>measure(x,result.fontSize)<=2)).toBe(true);

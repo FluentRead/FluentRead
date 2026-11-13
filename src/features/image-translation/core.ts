@@ -2,6 +2,7 @@
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
  * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
+ * 文档保真：允许文档适配器按原词对象显式保留有字形证据的数字候选，不抬高其原始置信度；适配器同时负责核对提示，普通图片调用维持原来的过滤策略。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -318,7 +319,7 @@ export function collectRawNumericGuards(blocks: OcrBlocks, recognized:readonly N
 
 /** 将原始识别结果清洗和拆行；结果用于各视图独立去重，不改变输入。 */
 type ParsedOcrLine = NumericEvidenceOcrLine & {rawNumericText?: string; numericSourceBox?: OcrBox; numericRawConflict?: true; suppressNumericResidual?: true; hiddenNumericEvidence?: true};
-function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}): ParsedOcrLine[] {
+function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?:{noNumeric:boolean}, retainedDocumentWords?: ReadonlySet<object>): ParsedOcrLine[] {
     if (!blocks) return [];
 
     const normalized: ParsedOcrLine[] = [];
@@ -332,9 +333,9 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
         const rawWords = (line.words || []).map(word => {
             const text=word.text.replace(/[\s\u3000]+/g, ' ').trim();
             if(fast&&/\p{N}/u.test(text))fast.noNumeric=false;
-            return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox};
+            return {text,confidence:word.confidence??100,explicitConfidence:word.confidence,bbox:word.bbox,retained:retainedDocumentWords?.has(word)};
         });
-        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && word.confidence >= 25
+        const words = rawWords.filter(word => word.text.length > 0 && Number.isFinite(word.confidence) && (word.confidence >= 25 || word.retained)
                 && isValidOcrBox(word.bbox))
             .sort((left, right) => left.bbox[main.start] - right.bbox[main.start]);
 
@@ -500,8 +501,9 @@ function restoreNumericRawText(lines:ParsedOcrLine[]):NumericEvidenceOcrLine[] {
     return lines;
 }
 
-export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false): NumericEvidenceOcrLine[] {
-    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence), includeNumericEvidence);
+/** 文档可按原词对象显式保留有字形证据的候选；原置信度不变，调用方必须附带核对位置。 */
+export function normalizeOcrLines(blocks: OcrBlocks, includeNumericEvidence = false, retainedDocumentWords?: ReadonlySet<object>): NumericEvidenceOcrLine[] {
+    return finalizeOcrLines(parseOcrLines(blocks, includeNumericEvidence, undefined, retainedDocumentWords), includeNumericEvidence);
 }
 
 /** 共享文本解析；每个视图独立去重和合列，坐标回映仍由调用方在合列之后执行。 */

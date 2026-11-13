@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {createSharedOcrTasks} from '@/src/features/image-translation/services/sharedOcrTasks';
 import scannedPaper from './fixtures/pdf-scanned-paper-ocr.json';
+import lowScoreNumber from './fixtures/pdf-scanned-low-score-number.json';
 import {recognizePdfDocument} from '@/src/features/document-translation/services/pdfOcr';
 
 const {recognize, ensureLanguages, clearModels, disposeWorker, removeFiles, createRuntime, tesseractCreateWorker, prefetchModels} = vi.hoisted(() => ({
@@ -43,6 +44,26 @@ describe('图片 OCR 处理与结果缓存', () => {
         ]};
         return {data: {blocks: [{paragraphs: [{lines: [{...word, words: [word], baseline: {x0: 10, y0: 40, x1: 51, y1: 40}, rowAttributes: {rowHeight: 30}}]}]}]}};
     };
+
+    it('keeps a low-score paper number with exact glyph evidence and a review location, without caching it as confirmed', async () => {
+        dimensions = {width: lowScoreNumber.width, height: lowScoreNumber.height};
+        const word = structuredClone(lowScoreNumber.word);
+        const raw = {data: {blocks: [{paragraphs: [{lines: [{text: word.text, bbox: word.bbox, words: [word]}]}]}]}};
+        recognize.mockResolvedValue(raw);
+        const lines = await recognizeImage('low-score-paper-number', 'en', undefined, {profile: 'document'});
+        expect(lines).toContainEqual({text: '3,700', bbox: word.bbox});
+        expect(lines).toContainEqual({text: '', bbox: word.bbox, documentReview: true});
+        expect(raw.data.blocks[0].paragraphs[0].lines[0].words[0].confidence).toBe(17);
+        await recognizeImage('low-score-paper-number', 'en', undefined, {profile: 'document'});
+        expect(recognize).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['image', 'area'] as const)('keeps low-score document number retention out of the %s profile', async profile => {
+        dimensions = {width: lowScoreNumber.width, height: lowScoreNumber.height};
+        const word = structuredClone(lowScoreNumber.word);
+        recognize.mockResolvedValue({data: {blocks: [{paragraphs: [{lines: [{text: word.text, bbox: word.bbox, words: [word]}]}]}]}});
+        expect(await recognizeImage('low-score-nondocument-number', 'en', undefined, {profile})).toEqual([]);
+    });
 
     it('recovers scripts from the same source pixels at two scales and caches only confirmed results', async () => {
         recognize.mockResolvedValueOnce(scriptResult()).mockResolvedValue({data: {text: '4\n', confidence: 95}});

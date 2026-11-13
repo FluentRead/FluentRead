@@ -2,6 +2,7 @@
  * @file src/features/image-translation/services/ocrRuntime.ts
  * 文件职责：将 Tesseract.js Worker 适配为图片翻译可调用的 OCR 服务，配置扩展内 worker/core 资源并按源语言串行执行识别或语言包预下载。
  * 主要内容：配置扩展语言资源和真实进度；文档页使用自动分栏与独立的九百万像素预算、空结果退回稀疏分割；表格等已定位区域可直接稀疏复核，布局模式独立缓存且不重复空回退；数字上下标候选从同一识别图像中按两种倍率裁剪重读，按需复用解码源和有界画布，无法确认的框携带核对标记且不进入完成缓存；图片/圈选保持原策略，缓存按用途隔离；保留竖排检测、坐标回映、在途合并与独立取消；透明前景只在 OCR 独占像素上合成底色，PNG 以外格式统一异步编码，借用或释放解码源并及时清理画布；公开 Worker 与缓存清理入口。
+ * 文档源文保真：低置信度数字词在字形和出现位置完整对应时保留原读数，并附原页核对框；不修改置信度，不把这些候选缓存成已确认结果。
  * 模块边界：该文件是 Tesseract 基础设施边界，不保存下载状态、不翻译识别文本也不绘制图片；并发所有权由 ocrWorkerRuntime 管理，持久化由后台 repository 负责。
  */
 import { createWorker, PSM, type Worker } from 'tesseract.js';
@@ -25,6 +26,7 @@ import {encodeImageCanvas} from './imageEncoding';
 import {flattenOcrAlpha} from './ocrPixels';
 import {numericEvidenceKey} from './mangaNumeric';
 import {recoverDocumentOcrScripts} from './documentOcrScripts';
+import {retainDocumentOcrNumbers} from './documentOcrNumbers';
 
 function extensionAsset(path: string): string {
     const getRuntimeUrl = chrome.runtime.getURL as (assetPath: string) => string;
@@ -268,8 +270,9 @@ export async function recognizeImage(
         if (signal?.aborted) throw abortRecognition();
         const readLines = async (recognition: TesseractRecognitionResult): Promise<RecognitionViews> => {
             const recovered = profile === 'document' ? await recoverDocumentScripts(recognitionImage, recognition, languages, signal) : undefined;
-            const views = normalizeOcrLineViews(recovered ? recovered.blocks : recognition.data.blocks);
-            const ordinary = profile === 'document' ? documentLineMetrics(views.ordinary, recognition) : views.ordinary;
+            const blocks = recovered ? recovered.blocks : recognition.data.blocks;
+            const views = normalizeOcrLineViews(blocks);
+            const ordinary = profile === 'document' ? documentLineMetrics(retainDocumentOcrNumbers(blocks, views.ordinary), recognition) : views.ordinary;
             // 未确认的脚标只携带原图坐标，不伪装成可靠正文；文档页据此提示对照核对。
             for (const bbox of recovered?.unresolved ?? []) ordinary.push({text: '', bbox, documentReview: true});
             return {

@@ -466,6 +466,20 @@ describe('图片翻译流程优化',()=>{
         }
         expect(dependencies.translateTexts).not.toHaveBeenCalled();
     });
+    it.each([false,true])('编号全大写多词说明交给现有服务判断，保留原文顺序与明确技术标识，batch=%s',async batch=>{
+        const requested:string[]=[];
+        const translateTexts=vi.fn(async(request:{origin:string|string[]})=>{
+            const convert=(text:string)=>{requested.push(text);return text==='FIELD SKETCH 09'?'现场速写 09':text==='CHECK POINT 12'?'检查点 12':text;};
+            return Array.isArray(request.origin)?request.origin.map(convert):convert(request.origin);
+        });
+        const {handler}=setup({supportsBatchTranslation:()=>batch,translateTexts,getGlossaryConfig:()=>({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
+        const texts=['FIELD SKETCH 09','GPT-6','CHECK POINT 12','OpenAI GPT-6','FIELD SKETCH 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'];
+        const response=await handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts});
+        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9']});
+        expect(requested).toEqual(batch?['FIELD SKETCH 09','CHECK POINT 12','FIELD SKETCH 09','INTEL CORE 9']:['FIELD SKETCH 09','CHECK POINT 12','INTEL CORE 9']);
+        // 普通词加整数也可能是名称；供应商原样返回时仍保留原文，不能声称语法能辨认所有品牌。
+        expect(texts[0]).toBe('FIELD SKETCH 09');
+    });
     it('逐条服务也跳过标识，保留单字、多语正文和重复行的对应位置', async () => {
         const {handler, dependencies} = setup();
         const texts = ['©', 'Read docs.sglang.io/cookbook', '1', 'a', '字', 'あ', 'Read docs.sglang.io/cookbook'];

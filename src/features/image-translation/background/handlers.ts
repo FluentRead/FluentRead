@@ -3,6 +3,7 @@
  * 图片与漫画的后端偏好仅从后台当前配置读取，并随已有可取消任务发送。
  * 文件职责：定义跨域图片读取、整图翻译、文本批译、阶段进度、取消和语言包下载后台消息，并对来自页面或扩展 UI 的未知输入执行严格校验。
  * 同图语境：AI 上下文开启且模型支持时，逐位置提供前后各两段 OCR 原文，通过既有篇章证据通道送达提示词、隔离缓存并跳过摘要；Google 批次附加不可序列化的同图标记并保留重复位置，由 adapter 进行有界邻文和严格回填。其他服务沿用原生批译或标题参考，取消所有权不变。
+ * 编号说明：图片中的有界全大写多词短语加独立整数不能仅因大小写被认定为产品版本，交给已有服务判断；不改原文、编号或共享语言识别规则，明确技术形式仍沿用原过滤，原样响应仍保留原图。
  * 主要内容：按设置选择单图 OCR，漫画俄语和韩语要求既有语言包，其他漫画走 PaddleOCR；包含消息解析、OCR 语言白名单、阶段通知和取消预算，待启动取消只保留尚未消费的有界 ID，避免旧历史误删重复 ID 的新取消；逐包下载排队、去重、部分成功保存和跨页状态查询；图片文本冻结目标语言，统一过滤同目标正文与无需翻译的标识，保留显式术语覆盖，附加内部策略将有效原样响应视为成功；去重批量和有界并发翻译同时保留原行映射、可信页面范围与术语版本。
  * 模块边界：可选漫画可见范围保留原值交给最终绘制端校验，不把异常空值降为缺省；本文件只负责协议入口与用例编排，不直接运行 Tesseract、Canvas、网络 fetch 或 Offscreen；图像读取和运算能力均由 Offscreen adapter 与 services 实现并由 app 注入。
  */
@@ -342,6 +343,13 @@ function imageTextDiscourse(texts: string[], sourceIndex: number): string {
     return neighbors.length ? JSON.stringify({source: 'neighboring image OCR', currentRegion: sourceIndex + 1, neighbors}) : '';
 }
 
+/** 两至六个较长全大写词和独立编号也可能是说明；语法不能证明它是型号。
+ * 保留短缩写、连写/带连接符或小数版本的原过滤，仅放行这一有界歧义；不猜词义或改写源文字。
+ */
+function hasImageTranslationText(text:string):boolean {
+    return hasTranslatableText(text)||/^[A-Z]{4,40}(?:[ \t]{1,8}[A-Z]{4,40}){1,5}[ \t]{1,8}\d{1,4}$/u.test(text.trim());
+}
+
 async function translateImageTexts(
     texts: string[],
     title: string,
@@ -364,7 +372,7 @@ async function translateImageTexts(
             pageUrl: glossaryContext?.pageUrl,
         }).terms.length > 0;
         if (hasExplicitGlossary) return true;
-        return hasTranslatableText(text)
+        return hasImageTranslationText(text)
             && (!targetLanguage || glossaryChanged || !shouldSkipTranslationForTarget(text, targetLanguage));
     });
     // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。

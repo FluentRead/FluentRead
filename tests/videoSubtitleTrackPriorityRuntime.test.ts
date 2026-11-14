@@ -255,6 +255,14 @@ function fixture(nativeText?: string, platform: 'x' | 'youtube' = 'x') {
   });
   const callsFor = (text: string) => ports.translate.mock.calls.filter(([source]) => source === text).length;
   const setCaption = (text: string) => {document.querySelector('.ytp-caption-segment')!.textContent = text;};
+  const setCaptionSegments = (parts: readonly string[]) => {
+    const line = document.createElement('span'); line.className = 'caption-visual-line';
+    for (const text of parts) {
+      const segment = document.createElement('span'); segment.className = 'ytp-caption-segment'; segment.textContent = text;
+      line.appendChild(segment);
+    }
+    document.getElementById('ytp-caption-window-container')!.replaceChildren(line);
+  };
   const emitTimedText = (cues: readonly {startMs: number; durationMs: number; text: string}[], url = 'https://www.youtube.com/api/timedtext?v=cue-proof&lang=en&fmt=json3') => {
     const event = new window.Event('message');
     Object.defineProperties(event, {
@@ -265,7 +273,7 @@ function fixture(nativeText?: string, platform: 'x' | 'youtube' = 'x') {
     });
     window.dispatchEvent(event);
   };
-  return {document, window, player, video, tracks, native, makeTrack, start, emitResource, emitCue, emitVideo, changeTracks, changeConfig, displayed, callsFor, setCaption, emitTimedText, observerRegistrations};
+  return {document, window, player, video, tracks, native, makeTrack, start, emitResource, emitCue, emitVideo, changeTracks, changeConfig, displayed, callsFor, setCaption, setCaptionSegments, emitTimedText, observerRegistrations};
 }
 const settle = () => vi.advanceTimersByTimeAsync(0);
 const nativeSource = 'The native caption remains visible.';
@@ -1605,6 +1613,63 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
 });
 
 
+describe('public mounted YouTube 合法重复与滚动字幕', () => {
+  it.each([
+    ['Very', 'very', 'Very very'], ['No', 'no', 'No no'], ['Bye', 'bye', 'Bye bye'],
+  ])('合法重复：无时间轴的%s/%s完整显示并送翻', async (first, second, source) => {
+    const f = fixture(undefined, 'youtube'); f.setCaptionSegments([first, second]); f.start();
+    await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+    expect(ports.translate.mock.calls.map(([text]) => text)).toEqual([source]);
+    // 相同内容在单片段和逐词片段间重建，不改变原文身份或重复调用服务。
+    f.document.getElementById('ytp-caption-window-container')!.innerHTML = '<span class="ytp-caption-segment"></span>';
+    f.setCaption(source); await vi.advanceTimersByTimeAsync(400);
+    f.setCaptionSegments([first, second]); await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+    expect(ports.translate.mock.calls.map(([text]) => text)).toEqual([source]);
+  });
+
+  it('合法重复：没有时间轴依据时保留两个可见同文行', async () => {
+    const sentence = 'A complete repeated sentence.', source = `${sentence} ${sentence}`;
+    const f = fixture(undefined, 'youtube');
+    f.document.getElementById('ytp-caption-window-container')!.innerHTML = `<span class="caption-visual-line"><span class="ytp-caption-segment">${sentence}</span></span><span class="caption-visual-line"><span class="ytp-caption-segment">${sentence}</span></span>`;
+    f.start(); await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+    expect(ports.translate.mock.calls.map(([text]) => text)).toEqual([source]);
+  });
+
+  it('当前cue使滚动同文行只显示一次，后续重复时段仍可显示', async () => {
+    ports.config.videoPreferHumanSubtitles = false;
+    const source = 'A timed repeated sentence.';
+    const f = fixture(undefined, 'youtube'); f.video.currentTime = .5;
+    f.document.getElementById('ytp-caption-window-container')!.innerHTML = `<span class="caption-visual-line"><span class="ytp-caption-segment">${source}</span></span><span class="caption-visual-line"><span class="ytp-caption-segment">${source}</span></span>`;
+    f.start(); f.emitTimedText([{startMs: 0, durationMs: 1000, text: source}, {startMs: 1000, durationMs: 1000, text: source}]); await settle();
+    expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+    f.video.currentTime = 1.5; f.emitVideo('timeupdate'); await settle();
+    expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+    expect(ports.translate.mock.calls.map(([text]) => text)).toEqual([source]);
+  });
+
+  it('合法重复：当前cue的No no不误选仍重叠的旧No', async () => {
+    ports.config.videoPreferHumanSubtitles = false;
+    const f = fixture(undefined, 'youtube'); f.video.currentTime = 1.5; f.setCaptionSegments(['No', 'no']); f.start();
+    f.emitTimedText([{startMs: 0, durationMs: 3000, text: 'No'}, {startMs: 1000, durationMs: 1000, text: 'No no'}]); await settle();
+    expect(f.displayed()).toMatchObject({source: 'No no', translated: translation('No no')});
+    expect(f.callsFor('No no')).toBe(1);
+  });
+
+  it('合法重复：紧凑原文模式和重新开启翻译保留完整分片台词', async () => {
+    ports.config.videoSubtitleDisplayMode = 'original-only';
+    const f = fixture(undefined, 'youtube'), bounds = f.player.getBoundingClientRect();
+    defineBrowserPort(f.player, 'getBoundingClientRect', {configurable: true, value: () => ({...bounds, width: 560, right: bounds.left + 560})});
+    f.setCaptionSegments(['No', 'no']); f.start(); await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source: 'No no', translated: ''}); expect(ports.translate).not.toHaveBeenCalled();
+    f.changeConfig({videoSubtitleDisplayMode: 'bilingual'}); await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source: 'No no', translated: translation('No no')});
+    expect(ports.translate.mock.calls.map(([text]) => text)).toEqual(['No no']);
+  });
+});
+
 // YouTube 由真实 timedtext 桥消息与媒体事件驱动；仅同步调用窗口计数，异步结果仍由原有资格校验处理。
 describe('public mounted YouTube timed cue selection and lifecycle', () => {
   it('rejects a late progressive translation when the media clock crosses the offset cue before its next event', async () => {
@@ -1877,9 +1942,12 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
     expect(ports.translate).not.toHaveBeenCalled();
   });
 
-  it('实际人工目标轨loader命中后进入空档，下一轮仍回退原文cue和缓存译文', async () => {
+  it.each([
+    ['普通原文', 'First source sentence.', ['First source sentence.']],
+    ['合法重复原文', 'No no', ['No', 'no']],
+  ] as const)('实际人工目标轨loader命中%s后进入空档，下一轮仍回退原文cue和缓存译文', async (_name, first, parts) => {
     Object.assign(ports.config, {from: 'en', videoPreferHumanSubtitles: true});
-    const first = 'First source sentence.', second = 'Second source sentence.', human = '第一句人工字幕。';
+    const second = 'Second source sentence.', human = '第一句人工字幕。';
     const f = fixture(undefined, 'youtube'); f.video.currentTime = .5;
     const script = f.document.createElement('script');
     script.textContent = 'var ytInitialPlayerResponse=' + JSON.stringify({videoDetails: {videoId: 'cue-proof'}, captions: {
@@ -1906,7 +1974,7 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
       ]));
       throw new Error('Unexpected human fixture timedtext language: ' + language);
     });
-    f.setCaption(first); f.start(); await settle();
+    f.setCaptionSegments(parts); f.start(); await settle();
     expect(f.displayed()).toMatchObject({source: first, translated: human});
     expect(f.callsFor(first)).toBe(0);
     const spy = vi.spyOn(subtitleLogic, 'selectYoutubeCaptionCue');
@@ -1916,7 +1984,7 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy.mock.calls[0][1]).toBe(first);
       spy.mockClear();
-      f.video.currentTime = 1.5; f.setCaption(second); f.emitVideo('timeupdate');
+      f.video.currentTime = 1.5; f.setCaptionSegments([second]); f.emitVideo('timeupdate');
       missSelections = spy.mock.calls.length;
       expect(spy.mock.calls.every(([, source, time]) => source === second && time === 1500)).toBe(true);
       expect(spy.mock.results.every(result => result.value.cue?.text === second && result.value.stale === false)).toBe(true);

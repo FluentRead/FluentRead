@@ -711,6 +711,7 @@
       "tests/mangaRecognitionInkProjection.test.ts",
       "tests/mangaDetectionCore.test.ts",
       "tests/imageTextPunctuation.test.ts",
+      "tests/imageTextBalance.test.ts",
       "tests/mangaRecognitionWhitespaceRecordings.test.ts",
       "tests/mangaRecognitionWhitespaceSdk.test.ts",
       "tests/mangaOcrDeskew.test.ts",

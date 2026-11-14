@@ -1,7 +1,7 @@
 <!--
  @file src/features/image-translation/ui/ImageTranslationSettingsPreview.vue
  文件职责：用本地示意图说明图片和漫画翻译的原图、译图对照方式。
- 主要内容：切换固定英文原图与中文译图样本，分别呈现清晰排版文字和漫画气泡；明确样本不随翻译语言变化。
+ 主要内容：切换固定英文原图与中文译图样本，分别呈现清晰排版文字和漫画气泡；气泡均衡换行以减少窄屏中的孤立尾字，明确样本不随翻译语言变化。
  模块边界：不运行 OCR、不修补背景、不读取网页图片、不联网；仅供设置效果预览使用。
 -->
 <template>
@@ -45,7 +45,7 @@ const translated = ref(true)
 .image-example-paper-lines i:nth-child(2) { width:95%; }
 .image-example-paper-lines i:last-child { width:55%; }
 .image-example-comic { position:relative; display:grid; gap:14px; min-height:270px; padding:20px; overflow:hidden; border:2px solid var(--line); border-radius:8px; background:var(--surface); }
-.image-example-bubble { position:relative; z-index:1; max-width:75%; padding:14px 18px; border:2px solid var(--ink); border-radius:50%; background:var(--surface); color:var(--ink); font-size:15px; font-weight:650; line-height:1.7; text-align:center; }
+.image-example-bubble { position:relative; z-index:1; max-width:75%; padding:14px 18px; border:2px solid var(--ink); border-radius:50%; background:var(--surface); color:var(--ink); font-size:15px; font-weight:650; line-height:1.7; text-align:center; text-wrap:balance; }
 .image-example-reply { justify-self:end; }
 .image-example-landscape { position:absolute; inset:35% 0 0; overflow:hidden; background:color-mix(in srgb,var(--brand) 6%,var(--surface)); }
 .image-example-landscape i { position:absolute; top:35%; left:-10%; width:75%; height:120%; border-radius:35% 70% 0 0; background:var(--surface-soft); transform:rotate(-20deg); }

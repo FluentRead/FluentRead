@@ -5,6 +5,7 @@
  * 主要内容：以 English 资源作为结构基线，逐项覆盖当前稳定 message key；旧版尚未 key 化的文案由 i18n 迁移层按显式映射处理。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入、提示词或翻译结果。
  */
+import {privacyProtectionMessages} from './privacyProtection';
 import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -567,6 +568,7 @@ export const esESMessages = {
     "settings.requestLimits.globalTitle": "Límites de solicitudes",
     "settings.requestLimits.globalHelp": "Los servicios y modelos sin ajustes propios comparten estos límites.",
     ...aiRequestTimeoutMessages["es-ES"],
+    ...privacyProtectionMessages["es-ES"],
     ...selectionDictionaryMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",

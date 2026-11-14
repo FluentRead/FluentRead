@@ -215,6 +215,8 @@ export interface TranslationCachePort {
 }
 
 export interface TranslationConfigSnapshot {
+    privacyProtection?: import('@/src/core/privacy/policy').PrivacyProtectionPolicy;
+    privacyProtectionSecretTerms?: readonly string[];
     /** 本次请求的界面语言，仅用于本地服务稳定失败文案。 */
     uiLanguage?: string;
     glossaryEnabled?: boolean;

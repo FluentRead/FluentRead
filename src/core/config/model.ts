@@ -5,6 +5,7 @@
  * 文件职责：定义 FluentRead 完整配置模型、默认值及各项设置的合法范围，包括默认开启并按服务独立保存的原生翻译合批偏好，是配置读取、保存、迁移和 UI 绑定共同依赖的领域契约。
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
  * 悬浮球边距：默认与悬停展开分别保存有符号 px 值，旧配置缺失时补齐默认值，读取和导入统一按范围及整数步长规范化。
+ * 隐私防护：本地脱敏策略随配置归一化，自定义词使用独立凭据字段，不写入公共配置。
  * 服务可用性：新增 disabledTranslationServices 持久化列表，默认空数组；导入时去重并约束标识长度。
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 侧边栏：保存原生翻译侧边栏的显示范围，旧配置与非法值默认使用当前标签页。
@@ -17,6 +18,7 @@
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；个人校订默认关闭且仅接受显式布尔开启，userscript 不保留该不可用设置；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
+import {normalizePrivacyPolicy, normalizePrivacyTerms} from '../privacy/policy';
 import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS, normalizeAiMultiSegmentMaxSegments, normalizeAiMultiSegmentMaxCharacters} from './aiMultiSegment';
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
 import {DEFAULT_NATIVE_ASR_BASE_URL, normalizeNativeAsrBaseUrl} from './nativeAsr';
@@ -476,6 +478,8 @@ export class Config {
     translationSidepanelScope: TranslationSidepanelScope; // Chromium 原生侧边栏的显示范围
     popupQuickFeatureOrder: PopupQuickFeatureId[]; // 快捷功能卡片的显示顺序
     popupQuickFeatureVisibility: PopupQuickFeatureVisibility; // 单张快捷功能卡片的可见性
+    privacyProtection: import('../privacy/policy').PrivacyProtectionPolicy; // 翻译出口的本地隐私防护策略
+    privacyProtectionSecretTerms: string[]; // 自定义敏感词，存入凭据区，不广播给网页或写入普通备份
     useCache: boolean; // 是否使用缓存
     translationCacheMaxBytes: number; // 翻译缓存内容容量上限（字节）
     translationCacheMaxEntries: number; // 翻译缓存条数上限
@@ -701,6 +705,8 @@ export class Config {
         this.toolbarClickAction = 'popup';
         this.popupQuickFeatureOrder = [...DEFAULT_POPUP_QUICK_FEATURE_ORDER];
         this.popupQuickFeatureVisibility = {...DEFAULT_POPUP_QUICK_FEATURE_VISIBILITY};
+        this.privacyProtection = normalizePrivacyPolicy(undefined);
+        this.privacyProtectionSecretTerms = [];
         this.useCache = true; // 默认开启缓存
         this.translationCacheMaxBytes = DEFAULT_TRANSLATION_CACHE_MAX_BYTES;
         this.translationCacheMaxEntries = DEFAULT_TRANSLATION_CACHE_MAX_ENTRIES;
@@ -1163,6 +1169,8 @@ export function normalizeConfig(value: unknown): Config {
             : false;
     }
     normalized.informationHighlight = normalizeInformationHighlightPreferences(source.informationHighlight);
+    normalized.privacyProtection = normalizePrivacyPolicy(source.privacyProtection);
+    normalized.privacyProtectionSecretTerms = normalizePrivacyTerms(source.privacyProtectionSecretTerms);
     normalized.nativeBatchTranslationEnabled = normalizeNativeBatchTranslationEnabled(source.nativeBatchTranslationEnabled);
     normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled === true;
     normalized.bilingualSentenceHighlightStyle = normalizeSentenceHighlightStyle(source.bilingualSentenceHighlightStyle);

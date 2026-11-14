@@ -5,6 +5,7 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供俄语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
+import {privacyProtectionMessages} from './privacyProtection';
 import videoLearningText from './video-learning/ru-RU.json';
 import selfHelpText from './self-help/ru-RU.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -567,6 +568,7 @@ export const ruRUMessages = {
     "settings.requestLimits.globalTitle": "Ограничения запросов",
     "settings.requestLimits.globalHelp": "Сервисы и модели без отдельных настроек используют эти общие ограничения.",
     ...aiRequestTimeoutMessages["ru-RU"],
+    ...privacyProtectionMessages["ru-RU"],
     ...selectionDictionaryMessages["ru-RU"],
     ...sectionTranslationRulesRussianMessages,
     "settings.requestLimits.retryIntervals": "Интервалы повторов",

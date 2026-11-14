@@ -273,8 +273,8 @@ describe('OptionsApp language recovery search with actual UI messages', () => {
     state.query = '翻译';
     expect(state.filteredResults.map(result => result.id)).toEqual([
       'settings-translation-stats/overview', 'settings-translation/page', 'settings-translation/section-translation',
-      'settings-translation/excluded-languages', 'settings-sites/rules', 'settings-video/general', 'settings-advanced/cache',
-      'feature-services', 'floating-ball-toggle', 'floating-ball-settings', 'translation-sentence-highlight',
+      'settings-translation/excluded-languages', 'settings-sites/rules', 'settings-video/general', 'settings-advanced/privacy', 'settings-advanced/cache',
+      'privacy-protection', 'feature-services', 'floating-ball-toggle', 'floating-ball-settings', 'translation-sentence-highlight',
       'settings-general', 'settings-services', 'settings-translation', 'settings-interface', 'settings-selection',
       'settings-image-translation', 'settings-video', 'settings-translation-center', 'settings-sites', 'settings-translation-stats',
     ]);

@@ -61,6 +61,10 @@ export function createUserscriptSettingsDataPlugin(root: string, enabled: boolea
         targets.set(normalizePath(resolve(root, 'src/core/glossary/builtins.ts')), {names: ['BUILTIN_GLOSSARIES']});
         targets.set(normalizePath(resolve(root, 'src/core/config/videoSubtitleAppearance.ts')), {names: ['VIDEO_SUBTITLE_SKINS']});
         targets.set(normalizePath(resolve(root, 'src/features/settings/model/chromeTranslationPreparation.ts')), {names: ['TEST_SAMPLES']});
+        targets.set(normalizePath(resolve(root, 'src/core/i18n/messages/privacyProtection.ts')), {
+            names: ['privacyProtectionChineseMessages', 'privacyProtectionEnglishMessages', 'privacyProtectionMessages'],
+            sharedLocale: {table: 'privacyProtectionMessages', key: 'zh-CN', reference: 'privacyProtectionChineseMessages'},
+        });
         targets.set(normalizePath(resolve(root, 'src/core/i18n/messages/aiRequestTimeout.ts')), {
             names: ['aiRequestTimeoutChineseMessages', 'aiRequestTimeoutMessages'],
             sharedLocale: {table: 'aiRequestTimeoutMessages', key: 'zh-CN', reference: 'aiRequestTimeoutChineseMessages'},

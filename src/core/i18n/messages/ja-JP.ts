@@ -5,6 +5,7 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供日语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
+import {privacyProtectionMessages} from './privacyProtection';
 import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -567,6 +568,7 @@ export const jaJPMessages = {
     "settings.requestLimits.globalTitle": "リクエスト制限",
     "settings.requestLimits.globalHelp": "個別設定のないサービスとモデルは、この制限を共有します。",
     ...aiRequestTimeoutMessages["ja-JP"],
+    ...privacyProtectionMessages["ja-JP"],
     ...selectionDictionaryMessages["ja-JP"],
     ...sectionTranslationRulesJapaneseMessages,
     "settings.requestLimits.retryIntervals": "再試行の間隔",

@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import * as ts from 'typescript';
 import { Config, normalizeConfig } from '@/src/core/config/model';
-import {options} from '@/src/core/config/catalog';
+import {LEGACY_DEFAULT_USER_ROLES, options} from '@/src/core/config/catalog';
 import {GLOSSARY_LIMITS} from '@/src/core/glossary';
 describe('工具栏点击行为配置', () => {
     it('旧配置保持打开面板，显式翻译偏好可导入导出且不影响悬浮球', () => {
@@ -32,9 +32,24 @@ describe('翻译服务启用状态配置', () => {
         const allClosed = normalizeConfig({service: 'openai', disabledTranslationServices});
         expect(allClosed.service).toBe('openai'); expect(allClosed.disabledTranslationServices).not.toContain('openai');
     });
-    it('默认保留全部服务，导入时去重并约束标识，关闭默认服务时选择一个启用项', () => {
-        expect(new Config().disabledTranslationServices).toEqual([]);
-        const normalized = normalizeConfig({service: 'openai', disabledTranslationServices: ['openai', ' openai ', 'deeplx', '', null, 12, 'x'.repeat(129)]} as never);
+    it('新配置默认移除指定 AI 平台，旧配置只迁移一次并保留已经配置的服务', () => {
+        const removedPlatforms = ['runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'standardcompute'];
+        expect(new Config().disabledTranslationServices).toEqual(removedPlatforms);
+        expect(normalizeConfig({disabledTranslationServices: []}).disabledTranslationServices).toEqual(removedPlatforms);
+        const oldConfig = normalizeConfig({service: 'runcrate', token: {cloudgpu: 'fixture-key'}});
+        expect(oldConfig.disabledTranslationServices).toEqual(['cheaperinference', 'cheapaimodel', 'standardcompute']);
+        expect(oldConfig.service).toBe('runcrate');
+        expect(oldConfig.aiPlatformDefaultRemovalMigrated).toBe(true);
+        const restored = normalizeConfig({...oldConfig, disabledTranslationServices: []});
+        expect(restored.disabledTranslationServices).toEqual([]);
+        const legacyPrompt = normalizeConfig({disabledTranslationServices: [], user_role: {runcrate: LEGACY_DEFAULT_USER_ROLES[0]}});
+        expect(legacyPrompt.disabledTranslationServices).toEqual(removedPlatforms);
+        const customPrompt = normalizeConfig({disabledTranslationServices: [], user_role: {runcrate: 'fixture custom prompt'}});
+        expect(customPrompt.disabledTranslationServices).not.toContain('runcrate');
+    });
+    it('尊重迁移后的显式可用状态；导入时去重并约束标识，关闭默认服务时选择一个启用项', () => {
+        expect(normalizeConfig({...new Config(), disabledTranslationServices: []}).disabledTranslationServices).toEqual([]);
+        const normalized = normalizeConfig({service: 'openai', aiPlatformDefaultRemovalMigrated: true, disabledTranslationServices: ['openai', ' openai ', 'deeplx', '', null, 12, 'x'.repeat(129)]} as never);
         expect(normalized.disabledTranslationServices).toEqual(['openai', 'deeplx']);
         expect(normalized.service).not.toBe('openai');
         expect(normalized.disabledTranslationServices).not.toContain(normalized.service);

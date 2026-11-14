@@ -76,6 +76,7 @@ const EXCLUDED_FIELDS = new Set([
     'persistCredentials',
     'videoServiceDefaultMigrated',
     'freeTranslationBilibiliDefaultApplied',
+    'aiPlatformDefaultRemovalMigrated',
     'uiLanguageSetupCompleted',
     // 关闭前偏好随快照保存，但不作为独立用户操作重复展示。
     'hoverShortcutBeforeDisable',

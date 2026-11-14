@@ -704,6 +704,12 @@ describe('完整译文字形使用实际绘制路径预检',()=>{
         expect(canDrawTranslatedImageText(budget(),c as never,'完整译文',10,20,200,80,'black',20,'left',undefined,'cyan',undefined,undefined,orientation)).toBe(true);
         expect(c.transform).not.toHaveBeenCalled();expect(c.fillText).not.toHaveBeenCalled();
     });
+    it.each([0,.01])('浏览器描边往返舍入后只容忍数值噪声，附加宽度%s',extra=>{
+        const c=measured();let width=1;
+        Object.defineProperty(c,'lineWidth',{get:()=>width,set:value=>{width=Math.fround(value)+extra;}});
+        expect(canDrawTranslatedImageText(budget(),c as never,'COMPLETE TEXT',0,0,200,80,'black',18,'left')).toBe(extra===0);
+        expect(c.fillText).not.toHaveBeenCalled();expect(c.restore).toHaveBeenCalledOnce();
+    });
     it('共享度量及字符预算耗尽时退出，原生字体错误仍抛出首因并恢复context',()=>{
         const c=measured();expect(canDrawTranslatedImageText({remaining:0,characters:100},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
         expect(canDrawTranslatedImageText({remaining:100,characters:2},c as never,'TEXT',0,0,100,50,'black')).toBe(false);

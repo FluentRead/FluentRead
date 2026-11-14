@@ -557,10 +557,12 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
                 ||m.actualBoundingBoxLeft+m.actualBoundingBoxRight<=0||m.actualBoundingBoxAscent+m.actualBoundingBoxDescent<=0)return false;
             const xs=[x-m.actualBoundingBoxLeft-radius,x+m.actualBoundingBoxRight+radius];
             const ys=[y-m.actualBoundingBoxAscent-radius,y+m.actualBoundingBoxDescent+radius];
+            // 原生描边宽度往返可能量化为float32；只容忍万分之一像素的数值误差。
+            const epsilon=1e-4;
             for(const px of xs)for(const py of ys){
                 const t=placement?.transform;
                 const dx=t?t[0]*px+t[2]*py+t[4]:px,dy=t?t[1]*px+t[3]*py+t[5]:py;
-                if(!Number.isFinite(dx)||!Number.isFinite(dy)||dx<left||dy<top||dx>left+width||dy>top+height)return false;
+                if(!Number.isFinite(dx)||!Number.isFinite(dy)||dx<left-epsilon||dy<top-epsilon||dx>left+width+epsilon||dy>top+height+epsilon)return false;
             }
             return true;
         };

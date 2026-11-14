@@ -49,6 +49,7 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
     const engine = createZoteroEngine({pdfFontLoader: host.fontCache ? createZoteroFontLoader(host.fontCache) : undefined});
     const queue = new ZoteroTaskQueue(host, engine, () => ({...persistedSettings}));
     const revision = ref(0);
+    const openSelect = ref('');       // Windows 下 Zotero 内容窗口的原生 <select> 弹层渲染异常，改为自绘下拉
     const notice = ref(''); const errorNotice = ref(false); const showSettings = ref(false);
     const busy = ref(false); const selection = ref<SelectionRequest | null>(initial.selection || null);
     const selectionResult = ref(''); const selectionBusy = ref(false);
@@ -178,10 +179,23 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
     if (windowClosed || ownWindow.closed) {unsubscribe(); await queue.dispose(); return;}
 
     function selectField(key: keyof TranslationSettings, title: string, values: Array<{value: string; label: string}>) {
-        return h('label', [h('span', title), h('select', {
-            value: settings.value[key], 'aria-label': title,
-            onChange: (event: Event) => update(key, (event.target as HTMLSelectElement).value),
-        }, values.map(option => h('option', {value: option.value}, option.label)))]);
+        const current = values.find(option => option.value === settings.value[key]);
+        const isOpen = openSelect.value === key;
+        return h('label', [h('span', title), h('div', {class: 'dropdown'}, [
+            h('button', {type: 'button', class: 'dropdown-toggle', 'aria-haspopup': 'listbox', 'aria-expanded': isOpen,
+                onClick: () => {openSelect.value = isOpen ? '' : key;}},
+                [h('span', {class: 'dropdown-label'}, String(current?.label ?? settings.value[key])), h('span', {class: 'dropdown-caret'}, '▾')]),
+            isOpen ? h('div', {class: 'dropdown-backdrop', onClick: () => {openSelect.value = '';}}) : null,
+            isOpen ? h('ul', {class: 'dropdown-menu', role: 'listbox', 'aria-label': title},
+                values.map(option => h('li', {key: option.value, role: 'option',
+                    'aria-selected': option.value === settings.value[key],
+                    class: option.value === settings.value[key] ? 'active' : '',
+                    onClick: (event: MouseEvent) => {
+                        event.preventDefault();      // 阻止 label 转发点击到按钮导致重新展开
+                        update(key, option.value);
+                        openSelect.value = '';
+                    }}, option.label))) : null,
+        ])]);
     }
     const button = (text: string, operation: () => Promise<unknown>, className = '', disabled = false) =>
         h('button', {type: 'button', class: className, disabled, onClick: () => void safe(operation)}, text);

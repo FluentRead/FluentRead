@@ -385,8 +385,20 @@ const cdp = () => {const id=++sessionCount;log('cdp-created',{id}); return {
   return {};
  }
 };};
-const mangaTabs=new Map();let tabSequence=0;
+const mangaTabs=new Map();let tabSequence=0,mangaApiProbe=0;
 const context={on(){},route:async()=>{},newCDPSession:async()=>cdp(),browser:()=>({newBrowserCDPSession:async()=>cdp()}),serviceWorkers:()=>[{on(){},url:()=> 'chrome-extension://audit-fixture/background.js',evaluate:async(callback,value)=>{
+ if(process.env.AUDIT_LIFECYCLE_FILE==='manga'&&callback.name==='readMangaBackgroundApiState'){
+  const attempt=++mangaApiProbe,delayed=process.env.AUDIT_MANGA_API_DELAY==='1',unavailable=process.env.AUDIT_MANGA_API_NEVER_READY==='1'||delayed&&attempt===1;
+  const previous={tabs:global.chrome.tabs,storage:global.chrome.storage,id:global.chrome.runtime.id};
+  // Execute the public CLI's actual readiness callback against controlled external APIs.
+  // No tab/storage method is invoked by a capability probe, and no browser/model starts.
+  const unused=()=>{throw Error('UNEXPECTED_READINESS_API_INVOCATION');};
+  global.chrome.tabs=unavailable?{}:{get:unused};
+  global.chrome.storage=unavailable?{}:{local:{get:unused}};
+  global.chrome.runtime.id=unavailable?undefined:delayed&&attempt===2?'foreign-fixture':'audit-fixture';
+  try{const state=await callback(value);log('manga-api-readiness-port',{attempt,state});return state;}
+  finally{global.chrome.tabs=previous.tabs;global.chrome.storage=previous.storage;global.chrome.runtime.id=previous.id;}
+ }
  if(process.env.AUDIT_LIFECYCLE_FILE==='manga'&&value?.url){
   const tab=value.tabId?mangaTabs.get(value.tabId):[...mangaTabs.values()].find(tab=>tab.url===value.url);
   log('manga-tab-state-port',{url:value.url,tabId:value.tabId,found:!!tab});
@@ -739,7 +751,7 @@ async function invoke(file: string, fault: string, extra: string[] = [], childEn
         try {process.kill(process.platform === 'win32' ? child.pid : -child.pid, signal);} catch {}
     };
     let forceTimer: ReturnType<typeof setTimeout> | undefined;
-    const deadline = setTimeout(() => {timedOut = true; kill('SIGTERM'); forceTimer = setTimeout(() => kill('SIGKILL'), 5000);}, 7000);
+    const deadline = setTimeout(() => {timedOut = true; kill('SIGTERM'); forceTimer = setTimeout(() => kill('SIGKILL'), 5000);}, childEnv.AUDIT_MANGA_API_NEVER_READY==='1'?15000:7000);
     let result: Result | undefined;
     let primaryError: unknown;
     try {
@@ -1234,6 +1246,8 @@ for (const fault of ['ws-open-error','ws-close-pending','ws-error-pending','ws-s
     it(`manga public CLI settles raw CDP ownership on ${fault} without native/model activity`,async()=>{
         const result=await invoke(manga,fault);
         expect(result.code).toBe(1);expect(count(result,'websocket-created')).toBe(1);expect(count(result,'websocket-close')).toBe(1);
+        expect(result.report.backgroundApiReadiness.map((receipt:any)=>receipt.state)).toEqual([{tabsGet:true,storageGet:true,runtimeId:'audit-fixture'}]);
+        expect(count(result,'manga-api-readiness-port')).toBe(1);
         expect(result.events.find(event=>event.kind==='manga-tab-state-port')).toMatchObject({found:true,url:'chrome-extension://audit-fixture/popup.html'});
         expect(result.report.tabVisibility[0]).toMatchObject({active:true,windowState:'normal',windowFocused:false,documentVisibility:'visible'});
         const attachments=result.events.filter(event=>event.kind==='websocket-command'&&event.method==='Target.attachToTarget');
@@ -1247,6 +1261,26 @@ for (const fault of ['ws-open-error','ws-close-pending','ws-error-pending','ws-s
         expect(JSON.stringify(result.report)).toContain(fault==='ws-normal'?'CONTROLLED_PAGE_FAILURE':fault==='ws-missing-target'?'Offscreen':fault==='ws-send-error'?'CONTROLLED_SOCKET_SEND_FAILURE':fault==='ws-malformed'?'JSON':'CDP');
     },12000);
 }
+it('manga public CLI waits for APIs and its own background identity before tab navigation',async()=>{
+    const result=await invoke(manga,'ws-normal',[],{AUDIT_MANGA_API_DELAY:'1'});
+    const expected=[{tabsGet:false,storageGet:false,runtimeId:null},{tabsGet:true,storageGet:true,runtimeId:'foreign-fixture'},{tabsGet:true,storageGet:true,runtimeId:'audit-fixture'}];
+    expect(result.report.backgroundApiReadiness.map((receipt:any)=>receipt.state)).toEqual(expected);
+    expect(result.events.filter(event=>event.kind==='manga-api-readiness-port').map(event=>event.state)).toEqual(expected);
+    const ready=result.events.findIndex(event=>event.kind==='manga-api-readiness-port'&&event.state.runtimeId==='audit-fixture');
+    expect(ready).toBeGreaterThanOrEqual(0);
+    expect(result.events.findIndex(event=>event.kind==='lifecycle-page-navigation')).toBeGreaterThan(ready);
+    expect(result.events.findIndex(event=>event.kind==='websocket-created')).toBeGreaterThan(ready);
+    expect(result.code).toBe(1);expect(count(result,'websocket-created')).toBe(1);expect(count(result,'websocket-close')).toBe(1);
+    expect(count(result,'session-close')).toBe(1);expect(result.report.profileRemoved).toBe(true);expect(result.report.modelRequests).toEqual([]);
+},12000);
+it('manga public CLI times out missing background APIs and cleans up before any tab or raw CDP use',async()=>{
+    const result=await invoke(manga,'ws-normal',[],{AUDIT_MANGA_API_NEVER_READY:'1'});
+    expect(result.code).toBe(1);expect(result.report.failure).toContain('Extension background APIs did not become ready before the startup deadline');
+    expect(result.report.backgroundApiReadiness.map((receipt:any)=>receipt.state)).toEqual([{tabsGet:false,storageGet:false,runtimeId:null}]);
+    expect(count(result,'manga-api-readiness-port')).toBeGreaterThan(1);
+    expect(count(result,'lifecycle-page-navigation')).toBe(0);expect(count(result,'websocket-created')).toBe(0);expect(count(result,'websocket-close')).toBe(0);
+    expect(count(result,'session-close')).toBe(1);expect(result.report.profileRemoved).toBe(true);expect(result.report.modelRequests).toEqual([]);
+},20000);
 
 it('selection public CLI clears its actual 25ms tracker after the next external interaction rejects',async()=>{
     const result=await invoke(selectionTrigger,'interval-interaction');

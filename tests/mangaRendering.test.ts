@@ -5,6 +5,7 @@ import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTransla
 import {findMangaBlankSpaces} from '@/src/features/image-translation/services/mangaBlankSpaces';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
+import {page,word} from './helpers/imageTypographyFixture';
 
 const W=1000,H=300;
 const region=(text='whole translated sentence'):MangaRegion=>({text,fontSize:20,bbox:{x0:500,y0:100,x1:800,y1:160},sourceBoxes:[{x0:500,y0:100,x1:800,y1:120}]});
@@ -15,7 +16,7 @@ function context(){
         save:vi.fn(function(){stack.push(Object.fromEntries(['font','direction','textAlign','textBaseline','lineWidth','fillStyle','strokeStyle','lineJoin'].map(key=>[key,c[key as keyof typeof c]])));}),
         restore:vi.fn(function(){Object.assign(c,stack.pop());}),
         measureText:vi.fn(function(text:string){const size=Number(c.font.match(/ ([\d.e+-]+)px/)![1]);return {width:Array.from(text).length*size*.6,actualBoundingBoxAscent:text?size*.7:0,actualBoundingBoxDescent:text?size*.2:0,actualBoundingBoxLeft:0,actualBoundingBoxRight:Array.from(text).length*size*.6};}),
-        beginPath:vi.fn(),rect:vi.fn(),clip:vi.fn(),fillRect:vi.fn(),strokeText:vi.fn(),
+        beginPath:vi.fn(),rect:vi.fn(),clip:vi.fn(),transform:vi.fn(),fillRect:vi.fn(),strokeText:vi.fn(),
         fillText:vi.fn(function(text:string,x:number,y:number){return {text,x,y,font:c.font};}),
     };
     return c;
@@ -32,6 +33,28 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it('有方向的源字样式在修补前观察，原清字盒不随译文倾角改变',()=>{
+        const p=page(),source={...word(p),fontSize:21},c=context(),native=c.measureText.getMockImplementation()!;
+        c.measureText.mockImplementation(text=>c.font.includes('100px Arial')?{width:600,actualBoundingBoxLeft:0,actualBoundingBoxRight:600,actualBoundingBoxAscent:105,actualBoundingBoxDescent:0}:native(text));
+        const before=p.pixels.slice(),original=structuredClone(source),backgrounds=sampleMangaBackgrounds(p.pixels,p.width,p.height,[source],c as never);
+        expect(backgrounds[0].sourceTypography?.owner).toBe(source);expect(backgrounds[0].sourceFontSize).toBeGreaterThan(19);expect(backgrounds[0].sourceFontSize).toBeLessThan(22);
+        drawMangaTranslations(c as never,p.pixels,p.width,p.height,[{...source,text:'完整译文'}],true,backgrounds);
+        expect(c.transform).toHaveBeenCalledOnce();expect(c.clip.mock.invocationCallOrder[0]).toBeLessThan(c.transform.mock.invocationCallOrder[0]);expect(c.fillText.mock.calls.map(call=>call[0]).join('')).toBe('完整译文');expect(source).toEqual(original);expect(p.pixels).toEqual(before);
+    });
+    it('旋转绘制保持源色/左右对齐并传播原生异常，缺指标或过期几何回退原布局',()=>{
+        for(const mode of ['left','right','flat','unknown-metrics','invalid-plane','stale-box','stale-physical','stale-text','long','throw'] as const){
+            const c=context(),r={...region(mode==='long'?'A'.repeat(4097):'完整译文')},g={owner:r,sourceText:r.text,radians:Math.PI/36,originX:650,originY:130,bounds:{x0:-100,y0:-10,x1:100,y1:10},width:200,height:20,count:1,heightGain:10};
+            if(mode==='unknown-metrics')c.measureText.mockImplementation(text=>({width:text.length*Number(c.font.match(/ ([\d.e+-]+)px/)![1])*.6} as never));
+            if(mode==='invalid-plane')g.originX=NaN;
+            if(mode==='stale-box')g.owner={...r,bbox:{...r.bbox}};
+            if(mode==='stale-physical')g.owner={...r,sourceBoxes:[]};
+            if(mode==='stale-text')g.sourceText='PREVIOUS';
+            const failure=new Error('transform failed');if(mode==='throw')c.transform.mockImplementation(()=>{throw failure;});
+            const draw=()=>drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{uniform:mode==='flat',color:'white',sourceFontSize:20,sourceTypography:g,...(['left','right'].includes(mode)?{textAlign:mode as 'left'|'right',foreground:'#aabbcc'}:{})}]);
+            if(mode==='throw')expect(draw).toThrow(failure);else {draw();expect(c.fillText.mock.calls.map(call=>call[0]).join('')).toBe(r.text);}
+            expect(c.transform.mock.calls.length).toBe(['left','right','flat','throw'].includes(mode)?1:0);expect(snapshot(c)).toEqual(snapshot(context()));
+        }
+    });
     it('可靠原字尺度替换页面统一字号上限，清字仍按原fontSize和原物理框',()=>{
         const c=context(),r={text:'短标题',fontSize:50,bbox:{x0:100,y0:100,x1:900,y1:160},sourceBoxes:[{x0:100,y0:100,x1:900,y1:160}]},before=structuredClone(r);
         drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{uniform:true,color:'#ffffff',sourceFontSize:40}]);

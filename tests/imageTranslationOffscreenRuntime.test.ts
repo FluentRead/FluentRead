@@ -4,6 +4,7 @@ import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs'
 import {recordMangaBubblePlacement,bindMangaBubblePlacements} from '@/src/features/image-translation/services/mangaBubblePlacement';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
 import type {ImageViewport} from '@/src/shared/image/types';
+import {page,word} from './helpers/imageTypographyFixture';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn(), setBackend:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',async importOriginal=>({...await importOriginal<typeof import('@/src/features/image-translation/services/mangaAlphaProtection')>(),planMangaAlphaProtection:mocks.alphaProtection}));
@@ -137,6 +138,22 @@ beforeEach(() => {
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+it.each([false,true])('倾斜原字在清字前核对并传到对应绘制入口，manga=%s',async manga=>{
+    const p=page(),source={...word(p),fontSize:21},before=structuredClone(source),pixels=p.pixels.slice();
+    ordinaryAlphaCanvas(p.width,p.height,p.pixels,canvas=>canvas.context.measureText.mockImplementation(()=>({width:600,actualBoundingBoxLeft:0,actualBoundingBoxRight:600,actualBoundingBoxAscent:105,actualBoundingBoxDescent:0})));
+    if(manga){
+        mocks.mangaRecognize.mockResolvedValueOnce([source]);mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        const actual=await vi.importActual<typeof import('@/src/features/image-translation/services/mangaRendering')>('@/src/features/image-translation/services/mangaRendering');mocks.sampleManga.mockImplementationOnce(actual.sampleMangaBackgrounds);
+    }else mocks.recognize.mockResolvedValueOnce([source]);
+    const result=await translateImageInOffscreen('oriented-source','en','Page',undefined,'oriented-source',manga);
+    const geometry=manga?mocks.mangaDraw.mock.calls[0][6][0].sourceTypography:mocks.draw.mock.calls[0][13];
+    expect(geometry.sourceText).toBe('SOURCE');expect(geometry.radians).toBeCloseTo(-Math.PI/36,2);expect(geometry.owner.bbox).toEqual(source.bbox);
+    const size=manga?mocks.mangaDraw.mock.calls[0][6][0].sourceFontSize:mocks.draw.mock.calls[0][7];expect(size).toBeGreaterThan(19);expect(size).toBeLessThan(22);
+    const repair=manga?mocks.repair:mocks.inpaint;expect(repair.mock.calls[0][3][0]).toMatchObject({text:'你好',bbox:source.bbox,fontSize:21});
+    expect(canvases[0].context.measureText.mock.invocationCallOrder.at(-1)!).toBeLessThan(repair.mock.invocationCallOrder[0]);
+    expect(source).toEqual(before);expect(p.pixels).toEqual(pixels);expect(manga?result.mangaPatches:result.image).toBeTruthy();
+});
 
 it.each(['gradient','flat'])('普通图%s源色沿用旧绘字框和清字框，字号采用真实墨迹',async kind=>{
     const width=240,height=120,pixels=new Uint8ClampedArray(width*height*4),source={text:'SOURCE',bbox:{x0:40,y0:40,x1:160,y1:64},...(kind==='gradient'?{textAlign:'right' as const}:{})};

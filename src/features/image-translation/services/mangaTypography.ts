@@ -4,8 +4,9 @@
  * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；纯同类标点直接绑定，避免拆开后又重新合并，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框与候选搜索共用同一词界和适配规则；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
  * 模块边界：纯文字和度量算法，不读取页面、配置或字体资源，不识别、翻译或修补图片；普通图片继续使用独立的通用排版。
  * 完整词：短正文在已安全绑定的字素/标点token上合并浏览器词边界，避免字号恢复后把中文词从中间折行；整段最多1024个UTF16单元和256个原token，不拆开既有安全单元，不改显式换行。长文或缺分割器沿用原分词，真正超宽的词仍由既有完整字素回退适配。
+ * 可选几何约束：同样行数可采用已观察源行距，每个字号及平衡候选须同时通过调用方的完整字形变换检查；缺省调用仍保持原算法与返回布局。
  */
-import type {ImageTranslationTextLayout} from './rendering';
+import type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
 
 export const MANGA_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
 const OPEN = /^[（【「『《〈“‘(\[]+$/u;
@@ -147,7 +148,7 @@ function parseMangaText(normalized:string):MangaTextSource {
 }
 
 function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
-    measure:(text:string,size:number)=>number,measureInk?: (text:string,size:number)=>MangaGlyphMetrics|undefined) {
+    measure:(text:string,size:number)=>number,measureInk?: (text:string,size:number)=>MangaGlyphMetrics|undefined,constraints?:ImageTextLayoutConstraints) {
     const {paragraphs,tokens,splitTokens} = source;
     const wrap = (size: number, limit = width) => {
         const lines: string[] = [];
@@ -182,6 +183,7 @@ function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
             lineHeight = Math.max(lineHeight,metric.ascent+metric.descent);
         }
         layout.lineHeight = lineHeight;
+        if(lines.length===constraints?.sourceLineCount&&Number.isFinite(constraints.sourceLinePitch))layout.lineHeight=Math.max(layout.lineHeight,constraints.sourceLinePitch!);
         let top = Infinity, bottom = -Infinity;
         const baselines = (metrics as MangaGlyphMetrics[]).map((metric,index)=>{
             const baseline = index*layout.lineHeight;
@@ -193,7 +195,7 @@ function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
         return layout;
     };
     const fits = (layout: MangaTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
-        && layout.lines.every(line => measure(line,layout.fontSize) <= width);
+        && layout.lines.every(line => measure(line,layout.fontSize) <= width)&&(!constraints?.accept||constraints.accept(layout));
     // 保留字号与行数，仅在末行明显过短时收拢行宽，避免气泡中留下单独的「了。」。
     const balance = (layout: MangaTextLayout) => {
         if (paragraphs.length !== 1 || layout.lines.length < 2) return layout;
@@ -213,11 +215,11 @@ function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
 /** 准确测量候选整行；普通单框先校验、再分词，与候选搜索共用相同词界及适配算法。 */
 export function layoutMangaTranslationText(text: string, width: number, height: number,
     measure: (text: string, size: number) => number, maxSize: number,
-    measureInk?: (text: string, size: number) => MangaGlyphMetrics | undefined): MangaTextLayout {
+    measureInk?: (text: string, size: number) => MangaGlyphMetrics | undefined,constraints?:ImageTextLayoutConstraints): MangaTextLayout {
     const normalized = text.replace(/\r\n?/gu, '\n').trim();
     if (!normalized || ![width,height,maxSize].every(value => Number.isFinite(value) && value > 0)) return {lines:[],fontSize:0,lineHeight:0};
     const source=parseMangaText(normalized);
-    const {wrap,fits,balance}=mangaLayoutFunctions(source,width,height,measure,measureInk);
+    const {wrap,fits,balance}=mangaLayoutFunctions(source,width,height,measure,measureInk,constraints);
     const {paragraphs}=source;
     let high = measureInk ? maxSize : Math.min(maxSize,height / 1.2);
     const largest = wrap(high);

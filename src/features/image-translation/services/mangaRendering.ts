@@ -8,9 +8,12 @@
  * 双向文字：按整段译文首个强方向字符统一度量和绘制，数字、括号及换行后的弱方向内容继承该段方向；缓存键包含方向，避免混合语言段落串用指标，结束后恢复原画布状态。
  * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
  * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；白底旁置规划只消费调用方已证明的候选，保持完整译文和源字号下限，不提供像素或清字授权；完整原图仍可通过现有按钮对照。
+ * 倾斜横排：仅在原字号证据不足时独立观察方向并核对原文尺度；同源原框及物理框绑定不变、未受透明孔洞影响时，按真实字形旋转后完整适配。原清字范围、透明裁剪与颜色证明保持独立。
  */
 import type {MangaRegion} from './mangaRegions';
-import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection,getImageSourceInkFontSize} from './rendering';
+import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection,getImageSourceInkFontSize,getImageSourceTypographyStyle} from './rendering';
+import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
+import {createImageTypographyPlane} from './sourceTypographyPlane';
 import {createMangaTranslationSearch, layoutMangaTranslationText, MANGA_TEXT_FONT} from './mangaTypography';
 import {mangaMaskBoxes} from '../mangaPatchResult';
 import {mangaAlphaClearRects,type MangaAlphaProtection} from './mangaAlphaProtection';
@@ -19,7 +22,7 @@ import {createMangaGlyphRasterLedger,rasterizeMangaGlyphs} from './mangaGlyphRas
 import {observeImageSourceAppearances} from './sourceAppearance';
 import {inferImageSourceAlignments} from './sourceAlignment';
 
-export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string; foregroundOutline?:string; textAlign?:'left'|'right';sourceFontSize?:number}
+export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string; foregroundOutline?:string; textAlign?:'left'|'right';sourceFontSize?:number;sourceTypography?:ImageSourceTypographyGeometry}
 type Box=MangaRegion['bbox'];
 type MangaMeasure=(text:string,size:number)=>{width:number;ascent:number;descent:number};
 export interface MangaBlankLayoutBudget {readonly remainingMeasurements:number;readonly remainingCharacters:number}
@@ -136,10 +139,16 @@ export function sampleMangaBackgrounds(pixels: Uint8ClampedArray, width: number,
     const appearances=observeImageSourceAppearances(pixels,width,height,regions);
     const eligible=new Set([...appearances].filter(([,appearance])=>appearance.outline).map(([region])=>region));
     const alignments=inferImageSourceAlignments(regions,eligible,width,height);
-    return regions.map(region => {
+    const backgrounds:MangaBackground[]=regions.map(region => {
         const background={...mangaRegionBackground(pixels,width,height,region.bbox),...(alignments.has(region)?{textAlign:alignments.get(region)}:{})},appearance=appearances.get(region);
         const sourceFontSize=context&&appearance?getImageSourceInkFontSize(context,region,appearance.inkBoxes):undefined;
         return appearance?{...background,...(appearance.foreground?{foreground:appearance.foreground}:{}),...(appearance.background?{textBackground:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance.outline?{foregroundOutline:appearance.outline}:{}),...(sourceFontSize!==undefined?{sourceFontSize}:{})}:background;
+    });
+    if(!context)return backgrounds;
+    const orientations=observeImageSourceTypographyGeometry(pixels,width,height,regions.filter((_,index)=>backgrounds[index].sourceFontSize===undefined));
+    return backgrounds.map((background,index)=>{
+        const style=getImageSourceTypographyStyle(context,regions[index],orientations.get(regions[index]));
+        return style?{...background,sourceFontSize:style.fontSize,sourceTypography:style.orientation}:background;
     });
 }
 
@@ -213,6 +222,29 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             const available=protection?mangaAlphaClearRects(protection,bounds,alphaLayoutBudget):[bounds];
             if(!available.length)throw new Error('漫画透明图案遮挡译文区域，已保留原图');
             const affected=available.length!==1||available[0]!==bounds;
+            const orientation=sampled.sourceTypography;
+            if(!affected&&orientation&&orientation.owner.bbox===box&&orientation.owner.sourceBoxes===region.sourceBoxes
+                &&orientation.sourceText===orientation.owner.text&&region.text.length<=4096){
+                const plane=createImageTypographyPlane(bounds,orientation,sampled.textAlign??'center',(text,size)=>{
+                    const metric=measure(text,size);return {left:metric.actualBoundingBoxLeft,right:metric.actualBoundingBoxRight,ascent:metric.ascent,descent:metric.descent};
+                },size=>lineWidth(size)/2+.5);
+                if(plane){
+                    const tilted=layoutMangaTranslationText(region.text,plane.width,plane.height,(text,size)=>{
+                        const metric=measure(text,size),inkWidth=metric.actualBoundingBoxLeft+metric.actualBoundingBoxRight;
+                        return Number.isFinite(inkWidth)?Math.max(metric.width,inkWidth)+lineWidth(size)+1:metric.width;
+                    },maxSize,mangaTranslationMeasureInk(lineWidth,measure),plane.constraints);
+                    const placement=plane.plan(tilted);
+                    if(placement){
+                        context.beginPath();context.rect(left,top,right-left,bottom-top);context.clip();
+                        context.font=`${weight} ${tilted.fontSize}px ${MANGA_TEXT_FONT}`;context.textAlign='left';context.textBaseline='alphabetic';context.lineJoin='round';
+                        const ink=sampled.foreground??(flatTextBackground?getImageTextColor(textBackground):'#111111');
+                        context.fillStyle=ink==='#111827'?'#111111':ink;context.strokeStyle=textOutline;context.lineWidth=lineWidth(tilted.fontSize);
+                        context.transform(...placement.transform);
+                        tilted.lines.forEach((text,line)=>{const {x,y}=placement.points[line];context.strokeText(text,x,y);context.fillText(text,x,y);});
+                        continue;
+                    }
+                }
+            }
             // 只有实际受孔洞影响的短段进入额外路径；普通单框不分词、不建栅格画布。
             // 全页至多64段，每段最多两个固定计划；像素、读回和相交检查另共用累计账本。
             let flowed=false;

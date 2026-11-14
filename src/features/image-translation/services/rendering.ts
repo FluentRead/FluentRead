@@ -7,8 +7,13 @@
  * 行缘标点：在既有词界及可证明的字素边界上绑定开闭标点与日文行首禁排字符；长词拆分后重新绑定，保留显式换行和完整正文，不以删字或越框解决孤立标点。
  * 短末行：仅对有界短段落进行五次以内的行宽平衡，使用浏览器词边界与原字素/标点边界的交集，保留字号、行数和完整词；候选须重新通过实际墨迹高度及宽度检查，不扩大清字或绘字范围。
  * 原字尺度与位置：优先使用同帧观察到的逐行墨迹，独立核对原文字的参考宽度与字高；多行要求独立上下排列、相近字高及宽度区间同时吻合，未知断行空格不能人为提高字号。采用实测尺度时也保留墨迹位置，按源边线和垂直中心放置完整译文并夹紧到原绘字框；不改源框、字体族、字重、裁剪或修补范围。透视和混合字号无法一致解释时沿用原路径。
+ * 倾斜译文：源方向须与原文字尺度分别核对；真实回退字形和描边旋转后仍须完整位于原框内，同行数参考源行距，只作最小整体平移。既有透明避让计划或缺失指标保持原布局，不新增清字权限。
  */
 import type {OcrLine} from '@/src/shared/image/types';
+import type {ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
+import {createImageTypographyPlane} from './sourceTypographyPlane';
+import type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
+export type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
 import type {ImageTextRegion} from '../paragraphs';
 import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
 import {bindImageTextPunctuation} from './imageTextPunctuation';
@@ -92,18 +97,10 @@ export function getImageTextColor(backgroundColor: string): string {
     return darkContrast >= lightContrast ? '#111827' : '#ffffff';
 }
 
-export interface ImageTranslationTextLayout {
-    lines: string[];
-    fontSize: number;
-    lineHeight: number;
-    /** 字体回退后的实际墨迹高度与字母基线；旧度量端口缺少指标时仍使用行框。 */
-    ink?: {height: number; baselines: number[]};
-}
-
 export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
 
 interface ImageSourceInkGeometry {width:number;height:number;count:number;bounds:OcrLine['bbox']}
-export interface ImageSourceTextStyle {fontSize:number;inkBounds?:OcrLine['bbox']}
+export interface ImageSourceTextStyle {fontSize:number;inkBounds?:OcrLine['bbox'];orientation?:ImageSourceTypographyGeometry}
 function imageSourceInkGeometry(line:ImageTextRegion,inkBoxes:readonly OcrLine['bbox'][]|undefined):ImageSourceInkGeometry|undefined {
     if(!inkBoxes?.length||inkBoxes.length>128||line.vertical||line.ruby?.length||line.guardOnly||line.numericUncertain
         ||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text))return;
@@ -143,6 +140,33 @@ function estimateImageInkFontSize({width,height,count}:ImageSourceInkGeometry,me
 export function getImageSourceInkFontSize(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes:readonly OcrLine['bbox'][]|undefined):number|undefined {
     const geometry=imageSourceInkGeometry(line,inkBoxes);
     return geometry?withImageSourceFontMetrics(context,line.text,(metric,space)=>estimateImageInkFontSize(geometry,metric,space)):undefined;
+}
+
+/** 方向旁证与原文字尺度分别核对；一个投影像素的量化区间只能补偿已解释框高膨胀的旋转，不能给直立字形阶梯授予角度。 */
+export function getImageSourceTypographyStyle(context:CanvasRenderingContext2D,line:ImageTextRegion,geometry:ImageSourceTypographyGeometry|undefined):ImageSourceTextStyle|undefined {
+    if(!geometry||geometry.owner!==line||geometry.sourceText!==line.text||line.vertical||line.ruby?.length||line.guardOnly||line.numericUncertain)return;
+    const b=line.bbox,g=geometry.bounds;
+    if(!b||!g||![b.x0,b.y0,b.x1,b.y1,g.x0,g.y0,g.x1,g.y1,geometry.radians,geometry.originX,geometry.originY,geometry.width,geometry.height,geometry.heightGain].every(Number.isFinite)
+        ||b.x1<=b.x0||b.y1<=b.y0||g.x1<=g.x0||g.y1<=g.y0||!Number.isInteger(geometry.count)||geometry.count<1||geometry.count>128
+        ||geometry.count!==(line.sourceBoxes?.length??1)||Math.abs(geometry.radians)<Math.PI/120||Math.abs(geometry.radians)>Math.PI*14.5/180
+        ||geometry.originX<b.x0-4||geometry.originX>b.x1+4||geometry.originY<b.y0-4||geometry.originY>b.y1+4)return;
+    const limit=Math.hypot(b.x1-b.x0,b.y1-b.y0)+12,extent=Math.abs(Math.cos(geometry.radians))+Math.abs(Math.sin(geometry.radians));
+    if(geometry.height<=extent||geometry.width<=extent*geometry.count||geometry.height>limit||geometry.width>limit*geometry.count||g.x1-g.x0>limit||g.y1-g.y0>limit
+        ||(geometry.linePitch!==undefined&&(!Number.isFinite(geometry.linePitch)||geometry.linePitch<=0||geometry.count===1||geometry.linePitch>g.y1-g.y0)))return;
+    const fontSize=withImageSourceFontMetrics(context,line.text,(metric,measureSpace)=>{
+        const refWidth=metric.actualBoundingBoxLeft+metric.actualBoundingBoxRight,refHeight=metric.actualBoundingBoxAscent+metric.actualBoundingBoxDescent;
+        if(![refWidth,refHeight].every(value=>Number.isFinite(value)&&value>0))return;
+        const space=geometry.count>1?measureSpace():0;if(!Number.isFinite(space)||space<0)return;
+        const minWidth=refWidth-space*(geometry.count-1);if(minWidth<=0)return;
+        const pointLow=geometry.width/refWidth*100,pointHigh=geometry.width/minWidth*100,pointHeight=geometry.height/refHeight*100;
+        const pointFits=Math.max(pointLow,pointHigh,pointHeight)<=Math.min(pointLow,pointHigh,pointHeight)*1.12;
+        const lowWidth=(geometry.width-extent*geometry.count)/refWidth*100,highWidth=(geometry.width-extent*geometry.count)/minWidth*100,
+            lowHeight=(geometry.height-extent)/refHeight*100;
+        if(!pointFits&&(geometry.heightGain<extent||Math.max(highWidth,lowHeight)>Math.min(pointLow,pointHeight)*1.12))return;
+        const estimate=(lowWidth+pointHigh+lowHeight+pointHeight)/4;
+        return estimate>=geometry.height*.8&&estimate<=geometry.height*2.5?estimate:undefined;
+    });
+    return fontSize===undefined?undefined:{fontSize,orientation:geometry};
 }
 
 /** 普通图优先用已观察的源字形；缺失时仍按原规则核对单个横排物理行的宽高。
@@ -275,6 +299,7 @@ export function layoutImageTranslationText(
     measure: (text: string, fontSize: number) => number,
     maxFontSize = Infinity,
     measureInk?: (text: string, fontSize: number) => {ascent: number; descent: number},
+    constraints?:ImageTextLayoutConstraints,
 ): ImageTranslationTextLayout {
     const normalized = text.replace(/\r\n?/g, '\n').trim();
     if (!normalized || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -357,6 +382,7 @@ export function layoutImageTranslationText(
                 && metric.ascent + metric.descent > 0 && Number.isFinite(metric.ascent + metric.descent))) {
                 let top = Infinity, bottom = -Infinity;
                 for (const metric of metrics) layout.lineHeight = Math.max(layout.lineHeight, metric.ascent + metric.descent);
+                if(lines.length===constraints?.sourceLineCount&&Number.isFinite(constraints.sourceLinePitch))layout.lineHeight=Math.max(layout.lineHeight,constraints.sourceLinePitch!);
                 const baselines = metrics.map((metric, index) => {
                     const baseline = index * layout.lineHeight;
                     top = Math.min(top, baseline - metric.ascent);
@@ -369,7 +395,7 @@ export function layoutImageTranslationText(
         return layout;
     };
     const fits = (layout: ImageTranslationTextLayout) => (layout.ink?.height ?? layout.lines.length * layout.lineHeight) <= height
-        && layout.lines.every(line => textWidth(line, layout.fontSize) <= width);
+        && layout.lines.every(line => textWidth(line, layout.fontSize) <= width)&&(!constraints?.accept||constraints.accept(layout));
 
     // 短段落末行过短时只收拢可用行宽，字号、行数、词和标点绑定保持不变。
     // 不平衡作者换行、长正文或已经需要拆词的段落；最多五次候选，复用当前字号测宽缓存。
@@ -442,6 +468,7 @@ export function drawTranslatedImageText(
     foregroundColor?: string,
     outlineColor?: string,
     sourceInkBounds?: OcrLine['bbox'],
+    orientation?:ImageSourceTypographyGeometry,
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -468,17 +495,22 @@ export function drawTranslatedImageText(
             return result;
         };
         const bleed = (size: number) => Math.max(0.35, size * 0.06) / 2;
-        const layout = prepared ?? layoutImageTranslationText(text, width - paddingX * 2, height - paddingY * 2,
-            (line, size) => {
+        const textWidth=(line:string,size:number)=>{
                 const metric = measure(line, size);
                 const inkWidth = metric.actualBoundingBoxLeft + metric.actualBoundingBoxRight;
                 return Number.isFinite(inkWidth) ? Math.max(metric.width, inkWidth) + bleed(size) * 2 : metric.width;
-            }, maxFontSize, (line, size) => {
+            },textInk=(line:string,size:number)=>{
                 const metric = measure(line, size);
                 const valid = metric.actualBoundingBoxAscent + metric.actualBoundingBoxDescent > 0;
                 return {ascent: valid ? metric.actualBoundingBoxAscent + bleed(size) : NaN,
                     descent: valid ? metric.actualBoundingBoxDescent + bleed(size) : NaN};
-            });
+            };
+        const plane=!prepared&&orientation&&text.length<=4096?createImageTypographyPlane({x0:left,y0:top,x1:left+width,y1:top+height},orientation,textAlign,(line,size)=>{
+            const metric=measure(line,size);return {left:metric.actualBoundingBoxLeft,right:metric.actualBoundingBoxRight,ascent:metric.actualBoundingBoxAscent,descent:metric.actualBoundingBoxDescent};
+        },bleed):undefined;
+        const tilted=plane?layoutImageTranslationText(text,plane.width,plane.height,textWidth,maxFontSize,textInk,plane.constraints):undefined;
+        const placement=tilted&&plane!.plan(tilted);
+        const layout = placement?tilted!:prepared ?? layoutImageTranslationText(text,width-paddingX*2,height-paddingY*2,textWidth,maxFontSize,textInk);
         if (layout.lines.length === 0) return;
         context.beginPath();
         context.rect(left, top, width, height);
@@ -490,6 +522,11 @@ export function drawTranslatedImageText(
         context.strokeStyle = outlineColor ?? backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * (outlineColor ? 0.025 : 0.06));
         context.lineJoin = 'round';
+        if(placement){
+            context.transform(...placement.transform);
+            layout.lines.forEach((line,index)=>{const {x,y}=placement.points[index];context.strokeText(line,x,y);context.fillText(line,x,y);});
+            return;
+        }
         const firstLine = textAlign === 'center'
             ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2
             : top + paddingY + layout.lineHeight / 2;

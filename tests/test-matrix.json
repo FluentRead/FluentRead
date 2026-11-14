@@ -691,6 +691,8 @@
       "tests/imageSourceAppearance.test.ts",
       "tests/imageSourceAlignment.test.ts",
       "tests/imageSourceInk.test.ts",
+      "tests/imageSourceTypographyGeometry.test.ts",
+      "tests/imageSourceTypographyPlane.test.ts",
       "tests/mangaCanvas.test.ts",
       "tests/mangaColorQualityCorpus.test.ts",
       "tests/mangaCompositor.test.ts",

@@ -5,6 +5,7 @@
  * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
  * 样式边界：逐列渐变候选的行高差超过20%时，最多额外观察262,144像素面积并复用同页源色；两个已确认墨色的对比达到3时撤回额外续行，避免大标题与副标题因同底色被并成一种样式。未知字色沿用原规则，这项观察只撤回关系，不授予写入或新增合段权限。
  * 墨迹间距：两端完整静区已经提供真实字形边界时，常规续行的2.5倍行距还须按较小实测字高核对，OCR留白不能放大可接受间隙；明确过远的原字形不借平色回退再次合段。消费者对实际墨迹证明执行相同限制，虚拟profile边界不冒充实测字形；大面积透明页的已授权长间距路径仍独立核对。
+ * 背景归属：以实际墨迹静区外角作为seed，避免OCR框外伸笔画占据旧起点；矩形证明之后可沿四邻封闭外轮廓取得owner边界，第二seed仍须有实色路径连到已验证边界，不能用包络包含代替连通。每个读取tile仍按原1Mi预算预付并进入receipt，失败不发布部分轮廓，内孔或过长边界仍沿用原洪泛路径。
  * 模块边界：不创建Canvas、不运行模型、不翻译或修改文字、不保留像素或擦除mask；缺失、歧义、预算不足及对象替换均回到原严格行距，静区布局不授权修补或绘字。普通图片可延迟给段落排版读取旁证；漫画可在结果收集时一次性消费旁证，仍需保留原始单行框。
  */
 import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
@@ -15,6 +16,7 @@ import {normalizeMangaSourceText} from './mangaRegions';
 import {imageMatteObservationBox,observeImageMatteGeometry,type ImageMatteGeometry,type ImageMatteObservationBox} from './imageMatteRepair';
 import {observeImageSourceInk} from './sourceInk';
 import {getImageRgbContrast} from './rendering';
+import {traceImageMatteBoundary} from './imageMatteBoundary';
 type Box=ImageTextRegion['bbox'];
 /** 只读取段落所需的物理行与归属；不反向依赖采用此证明的气泡消费者。 */
 interface ImageParagraphPage {results:MangaOcrItem[];numericEvidence?:MangaOcrItem[];bubbles?:Array<{bbox:Box;results:MangaOcrItem[];numericEvidence?:MangaOcrItem[]}>;layoutBubbles?:Array<{bbox:Box}>;largeAlphaHoles?:true;imageParagraphGapProofs?:ImageParagraphGapProof[]}
@@ -210,7 +212,7 @@ function observeGapEvidence(pixels:Uint8ClampedArray,width:number,box:Box,profil
 
 type TopologyReceipt=NonNullable<ImageParagraphGapProof['topology']>;
 type Tile={geometry:ImageMatteObservationBox;classes:Uint8Array};
-type MatteOwner={id:number;color:number;box:Box;keys:Set<number>;complete:boolean;rectangle?:true};
+type MatteOwner={id:number;color:number;box:Box;keys:Set<number>;complete:boolean;rectangle?:true;contour?:true};
 /** Only ordinary candidates with complete H8 matte geometry enter topology; that geometry guarantees an in-page pixel outside each source edge. */
 /** 按页借已有RGBA懒分类，每tile只读源一次；仅保留1byte分类/owner标签，不复制RGBA。 */
 function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgrounds:number[],reserve:(count:number)=>boolean,check:()=>void) {
@@ -251,6 +253,13 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
             for(let xx=left;rectangle&&xx<=right;xx++)rectangle=isBackground(xx,top)&&isBackground(xx,bottom)&&!isBackground(xx,top-1)&&!isBackground(xx,bottom+1);
             for(let yy=top+1;rectangle&&yy<bottom;yy++)rectangle=isBackground(left,yy)&&isBackground(right,yy)&&!isBackground(left-1,yy)&&!isBackground(right+1,yy);
             if(rectangle){owner.box={x0:left,y0:top,x1:right+1,y1:bottom+1};owner.complete=true;owner.rectangle=true;first.classes[index(first,x,y)]=owner.id;return owner;}
+            const contour=traceImageMatteBoundary(width,height,x,y,isBackground,check);
+            if(contour){
+                owner.box=contour.box;owner.complete=true;owner.contour=true;
+                // No partial contour labels may escape a failed/cancelled trace.
+                for(const p of contour.points){const xx=p%width,yy=Math.floor(p/width),tile=tileFor(xx,yy,owner.keys);tile.classes[index(tile,xx,yy)]=owner.id;}
+                first.classes[index(first,x,y)]=owner.id;return owner;
+            }
             // 64Ki条目，即256KiB；仅环形待处理前沿，不按整页分配队列。
             const queue=borrowQueue();let steps=0;
             function push(xx:number,yy:number):void {
@@ -279,6 +288,19 @@ function topologyPage(pixels:Uint8ClampedArray,width:number,height:number,backgr
             if(owner.rectangle){
                 if(x<owner.box.x0||x>=owner.box.x1||y<owner.box.y0||y>=owner.box.y1)return;
                 for(let xx=owner.box.x0;xx<=x;xx++){const t=tileFor(xx,y),label=t.classes[index(t,xx,y)];if(label!==owner.color&&owners.get(label)?.color!==owner.color)return;}
+            }else if(owner.contour){
+                // Bbox containment cannot identify islands inside a closed outline.
+                // Each ray must remain actual background until a verified boundary.
+                let connected=false;
+                for(const [dx,dy]of [[-1,0],[1,0],[0,-1],[0,1]]){
+                    for(let xx=x,yy=y;xx>=owner.box.x0&&xx<owner.box.x1&&yy>=owner.box.y0&&yy<owner.box.y1;xx+=dx,yy+=dy){
+                        const t=tileFor(xx,yy),label=t.classes[index(t,xx,yy)];
+                        if(label===owner.id){connected=true;break;}
+                        if(label!==owner.color&&owners.get(label)?.color!==owner.color)break;
+                    }
+                    if(connected)break;
+                }
+                if(!connected)return;
             }else if(tile.classes[index(tile,x,y)]!==owner.id)return;
             current=owner;return owner;
         }
@@ -430,7 +452,7 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         const extra=windows.reduce((sum,box)=>sum+area(box),0),prechecked=candidate.precheckedGap?area(candidate.precheckedGap):0;
         if(prechecked>extra||!reserve(extra-prechecked))break;
         const background=candidate.topologyBackground??(ga.background[0]|ga.background[1]<<8|ga.background[2]<<16|ga.background[3]<<24)>>>0;
-        const external=candidate.precheckedGap?undefined:topology(background,a,b);
+        const external=candidate.precheckedGap?undefined:topology(background,ga.supportBox,gb.supportBox);
         let clear=true;
         if(candidate.precheckedGap){
             const anchor=candidate.flatOwner!;

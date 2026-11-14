@@ -547,6 +547,8 @@
       "tests/compactExtensionZip.test.ts",
       "tests/imageDetectionEvidence.test.ts",
       "tests/imageParagraphGapEvidence.test.ts",
+      "tests/imageParagraphBoundary.test.ts",
+      "tests/imageMatteBoundary.test.ts",
       "tests/imageDetectionSnapshot.test.ts",
       "tests/imageMattePageOwnership.test.ts",
       "tests/pdfSourceOcrSuggestion.test.ts",

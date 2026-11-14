@@ -1,0 +1,73 @@
+{
+  "width": 1600,
+  "height": 1050,
+  "source": "tests/fixtures/manga-structures/bound-spread-gutter-caption.png",
+  "sourceSha256": "7d89524bd73305c0040b2387d81d1359d08b64b89dfcfb414d62c8fee7f2f2eb",
+  "manifest": "tests/fixtures/manga-structures/manifest.json",
+  "manifestSha256": "14ff0cd74c1dabe73d5d8712fdc071f33162d4f8736f7f6aaf6c5f0026e905bc",
+  "file": "bound-spread.rgba.gz",
+  "rgbaSha256": "a648e49d9d8078c4a89ec47903091473af52f305f753475415a2f0204b2af936",
+  "gzipSha256": "fcf788807acc77d661ed8043e1ed56bfa26c124049c7e36d5c7cf606acb5adcc",
+  "page": {
+    "results": [
+      {
+        "text": "READ ACROSS THE FOLD",
+        "confidence": 0.989811024069786,
+        "box": {
+          "x": 449,
+          "y": 142,
+          "width": 676,
+          "height": 36
+        }
+      },
+      {
+        "text": "KEEP THE LEFT PAGE",
+        "confidence": 0.965087761481603,
+        "box": {
+          "x": 143,
+          "y": 350,
+          "width": 406,
+          "height": 25
+        }
+      },
+      {
+        "text": "THE STORY CONTINUES",
+        "confidence": 0.989472320205287,
+        "box": {
+          "x": 905,
+          "y": 351,
+          "width": 442,
+          "height": 25
+        }
+      },
+      {
+        "text": "OPEN BESIDE THE MAP",
+        "confidence": 0.9887618610733434,
+        "box": {
+          "x": 143,
+          "y": 416,
+          "width": 434,
+          "height": 24
+        }
+      },
+      {
+        "text": "ON THE OTHER SIDE",
+        "confidence": 0.9853815962286556,
+        "box": {
+          "x": 903,
+          "y": 416,
+          "width": 380,
+          "height": 24
+        }
+      }
+    ],
+    "bubbles": []
+  },
+  "expectedParagraphs": [
+    "READ ACROSS THE FOLD",
+    "KEEP THE LEFT PAGE OPEN BESIDE THE MAP",
+    "THE STORY CONTINUES ON THE OTHER SIDE"
+  ],
+  "knownMissingOcr": "VOL 08",
+  "provenance": "Exact native OCR items and opaque RGBA from the frozen original full-page PNG. This test exercises grouping of existing items only; it does not claim recovery of VOL 08 or live translation quality."
+}

@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence,getImageParagraphGapEvidence,consumeImageParagraphGapEvidence,createImageParagraphWorkQueue,type ImageParagraphGapProof} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
 import {flattenOcrAlpha} from '@/src/features/image-translation/services/ocrPixels';
 import {imageMatteObservationBox,observeImageMatteGeometry,planImageMatteCandidate} from '@/src/features/image-translation/services/imageMatteRepair';
+import * as matteGeometry from '@/src/features/image-translation/services/imageMatteRepair';
 import {groupImageParagraphs,type ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import type {MangaOcrPage} from '@/src/features/image-translation/services/mangaBubbles';
 import {collectMangaRegions} from '@/src/features/image-translation/services/mangaBubbles';
@@ -526,7 +527,7 @@ describe('几何、预算与取消的保守失败',()=>{
         const queue=createImageParagraphWorkQueue(2);expect(queue.size).toBe(0);expect(queue.shift()).toBeUndefined();queue.push(7);queue.push(9);expect(queue.size).toBe(2);expect(()=>queue.push(11)).toThrow('队列已满');expect(queue.shift()).toBe(7);queue.push(11);expect([queue.shift(),queue.shift(),queue.shift()]).toEqual([9,11,undefined]);
         queue.push(13);queue.push(15);queue.clear();expect(queue.size).toBe(0);expect(queue.shift()).toBeUndefined();queue.push(17);expect(queue.shift()).toBe(17);expect(createImageParagraphWorkQueue().size).toBe(0);
     });
-    it('外部组件64Ki访问上限与非矩形owner的1Mi预算耗尽都只保留原段',()=>{
+    it('外部组件仍受64Ki上限，闭合大曲面可在1Mi原预算内按边界证明',()=>{
         const build=(width:number,height:number,ellipse=false)=>{
             const pixels=new Uint8ClampedArray(width*height*4);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const inside=ellipse?((x-width/2)/(width/2-70))**2+((y-height/2)/(height/2-70))**2<=1:x>=20&&x<width-20&&y>=20&&y<height-20;pixels.set(inside?[24,44,68,255]:[0,0,0,255],(y*width+x)*4);}
             const x=ellipse?300:40,y=ellipse?400:300,page:MangaOcrPage={results:[{text:'FIRST LINE',confidence:.99,box:{x,y,width:90,height:14}},{text:'SECOND LINE',confidence:.99,box:{x,y:y+34,width:90,height:14}}]};
@@ -534,7 +535,10 @@ describe('几何、预算与取消的保守失败',()=>{
             if(!ellipse)for(let yy=100;yy<900;yy++)for(let xx=200;xx<800;xx++)pixels.set([0,0,0,255],(yy*width+xx)*4);
             return{page,pixels,width,height};
         };
-        for(const f of [build(1000,1000),build(1400,1200,true)])expect(produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels)).toEqual([]);
+        const blocked=build(1000,1000);expect(produceImageParagraphGapProofs(blocked.page,blocked.width,blocked.height,blocked.pixels)).toEqual([]);
+        const ellipse=build(1400,1200,true),proofs=produceImageParagraphGapProofs(ellipse.page,ellipse.width,ellipse.height,ellipse.pixels);
+        expect(proofs.map(p=>[p.previous.text,p.next.text])).toEqual([['FIRST LINE','SECOND LINE']]);
+        expect(proofs.reduce((sum,p)=>sum+p.pixels,0)).toBeLessThanOrEqual(1_048_576);
         const f=build(1000,1000),error=new Error('owner cancelled');let checks=0;expect(()=>produceImageParagraphGapProofs(f.page,f.width,f.height,f.pixels,()=>{if(++checks>1000)throw error;})).toThrow(error);
     });
     it('不透明无宽gap候选零源像素访问，4096密集标签在共享比较预算结束',()=>{
@@ -594,15 +598,39 @@ describe('几何、预算与取消的保守失败',()=>{
         expect(adopt({...f,width:2048,height:1024},[{...p,width:2048,height:1024,topology:{owner:{x0:20,y0:20,x1:180,y1:120},tiles}}]).support).toBeUndefined();
     });
     it('矩形第二seed的路径有内部隔断时仍不授权，不能用同色跳过连通',()=>{
-        const f=basic();for(let y=0;y<200;y++)for(let x=0;x<200;x++)if(x<20||x>=180||y<20||y>=120)f.set(x,y,[0,0,0,255]);f.set(25,73,[0,0,0,255]);expect(produceImageParagraphGapProofs(f.page,200,200,f.pixels)).toEqual([]);
+        for(const contour of [false,true]){
+            const f=basic();for(let y=0;y<200;y++)for(let x=0;x<200;x++)if(x<20||x>=180||y<20||y>=120)f.set(x,y,[0,0,0,255]);
+            if(contour)f.set(20,20,[0,0,0,255]);
+            const actual=observeImageMatteGeometry(f.pixels,200,200,{x0:40,y0:74,x1:130,y1:88})!.supportBox;
+            f.set(25,Math.floor(actual.y0)-1,[0,0,0,255]);expect(produceImageParagraphGapProofs(f.page,200,200,f.pixels)).toEqual([]);
+        }
     });
     it('借用像素在H8/corridor之后漂移，seed或两个owner不一致均不授权',()=>{
         const base=()=>{const f=basic();for(let y=0;y<200;y++)for(let x=0;x<200;x++)if(x<20||x>=180||y<20||y>=120)f.set(x,y,[0,0,0,255]);return f;};
-        const seed=base();let seedReads=0;const seedIndex=(39*200+39)*4,unstable=new Proxy(seed.pixels,{get(target,key){if(key===String(seedIndex)&&++seedReads>=3)return 0;return Reflect.get(target,key,target);}});expect(produceImageParagraphGapProofs(seed.page,200,200,unstable)).toEqual([]);
-        for(const curved of [false,true]){const f=base();for(let y=65;y<70;y++)for(let x=20;x<180;x++)f.set(x,y,[0,0,0,255]);if(curved)f.set(20,20,[0,0,0,255]);let checks=0;
+        const seed=base(),actual=observeImageMatteGeometry(seed.pixels,200,200,{x0:40,y0:40,x1:130,y1:54})!.supportBox;
+        const seedIndex=((Math.floor(actual.y0)-1)*200+Math.floor(actual.x0)-1)*4;
+        let endpoints=0,drift=false;const original=matteGeometry.observeImageMatteGeometry;
+        const spy=vi.spyOn(matteGeometry,'observeImageMatteGeometry').mockImplementation((...args)=>{const geometry=original(...args);if(++endpoints===2)drift=true;return geometry;});
+        const unstable=new Proxy(seed.pixels,{get(target,key){if(drift&&key===String(seedIndex))return 0;return Reflect.get(target,key,target);}});
+        try{expect(produceImageParagraphGapProofs(seed.page,200,200,unstable)).toEqual([]);expect(endpoints).toBe(2);}finally{spy.mockRestore();}
+        for(const kind of ['rectangle','notch','hole']){const f=base();for(let y=65;y<70;y++)for(let x=20;x<180;x++)f.set(x,y,[0,0,0,255]);if(kind==='notch')f.set(20,20,[0,0,0,255]);
+            if(kind==='hole')for(let y=35;y<45;y++)for(let x=145;x<155;x++)f.set(x,y,[0,0,0,255]);let checks=0;
             const pixels=new Proxy(f.pixels,{get(target,key){if(typeof key==='string'&&/^\d+$/u.test(key)){const i=Number(key),p=Math.floor(i/4),x=p%200,y=Math.floor(p/200);if(checks>2&&checks<30&&x>=40&&x<130&&y>=65&&y<70)return [24,44,68,255][i%4];}return Reflect.get(target,key,target);}});
             expect(produceImageParagraphGapProofs(f.page,200,200,pixels,()=>{checks++;})).toEqual([]);
         }
+    });
+    it('高周长闭合背景在原1Mi共享观察预算耗尽后撤回，不能靠轮廓回退绕过计费',()=>{
+        const width=1400,height=1200,pixels=new Uint8ClampedArray(width*height*4),page:MangaOcrPage={results:[]};
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+            const inside=x>=20&&x<1380&&y>=20&&y<1180&&(x<200||y%4===0);
+            pixels.set(inside?[24,44,68,255]:[0,0,0,255],(y*width+x)*4);
+        }
+        for(const y of [300,334]){
+            page.results.push({text:'COMPLETE LINE',confidence:.99,box:{x:40,y,width:90,height:14}});
+            for(let yy=y+2;yy<y+12;yy++)for(let x=43;x<46;x++)pixels.set([230,240,250,255],(yy*width+x)*4);
+        }
+        const before=digestPixels(pixels);expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);expect(digestPixels(pixels)).toBe(before);
+        function digestPixels(value:Uint8ClampedArray){return createHash('sha256').update(new Uint8Array(value.buffer,value.byteOffset,value.byteLength)).digest('hex');}
     });
     it('候选枚举后raw几何改到前一owner marker也不能替代原snapshot',()=>{
         const f=basic();for(let y=0;y<200;y++)for(let x=0;x<200;x++)if(x<20||x>=180||y<20||y>=140)f.set(x,y,[0,0,0,255]);

@@ -10,16 +10,18 @@
  * 抗锯齿续证：恒色外周的原投影不足两处间隙时，另有262144像素观察面积、512组件与512时间步的页级余额，不占原路径额度；以同一实测墨色的双层字形和共同间隙复核。只有原SDK同字序、CTC数量及间隙字形序号均一致才补空格，不降低blank-run和空格峰门槛。
  * 灰度续证：非恒色外周且原彩色投影没有墨迹时，允许上下紧裁的中性字形使用同等独立页级余额；不消耗恒色续证额度，不增加模型或画布读回，仍只补原字符之间的空格。
  * 浅色有色底续证：原灰度旁证失败后，左右完整同色边缘与内部共同墨色可支持同样的三层字形核对；独立像素、组件和时间步余额不占原灰度路径额度，原SDK字序、唯一blank-run及空格峰门槛不变。
+ * 深色底续证：非恒色外周且原路径没有旁证时，独立核对主导暗底、单一高对比墨色、三层同字形及完整背景空列；允许原字触边，不提高彩色边缘阈值。每页另限262144像素、512组件、512时间步，失败不退款；不占原有路径额度，不保留原裁图或改变字符与物理框。
  * 模块边界：只给锁定的 per-box、原比例 SDK 路径提供可选文字后处理，不导入 SDK 私有解码器，不修改概率或原像素；
  * CTC 横坐标只是空间候选，不是字形或擦除边界，物理空隙仍不能证明作者的语义空格，真实异常由调用方保留首因。
  */
-import {observeMangaRecognitionInkProjection,observeMangaRecognitionNeutralProjection,observeMangaRecognitionTintedProjection} from './mangaRecognitionInkProjection';
+import {observeMangaRecognitionInkProjection,observeMangaRecognitionNeutralProjection,observeMangaRecognitionTintedProjection,observeMangaRecognitionDarkProjection} from './mangaRecognitionInkProjection';
 
 export const MANGA_RECOGNITION_WHITESPACE_LIMITS=Object.freeze({
     pixels:2_000_000,cropPixels:262_144,height:48,crops:128,runs:4096,steps:2000,records:8192,classes:18710,
     inkPixels:262_144,inkRuns:512,inkSteps:512,
     neutralPixels:262_144,neutralRuns:512,neutralSteps:512,
     tintedPixels:262_144,tintedRuns:512,tintedSteps:512,
+    darkPixels:262_144,darkRuns:512,darkSteps:512,
 });
 export interface MangaWhitespaceRun {
     boxes:readonly {width:number;height:number}[];batchSize:number;dictionary:readonly string[];
@@ -30,7 +32,7 @@ export interface MangaWhitespaceReceipt {
 }
 interface Gap {start:number;end:number;after?:number}
 export interface MangaTerminalPeriodEvidence {start:number;previousInkEnd:number}
-interface Projection {width:number;gaps:Gap[];characters?:number;neutral?:true;tinted?:true;terminalPeriod?:MangaTerminalPeriodEvidence}
+interface Projection {width:number;gaps:Gap[];characters?:number;neutral?:true;tinted?:true;dark?:true;terminalPeriod?:MangaTerminalPeriodEvidence}
 interface Trace {indices:Uint32Array;spaces:Float32Array;valid:number;paddedWidth:number}
 
 /** @internal Pure, bounded edge-pixel classifier used by the OCR observer and its ambiguity regression. */
@@ -73,6 +75,7 @@ export function createMangaRecognitionWhitespace(){
     let inkPixels=0,inkRuns=0,inkSteps=0;
     let neutralPixels=0,neutralRuns=0,neutralSteps=0;
     let tintedPixels=0,tintedRuns=0,tintedSteps=0;
+    let darkPixels=0,darkRuns=0,darkSteps=0;
     const current=()=>{if(!active||signal?.aborted){scope=undefined;return;}return scope;};
     const disable=()=>{scope=undefined;};
     function withTerminalPeriod(text:string,position:number|undefined,projection:Projection):string {
@@ -97,6 +100,12 @@ export function createMangaRecognitionWhitespace(){
         for(let x=0;x<width;x++){inspectBorder(x,0);inspectBorder(x,47);}
         for(let y=1;y<47;y++){inspectBorder(0,y);inspectBorder(width-1,y);}
         if(invalidBorder)return;
+        const darkProjection=():Projection|undefined=>{
+            if(flatBorder||darkPixels+width*48*2>limits.darkPixels)return;
+            darkPixels+=width*48*2;const budget={remaining:limits.darkRuns-darkRuns};
+            const projection=observeMangaRecognitionDarkProjection(data,width,budget);darkRuns=limits.darkRuns-budget.remaining;
+            if(projection)return{width,...projection,dark:true};
+        };
 
         const counts=new Uint8Array(width),edgeWidth=Math.min(24,width),edgeStart=width-edgeWidth,edgeInk=new Uint8Array(edgeWidth*48);
         if(flatBorder){
@@ -110,7 +119,7 @@ export function createMangaRecognitionWhitespace(){
         }else{
             // BGR text on neutral/tinted balloons can have glyphs touching the crop edge. Keep this
             // fallback narrow: reject colorful borders and count only dark chromatic ink pixels.
-            if(chromaticBorder>borderPixels*.6)return;
+            if(chromaticBorder>borderPixels*.6)return darkProjection();
             for(let y=0;y<48;y++)for(let x=0;x<width;x++){
                 const offset=(y*width+x)*4,r=data[offset],g=data[offset+1],b=data[offset+2];
                 if(data[offset+3]!==255)return;
@@ -146,13 +155,14 @@ export function createMangaRecognitionWhitespace(){
                 const supplemental=observeMangaRecognitionTintedProjection(data,width,budget);tintedRuns=limits.tintedRuns-budget.remaining;
                 if(supplemental)return{width,...supplemental,tinted:true};
             }
-            return terminalPeriod?{width,gaps:[],terminalPeriod}:undefined;
+            return terminalPeriod?{width,gaps:[],terminalPeriod}:darkProjection();
         }
         const sorted=[...gaps].sort((a,b)=>(a.end-a.start)-(b.end-b.start)||a.index-b.index),rank=new Uint32Array(gaps.length);
         sorted.forEach((gap,index)=>{rank[gap.index]=index;});
         const mid=Math.floor((gaps.length-1)/2);
         const significant=gaps.filter(gap=>{const other=sorted[mid+(rank[gap.index]<=mid?1:0)];return gap.end-gap.start>=2*(other.end-other.start)+1;});
         if(significant.length||terminalPeriod)return{width,gaps:significant.map(({start,end})=>({start,end})),...(terminalPeriod?{terminalPeriod}:{})};
+        return darkProjection();
     }
     function capture(data:Float32Array,row:number,T:number,width:number,paddedWidth:number):Trace|undefined {
         const indices=new Uint32Array(T),spaces=new Float32Array(T),C=limits.classes;
@@ -205,7 +215,7 @@ export function createMangaRecognitionWhitespace(){
         return withTerminalPeriod(output,position,projection);
     }
     return{
-        beginPage(pageSignal?:AbortSignal){scope=undefined;signal=pageSignal;active=true;crops=pixels=runs=steps=inkPixels=inkRuns=inkSteps=neutralPixels=neutralRuns=neutralSteps=tintedPixels=tintedRuns=tintedSteps=0;},
+        beginPage(pageSignal?:AbortSignal){scope=undefined;signal=pageSignal;active=true;crops=pixels=runs=steps=inkPixels=inkRuns=inkSteps=neutralPixels=neutralRuns=neutralSteps=tintedPixels=tintedRuns=tintedSteps=darkPixels=darkRuns=darkSteps=0;},
         beginRun(options:MangaWhitespaceRun){
             scope=undefined;
             if(!active||signal?.aborted||!options.supportedPerBox||!options.sourceRatioOne||options.boxes.length>limits.records
@@ -255,14 +265,14 @@ export function createMangaRecognitionWhitespace(){
                 ||dims[2]!==limits.classes||!Number.isSafeInteger(dims[0]*dims[1]*dims[2])){disable();return;}
             const T=dims[1];
             const canCapture=(index:number)=>{const projection=run.projections.get(index);return !!projection?.gaps.length
-                &&(projection.characters===undefined?steps+T<=limits.steps:projection.tinted?tintedSteps+T<=limits.tintedSteps:projection.neutral?neutralSteps+T<=limits.neutralSteps:inkSteps+T<=limits.inkSteps);};
+                &&(projection.characters===undefined?steps+T<=limits.steps:projection.dark?darkSteps+T<=limits.darkSteps:projection.tinted?tintedSteps+T<=limits.tintedSteps:projection.neutral?neutralSteps+T<=limits.neutralSteps:inkSteps+T<=limits.inkSteps);};
             if(!batch.indices.some(canCapture))return;
             const data=output.data;
             if(!(data instanceof Float32Array)||data.length!==dims[0]*T*limits.classes){disable();return;}
             for(let row=0;row<batch.indices.length;row++){
                 const index=batch.indices[row];if(!canCapture(index))continue;
                 const projection=run.projections.get(index)!;
-                if(projection.characters===undefined)steps+=T;else if(projection.tinted)tintedSteps+=T;else if(projection.neutral)neutralSteps+=T;else inkSteps+=T;
+                if(projection.characters===undefined)steps+=T;else if(projection.dark)darkSteps+=T;else if(projection.tinted)tintedSteps+=T;else if(projection.neutral)neutralSteps+=T;else inkSteps+=T;
                 const trace=capture(data,row,T,batch.widths[row],batch.width);if(trace)run.traces.set(index,trace);
             }
         },

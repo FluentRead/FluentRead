@@ -353,7 +353,7 @@ export default defineConfig({
             // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
             const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
             // YouTube 内嵌播放器保留独立 document_start 入口；改为视频公共接口后，Chrome 比聚合入口包减少442,186bytes。
-            // 当前 Chrome/Firefox 实测68,472,461/68,093,593bytes；原门槛66,485,000/66,138,000bytes，仅补足按1kB取整的代码增量。
+            // 合入主线配色后 Chrome/Firefox 实测68,472,474/68,093,606bytes；原门槛66,485,000/66,138,000bytes，仅补足按1kB取整的代码增量。
             const youtubeEmbedBudget = browser === 'chrome' || browser === 'edge' ? 1_988_000 : 1_956_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。

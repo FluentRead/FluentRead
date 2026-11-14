@@ -245,7 +245,13 @@ export function downloadSubtitleSrt(srt: string, languageCode: string): void {
 
 export function isYouTubeVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
   return YOUTUBE_HOST_PATTERN.test(locationLike.hostname)
-    && (locationLike.pathname === '/watch' || locationLike.pathname.startsWith('/shorts/'));
+    && (locationLike.pathname === '/watch' || locationLike.pathname.startsWith('/shorts/') || isYouTubeEmbedPage(locationLike));
+}
+
+/** YouTube iframe 播放器使用独立 /embed/{videoId} 文档；只接受真实视频 ID。 */
+export function isYouTubeEmbedPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
+  return YOUTUBE_HOST_PATTERN.test(locationLike.hostname)
+    && /^\/embed\/[\w-]{11}\/?$/u.test(locationLike.pathname);
 }
 
 export function isXVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {

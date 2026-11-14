@@ -28,6 +28,7 @@ export {
 } from '@/src/features/floating-ball/public';
 export {
     isSupportedVideoPage,
+    isYouTubeEmbedPage,
     mountVideoSubtitleTranslation,
 } from '@/src/features/video-subtitle/public';
 export {

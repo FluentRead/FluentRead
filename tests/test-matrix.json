@@ -551,6 +551,7 @@
       "tests/pdfSourceOcrSuggestion.test.ts",
       "tests/pdfSourceRecoveryWorkflow.test.ts",
       "tests/videoCourseCaptions.test.ts",
+      "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts"
     ],
     "functional": [

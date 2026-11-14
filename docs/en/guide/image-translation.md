@@ -45,6 +45,8 @@ Manga wrapping tries to keep complete words and graphemes together, reducing spl
 
 Small Japanese reading annotations above horizontal text or to the right of vertical text are attached to the body when their size, position and ownership are clear. This avoids translating the reading as a separate text block. The body and annotation keep their original erasure bounds, with padding based on the annotation's own size. Ambiguous annotations, independent small text and already grouped recognition regions retain their existing handling.
 
+Annotations near the top of a large curved bubble also follow their body when the background is supported, the body has one owner, and the small text belongs to no other bubble or independent card.
+
 For slightly tilted horizontal text in photographs, translations follow the source angle and position when both direction and font scale can be verified. Matching line counts can also retain the observed spacing. The complete rotated text must fit inside the original region; uncertain cases keep the existing layout. Strong perspective, curved text and complex textures can still be reconstructed inaccurately.
 
 Individual translation requests include bounded neighboring text from the same image as reference for services that support context. Batch requests continue to process their existing paragraphs together. Translated images follow the original image's shape clipping and pixel scaling settings.

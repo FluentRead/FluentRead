@@ -717,6 +717,7 @@
       "tests/mangaRecognitionWhitespace.test.ts",
       "tests/mangaRecognitionInkProjection.test.ts",
       "tests/mangaRecognitionTintedWhitespace.test.ts",
+      "tests/mangaRecognitionDarkWhitespace.test.ts",
       "tests/mangaDetectionCore.test.ts",
       "tests/mangaDetectionRefinement.test.ts",
       "tests/mangaDetectionRecovery.test.ts",

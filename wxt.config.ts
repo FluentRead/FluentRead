@@ -352,6 +352,9 @@ export default defineConfig({
             const browser = wxt.config.browser;
             // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
             const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
+            // YouTube 内嵌播放器保留独立 document_start 入口；改为视频公共接口后，Chrome 比聚合入口包减少442,186bytes。
+            // 合入主线配色后 Chrome/Firefox 实测68,472,474/68,093,606bytes；原门槛66,485,000/66,138,000bytes，仅补足按1kB取整的代码增量。
+            const youtubeEmbedBudget = browser === 'chrome' || browser === 'edge' ? 1_988_000 : 1_956_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
@@ -398,7 +401,7 @@ export default defineConfig({
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

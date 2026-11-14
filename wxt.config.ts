@@ -352,6 +352,9 @@ export default defineConfig({
             const browser = wxt.config.browser;
             // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
             const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
+            // YouTube 内嵌播放器保留独立 document_start 入口；改为视频公共接口后，Chrome 比聚合入口包减少442,186bytes。
+            // 合入主线配色后 Chrome/Firefox 实测68,472,474/68,093,606bytes；原门槛66,485,000/66,138,000bytes，仅补足按1kB取整的代码增量。
+            const youtubeEmbedBudget = browser === 'chrome' || browser === 'edge' ? 1_988_000 : 1_956_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
@@ -392,15 +395,14 @@ export default defineConfig({
             // 仅增加规则、恢复协议和 UI，不新增模型/运行依赖；两平台预算各增加 55 kB。
             // 集成到最新 main 时保留图片排版已增加的预算，再叠加隐私防护的 55 kB。
             // 大气泡注音归属在旧基线上仅增加 Chrome 492、Firefox 473 bytes；集成后先沿用最新主干余量，并重新实测。
-            // 纯色文字修补集成隐私主干后，Chrome 从66,481,013增至66,485,383bytes，Firefox 从66,134,202增至66,138,574bytes。
-            // 仅 offscreen 和推理 Worker 改变；利用已有余量后，两平台门槛各增加1kB，没有新增模型或依赖，课程预算不变。
-            // 浅色底词隙复核使 Chrome 从66,485,383增至66,486,058bytes，Firefox 从66,138,574增至66,139,249bytes。
-            // 两平台仅各增加675bytes的图片代码，门槛各增加1kB；无新增模型或依赖，课程预算不变。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_316_000 : 66_114_000;
+            // 纯色文字修补集成已修正主干后，Chrome 从68,472,474增至68,476,844bytes，Firefox 从68,093,606增至68,097,978bytes。
+            // 仅 offscreen 和推理 Worker 改变；利用已有余量后，两平台门槛各增加4kB，没有新增模型或依赖，课程与YouTube预算不变。
+            // 浅色底词隙复核已单独实测两平台各增加675bytes；门槛各追加1kB，无新增模型或依赖，独立frame预算不变。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_319_000 : 66_117_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

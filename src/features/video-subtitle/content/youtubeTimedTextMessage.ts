@@ -36,7 +36,7 @@ export interface ValidatedYoutubeTimedTextMessage {
 
 function isYoutubeVideoUrl(url: URL): boolean {
     return YOUTUBE_HOST_PATTERN.test(url.hostname)
-        && (url.pathname === '/watch' || url.pathname.startsWith('/shorts/'));
+        && (url.pathname === '/watch' || url.pathname.startsWith('/shorts/') || /^\/embed\/[\w-]{11}\/?$/u.test(url.pathname));
 }
 
 /**

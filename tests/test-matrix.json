@@ -929,6 +929,7 @@
       "tests/sidepanelApp.test.ts",
       "tests/imageMatteAvailability.test.ts",
       "tests/videoCourseFrame.test.ts",
+      "tests/youtubeEmbedFrameRuntime.test.ts",
       "tests/translationPrivacy.test.ts",
       "tests/privacySettingsLifecycle.test.ts"
     ],

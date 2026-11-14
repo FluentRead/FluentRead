@@ -29,6 +29,23 @@ function flatTitleFixture(){
     expect(digest(source)).toBe(fixture.rgbaSha256);
     return {fixture,source};
 }
+it('双页右段的完整贴边字形不应因合段而把已知底色重新交给模型',async()=>{
+    const base=new URL('./fixtures/image-translation/paragraph-boundary/',import.meta.url),manifest=JSON.parse(readFileSync(new URL('manifest.json',base),'utf8'));
+    const source=new Uint8ClampedArray(gunzipSync(readFileSync(new URL(manifest.file,base)))),digest=(data:Uint8Array|Uint8ClampedArray)=>createHash('sha256').update(new Uint8Array(data.buffer,data.byteOffset,data.byteLength)).digest('hex');
+    expect(digest(source)).toBe(manifest.rgbaSha256);
+    const items=manifest.page.results.filter((item:{text:string})=>['THE STORY CONTINUES','ON THE OTHER SIDE'].includes(item.text));
+    expect(items).toHaveLength(2);
+    const sourceBoxes=items.map((item:{box:{x:number;y:number;width:number;height:number}})=>({x0:item.box.x,y0:item.box.y,x1:item.box.x+item.box.width,y1:item.box.y+item.box.height}));
+    const joined={text:'THE STORY CONTINUES ON THE OTHER SIDE',fontSize:25,sourceBoxes,bbox:{x0:903,y0:351,x1:1347,y1:440}};
+    const port={run:vi.fn(async(patch:{width:number;height:number})=>zero(patch)),release:vi.fn()},create=vi.fn(async()=>port),runtime=createMangaInpaintingRuntime(create);
+    try{
+        const output=await runtime.repair(source,manifest.width,manifest.height,[joined],undefined,undefined,undefined,[{uniform:false,color:'rgb(243,237,217)'}]);
+        expect(create).not.toHaveBeenCalled();expect(digest(source)).toBe(manifest.rgbaSha256);
+        const expected=source.slice();
+        for(const box of mangaMaskBoxes(joined,manifest.width,manifest.height))for(let y=box.y0;y<box.y1;y++)for(let x=box.x0;x<box.x1;x++)expected.set([243,237,217,255],(y*manifest.width+x)*4);
+        expect(digest(output)).toBe(digest(expected));
+    }finally{await runtime.dispose();}
+});
 it('紧贴原字的背景采样不能让已完整证明的纯色标题进入模型并产生色带',async()=>{
     const {fixture,source}=flatTitleFixture();
     const snapshot=source.slice(),port={run:vi.fn(async(patch:{width:number;height:number})=>zero(patch)),release:vi.fn()},create=vi.fn(async()=>port),runtime=createMangaInpaintingRuntime(create);

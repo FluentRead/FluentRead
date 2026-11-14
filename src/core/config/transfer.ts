@@ -229,6 +229,7 @@ export function prepareConfigForImport(
     ...sanitizeConfigCredentials(importedConfig),
     count: currentConfig.count,
     videoServiceDefaultMigrated: currentConfig.videoServiceDefaultMigrated,
+    aiPlatformDefaultRemovalMigrated: currentConfig.aiPlatformDefaultRemovalMigrated,
   }, credentials))
   const ownServices = (field: 'token' | 'apiKeys' | 'secret') => {
     if (!Object.hasOwn(value, field) || !isRecord(value[field])) return []

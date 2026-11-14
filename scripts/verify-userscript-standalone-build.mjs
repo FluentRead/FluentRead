@@ -33,9 +33,8 @@ for (const [passed, message] of assertions) {
 const bytes = Buffer.byteLength(source);
 // Full Options adds its navigation, settings forms, and CSS to the direct-install build.
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
-// Pre-privacy main 13b07b8d builds to 3,661,933 bytes; current main fa6dab61 builds to 3,685,297 (+23,364).
-// Privacy rules, restoration and settings add no dependencies. The image-caption candidate is byte-identical to current main.
-// Keep 1,703 bytes of measured headroom; Greasy Fork and the separate compact build retain their own limits.
-const maxBytes = 3_687_000;
+// Current main f9ca5ec6f builds to 3,685,253 bytes; provider-default migration adds 2,968 bytes.
+// Raise this cap by the measured 3 kB and retain 1,779 bytes of headroom; Greasy Fork and compact-build limits stay unchanged.
+const maxBytes = 3_690_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

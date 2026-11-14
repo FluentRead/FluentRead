@@ -7,7 +7,7 @@
 import {normalizeConfig, type Config} from './model';
 import {dropCredentialsForChangedDestinations} from './credentialBinding';
 import {CONFIG_CREDENTIAL_FIELDS, extractConfigCredentials, mergeConfigCredentials, sanitizeConfigCredentials, type ConfigCredentialField, type ConfigCredentials} from './credentials';
-const CONFIG_PATCH_PROTECTED_FIELDS = new Set<string>(['count', 'videoServiceDefaultMigrated']);
+const CONFIG_PATCH_PROTECTED_FIELDS = new Set<string>(['count', 'videoServiceDefaultMigrated', 'aiPlatformDefaultRemovalMigrated']);
 const CONFIG_CREDENTIAL_FIELD_SET = new Set<string>(CONFIG_CREDENTIAL_FIELDS);
 
 export function isConfigObject(value: unknown): value is Record<string, unknown> {
@@ -63,6 +63,7 @@ export function createConfigPatch(
         ...requestedFields,
         count: currentConfig.count,
         videoServiceDefaultMigrated: currentConfig.videoServiceDefaultMigrated,
+        aiPlatformDefaultRemovalMigrated: currentConfig.aiPlatformDefaultRemovalMigrated,
     });
     return Object.fromEntries(
         Object.keys(requestedFields)
@@ -215,6 +216,7 @@ export function prepareConfigSaveSnapshot(
             ...incomingConfig,
             count: currentConfig.count,
             videoServiceDefaultMigrated: currentConfig.videoServiceDefaultMigrated,
+            aiPlatformDefaultRemovalMigrated: currentConfig.aiPlatformDefaultRemovalMigrated,
         });
     }
 
@@ -222,6 +224,7 @@ export function prepareConfigSaveSnapshot(
         ...sanitizeConfigCredentials(incomingConfig),
         count: currentConfig.count,
         videoServiceDefaultMigrated: currentConfig.videoServiceDefaultMigrated,
+        aiPlatformDefaultRemovalMigrated: currentConfig.aiPlatformDefaultRemovalMigrated,
     }, extractConfigCredentials(currentConfig)));
 }
 
@@ -266,5 +269,6 @@ export function prepareConfigPatchFromSnapshot(
         ...patch,
         count: currentConfig.count,
         videoServiceDefaultMigrated: currentConfig.videoServiceDefaultMigrated,
+        aiPlatformDefaultRemovalMigrated: currentConfig.aiPlatformDefaultRemovalMigrated,
     });
 }

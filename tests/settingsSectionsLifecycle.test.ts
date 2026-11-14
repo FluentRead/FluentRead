@@ -635,7 +635,7 @@ describe('新服务对话框实际模板首次挂载与后续实例归属', () =
         expect(fixture.providerState!.serviceType).toBe('interface');
         expect(document.querySelectorAll('[data-testid="custom-service-dialog"]')).toHaveLength(1);
         expect(document.querySelector('[data-testid="custom-service-type-interface"]')?.getAttribute('aria-pressed')).toBe('true');
-        expect(document.querySelector('[data-testid="custom-service-type-restore"]')).toBeNull();
+        expect(document.querySelector('[data-testid="custom-service-type-restore"]')).not.toBeNull();
         inputProvider(fixture, 'name', '  Daily combination  ');inputProvider(fixture, 'endpoint', 'https://hidden.example/v1');
         inputProvider(fixture, 'api-key', 'fixture-hidden-secret');inputProvider(fixture, 'model', 'hidden-model');
         const oldInterfaceSubmit = fixture.providerState!.actions.submit;
@@ -1116,7 +1116,9 @@ describe('服务窗口加载反馈公开关闭与已知失败归属', () => {
 
 // 通过真实父模板收到子组件 emits；服务目录/配置面板是已单独测试的受控 UI 端口。
 async function serviceEditorFixture(configSnapshot: Record<string, unknown> = {}) {
-    const fixture = await mountSections({template:true,serviceEvents:true,activeSection:'settings-services',configSnapshot});
+    const fixture = await mountSections({template:true,serviceEvents:true,activeSection:'settings-services',configSnapshot:{
+        disabledTranslationServices: [], aiPlatformDefaultRemovalMigrated: true, ...configSnapshot,
+    }});
     await vi.waitFor(()=>expect(fixture.data.serviceConfiguration).toBeDefined());
     const catalog = async (event: string, ...values: unknown[]) => {fixture.data.serviceCatalog!.emit(event,...values);await settle();};
     const configuration = async (event: string, ...values: unknown[]) => {fixture.data.serviceConfiguration!.emit(event,...values);await settle();};

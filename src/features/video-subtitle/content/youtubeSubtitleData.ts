@@ -523,7 +523,8 @@ export function serializeSrtCues(cues: readonly VideoSubtitleCue[]): string {
 export function getYoutubeVideoId(locationLike: Pick<Location, 'hostname' | 'pathname' | 'search'> = window.location): string {
   try {
     const url = new URL(locationLike.pathname + locationLike.search, `https://${locationLike.hostname}`);
-    return url.searchParams.get('v') || url.pathname.split('/').filter(Boolean).pop() || '';
+    if (url.pathname === '/watch') return url.searchParams.get('v') || '';
+    return url.pathname.match(/^\/(?:shorts|embed)\/([\w-]{11})(?:\/|$)/u)?.[1] || '';
   } catch {
     return '';
   }

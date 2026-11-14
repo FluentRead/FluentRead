@@ -1,5 +1,9 @@
 # 视频字幕与本地推理
 
+## YouTube 内嵌播放器入口
+
+`youtubeEmbedFrameRuntime` 验证 `/embed/{11位视频ID}` 子 frame 的配置水合、语言包等待、总开关、站点禁用、BFCache 暂停恢复及失效清理；延迟完成的语言回调不能重新挂载已关闭页面。专用内容入口与 MAIN 桥保持 `document_start`，匹配范围相同；顶层桥继续覆盖 YouTube 全路径以支持 SPA 导航。组合根只导入视频公共入口，避免把其他顶层功能的聚合模块带入独立播放器包。`youtubeSubtitleData` 和 `videoSubtitle` 同时核对原 watch/shorts ID 契约、内嵌路径 ID、错误主机、额外路径及伪造查询参数。这些端口与路由测试不代表真实 X 卡片、在线字幕或跨设备验收。
+
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
 ## B 站、Udemy 与 edX 课程字幕

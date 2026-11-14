@@ -240,6 +240,21 @@ describe('凭据边界审计回归', () => {
         expect(credentialsEqual(a, extractConfigCredentials({...b, extra: {second: [2, 1], first: 1}}))).toBe(false);
     });
 
+    it('隐私词按内容比较，重复引用与独立副本等价且不会改变凭据', () => {
+        const left = extractConfigCredentials({privacyProtectionSecretTerms: ['synthetic term one', 'synthetic term two']});
+        const right = extractConfigCredentials(left);
+        left.extra = {first: left.privacyProtectionSecretTerms, second: left.privacyProtectionSecretTerms};
+        right.extra = {first: [...right.privacyProtectionSecretTerms], second: [...right.privacyProtectionSecretTerms]};
+        const original = JSON.stringify([left, right]);
+        expect(credentialsEqual(left, right)).toBe(true);
+        expect(credentialsEqual(right, left)).toBe(true);
+        expect(JSON.stringify([left, right])).toBe(original);
+        expect(credentialsEqual(left, {...right, privacyProtectionSecretTerms: []})).toBe(false);
+        expect(credentialsEqual(left, {...right, privacyProtectionSecretTerms: [...right.privacyProtectionSecretTerms].reverse()})).toBe(false);
+        expect(left.extra.first).toBe(left.extra.second);
+        expect(right.extra.first).not.toBe(right.extra.second);
+    });
+
     it('请求头只删除 HTTP 空白，保留合法 NBSP 字节，合并结果与 Headers 一致', () => {
         const value = ' \t\u00a0synthetic\u00a0\t ';
         const parsed = parseCustomHeaders(JSON.stringify({'X-Auth': value}));

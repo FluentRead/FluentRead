@@ -172,6 +172,25 @@ describe('translation broker privacy enforcement', () => {
     for (const call of calls) expect(JSON.stringify(call)).not.toContain('@');
     expect(cache.get).not.toHaveBeenCalled(); expect(cache.set).not.toHaveBeenCalled();
   });
+  it.each(['borrowed', 'damaged'] as const)('stops after a %s summary marker without sending the body, and allows a later clean retry', async mode => {
+    const config = current(); config.service = 'openai'; config.enableAIContext = true;
+    const request = {origin: 'Contact demo@example.test', pageContext: 'page@example.test. ' + 'Background material. '.repeat(30)};
+    const original = JSON.stringify(request);
+    const {broker, provider, cache} = setup(config, outbound => {
+      expect(outbound.summaryPrompt).toBeTruthy();
+      const marker = outbound.summaryPrompt!.match(/__FRP_[A-P]{24}_[A-Z0-9]+__/u)![0];
+      return mode === 'borrowed' ? marker : marker.toLowerCase();
+    });
+    await expect(broker.translateWithCache(request)).rejects.toMatchObject({code: 'PRIVACY_RESTORE_FAILED', retryable: false});
+    expect(provider).toHaveBeenCalledTimes(1);
+    provider.mockImplementation(async outbound => outbound.summaryPrompt ? '普通背景摘要' : translated(outbound.origin as string));
+    expect(await broker.translateWithCache(request)).toBe('请联系 demo@example.test');
+    expect(provider).toHaveBeenCalledTimes(3);
+    expect(provider.mock.calls.filter(([outbound]) => !outbound.summaryPrompt)).toHaveLength(1);
+    for (const [outbound] of provider.mock.calls) expect(JSON.stringify(outbound)).not.toContain('@');
+    expect(cache.get).not.toHaveBeenCalled(); expect(cache.set).not.toHaveBeenCalled();
+    expect(JSON.stringify(request)).toBe(original);
+  });
   it('isolates pending requests when the protection policy changes', async () => {
     const config = current(); config.useCache = false;
     let release!: () => void;

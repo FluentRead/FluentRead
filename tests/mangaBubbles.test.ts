@@ -14,7 +14,7 @@ describe('实际普通图片物理行的段落证明采用',()=>{
         rect(pixels,width,0,0,width,height,[24,44,68,255]);
         const first=text('First complete line',40,40,90,14),second=text('Second complete line',40,74,90,14);
         for(const item of [first,second])for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)
-            rect(pixels,width,x,item.box.y+3,3,8,[240,245,250,255]);
+            rect(pixels,width,x,item.box.y+2,3,10,[240,245,250,255]);
         return{width,height,pixels,first,second};
     }
     it('全页端点被实际局部行替代后不能按相近位置转授续行',()=>{
@@ -80,7 +80,7 @@ describe('漫画间隙证明端点映射的安全回退',()=>{
     function fixture(){
         const width=200,height=200,pixels=image(width,height);rect(pixels,width,0,0,width,height,[24,44,68,255]);
         const first=text('First complete line',40,40,90,14),second=text('Second complete line',40,74,90,14);
-        for(const item of [first,second])for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)rect(pixels,width,x,item.box.y+3,3,8,[240,245,250,255]);
+        for(const item of [first,second])for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)rect(pixels,width,x,item.box.y+2,3,10,[240,245,250,255]);
         return{width,height,pixels,first,second};
     }
     it('foreign proof endpoints without a matching physical source region are ignored',()=>{

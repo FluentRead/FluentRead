@@ -223,6 +223,8 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         const f=fixture(224),width=f.width,height=160,pixels=new Pixels(width*height*4);
         fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);
         for(const r of f.art)fill(f.pixels,width,r,f.matte);
+        // 本例测试翻译前的端点/数字guard，而非超宽行距：使用20px字形与40px真实间隙。
+        for(const x0 of [40,54])fill(f.pixels,width,{x0,y0:28,x1:x0+4,y1:40},[255,255,255,255]);
         for(const dy of [0,60])for(let y=0;y<f.height;y++)for(let x=0;x<width;x++)pixels.set(f.pixels.subarray((y*width+x)*4,(y*width+x+1)*4),((y+dy)*width+x)*4);
         source={width,height,pixels};
         mocks.mangaRecognize.mockImplementation(async()=>{

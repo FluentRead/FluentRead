@@ -16,7 +16,8 @@ function basic(){
     const width=200,height=200,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
     const page:MangaOcrPage={results:[{text:'FIRST LINE',confidence:.99,box:{x:40,y:40,width:90,height:14}},{text:'SECOND LINE',confidence:.99,box:{x:40,y:74,width:90,height:14}}]};
     const set=(x:number,y:number,color=[230,240,250,255])=>pixels.set(color,(y*width+x)*4);
-    for(const row of page.results)for(let y=row.box.y+3;y<row.box.y+11;y++)for(let x=row.box.x+3;x<row.box.x+6;x++)set(x,y);
+    // 这些归属/预算用例需要合法续行：实测10px字形与24px空白。超宽墨迹间距由独立负例覆盖。
+    for(const row of page.results)for(let y=row.box.y+2;y<row.box.y+12;y++)for(let x=row.box.x+3;x<row.box.x+6;x++)set(x,y);
     return{width,height,pixels,page,set};
 }
 type Fixture=ReturnType<typeof basic>;
@@ -35,8 +36,8 @@ function smoothFieldFixture(){
 }
 function alphaLongFixture(){
     const f=basic();f.page.largeAlphaHoles=true;f.page.results[1]!.box.y=90;
-    for(let y=77;y<85;y++)for(let x=43;x<46;x++)f.set(x,y,[24,44,68,255]);
-    for(let y=93;y<101;y++)for(let x=43;x<46;x++)f.set(x,y,[230,240,250,255]);
+    for(let y=76;y<86;y++)for(let x=43;x<46;x++)f.set(x,y,[24,44,68,255]);
+    for(let y=92;y<102;y++)for(let x=43;x<46;x++)f.set(x,y,[230,240,250,255]);
     return f;
 }
 function styleGradient(firstHeight=25,secondColor=[18,26,45,255],third=false){
@@ -48,6 +49,35 @@ function styleGradient(firstHeight=25,secondColor=[18,26,45,255],third=false){
     for(const [i,item] of results.entries())for(let y=item.box.y+3;y<item.box.y+item.box.height-3;y++)for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x++)pixels.set(i===1?secondColor:[245,245,250,255],(y*width+x)*4);
     return {width,height,pixels,page:{results} as MangaOcrPage};
 }
+describe('实际墨迹间距不借OCR留白放大',()=>{
+    function spacing(gap=40,padding=8){
+        const width=260,height=220,pixels=new Uint8ClampedArray(width*height*4);
+        for(let i=0;i<pixels.length;i+=4)pixels.set([220,200,140,255],i);
+        const page:MangaOcrPage={results:[48,64+gap].map((y,index)=>({text:index?'SECOND COMPLETE LINE.':'FIRST COMPLETE LINE.',confidence:.99,box:{x:42,y:y-padding,width:146,height:16+padding*2}}))};
+        for(const y0 of [48,64+gap])for(let y=y0;y<y0+16;y++)for(let x=52;x<178;x++)if(x%9<5)pixels.set([10,20,30,255],(y*width+x)*4);
+        return {...basic(),width,height,pixels,page};
+    }
+    it.each([1,4,8])('完整墨迹间距上限及下一像素按源字高判断，OCR每侧留白%s不放大上限',padding=>{
+        const near=spacing(40,padding),far=spacing(41,padding),before=far.pixels.slice();
+        const allowed=adopt(near);expect(allowed.proofs).toHaveLength(1);expect(groupImageParagraphs(allowed.regions,allowed.support)).toHaveLength(1);
+        const rejected=adopt(far);expect(rejected.proofs).toEqual([]);expect(rejected.support).toBeUndefined();expect(groupImageParagraphs(rejected.regions,rejected.support)).toHaveLength(2);expect(far.pixels).toEqual(before);
+        // 即使两句被同一气泡包住，也不能绕过已观察到的过大墨迹间距再走flat-owner。
+        far.page.bubbles=[{bbox:{x0:20,y0:20,x1:220,y1:180},results:[]}];expect(produceImageParagraphGapProofs(far.page,far.width,far.height,far.pixels)).toEqual([]);
+    });
+    it('透视便签的真实原图裁片保持两条独立标签，旧共享背景证明在消费者处也失效',()=>{
+        const base=new URL('./fixtures/image-translation/paragraph-spacing/',import.meta.url),manifest=JSON.parse(readFileSync(new URL('manifest.json',base),'utf8'));
+        for(const [file,hash]of [[manifest.source,manifest.sourceSha256],[manifest.sourceManifest,manifest.sourceManifestSha256]])expect(createHash('sha256').update(readFileSync(new URL(file,base))).digest('hex')).toBe(hash);
+        const bytes=gunzipSync(readFileSync(new URL(manifest.file,base)));expect(createHash('sha256').update(bytes).digest('hex')).toBe(manifest.rgbaSha256);
+        const f={...basic(),width:manifest.crop.width,height:manifest.crop.height,pixels:new Uint8ClampedArray(bytes),page:{results:manifest.rawItems} as MangaOcrPage};
+        expect(bytes.length).toBe(f.width*f.height*4);
+        for(const [index,item]of f.page.results.entries())expect(item).toEqual({...manifest.rawItemsOriginal[index],box:{...manifest.rawItemsOriginal[index].box,x:manifest.rawItemsOriginal[index].box.x-manifest.crop.x,y:manifest.rawItemsOriginal[index].box.y-manifest.crop.y}});
+        const before=f.pixels.slice(),raw=JSON.stringify(f.page.results),current=adopt(f);expect(current.proofs).toEqual([]);expect(groupImageParagraphs(current.regions,current.support).map(r=>r.text)).toEqual(manifest.expectedParagraphs);
+        const proof={...manifest.legacyProof,previous:f.page.results[0],next:f.page.results[1]} as ImageParagraphGapProof;
+        const legacy=adopt(f,[proof]);expect(legacy.support).toBeUndefined();expect(groupImageParagraphs(legacy.regions,legacy.support).map(r=>r.text)).toEqual(manifest.expectedParagraphs);
+        expect(mergeMangaParagraphContinuations(legacy.regions as MangaRegion[],legacy.support).map(r=>r.text)).toEqual(manifest.expectedParagraphs);expect(f.pixels).toEqual(before);expect(JSON.stringify(f.page.results)).toBe(raw);
+    });
+});
+
 describe('渐变上的标题样式边界',()=>{
     it('冻结招牌的大小与字色差异保留两块完整标题，不借同背景强行合段',()=>{
         const raw=gunzipSync(readFileSync(new URL('./fixtures/manga-color-quality/truth/prism-platform-gradient-signs.source-rgba.bin.gz',import.meta.url)));
@@ -171,7 +201,7 @@ describe('低对比平滑间隙证明的生产消费',()=>{
     it('平滑间隙内有实际识别框时不生成跨框证明',()=>{
         const width=3600,height=200,pixels=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i+=4)pixels.set([24,44,68,255],i);
         const page:MangaOcrPage={results:[{text:'FIRST LINE',confidence:.99,box:{x:1750,y:40,width:90,height:14}},{text:'SECOND LINE',confidence:.99,box:{x:1750,y:74,width:90,height:14}},{text:'PHYSICAL NOISE',confidence:.99,box:{x:1780,y:60,width:5,height:4}}]};
-        for(const item of page.results.slice(0,2))for(let y=item.box.y+3;y<item.box.y+11;y++)for(let x=item.box.x+3;x<item.box.x+6;x++)pixels.set([230,240,250,255],(y*width+x)*4);
+        for(const item of page.results.slice(0,2))for(let y=item.box.y+2;y<item.box.y+12;y++)for(let x=item.box.x+3;x<item.box.x+6;x++)pixels.set([230,240,250,255],(y*width+x)*4);
         for(let y=56;y<72;y++)for(let x=1750;x<1840;x++){const value=24+Math.round((x-1750)*20/89);pixels.set([value,value+20,value+20,255],(y*width+x)*4);}
         expect(produceImageParagraphGapProofs(page,width,height,pixels)).toEqual([]);
     });
@@ -362,8 +392,9 @@ describe('段落间隙预算与画外墨迹回退',()=>{
         addPair('TARGET',100,5210,60,75,true);
         for(const row of results.filter(item=>item.text.includes('TARGET')))
             for(let y=row.box.y-8;y<row.box.y+row.box.height+8;y++)for(let x=92;x<168;x++)pixels.set([34,54,54,255],(y*width+x)*4);
+        // 实测字高覆盖30px，75px间距恰好合法，保证本例抵达后面的fallback预算检查。
         for(const row of results.filter(item=>item.text.includes('TARGET')))
-            for(let y=row.box.y+8;y<row.box.y+20;y++)if(y!==row.box.y+14)
+            for(let y=row.box.y;y<row.box.y+30;y++)if(y!==row.box.y+14)
                 for(let x=103;x<158;x+=8)for(let xx=x;xx<x+3;xx++)if(Math.abs(xx-(row.box.x+row.box.width/2))>2)pixels.set([230,240,250,255],(y*width+xx)*4);
         results.push(
             {text:'LEFT GUARD',confidence:.99,box:{x:40,y:5210,width:20,height:30}},
@@ -371,7 +402,8 @@ describe('段落间隙预算与画外墨迹回退',()=>{
         );
         for(let y=5245;y<5310;y++)for(let x=100;x<160;x++){const value=24+Math.round((x-100)*20/59);pixels.set([value,value+20,value+20,255],(y*width+x)*4);}
         const target=results.find(item=>item.text==='FIRST DIALOGUE LINE TARGET.')!;
-        expect(observeImageMatteGeometry(pixels,width,height,{x0:target.box.x,y0:target.box.y,x1:target.box.x+target.box.width,y1:target.box.y+target.box.height})).toBeDefined();
+        expect(observeImageMatteGeometry(pixels,width,height,{x0:target.box.x,y0:target.box.y,x1:target.box.x+target.box.width,y1:target.box.y+target.box.height}))
+            .toMatchObject({supportBox:{y0:target.box.y,y1:target.box.y+30}});
         const proofs=produceImageParagraphGapProofs({results,bubbles},width,height,pixels);
         expect(proofs.some(proof=>proof.previous.text.includes('TARGET'))).toBe(false);
     });
@@ -468,7 +500,7 @@ describe('几何、预算与取消的保守失败',()=>{
             for(let y=30;y<110;y++)for(let x=20;x<100;x++)set(x,y);
             const rows=[50,80].slice(0,channels).flatMap(left=>[11,25].map(top=>({text:'PRIOR LINE',confidence:.99,box:{x:left+2,y:top,width:4,height:4}})));
             const later=[50,64].map(top=>({text:'LATER LINE',confidence:.99,box:{x:40,y:top,width:20,height:4}}));rows.push(...later);
-            for(const row of rows)for(let y=row.box.y+1;y<row.box.y+3;y++)set(row.box.x+1,y,[230,240,250,255]);
+            for(const row of rows)for(let y=row.box.y;y<row.box.y+4;y++)set(row.box.x+1,y,[230,240,250,255]);
             const before=pixels.slice();expect(produceImageParagraphGapProofs({results:later},width,height,pixels)).toEqual([]);
             for(const order of [rows,[...rows].reverse(),[...later,...rows.slice(0,-2)], [...rows.slice(0,-2),...rows.slice(0,-2),...later]])expect(produceImageParagraphGapProofs({results:order},width,height,pixels)).toEqual([]);
             expect(Buffer.compare(Buffer.from(pixels.buffer,pixels.byteOffset,pixels.byteLength),Buffer.from(before.buffer,before.byteOffset,before.byteLength))).toBe(0);
@@ -478,7 +510,7 @@ describe('几何、预算与取消的保守失败',()=>{
         const width=200,height=140,pixels=new Uint8ClampedArray(width*height*4),set=(x:number,y:number,color=[24,44,68,255])=>pixels.set(color,(y*width+x)*4);
         for(let y=0;y<height;y++)for(let x=0;x<width;x++)set(x,y,[0,0,0,255]);for(let y=0;y<30;y++)for(let x=50;x<61;x++)set(x,y);for(let y=30;y<110;y++)for(let x=20;x<100;x++)set(x,y);for(let y=40;y<110;y++)for(let x=125;x<185;x++)set(x,y);
         const rows=[{text:'PRIOR ONE',confidence:.99,box:{x:52,y:11,width:4,height:4}},{text:'PRIOR TWO',confidence:.99,box:{x:52,y:25,width:4,height:4}},{text:'LATER ONE',confidence:.99,box:{x:40,y:50,width:20,height:4}},{text:'LATER TWO',confidence:.99,box:{x:40,y:64,width:20,height:4}},{text:'SEPARATE ONE',confidence:.99,box:{x:140,y:50,width:20,height:4}},{text:'SEPARATE TWO',confidence:.99,box:{x:140,y:64,width:20,height:4}}];
-        for(const row of rows)for(let y=row.box.y+1;y<row.box.y+3;y++)set(row.box.x+1,y,[230,240,250,255]);
+        for(const row of rows)for(let y=row.box.y;y<row.box.y+4;y++)set(row.box.x+1,y,[230,240,250,255]);
         const proofs=produceImageParagraphGapProofs({results:rows},width,height,pixels);expect(proofs.map(p=>[p.previous.text,p.next.text])).toEqual([['SEPARATE ONE','SEPARATE TWO']]);
     });
     it('同一producer多组件外部连通共用一个有界FIFO缓冲，不按条纹分配',()=>{
@@ -498,7 +530,7 @@ describe('几何、预算与取消的保守失败',()=>{
         const build=(width:number,height:number,ellipse=false)=>{
             const pixels=new Uint8ClampedArray(width*height*4);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const inside=ellipse?((x-width/2)/(width/2-70))**2+((y-height/2)/(height/2-70))**2<=1:x>=20&&x<width-20&&y>=20&&y<height-20;pixels.set(inside?[24,44,68,255]:[0,0,0,255],(y*width+x)*4);}
             const x=ellipse?300:40,y=ellipse?400:300,page:MangaOcrPage={results:[{text:'FIRST LINE',confidence:.99,box:{x,y,width:90,height:14}},{text:'SECOND LINE',confidence:.99,box:{x,y:y+34,width:90,height:14}}]};
-            for(const row of page.results)for(let yy=row.box.y+3;yy<row.box.y+11;yy++)for(let xx=row.box.x+3;xx<row.box.x+6;xx++)pixels.set([230,240,250,255],(yy*width+xx)*4);
+            for(const row of page.results)for(let yy=row.box.y+2;yy<row.box.y+12;yy++)for(let xx=row.box.x+3;xx<row.box.x+6;xx++)pixels.set([230,240,250,255],(yy*width+xx)*4);
             if(!ellipse)for(let yy=100;yy<900;yy++)for(let xx=200;xx<800;xx++)pixels.set([0,0,0,255],(yy*width+xx)*4);
             return{page,pixels,width,height};
         };
@@ -547,7 +579,7 @@ describe('几何、预算与取消的保守失败',()=>{
         const width=512,height=448,pixels=new Uint8ClampedArray(width*height*4),page:MangaOcrPage={results:[]};for(let i=0;i<pixels.length;i+=4)pixels.set([5,10,15,255],i);
         for(let n=0;n<128;n++){const ox=(n%16)*32,oy=Math.floor(n/16)*56,bg=[40+(n%16)*8,50+Math.floor(n/16)*8,100,255];
             for(let y=oy+3;y<oy+39;y++)for(let x=ox+3;x<ox+29;x++)pixels.set(bg,(y*width+x)*4);
-            for(const top of [oy+10,oy+24]){page.results.push({text:'LINE',confidence:.99,box:{x:ox+10,y:top,width:8,height:4}});for(let y=top+1;y<top+3;y++)for(let x=ox+11;x<ox+13;x++)pixels.set([230,240,250,255],(y*width+x)*4);}
+            for(const top of [oy+10,oy+24]){page.results.push({text:'LINE',confidence:.99,box:{x:ox+10,y:top,width:8,height:4}});for(let y=top;y<top+4;y++)for(let x=ox+11;x<ox+13;x++)pixels.set([230,240,250,255],(y*width+x)*4);}
         }
         const proofs=produceImageParagraphGapProofs(page,width,height,pixels);expect(proofs.length).toBeGreaterThan(100);expect(proofs.length).toBeLessThan(128);expect(proofs.every(p=>p.topology)).toBe(true);expect(proofs.reduce((n,p)=>n+p.pixels,0)).toBeLessThanOrEqual(1_048_576);
     });

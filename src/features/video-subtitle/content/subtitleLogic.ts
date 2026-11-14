@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/subtitleLogic.ts
  * 文件职责：提供字幕批量翻译、配置指纹和渐进文本展示的纯逻辑。
- * 主要内容：相同译文保留原文且不重复展示；合成双语导出的双行文本和单轨时间轴，去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间。
+ * 主要内容：相同译文保留原文且不重复展示；合成双语导出的双行文本和单轨时间轴，去重并限制批译并发，按目录中的实际服务标识生成配置键，使免费线路和 DeepL 套餐变化失效旧字幕；按原文进度截取译文与按时间选择渐进字幕；保持 X 短 cue 的最小展示区间与旧 DOM 文本切换语义；按播放速度选取当前句和八条不同的后续原文，在时间边界之间复用预取窗口，并以手动偏移计算有效字幕区间；折叠滚动窗口中同一句被上一行残留重复的可见行，只保留当前句一次。
  * 模块边界：只处理输入数据和注入翻译函数，不读取 DOM、全局配置或浏览器接口。
  */
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
@@ -377,6 +377,20 @@ export function getVideoTranslationConfigFingerprint(value: Config): string {
 
 export function normalizeVideoCaptionText(value: string): string {
   return value.replace(/[\s\u3000]+/g, ' ').trim();
+}
+
+/**
+ * 滚动窗口会短暂保留上一句；视频连续重复同一句话时，可见行恰好是同一句的两次输出。
+ * 按行边界找到前后两半完全相同（忽略大小写与空白差异）的切点，只保留当前（后半）一次，
+ * 避免面板原文与译文各显示两遍；单个分段内部的合法重复（如歌词）没有行边界可切，保持原样。
+ */
+export function collapseRepeatedCaptionLines(segments: readonly string[]): string[] {
+  for (let split = 1; split < segments.length; split += 1) {
+    const previous = normalizeVideoCaptionText(segments.slice(0, split).join(' ')).toLocaleLowerCase();
+    const current = normalizeVideoCaptionText(segments.slice(split).join(' ')).toLocaleLowerCase();
+    if (previous === current) return segments.slice(split);
+  }
+  return [...segments];
 }
 
 

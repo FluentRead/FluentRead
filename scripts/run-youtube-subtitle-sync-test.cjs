@@ -208,6 +208,21 @@ let launchAttempted = false;
   await setCaption(4, 'The same beginning');
   await page.waitForTimeout(550);
   check('A matching prefix does not borrow a future full sentence', !(await sample()).original.includes('future') && (await sample()).translation === '', await sample());
+  // Issue #1341：视频连续重复同一句时，滚动窗口会同时保留上一行与当前行；
+  // 面板必须只读取并翻译当前句一次，而不是把两句相同文本拼成一份双语字幕。
+  await page.evaluate(lines => {
+    document.querySelector('#ytp-caption-window-container').innerHTML = lines.map(line => `<span class="ytp-caption-segment">${line}</span>`).join('');
+    document.querySelector('video').currentTime = 5.2;
+  }, ['A native sentence without a timed track.', 'A native sentence without a timed track.']);
+  await page.waitForFunction(() => !document.querySelector('video').seeking);
+  diagnostics.setPhase('caption-5.2-rolling-duplicate');
+  await waitTranslation(translations['A native sentence without a timed track.']);
+  const rollingDuplicate = await sample();
+  check('A rolling window repeating the same sentence shows and translates it once', rollingDuplicate.original === 'A native sentence without a timed track.'
+    && rollingDuplicate.translation === translations['A native sentence without a timed track.'], rollingDuplicate);
+  const rollingRequest = await worker.evaluate(() => globalThis.fixtureRequests.filter(source => source.includes('A native sentence')).slice(-1)[0]);
+  check('The duplicated rolling line is never sent to the translation service', rollingRequest === 'A native sentence without a timed track.', {rollingRequest});
+  await page.evaluate(() => {document.querySelector('#ytp-caption-window-container').innerHTML = '<span class="ytp-caption-segment"></span>';});
   await setCaption(10.2, 'Slow translation belongs here.');
   await page.waitForTimeout(150);
   await setCaption(11.2, 'The next caption is ready.');

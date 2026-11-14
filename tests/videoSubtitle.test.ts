@@ -21,7 +21,7 @@ import {
 } from '@/src/features/video-subtitle/content/ui';
 import {getVideoServiceLabel, getVideoPretranslationWindowMs} from '@/src/features/video-subtitle/content/serviceProfile';
 import {getVisibleVideoAiCue, mergeVideoAiSubtitleCues} from '@/src/features/video-subtitle/content/video-ai/cueTimeline';
-import {normalizeVideoCaptionText, revealVideoSubtitleTranslation, translateVideoSubtitleCues} from '@/src/features/video-subtitle/content/subtitleLogic';
+import {normalizeVideoCaptionText, revealVideoSubtitleTranslation, translateVideoSubtitleCues, collapseRepeatedCaptionLines} from '@/src/features/video-subtitle/content/subtitleLogic';
 import {applyVideoDisplayState, findVideoPlayer, findCaptionContainer, getVisibleCaptionSegments, renderVideoReadingAnnotation, clearRenderedVideoTranslation} from '@/src/features/video-subtitle/content/ui';
 import {validateYoutubeTimedTextMessage} from '@/src/features/video-subtitle/content/youtubeTimedTextMessage';
 import {config} from '@/src/services/config/store';
@@ -74,6 +74,30 @@ describe('YouTube 视频字幕识别', () => {
         rollup.getBoundingClientRect = () => ({top: 100, bottom: 160, height: 60} as DOMRect);
         segments[3].getBoundingClientRect = () => ({height: 0} as DOMRect);
         expect(readVisibleCaptionText(rollup)).toContain('Outside below.');
+    });
+
+    it('滚动窗口残留上一行且与当前行同句时只读取当前句一次', () => {
+        const {document} = parseHTML('<div id="captions"><span class="ytp-caption-segment">Hey, it doesn\'t matter as long as I get it done!</span><span class="ytp-caption-segment">Hey, it doesn\'t matter as long as I get it done!</span></div>');
+        expect(readVisibleCaptionText(document.getElementById('captions'))).toBe('Hey, it doesn\'t matter as long as I get it done!');
+        const words = parseHTML('<div id="captions"><span class="ytp-caption-segment">Sea</span><span class="ytp-caption-segment">otters</span><span class="ytp-caption-segment">Sea</span><span class="ytp-caption-segment">otters</span></div>');
+        expect(readVisibleCaptionText(words.document.getElementById('captions'))).toBe('Sea otters');
+        const folded = parseHTML('<div id="captions"><span class="ytp-caption-segment">Hey! It works.</span><span class="ytp-caption-segment">hey!  it WORKS.</span></div>');
+        expect(readVisibleCaptionText(folded.document.getElementById('captions'))).toBe('hey! it WORKS.');
+    });
+
+    it('不同句保持拼接且单行内部的合法重复不被折叠', () => {
+        const mixed = parseHTML('<div id="captions"><span class="ytp-caption-segment">They open the shell.</span><span class="ytp-caption-segment">Sea otters have strong teeth.</span></div>');
+        expect(readVisibleCaptionText(mixed.document.getElementById('captions'))).toBe('They open the shell. Sea otters have strong teeth.');
+        const single = parseHTML('<div id="captions"><span class="ytp-caption-segment">Bye bye! Bye bye!</span></div>');
+        expect(readVisibleCaptionText(single.document.getElementById('captions'))).toBe('Bye bye! Bye bye!');
+    });
+
+    it('折叠重复可见行只按行边界切分，不匹配时保持原顺序', () => {
+        expect(collapseRepeatedCaptionLines([])).toEqual([]);
+        expect(collapseRepeatedCaptionLines(['Only line.'])).toEqual(['Only line.']);
+        expect(collapseRepeatedCaptionLines(['A', 'B', 'A', 'B'])).toEqual(['A', 'B']);
+        expect(collapseRepeatedCaptionLines(['A', 'B', 'C'])).toEqual(['A', 'B', 'C']);
+        expect(collapseRepeatedCaptionLines(['A A', 'A A'])).toEqual(['A A']);
     });
 
     it('只读取当前播放器内的字幕，忽略页面上残留的其他字幕容器', () => {

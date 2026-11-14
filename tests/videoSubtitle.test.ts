@@ -16,7 +16,7 @@ vi.mock('webextension-polyfill', () => ({
     default: { runtime: { sendMessage: vi.fn() } },
 }));
 import {
-    getVideoSubtitleDownloadErrorMessage, isYouTubeVideoPage, isXHostPage, isXVideoPage, isSupportedVideoPage,
+    getVideoSubtitleDownloadErrorMessage, isYouTubeVideoPage, isYouTubeEmbedPage, isXHostPage, isXVideoPage, isSupportedVideoPage,
     normalizeVideoSubtitleDisplayMode, readVisibleCaptionText, VIDEO_CAPTION_SEGMENT_SELECTOR,
 } from '@/src/features/video-subtitle/content/ui';
 import {getVideoServiceLabel, getVideoPretranslationWindowMs} from '@/src/features/video-subtitle/content/serviceProfile';
@@ -381,6 +381,22 @@ describe('YouTube timedtext MAIN bridge 消息边界', () => {
         url: 'https://www.youtube.com/api/timedtext?v=current-video&lang=en',
         responseText,
     };
+
+    it('内嵌播放器只接收同主机与完整路径ID的字幕，查询参数不能冒领其他视频', () => {
+        const valid = new URL('https://www.youtube.com/embed/abcdefghijk?v=other-video');
+        vi.stubGlobal('window', {location: valid});
+        expect(isYouTubeEmbedPage()).toBe(true);
+        expect(isYouTubeVideoPage(valid)).toBe(true);
+        expect(validateYoutubeTimedTextMessage({...payload, url: 'https://www.youtube.com/api/timedtext?v=abcdefghijk&lang=en'}, valid.href)?.cues).toHaveLength(1);
+        expect(validateYoutubeTimedTextMessage({...payload, url: 'https://www.youtube.com/api/timedtext?v=other-video&lang=en'}, valid.href)).toBeNull();
+        for (const href of ['https://youtube.com.evil.test/embed/abcdefghijk', 'https://youtube.com/embed/short-id',
+            'https://youtube.com/embed/abcdefghijk/more', 'https://youtube.com/embed/abcdefghijkl']) {
+            const invalid = new URL(href);
+            expect(isYouTubeEmbedPage(invalid)).toBe(false);
+            expect(validateYoutubeTimedTextMessage(payload, href)).toBeNull();
+        }
+        expect(isYouTubeEmbedPage(new URL('https://m.youtube.com/embed/aB_cD-eF123/'))).toBe(true);
+    });
 
     it('只接收绑定到当前 watch/shorts videoId 的真实 timedtext URL', () => {
         expect(validateYoutubeTimedTextMessage(

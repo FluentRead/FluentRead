@@ -11,6 +11,10 @@ import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/fea
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
 import {getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
+import {Config} from '@/src/core/config/model';
+import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
+import {createTranslationBroker} from '@/src/services/translation/broker';
+import type {TranslationProviderRequest, TranslationRequestMessage} from '@/src/services/translation/types';
 
 // 扩展运行时按需加载界面语言；本文件验证全部语言的文案契约，因此一次注册全部资源包。
 registerAllUiLanguageBundles();
@@ -21,6 +25,40 @@ function setup(extra = {}) {
     const handlers=createImageTranslationBackgroundHandlers(dependencies);
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
+
+it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker隐私边界兼容：%s',async mode=>{
+    const config=new Config();config.service='google';config.from='en';config.to='zh-Hans';
+    config.privacyProtection=normalizePrivacyPolicy({enabled:true,mode:mode==='block'?'block':'mask'});
+    const convert=(text:string)=>text.replaceAll('FIELD SKETCH','现场速写').replaceAll('Contact','请联系');
+    const provider=vi.fn(async(request:TranslationProviderRequest)=>{
+        const translate=(text:string)=>mode==='damaged'?'已翻译':convert(text);
+        return Array.isArray(request.origin)?request.origin.map(translate):translate(request.origin);
+    });
+    const cache={get:vi.fn(async()=>null),set:vi.fn(async()=>true),clear:vi.fn(async()=>{}),cleanup:vi.fn(async()=>{})};
+    const broker=createTranslationBroker({ready:Promise.resolve(),getConfig:()=>config,providers:{google:provider},cache,
+        serviceTypes:{machine:new Set(['google']),isAI:()=>false,isAiSdk:()=>false,isUseAIContext:()=>false},
+        endpointResolver:{resolveOpenAICompatibleEndpoint:()=>({endpoint:'https://translation.invalid/v1'}),aiSdkTransportProfile:'test'},
+        promptBuilder:{buildPageSummaryPrompt:text=>text,buildPageSummarySystemPrompt:()=>''},getMissingCredentialMessage:()=>null,
+        getTranslationLanguages:override=>({sourceLanguage:override?.sourceLanguage??config.from,targetLanguage:override?.targetLanguage??config.to}),
+        resolveConfiguredModel:(selected,custom)=>custom||selected||'',buildTranslationCacheKey:identity=>JSON.stringify(identity)});
+    const current=setup({supportsBatchTranslation:()=>true,getGlossaryConfig:()=>config,
+        translateTexts:(request:TranslationRequestMessage)=>broker.translateWithCache(request)});
+    const texts=['FIELD SKETCH 09','Contact one@example.test','Contact two@example.test','FIELD SKETCH 09'];
+    const outcome=await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Image notes'})
+        .then(value=>({value,error:undefined}),error=>({value:undefined,error}));
+    if(mode==='mask'){
+        expect(outcome.error).toBeUndefined();expect(outcome.value).toEqual({success:true,translations:texts.map(convert)});
+        expect(provider).toHaveBeenCalledOnce();
+    }else{
+        expect(outcome.error).toBeInstanceOf(Error);
+        expect(String(outcome.error)).toContain(mode==='block'?'敏感内容':'隐私标记');
+        expect(String(outcome.error)).not.toContain('@example.test');
+        expect(provider).toHaveBeenCalledTimes(mode==='block'?0:1);
+    }
+    for(const [request] of provider.mock.calls)expect(JSON.stringify(request)).not.toContain('@example.test');
+    expect(cache.get).not.toHaveBeenCalled();expect(cache.set).not.toHaveBeenCalled();
+    expect(texts).toEqual(['FIELD SKETCH 09','Contact one@example.test','Contact two@example.test','FIELD SKETCH 09']);
+});
 
 it('单段翻译携带相邻原文参考，保留已是目标语言的标题且不混入待译正文', async () => {
     const current = setup({getGlossaryConfig: () => ({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
@@ -465,6 +503,20 @@ describe('图片翻译流程优化',()=>{
                 .resolves.toEqual({success: true, translations: message.texts});
         }
         expect(dependencies.translateTexts).not.toHaveBeenCalled();
+    });
+    it.each([false,true])('编号全大写多词说明交给现有服务判断，保留原文顺序与明确技术标识，batch=%s',async batch=>{
+        const requested:string[]=[];
+        const translateTexts=vi.fn(async(request:{origin:string|string[]})=>{
+            const convert=(text:string)=>{requested.push(text);return text==='FIELD SKETCH 09'?'现场速写 09':text==='CHECK POINT 12'?'检查点 12':text;};
+            return Array.isArray(request.origin)?request.origin.map(convert):convert(request.origin);
+        });
+        const {handler}=setup({supportsBatchTranslation:()=>batch,translateTexts,getGlossaryConfig:()=>({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
+        const texts=['FIELD SKETCH 09','GPT-6','CHECK POINT 12','OpenAI GPT-6','FIELD SKETCH 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'];
+        const response=await handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts});
+        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9']});
+        expect(requested).toEqual(batch?['FIELD SKETCH 09','CHECK POINT 12','FIELD SKETCH 09','INTEL CORE 9']:['FIELD SKETCH 09','CHECK POINT 12','INTEL CORE 9']);
+        // 普通词加整数也可能是名称；供应商原样返回时仍保留原文，不能声称语法能辨认所有品牌。
+        expect(texts[0]).toBe('FIELD SKETCH 09');
     });
     it('逐条服务也跳过标识，保留单字、多语正文和重复行的对应位置', async () => {
         const {handler, dependencies} = setup();

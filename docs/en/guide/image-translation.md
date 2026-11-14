@@ -49,6 +49,8 @@ For slightly tilted horizontal text in photographs, translations follow the sour
 
 Individual translation requests include bounded neighboring text from the same image as reference for services that support context. Batch requests continue to process their existing paragraphs together. Translated images follow the original image's shape clipping and pixel scaling settings.
 
+Some numbered descriptions made of several uppercase words are passed to the current translation service, reducing cases where a whole caption is skipped as a model name. The source text and number remain intact; names returned unchanged by the service stay in the original image.
+
 With a prompt-based AI service (or a composite containing one) and **AI context** enabled, each text region can reference up to two recognized regions before and after it, without an extra summary request. Repeated short phrases retain their own positions and neighboring context; changed context cannot reuse a translation cached for another meaning. Turning the setting off keeps the existing translation behavior. Context can help resolve ambiguity, but recognition errors and model mistakes still require checking the original.
 
 When Google native batching is enabled, complete sentences from an image can share context in groups of up to four, while headings remain separate. The extension checks region identifiers and sentence endings, then falls back to independent translation if a result loses a region, mixes positions or changes an independent sentence into a comma continuation. Repeated phrases keep their positions and group context in the cache. Only recognized text is sent, not the original image; check specific meanings against the source.

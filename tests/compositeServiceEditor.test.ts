@@ -32,6 +32,7 @@ describe('组合翻译编辑草稿', () => {
   })
   it('候选包含内置和已创建自定义服务，排除目录标题与任何组合', () => {
     const config = new Config()
+    config.disabledTranslationServices = []
     config.customOpenAIProviders = [{id: 'custom:work', name: 'Work', endpoint: 'https://example.test/v1', models: ['fixture']},
       {id: 'composite:nested', name: 'Invalid nested', endpoint: '', models: []}]
     const result = getCompositeMemberOptions(config)

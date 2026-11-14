@@ -119,7 +119,7 @@ function parseCompleteDriveSyncPayload(value: unknown): DriveSyncConfig {
     if (references.some(service => isCompositeTranslationProviderId(service) && !isConfiguredCompositeTranslationProvider(composites, service))) {
         throw new DriveConfigError('同步配置引用了不存在的组合翻译服务，请重新预览配置。');
     }
-    // 快照省略运行时迁移状态，但必须按已完成迁移的用户配置解析，保留用户选择。
+    // 视频默认服务迁移标记由本机接管；AI 平台可用状态及其迁移标记随快照同步。
     return toDriveSyncConfig({...value.config, videoServiceDefaultMigrated: true});
 }
 

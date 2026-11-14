@@ -6,7 +6,7 @@
  * 主要内容：支持单图选择本地识别引擎，包含正文/全部节点识别范围，保留各功能独立服务，并将所有功能服务的空值解释为继承网页默认；统一中文简繁标识及历史配置别名，并保存常用服务顺序，保存默认空的 Origin/Referer 域名移除名单和组合翻译配置；组合成员只引用普通服务，删除自定义成员与组合时精确清理无效选择，包含 Config 接口、字幕和翻译模式类型、延迟与字号范围、默认 API 地址及多项功能开关，使新增配置项在一个位置获得类型和初始语义；归一化时以迭代克隆保留深层数据和共享引用，安全迁移任意自有凭据键，升级历史默认提示词，只迁移已登记模型编号，并在线性目录遍历中保护自定义服务的当前模型和 Thinking 偏好。 可核对的公开符号包括 DeepSeekApiType、DeepSeekThinkingMode、VideoSubtitleDisplayMode、FullPageTranslationMode、DEFAULT_VIDEO_SUBTITLE_FONT_SIZE、DEFAULT_NEW_API_URL、DEFAULT_MOUSE_HOVER_TRANSLATION_DELAY。
  * 悬浮球边距：默认与悬停展开分别保存有符号 px 值，旧配置缺失时补齐默认值，读取和导入统一按范围及整数步长规范化。
  * 隐私防护：本地脱敏策略随配置归一化，自定义词使用独立凭据字段，不写入公共配置。
- * 服务可用性：新增 disabledTranslationServices 持久化列表，默认空数组；导入时去重并约束标识长度。
+ * 服务可用性：disabledTranslationServices 持久化用户关闭项；指定第三方 AI 平台新安装时默认关闭，旧配置只迁移一次并保留已有明确配置；导入时去重并约束标识长度。
  * 查词来源：默认使用现有本地优先策略，按需指定单一词典，旧配置与非法来源回到默认自动。
  * 侧边栏：保存原生翻译侧边栏的显示范围，旧配置与非法值默认使用当前标签页。
  * 工具栏：保存图标点击后打开快捷面板或直接翻译的偏好，旧配置与非法值保留面板默认行为。
@@ -27,7 +27,7 @@ import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE,
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
 import {normalizeShareCardPreferences, type ShareCardPreferences} from '@/src/core/config/shareCard';
-import {normalizeDisabledTranslationServices} from './serviceAvailability';
+import {DEFAULT_DISABLED_AI_PLATFORM_SERVICES, normalizeDisabledTranslationServices} from './serviceAvailability';
 import type {TranslationScope} from '@/src/core/translation/types';
 import {
     currentModelIds,
@@ -414,6 +414,7 @@ export class Config {
     display: number = 1;
     service: string;
     disabledTranslationServices: string[]; // 用户关闭的服务；关闭后停止新请求并从选择项中禁选
+    aiPlatformDefaultRemovalMigrated: boolean; // 指定 AI 平台默认移除策略的一次性迁移标记
     hoverTranslationService: string; // 悬浮翻译服务，空值跟随默认网页服务
     selectionTranslationService: string; // 普通划词翻译服务，空值跟随默认网页服务
     imageTranslationService: string; // 图片 OCR 后的文字翻译服务，空值跟随默认网页服务
@@ -636,7 +637,8 @@ export class Config {
         this.hotkey = defaultOption.hotkey;
         this.hoverShortcutBeforeDisable = defaultOption.hotkey;
         this.service = defaultOption.service;
-        this.disabledTranslationServices = [];
+        this.disabledTranslationServices = [...DEFAULT_DISABLED_AI_PLATFORM_SERVICES];
+        this.aiPlatformDefaultRemovalMigrated = true;
         this.hoverTranslationService = '';
         this.selectionTranslationService = '';
         this.imageTranslationService = '';
@@ -1137,6 +1139,87 @@ function normalizeCustomOpenAIProviderState(normalized: Config, source: Partial<
     normalized.token = apiKeysToToken(normalized.apiKeys);
 }
 
+/** 判定旧配置中目标平台是否已经被实际选用或单独配置。 */
+function hasConfiguredAiPlatformService(source: Partial<Config>, service: string): boolean {
+    const raw = source as Record<string, unknown>;
+    const selectedFields = [
+        'service', 'hoverTranslationService', 'selectionTranslationService',
+        'imageTranslationService', 'documentService', 'videoService',
+        'areaTranslationService', 'inputBoxTranslationService',
+    ];
+    if (selectedFields.some(field => raw[field] === service)) return true;
+
+    for (const field of ['harness', 'writing'] as const) {
+        const preferences = raw[field];
+        if (preferences && typeof preferences === 'object' && !Array.isArray(preferences)
+            && (preferences as Record<string, unknown>).service === service) return true;
+    }
+
+    for (const field of ['favoriteServices', 'translationCenterServices'] as const) {
+        const selected = raw[field];
+        if (Array.isArray(selected) && selected.includes(service)) return true;
+    }
+    const quickProfiles = raw.quickTranslationProfiles;
+    if (Array.isArray(quickProfiles) && quickProfiles.some(profile => (
+        profile !== null && typeof profile === 'object' && !Array.isArray(profile)
+        && (profile as Record<string, unknown>).service === service
+    ))) return true;
+    const composites = raw.compositeTranslationProviders;
+    if (Array.isArray(composites) && composites.some(provider => (
+        provider !== null && typeof provider === 'object' && !Array.isArray(provider)
+        && Array.isArray((provider as Record<string, unknown>).services)
+        && ((provider as Record<string, unknown>).services as unknown[]).includes(service)
+    ))) return true;
+
+    const mappings = raw as Record<string, unknown>;
+    for (const field of ['token', 'secret', 'proxy', 'customModel', 'customBody', 'customHeaders', 'serviceRegion'] as const) {
+        const mapping = mappings[field];
+        const value = mapping && typeof mapping === 'object' && !Array.isArray(mapping)
+            ? (mapping as Record<string, unknown>)[service]
+            : undefined;
+        if (typeof value === 'string' && value.trim()) return true;
+    }
+
+    const apiKeys = mappings.apiKeys && typeof mappings.apiKeys === 'object' && !Array.isArray(mappings.apiKeys)
+        ? (mappings.apiKeys as Record<string, unknown>)[service]
+        : undefined;
+    if (Array.isArray(apiKeys) && apiKeys.some(key => typeof key === 'string' && key.trim())) return true;
+
+    const customModels = mappings.customModels && typeof mappings.customModels === 'object' && !Array.isArray(mappings.customModels)
+        ? (mappings.customModels as Record<string, unknown>)[service]
+        : undefined;
+    if (Array.isArray(customModels) && customModels.some(model => typeof model === 'string' && model.trim())) return true;
+
+    const selectedModel = mappings.model && typeof mappings.model === 'object' && !Array.isArray(mappings.model)
+        ? (mappings.model as Record<string, unknown>)[service]
+        : undefined;
+    if (typeof selectedModel === 'string' && selectedModel.trim()
+        && selectedModel !== (defaultModelIds as Record<string, unknown>)[service]) return true;
+
+    for (const field of ['modelThinking', 'serviceRequestLimits', 'modelRequestLimits', 'modelVision'] as const) {
+        const mapping = mappings[field];
+        const value = mapping && typeof mapping === 'object' && !Array.isArray(mapping)
+            ? (mapping as Record<string, unknown>)[service]
+            : undefined;
+        if (value && typeof value === 'object' && Object.keys(value).length > 0) return true;
+    }
+    const rotation = mappings.apiKeyRotationEnabled && typeof mappings.apiKeyRotationEnabled === 'object'
+        && !Array.isArray(mappings.apiKeyRotationEnabled)
+        ? (mappings.apiKeyRotationEnabled as Record<string, unknown>)[service]
+        : undefined;
+    if (rotation === true) return true;
+
+    const systemRole = mappings.system_role && typeof mappings.system_role === 'object' && !Array.isArray(mappings.system_role)
+        ? (mappings.system_role as Record<string, unknown>)[service]
+        : undefined;
+    const userRole = mappings.user_role && typeof mappings.user_role === 'object' && !Array.isArray(mappings.user_role)
+        ? (mappings.user_role as Record<string, unknown>)[service]
+        : undefined;
+    return (typeof systemRole === 'string' && systemRole !== defaultOption.system_role)
+        || (typeof userRole === 'string' && userRole !== defaultOption.user_role
+            && !LEGACY_DEFAULT_USER_ROLES.includes(userRole));
+}
+
 /**
  * 将存储或导入的普通对象补齐为当前配置结构，并迁移已退役或错误的模型编号。
  */
@@ -1240,6 +1323,14 @@ export function normalizeConfig(value: unknown): Config {
     normalized.apiKeyRecoveryMs = normalizeApiKeyRecoveryMs(source.apiKeyRecoveryMs);
     normalized.freeTranslationOrder = normalizeFreeTranslationOrder(source.freeTranslationOrder);
     normalized.disabledTranslationServices = normalizeDisabledTranslationServices(source.disabledTranslationServices);
+    if (source.aiPlatformDefaultRemovalMigrated !== true) {
+        const disabledServices = new Set(normalized.disabledTranslationServices);
+        for (const service of DEFAULT_DISABLED_AI_PLATFORM_SERVICES) {
+            if (!hasConfiguredAiPlatformService(source, service)) disabledServices.add(service);
+        }
+        normalized.disabledTranslationServices = [...disabledServices];
+    }
+    normalized.aiPlatformDefaultRemovalMigrated = true;
     // 旧配置首次升级默认开启 B站；标记写入后尊重用户后续的手动关闭。
     if (source.freeTranslationBilibiliDefaultApplied !== true) {
         const order = normalized.freeTranslationOrder.filter(id => id !== 'bilibiliFree');

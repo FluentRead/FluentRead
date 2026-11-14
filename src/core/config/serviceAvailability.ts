@@ -1,7 +1,7 @@
 /**
  * @file src/core/config/serviceAvailability.ts
  * 文件职责：规范化用户关闭的翻译服务，并把关闭状态投影到服务选择项。
- * 主要内容：去重、限制服务标识长度，保留内置、自定义与组合服务的统一开关状态；选择列表保留已关闭项并标为不可选，供调用方显示旧配置和恢复提示。
+ * 主要内容：为指定的第三方 AI 平台提供默认收起名单；去重、限制服务标识长度，保留内置、自定义与组合服务的统一开关状态；选择列表保留已关闭项并标为不可选，供调用方显示旧配置和恢复提示。
  * 模块边界：只处理配置值和选项，不读取存储、不修改配置、不判断浏览器能力或发起翻译。
  */
 
@@ -9,6 +9,15 @@ export interface TranslationServiceAvailabilityOption {
   value: string
   disabled?: boolean
 }
+
+/** 新安装和一次性旧配置迁移中默认放入“恢复已移除服务”的 AI 平台。 */
+export const DEFAULT_DISABLED_AI_PLATFORM_SERVICES = [
+  'runcrate',
+  'cloudgpu',
+  'cheaperinference',
+  'cheapaimodel',
+  'standardcompute',
+] as const
 
 export const TRANSLATION_SERVICE_DISABLED_MESSAGE = '所选翻译服务已关闭。请在翻译服务设置的「自定义服务」中恢复，或选择其他服务。'
 

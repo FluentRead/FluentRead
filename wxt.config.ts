@@ -358,6 +358,8 @@ export default defineConfig({
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
             // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
             // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
+            // 旧配置迁移保留既有服务选择和平台设置；基线实测 Chrome/Firefox 分别增加 17,099/17,002 bytes，两平台门槛各加 18 kB。
+            const aiPlatformDefaultRemovalBudget = 18_000;
             // GitHub 名称保护和 Mac 基准页面适配已在主线；扫描论文及原文校订单独实测比 dc7bff026 基线增加 66,822 bytes。
             // 图片 OCR 批次主线重新构建为 66,186,315 bytes；汉字复核合并后为 66,190,277 bytes，增加 3,962 bytes，保留约 1.7 kB 余量。
             // 断句与无边框表格在上述主线增加 2,790 bytes；当前实测 66,193,067 bytes，门槛仅随代码增量调整。
@@ -406,7 +408,7 @@ export default defineConfig({
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

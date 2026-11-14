@@ -409,13 +409,19 @@ describe('设置历史的具体修改时间线', () => {
     });
 
     it('统计、迁移标记和凭据不会进入修改摘要，不改变源快照', () => {
-        const before = {...baseConfig, count: 1, token: {openai: 'first-secret'}, customHeaders: {openai: 'Authorization: first-secret'}};
-        const after = {...baseConfig, count: 999, token: {openai: 'second-secret'}, customHeaders: {openai: 'Authorization: second-secret'}};
+        const before = {...baseConfig, count: 1, token: {openai: 'first-secret'}, customHeaders: {openai: 'Authorization: first-secret'},
+            privacyProtectionSecretTerms: ['synthetic-private-term-before']};
+        const after = {...baseConfig, count: 999, token: {openai: 'second-secret'}, customHeaders: {openai: 'Authorization: second-secret'},
+            privacyProtectionSecretTerms: ['synthetic-private-term-after']};
         const source = [{...entry(1), config: before as never}, {...entry(2), config: after as never}];
         const original = JSON.stringify(source);
         const timeline = buildConfigHistoryTimeline(source);
         expect(timeline[0].diff?.changeCount).toBe(0);
-        expect(JSON.stringify(timeline)).not.toContain('secret');
+        const serialized = JSON.stringify(timeline);
+        for (const value of ['first-secret', 'second-secret', ...before.privacyProtectionSecretTerms, ...after.privacyProtectionSecretTerms]) {
+            expect(serialized).not.toContain(value);
+        }
+        expect(timeline[0].config.privacyProtection.categories).toContain('secret');
         expect(JSON.stringify(source)).toBe(original);
     });
 

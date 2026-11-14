@@ -1893,12 +1893,17 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
     worker=context.serviceWorkers().find(ownWorker)||await context.waitForEvent('serviceworker',{predicate:ownWorker,timeout:30000});
     const extensionId=new URL(worker.url()).host;
     report.backgroundApiReadiness=[];
-    await wait(async()=>{
-        const state=await worker.evaluate(()=>({tabsGet:typeof globalThis.chrome?.tabs?.get==='function',storageGet:typeof globalThis.chrome?.storage?.local?.get==='function',runtimeId:globalThis.chrome?.runtime?.id??null}));
+    // 图片 wait 会读取内容脚本 UI；后台启动阶段尚未创建页面和 CDP，只用有界时钟轮询能力。
+    const backgroundApiDeadline=Date.now()+10000;
+    let backgroundApiReady=false;
+    while(Date.now()<backgroundApiDeadline){
+        const state=await worker.evaluate(function readMangaBackgroundApiState(){return {tabsGet:typeof globalThis.chrome?.tabs?.get==='function',storageGet:typeof globalThis.chrome?.storage?.local?.get==='function',runtimeId:globalThis.chrome?.runtime?.id??null};});
         const previous=report.backgroundApiReadiness.at(-1);
         if(!previous||JSON.stringify(previous.state)!==JSON.stringify(state))report.backgroundApiReadiness.push({at:Date.now(),state});
-        return state.tabsGet&&state.storageGet&&state.runtimeId===extensionId;
-    },10000);
+        if(state.tabsGet&&state.storageGet&&state.runtimeId===extensionId){backgroundApiReady=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,200));
+    }
+    assert.ok(backgroundApiReady,'Extension background APIs did not become ready before the startup deadline');
 
     popup=context.pages()[0];
     diagnostics?.setExtensionId(extensionId);

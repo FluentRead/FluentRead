@@ -69,7 +69,7 @@ Adjacent horizontal text on the same paper also checks actual glyph bounds and c
 
 Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Tightly cropped text on light tinted backgrounds also checks the background and glyphs, for example restoring `FIELDNOTE 12` to `FIELD NOTE 12`. Existing letters, digits and source bounds stay unchanged.
 
-Bright text on dark backgrounds also checks complete blank columns and model evidence when strokes touch the recognition crop edges, for example restoring `CHECKTHE OXYGEN` to `CHECK THE OXYGEN`. Existing spaces, characters and positions are preserved. Mixed colors, transparency, connected strokes or insufficient evidence retain the original recognition result.
+Bright text on dark backgrounds also checks complete blank columns and model evidence when strokes touch the recognition crop edges, for example restoring `CHECKTHE OXYGEN` to `CHECK THE OXYGEN`. Existing spaces, characters and positions are preserved. Mixed colors, uncertain backgrounds, connected strokes or insufficient evidence retain the original recognition result.
 
 Image translation also checks text detection evidence alongside recognition to reduce highlights, textures and decorative lines being mistaken for text.
 

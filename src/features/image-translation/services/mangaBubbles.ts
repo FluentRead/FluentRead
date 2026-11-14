@@ -2,6 +2,7 @@
  * @file src/features/image-translation/services/mangaBubbles.ts
  * 普通图片分组前先登记已采用的词界来历，再衔接物理行的段落证据，避免可靠空格修正打断同一对白。
  * 文件职责：从漫画像素定位封闭浅色气泡，让小字以局部高分辨率识别并排除绘画噪声。
+ * 注音归属：最多4096条原始识别结果复用唯一注音关系；浅底可信且未属其他气泡或白卡的读音，可跟随唯一正文进入大型气泡分组，原文、字号及清字物理框不变。
  * 主要内容：以扫描行四邻域填充亮色连通区域，按待处理行段增长轻量栈，不为整图预分配逐像素队列；最多二十四个小裁图参与局部识别，大型曲边浅底组件只提供保守内接区域且不增加推理；用上下边缘占比、行包络实心度、密度和面积界限排除大型矩形或多洞面板，行跨度数组按高度有界复用；同次扫描为大气泡记录最多一百二十八处内部独立浅色岛，超限撤回新增归属，仅排除完整落在岛内的物理框且不传输排除元数据；从已有原像素核对候选边缘浅底，成员绑定原 OCR 结果索引，角落与独立旁白维持原分组；按最小局部候选优先消除嵌套候选对同一物理行的重复，逐行以可靠局部识别替换重叠的全页结果，保留局部漏行与失败时的全页回退；漫画在最紧的所属气泡内合并局部及回退行并保留气泡外可靠旁白，整页仍按严格间距分组且只采纳同帧像素证实的额外续行；普通图片保留物理行供独立段落策略处理；漫画与图片均保留冲突数字证据并合并重复数字保护框。
  * 模块边界：纯像素和坐标算法，不创建 Canvas、不访问网络、不运行模型；气泡本身不作为文字证据，只有后续识别出的有效文本进入翻译。
  * 视图边界：原图 owner 可提供有界词界证明；只选择两个已观测原文中的一个并保留局部几何，实际去重接受后确认采用，并按每次分组的实际对象及唯一源框记录内部来历，与原 SDK 观测分离。缺失或失效证明沿用原局部优先规则，不从空白推造字符。
@@ -14,6 +15,7 @@ import {createMangaViewWordBoundaryConsumer,type MangaViewWordBoundaryProof} fro
 import type {ImageDetectionFrame} from './imageDetectionEvidence';
 import {bindImageParagraphGapEvidence,consumeImageParagraphGapEvidence,createImageParagraphGapConsumer,type ImageParagraphGapProof} from './imageParagraphGapEvidence';
 import {recordMangaBubblePlacement} from './mangaBubblePlacement';
+import {findImageRubyOwners} from '../ruby';
 type Box=MangaRegion['bbox'];
 export interface MangaLayoutOwner extends Box {exclusions?:Box[]}
 export interface MangaLayoutBubble {bbox:Box;members:number[]}
@@ -92,7 +94,7 @@ export function findMangaBubbleLayout(pixels:Uint8ClampedArray,width:number,heig
     return {recognition:candidates.sort((a,b)=>b.area-a.area).slice(0,24).map(item=>item.bbox),ownership};
 }
 
-/** 用已有原像素核对物理框边缘的浅底；仅输出原结果索引，不复制文字或向主线程发送行掩码。 */
+/** 用已有原像素核对物理框边缘的浅底；唯一附属注音可随正文归属，但不借走其他气泡或独立白卡的小字。仅输出原结果索引，不扩大清字范围。 */
 export function assignMangaLayoutBubbles(pixels:Uint8ClampedArray,width:number,height:number,owners:MangaLayoutOwner[],items:MangaOcrItem[]):MangaLayoutBubble[]{
     if(![width,height].every(value=>Number.isSafeInteger(value)&&value>0&&value<=8192)||width*height>16_777_216||pixels.length<width*height*4)return [];
     if(!owners.length)return [];
@@ -107,10 +109,27 @@ export function assignMangaLayoutBubbles(pixels:Uint8ClampedArray,width:number,h
         }
         return white>=9;
     });
-    return owners.flatMap(bbox=>{
-        const members=items.flatMap((item,index)=>supported[index]&&itemCenterInside(item,bbox)
-            &&!bbox.exclusions?.some(exclusion=>item.box.x>=exclusion.x0&&item.box.y>=exclusion.y0
-                &&item.box.x+item.box.width<=exclusion.x1&&item.box.y+item.box.height<=exclusion.y1)?[index]:[]);
+    const excluded=(item:MangaOcrItem,bbox:MangaLayoutOwner)=>bbox.exclusions?.some(exclusion=>item.box.x>=exclusion.x0&&item.box.y>=exclusion.y0
+        &&item.box.x+item.box.width<=exclusion.x1&&item.box.y+item.box.height<=exclusion.y1);
+    const memberships=owners.map(bbox=>items.flatMap((item,index)=>supported[index]&&itemCenterInside(item,bbox)&&!excluded(item,bbox)?[index]:[]));
+    // 内接矩形只表示大气泡中央的安全归属。注音可能在其上方，需复用完整物理行上的唯一关系。
+    // 独立限制新增转换规模；既有索引、像素取样和分组结果在超限时保持不变。
+    if(items.length<=4096){
+        const originalOwners=new Map<number,number[]>();
+        memberships.forEach((members,owner)=>members.forEach(index=>{
+            const values=originalOwners.get(index)??[];values.push(owner);originalOwners.set(index,values);
+        }));
+        const physical=items.flatMap((item,index)=>groupMangaText([item],'auto',width,height).map(line=>({...line,index})));
+        for(const [ruby,main] of findImageRubyOwners(physical)){
+            if(originalOwners.has(ruby.index)||!supported[ruby.index])continue;
+            const candidates=originalOwners.get(main.index);
+            if(candidates?.length!==1)continue;
+            const owner=candidates[0];
+            if(!excluded(items[ruby.index],owners[owner]))memberships[owner].push(ruby.index);
+        }
+    }
+    return owners.flatMap((bbox,index)=>{
+        const members=memberships[index].sort((a,b)=>a-b);
         return members.length?[{bbox:{x0:bbox.x0,y0:bbox.y0,x1:bbox.x1,y1:bbox.y1},members}]:[];
     });
 }

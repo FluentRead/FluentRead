@@ -391,6 +391,7 @@ export default defineConfig({
             // 本地隐私防护与七语设置：同环境 Chrome 基线 66,414,783 → 66,465,891 bytes（+51,108，敏感词字段兼容旧版清洗器）。
             // 仅增加规则、恢复协议和 UI，不新增模型/运行依赖；两平台预算各增加 55 kB。
             // 集成到最新 main 时保留图片排版已增加的预算，再叠加隐私防护的 55 kB。
+            // 大气泡注音归属在旧基线上仅增加 Chrome 492、Firefox 473 bytes；集成后先沿用最新主干余量，并重新实测。
             const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_314_000 : 66_112_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。

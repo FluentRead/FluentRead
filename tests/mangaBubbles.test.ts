@@ -218,6 +218,42 @@ describe('漫画局部气泡识别边界',()=>{
         expect(assignMangaLayoutBubbles(p,width,height,[box(70,70,20,20)],[item])).toEqual([]);
         for(const [w,h] of [[0,1],[8193,1],[4097,4097],[100,100]])expect(assignMangaLayoutBubbles(image(1,1),w,h,[bbox],[item])).toEqual([]);
     });
+    it('大气泡内接框上方的唯一注音随物理正文归属，保留原索引、字高与逐框擦除范围',()=>{
+        // 固定原图 multisize-margin-callouts 的实际 Paddle 框，注音中心高于保守内接框。
+        const width=1200,height=1400,p=image(width,height).fill(255),owner=box(250,276,601,279);
+        const items=[text('光を向けて育てる',499,192,43,367),text('ひかり',542,186,23,60),
+            text('小さな芽を見よう',659,191,40,366),text('め',703,322,23,27)];
+        const snapshot=structuredClone(items),pixels=p.slice();
+        const assigned=assignMangaLayoutBubbles(p,width,height,[owner],items);
+        expect(assigned).toEqual([{bbox:owner,members:[0,1,2,3]}]);
+        const [body]=collectMangaRegions({results:items,layoutBubbles:assigned},'ja',width,height);
+        expect(body.text).toBe('小さな芽を見よう光を向けて育てる');
+        expect(body.ruby?.map(value=>[value.text,value.fontSize])).toEqual([['め',27],['ひかり',23]]);
+        expect(body.sourceBoxes).toEqual([box(659,191,40,366),box(703,322,23,27),box(499,192,43,367),box(542,186,23,60)]);
+        expect(items).toEqual(snapshot);expect(p).toEqual(pixels);
+    });
+    it('注音不能从已有气泡、独立白卡或不可靠浅底借走，也不猜测多重归属',()=>{
+        const width=300,height=300,base=box(60,100,180,180),main=text('風の音を聞いて',100,20,40,250),ruby=text('かぜ',145,22,20,40);
+        const cases=[
+            {owners:[base,box(140,15,30,55)],items:[main,ruby],expected:[[0],[1]]},
+            {owners:[base,{...base}],items:[main,ruby],expected:[[0],[0]]},
+            {owners:[{...base,exclusions:[box(140,15,30,55)]}],items:[main,ruby],expected:[[0]]},
+            {owners:[base],items:[main,{...ruby,confidence:.3}],expected:[[0]]},
+            {owners:[base],items:[main,{...ruby,text:'LABEL'}],expected:[[0]]},
+            {owners:[base],items:[main,{...ruby,box:{...ruby.box,x:180}}],expected:[[0]]},
+            {owners:[base],items:[main,ruby,text('12',142,30,2,10)],expected:[[0]]},
+            {owners:[base],items:[main,ruby,{...main,text:'花の音'}],expected:[[0,2]]},
+            {owners:[box(200,100,90,180)],items:[main,ruby],expected:[]},
+        ];
+        for(const test of cases){
+            const p=image(width,height).fill(255);
+            expect(assignMangaLayoutBubbles(p,width,height,test.owners,test.items).map(value=>value.members),JSON.stringify(test)).toEqual(test.expected);
+        }
+        const dark=image(width,height).fill(255);rect(dark,width,145,22,20,40,[0,0,0,255]);
+        expect(assignMangaLayoutBubbles(dark,width,height,[base],[main,ruby]).map(value=>value.members)).toEqual([[0]]);
+        const crowded=[main,ruby,...Array.from({length:4095},()=>text('LABEL',250,10,20,10))];
+        expect(assignMangaLayoutBubbles(image(width,height).fill(255),width,height,[base],crowded).map(value=>value.members)).toEqual([[0]]);
+    });
     it('小于局部识别最小边的独立黑边白卡也不归属外层对白，不发送排除元数据',()=>{
         const width=500,height=500,p=image(width,height);
         for(let y=40;y<370;y++)for(let x=50;x<300;x++)if(((x-175)/125)**2+((y-205)/165)**2<1)p.set([255,255,255,255],(y*width+x)*4);

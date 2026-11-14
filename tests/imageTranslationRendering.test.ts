@@ -8,12 +8,63 @@ import {
     getImageSourceFontLimit,
     getImageSourceInkFontSize,
     getImageSourceTextStyle,
+    getImageSourceTypographyStyle,
     getImageSingleLineHeight,
     getImageRgbContrast,
     layoutImageTranslationText,
 } from '@/src/features/image-translation/services/rendering';
 
 const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+
+describe('倾角旁证的独立原文字号核对',()=>{
+    const source=()=>({text:'SOURCE WORDS',bbox:{x0:10,y0:10,x1:210,y1:70}});
+    const geometry=(line=source())=>({owner:line,sourceText:line.text,radians:-Math.PI/36,originX:110,originY:40,bounds:{x0:-50,y0:-7.5,x1:50,y1:7.5},width:100,height:15,count:1,heightGain:10});
+    const metric=(w=500,h=75)=>({width:w,actualBoundingBoxLeft:0,actualBoundingBoxRight:w,actualBoundingBoxAscent:h,actualBoundingBoxDescent:0});
+    it('原字宽高支持同一尺度时携带同源方向，不修改输入且只做一次原文度量',()=>{
+        const context=canvasContext(),line=source(),g=geometry(line),before=structuredClone({line,g});context.measureText.mockReturnValue(metric() as never);
+        const result=getImageSourceTypographyStyle(context as never,line,g)!;
+        expect(result.fontSize).toBeGreaterThan(19);expect(result.fontSize).toBeLessThan(20.1);expect(result.orientation).toBe(g);expect(result).not.toHaveProperty('inkBounds');
+        expect({line,g}).toEqual(before);expect(context.measureText).toHaveBeenCalledOnce();expect(context.restore).toHaveBeenCalledOnce();
+    });
+    it('像素量化区间只在旋转确实解释框高膨胀时采用，直立字形阶梯不可借此通过',()=>{
+        const context=canvasContext(),line=source(),g={...geometry(line),height:17,bounds:{x0:-50,y0:-8.5,x1:50,y1:8.5}};context.measureText.mockReturnValue(metric() as never);
+        expect(getImageSourceTypographyStyle(context as never,line,g)?.fontSize).toBeGreaterThan(20);
+        for(const heightGain of [0,-2,1])expect(getImageSourceTypographyStyle(context as never,line,{...g,heightGain})).toBeUndefined();
+        expect(getImageSourceTypographyStyle(context as never,line,{...g,height:30,bounds:{...g.bounds,y0:-15,y1:15}})).toBeUndefined();
+    });
+    it('多行同时检查未知断行空格的两端尺度，并保留经证实的行间距',()=>{
+        const context=canvasContext(),line={...source(),bbox:{x0:0,y0:0,x1:300,y1:120},sourceBoxes:[{x0:20,y0:10,x1:220,y1:50},{x0:20,y0:65,x1:220,y1:105}]},g={...geometry(line),originY:57.5,count:2,width:200,bounds:{x0:-50,y0:-35,x1:50,y1:35},linePitch:55};
+        context.measureText.mockImplementation(text=>metric(text===' '?20:1000,text===' '?0:75) as never);
+        expect(getImageSourceTypographyStyle(context as never,line,g)?.orientation?.linePitch).toBe(55);expect(context.measureText).toHaveBeenCalledTimes(2);
+        for(const space of [NaN,-1,1000,200]){context.measureText.mockImplementation(text=>metric(text===' '?space:1000,text===' '?0:75) as never);expect(getImageSourceTypographyStyle(context as never,line,g)).toBeUndefined();}
+    });
+    it('来源对象、原文快照和保护标记在任何原生字体度量之前检查',()=>{
+        const context=canvasContext(),line=source(),g=geometry(line);
+        expect(getImageSourceTypographyStyle(context as never,line,undefined)).toBeUndefined();expect(getImageSourceTypographyStyle(context as never,{...line},g)).toBeUndefined();
+        line.text='CHANGED';expect(getImageSourceTypographyStyle(context as never,line,g)).toBeUndefined();
+        for(const change of [{vertical:true as const},{ruby:[{text:'か',bbox:line.bbox}]},{guardOnly:true as const},{numericUncertain:true as const}]){const item={...source(),...change};expect(getImageSourceTypographyStyle(context as never,item,geometry(item))).toBeUndefined();}
+        expect(context.measureText).not.toHaveBeenCalled();
+    });
+    it('非法几何、越界中心、行数和间距不产生可绘制的方向样式',()=>{
+        const context=canvasContext(),line=source(),g=geometry(line);
+        for(const change of [
+            {bounds:undefined},{bounds:{...g.bounds,x0:NaN}},{bounds:{...g.bounds,x1:-50}},{bounds:{...g.bounds,y1:-7.5}},
+            {radians:0},{radians:Math.PI/2},{originX:NaN},{originX:5},{originX:215},{originY:5},{originY:75},
+            {count:0},{count:129},{count:1.5},{count:2},{height:0},{width:0},{height:1000},{width:1000},
+            {bounds:{...g.bounds,x1:1000}},{bounds:{...g.bounds,y1:1000}},
+            {linePitch:NaN},{linePitch:0},{linePitch:10},
+        ])expect(getImageSourceTypographyStyle(context as never,line,{...g,...change} as never)).toBeUndefined();
+        for(const bbox of [undefined,{...line.bbox,x1:10},{...line.bbox,y1:10},{...line.bbox,y1:Infinity}]){const item={...line,bbox:bbox!};expect(getImageSourceTypographyStyle(context as never,item,geometry(item))).toBeUndefined();}
+        const rows={...line,sourceBoxes:[line.bbox,line.bbox]};expect(getImageSourceTypographyStyle(context as never,rows,{...geometry(rows),count:2,linePitch:30})).toBeUndefined();
+        expect(context.measureText).not.toHaveBeenCalled();
+    });
+    it('缺失或无法解释源字形的指标保留未知；原生异常仍归还画布状态',()=>{
+        const context=canvasContext(),line=source(),g=geometry(line);
+        for(const [w,h]of [[0,75],[500,0],[NaN,75],[500,Infinity],[250,37.5],[1000,150]]){context.measureText.mockReturnValue(metric(w,h) as never);expect(getImageSourceTypographyStyle(context as never,line,g)).toBeUndefined();}
+        const failure=new Error('font context lost');context.measureText.mockImplementation(()=>{throw failure;});expect(()=>getImageSourceTypographyStyle(context as never,line,g)).toThrow(failure);
+        expect(context.save.mock.calls.length).toBe(context.restore.mock.calls.length);
+    });
+});
 
 describe('已观察源字形的独立字号核对',()=>{
     const source=()=>({text:'SOURCE WORDS',fontSize:40,bbox:{x0:10,y0:10,x1:210,y1:50}});
@@ -151,7 +202,7 @@ const measure = (text: string, fontSize: number) => Array.from(segmenter.segment
 
 function canvasContext() {
     const context = {
-        font: '', save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(),
+        font: '', save: vi.fn(), restore: vi.fn(), beginPath: vi.fn(), rect: vi.fn(), clip: vi.fn(), transform:vi.fn(),
         measureText: vi.fn((text: string) => ({width: measure(text, Number(context.font.match(/([\d.]+)px/)![1]))})),
         fillText: vi.fn(), strokeText: vi.fn(),
     };
@@ -161,6 +212,21 @@ function canvasContext() {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
 describe('图片译文排版与绘制', () => {
+    it('倾斜译文只在原世界坐标裁剪后变换，保存全部正文并在异常时恢复状态',()=>{
+        const source={text:'SOURCE',bbox:{x0:10,y0:20,x1:210,y1:100}},orientation={owner:source,sourceText:source.text,radians:-Math.PI/36,originX:110,originY:60,bounds:{x0:-80,y0:-10,x1:80,y1:10},width:160,height:20,count:1,heightGain:10};
+        const context=canvasContext();context.measureText.mockImplementation(text=>{const size=Number(context.font.match(/([\d.]+)px/)![1]);return {width:text.length*size*.6,actualBoundingBoxLeft:0,actualBoundingBoxRight:text.length*size*.6,actualBoundingBoxAscent:size*.8,actualBoundingBoxDescent:size*.2} as never;});
+        const draw=()=>drawTranslatedImageText(context as never,'完整译文',10,20,200,80,'white',20,'left',undefined,undefined,undefined,undefined,orientation);
+        draw();expect(context.transform).toHaveBeenCalledOnce();expect(context.clip.mock.invocationCallOrder[0]).toBeLessThan(context.transform.mock.invocationCallOrder[0]);expect(context.fillText.mock.calls.map(c=>c[0]).join('')).toBe('完整译文');expect(context.rect).toHaveBeenCalledWith(10,20,200,80);
+        const failure=new Error('native transform failed');context.transform.mockImplementation(()=>{throw failure;});expect(draw).toThrow(failure);expect(context.restore).toHaveBeenCalledTimes(2);
+    });
+    it('缺少真实指标、无效平面、过长正文或已有透明避让计划时不旋转',()=>{
+        const source={text:'SOURCE',bbox:{x0:10,y0:20,x1:210,y1:100}},orientation={owner:source,sourceText:source.text,radians:-Math.PI/36,originX:110,originY:60,bounds:{x0:-80,y0:-10,x1:80,y1:10},width:160,height:20,count:1,heightGain:10};
+        for(const mode of ['metrics','plane','long','prepared']){
+            const context=canvasContext(),text=mode==='long'?'A'.repeat(4097):'完整译文',g=mode==='plane'?{...orientation,originX:NaN}:orientation;
+            drawTranslatedImageText(context as never,text,10,20,200,80,'white',20,'left',mode==='prepared'?{lines:[text],fontSize:20,lineHeight:24}:undefined,undefined,undefined,undefined,g);
+            expect(context.transform).not.toHaveBeenCalled();expect(context.fillText.mock.calls.map(c=>c[0]).join('')).toBe(text);expect(context.restore).toHaveBeenCalledOnce();
+        }
+    });
     it.each(['left','center','right'] as const)('缩小后的%s译文按源墨迹边线与垂直中心定位，单行/换行都保留完整字形',align=>{
         for(const count of [1,2]){
             const context=canvasContext(),lines=Array(count).fill('TEXT'),height=count===1?21.2:51.2;

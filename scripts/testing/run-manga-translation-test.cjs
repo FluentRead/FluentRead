@@ -2027,7 +2027,10 @@ await import('./mangaInferenceWorker.real.js');self.removeEventListener('message
         const boxes=new WeakMap(),rect=CanvasRenderingContext2D.prototype.rect,draw=CanvasRenderingContext2D.prototype.fillText;
         CanvasRenderingContext2D.prototype.rect=function(x,y,width,height){boxes.set(this,{x,y,width,height});return rect.call(this,x,y,width,height);};
         CanvasRenderingContext2D.prototype.fillText=function(text,x,y,...args){
-            if(this.font.includes('Noto Sans')&&samples.length<1024)samples.push({text,x,y,font:this.font,direction:this.direction,fill:this.fillStyle,stroke:this.strokeStyle,lineWidth:this.lineWidth,canvas:{width:this.canvas.width,height:this.canvas.height},box:boxes.get(this)});
+            if(this.font.includes('Noto Sans')&&samples.length<1024){
+                const {a,b,c,d,e,f}=this.getTransform();
+                samples.push({text,x,y,font:this.font,direction:this.direction,textAlign:this.textAlign,textBaseline:this.textBaseline,transform:{a,b,c,d,e,f},fill:this.fillStyle,stroke:this.strokeStyle,lineWidth:this.lineWidth,canvas:{width:this.canvas.width,height:this.canvas.height},box:boxes.get(this)});
+            }
             return draw.call(this,text,x,y,...args);
         };
     })()`});

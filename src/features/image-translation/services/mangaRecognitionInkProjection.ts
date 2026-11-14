@@ -1,7 +1,8 @@
 /**
  * @file src/features/image-translation/services/mangaRecognitionInkProjection.ts
- * 文件职责：为抗锯齿残色连接字母的识别裁图提供两层相互核对的字形间隙。
+ * 文件职责：为抗锯齿残色或灰度起伏影响的识别裁图提供两层相互核对的字形间隙。
  * 主要内容：仅接收48像素高、完整不透明恒色外周的有界裁图；所有颜色必须能由同一实测墨色与底色混合得到。墨色差1/8和1/4两层须有相同的4–64个字形、逐项嵌套及同位置显著词隙；更弱1/16层只允许至多两个字形通过不超过两像素的词内抗锯齿连合，词隙仍须在该层为空。返回共同空列和前一字形序号；全部组件扫描预付共享余额。
+ * 灰度裁图：完整不透明、逐像素色差不超过16且左右边缘亮度至少220时，借用既有80/120/160灰度阈值核对字形；上下边缘允许紧裁字形，不要求整个气泡恒色。三层沿用相同组件与词隙约束，由调用方使用独立的页级额度。
  * 模块边界：只读既有RGBA，不运行模型、不创建Canvas、不猜词或改变字符；调用方仍须核对原SDK文本、CTC字符数量、唯一blank-run及空格峰。外周、颜色或两层对应不明时不提供旁证，不能用作清字蒙版。
  */
 import {getImageRgbContrast} from './rendering';
@@ -26,6 +27,35 @@ function significant(items:Band[]):Array<Band&{after:number}> {
     const sorted=[...gaps].sort((a,b)=>a.end-a.start-(b.end-b.start)||a.after-b.after),rank=new Map(sorted.map((gap,i)=>[gap,i]));
     const mid=Math.floor((gaps.length-1)/2);
     return gaps.filter(gap=>{const other=sorted[mid+(rank.get(gap)!<=mid?1:0)];return gap.end-gap.start>=2*(other.end-other.start)+1;});
+}
+
+function resolve(low:Uint8Array,middle:Uint8Array,high:Uint8Array,budget:MangaRecognitionInkBudget):MangaRecognitionInkProjection|undefined {
+    const lower=bands(low,budget);if(!lower)return;
+    const center=bands(middle,budget);if(!center||center.length<4||center.length>64)return;
+    const upper=bands(high,budget);if(!upper||upper.length!==center.length||upper.some((b,i)=>b.start<center[i].start||b.end>center[i].end))return;
+    const lowGaps=new Map<number,Band>();let cursor=0;
+    for(let i=0;i<lower.length;i++){
+        const first=cursor;while(cursor<center.length&&center[cursor].start<lower[i].end)cursor++;
+        if(cursor===first||cursor-first>2||(cursor-first===2&&center[cursor-1].start-center[first].end>2))return;
+        if(i+1<lower.length)lowGaps.set(cursor,{start:lower[i].end,end:lower[i+1].start});
+    }
+    // 强层字形包含于弱层；共同空列不能凭阈值切断真实连接。显著词隙至少三像素，不会被允许的两像素弱层连合吞掉。
+    const highGaps=new Set(significant(upper).map(gap=>gap.after)),gaps=significant(center).filter(gap=>highGaps.has(gap.after))
+        .map(gap=>({...lowGaps.get(gap.after)!,after:gap.after}));
+    return gaps.length?{characters:center.length,gaps}:undefined;
+}
+
+/** 非恒色中性底只提供字形空列，不能改写字母；调用方预付像素观察并在失败后保留组件扣费。 */
+export function observeMangaRecognitionNeutralProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget):MangaRecognitionInkProjection|undefined {
+    if(!Number.isSafeInteger(width)||width<8||width*48>262_144||!(data instanceof Uint8ClampedArray)||data.length!==width*48*4
+        ||!Number.isSafeInteger(budget.remaining)||budget.remaining<=0)return;
+    const low=new Uint8Array(width),middle=new Uint8Array(width),high=new Uint8Array(width);
+    for(let y=0;y<48;y++)for(let x=0;x<width;x++){
+        const p=(y*width+x)*4,r=data[p],g=data[p+1],b=data[p+2],value=Math.max(r,g,b);
+        if(data[p+3]!==255||value-Math.min(r,g,b)>16||((x===0||x===width-1)&&value<220))return;
+        if(value<=160)low[x]=1;if(value<=120)middle[x]=1;if(value<=80)high[x]=1;
+    }
+    return resolve(low,middle,high,budget);
 }
 
 /** 调用方预付两遍完整像素扫描；失败也不返还组件预算。 */
@@ -53,18 +83,5 @@ export function observeMangaRecognitionInkProjection(data:Uint8ClampedArray,widt
         const p=(y*width+x)*4,d=Math.max(Math.abs(data[p]-background[0]),Math.abs(data[p+1]-background[1]),Math.abs(data[p+2]-background[2]));
         if(d>=lowLevel)low[x]=1;if(d>=middleLevel)middle[x]=1;if(d>=highLevel)high[x]=1;
     }
-    const lower=bands(low,budget);if(!lower)return;
-    const center=bands(middle,budget);if(!center||center.length<4||center.length>64)return;
-    const upper=bands(high,budget);if(!upper||upper.length!==center.length||upper.some((b,i)=>b.start<center[i].start||b.end>center[i].end))return;
-    const lowGaps=new Map<number,Band>();let cursor=0;
-    for(let i=0;i<lower.length;i++){
-        const first=cursor;while(cursor<center.length&&center[cursor].start<lower[i].end)cursor++;
-        if(cursor===first||cursor-first>2||(cursor-first===2&&center[cursor-1].start-center[first].end>2))return;
-        if(i+1<lower.length)lowGaps.set(cursor,{start:lower[i].end,end:lower[i+1].start});
-    }
-    // 强层字形包含于弱层；保留所有层共同的弱层空列，不能凭阈值把真实连接切成词隙。
-    // 显著间隙至少三像素，不会被允许的两像素弱层连合吞掉，因此该序号一定有弱层空列。
-    const highGaps=new Set(significant(upper).map(gap=>gap.after)),gaps=significant(center).filter(gap=>highGaps.has(gap.after))
-        .map(gap=>({...lowGaps.get(gap.after)!,after:gap.after}));
-    return gaps.length?{characters:center.length,gaps}:undefined;
+    return resolve(low,middle,high,budget);
 }

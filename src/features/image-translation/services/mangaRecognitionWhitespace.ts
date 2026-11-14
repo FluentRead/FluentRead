@@ -8,14 +8,16 @@
  * argmax 仅观察原控制器与 SDK 有效前缀的并域，共同 padding 不再检查有限值；恢复域、数组长度、比例坐标及预算不变；
  * 推理前不保留 RGBA，收尾清除元数据，不接管 Tensor 或创建任何 Canvas/模型/重试。
  * 抗锯齿续证：恒色外周的原投影不足两处间隙时，另有262144像素观察面积、512组件与512时间步的页级余额，不占原路径额度；以同一实测墨色的双层字形和共同间隙复核。只有原SDK同字序、CTC数量及间隙字形序号均一致才补空格，不降低blank-run和空格峰门槛。
+ * 灰度续证：非恒色外周且原彩色投影没有墨迹时，允许上下紧裁的中性字形使用同等独立页级余额；不消耗恒色续证额度，不增加模型或画布读回，仍只补原字符之间的空格。
  * 模块边界：只给锁定的 per-box、原比例 SDK 路径提供可选文字后处理，不导入 SDK 私有解码器，不修改概率或原像素；
  * CTC 横坐标只是空间候选，不是字形或擦除边界，物理空隙仍不能证明作者的语义空格，真实异常由调用方保留首因。
  */
-import {observeMangaRecognitionInkProjection} from './mangaRecognitionInkProjection';
+import {observeMangaRecognitionInkProjection,observeMangaRecognitionNeutralProjection} from './mangaRecognitionInkProjection';
 
 export const MANGA_RECOGNITION_WHITESPACE_LIMITS=Object.freeze({
     pixels:2_000_000,cropPixels:262_144,height:48,crops:128,runs:4096,steps:2000,records:8192,classes:18710,
     inkPixels:262_144,inkRuns:512,inkSteps:512,
+    neutralPixels:262_144,neutralRuns:512,neutralSteps:512,
 });
 export interface MangaWhitespaceRun {
     boxes:readonly {width:number;height:number}[];batchSize:number;dictionary:readonly string[];
@@ -26,7 +28,7 @@ export interface MangaWhitespaceReceipt {
 }
 interface Gap {start:number;end:number;after?:number}
 export interface MangaTerminalPeriodEvidence {start:number;previousInkEnd:number}
-interface Projection {width:number;gaps:Gap[];characters?:number;terminalPeriod?:MangaTerminalPeriodEvidence}
+interface Projection {width:number;gaps:Gap[];characters?:number;neutral?:true;terminalPeriod?:MangaTerminalPeriodEvidence}
 interface Trace {indices:Uint32Array;spaces:Float32Array;valid:number;paddedWidth:number}
 
 /** @internal Pure, bounded edge-pixel classifier used by the OCR observer and its ambiguity regression. */
@@ -67,6 +69,7 @@ export function createMangaRecognitionWhitespace(){
     let active=false,signal:AbortSignal|undefined,scope:Scope|undefined;
     let crops=0,pixels=0,runs=0,steps=0;
     let inkPixels=0,inkRuns=0,inkSteps=0;
+    let neutralPixels=0,neutralRuns=0,neutralSteps=0;
     const current=()=>{if(!active||signal?.aborted){scope=undefined;return;}return scope;};
     const disable=()=>{scope=undefined;};
     function withTerminalPeriod(text:string,position:number|undefined,projection:Projection):string {
@@ -127,6 +130,11 @@ export function createMangaRecognitionWhitespace(){
                 // 恒色完整外周不含触碰右下边缘的裁切句点；保留非恒色分支原有句点处理。
                 if(supplemental)return{width,...supplemental};
             }
+            if(!flatBorder&&!edges.length&&neutralPixels+width*48*2<=limits.neutralPixels){
+                neutralPixels+=width*48*2;const budget={remaining:limits.neutralRuns-neutralRuns};
+                const supplemental=observeMangaRecognitionNeutralProjection(data,width,budget);neutralRuns=limits.neutralRuns-budget.remaining;
+                if(supplemental)return{width,...supplemental,neutral:true};
+            }
             return terminalPeriod?{width,gaps:[],terminalPeriod}:undefined;
         }
         const sorted=[...gaps].sort((a,b)=>(a.end-a.start)-(b.end-b.start)||a.index-b.index),rank=new Uint32Array(gaps.length);
@@ -186,7 +194,7 @@ export function createMangaRecognitionWhitespace(){
         return withTerminalPeriod(output,position,projection);
     }
     return{
-        beginPage(pageSignal?:AbortSignal){scope=undefined;signal=pageSignal;active=true;crops=pixels=runs=steps=inkPixels=inkRuns=inkSteps=0;},
+        beginPage(pageSignal?:AbortSignal){scope=undefined;signal=pageSignal;active=true;crops=pixels=runs=steps=inkPixels=inkRuns=inkSteps=neutralPixels=neutralRuns=neutralSteps=0;},
         beginRun(options:MangaWhitespaceRun){
             scope=undefined;
             if(!active||signal?.aborted||!options.supportedPerBox||!options.sourceRatioOne||options.boxes.length>limits.records
@@ -236,13 +244,14 @@ export function createMangaRecognitionWhitespace(){
                 ||dims[2]!==limits.classes||!Number.isSafeInteger(dims[0]*dims[1]*dims[2])){disable();return;}
             const T=dims[1];
             const canCapture=(index:number)=>{const projection=run.projections.get(index);return !!projection?.gaps.length
-                &&(projection.characters===undefined?steps+T<=limits.steps:inkSteps+T<=limits.inkSteps);};
+                &&(projection.characters===undefined?steps+T<=limits.steps:projection.neutral?neutralSteps+T<=limits.neutralSteps:inkSteps+T<=limits.inkSteps);};
             if(!batch.indices.some(canCapture))return;
             const data=output.data;
             if(!(data instanceof Float32Array)||data.length!==dims[0]*T*limits.classes){disable();return;}
             for(let row=0;row<batch.indices.length;row++){
                 const index=batch.indices[row];if(!canCapture(index))continue;
-                if(run.projections.get(index)!.characters===undefined)steps+=T;else inkSteps+=T;
+                const projection=run.projections.get(index)!;
+                if(projection.characters===undefined)steps+=T;else if(projection.neutral)neutralSteps+=T;else inkSteps+=T;
                 const trace=capture(data,row,T,batch.widths[row],batch.width);if(trace)run.traces.set(index,trace);
             }
         },

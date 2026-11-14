@@ -49,7 +49,7 @@ Ordinary rotated, scaled, mirrored and perspective images follow the page's nati
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
-On solid backgrounds, scaling can connect an English word and an identifier. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`. Existing letters, digits and source bounds stay unchanged.
+Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Existing letters, digits and source bounds stay unchanged.
 
 On a continuous gradient, neighboring lines with clearly different sizes and verified text colors retain separate regions. This helps preserve a heading and subtitle as distinct styles. Same-image context still follows the selected translation service and settings.
 

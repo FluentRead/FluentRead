@@ -3,7 +3,7 @@ import {describe,it,expect} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
-import {observeMangaRecognitionInkProjection as project} from '@/src/features/image-translation/services/mangaRecognitionInkProjection';
+import {observeMangaRecognitionInkProjection as project,observeMangaRecognitionNeutralProjection as neutral} from '@/src/features/image-translation/services/mangaRecognitionInkProjection';
 import {createMangaRecognitionWhitespace,MANGA_RECOGNITION_WHITESPACE_LIMITS as limits} from '@/src/features/image-translation/services/mangaRecognitionWhitespace';
 const BG=[240,180,100],INK=[40,30,80],C=18710;
 function frame(spans=[[10,26],[28,44],[46,62],[90,106],[108,124],[126,142]],width=160,background=BG,ink=INK){
@@ -116,6 +116,78 @@ describe('只补模型与物理字序共同支持的空格',()=>{
             const result=c.applyToSdkResults(raw);
             expect(result.map(r=>r.text)).toEqual(cohort.expected.map((r:any)=>r.text));expect(result.filter(r=>r.text==='ROUTE C4')).toHaveLength(1);
             expect(result.every((r,i)=>r.box===raw[i].box&&r.confidence===raw[i].confidence&&r.positions===raw[i].positions)).toBe(true);c.endRun();
+        }
+        c.endPage();expect(fixture.cohorts).toHaveLength(2);
+    });
+});
+
+function gray(spans?:number[][],width=160){
+    const f=frame(spans,width,[246,246,246],[25,25,25]);
+    f.data.set([247,247,247,255],0);f.paint(...f.spans[0] as [number,number],[25,25,25],0,48);return f;
+}
+describe('紧裁灰度字行的独立旁证',()=>{
+    it('灰度起伏和上下触边仍须由三层同字形支持，保持原像素',()=>{
+        const f=gray(),before=f.data.slice(),budget={remaining:512};
+        expect(neutral(f.data,f.width,budget)).toEqual({characters:6,gaps:[{start:62,end:90,after:3}]});expect(f.data).toEqual(before);expect(budget.remaining).toBe(494);
+        const c=createMangaRecognitionWhitespace();c.beginPage();const {source,result}=cycle(c,f);expect(result.text).toBe('ABC DEF');expect(result.box).toBe(source.box);expect(result.confidence).toBe(source.confidence);c.endPage();
+    });
+    it('透明、彩色、左右触边或阈值拆字均不提供灰度旁证',()=>{
+        for(const [x,y,color]of [[0,12,[219,219,219,255]],[159,20,[0,0,0,255]],[25,10,[30,30,30,254]],[25,10,[10,10,27,255]]] as const){
+            const f=gray();f.data.set(color,(y*f.width+x)*4);expect(neutral(f.data,f.width,{remaining:512})).toBeUndefined();
+        }
+        const weak=gray();weak.paint(28,44,[100,100,100]);expect(neutral(weak.data,weak.width,{remaining:512})).toBeUndefined();
+        const bridge=gray();bridge.paint(62,90,[150,150,150]);expect(neutral(bridge.data,bridge.width,{remaining:512})).toBeUndefined();
+    });
+    it('尺寸、像素类型和组件预算异常不进入观察',()=>{
+        const f=gray();for(const width of [0,7,8.5,NaN,5462])expect(neutral(f.data,width,{remaining:512})).toBeUndefined();
+        expect(neutral(new Uint8Array(f.data) as never,f.width,{remaining:512})).toBeUndefined();expect(neutral(f.data.subarray(4),f.width,{remaining:512})).toBeUndefined();
+        for(const remaining of [-1,NaN,.5,0,5,6,12]){const budget={remaining};expect(neutral(f.data,f.width,budget)).toBeUndefined();if(remaining>0&&Number.isInteger(remaining))expect(budget.remaining).toBe(0);}
+    });
+    it('模型字符数、字符身份和空格信号仍独立约束灰度字形',()=>{
+        for(const mode of ['count','script','peak','position','weak']){
+            const c=createMangaRecognitionWhitespace();c.beginPage();const dict=dictionary();let text='ABCDEF',value=tensor();
+            if(mode==='count'){value=tensor(20,[2,4,6,12,14]);text='ABCDE';}
+            if(mode==='script'){dict[1]='Ж';text='ЖBCDEF';}
+            if(mode==='peak')value=tensor(20,[2,4,6,12,14,16],7);
+            if(mode==='position')value=tensor(20,[2,12,13,14,15,16],9);
+            if(mode==='weak')value=tensor(20,[2,4,6,12,14,16],9,.0009);
+            expect(cycle(c,gray(),value,text,dict).result.text).toBe(text);c.endPage();
+        }
+    });
+    it('灰度像素与组件预算跨run累计，失败不返还，下一页恢复',()=>{
+        for(const f of [gray(),gray(Array.from({length:55},(_,i)=>{const x=5+i*6+(i>=25?20:0);return[x,x+4];}),380)]){
+            const c=createMangaRecognitionWhitespace();c.beginPage();let reads=0;
+            const output=()=>({dims:[1,1,C],get data(){reads++;return new Float32Array(C);}});
+            for(let i=0;i<24;i++)cycle(c,f,output());const expected=f.width===160?Math.floor(limits.neutralPixels/(160*48*2)):3;expect(reads).toBe(expected);
+            cycle(c,frame(),output());expect(reads).toBe(expected+1);
+            c.beginPage();cycle(c,f,output());expect(reads).toBe(expected+2);c.endPage();
+        }
+    });
+    it('灰度时间步耗尽不占原路径或恒色抗锯齿额度',()=>{
+        const c=createMangaRecognitionWhitespace();c.beginPage();let reads=0;
+        const output=()=>({dims:[1,256,C],get data(){reads++;return new Float32Array(256*C);}});
+        for(let i=0;i<3;i++)cycle(c,gray(),output());expect(reads).toBe(2);
+        cycle(c,frame(),output());expect(reads).toBe(3);
+        const original=frame([[10,26],[28,44],[90,106]]);original.paint(26,28,BG,8,9);cycle(c,original,output(),'ABC');expect(reads).toBe(4);c.endPage();
+    });
+    it('原生雨夜完整cohort恢复局部I SAVED，整页错误字母L保持原值',()=>{
+        const file=readFileSync(new URL('./fixtures/manga-whitespace-neutral-rain.json',import.meta.url));expect(file.length).toBeLessThan(500000);
+        expect(createHash('sha256').update(file).digest('hex')).toBe('b3fdbd650ae430d186159dcbba9ed7408abd6bdf2977e3b3cf31e57418c7201b');
+        const fixture=JSON.parse(file.toString()),manifest=readFileSync(new URL('./fixtures/manga-natural/manifest.json',import.meta.url));
+        expect(fixture.originalManifestSha256).toBe(createHash('sha256').update(manifest).digest('hex'));
+        const scene=JSON.parse(manifest.toString()).fixtures.find((s:any)=>s.name===fixture.sourceScene);expect(scene.expectedSource).toContain(fixture.expectedSource);expect(fixture.expectedSource).toBe('I SAVED YOU A SEAT.');expect(fixture.sourcePngSha256).toBe(scene.sha256);
+        const c=createMangaRecognitionWhitespace();c.beginPage();
+        for(const cohort of fixture.cohorts){
+            expect(cohort.reads).toHaveLength(cohort.batch.dims[0]);expect([...cohort.batch.readIndices].sort((a:number,b:number)=>a-b)).toEqual(cohort.originalReadIndices);expect(cohort.batch.observations.map((r:any)=>r.readIndex)).toEqual(cohort.batch.readIndices);
+            const boxes=cohort.reads.map((r:any)=>r.box),dict=Array(C).fill('');for(const [id,text]of cohort.batch.dictionary)dict[id]=text;
+            c.beginRun({boxes,batchSize:cohort.batch.dims[0],dictionary:dict,supportedPerBox:true,sourceRatioOne:true});
+            cohort.reads.forEach((r:any,i:number)=>{const raw=gunzipSync(Buffer.from(r.rgbaGzipBase64,'base64'),{maxOutputLength:r.width*48*4});expect(createHash('sha256').update(raw).digest('hex')).toBe(r.rgbaSha256);c.observeBorrowedRead(i,r.width,48,new Uint8ClampedArray(raw));});
+            const input={},batch=cohort.batch,data=new Float32Array(batch.dims.reduce((a:number,b:number)=>a*b,1));
+            batch.observations.forEach((row:any,n:number)=>row.statistics.forEach(([id,max,blank,space]:number[],t:number)=>{const p=(n*batch.dims[1]+t)*C;data[p]=blank;data[p+C-1]=space;data[p+id]=max;}));
+            c.bindInput(input,{readIndices:batch.readIndices.map((i:number)=>cohort.originalReadIndices.indexOf(i)),resizedWidths:batch.resizedWidths,paddedWidth:batch.paddedWidth,height:48});c.observeOutput(input,{dims:batch.dims,data});
+            const raw:Array<{text:string;box:object;confidence:number;positions?:readonly number[]}>=cohort.rawSdk.map((r:any)=>({...r,box:boxes[cohort.originalReadIndices.indexOf(r.originalReadIndex)]}));
+            const result=c.applyToSdkResults(raw);expect(result.map(r=>r.text)).toEqual(cohort.expected.map((r:any)=>r.text));
+            expect(result.every((r,i)=>r.text.replaceAll(' ','')===raw[i].text.replaceAll(' ','')&&r.box===raw[i].box&&r.confidence===raw[i].confidence&&r.positions===raw[i].positions)).toBe(true);c.endRun();
         }
         c.endPage();expect(fixture.cohorts).toHaveLength(2);
     });

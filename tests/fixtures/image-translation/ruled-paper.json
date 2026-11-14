@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "sourcePath": "tests/fixtures/manga-structures/photographed-perspective-note.png",
+  "sourcePngSha256": "cd39921f84b1b3f5176e823874951daab543061a2b7b5fcd4a8b8dad3e96b9e3",
+  "crop": {
+    "x": 218,
+    "y": 397,
+    "width": 676,
+    "height": 163
+  },
+  "width": 676,
+  "height": 163,
+  "line": {
+    "text": "钥匙在蓝色杯子下面，请在日落前回来。",
+    "sourceText": "THE KEY IS UNDER THE BLUE CUP PLEASE RETURN BEFORE SUNSET",
+    "bbox": {
+      "x0": 5,
+      "y0": 5,
+      "x1": 671,
+      "y1": 158
+    },
+    "fontSize": 82,
+    "sourceBoxes": [
+      {
+        "x0": 5,
+        "y0": 5,
+        "x1": 654,
+        "y1": 72
+      },
+      {
+        "x0": 17,
+        "y0": 76,
+        "x1": 671,
+        "y1": 158
+      }
+    ]
+  },
+  "files": {
+    "source": {
+      "file": "ruled-paper-source.rgba.gz",
+      "rgbaSha256": "4731106e0f9c092c8633b4576ff280744b245ade9ea61126bfc2a8740a37a042",
+      "gzipSha256": "e9ab56120280127ee3da7002233fb6f28734cc9ca4c1745704db874d36e904fa",
+      "bytes": 440752,
+      "compressedBytes": 57003
+    },
+    "reference": {
+      "file": "ruled-paper-reference.rgba.gz",
+      "rgbaSha256": "37c4cebb41076237e34e0185e68e9a5882a5a0ce8ce137330ae4c7a291c74665",
+      "gzipSha256": "2ffa81ef054b6d6592e15b61cc225f0e46b7d31f4b86f295d934efea4079a10f",
+      "bytes": 440752,
+      "compressedBytes": 5306
+    }
+  },
+  "provenance": {
+    "generatorPath": "scripts/testing/generate-manga-structure-fixtures.py",
+    "generatorSha256": "ae466f7a8c72346b4ff26c05ba15ee5d6db297201cad16edacb593095b747f21",
+    "pillowVersion": "12.3.0",
+    "allFiveOriginalPngsExactlyReproduced": true,
+    "referencePngSha256": "73b1556a8277671a249f8c48f0a1fad5f94725b5c5afe3bb147eb09266d5b074",
+    "referenceMethod": "Read-only snapshot of original paper before drawing text; apply identical original perspective warp. Original design, fonts, PNGs and manifest remain unchanged.",
+    "referenceUsedOnlyForEvaluation": true
+  }
+}

@@ -3,10 +3,12 @@
  * 文件职责：依据有效 OCR 文本框在像素缓冲区中修复原文字，保留修复区域以外的图像内容。
  * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；纯色边界省去队列，独立不透明矩形在完整边界符合平滑渐变时重建渐变，避免扩散造成条纹；共享渐变规划只在完整外周匹配且内部不含透明像素时冻结颜色，失败不写入，供漫画按原清字框复用；默认保留输入，也可显式复用调用方独占的像素缓冲。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
+ * 细线背景：在原纯色与渐变规则之后，按单次修补共享的预付面积预算验证细线背景；只在完整不透明蒙版内采用源线条与横截面计划，保留已确认背景，少量跨度外像素仍走原扩散；透明保护路径保持原样。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from './mangaAlphaProtection';
+import {IMAGE_RULED_REPAIR_LIMITS,planImageRuledTextRepair} from './ruledTextRepair';
 
 interface MaskRectangle {
     left: number;
@@ -98,11 +100,12 @@ export function inpaintTextRegions(
         .filter((rectangle): rectangle is MaskRectangle => rectangle !== undefined);
     if (rectangles.length === 0) return result;
 
-    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection);
+    const ruleBudget={remaining:IMAGE_RULED_REPAIR_LIMITS.pagePixels};
+    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection,ruleBudget);
     return result;
 }
 
-function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[], protection?: MangaAlphaProtection): void {
+function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[], protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number}): void {
     const bounds = rectangles.reduce(union);
     // 一像素已知边界保留原八邻域；触图边时不引入不存在的外围像素。
     const left = Math.max(0, bounds.left - 1), top = Math.max(0, bounds.top - 1);
@@ -167,6 +170,21 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
         && bounds.right < imageWidth && bounds.bottom < imageHeight) {
         const repair = planImageGradientRepair(result, imageWidth, left, top, width, height);
         if (repair) {repair(result); return;}
+    }
+
+    if(!protection){
+        const ruled=planImageRuledTextRepair(result,imageWidth,imageHeight,{left,top,width,height,mask},ruleBudget);
+        if(ruled){
+            for(let index=0;index<mask.length;index++){
+                if(mask[index]!==1||!ruled.kind[index])continue;
+                if(ruled.kind[index]===2){
+                    const offset=((Math.floor(index/width)+top)*imageWidth+index%width+left)*4;
+                    for(let channel=0;channel<3;channel++)result[offset+channel]=ruled.colors[index*3+channel];
+                }
+                mask[index]=0;maskedCount--;
+            }
+            if(maskedCount===0)return;
+        }
     }
 
     const queue = new Uint32Array(maskedCount);

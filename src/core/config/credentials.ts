@@ -2,11 +2,13 @@
  * @file src/core/config/credentials.ts
  *
  * 文件职责：定义配置中的敏感凭据边界，并提供从完整配置提取、解析、比较和清除凭据的纯函数。
+ * 隐私词：字段名保留 Secret 语义，使旧版未知字段清洗器也会排除该内容；新版本沿用独立凭据存储和备份权限。
  * 主要内容：列出敏感字段和专用存储契约，只提取自有凭据字段；使用迭代复制清洗深层对象、循环及重复引用，网站与局部区域规则按专用结构校验且移除未知字段，并按内容比较凭据，避免对象键顺序导致重复保存。
  * 模块边界：本文件属于 core 领域层，只定义规则、类型与纯转换；不直接读写浏览器存储、不发起网络请求、不挂载 Vue/WXT 入口，持久化、协议调用和界面编排分别由 services、providers 与 features 承担。
  */
 
 import type { Config } from './model';
+import {normalizePrivacyTerms} from '../privacy/policy';
 import {normalizeNativeAsrBaseUrl} from './nativeAsr';
 import {isSensitiveConfigKey} from './sensitiveKeys';
 import {normalizeApiKeys} from './apiKeys';
@@ -20,6 +22,7 @@ export const LOCAL_CREDENTIALS_STORAGE_KEY = 'local:credentials' as const;
 export const CREDENTIALS_SCHEMA_VERSION = 1 as const;
 
 export const CONFIG_CREDENTIAL_FIELDS = [
+    'privacyProtectionSecretTerms',
     'token',
     'apiKeys',
     'secret',
@@ -39,6 +42,7 @@ export type ConfigCredentialField = typeof CONFIG_CREDENTIAL_FIELDS[number];
 export type PublicConfig = Omit<Config, ConfigCredentialField>;
 
 export interface ConfigCredentials {
+    privacyProtectionSecretTerms: string[];
     schemaVersion: typeof CREDENTIALS_SCHEMA_VERSION;
     token: Record<string, string>;
     apiKeys: Record<string, string[]>;
@@ -113,6 +117,7 @@ export function extractConfigCredentials(value: unknown): ConfigCredentials {
     const source = isRecord(value) ? value : {};
     return {
         schemaVersion: CREDENTIALS_SCHEMA_VERSION,
+        privacyProtectionSecretTerms: normalizePrivacyTerms(ownCredentialValue(source, 'privacyProtectionSecretTerms')),
         token: stringMapping(ownCredentialValue(source, 'token')),
         apiKeys: normalizeApiKeys(ownCredentialValue(source, 'apiKeys')),
         secret: stringMapping(ownCredentialValue(source, 'secret')),
@@ -139,7 +144,7 @@ export function hasCredentialFields(value: unknown): boolean {
 }
 
 export function hasCredentialData(value: ConfigCredentials): boolean {
-    return Object.keys(value.token).length > 0
+    return value.privacyProtectionSecretTerms.length > 0 || Object.keys(value.token).length > 0
         || Object.keys(value.apiKeys).length > 0
         || Object.keys(value.secret).length > 0
         || Object.keys(value.customHeaders).length > 0

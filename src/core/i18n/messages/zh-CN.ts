@@ -6,6 +6,7 @@
  * 现有中文用户在切换或升级配置后仍看到兼容文案；共享七语目录只引用可独立裁剪的中文常量。
  * 模块边界：资源只描述扩展自己的界面文本；翻译服务的源文本、目标文本和用户内容不属于这里。
  */
+import {privacyProtectionChineseMessages} from './privacyProtection';
 import videoLearningText from './video-learning/zh-CN.json';
 import selfHelpText from './self-help/zh-CN.json';
 import {compositeTranslationChineseMessages} from './compositeTranslation';
@@ -563,6 +564,7 @@ export const zhCNMessages = {
     "settings.requestLimits.globalTitle": "请求限制",
     "settings.requestLimits.globalHelp": "未单独设置的服务和模型共用这些限制",
     ...aiRequestTimeoutChineseMessages,
+    ...privacyProtectionChineseMessages,
     ...selectionDictionaryChineseMessages,
     ...sectionTranslationRulesChineseMessages,
     "settings.requestLimits.retryIntervals": "重试间隔",

@@ -80,7 +80,7 @@ describe('Google Drive 完整快照和安全合并', () => {
     it('拒绝不完整快照、恶意原型字段和复杂树', () => {
         const fixture = complete();
         for (const invalid of [null, [], {}, {format: 'fluentread-complete-config', version: 2, config: fixture}, {format: 'fluentread-complete-config', version: 1, config: {}}, {format: 'fluentread-complete-config', version: 1, config: {...fixture, token: undefined, on: null}}]) expect(() => parseDriveSyncPayload(invalid)).toThrow();
-        for (const field of CONFIG_CREDENTIAL_FIELDS) {const missing = {...fixture}; delete missing[field]; expect(() => parseDriveSyncPayload(driveSyncPayload(missing))).toThrow('完整');}
+        for (const field of CONFIG_CREDENTIAL_FIELDS.filter(field => field !== 'privacyProtectionSecretTerms')) {const missing = {...fixture}; delete missing[field]; expect(() => parseDriveSyncPayload(driveSyncPayload(missing))).toThrow('完整');}
         const malicious = JSON.parse('{"future":{"__proto__":{"polluted":true}}}');
         expect(() => toDriveSyncConfig({...fixture, ...malicious})).toThrow('无效字段');
         let deep: unknown = 1;
@@ -88,6 +88,15 @@ describe('Google Drive 完整快照和安全合并', () => {
         expect(() => toDriveSyncConfig({...fixture, deep})).toThrow('复杂');
         expect(() => toDriveSyncConfig({...fixture, huge: Array.from({length: 50_001}, () => 0)})).toThrow('复杂');
         expect({}).not.toHaveProperty('polluted');
+    });
+    it('旧完整备份可缺省新增的隐私词，普通备份同步策略但排除自定义敏感词', () => {
+        const fixture = complete({privacyProtection: {enabled: true, mode: 'mask', categories: ['email']}, privacyProtectionSecretTerms: ['内部示例']});
+        const legacy = {...fixture}; delete legacy.privacyProtectionSecretTerms;
+        expect(parseDriveSyncPayload(driveSyncPayload(legacy)).privacyProtectionSecretTerms).toEqual([]);
+        const ordinary = projectDriveSyncConfig(fixture);
+        expect(ordinary.privacyProtection).toEqual(fixture.privacyProtection);
+        expect(JSON.stringify(ordinary)).not.toContain('内部示例');
+        expect(restoreDriveSyncSettings(fixture, ordinary).privacyProtectionSecretTerms).toEqual(['内部示例']);
     });
     it('按共同基线自动选择单边修改，并要求显式解决双方冲突', () => {
         const base = {to: 'en', theme: 'light', future: {a: 1, b: 2}, list: [1, 2]};

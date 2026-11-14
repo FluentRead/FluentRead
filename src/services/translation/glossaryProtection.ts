@@ -61,7 +61,7 @@ export function prepareGlossaryRequest(message: TranslationRequestMessage, curre
             restore: (result: unknown) => terms.restore(literals.restore(result))};
     });
     const tokens = Object.freeze(packets.flatMap(packet => packet.tokens));
-    const providerConfig = Object.freeze({...current, glossaryProtectedTokens: tokens});
+    const providerConfig = Object.freeze({...current, glossaryProtectedTokens: Object.freeze([...(current.glossaryProtectedTokens ?? []), ...tokens])});
     return {
         message: attachTranslationProviderConfig({...message,
             origin: Array.isArray(message.origin) ? packets.map(packet => packet.text) : packets[0].text,

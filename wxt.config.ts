@@ -388,11 +388,12 @@ export default defineConfig({
             // 分别增加3,226和3,170bytes，使用现有余量后各增加3kB门槛；没有新增模型或依赖，课程预算不变。
             // 倾角与完整旋转字形适配使 Chrome 从66,418,853增至66,429,276bytes，Firefox 从66,072,535增至66,082,844bytes，仅 offscreen 代码改变。
             // 分别增加10,423和10,309bytes，使用现有余量后门槛分别增加11kB和10kB；没有新增模型或依赖，课程预算不变。
-            // 大气泡注音归属使 Chrome 从66,429,404增至66,429,896bytes，Firefox 从66,082,972增至66,083,445bytes，仅 offscreen 和推理 Worker 代码改变。
-            // 分别增加492和473bytes；Chrome 沿用现有余量，Firefox 门槛增加1kB，没有新增模型或依赖，课程预算不变。
-            // 完整纯色文字修补证明使 Chrome 从66,429,896增至66,434,266bytes，Firefox 从66,083,445增至66,087,817bytes，仅 offscreen 和推理 Worker 代码改变。
-            // 分别增加4,370和4,372bytes，利用现有余量后门槛分别增加5kB和4kB；没有新增模型或依赖，课程预算不变。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_264_000 : 66_062_000;
+            // 本地隐私防护与七语设置：同环境 Chrome 基线 66,414,783 → 66,465,891 bytes（+51,108，敏感词字段兼容旧版清洗器）。
+            // 仅增加规则、恢复协议和 UI，不新增模型/运行依赖；两平台预算各增加 55 kB。
+            // 集成到最新 main 时保留图片排版已增加的预算，再叠加隐私防护的 55 kB。
+            // 大气泡注音归属在旧基线上仅增加 Chrome 492、Firefox 473 bytes；集成后先沿用最新主干余量，并重新实测。
+            // 纯色文字修补在旧基线上增加 Chrome 4,370、Firefox 4,372 bytes；先以最新主干门槛实测合并产物。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_314_000 : 66_112_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

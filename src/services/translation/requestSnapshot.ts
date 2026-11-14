@@ -31,6 +31,7 @@ export type {TrustedTranslationGlossaryContext} from './types';
 import {normalizeFreeTranslationOrder, normalizeFreeTranslationMode} from '@/src/core/config/freeTranslation';
 import {normalizeApiKeyRecoveryMs} from '@/src/core/config/scheduling';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
+import {normalizePrivacyPolicy, normalizePrivacyTerms} from '@/src/core/privacy/policy';
 import {normalizeDisabledTranslationServices} from '@/src/core/config/serviceAvailability';
 import type {CustomOpenAIProvider} from '@/src/core/config/customOpenAI';
 import type {CompositeTranslationProvider} from '@/src/core/config/compositeTranslation';
@@ -406,6 +407,9 @@ export function createTranslationProviderConfigSnapshot(
     };
     return Object.freeze({
         ...providerSource,
+        privacyProtection: Object.freeze({...normalizePrivacyPolicy(source.privacyProtection),
+            categories: Object.freeze(normalizePrivacyPolicy(source.privacyProtection).categories)}),
+        privacyProtectionSecretTerms: Object.freeze(normalizePrivacyTerms(source.privacyProtectionSecretTerms)),
         disabledTranslationServices: Object.freeze(normalizeDisabledTranslationServices(source.disabledTranslationServices)),
         aiRequestTimeoutMs: normalizeAiRequestTimeoutMs(source.aiRequestTimeoutMs),
         freeTranslationOrder: Object.freeze(normalizeFreeTranslationOrder(source.freeTranslationOrder)),

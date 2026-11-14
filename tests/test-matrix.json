@@ -551,7 +551,8 @@
       "tests/pdfSourceOcrSuggestion.test.ts",
       "tests/pdfSourceRecoveryWorkflow.test.ts",
       "tests/videoCourseCaptions.test.ts",
-      "tests/imageFlatTextRepair.test.ts"
+      "tests/imageFlatTextRepair.test.ts",
+      "tests/privacyProtection.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -926,7 +927,9 @@
       "tests/sidepanelBootstrap.test.ts",
       "tests/sidepanelApp.test.ts",
       "tests/imageMatteAvailability.test.ts",
-      "tests/videoCourseFrame.test.ts"
+      "tests/videoCourseFrame.test.ts",
+      "tests/translationPrivacy.test.ts",
+      "tests/privacySettingsLifecycle.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

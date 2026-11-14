@@ -6,6 +6,7 @@
  * 并保留参数化旧文案的安全回退，支持后续翻译者继续补齐未 key 化区域。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入、提示词或翻译结果。
  */
+import {privacyProtectionEnglishMessages} from './privacyProtection';
 import videoLearningText from './video-learning/en-US.json';
 import selfHelpText from './self-help/en-US.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -568,6 +569,7 @@ export const enUSMessages = {
     "settings.requestLimits.globalTitle": "Request limits",
     "settings.requestLimits.globalHelp": "Services and models without custom settings share these limits.",
     ...aiRequestTimeoutMessages["en-US"],
+    ...privacyProtectionEnglishMessages,
     ...selectionDictionaryMessages["en-US"],
     ...sectionTranslationRulesEnglishMessages,
     "settings.requestLimits.retryIntervals": "Retry intervals",

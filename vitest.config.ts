@@ -74,6 +74,7 @@ export default defineConfig({
         resolve(__dirname, 'src/features/self-help/ui/DiagnosticNotice.vue'),
         resolve(__dirname, 'src/features/translation-center/ui/TranslationCenter.vue'),
         resolve(__dirname, 'src/features/settings/ui/SettingsSections.vue'),
+        resolve(__dirname, 'src/features/settings/ui/PrivacyProtectionSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/components/SettingsDisclosure.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/CustomOpenAIProviderDialog.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/CompositeTranslationFields.vue'),

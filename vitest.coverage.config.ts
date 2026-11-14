@@ -18,6 +18,12 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/core/i18n/messages/privacyProtection.ts',
+                'src/core/privacy/policy.ts',
+                'src/core/privacy/detect.ts',
+                'src/core/privacy/session.ts',
+                'src/services/translation/privacyProtection.ts',
+                'src/features/settings/ui/PrivacyProtectionSettings.vue',
                 'src/app/background/toolbarActionRuntime.ts',
                 'src/features/settings/ui/components/ToolbarClickSetting.vue',
                 'src/ui/confirmExport.ts',

@@ -379,7 +379,6 @@ export function normalizeVideoCaptionText(value: string): string {
   return value.replace(/[\s\u3000]+/g, ' ').trim();
 }
 
-
 function getVideoCaptionPrefixProgress(visibleSource: string, fullSource: string): number | null {
   const visible = normalizeVideoCaptionText(visibleSource);
   const full = normalizeVideoCaptionText(fullSource);

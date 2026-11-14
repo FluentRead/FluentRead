@@ -86,8 +86,21 @@ describe('原蒙版内的纯色文字独立修补证据',()=>{
         const single=fixture();single.rect(50,15,30,30,single.background);expect(plan(single)).toBeUndefined();
         const art=fixture();art.rect(20,20,14,20);art.rect(55,20,14,20);expect(plan(art)).toBeUndefined();
     });
-    it.each([[10,20],[20,10],[89,20],[20,49]])('接触蒙版边缘的墨迹不能在%s,%s被截断',(x,y)=>{
+    it.each([[10,20],[20,10],[89,20],[20,49]])('孤立边缘墨迹在%s,%s仍不足以证明完整字形',(x,y)=>{
         const f=fixture();f.point(x,y);expect(plan(f)).toBeUndefined();
+    });
+    it.each([[10,20,55,20],[76,20,20,20],[20,10,55,20],[20,30,55,20]])('完整外周与字形尺度共同支持贴边组件：%j',(x,y,otherX,otherY)=>{
+        const f=fixture();f.rect(10,10,80,40,f.background);f.glyph(x,y);f.glyph(otherX,otherY);
+        const before=f.pixels.slice(),repair=plan(f);expect(repair).toBeTypeOf('function');
+        const output=before.slice();repair!(output);
+        for(let yy=0;yy<f.height;yy++)for(let xx=0;xx<f.width;xx++){
+            const at=(yy*f.width+xx)*4;
+            expect(Array.from(output.subarray(at,at+4))).toEqual(xx>=10&&xx<90&&yy>=10&&yy<50?[...f.background,255]:Array.from(before.subarray(at,at+4)));
+        }
+        expect(f.pixels).toEqual(before);
+    });
+    it.each([[9,20],[20,9],[90,20],[20,50]])('外周仍有墨迹时%s,%s不允许贴边修补',(x,y)=>{
+        const f=fixture();f.glyph(10,20);f.point(x,y);const before=f.pixels.slice();expect(plan(f)).toBeUndefined();expect(f.pixels).toEqual(before);
     });
     it('每个组件须有实心墨迹，跨行大图案和过长连接字形不猜测',()=>{
         const weak=fixture();weak.point(80,20,weak.background.map((v,c)=>Math.round(v+(weak.foreground[c]-v)*.25)));expect(plan(weak)).toBeUndefined();

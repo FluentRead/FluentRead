@@ -3,6 +3,7 @@
  * 文件职责：在原有物理清字框内独立验证纯色底与单一墨色字形，避免紧框边缘误采到原字后让模型生成色带。
  * 主要内容：完整不透明外周须为同一颜色，内部每个非底色像素须符合共同高对比墨色的抗锯齿混合；八邻域组件须有实心墨迹、符合原字号尺度，且至少两个组件的包围框内有足够空隙。单框最多65536像素、512种非底色和256个组件，先扣除调用方整页预算；成功计划只写原清字框，不保留源像素引用。
  * 模块边界：纯像素验证，不猜测图中文字、不调用模型，也不把只读样式观察当作清字授权；沿用调用方已有OCR物理框，混色、纹理、透明、孤立浅色、连通大图案和不足证据均不产生计划。
+ * 贴边完整性：已验证的完整同色外周排除连通笔画被框边截断；组件只有同时达到字号尺度与包围框空隙要求时才可触及原蒙版边缘，孤立边点仍拒绝，不扩张清字范围。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import {getImageRgbContrast} from './rendering';
@@ -66,8 +67,12 @@ export function planImageFlatTextRepair(pixels:Uint8ClampedArray,imageWidth:numb
             }
         }
         const w=right-left+1,h=bottom-top+1,cross=vertical?w:h,along=vertical?h:w;
-        if(!strong||left===0||top===0||right===width-1||bottom===height-1||cross>fontSize*1.5||along>fontSize*3)return;
-        if(tail<w*h*.85&&cross>=fontSize*.5&&along>=fontSize*.25)shaped++;
+        const glyph=tail<w*h*.85&&cross>=fontSize*.5&&along>=fontSize*.25;
+        // The full outside ring has already proved no connected ink continues
+        // beyond this mask. Edge noise still needs the same glyph-scale evidence.
+        if(!strong||cross>fontSize*1.5||along>fontSize*3
+            ||(left===0||top===0||right===width-1||bottom===height-1)&&!glyph)return;
+        if(glyph)shaped++;
     }
     if(shaped<2)return;
     const length=pixels.length;

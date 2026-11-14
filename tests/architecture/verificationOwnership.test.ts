@@ -156,6 +156,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path === 'scripts/generate-userscript-language-data.mjs'
         // 固定 Unicode 源、全标量集合对照与离线再生成检查由图片排版专项负责。
         || path === 'scripts/generate-image-grapheme-space-data.mjs'
+        || path === 'scripts/generate-image-line-punctuation-data.mjs'
         || path === 'scripts/build-userscript-standalone.mjs'
         || path === 'scripts/build-userscript-greasyfork.mjs'
         || path === 'scripts/verify-userscript-build.mjs'

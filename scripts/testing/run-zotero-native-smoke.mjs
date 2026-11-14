@@ -196,10 +196,20 @@ async function probe(config) {
         if (config.liveMicrosoft) {
             try {
                 [...workspace.document.querySelectorAll('button')].find(button => button.textContent === '翻译设置').click();
-                const service = await waitFor(() => workspace.document.querySelector('select[aria-label="翻译服务"]'), 'live service setting');
-                service.value = 'microsoft'; service.dispatchEvent(new workspace.Event('change', {bubbles:true}));
-                const target = workspace.document.querySelector('select[aria-label="译文"]');
-                target.value = 'zh-Hans'; target.dispatchEvent(new workspace.Event('change', {bubbles:true}));
+                const choose = async (label, optionLabel) => {
+                    const control = await waitFor(() => {
+                        const title = [...workspace.document.querySelectorAll('label[for]')].find(element => element.textContent === label);
+                        return title && workspace.document.getElementById(title.getAttribute('for'));
+                    }, label);
+                    control.click();
+                    const option = await waitFor(() => {
+                        const menu = workspace.document.getElementById(control.getAttribute('aria-controls'));
+                        return [...(menu?.querySelectorAll('[role="option"]') ?? [])].find(element => element.textContent === optionLabel);
+                    }, optionLabel);
+                    option.click();
+                };
+                await choose('翻译服务', '微软翻译 · 无需密钥');
+                await choose('译文', '简体中文');
                 workspace.FluentReadWorkspace.receive({selection:{attachmentID:attachment.id,text:'A reproducible experiment should describe its methods clearly.',page:1}});
                 const translate = await waitFor(() => [...workspace.document.querySelectorAll('button')].find(button => button.textContent === '翻译选中文字'), 'live selection action');
                 translate.click();

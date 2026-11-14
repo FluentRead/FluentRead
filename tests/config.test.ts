@@ -3,8 +3,9 @@ import { reactive } from 'vue';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import * as ts from 'typescript';
-import { Config, normalizeConfig } from '@/src/core/config/model';
-import {LEGACY_DEFAULT_USER_ROLES, options} from '@/src/core/config/catalog';
+import {Config, normalizeConfig} from '@/src/core/config/model';
+import {configPatchValuesEqual, createConfigPatch} from '@/src/core/config/mutations';
+import {defaultOption, defaultModelIds, LEGACY_DEFAULT_USER_ROLES, options} from '@/src/core/config/catalog';
 import {GLOSSARY_LIMITS} from '@/src/core/glossary';
 describe('工具栏点击行为配置', () => {
     it('旧配置保持打开面板，显式翻译偏好可导入导出且不影响悬浮球', () => {
@@ -54,6 +55,73 @@ describe('翻译服务启用状态配置', () => {
         expect(normalized.service).not.toBe('openai');
         expect(normalized.disabledTranslationServices).not.toContain(normalized.service);
         expect(normalizeConfig(JSON.parse(JSON.stringify(normalized))).disabledTranslationServices).toEqual(normalized.disabledTranslationServices);
+    });
+    it('旧配置中的服务引用与平台设置保留对应服务', () => {
+        const service = 'runcrate';
+        const selectedFields = [
+            'service', 'hoverTranslationService', 'selectionTranslationService', 'imageTranslationService',
+            'documentService', 'videoService', 'areaTranslationService', 'inputBoxTranslationService',
+        ];
+        const references: Record<string, unknown>[] = [
+            ...selectedFields.map(field => ({[field]: service})),
+            {harness: {service}},
+            {writing: {service}},
+            {favoriteServices: [service]},
+            {translationCenterServices: [service]},
+            {quickTranslationProfiles: [{service}]},
+            {compositeTranslationProviders: [{id: 'composite:fixture', name: 'fixture', services: [service, 'google'], strategy: 'sequential', timeoutMs: 12000}]},
+        ];
+        const platformSettings: Record<string, unknown>[] = [
+            {secret: {[service]: 'fixture-secret'}},
+            {proxy: {[service]: 'https://proxy.example/v1'}},
+            {customModel: {[service]: 'fixture-model'}},
+            {customBody: {[service]: '{"fixture":true}'}},
+            {customHeaders: {[service]: '{"X-Fixture":"yes"}'}},
+            {serviceRegion: {[service]: 'fixture-region'}},
+            {apiKeys: {[service]: ['fixture-key']}},
+            {customModels: {[service]: ['fixture-model']}},
+            {model: {[service]: 'fixture-model'}},
+            {modelThinking: {[service]: {fixture: true}}},
+            {serviceRequestLimits: {[service]: {fixture: 1}}},
+            {modelRequestLimits: {[service]: {fixture: 1}}},
+            {modelVision: {[service]: {fixture: true}}},
+            {apiKeyRotationEnabled: {[service]: true}},
+            {system_role: {[service]: 'fixture system prompt'}},
+            {user_role: {[service]: 'fixture user prompt'}},
+        ];
+        for (const settings of [...references, ...platformSettings]) {
+            expect(normalizeConfig({disabledTranslationServices: [], ...settings}).disabledTranslationServices).not.toContain(service);
+        }
+    });
+    it('旧默认值、空值和其他服务的设置不会误判为目标服务配置', () => {
+        const service = 'runcrate';
+        const unconfigured: Record<string, unknown>[] = [
+            {harness: 'invalid'}, {writing: []}, {writing: {service: 'google'}},
+            {favoriteServices: ['google']}, {translationCenterServices: ['google']},
+            {quickTranslationProfiles: [null, [], {service: 'google'}]},
+            {compositeTranslationProviders: [null, {}, {services: ['google']}]},
+            {token: {[service]: '  '}}, {secret: {[service]: ''}}, {proxy: {[service]: ''}},
+            {customModel: {[service]: ''}}, {customBody: {[service]: ''}}, {customHeaders: {[service]: ''}},
+            {serviceRegion: {[service]: ''}}, {apiKeys: {[service]: ['', '  ']}},
+            {customModels: {[service]: []}}, {model: {[service]: defaultModelIds[service as keyof typeof defaultModelIds]}},
+            {modelThinking: {[service]: {}}}, {serviceRequestLimits: {[service]: {}}},
+            {modelRequestLimits: {[service]: {}}}, {modelVision: {[service]: {}}},
+            {apiKeyRotationEnabled: {[service]: false}}, {system_role: {[service]: defaultOption.system_role}},
+            {user_role: {[service]: defaultOption.user_role}},
+        ];
+        for (const settings of unconfigured) {
+            expect(normalizeConfig({disabledTranslationServices: [], ...settings}).disabledTranslationServices).toContain(service);
+        }
+    });
+});
+
+describe('配置补丁中的迁移标记保护', () => {
+    it('忽略对后台迁移标记的补丁，并比较重复引用的对象图', () => {
+        const current = new Config();
+        const patch = createConfigPatch({service: 'google', aiPlatformDefaultRemovalMigrated: false}, current, false, new Set(Object.keys(current)));
+        expect(patch).toEqual({service: 'google'});
+        const shared = {};
+        expect(configPatchValuesEqual({first: shared, second: shared}, {first: {}, second: {}})).toBe(true);
     });
 });
 

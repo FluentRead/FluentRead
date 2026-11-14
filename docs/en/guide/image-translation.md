@@ -33,6 +33,8 @@ When the last line of a short paragraph is much shorter than the others, line wi
 
 Ordinary images use the actual glyph bounds of your device's fonts to reduce clipping of accents, ascenders and descenders. Merged Tesseract vertical text keeps each column's erasure bounds, preserving artwork between columns. For opaque text regions whose complete boundary matches a smooth gradient, ordinary image and manga repair continue that gradient. Complex textures or translucent backgrounds may still show repair artifacts; switch to the original to compare.
 
+For fine ruled paper in ordinary images, repair preserves the background and fills line segments hidden by text when the source supports consistent direction, spacing and color. This reduces broad smudges. Dashed lines, crossing patterns, curved textures and uncertain regions keep the existing repair method.
+
 Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.
 
 On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.

@@ -347,6 +347,7 @@
       "tests/imageTextSegmentation.test.ts",
       "tests/imageMattePage.test.ts",
       "tests/imageTranslationInpainting.test.ts",
+      "tests/imageRuledTextRepair.test.ts",
       "tests/videoTranscriptionCacheClient.test.ts",
       "tests/xCaptionSource.test.ts",
       "tests/siteAdaptationCore.test.ts",

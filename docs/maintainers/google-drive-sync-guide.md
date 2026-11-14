@@ -57,6 +57,16 @@ FluentRead 直接把配置保存到**每位用户自己的 Google Drive**。开�
 
 ## 3 从用户点击到云端保存
 
+### 浏览器支持边界
+
+当前原生授权仅支持桌面版 Google Chrome。`Chrome/` UA 和 `chrome.identity.getAuthToken` 的存在都不能证明兼容：Chromium 官方说明其默认实现依赖受限 Google API，在 Chrome 之外会失败（[官方说明](https://github.com/chromium/chromium/blob/main/docs/api_keys.md#polyfilling-chromeidentity-api-in-your-chromium-derivative)）。
+
+后台使用 `navigator.userAgentData` 的低熵 `brands` 确认 `Google Chrome` 品牌，并排除移动端与已识别的衍生浏览器；不读取高熵信息、不发起网络或授权探测。缺少品牌信息或只有 Chromium 品牌时关闭同步及删除入口，提示 WebDAV 或本地备份。Aside、Ego Lite、Vivaldi（含移动版）目前不在支持范围；后续支持须单独完成授权适配及真实浏览器验证，不能仅放宽品牌判断。
+
+浏览器品牌可能被修改，不能作为安全身份凭据。若已通过检查的环境授权失败或未返回令牌，界面仍说明桌面 Chrome 支持边界与替代方案，不暴露提供商的原始错误。取消或暂时失败不会永久禁用 Chrome 的重试入口。
+
+### 同步流程
+
 ```mermaid
 sequenceDiagram
     actor U as 用户

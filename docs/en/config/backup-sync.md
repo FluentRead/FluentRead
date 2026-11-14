@@ -47,6 +47,8 @@ Turning sensitive settings off or restoring basic settings does not remove secre
 
 ## Google Drive configuration sync
 
+Currently supported only in **desktop Google Chrome**. Aside, Ego Lite, Vivaldi (including mobile), and other Chromium-based browsers are not yet supported: installing Chrome extensions does not guarantee Google sign-in support. When browser compatibility cannot be confirmed, the sync button is hidden. Use **WebDAV** or **local backups** instead.
+
 1. Select **Google Drive** under **Cloud backup** and check the scope.
 2. Start sync and complete Google authorization.
 3. Check the account and choose to save local settings, restore the cloud copy, or merge changes.

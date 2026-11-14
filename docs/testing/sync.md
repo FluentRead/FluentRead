@@ -47,6 +47,8 @@ node scripts/testing/run-site-display-mode-test.cjs \
 
 ## Google Drive 完整配置同步
 
+Issue #1339 的 `googleDriveAuth` 回归覆盖带 Chrome UA 的衍生浏览器、缺失/空/未知品牌、移动端、Google Chrome 品牌顺序，以及授权失败后的替代方案与重试；不支持的环境不得调用 Identity 或 Drive HTTP。生产界面专项使用受控品牌信息复现判断分支，不能代替 Aside、Ego Lite、Vivaldi 的实机或真实账号授权验收。
+
 `tests/googleDriveEncryption.test.ts`、`tests/googleDriveConfig.test.ts`、`tests/googleDriveAuth.test.ts`、`tests/googleDriveApi.test.ts`、`tests/googleDriveSync.test.ts`、`tests/googleDriveSyncClient.test.ts` 和 `tests/backgroundGoogleDriveSync.test.ts` 验证完整凭据快照、认证加密、账号隔离、差异隐藏、三方合并、过期与一次性预览、MV3 后台重启恢复和失败回滚。`tests/i18n.test.ts` 还验证同步状态及隐藏内容的多语言展示。
 
 生产扩展构建后执行 `node scripts/testing/run-google-drive-sync-ui-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <扩展界面测试技能>/scripts/focus-safe-browser.cjs --artifacts-dir <证据目录>`。专项使用临时 Edge profile、第二屏后台可见窗口，先验证实际 Edge 的不支持提示，再注入虚构 Chrome Identity 与 Google Drive 响应；检查真实页面的预览、上传与下载方向、加密完整凭据恢复、损坏文件阻断、私有存储边界、无口令输入流程，以及中英文 390px 布局。

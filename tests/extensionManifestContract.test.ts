@@ -1028,6 +1028,7 @@ describe('Chrome unified ZIP packaging', () => {
             const runtimeId = verifyChromeOfflineManifest(offline, manifest);
             const ports: DriveAuthPorts = {
                 userAgent: () => 'Chrome/142.0.0.0',
+                userAgentData: () => ({brands: [{brand: 'Google Chrome'}], mobile: false}),
                 identity: {getAuthToken: vi.fn(async () => ({})), removeCachedAuthToken: vi.fn(async () => undefined), clearAllCachedAuthTokens: vi.fn(async () => undefined)},
                 runtime: {id: runtimeId, getManifest: () => offline}, fetch: vi.fn(),
             };

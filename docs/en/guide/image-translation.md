@@ -63,7 +63,7 @@ Ordinary rotated, scaled, mirrored and perspective images follow the page's nati
 
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
-Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Existing letters, digits and source bounds stay unchanged.
+Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Tightly cropped text on light tinted backgrounds also checks the background and glyphs, for example restoring `FIELDNOTE 12` to `FIELD NOTE 12`. Existing letters, digits and source bounds stay unchanged.
 
 Image translation also checks text detection evidence alongside recognition to reduce highlights, textures and decorative lines being mistaken for text.
 

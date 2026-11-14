@@ -48,6 +48,22 @@ describe('透明图案与完整译文共同排版',()=>{
     });
 });
 describe('漫画专用完整排版',()=>{
+    it('源字号使译文换成两行时，保持看懂等完整词，不因字框容量按单字拆词',()=>{
+        const text='流畅阅读：看懂每一页漫画',width=60,height=24;
+        const layout=layoutMangaTranslationText(text,width,height,measure,10);
+        expect(layout.lines.join('')).toBe(text);expect(layout.lines).toHaveLength(2);
+        expect(layout.lines.some(line=>line.includes('看懂'))).toBe(true);
+        expect(layout.lines.every(line=>measure(line,layout.fontSize)<=width)).toBe(true);
+        expect(layout.fontSize).toBeGreaterThan(8);expect(layout.fontSize).toBeLessThanOrEqual(10);
+        const search=createMangaTranslationSearch(text,measure,10);
+        expect(search.finish(search.prepare(width,height))).toEqual(layout);
+    });
+    it.each(['阿尔巴尼亚好。','abcde 好。'])('短末行平衡不拆开原区域内放得下的词 %s',text=>{
+        const layout=layoutMangaTranslationText(text,60,50,measure,10);
+        expect(layout.lines).toEqual([text.startsWith('abcde')?'abcde':'阿尔巴尼亚','好。']);
+        expect(layout.fontSize).toBe(10);
+        const search=createMangaTranslationSearch(text,measure,10);expect(search.finish(search.prepare(60,50))).toEqual(layout);
+    });
     it.each(['你好！！再见……','A（（文字））B','「「对白？！」」\n……旁白！！','）？！开始','结尾（（'])
     ('连续标点场景 %s 保留全文与可用宽度，直接排版与搜索一致',text=>{
         const widthOf=(value:string,size:number)=>Array.from(value).length*size;
@@ -197,8 +213,9 @@ describe('漫画专用完整排版',()=>{
         expect(layoutMangaTranslationText('你好.再见',20,100,measure,10).lines).toEqual(['你','好.','再见']);
     });
     it('末行很短时平衡气泡行宽，字号和行数保持不变',()=>{
+        // 平衡不得把已识别的“确认”拆成“确/认”。
         expect(layoutMangaTranslationText('我早就确认过了。',70,50,measure,10))
-            .toEqual({lines:['我早就确','认过了。'],fontSize:10,lineHeight:12});
+            .toEqual({lines:['我早就确认','过了。'],fontSize:10,lineHeight:12});
         expect(layoutMangaTranslationText('x Hello',60,100,measure,10).lines).toEqual(['x','Hello']);
         expect(layoutMangaTranslationText('你好\n再见',20,40,measure,10).lines).toEqual(['你好','再见']);
     });

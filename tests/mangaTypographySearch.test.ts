@@ -8,6 +8,29 @@ const ink=(_text:string,size:number)=>({ascent:size*.7,descent:size*.2});
 const empty={lines:[],fontSize:0,lineHeight:0};
 
 describe('共享分词的有界漫画候选搜索',()=>{
+    it('短东亚正文的词分割只做一次，候选搜索复用；全文与token预算在调用分割器之前检查',async()=>{
+        vi.resetModules();const NativeSegmenter=Intl.Segmenter,words=vi.fn();
+        class ObservedSegmenter {
+            private readonly native:Intl.Segmenter;private readonly word:boolean;
+            constructor(locales?:string,options?:Intl.SegmenterOptions){this.native=new NativeSegmenter(locales,options);this.word=options?.granularity==='word';}
+            segment(text:string){if(this.word)words(text);return this.native.segment(text);}
+        }
+        vi.stubGlobal('Intl',new Proxy(Intl,{get:(target,key)=>key==='Segmenter'?ObservedSegmenter:Reflect.get(target,key)}));
+        try{
+            const {createMangaTranslationSearch:factory,layoutMangaTranslationText:layout}=await import('@/src/features/image-translation/services/mangaTypography');
+            const search=factory('流畅阅读：看懂每一页漫画',measure,10,ink);
+            for(const [width,height]of [[60,24],[70,30],[90,40]])search.finish(search.prepare(width,height));
+            expect(words).toHaveBeenCalledOnce();words.mockClear();
+            for(const text of ['甲乙'+'a'.repeat(1023),'甲'.repeat(257),'ASCII words only','甲'])layout(text,10000,100,measure,1);
+            expect(words).not.toHaveBeenCalled();
+            for(const text of ['甲乙'+'a'.repeat(1022),'甲'.repeat(256)]){
+                const result=layout(text,10000,100,measure,1);expect(result.lines.join('')).toBe(text);
+            }
+            expect(words).toHaveBeenCalledTimes(2);
+            const explicit=layout('保持根部\n\n露出水面。',100,100,measure,10);
+            expect(explicit.lines).toEqual(['保持根部','','露出水面。']);
+        }finally{vi.unstubAllGlobals();vi.resetModules();}
+    });
     it('未fit的最大字号只留下数字尺寸，完成后仍与旧十二轮全文排版一致',()=>{
         const search=createMangaTranslationSearch('保留完整译文。Alpha Ågyp',measure,30,ink);
         const candidate=search.prepare(54,24);

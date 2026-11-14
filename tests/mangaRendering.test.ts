@@ -4,6 +4,7 @@ import {gunzipSync} from 'node:zlib';
 import {createMangaBlankLayoutBudget,drawMangaTranslations,planMangaBlankTranslation,sampleMangaBackgrounds} from '@/src/features/image-translation/services/mangaRendering';
 import {findMangaBlankSpaces} from '@/src/features/image-translation/services/mangaBlankSpaces';
 import type {MangaRegion} from '@/src/features/image-translation/services/mangaRegions';
+import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult';
 
 const W=1000,H=300;
 const region=(text='whole translated sentence'):MangaRegion=>({text,fontSize:20,bbox:{x0:500,y0:100,x1:800,y1:160},sourceBoxes:[{x0:500,y0:100,x1:800,y1:120}]});
@@ -31,6 +32,17 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it('可靠原字尺度替换页面统一字号上限，清字仍按原fontSize和原物理框',()=>{
+        const c=context(),r={text:'短标题',fontSize:50,bbox:{x0:100,y0:100,x1:900,y1:160},sourceBoxes:[{x0:100,y0:100,x1:900,y1:160}]},before=structuredClone(r);
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{uniform:true,color:'#ffffff',sourceFontSize:40}]);
+        expect(c.fillText.mock.results.map(v=>(v.value as {font:string}).font)).toEqual([expect.stringContaining(' 40px ')]);
+        expect(c.fillRect.mock.calls).toEqual(mangaMaskBoxes(before,W,H).map(b=>[b.x0,b.y0,b.x1-b.x0,b.y1-b.y0]));expect(r).toEqual(before);
+    });
+    it.each([NaN,Infinity,0,-1,151])('非法或超出源区域物理比例的字号%s保持旧上限',sourceFontSize=>{
+        const c=context(),r=region('短标题');
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(255),W,H,[r],true,[{uniform:true,color:'#ffffff',sourceFontSize}]);
+        expect(c.fillText.mock.results.every(v=>(v.value as {font:string}).font.startsWith('600 21px '))).toBe(true);
+    });
     it('冻结招牌的两个渐变标题保留共同左边线，独立平色标签不猜测对齐',()=>{
         const pixels=new Uint8ClampedArray(gunzipSync(readFileSync(new URL('./fixtures/manga-color-quality/truth/prism-platform-gradient-signs.source-rgba.bin.gz',import.meta.url))));
         const rows=[{text:'沿着东方的轨道',fontSize:37,bbox:{x0:181,y0:130,x1:1003,y1:167}},

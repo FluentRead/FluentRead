@@ -16,16 +16,17 @@ describe('只读取原图的文字色与背景证据',()=>{
     it('保留源深蓝，返回独立颜色记录且不改源像素或框',()=>{
         const {pixels,region}=fixture(),before=pixels.slice();Object.freeze(region.bbox);Object.freeze(region);
         const appearance=observeImageSourceAppearances(pixels,160,120,[region]).get(region);
-        expect(appearance).toEqual({foreground:'rgb(25,48,75)',background:[255,255,255,255]});expect(pixels).toEqual(before);
+        expect(appearance).toEqual({foreground:'rgb(25,48,75)',background:[255,255,255,255],inkBoxes:[box(38,34,74,46)]});expect(pixels).toEqual(before);
     });
     it('低对比源色只提供背景，绘字沿用高对比选择',()=>{
         const {pixels,region}=fixture([190,190,190,255]);
-        expect(observeImageSourceAppearances(pixels,160,120,[region]).get(region)).toEqual({background:[255,255,255,255]});
+        expect(observeImageSourceAppearances(pixels,160,120,[region]).get(region)).toEqual({background:[255,255,255,255],inkBoxes:[box(38,34,74,46)]});
     });
     it('同段多行颜色一致才采用，行间图案不能被当成同色背景',()=>{
         const a=box(30,30,130,50),b=box(30,75,130,95),region={...line(box(30,30,130,95)),sourceBoxes:[a,b]},pixels=rgba();
         paint(pixels,160,box(40,35,70,45),[25,48,75,255]);paint(pixels,160,box(40,80,70,90),[25,48,75,255]);
         expect(observeImageSourceAppearances(pixels,160,120,[region]).get(region)?.foreground).toBe('rgb(25,48,75)');
+        expect(observeImageSourceAppearances(pixels,160,120,[region]).get(region)?.inkBoxes).toEqual([box(40,35,70,45),box(40,80,70,90)]);
         paint(pixels,160,box(50,60,90,65),[220,80,20,255]);
         expect(observeImageSourceAppearances(pixels,160,120,[region]).size).toBe(0);
     });
@@ -53,7 +54,7 @@ describe('只读取原图的文字色与背景证据',()=>{
         const pixels=new Uint8ClampedArray(raw.buffer,raw.byteOffset,raw.byteLength);
         const main=[box(830,149,880,452),box(717,150,768,500)],annotations=[box(886,147,912,211+1/3),box(775,150,802,217)];
         const region:ImageTextRegion={text:'風の音を聞いて小道で待っている',vertical:true,fontSize:51,bbox:box(717,147,912,500),sourceBoxes:[main[0],annotations[0],main[1],annotations[1]],ruby:annotations.map((bbox,i)=>({text:i?'こみち':'かぜ',bbox}))};
-        expect(observeImageSourceAppearances(pixels,1100,1500,[region]).get(region)).toEqual({foreground:'rgb(137,40,90)',background:[137,224,196,255]});
+        expect(observeImageSourceAppearances(pixels,1100,1500,[region]).get(region)).toEqual({foreground:'rgb(137,40,90)',background:[137,224,196,255],inkBoxes:[box(832,150,876,450),box(720,150,764,497)]});
     });
     it('调色板观察不会授予清字权限，宽灰色组件仍不能通过原修补准入',()=>{
         const pixels=rgba(),region=line(box(30,25,130,95));

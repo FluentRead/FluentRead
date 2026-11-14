@@ -347,7 +347,7 @@ describe('48K 漫画排印的数值、Unicode 与操作边界', () => {
         } finally {vi.stubGlobal('Intl', intl); vi.resetModules();}
     });
     it('短末行平衡保留字号、行数与完整标点，相近行宽无需重排', () => {
-        expect(layoutMangaTranslationText('我早就确认过了。', 70, 50, measure, 10)).toEqual({lines: ['我早就确', '认过了。'], fontSize: 10, lineHeight: 12});
+        expect(layoutMangaTranslationText('我早就确认过了。', 70, 50, measure, 10)).toEqual({lines: ['我早就确认', '过了。'], fontSize: 10, lineHeight: 12});
         expect(layoutMangaTranslationText('x Hello', 60, 100, measure, 10).lines).toEqual(['x', 'Hello']);
         expect(layoutMangaTranslationText('你好再见', 20, 100, measure, 10).lines).toEqual(['你好', '再见']);
     });

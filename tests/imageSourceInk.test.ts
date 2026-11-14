@@ -17,16 +17,22 @@ const observe=(pixels=fixture(),bounds=box(),sources=[bounds])=>observeImageSour
 describe('源墨色的只读渐变与完整物理框观察',()=>{
     it('从未修补的完整渐变恢复共同源色，并单独给出细对比描边',()=>{
         const pixels=fixture(true),before=pixels.slice(),bounds=Object.freeze(box());
-        expect(observe(pixels,bounds)).toEqual({foreground:'rgb(230,220,210)',outline:'#111827'});expect(pixels).toEqual(before);
+        expect(observe(pixels,bounds)).toEqual({foreground:'rgb(230,220,210)',outline:'#111827',inkBoxes:[box(35,30,95,50)]});expect(pixels).toEqual(before);
         const region={text:'SOURCE',bbox:bounds,fontSize:40};
         const appearance=observeImageSourceAppearances(pixels,W,H,[region]).get(region)!;
-        expect(appearance).toEqual({foreground:'rgb(230,220,210)',outline:'#111827'});
+        expect(appearance).toEqual({foreground:'rgb(230,220,210)',outline:'#111827',inkBoxes:[box(35,30,95,50)]});
         expect(expandImageTextBounds(pixels,W,H,bounds,44,appearance,[],{remaining:10000})).toBe(bounds);
         expect(appearance).not.toHaveProperty('mask');expect(appearance).not.toHaveProperty('background');
     });
     it('纯色底保留源色与底色，低对比只提供底色',()=>{
-        expect(observe()).toEqual({background:[20,30,50,255],foreground:'rgb(230,220,210)'});
-        expect(observe(fixture(false,[60,70,90]))).toEqual({background:[20,30,50,255]});
+        expect(observe()).toEqual({background:[20,30,50,255],foreground:'rgb(230,220,210)',inkBoxes:[box(35,30,95,50)]});
+        expect(observe(fixture(false,[60,70,90]))).toEqual({background:[20,30,50,255],inkBoxes:[box(35,30,95,50)]});
+    });
+    it('整体渐变的多框颜色证明不把总墨迹高度冒充一行字体',()=>{
+        const pixels=fixture(true);
+        for(let y=35;y<50;y++)for(let x=35;x<95;x++)pixels.set([30+x*.3,40+y*.2,70,255],(y*W+x)*4);
+        for(let y=55;y<65;y++)for(let x=40;x<90;x++)pixels.set([230,220,210,255],(y*W+x)*4);
+        expect(observe(pixels,box(20,20,120,75),[box(20,20,120,40),box(20,50,120,75)])).toEqual({foreground:'rgb(230,220,210)',outline:'#111827'});
     });
     it('冻结招牌原像素恢复白标题、深色副标题与黄色夜牌，不靠修改真值通过',()=>{
         const raw=gunzipSync(readFileSync(new URL('./fixtures/manga-color-quality/truth/prism-platform-gradient-signs.source-rgba.bin.gz',import.meta.url)));

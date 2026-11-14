@@ -39,6 +39,19 @@ function deferred<T>() {
 }
 
 describe('翻译服务连接测试', () => {
+    it('连接测试同样脱敏私密模板，阻止模式不能发送这些模板', async () => {
+        const source = new Config(); source.privacyProtection.enabled = true;
+        source.system_role.demo = 'Contact demo@example.test';
+        adapter.mockImplementation(async request => {
+            const selected = getTranslationProviderConfig(request, createTranslationProviderConfigSnapshot(source));
+            expect(selected.system_role.demo).not.toContain('demo@example.test');
+            return '有效译文';
+        });
+        await expect(runTranslationServiceConnectionTest('demo', {configSnapshot: createTranslationProviderConfigSnapshot(source)})).resolves.toBeTruthy();
+        adapter.mockClear(); source.privacyProtection.mode = 'block';
+        await expect(runTranslationServiceConnectionTest('demo', {configSnapshot: createTranslationProviderConfigSnapshot(source)})).rejects.toMatchObject({code: 'PRIVACY_CONTENT_BLOCKED'});
+        expect(adapter).not.toHaveBeenCalled();
+    });
     it.each(['transmart', 'apertiumFree'])('免费池 %s 直接调用匿名适配器，使用支持的固定语言对', async freeProviderId => {
         freeAdapter.mockResolvedValue('有效译文');
         const source = Object.assign(new Config(), {from: 'auto', to: 'en'});

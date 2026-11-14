@@ -98,7 +98,7 @@ export function parseDriveSyncPayload(value: unknown): DriveSyncConfig {
 function parseCompleteDriveSyncPayload(value: unknown): DriveSyncConfig {
     if (!record(value) || value.format !== 'fluentread-complete-config' || value.version !== 1
         || !isConfigImportValid(value.config)
-        || !CONFIG_CREDENTIAL_FIELDS.every(field => Object.hasOwn(value.config as object, field))) {
+        || !CONFIG_CREDENTIAL_FIELDS.every(field => field === 'privacyProtectionSecretTerms' || Object.hasOwn(value.config as object, field))) {
         throw new DriveConfigError('云端文件不包含完整的配置和凭据快照');
     }
     const config = value.config;

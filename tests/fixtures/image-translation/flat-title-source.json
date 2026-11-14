@@ -1,0 +1,39 @@
+{
+  "sourcePng": "tests/fixtures/manga-structures/multisize-margin-callouts.png",
+  "sourcePngSha256": "8196a876fa9b441499d3d72a907d81230e5c6b03131061f5e3af488cdf9cfb4d",
+  "crop": {
+    "x0": 76,
+    "y0": 59,
+    "x1": 611,
+    "y1": 96
+  },
+  "width": 535,
+  "height": 37,
+  "rgbaSha256": "4d494dd027c14849a8fa6b0813c806dcc9b8dc15d9320893c41ac32c7da0bc08",
+  "rgbaFile": "flat-title-source.rgba.gz",
+  "background": [
+    238,
+    234,
+    213,
+    255
+  ],
+  "region": {
+    "text": "GLASSHOUSE OBSERVATION",
+    "fontSize": 25,
+    "bbox": {
+      "x0": 6,
+      "y0": 6,
+      "x1": 529,
+      "y1": 31
+    },
+    "sourceBoxes": [
+      {
+        "x0": 6,
+        "y0": 6,
+        "x1": 529,
+        "y1": 31
+      }
+    ]
+  },
+  "provenance": "Exact original source crop around the real OCR physical mask plus its complete one-pixel perimeter. No resampling, color edits or OCR-dependent truth revision; background from the original frozen scene design."
+}

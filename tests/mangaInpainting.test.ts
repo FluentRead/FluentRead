@@ -1,5 +1,8 @@
 vi.mock('@/src/shared/onnx/resources', async original => ({...await original<any>(), paceLocalInference: mocks.pace}));
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {gunzipSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
 const mocks=vi.hoisted(()=>({gpu:vi.fn(),load:vi.fn(),background:vi.fn(),create:vi.fn(),run:vi.fn(),release:vi.fn(),tensor:vi.fn(),tensorDispose:vi.fn(),outputDispose:vi.fn(),workerPrepare:vi.fn(),workerRequest:vi.fn(),workerRelease:vi.fn(),pace:vi.fn((operation:()=>Promise<unknown>)=>operation()),wasm:{numThreads:0,wasmPaths:undefined as unknown,proxy:true}}));
 vi.mock('@/src/features/image-translation/services/mangaOcrAssets',async original=>({...await original<any>(),loadMangaInpaintAsset:mocks.load}));
 vi.mock('@/src/shared/onnx/webgpu',()=>({probeWebGpu:mocks.gpu}));
@@ -17,6 +20,52 @@ const zero=(patch:{width:number;height:number})=>new Float32Array(patch.width*pa
 const deferred=<T,>()=>{let resolve!:(value:T)=>void;const promise=new Promise<T>(done=>{resolve=done;});return {promise,resolve};};
 const tick=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
 const gradientPixels=()=>{const result=pixels();for(let y=0;y<128;y++)for(let x=0;x<128;x++)result.set([40+x,50+y,80+Math.round((x+y)/2),255],(y*128+x)*4);return result;};
+
+function flatTitleFixture(){
+    const fixture=JSON.parse(readFileSync(new URL('./fixtures/image-translation/flat-title-source.json',import.meta.url),'utf8'));
+    const source=new Uint8ClampedArray(gunzipSync(readFileSync(new URL('./fixtures/image-translation/flat-title-source.rgba.gz',import.meta.url))));
+    const digest=(value:Uint8Array|Uint8ClampedArray)=>createHash('sha256').update(value).digest('hex');
+    expect(digest(readFileSync(new URL('./fixtures/manga-structures/multisize-margin-callouts.png',import.meta.url)))).toBe(fixture.sourcePngSha256);
+    expect(digest(source)).toBe(fixture.rgbaSha256);
+    return {fixture,source};
+}
+it('紧贴原字的背景采样不能让已完整证明的纯色标题进入模型并产生色带',async()=>{
+    const {fixture,source}=flatTitleFixture();
+    const snapshot=source.slice(),port={run:vi.fn(async(patch:{width:number;height:number})=>zero(patch)),release:vi.fn()},create=vi.fn(async()=>port),runtime=createMangaInpaintingRuntime(create);
+    try{
+        const result=await runtime.repair(source,fixture.width,fixture.height,[fixture.region],undefined,undefined,undefined,[{uniform:false,color:'rgb(238,234,213)'}]);
+        expect(create).not.toHaveBeenCalled();expect(source).toEqual(snapshot);
+        const [mask]=mangaMaskBoxes(fixture.region,fixture.width,fixture.height);
+        for(let y=0;y<fixture.height;y++)for(let x=0;x<fixture.width;x++){
+            const at=(y*fixture.width+x)*4;
+            expect(Array.from(result.slice(at,at+4))).toEqual(x>=mask.x0&&x<mask.x1&&y>=mask.y0&&y<mask.y1?fixture.background:Array.from(snapshot.slice(at,at+4)));
+        }
+    }finally{await runtime.dispose();}
+});
+
+it('纯色字形页不等待其他页面的模型队列，取消仍撤回结果',async()=>{
+    const {fixture,source}=flatTitleFixture(),pending=deferred<Float32Array>(),port={run:vi.fn((_patch:{width:number;height:number})=>pending.promise),release:vi.fn()},runtime=createMangaInpaintingRuntime(async()=>port);
+    const first=runtime.repair(pixels(),128,128,[region],undefined,undefined,undefined,[{uniform:false,color:'#fff'}]);
+    await tick();expect(port.run).toHaveBeenCalledOnce();
+    const result=await runtime.repair(source,fixture.width,fixture.height,[fixture.region],undefined,undefined,undefined,[{uniform:false,color:'#fff'}]);
+    expect(Array.from(result.slice((10*fixture.width+10)*4,(10*fixture.width+10)*4+4))).toEqual(fixture.background);
+    const controller=new AbortController();controller.abort();
+    await expect(runtime.repair(source,fixture.width,fixture.height,[fixture.region],controller.signal,undefined,undefined,[{uniform:false,color:'#fff'}])).rejects.toMatchObject({name:'AbortError'});
+    expect(port.run).toHaveBeenCalledOnce();pending.resolve(zero(port.run.mock.calls[0][0]));await first;await runtime.dispose();
+});
+
+it('一个区域的物理行须全部证明，单行混色时整组保留原始模型输入',async()=>{
+    const {fixture,source}=flatTitleFixture(),width=fixture.width*2,height=fixture.height,input=new Uint8ClampedArray(source.length*2);
+    for(let y=0;y<height;y++)for(let copy=0;copy<2;copy++)input.set(source.slice(y*fixture.width*4,(y+1)*fixture.width*4),(y*width+copy*fixture.width)*4);
+    input.set([255,0,0,255],(20*width+fixture.width+200)*4);
+    const a=fixture.region.bbox,b={...a,x0:a.x0+fixture.width,x1:a.x1+fixture.width};
+    const combined={...fixture.region,bbox:{...a,x1:b.x1},sourceBoxes:[a,b]},original=input.slice();
+    const port={run:vi.fn(async patch=>zero(patch)),release:vi.fn()},runtime=createMangaInpaintingRuntime(async()=>port);
+    try{
+        await runtime.repair(input,width,height,[combined],undefined,undefined,undefined,[{uniform:false,color:'#fff'}]);
+        expect(port.run).toHaveBeenCalledOnce();expect(port.run.mock.calls[0][0]).toEqual(createMangaPatch(original,width,height,combined).patch);expect(input).toEqual(original);
+    }finally{await runtime.dispose();}
+});
 
 /** 与按矩形投影的实现独立：逐个输出格检查源面积相交，并核对色彩积分和补齐边界。 */
 function assertPatchFootprints(input:Uint8ClampedArray,width:number,height:number,candidate:Parameters<typeof createMangaPatch>[3],mapping:ReturnType<typeof createMangaPatch>) {

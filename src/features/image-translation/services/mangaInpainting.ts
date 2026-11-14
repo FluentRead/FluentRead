@@ -4,6 +4,7 @@
  * 主要内容：共享本次原图背景分类，完整确认均匀的页面不等待其他页面的模型修补队列；默认返回独立像素副本，仅显式持有独占像素的调用方可在均匀页复用原缓冲，复杂页始终保留原图与输出分离；按识别行及其有界描边余量建立局部蒙版，按面积相交投影为补丁行段，避免每个补丁像素遍历全部文字行；截取有上下文且最长边不超过 512 的有界补丁，归一化 ONNX 张量并仅回写蒙版区域；所有区域共同跳过原图阶段冻结的低 alpha 行段并保留其四通道，透明补丁仅在完整外周透明度一致时压低 source-over 字形增加的 alpha，不把 RGB 模型当作 alpha 预测器；融合 ONNX 执行图，兼容的硬件 GPU 加速修补、设备失效有界切换 CPU；独立 Worker 串行推理、70% 计算时间预算、滚动取消保留模型端口并由 owner 有界收尾，三分钟空闲释放约束资源。
  * 几何与采样：小补丁保留原像素网格，大补丁等比例面积缩小，随后对称补齐模型尺寸而非分别拉伸横纵；蒙版覆盖所有参与面积采样的源字形，补齐区镜像相同蒙版；输出只从有效内容区按像素中心双线性回填，避免缩放台阶和补齐像素串入原图。
  * 渐变重建：在原始帧上完整验证每个物理清字框，只有全部边界符合双线性渐变且内部不透明时复用确定性重建；纯渐变页不等待模型队列或初始化模型，混合页仅将其余复杂区域交给 LaMa，现有透明保护路径保持。
+ * 纯色文字重建：复杂分类中的物理行另须完整通过单一底色、共同墨色和字形组件检查，才按原蒙版恢复底色；整页独立预付2097152像素，注音沿用自己的字高，失败仍走原模型流程。
  * 模块边界：不读取网页 DOM、不上传图像、不翻译文字；均匀气泡无需加载模型，最后的译文排版由 mangaRendering 处理，模型生成内容始终局限于检测文字蒙版。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
@@ -14,9 +15,10 @@ import {configureOnnxWasmBackend} from '@/src/shared/onnx/wasmBinary';
 import {assertMangaOcrActive, loadMangaInpaintAsset, MANGA_INPAINT_ASSET, withMangaModelAdmission} from './mangaOcrAssets';
 import {mangaRegionBackground, type MangaBackground} from './mangaRendering';
 import type {MangaRegion} from './mangaRegions';
-import {mangaMaskBoxes as maskBoxes} from '../mangaPatchResult';
+import {mangaMaskBoxes as maskBoxes,createMangaMaskFontResolver} from '../mangaPatchResult';
 import {isMangaAlphaProtected,type MangaAlphaProtection} from './mangaAlphaProtection';
 import {planImageGradientRepair} from './inpainting';
+import {planImageFlatTextRepair} from './flatTextRepair';
 
 export type {MangaPatch} from './mangaInferenceClient';
 interface PatchMapping {patch: MangaPatch; left: number; top: number; sourceWidth: number; sourceHeight: number; contentWidth: number; contentHeight: number; alpha?: number; protection?:MangaAlphaProtection}
@@ -136,16 +138,19 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                     return Promise.resolve().then(()=>{assertMangaOcrActive(signal);return options?.reuseUniformPixels===true ? pixels : new Uint8ClampedArray(pixels);});
                 }
                 // 先在未改变的原图上验证全部物理行框；成功后才执行，不以已修补像素证明后续区域。
-                const gradients = options?.protection ? [] : regions.map((region,index) => {
+                const flatBudget={remaining:2_097_152};
+                const simpleRepairs = options?.protection ? [] : regions.map((region,index) => {
                     if (backgrounds?.[index]?.uniform === true) return null;
-                    const repairs = maskBoxes(region,width,height).map(box => planImageGradientRepair(pixels,width,
-                        box.x0-1,box.y0-1,box.x1-box.x0+2,box.y1-box.y0+2,true));
+                    const sources=region.sourceBoxes??[region.bbox],sourceSize=createMangaMaskFontResolver(region);
+                    const repairs = maskBoxes(region,width,height).map((box,sourceIndex) => planImageGradientRepair(pixels,width,
+                        box.x0-1,box.y0-1,box.x1-box.x0+2,box.y1-box.y0+2,true)
+                        ??planImageFlatTextRepair(pixels,width,height,{mask:box,source:sources[sourceIndex],fontSize:sourceSize(sources[sourceIndex]),vertical:region.vertical},flatBudget));
                     return repairs.every(Boolean) ? (target:Uint8ClampedArray) => repairs.forEach(repair=>repair!(target)) : undefined;
                 });
-                if (gradients.length === regions.length && gradients.every(repair => repair !== undefined)) {
+                if (simpleRepairs.length === regions.length && simpleRepairs.every(repair => repair !== undefined)) {
                     return Promise.resolve().then(()=>{
                         assertMangaOcrActive(signal);const result=new Uint8ClampedArray(pixels);
-                        gradients.forEach(repair=>repair?.(result));return result;
+                        simpleRepairs.forEach(repair=>repair?.(result));return result;
                     });
                 }
                 return queue(async()=>{
@@ -155,7 +160,7 @@ export function createMangaInpaintingRuntime(create: (signal?: AbortSignal,progr
                         const result = new Uint8ClampedArray(pixels);
                         const pending = regions.filter((region,index) => {
                             if ((backgrounds?.[index] ?? mangaRegionBackground(pixels,width,height,region.bbox)).uniform) return false;
-                            const repair=gradients[index];if(repair){repair(result);return false;}return true;
+                            const repair=simpleRepairs[index];if(repair){repair(result);return false;}return true;
                         });
                         let completed = 0;
                         for (const region of pending) {

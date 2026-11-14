@@ -698,6 +698,7 @@ export default defineConfig({
                 'src/features/image-translation/services/sourceInk.ts',
                 'src/features/image-translation/services/sourceTypographyGeometry.ts',
                 'src/features/image-translation/services/sourceTypographyPlane.ts',
+                'src/features/image-translation/services/flatTextRepair.ts',
                 'src/features/image-translation/services/remoteImage.ts',
                 'src/features/input-translation/content/index.ts',
                 'src/features/input-translation/content/inputBox.ts',

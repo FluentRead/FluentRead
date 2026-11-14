@@ -550,7 +550,8 @@
       "tests/imageMattePageOwnership.test.ts",
       "tests/pdfSourceOcrSuggestion.test.ts",
       "tests/pdfSourceRecoveryWorkflow.test.ts",
-      "tests/videoCourseCaptions.test.ts"
+      "tests/videoCourseCaptions.test.ts",
+      "tests/imageFlatTextRepair.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

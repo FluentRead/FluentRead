@@ -339,6 +339,9 @@
 
     <!-- 高级选项 -->
     <section v-if="hasVisitedSection('settings-advanced')" v-show="props.activeSection === 'settings-advanced'" id="settings-advanced" class="settings-section">
+      <SettingsPanel name="privacy" :active="props.activePanel">
+        <PrivacyProtectionSettings id="privacy-protection-settings" :config="config" :active="viewActive && props.activeSection === 'settings-advanced' && (!props.activePanel || props.activePanel === 'privacy')" />
+      </SettingsPanel>
       <SettingsPanel name="recognition" :active="props.activePanel">
 <SettingsGroup :title="t('settings.pageRecognition.title')">
         <SettingsItem :label="t('settings.pageRecognition.allNodes')" :description="t('settings.pageRecognition.description')">
@@ -581,6 +584,7 @@
 
 <script lang="ts" setup>
 import SettingsPanel from './components/SettingsPanel.vue';
+import PrivacyProtectionSettings from './PrivacyProtectionSettings.vue';
 import {VIDEO_COURSE_PLATFORMS} from '@/src/core/config/videoCourse';
 const courseSiteLabels = {bilibili: 'Bilibili', udemy: 'Udemy', edx: 'edX'};
 import ServiceRepairReturn from './services/ServiceRepairReturn.vue';

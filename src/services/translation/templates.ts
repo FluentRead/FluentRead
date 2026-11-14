@@ -121,6 +121,7 @@ function buildUserPrompt(
     }
     if (hasProtectedTokens) {
         parts.push('Preserve every __FRTERM_ placeholder exactly once, unchanged. Never invent placeholders; they are restored locally.');
+        if (current.privacyProtection?.enabled) parts.push('Preserve every __FRP_ privacy placeholder exactly once and unchanged in its original text segment. Do not copy placeholders from reference context.');
     }
     // 网页参考材料必须先于真正的翻译任务出现。若把它追加在原文之后，部分较弱模型
     // 会继续翻译 context，并把 <webpage_context> 标签一并作为译文返回（Issue #352）。

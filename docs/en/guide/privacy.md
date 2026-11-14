@@ -8,6 +8,10 @@ FluentRead does not run its own translation server. The features you enable and 
 
 <GuideVisual kind="privacy" en />
 
+## Optional translation privacy
+
+[Translation privacy](/en/config/privacy-protection) can locally mask detected sensitive values before text translation and restore them afterwards, or block matching requests. Custom phrases use local credential storage, and protected requests skip persistent translation caching. Detection is limited and does not replace the separate data-handling rules for features such as the reading assistant or cloud OCR.
+
 ## What gets sent?
 
 | Feature | Content and destination |

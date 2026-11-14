@@ -14,7 +14,7 @@ import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import {Config} from '@/src/core/config/model';
 import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
 import {createTranslationBroker} from '@/src/services/translation/broker';
-import type {TranslationProviderRequest} from '@/src/services/translation/types';
+import type {TranslationProviderRequest, TranslationRequestMessage} from '@/src/services/translation/types';
 
 // 扩展运行时按需加载界面语言；本文件验证全部语言的文案契约，因此一次注册全部资源包。
 registerAllUiLanguageBundles();
@@ -42,7 +42,7 @@ it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker�
         getTranslationLanguages:override=>({sourceLanguage:override?.sourceLanguage??config.from,targetLanguage:override?.targetLanguage??config.to}),
         resolveConfiguredModel:(selected,custom)=>custom||selected||'',buildTranslationCacheKey:identity=>JSON.stringify(identity)});
     const current=setup({supportsBatchTranslation:()=>true,getGlossaryConfig:()=>config,
-        translateTexts:(request:{origin:string|string[]})=>broker.translateWithCache(request)});
+        translateTexts:(request:TranslationRequestMessage)=>broker.translateWithCache(request)});
     const texts=['FIELD SKETCH 09','Contact one@example.test','Contact two@example.test','FIELD SKETCH 09'];
     const outcome=await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Image notes'})
         .then(value=>({value,error:undefined}),error=>({value:undefined,error}));

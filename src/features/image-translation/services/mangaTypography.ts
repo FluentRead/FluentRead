@@ -1,8 +1,9 @@
 /**
  * @file src/features/image-translation/services/mangaTypography.ts
  * 文件职责：在漫画原有区域内排版完整译文，区分对白与大标题并保持东亚标点的阅读习惯。
- * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；纯同类标点直接绑定，避免拆开后又重新合并，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框仍保留原度量顺序；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
+ * 主要内容：保留词、字素与显式换行，扩展东亚文字与英文分词，必要时按字素边界合并词；纯同类标点直接绑定，避免拆开后又重新合并，闭标点跟随前字、开标点跟随后字；按真实 Canvas 字宽和可用字形上下界二分适配字号，单行不重复扣除行距，多行仍保留基线间距，缺少完整字形指标时沿用行框；合并字形有效性与最大行距遍历，基线数组就地归一化，减少临时数组而不改变浮点运算顺序；同一区域共享分词与长词字素，候选仅保留数字状态，最大字号预检后按二分上界跳过不可能胜出的搜索；普通单框与候选搜索共用同一词界和适配规则；逐项求最大宽高以兼容大量段落与行；末行过短时平衡行宽而不增加行数或越过字形预算，不截字、不横向压缩。
  * 模块边界：纯文字和度量算法，不读取页面、配置或字体资源，不识别、翻译或修补图片；普通图片继续使用独立的通用排版。
+ * 完整词：短正文在已安全绑定的字素/标点token上合并浏览器词边界，避免字号恢复后把中文词从中间折行；整段最多1024个UTF16单元和256个原token，不拆开既有安全单元，不改显式换行。长文或缺分割器沿用原分词，真正超宽的词仍由既有完整字素回退适配。
  */
 import type {ImageTranslationTextLayout} from './rendering';
 
@@ -16,7 +17,10 @@ const LEGACY_CJK = /\s+|[\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]\p{Mark}*|[^\s\
 const CJK = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;
 const SIMPLE_TEXT = /^[\x20-\x7e\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\u2e80-\u9fff\uac00-\ud7a3\uff01-\uff65]*$/u;
 const TEXT_EXTEND = /[\p{Mark}\p{Grapheme_Extend}]/u;
-const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter(undefined, {granularity:'grapheme'}) : undefined;
+const MangaSegmenter=Intl.Segmenter;
+const segmenter = typeof MangaSegmenter === 'function' ? new MangaSegmenter(undefined, {granularity:'grapheme'}) : undefined;
+let wordSegmenter:Intl.Segmenter|undefined;
+const WORD_SCRIPTS=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
 export interface MangaGlyphMetrics {ascent: number; descent: number}
 export interface MangaTextLayout extends ImageTranslationTextLayout {ink?: {height: number; baselines: number[]}}
@@ -124,6 +128,21 @@ export interface MangaTextSearchCandidate {readonly width:number;readonly height
 function parseMangaText(normalized:string):MangaTextSource {
     const paragraphs = normalized.split('\n').map(paragraph => paragraph.trim());
     const tokens = paragraphs.map(paragraph => bindPunctuation(splitEdgePunctuation(tokenizeMangaText(paragraph))));
+    if(segmenter&&normalized.length<=1024&&tokens.reduce((count,parts)=>count+parts.length,0)<=256){
+        for(let row=0;row<tokens.length;row++){
+            const parts=tokens[row],text=parts.join('');
+            if(parts.length<2||!WORD_SCRIPTS.test(text))continue;
+            wordSegmenter??=new MangaSegmenter(undefined,{granularity:'word'});
+            const boundaries=new Set<number>([text.length]);
+            for(const part of wordSegmenter.segment(text))boundaries.add(part.index+part.segment.length);
+            const words:string[]=[];let pending='',offset=0;
+            for(const part of parts){
+                pending+=part;offset+=part.length;
+                if(boundaries.has(offset)){words.push(pending);pending='';}
+            }
+            tokens[row]=words;
+        }
+    }
     return {paragraphs,tokens,splitTokens:new Map<string,string[]>()};
 }
 
@@ -139,7 +158,8 @@ function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
                 const candidate = current + space + token; space = '';
                 if (measure(candidate,size) <= limit) {current = candidate; continue;}
                 if (current) {lines.push(current); current = '';}
-                if (measure(token,size) <= limit) {current = token; continue;}
+                // 有完整字素/标点边界时，平衡不能拆开原区域内放得下的词；旧码点路径保持原规则。
+                if (measure(token,size) <= (segmenter?width:limit)) {current = token; continue;}
                 let parts = splitTokens.get(token);
                 if (!parts) {
                     parts = bindPunctuation(segmenter ? Array.from(segmenter.segment(token), part => part.segment) : Array.from(token));
@@ -190,7 +210,7 @@ function mangaLayoutFunctions(source:MangaTextSource,width:number,height:number,
     return {wrap,fits,balance};
 }
 
-/** 准确测量候选整行；普通单框保留先校验、再分词及全部度量调用的原顺序。 */
+/** 准确测量候选整行；普通单框先校验、再分词，与候选搜索共用相同词界及适配算法。 */
 export function layoutMangaTranslationText(text: string, width: number, height: number,
     measure: (text: string, size: number) => number, maxSize: number,
     measureInk?: (text: string, size: number) => MangaGlyphMetrics | undefined): MangaTextLayout {

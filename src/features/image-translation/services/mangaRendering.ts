@@ -3,13 +3,14 @@
  * 文件职责：在整段漫画区域中绘制适合阅读的译文，避免整行逐框放大和复杂背景扩散条纹。
  * 背景颜色：均匀性判定继续使用原量化桶及透明度门禁，实际填色使用采样均值，减少粗色阶导致的可见色块。
  * 原图样式：修补前验证完整绘字区域的背景与共同墨色，可靠且对比充分时沿用源字色；已证纯色文字区域用同底色细描边，渐变源色用细对比描边，清字分类与原掩码独立保持。
+ * 原字尺度：调用方提供原文字与原生度量端口时，复用同次样式观察的逐行墨迹核对字号；可靠尺度仅替换绘字上限，源fontSize继续决定原清字余量，不能用译文字宽反推源字号，也不修改源框或白底旁置规则。
  * 边线对齐：可确认原字色的相邻渐变单行，只有唯一明确共同边线时提供左右对齐提示；单行译文用实际字形左右界及描边余量核验后放入原框，缺指标、换行或透明避让仍保持居中，不改变字号或清字范围。
  * 双向文字：按整段译文首个强方向字符统一度量和绘制，数字、括号及换行后的弱方向内容继承该段方向；缓存键包含方向，避免混合语言段落串用指标，结束后恢复原画布状态。
  * 主要内容：保留整段内容和裁剪边界，对白保留横向内边距，按真实 Canvas 整行字形上下界、描边与有界像素余量适配并居中，缺少完整指标时保守沿用行框；原始大标题使用有界大字与高对比描边；边缘采样全部不透明时才允许均匀背景按原始行及描边蒙版清字；清字和绘字共同扣除原图冻结的低 alpha 并集；受影响的短段优先在原字号整行中绕孔分配完整词，并以实际绘字像素审计，失败时仅增加一次水平余量；成功复用同一位图，预算或不支持路径沿用无孔连续矩形完整重排，避免切除译文字形；多候选共享分词，按原序预检最大字号后用二分上界跳过必输搜索，保留原候选顺序的平局及页内准入；页内度量以固定字体族下的字重、字号与全文短键复用，仍保持有界缓存；复用原图背景分类，避免修补后被误判成均匀底色而二次铺板。
  * 模块边界：只操作调用方提供的画布和像素，不运行 OCR/翻译、不修改宿主页面；白底旁置规划只消费调用方已证明的候选，保持完整译文和源字号下限，不提供像素或清字授权；完整原图仍可通过现有按钮对照。
  */
 import type {MangaRegion} from './mangaRegions';
-import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection} from './rendering';
+import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection,getImageSourceInkFontSize} from './rendering';
 import {createMangaTranslationSearch, layoutMangaTranslationText, MANGA_TEXT_FONT} from './mangaTypography';
 import {mangaMaskBoxes} from '../mangaPatchResult';
 import {mangaAlphaClearRects,type MangaAlphaProtection} from './mangaAlphaProtection';
@@ -18,7 +19,7 @@ import {createMangaGlyphRasterLedger,rasterizeMangaGlyphs} from './mangaGlyphRas
 import {observeImageSourceAppearances} from './sourceAppearance';
 import {inferImageSourceAlignments} from './sourceAlignment';
 
-export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string; foregroundOutline?:string; textAlign?:'left'|'right'}
+export interface MangaBackground {color: string; uniform: boolean; foreground?:string; textBackground?:string; foregroundOutline?:string; textAlign?:'left'|'right';sourceFontSize?:number}
 type Box=MangaRegion['bbox'];
 type MangaMeasure=(text:string,size:number)=>{width:number;ascent:number;descent:number};
 export interface MangaBlankLayoutBudget {readonly remainingMeasurements:number;readonly remainingCharacters:number}
@@ -131,13 +132,14 @@ export function mangaRegionBackground(pixels: Uint8ClampedArray, width: number, 
 }
 
 /** 背景判断取自原图；修补模型生成的平滑像素不应改变该区域的绘制策略。 */
-export function sampleMangaBackgrounds(pixels: Uint8ClampedArray, width: number, height: number, regions: MangaRegion[]): MangaBackground[] {
+export function sampleMangaBackgrounds(pixels: Uint8ClampedArray, width: number, height: number, regions: MangaRegion[],context?:CanvasRenderingContext2D): MangaBackground[] {
     const appearances=observeImageSourceAppearances(pixels,width,height,regions);
     const eligible=new Set([...appearances].filter(([,appearance])=>appearance.outline).map(([region])=>region));
     const alignments=inferImageSourceAlignments(regions,eligible,width,height);
     return regions.map(region => {
         const background={...mangaRegionBackground(pixels,width,height,region.bbox),...(alignments.has(region)?{textAlign:alignments.get(region)}:{})},appearance=appearances.get(region);
-        return appearance?{...background,...(appearance.foreground?{foreground:appearance.foreground}:{}),...(appearance.background?{textBackground:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance.outline?{foregroundOutline:appearance.outline}:{})}:background;
+        const sourceFontSize=context&&appearance?getImageSourceInkFontSize(context,region,appearance.inkBoxes):undefined;
+        return appearance?{...background,...(appearance.foreground?{foreground:appearance.foreground}:{}),...(appearance.background?{textBackground:`rgb(${appearance.background.slice(0,3).join(',')})`}:{}),...(appearance.outline?{foregroundOutline:appearance.outline}:{}),...(sourceFontSize!==undefined?{sourceFontSize}:{})}:background;
     });
 }
 
@@ -181,7 +183,9 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
             }
             const display = !sampled.uniform && !region.vertical && region.fontSize >= width * .045;
             const weight = display ? 800 : 600;
-            const maxSize = Math.min(region.fontSize * 1.05,width * (display ? .10 : .034));
+            const observedSize=sampled.sourceFontSize;
+            const maxSize = observedSize!==undefined&&Number.isFinite(observedSize)&&observedSize>0&&observedSize<=(box.y1-box.y0)*2.5
+                ?observedSize:Math.min(region.fontSize * 1.05,width * (display ? .10 : .034));
             // 保留横向余量；OCR 框是字形边界，竖向空间由实际字形和描边适配，不再重复扣除内边距。
             let measuredFont = '', keyFontSize = NaN, font = '', keyPrefix = '', logicalPrefixLength = 0;
             const direction=getImageTextDirection(region.text);

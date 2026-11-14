@@ -33,13 +33,15 @@ When the last line of a short paragraph is much shorter than the others, line wi
 
 Ordinary images use the actual glyph bounds of your device's fonts to reduce clipping of accents, ascenders and descenders. Merged Tesseract vertical text keeps each column's erasure bounds, preserving artwork between columns. For opaque text regions whose complete boundary matches a smooth gradient, ordinary image and manga repair continue that gradient. Complex textures or translucent backgrounds may still show repair artifacts; switch to the original to compare.
 
-Single horizontal lines use both the source text's width and ink height to check its font scale, reducing size differences caused by letter shapes. Unreliable estimates and complex paragraphs keep their existing limits. Translations still fit their complete glyphs within the available area; this does not recover the original font family or every decorative style.
+Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.
 
 On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.
 
 Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Uncertain mixed colors and textures keep their existing handling.
 
 Manga translations use the direction of their paragraph when measuring and drawing text. This helps keep numbers, brackets and punctuation in Arabic and Hebrew text from following an unrelated default canvas direction.
+
+Manga wrapping tries to keep complete words and graphemes together, reducing splits within short Chinese words. Word boundaries depend on the browser's language support; words that exceed the available width can still wrap at complete graphemes.
 
 Small Japanese reading annotations above horizontal text or to the right of vertical text are attached to the body when their size, position and ownership are clear. This avoids translating the reading as a separate text block. The body and annotation keep their original erasure bounds, with padding based on the annotation's own size. Ambiguous annotations, independent small text and already grouped recognition regions retain their existing handling.
 

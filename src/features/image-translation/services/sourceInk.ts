@@ -3,13 +3,14 @@
  * 文件职责：只读观察纯色或平滑渐变底上的共同源字色，为译文保留可确认的视觉样式。
  * 主要内容：完整不透明外周校验双线性背景，所有显著差异限于原物理字框四像素内，以包含真实OCR框外的抗锯齿尾缘；从实际重复墨色中选取主色，再验证每个墨迹像素都能由同一颜色与局部背景混合得到。渐变容忍仅覆盖八位量化，不用它授予清字权限；纯色底的框外空处要求逐字节一致。单项六万五千像素、四千颜色和一百二十八物理框有硬上限，整页预算由调用方预付。
  * 模块边界：不修改像素、不返回掩码或修补计划，不推断字体、语义或艺术归属；纯色沿用4.5的局部对比门槛，渐变至少3并另给细对比描边，均不代表缩放后页面的可访问性认证。混色、纹理、透明或证据不足时保持未知。
+ * 字形边界：单个物理源框完成全部颜色验证后复用已有墨迹索引给出紧边界，供独立字号核对；多框不把总包围框冒充单行字高，也不授予额外清字范围。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import {imageMatteObservationBox,type ImageMattePalette} from './imageMatteRepair';
 import {getImageRgbContrast,getImageRgbLuminance,getImageTextColor} from './rendering';
 
 type Box=OcrLine['bbox'];
-export interface ImageSourceInk {background?:ImageMattePalette['background'];foreground?:string;outline?:string}
+export interface ImageSourceInk {background?:ImageMattePalette['background'];foreground?:string;outline?:string;inkBoxes?:readonly Box[]}
 const TOLERANCE=1.5;
 
 /** 每个颜色通道必须共享同一个覆盖率；可供只读样式和识别投影复核，不能证明字形、词界或擦除归属。 */
@@ -66,16 +67,19 @@ export function observeImageSourceInk(pixels:Uint8ClampedArray,width:number,heig
     for(const [color,n] of colors)if(n>count){candidate=color;count=n;}
     if(count<8||count<inkCount*.1)return;
     const ink=[candidate&255,candidate>>>8&255,candidate>>>16&255];
+    let x0=w,y0=h,x1=0,y1=0;
     for(let i=0;i<inkCount;i++){
         const x=inkPixels[i]%w,y=Math.floor(inkPixels[i]/w);
         if(!matchesImageSourceInk(read(x,y),background(x,y),ink))return;
+        x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+1);y1=Math.max(y1,y+1);
     }
+    const geometry=sources.length===1?{inkBoxes:[{x0:left+x0,y0:top+y0,x1:left+x1,y1:top+y1}]}:{};
     const foreground=`rgb(${ink.join(',')})`;
-    if(flat)return {background:[...corners[0]] as ImageMattePalette['background'],...(getImageRgbContrast(ink,corners[0])>=4.5?{foreground}:{})};
+    if(flat)return {...geometry,background:[...corners[0]] as ImageMattePalette['background'],...(getImageRgbContrast(ink,corners[0])>=4.5?{foreground}:{})};
     const luminance=getImageRgbLuminance(ink);
     for(let y=Math.floor(bounds.y0);y<Math.ceil(bounds.y1);y++)for(let x=Math.floor(bounds.x0);x<Math.ceil(bounds.x1);x++){
         const bg=getImageRgbLuminance(background(x-left,y-top));
         if((Math.max(luminance,bg)+.05)/(Math.min(luminance,bg)+.05)<3)return;
     }
-    return {foreground,outline:getImageTextColor(foreground)};
+    return {...geometry,foreground,outline:getImageTextColor(foreground)};
 }

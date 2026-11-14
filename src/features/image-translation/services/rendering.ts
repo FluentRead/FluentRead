@@ -6,6 +6,7 @@
  * 原色与余量：接收调用方已验证的前景色与可选细对比描边，并提供局部RGB对比度与单行实际高度度量；描边仍在原布局留量之内，这些度量本身不授予新增像素或清字权限。
  * 行缘标点：在既有词界及可证明的字素边界上绑定开闭标点与日文行首禁排字符；长词拆分后重新绑定，保留显式换行和完整正文，不以删字或越框解决孤立标点。
  * 短末行：仅对有界短段落进行五次以内的行宽平衡，使用浏览器词边界与原字素/标点边界的交集，保留字号、行数和完整词；候选须重新通过实际墨迹高度及宽度检查，不扩大清字或绘字范围。
+ * 原字尺度与位置：优先使用同帧观察到的逐行墨迹，独立核对原文字的参考宽度与字高；多行要求独立上下排列、相近字高及宽度区间同时吻合，未知断行空格不能人为提高字号。采用实测尺度时也保留墨迹位置，按源边线和垂直中心放置完整译文并夹紧到原绘字框；不改源框、字体族、字重、裁剪或修补范围。透视和混合字号无法一致解释时沿用原路径。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
@@ -101,24 +102,76 @@ export interface ImageTranslationTextLayout {
 
 export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
 
-/** 单个横排物理行的字号上限：宽度与墨迹高度独立推算一致时，才采用参考字体的 em 估计。
- * OCR 框不是字体行框；含下伸笔画的行不能仅因框更高就变成大字。未知字体形状、合段和长文本保留旧上限。
- * 这里只估计尺度，不声称识别字体族；最终译文仍须用设备实际回退字体的完整墨迹适配。
- */
-export function getImageSourceFontLimit(context:CanvasRenderingContext2D,line:ImageTextRegion):number {
-    if(line.vertical)return Infinity;
-    const b=line.bbox,height=b.y1-b.y0,width=b.x1-b.x0,fallback=(line.fontSize??height)*1.2;
-    if(line.sourceBoxes&&line.sourceBoxes.length!==1||line.ruby?.length||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text)
-        ||![width,height].every(value=>Number.isFinite(value)&&value>0))return fallback;
+interface ImageSourceInkGeometry {width:number;height:number;count:number;bounds:OcrLine['bbox']}
+export interface ImageSourceTextStyle {fontSize:number;inkBounds?:OcrLine['bbox']}
+function imageSourceInkGeometry(line:ImageTextRegion,inkBoxes:readonly OcrLine['bbox'][]|undefined):ImageSourceInkGeometry|undefined {
+    if(!inkBoxes?.length||inkBoxes.length>128||line.vertical||line.ruby?.length||line.guardOnly||line.numericUncertain
+        ||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text))return;
+    const sources=line.sourceBoxes??[line.bbox];if(sources.length!==inkBoxes.length)return;
+    const valid=(b:OcrLine['bbox']|undefined)=>b&&[b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)&&b.x0>=0&&b.y0>=0&&b.x1>b.x0&&b.y1>b.y0;
+    if(!valid(line.bbox))return;
+    for(let i=0;i<inkBoxes.length;i++){
+        const b=inkBoxes[i],s=sources[i];
+        if(!valid(b)||!valid(s)||s.x0<line.bbox.x0||s.y0<line.bbox.y0||s.x1>line.bbox.x1||s.y1>line.bbox.y1
+            ||b.x0<Math.floor(s.x0)-4||b.y0<Math.floor(s.y0)-4||b.x1>Math.ceil(s.x1)+4||b.y1>Math.ceil(s.y1)+4)return;
+    }
+    const rows=[...inkBoxes].sort((a,b)=>a.y0-b.y0||a.x0-b.x0);let width=0,height=0,small=Infinity,left=Infinity,right=0;
+    for(let i=0;i<rows.length;i++){
+        const b=rows[i],h=b.y1-b.y0;width+=b.x1-b.x0;height=Math.max(height,h);small=Math.min(small,h);left=Math.min(left,b.x0);right=Math.max(right,b.x1);
+        if(i){const a=rows[i-1];if(a.y1>b.y0||Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0)<Math.min(a.x1-a.x0,b.x1-b.x0)*.5)return;}
+    }
+    if(height>small*1.35)return;
+    return {width,height,count:rows.length,bounds:{x0:left,y0:rows[0].y0,x1:right,y1:rows[rows.length-1].y1}};
+}
+function withImageSourceFontMetrics(context:CanvasRenderingContext2D,text:string,select:(metrics:TextMetrics,space:()=>number)=>number|undefined):number|undefined {
     context.save();
     try{
-        context.font='400 100px Arial, sans-serif';context.textAlign='left';context.textBaseline='alphabetic';context.direction=getImageTextDirection(line.text);
-        const metrics=context.measureText(line.text),inkWidth=metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight,
-            inkHeight=metrics.actualBoundingBoxAscent+metrics.actualBoundingBoxDescent;
-        if(![inkWidth,inkHeight].every(value=>Number.isFinite(value)&&value>0))return fallback;
-        const byWidth=width/inkWidth*100,byHeight=height/inkHeight*100,estimate=(byWidth+byHeight)/2;
-        return Math.max(byWidth,byHeight)<=Math.min(byWidth,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5?estimate:fallback;
+        context.font='400 100px Arial, sans-serif';context.textAlign='left';context.textBaseline='alphabetic';context.direction=getImageTextDirection(text);
+        return select(context.measureText(text),()=>context.measureText(' ').width);
     }finally{context.restore();}
+}
+function estimateImageInkFontSize({width,height,count}:ImageSourceInkGeometry,metric:TextMetrics,measureSpace:()=>number):number|undefined {
+    const inkWidth=metric.actualBoundingBoxLeft+metric.actualBoundingBoxRight,inkHeight=metric.actualBoundingBoxAscent+metric.actualBoundingBoxDescent;
+    if(![inkWidth,inkHeight].every(value=>Number.isFinite(value)&&value>0))return;
+    const space=count>1?measureSpace():0;if(!Number.isFinite(space)||space<0)return;
+    const minimumWidth=inkWidth-space*(count-1);if(minimumWidth<=0)return;
+    // 原合段可能插入空格或直接连接CJK；两种宽度边界都须支持同一尺度，不猜断行位置。
+    const low=width/inkWidth*100,high=width/minimumWidth*100,byHeight=height/inkHeight*100,estimate=(low+high+byHeight*2)/4;
+    if(Math.max(low,high,byHeight)<=Math.min(low,high,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5)return estimate;
+}
+/** 已验证源像素的字形尺度；参考字体须同时解释完整原文字的宽度和字高，不能只按空框缩放。 */
+export function getImageSourceInkFontSize(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes:readonly OcrLine['bbox'][]|undefined):number|undefined {
+    const geometry=imageSourceInkGeometry(line,inkBoxes);
+    return geometry?withImageSourceFontMetrics(context,line.text,(metric,space)=>estimateImageInkFontSize(geometry,metric,space)):undefined;
+}
+
+/** 普通图优先用已观察的源字形；缺失时仍按原规则核对单个横排物理行的宽高。
+ * OCR 框不是字体行框；含下伸笔画的行不能仅因框更高就变成大字。未知字体形状、多行证据不足和长文本保留旧上限。
+ * 这里只估计尺度，不声称识别字体族；最终译文仍须用设备实际回退字体的完整墨迹适配。
+ */
+export function getImageSourceFontLimit(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes?:readonly OcrLine['bbox'][]):number {
+    return getImageSourceTextStyle(context,line,inkBoxes).fontSize;
+}
+/** 只有同一次字宽/字高核对采用实测尺度时，才把实测位置传给绘字；清字与裁剪仍使用原范围。 */
+export function getImageSourceTextStyle(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes?:readonly OcrLine['bbox'][]):ImageSourceTextStyle {
+    if(line.vertical)return {fontSize:Infinity};
+    const geometry=imageSourceInkGeometry(line,inkBoxes);
+    const b=line.bbox,height=b.y1-b.y0,width=b.x1-b.x0,fallback=(line.fontSize??height)*1.2;
+    const legacyEligible=!(line.sourceBoxes&&line.sourceBoxes.length!==1||line.ruby?.length||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text)
+        ||![width,height].every(value=>Number.isFinite(value)&&value>0));
+    if(!geometry&&!legacyEligible)return {fontSize:fallback};
+    let inkBounds:OcrLine['bbox']|undefined;
+    // 新旧估计共用同一次原生指标；新证据不足时不重复measureText或改变旧路径的工作量。
+    const fontSize=withImageSourceFontMetrics(context,line.text,(metrics,space)=>{
+        if(geometry){const observed=estimateImageInkFontSize(geometry,metrics,space);if(observed!==undefined){inkBounds=geometry.bounds;return observed;}}
+        if(!legacyEligible)return;
+        const inkWidth=metrics.actualBoundingBoxLeft+metrics.actualBoundingBoxRight,
+            inkHeight=metrics.actualBoundingBoxAscent+metrics.actualBoundingBoxDescent;
+        if(![inkWidth,inkHeight].every(value=>Number.isFinite(value)&&value>0))return;
+        const byWidth=width/inkWidth*100,byHeight=height/inkHeight*100,estimate=(byWidth+byHeight)/2;
+        return Math.max(byWidth,byHeight)<=Math.min(byWidth,byHeight)*1.12&&estimate>=height*.8&&estimate<=height*2.5?estimate:undefined;
+    })??fallback;
+    return {fontSize,...(inkBounds?{inkBounds}:{})};
 }
 
 /** 只有整段可在当前宽度以源字号保持一行时，返回实际墨迹与描边所需的高度。 */
@@ -388,6 +441,7 @@ export function drawTranslatedImageText(
     prepared?: ImageTranslationTextLayout,
     foregroundColor?: string,
     outlineColor?: string,
+    sourceInkBounds?: OcrLine['bbox'],
 ): void {
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
@@ -440,16 +494,28 @@ export function drawTranslatedImageText(
             ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2
             : top + paddingY + layout.lineHeight / 2;
         const x = textAlign === 'left' ? left + paddingX : textAlign === 'right' ? left + width - paddingX : left + width / 2;
+        const anchor=layout.ink&&sourceInkBounds&&[sourceInkBounds.x0,sourceInkBounds.y0,sourceInkBounds.x1,sourceInkBounds.y1].every(Number.isFinite)
+            &&sourceInkBounds.x1>sourceInkBounds.x0&&sourceInkBounds.y1>sourceInkBounds.y0?sourceInkBounds:undefined;
+        const inkTop=layout.ink?(anchor
+            ?Math.max(top+paddingY,Math.min(top+height-paddingY-layout.ink.height,(anchor.y0+anchor.y1-layout.ink.height)/2))
+            :top+(textAlign==='center'?(height-layout.ink.height)/2:paddingY)):0;
         layout.lines.forEach((line, index) => {
             const y = layout.ink
-                ? top + (textAlign === 'center' ? (height - layout.ink.height) / 2 : paddingY) + layout.ink.baselines[index]
+                ? inkTop + layout.ink.baselines[index]
                 : firstLine + index * layout.lineHeight;
             const metric = layout.ink ? measure(line, layout.fontSize) : undefined;
-            const inkX = metric && Number.isFinite(metric.actualBoundingBoxLeft + metric.actualBoundingBoxRight)
+            let inkX = metric && Number.isFinite(metric.actualBoundingBoxLeft + metric.actualBoundingBoxRight)
                 ? textAlign === 'left' ? left + paddingX + metric.actualBoundingBoxLeft + bleed(layout.fontSize)
                     : textAlign === 'right' ? left + width - paddingX - metric.actualBoundingBoxRight - bleed(layout.fontSize)
                         : left + (width + metric.actualBoundingBoxLeft - metric.actualBoundingBoxRight) / 2
                 : x;
+            if(anchor){
+                const span=metric!.actualBoundingBoxLeft+metric!.actualBoundingBoxRight+bleed(layout.fontSize)*2;
+                if(Number.isFinite(span)&&span>0){
+                    const start=textAlign==='left'?anchor.x0:textAlign==='right'?anchor.x1-span:(anchor.x0+anchor.x1-span)/2;
+                    inkX=Math.max(left+paddingX,Math.min(left+width-paddingX-span,start))+metric!.actualBoundingBoxLeft+bleed(layout.fontSize);
+                }
+            }
             context.strokeText(line, inkX, y);
             context.fillText(line, inkX, y);
         });

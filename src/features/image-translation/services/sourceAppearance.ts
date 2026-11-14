@@ -4,6 +4,7 @@
  * 主要内容：复用闭环静区和共同墨色端点观察，只接受不透明、整段背景一致的源区域；注音不决定正文字色，混色正文不猜测。源色对背景至少4.5:1时才提供字色，其余保留高对比默认；全部候选预付有界像素预算，避免顺序决定大页只有前半部换色。扩展仅扫描新增像素、保持原横向边界、避开所有其他文字，并要求完整新增范围仍是同一不透明底色。
  * 模块边界：只读像素和几何，不授权清字、不扩大擦除mask、不改变OCR或翻译，也不读取DOM；调色板不替代原透明保护和原文保护。对比度是局部采用门槛，不代表整页符合可访问性规范。
  * 渐变观察：原静区观察不足时，可在整段完整边界及物理字框内验证共同墨色；渐变只提供字色与细对比描边，不提供纯色背景或扩框权限，注音和已确认的混色/行间图案不进入此后备路径。
+ * 字号旁证：保留每个已验证物理行的独立墨迹边界，复用本次调色板观察，不追加Canvas读回；它与颜色一起仅描述原图，不修改原OCR行高、清字掩码或绘字边界。
  */
 import type {ImageTextRegion} from '../paragraphs';
 import {imageMatteObservationBox,observeImageMattePalette} from './imageMatteRepair';
@@ -68,7 +69,7 @@ export function observeImageSourceAppearances(pixels:Uint8ClampedArray,width:num
         if(!palettes.every(p=>equalColor(p!.background,first.background)&&equalColor(p!.ink,first.ink)))continue;
         if(!flatBetweenSources(pixels,width,bounds,[...sources,...palettes.map(p=>p!.supportBox)],first.background))continue;
         const foreground=getImageRgbContrast(first.ink,first.background)>=4.5?`rgb(${first.ink.slice(0,3).join(',')})`:undefined;
-        result.set(region,{background:first.background,...(foreground?{foreground}:{})});
+        result.set(region,{background:first.background,...(foreground?{foreground}:{}),inkBoxes:palettes.map(p=>({...p!.supportBox}))});
     }
     return result;
 }

@@ -5,6 +5,7 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供法语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
+import {privacyProtectionMessages} from './privacyProtection';
 import videoLearningText from './video-learning/fr-FR.json';
 import selfHelpText from './self-help/fr-FR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -567,6 +568,7 @@ export const frFRMessages = {
     "settings.requestLimits.globalTitle": "Limites de requêtes",
     "settings.requestLimits.globalHelp": "Les services et modèles sans réglages spécifiques partagent ces limites.",
     ...aiRequestTimeoutMessages["fr-FR"],
+    ...privacyProtectionMessages["fr-FR"],
     ...selectionDictionaryMessages["fr-FR"],
     ...sectionTranslationRulesFrenchMessages,
     "settings.requestLimits.retryIntervals": "Délais de nouvelle tentative",

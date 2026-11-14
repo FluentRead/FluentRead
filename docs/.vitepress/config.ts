@@ -54,6 +54,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       collapsed: true,
       items: [
         item('设置概览', 'Settings overview', '/config/'),
+        item('翻译隐私防护', 'Translation privacy', '/config/privacy-protection'),
         item('翻译服务', 'Translation providers', '/config/translation-engines'),
         item('ChatGPT 套餐接入状态', 'ChatGPT plan availability', '/config/chatgpt-plan'),
         item('译文外观与阅读辅助', 'Appearance & reading aids', '/config/appearance'),

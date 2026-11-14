@@ -1,5 +1,6 @@
 /**
  * @file src/services/translation/broker.ts
+ * 隐私防护：provider 前统一处理正文、上下文与提示词，逐槽校验后本地恢复；开启时跳过持久翻译缓存并隔离 pending 身份，失败不得降级发送明文。
  * 字幕参考：只向文档中的提示词 AI 传递有界 cue，独立于网页摘要开关并进入缓存身份；上下文异常回退会移除字幕参考并继续复验。
  * 用量控制：短参考直接复用；完整 AI 批次中的少数空槽或原文回显只恢复对应槽，整包回显仍触发原有降级。
  * 同图 Google：可信且启用原生合批的图片请求保留重复位置，以整组有序指纹隔离缓存；部分缺失重算完整邻文，逐条回退仍受原截止时间和取消所有权约束。
@@ -81,6 +82,8 @@ import {
     TranslationRequestSchedulerDeadlineError,
 } from './requestScheduler';
 import {serializeTranslationError} from './errors';
+import {preparePrivacyRequest} from './privacyProtection';
+import {PrivacyProtectionError} from '@/src/core/privacy/policy';
 import {createTranslationIdentityPolicy, type CacheRequestMode, type TranslationRequestIdentityContext} from './requestIdentity';
 import {currentConfiguredModel} from './templates';
 import {normalizeTranslationMaxRetries} from '@/src/core/config/scheduling';
@@ -274,7 +277,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     }
 
     function isCacheEnabled(current: TranslationProviderConfigSnapshot, message: TranslationRequestMessage): boolean {
-        return current.useCache && message.useCache !== false;
+        return !current.privacyProtection?.enabled && current.useCache && message.useCache !== false;
     }
 
     function isCacheableResult(origin: string, result: unknown, execution: TranslationRequestExecution): result is string {
@@ -441,6 +444,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         const retries = rotates ? 0 : current.translationMaxRetries === undefined
             ? 2 : normalizeTranslationMaxRetries(current.translationMaxRetries);
         return (ownershipKey ? `:owner:${ownershipKey.length}:${ownershipKey}` : '')
+            + (current.privacyProtection?.enabled ? `:privacy:${sha256Hex(JSON.stringify([current.privacyProtection, current.privacyProtectionSecretTerms]))}` : '')
             + `:quota:${quotaDigest(execution, getEffectiveRequestModel(current, service, modelOverride))}`
             + (sdk ? `:sdk-retries:${retries}` : '');
     }
@@ -662,9 +666,12 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                     });
                     const operation = Promise.resolve().then(async () => {
                         throwIfRequestAborted(execution.abortSignal);
-                        if (restoreLiteralEmoji) return restoreLiteralEmoji(await provider({...providerMessage}));
-                        const protectedRequest = prepareGlossaryRequest(providerMessage, execution.config);
-                        return protectedRequest.restore(await provider({...protectedRequest.message}));
+                        const privacy = preparePrivacyRequest(providerMessage, execution.config);
+                        try {
+                            if (restoreLiteralEmoji) return restoreLiteralEmoji(privacy.restore(await provider({...privacy.message})));
+                            const protectedRequest = prepareGlossaryRequest(privacy.message, privacy.config);
+                            return privacy.restore(protectedRequest.restore(await provider({...protectedRequest.message})));
+                        } finally {privacy.dispose();}
                     });
                     // 调度调用方可能已因 deadline/取消收到结果，但真实 provider transport
                     // 仍需结束后才能释放后台并发槽，避免旧请求与新请求叠加。
@@ -1259,6 +1266,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 if (execution.abortSignal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
                     throw error;
                 }
+                if (error instanceof PrivacyProtectionError) throw error;
                 warn('[FluentRead] page context summary failed; using extracted context:', error);
                 // 超时只是本次摘要预算耗尽，不能把原上下文当成成功摘要缓存，否则同 key 无法重试。
                 if (!(error instanceof TranslationProviderDeadlineError)
@@ -1734,6 +1742,12 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             trace.model = cleanModelName(getEffectiveRequestModel(current, selectedService, message.modelOverride));
         }
         const imageInput = getTranslationImageInput(message);
+        if (imageInput && current.privacyProtection?.enabled) throw new PrivacyProtectionError('PRIVACY_IMAGE_BLOCKED');
+        // 阻止模式先检查完整输入，不能先发送无敏感词的网页摘要，再发现正文需要阻止。
+        if (current.privacyProtection?.enabled && current.privacyProtection.mode === 'block') {
+            const preflight = preparePrivacyRequest(message, current);
+            preflight.dispose();
+        }
         if (imageInput && Array.isArray(message.origin) && message.origin.length > 0) {
             throw new Error('图片识别请求必须使用单条原文');
         }

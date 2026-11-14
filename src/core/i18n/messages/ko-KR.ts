@@ -5,6 +5,7 @@
  * 主要内容：保持语言名称使用各自原生写法，并为尚未 key 化的旧 UI 提供韩语映射。
  * 模块边界：资源只描述扩展自己的界面文本；不会翻译网页正文、用户输入或翻译结果。
  */
+import {privacyProtectionMessages} from './privacyProtection';
 import videoLearningText from './video-learning/ko-KR.json';
 import selfHelpText from './self-help/ko-KR.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
@@ -567,6 +568,7 @@ export const koKRMessages = {
     "settings.requestLimits.globalTitle": "요청 제한",
     "settings.requestLimits.globalHelp": "개별 설정이 없는 서비스와 모델은 이 제한을 공유합니다.",
     ...aiRequestTimeoutMessages["ko-KR"],
+    ...privacyProtectionMessages["ko-KR"],
     ...selectionDictionaryMessages["ko-KR"],
     ...sectionTranslationRulesKoreanMessages,
     "settings.requestLimits.retryIntervals": "재시도 간격",

@@ -38,6 +38,8 @@ export type SettingsSearchTarget = {
 
 /** 表单内的直达入口与真实控件共用 targetId，避免搜索只停在长分区顶部。 */
 export const settingsSearchTargets: readonly SettingsSearchTarget[] = [
+  {id: 'privacy-protection', sectionId: 'settings-advanced', targetId: 'privacy-protection-settings',
+    label: '翻译隐私防护', description: '高级选项', searchTerms: '脱敏 隐私 安全 敏感信息 邮箱 电话 身份证 密钥 隐私防护 privacy redaction PII'},
   {
     id: 'information-highlight', sectionId: 'settings-translation', targetId: 'information-highlight-settings',
     label: '智能高亮', description: '辅助阅读', searchTerms: '文本智能高亮、信息高亮、重点高亮、意外度、surprisal、关键词、密度、本地模型、隐私',
@@ -299,6 +301,7 @@ export const settingsPagePanels: Readonly<Record<string, readonly SettingsPagePa
     {"id": "local", "labelKey": "options.panel.local", "searchTerms": "X 本地 AI Whisper 语音 识别", "targetIds": []},
   ],
   'settings-advanced': [
+    {id: 'privacy', labelKey: 'privacy.title', searchTerms: '隐私 脱敏 安全 敏感信息 privacy redaction PII', targetIds: ['privacy-protection-settings']},
     {"id": "recognition", "labelKey": "options.panel.recognition", "searchTerms": "页面识别 节点 段落 标题 侧栏 双语上下顺序 原文在上 译文在上", "targetIds": []},
     {"id": "requests", "labelKey": "options.panel.requests", "searchTerms": "并发 限流 重试 性能 密钥 恢复 退避 AI 请求 超时 timeout 等待 慢模型", "targetIds": []},
     {"id": "cache", "labelKey": "options.panel.cache", "searchTerms": "缓存 容量 条数 存储 清除", "targetIds": []},

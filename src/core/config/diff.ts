@@ -681,6 +681,7 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     videoSentenceLearningAppearance: {group: 'videoSubtitles', label: '完整句学习外观'},
 
     useCache: {group: 'advanced', label: '缓存翻译结果', format: formatBoolean},
+    privacyProtection: {group: 'advanced', label: '翻译隐私防护', format: formatValue},
     translationCacheMaxBytes: {group: 'advanced', label: '翻译缓存容量上限', format: (value) => formatNumber(value, ' B')},
     translationCacheMaxEntries: {group: 'advanced', label: '翻译缓存条数上限', format: (value) => formatNumber(value, ' 条')},
     enableAIContext: {group: 'general', label: 'AI 智能上下文', format: formatBoolean},

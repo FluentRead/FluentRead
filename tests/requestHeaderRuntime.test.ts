@@ -9,10 +9,15 @@ const mocks = vi.hoisted(() => ({
     config: {requestHeaderRules: [] as Array<{domain: string; removeOrigin: boolean; removeReferer: boolean}>},
     subscribe: vi.fn(),
 }));
+// 能力矩阵在模块加载时求值，用可变对象模拟宿主浏览器，覆盖 Safari 与 Chromium 两种规则条件。
+const caps = vi.hoisted(() => ({browser: 'firefox'}));
+vi.mock('@/src/platform/browser/capabilities', () => ({
+    browserCapabilities: {get browser() { return caps.browser; }},
+}));
 vi.mock('@/src/services/config/store', () => ({config: mocks.config, configReady: Promise.resolve(), subscribeConfig: mocks.subscribe}));
 import {installRequestHeaderRuntime} from '@/src/app/background/requestHeaderRuntime';
 import {runtimeFetch, setRuntimeFetch} from '@/src/platform/http/runtime';
-afterEach(() => {setRuntimeFetch(); vi.unstubAllGlobals(); vi.restoreAllMocks(); mocks.subscribe.mockReset();});
+afterEach(() => {setRuntimeFetch(); vi.unstubAllGlobals(); vi.restoreAllMocks(); mocks.subscribe.mockReset(); caps.browser = 'firefox';});
 
 describe('后台请求头同步屏障', () => {
     it('用真实扩展 origin 的 hostname 安装规则，网络等待安装；配置更新与删除后立即同步', async () => {
@@ -57,6 +62,25 @@ describe('后台请求头同步屏障', () => {
         await runtimeFetch('https://api.example.com/');
         expect(fetch).toHaveBeenCalledOnce();
     });
+});
+
+it('Safari 宿主下省略 initiatorDomains，规则仍按精确域名安装', async () => {
+    caps.browser = 'safari';
+    mocks.config.requestHeaderRules = [{domain: 'api.example.com', removeOrigin: true, removeReferer: false}];
+    const api = {getDynamicRules: vi.fn().mockResolvedValue([]), updateDynamicRules: vi.fn().mockResolvedValue(undefined)};
+    vi.stubGlobal('browser', {runtime: {getURL: () => 'safari-web-extension://own-uuid/'}, declarativeNetRequest: api});
+    const fetch = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', fetch);
+    installRequestHeaderRuntime();
+    await Promise.resolve();
+    await runtimeFetch('https://api.example.com/v1');
+    const addRules = api.updateDynamicRules.mock.calls[0][0].addRules;
+    expect(addRules).toHaveLength(2);
+    for (const rule of addRules) {
+        expect(rule.condition).not.toHaveProperty('initiatorDomains');
+        expect(rule.condition).toMatchObject({resourceTypes: ['xmlhttprequest']});
+    }
+    expect(fetch).toHaveBeenCalledOnce();
 });
 
 it('缺少 DNR 的运行环境不影响其他服务', async () => {

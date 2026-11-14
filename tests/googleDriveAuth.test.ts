@@ -5,6 +5,7 @@ import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_
 function fixture() {
     const ports: DriveAuthPorts = {
         userAgent: () => 'Chrome/142.0.0.0',
+        userAgentData: () => ({brands: [{brand: 'Chromium'}, {brand: 'Not A;Brand'}, {brand: 'Google Chrome'}], mobile: false}),
         identity: {getAuthToken: vi.fn(async () => ({token: 'fixture-access', grantedScopes: [...GOOGLE_DRIVE_SCOPES]})), removeCachedAuthToken: vi.fn(async () => undefined), clearAllCachedAuthTokens: vi.fn(async () => undefined)},
         runtime: {id: GOOGLE_DRIVE_EXTENSION_ID, getManifest: () => ({oauth2: {client_id: GOOGLE_DRIVE_DEFAULT_CLIENT_ID, scopes: [...GOOGLE_DRIVE_SCOPES]}})},
         fetch: vi.fn(async () => new Response(JSON.stringify({user: {permissionId: 'fixture-account', emailAddress: 'tester@fixture.invalid'}}))),
@@ -35,9 +36,12 @@ describe('Chrome Google 身份边界', () => {
         expect(f.ports.identity!.clearAllCachedAuthTokens).toHaveBeenCalledOnce();
     });
     it('未配置、浏览器不支持、扩展 ID 错误和范围不全均不能发起认证', async () => {
-        for (const userAgent of ['Firefox/140.0', 'Chrome/142.0 Edg/142.0', 'Chrome/142.0 OPR/142.0']) {
+        for (const userAgent of ['Firefox/140.0', 'Chrome/142.0 Edg/142.0', 'Chrome/142.0 OPR/142.0', 'Chrome/157.0 Aside/1.0', 'Chrome/157.0 Ego/0.6', 'Chrome/157.0 EgoLite/0.6', 'Chrome/157.0 Vivaldi/7.0', 'Chrome/157.0 Android', 'Chrome/157.0 Mobile']) {
             const unsupported = fixture(); unsupported.ports.userAgent = () => userAgent;
             expect(unsupported.auth.availability().available).toBe(false);
+            await expect(unsupported.auth.open(true)).rejects.toThrow('WebDAV 或本地备份');
+            expect(unsupported.ports.identity!.getAuthToken).not.toHaveBeenCalled();
+            expect(unsupported.ports.fetch).not.toHaveBeenCalled();
         }
         const f = fixture();
         f.ports.identity = undefined;
@@ -55,12 +59,39 @@ describe('Chrome Google 身份边界', () => {
         const custom = fixture(); custom.ports.runtime.id = 'fixture-custom-id'; custom.ports.runtime.getManifest = () => ({oauth2: {client_id: 'fixture-custom-client', scopes: [...GOOGLE_DRIVE_SCOPES]}});
         expect(custom.auth.availability().available).toBe(true);
     });
+    it('Chrome UA 和同名 API 不足以证明支持；缺失、未知或移动端品牌不会触发授权或请求', async () => {
+        const data: ReturnType<DriveAuthPorts['userAgentData']>[] = [
+            undefined, {brands: [], mobile: false},
+            ...['Chromium', 'Aside', 'Ego', 'Ego Lite', 'Vivaldi', 'Brave', 'Google Chrome Canary-like'].map(brand => ({brands: [{brand: 'Not A;Brand'}, {brand}], mobile: false})),
+            {brands: [{brand: 'Google Chrome'}], mobile: true},
+        ];
+        for (const browserData of data) {
+            const f = fixture();
+            f.ports.userAgentData = () => browserData;
+            expect(f.auth.availability()).toMatchObject({available: false, reason: expect.stringContaining('桌面版 Google Chrome')});
+            await expect(f.auth.open(true)).rejects.toThrow('WebDAV 或本地备份');
+            expect(f.ports.identity!.getAuthToken).not.toHaveBeenCalled();
+            expect(f.ports.fetch).not.toHaveBeenCalled();
+        }
+    });
+    it('Google Chrome 品牌顺序和 GREASE 名称不影响已支持的桌面授权', async () => {
+        const f = fixture();
+        f.ports.userAgentData = () => ({brands: [{brand: 'Google Chrome'}, {brand: 'Not(A:Brand'}, {brand: 'Chromium'}], mobile: false});
+        expect((await f.auth.open(true)).account.id).toBe('drive:fixture-account');
+    });
     it('拒绝取消、空 token 和未授予 Drive 范围；旧邮箱授权不能代替 Drive，兼容 Chrome 未返回 grantedScopes', async () => {
         const f = fixture();
         vi.mocked(f.ports.identity!.getAuthToken).mockRejectedValueOnce(new Error('fixture provider private error'));
-        await expect(f.auth.open()).rejects.toThrow('授权未完成');
-        vi.mocked(f.ports.identity!.getAuthToken).mockResolvedValueOnce({});
-        await expect(f.auth.open()).rejects.toThrow('有效授权');
+        const failure = await f.auth.open(true).catch(error => error);
+        expect(failure.message).toContain('Google 授权未完成');
+        expect(failure.message).toContain('桌面版 Google Chrome');
+        expect(failure.message).toContain('WebDAV 或本地备份');
+        expect(failure.message).not.toContain('fixture provider private error');
+        expect(f.auth.availability().available).toBe(true);
+        for (const result of [{}, undefined, null]) {
+            vi.mocked(f.ports.identity!.getAuthToken).mockResolvedValueOnce(result as {token?: string});
+            await expect(f.auth.open()).rejects.toThrow('Google 授权未完成。请在桌面版 Google Chrome');
+        }
         vi.mocked(f.ports.identity!.getAuthToken).mockResolvedValueOnce({token: 'fixture-access', grantedScopes: []});
         await expect(f.auth.open()).rejects.toThrow('配置数据权限');
         expect(f.ports.fetch).not.toHaveBeenCalled();
@@ -180,6 +211,22 @@ it('releases a rejected late identity without attempting token cleanup', async (
     const controller=new AbortController();const old=f.auth.open(true,controller.signal).catch(error=>error);
     await vi.waitFor(()=>expect(reject).toBeTypeOf('function'));controller.abort();await old;reject(new Error('fixture identity cancelled'));
     await vi.waitFor(async()=>expect((await f.auth.open(true)).account.id).toBe('drive:fixture-account'));
+    expect(f.ports.identity!.removeCachedAuthToken).not.toHaveBeenCalled();
+});
+
+it.each([{}, undefined])('取消后迟到的空授权 %j 不阻断后续重试，提前清理缓存仍须等待原请求结束', async result => {
+    const f = fixture();
+    let release!: (value: {token?: string}) => void;
+    vi.mocked(f.ports.identity!.getAuthToken).mockImplementationOnce(() => new Promise(resolve => {release = resolve;}));
+    const controller = new AbortController();
+    const old = f.auth.open(true, controller.signal).catch(error => error);
+    await vi.waitFor(() => expect(release).toBeTypeOf('function'));
+    controller.abort();
+    await old;
+    await f.auth.disconnect();
+    await expect(f.auth.open(true)).rejects.toThrow('上次 Google 授权');
+    release(result as {token?: string});
+    await vi.waitFor(async () => expect((await f.auth.open(true)).account.id).toBe('drive:fixture-account'));
     expect(f.ports.identity!.removeCachedAuthToken).not.toHaveBeenCalled();
 });
 

@@ -45,12 +45,13 @@ async function main() {
         await page.locator('button[data-section="settings-data"]').click();
         const card = page.locator('[data-testid="google-drive-sync"]');
         await card.waitFor({state: 'visible'});
-        await card.getByText('Google Drive 同步目前支持 Chrome 扩展', {exact: false}).waitFor();
+        await card.getByText('Google Drive 同步仅支持桌面版 Google Chrome', {exact: false}).waitFor();
         check(await page.locator('[data-testid="google-drive-sync-now"]').count() === 0, 'Edge explicitly shows unsupported native OAuth');
 
         // 夹具只修改本次临时 profile 的 worker，不授权或访问任何真实账号。
         await worker.evaluate(() => {
             Object.defineProperty(navigator, 'userAgent', {get: () => 'Chrome/142.0.0.0 fixture'});
+            Object.defineProperty(navigator, 'userAgentData', {get: () => ({brands: [{brand: 'Google Chrome'}], mobile: false})});
             globalThis.__driveFixture = {content: null, version: 0, authorizations: 0, clears: 0, requests: 0, uploads: 0, removes: 0, networkFailure: false, etagMode: 'v3', accountId: 'fixture-account', email: 'tester@fixture.invalid'};
             chrome.identity.getAuthToken = async ({interactive, scopes}) => {
                 if (JSON.stringify(scopes) !== JSON.stringify(['https://www.googleapis.com/auth/drive.appdata'])) throw new Error('fixture rejected extra OAuth scopes');

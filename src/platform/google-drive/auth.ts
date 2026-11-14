@@ -1,11 +1,13 @@
 /**
  * @file src/platform/google-drive/auth.ts
  * 文件职责：连接 Chrome 原生身份 API，并将一次同步绑定到同一个 Google 账号。
- * 主要内容：单项 Drive 授权、Drive 账号识别、短期令牌刷新与账号切换保护。
+ * 主要内容：确认桌面 Google Chrome 品牌、单项 Drive 授权、Drive 账号识别、短期令牌刷新与账号切换保护。
  * 模块边界：不保存令牌、不读取配置；账号和令牌只在后台请求期间使用。
  */
 import {cancelUnreadResponseBody} from '@/src/platform/http/runtime';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_ID, GOOGLE_DRIVE_SCOPES} from './constants';
+
+const AUTHORIZATION_INCOMPLETE = 'Google 授权未完成。请在桌面版 Google Chrome 中登录并允许授权后重试；也可改用 WebDAV 或本地备份。';
 
 // 邮箱仅用于预览展示；账号绑定始终使用 Drive permissionId，不依赖邮箱或额外身份授权。
 export interface DriveAccount {id: string; email: string}
@@ -21,8 +23,13 @@ export interface DriveIdentity {
 export class DriveError extends Error {
     constructor(message: string, readonly status?: number) {super(message); this.name = 'DriveError';}
 }
+export interface DriveBrowserData {
+    brands: readonly {brand: string}[];
+    mobile: boolean;
+}
 export interface DriveAuthPorts {
     userAgent(): string;
+    userAgentData(): DriveBrowserData | undefined;
     identity?: DriveIdentity;
     runtime: {id: string; getManifest(): {oauth2?: {client_id?: string; scopes?: string[]}}};
     fetch: typeof fetch;
@@ -44,7 +51,15 @@ export function createDriveAuth(ports: DriveAuthPorts) {
     };
     function availability(): {available: boolean; reason: string} {
         const oauth = ports.runtime.getManifest().oauth2;
-        if (!/\bChrome\//u.test(ports.userAgent()) || /\b(?:Edg|OPR)\//u.test(ports.userAgent()) || !ports.identity?.getAuthToken || !oauth?.client_id) return {available: false, reason: 'Google Drive 同步目前支持 Chrome 扩展；其他浏览器可使用下方完整数据备份。'};
+        const userAgent = ports.userAgent();
+        const browserData = ports.userAgentData();
+        // Chromium 衍生浏览器也可能暴露 Chrome UA 和 identity API，不能据此承诺原生 Google 授权可用。
+        // 只读取低熵品牌信息；无法确认品牌时关闭入口，不通过发起授权来探测兼容性。
+        if (!browserData?.brands.some(({brand}) => brand === 'Google Chrome') || browserData.mobile
+            || !/\bChrome\//u.test(userAgent) || /\b(?:Edg\w*|OPR|Vivaldi|Aside|Ego(?:Lite)?)\/|\b(?:Android|Mobile)\b/iu.test(userAgent)
+            || typeof ports.identity?.getAuthToken !== 'function' || !oauth?.client_id) {
+            return {available: false, reason: 'Google Drive 同步仅支持桌面版 Google Chrome；请改用 WebDAV 或本地备份。'};
+        }
         if (oauth.client_id === GOOGLE_DRIVE_DEFAULT_CLIENT_ID && ports.runtime.id !== GOOGLE_DRIVE_EXTENSION_ID) return {available: false, reason: '当前开发版扩展 ID 与 Google OAuth 客户端不匹配，请按维护者指南设置扩展公钥或单独创建开发客户端。'};
         if (!GOOGLE_DRIVE_SCOPES.every(scope => oauth.scopes?.includes(scope))) return {available: false, reason: '扩展缺少 Google Drive 应用数据授权范围，请重新构建。'};
         return {available: true, reason: ''};
@@ -60,7 +75,7 @@ export function createDriveAuth(ports: DriveAuthPorts) {
         });
         let result: Awaited<ReturnType<DriveIdentity['getAuthToken']>>;
         const quarantine = () => {
-            const cleanup = request.then(async late => {if (late.token) await ports.identity!.removeCachedAuthToken({token: late.token});}, () => undefined)
+            const cleanup = request.then(async late => {if (late?.token) await ports.identity!.removeCachedAuthToken({token: late.token});}, () => undefined)
                 .catch(() => {abandonedCleanupFailed = true;});
             abandonedIdentities.add(cleanup);
             void cleanup.then(() => {abandonedIdentities.delete(cleanup);});
@@ -72,9 +87,9 @@ export function createDriveAuth(ports: DriveAuthPorts) {
             signal?.throwIfAborted();
         } catch (error) {
             if (signal?.aborted) throw signal.reason;
-            throw new DriveError('Google 授权未完成，请点击同步按钮后重试。');
+            throw new DriveError(AUTHORIZATION_INCOMPLETE);
         } finally {signal?.removeEventListener('abort', abort);}
-        if (!result.token) throw new DriveError('Google 未返回有效授权，请点击同步按钮重试。');
+        if (!result?.token) throw new DriveError(AUTHORIZATION_INCOMPLETE);
         if (result.grantedScopes && !result.grantedScopes.includes(GOOGLE_DRIVE_SCOPES[0])) throw new DriveError('未允许 Google Drive 配置数据权限，请重新同步并在 Google 授权页面允许访问配置数据。');
         return result.token;
     }

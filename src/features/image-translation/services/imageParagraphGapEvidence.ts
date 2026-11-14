@@ -4,6 +4,7 @@
  * 小字续行：狭窄走廊保留至少两行实测像素，中心对齐的未完句同时验证两端前景与完整平滑间隙；相邻关系不受更早或更晚的段内行干扰。已被像素证明选中的空格视图可通过内部原对象来历保留几何关系，克隆、坐标或非空格文字变化仍拒绝。
  * 主要内容：先限定横排字号、列投影和邻接范围，再按页预扣128次/1Mi源观察面积、每ROI64Ki预算；H8唯一静区、完整横向空白走廊和左右行单元共同排除边线与控件附件；不透明精确平色间隙还须证明两行处于同一封闭matte owner；原始对象及完整快照随同页graph跨Worker，实际去重采用后绑定数组、原图及尺寸，整段包络仍受所有物理行和数值guard阻挡。
  * 样式边界：逐列渐变候选的行高差超过20%时，最多额外观察262,144像素面积并复用同页源色；两个已确认墨色的对比达到3时撤回额外续行，避免大标题与副标题因同底色被并成一种样式。未知字色沿用原规则，这项观察只撤回关系，不授予写入或新增合段权限。
+ * 墨迹间距：两端完整静区已经提供真实字形边界时，常规续行的2.5倍行距还须按较小实测字高核对，OCR留白不能放大可接受间隙；明确过远的原字形不借平色回退再次合段。消费者对实际墨迹证明执行相同限制，虚拟profile边界不冒充实测字形；大面积透明页的已授权长间距路径仍独立核对。
  * 模块边界：不创建Canvas、不运行模型、不翻译或修改文字、不保留像素或擦除mask；缺失、歧义、预算不足及对象替换均回到原严格行距，静区布局不授权修补或绘字。普通图片可延迟给段落排版读取旁证；漫画可在结果收集时一次性消费旁证，仍需保留原始单行框。
  */
 import type {ImageParagraphContinuations,ImageTextRegion} from '../paragraphs';
@@ -78,6 +79,11 @@ function potential(a:Box,b:Box,wide=true):boolean {
         &&(!wide||Math.floor(gap)>Math.floor(small*.65))
         &&Math.min(a.x1,b.x1)-Math.max(a.x0,b.x0)>=Math.min(a.x1-a.x0,b.x1-b.x0)*.5
         &&Math.min(Math.abs(a.x0-b.x0),Math.abs(a.x1-b.x1),Math.abs(a.x0+a.x1-b.x0-b.x1)/2)<=small*.8;
+}
+/** 完整墨迹只收紧原候选间距；单独满足此式不提供续段或写图权限。 */
+function observedInkGapFits(previous:ImageMatteGeometry,next:ImageMatteGeometry):boolean {
+    const a=previous.supportBox,b=next.supportBox;
+    return b.y0-a.y1<=Math.min(a.y1-a.y0,b.y1-b.y0)*2.5;
 }
 /** 紧邻居中续行仅豁免小幅行距：字号接近、无句末、中心相合，仍须逐像素验证完整间隙。 */
 function tightContinuation(previous:MangaOcrItem,next:MangaOcrItem):boolean {
@@ -409,7 +415,9 @@ export function produceImageParagraphGapProofs(page:ImageParagraphPage,width:num
         const endpointArea=oa.width*oa.height+ob.width*ob.height;
         if(endpointArea>MAX_PIXELS-charged)break enumerate;charged+=endpointArea;
         for(const item of [previous,next])if(!cache.has(item))cache.set(item,observeImageMatteGeometry(pixels,width,height,boxOf(item)));
-        const ga=cache.get(previous),gb=cache.get(next),windows=ga&&gb?layout(a,b,ga,gb,physical,width,height):undefined;
+        const ga=cache.get(previous),gb=cache.get(next);
+        if(ga&&gb&&!alphaLongContinuation&&!observedInkGapFits(ga,gb))continue;
+        const windows=ga&&gb?layout(a,b,ga,gb,physical,width,height):undefined;
         if(ga&&gb&&windows&&!alphaLongContinuation){candidates.push({ordinal,previous,next,previousSnapshot,nextSnapshot,previousGeometry:ga,nextGeometry:gb,endpointArea,windows});continue;}
         if(proveSmoothGap(previous,next,previousSnapshot,nextSnapshot,ordinal,endpointArea,oa,ob,true,alphaLongContinuation)==='budget')break enumerate;
     }
@@ -485,6 +493,7 @@ export function createImageParagraphGapConsumer(page:ImageParagraphPage,width:nu
                 const alphaLongContinuation=proof.alphaLongContinuation===true;
                 if(proof.alphaLongContinuation!==undefined&&!alphaLongContinuation||alphaLongContinuation&&(page.largeAlphaHoles!==true||!alphaLongPotential(a,b))
                     ||(!potential(a,b)&&!alphaLongContinuation)||owner(previous,page)!==owner(next,page)||!validGeometry(ga,a,width,height,profileMode||flatOwnerMode)||!validGeometry(gb,b,width,height,profileMode||flatOwnerMode))continue;
+                if(!profileMode&&!flatOwnerMode&&!observedInkGapFits(ga,gb))continue;
                 const profileWindow=flatOwnerMode||profileMode?pageGapEvidenceWindow(a,b,width,height):undefined;
                 const windows=profileMode||flatOwnerMode?(profileWindow?[profileWindow]:undefined):layout(a,b,ga,gb,physical,width,height);if(!windows)continue;
                 if(flatOwnerMode){

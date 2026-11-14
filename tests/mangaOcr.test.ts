@@ -282,7 +282,7 @@ describe('普通图片的段落静区证明生产与实际结果绑定',()=>{
         const results=[{text:'First complete line',confidence:.99,box:{x:40,y:40,width:90,height:14}},
             {text:'Second complete line',confidence:.99,box:{x:40,y:74,width:90,height:14}}];
         for(const item of results)for(let x=item.box.x+4;x<item.box.x+item.box.width-4;x+=8)
-            for(let y=item.box.y+3;y<item.box.y+11;y++)for(let dx=0;dx<3;dx++)pixels.set([240,245,250,255],(y*200+x+dx)*4);
+            for(let y=item.box.y+2;y<item.box.y+12;y++)for(let dx=0;dx<3;dx++)pixels.set([240,245,250,255],(y*200+x+dx)*4);
         const factory=vi.mocked(document.createElement).getMockImplementation()!;
         vi.mocked(document.createElement).mockImplementation(()=>{
             const canvas=factory('canvas');mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});return canvas;

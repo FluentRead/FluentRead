@@ -65,8 +65,9 @@ describe('AI SDK 首批服务路由', () => {
             services.cloudgpu,
             services.cheaperinference,
             services.cheapaimodel,
+            services.standardcompute,
         ]);
-        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(30);
+        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(31);
         expect(getAiSdkEndpointRoute(services.custom)).toBe('custom');
         expect(getAiSdkEndpointRoute(services.newapi)).toBe('newapi');
         expect(getAiSdkEndpointRoute(services.azureOpenai)).toBe('azure');

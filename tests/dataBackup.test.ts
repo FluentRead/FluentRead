@@ -42,6 +42,19 @@ function modelUsage(): ModelUsageTransferDocument {
 }
 
 describe('统一本机数据备份信封', () => {
+    it.each([null, 'phrase', {}, [42], ['x'.repeat(257)], Array.from({length: 129}, () => 'phrase')])(
+        '精确备份拒绝非法的自定义敏感词，不静默截断：%j', privacyProtectionSecretTerms => {
+            const config = {...prepareConfigForExport(new Config()), privacyProtectionSecretTerms};
+            expect(() => createFluentReadDataBackup({config, vocabulary: vocabulary(), modelUsage: modelUsage()})).toThrow('精确凭据快照');
+        },
+    );
+    it('兼容旧备份缺省隐私词，并保留合法词条的完整快照', () => {
+        const config = prepareConfigForExport(new Config());
+        config.privacyProtectionSecretTerms = ['人工示例'];
+        expect(createFluentReadDataBackup({config, vocabulary: vocabulary(), modelUsage: modelUsage()}).config.privacyProtectionSecretTerms).toEqual(['人工示例']);
+        delete config.privacyProtectionSecretTerms;
+        expect(() => createFluentReadDataBackup({config, vocabulary: vocabulary(), modelUsage: modelUsage()})).not.toThrow();
+    });
     it('组合并识别配置、单词本与模型用量完整备份', () => {
         const config = new Config();
         config.translationLoadingStyle = 'orbit';

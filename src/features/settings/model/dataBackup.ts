@@ -60,6 +60,8 @@ function isStringMapping(value: unknown): boolean {
 }
 
 const exactCredentialFieldValidators: Record<ConfigCredentialField, (value: unknown) => boolean> = {
+    privacyProtectionSecretTerms: value => Array.isArray(value) && value.length <= 128
+        && value.every(term => typeof term === 'string' && term.length <= 256),
     token: isStringMapping,
     apiKeys: value => isPlainRecord(value)
         && Object.values(value).every(item => Array.isArray(item) && item.every(key => typeof key === 'string')),
@@ -81,9 +83,9 @@ function hasExactCredentialSnapshot(value: unknown): boolean {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
     const record = value as Record<string, unknown>;
     return CONFIG_CREDENTIAL_FIELDS.every(field => (
-        // 早期 v2 尚无这三个字段；secret/请求头缺省为空，apiKeys 从旧 token 迁移。
+        // 早期 v2 尚无后续字段；隐私词、secret/请求头缺省为空，apiKeys 从旧 token 迁移。
         // 只兼容缺失，显式提供的畸形值仍须拒绝，不能在校验前用默认值掩盖。
-        ((field === 'secret' || field === 'customHeaders' || field === 'apiKeys')
+        ((field === 'secret' || field === 'customHeaders' || field === 'apiKeys' || field === 'privacyProtectionSecretTerms')
             && !Object.prototype.hasOwnProperty.call(record, field))
         || (Object.prototype.hasOwnProperty.call(record, field)
         && exactCredentialFieldValidators[field](record[field]))

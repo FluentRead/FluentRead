@@ -2,11 +2,13 @@
  * @file src/providers/translation/connectionTest.ts
  *
  * 文件职责：通过真实 provider registry 执行最小翻译连接测试，覆盖服务鉴权、端点、模型配置和响应解析。
+ * 隐私边界：连接检查中的用户模板同样经过本地脱敏与阻止策略，不能因静态测试原文绕过防护。
  * 主要内容：使用固定英文测试文本调用指定适配器，为 MyMemory 和免费池单服务指定测试语言对；组合服务按配置策略逐成员检查，沿用冻结凭据、成员模型、共享总预算和取消边界，模型用量仍记录真实服务；传递共享调度租约直到真实传输结束，验证非空结果并返回耗时；formatConnectionTestError 将失败转换为可读消息。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
 import {translationProviderRegistry} from './registry';
+import {preparePrivacyRequest} from '@/src/services/translation/privacyProtection';
 import {resolveConfiguredModel, services, servicesType} from '@/src/core/config/catalog';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
 import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
@@ -135,6 +137,13 @@ export async function runTranslationServiceConnectionTest(
             const requestWithConfig = selectedSnapshot
                 ? attachTranslationProviderConfig(observedRequest, selectedSnapshot)
                 : observedRequest;
+            // 连接测试也会使用用户模板，必须遵守与正式翻译相同的隐私规则。
+            const invokeAdapter = async (request: typeof requestWithConfig) => {
+                if (!selectedSnapshot) return adapter(request);
+                const privacy = preparePrivacyRequest(request, selectedSnapshot);
+                try {return privacy.restore(await adapter(privacy.message));}
+                finally {privacy.dispose();}
+            };
             const transport = usageOptions.requestScheduler
                 ? usageOptions.requestScheduler.schedule(async (lease) => {
                     // 每次入场建立独立上下文，避免后续 Key 尝试覆盖仍在结算的请求租约。
@@ -142,7 +151,7 @@ export async function runTranslationServiceConnectionTest(
                         service,
                         model: effectiveModel,
                     }, lease);
-                    const operation = Promise.resolve().then(() => adapter(scheduledRequest));
+                    const operation = Promise.resolve().then(() => invokeAdapter(scheduledRequest));
                     lease.holdUntil(operation);
                     return operation;
                 }, {
@@ -151,7 +160,7 @@ export async function runTranslationServiceConnectionTest(
                     identity: {service, model: effectiveModel},
                     countRate: usageOptions.countRate !== false,
                 })
-                : Promise.resolve().then(() => adapter(requestWithConfig));
+                : Promise.resolve().then(() => invokeAdapter(requestWithConfig));
             const response = await Promise.race([transport, timeout, abort]);
             if (!isNonEmptyText(response)) throw new Error('服务已响应，但没有返回有效译文');
             if (freeProviderId !== undefined && response.trim() === CONNECTION_TEST_ORIGIN) {

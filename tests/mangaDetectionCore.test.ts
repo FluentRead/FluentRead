@@ -115,3 +115,73 @@ it('真实概率片段仅排除高光SA，保留字母数字、细灰字、小�
         const original=structuredClone(sample.raw);const b=record(c,f,sample.raw.box,sample.originalRegion,sample.mappedRegion);expect(c.rejects(b)).toBe(sample.expectedExcluded);expect(sample.raw).toEqual(original);c.endPage();
     }
 });
+
+describe('补充核心绑定到当前页原像素视图',()=>{
+    const source={pageWidth:512,pageHeight:256,x:20,y:30,width:384,height:128};
+    function refinementFrame(c:Core,scope:any=source,columns=1,w=384,h=128){
+        const ticket=c.beginFrame(w,h,1536,scope),ratio=Math.min(1,1536/Math.max(w,h)),width=Math.ceil(Math.round(w*ratio)/32)*32,height=Math.ceil(Math.round(h*ratio)/32)*32;
+        const data=new Float32Array(width*height);const boxes:Array<{x:number;y:number;width:number;height:number}>=[];
+        c.observe(ticket,{dims:[1,3,height,width]},{dims:[1,1,height,width],data});
+        for(let column=0;column<columns;column++){
+            const offset=column*128,raw={x0:16+offset,y0:16,x1:112+offset,y1:112},mapped={x0:8+offset,y0:8,x1:120+offset,y1:120};
+            for(let y=raw.y0;y<raw.y1;y++)for(let x=raw.x0;x<raw.x1;x++)data[y*width+x]=.1;
+            for(let y=48;y<60;y++)for(let x=32+offset;x<96+offset;x++)data[y*width+x]=.9;
+            c.observeRegion(ticket,width,height,raw,mapped);boxes.push({x:mapped.x0,y:mapped.y0,width:112,height:112});
+        }
+        return {ticket,width,height,data,boxes};
+    }
+    it('保留父框和原概率，只有唯一原Box能把紧凑核心映回同一页',()=>{
+        const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c),before=f.data.slice();c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);
+        expect(c.takeRefinements()).toEqual([{core:{x0:52,y0:78,x1:116,y1:90},crop:{x0:48,y0:74,x1:120,y1:94},area:768,parent:{x0:28,y0:38,x1:140,y1:150},pageWidth:512,pageHeight:256}]);
+        expect(c.takeRefinements()).toEqual([]);expect(f.data).toEqual(before);expect(c.rejects(f.boxes[0])).toBe(false);expect(c.refinementUsage).toEqual({pixels:9216,components:1,overflow:false});
+    });
+    it('原像素视图中的完全弱组件仍按原规则排除，不产生补充识别',()=>{
+        const c=createMangaDetectionCore();c.beginPage();const ticket=c.beginFrame(384,128,1536,source),data=new Float32Array(384*128);
+        for(let y=16;y<112;y++)for(let x=16;x<112;x++)data[y*384+x]=.1;
+        c.observe(ticket,{dims:[1,3,128,384]},{dims:[1,1,128,384],data});c.observeRegion(ticket,384,128,{x0:16,y0:16,x1:112,y1:112},{x0:8,y0:8,x1:120,y1:120});
+        const box={x:8,y:8,width:112,height:112};c.bindBoxes(ticket,[box]);c.endFrame(ticket);expect(c.takeRefinements()).toEqual([]);expect(c.rejects(box)).toBe(true);
+    });
+    it('未知/放大视图和无法对应整页的坐标不生成补充候选',()=>{
+        for(const scope of [undefined,{...source,width:128},{...source,height:64},{...source,pageWidth:0},{...source,pageHeight:0},{...source,pageWidth:8193},{...source,pageHeight:8193},{...source,pageWidth:8192,pageHeight:2049},{...source,x:NaN},{...source,x:-1},{...source,y:-1},{...source,x:200},{...source,y:200}]){
+            const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c,scope===undefined?null:scope);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);expect(c.refinementUsage.pixels).toBe(0);
+        }
+        for(const [w,h]of [[1537,128],[128,1537]]){const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c,{pageWidth:2000,pageHeight:2000,x:0,y:0,width:w,height:h},1,w,h);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);}
+    });
+    it('重复区域、重复Box、Box坐标漂移和非法绑定撤回不明确候选',()=>{
+        for(const mode of ['region','boxes','mutation','unknown']){
+            const c=createMangaDetectionCore();c.beginPage();const f=refinementFrame(c);
+            if(mode==='region')c.observeRegion(f.ticket,f.width,f.height,{x0:16,y0:16,x1:112,y1:112},{x0:8,y0:8,x1:120,y1:120});
+            c.bindBoxes(f.ticket,mode==='boxes'?[f.boxes[0],{...f.boxes[0]}]:f.boxes);
+            if(mode==='mutation')f.boxes[0].width++;
+            if(mode==='unknown')c.bindBoxes(undefined,[]);
+            c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);
+        }
+    });
+    it('取消、重复推理、交错帧和换页不泄漏候选',()=>{
+        for(const mode of ['abort','duplicate','overlap','end','restart']){
+            const controller=new AbortController(),c=createMangaDetectionCore();c.beginPage(controller.signal);const f=refinementFrame(c);
+            if(mode==='duplicate')c.observe(f.ticket,{dims:[1,3,f.height,f.width]},{dims:[1,1,f.height,f.width],data:f.data});
+            c.bindBoxes(f.ticket,f.boxes);
+            if(mode==='abort')controller.abort();if(mode==='overlap')c.beginFrame(384,128,1536,source);if(mode==='end')c.endPage();if(mode==='restart')c.beginPage();
+            c.endFrame(f.ticket);expect(c.takeRefinements()).toEqual([]);
+        }
+    });
+    it('原Box跨帧复用时撤回旧视图候选，其他Box保留各自来源',()=>{
+        for(const mode of ['unknown-source','new-source','duplicate']){
+            const c=createMangaDetectionCore();c.beginPage();
+            const old=refinementFrame(c,source,2);c.bindBoxes(old.ticket,old.boxes);c.endFrame(old.ticket);
+            const next=refinementFrame(c,mode==='unknown-source'?null:{...source,x:60});
+            c.bindBoxes(next.ticket,mode==='duplicate'?[old.boxes[0],{...old.boxes[0]}]:[old.boxes[0]]);c.endFrame(next.ticket);
+            const candidates=c.takeRefinements();
+            expect(candidates.map(candidate=>candidate.core.x0)).toEqual(mode==='new-source'?[180,92]:[180]);
+            expect(candidates.map(candidate=>candidate.parent.x0)).toEqual(mode==='new-source'?[156,68]:[156]);
+        }
+    });
+    it('页内记录超额撤回全部补充候选，换页才恢复额度',()=>{
+        const c=createMangaDetectionCore();c.beginPage();
+        for(let i=0;i<127;i++){const f=refinementFrame(c);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);}
+        const f=refinementFrame(c,source,3);c.bindBoxes(f.ticket,f.boxes);c.endFrame(f.ticket);expect(c.refinementUsage.overflow).toBe(true);expect(c.takeRefinements()).toEqual([]);
+        const used=c.refinementUsage.pixels;const skipped=refinementFrame(c);c.bindBoxes(skipped.ticket,skipped.boxes);c.endFrame(skipped.ticket);expect(c.refinementUsage.pixels).toBe(used);
+        c.beginPage();const fresh=refinementFrame(c);c.bindBoxes(fresh.ticket,fresh.boxes);c.endFrame(fresh.ticket);expect(c.takeRefinements()).toHaveLength(1);expect(c.refinementUsage.overflow).toBe(false);
+    });
+});

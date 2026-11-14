@@ -10,6 +10,7 @@
  * 段落间距：普通图片与漫画均在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。漫画只请求轻量段落侧车，不开启普通图片检测帧；关系随同一结果对象图传输，漫画收集器只采用仍为单原框的整页物理行，不授予擦除权限。
  * 气泡补绘：仅漫画结果将收集阶段记录的局部气泡提示绑定到当前原图与尺寸，不向公开行属性附加坐标，也不增加 Worker 消息或模型调用；提示只供后续纯白空处复核。
  * 检测核心：借用同次原概率与未加留白组件，将完全没有0.3响应的候选绑定到原SDK Box；保留原检测和识别批次，原数字证据先进入保护，再在识别重试结束后排除弱结果。反向重检的新候选仍按其自身检测旁证核对，不改弱边缘修补侧车；页内有界观察，取消和失败清除引用。
+ * 弱连接复核：仅原像素视图记录大框内的完整紧凑核心，原整页、瓦片、气泡及既有重试全部结束后，独立复核有限双裁图；两次高置信文字一致且实际墨迹完整才替换低置信父框或补充漏行。复用原会话和原像素，不重跑检测、不改变原批次或复识别预算，其他原文和数值始终作为障碍。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
@@ -35,6 +36,7 @@ import {bindImageDetectionEvidence,createImageDetectionEvidenceBudget,type Image
 import {bindImageParagraphGapEvidence,produceImageParagraphGapProofs} from './imageParagraphGapEvidence';
 import {bindMangaBubblePlacements} from './mangaBubblePlacement';
 import {createMangaDetectionCore} from './mangaDetectionCore';
+import {planMangaDetectionRecovery,recoverMangaDetectionRegions} from './mangaDetectionRecovery';
 
 interface MangaOcrPort {
     recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true}): Promise<MangaOcrPage>;
@@ -305,7 +307,8 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         }
         async run(image:Parameters<InstanceType<typeof DetectionService>['run']>[0]){
             const observation=detectionObservation,limit=this.evidenceSideLimit;
-            const ticket=this.detectionCore.beginFrame((image as HTMLCanvasElement)?.width,(image as HTMLCanvasElement)?.height,limit);
+            const ticket=this.detectionCore.beginFrame((image as HTMLCanvasElement)?.width,(image as HTMLCanvasElement)?.height,limit,
+                observation&&image===observation.canvas?observation.frame:undefined);
             // 锁定SDK6.6仅在长边超maxSideLength时缩小；auto未知时不推测比例。
             if(detectionBudget&&observation&&image===observation.canvas&&typeof limit==='number'&&limit>0){
                 const frame=observation.frame;
@@ -322,6 +325,30 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         private remainingRubyRescues=2;
         private remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;
         private originalSource:{image:ImageBitmap|HTMLImageElement;width:number;height:number;identity?:{src:string;currentSrc:string}}|undefined;
+        async recoverDetectionFrames(canvas:HTMLCanvasElement|OffscreenCanvas,pixels:Uint8ClampedArray,page:MangaOcrPage,bubbles:NonNullable<MangaOcrPage['bubbles']>):Promise<void>{
+            const records=this.detector instanceof MangaDetection?this.detector.detectionCore.takeRefinements():[];
+            if(!records.length)return;
+            const protectedGroups=[page.numericEvidence??[],...bubbles.flatMap(bubble=>[bubble.results,bubble.numericEvidence??[]])];
+            const prepared=planMangaDetectionRecovery(pixels,canvas.width,canvas.height,records,page.results,protectedGroups);
+            if(!prepared.plans.length)return;
+            const recovered=await recoverMangaDetectionRegions(page.results,prepared,async bounds=>{
+                const crop=createOcrCanvas();
+                try{
+                    crop.width=bounds.x1-bounds.x0;crop.height=bounds.y1-bounds.y0;
+                    const context=crop.getContext('2d',{willReadFrequently:true});if(!context)throw new Error('浏览器不支持图片处理');
+                    context.drawImage(canvas,bounds.x0,bounds.y0,crop.width,crop.height,0,0,crop.width,crop.height);
+                    const results=await this.recognitor!.run(crop,[{x:0,y:0,width:crop.width,height:crop.height}],
+                        this.options.recognition!.charactersDictionary,'per-box',{recBatchSize:1});
+                    this.checkInferenceFailure();return results;
+                }finally{crop.width=0;crop.height=0;}
+            },()=>assertMangaOcrActive(activeSignal));
+            if(recovered.numericEvidence.length){
+                const numericEvidence=[...(page.numericEvidence??[]),...recovered.numericEvidence];
+                if(numericEvidence.length>4096)throw new Error('图片数字保护区域过于复杂，已保留原图');
+                page.numericEvidence=numericEvidence;
+            }
+            page.results=recovered.results;
+        }
         beginMangaPage(): void {this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);if(this.detector instanceof MangaDetection)this.detector.detectionCore.beginPage(activeSignal);}
         tryReserveMangaRubyRescue(sourcePixels:number):boolean {
             if(this.remainingRubyRescues<=0||!Number.isSafeInteger(sourcePixels)||sourcePixels<=0||sourcePixels>this.remainingPreprocessingPixels)return false;
@@ -701,6 +728,8 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             }
                         }finally{crop.width=0;crop.height=0;}
                     }
+                    assertMangaOcrActive(options.signal);
+                    await service.recoverDetectionFrames(canvas,pixels.data,page,bubbles);
                     assertMangaOcrActive(options.signal);
                     const layoutBubbles=assignMangaLayoutBubbles(pixels.data,canvas.width,canvas.height,ownership,page.results);
                     const hasLargeAlphaHoles=alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2;

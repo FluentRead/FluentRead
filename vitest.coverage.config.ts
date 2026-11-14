@@ -691,6 +691,8 @@ export default defineConfig({
                 'src/features/image-translation/services/sourceAlignment.ts',
                 'src/features/image-translation/services/mangaRecognitionInkProjection.ts',
                 'src/features/image-translation/services/mangaDetectionCore.ts',
+                'src/features/image-translation/services/mangaDetectionRefinement.ts',
+                'src/features/image-translation/services/mangaDetectionRecovery.ts',
                 'src/features/image-translation/services/imageTextPunctuation.ts',
                 'src/features/image-translation/linePunctuationData.ts',
                 'src/features/image-translation/services/sourceInk.ts',

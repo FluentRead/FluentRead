@@ -710,6 +710,8 @@
       "tests/mangaRecognitionWhitespace.test.ts",
       "tests/mangaRecognitionInkProjection.test.ts",
       "tests/mangaDetectionCore.test.ts",
+      "tests/mangaDetectionRefinement.test.ts",
+      "tests/mangaDetectionRecovery.test.ts",
       "tests/imageTextPunctuation.test.ts",
       "tests/imageTextBalance.test.ts",
       "tests/mangaRecognitionWhitespaceRecordings.test.ts",

@@ -196,7 +196,7 @@ function authFixture() {
     const identity = {getAuthToken: vi.fn(async () => ({token: 'token-A', grantedScopes: [...GOOGLE_DRIVE_SCOPES]})),
         removeCachedAuthToken: vi.fn(async (_details: {token: string}) => undefined), clearAllCachedAuthTokens: vi.fn(async () => undefined)};
     const fetcher = vi.fn<typeof fetch>(async () => new Response(JSON.stringify({user: {permissionId: 'A'}})));
-    const authPorts: DriveAuthPorts = {userAgent: () => 'Chrome/142.0', identity, fetch: fetcher,
+    const authPorts: DriveAuthPorts = {userAgent: () => 'Chrome/142.0', userAgentData: () => ({brands: [{brand: 'Google Chrome'}], mobile: false}), identity, fetch: fetcher,
         runtime: {id: GOOGLE_DRIVE_EXTENSION_ID, getManifest: () => ({oauth2: {client_id: GOOGLE_DRIVE_DEFAULT_CLIENT_ID, scopes: [...GOOGLE_DRIVE_SCOPES]}})}};
     return {identity, fetcher, auth: createDriveAuth(authPorts)};
 }

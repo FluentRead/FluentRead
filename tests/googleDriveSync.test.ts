@@ -753,7 +753,7 @@ describe('Google pending authorization ownership', () => {
         const f=fixture();let release!: (value:{token:string})=>void;
         const identity={getAuthToken:vi.fn().mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockResolvedValue({token:'fresh-token',grantedScopes:[...GOOGLE_DRIVE_SCOPES]}),removeCachedAuthToken:vi.fn(async()=>undefined),clearAllCachedAuthTokens:vi.fn(async()=>undefined)};
         const network=vi.fn(async()=>new Response(JSON.stringify({user:{permissionId:'new-account'}})));
-        f.ports.auth=createDriveAuth({identity,fetch:network,userAgent:()=> 'Chrome/142.0',runtime:{id:'fixture',getManifest:()=>({oauth2:{client_id:'fixture-custom',scopes:[...GOOGLE_DRIVE_SCOPES]}})}});
+        f.ports.auth=createDriveAuth({identity,fetch:network,userAgent:()=> 'Chrome/142.0',userAgentData:()=>({brands:[{brand:'Google Chrome'}],mobile:false}),runtime:{id:'fixture',getManifest:()=>({oauth2:{client_id:'fixture-custom',scopes:[...GOOGLE_DRIVE_SCOPES]}})}});
         const service=createGoogleDriveSync(f.ports);
         const old=service.prepare(password,7,'old').catch(error=>error);
         await vi.waitFor(()=>expect(release).toBeTypeOf('function'));

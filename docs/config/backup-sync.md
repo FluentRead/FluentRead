@@ -47,6 +47,8 @@
 
 ## Google Drive 配置同步
 
+目前仅支持**桌面版 Google Chrome**。Aside、Ego Lite、Vivaldi（含移动版）及其他 Chromium 衍生浏览器尚不在支持范围；能安装 Chrome 扩展不代表支持 Google 授权。无法确认浏览器兼容性时不会显示同步按钮，请改用 **WebDAV** 或上方的**本地备份**。
+
 1. 在**云备份**选择 **Google Drive**，确认同步范围。
 2. 点击**立即与Google Drive同步**，完成 Google 授权。
 3. 核对账号，选择保存本机、恢复云端或逐项合并。

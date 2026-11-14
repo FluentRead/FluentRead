@@ -361,7 +361,7 @@ onBeforeUnmount(() => {
 .provider-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .provider-copy strong { min-width: 0; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .provider-result { display: flex; align-items: center; gap: 4px 8px; min-height: 19px; }
-.provider-state { padding: 2px 5px; border-radius: 4px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
+.provider-state { padding: 2px 5px; border-radius: 4px; color: var(--muted, var(--el-text-color-secondary)); background: var(--el-fill-color-light); font-size: 10px; white-space: nowrap; }
 .provider-state.is-success { color: var(--el-color-success-dark-2); background: var(--el-color-success-light-9); }
 .provider-state.is-error { color: var(--el-color-danger-dark-2); background: var(--el-color-danger-light-9); }
 .provider-state.is-checking { color: var(--el-color-primary); background: var(--el-color-primary-light-9); }

@@ -406,7 +406,8 @@ export default defineConfig({
             // 利用现有余量后各增加1kB门槛；不新增模型、依赖或源像素预算。
             // 深色底紧裁空格复核实测：Chrome 从68,501,871增至68,503,598bytes，Firefox 从68,122,872增至68,124,597bytes。
             // 增量仅为既有OCR worker算法与共享限额常量；利用余量后各追加1kB，无新增模型、依赖或Canvas读回。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000;
+            // 普通图完整漏擦修补与共享字形预检实测增加约3kB，仅离屏代码；沿用已有可选模型，默认不下载。
+            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_330_000 : 66_128_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

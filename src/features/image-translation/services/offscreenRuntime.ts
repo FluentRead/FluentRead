@@ -2,7 +2,8 @@
  * @file src/features/image-translation/services/offscreenRuntime.ts
  * 后台选择的本地后端在加载图片前交给已有推理客户端，在串行任务边界生效。
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
- * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，擦除只使用原始行框；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明图不额外复制整页；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，常规擦除按原始行框，完整墨迹修补须另外逐点授权；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明常规修补不额外复制整页，可选分割沿用独立 Worker 快照；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
+ * 漏擦救援：不透明纯色文字有原墨迹落在旧掩码外时，复用完整 RGBA 提案与缓存分割逐像素授权；整页成功才回填原字像素，保留原色、字号与坐标，绘字框含图案或完整字形无法容纳时保留原图与阅读译文。提案不成立的复杂页维持既有修补，未准备模型时沿用资源就绪重试协议。
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
@@ -25,9 +26,10 @@ import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import {createImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
 import { recognizeImage } from './ocrRuntime';
-import { getImageTextBackgroundColor, drawTranslatedImageText,getImageTextDirection,getImageSourceTextStyle,getImageSourceTypographyStyle,getImageSingleLineHeight,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import { getImageTextBackgroundColor, drawTranslatedImageText,canDrawTranslatedImageText,getImageTextDirection,getImageSourceTextStyle,getImageSourceTypographyStyle,getImageSingleLineHeight,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
 import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
 import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
+import {hasUncoveredImageInk} from './imageEraseCoverage';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
 import {mangaOcrRuntime} from './mangaOcr';
 import {createMangaBlankLayoutBudget, drawMangaTranslations, planMangaBlankTranslation, sampleMangaBackgrounds} from './mangaRendering';
@@ -609,6 +611,60 @@ async function prepareTranslatedImage(
                 if(changed&&!prepared)throw new ImageAlphaProtectionUnavailableError();
                 drawing.set(line,{...drawing.get(line)!,bounds,prepared});
             }
+        }
+        // 墨迹遗漏仅触发提案；颜色与几何不能替代同帧模型逐像素授权。整页提案失败保留原修补策略。
+        if(!protection&&isSingleFrameImageData(source.currentSrc||source.src)
+            &&hasUncoveredImageInk(sourcePixels.data,canvas.width,canvas.height,appearances)){
+            const owners=new Set(selected.map(candidate=>candidate.original));
+            const proposal=proposeImageMattePage(sourcePixels.data,canvas.width,canvas.height,translatedLines,
+                lines.filter(line=>!owners.has(line)),line=>drawing.get(line)!.bounds);
+            if(proposal)try {
+                const retainSource=async()=>{await checkImageCancellation(signal);return imageAlphaUnchanged(readingLines);};
+                const view=getImageMatteProposalDrawings(proposal)!;
+                const args:Array<Parameters<typeof drawTranslatedImageText>>=[];
+                for(const item of view.drawings){
+                    const plan=drawing.get(item.line)!,b=plan.bounds;
+                    // 至多128个绘字框与4096个图案矩形；保留原排版，不以裁字或移动译文绕过保护。
+                    for(const art of view.rectangles){
+                        if(b.x0<art.x1&&art.x0<b.x1&&b.y0<art.y1&&art.y0<b.y1)
+                            return await retainSource();
+                    }
+                    args.push([context,item.line.text,b.x0,b.y0,b.x1-b.x0,b.y1-b.y0,
+                        `rgb(${item.background.slice(0,3).join(',')})`,fontStyles.get(item.line)!.fontSize,
+                        item.line.vertical?'center':item.line.textAlign??'left',plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds,plan.orientation]);
+                }
+                // 同页两轮预检共用度量预算，不因模型等待而重置。
+                const budget={remaining:8192,characters:4_194_304};
+                const preflight=()=>args.every(item=>canDrawTranslatedImageText(budget,...item));
+                if(!preflight())return await retainSource();
+                await checkImageCancellation(signal);
+                let plan=support?authorizeImageMatteProposal(proposal,support):undefined;
+                if(!plan){
+                    const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
+                    await checkImageCancellation(signal);
+                    if(!ready)return {...imageAlphaUnchanged(readingLines),retryWhenSegmentationReady:true};
+                    const seg=await mangaInferenceClient.segmentText(()=>{
+                        throwIfImageOperationAborted(signal);
+                        return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
+                    },signal);
+                    throwIfImageOperationAborted(signal);
+                    const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
+                    try {plan=authorizeImageMatteProposal(proposal,segmentation);}
+                    finally {segmentation.dispose();}
+                    if(!plan)return await retainSource();
+                }
+                await checkImageCancellation(signal);
+                // 等待模型期间字体可能就绪；在同一同步段重新预检、应用并绘制，失败不发布局部译图。
+                if(!preflight())return await retainSource();
+                sourceUnchanged=false;
+                applyImageMattePage(sourcePixels.data,canvas.width,canvas.height,plan);
+                for(const box of plan.uploads)context.putImageData(sourcePixels,0,0,box.x0,box.y0,box.x1-box.x0,box.y1-box.y0);
+                for(const item of args)drawTranslatedImageText(...item);
+                await checkImageCancellation(signal);
+                const image=await encodeImageCanvas(canvas,signal);
+                throwIfImageOperationAborted(signal);
+                return {image,lines:readingLines};
+            }finally {discardImageMatteProposal(proposal);}
         }
         // 全文布局先全部通过才擦除；保护点不可写也不可当作已知背景，无法完整修补时撤回。
         sourceUnchanged=false;

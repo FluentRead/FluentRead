@@ -343,6 +343,7 @@
       "tests/imageOcrNormalization.test.ts",
       "tests/ocrDualViewDifferential.test.ts",
       "tests/imageTranslationRendering.test.ts",
+      "tests/imageEraseCoverage.test.ts",
       "tests/imageMatteRepair.test.ts",
       "tests/imageTextSegmentation.test.ts",
       "tests/imageMattePage.test.ts",

@@ -118,6 +118,16 @@ function createDependencies(overrides: Partial<VocabularyBookBackgroundDependenc
 }
 
 describe('vocabulary background message handlers', () => {
+    it('userscript rejects extension-only durable undo operations before reading any recovery record', async () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        const {dependencies, repository} = createDependencies({isTrustedUndoSender: () => true});
+        try {
+            const handler = createVocabularyBookHandler(dependencies);
+            expect(await handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'listUndo'}, {}))
+                .toMatchObject({success: false, error: {code: 'invalid-input', message: '操作不支持'}});
+            expect(repository.listUndo).not.toHaveBeenCalled();
+        } finally {vi.unstubAllEnvs();}
+    });
     it('only lets the same extension settings page access durable deletion recovery', async () => {
         const {dependencies, repository} = createDependencies({isTrustedUndoSender: sender =>
             isTrustedSettingsSender(sender, 'fixture-id', 'chrome-extension://fixture-id/options.html')});

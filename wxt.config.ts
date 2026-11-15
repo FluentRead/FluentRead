@@ -411,10 +411,14 @@ export default defineConfig({
             // Firefox 从68,124,625增至68,139,808bytes，分别增加15,758/15,183bytes；仅代码、样式和七语文案变化。
             // WASM、模型和其他非代码资源逐文件摘要不变，仅为这组已实测的布局功能各增加16kB预算。
             const learningCardAndDocumentLayoutBudget = 16_000;
+            // GitHub 原生 PR 列表页标题的精确保护规则在五份入口中共增加2,340bytes；
+            // 相比9032adeac，Chrome为68,521,516、Firefox为68,141,936bytes，全部非代码文件摘要不变。
+            // 利用已有余量后各补2kB，继续检查真实磁盘总量，不增加资源或依赖。
+            const githubPullListHeadingBudget = 2_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + learningCardAndDocumentLayoutBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + learningCardAndDocumentLayoutBudget + githubPullListHeadingBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -11,6 +11,12 @@ const deferred = () => {
 };
 
 describe('视频读音标注会话', () => {
+  it.each([false, true])('同句重复请求保留当前或预取归属，不重复运行引擎（prefetch=%s）', async prefetch => {
+    const pending = deferred(), annotate = vi.fn(() => pending.promise), session = new VideoReadingAnnotationSession(annotate);
+    const first = session.request('same', 'ja', prefetch); await flush();
+    expect(session.request(' same ', 'JA', prefetch)).toBe(first); expect(annotate).toHaveBeenCalledOnce();
+    pending.resolve(result('same')); await expect(first).resolves.toEqual(result('same')); session.destroy();
+  });
   it('读音偏好默认关闭，只接受显式布尔值且独立于逐字高亮', () => {
     expect(normalizeVideoSubtitleAppearance(undefined).readingAnnotation).toBe(false);
     expect(normalizeVideoSubtitleAppearance({readingAnnotation: 'true'}).readingAnnotation).toBe(false);

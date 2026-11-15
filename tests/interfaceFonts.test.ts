@@ -35,6 +35,17 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('按需字体资源契约', () => {
+  it('下载状态回调立即切回系统字体时，不再启动已排队的 fetch', async () => {
+    const h = harness()
+    let replacement: Promise<void> | undefined
+    h.deps.onState = state => {
+      h.states.push(state)
+      if (state.status === 'loading' && state.source && !replacement) replacement = h.loader.load('system')
+    }
+    await h.loader.load('noto-sans-sc'); await replacement
+    expect(h.deps.fetch).not.toHaveBeenCalled(); expect(h.deps.install).not.toHaveBeenCalled()
+    expect(h.states.at(-1)).toMatchObject({font: 'system', status: 'system'})
+  })
   it('只读取缓存键展示下载状态；共享中文未齐全时不把英文字体标成已下载', async () => {
     const cache = {keys: vi.fn(async () => getInterfaceFontAssets('inter').map(asset => new Request(`https://fluentread.app/__interface_fonts__/${asset.sha256}`)))}
     const open = vi.fn(async () => cache as unknown as Cache)

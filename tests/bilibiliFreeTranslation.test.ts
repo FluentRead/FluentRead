@@ -66,6 +66,7 @@ describe('B站官方免费翻译', () => {
         expect(body).toMatchObject({model: 'Index-Translate-35B-A3B', stream: false, chat_template_kwargs: {enable_thinking: false}});
         expect(JSON.stringify(init)).not.toContain('private');
         expect(body.messages[0].content).toContain('简体中文');
+        expect(body.messages[0].content).toContain('表情符号和 __FRTERM_...__ 内部占位符必须原样保留，包括全部下划线');
     });
 
     it('自动源语言与默认目标可用，繁体目标不会降为简体', async () => {
@@ -131,6 +132,12 @@ describe('B站官方免费翻译', () => {
         await expect(translateBilibiliFree(request('First paragraph.\nSecond paragraph.')))
             .rejects.toMatchObject({statusCode: 429, retryAfterMs: 12000});
         expect(fetch).toHaveBeenCalledOnce();
+    });
+
+    it('模型返回槽结构标记时不能把损坏分界重建为成功响应', async () => {
+        const packet = serializeTranslationSlots(['Read the first paragraph.', 'Continue here.'], 'bilibili-invalid-slot');
+        setRuntimeFetch(vi.fn().mockImplementation(async () => reply(packet.starts[0])));
+        await expect(translateBilibiliFree(request(packet.payload))).rejects.toThrow('B站翻译返回的文本槽结构无效');
     });
 
     it('内部文本槽保留原命名空间，标记不发送给模型', async () => {

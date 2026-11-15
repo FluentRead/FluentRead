@@ -3,15 +3,16 @@
  * 文件职责：在统一翻译调用边界保护术语，使机器翻译、AI 与批量请求共用相同的本地回填规则。
  * 主要内容：按冻结范围选取用户与自动条目，网页保留常用技术术语，文档保护地址、代码式名称及有限相邻数学表达式；内部 g 标签原样送翻并避开用户短词匹配，保持消息和内部槽协议，按实际目标语言校验批量形状、行内结构和未翻译正文；纯术语判断比较 NFC 写法，实际回填保留原文 Unicode；userscript 编译时移除不支持的文档专属路径。
  * 模块边界：不自行调用网络或修改配置；缓存、取消、超时与最终结果验证仍由 broker 管理。
- * 字素保护：先处理用户与自动术语，再对剩余完整 emoji 叠加同一占位符协议；摘要不强制保留，用户译法优先且未配置词库的翻译也受保护。兼容重试仅接受无用户术语和结构标记的单行正文，检查 emoji 字素顺序及默认术语的原写法和次数。
+ * 字素保护：先处理用户与自动术语，普通单行正文两端的完整 emoji 与间距留在本地原位回填，正文内部的 emoji 叠加同一占位符协议；摘要不强制保留，用户译法优先且未配置词库的翻译也受保护。兼容重试仅接受无用户术语和结构标记的单行正文，检查 emoji 字素顺序及默认术语的原写法和次数。
  */
 import {findGlossaryMatches, GlossaryPlaceholderError, protectGlossaryText, resolveGlossaryEntries, type GlossaryProtectionEntry} from '@/src/core/glossary';
 import {hasOnlyCommonWebTerms, matchCommonWebTerms} from '@/src/core/glossary/commonWebTerms';
 import {DocumentInlineMarkerError, documentInlineMarkerRanges, normalizeDocumentInlineMarkers, validateDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import {findDocumentLiteralTerms} from '@/src/core/translation/documentLiterals';
 import {protectDocumentMathText} from '@/src/core/translation/documentMathProtection';
-import {findEmojiLiteralRanges, hasEmojiLiterals} from '@/src/core/translation/emojiLiterals';
+import {findEmojiLiteralRanges, hasEmojiLiterals, splitBoundaryEmojiLiterals} from '@/src/core/translation/emojiLiterals';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
+import {hasTranslationContent} from '@/src/core/translation/result';
 import {attachTranslationProviderConfig, getTranslationGlossarySourceSlots, getTranslationGlossarySourceText} from './requestSnapshot';
 import type {TranslationProviderConfigSnapshot, TranslationRequestMessage} from './types';
 
@@ -56,9 +57,15 @@ export function prepareGlossaryRequest(message: TranslationRequestMessage, curre
             : protectGlossaryText(text, plan.entries, String(index));
         const ranges = findEmojiLiteralRanges(terms.text);
         if (!ranges.length) return terms;
-        const literals = protectGlossaryText(terms.text, [], `emoji-${index}`, [], undefined, ranges);
+        const boundary = !documentContext && !reservedProtectionMarker.test(text)
+            ? splitBoundaryEmojiLiterals(terms.text, ranges) : {text: terms.text, prefix: '', suffix: ''};
+        const literals = protectGlossaryText(boundary.text, [], `emoji-${index}`, [], undefined, findEmojiLiteralRanges(boundary.text));
         return {text: literals.text, tokens: [...terms.tokens, ...literals.tokens],
-            restore: (result: unknown) => terms.restore(literals.restore(result))};
+            restore(result: unknown) {
+                const restored = terms.restore(literals.restore(result));
+                // 本地表情不能把服务的空译文伪装成有内容的成功响应。
+                return hasTranslationContent(restored) ? boundary.prefix + restored + boundary.suffix : restored;
+            }};
     });
     const tokens = Object.freeze(packets.flatMap(packet => packet.tokens));
     const providerConfig = Object.freeze({...current, glossaryProtectedTokens: Object.freeze([...(current.glossaryProtectedTokens ?? []), ...tokens])});

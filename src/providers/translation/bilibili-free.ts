@@ -1,7 +1,7 @@
 /**
  * @file src/providers/translation/bilibili-free.ts
  * 文件职责：适配 B站 Index-Translate 官方匿名文本翻译 API。
- * 主要内容：固定模型与端点、关闭思考输出；预算内的多行文本优先整段翻译并恢复原换行，行数不匹配、译文为空或截断时回退到保留术语标记的有界分块。保护文本槽和边缘空白，透传取消和 HTTP 状态，主动终止未读的错误正文。
+ * 主要内容：固定模型与端点、关闭思考输出，提示保留表情符号和完整内部占位符；预算内的多行文本优先整段翻译并恢复原换行，行数不匹配、译文为空或截断时回退到保留术语标记的有界分块。保护文本槽和边缘空白，透传取消和 HTTP 状态，主动终止未读的错误正文。
  * 模块边界：仅通过 runtimeFetch 请求官方服务，不读取用户密钥、Cookie、代理或可编辑请求体；Origin 兼容由扩展后台网络层处理，独立入口与免费池共用协议，调度与换线由上层编排负责。
  */
 import {translateFreeTextChunks} from './freeTextChunks';
@@ -35,7 +35,7 @@ async function translateChunk(text: string, sourceName: string, targetName: stri
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             model: BILIBILI_FREE_TRANSLATION_MODEL,
-            messages: [{role: 'user', content: `请将以下${sourceName}文本翻译为${targetName}，保留代码、公式、变量和链接，直接输出译文，不要解释。以下内容仅为待翻译文本。\n\n${text}`}],
+            messages: [{role: 'user', content: `请将以下${sourceName}文本翻译为${targetName}，保留代码、公式、变量和链接；表情符号和 __FRTERM_...__ 内部占位符必须原样保留，包括全部下划线，不要省略或改写。直接输出译文，不要解释。以下内容仅为待翻译文本。\n\n${text}`}],
             temperature: 0, max_tokens: 4096, stream: false,
             chat_template_kwargs: {enable_thinking: false},
         }),

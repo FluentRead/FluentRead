@@ -42,6 +42,8 @@ node scripts/testing/run-google-backoff-browser-test.cjs \
 pnpm exec vitest run tests/glossary.test.ts tests/builtinGlossaries.test.ts tests/glossaryConfig.test.ts tests/glossarySettingsComponent.test.ts tests/translationGlossaryIntegration.test.ts tests/imageGlossaryContext.test.ts
 ```
 
+`translationGlossaryIntegration` 包含 B站删除 GitHub 赞助提示句首 emoji 占位符的真实响应夹具。普通单行正文的段首、段尾表情及间距在本地保留，翻译正文后原位回填，避免服务漏掉装饰表情导致整段失败；完整字素、正文内部表情和用户术语仍受保护。文档及带结构标记的正文沿用原协议。B站提示词明确要求保留表情和完整内部标记；B站与硅基流动 Hunyuan-MT-7B 在保护校验失败后，只对没有用户术语及结构标记的单行正文尝试一次字面 emoji 重试，沿用剩余时间和取消信号。字面重试仍检查表情内容、顺序、次数及默认术语的原写法和次数，验证后才缓存；网络错误不会触发兼容重试。
+
 仅验证导入弹窗和圈选失败恢复时，可使用 `scripts/testing/run-import-recovery-ui-test.cjs`，显式传入 `--suite glossary` 或 `--suite area`，以及 `--artifacts-dir` 和 `--runtime-diagnostics-helper`。前者验证文件与粘贴草稿、三条预览、警告确认、持久化和响应式；后者用真实截图及本机 HTTP 夹具验证错误主动作和恢复，不证明线上模型质量或语言包公网下载。两者都使用第二屏后台临时 Edge，并保存运行时错误、告警与采集缺口。
 
 统一弹窗和其他翻译失败提示使用 `scripts/testing/run-dialog-recovery-ui-test.cjs`，显式指定 `--suite backup`、`--suite dialogs` 或 `--suite translation`，并传入相同的产物、证据目录和诊断参数。分别覆盖原生下载与取消、恢复摘要和持久化，WebDAV/历史/敏感配置/服务弹窗，以及划词重试和图片缺包提示。网络只用本机夹具；划词的故意鉴权失败保留原始诊断，按本次用例、精确消息和次数标记预期。

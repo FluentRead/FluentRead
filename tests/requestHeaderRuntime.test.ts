@@ -9,15 +9,11 @@ const mocks = vi.hoisted(() => ({
     config: {requestHeaderRules: [] as Array<{domain: string; removeOrigin: boolean; removeReferer: boolean}>},
     subscribe: vi.fn(),
 }));
-// 能力矩阵在模块加载时求值，用可变对象模拟宿主浏览器，覆盖 Safari 与 Chromium 两种规则条件。
-const caps = vi.hoisted(() => ({browser: 'firefox'}));
-vi.mock('@/src/platform/browser/capabilities', () => ({
-    browserCapabilities: {get browser() { return caps.browser; }},
-}));
 vi.mock('@/src/services/config/store', () => ({config: mocks.config, configReady: Promise.resolve(), subscribeConfig: mocks.subscribe}));
 import {installRequestHeaderRuntime} from '@/src/app/background/requestHeaderRuntime';
 import {runtimeFetch, setRuntimeFetch} from '@/src/platform/http/runtime';
-afterEach(() => {setRuntimeFetch(); vi.unstubAllGlobals(); vi.restoreAllMocks(); mocks.subscribe.mockReset(); caps.browser = 'firefox';});
+import {DOUBAO_GUEST_HEADER} from '@/src/platform/http/doubaoGuest';
+afterEach(() => {setRuntimeFetch(); vi.unstubAllGlobals(); vi.restoreAllMocks(); mocks.subscribe.mockReset();});
 
 describe('后台请求头同步屏障', () => {
     it('用真实扩展 origin 的 hostname 安装规则，网络等待安装；配置更新与删除后立即同步', async () => {
@@ -64,23 +60,29 @@ describe('后台请求头同步屏障', () => {
     });
 });
 
-it('Safari 宿主下省略 initiatorDomains，规则仍按精确域名安装', async () => {
-    caps.browser = 'safari';
-    mocks.config.requestHeaderRules = [{domain: 'api.example.com', removeOrigin: true, removeReferer: false}];
-    const api = {getDynamicRules: vi.fn().mockResolvedValue([]), updateDynamicRules: vi.fn().mockResolvedValue(undefined)};
+it('Safari 26 的动态规则和豆包会话规则保留扩展发起方及 POST 隔离条件', async () => {
+    mocks.config.requestHeaderRules = [{domain: 'api.example.com', removeOrigin: true, removeReferer: true}];
+    const api = {
+        getDynamicRules: vi.fn().mockResolvedValue([]),
+        updateDynamicRules: vi.fn().mockResolvedValue(undefined),
+        updateSessionRules: vi.fn().mockResolvedValue(undefined),
+    };
     vi.stubGlobal('browser', {runtime: {getURL: () => 'safari-web-extension://own-uuid/'}, declarativeNetRequest: api});
     const fetch = vi.fn().mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', fetch);
     installRequestHeaderRuntime();
-    await Promise.resolve();
-    await runtimeFetch('https://api.example.com/v1');
-    const addRules = api.updateDynamicRules.mock.calls[0][0].addRules;
-    expect(addRules).toHaveLength(2);
-    for (const rule of addRules) {
-        expect(rule.condition).not.toHaveProperty('initiatorDomains');
-        expect(rule.condition).toMatchObject({resourceTypes: ['xmlhttprequest']});
-    }
+    const url = 'https://www.doubao.com/samantha/plugin/stream_article_translate?fixture=1';
+    await runtimeFetch(url, {method: 'POST', headers: {[DOUBAO_GUEST_HEADER]: 'fixture-token'}});
+    const dynamicRules = api.updateDynamicRules.mock.calls[0][0].addRules;
+    expect(dynamicRules).toHaveLength(2);
+    for (const rule of dynamicRules) expect(rule.condition.initiatorDomains).toEqual(['own-uuid']);
+    const sessionRule = api.updateSessionRules.mock.calls[1][0].addRules[0];
+    expect(sessionRule.condition).toMatchObject({initiatorDomains: ['own-uuid'], requestMethods: ['post'], resourceTypes: ['xmlhttprequest']});
+    expect(new RegExp(sessionRule.condition.regexFilter).test(url)).toBe(true);
+    expect(new RegExp(sessionRule.condition.regexFilter).test(`${url}&other=1`)).toBe(false);
     expect(fetch).toHaveBeenCalledOnce();
+    expect(new Headers(fetch.mock.calls[0][1].headers).has(DOUBAO_GUEST_HEADER)).toBe(false);
+    expect(api.updateSessionRules).toHaveBeenLastCalledWith({removeRuleIds: [sessionRule.id], addRules: []});
 });
 
 it('缺少 DNR 的运行环境不影响其他服务', async () => {

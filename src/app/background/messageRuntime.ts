@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/messageRuntime.ts
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本、扩展面板导航和标签页状态等公开 handler 连接到 browser.runtime。
- * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，图片邻文由已启用的 AI 上下文开关及当前模型的提示词能力决定，绑定事务页面及术语版本；为配置、缓存、词书、个人校订注入共享网页通知端口，Safari 从可信配置读取登记接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
+ * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，图片邻文由已启用的 AI 上下文开关及当前模型的提示词能力决定，绑定事务页面及术语版本；Safari 为后台 iframe 注册同源接收端，并从可信配置读取网页通知接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
  */
 import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} from './providerRuntime';
@@ -38,6 +38,7 @@ import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
 import {isBrowserTabId, type TabTranslationStateStore} from './tabTranslationState';
 import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers, type VocabularyBackgroundContext} from './handlers/vocabulary';
 import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
+import {installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
 import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
 import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
 import {createConfigBackgroundHandlers} from './configMessageHandlers';
@@ -161,7 +162,12 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             requestRegistry: translationRequestRegistry,
         }),
     );
-    browser.runtime.onMessage.addListener(createBackgroundRuntimeMessageListener(router, (sender) => ({sender}) as BackgroundRuntimeContext));
+    const listener = createBackgroundRuntimeMessageListener(router, (sender) => ({sender}) as BackgroundRuntimeContext);
+    browser.runtime.onMessage.addListener(listener);
+    if (capabilities.browser === 'safari') {
+        const removePageListener = installExtensionPageMessageListener(window as unknown as ExtensionPageMessageTarget, listener);
+        window.addEventListener('pagehide', removePageListener, {once: true});
+    }
     selectionPageZoom.installZoomChangeListener();
     browser.tabs.onRemoved.addListener((tabId: number) => releaseVideoSubtitleOwnerForTab(Number(tabId)));
     installBrowserConfigStorageBroadcast(tabBroadcast);

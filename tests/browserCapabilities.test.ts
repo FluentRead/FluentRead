@@ -50,6 +50,7 @@ describe('browser capability contract', () => {
     it('keeps unsupported Firefox MV3, Opera, Chromium MV2 and unknown targets disabled', () => {
         for (const target of [
             {browser: 'firefox', manifestVersion: 3 as const},
+            {browser: 'safari', manifestVersion: 3 as const},
             {browser: 'opera', manifestVersion: 3 as const},
             {browser: 'chrome', manifestVersion: 2 as const},
             {browser: '   ', manifestVersion: 3 as const},
@@ -66,8 +67,8 @@ describe('browser capability contract', () => {
         }
     });
 
-    it('Firefox MV2 uses shared DOM features without claiming native Offscreen or Chrome Translator', () => {
-        expect(resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2})).toMatchObject({
+    it.each(['firefox', 'safari'])('%s MV2 uses shared DOM features without claiming native Offscreen or Chrome Translator', browser => {
+        expect(resolveBrowserCapabilities({browser, manifestVersion: 2})).toMatchObject({
             offscreenDocument: false,
             extensionDom: true,
             chromeTranslation: false,

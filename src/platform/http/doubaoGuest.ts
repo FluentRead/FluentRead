@@ -32,14 +32,7 @@ export function readDoubaoGuestRequest(url: string, method: string, headers: Hea
 }
 
 /** 会话规则由浏览器保存在内存，不写入动态规则或用户的 Cookie 存储。 */
-export function createDoubaoGuestFetch(
-    api: GuestRulesPort | undefined,
-    extensionDomain: string,
-    fetcher: RuntimeFetch,
-    options: {scopeToInitiator?: boolean} = {},
-): RuntimeFetch {
-    // Safari 没有 initiatorDomains / requestMethods 条件；规则改为只按精确 URL 和 xmlhttprequest 匹配。
-    const scopeToInitiator = options.scopeToInitiator !== false;
+export function createDoubaoGuestFetch(api: GuestRulesPort | undefined, extensionDomain: string, fetcher: RuntimeFetch): RuntimeFetch {
     // 同一个保留编号串行使用。后台重启时清理上次被中断的临时规则。
     let tail = api?.updateSessionRules
         ? api.updateSessionRules({removeRuleIds: [DOUBAO_GUEST_RULE_ID], addRules: []}).catch(() => undefined)
@@ -70,7 +63,8 @@ export function createDoubaoGuestFetch(
                 condition: {
                     regexFilter: `^${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
                     isUrlFilterCaseSensitive: true,
-                    ...(scopeToInitiator ? {initiatorDomains: [extensionDomain], requestMethods: ['post' as const]} : {}),
+                    initiatorDomains: [extensionDomain],
+                    requestMethods: ['post'],
                     resourceTypes: ['xmlhttprequest'],
                 },
             };

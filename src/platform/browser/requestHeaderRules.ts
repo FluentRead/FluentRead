@@ -1,7 +1,7 @@
 /**
  * @file src/platform/browser/requestHeaderRules.ts
  * 文件职责：把请求头移除名单同步为浏览器 DNR 动态规则，仅影响本扩展对精确域名的 HTTP 请求。
- * 主要内容：独立规则编号段和内置供应商额外槽位、Origin/Referer remove 动作、扩展 initiator 限制、串行原子替换、成功去重和失败重试。
+ * 主要内容：独立规则编号段和内置供应商额外槽位、Origin/Referer remove 动作、扩展 initiator 限制（Safari 无该条件，可按平台关闭）、串行原子替换、成功去重和失败重试。
  * 模块边界：不读配置或选择服务；后台注入配置快照和浏览器端口，不修改宿主请求、响应头或 CORS。
  */
 import type {DeclarativeNetRequest} from 'webextension-polyfill';
@@ -10,7 +10,21 @@ import {MAX_REQUEST_HEADER_RULES, normalizeRequestHeaderRules} from '@/src/core/
 export const REQUEST_HEADER_RULE_START = 2_763_000;
 export type RequestHeaderRulesPort = Pick<DeclarativeNetRequest.Static, 'getDynamicRules' | 'updateDynamicRules'>;
 
-export function createRequestHeaderRulesSynchronizer(api: RequestHeaderRulesPort | undefined, extensionDomain: string) {
+export interface RequestHeaderRuleOptions {
+    /**
+     * Safari 的 RuleCondition 只支持 domainType、excludedResourceTypes、isUrlFilterCaseSensitive、
+     * regexFilter、resourceTypes，没有 initiatorDomains。关闭后规则仍按精确域名和 xmlhttprequest
+     * 匹配，但不再限定发起方必须是本扩展。
+     */
+    readonly scopeToInitiator?: boolean;
+}
+
+export function createRequestHeaderRulesSynchronizer(
+    api: RequestHeaderRulesPort | undefined,
+    extensionDomain: string,
+    options: RequestHeaderRuleOptions = {},
+) {
+    const scopeToInitiator = options.scopeToInitiator !== false;
     let applied: string | undefined;
     let tail: Promise<void> = Promise.resolve();
     return {
@@ -37,7 +51,7 @@ export function createRequestHeaderRulesSynchronizer(api: RequestHeaderRulesPort
                     ]},
                     condition: {
                         regexFilter: `^https?://${entry.domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?::[0-9]+)?/`,
-                        initiatorDomains: [extensionDomain],
+                        ...(scopeToInitiator ? {initiatorDomains: [extensionDomain]} : {}),
                         resourceTypes: ['xmlhttprequest'],
                     },
                 }));

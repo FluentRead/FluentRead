@@ -68,6 +68,18 @@ describe('按域名请求头移除名单', () => {
         expect(port.updateDynamicRules).toHaveBeenCalledOnce();
     });
 
+    it('Safari 不支持 initiatorDomains 时只按精确域名与 XHR 收窄', async () => {
+        const port = api();
+        const sync = createRequestHeaderRulesSynchronizer(port, 'own-extension-id', {scopeToInitiator: false});
+        await sync.sync([origin]);
+        const rule = port.updateDynamicRules.mock.calls[0][0].addRules[0];
+        expect(rule.condition).toMatchObject({resourceTypes: ['xmlhttprequest']});
+        expect(rule.condition).not.toHaveProperty('initiatorDomains');
+        const pattern = new RegExp(rule.condition.regexFilter);
+        expect(pattern.test('https://api.example.com/v1/chat')).toBe(true);
+        expect(pattern.test('https://sub.api.example.com/')).toBe(false);
+    });
+
     it('重启时清理过期规则，删除或关闭两项开关后恢复默认行为', async () => {
         const port = api();
         port.getDynamicRules.mockResolvedValue([{id: REQUEST_HEADER_RULE_START}]);

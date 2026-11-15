@@ -423,7 +423,10 @@ export default defineConfig({
             // 相比9032adeac，Chrome为68,521,516、Firefox为68,141,936bytes，全部非代码文件摘要不变。
             // 利用已有余量后各补2kB，继续检查真实磁盘总量，不增加资源或依赖。
             const githubPullListHeadingBudget = 2_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget));
+            // 合入本地主线有效旧界面译文后，Chrome 68,564,682 → 68,567,508 bytes（+2,826）。
+            // 仅六份 i18n JSON 改变，552 份其余产物摘要相同；沿用余量后 Chrome/Edge 仅补1kB。
+            const legacyTranslationTextBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -98,7 +98,8 @@ export function createInformationHighlightModelRuntime(dependencies: Information
             } catch (error) {
                 phase = controller.signal.aborted ? 'paused' : 'error';
                 errorCode = controller.signal.aborted ? undefined : downloadErrorCode(error);
-            } finally {if (job?.controller === controller) job = undefined; fileSnapshot = undefined; dependencies.notify();}
+            // prepare 在 job 存在时复用或等待；只有本任务的 finally 释放这个准备名额。
+            } finally {job = undefined; fileSnapshot = undefined; dependencies.notify();}
         };
         job = {controller, done: Promise.resolve().then(run)};
         return {...current, phase: 'queued' as const};

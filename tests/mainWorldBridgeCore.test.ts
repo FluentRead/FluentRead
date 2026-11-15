@@ -730,6 +730,10 @@ describe('YouTube timedtext MAIN world bridge core', () => {
         load(new Blob(['WEBVTT blob']), 'blob');
         await new Promise(resolve => setTimeout(resolve, 0));
         expect(fixture.posts).toHaveLength(2);
+        const unreadableBlob=new Blob(['WEBVTT unavailable']);
+        vi.spyOn(unreadableBlob,'text').mockRejectedValueOnce(new Error('Blob backing file unavailable'));
+        load(unreadableBlob,'blob');await new Promise(resolve=>setTimeout(resolve,0));
+        expect(fixture.posts).toHaveLength(2);
         const pending = load(new Blob(['WEBVTT late']), 'blob');
         fixture.xhrOpen.value.call(pending, 'GET', 'https://example.com/reuse');
         await new Promise(resolve => setTimeout(resolve, 0));
@@ -778,6 +782,16 @@ describe('YouTube timedtext MAIN world bridge core', () => {
             await new Promise(resolve => setTimeout(resolve, 10));
             expect(fixture.posts).toHaveLength(0);
         } finally { dispose(); }
+    });
+    it('rejects an oversized clone header even when the clone body refuses cancellation', async () => {
+        const fixture=youtubeFixture(),cancel=vi.fn(async()=>{throw new Error('clone stream already failed');});
+        const original={clone:()=>({headers:new Headers({'content-length':'8000001'}),body:{cancel},text:vi.fn()})};
+        (fixture.originalFetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(original);
+        const dispose=installYoutubeTimedTextBridgeCore(fixture.environment);
+        try {
+            expect(await fixture.fetch.value.call({},'/api/timedtext')).toBe(original);
+            await flush();expect(cancel).toHaveBeenCalledOnce();expect(fixture.posts).toHaveLength(0);
+        } finally {dispose();}
     });
 
     it('YouTube 未结束的克隆正文在 15 秒总读取预算后释放并忽略迟到数据', async () => {

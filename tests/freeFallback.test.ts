@@ -17,6 +17,16 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-05T00:
 afterEach(() => { vi.useRealTimers(); });
 
 describe('free provider fallback coordinator', () => {
+    it('keeps every live route lease when all health entries are busy at the eviction limit', async () => {
+        const run=createFreeFallbackRunner(129),gates=Array.from({length:129},()=>deferred<string>());
+        const routes=gates.map((gate,index)=>candidate(`busy-${index}`,vi.fn(()=>gate.promise)));
+        const requests:Promise<string>[]=[];
+        for(const route of routes){requests.push(run([route],{...options,timeoutMs:10_000}));await flush();}
+        expect(routes.every(route=>vi.mocked(route.translate).mock.calls.length===1)).toBe(true);
+        gates.forEach((gate,index)=>gate.resolve(`译文 ${index}`));
+        await expect(Promise.all(requests)).resolves.toEqual(gates.map((_,index)=>`译文 ${index}`));
+        expect(vi.getTimerCount()).toBe(0);
+    });
     it('reports the earliest temporary recovery without repeating the pool or borrowing permanent routes', async () => {
         const run = createFreeFallbackRunner(3, {random: () => 0});
         const routes = [

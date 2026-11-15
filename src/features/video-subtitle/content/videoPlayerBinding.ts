@@ -272,12 +272,10 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     }
   };
 
-  const menuRenderParent = (next: VideoPlayerTarget, scope: HTMLElement): HTMLElement => {
+  const menuRenderParent = (next: VideoPlayerTarget, scope: HTMLElement, ownedMenu: HTMLElement): HTMLElement => {
     const viewport = viewportPresentation();
-    if (menu) {
-      if (viewport) menu.dataset.presentation = 'viewport';
-      else delete menu.dataset.presentation;
-    }
+    if (viewport) ownedMenu.dataset.presentation = 'viewport';
+    else delete ownedMenu.dataset.presentation;
     if (!viewport && scope === next.player) return next.player;
     const playerRect = next.player.getBoundingClientRect();
     let rect: {left: number; top: number; width: number; height: number} = playerRect;
@@ -321,7 +319,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
 
   const syncOwnedMenuHost = (next: VideoPlayerTarget, scope: HTMLElement) => {
     if (menu) {
-      const parent = menuRenderParent(next, scope);
+      const parent = menuRenderParent(next, scope, menu);
       moveWithFocus(menu, parent);
       if (parent === menuHost) {
         if (!menuPointer) menuPointer = {node: menu, value: menu.style.getPropertyValue('pointer-events'), priority: menu.style.getPropertyPriority('pointer-events')};

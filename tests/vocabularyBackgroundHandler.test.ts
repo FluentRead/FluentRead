@@ -118,6 +118,16 @@ function createDependencies(overrides: Partial<VocabularyBookBackgroundDependenc
 }
 
 describe('vocabulary background message handlers', () => {
+    it('userscript rejects extension-only durable undo operations before reading any recovery record', async () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        const {dependencies, repository} = createDependencies({isTrustedUndoSender: () => true});
+        try {
+            const handler = createVocabularyBookHandler(dependencies);
+            expect(await handler.handle({type: VOCABULARY_BOOK_MESSAGE, action: 'listUndo'}, {}))
+                .toMatchObject({success: false, error: {code: 'invalid-input', message: '操作不支持'}});
+            expect(repository.listUndo).not.toHaveBeenCalled();
+        } finally {vi.unstubAllEnvs();}
+    });
     it('only lets the same extension settings page access durable deletion recovery', async () => {
         const {dependencies, repository} = createDependencies({isTrustedUndoSender: sender =>
             isTrustedSettingsSender(sender, 'fixture-id', 'chrome-extension://fixture-id/options.html')});
@@ -146,12 +156,19 @@ describe('vocabulary background message handlers', () => {
         expect(repository.restoreUndo).toHaveBeenCalledOnce();
         expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
     });
-    it.each(['invalid-input','limit-exceeded'])('maps confirmed undo errors to fixed safe messages: %s',async code=>{
+    it.each(['invalid-input','limit-exceeded','unknown-storage-code'])('maps confirmed undo errors to fixed safe messages: %s',async code=>{
         const {dependencies,repository}=createDependencies({isTrustedUndoSender:()=>true});
         repository.listUndo.mockRejectedValueOnce(Object.assign(new Error('private secret'),{name:'VocabularyBookError',code}));
         const result=await createVocabularyBookHandler(dependencies).handle({type:VOCABULARY_BOOK_MESSAGE,action:'listUndo'},{});
-        expect(result).toMatchObject({success:false,error:{code}});expect(JSON.stringify(result)).not.toContain('private secret');
+        expect(result).toMatchObject({success:false,error:{code:code==='unknown-storage-code'?'storage-error':code}});expect(JSON.stringify(result)).not.toContain('private secret');
         expect(dependencies.logOperationFailure).not.toHaveBeenCalled();
+    });
+    it('does not announce a collection change when removal or undo confirms no mutation',async()=>{
+        const {dependencies,repository}=createDependencies({isTrustedUndoSender:()=>true}),handler=createVocabularyBookHandler(dependencies);
+        repository.removeWithUndo.mockResolvedValueOnce(null);repository.restoreUndo.mockResolvedValueOnce('expired' as never);
+        expect(await handler.handle({type:VOCABULARY_BOOK_MESSAGE,action:'removeWithUndo',entryId:'entry'},{})).toMatchObject({success:true,data:null});
+        expect(await handler.handle({type:VOCABULARY_BOOK_MESSAGE,action:'restoreUndo',undoId:'00000000-0000-4000-8000-000000000001'},{})).toMatchObject({success:true,data:'expired'});
+        expect(dependencies.broadcastChanged).not.toHaveBeenCalled();
     });
     it('does not leak private text through clear failure diagnostics',async()=>{
         const {dependencies,repository}=createDependencies();repository.clear.mockRejectedValueOnce(new Error('private reading https://secret.test'));

@@ -10,6 +10,13 @@ const file = (name = 'dict.dat.gz'): ReadingAssetFile => ({name, size: data.leng
 ]});
 
 describe('on-demand reading data store', () => {
+    it('falls back after an invalid response even if the unread body rejects cancellation', async () => {
+        const invalid=new Response(new ReadableStream({cancel(){return Promise.reject(new Error('network stream already closed'));}}),{status:503});
+        const cancel=vi.spyOn(invalid.body!,'cancel');
+        const fetcher=vi.fn().mockResolvedValueOnce(invalid).mockResolvedValueOnce(new Response(data));
+        expect(new Uint8Array(await create(undefined,{fetch:fetcher}).get(file().name))).toEqual(data);
+        expect(cancel).toHaveBeenCalledOnce();expect(fetcher).toHaveBeenCalledTimes(2);expect(cache.put).toHaveBeenCalledOnce();
+    });
     let entries: Map<string, Response>;
     let cache: {match: ReturnType<typeof vi.fn>; put: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn>};
     beforeEach(() => {

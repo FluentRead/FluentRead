@@ -47,6 +47,14 @@ function createController(order: string[], visibleIds: string[]) {
 }
 
 describe('usePopupLayoutReorder', () => {
+  it('accepts dragover without a transfer object and skips saving an unchanged drop order', () => {
+    const {controller,updates}=createController(['a','b','c'],['a','b','c'])
+    controller.start(dragEvent(0,0),'a')
+    const over=dragEvent(0,0);Object.defineProperty(over,'dataTransfer',{value:null})
+    controller.over(over,'b');expect(controller.dropTarget.value).toBe('b')
+    controller.drop(dragEvent(0,0),'b')
+    expect(updates).toEqual([]);expect(controller.draggedItem.value).toBeNull()
+  })
   it('reorders visible slots while preserving hidden entries in their slots', () => {
     const {controller, updates} = createController(
       ['translation', 'hidden-site', 'quickFeatures', 'footer'],

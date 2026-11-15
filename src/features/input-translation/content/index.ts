@@ -495,7 +495,8 @@ export function createInputTranslationContentFeature(
                         event.preventDefault();
                         event.stopPropagation();
                         const reportFailure = (error: unknown) => {
-                            if (!signal.aborted) logger.error('输入框翻译操作失败:', error);
+                            // 成功提示可比原翻译请求存活更久；恢复等待结束后也须复验当前实例的代次。
+                            if (!signal.aborted && requestId === activeInputTranslationRequestId) logger.error('输入框翻译操作失败:', error);
                         };
                         void restore.onRestore().catch(reportFailure);
                     });

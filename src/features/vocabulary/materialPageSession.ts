@@ -193,7 +193,8 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
                     } finally {combined.release();}
                 });
                 pending = work;
-                void work.then(() => {if (pending === work) pending = undefined;}, () => {if (pending === work) pending = undefined;});
+                // 同一会话拒绝并行分页；这组回调是 pending 的唯一释放入口。
+                void work.then(() => {pending = undefined;}, () => {pending = undefined;});
                 return work;
             },
             getTopicsPage(options) {
@@ -236,7 +237,7 @@ export async function createMaterialPageSession(repository:Repository, input:Mat
                     } finally {combined.release();}
                 });
                 pending=work;
-                void work.then(() => {if (pending === work) pending=undefined;}, () => {if (pending === work) pending=undefined;});
+                void work.then(() => {pending=undefined;}, () => {pending=undefined;});
                 return work;
             },
             close,

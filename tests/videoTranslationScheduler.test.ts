@@ -3,6 +3,13 @@ import {VideoTranslationScheduler} from '@/src/features/video-subtitle/content/t
 
 const tick = () => new Promise<void>(r => setTimeout(r, 0));
 describe('VideoTranslationScheduler', () => {
+  it('重复预取复用原任务，不占用额外名额', async () => {
+    let complete!: (value: string) => void;
+    const translate = vi.fn(() => new Promise<string>(resolve => {complete = resolve;}));
+    const scheduler = new VideoTranslationScheduler(translate), first = scheduler.request('same', true);
+    expect(scheduler.request('same', true)).toBe(first); await tick(); expect(translate).toHaveBeenCalledOnce();
+    complete('译文'); await expect(first).resolves.toBe('译文');
+  });
   it('跳转后删除旧的未启动预取，保留在途、当前优先请求和新窗口', async () => {
     const calls: string[] = [];
     const releases = new Map<string, (text: string) => void>();

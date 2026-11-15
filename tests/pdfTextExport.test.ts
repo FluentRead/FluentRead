@@ -1,5 +1,5 @@
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -16,6 +16,7 @@ import {renderPdfReadingPages} from '@/src/features/document-translation/ui/pdfP
 import {paginatePdfReadingPlan, type PdfReadingOutputPage} from '@/src/features/document-translation/core/pdfTextLayout';
 import {pdfFallbackBidiLine} from '@/src/features/document-translation/core/pdfFallbackBidi';
 
+const standardFontDataUrl = join(dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json')), 'standard_fonts') + '/';
 const fontBytes = new Uint8Array(readFileSync(new URL('../assets/pdf-fonts/FluentReadNotoSansSC-Regular.woff2', import.meta.url)));
 const textOnlyOptions = {pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: async () => fontBytes};
 const compact = (text: string) => text.replace(/\s/gu, '');
@@ -49,7 +50,7 @@ async function fixture(): Promise<ParsedDocument> {
 }
 
 async function extract(bytes: Uint8Array): Promise<string[]> {
-    const task = getDocument({data: bytes.slice(), disableFontFace: true});
+    const task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
     const pdf = await task.promise;
     try {
         const texts: string[] = [];
@@ -63,7 +64,7 @@ async function extract(bytes: Uint8Array): Promise<string[]> {
 }
 
 async function pageLabels(bytes: Uint8Array): Promise<string[] | null> {
-    const task = getDocument({data: bytes.slice(), disableFontFace: true});
+    const task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
     try {return await (await task.promise).getPageLabels();}
     finally {await task.destroy();}
 }
@@ -76,6 +77,23 @@ function saveEvidence(name: string, bytes: Uint8Array): void {
 }
 
 describe('visible Unicode PDF reading export', () => {
+    it.each([0, 90, 180, 270] as const)('keeps emoji joiners in searchable raster text without changing line advance at %s degrees', async rotation => {
+        const document = await fixture(); if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const page = document.binary.pages[0]; page.rotation = rotation;
+        if (rotation === 90 || rotation === 270) {page.width = 800; page.height = 600;}
+        const text = '中文 α é 👩‍💻 👨‍👩‍👧‍👦 尾部';
+        const download = await createDocumentDownload(document, ['', text], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+            textItems: [{segmentIndex: 1, text, x: 42, y: 110, width: 312, fontSize: 14}]}),
+        });
+        const [extracted] = await extract(download.data as Uint8Array);
+        expect(compact(extracted)).toContain(compact(text));
+        const output = await PDFDocument.load(download.data as Uint8Array), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+        const font = fonts.keys().map(key => fonts.lookup(key, PDFDict)).find(value => value.get(PDFName.of('BaseFont'))?.toString() === '/FluentReadSourceText')!;
+        const widths = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict).lookup(PDFName.of('W'), PDFArray);
+        expect(widths.asArray().length).toBeGreaterThan(0);
+        for (let index = 1; index < widths.size(); index += 2) expect(widths.lookup(index, PDFArray).asArray().map(value => value.toString())).toEqual(['2000']);
+        saveEvidence(`raster-emoji-joiners-${rotation}.pdf`, download.data as Uint8Array);
+    });
     it('exports a full reading page without a blank second page caused by trailing newlines', async () => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
@@ -108,7 +126,7 @@ describe('visible Unicode PDF reading export', () => {
         expect(await pageLabels(download.data as Uint8Array)).toEqual(['1']);
         expect(result[0]).toContain('Original selectable source page');
         expect(compact(result[0])).toContain(compact(translations.join('')));
-        const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+        const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
         try {
             const pdf = await task.promise, page = await pdf.getPage(1);
             const items = (await page.getTextContent({disableNormalization: true})).items.filter((item): item is TextItem => 'str' in item);
@@ -139,7 +157,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, translations, 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: translations.map((text, segmentIndex) => ({segmentIndex, text, x: 42, y: 50 + segmentIndex * 60, width: 312, fontSize: 14,
                     ...(segmentIndex === 1 ? {direction: bidi.direction} : {})}))})});
-            const bytes = download.data as Uint8Array, task = getDocument({data: bytes.slice(), disableFontFace: true});
+            const bytes = download.data as Uint8Array, task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1), items = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item);
                 const raw = items.map(item => item.str).join('');
@@ -213,7 +231,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14,
                     ...(direction ? {direction} : {})}]})});
-            const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+            const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1);
                 const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
@@ -232,7 +250,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14,
                     ...(direction ? {direction} : {})}]})});
-            const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+            const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1);
                 const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
@@ -249,7 +267,7 @@ describe('visible Unicode PDF reading export', () => {
         // Both engines choose RTL for this four-code-unit line, but stock's RTL transform removes angle characters.
         const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
             textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14, direction: 'rtl'}]})});
-        const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+        const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
         try {
             const pdf = await task.promise, page = await pdf.getPage(1);
             const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
@@ -310,6 +328,27 @@ describe('visible Unicode PDF reading export', () => {
         expect(rasterize).toHaveBeenCalledOnce();
         expect(rasterize.mock.calls[0][0].footerLabel).toBe(presentation === 'layout' ? '原文第 1 页 · 译文续页' : undefined);
         expect(progress).toContainEqual({phase: 'rendering', completedPages: 1, totalPages: 1});
+    });
+
+    it('loads one reading font and keeps both translated pages searchable in a multi-page export', async () => {
+        const document = await fixture();
+        if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const source = await PDFDocument.load(document.binary.bytes);
+        source.addPage([600, 800]).drawText('Second source page', {x: 42, y: 720, size: 14});
+        document.binary.bytes = await source.save();
+        document.segments = [...document.segments, ...document.segments.map(segment => ({...segment, id: segment.id + 2, source: `Second ${segment.source}`}))];
+        const first = document.binary.pages[0];
+        document.binary.pages.push({...first, pageNumber: 2, segmentIndexes: [2, 3],
+            blocks: first.blocks.map(block => ({...block, segmentIndex: block.segmentIndex + 2})),
+        });
+        const translations = ['第一页标题', '第一页完整译文', '第二页标题', '第二页完整译文'];
+        const loader = vi.fn(async () => fontBytes);
+        const result = await createDocumentDownload(document, translations, 'translated', {
+            pdfPresentation: 'readable', pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: loader,
+        });
+        expect(loader).toHaveBeenCalledOnce();
+        const pages = await extract(result.data as Uint8Array);
+        expect(pages.map(compact)).toEqual([translations.slice(0, 2).join(''), translations.slice(2).join('')]);
     });
 
     it('attempts an unavailable continuation font only once per multi-page export and closes raster fallback on cancellation', async () => {
@@ -445,7 +484,9 @@ describe('visible Unicode PDF reading export', () => {
     });
 
     it('rejects a malformed raster text alphabet exceeding CID capacity instead of saving truncated search data', async () => {
-        const text = Array.from({length: 65_536}, (_unused, index) => String.fromCodePoint(0x10000 + index)).join('');
+        // 格式字符与邻字共用 CID；这里仍须提供真正超过 16-bit CID 容量的独立字母表。
+        const text = Array.from({length: 66_000}, (_unused, index) => String.fromCodePoint(0x10000 + index))
+            .filter(character => !/\p{Cf}/u.test(character)).slice(0, 65_536).join('');
         await expect(createDocumentDownload(await fixture(), ['标题', '译文'], 'translated', {
             pdfPageRasterizer: async () => ({data: layoutPng, format: 'png', textItems: [{segmentIndex: 0, text, x: 42, y: 50, width: 500, fontSize: 14}]}),
         })).rejects.toThrow('过多独立字形');

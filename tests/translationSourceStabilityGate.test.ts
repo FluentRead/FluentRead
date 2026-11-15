@@ -25,6 +25,21 @@ function fixture() {
 }
 
 describe('动态来源安静窗口调度', () => {
+    it('replacement cancels only timers for the old source while retaining neighbors in both sessions', async () => {
+        const {document,element,candidate,session,ports,gate}=fixture(),otherSession=createSession();
+        ports.source.mockImplementation(fresh=>fresh.element.textContent??'');
+        gate.blocks(candidate,'Waiting for the server.',session);
+        const neighbor=document.createElement('p');document.body.append(neighbor);neighbor.textContent='Ready neighboring article.';
+        const adjacent={...candidate,element:neighbor};gate.blocks(adjacent,'Preparing neighboring article.',session);gate.blocks(adjacent,neighbor.textContent,session);
+        const distant=document.createElement('p');document.body.append(distant);distant.textContent='Ready separate session.';
+        const separate={...candidate,element:distant};gate.blocks(separate,'Preparing separate session.',otherSession);gate.blocks(separate,distant.textContent,otherSession);
+        expect(vi.getTimerCount()).toBe(3);
+        const replacement=document.createElement('p');replacement.textContent='The final article is ready.';element.replaceWith(replacement);
+        gate.blocks({...candidate,element:replacement},replacement.textContent,session);
+        expect(vi.getTimerCount()).toBe(3);await vi.advanceTimersByTimeAsync(1800);
+        expect(ports.queue.mock.calls.map(call=>call[1])).toEqual(expect.arrayContaining([neighbor,distant,replacement]));
+        expect(ports.queue).toHaveBeenCalledTimes(3);expect(vi.getTimerCount()).toBe(0);
+    });
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => {vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();});
 

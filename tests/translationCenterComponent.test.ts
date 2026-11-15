@@ -33,7 +33,7 @@ vi.mock('element-plus', () => ({ElOption: {props: ['value', 'label'], setup: (pr
 vi.mock('@/src/ui/components/UiSelect.vue', () => ({default: {props: ['modelValue'], emits: ['update:modelValue', 'change', 'visible-change'], setup: (props: any, context: any) => () => vue.h('select', {
   value: props.modelValue, onFocus: () => context.emit('visible-change', true), onBlur: () => context.emit('visible-change', false),
   onChange: (event: Event) => {const value = (event.target as HTMLSelectElement).value; context.emit('update:modelValue', value); context.emit('change', value);},
-}, context.slots.default?.())}}));
+}, [context.slots.label?.(), context.slots.default?.()])}}));
 vi.mock('@/src/ui/components/UiIcon.vue', () => ({default: {render: () => null}}));
 vi.mock('@/src/ui/components/ServiceIcon.vue', () => ({default: {render: () => null}}));
 const deferred = () => {let resolve!: (text: string) => void; const promise = new Promise<string>(done => {resolve = done;}); return {promise, resolve};};
@@ -60,7 +60,9 @@ async function mountCenter(surface: 'settings' | 'sidebar' = 'settings'): Promis
     parentNode: node => node.parentNode, nextSibling: node => node.nextSibling,
     insert: (node, parent, anchor) => parent.insertBefore(node, anchor || null), remove: node => node.remove(),
     patchProp: (node, key, previous, value) => {
-      if (key.startsWith('on')) {if (key.includes(':')) return; const event = key.slice(2).replace(/(?:Once|Passive|Capture)+$/, '').toLowerCase(); if (previous) node.removeEventListener(event, previous); if (value) node.addEventListener(event, value);}
+      if (key.startsWith('on')) {if (key.includes(':')) return; const event = key.slice(2).replace(/(?:Once|Passive|Capture)+$/, '').toLowerCase();
+        for (const listener of Array.isArray(previous) ? previous : previous ? [previous] : []) node.removeEventListener(event, listener);
+        for (const listener of Array.isArray(value) ? value : value ? [value] : []) node.addEventListener(event, listener);}
       else if (key === 'style') Object.assign(node.style, value || {});
       else if (key === 'value') {if (node.tagName === 'SELECT') for (const option of node.querySelectorAll('option')) option.toggleAttribute('selected', option.value === value); else node.value = value;}
       else if (value == null || (value === false && !key.startsWith('aria-'))) node.removeAttribute(key);
@@ -76,6 +78,45 @@ async function mountCenter(surface: 'settings' | 'sidebar' = 'settings'): Promis
 afterEach(() => {close(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('translation center product workflow', () => {
+  it('expires save and copy acknowledgements while pending language choices survive incoming configuration', async () => {
+    vi.useFakeTimers();
+    const pending = deferred(); requestPatch.mockReturnValueOnce(pending.promise);
+    state.sourceLanguage = 'en'; state.targetLanguage = 'ja'; state.persistTranslationCenterConfig('source', 'target');
+    subscription(config);
+    expect(state.sourceLanguage).toBe('en'); expect(state.targetLanguage).toBe('ja');
+    pending.resolve(''); await vue.nextTick(); await vue.nextTick();
+    expect(state.saveState).toBe('saved');
+    await state.copyText('reviewed', 'google'); expect(state.copiedService).toBe('google');
+    await vi.advanceTimersByTimeAsync(1800);
+    expect(state.saveState).toBe('idle'); expect(state.copiedService).toBe(''); expect(state.feedback).toBe('');
+  });
+  it('dismisses the service picker with Escape and bounds Alt arrow card moves at either end', async () => {
+    const key = (target: EventTarget, value: string) => {const event = new document.defaultView!.Event('keydown', {bubbles: true, cancelable: true}); Object.assign(event, {key: value, altKey: true}); target.dispatchEvent(event);};
+    await state.toggleServicePicker(); await vue.nextTick(); key(host.querySelector('[role="dialog"]')!, 'Escape');
+    await vue.nextTick(); expect(state.servicePickerOpen).toBe(false);
+    const initial = state.cards.map((card: any) => card.service);
+    key(host.querySelector('.drag-handle')!, 'ArrowUp'); await vue.nextTick(); expect(state.cards.map((card: any) => card.service)).toEqual(initial);
+    key(host.querySelector('.drag-handle')!, 'ArrowDown'); await vue.nextTick(); expect(state.cards.map((card: any) => card.service)).toEqual([...initial].reverse());
+    key(host.querySelectorAll('.drag-handle')[1], 'ArrowUp'); await vue.nextTick(); expect(state.cards.map((card: any) => card.service)).toEqual(initial);
+    state.swapLanguages(); expect(state.sourceLanguage).toBe('auto');
+  });
+  it('preserves a failed language edit across storage sync and ignores a clipboard rejection after close', async () => {
+    requestPatch.mockRejectedValueOnce(new Error('offline'));
+    state.sourceLanguage = 'en'; state.targetLanguage = 'ja'; state.persistTranslationCenterConfig('source', 'target');
+    await vue.nextTick(); await vue.nextTick(); subscription(config);
+    expect(state.sourceLanguage).toBe('en'); expect(state.targetLanguage).toBe('ja'); expect(state.saveState).toBe('error');
+    let reject!: (cause: Error) => void; copy.mockReturnValueOnce(new Promise((_resolve, fail) => {reject = fail;}));
+    const pending = state.copyText('reviewed', 'google'), feedback = state.feedback;
+    const staleSubscription = subscription; close(); staleSubscription(config); reject(new Error('window closed')); await pending;
+    expect(state.feedback).toBe(feedback);
+  });
+  it('keeps acknowledgement state for an outstanding save when another field has no changes', async () => {
+    const pending = deferred(); requestPatch.mockReturnValueOnce(pending.promise);
+    config.translationCenterServices = state.cards.map((card: any) => card.service);
+    state.setLayout('grid'); state.persistTranslationCenterConfig('services');
+    expect(requestPatch).toHaveBeenCalledOnce(); expect(state.saveState).toBe('idle');
+    pending.resolve(''); await vue.nextTick(); await vue.nextTick(); expect(state.saveState).toBe('saved');
+  });
   it('uses a compact single column in the sidebar without changing saved comparison layout', async () => {
     close();config.translationCenterLayout = 'grid';config.translationCenterServices = ['google'];await mountCenter('sidebar');
     expect(host.querySelector('.is-sidebar')).not.toBeNull();expect(host.querySelector('.results-layout-control')).toBeNull();

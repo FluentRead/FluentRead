@@ -93,7 +93,9 @@ describe('学习材料旧模板本地化', () => {
             '材料备份传输包含多余数据', '材料备份传输不完整', '材料备份传输格式无效',
             '材料备份分片长度无效', '材料备份过大', '材料备份错误代码无效',
         ];
-        const source = readFileSync('src/features/vocabulary/materialBackupExportClient.ts', 'utf8');
+        // 安全计数由导出客户端调用的公共计数模块负责，错误文案仍须进入本地化检查。
+        const source = ['src/features/vocabulary/materialBackupExportClient.ts',
+            'src/features/vocabulary/materialBackupSafeCount.ts'].map(file => readFileSync(file, 'utf8')).join('\n');
         for (const message of messages) {
             expect(source).toContain(`'${message}'`);
             for (const language of languages) {

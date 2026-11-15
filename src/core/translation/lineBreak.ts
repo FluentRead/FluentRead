@@ -27,7 +27,7 @@ export function* iterateTranslationSentences(text: string): IterableIterator<str
         cursor = next;
         sentenceEndPattern.lastIndex = cursor;
     }
-    if (cursor < text.length || cursor === 0) yield text.slice(cursor);
+    yield text.slice(cursor);
 }
 
 /** 数组入口保持完整片段及空文本契约，供译文 DOM 换行使用。 */

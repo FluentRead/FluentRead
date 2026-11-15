@@ -7,6 +7,13 @@ const state = (overrides: Partial<FrameTranslationState> = {}): FrameTranslation
 const deferred = <T>() => {let resolve!: (value: T) => void; let reject!: (reason?: unknown) => void; const promise = new Promise<T>((r, j) => {resolve = r; reject = j;}); return {promise, resolve, reject};};
 
 describe('QQ mail frame session snapshots', () => {
+    it('re-reads after start synchronously requests a new revision and makes disposal idempotent', async () => {
+        const deps={readState:vi.fn().mockResolvedValueOnce(state()).mockResolvedValue(state({revision:2})),isEnabled:()=>true,setAvailable:vi.fn(),start:vi.fn(),restore:vi.fn()};
+        const c=createFrameSessionController(deps);deps.start.mockImplementationOnce(()=>{void c.refresh();});
+        await c.refresh();expect(deps.start.mock.calls.map(([value])=>value.revision)).toEqual([1,2]);
+        c.dispose();const calls=deps.restore.mock.calls.length;c.dispose();c.suspend();await c.refresh();
+        expect(deps.restore).toHaveBeenCalledTimes(calls);expect(deps.readState).toHaveBeenCalledTimes(2);
+    });
     it('accepts valid single/bilingual snapshots and optional fields', () => {
         expect(isFrameTranslationState(state())).toBe(true);
         expect(isFrameTranslationState(state({scope: 'content'}))).toBe(true);

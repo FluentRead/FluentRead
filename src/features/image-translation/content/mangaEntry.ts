@@ -64,7 +64,7 @@ export function mountMangaEntry(ctx: ContentScriptContext, ports: {startAreaTran
         if (removed) return;
         removed = true;
         stopOpener();stopStatus();stopConfig();releaseOverlay?.();releaseOverlay = undefined;document.removeEventListener('fluentread-route-change', sync);
-        if (cleanup === remove) {cleanup = undefined;if(canRead===allowed)canRead=undefined;publishReading(false);}
+        if (cleanup === remove) {cleanup = undefined;canRead=undefined;publishReading(false);}
     };
     cleanup = remove;
     pending = createVueShadowUi(ctx, {name: 'fluent-read-manga-entry', hostId: 'fluent-read-manga-entry-container', component: MangaEntry, mode: 'closed', css:mangaEntryStyles,
@@ -110,4 +110,11 @@ export function openMangaReading(event: MouseEvent, toggle = true):boolean {
     if (readingOpen) {if (!toggle) return true;if (!instance.closeReading) return false;instance.closeReading();return true;}
     void instance.openReading(event,target).catch(() => {if(ui===current){instance.closeReading?.();publishReading(false);}});return true;
 }
-export function unmountMangaEntry(): void {owner++;pending = null;cleanup?.();cleanup = undefined;ui?.remove();ui = null;}
+export function unmountMangaEntry(): void {
+    owner++;pending = null;
+    // 先归还旧 UI 的槽位；清理端口同步重挂时，新实例保留自己的 UI 与订阅释放器。
+    const mounted = ui;ui = null;
+    const release = cleanup;release?.();
+    if (cleanup === release) cleanup = undefined;
+    mounted?.remove();
+}

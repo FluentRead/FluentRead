@@ -78,7 +78,8 @@ export function paintCardBackground(context: CanvasRenderingContext2D, theme: Sh
         context.fillStyle = gradient; context.fillRect(0, 0, width, height);
         glow(context, width / 2, -100, 240, '#ffffff', width, height);
         context.fillStyle = '#ffffff26'; context.beginPath(); context.arc(width + 12, height + 100, 170, 0, Math.PI * 2); context.fill();
-    } else if (theme === 'blueprint') {
+    } else {
+        // CARD_THEMES 的穷尽类型已在入口取色；剩余主题必为 blueprint。
         context.strokeStyle = '#aacde012'; context.lineWidth = .5;
         for (let x = 16; x < width; x += 32) { context.beginPath(); context.moveTo(x, 0); context.lineTo(x, height); context.stroke(); }
         for (let y = 16; y < height; y += 32) { context.beginPath(); context.moveTo(0, y); context.lineTo(width, y); context.stroke(); }

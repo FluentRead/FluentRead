@@ -70,7 +70,8 @@ export function mountPersonalCorrections(ctx: ContentScriptContext, signal: Abor
     document.removeEventListener('pointerover', discover, true); document.removeEventListener('focusin', discover, true);
     document.removeEventListener('keydown', keydown, true); signal.removeEventListener('abort', instance.dispose);
     try {ui?.remove();} catch { /* 扩展重载后仍继续释放监听器和单例。 */ }
-    finally {ui = undefined; if (owner === instance) owner = undefined;}
+    // owner 非空时 mount 拒绝新实例，只有本次清理可以释放它。
+    finally {ui = undefined; owner = undefined;}
   }};
   owner = instance;
   document.addEventListener('pointerover', discover, true); document.addEventListener('focusin', discover, true);

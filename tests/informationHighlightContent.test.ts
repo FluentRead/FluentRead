@@ -7,7 +7,7 @@
 import {informationHighlightOpacity} from '@/src/features/information-highlight/domain/presentation';
 import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {scoreInformationKeywords, selectInformationSpans} from '@/src/features/information-highlight/domain/keywords';
+import {alignInformationWordSpans, scoreInformationKeywords, selectInformationSpans} from '@/src/features/information-highlight/domain/keywords';
 import {informationGraphemeBoundaries, informationSliceEnd} from '@/src/features/information-highlight/domain/textBoundaries';
 import {collectInformationParagraphs, informationRanges, isInformationParagraphCurrent} from '@/src/features/information-highlight/content/readingText';
 import {installInformationHighlight, INFORMATION_HIGHLIGHT_NAME} from '@/src/features/information-highlight/public';
@@ -115,6 +115,8 @@ describe('local keyword and Unicode coordinates', () => {
         const join = 'ab‍cd'; expect(selectInformationSpans(join, [{start: 0, end: 5, score: 1}], 'high')).toEqual([]);
     });
     it('aggregates model pieces into whole words, rejects bad boundaries, and makes density a bounded paint budget', () => {
+        expect(alignInformationWordSpans('Alpha beta.', [{start: 0, end: 10, score: 1}, {start: 1, end: 2, score: 3}]))
+            .toEqual([{start: 0, end: 5, score: 4}, {start: 6, end: 10, score: 1}]);
         const text = 'extraordinary algorithms preserve cafe\u0301 and emoji 👩‍💻 safely';
         const spans = [...scoreInformationKeywords(text).spans, {start: 0, end: 5, score: 5}, {start: 5, end: 13, score: 5},
             {start: -1, end: 3, score: 10}, {start: 0.5, end: 3, score: 10}, {start: 0, end: 0, score: 2},
@@ -157,6 +159,15 @@ describe('read-only body collection and native mapping', () => {
         const inline = fixture('<span>A readable standalone inline scope.</span>');
         Object.defineProperty(inline.document, 'body', {value: inline.document.querySelector('span')});
         expect(collect(inline).paragraphs[0].text).toBe('A readable standalone inline scope.');
+    });
+    it('deduplicates discovered root handles when the translation resolver reuses a root during handoff', () => {
+        const f=fixture('<article><span id="first"></span><span id="alias"></span></article>');
+        const host=f.document.querySelector('#first')!,root=host.attachShadow({mode:'closed'});
+        root.innerHTML='<p>Shared translated readable paragraph contents.</p>';
+        const scan=collect(f,element=>element.id==='first'||element.id==='alias'?root:undefined);
+        expect(scan.roots).toEqual([f.document,root]);
+        expect(scan.paragraphs.every(paragraph=>paragraph.root===root&&paragraph.text==='Shared translated readable paragraph contents.')).toBe(true);
+        expect(scan.paragraphs.length).toBeGreaterThan(0);
     });
     it('reads registered closed translation text only while attached, and discovers open roots and slot projection', () => {
         const f = fixture('<article><span id="closed" class="fluent-read-single-slot" data-fr-translation-owned="true" translate="no">Original preserved hidden text.</span><span id="open"></span><span id="projection"></span></article>');
@@ -211,6 +222,19 @@ describe('read-only body collection and native mapping', () => {
 });
 
 describe('page-owned scoring, paint and cancellation', () => {
+    it('redraws split paragraphs sharing one Text node without retaining ranges from another slice',async()=>{
+        const text='Extraordinary scientific vocabulary preserves algorithmic information. '.repeat(80),f=fixture(`<p>${text}</p>`);
+        const controller=installInformationHighlight(f.document,{...defaults,density:'low'},{scoreLocal:vi.fn()});controller.setEnabled(true);await f.settle();expect(controller.getState().processedParagraphs).toBeGreaterThan(1);
+        controller.updatePreferences({...defaults,density:'high'});await f.settle();
+        const fresh=fixture(`<p>${text}</p>`),expected=installInformationHighlight(fresh.document,{...defaults,density:'high'},{scoreLocal:vi.fn()});expected.setEnabled(true);await fresh.settle();
+        expect(f.painted().sort()).toEqual(fresh.painted().sort());controller.dispose();expected.dispose();
+    });
+    it('does not finish the last paragraph as active after cancellation during its rendering-budget yield',async()=>{
+        const f=fixture();f.slow();const controller=installInformationHighlight(f.document,{...defaults},{scoreLocal:vi.fn()});controller.setEnabled(true);vi.advanceTimersByTime(180);
+        for(let i=0;i<200&&controller.getState().processedParagraphs===0;i++)await f.flush();
+        expect(controller.getState().processedParagraphs).toBe(1);expect(f.frames.size).toBe(1);controller.dispose();await f.flush();
+        expect(controller.getState().enabled).toBe(false);expect(f.painted()).toEqual([]);expect(f.frames.size).toBe(0);
+    });
     it('paints score levels with monotonic density, reuses model scores and keeps legacy styles compatible', async () => {
         const terms = Array.from({length: 30}, (_, index) => `term${String(index).padStart(2, '0')}`);
         const f = fixture(`<article><p>${terms.join(' ')}</p></article>`), before = f.document.body.innerHTML;
@@ -844,6 +868,17 @@ describe('content composition and runtime score messages', () => {
         await automatic.f.settle(); await automatic.f.settle(); expect(automatic.runtime.getState()).toMatchObject({phase: 'active', mode: 'keywords'}); expect(automatic.notice).not.toHaveBeenCalled(); automatic.runtime.unmount();
         const silent = fixture(), quiet = createInformationHighlightContentRuntime({document: silent.document, preferences: {...defaults, mode: 'surprisal-local'}, send: vi.fn(async () => ({success: false}))});
         quiet.mount(new AbortController().signal, () => true); press(silent); await silent.settle(); expect(quiet.getState().phase).toBe('error'); quiet.unmount();
+    });
+    it.each(['unmount', 'disable'] as const)('does not revive a model fallback after a notice handler requests %s', async action => {
+        const f = fixture();
+        const runtime = createInformationHighlightContentRuntime({document: f.document, preferences: {...defaults, mode: 'surprisal-local'},
+            send: vi.fn(async () => ({success: false, error: 'INFORMATION_HIGHLIGHT_NOT_DOWNLOADED'})),
+            notice: message => {if (message === 'modelNotReady') {if (action === 'unmount') runtime.unmount(); else runtime.setEnabled(false);}}});
+        runtime.mount(new AbortController().signal, () => true);
+        const event = new f.window.Event('keydown', {bubbles: true, cancelable: true}) as KeyboardEvent;
+        Object.assign(event, {key: 'h', code: 'KeyH', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false});
+        Object.defineProperty(event, 'isTrusted', {value: true}); f.document.dispatchEvent(event); await f.settle();
+        expect(runtime.getState()).toMatchObject({enabled: false, mode: 'surprisal-local'}); expect(f.painted()).toEqual([]); runtime.unmount();
     });
     it('mounts only current activation, owns abort, maps score messages and returns idle after route change', async () => {
         const f = fixture(), activation = new AbortController();

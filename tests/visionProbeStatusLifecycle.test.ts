@@ -39,6 +39,20 @@ beforeEach(() => {vi.useFakeTimers();vi.setSystemTime(2_000_000_000);ports.getIt
 afterEach(() => {app?.unmount();vi.useRealTimers();});
 
 describe('识图状态真实 Vue 生命周期与订阅预算', () => {
+    it('已进入任务队列的过期计时回调在隐藏与重新激活后仍不能改写时钟', async () => {
+        const timer = vi.spyOn(globalThis, 'setTimeout');
+        try {
+            mount(); await settle(); ports.subscriptions[0].callback(records()); await settle();
+            const callback = timer.mock.calls.find(call => call[1] === VISION_PROBE_TTL_MS)![0] as () => void;
+            active.value = false; await settle(); vi.mocked(resolveVisionCapabilityWithProbe).mockClear();
+            vi.setSystemTime(Date.now() + 500); callback(); await settle();
+            expect(resolveVisionCapabilityWithProbe).not.toHaveBeenCalled();
+            active.value = true; await settle(); ports.subscriptions.at(-1)!.callback(records()); await settle();
+            vi.mocked(resolveVisionCapabilityWithProbe).mockClear(); vi.setSystemTime(Date.now() + 500); callback(); await settle();
+            expect(resolveVisionCapabilityWithProbe).not.toHaveBeenCalled();
+            expect(status.result.value.capability).toBe('supported');
+        } finally {timer.mockRestore();}
+    });
     it('初始隐藏不读缓存、不订阅、不计算配置身份，激活才读取', async () => {
         mount(false);await settle();expect(ports.getItem).not.toHaveBeenCalled();expect(ports.subscriptions).toHaveLength(0);
         expect(resolveVisionCapabilityWithProbe).not.toHaveBeenCalled();expect(status.result.value).toEqual({capability: 'unknown', source: 'unknown'});

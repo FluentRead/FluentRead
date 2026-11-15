@@ -14,6 +14,16 @@ function localEntries(bytes: Uint8Array): Map<string, {method: number; data: Uin
 }
 
 describe('document archive stream lifecycle', () => {
+    it('keeps stored UTF-8 entries when central-directory extra fields use an unrelated extension tag', async () => {
+        const source = await generateDocumentArchive(new JSZip().file('图像.bin', 'Stored bytes', {compression: 'STORE'}));
+        const bytes = source.slice(), view = new DataView(bytes.buffer), end = bytes.length - 22, central = view.getUint32(end + 16, true);
+        const extra = central + 46 + view.getUint16(central + 28, true);
+        expect(view.getUint16(central + 30, true)).toBeGreaterThanOrEqual(4); expect(view.getUint16(extra, true)).toBe(0x7075);
+        view.setUint16(extra, 0xcafe, true);
+        const loaded = await JSZip.loadAsync(bytes); preserveStoredDocumentEntries(loaded, bytes, new Set());
+        const output = await generateDocumentArchive(loaded, {compression: 'DEFLATE'});
+        expect(localEntries(output).get('图像.bin')).toEqual(localEntries(source).get('图像.bin'));
+    });
     it('retains original stored media and compressed resources, while changed XML remains deflated', async () => {
         const zip = new JSZip();
         zip.file('media/图像.png', Uint8Array.from({length: 8_000}, (_, index) => index % 251), {compression: 'STORE'});

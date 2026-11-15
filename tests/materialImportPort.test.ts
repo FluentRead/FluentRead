@@ -57,6 +57,14 @@ afterEach(async()=>{for(const release of pendingDelays)release();for(const bridg
 const trustSender=(sender:any)=>{if(!sender?.url||sender.id!=='fixture')return false;try{const u=new URL(sender.url);return u.protocol==='chrome-extension:'&&u.host==='fixture'&&u.pathname==='/options.html';}catch{return false;}};
 
 describe('material stage Port bridge',()=>{
+  it.each(['begin','resume'] as const)('does not bind a late %s status after disconnection',async action=>{
+    const {port,stage}=harness(),started=deferred(),release=deferred(),cap=createImportCapability();
+    const original=stage.status.bind(stage);vi.spyOn(stage,'status').mockImplementationOnce(async(...args)=>{const value=await original(...args);started.resolve();await release.promise;return value;});
+    if(action==='resume')await stage.beginRecoverable(emptyManifest(),{generation:0,capturedAt:100},cap,{deadline:1000});
+    port.emit({id:1,action,capability:cap,...(action==='begin'?{manifest:emptyManifest(),guard:{generation:0,capturedAt:100},deadline:1000}:{})});
+    await started.promise;port.disconnect();release.resolve();await new Promise(resolve=>setTimeout(resolve,0));
+    expect(port.output).toHaveLength(0);expect((await stage.status(cap)).state).toBe('open');
+  });
   it('rejects non-object capability and frame payloads before accessing their fields',()=>{
     for(const input of [null,undefined,[],42,'secret']){
       expect(()=>snapshotMaterialImportCapability(input)).toThrow('invalid');

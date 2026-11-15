@@ -31,6 +31,25 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe('verified resumable model downloads', () => {
+  it('retries the next origin after fetch fails before producing a response',async()=>{
+    const bytes=new Uint8Array([9]),file=fileFor(bytes),fetcher=vi.fn().mockRejectedValueOnce(Error('temporary network failure')).mockResolvedValueOnce(new Response(bytes));
+    vi.stubGlobal('fetch',fetcher);await downloadTranslationArtifact(file,new AbortController().signal,()=>undefined);
+    expect(fetcher).toHaveBeenCalledTimes(2);expect(await artifactComplete(file)).toBe(true);
+  });
+  it('assembles partial network chunks before writing and verifying the complete model chunk',async()=>{
+    const bytes=new Uint8Array([1,2,3,4,5]),file=fileFor(bytes),progress=vi.fn();
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(bytes.subarray(0,2));controller.enqueue(bytes.subarray(2));controller.close();}}))));
+    await downloadTranslationArtifact(file,new AbortController().signal,progress);
+    expect(await artifactComplete(file)).toBe(true);expect(new Uint8Array(await (await translationArtifactBlob(file)).arrayBuffer())).toEqual(bytes);
+    expect(progress).toHaveBeenCalledWith(2,false);expect(progress).toHaveBeenCalledWith(5,true);
+  });
+  it('releases rejected response bodies before a reader was acquired and successfully retries the next origin',async()=>{
+    const bytes=new Uint8Array([9]),file=fileFor(bytes),cancel=vi.fn(async()=>undefined);
+    const body={getReader(){throw Error('reader unavailable');},cancel};
+    vi.stubGlobal('fetch',vi.fn().mockResolvedValueOnce({ok:true,status:200,body}).mockResolvedValueOnce(new Response(bytes)));
+    await downloadTranslationArtifact(file,new AbortController().signal,()=>undefined);
+    expect(cancel).toHaveBeenCalledOnce();expect(await artifactComplete(file)).toBe(true);
+  });
   it.each(['http', 'range', 'overflow'])('releases a rejected %s response before falling back even when cancel never settles', async stage => {
     const bytes = new Uint8Array([7]);
     const file = fileFor(bytes);

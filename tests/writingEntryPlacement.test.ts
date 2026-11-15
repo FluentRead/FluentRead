@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import {describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {placeWritingEntry, prepareWritingEntryHost} from '@/src/features/writing-assistant/entryPlacement';
 
@@ -36,6 +36,9 @@ describe('writing entry placement', () => {
 
         expect(placeWritingEntry(action, host, 'gmail')).toBe(true);
         expect([...action.parentElement!.children].map(node => node.textContent)).toEqual(['Send', '', 'Discard']);
+        const insert = vi.spyOn(action.parentElement!, 'insertBefore');
+        expect(placeWritingEntry(action, host, 'gmail')).toBe(true);
+        expect(insert).not.toHaveBeenCalled();
     });
 
     it('moves an existing host with a rerendered action row without duplicating it', () => {

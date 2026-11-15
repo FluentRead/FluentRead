@@ -10,6 +10,16 @@ function convertSanitizedArticle(content: string) {
 }
 
 describe('readable Markdown from sanitized article structures', () => {
+    it('preserves multiline footnote definitions and removes only their return links', () => {
+        const markdown = convertSanitizedArticle('<p>Observation<sup id="fnref:detail">1</sup>.</p><div id="footnotes"><ol><li id="fn:detail"><p>First explanation.</p><p>Second explanation.</p><a class="footnote-backref">Return to text</a></li></ol></div>');
+        expect(markdown).toContain('[^detail]: First explanation.\n    \n    Second explanation.');
+        expect(markdown).toContain('Observation[^detail]'); expect(markdown).not.toContain('Return to text');
+    });
+    it('keeps unconvertible MathML inside a complex table instead of discarding its structure', () => {
+        const formula = '<math><mfrac><mi>x</mi></mfrac></math>';
+        const markdown = convertSanitizedArticle(`<table><tr><th colspan="2">Ratio</th></tr><tr><td>${formula}</td><td>Explanation</td></tr></table>`);
+        expect(markdown).toContain(formula); expect(markdown).toContain('colspan="2"'); expect(markdown).toContain('Explanation');
+    });
     it('优先使用 TeX annotation 的完整公式，保留视觉 MathML 未表达的语义', () => {
         const markdown = convertSanitizedArticle(
             '<p>The supplied expression <math data-latex="fallback"><semantics><mi>x</mi><annotation encoding="application/x-tex">\\frac{x}{2} + y^{3}</annotation></semantics></math> stays complete.</p>',

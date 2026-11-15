@@ -129,6 +129,20 @@ function visibleSelection(text: string): Selection {
 }
 
 describe('全文翻译快捷键状态联动', () => {
+    it.each([false,true])('an existing translation card is excluded only when it is contained by the selection (%s)', async contains => {
+        const host={} as HTMLElement,selection={...visibleSelection('Selected English text'),containsNode:vi.fn(()=>contains)};
+        vi.mocked(document.getElementById).mockReturnValue(host);mocks.getSelection.mockReturnValue(selection as unknown as Selection);
+        const {createContentHotkeyRuntime}=await import('@/src/app/content/hotkeyRuntime');
+        expect(createContentHotkeyRuntime(()=>false).selectionShortcutPorts.hasActiveSelectionTranslationCandidate()).toBe(!contains);
+        expect(selection.containsNode).toHaveBeenCalledWith(host,true);
+    });
+    it('rejects a protected selection and accepts a height-only line after an empty rectangle', async () => {
+        const range={getClientRects:()=>[{width:0,height:0},{width:0,height:24}],getBoundingClientRect:vi.fn()};
+        mocks.getSelection.mockReturnValue({rangeCount:1,isCollapsed:false,toString:()=>'Selected English text',getRangeAt:()=>range} as unknown as Selection);
+        const {createContentHotkeyRuntime}=await import('@/src/app/content/hotkeyRuntime'),ports=createContentHotkeyRuntime(()=>false).selectionShortcutPorts;
+        mocks.shouldIgnoreSelection.mockReturnValueOnce(true);expect(ports.hasActiveSelectionTranslationCandidate()).toBe(false);
+        expect(ports.hasActiveSelectionTranslationCandidate()).toBe(true);expect(range.getBoundingClientRect).not.toHaveBeenCalled();
+    });
     it.each([[160, 0, true], [0, 24, true], [0, 0, false]])('逐行矩形为空时根据总边界 %i×%i 判断可见选区', async (width, height, visible) => {
         const bounds = vi.fn(() => ({width, height}));
         const range = {getClientRects: () => [], getBoundingClientRect: bounds};
@@ -802,6 +816,12 @@ describe('全文 pending 手势绑定主键、配置身份与页面生命周期'
         runtime.installFloatingBallHotkey(controller.signal);
         return {runtime, controller, documentTarget, windowTarget};
     }
+    it('keeps a shared F9 release valid when an unchanged hover draft is unparsable and an unrelated key releases with Shift held', async () => {
+        Object.assign(mocks.config,{hotkey:'custom',customHotkey:'Hyper+T'});
+        const f=await installPendingRuntime();f.documentTarget.emit('keydown',pendingKey());
+        f.documentTarget.emit('keyup',pendingKey({key:'x',code:'KeyX',shiftKey:true}));expectNoFullPageAction();
+        f.documentTarget.emit('keyup',pendingKey());expect(mocks.autoTranslateEnglishPage).toHaveBeenCalledOnce();f.controller.abort();
+    });
 
     function expectNoFullPageAction(): void {
         expect(mocks.autoTranslateEnglishPage).not.toHaveBeenCalled();

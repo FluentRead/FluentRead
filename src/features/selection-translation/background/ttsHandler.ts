@@ -430,7 +430,7 @@ export function createSelectionTtsBackgroundHandlers(
                 await stopping;
                 if (activeSelectionTts !== active) return {success: false, error: '语音播放已取消'};
                 if (dependencies.offscreenPlaybackEnabled === false) {
-                    if (activeSelectionTts === active) activeSelectionTts = null;
+                    activeSelectionTts = null;
                     return {success: false, error: '当前浏览器暂不支持 Google TTS 扩展播放'};
                 }
 

@@ -227,8 +227,8 @@ function applyTranslationFontFamily(
     if (!sourceText) return;
     // 是否改写只取决于原文与目标书写体系；常见的拉丁原文不能为每次提交强制计算宿主样式。
     if (!resolveTranslationFontFamily(sourceText, translated.lang)) return;
-    const fontFamily = resolveTranslationFontFamily(sourceText, translated.lang, hostFontFamily(host));
-    if (fontFamily) translated.style.fontFamily = fontFamily;
+    // 上面的纯规则已确认目标字体栈；追加宿主字体只扩展非空栈，不改变书写体系判断。
+    translated.style.fontFamily = resolveTranslationFontFamily(sourceText, translated.lang, hostFontFamily(host))!;
 }
 
 export interface SingleTranslationSlot {

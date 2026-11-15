@@ -7,6 +7,7 @@
  */
 const assert = require('node:assert/strict');
 const {guardBrowserClose} = require('./owned-browser-close.cjs');
+const {controlledProviderRuntime} = require('../site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -65,16 +66,16 @@ async function main() {
     assert.equal(report.windowPlacement.mode, 'background-visible-no-focus');
     assert.equal(report.windowPlacement.browserFrontmost, false);
     let worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: args.timeout});
-    const installWorker = current => current.evaluate(() => {
+    const installWorker = current => current.evaluate(controlledProviderRuntime, true).then(() => current.evaluate(() => {
       globalThis.fixedHeightRequests = [];
       globalThis.fetch = async (input, init) => {
         const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
         if (url.hostname !== 'edge.microsoft.com' || url.pathname !== '/translate/translatetext') throw new Error(`External worker fetch disabled: ${url.origin}`);
         const texts = JSON.parse(init?.body ?? await input.text());
         globalThis.fixedHeightRequests.push(texts);
-        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: `测试译文：${text}`}]}))), {status: 200, headers: {'content-type': 'application/json'}});
+        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: globalThis.__frCompatibilityTransport.encode(text, 'microsoft-escaped-text')}]}))), {status: 200, headers: {'content-type': 'application/json'}});
       };
-    });
+    }));
     await installWorker(worker);
     const fixture = fs.readFileSync(path.join(root, 'tests/fixtures/fixed-height-translation-fixture.html'), 'utf8');
     const url = 'https://openrouter.ai/provider/minimax-fixed-height-fixture';

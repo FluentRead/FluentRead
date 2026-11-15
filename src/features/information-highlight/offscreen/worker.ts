@@ -81,7 +81,9 @@ export function startInformationHighlightWorker(): void {
                 if (controller.signal.aborted) throw new DOMException('信息高亮已取消', 'AbortError');
                 self.postMessage({requestId: request.requestId, success: true, initialized: true, stage: 'scoring'} satisfies InformationHighlightWorkerResponse);
                 const cached = results.get(request.text!);
-                const result = cached ?? await scoreLocalSurprisal(loaded, request.text!, controller.signal);
+                // 命中时不进入异步推理；显式分支也避免条件 await 混淆后续缓存写入计数。
+                let result = cached;
+                if (result === undefined) result = await scoreLocalSurprisal(loaded, request.text!, controller.signal);
                 if (!cached) results.put(request.text!, result);
                 self.postMessage({requestId: request.requestId, success: true, initialized: true, result} satisfies InformationHighlightWorkerResponse);
             } catch (error) {

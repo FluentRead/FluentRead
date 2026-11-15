@@ -92,6 +92,22 @@ describe('optional full ECDICT asset', () => {
         expect(await readCachedFullEcdict()).toBeNull();
         await expect(downloadFullEcdict()).rejects.toThrow('cache unavailable');
     });
+    it('treats a corrupt cached dictionary as a miss even when eviction fails', async () => {
+        const {cache} = optionalDictionaryCache();
+        vi.spyOn(cache, 'match').mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])));
+        const remove = vi.spyOn(cache, 'delete').mockRejectedValueOnce(new Error('storage unavailable'));
+        await expect(readCachedFullEcdict()).resolves.toBeNull(); expect(remove).toHaveBeenCalledOnce();
+    });
+    it('aborts an unresponsive dictionary mirror at its deadline and accepts the next verified source', async () => {
+        optionalDictionaryCache(); vi.useFakeTimers();
+        let firstSignal: AbortSignal | undefined;
+        const fetch = vi.fn().mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+            firstSignal = init.signal; firstSignal!.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')), {once: true});
+        })).mockResolvedValueOnce(new Response(fullEcdictBytes()));
+        setRuntimeFetch(fetch);
+        const pending = downloadFullEcdict(); await vi.advanceTimersByTimeAsync(12_000);
+        expect(firstSignal?.aborted).toBe(true); expect((await pending).at(-1)?.[0]).toBe('bis'); expect(fetch).toHaveBeenCalledTimes(2);
+    });
 
     it('validates the fixed asset, falls back to a second source and reuses the cached copy', async () => {
         const {stored} = optionalDictionaryCache();
@@ -334,7 +350,21 @@ describe('word dictionary Unicode and untrusted payload boundaries', () => {
         expect(merged.meanings[0].definitions).toEqual([{definition: 'an English definition', translatedDefinition: '中文释义'}]);
     });
 
+    it('pairs a bare English sense with the earlier Chinese gloss without inventing examples', () => {
+        const base = card('pair', 'youdao-web', {definition: '中文释义'});
+        base.meanings[0].definitions[0].translatedDefinition = '中文释义';
+        expect(mergeWordCardData(base, card('pair')).meanings[0].definitions).toEqual([{definition: 'an English definition', translatedDefinition: '中文释义'}]);
+    });
+    it('retains distinct Chinese senses and avoids appending a Chinese gloss already present in an English sense', () => {
+        const chinese = mergeWordCardData(card('pair', 'youdao-web', {definition: '第一项'}), card('pair', 'ecdict-local', {definition: '第二项'}));
+        expect(chinese.meanings[0].definitions.map(item => item.definition)).toEqual(['第一项', '第二项']);
+        const english = card('pair'); english.meanings[0].definitions[0].translatedDefinition = '中文释义；其他解释';
+        expect(mergeWordCardData(english, card('pair', 'youdao-web', {definition: '中文释义'})).meanings[0].definitions)
+            .toEqual([{definition: 'an English definition', translatedDefinition: '中文释义；其他解释'}]);
+    });
+
     it('selects at most two unlabelled pronunciations and handles a single regional row', () => {
+        expect(selectPronunciations([{text: '/ˈprimary/', label: '美式'}, {text: '/weak/', label: '美式'}])).toEqual([{text: '/ˈprimary/', label: '美式'}]);
         expect(selectPronunciations([{text: 'a'}, {text: 'b'}, {text: 'c'}])).toEqual([{text: 'a'}, {text: 'b'}]);
         expect(selectPronunciations([
             {text: '/weak/', label: '美式'},
@@ -442,7 +472,7 @@ describe('word dictionary provider network adapters', () => {
     it('loads and memoizes the browser-local ECDICT index while filtering malformed rows', async () => {
         const getURL = vi.fn(() => 'moz-extension://fixture/ecdict-core.json');
         vi.stubGlobal('browser', {runtime: {getURL}});
-        const fetchMock = vi.fn(async () => response([null, {}, {w: ''}, ['broken'], ['Local', 'ləʊkəl', 'adj. local', 'adj. 本地']]));
+        const fetchMock = vi.fn(async () => response([null, {}, {w: ''}, ['broken'], ['', '', '', ''], ['Local', 'ləʊkəl', 'adj. local', 'adj. 本地']]));
         vi.stubGlobal('fetch', fetchMock);
         const local = provider(createDefaultWordDictionaryProviders(), 'ecdict-local');
 

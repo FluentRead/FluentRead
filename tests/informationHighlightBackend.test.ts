@@ -302,6 +302,14 @@ describe('bounded model runtime and explicit downloads', () => {
         else await preparation;
         await flush(); expect(value.store.download).toHaveBeenCalledTimes(6); value.runtime.dispose();
     });
+    it('ignores a queued warm timer callback while the same worker owns a newer scoring request',async()=>{
+        vi.useFakeTimers();const value=fixture(),timers=vi.spyOn(globalThis,'setTimeout');
+        const first=value.runtime.score('first',new AbortController().signal);await flush();value.answer();await first;
+        const callback=timers.mock.calls.find(([,delay])=>delay===180_000)![0] as ()=>void;
+        expect(typeof callback).toBe('function');const next=value.runtime.score('next',new AbortController().signal);
+        const settled=expect(next).resolves.toEqual(result);await flush();callback();expect(value.worker.terminate).not.toHaveBeenCalled();
+        value.answer();await settled;expect(value.createWorker).toHaveBeenCalledOnce();value.runtime.dispose();
+    });
     it('cancels immediately, lets a cooperative chunk drain, reuses warm worker and releases after idle', async () => {
         const {runtime, worker, createWorker, answer} = fixture(); const controller = new AbortController();
         const task = runtime.score('a', controller.signal); await flush(); expect(createWorker).toHaveBeenCalledOnce();

@@ -127,6 +127,34 @@ function configstoreAuditHistory(): ConfigHistoryState {
 }
 
 describe('configstoreAudit storage owners, count replay and message authority', () => {
+    it('uses safe runtime defaults after two failed reads raced by storage removal notices',async()=>{
+        const {store,port}=await configstoreAuditLoad({trusted:false,configurePort:(port,_records,emit)=>{
+            vi.mocked(port.getItem).mockImplementation(async()=>{emit('local:config',null);throw Error('concurrent read failed');});
+        }});
+        expect(store.config.count).toBe(0);expect(store.config.token).toEqual({});expect(port.setItem).not.toHaveBeenCalled();
+        await expect(store.requestConfigPatch({to:'ja'})).rejects.toThrow('安全水合');
+    });
+    it('rejects an invalid replace acknowledgement even without a deferred storage notice',async()=>{
+        const {store}=await configstoreAuditLoad();await expect(store.requestConfigSave({...store.config,to:'ja'},async()=>({success:true}))).rejects.toThrow('有效 revision');
+        expect(store.config.to).toBe('en');
+    });
+    it.each([false,true])('keeps a queued optimistic successor after its predecessor fails with unavailable authority: read failure=%s',async readFails=>{
+        const {store,port,records}=await configstoreAuditLoad(),firstStarted=configstoreAuditDeferred<void>(),secondStarted=configstoreAuditDeferred<void>(),firstGate=configstoreAuditDeferred<void>(),secondGate=configstoreAuditDeferred<void>();let calls=0;
+        configstoreAuditCleanups.push(()=>{firstGate.resolve();secondGate.resolve();});
+        const sender=async()=>{if(++calls===1){firstStarted.resolve();await firstGate.promise;if(readFails)vi.mocked(port.getItem).mockRejectedValueOnce(Error('read unavailable'));else records.set('local:config',null);return {success:false,error:'predecessor failed'};}
+            secondStarted.resolve();await secondGate.promise;records.set('local:config',{...sanitizeConfigCredentials(normalizeConfig({to:'en',theme:'dark'})),__fluentConfigRevision:11});return {success:true,revision:11};};
+        const first=store.requestConfigPatch({to:'ja'},sender).catch(error=>error);await firstStarted.promise;const second=store.requestConfigPatch({theme:'dark'},sender);
+        firstGate.resolve();await secondStarted.promise;expect(await first).toBeInstanceOf(Error);expect(store.config.theme).toBe('dark');secondGate.resolve();await second;
+        expect(store.config.to).toBe('en');expect(store.config.theme).toBe('dark');
+    });
+    it.each([false,true])('a successful predecessor with a failed reread does not overwrite its queued successor: trusted=%s',async trusted=>{
+        const {store,port,records}=await configstoreAuditLoad({trusted}),started=configstoreAuditDeferred<void>(),gate=configstoreAuditDeferred<void>(),nextStarted=configstoreAuditDeferred<void>(),nextGate=configstoreAuditDeferred<void>();let calls=0;
+        configstoreAuditCleanups.push(()=>{gate.resolve();nextGate.resolve();});
+        const sender=async()=>{if(++calls===1){started.resolve();await gate.promise;vi.mocked(port.getItem).mockRejectedValueOnce(Error('reread unavailable'));return {success:true,revision:11};}
+            nextStarted.resolve();await nextGate.promise;records.set('local:config',{...sanitizeConfigCredentials(normalizeConfig({to:'ja',theme:'dark'})),__fluentConfigRevision:12});return {success:true,revision:12};};
+        const first=store.requestConfigPatch({to:'ja'},sender);await started.promise;const second=store.requestConfigPatch({theme:'dark'},sender);gate.resolve();await nextStarted.promise;await first;
+        expect(store.config.theme).toBe('dark');nextGate.resolve();await second;expect(store.config.to).toBe('ja');expect(store.config.theme).toBe('dark');if(!trusted)expect(store.config.token).toEqual({});
+    });
     it('restores cloud website rules through the real import, store and encrypted repository without losing content labels', async () => {
         const {store, repository} = await configstoreAuditLoad({owner: true, indexed: true,
             initial: {token: {openai: 'fixture-local-key'}}});
@@ -232,6 +260,24 @@ describe('configstoreAudit storage owners, count replay and message authority', 
         expect(await store.incrementConfigCount(1, 'fixture-retained')).toBe(5);
         emit('local:config', {...record, count: 8, __fluentConfigRevision: 11, __fluentCountOperations: [{id: 'fixture-broadcast', delta: 2, count: 8}]});
         expect(await store.incrementConfigCount(2, 'fixture-broadcast')).toBe(8);
+        expect(port.setItem).not.toHaveBeenCalled();
+    });
+    it('continuous startup broadcasts preserve the newest count replay log after bounded initialization retries', async () => {
+        let reads = 0;
+        const {store, port} = await configstoreAuditLoad({owner: true, configurePort: (port, records, emit) => {
+            const original = vi.mocked(port.getItem).getMockImplementation()!;
+            vi.mocked(port.getItem).mockImplementation(async key => {
+                if (key === 'local:credentials' && ++reads <= 2) {
+                    const count = reads === 1 ? 5 : 8;
+                    emit('local:config', {...records.get('local:config') as object, count, __fluentConfigRevision: 10 + reads,
+                        __fluentCountOperations: [{id: 'fixture-startup-replay', delta: 2, count}]});
+                }
+                return original(key);
+            });
+        }});
+        expect(reads).toBe(2); expect(store.config.count).toBe(8);
+        vi.mocked(port.setItem).mockClear();
+        expect(await store.incrementConfigCount(2, 'fixture-startup-replay')).toBe(8);
         expect(port.setItem).not.toHaveBeenCalled();
     });
 
@@ -567,11 +613,11 @@ describe('configstoreAudit lazy history and persistence recovery', () => {
         const newer = appendConfigHistorySnapshot(latest, {to: 'de'}, '2026-10-25T02:00:00Z')!;
         const gate = configstoreAuditDeferred<void>(), started = configstoreAuditDeferred<void>();
         configstoreAuditCleanups.push(() => gate.resolve());
-        const {store, emit} = await configstoreAuditLoad({owner: true, records: {'local:configHistory': raw}, configurePort: (port, records) => {
+        const {store, emit, records, port} = await configstoreAuditLoad({owner: true, configurePort: (port, records) => {
             const original = vi.mocked(port.getItem).getMockImplementation()!;
             let reads = 0;
             vi.mocked(port.getItem).mockImplementation(async key => {
-                if (key !== 'local:configHistory' || ++reads === 1) return original(key);
+                if (key !== 'local:configHistory' || ++reads <= 2) return original(key);
                 const snapshot = structuredClone(records.get(key));
                 started.resolve(); await gate.promise;
                 return snapshot as never;
@@ -581,11 +627,22 @@ describe('configstoreAudit lazy history and persistence recovery', () => {
                 return false;
             });
         }});
+        records.set('local:configHistory',raw);
         const ready = Promise.resolve(store.configHistoryReady);
         await started.promise;
         emit('local:configHistory', newer);
         gate.resolve(); await ready;
         expect(store.getConfigHistorySnapshot()).toEqual(newer);
+        expect(port.setItemIfUnchanged).toHaveBeenCalledOnce();
+    });
+    it('a history notice delivered inside the migration reread takes precedence over its stale returned value',async()=>{
+        const raw=configstoreAuditHistory();Object.assign(raw.entries[0].config,{count:9});
+        const latest=appendConfigHistorySnapshot(raw,{to:'ko'},'2026-10-25T01:00:00Z')!,newer=appendConfigHistorySnapshot(latest,{to:'de'},'2026-10-25T02:00:00Z')!;let reads=0;
+        const {store,records,port}=await configstoreAuditLoad({owner:true,configurePort:(port,records,emit)=>{
+            const original=vi.mocked(port.getItem).getMockImplementation()!;
+            vi.mocked(port.getItem).mockImplementation(async key=>{if(key!=='local:configHistory'||++reads<=2)return original(key);emit(key,newer);return structuredClone(latest) as never;});
+            port.setItemIfUnchanged=vi.fn(async key=>{records.set(key,latest);return false;});
+        }});records.set('local:configHistory',raw);await store.configHistoryReady;expect(reads).toBe(3);expect(store.getConfigHistorySnapshot()).toEqual(newer);expect(port.setItemIfUnchanged).toHaveBeenCalledOnce();
     });
 
     it('ignores invalid, duplicate and stale external history while a real cursor write is pending', async () => {
@@ -641,6 +698,13 @@ describe('configstoreAudit lazy history and persistence recovery', () => {
         expect(final.entries[final.cursor].config.to).toBe('en');
         expect((records.get('local:configHistory') as ConfigHistoryState).entries.at(-1)?.config.to).toBe('en');
     });
+    it('a failed old cursor write cannot clear a newer queued history write',async()=>{
+        const {store,port}=await configstoreAuditLoad({owner:true,initial:{to:'fr'},records:{'local:configHistory':configstoreAuditHistory()}});await store.configHistoryReady;
+        const gate=configstoreAuditDeferred<void>(),started=configstoreAuditDeferred<void>();configstoreAuditCleanups.push(()=>gate.resolve());
+        vi.mocked(port.setItem).mockImplementationOnce(async()=>{started.resolve();await gate.promise;throw Error('old history write failed');});
+        const first=store.applyConfigHistoryAction('undo').catch(error=>error);await started.promise;const next=store.applyConfigHistoryAction('restore',10);await new Promise(resolve=>setImmediate(resolve));gate.resolve();
+        expect(await first).toBeInstanceOf(Error);await next;const history=store.getConfigHistorySnapshot();expect(history.entries[history.cursor].config.to).toBe('en');
+    });
 
     it('coalesces concurrent restores before old history disk work starts', async () => {
         const {store, records} = await configstoreAuditLoad({owner: true, initial: {to: 'fr'}, records: {'local:configHistory': configstoreAuditHistory()}});
@@ -680,6 +744,11 @@ describe('configstoreAudit lazy history and persistence recovery', () => {
         expect(records.has('local:configHistory')).toBe(false);
         await vi.advanceTimersByTimeAsync(1); await store.flushConfigHistory();
         expect(store.getConfigHistorySnapshot().entries.map(entry => entry.config.to)).toEqual(['en', 'fr']);
+    });
+    it('a debounce callback already queued before an explicit flush does not append the snapshot again',async()=>{
+        const {store}=await configstoreAuditLoad({owner:true});await store.configHistoryReady;vi.useFakeTimers();const timer=vi.spyOn(globalThis,'setTimeout');
+        await store.saveConfig({...store.config,to:'ja'},{recordHistory:true});const callback=timer.mock.calls.find(([,delay])=>delay===350)![0] as ()=>void;timer.mockRestore();
+        await store.flushConfigHistory();const snapshot=store.getConfigHistorySnapshot();callback();await store.flushConfigHistory();expect(store.getConfigHistorySnapshot()).toEqual(snapshot);
     });
 
     it('flush waits through a history append queued by a later debounce timer', async () => {

@@ -32,6 +32,16 @@ afterEach(() => {
 });
 
 describe('translation queue', () => {
+  it('大页面队列压缩中保留后部取消空槽，其余任务按顺序完成且后续请求仍可执行', async () => {
+    mockConfig.maxConcurrentTranslations = 1;
+    const size = 2300, removed = 2200, caller = new AbortController(), ran: number[] = [];
+    const jobs = Array.from({length: size}, (_, index) => enqueueTranslation(async () => {ran.push(index); return index;}, undefined, index === removed ? caller.signal : undefined));
+    const settled = Promise.allSettled(jobs); caller.abort(); const outcomes = await settled;
+    expect(outcomes[removed]).toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+    expect(outcomes.filter(item => item.status === 'fulfilled')).toHaveLength(size - 1);
+    expect(ran).toEqual(Array.from({length: size}, (_, index) => index).filter(index => index !== removed));
+    await expect(enqueueTranslation(async () => 'next')).resolves.toBe('next');
+  });
   it('立即摘除取消信号对应的等待项，不等其他活动请求结束', async () => {
     mockConfig.maxConcurrentTranslations = 1;
     const gate = deferred<void>();

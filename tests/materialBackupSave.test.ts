@@ -289,6 +289,16 @@ describe('material backup save targets', () => {
         await expect(saveMaterialBackup(second,async consume=>{try {await consume(new Uint8Array([1]));} catch {/* consumer cannot hide write failure */}})).rejects.toThrow('disk full');
         expect(two.file.abort).toHaveBeenCalledOnce();expect(two.file.close).not.toHaveBeenCalled();
     });
+    it('keeps the first protocol failure when an overlapping receiver frame is followed by a disk failure',async()=>{
+        const gate=deferred<void>(),failure=Error('disk failed after protocol rejection');
+        const target:MaterialBackupSaveTarget={write:vi.fn(()=>gate.promise),commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
+        const result=saveMaterialBackup(target,async consume=>{
+            const first=consume(new Uint8Array([1]));const observed=first.catch(()=>{});
+            await Promise.resolve();await expect(consume(new Uint8Array([2]))).rejects.toThrow('写入顺序无效');
+            gate.reject(failure);await observed;
+        });
+        await expect(result).rejects.toThrow('写入顺序无效');expect(target.commit).not.toHaveBeenCalled();expect(target.abort).toHaveBeenCalledOnce();
+    });
     it('keeps undefined write errors and rejects invalid or overlapping frames even if receive catches them', async () => {
         const target:MaterialBackupSaveTarget={write:async()=>{throw undefined;},commit:vi.fn(async()=> 'saved' as const),abort:vi.fn(async()=>{})};
         await expect(saveMaterialBackup(target,async consume=>{try {await consume(new Uint8Array([1]));} catch {}})).rejects.toBeUndefined();

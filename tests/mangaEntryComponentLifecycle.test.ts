@@ -172,11 +172,11 @@ describe('actual manga entry resource consent and lifecycle', () => {
     expect(find(value => value.props.role === 'dialog')).toBeUndefined();
     expect(props.inspectResources).not.toHaveBeenCalled(); expect(props.persist).not.toHaveBeenCalled(); expect(props.toggle).not.toHaveBeenCalled();
   });
-  it('ignores a late area launch rejection after the reader navigates and allows the new page to launch', async () => {
+  it.each(['success','failure'])('ignores a late area launch %s after the reader navigates and allows the new page to launch', async outcome => {
     const {props,tick,find} = await mountEntry(), pending = deferred<boolean>();
     props.status.areaFallback = true; props.startAreaTranslation.mockReturnValueOnce(pending.promise); await tick();
     find(value => value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!.props.onClick({detail:0}); await tick();
-    props.page.route = '/chapter/2'; await tick(); pending.reject('late area failure'); await tick(); await tick();
+    props.page.route = '/chapter/2'; await tick();if(outcome==='success')pending.resolve(true);else pending.reject('late area failure');await tick(); await tick();
     expect(find(value => value.props.role === 'dialog')).toBeUndefined();
     find(value => value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!.props.onClick({detail:0}); await tick(); await tick();
     expect(props.startAreaTranslation).toHaveBeenCalledTimes(2); expect(find(value => value.props.role === 'dialog')).toBeUndefined();

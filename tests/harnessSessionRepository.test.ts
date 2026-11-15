@@ -74,6 +74,13 @@ describe('Harness session normalization', () => {
 });
 
 describe('Harness session repository', () => {
+    it('keeps a live session when its legacy oldest-turn index is stale', async () => {
+        const repository = repo(), now = Date.now();
+        const stored = normalizeHarnessSession({...session('stale-index',now),turns:[turn('fresh',now)]});
+        await repository.database.sessions.put({...stored,oldestTurnAt:now-HARNESS_SESSION_TTL_MS-1} as never);
+        expect(await repository.prune()).toBe(0);
+        expect((await repository.get(stored.id))?.turns.map(value=>value.id)).toEqual(['fresh']);
+    });
     it('atomically merges turns and returns defensive copies and summaries', async () => {
         const repository = repo();
         const base = session();

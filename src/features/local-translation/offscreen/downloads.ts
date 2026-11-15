@@ -134,7 +134,8 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
                 : error instanceof Error && error.message === 'LOCAL_TRANSLATION_INTEGRITY' ? 'integrity' : 'network';
             update(model, {phase: controller.signal.aborted ? 'paused' : 'error', bytesPerSecond: 0, error: controller.signal.aborted ? undefined : code});
         } finally {
-            if (jobs.get(model)?.controller === controller) jobs.delete(model);
+            // 同模型的新任务须等当前 job 退出后才能入队，运行期间不会被替换。
+            jobs.delete(model);
             if (removals.has(model)) update(model, {phase: 'removing'});
             await persist();
         }
@@ -208,7 +209,8 @@ export function createLocalTranslationDownloadManager(dependencies: LocalTransla
             });
             job.done = done;
             jobs.set(model, job);
-            queue = done.catch(() => undefined);
+            // done 已在上方统一处理下载及持久化失败；后续任务只等待其清理完成。
+            queue = done;
             await saved;
             return snapshot();
         },

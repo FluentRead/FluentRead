@@ -130,6 +130,22 @@ afterEach(() => {
 });
 
 describe('synthetic 双语片段 source-only 重挂', () => {
+    it('位置对应的新根不匹配时仍能找到同批唯一的等价行内宿主',()=>{
+        const scenario=createCommittedSyntheticScenario(),other=scenario.document.createElement('p'),unrelated=scenario.document.createElement('p'),replacement=scenario.document.createElement('div');
+        other.textContent='Old other';unrelated.textContent='Unrelated';scenario.document.body.appendChild(other);
+        replacement.innerHTML='Inline <strong>source.</strong><p>Independent block.</p>';resolveCandidates([candidate(replacement,[replacement.firstChild!,replacement.querySelector('strong')!])]);
+        scenario.document.body.replaceChildren(unrelated,replacement);
+        const result=transferEquivalentSyntheticBilingualSegments([childListRecord(scenario.document.body,[unrelated,replacement],[scenario.host,other])],()=>true);
+        expect(result.transfers).toHaveLength(1);expect(replacement.querySelector('.fluent-read-bilingual-content')).toBe(scenario.wrapper);
+    });
+    it('候选解析期间宿主离开文档时，熔断不会保存不存在的父边界',()=>{
+        const scenario=createCommittedSyntheticScenario();
+        for(let i=0;i<3;i++){const replacement=replaceWithEquivalentSource(scenario);expect(transferEquivalentSyntheticBilingualSegments([replacement.record],()=>true).transfers).toHaveLength(1);}
+        const replacement=replaceWithEquivalentSource(scenario),resolve=translationCore.resolve.getMockImplementation()!;let removed=false;
+        translationCore.resolve.mockImplementation((...args:any[])=>{if(!removed){removed=true;scenario.host.remove();}return resolve(...args);});
+        const result=transferEquivalentSyntheticBilingualSegments([replacement.record],()=>true);
+        expect(result.transfers).toHaveLength(0);expect(result.capitulations).toHaveLength(0);expect(getTranslationState(scenario.owner)).toBeUndefined();
+    });
     it('行内来源换代保留已提交的译文前置顺序，恢复后仍保留新来源节点', () => {
         const scenario = createCommittedSyntheticScenario();
         scenario.owner.prepend(scenario.wrapper);

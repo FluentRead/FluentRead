@@ -742,6 +742,7 @@ const {
   evaluateProductionBuildFreshness,
   installCoverageTracker,
   isNaturalLanguageText,
+  leaveEditingFocusForHover,
   normalizeCoverageRules,
   normalizeHoverTargets,
   normalizeInteractionScenarios,
@@ -766,6 +767,7 @@ const {
   COVERAGE_EXCLUDED_ANCESTORS: string;
   COVERAGE_PROTECTED_DESCENDANTS: string;
   COVERAGE_TRACKER_KEY: string;
+  leaveEditingFocusForHover: (page: unknown, target?: {selector: string; index: number}) => Promise<number>;
   assertFreshProductionExtension: (extensionDir: string, projectRoot: string) => unknown;
   waitForHostMathRendering: (page: unknown, timeout: number) => Promise<unknown>;
   waitForStableTarget: (page: unknown, selector: string, timeout: number) => Promise<void>;
@@ -5212,6 +5214,43 @@ describe('site coverage exact owner completion v2', () => {
 
 
 describe('Factorio multilingual live-source catalog', () => {
+  it.each([false, true])('leaves autofocus through native passive text, retaining interactive targets as Tab-only (%s)', async interactive => {
+    const {document} = parseHTML('<html><body><input autofocus><p id="source">Readable source</p><a href="/other">Linked source</a><button>Next</button></body></html>');
+    let active: Element | null = document.querySelector('input');
+    Object.defineProperty(document, 'activeElement', {get: () => active});
+    Object.defineProperty(document, 'elementFromPoint', {value: () => document.querySelector(interactive ? 'a' : 'p')});
+    vi.stubGlobal('document', document);
+    const click = vi.fn(async (x: number, y: number) => {expect([x, y]).toEqual([40, 60]); active = document.body;});
+    const press = vi.fn(async () => {active = document.querySelector('button');});
+    const before = document.body.innerHTML;
+    const page = {evaluate: async (fn: (arg: unknown) => unknown, arg: unknown) => fn === findHoverTextPointInPage ? {x: 40, y: 60} : fn(arg), mouse: {click}, keyboard: {press}};
+    try {
+      await expect(leaveEditingFocusForHover(page, {selector: '#source', index: 0})).resolves.toBe(1);
+      expect(click).toHaveBeenCalledTimes(interactive ? 0 : 1); expect(press).toHaveBeenCalledTimes(interactive ? 1 : 0);
+      expect(document.body.innerHTML).toBe(before);
+    } finally {vi.unstubAllGlobals();}
+  });
+  it.each(['input', 'textarea', 'select', 'div contenteditable="true"', 'div role="textbox"'])('leaves an autofocus %s with native Tab before sending a hover shortcut', async markup => {
+    const {document} = parseHTML(`<html><body><${markup} autofocus></${markup.split(' ')[0]}><button>Next control</button></body></html>`);
+    let active: Element | null = document.body.firstElementChild;
+    Object.defineProperty(document, 'activeElement', {get: () => active}); vi.stubGlobal('document', document);
+    const press = vi.fn(async (key: string) => {expect(key).toBe('Tab'); active = document.querySelector('button');});
+    try {
+      await expect(leaveEditingFocusForHover({evaluate: async (fn: () => boolean) => fn(), keyboard: {press}})).resolves.toBe(1);
+      expect(press).toHaveBeenCalledOnce(); expect(active).toBe(document.querySelector('button'));
+      expect(document.querySelector('[autofocus]')).not.toBeNull();
+    } finally {vi.unstubAllGlobals();}
+  });
+  it('fails before the hover hotkey when a native editor keeps focus trapped', async () => {
+    const {document} = parseHTML('<html><body><input autofocus></body></html>');
+    Object.defineProperty(document, 'activeElement', {value: document.querySelector('input')}); vi.stubGlobal('document', document);
+    const press = vi.fn(async () => undefined);
+    try {
+      await expect(leaveEditingFocusForHover({evaluate: async (fn: () => boolean) => fn(), keyboard: {press}})).rejects.toThrow('焦点仍在编辑区');
+      expect(press.mock.calls).toEqual(Array.from({length: 8}, () => ['Tab']));
+      expect(document.querySelector('input')!.hasAttribute('autofocus')).toBe(true);
+    } finally {vi.unstubAllGlobals();}
+  });
   const descriptions = {
     zh: '为异星工厂添加全新生产配方和机器，改善物流与自动化体验。',
     a: 'Adds new production recipes and machines for your factory.',
@@ -5867,6 +5906,19 @@ describe('hover source choice for the original Chinese-output flow', () => {
     });
     return {...page, waitForFunction};
   }
+
+  it('keeps mixed foreign text eligible while excluding confidently Chinese technical titles by the production rule', async () => {
+    const chineseTitle = 'fix(safari): 启用扩展自有 DOM 能力并适配 DNR 条件限制';
+    const englishTitle = 'Preserve ownership when the native title changes';
+    const html = '<main>' + [chineseTitle, mixedTitle, englishTitle].map(text => `<a data-testid="listitem-title-link">${text}</a>`).join('') + '</main>';
+    await withCompletionFixture(async ({page, tracker}) => {
+      const rule = normalizeCoverageRules(cases['github-project-pulls'].coverageRules)[0];
+      await expect(waitForCoverageReady(hoverPage(page), [rule], 100)).resolves.toBeUndefined();
+      expect(tracker.report().find(item => item.name === rule.name)).toMatchObject({seenCount: 2, translatedCount: 0});
+      expect(() => assertCoverageReport([rule], tracker.report(), 'mixed source still needs a translation')).toThrow();
+      expect(isNaturalLanguageText(chineseTitle)).toBe(true); // 原始形态启发式不会冒充语言判断。
+    }, html, cases['github-project-pulls'].coverageRules);
+  });
 
   it('chooses the next source title without reducing original full-owner coverage', async () => {
     const titleA = 'Fix repeated translation in flexible labels';

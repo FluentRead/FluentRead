@@ -353,9 +353,8 @@ export function createConfigMutationClient(ports: ConfigMutationClientPorts) {
             }} : {}),
         });
         const generation = requestGeneration;
-        const request = requestQueue
-            .catch(() => undefined)
-            .then(async () => {
+        // requestQueue 只保存下方双分支归一化后的完成值；上次失败不能阻塞后续请求。
+        const request = requestQueue.then(async () => {
                 await authority.ready;
                 // 远程扩展页在凭据水合失败后只有公开配置，绝不能把空 token/ak/sk 当成
                 // 用户修改发给后台并清除仍安全保存的 API Key。完整重载成功前统一拒绝保存。

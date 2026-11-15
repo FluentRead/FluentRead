@@ -112,6 +112,18 @@ describe('Japanese video reading annotation', () => {
         expect(tokenize).toHaveBeenCalledWith('パーティー');
     });
 
+    it('releases a shared failed initialization for every waiter and permits a fresh dictionary build', async () => {
+        let finish!: TokenizerCallback;
+        const build=vi.fn(()=>({build:(callback:TokenizerCallback)=>{finish=callback;}}));
+        const romanize=createJapaneseRomanizer(build);
+        const first=expect(romanize('猫','/dict')).rejects.toThrow('shared dictionary failure');
+        const second=expect(romanize('犬','/dict')).rejects.toThrow('shared dictionary failure');
+        expect(build).toHaveBeenCalledOnce();finish(new Error('shared dictionary failure'),{tokenize:()=>[]});
+        await Promise.all([first,second]);
+        const retry=romanize('猫','/dict');expect(build).toHaveBeenCalledTimes(2);
+        finish(null,{tokenize:()=>[token('猫','ネコ')]});await expect(retry).resolves.toBe('neko');
+    });
+
     it('retries after an initialization failure and rejects switching a live dictionary', async () => {
         let attempt = 0;
         const build = vi.fn(() => ({build: (callback: TokenizerCallback) => {

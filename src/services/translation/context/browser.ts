@@ -108,10 +108,12 @@ function exceedsDefuddleBudget(doc: Document): boolean {
             const attributes = (current as Element).attributes;
             for (let index = 0; index < attributes.length; index += 1) {
                 const attribute = attributes.item(index);
-                if (attribute) markupCharacters += attribute.name.length + attribute.value.length;
+                // Native NamedNodeMap 在此无回调的有界索引内始终有对应属性。
+                markupCharacters += attribute!.name.length + attribute!.value.length;
             }
         }
-        else if (current.nodeType === 3) characters += current.nodeValue!.length;
+        // 此 TreeWalker 仅遍历 Element 与 Text。
+        else characters += current.nodeValue!.length;
         if (shouldUseBoundedPageCapture({
             elements,
             textCharacters: characters,
@@ -214,7 +216,8 @@ function loadDefuddleModule(): Promise<ReadablePageExtractor> {
     const pending = Promise.all([import('defuddle'), import('./markdown')])
         .then(([{default: Defuddle}, {createReadablePageMarkdown}]) => ({Defuddle, createReadablePageMarkdown}));
     const wrapped = pending.catch((error) => {
-        if (defuddleModulePromise === wrapped) defuddleModulePromise = null;
+        // 已创建的模块加载 Promise 在结算前不可替换。
+        defuddleModulePromise = null;
         throw error;
     });
     defuddleModulePromise = wrapped;

@@ -11,8 +11,9 @@ describe('shared Vitest regression configuration', () => {
         expect(strict.server).toBe(base.server);
         expect(base.server?.fs?.allow).toContain(realpathSync(resolve(__dirname, '../node_modules')));
         expect(base.server?.fs?.strict).not.toBe(false);
-        const {coverage, ...execution} = strict.test!;
+        const {coverage, testTimeout, ...execution} = strict.test!;
         expect(execution).toEqual(base.test);
+        expect(testTimeout).toBe(30_000);
         expect(execution.environment).toBe('node');
         expect(execution.isolate).not.toBe(false);
         expect(coverage).toBeDefined();

@@ -131,12 +131,12 @@ function resolveSolidBackground(layers) {
   }
   return null;
 }
-const expectedGeneralGroups = ['基础配置', '翻译服务选择', '网页辅助', '基本偏好'];
+const expectedGeneralGroups = ['基础配置', '网页辅助', '基本偏好'];
 const expectedGeneralSubgroups = [];
 const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'video-learning', 'font'];
 const expectedInterfaceGroups = ['译文样式', '逐句高亮样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '完整句学习外观', '界面字体'];
 // 划词触发、翻译卡片与朗读均在划词页；阅读辅助保留在翻译设置首项。
-const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球进阶设置', '段落复制', '局部翻译', '不翻译的语言'];
+const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球设置', '段落复制', '局部翻译', '不翻译的语言'];
 const expectedLoadingStyles = [
   ['ring', '柔和圆环'],
   ['minimal', '简洁'],
@@ -243,6 +243,9 @@ async function assertTestBrowserRemainsBackground(context, label) {
 
 // 桌面点击真实侧栏入口，窄屏选择生产移动导航；不绕过用户导航写 hash。
 async function selectSettingsSection(page, sectionId, panelId) {
+  // 重载后的默认 HTML 可能先于响应式样式出现；等导航布局可见后再判断桌面/移动入口。
+  await page.locator('.settings-app > .sidebar').waitFor({state: 'visible', timeout});
+  await page.waitForFunction(() => [...document.querySelectorAll('select.mobile-settings-navigation, nav[aria-label="设置分类"] .nav-group-toggle')].some(node => node.getClientRects().length > 0));
   const mobile = page.locator('select.mobile-settings-navigation');
   if (await mobile.isVisible()) {
     await mobile.selectOption(sectionId);
@@ -1134,17 +1137,14 @@ function assertCompleteBackupEnvelope(value, sentinels, options = {}) {
 }
 
 async function downloadCompleteBackup(page, includePrivateContext = false) {
-  const downloadPromise = page.waitForEvent('download', {timeout});
   await page.getByRole('button', {name: '导出备份', exact: true}).click();
   const contextDialog = page.locator('.el-message-box:visible');
-  await contextDialog.getByText('是否包含单词上下文？', {exact: true}).waitFor({state: 'visible', timeout});
-  for (const label of ['不包含并导出', '包含并导出']) {
-    await contextDialog.getByRole('button', {name: label, exact: true}).waitFor({state: 'visible', timeout});
-  }
-  await contextDialog.getByRole('button', {
-    name: includePrivateContext ? '包含并导出' : '不包含并导出',
-    exact: true,
-  }).click();
+  const contextOption = contextDialog.locator('.fr-backup-export-option input[type="checkbox"]');
+  await contextOption.waitFor({state: 'visible', timeout});
+  if (await contextOption.isChecked()) throw new Error('完整备份默认包含了私人上下文');
+  await contextOption.setChecked(includePrivateContext);
+  const downloadPromise = page.waitForEvent('download', {timeout});
+  await contextDialog.getByRole('button', {name: '导出备份', exact: true}).click();
   const download = await downloadPromise;
   const downloadedPath = await download.path();
   if (!downloadedPath) throw new Error('完整备份下载未产生可读文件');
@@ -1368,7 +1368,9 @@ async function verifyIndependentAreaSettings(page, context, extensionOrigin, rep
   const areaDrawer = popup.locator('.drawer-surface');
   await areaDrawer.getByRole('heading', {name: '图片翻译', exact: true}).waitFor({state: 'visible', timeout});
   if (await areaDrawer.getByRole('switch', {name: '启用或关闭圈选翻译'}).getAttribute('aria-checked') !== 'true') throw new Error('Popup 没有同步圈选开关');
-  if (!await areaDrawer.getByTestId('area-translation-demo').isVisible() || !(await areaDrawer.locator('.image-method-shortcut').innerText()).includes('Shift+Z')) throw new Error('Popup 图片抽屉缺少圈选快捷键与操作示例');
+  const areaDemo = areaDrawer.getByTestId('area-translation-demo');
+  const areaShortcut = await areaDemo.locator('.area-hotkey kbd').allTextContents();
+  if (!await areaDemo.isVisible() || areaShortcut.join('+') !== 'Shift+Z') throw new Error(`Popup 图片抽屉缺少圈选快捷键与操作示例：${JSON.stringify(areaShortcut)}`);
   report.screenshots.push(await screenshot(popup, 'popup-area-independent-drawer.png'));
   await areaDrawer.getByRole('button', {name: '关闭', exact: true}).click();
   await popup.locator('[data-popup-quick-feature="image"]').click();
@@ -1587,7 +1589,10 @@ async function main() {
       if (await activeButtons.count() !== 1 || await activeButtons.first().getAttribute('data-section') !== id) {
         throw new Error(`${id} 导航激活状态异常`);
       }
-      const anchor = page.locator(`#${id}`);
+      // 统计页会保留上次选择的总览/模型用量分类，导航验收应读取当前唯一可见的面板。
+      const anchor = id === 'settings-translation-stats'
+        ? page.locator('#settings-translation-stats:visible, #settings-model-usage:visible') : page.locator(`#${id}`);
+      await anchor.waitFor({state: 'visible', timeout});
       if (await anchor.count() !== 1 || !await anchor.isVisible()) throw new Error(`页面锚点不可见：${id}`);
       if (id === 'settings-image-translation') {
         await openSharedOcrResources(page);
@@ -1775,7 +1780,7 @@ async function main() {
     if (await loadingStylePanel.locator('.settings-group').count() !== 1
       || await loadingStylePanel.locator('h2, h3').count() !== 1
       || await loadingStyleGroup.getByRole('heading', {name: '翻译加载样式', exact: true}).count() !== 1
-      || await loadingStyleGroup.locator('.settings-group-heading > p').textContent() !== '选择样式即可预览；选“无”关闭界面动画并保留静态反馈。'
+      || await loadingStyleGroup.locator('.settings-group-heading .settings-card-heading-copy > p').textContent() !== '选择样式即可预览；选“无”关闭界面动画并保留静态反馈。'
       || await loadingStylePanel.locator('.el-switch, [role="switch"]').count() !== 0) {
       throw new Error('动画选择器应只有一个标题和说明，不能保留嵌套分组或独立动画开关');
     }
@@ -2431,8 +2436,8 @@ async function main() {
         || metrics.popupWidthVariable !== `${skin.popupWidth}px`
         || metrics.shellHeight > 560
         || metrics.horizontalOverflow
-        || metrics.brand !== skin.brand
-        || metrics.surface !== skin.surface
+        || JSON.stringify(parseCssColor(metrics.brand)) !== JSON.stringify(parseCssColor(skin.brand))
+        || JSON.stringify(parseCssColor(metrics.surface)) !== JSON.stringify(parseCssColor(skin.surface))
         || !metrics.ink
         || metrics.textContrast < 4.5
         || (skin.kind === 'palette' && (
@@ -2484,7 +2489,7 @@ async function main() {
         ? contrastRatio(darkMetrics.actionText, darkMetrics.translateButtonBackground)
         : null;
       if (darkMetrics.horizontalOverflow
-        || darkMetrics.surface !== skin.darkSurface
+        || JSON.stringify(parseCssColor(darkMetrics.surface)) !== JSON.stringify(parseCssColor(skin.darkSurface))
         || !darkMetrics.brand
         || !darkMetrics.ink
         || darkMetrics.textContrast < 4.5
@@ -3296,8 +3301,16 @@ async function main() {
     ];
     const expectedPlatformServices = [
       'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
-      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'ollama',
+      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'ollama',
     ];
+    // 新装时四个未配置的第三方平台默认关闭，旧配置及显式配置仍由配置迁移测试覆盖。
+    const defaultDisabledPlatforms = ['runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel'];
+    const hiddenPlatforms = await page.evaluate(async expected => {
+      const stored = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+      const config = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
+      return config.disabledTranslationServices.filter(service => expected.includes(service)).sort();
+    }, defaultDisabledPlatforms);
+    if (JSON.stringify(hiddenPlatforms) !== JSON.stringify([...defaultDisabledPlatforms].sort())) throw new Error(`默认关闭的平台状态异常：${JSON.stringify(hiddenPlatforms)}`);
     const serviceViews = await serviceCatalog.locator('[data-service-view]')
       .evaluateAll(buttons => buttons.map(button => button.dataset.serviceView));
     if (serviceViews.length !== 0) {
@@ -3728,6 +3741,8 @@ async function main() {
     for (const sectionLabel of ['设置与凭据', '单词本', '模型用量']) {
       await localDataImportDialog.getByText(sectionLabel, {exact: true}).first().waitFor({state: 'visible', timeout});
     }
+    const configDetails = localDataImportDialog.locator('details.config-import-preview');
+    if (!await configDetails.getAttribute('open')) await configDetails.locator('summary').click();
     await localDataImportDialog.locator('.config-change-group h4')
       .filter({hasText: /^凭据安全/u})
       .waitFor({state: 'visible', timeout});

@@ -40,6 +40,28 @@ function deferred<T>() {
 }
 
 describe('Offscreen Chrome 翻译域', () => {
+    it('keeps cancellation authoritative when a late detector creation rejects', async () => {
+        let reject!: (error: Error) => void;
+        const creation = new Promise<never>((_resolve, failure) => {reject = failure;}), controller = new AbortController();
+        const create = vi.fn(() => creation);
+        const pending = detectChromeLanguage('hello', {translation: {createDetector: create}} as ChromeTranslationEnvironment, controller.signal);
+        const cancelled = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(create).toHaveBeenCalledOnce());
+        controller.abort(); await cancelled; reject(new Error('late detector failure')); await Promise.resolve(); await Promise.resolve();
+    });
+    it.each([false,true])('settles stream cancellation with iterator.return missing=%s or rejecting', async noReturn => {
+        const next = deferred<IteratorResult<unknown>>(), close = vi.fn().mockRejectedValue(new Error('stream already gone'));
+        const iterator = {next: vi.fn(() => next.promise), return: noReturn?undefined:close, [Symbol.asyncIterator]() {return this;}};
+        const environment = modernTranslator({translateStreaming: vi.fn(() => iterator), destroy: vi.fn()}), controller = new AbortController();
+        const pending = performChromeTranslation('hello', 'en', 'zh', environment, controller.signal);
+        const cancelled = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        await vi.waitFor(() => expect(iterator.next).toHaveBeenCalledOnce()); controller.abort(); await cancelled;
+        await Promise.resolve(); expect(close).toHaveBeenCalledTimes(noReturn?0:1); next.resolve({done: true, value: undefined}); disposeChromeTranslationModels(environment);
+    });
+    it('uses script evidence and destroys a legacy detector that returns no confident language', async () => {
+        const destroy=vi.fn(),environment={translation:{createDetector:vi.fn(async()=>({detect:async()=>[],destroy}))}};
+        await expect(detectChromeLanguage('こんにちは',environment)).resolves.toBe('ja');expect(destroy).toHaveBeenCalledOnce();
+    });
     afterEach(() => { vi.useRealTimers(); });
     it('结构化准备错误重复经过友好映射时保留实际语言对与对象身份', () => {
         const error = createChromePreparationRequiredError('fr', 'zh');

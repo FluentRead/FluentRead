@@ -35,6 +35,17 @@ function harness() {
 afterEach(() => vi.useRealTimers())
 
 describe('按需字体资源契约', () => {
+  it('下载状态回调立即切回系统字体时，不再启动已排队的 fetch', async () => {
+    const h = harness()
+    let replacement: Promise<void> | undefined
+    h.deps.onState = state => {
+      h.states.push(state)
+      if (state.status === 'loading' && state.source && !replacement) replacement = h.loader.load('system')
+    }
+    await h.loader.load('noto-sans-sc'); await replacement
+    expect(h.deps.fetch).not.toHaveBeenCalled(); expect(h.deps.install).not.toHaveBeenCalled()
+    expect(h.states.at(-1)).toMatchObject({font: 'system', status: 'system'})
+  })
   it('只读取缓存键展示下载状态；共享中文未齐全时不把英文字体标成已下载', async () => {
     const cache = {keys: vi.fn(async () => getInterfaceFontAssets('inter').map(asset => new Request(`https://fluentread.app/__interface_fonts__/${asset.sha256}`)))}
     const open = vi.fn(async () => cache as unknown as Cache)
@@ -205,9 +216,10 @@ describe('字体下载、缓存和切换生命周期', () => {
     expect(h.states.at(-1)?.status).toBe('ready')
   })
 
-  it('缓存损坏会删除并重新下载，而不是把坏数据传入字体解析器', async () => {
+  it.each([false, true])('缓存损坏时删除失败=%s 仍重新下载并校验后注册字体', async deletionFails => {
     const h = harness()
     h.cache.match.mockResolvedValueOnce(new Response('corrupt'))
+    if (deletionFails) h.cache.delete.mockRejectedValueOnce(new Error('corrupt cache entry locked'))
     await h.loader.load('noto-sans-sc')
     expect(h.cache.delete).toHaveBeenCalledOnce()
     expect(h.deps.fetch).toHaveBeenCalledOnce()

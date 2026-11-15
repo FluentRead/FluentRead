@@ -121,6 +121,16 @@ describe('native fullscreen subtitles', () => {
     state.reading.text = 'genbun'; state.reading.source = 'other'; expect(readNativeFullscreenCues(state)[0].text).toBe('&lt;原文&gt;\n译文');
   });
 
+  it('accepts a platform cue already updated to the desired reading without writing it again', () => {
+    const f=setup();f.state.reading={enabled:true,source:'Original',text:''};f.bridge.sync();
+    const track=f.tracks[0];f.select(track);
+    const cue=track.cues![0];let text='Original\norijinaru\n译文';const assign=vi.fn((value:string)=>{text=value;});
+    Object.defineProperty(cue,'text',{configurable:true,get:()=>text,set:assign});
+    f.state.reading.text='orijinaru';f.bridge.sync();
+    expect(cue.text).toBe(text);expect(assign).not.toHaveBeenCalled();expect(track.cues![0]).toBe(cue);
+    f.bridge.destroy();
+  });
+
   it('新读音只patch重复原文对应的cue，不重读或重建两千句时间轴，等待态保留已完成读音', () => {
     const f = setup(); let reads = 0;
     f.state.revision = 1;

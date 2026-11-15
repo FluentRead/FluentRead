@@ -834,6 +834,16 @@ describe('local translation owner model management and worker failures', () => {
 });
 
 describe('local translation background handlers', () => {
+  it('does not poison later trusted download progress when receipt storage rejects once', async () => {
+    const storage={get:vi.fn(async()=>({})),set:vi.fn(async(_value:unknown)=>undefined)};
+    const offscreen={prepare:vi.fn(),status:vi.fn(),remove:vi.fn(),pause:vi.fn(),translate:vi.fn()};
+    const handlers=createLocalTranslationBackgroundHandlers({offscreen,isTrustedProgress:()=>true,storage});
+    const progress=handlers.find(item=>item.type==='fluentReadLocalTranslationDownloadProgress')!;
+    const snapshot=translationSnapshot('ready');storage.set.mockRejectedValueOnce(new Error('receipt quota exceeded'));
+    await expect(progress.handle({type:progress.type,snapshot} as never,{})).rejects.toThrow('receipt quota exceeded');
+    await expect(progress.handle({type:progress.type,snapshot} as never,{})).resolves.toEqual({success:true});
+    expect(storage.set).toHaveBeenCalledTimes(2);
+  });
   it('acknowledges background jobs without marking them downloaded and only persists trusted completed progress', async () => {
     let stored: Record<string, unknown> = {[LOCAL_TRANSLATION_MODEL_STATE_KEY]: []};
     const offscreen = {

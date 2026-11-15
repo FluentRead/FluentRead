@@ -51,6 +51,46 @@ afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const phase = async (manager: ReturnType<typeof createLocalTranslationDownloadManager>, model = ids.opusZhEn as string) => (await manager.status()).tasks.find((task) => task.model === model)?.phase;
 
 describe('page-independent local model jobs', () => {
+  it('recovers from an unreadable stored snapshot and retries initialization after a cache-open failure', async () => {
+    entries.set('https://fluentread.invalid/local-translation-downloads-v2', new Response('{broken snapshot'));
+    const manager = createLocalTranslationDownloadManager();
+    vi.spyOn(caches, 'open').mockRejectedValueOnce(new Error('cache temporarily unavailable'));
+    await expect(manager.status()).rejects.toThrow('cache temporarily unavailable');
+    const recovered = await manager.status();
+    expect(recovered.tasks.find(task => task.model === ids.opusZhEn)?.phase).toBe('idle');
+    expect(fake.download).not.toHaveBeenCalled();
+  });
+
+  it('aborts transfer when a progress receipt cannot be stored and keeps resumable paused state', async () => {
+    const manager = createLocalTranslationDownloadManager(); await manager.status();
+    const open = caches.open.bind(caches); let failed = false;
+    vi.spyOn(caches, 'open').mockImplementation(async name => {
+      const cache = await open(name), put = cache.put.bind(cache);
+      cache.put = async (key, value) => {
+        const snapshot = await (value as Response).clone().json();
+        const task = snapshot.tasks.find((entry: {model: string}) => entry.model === ids.opusZhEn);
+        if (!failed && task.phase === 'downloading' && task.downloadedBytes > 0) {failed = true; throw new Error('progress write failed');}
+        return put(key, value);
+      };
+      return cache;
+    });
+    await manager.start(ids.opusZhEn);
+    await vi.waitFor(() => expect(fake.download).toHaveBeenCalled());
+    const signal = fake.download.mock.calls[0][1] as AbortSignal;
+    await vi.waitFor(() => expect(signal.aborted).toBe(true));
+    expect(await phase(manager)).toBe('paused'); expect(failed).toBe(true);
+    expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn)?.downloadedBytes).toBe(4);
+  });
+
+  it('reports the original storage failure even when recording the queued-job error also fails', async () => {
+    const manager = createLocalTranslationDownloadManager(); await manager.status();
+    const open = caches.open.bind(caches);
+    vi.spyOn(caches, 'open').mockImplementation(async name => ({...await open(name), put: async () => {throw new Error('cache writes unavailable');}}));
+    await expect(manager.start(ids.opusZhEn)).rejects.toThrow('cache writes unavailable');
+    await vi.waitFor(async () => expect(await phase(manager)).toBe('error'));
+    expect((await manager.status()).tasks.find(task => task.model === ids.opusZhEn)?.error).toBe('storage');
+    expect(fake.download).not.toHaveBeenCalled();
+  });
   it('ignores stale or non-ready rechecks and legacy models without tracked artifacts', async () => {
     fake.complete.add(ids.opusZhEn);fake.legacyCached = true;
     const manager = createLocalTranslationDownloadManager(), states = (await manager.status()).tasks;

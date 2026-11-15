@@ -20,6 +20,7 @@ const harness = vi.hoisted(() => ({
     save: vi.fn(),
     remind: vi.fn(),
     refresh: vi.fn(),
+    subscribe: vi.fn(),
     pause: vi.fn(),
     rememberedPorts: {} as Record<string, any>,
     realRemembered: false,
@@ -29,7 +30,7 @@ const harness = vi.hoisted(() => ({
     editing: vi.fn(() => false),
 }));
 
-vi.mock('@/src/services/config/store', () => ({config: harness.config, subscribeConfig: () => () => {}, requestConfigPatch: vi.fn(async (_patch: unknown, send: (msg: unknown) => Promise<unknown>) => {await send({type:'persistConfig'});})}));
+vi.mock('@/src/services/config/store', () => ({config: harness.config, subscribeConfig: harness.subscribe, requestConfigPatch: vi.fn(async (_patch: unknown, send: (msg: unknown) => Promise<unknown>) => {await send({type:'persistConfig'});})}));
 vi.mock('@/src/features/section-translation/content/remembered', async importOriginal => {
     const actual = await importOriginal<typeof import('@/src/features/section-translation/content/remembered')>();
     return {createRememberedSectionRuntime: (ports: Parameters<typeof actual.createRememberedSectionRuntime>[0], signal: AbortSignal) => {
@@ -105,6 +106,7 @@ beforeEach(() => {
     harness.realRemembered = false;
     Object.assign(harness.config, {on: true, quickTranslationProfiles: [{id: 'section-1', hotkey: 'Ctrl+R'}], sectionTranslationHotkeyEnabled: false, sectionTranslationHotkey: 'Alt+R', customSectionTranslationHotkey: ''});
     vi.clearAllMocks();
+    harness.subscribe.mockReturnValue(vi.fn());
     harness.startPicker.mockReturnValue(true);
     harness.pickerActive.mockReturnValue(false);
     harness.editing.mockReturnValue(false);
@@ -120,6 +122,12 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('局部翻译入口', () => {
+    it('refreshes remembered regions on a configuration notification and removes the subscription on abort', () => {
+        const stop=vi.fn();harness.subscribe.mockReturnValueOnce(stop);
+        const controller=mount();harness.refresh.mockClear();
+        harness.subscribe.mock.calls[0][0]();expect(harness.refresh).toHaveBeenCalledOnce();
+        controller.abort();expect(stop).toHaveBeenCalledOnce();
+    });
 
     it('保存选择委托权威配置端口，失败保留选择并说明原因，路由使旧确认失效', async () => {
         const controller = mount(); startSectionTranslationPicker();

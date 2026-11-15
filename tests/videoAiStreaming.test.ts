@@ -1102,6 +1102,13 @@ describe('本地 AI 字幕时间轴稳定性', () => {
     expect(invalid[0]).toMatchObject({ durationMs: 500, spokenEndMs: 2_500 });
   });
 
+  it('较早和同起点但更旧的重叠 cue 不抢占当前最新字幕', () => {
+    const current={startMs:1_000,durationMs:3_000,availableAtMs:900,text:'Latest visible caption.'};
+    const older={startMs:0,durationMs:4_000,availableAtMs:800,text:'Older overlapping caption.'};
+    const duplicate={...current,availableAtMs:500,text:'Earlier result at the same start.'};
+    expect(getVisibleVideoAiCue([current,older,duplicate] as VideoAiStabilizedCue[],1_200)).toBe(current);
+  });
+
   it('没有 spokenEnd 时按 cue 时长 fallback', () => {
     const cue = { startMs: 1_000, durationMs: Number.NaN, text: 'fallback duration' };
     expect(getVisibleVideoAiCue([cue], 1_000)?.text).toBe(cue.text);

@@ -370,6 +370,32 @@ describe('划词翻译挂载生命周期', () => {
 });
 
 describe('圈选翻译按需挂载生命周期', () => {
+    it('shares an unfinished UI mount across simultaneous context menu activations', async () => {
+        const pending = pendingUi(), beginSelection = vi.fn(() => true);
+        const mountedUi = ui({beginSelection});
+        mocks.createVueShadowUi.mockReturnValueOnce(pending.promise);
+        const runtime = await import('@/src/features/area-translation/public');
+        const {startAreaTranslationFromContextMenu} = await import('@/src/features/area-translation/content/contextMenuBridge');
+        runtime.mountAreaTranslator({} as never);
+        const first = startAreaTranslationFromContextMenu(), second = startAreaTranslationFromContextMenu();
+        expect(mocks.createVueShadowUi).toHaveBeenCalledOnce();
+        pending.resolve(mountedUi);
+        await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+        expect(beginSelection).toHaveBeenCalledTimes(2);
+        runtime.unmountAreaTranslator();
+        expect(mountedUi.remove).toHaveBeenCalledOnce();
+    });
+    it('reports a rejected lazy mount once and permits a later shortcut to retry', async () => {
+        const failure=new Error('shadow UI creation failed'),error=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+        const beginSelection=vi.fn(()=>true);mocks.createVueShadowUi.mockRejectedValueOnce(failure).mockResolvedValueOnce(ui({beginSelection}));
+        const listen=vi.spyOn(document,'addEventListener'),runtime=await import('@/src/features/area-translation/public');
+        try {
+            runtime.mountAreaTranslator({} as never);const key=listen.mock.calls.find(([type])=>type==='keydown')![1] as (event:KeyboardEvent)=>void;
+            mocks.shouldStartAreaTranslationFromHotkey.mockReturnValue(true);const event={preventDefault:vi.fn()} as unknown as KeyboardEvent;
+            key(event);await vi.waitFor(()=>expect(error).toHaveBeenCalledWith('[FluentRead] 圈选翻译挂载失败',failure));
+            key(event);await vi.waitFor(()=>expect(beginSelection).toHaveBeenCalledOnce());expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+        } finally {runtime.unmountAreaTranslator();error.mockRestore();listen.mockRestore();}
+    });
     it('可信快捷键由入口启动覆盖层，未匹配手势不创建 UI', async () => {
         const beginSelection = vi.fn().mockReturnValue(true);
         mocks.createVueShadowUi.mockResolvedValue(ui({beginSelection}));

@@ -49,6 +49,17 @@ describe('material backup export runtime',()=>{
         expect(()=>installMaterialBackupExportRuntime(f.options as never)).toThrow(failure);
         expect(f.runtime.onConnect.listeners.size).toBe(0);await vi.waitFor(()=>expect(f.close).toHaveBeenCalledOnce());
     });
+    it('retries listener removal through the same disposer without closing an already closed database twice',async()=>{
+        const f=fixture(),stop=installMaterialBackupExportRuntime(f.options as never);
+        const remove=f.runtime.onConnect.removeListener.bind(f.runtime.onConnect);
+        f.runtime.onConnect.removeListener=()=>{throw Error('listener busy');};
+        await expect(stop()).rejects.toThrow('listener busy');
+        expect(f.close).toHaveBeenCalledOnce();
+        f.runtime.onConnect.removeListener=remove;
+        await expect(stop()).resolves.toBeUndefined();
+        expect(f.close).toHaveBeenCalledOnce();expect(f.runtime.onConnect.listeners.size).toBe(0);
+        const fresh=installMaterialBackupExportRuntime(f.options as never);expect(fresh).not.toBe(stop);await fresh();
+    });
     it('retries a failed database close before installing another runtime',async()=>{
         const f=fixture(),stop=installMaterialBackupExportRuntime(f.options as never);f.close.mockImplementationOnce(()=>{throw Error('close failed');});
         await expect(stop()).rejects.toThrow('close failed');expect(f.runtime.onConnect.listeners.size).toBe(0);

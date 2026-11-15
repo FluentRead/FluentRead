@@ -43,6 +43,13 @@ function scan(fixture: ReturnType<typeof dom>, request: Parameters<typeof scanMa
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
 
 describe('material paragraph scan', () => {
+    it('cancels its native timeout before the first slice when the caller aborts', async () => {
+        vi.useFakeTimers();const f=dom(`<p>${quote}</p>`),controller=new AbortController();
+        const pending=scanMaterialParagraphs(f.document,{kind:'locate',locator:{kind:'text',quote}},{signal:controller.signal});
+        expect(vi.getTimerCount()).toBe(1);controller.abort();
+        expect((await pending).status).toBe('cancelled');expect(vi.getTimerCount()).toBe(0);
+        await vi.runAllTimersAsync();expect(f.counters().reads).toBe(0);
+    });
     it('finds captured source paragraphs in nested open shadow roots and observes their changes', async () => {
         const f = dom('<div id="outer"></div>');
         const outer = f.document.getElementById('outer')!.attachShadow({mode:'open'});

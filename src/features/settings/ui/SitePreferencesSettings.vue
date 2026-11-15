@@ -85,8 +85,9 @@ async function addSite() {
   if (await commit(patch)) { input.value = ''; search.value = ''; }
 }
 function change(row: SitePreferenceRow, field: 'alwaysTranslate' | 'extensionDisabled' | 'floatingBallHidden' | 'translationOnly', event: Event) {
-  const patch = updateSitePreference(props.settings, row.domain, {...row, [field]: (event.target as HTMLInputElement).checked});
-  if (patch) void commit(patch);
+  // 行来自 listSitePreferences，域名已通过相同规则规范化。
+  const patch = updateSitePreference(props.settings, row.domain, {...row, [field]: (event.target as HTMLInputElement).checked})!;
+  void commit(patch);
 }
 async function remove(row: SitePreferenceRow) {
   const patch = updateSitePreference(props.settings, row.domain, null)!;

@@ -1001,6 +1001,25 @@ describe('全文翻译进度面板 content runtime', () => {
     expect(mocks.dismissPageNotice).toHaveBeenCalledWith('translation-progress-mount-wait');
   });
 
+  it('coalesces repeated blocked mount requests and suppresses a hidden notice after disabling the panel', async () => {
+    const first = pendingUi(), second = pendingUi();
+    mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'hidden'});
+    const runtime = await import('@/src/features/full-page-translation/content/progressPanel');
+    runtime.mountTranslationProgressPanel({} as never);runtime.unmountTranslationProgressPanel();
+    runtime.mountTranslationProgressPanel();runtime.unmountTranslationProgressPanel();
+    mocks.showPageNotice.mockClear();
+    expect(runtime.mountTranslationProgressPanel()).toBeNull();
+    expect(runtime.mountTranslationProgressPanel()).toBeNull();
+    expect(mocks.createVueShadowUi).toHaveBeenCalledTimes(2);
+    mocks.config.translationProgressPanelEnabled = false;
+    Object.defineProperty(document, 'visibilityState', {configurable: true, value: 'visible'});
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(mocks.showPageNotice).not.toHaveBeenCalled();
+    runtime.unmountTranslationProgressPanel();
+    first.resolve(ui());second.resolve(ui());await Promise.all([first.promise, second.promise]);
+  });
+
   it('defers the recovery notice until the page is visible and removes it on disable', async () => {
     const first = pendingUi(), second = pendingUi();
     mocks.createVueShadowUi.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);

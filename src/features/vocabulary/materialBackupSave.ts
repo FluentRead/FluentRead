@@ -171,9 +171,10 @@ export async function saveMaterialBackup(target:MaterialBackupSaveTarget, receiv
         const copy = chunk.slice();
         const work = Promise.resolve().then(async()=>{check(controller.signal);await target.write(copy,controller.signal);check(controller.signal);bytes += copy.byteLength;});
         pending = work;
-        void work.then(()=>{if(pending===work)pending=undefined;},error=>{
+        // consume 拒绝重叠分片；pending 不会在工作结算前被另一份任务替换。
+        void work.then(()=>{pending=undefined;},error=>{
             if(!controller.signal.aborted && !writeFailedBeforeCancel){writeFailedBeforeCancel=true;writeFailure=error;}
-            if(!failed){failed=true;failure=error;}if(pending===work)pending=undefined;
+            if(!failed){failed=true;failure=error;}pending=undefined;
         });
         return work;
     };

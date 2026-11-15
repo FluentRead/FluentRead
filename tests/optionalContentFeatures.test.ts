@@ -37,6 +37,14 @@ function createHarness(overrides: Partial<OptionalContentFeatureConfig> = {}): H
 afterEach(() => vi.restoreAllMocks());
 
 describe('optional content feature 生命周期', () => {
+    it('does not mount input translation if the site eligibility check synchronously aborts activation', () => {
+        const activation=new AbortController(),mount=vi.fn();
+        const runtime=createOptionalContentFeatureRuntime({activationSignal:activation.signal,
+            config:{on:true,inputBoxTranslationTrigger:'ctrl_enter',paragraphCopyEnabled:false},
+            isSiteDisabled:()=>{activation.abort();return false;},inputTranslationFeature:{mount,invalidate:vi.fn()},
+            mountParagraphCopyContentFeature:vi.fn(),mountSectionTranslationContentFeature:vi.fn()});
+        runtime.sync();expect(mount).not.toHaveBeenCalled();runtime.dispose();
+    });
     it('默认关闭的输入框翻译与段落复制不挂载，局部翻译入口只挂载一次', () => {
         const harness = createHarness();
 

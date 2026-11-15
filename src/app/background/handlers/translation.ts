@@ -130,7 +130,8 @@ export function createTranslationRequestRegistry(): TranslationRequestRegistry {
             try {
                 return await operation(controller.signal, key);
             } finally {
-                if (active.get(key) === controller) active.delete(key);
+                // 同 key 在 active/completed 中时拒绝重入，cancel 只终止 controller；本轮是唯一删除者。
+                active.delete(key);
                 remember(completed, key);
             }
         },

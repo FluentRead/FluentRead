@@ -236,6 +236,13 @@ describe('createApiKeyPool', () => {
     expect(rotation.success('old', oldLease, 2)).toBe(false);
     expect(rotation.success('old', newLease, 2)).toBe(true);
   });
+  it('evicts the least recently touched scope and retains a newer lease even when insertion order differs', () => {
+    const rotation = createApiKeyRotation({maxScopes: 2});
+    const first = rotation.pick('first', ['a'], [], 0), oldest = rotation.pick('second', ['b'], [], 1);
+    rotation.pick('first', ['a'], [], 2); rotation.pick('third', ['c'], [], 3);
+    expect(rotation.success('second', oldest, 4)).toBe(false);
+    expect(rotation.success('first', first, 4)).toBe(true);
+  });
 
   it('reports lease results through rotation and returns cooldown retry time', () => {
     const rotation = createApiKeyRotation();

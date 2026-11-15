@@ -345,6 +345,11 @@ describe('free Chinese web providers', () => {
         await translateFreeChineseWebText('youdaoFree', 'Hello from auto detection', 'auto', 'zh-Hans');
         const fallbackUrl = new URL(String(fetchMock.mock.calls.at(-1)?.[0]));
         expect(fallbackUrl.searchParams.get('from')).toBe('en');
+        fetchMock.mockResolvedValueOnce(Response.json({fanyi: {tran: '自动目标'}}));
+        await translateFreeChineseWebText('youdaoFree', 'English with an automatic target', 'en', 'auto');
+        const autoTarget = new URL(String(fetchMock.mock.calls.at(-1)?.[0]));
+        expect(autoTarget.searchParams.get('from')).toBe('en');
+        expect(autoTarget.searchParams.get('to')).toBe('zh-CHS');
         await expect(translateFreeChineseWebText('youdaoFree', 'Plain auto text', 'auto', 'en')).rejects.toMatchObject({statusCode: 400});
     });
 

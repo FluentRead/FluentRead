@@ -100,7 +100,7 @@ function toError(value: unknown, fallback: string): Error {
   return value instanceof Error ? value : new Error(typeof value === 'string' ? value : fallback);
 }
 
-function terminateWorker(error?: Error, releaseStream = false): void {
+function terminateWorker(error = new Error('本地视频 AI 字幕已取消'), releaseStream = false): void {
   firstAudioWarmLease = null;
   clearIdleDisposal();
   workerGeneration++;
@@ -113,7 +113,7 @@ function terminateWorker(error?: Error, releaseStream = false): void {
   pendingWorkerRequests.clear();
   pending.forEach((request) => {
     window.clearTimeout(request.timeout);
-    if (error) request.reject(error);
+    request.reject(error);
   });
 }
 
@@ -460,8 +460,9 @@ function drainQueue(): void {
           firstAudioWarmLease = {streamId: prepareJob.streamId, deadlineAt: Date.now() + MODEL_FIRST_AUDIO_WARM_LEASE_MS};
         }
         prepareJob.resolve(prepared);
-      } else if (transcriptionJob) {
-        transcriptionJob.resolve(await transcribeLocalVideoAudioNow(transcriptionJob.request));
+      } else {
+        // 队列入口已排除两个任务都为空；prepare 分支之外必定归转写任务所有。
+        transcriptionJob!.resolve(await transcribeLocalVideoAudioNow(transcriptionJob!.request));
       }
     } catch (error) {
       firstAudioWarmLease = null;
@@ -506,10 +507,11 @@ export function prepareLocalVideoTranscriptionModel(model?: unknown, options?: {
   pendingPreparePromises.set(requestKey, request);
   void request.then(
     () => {
-      if (pendingPreparePromises.get(requestKey) === request) pendingPreparePromises.delete(requestKey);
+      // 同键准备在 Map 非空时只复用该 Promise；此回调是唯一移除入口。
+      pendingPreparePromises.delete(requestKey);
     },
     () => {
-      if (pendingPreparePromises.get(requestKey) === request) pendingPreparePromises.delete(requestKey);
+      pendingPreparePromises.delete(requestKey);
     },
   );
   return request;
@@ -558,7 +560,8 @@ export async function cancelLocalVideoTranscription(
       || pendingPrepare.some((job) => job.streamId === normalizedStreamId)
     ) return;
     firstAudioWarmLease = null;
-    if (activeStreamId === normalizedStreamId) activeStreamId = '';
+    // ownsStream 的其他归属已在上方排除，此处只可能由 activeStreamId 持有。
+    activeStreamId = '';
     scheduleIdleDisposal();
     return;
   }

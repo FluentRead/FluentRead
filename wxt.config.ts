@@ -419,7 +419,17 @@ export default defineConfig({
             // 同环境 6d1496387：浮动学习卡、七语操作文案及导入布局使 Chrome +15,855、Firefox +15,288 bytes。
             // 实测为 68,561,219/68,181,391 bytes；仅追加 16 kB 文本代码预算，模型与 WASM 不变。
             const floatingLearningBudget = 16_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget));
+            // GitHub 原生 PR 列表页标题的精确保护规则在五份入口中共增加2,340bytes；
+            // 相比9032adeac，Chrome为68,521,516、Firefox为68,141,936bytes，全部非代码文件摘要不变。
+            // 利用已有余量后各补2kB，继续检查真实磁盘总量，不增加资源或依赖。
+            const githubPullListHeadingBudget = 2_000;
+            // 合入本地主线有效旧界面译文后，Chrome 68,564,682 → 68,567,508 bytes（+2,826）。
+            // 仅六份 i18n JSON 改变，552 份其余产物摘要相同；沿用余量后 Chrome/Edge 仅补1kB。
+            const legacyTranslationTextBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
+            // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
+            const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

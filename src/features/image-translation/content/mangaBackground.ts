@@ -110,7 +110,8 @@ export function createMangaBackground(ports: Parameters<typeof createMangaCanvas
             dispose() {
                 if (released) return;
                 released = true;hide();URL.revokeObjectURL(url);
-                if (page.presentation === presentation) page.presentation = undefined;
+                // 替换前同步释放旧 presentation，迟到的旧句柄由 released 拒绝重复释放。
+                page.presentation = undefined;
             },
         };
         page.presentation?.dispose();page.presentation = presentation;

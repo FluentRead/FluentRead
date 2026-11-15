@@ -22,7 +22,7 @@ export function splitLocalTranslationText(text: string, maxLength = 480): string
             result.push(rest.slice(0, end));
             rest = rest.slice(end);
         }
-        if (rest) result.push(rest);
+        result.push(rest);
     }
     return result;
 }

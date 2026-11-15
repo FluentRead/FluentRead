@@ -5,7 +5,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {sha256} from '@noble/hashes/sha256';
 import {bytesToHex} from '@noble/hashes/utils';
 import {prepareMaterialBackup, sendMaterialBackup} from '@/src/features/vocabulary/materialBackupReader';
-import {RecordCollector} from '@/src/features/vocabulary/materialBackupJson';
+import {RecordCollector, MAX_RECORDS} from '@/src/features/vocabulary/materialBackupJson';
 import {createStage} from '@/src/features/vocabulary/materialImportStage';
 import {createMaterialImportCapability} from '@/src/features/vocabulary/materialImportPort';
 import {MaterialDatabase, MaterialRepository} from '@/src/features/vocabulary/materialRepository';
@@ -33,6 +33,22 @@ async function read(blob: Blob) {
 }
 
 describe('material backup source reader', () => {
+  it('keeps a split UTF-8 codepoint pending without hashing or counting an empty decoder fragment', () => {
+    const bytes=encoder.encode('"中"'),collector=new RecordCollector(undefined,true);
+    collector.start(0);collector.end(bytes.length);
+    for(let index=0;index<bytes.length;index++)collector.process(bytes.subarray(index,index+1),index);
+    expect(collector.values).toHaveLength(1);expect(collector.values[0]).toMatchObject({length:bytes.length,complete:true,digest:bytesToHex(sha256(bytes))});
+  });
+  it('rejects an over-limit array of compound records without returning a partial plan', async () => {
+    await expect(prepareMaterialBackup(new Blob([wrap(Array(MAX_RECORDS+1).fill('{}').join(','))]))).rejects.toThrow('超过材料上限');
+  });
+  it('never sends an empty UTF-8 fragment for a forged partial-codepoint record range and still rejects its digest',async()=>{
+    const blob=new Blob([wrap('{"value":"😀"}')]),plan=await prepareMaterialBackup(blob);
+    const bytes=new Uint8Array(await blob.arrayBuffer()),first=bytes.indexOf(0xf0),bad=structuredClone(plan),frames:Frame[]=[];
+    bad.plan.records[0]={start:first,end:first+1,length:3};bad.manifest.bytes=3;bad.manifest.digest='0'.repeat(64);
+    await expect(sendMaterialBackup(blob,bad,async frame=>{frames.push(frame);})).rejects.toThrow('改变');
+    expect(frames).toHaveLength(1);expect([...frames[0].bytes]).toEqual([0xef,0xbf,0xbd]);
+  });
   it.each(['unfinished', 'missing-record'] as const)('rejects inconsistent parsing components before rereading: %s', async failure => {
     // Fault injection at the internal parsing boundary; valid native input does not
     // independently desynchronize the syntax parser and the byte collector.

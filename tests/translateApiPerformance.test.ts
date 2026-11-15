@@ -1343,12 +1343,15 @@ describe('translation API request lifecycle performance', () => {
     remove.mockRestore();
   });
 
-  it('运行时同步取消即使取消通知抛错也只结束本调用，迟到结果结算后下一请求才启动', async () => {
+  it.each(['sync', 'async'] as const)('运行时同步取消，即使取消通知 %s 失败也只结束本调用，迟到结果结算后下一请求才启动', async failure => {
     mocks.config.maxConcurrentTranslations = 1;
     const controller = new AbortController();
     const transport = deferred<string>();
     mocks.sendMessage.mockImplementation(message => {
-      if (message.type) throw new Error('Extension context invalidated');
+      if (message.type) {
+        if (failure === 'sync') throw new Error('Extension context invalidated');
+        return Promise.reject(new Error('Extension context invalidated'));
+      }
       if (message.origin === 'Synchronous source') {
         controller.abort();
         return transport.promise;

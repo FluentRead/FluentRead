@@ -10,6 +10,9 @@ export default defineConfig({
     ...baseConfig,
     test: {
         ...baseConfig.test,
+        // Vitest 5 会复验同步用例的真实截止时间。完整源码图和冻结像素语料在 V8 插桩下实测需 7–12 秒；
+        // 只为严格覆盖率保留有界 30 秒预算，各用例显式的性能/超时断言和四维 100% 门槛保持原值。
+        testTimeout: 30_000,
         coverage: {
             provider: 'v8',
             enabled: true,

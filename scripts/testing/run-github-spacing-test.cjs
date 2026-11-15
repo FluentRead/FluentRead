@@ -7,6 +7,7 @@
  */
 const assert = require('node:assert/strict');
 const {guardBrowserClose} = require('./owned-browser-close.cjs');
+const {controlledProviderRuntime} = require('../site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -41,7 +42,7 @@ async function main() {
   let session, context, worker, popup, page, primaryError, sequence = 0;
   const installedWorkers = new WeakMap();
   const installWorker = current => {
-    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(() => {
+    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(controlledProviderRuntime, true).then(() => current.evaluate(() => {
       globalThis.spacingRequests = []; globalThis.failSpacingRequests = false;
       globalThis.fetch = async (input, init) => {
         const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
@@ -49,10 +50,10 @@ async function main() {
         const texts = JSON.parse(init?.body ?? await input.text()); globalThis.spacingRequests.push(texts);
         if (globalThis.failSpacingRequests) return new Response('', {status: 503});
         return new Response(JSON.stringify(texts.map(text => ({translations: [{text:
-          /translate hovered visual text blocks/.test(text) ? '修复：翻译悬停的视觉文本块' : `测试译文：${text}`}]}))),
+          /translate hovered visual text blocks/.test(text) ? '修复：翻译悬停的视觉文本块' : globalThis.__frCompatibilityTransport.encode(text, 'microsoft-escaped-text')}]}))),
         {status: 200, headers: {'content-type': 'application/json'}});
       };
-    }));
+    })));
     return installedWorkers.get(current);
   };
   const patchConfig = async updates => {

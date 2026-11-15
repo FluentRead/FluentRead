@@ -199,6 +199,9 @@ describe('漫画画布按需阅读快照',()=>{
         f.styles.set(parent,{overflowX:'hidden',overflowY:'hidden'});expect(f.runtime.readingVisible(f.canvas)).toBe(false);
         Object.assign(bounds,{left:150,right:450,top:100,bottom:250});expect(f.runtime.readingVisible(f.canvas)).toBe(true);
         Object.assign(bounds,{top:400,bottom:500});expect(f.runtime.readingVisible(f.canvas)).toBe(false);
+        Object.assign(bounds,{left:150,right:450,top:100,bottom:250});
+        f.styles.set(parent,{overflowX:'hidden',overflowY:'visible'});expect(f.runtime.readingVisible(f.canvas)).toBe(true);
+        f.styles.set(parent,{overflowX:'visible',overflowY:'clip'});expect(f.runtime.readingVisible(f.canvas)).toBe(true);
         f.styles.set(parent,{display:'none'});expect(f.runtime.readingVisible(f.canvas)).toBe(false);f.runtime.dispose();
     });
     it('未完成和失败页面分别报告等待与错误，不启动额外请求',async()=>{

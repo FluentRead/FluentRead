@@ -40,6 +40,20 @@ afterEach(() => {
 });
 
 describe('Offscreen 远程图片读取', () => {
+    it.each([false, true])('响应无效时保留原始错误，即使响应体缺失或取消失败（有响应体：%s）', async hasBody => {
+        const cancel = vi.fn().mockRejectedValue(new Error('already closed'));
+        await expect(fetchRemoteImageForOcr('https://cdn.example.com/image.png', async () => response({ok: false, status: 403, body: hasBody ? {cancel} as never : null})))
+            .rejects.toThrow('图片服务器返回 403');
+        await Promise.resolve();
+        expect(cancel).toHaveBeenCalledTimes(hasBody ? 1 : 0);
+    });
+    it('图片流读取与取消同时失败时仍释放 reader 并保留读取错误', async () => {
+        const reader = {read: vi.fn().mockRejectedValue(new Error('stream disconnected')), cancel: vi.fn().mockRejectedValue(new Error('already closed')), releaseLock: vi.fn()};
+        await expect(fetchRemoteImageForOcr('https://cdn.example.com/image.png', async () => response({body: {getReader: () => reader} as never})))
+            .rejects.toThrow('stream disconnected');
+        await Promise.resolve();
+        expect(reader.cancel).toHaveBeenCalledOnce(); expect(reader.releaseLock).toHaveBeenCalledOnce();
+    });
     it('多分块读取时及时释放取消监听并保留图片字节', async () => {
         let remaining = 2048;
         const body = new ReadableStream<Uint8Array>({

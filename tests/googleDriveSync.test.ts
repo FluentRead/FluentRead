@@ -38,6 +38,20 @@ async function synced() {
     return f;
 }
 describe('Google Drive 同步事务', () => {
+    it('retains the original upload failure when authentication cleanup also rejects', async () => {
+        const f=fixture(),preview=await f.service.prepare(password);
+        vi.mocked(f.ports.api.write).mockRejectedValueOnce(new Error('upload transport unavailable'));
+        vi.mocked(f.ports.auth.disconnect).mockRejectedValueOnce(new Error('auth cache unavailable'));
+        await expect(f.service.commit(preview.id,password,'upload',{})).rejects.toThrow('upload transport unavailable');
+        expect(f.state).toMatchObject({connected:false,cleanupPending:true});expect((f.state as DriveSyncState).prepared).toBeUndefined();
+        expect(f.ports.apply).not.toHaveBeenCalled();
+    });
+    it('still attempts authentication cleanup when reading local sync state fails', async () => {
+        const f=fixture();vi.mocked(f.ports.readState).mockRejectedValueOnce(new Error('sync state unavailable'));
+        vi.mocked(f.ports.auth.disconnect).mockRejectedValueOnce(new Error('auth cache unavailable'));
+        await expect(f.service.cancel()).rejects.toThrow('auth cache unavailable');
+        expect(f.ports.auth.disconnect).toHaveBeenCalledOnce();expect(f.ports.writeState).not.toHaveBeenCalled();
+    });
     it('恢复缺失网站规则的旧普通备份时保留本机规则，云端文件不被重写', async () => {
         const f = fixture();
         f.local = config({...f.local, siteAdaptation: {...new Config().siteAdaptation, disabledRuleIds: ['reddit']}});

@@ -40,7 +40,11 @@ describe('课程字幕配置与身份', () => {
         ['/video/av123?p=9007199254740992', 'av123:1'], ['/list/123', ''], ['/video/invalid', ''], ['/bangumi/play/ep123', ''],
     ])('分 P 地址 %s', (path, expected) => expect(getBilibiliPart(new URL(path, bili))).toBe(expected));
     it('只为课程视频生成请求，小节和语言变化产生不同身份', () => {
-        expect(getCourseCaptionRequest('bilibili', bili, video())?.key).toBe('BV1xx411c7mD:2');
+        expect(getCourseCaptionRequest('bilibili', bili, video())?.id).toBe('BV1xx411c7mD:2');
+        const original = getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'zh-Hans')!;
+        expect(original.language).toBe('auto'); expect(original.target).toBe('zh-Hans');
+        expect(getCourseCaptionRequest('bilibili', bili, video(), 'en', 'zh-Hans')?.key).not.toBe(original.key);
+        expect(getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'en')?.key).not.toBe(original.key);
         expect(getCourseCaptionRequest('bilibili', new URL('/bangumi/play/ep1', bili), video())).toBeNull();
         expect(getCourseCaptionRequest('udemy', udemy, video())?.key).toBe('programming/123');
         expect(getCourseCaptionRequest('udemy', new URL('/course/demo/learn/', udemy), video())).toBeNull();
@@ -64,6 +68,17 @@ describe('课程字幕配置与身份', () => {
 });
 
 describe('原文轨道和有界时间轴', () => {
+    it('B 站中文轨在前时仍选择英文原文候选，并保留单一语言回退', () => {
+        const chinese = biliTrack('zh-Hans'), english = biliTrack('en-US');
+        expect(chooseBilibiliCaption([chinese, english], bili, 'auto', 'zh-CN')?.language).toBe('en-US');
+        expect(chooseBilibiliCaption([biliTrack('zh-Hant'), english], bili, 'auto', 'zh-Hans')?.language).toBe('en-US');
+        expect(chooseBilibiliCaption([chinese, biliTrack('ai-en')], bili, 'auto', 'zh-Hans')?.language).toBe('en');
+        expect(chooseBilibiliCaption([chinese, english], bili, 'zh', 'en')?.language).toBe('zh-Hans');
+        expect(chooseBilibiliCaption([chinese, english], bili, 'en', 'en')?.language).toBe('en-US');
+        expect(chooseBilibiliCaption([chinese, english], bili, 'ja', 'zh-Hans')?.language).toBe('en-US');
+        expect(chooseBilibiliCaption([chinese], bili, 'auto', 'zh-Hans')?.language).toBe('zh-Hans');
+        expect(chooseBilibiliCaption([biliTrack('ai-en'), english], bili, 'en', 'zh-Hans')?.manual).toBe(true);
+    });
     it.each([null, 1, '', 'x'.repeat(8193), 'https://', 'http://aisubtitle.hdslb.com/x', 'https://u:p@aisubtitle.hdslb.com/x', 'https://evil.test/x', 'https://hdslb.com.evil.test/x'])('拒绝 B 站不可信资源 %s', value => {
         expect(resolveCourseCaptionUrl(value, bili, 'bilibili')).toBe('');
     });
@@ -120,6 +135,29 @@ function sourceFixture(base = edx, bodies: unknown[] = [transcript]) {
 async function settled(source: CourseCaptionSource) { await vi.waitFor(() => expect(source.status).not.toBe('loading')); }
 
 describe('课程字幕请求生命周期', () => {
+    it('B 站目标语言变化会取消旧轨道加载，迟到的英文字幕不会覆盖新选中的中文', async () => {
+        const f = sourceFixture(bili);
+        let finishEnglish!: (response: Response) => void;
+        f.fetch.mockImplementation(async input => {
+            const url = String(input);
+            if (url.includes('api.bilibili.com')) return json({data: {cid: 456, subtitle: {subtitles: [
+                {...biliTrack('zh-Hans'), subtitle_url: '//aisubtitle.hdslb.com/zh.json'},
+                {...biliTrack('en-US'), subtitle_url: '//aisubtitle.hdslb.com/en.json'},
+            ]}}});
+            if (url.endsWith('/en.json')) return new Promise(resolve => {finishEnglish = resolve;});
+            return json({body: [{from: 0, to: 1, content: '当前选择的中文字幕。'}]});
+        });
+        f.source.sync(getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'zh-Hans'), 'same-media');
+        await vi.waitFor(() => expect(finishEnglish).toBeTypeOf('function'));
+        const oldSignal = f.fetch.mock.calls[1][1]!.signal!;
+        f.source.sync(getCourseCaptionRequest('bilibili', bili, video(), 'auto', 'en'), 'same-media');
+        expect(oldSignal.aborted).toBe(true); await settled(f.source);
+        finishEnglish(json(biliBody)); await new Promise(resolve => setTimeout(resolve, 0));
+        expect(f.source.status).toBe('ready'); expect(f.source.language).toBe('zh-Hans');
+        expect(f.source.cues).toEqual([{startMs: 0, durationMs: 1000, text: '当前选择的中文字幕。'}]);
+        expect(f.changed).toHaveBeenCalledOnce();
+    });
+
     it('同一身份只读取一次，关闭后清空；失败需明确重试', async () => {
         const f = sourceFixture(edx, [new Error('offline'), transcript]);
         f.source.sync(null, 'media'); expect(f.fetch).not.toHaveBeenCalled();

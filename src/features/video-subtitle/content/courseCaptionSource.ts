@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/courseCaptionSource.ts
  * 文件职责：读取 B 站、Udemy 和 edX 的完整原文时间轴，并隔离换课、语言变化及关闭后的迟到结果。
- * 主要内容：复用有界字幕传输，B 站重用当前 CID 的签名资源或固定播放器接口；Udemy 在当前企业域请求已订阅课程，edX 读取当前块语言；失败由用户明确重试。
+ * 主要内容：复用有界字幕传输，B 站重用当前 CID 的签名资源或固定播放器接口并按请求的原语言及目标语言选轨；Udemy 在当前企业域请求已订阅课程，edX 读取当前块语言；失败由用户明确重试。
  * 模块边界：只依赖注入的网页读取端口，不翻译、不保存账号数据或音视频；同一媒体身份只保留一份在途请求和成功时间轴。
  */
 import {captionRecord, chooseBilibiliCaption, chooseUdemyCaption, parseCourseCaptionJson, type CourseCaptionRequest} from './courseCaptionData';
@@ -69,7 +69,7 @@ export class CourseCaptionSource {
             const url = signed || `https://api.bilibili.com/x/player/v2?cid=${cid}&${id.startsWith('av') ? `aid=${id.slice(2)}` : `bvid=${id}`}`;
             const data = captionRecord((await json(url)).data);
             if (data.cid !== cid) throw new Error('字幕媒体身份不匹配');
-            const track = chooseBilibiliCaption(captionRecord(data.subtitle).subtitles, base);
+            const track = chooseBilibiliCaption(captionRecord(data.subtitle).subtitles, base, request.language, request.target);
             return track ? {language: track.language, cues: parseCourseCaptionJson('bilibili', JSON.parse(await text(track.url)))} : {language: '', cues: []};
         }
         if (request.platform === 'udemy') {

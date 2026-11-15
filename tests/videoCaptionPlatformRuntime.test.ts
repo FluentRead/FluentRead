@@ -407,6 +407,44 @@ function courseFixture(platform: 'bilibili' | 'udemy' | 'edx') {
 }
 
 describe('完整课程字幕公共挂载', () => {
+    it('B 站中文人工轨排在英文前时显示英中双语，模式切换复用原文而语言变化重新选轨', async () => {
+        const f = courseFixture('bilibili');
+        const chinese = '这是视频的中文字幕。';
+        f.fetch.mockImplementation(async input => {
+            const url = String(input);
+            return new Response(JSON.stringify(url.includes('hdslb.com')
+                ? {body: [{from: 0, to: 1, content: url.includes('/en.json') ? f.source : chinese}]}
+                : {data: {cid: 456, subtitle: {subtitles: [
+                    {lan: 'zh-Hans', subtitle_url: '//aisubtitle.hdslb.com/zh.json'},
+                    {lan: 'en-US', subtitle_url: '//aisubtitle.hdslb.com/en.json'},
+                ]}}}));
+        });
+        f.config.from = 'auto';
+        const dispose = f.start(); f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
+        const source = () => f.shadow()!.querySelector<HTMLElement>('.source')!;
+        const translated = () => f.shadow()!.querySelector<HTMLElement>('.translation')!;
+        expect(source().textContent).toBe(f.source); expect(source().hidden).toBe(false);
+        expect(translated().textContent).toBe('测试译文');
+        expect(f.translate).toHaveBeenCalledWith(f.source, expect.any(AbortSignal));
+        const count = f.fetch.mock.calls.length;
+        f.choose('translation-only'); await vi.advanceTimersByTimeAsync(100);
+        expect(source().hidden).toBe(true); expect(translated().textContent).toBe('测试译文');
+        f.choose('original-only'); await vi.advanceTimersByTimeAsync(100);
+        expect(source().hidden).toBe(false); expect(source().textContent).toBe(f.source); expect(translated().textContent).toBe('');
+        f.choose('bilingual'); await vi.advanceTimersByTimeAsync(100);
+        expect(source().hidden).toBe(false); expect(translated().textContent).toBe('测试译文');
+        expect(f.fetch).toHaveBeenCalledTimes(count); expect(f.translate).toHaveBeenCalledOnce();
+        f.config.to = 'en'; f.change(); await vi.advanceTimersByTimeAsync(350);
+        expect(source().textContent).toBe(chinese);
+        f.config.from = 'en'; f.change(); await vi.advanceTimersByTimeAsync(350);
+        expect(source().textContent).toBe(f.source);
+        f.choose('off'); expect(f.document.getElementById('fluent-read-platform-captions')?.hidden).toBe(true);
+        f.config.from = 'auto'; f.config.to = 'zh-Hans'; f.change();
+        f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
+        expect(source().textContent).toBe(f.source); expect(translated().textContent).toBe('测试译文');
+        dispose(); expect(f.document.getElementById('fluent-read-platform-captions')).toBeNull();
+    });
+
     it('B 站自动开关默认关闭且不请求，手动开启后严格遵循空档、校时和关闭后的入口', async () => {
         const f = courseFixture('bilibili'); const dispose = f.start();
         expect(f.fetch).not.toHaveBeenCalled(); expect(f.manifest).not.toHaveBeenCalled();

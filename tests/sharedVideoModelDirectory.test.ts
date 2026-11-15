@@ -92,6 +92,16 @@ describe('user-authorized shared Whisper directory', () => {
         expect(await (await cache.match(url))!.text()).toBe('valid model bytes');
         const cancel = await cache.match(url); await cancel!.body!.cancel('closed status view');
     });
+    it('keeps a valid completion record when a status read cancels while the file stream is pending', async () => {
+        const f = sharedDirectoryFixture(); f.setStored(f.handle);
+        const cache = (await createSharedVideoAiModelCache())!; await cache.put(url, data());
+        f.faults.pendingRead = true;
+        const response = (await cache.match(url))!;
+        await Promise.resolve(); await response.body!.cancel('status needs file metadata only');
+        await Promise.resolve(); expect(f.removed).toEqual([]);
+        f.faults.pendingRead = false;
+        expect(await (await cache.match(url))!.text()).toBe('valid model bytes');
+    });
     it.each(['tiny', 'base', 'small'] as const)('requires a complete %s precision set and keeps other models separate', async model => {
         const f = sharedDirectoryFixture(); f.setStored(f.handle);
         const cache = (await createSharedVideoAiModelCache())!;

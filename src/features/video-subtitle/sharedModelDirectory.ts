@@ -226,10 +226,12 @@ async function readMetadata(handle: FileSystemDirectoryHandle, identity: ModelFi
 function verifiedResponse(file: File, metadata: ModelFileMetadata, onIntegrityFailure: () => Promise<void>): Response {
   const reader = file.stream().getReader();
   const hash = sha256.create();
+  let cancelled = false;
   const body = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const chunk = await reader.read();
+        if (cancelled) return;
         if (chunk.done) {
           if (bytesToHex(hash.digest()) !== metadata.sha256) {
             await onIntegrityFailure();
@@ -246,6 +248,7 @@ function verifiedResponse(file: File, metadata: ModelFileMetadata, onIntegrityFa
       }
     },
     async cancel(reason) {
+      cancelled = true;
       await reader.cancel(reason);
     },
   });

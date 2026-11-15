@@ -410,8 +410,8 @@ export default defineConfig({
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            // 同环境 f0daab6d1：共享 Whisper 目录使 Chrome 68,503,659 → 68,545,011 bytes（+41,352），
-            // Firefox 68,124,625 → 68,165,758 bytes（+41,133）；模型和 WASM 摘要不变，各追加 42 kB。
+            // 同环境 f0daab6d1：共享 Whisper 目录使 Chrome 68,503,659 → 68,545,144 bytes（+41,485），
+            // Firefox 68,124,625 → 68,165,889 bytes（+41,264）；模型和 WASM 摘要不变，各追加 42 kB。
             const sharedWhisperBudget = 42_000;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget));
         },

@@ -9,7 +9,7 @@ export function sharedDirectoryFixture() {
     let operationError: Error | undefined;
     const faults: {
         idb?: {phase: string; error?: Error}; metadataWrite?: boolean; bodyWrite?: boolean;
-        read?: boolean; remove?: boolean; onRead?: (key: string) => void;
+        read?: boolean; pendingRead?: boolean; remove?: boolean; onRead?: (key: string) => void;
     } = {};
     const directory = (prefix = ''): any => ({
         kind: 'directory', name: prefix || 'shared',
@@ -26,6 +26,7 @@ export function sharedDirectoryFixture() {
                     faults.onRead?.(key);
                     const file = new File([new Uint8Array(files.get(key) || [])], name);
                     if (faults.read) Object.defineProperty(file, 'stream', {value: () => new ReadableStream({start: controller => controller.error(new Error('read disconnected'))})});
+                    if (faults.pendingRead) Object.defineProperty(file, 'stream', {value: () => new ReadableStream({pull: () => new Promise<void>(() => undefined)})});
                     return file;
                 },
                 createWritable: async () => {

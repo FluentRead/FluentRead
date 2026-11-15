@@ -99,9 +99,17 @@ export async function verifySafariBuild(directory) {
     assert(/^<!doctype html>\s*<html>\s*<head>\s*<meta charset="utf-8">\s*<\/head>\s*<body>\s*<script src="\.\/background\.js"><\/script>\s*<\/body>\s*<\/html>\s*$/u.test(page),
         'Safari 后台页必须仅加载包内 ./background.js，不能包含额外脚本或节点');
     const scripts = ['background.js'];
+    const domPage = utf8.decode(await readFile(await artifactPath(absolute, 'offscreen.html')));
+    const domScripts = [...domPage.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gu)];
+    assert(domScripts.length === 1 && /\btype="module"/u.test(domScripts[0][1]) && !domScripts[0][2].trim(),
+        'Safari DOM 页面必须仅加载一个包内模块脚本');
+    const domSource = /\bsrc="([^"]+)"/u.exec(domScripts[0][1]);
+    assert(domSource, 'Safari DOM 页面缺少模块脚本引用');
     const references = [
         manifest.background.page,
         ...scripts,
+        'offscreen.html',
+        domSource[1].replace(/^\//u, ''),
         manifest.browser_action.default_popup,
         ...(manifest.options_ui?.page === undefined ? [] : [manifest.options_ui.page]),
         ...manifest.content_scripts.flatMap(entry => [...(entry.js ?? []), ...(entry.css ?? [])]),
@@ -109,7 +117,6 @@ export async function verifySafariBuild(directory) {
     for (const file of references) await readFile(await artifactPath(absolute, file));
     const background = utf8.decode(await readFile(await artifactPath(absolute, scripts[0])));
     assert(background.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:safari:mv2__'), '后台缺少 Safari/MV2 能力标记，请勿复制 Chrome 或 Firefox 产物');
-    assert(!existsSync(path.join(absolute, 'offscreen.html')), 'Safari 产物不能包含 Chromium/Firefox 专用 Offscreen 页面');
     return {
         extension: absolute,
         version: manifest.version,

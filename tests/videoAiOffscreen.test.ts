@@ -7,6 +7,8 @@ vi.mock('@/src/shared/onnx/resources', async original => ({
 import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
 import * as modelCache from '@/src/features/video-subtitle/offscreen/modelCache';
 import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import {sharedDirectoryFixture} from './helpers/sharedVideoModelDirectory';
+import {moveVideoAiModelToSharedDirectory, getVideoAiModelFileUrl, VIDEO_AI_Q4_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
 
 class FakeWorker {
     static instances: FakeWorker[] = [];
@@ -25,6 +27,28 @@ class FakeWorker {
     reply(response: Record<string, unknown>): void { this.onmessage?.({data: response} as MessageEvent); }
     fail(message = 'worker failed'): void { this.onerror?.({message} as ErrorEvent); }
 }
+
+it.each(['tiny', 'base'] as const)('serializes shared migration with inference and releases the loaded %s worker only when needed', async loaded => {
+    const f = sharedDirectoryFixture(); f.setStored(f.handle); installWorker();
+    const moveLocalVideoTranscriptionModelToShared = (model: unknown) => moveVideoAiModelToSharedDirectory(model, undefined, removeLocalVideoTranscriptionModel);
+    const local = new Map(VIDEO_AI_Q4_MODEL_FILES.map(file => [getVideoAiModelFileUrl('tiny', file), 'local bytes']));
+    vi.stubGlobal('caches', {open: async () => ({
+        keys: async () => [...local.keys()].map(url => new Request(url)),
+        match: async (url: string) => local.has(url) ? new Response(local.get(url)) : undefined,
+        delete: async (request: Request) => local.delete(request.url),
+    })});
+    const pending = transcribeLocalVideoAudio({streamId: 'shared-migration', audioPcm16Base64: 'AAAAAA==', model: loaded});
+    await drain();
+    await expect(moveLocalVideoTranscriptionModelToShared('tiny')).rejects.toThrow('正在使用');
+    const worker = FakeWorker.instances.at(-1)!;
+    worker.reply({requestId: (worker as any).lastMessage.requestId, success: true, model: loaded, text: 'ready', segments: []});
+    await pending;
+    const migrating = moveLocalVideoTranscriptionModelToShared('tiny');
+    await migrating;
+    expect(local.size).toBe(0); expect(worker.terminated).toBe(loaded === 'tiny');
+    await expect(moveLocalVideoTranscriptionModelToShared('tiny')).rejects.toThrow('不完整');
+    await cancelLocalVideoTranscription('shared-migration');
+});
 
 beforeEach(() => {
     // 保留真实预算的排队和释放语义，用单槽位模拟其他本地推理占满共享预算。

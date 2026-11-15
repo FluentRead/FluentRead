@@ -406,19 +406,24 @@ export default defineConfig({
             // 利用现有余量后各增加1kB门槛；不新增模型、依赖或源像素预算。
             // 深色底紧裁空格复核实测：Chrome 从68,501,871增至68,503,598bytes，Firefox 从68,122,872增至68,124,597bytes。
             // 增量仅为既有OCR worker算法与共享限额常量；利用余量后各追加1kB，无新增模型、依赖或Canvas读回。
-            const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000;
-            // 对照 f0daab6d1：学习卡浮动/调高与文档导入布局使 Chrome 从68,503,659增至68,519,417bytes，
-            // Firefox 从68,124,625增至68,139,808bytes，分别增加15,758/15,183bytes；仅代码、样式和七语文案变化。
-            // WASM、模型和其他非代码资源逐文件摘要不变，仅为这组已实测的布局功能各增加16kB预算。
-            const learningCardAndDocumentLayoutBudget = 16_000;
+            // Safari DOM 页面与同源消息传输：Safari 同环境基线67,864,461→68,133,060bytes；Chrome 为68,506,284bytes。
+            // 使用既有余量后，Safari 仅需追加9kB，Chrome/Firefox 共用适配器追加3kB；没有新增模型或依赖。
+            const domRuntimeBudget = browser === 'safari' ? 9_000 : 3_000;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget;
+            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
+            // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
+            if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
+            // 同环境 f0daab6d1：共享 Whisper 目录使 Chrome 68,503,659 → 68,545,144 bytes（+41,485），
+            // Firefox 68,124,625 → 68,165,889 bytes（+41,264）；模型和 WASM 摘要不变，各追加 42 kB。
+            const sharedWhisperBudget = 42_000;
+            // 同环境 6d1496387：浮动学习卡、七语操作文案及导入布局使 Chrome +15,855、Firefox +15,288 bytes。
+            // 实测为 68,561,219/68,181,391 bytes；仅追加 16 kB 文本代码预算，模型与 WASM 不变。
+            const floatingLearningBudget = 16_000;
             // GitHub 原生 PR 列表页标题的精确保护规则在五份入口中共增加2,340bytes；
             // 相比9032adeac，Chrome为68,521,516、Firefox为68,141,936bytes，全部非代码文件摘要不变。
             // 利用已有余量后各补2kB，继续检查真实磁盘总量，不增加资源或依赖。
             const githubPullListHeadingBudget = 2_000;
-            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
-            // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
-            if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + learningCardAndDocumentLayoutBudget + githubPullListHeadingBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

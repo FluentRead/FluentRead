@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/offscreen/modelCache.ts
- * 文件职责：维护 Transformers.js Whisper 模型文件的远程地址、q4/q8 清单与 Cache Storage 下载。
- * 主要内容：只读缓存键核对已登记模型的完整七文件精度清单；按模型选择 Tiny/Base 的 q4/q8 或 Small 的 FP32 编码器加 q4 解码器，流式接收并在国内源、官方与镜像间有界回退，限制单文件大小、下载与断流等待，把完整文件清单合并成真实字节进度；下载失败展示统一重试提示，将来源诊断保留在错误原因中。
+ * 文件职责：维护 Transformers.js Whisper 模型文件地址、浏览器缓存与可选的共享目录缓存。
+ * 主要内容：按固定版本及完整精度清单核对本地和共享模型，优先从共享目录复用，允许把本地完整模型迁移过去；网络下载继续流式接收、有界回退并发布真实字节进度。
  * 模块边界：只处理模型文件缓存，不创建 Worker、不初始化 ONNX session，也不参与后台 owner 生命周期。
  */
 import {withModelDownload, type ModelSourcePreference} from '@/src/platform/http/modelDownloads';
@@ -14,42 +14,31 @@ import {
   VIDEO_LOCAL_TRANSCRIPTION_MODELS,
   type VideoLocalTranscriptionModel,
 } from '@/src/features/video-subtitle/transcription';
+import {
+  VIDEO_AI_MODEL_REVISION,
+  VIDEO_AI_Q4_MODEL_FILES,
+  VIDEO_AI_Q8_MODEL_FILES,
+  VIDEO_AI_SMALL_MODEL_FILES,
+  getVideoAiModelFileSets,
+  type VideoAiModelFile,
+} from '@/src/features/video-subtitle/modelFiles';
+import {
+  createSharedVideoAiModelCache,
+  readSharedVideoAiModels,
+  sharedModelFileUrl,
+  type VideoAiModelCache,
+  type SharedVideoAiModelCache,
+} from '@/src/features/video-subtitle/sharedModelDirectory';
+
+export {
+  VIDEO_AI_MODEL_REVISION,
+  VIDEO_AI_Q4_MODEL_FILES,
+  VIDEO_AI_Q8_MODEL_FILES,
+  VIDEO_AI_SMALL_MODEL_FILES,
+};
 
 export const VIDEO_AI_MODEL_REMOTE_HOST = 'https://modelscope.cn/models/';
-export const VIDEO_AI_MODEL_REVISION = 'master';
 export const VIDEO_AI_MODEL_REMOTE_PATH_TEMPLATE = '{model}/resolve/{revision}/';
-
-// Transformers.js 的 Tiny/Base Whisper q4 pipeline 实际读取这 7 个文件。固定清单既能
-// 避免设置页为了“下载”而初始化 ONNX session，也不会把整个仓库无关文件
-// 拉进浏览器。模型推理仍由 transcription.worker.ts 独立完成。
-export const VIDEO_AI_Q4_MODEL_FILES = [
-  'config.json',
-  'generation_config.json',
-  'preprocessor_config.json',
-  'tokenizer.json',
-  'tokenizer_config.json',
-  'onnx/encoder_model_q4.onnx',
-  'onnx/decoder_model_merged_q4.onnx',
-] as const;
-export const VIDEO_AI_Q8_MODEL_FILES = [
-  'config.json',
-  'generation_config.json',
-  'preprocessor_config.json',
-  'tokenizer.json',
-  'tokenizer_config.json',
-  'onnx/encoder_model_quantized.onnx',
-  'onnx/decoder_model_merged_quantized.onnx',
-] as const;
-/** Small 编码器保留 FP32；完整预下载与实际 Worker 必须使用同一份混合精度清单。 */
-export const VIDEO_AI_SMALL_MODEL_FILES = [
-  'config.json',
-  'generation_config.json',
-  'preprocessor_config.json',
-  'tokenizer.json',
-  'tokenizer_config.json',
-  'onnx/encoder_model.onnx',
-  'onnx/decoder_model_merged_q4.onnx',
-] as const;
 
 const TRANSFORMERS_CACHE_NAME = 'transformers-cache';
 const MODEL_FILE_DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -59,28 +48,65 @@ export function getVideoAiModelFileUrl(model: unknown, file: string): string {
   return `${VIDEO_AI_MODEL_REMOTE_HOST}${modelId}/resolve/${VIDEO_AI_MODEL_REVISION}/${file}`;
 }
 
+interface ResolvedVideoAiModelCache {
+  cache: VideoAiModelCache;
+  localCache: Cache;
+  sharedCache?: SharedVideoAiModelCache;
+}
+
+/** Transformers.js 使用共享目录优先、扩展 CacheStorage 兜底的同一缓存接口。 */
+export async function createVideoAiModelCache(): Promise<ResolvedVideoAiModelCache> {
+  if (typeof caches === 'undefined') throw new Error('当前浏览器不支持本地模型缓存');
+  const localCache = await caches.open(TRANSFORMERS_CACHE_NAME);
+  const sharedCache = await createSharedVideoAiModelCache();
+  if (!sharedCache) return {cache: localCache, localCache};
+  return {
+    localCache,
+    sharedCache,
+    cache: {
+      match: async request => await sharedCache.match(request) || await localCache.match(request),
+      put: (request, response) => sharedCache.put(request, response),
+      putWithProgress: (request, response, onProgress) => sharedCache.putWithProgress(request, response, onProgress),
+    },
+  };
+}
+
 /**
  * 下载登记只代表过去成功；可用状态还需同一精度清单的全部精确缓存键。
  * Tiny/Base 保留实际 Worker 支持的完整 q4 或 q8，Small 仅 FP32 encoder/q4 decoder。
  * 后台可直接读取同扩展 origin 的 Request 元数据，不读取模型响应体、
  * 不创建缺失缓存，也不删除登记或 q8 回退文件，避免与进行中的下载竞态。
  */
-export async function readCachedVideoAiModels(receipts: unknown): Promise<VideoLocalTranscriptionModel[]> {
+export async function readCachedVideoAiModelState(receipts: unknown): Promise<{
+  models: VideoLocalTranscriptionModel[];
+  localModels: VideoLocalTranscriptionModel[];
+  sharedModels: VideoLocalTranscriptionModel[];
+}> {
   const models = normalizeVideoLocalTranscriptionModels(receipts);
-  if (!models.length) return [];
-  if (typeof caches === 'undefined') throw new Error('当前浏览器不支持本地模型缓存');
+  if (typeof caches === 'undefined') {
+    if (models.length) throw new Error('当前浏览器不支持本地模型缓存');
+    return {models: [], localModels: [], sharedModels: []};
+  }
+  let localModels: VideoLocalTranscriptionModel[] = [];
+  let sharedModels: VideoLocalTranscriptionModel[] = [];
   try {
-    if (!await caches.has(TRANSFORMERS_CACHE_NAME)) return [];
-    const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
-    const urls = new Set((await cache.keys()).map(request => request.url));
-    return models.filter(model => {
-      const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
-      return complete(model === 'small' ? VIDEO_AI_SMALL_MODEL_FILES : VIDEO_AI_Q4_MODEL_FILES)
-        || model !== 'small' && complete(VIDEO_AI_Q8_MODEL_FILES);
-    });
+    if (models.length && await caches.has(TRANSFORMERS_CACHE_NAME)) {
+      const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+      const urls = new Set((await cache.keys()).map(request => request.url));
+      localModels = models.filter(model => {
+        const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
+        return getVideoAiModelFileSets(model).some(complete);
+      });
+    }
+    sharedModels = await readSharedVideoAiModels(await createSharedVideoAiModelCache());
   } catch (error) {
     throw new Error('无法读取模型缓存，请重试', {cause: error});
   }
+  return {models: [...new Set([...localModels, ...sharedModels])], localModels, sharedModels};
+}
+
+export async function readCachedVideoAiModels(receipts: unknown): Promise<VideoLocalTranscriptionModel[]> {
+  return (await readCachedVideoAiModelState(receipts)).models;
 }
 
 /**
@@ -95,8 +121,8 @@ export async function cacheVideoAiModelFiles(
 ): Promise<void> {
   const normalizedModel = normalizeVideoLocalTranscriptionModel(model);
   if (normalizedModel === 'small' && dtype === 'q8') throw new Error('Small 模型只支持 FP32 编码器与 q4 解码器');
-  if (typeof caches === 'undefined') throw new Error('当前浏览器不支持本地模型缓存');
-  const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+  const resolved = await createVideoAiModelCache();
+  const cache = resolved.cache;
 
   const files = normalizedModel === 'small' ? VIDEO_AI_SMALL_MODEL_FILES
     : dtype === 'q8' ? VIDEO_AI_Q8_MODEL_FILES : VIDEO_AI_Q4_MODEL_FILES;
@@ -113,13 +139,34 @@ export async function cacheVideoAiModelFiles(
     for (const file of files) {
       const url = getVideoAiModelFileUrl(model, file);
       const progress = tracker.file();
-      const cached = await cache.match(url);
-      if (cached) {
-        progress.cached(Number(cached.headers.get('Content-Length')));
-        continue;
+      if (resolved.sharedCache) {
+        const shared = await resolved.sharedCache.match(url);
+        if (shared) {
+          try {
+            await verifySharedModelResponse(shared);
+            progress.cached(Number(shared.headers.get('Content-Length')));
+            continue;
+          } catch {
+            // 损坏文件的校验记录已失效；优先用本机副本修复，否则重新下载。
+          }
+        }
+        const local = await resolved.localCache.match(url);
+        if (local) {
+          await resolved.sharedCache.putWithProgress(url, local, progress.advance);
+          progress.complete();
+          continue;
+        }
+      } else {
+        const cached = await cache.match(url);
+        if (cached) {
+          progress.cached(Number(cached.headers.get('Content-Length')));
+          continue;
+        }
       }
 
-      await withModelDownload(url, response => cache.put(url, response), {
+      await withModelDownload(url, response => resolved.sharedCache
+        ? resolved.sharedCache.putWithProgress(url, response, progress.advance)
+        : cache.put(url, response), {
         timeoutMs: normalizedModel === 'small' ? 300_000 : MODEL_FILE_DOWNLOAD_TIMEOUT_MS,
         maxBytes: (normalizedModel === 'small' && file === 'onnx/encoder_model.onnx' ? 384 : 256) * 1024 * 1024,
         signal: controller.signal,
@@ -131,10 +178,80 @@ export async function cacheVideoAiModelFiles(
     }
   } catch (error) {
     if (controller.signal.aborted) throw new Error('模型下载超过总等待时限', {cause: error});
+    if (error instanceof Error && error.name === 'QuotaExceededError') throw error;
+    if (error instanceof Error && error.message.includes('共享模型目录需要重新授权')) throw error;
     throw new Error('模型下载失败，请检查网络后重试', {cause: error});
   } finally {
     clearTimeout(totalTimeout);
   }
+}
+
+/** 将已有的完整浏览器缓存模型迁入共享目录，验证每个文件后再清除本地副本。 */
+export async function moveVideoAiModelToSharedDirectory(
+  model: unknown,
+  onProgress?: (progress: DownloadProgress) => void,
+  removeLocalModel: (model: unknown) => Promise<void> = removeVideoAiModelFiles,
+): Promise<void> {
+  if (!VIDEO_LOCAL_TRANSCRIPTION_MODELS.some(item => item.value === model)) throw new Error('无效的本地字幕模型');
+  const normalizedModel = normalizeVideoLocalTranscriptionModel(model);
+  if (typeof caches === 'undefined') throw new Error('当前浏览器不支持本地模型缓存');
+  const sharedCache = await createSharedVideoAiModelCache();
+  if (!sharedCache) throw new Error('请先在本地 AI 字幕设置中选择共享模型文件夹');
+  const localCache = await caches.open(TRANSFORMERS_CACHE_NAME);
+  const files = await findCompleteLocalModelFiles(localCache, normalizedModel);
+  if (!files) throw new Error('浏览器缓存中的模型文件不完整，请先重新下载');
+  const tracker = createDownloadProgressTracker(files.length, getVideoLocalTranscriptionDownloadBytes(normalizedModel), progress => onProgress?.(progress));
+  for (const file of files) {
+    const url = getVideoAiModelFileUrl(normalizedModel, file);
+    const progress = tracker.file();
+    const existing = await sharedCache.match(sharedModelFileUrl(normalizedModel, file));
+    if (existing) {
+      try {
+        await verifySharedModelResponse(existing);
+        progress.cached(Number(existing.headers.get('Content-Length')));
+        continue;
+      } catch {
+        // 目录里同长但损坏的文件不能代替浏览器中仍然可用的副本。
+      }
+    }
+    const cached = await localCache.match(url);
+    if (!cached) throw new Error('浏览器缓存中的模型文件不完整，请先重新下载');
+    await sharedCache.putWithProgress(url, cached, progress.advance);
+    progress.complete();
+  }
+  const sharedModels = await readSharedVideoAiModels(sharedCache);
+  if (!sharedModels.includes(normalizedModel)) throw new Error('共享模型文件校验失败，请重试迁移');
+  for (const file of files) {
+    const response = await sharedCache.match(sharedModelFileUrl(normalizedModel, file));
+    if (!response) throw new Error('共享模型文件校验失败，请重试迁移');
+    await verifySharedModelResponse(response);
+  }
+  // 应用层传入既有 Worker 生命周期删除入口；活跃识别或下载会拒绝清理并保留本机副本。
+  await removeLocalModel(normalizedModel);
+}
+
+/** 消费受校验的流但不聚合权重，只有 SHA-256 结算成功后才允许删掉本机副本。 */
+async function verifySharedModelResponse(response: Response): Promise<void> {
+  if (!response.body) throw new Error('共享模型文件校验失败，请重试迁移');
+  const reader = response.body.getReader();
+  try {
+    while (!(await reader.read()).done) { /* 流式 SHA-256 在共享缓存 Response 中结算。 */ }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function findCompleteLocalModelFiles(cache: Cache, model: VideoLocalTranscriptionModel): Promise<readonly VideoAiModelFile[] | undefined> {
+  for (const files of getVideoAiModelFileSets(model)) {
+    const complete = await Promise.all(files.map(async file => {
+      const response = await cache.match(getVideoAiModelFileUrl(model, file));
+      if (!response) return false;
+      await response.body?.cancel();
+      return true;
+    }));
+    if (complete.every(Boolean)) return files;
+  }
+  return undefined;
 }
 
 export function cacheVideoAiQ4ModelFiles(model: unknown, onProgress?: (progress: DownloadProgress) => void, options?: {preference?: ModelSourcePreference}): Promise<void> {

@@ -27,6 +27,7 @@ export interface OffscreenRequestMap {
     VIDEO_AI_PREPARE: VideoPrepareInput;
     VIDEO_AI_CANCEL: {streamId: string; reason?: VideoTranscriptionCancelReason};
     VIDEO_AI_REMOVE_MODEL: {model?: VideoTranscriptionModel};
+    VIDEO_AI_SHARE_MODEL: {model?: VideoTranscriptionModel};
     LOCAL_TRANSLATION_TRANSLATE: LocalTranslationInput & {requestId: string};
     LOCAL_TRANSLATION_PREPARE: {model: LocalTranslationModelId; keepWarm?: boolean};
     LOCAL_TRANSLATION_STATUS: object;
@@ -46,6 +47,7 @@ export interface OffscreenResponseMap {
     VIDEO_AI_PREPARE: InferenceResponse<VideoPreparationResult>;
     VIDEO_AI_CANCEL: InferenceResponse;
     VIDEO_AI_REMOVE_MODEL: InferenceResponse;
+    VIDEO_AI_SHARE_MODEL: InferenceResponse;
     LOCAL_TRANSLATION_TRANSLATE: InferenceResponse<{result: string; requestId?: string}>;
     LOCAL_TRANSLATION_PREPARE: InferenceResponse<LocalTranslationDownloadSnapshot>;
     LOCAL_TRANSLATION_STATUS: InferenceResponse<LocalTranslationStatus>;
@@ -80,7 +82,7 @@ export const isLocalTranslationStatus = shape<LocalTranslationStatus>({models: a
 const responses: {[K in OffscreenRequestType]: Validator<OffscreenResponseMap[K]>} = {
     READING_ANNOTATION: isReadingAnnotationResponse,
     READING_ANNOTATION_CANCEL: response(shape<{cancelled: boolean}>({cancelled: isBoolean})),
-    VIDEO_AI_TRANSCRIBE: response(isVideoTranscriptionResult), VIDEO_AI_PREPARE: response(isVideoPreparationResult), VIDEO_AI_CANCEL: response(noFields), VIDEO_AI_REMOVE_MODEL: response(noFields),
+    VIDEO_AI_TRANSCRIBE: response(isVideoTranscriptionResult), VIDEO_AI_PREPARE: response(isVideoPreparationResult), VIDEO_AI_CANCEL: response(noFields), VIDEO_AI_REMOVE_MODEL: response(noFields), VIDEO_AI_SHARE_MODEL: response(noFields),
     LOCAL_TRANSLATION_TRANSLATE: response(shape<{result: string; requestId?: string}>({result: isString, requestId: optional(requestId)})),
     LOCAL_TRANSLATION_PREPARE: response(isLocalTranslationSnapshot), LOCAL_TRANSLATION_STATUS: response(isLocalTranslationStatus), LOCAL_TRANSLATION_PAUSE: response(isLocalTranslationSnapshot), LOCAL_TRANSLATION_REMOVE_MODEL: response(noFields),
     CANCEL_LOCAL_TRANSLATION_OFFSCREEN: response(shape<{cancelled?: boolean; requestId?: string}>({cancelled: optional(isBoolean), requestId: optional(requestId)})),
@@ -95,6 +97,7 @@ const requests: {[K in OffscreenRequestType]: Validator<OffscreenRequestMap[K]>}
     VIDEO_AI_PREPARE: shape<VideoPrepareInput>({model: optional(videoModel), streamId: optional(isString), keepWarm: optional(isBoolean), preference: optional(oneOf('official', 'mirror', 'auto'))}),
     VIDEO_AI_CANCEL: shape<OffscreenRequestMap['VIDEO_AI_CANCEL']>({streamId: isNonEmptyString, reason: optional(oneOf('cancel', 'complete'))}),
     VIDEO_AI_REMOVE_MODEL: shape<OffscreenRequestMap['VIDEO_AI_REMOVE_MODEL']>({model: optional(videoModel)}),
+    VIDEO_AI_SHARE_MODEL: shape<OffscreenRequestMap['VIDEO_AI_SHARE_MODEL']>({model: optional(videoModel)}),
     LOCAL_TRANSLATION_TRANSLATE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_TRANSLATE']>({requestId, model: isLocalTranslationModel, text: isNonEmptyString, sourceLanguage: isNonEmptyString, targetLanguage: isNonEmptyString, sourceLanguageDetectionText: optional(isString)}),
     LOCAL_TRANSLATION_PREPARE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PREPARE']>({model: isLocalTranslationModel, keepWarm: optional(isBoolean)}),
     LOCAL_TRANSLATION_STATUS: noFields, LOCAL_TRANSLATION_PAUSE: shape<OffscreenRequestMap['LOCAL_TRANSLATION_PAUSE']>({model: isLocalTranslationModel}), LOCAL_TRANSLATION_REMOVE_MODEL: shape<OffscreenRequestMap['LOCAL_TRANSLATION_REMOVE_MODEL']>({model: isLocalTranslationModel}),

@@ -40,7 +40,7 @@ The native extension targets Safari/iOS 26+ and runs independently of Userscript
 
 Grant **website access** and **translation-service access** separately. Free translation tries authorized services only: allowing one service starts translation, while declining does not prompt for another automatically. Add services individually in full settings without first granting all websites.
 
-Chrome’s built-in translation, image OCR, and area capture are unavailable, along with some local processing, speech playback, and Chrome-only Google Drive sign-in. Each online service still needs runtime verification.
+The developer preview enables image OCR, image translation, area capture translation, and extension speech playback. These features still need verification on Safari 26+ devices. Chrome’s built-in translation and Chrome-only Google Drive sign-in are unavailable. Each online service still needs runtime verification.
 
 <details class="guide-details">
 <summary>Build and install the source preview</summary>

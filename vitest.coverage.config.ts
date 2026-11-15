@@ -908,6 +908,7 @@ export default defineConfig({
                 'src/platform/offscreen/client.ts',
                 'src/platform/offscreen/firefoxDocument.ts',
                 'src/platform/offscreen/extensionClient.ts',
+                'src/platform/offscreen/extensionPageMessaging.ts',
                 'src/platform/storage/credentialContext.ts',
                 'src/platform/storage/configEncryption.ts',
                 'src/platform/storage/configRepository.ts',

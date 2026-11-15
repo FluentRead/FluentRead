@@ -210,6 +210,7 @@
       "tests/offscreenAdapters.test.ts",
       "tests/offscreenClient.test.ts",
       "tests/firefoxDocumentRuntime.test.ts",
+      "tests/extensionPageMessaging.test.ts",
       "tests/offscreenTtsPlayback.test.ts",
       "tests/pageContext.test.ts",
       "tests/pageContextPolicy.test.ts",

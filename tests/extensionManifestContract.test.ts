@@ -296,6 +296,11 @@ describe('Safari unsigned delivery contract', () => {
     }
 
     const backgroundPage = () => createSafariBackgroundPage({browser: 'safari', manifestVersion: 2})[0];
+    const domPage = '<!doctype html><html><body><script type="module" src="/dom-runtime.js"></script></body></html>';
+    function writeDomRuntime(directory: string) {
+        writeFileSync(resolve(directory, 'offscreen.html'), domPage);
+        writeFileSync(resolve(directory, 'dom-runtime.js'), 'sharedDomRuntime();');
+    }
 
     type SafariTargetIdentity = {
         id: string;
@@ -682,7 +687,7 @@ describe('Safari unsigned delivery contract', () => {
         } finally {rmSync(directory, {recursive: true, force: true});}
     });
 
-    it('检查最终文件，拒绝错放的浏览器后台、缺失引用和 Offscreen 容器', async () => {
+    it('检查最终文件，要求 Safari 后台 DOM 页面及其包内模块，拒绝错放的浏览器后台和缺失引用', async () => {
         const {verifySafariBuild} = await safariTools();
         const directory = mkdtempSync(resolve(tmpdir(), 'fluentread-safari-contract-'));
         try {
@@ -691,8 +696,9 @@ describe('Safari unsigned delivery contract', () => {
             writeFileSync(resolve(directory, 'background.js'), '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:safari:mv2__');
             writeFileSync(resolve(directory, 'popup.html'), '<html></html>');
             writeFileSync(resolve(directory, 'content.js'), 'sharedContent();');
+            writeDomRuntime(directory);
             const verified = await verifySafariBuild(directory);
-            expect(verified).toEqual(expect.objectContaining({extension: directory, version: '0.0.38', checkedReferences: 4, artifactCount: 5}));
+            expect(verified).toEqual(expect.objectContaining({extension: directory, version: '0.0.38', checkedReferences: 6, artifactCount: 7}));
             writeFileSync(resolve(directory, 'content.js'), 'changedSharedContent();');
             const changed = await verifySafariBuild(directory);
             expect(changed.manifestSha256).toBe(verified.manifestSha256);
@@ -700,9 +706,26 @@ describe('Safari unsigned delivery contract', () => {
             writeFileSync(resolve(directory, 'background.js'), '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:chrome:mv3__');
             await expect(verifySafariBuild(directory)).rejects.toThrow('能力标记');
             writeFileSync(resolve(directory, 'background.js'), '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:safari:mv2__');
-            writeFileSync(resolve(directory, 'offscreen.html'), '<html></html>');
-            await expect(verifySafariBuild(directory)).rejects.toThrow('Offscreen');
             rmSync(resolve(directory, 'offscreen.html'));
+            await expect(verifySafariBuild(directory)).rejects.toThrow('ENOENT');
+            writeDomRuntime(directory);
+            rmSync(resolve(directory, 'dom-runtime.js'));
+            await expect(verifySafariBuild(directory)).rejects.toThrow('ENOENT');
+            writeDomRuntime(directory);
+            for (const invalid of [
+                domPage.replace('type="module"', ''),
+                domPage.replace('</script>', 'inlineRuntime();</script>'),
+                domPage.replace('</body>', '<script type="module" src="/dom-runtime.js"></script></body>'),
+                domPage.replace('src="/dom-runtime.js"', ''),
+            ]) {
+                writeFileSync(resolve(directory, 'offscreen.html'), invalid);
+                await expect(verifySafariBuild(directory)).rejects.toThrow('DOM 页面');
+            }
+            for (const source of ['https://example.invalid/dom-runtime.js', '../dom-runtime.js', '//example.invalid/dom-runtime.js']) {
+                writeFileSync(resolve(directory, 'offscreen.html'), domPage.replace('/dom-runtime.js', source));
+                await expect(verifySafariBuild(directory)).rejects.toThrow('包内相对路径');
+            }
+            writeDomRuntime(directory);
             rmSync(resolve(directory, 'content.js'));
             await expect(verifySafariBuild(directory)).rejects.toThrow('ENOENT');
         } finally {rmSync(directory, {recursive: true, force: true});}
@@ -718,6 +741,7 @@ describe('Safari unsigned delivery contract', () => {
             writeFileSync(resolve(directory, 'background.js'), '__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:safari:mv2__');
             writeFileSync(resolve(directory, 'popup.html'), '<html></html>');
             writeFileSync(resolve(directory, 'content.js'), 'sharedContent();');
+            writeDomRuntime(directory);
         };
         try {
             reset();
@@ -1276,6 +1300,8 @@ describe('extension manifest capability contract', () => {
             ['chrome', 2, 0],
             ['firefox', 2, 0],
             ['firefox', 3, 0],
+            ['safari', 2, 0],
+            ['safari', 3, 0],
             ['opera', 3, 0],
         ] as const) {
             const permissions = permissionsFor(browser, manifestVersion);
@@ -1293,7 +1319,7 @@ describe('extension manifest capability contract', () => {
     it('keeps the Offscreen page entrypoint target-limited and delegates to the app composition root', () => {
         const html = readFileSync(resolve(PROJECT_ROOT, 'entrypoints/offscreen/index.html'), 'utf8');
         const main = sourceBody('entrypoints/offscreen/main.ts');
-        expect(html).toContain('<meta name="wxt.include" content="[\'chrome\', \'edge\', \'firefox\']">');
+        expect(html).toContain('<meta name="wxt.include" content="[\'chrome\', \'edge\', \'firefox\', \'safari\']">');
         expect(html).toContain('<script type="module" src="./main.ts"></script>');
         expect(html).not.toContain('opera');
         expect(main).toBe(

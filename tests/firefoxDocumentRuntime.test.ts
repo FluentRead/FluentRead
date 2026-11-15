@@ -4,13 +4,13 @@ import {LOCAL_TRANSLATION_MODEL_IDS} from '@/src/core/config/localTranslation';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createFirefoxBackgroundDocument} from '@/src/platform/offscreen/firefoxDocument';
 import {createExtensionDomClient} from '@/src/platform/offscreen/extensionClient';
+import {createExtensionPageRuntime, installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
 import {chromeOffscreenClient, type OffscreenRuntimeApi} from '@/src/platform/offscreen/client';
 import {createOffscreenMessageListener, type OffscreenMessageDependencies} from '@/src/app/offscreen/messageRouter';
 import {createImageTranslationOffscreenAdapter} from '@/src/features/image-translation/background/offscreenAdapter';
 import {createAreaTranslationOffscreenAdapter} from '@/src/features/area-translation/background/offscreenAdapter';
 import {createSelectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
 
-const firefox = {browser: 'firefox', manifestVersion: 2 as const};
 const getURL = (path: string) => `moz-extension://test/${path.replace(/^\//u, '')}`;
 const documentOptions = {url: 'offscreen.html', reasons: [], justification: 'test'};
 
@@ -18,7 +18,7 @@ function makeDocument(): Document {
     return parseHTML('<html><body></body></html>').document as unknown as Document;
 }
 
-function createSubject(overrides: Partial<OffscreenMessageDependencies> = {}) {
+function createSubject(overrides: Partial<OffscreenMessageDependencies> = {}, browser = 'firefox') {
     const document = makeDocument();
     const dependencies: OffscreenMessageDependencies = {
         translate: vi.fn(async () => 'translated'),
@@ -35,25 +35,36 @@ function createSubject(overrides: Partial<OffscreenMessageDependencies> = {}) {
         ...overrides,
     };
     const listener = createOffscreenMessageListener(dependencies);
-    let lastError: {message: string} | undefined;
     let failNextBusinessMessage = false;
-    const runtime: OffscreenRuntimeApi & {getURL: typeof getURL} = {
-        getURL,
-        get lastError() { return lastError; },
-        sendMessage: vi.fn((message, callback) => {
-            const type = (message as {type: string}).type;
-            if (failNextBusinessMessage && type === 'FLUENT_READ_IMAGE_FETCH_OFFSCREEN') {
-                failNextBusinessMessage = false;
-                lastError = {message: 'Could not establish connection. Receiving end does not exist.'};
-                callback(undefined);
-                lastError = undefined;
-                return;
+    const deliver = (message: unknown, callback: (response: unknown) => void) => {
+        const type = (message as {type: string}).type;
+        if (failNextBusinessMessage && type === 'FLUENT_READ_IMAGE_FETCH_OFFSCREEN') {
+            failNextBusinessMessage = false;
+            throw new Error('Could not establish connection. Receiving end does not exist.');
+        }
+        expect(document.querySelectorAll('iframe')).toHaveLength(1);
+        expect(listener(message, {}, callback)).toBe(true);
+    };
+    if (browser === 'safari') {
+        const createElement = document.createElement.bind(document);
+        document.createElement = ((tag: string) => {
+            const element = createElement(tag);
+            if (tag === 'iframe') {
+                const target: ExtensionPageMessageTarget = {};
+                installExtensionPageMessageListener(target, (message, _sender, reply) => {deliver(message, reply); return true;});
+                Object.defineProperty(element, 'contentWindow', {value: target});
             }
-            expect(document.querySelectorAll('iframe')).toHaveLength(1);
-            expect(listener(message, {}, callback)).toBe(true);
+            return element;
+        }) as typeof document.createElement;
+    }
+    const runtime: OffscreenRuntimeApi & {getURL: typeof getURL} = {
+        getURL: path => `${browser === 'safari' ? 'safari-web-extension' : 'moz-extension'}://test/${path.replace(/^\//u, '')}`,
+        sendMessage: vi.fn((message, callback) => {
+            if (browser === 'safari') throw new Error('Safari 原生消息不会投递给同页 iframe');
+            deliver(message, callback);
         }),
     };
-    const client = createExtensionDomClient(firefox, () => runtime, () => document);
+    const client = createExtensionDomClient({browser, manifestVersion: 2}, () => runtime, () => document);
     return {document, runtime, client, dependencies, loseReceiver: () => { failNextBusinessMessage = true; }};
 }
 
@@ -66,7 +77,7 @@ afterEach(() => {
     vi.resetModules();
 });
 
-describe('Firefox shared DOM runtime', () => {
+describe('Firefox and Safari shared DOM runtime', () => {
     it('releases ordinary OCR and cached Chrome models when the shared runtime page exits', async () => {
         const disposeOcr = vi.fn(), disposeChrome = vi.fn();
         vi.doMock('@/src/app/offscreen/imageTranslation', async importOriginal => ({
@@ -97,10 +108,12 @@ describe('Firefox shared DOM runtime', () => {
         const unrelated = document.createElement('div');
         document.body.append(unrelated);
         const host = createFirefoxBackgroundDocument(() => document, getURL);
+        expect(host.getMessageTarget()).toBeUndefined();
         await expect(host.getContexts()).resolves.toEqual([]);
         await host.closeDocument!();
         await host.createDocument(documentOptions);
         const frame = document.querySelector('iframe')!;
+        expect(host.getMessageTarget()).toBe(frame.contentWindow);
         expect(frame.hidden).toBe(true);
         expect(frame.src).toBe(getURL('offscreen.html'));
         await host.createDocument(documentOptions);
@@ -116,31 +129,32 @@ describe('Firefox shared DOM runtime', () => {
         await expect(host.getContexts()).resolves.toEqual([]);
     });
 
-    it('reports unavailable Firefox background DOM before starting any business request', async () => {
+    it('reports unavailable background DOM before starting any business request', async () => {
         const host = createFirefoxBackgroundDocument(() => undefined, getURL);
-        await expect(host.createDocument(documentOptions)).rejects.toThrow('Firefox 后台页面尚未就绪');
+        await expect(host.createDocument(documentOptions)).rejects.toThrow('扩展后台页面尚未就绪');
         const empty = createFirefoxBackgroundDocument(() => ({body: null}) as unknown as Document, getURL);
-        await expect(empty.createDocument(documentOptions)).rejects.toThrow('Firefox 后台页面尚未就绪');
+        await expect(empty.createDocument(documentOptions)).rejects.toThrow('扩展后台页面尚未就绪');
     });
 
-    it('reuses the native client outside Firefox MV2 without reading document or runtime globals', () => {
+    it('reuses the native client outside Firefox/Safari MV2 without reading document or runtime globals', () => {
         const getRuntime = vi.fn();
         const getDocument = vi.fn();
-        for (const target of [{browser: 'chrome', manifestVersion: 3 as const}, {browser: 'firefox', manifestVersion: 3 as const}]) {
+        for (const target of [{browser: 'chrome', manifestVersion: 3 as const}, {browser: 'firefox', manifestVersion: 3 as const}, {browser: 'safari', manifestVersion: 3 as const}]) {
             expect(createExtensionDomClient(target, getRuntime, getDocument)).toBe(chromeOffscreenClient);
         }
         expect(getRuntime).not.toHaveBeenCalled();
         expect(getDocument).not.toHaveBeenCalled();
     });
 
-    it('uses the existing image, area, TTS and video protocols through one shared receiver and frame', async () => {
-        const {client, document, dependencies} = createSubject();
+    it.each(['firefox', 'safari'])('%s uses the existing image, area, TTS and video protocols through one shared receiver and frame', async browser => {
+        const {client, document, dependencies} = createSubject({}, browser);
         const image = createImageTranslationOffscreenAdapter(client);
         const area = createAreaTranslationOffscreenAdapter(client);
         const tts = createSelectionTtsOffscreenAdapter(client);
         await expect(client.sendIfPresent({type: 'STOP_SELECTION_TTS'})).resolves.toBeUndefined();
         expect(document.querySelector('iframe')).toBeNull();
         await Promise.all([client.ensureDocument(), client.ensureDocument()]);
+        expect(document.querySelector('iframe')!.src).toBe(`${browser === 'safari' ? 'safari-web-extension' : 'moz-extension'}://test/offscreen.html`);
         await expect(image.fetchImage('https://example.test/a.png')).resolves.toBe('data:image/png;base64,AA==');
         await expect(image.translateImage('data:image/png;base64,AA==', 'en', 'image')).resolves.toMatchObject({lines: []});
         const selection = {left: 0, top: 0, width: 20, height: 20, viewportWidth: 100, viewportHeight: 100};
@@ -159,8 +173,8 @@ describe('Firefox shared DOM runtime', () => {
         await expect(client.hasDocument()).resolves.toBe(true);
     });
 
-    it('uses the shared receiver-loss recovery to replace only its own iframe', async () => {
-        const {client, document, loseReceiver} = createSubject();
+    it.each(['firefox', 'safari'])('%s uses the shared receiver-loss recovery to replace only its own iframe', async browser => {
+        const {client, document, loseReceiver} = createSubject({}, browser);
         await client.ensureDocument();
         const firstFrame = document.querySelector('iframe');
         loseReceiver();
@@ -171,10 +185,10 @@ describe('Firefox shared DOM runtime', () => {
         expect(document.querySelector('iframe')).not.toBe(firstFrame);
     });
 
-    it('delivers caller cancellation to the existing image router and rejects late work', async () => {
+    it.each(['firefox', 'safari'])('%s delivers caller cancellation to the existing image router and rejects late work', async browser => {
         let resolveImage!: (value: string) => void;
         const fetchImage = vi.fn((_url: string, _signal: AbortSignal) => new Promise<string>(resolve => { resolveImage = resolve; }));
-        const {client, document} = createSubject({fetchImage});
+        const {client, document} = createSubject({fetchImage}, browser);
         const controller = new AbortController();
         const pending = createImageTranslationOffscreenAdapter(client).fetchImage('https://pbs.twimg.com/media/image.png', {
             requestId: 'image-cancel', signal: controller.signal, timeoutMs: 5_000,
@@ -189,9 +203,9 @@ describe('Firefox shared DOM runtime', () => {
         expect(document.querySelectorAll('iframe')).toHaveLength(1);
     });
 
-    it('binds the production Firefox selector lazily to its background document and native messaging', async () => {
-        vi.doMock('@/src/platform/browser/capabilities', () => ({browserCapabilities: firefox}));
-        const subject = createSubject();
+    it.each(['firefox', 'safari'])('binds the production %s selector lazily to its background document and native messaging', async browser => {
+        vi.doMock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {browser, manifestVersion: 2}}));
+        const subject = createSubject({}, browser);
         vi.stubGlobal('document', subject.document);
         vi.stubGlobal('chrome', {runtime: subject.runtime});
         const {extensionDomClient} = await import('@/src/platform/offscreen/extensionClient');
@@ -264,7 +278,8 @@ describe('Firefox shared DOM runtime', () => {
 
 
 describe('shared offscreen composition through actual message routing', () => {
-    it('routes model preparation, inference, progress, cancellation and teardown through the composed public ports', async () => {
+    it.each(['firefox', 'safari'])('%s routes model preparation, inference, progress, cancellation and teardown through the composed public ports', async browser => {
+        vi.doMock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {browser, manifestVersion: 2}}));
         const translation = {configureLocalTranslationDownloadNotifications: vi.fn(), disposeLocalTranslationWorker: vi.fn(),
             prepareLocalTranslationModel: vi.fn(async () => translationSnapshot()), pauseLocalTranslationModelDownload: vi.fn(async () => translationSnapshot('paused')),
             getLocalTranslationModelStatus: vi.fn(async () => ({...translationSnapshot('ready'), models: []})), removeLocalTranslationModel: vi.fn(async () => {}), translateLocalText: vi.fn(async () => '本地译文')};
@@ -296,11 +311,26 @@ describe('shared offscreen composition through actual message routing', () => {
         vi.stubGlobal('Worker', WorkerPort); const windowPort = new EventTarget(); vi.stubGlobal('window', windowPort); vi.stubGlobal('self', windowPort);
         let listener!: ReturnType<typeof createOffscreenMessageListener>; const sent: any[] = [];
         const readLastError = vi.fn(() => undefined), runtimeId = 'composed-offscreen';
+        const parentTarget: ExtensionPageMessageTarget = {};
+        const offscreenUrl = 'safari-web-extension://fixture/offscreen.html';
+        Object.assign(windowPort, {parent: parentTarget, location: {href: offscreenUrl}});
+        installExtensionPageMessageListener(parentTarget, (message, sender, reply) => {
+            expect(sender).toEqual({id: runtimeId, url: offscreenUrl});
+            sent.push(message); reply(undefined);
+        });
         vi.stubGlobal('chrome', {runtime: {id: runtimeId, getURL: (path: string) => `chrome-extension://fixture/${path}`,
             onMessage: {addListener: (value: typeof listener) => {listener = value;}},
-            sendMessage: (value: any, callback: () => void) => {sent.push(value); callback();}, get lastError() {return readLastError();}}});
+            sendMessage: (value: any, callback: () => void) => {
+                if (browser === 'safari') throw new Error('Safari 原生消息不会投递给同页 iframe');
+                sent.push(value); callback();
+            }, get lastError() {return readLastError();}}});
         (await import('@/src/app/offscreen/runtime')).startOffscreenApp();
-        const send = (type: string, data: Record<string, unknown> = {}) => new Promise<any>(resolve => {expect(listener({target: 'offscreen', type, ...data}, {id: runtimeId}, resolve)).toBe(true);});
+        const pageRuntime = createExtensionPageRuntime(() => ({id: runtimeId}), () => windowPort as unknown as ExtensionPageMessageTarget, () => 'safari-web-extension://fixture/safari-background.html');
+        const send = (type: string, data: Record<string, unknown> = {}) => new Promise<any>(resolve => {
+            const message = {target: 'offscreen', type, ...data};
+            if (browser === 'safari') pageRuntime.sendMessage(message, resolve);
+            else expect(listener(message, {id: runtimeId}, resolve)).toBe(true);
+        });
         try {
             expect(await send('READING_ANNOTATION', {requestId: 'reading', text: '日本語', language: 'ja'})).toMatchObject({success: true, result: {text: 'nihongo'}});
             expect(workers[0].url).toBe('chrome-extension://fixture/readingAnnotationWorker.js'); expect(workers[0].options).toEqual({type: 'module'});
@@ -330,7 +360,8 @@ describe('shared offscreen composition through actual message routing', () => {
             for (const modelId of ['qwen2.5-0.5b']) expect(await send('INFORMATION_HIGHLIGHT_PREPARE_OFFSCREEN', {modelId})).toMatchObject({success: true});
             expect(workers.filter(worker => worker.url.endsWith('informationHighlightWorker.js'))).toHaveLength(1);
             expect(informationPorts.probe).toBeTypeOf('function'); expect(informationPorts.budget).toBeTypeOf('function');
-            expect(sent.some(message => message.type === 'fluentReadDownloadProgress')).toBe(true); expect(readLastError).toHaveBeenCalled();
+            expect(sent.some(message => message.type === 'fluentReadDownloadProgress')).toBe(true);
+            if (browser === 'firefox') expect(readLastError).toHaveBeenCalled();
             const route = {tabId: 7, clientRequestId: 'speech-playback', frameId: 2, ownerUrl: 'https://fixture.invalid/reader'};
             const revision = await send('READ_SELECTION_TTS_REVISION');
             const reservation = await send('RESERVE_SELECTION_TTS', {...route, expectedRevision: revision.revision});
@@ -340,6 +371,7 @@ describe('shared offscreen composition through actual message routing', () => {
         } finally {windowPort.dispatchEvent(new Event('pagehide'));}
         expect(workers[0].terminate).toHaveBeenCalledOnce(); expect(disposeInformation).toHaveBeenCalledOnce(); expect(disposeChrome).toHaveBeenCalledWith(windowPort);
         expect(disposeOcr).toHaveBeenCalledOnce(); expect(translation.disposeLocalTranslationWorker).toHaveBeenCalledOnce(); expect(speech.disposeLocalTtsWorker).toHaveBeenCalledOnce();
+        if (browser === 'safari') expect((windowPort as unknown as ExtensionPageMessageTarget).__fluentReadExtensionPageMessage).toBeUndefined();
     });
 });
 

@@ -63,6 +63,27 @@ function createSubject(overrides: Partial<SelectionTtsBackgroundDependencies> = 
 }
 
 describe('selection TTS background handlers', () => {
+    it.each(['resolve', 'reject'] as const)('late Google PLAY %s remains cancelled even when both remote STOP acknowledgements fail', async outcome => {
+        const play = deferred<void>();
+        const {dependencies, router} = createSubject({playWithOffscreen: vi.fn(() => play.promise),
+            stopWithOffscreen: vi.fn().mockRejectedValue(new Error('Offscreen disconnected'))});
+        const sender = {sender: {tab: {id: 11}}};
+        const request = router.dispatch({type: SELECTION_TTS_GOOGLE_MESSAGE_TYPE, text: 'hello', clientRequestId: 'stop-failure'}, sender);
+        await vi.waitFor(() => expect(dependencies.playWithOffscreen).toHaveBeenCalledOnce());
+        await expect(router.dispatch({type: SELECTION_TTS_STOP_MESSAGE_TYPE, clientRequestId: 'stop-failure'}, sender))
+            .resolves.toEqual({handled: true, response: {success: true}});
+        if (outcome === 'resolve') play.resolve(); else play.reject(new Error('Late PLAY failure'));
+        await expect(request).resolves.toEqual({handled: true, response: {success: false, error: '语音播放已取消'}});
+        expect(dependencies.stopWithOffscreen).toHaveBeenCalledTimes(2);
+        expect(dependencies.stopWithOffscreen).toHaveBeenLastCalledWith(expect.objectContaining({tabId: 11, clientRequestId: 'stop-failure'}));
+    });
+
+    it('terminal playback receipt remains acknowledged when its original tab has already closed', async () => {
+        const {dependencies, router} = createSubject({sendTabMessage: vi.fn().mockRejectedValue(new Error('Tab no longer exists'))});
+        await expect(router.dispatch({type: SELECTION_TTS_PLAYBACK_STATE_MESSAGE_TYPE, tabId: 7,
+            clientRequestId: 'closed-tab', state: 'ended'}, {})).resolves.toEqual({handled: true, response: {success: true}});
+        expect(dependencies.sendTabMessage).toHaveBeenCalledWith(7, {type: 'selectionTtsState', clientRequestId: 'closed-tab', state: 'ended', error: undefined});
+    });
     it('rejects Google playback when extension playback is disabled without touching transport', async () => {
         const {router, dependencies} = createSubject({offscreenPlaybackEnabled: false});
         await expect(router.dispatch({type: SELECTION_TTS_GOOGLE_MESSAGE_TYPE, text: 'hello', clientRequestId: 'disabled-google'},

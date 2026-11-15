@@ -92,6 +92,22 @@ describe('optional full ECDICT asset', () => {
         expect(await readCachedFullEcdict()).toBeNull();
         await expect(downloadFullEcdict()).rejects.toThrow('cache unavailable');
     });
+    it('treats a corrupt cached dictionary as a miss even when eviction fails', async () => {
+        const {cache} = optionalDictionaryCache();
+        vi.spyOn(cache, 'match').mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])));
+        const remove = vi.spyOn(cache, 'delete').mockRejectedValueOnce(new Error('storage unavailable'));
+        await expect(readCachedFullEcdict()).resolves.toBeNull(); expect(remove).toHaveBeenCalledOnce();
+    });
+    it('aborts an unresponsive dictionary mirror at its deadline and accepts the next verified source', async () => {
+        optionalDictionaryCache(); vi.useFakeTimers();
+        let firstSignal: AbortSignal | undefined;
+        const fetch = vi.fn().mockImplementationOnce((_url, init) => new Promise((_resolve, reject) => {
+            firstSignal = init.signal; firstSignal!.addEventListener('abort', () => reject(new DOMException('Timed out', 'AbortError')), {once: true});
+        })).mockResolvedValueOnce(new Response(fullEcdictBytes()));
+        setRuntimeFetch(fetch);
+        const pending = downloadFullEcdict(); await vi.advanceTimersByTimeAsync(12_000);
+        expect(firstSignal?.aborted).toBe(true); expect((await pending).at(-1)?.[0]).toBe('bis'); expect(fetch).toHaveBeenCalledTimes(2);
+    });
 
     it('validates the fixed asset, falls back to a second source and reuses the cached copy', async () => {
         const {stored} = optionalDictionaryCache();

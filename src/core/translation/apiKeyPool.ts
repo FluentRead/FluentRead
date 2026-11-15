@@ -291,8 +291,8 @@ export function createApiKeyRotation(options: ApiKeyRotationOptions = {}): ApiKe
     let entry = pools.get(scopeId);
     if (!entry) {
       if (pools.size >= maxScopes) {
-        const oldest = [...pools.entries()].sort((left, right) => left[1].touchedAt - right[1].touchedAt)[0];
-        if (oldest) pools.delete(oldest[0]);
+        const oldest = [...pools.entries()].sort((left, right) => left[1].touchedAt - right[1].touchedAt)[0]!;
+        pools.delete(oldest[0]);
       }
       entry = {pool: createApiKeyPool(keyIds, options), touchedAt: now};
       pools.set(scopeId, entry);

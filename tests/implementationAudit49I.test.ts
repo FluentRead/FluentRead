@@ -1336,7 +1336,7 @@ it('full-page public provider preserves bounded normal, empty and fallback respo
     expect(result.code).toBe(0);const output=JSON.parse(result.stdout);
     expect(output.requests).toBe(3);expect(output.items).toBe(2);expect(output.payloads).toEqual([[' A little curiosity goes a long way. ','unmatched'],[],[]]);
     expect(output.responses.map((response:any)=>response.status)).toEqual([200,200,200]);
-    const translated=JSON.parse(output.responses[0].body);expect(translated).toHaveLength(2);expect(translated[1].translations[0].text).toBe('测试译文：unmatched');
+    const translated=JSON.parse(output.responses[0].body);expect(translated).toHaveLength(2);expect(translated[1].translations[0].text).toBe(require('../scripts/site-translation/controlled-provider.cjs').encodeControlledTranslation('unmatched', 'microsoft-escaped-text'));
     expect(JSON.parse(output.responses[1].body)).toEqual([]);expect(JSON.parse(output.responses[2].body)).toEqual([]);
     expect(count(result,'server-closed')).toBe(1);expect(count(result,'launch')).toBe(0);
 },12000);

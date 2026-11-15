@@ -76,6 +76,23 @@ function saveEvidence(name: string, bytes: Uint8Array): void {
 }
 
 describe('visible Unicode PDF reading export', () => {
+    it.each([0, 90, 180, 270] as const)('keeps emoji joiners in searchable raster text without changing line advance at %s degrees', async rotation => {
+        const document = await fixture(); if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const page = document.binary.pages[0]; page.rotation = rotation;
+        if (rotation === 90 || rotation === 270) {page.width = 800; page.height = 600;}
+        const text = '中文 α é 👩‍💻 👨‍👩‍👧‍👦 尾部';
+        const download = await createDocumentDownload(document, ['', text], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
+            textItems: [{segmentIndex: 1, text, x: 42, y: 110, width: 312, fontSize: 14}]}),
+        });
+        const [extracted] = await extract(download.data as Uint8Array);
+        expect(compact(extracted)).toContain(compact(text));
+        const output = await PDFDocument.load(download.data as Uint8Array), fonts = output.getPage(0).node.Resources()!.lookup(PDFName.of('Font'), PDFDict);
+        const font = fonts.keys().map(key => fonts.lookup(key, PDFDict)).find(value => value.get(PDFName.of('BaseFont'))?.toString() === '/FluentReadSourceText')!;
+        const widths = font.lookup(PDFName.of('DescendantFonts'), PDFArray).lookup(0, PDFDict).lookup(PDFName.of('W'), PDFArray);
+        expect(widths.asArray().length).toBeGreaterThan(0);
+        for (let index = 1; index < widths.size(); index += 2) expect(widths.lookup(index, PDFArray).asArray().map(value => value.toString())).toEqual(['2000']);
+        saveEvidence(`raster-emoji-joiners-${rotation}.pdf`, download.data as Uint8Array);
+    });
     it('exports a full reading page without a blank second page caused by trailing newlines', async () => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
@@ -445,7 +462,9 @@ describe('visible Unicode PDF reading export', () => {
     });
 
     it('rejects a malformed raster text alphabet exceeding CID capacity instead of saving truncated search data', async () => {
-        const text = Array.from({length: 65_536}, (_unused, index) => String.fromCodePoint(0x10000 + index)).join('');
+        // 格式字符与邻字共用 CID；这里仍须提供真正超过 16-bit CID 容量的独立字母表。
+        const text = Array.from({length: 66_000}, (_unused, index) => String.fromCodePoint(0x10000 + index))
+            .filter(character => !/\p{Cf}/u.test(character)).slice(0, 65_536).join('');
         await expect(createDocumentDownload(await fixture(), ['标题', '译文'], 'translated', {
             pdfPageRasterizer: async () => ({data: layoutPng, format: 'png', textItems: [{segmentIndex: 0, text, x: 42, y: 50, width: 500, fontSize: 14}]}),
         })).rejects.toThrow('过多独立字形');

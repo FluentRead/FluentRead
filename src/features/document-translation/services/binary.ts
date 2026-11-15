@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/services/binary.ts
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
- * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
+ * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -1184,7 +1184,7 @@ async function renderPdf(
     options: CreateDocumentDownloadOptions,
 ): Promise<Uint8Array> {
     const binary = document.binary as Extract<NonNullable<ParsedDocument['binary']>, {kind: 'pdf'}>;
-    const {PDFDocument, EncryptedPDFError, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
+    const {PDFDocument, PDFDict, EncryptedPDFError, PDFHexString, PDFString, PDFName, degrees, rgb, pushGraphicsState, popGraphicsState,
         concatTransformationMatrix, setTextRenderingMode, TextRenderingMode, beginText, endText, setFontAndSize, showText} = await import('pdf-lib');
     options.signal?.throwIfAborted();
     const outputPdf = await PDFDocument.create();
@@ -1334,7 +1334,7 @@ async function renderPdf(
     };
     // 光栅层已经承载真实字形；不可见层使用独立 ToUnicode 映射保全任何 Unicode，普通原版导出不必联网下载字体。
     // 这个 CID 字体只能用于 Invisible 模式；可见全文续页仍使用经过字形校验的真实开放字体。
-    type SelectableFont = {font: ReturnType<typeof outputPdf.context.register>; unicode: ReturnType<typeof outputPdf.context.register>;
+    type SelectableFont = {font: ReturnType<typeof outputPdf.context.register>; unicode: ReturnType<typeof outputPdf.context.register>; descendant: ReturnType<typeof outputPdf.context.register>;
         characters: Map<string, number>; names: WeakMap<ReturnType<typeof outputPdf.addPage>, ReturnType<ReturnType<typeof outputPdf.addPage>['node']['newFontDictionary']>>};
     const selectableFonts = new Map<boolean, SelectableFont>();
     const fallbackText = (text: string, bidi = false) => {
@@ -1348,10 +1348,11 @@ async function renderPdf(
                 CIDSystemInfo: {Registry: PDFString.of('Adobe'), Ordering: PDFString.of('Identity'), Supplement: 0}, FontDescriptor: descriptor, CIDToGIDMap: 'Identity', DW: bidi ? 500 : 1000}));
             const font = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'Type0', BaseFont: fontName,
                 Encoding: 'Identity-H', DescendantFonts: [descendant], ToUnicode: unicode}));
-            resource = {font, unicode, characters: new Map(), names: new WeakMap()}; selectableFonts.set(bidi, resource);
+            resource = {font, unicode, descendant, characters: new Map(), names: new WeakMap()}; selectableFonts.set(bidi, resource);
         }
         let hex = '';
-        for (const character of text) {
+        // PDF.js 会过滤独立 Cf 字形；将连接符等格式字符与相邻字符放入同一个 CID，保全组合表情及文字语义。
+        for (const character of text.match(/\p{Cf}*[\s\S]\p{Cf}*/gu)!) {
             let code = resource.characters.get(character);
             if (code === undefined) {
                 if (resource.characters.size >= 65_535) throw new Error('PDF 原文包含过多独立字形，无法保全搜索文字');
@@ -1620,7 +1621,13 @@ async function renderPdf(
     options.signal?.throwIfAborted();
     outline.write();
     if (layoutPageLabels.length) outputPdf.catalog.set(PDFName.of('PageLabels'), outputPdf.context.obj({Nums: layoutPageLabels}));
-    for (const [bidi, {unicode, characters}] of selectableFonts) {
+    for (const [bidi, {unicode, descendant, characters}] of selectableFonts) {
+        // 合并 CID 仍使用原先每码点的 advance，避免修复复制文本时挪动搜索/选择的行几何。
+        const widths = [...characters].flatMap(([character, code]) => {
+            const length = Array.from(character).length;
+            return length > 1 ? [code, [(bidi ? 500 : 1000) * length]] : [];
+        });
+        if (widths.length) outputPdf.context.lookup(descendant, PDFDict).set(PDFName.of('W'), outputPdf.context.obj(widths));
         const pairs = [...characters].map(([character, code]) => `<${code.toString(16).padStart(4, '0')}> <${PDFHexString.fromText(character).asString().slice(4)}>`);
         const groups: string[] = [];
         for (let index = 0; index < pairs.length; index += 100) {

@@ -51,7 +51,7 @@ export function createConfigMutationCoordinator(): ConfigMutationCoordinator {
     let queue: Promise<unknown> = Promise.resolve();
     return {
         run<T>(mutation: () => Promise<T>): Promise<T> {
-            const result = queue.catch(() => undefined).then(mutation);
+            const result = queue.then(mutation);
             queue = result.then(() => undefined, () => undefined);
             return result;
         },
@@ -264,9 +264,7 @@ export function createConfigPersistenceHandler<TConfig>(
                 }
             }
 
-            const persist = persistQueue
-                .catch(() => undefined)
-                .then(() => runMutation(async () => {
+            const persist = persistQueue.then(() => runMutation(async () => {
                     // 步骤 1：队列轮到当前请求时再判断它是否仍是该 client 的最新序列。
                     if (request.sequence && latestSequenceByClient.get(request.clientId) !== request.sequence) {
                         return dependencies.getCurrentRevision?.() ?? 0;

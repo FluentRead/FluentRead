@@ -31,6 +31,12 @@ pnpm exec vitest run tests/pdfPaperLayouts.test.ts tests/pdfLayoutAnalysis.test.
 FLUENTREAD_PDF_CORPUS=/path/to/papers pnpm exec vitest run tests/pdfPaperLayouts.test.ts
 ```
 
+## PDF 可搜索导出
+
+`tests/pdfTextExport.test.ts` 解析实际生成的 PDF，检查原版文字层、溢出续页、完整尾文及标准页标签。光栅回退的 Unicode 回归还覆盖四种页面旋转、组合表情连接符、变体字符和搜索文字的行宽；格式字符与相邻字符共用 CID，并保留原先每码点的 advance，不能以拆散组合表情换取可复制文字。
+
+隔离浏览器文档流程按页标签逐一核对原版页与紧随的续页；受限表格单元格的完整校订须同时保留在所属页批注及可复制的续页正文中。静态原文块使用来源块身份，不冒充送翻片段。
+
 ## 扫描版 PDF 识别
 
 `tests/pdfLayoutAnalysis.test.ts` 重放真实 OCR 的稀疏长行距句尾，验证未结束正文只在左对齐、同字号和小写短续行共同成立时合段，并保留新段、列表与标题边界。

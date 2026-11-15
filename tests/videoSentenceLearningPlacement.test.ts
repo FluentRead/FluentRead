@@ -259,6 +259,29 @@ describe('移动学习面板绘制所有权', () => {
         f.player.remove(); expect(placement.isConnected(f.player)).toBe(false); placement.destroy(); expect(f.scope.querySelector('.fluent-read-video-learning-frame')).toBeNull();
     });
 
+    it('DOM迁移的失焦回调同步重入定位时不重复移动host或释放frame', () => {
+        const f = mobileFixture();
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance(), onDragPosition: vi.fn()});
+        f.state.onMove = node => {if (node === f.host) placement.syncPlayer(f.player);};
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.player});
+        expect(() => placement.syncPlayer(f.player)).not.toThrow(); f.flush();
+        expect(f.host.parentElement).toBe(f.player); expect(f.renderFrame()).toBeNull();
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.scope});
+        expect(() => placement.syncPlayer(f.player)).not.toThrow(); f.flush();
+        expect(f.host.parentElement).toBe(f.renderFrame()); expect(placement.isConnected(f.player)).toBe(true);
+        expect(() => placement.destroy()).not.toThrow(); expect(f.host.parentElement).toBe(f.player); expect(f.renderFrame()).toBeNull();
+    });
+
+    it('DOM迁移中同步关闭面板先停止回调，迁移返回后仍撤回host并移除绘制层', () => {
+        const f = mobileFixture();
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance(), onDragPosition: vi.fn()});
+        f.state.onMove = node => {if (node === f.host) placement.destroy();};
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.player});
+        expect(() => placement.syncPlayer(f.player)).not.toThrow(); f.flush();
+        expect(f.host.parentElement).toBe(f.player); expect(f.renderFrame()).toBeNull();
+        expect(placement.isConnected(f.player)).toBe(false); expect(f.observers[0].disconnect).toHaveBeenCalledOnce();
+    });
+
     it('重挂只恢复原输入失焦，不抢已移出的焦点；已有焦点保持时不重复focus', () => {
         const f = mobileFixture(), input = f.host.querySelector<HTMLElement>('textarea')!, outside = f.document.createElement('button'); f.document.body.appendChild(outside);
         let active: Element | null = input; Object.defineProperty(f.document, 'activeElement', {get: () => active});

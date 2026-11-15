@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/sentenceLearningPlacement.ts
  * 文件职责：管理学习卡的播放器内定位与独立浮动层，避免小播放器挤压阅读和收藏操作。
- * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及通过底部把手调整高度，提交抬手时的最终坐标；视口缩小时使用实际可见高度，位置和高度仅记在当前页面会话。
+ * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及通过底部把手调整高度，提交抬手时的最终坐标；迁移期间串行处理焦点回调和销毁，视口缩小时使用实际可见高度，位置和高度仅记在当前页面会话。
  * 模块边界：只操作自有面板和绘制层，不选择媒体、不更改媒体时间/速度、不保存学习数据或全局配置；host负责创建、同媒体迁移与最终销毁。
  */
 import {normalizeVideoSentenceLearningAppearance, type VideoSentenceLearningAppearance} from '@/src/core/config/videoSentenceLearningAppearance';
@@ -64,6 +64,7 @@ export function createVideoSentenceLearningPlacement(options: {
     let resizeDrag: {id: number; y: number; height: number} | undefined;
     let resizePointerY: number | undefined;
     let renderFrame: HTMLElement | undefined;
+    let updatingParent = false;
     const scopeForPlayer = () => {
         const scope = getYoutubeSubtitleControlsScope(player);
         return doc.fullscreenElement && !doc.fullscreenElement.contains(scope) ? player : scope;
@@ -86,48 +87,64 @@ export function createVideoSentenceLearningPlacement(options: {
         // 只修复DOM重挂造成的失焦；用户/站点已经聚焦外部控件时保留其选择。
         if (inside && focused.isConnected && (!doc.activeElement || doc.activeElement === doc.body)) focused.focus({preventScroll: true});
     };
-    const restoreFrame = () => {
+    const restoreFrameNow = () => {
         if (!renderFrame) return;
+        const previous = renderFrame;
+        renderFrame = undefined;
         moveHost(player);
-        renderFrame.remove(); renderFrame = undefined;
+        previous.remove();
+    };
+    const restoreFrame = () => {
+        // appendChild 的失焦回调可能同步触发销毁；等当前原生迁移完成再撤回宿主。
+        if (updatingParent) return;
+        updatingParent = true;
+        try {restoreFrameNow();} finally {updatingParent = false;}
     };
     const syncRenderParent = () => {
-        const viewport = readViewport();
-        if (detached && !(viewport.width > 0 && viewport.height > 0)) detached = false;
-        const scope = detached ? floatingParent() : scopeForPlayer();
-        const rect = player.getBoundingClientRect();
-        const width = player.clientWidth || rect.width, height = player.clientHeight || rect.height;
-        if (width <= 0 || height <= 0 || rect.width <= 0 || rect.height <= 0 || (scope === player && !detached)) {
-            restoreFrame(); moveHost(player); return;
-        }
-        if (!renderFrame) {
-            renderFrame = doc.createElement('div');
-            renderFrame.className = 'fluent-read-video-learning-frame fluent-read-video-ui notranslate';
-            renderFrame.setAttribute('data-fluent-read-ui', 'video-subtitle'); renderFrame.setAttribute('translate', 'no');
-            // 透明绘制层只接收学习卡自身的指针事件；浮出播放器时固定在可见窗口。
-            for (const [name, value] of Object.entries({position: 'absolute', left: '0', top: '0', margin: '0', padding: '0', border: '0',
-                'box-sizing': 'border-box', 'pointer-events': 'none', 'z-index': '2147483645', 'transform-origin': '0 0', overflow: 'visible'})) renderFrame.style.setProperty(name, value, 'important');
-        }
-        if (renderFrame.parentElement !== scope) {
-            // 先撤回宿主再移动空frame，避免整块迁移导致内部输入焦点丢失。
-            moveHost(player); scope.appendChild(renderFrame);
-        }
-        if (detached) {
-            renderFrame.style.setProperty('position', 'fixed', 'important');
-            renderFrame.style.setProperty('left', '0', 'important'); renderFrame.style.setProperty('top', '0', 'important');
-            renderFrame.style.setProperty('width', viewport.width + 'px', 'important'); renderFrame.style.setProperty('height', viewport.height + 'px', 'important');
-            renderFrame.style.setProperty('transform', 'translate(' + viewport.left + 'px, ' + viewport.top + 'px)', 'important');
+        // blur/config 回调可以同步再次同步同一播放器，不能在尚未完成的 DOM 迁移中再次移动原节点。
+        if (updatingParent) {schedule(); return;}
+        updatingParent = true;
+        try {
+            const viewport = readViewport();
+            if (detached && !(viewport.width > 0 && viewport.height > 0)) detached = false;
+            const scope = detached ? floatingParent() : scopeForPlayer();
+            const rect = player.getBoundingClientRect();
+            const width = player.clientWidth || rect.width, height = player.clientHeight || rect.height;
+            if (width <= 0 || height <= 0 || rect.width <= 0 || rect.height <= 0 || (scope === player && !detached)) {
+                restoreFrameNow(); moveHost(player); return;
+            }
+            if (!renderFrame) {
+                renderFrame = doc.createElement('div');
+                renderFrame.className = 'fluent-read-video-learning-frame fluent-read-video-ui notranslate';
+                renderFrame.setAttribute('data-fluent-read-ui', 'video-subtitle'); renderFrame.setAttribute('translate', 'no');
+                // 透明绘制层只接收学习卡自身的指针事件；浮出播放器时固定在可见窗口。
+                for (const [name, value] of Object.entries({position: 'absolute', left: '0', top: '0', margin: '0', padding: '0', border: '0',
+                    'box-sizing': 'border-box', 'pointer-events': 'none', 'z-index': '2147483645', 'transform-origin': '0 0', overflow: 'visible'})) renderFrame.style.setProperty(name, value, 'important');
+            }
+            if (renderFrame.parentElement !== scope) {
+                // 先撤回宿主再移动空frame，避免整块迁移导致内部输入焦点丢失。
+                moveHost(player); scope.appendChild(renderFrame);
+            }
+            if (detached) {
+                renderFrame.style.setProperty('position', 'fixed', 'important');
+                renderFrame.style.setProperty('left', '0', 'important'); renderFrame.style.setProperty('top', '0', 'important');
+                renderFrame.style.setProperty('width', viewport.width + 'px', 'important'); renderFrame.style.setProperty('height', viewport.height + 'px', 'important');
+                renderFrame.style.setProperty('transform', 'translate(' + viewport.left + 'px, ' + viewport.top + 'px)', 'important');
+                moveHost(renderFrame);
+                return;
+            }
+            renderFrame.style.setProperty('position', 'absolute', 'important');
+            renderFrame.style.setProperty('width', width + 'px', 'important'); renderFrame.style.setProperty('height', height + 'px', 'important');
+            renderFrame.style.setProperty('transform', 'none', 'important');
+            const base = renderFrame.getBoundingClientRect();
+            if (base.width <= 0 || base.height <= 0) {restoreFrameNow(); return;}
+            const sx = base.width / width, sy = base.height / height;
+            renderFrame.style.setProperty('transform', 'translate(' + ((rect.left - base.left) / sx) + 'px, ' + ((rect.top - base.top) / sy) + 'px) scale(' + (rect.width / base.width) + ', ' + (rect.height / base.height) + ')', 'important');
             moveHost(renderFrame);
-            return;
+        } finally {
+            updatingParent = false;
+            if (!active) restoreFrame();
         }
-        renderFrame.style.setProperty('position', 'absolute', 'important');
-        renderFrame.style.setProperty('width', width + 'px', 'important'); renderFrame.style.setProperty('height', height + 'px', 'important');
-        renderFrame.style.setProperty('transform', 'none', 'important');
-        const base = renderFrame.getBoundingClientRect();
-        if (base.width <= 0 || base.height <= 0) {restoreFrame(); return;}
-        const sx = base.width / width, sy = base.height / height;
-        renderFrame.style.setProperty('transform', 'translate(' + ((rect.left - base.left) / sx) + 'px, ' + ((rect.top - base.top) / sy) + 'px) scale(' + (rect.width / base.width) + ', ' + (rect.height / base.height) + ')', 'important');
-        moveHost(renderFrame);
     };
     const readPlayerBounds = () => {
         const rect = player.getBoundingClientRect();

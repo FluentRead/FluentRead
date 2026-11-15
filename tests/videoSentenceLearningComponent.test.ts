@@ -139,6 +139,52 @@ beforeEach(() => {
 afterEach(() => {close(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('完整句学习组件的调度与异步归属回归', () => {
+  it('真实浮出和停靠按钮同步标签及高度把手，面板手势不泄漏给播放器', async () => {
+    const host = await mountRendered(), parentClick = vi.fn(), parentPointer = vi.fn();
+    host.addEventListener('click', parentClick); host.addEventListener('pointerdown', parentPointer);
+    const section = host.querySelector('.fr-video-learning')!;
+    section.dispatchEvent(new document.defaultView!.Event('pointerdown', {bubbles: true}));
+    host.querySelector('[data-learning-action="float"]')!.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush();
+    expect(host.querySelector('[data-learning-action="dock"]')?.getAttribute('aria-pressed')).toBe('true');
+    expect((host.querySelector('[data-learning-resize-handle]') as HTMLElement).style.display).not.toBe('none');
+    host.querySelector('[data-learning-action="dock"]')!.dispatchEvent(new document.defaultView!.Event('click', {bubbles: true})); await flush();
+    expect(host.querySelector('[data-learning-action="float"]')?.getAttribute('aria-pressed')).toBe('false');
+    expect((host.querySelector('[data-learning-resize-handle]') as HTMLElement).style.display).toBe('none');
+    expect(parentClick).not.toHaveBeenCalled(); expect(parentPointer).not.toHaveBeenCalled();
+  });
+
+  it('打开外观、词书和讲解设置失败时不产生未处理拒绝，也不破坏当前句', async () => {
+    const host = await mountRendered();
+    sendRuntimeMessage.mockRejectedValueOnce(new Error('Options unavailable'));
+    state.openAppearance(); await flush();
+    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-interface', target: 'video-sentence-learning-appearance'});
+    sendRuntimeMessage.mockRejectedValueOnce(new Error('Library unavailable'));
+    state.openLibrary(); await flush();
+    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-vocabulary'});
+    config.harness.enabled = false; sendRuntimeMessage.mockRejectedValueOnce(new Error('Reading settings unavailable'));
+    state.explain(); await flush();
+    expect(sendRuntimeMessage).toHaveBeenLastCalledWith({type: 'openOptionsPage', section: 'settings-selection'});
+    expect(host.querySelector('[data-learning-original]')?.textContent).toBe(first);
+    expect(streamReading).not.toHaveBeenCalled();
+  });
+
+  it('快速取消编辑不会执行迟到聚焦，同一句切换目标语言保留阅读滚动', async () => {
+    const host = await mountRendered();
+    state.editTranslation(); state.editTranslation(); state.editExplanation(); state.editExplanation(); await flush();
+    expect(host.querySelector('[data-learning-translation-editor]')).toBeNull();
+    expect(host.querySelector('[data-learning-explanation-editor]')).toBeNull();
+    state.body.scrollTop = 123; props.targetLanguage = 'ja'; await flush();
+    expect(state.body.scrollTop).toBe(123); expect(state.sentence.text).toBe(first);
+  });
+
+  it('换句后迟到的翻译拒绝和讲解错误不能覆盖新一句的状态', async () => {
+    const pending = deferred<string>(); translate.mockImplementationOnce(() => pending.promise);
+    await mount(); await advance(0); state.explain(); const stale = readingCallbacks;
+    await step(1); await advance(120);
+    pending.reject(new Error('Old translation failed')); stale.error(new Error('Old explanation failed')); await flush();
+    expect(state.sentence.text).toBe(second); expect(state.translation).toBe(`Translated: ${second}`);
+    expect(state.translationError).toBe(''); expect(state.error).toBe('');
+  });
   it.each([new Error('service unavailable'), 'unexpected rejection', '   '])('翻译失败 %s 显示实际重试控件，重试恢复且保留原句', async result => {
     if (typeof result === 'string' && !result.trim()) translate.mockResolvedValueOnce(result);
     else translate.mockRejectedValueOnce(result);

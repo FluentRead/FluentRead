@@ -336,7 +336,7 @@ describe('visible Unicode PDF reading export', () => {
         const source = await PDFDocument.load(document.binary.bytes);
         source.addPage([600, 800]).drawText('Second source page', {x: 42, y: 720, size: 14});
         document.binary.bytes = await source.save();
-        document.segments.push(...document.segments.map(segment => ({...segment, id: segment.id + 2, source: `Second ${segment.source}`})));
+        document.segments = [...document.segments, ...document.segments.map(segment => ({...segment, id: segment.id + 2, source: `Second ${segment.source}`}))];
         const first = document.binary.pages[0];
         document.binary.pages.push({...first, pageNumber: 2, segmentIndexes: [2, 3],
             blocks: first.blocks.map(block => ({...block, segmentIndex: block.segmentIndex + 2})),

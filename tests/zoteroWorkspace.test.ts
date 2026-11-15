@@ -154,6 +154,7 @@ describe('Zotero Vue workspace user flows', () => {
         await press(target, 'f');
         expect(activeOption(target)).toBe('Français');
         expect((await press(target, 'Tab')).defaultPrevented).toBe(false);
+        expect(target.getAttribute('aria-expanded')).toBe('false');
         target.dispatchEvent(new win.Event('blur'));
         await settle();
         expect(target.getAttribute('aria-expanded')).toBe('false');

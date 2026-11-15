@@ -228,6 +228,9 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
                         close();
                     }
                     return;
+                case 'Tab':
+                    close();
+                    return;
             }
             if (event.key.length !== 1) return;
             const prefix = event.key.toLocaleLowerCase();

@@ -1,6 +1,6 @@
 <!--
  * @file src/features/video-subtitle/ui/VideoSentenceLearning.vue
- * 文件职责：在现有播放器上提供可关闭的完整句学习面板，连接原始字幕、主动播放控制和现有收藏。
+ * 文件职责：为视频提供可关闭的完整句学习面板，可移出播放器并调整浮动高度。
  * 主要内容：以双语阅读卡呈现原句、可选本地读音、译文和按需讲解；服务与后台错误仅在错误展示边界本地化，字幕、译文与模型正文保留原值；索引跟随播放、合并快速换句的翻译请求，读音独立跟随固定句或历史句、失败可单独重试、收起时取消且不新增请求；短高换句只归顶自有整卡滚动区，按配置身份管理自动译文、人工草稿与准确的异步收藏状态。
  * 材料关联：完整句收藏与问答引用归于可靠视频来源与原始时间，关闭、更换句子和隐私状态禁止迟到关联。规则断句沿用原字幕范围，切换共享时间的句子不重复跳转。
  * 模块边界：不创建或定位播放器，学习键只接受包含当前视频的显式逻辑播放器及面板自身，菜单让位限定已验证同视频范围；不采集音频或计算掌握状态，翻译沿用注入服务，卸载取消控制与迟到回写。
@@ -13,6 +13,7 @@
       <div class="fr-video-learning-heading" data-learning-drag-handle :title="t('video.learning.drag')"><svg class="fr-video-learning-grip" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M7 5h.01M13 5h.01M7 10h.01M13 10h.01M7 15h.01M13 15h.01" /></svg><strong>{{ t('video.learning.title') }}</strong></div>
       <div class="fr-video-learning-header-actions">
         <button type="button" class="fr-video-learning-icon fr-video-learning-help-toggle" data-learning-action="help" :aria-label="t('video.learning.help')" :title="t('video.learning.help')" :aria-expanded="helpOpen" @click="helpOpen = !helpOpen">?</button>
+        <button type="button" class="fr-video-learning-icon" :data-learning-action="floating ? 'dock' : 'float'" :aria-label="t(floating ? 'video.learning.dock' : 'video.learning.float')" :title="t(floating ? 'video.learning.dock' : 'video.learning.float')" :aria-pressed="floating" @click="floating = !floating"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path v-if="!floating" d="M11 4h5v5M16 4 9 11M14 11v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h4"/><path v-else d="M9 4H5a1 1 0 0 0-1 1v4M4 4l7 7M11 16h4a1 1 0 0 0 1-1v-4"/></svg></button>
         <button type="button" class="fr-video-learning-icon" data-learning-action="appearance" :aria-label="t('video.learning.appearance')" :title="t('video.learning.appearance')" @click="openAppearance"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3 6h8M15 6h2M3 14h2M9 14h8M12 3v6M6 11v6" /></svg></button>
         <button type="button" class="fr-video-learning-icon" data-learning-action="collapse" :aria-label="t(expanded ? 'video.learning.collapse' : 'video.learning.expand')" :title="t(expanded ? 'video.learning.collapse' : 'video.learning.expand')" :aria-expanded="expanded" @click="expanded = !expanded"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true" :class="{'is-flipped': !expanded}"><path d="m5 12 5-5 5 5" /></svg></button>
         <button type="button" class="fr-video-learning-icon" data-learning-action="close" :aria-label="t('video.learning.close')" :title="t('video.learning.close')" @click="emit('close')"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m6 6 8 8M14 6l-8 8" /></svg></button>
@@ -63,6 +64,7 @@
         <button type="button" class="fr-video-learning-save" data-learning-action="save" :data-learning-saved="saved" :disabled="saved || saving || explaining || !translation.trim() || (translating && !translationEdited)" :title="!translation.trim() ? t('video.learning.editPlaceholder') : undefined" @click="save"><svg v-if="saved" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="m4 10 4 4 8-8" /></svg>{{ t(saving ? 'video.learning.saving' : saved ? 'video.learning.savedShort' : savedSnapshot ? 'video.learning.update' : 'video.learning.save') }}</button>
       </div>
     </footer>
+    <div v-show="floating" class="fr-video-learning-resize-handle" data-learning-resize-handle role="slider" tabindex="0" aria-orientation="vertical" :aria-label="t('video.learning.resize')" :title="t('video.learning.resize')" aria-valuemin="180" aria-valuemax="640" aria-valuenow="640"><span aria-hidden="true" /></div>
   </section>
 </template>
 <script setup lang="ts">
@@ -92,6 +94,7 @@ const {t, translateLegacy} = useUiI18n();
 const appearance = ref(normalizeVideoSentenceLearningAppearance(config.videoSentenceLearningAppearance));
 const appearanceStyle = computed(() => getVideoSentenceLearningAppearanceCssVars(appearance.value));
 const helpOpen = ref(false);
+const floating = ref(false);
 const sentences = computed(() => buildSemanticLearningTimeline(props.cues));
 const sentenceTimeIndex = computed(() => createSemanticLearningTimeIndex(sentences.value));
 const index = ref(0);

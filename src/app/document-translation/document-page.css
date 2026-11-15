@@ -599,14 +599,17 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-sidebar .sidebar-outline { margin-bottom: 10px; }
 .document-sidebar .document-batch { margin-bottom: 10px; }
 
-/* 文件页：每份文件一行（名称、状态、进度条），批量操作收在列表下方。 */
+/* 文件页：每份文件一行（名称、状态、进度条）；导入状态与批量操作各占一行，操作收在列表下方。 */
 .is-workspace .document-sidebar .document-batch { display: flex; flex-direction: column; }
-.is-workspace .document-sidebar .batch-toolbar { order: 3; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--line); }
+.is-workspace .document-sidebar .batch-toolbar { order: 3; display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--line); }
 .is-workspace .document-sidebar .batch-toolbar:not(:has(> button:not(.batch-toggle), > label, > .batch-status:not(.idle), > .queue-error)) { display: none; }
 .is-workspace .document-sidebar .batch-status.idle { display: none; }
-.is-workspace .document-sidebar .batch-toolbar > button { width: 100%; min-height: 32px; border-radius: 9px; font-weight: 650; }
+.is-workspace .document-sidebar .batch-toolbar > :not(.batch-toggle) { min-width: 0; max-width: 100%; }
+.is-workspace .document-sidebar .batch-toolbar > .batch-status, .is-workspace .document-sidebar .batch-toolbar > .queue-error { width: 100%; overflow-wrap: anywhere; }
+.is-workspace .document-sidebar .batch-toolbar > button { width: 100%; min-width: 0; min-height: 32px; border-radius: 9px; font-weight: 650; }
 .is-workspace .document-sidebar .batch-toolbar > .batch-start { border-color: var(--brand); color: #fff; background: var(--brand); }
-.is-workspace .document-sidebar .batch-toolbar > label { justify-content: space-between; color: var(--muted); }
+.is-workspace .document-sidebar .batch-toolbar > label { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+.is-workspace .document-sidebar .batch-toolbar > label .batch-output { flex: none; max-width: 100%; }
 .is-workspace .document-sidebar .batch-files { order: 1; }
 .is-workspace .document-sidebar .sidebar-add-file { order: 2; }
 .is-workspace .document-sidebar .document-batch > .notice { order: 4; }

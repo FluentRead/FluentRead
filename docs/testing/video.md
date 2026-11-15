@@ -30,6 +30,8 @@
 
 ## 视频完整句学习
 
+学习卡浮出播放器后仍复用原组件和草稿，并随同一播放器的全屏状态迁移；底部把手向下拖动增高、向上拖动缩小，拖动和调高都须提交抬手时的最终坐标。`videoSentenceLearningPlacement` 覆盖浮出/停靠、视口偏移与缩小、键盘调高、ARIA实际高度、关闭重开及监听器清理；实际窗口与媒体交互仍需生产浏览器验收。
+
 设置中心关闭视频字幕总开关时，YouTube/X 播放器按钮和菜单必须移除；播放器菜单的「关闭」只停止翻译并隐藏字幕，保留入口、关闭选中态及原显示方式，可从同一菜单恢复双语、译文或原文，刷新后入口仍在。`videoSubtitleTrackPriorityRuntime` 覆盖两平台的字幕关闭、重复关闭、重新挂载与菜单恢复，以及功能总开关关闭后移除节点、重复开启无副本。生产 Chrome 构建后使用 `node scripts/run-video-menu-state-test.cjs --button-visibility-only --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper scripts/testing/focus-safe-browser.cjs --artifacts-dir <证据目录>` 定向验证：初始关闭、外部配置关闭、控制栏重建、刷新、菜单关闭保留入口、菜单重新开启，以及字幕功能关闭时网页段落翻译—恢复—再次翻译的 `[1, 0, 1]`。脚本使用临时 Edge 后台正常窗口与受控 YouTube/X DOM、媒体和翻译响应；不代表原站、在线服务或 Firefox 运行验收。
 
 AI 字幕运行时的缓存恢复与完整生成提交由 `video-ai/subtitleSession.ts` 统一拥有：媒体、模型、来源语言变化或卸载后，旧缓存不能写入新会话；原生轨道就绪时拒绝缓存恢复；同媒体元数据补全保持生成开始时的模型与语言快照。`videoAiSubtitleSession` 使用受控未决 Promise 验证这些边界、请求去重、新旧请求终结顺序、失败恢复、重入与销毁，完整时间轴提交会复制身份和 cue，缓存失败保留已识别字幕。

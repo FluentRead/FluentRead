@@ -153,7 +153,7 @@ async function main() {
     const chunkDir=path.join(stagedExtension,'chunks');
     const onboardingFiles=fs.readdirSync(chunkDir).filter(name=>name.endsWith('.js')&&fs.readFileSync(path.join(chunkDir,name),'utf8').includes('onboarding-load-error'));
     assert.equal(onboardingFiles.length,1);
-    const mainImports=[...fs.readFileSync(path.join(chunkDir,onboardingFiles[0]),'utf8').matchAll(/import\(["']([^"']+\.js)["']\)/g)].map(match=>path.resolve(chunkDir,match[1])).filter(file=>fs.existsSync(file)&&fs.readFileSync(file,'utf8').includes('data-popup-module-order'));
+    const mainImports=[...fs.readFileSync(path.join(chunkDir,onboardingFiles[0]),'utf8').matchAll(/import\((["'`])([^"'`]+\.js)\1\)/g)].map(match=>path.resolve(chunkDir,match[2])).filter(file=>fs.existsSync(file)&&fs.readFileSync(file,'utf8').includes('data-popup-module-order'));
     assert.equal(mainImports.length,1);const mainChunk=path.basename(mainImports[0]);report.actualMainChunk={onboarding:onboardingFiles[0],main:mainChunk,sha256:hash(fs.readFileSync(mainImports[0]))};
     session = await launchFocusSafePersistentContext({
       chromium,

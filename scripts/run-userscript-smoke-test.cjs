@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
+const {controlledProviderRuntime} = require('./site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -356,6 +357,7 @@ async function main() {
       sharedGmStore.delete(key);
     });
     await context.exposeFunction('__fluentReadGmList', () => [...sharedGmStore.keys()]);
+    await context.addInitScript(`globalThis.__frFixtureEncode = (${controlledProviderRuntime.toString()})(false).encode;`);
     await context.addInitScript(({modern}) => {
       // Reproduce issue #524's Dexie collision by making a different version
       // visible in the same execution realm before FluentRead's bundle runs.
@@ -397,7 +399,7 @@ async function main() {
           try {
             const body = JSON.parse(String(details.data || '[]'));
             const responseText = JSON.stringify(body.map((text) => ({
-              translations: [{text: `译文：${String(text).replace(/<[^>]+>/g, '')}`}],
+              translations: [{text: globalThis.__frFixtureEncode(String(text), 'microsoft-escaped-text')}],
             })));
             const response = {
               status: 200,

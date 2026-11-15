@@ -6,6 +6,7 @@
 const assert = require('node:assert/strict');
 const {mapPdfLayoutPages} = require('./testing/pdf-output-pages.cjs');
 const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
+const {encodeControlledTranslation, decodeControlledTranslationText} = require('./site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -53,7 +54,7 @@ async function fixtureServer() {
         ? `${state.englishLabels?.[text.trim()] ?? 'Controlled translated text.'} ${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')} ${[...text.replace(/__FRTERM_[a-z0-9_]+?__/giu, '').matchAll(/(?<![\p{N}_.])[0-9]+(?:[,._][0-9]+)*(?![\p{N}_.])/gu)].map(match => match[0]).join(' ')}`
         : state.chineseOnly
         ? `本地测试译文：扫描文档的文字经过识别后，按段落进行翻译。原始图像仍保留，阅读器展示对应的中文内容。${[...text.matchAll(/__FRTERM_[a-z0-9_]+?__/giu)].map(match => match[0]).join(' ')}`
-        : `测试译文：${text.replace(/<(g\d+)>([\s\S]*?)<\/\1>/gu, (_match, tag, inner) => `<${tag}>测试译文：${inner}</${tag}>`)}`;
+        : encodeControlledTranslation(text);
       const translation = protocol.test(source) ? source.replace(protocol, (_match, begin, _nonce, _index, text, end) => `${begin}${translate(text)}${end}`) : translate(source);
       await new Promise(resolve => setTimeout(resolve, state.delay));
       if (state.holdSource?.test(source)) {
@@ -206,15 +207,19 @@ async function main() {
       assert.equal(await page.evaluate(() => sessionStorage.getItem('fluentread.document.open')), null, '离开文档后不应再记住已打开的文档');
     };
     const download = async (mode = 'bilingual', partial = false) => {
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       const dialog = page.locator('.download-dialog[open][aria-labelledby="download-document-heading"]');
       await dialog.getByRole('heading', {name: '下载文件', exact: true}).waitFor();
-      await dialog.locator('.export-options button').nth(mode === 'bilingual' ? 0 : 1).click();
+      await dialog.getByRole('radio', {name: mode === 'bilingual' ? '双语对照' : '仅译文', exact: true}).check();
+      const submit = dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true});
       if (partial) {
-        assert.equal(await dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).isDisabled(), true);
-        await dialog.getByRole('checkbox').check();
+        await submit.click();
+        await dialog.getByRole('heading', {name: '译文还未完成', exact: true}).waitFor();
+        assert.equal(await dialog.locator('.download-submit').count(), 0, '未完成译文必须先确认，不能直接下载');
+        const [file] = await Promise.all([page.waitForEvent('download', {timeout: suite === 'pdf-export' ? 120000 : 30000}), dialog.getByRole('button', {name: '下载当前结果', exact: true}).click()]);
+        const dest = path.join(artifactsDir, file.suggestedFilename()); await file.saveAs(dest); report.downloads.push(dest); return dest;
       }
-      const [file] = await Promise.all([page.waitForEvent('download', {timeout: suite === 'pdf-export' ? 120000 : 30000}), dialog.getByRole('button', {name: mode === 'bilingual' ? '下载双语文件' : '下载译文文件', exact: true}).click()]);
+      const [file] = await Promise.all([page.waitForEvent('download', {timeout: suite === 'pdf-export' ? 120000 : 30000}), submit.click()]);
       const dest = path.join(artifactsDir, file.suggestedFilename()); await file.saveAs(dest); report.downloads.push(dest); return dest;
     };
     assert.equal(await page.locator('.format-card').count(), 8);
@@ -233,7 +238,7 @@ async function main() {
       await page.getByRole('button', {name: '校订译文', exact: true}).click();
       await page.locator('textarea.document-translation').first().fill('100 页导出校订保留测试');
       await page.getByRole('button', {name: '阅读', exact: true}).click();
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       const dialog = page.locator('.download-dialog[open]');
       await dialog.getByRole('button', {name: '下载双语文件', exact: true}).click();
       await dialog.locator('.export-progress').filter({hasText: /\d+ \/ 100 页/}).waitFor();
@@ -269,7 +274,7 @@ async function main() {
       await page.getByRole('button', {name: '校订译文', exact: true}).click();
       assert.equal(await page.locator('textarea.document-translation').first().inputValue(), '100 页导出校订保留测试');
       await page.setViewportSize({width: 390, height: 844});
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       await noOverflow(); await shot('pdf-100-export-mobile');
       report.cases.push('100-page bilingual and translated-only downloads reopen with every original page, translated pages and original page dimensions');
       assert.equal(report.consoleErrors.length, 0);
@@ -608,7 +613,7 @@ async function main() {
       await page.locator('textarea.document-translation').nth(1).fill('保持时间轴不变。');
       await page.getByRole('button', {name: '阅读', exact: true}).click();
       await page.getByRole('button', {name: '译文', exact: true}).click();
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       const dialog = page.locator('.download-dialog[open]');
       await page.waitForFunction(() => document.querySelector('.download-dialog[open] .export-options button:nth-child(2)')?.getAttribute('aria-pressed') === 'true');
       assert.equal(await dialog.locator('.export-options button').nth(1).getAttribute('aria-pressed'), 'true');
@@ -625,7 +630,7 @@ async function main() {
       report.downloads.push(translatedPath);
       report.cases.push('translated reading selects translation-only export; downloaded SRT matches preview and contains no reviewed source text');
       await page.getByRole('button', {name: '双语', exact: true}).click();
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       assert.equal(await dialog.locator('.export-options button').first().getAttribute('aria-pressed'), 'true');
       await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
       const bilingualPath = await download('bilingual');
@@ -673,7 +678,7 @@ async function main() {
       assert.equal(await page.locator('.document-app.dark').count(), 1);
       await page.setViewportSize({width: 820, height: 960}); await noOverflow(); await shot('subtitle-tablet-dark');
       await page.setViewportSize({width: 390, height: 844}); await noOverflow(); await shot('subtitle-mobile-dark');
-      await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+      await page.locator('.download-button').click();
       await noOverflow(); await shot('subtitle-export-mobile-dark');
       await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
       await page.emulateMedia({colorScheme: 'light'}); await shot('subtitle-mobile-light');
@@ -806,7 +811,8 @@ async function main() {
           assert.equal(entry.spinners, 0, '翻译完成后不能残留等待动画'); assert.equal(entry.sheets, 0, '原版排版下不应出现重排续页'); assert(entry.blocks.length > 0, `第 ${entry.page} 页应有译文块`);
           for (const block of entry.blocks) {
             assert(pdfSources.has(block.source), `译文块的原文必须真实送往翻译服务：${JSON.stringify({source: block.source, requested: [...pdfSources]})}`);
-            assert.equal(compact(block.text), compact(corrections.get(block.segment) ?? `测试译文：${block.source}`), `第 ${entry.page} 页片段 ${block.segment} 的译文块必须完整等于译文`);
+            const corrected = corrections.get(block.segment);
+            assert.equal(compact(corrected === undefined ? decodeControlledTranslationText(block.text, literal => block.source.includes(literal)) : block.text), compact(corrected ?? block.source), `第 ${entry.page} 页片段 ${block.segment} 的译文块必须完整绑定原文或校订结果`);
             assert(block.left >= -2 && block.top >= -2 && block.right <= entry.frame.width + 2 && block.bottom <= entry.frame.height + 2, `译文块不能超出页面：${JSON.stringify({block, frame: entry.frame})}`);
           }
         }
@@ -822,15 +828,22 @@ async function main() {
         await pdfPresentation('readable');
         await page.locator('.pdf-page-row[data-page-number="1"] .pdf-reading-sheet .pdf-reading-paragraph').first().waitFor(); await page.locator('.pdf-page-row[data-page-number="2"] .pdf-reading-sheet .pdf-reading-paragraph').first().waitFor();
         const readable = await page.locator('.pdf-reading-sheet .pdf-reading-paragraph').evaluateAll(elements => elements.map(element => ({page: element.closest('[data-pdf-reading-page]').dataset.pdfReadingPage, segment: element.dataset.pdfSegmentIndex, id: element.dataset.pdfSourceId, source: element.dataset.pdfSourceText, role: element.dataset.pdfRole, text: element.textContent})));
-        const isKeptSource = entry => ['footer', 'metadata'].includes(entry.role);
+        const isKeptSource = entry => Number(entry.segment) < 0 || ['footer', 'metadata'].includes(entry.role);
         expectedPdfTranslations = readable.filter(entry => !isKeptSource(entry));
         assert.equal(await page.locator('.pdf-translation-layer').count(), 0, '重排阅读不显示原版排版的译文层');
         for (const entry of readable) {
-          assert.match(entry.segment, /^\d+$/u);
-          assert.equal(entry.id, `pdf-${entry.page}-segment-${entry.segment}`, '重排阅读的段落身份必须准确对应来源页与片段');
-          assert.equal(entry.text, isKeptSource(entry) ? entry.source : corrections.get(entry.segment) ?? `测试译文：${entry.source}`, `重排阅读片段 ${entry.segment}（${entry.role}）内容不符`);
+          assert.match(entry.segment, /^-?\d+$/u);
+          if (Number(entry.segment) < 0) {
+            assert.match(entry.id, new RegExp(`^pdf-${entry.page}-block-\\d+$`, 'u'), '静态文字必须保留来源页与原文块身份');
+          } else {
+            assert.equal(entry.id, `pdf-${entry.page}-segment-${entry.segment}`, '重排阅读的段落身份必须准确对应来源页与片段');
+          }
+          const corrected = corrections.get(entry.segment);
+          assert.equal(isKeptSource(entry) || corrected !== undefined ? entry.text : decodeControlledTranslationText(entry.text, literal => entry.source.includes(literal)), corrected ?? entry.source, `重排阅读片段 ${entry.segment}（${entry.role}）内容不符`);
         }
-        assert.equal(new Set(readable.map(entry => entry.segment)).size, readable.length, '重排阅读不能遗漏片段后重复另一个同文片段');
+        assert.equal(new Set(readable.map(entry => entry.id)).size, readable.length, '重排阅读不能重复来源块');
+        const readableSegments = readable.filter(entry => Number(entry.segment) >= 0);
+        assert.equal(new Set(readableSegments.map(entry => entry.segment)).size, readableSegments.length, '重排阅读不能遗漏片段后重复另一个同文片段');
         const readableSources = new Set(readable.map(entry => entry.source));
         for (const source of pdfSources) assert(readableSources.has(source), `每个实际请求原文都必须出现在对应的文档片段里：${source}`);
         const identity = ({page, segment, id, source, role}) => JSON.stringify([page, segment, id, source, role]);
@@ -852,13 +865,15 @@ async function main() {
       const bytes = fs.readFileSync(dest);
       assert(bytes.length > 0);
       if (name === 'sample.pdf') {
-        // 原版排版导出与阅读器一致：每个原页对应一张左右对照页；原文仍可选择，较长译文全文存入 PDF 批注。
+        // 原版页逐源页保留，溢出译文在所属页的可搜索续页及批注中完整保留。
         const {PDFDocument, PDFDict, PDFName, PDFHexString, PDFArray} = require('pdf-lib'); const pdf = await PDFDocument.load(bytes);
-        const sourceTexts = await pdfPageTexts(fs.readFileSync(path.join(exampleDir, name))), outputTexts = await pdfPageTexts(bytes);
-        assert.equal(pdf.getPageCount(), sourceTexts.length, '原版排版下载必须逐页对应全部原页');
-        assert.deepEqual(outputTexts, sourceTexts, '双语下载每页必须按顺序保留原页全部可选文字');
+        const sourceTexts = await pdfPageTexts(fs.readFileSync(path.join(exampleDir, name))), {texts: outputTexts, labels} = await pdfPageTexts(bytes, true);
+        const mapped = mapPdfLayoutPages(sourceTexts.length, outputTexts.map((text, index) => ({text, label: labels?.[index]})));
+        assert(mapped.ok, '原版下载须逐源页保留原版页，续页紧跟所属原页且编号连续');
+        mapped.pages.forEach((entry, index) => assert(entry.text.startsWith(sourceTexts[index]), `第 ${index + 1} 个原页必须按原顺序保留全部可选原文`));
         const notes = [];
-        for (const [pageIndex, sheet] of pdf.getPages().entries()) {
+        for (const [pageIndex, physicalPage] of mapped.indices.entries()) {
+          const sheet = pdf.getPage(physicalPage);
           const pageNumber = String(pageIndex + 1), gap = Math.max(8, Math.min(24, 612 * 0.025));
           const remaining = expectedPdfTranslations.filter(entry => entry.page === pageNumber).map(entry => entry.text), pageNotes = [];
           assert.deepEqual(sheet.getSize(), {width: 612 * 2 + gap, height: 792}, '同页双语须保留左右原页尺寸');
@@ -876,8 +891,10 @@ async function main() {
           }
           const required = forcedPdfOverflow.filter(entry => entry.page === pageNumber).map(entry => entry.text);
           for (const text of new Set(required)) assert.equal(pageNotes.filter(note => note === text).length, required.filter(note => note === text).length, `第 ${pageNumber} 页每个受限同文单元格都须保留独立的完整校订批注`);
+          const continuationText = mapped.continuations.filter(entry => entry.sourcePage === Number(pageNumber)).map(entry => outputTexts[entry.index]).join('\n').replace(/\s/gu, '');
+          for (const text of required) assert(continuationText.includes(text.replace(/\s/gu, '')), `第 ${pageNumber} 页的完整校订必须也能从所属续页复制`);
         }
-        report.pdfExport = {pages: pdf.getPageCount(), originalPageIndexes: outputTexts.map((_text, index) => index), sizes: pdf.getPages().map(sheet => sheet.getSize()), fullTranslationNotes: notes};
+        report.pdfExport = {pages: pdf.getPageCount(), originalPageIndexes: mapped.indices, continuations: mapped.continuations, sizes: pdf.getPages().map(sheet => sheet.getSize()), fullTranslationNotes: notes};
       } else if (name.endsWith('.epub') || name.endsWith('.docx')) {
         const zip = await require('jszip').loadAsync(bytes);
         assert(zip.file(name.endsWith('.epub') ? 'OEBPS/chapter-1.xhtml' : 'word/document.xml'));
@@ -939,7 +956,7 @@ async function main() {
         const correction = `Large ${format} reviewed translation`;
         await page.locator('textarea.document-translation').first().fill(correction);
         await page.getByRole('button', {name: '阅读', exact: true}).click();
-        await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
+        await page.locator('.download-button').click();
         const dialog = page.locator('.download-dialog[open]');
         await dialog.getByRole('checkbox').check();
         await dialog.getByRole('button', {name: '下载双语文件', exact: true}).click();
@@ -1019,9 +1036,9 @@ async function main() {
     report.cases.push('browser reload prompts beforeunload and cancellation retains unsaved document');
     await page.getByRole('button', {name: '阅读', exact: true}).click();
     await page.getByRole('button', {name: '原文', exact: true}).click();
-    await page.getByRole('button', {name: '下载文件 ↓', exact: true}).click();
-    assert.equal(await page.locator('dialog[open] .export-options button').first().getAttribute('aria-pressed'), 'true');
-    await page.locator('dialog[open]').getByRole('button', {name: '返回文档'}).click();
+    await page.locator('.download-button').click();
+    assert.equal(await page.locator('#document-download-panel input[value="bilingual"]').isChecked(), true);
+    await page.locator('#document-download-panel[open]').getByRole('button', {name: '关闭下载窗口', exact: true}).click();
     await page.getByRole('button', {name: '双语', exact: true}).click();
     await openSettings();
     await page.locator('.document-settings-dialog[open]').getByRole('button', {name: '打开新文件', exact: true}).click();
@@ -1055,8 +1072,9 @@ async function main() {
     await failureSettings.getByRole('button', {name: '返回文档', exact: true}).click();
     await page.getByRole('button', {name: '开始翻译', exact: true}).click();
     // 失败不再立刻中断：服务出错时自动退避重试（2 s、4 s……累计最多 120 s），工具栏下方浮出重试提示；已完成的片段保留，服务恢复后无需手动操作即可译完。
-    const retryNotice = page.locator('.document-taskbar .taskbar-notices .task-notice').filter({hasText: '翻译服务暂时没有响应，将自动重试'});
+    const retryNotice = page.locator('.document-taskbar .translation-recovery[role="status"]');
     await retryNotice.waitFor();
+    assert.match(await retryNotice.locator('.recovery-error-detail').textContent(), /自动重试/u, '重试详情须说明自动恢复状态');
     assert.match(await page.locator('.document-status').innerText(), /正在翻译/, '自动重试期间文档仍在翻译，不应显示翻译中断');
     await page.waitForFunction(() => document.querySelector('[role=progressbar][aria-label="文档翻译进度"]')?.getAttribute('aria-valuenow') === '66');
     assert.equal(await page.locator('.pause-button').count(), 1, '重试期间可以暂停');
@@ -1084,7 +1102,7 @@ async function main() {
     assert.match(await page.locator('textarea.document-translation').first().inputValue(), /replacement document/);
     report.cases.push('confirmed restart then replace aborts previous task; late results cannot contaminate new document');
     const recovery = await download('translated');
-    assert(fs.readFileSync(recovery, 'utf8').includes('测试译文：A replacement document'));
+    assert(fs.readFileSync(recovery, 'utf8').includes(encodeControlledTranslation('A replacement document')));
     report.cases.push('service failure keeps completed work, shows the automatic-retry notice while still translating, recovers without user action, translated-only export works');
     // 本地历史：结果已下载、没有未保存内容时刷新不再询问，直接恢复当前文档与译文；离开文档后首页“最近翻译”列出它。
     await page.waitForTimeout(600);
@@ -1096,7 +1114,7 @@ async function main() {
     assert.equal(await page.locator('.file-drop-zone').count(), 0, '刷新后应恢复文档而不是回到首页');
     await status('翻译完成');
     await page.getByRole('button', {name: '校订译文', exact: true}).click();
-    assert.match(await page.locator('textarea.document-translation').first().inputValue(), /测试译文：A replacement document/);
+    assert((await page.locator('textarea.document-translation').first().inputValue()).includes(encodeControlledTranslation('A replacement document')));
     await page.getByRole('button', {name: '阅读', exact: true}).click();
     const restoreRequests = fixture.state.requests.length;
     await newFile();

@@ -55,7 +55,8 @@ function controlledProviderRuntime(installTransport = false) {
     return;
   }
   const originalFetch = globalThis.fetch;
-  const state = {protocol, requests: 0, texts: 0, active: 0};
+  // 其他本地夹具复用同一编码器，保留各自的请求记录、延迟与故障注入，而不返回被生产门禁拒绝的原文加前缀。
+  const state = {protocol, requests: 0, texts: 0, active: 0, encode};
   globalThis.__frCompatibilityTransport = state;
   globalThis.fetch = async (input, init) => {
     const address = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);

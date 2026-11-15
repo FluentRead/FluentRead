@@ -131,6 +131,10 @@ node scripts/run-selection-speech-test.cjs \
 
 ## YouTube 全屏与字幕同步
 
+`node scripts/run-youtube-subtitle-handover-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --artifacts-dir <证据目录>` 验证 #1341 的早到响应交接。生产扩展使用真实 MAIN-world Fetch 桥与 content runtime；阻塞解析的受控资源让 timedtext 在 `document.readyState=loading` 时先到，之后的补抓明确返回空响应。相同 JSON3、原生滚动窗口结构和媒体时钟分别测试挂载前、挂载后到达，两条同文原生行应按当前 cue 显示及翻译一次；后续重复时段、`No no` 和单 cue 内完整整句重复仍保留。专项保存响应/挂载时刻、请求输入、截图、后台与页面诊断，使用临时 profile、第二屏后台可见窗口。JSON3 窗口结构取自真实 YouTube 播放器观察，文字与网络响应受控；这不等于原视频回放或在线翻译验收。
+
+`tests/mainWorldBridgeLifecycle.test.ts` 验证默认 YouTube 适配器回放早到响应、不消费宿主正文、不因回放重发请求，并在换地址时拒绝旧响应、停用后清空；`tests/videoSubtitleTrackPriorityRuntime.test.ts` 验证实际公共 mount 在初始化监听及页面状态后取回时间轴，既处理滚动同文行，也保留合法重复，seek 不重复请求回放。
+
 `tests/videoTranslationScheduler.test.ts` 验证三路满载的重复当前句请求不枚举等待队列，仍合并同一 Promise、提升优先级并在完成后保留同级顺序；清理后不响应 abort 的旧传输仍占原名额，其迟到 finally 可启动同 key 的新请求。两路预取保留第三路的原行为继续回归，操作计数不代表播放器或供应商耗时。
 
 `tests/videoSubtitleTrackPriorityRuntime.test.ts` 从实际公共 mount 验证 YouTube 同轮选择、两次时钟跨界、NaN、seek、字幕偏移、换轨、迟到结果及人工目标轨命中后回退。只在同步媒体事件窗口对真实 selector 作 call-through 计数，先检查原译文及翻译请求不变；不模拟业务算法。YouTube 夹具按订阅过滤 Linkedom 错发的 attributes，保留真实 childList 与业务回调，并断言观察器预算、订阅和计时器清理；既有 X 夹具继续使用原观察器。这是受控 DOM/媒体/fetch 端口验证，不代表原生浏览器布局、在线字幕服务或设备耗时。

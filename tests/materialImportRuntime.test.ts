@@ -265,6 +265,17 @@ describe('material import background registration',()=>{
     const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);
     expect(()=>f.notify()).not.toThrow();expect(f.runtime.sendMessage).toHaveBeenCalledOnce();dispose();
   });
+  it('keeps a successful port commit when the post-commit notification rejects asynchronously',async()=>{
+    const f=fixture();f.runtime.sendMessage.mockRejectedValue(new Error('background notification channel closed'));
+    f.stage.commit.mockImplementationOnce(async()=>{f.notify();return {inserted:1,updated:0,skipped:0};});
+    const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);
+    p.onMessage.fire({id:1,action:'begin',capability,manifest,guard,deadline:10_000});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(1));
+    p.onMessage.fire({id:2,action:'commit'});
+    await vi.waitFor(()=>expect(p.messages).toHaveLength(2));
+    expect(p.messages[1]).toMatchObject({id:2,ok:true,data:{inserted:1,updated:0,skipped:0}});
+    expect(f.stage.commit).toHaveBeenCalledOnce();expect(f.runtime.sendMessage).toHaveBeenCalled();dispose();
+  });
   it('stops pending readiness waits when the runtime is disposed',async()=>{
     const f=fixture();let ready!:()=>void;f.deps.ready=new Promise<void>(resolve=>{ready=resolve;});
     const dispose=installMaterialImportRuntime(f.deps as never),p=f.port();f.runtime.onConnect.fire(p.port);

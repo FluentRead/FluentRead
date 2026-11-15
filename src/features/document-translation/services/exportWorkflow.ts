@@ -100,7 +100,8 @@ export function createDocumentExportWorkflow(ports: DocumentExportPorts) {
         } finally {
             if (active === controller) {
                 active = null;
-                if (!disposed) ports.onState({busy: false, canceling: false});
+                // dispose 经 reset 清空 active；仍拥有控制器便仍可发布结束状态。
+                ports.onState({busy: false, canceling: false});
             }
         }
     }

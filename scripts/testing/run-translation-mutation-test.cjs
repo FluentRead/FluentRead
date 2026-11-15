@@ -10,6 +10,7 @@
 const {guardBrowserClose} = require('./owned-browser-close.cjs');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const {controlledProviderRuntime} = require('../site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -118,7 +119,7 @@ async function main() {
   let session, context, worker, popup, primaryError, sequence = 0;
   const installedWorkers = new WeakMap();
   const installWorker = current => {
-    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(() => {
+    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(controlledProviderRuntime, true).then(() => current.evaluate(() => {
       globalThis.translationMutationRequests = [];
       globalThis.fetch = async (input, init) => {
         const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
@@ -129,10 +130,10 @@ async function main() {
         globalThis.translationMutationRequests.push({at: Date.now(), texts});
         const labels = {'Merge pull request': '合并拉取请求', 'Save changes': '保存更改', 'Open settings': '打开设置',
           'Review': '审查', 'changes': '更改'};
-        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: labels[text] || `测试译文：${text}`}]}))),
+        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: labels[text] || globalThis.__frCompatibilityTransport.encode(text, 'microsoft-escaped-text')}]}))),
           {status: 200, headers: {'content-type': 'application/json'}});
       };
-    }));
+    })));
     return installedWorkers.get(current);
   };
   const patchConfig = async updates => {

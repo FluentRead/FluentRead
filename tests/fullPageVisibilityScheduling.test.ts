@@ -641,6 +641,7 @@ describe("全文翻译可见性锚点", () => {
         const shadow = host.attachShadow({mode: 'open'});
         const inner = document.createElement('span'); shadow.append(inner);
         setLayoutBox(candidate, 0, 0); setLayoutBox(host, 0, 0);
+        Object.defineProperty(candidate, 'getClientRects', {configurable: true, value: () => [{width: 0, height: 20}, {width: 10, height: 0}]});
         setLayoutBox(light, 100, 20); setLayoutBox(inner, 80, 20);
         Object.defineProperty(broken, 'getClientRects', {configurable: true, value: () => {throw new Error('stale layout');}});
         expect(resolveFullPageVisibilityAnchor(candidate)).toBe(inner);

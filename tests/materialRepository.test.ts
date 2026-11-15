@@ -219,6 +219,12 @@ describe('local material lifecycle', () => {
         await repository.importData(backup,500);
         expect((await repository.get(original.id))?.title).toBe(hostname.slice(0,240));
     });
+    it('does not use a corrupt stored document URL as an article migration identity',async()=>{
+        const current=await repository.capture({source:{kind:'document',fingerprint:'sha256:corrupt-url',url:'https://valid.test/document'},reference:{kind:'vocabulary',id:'v'}},100);
+        await db.materials.update(current.id,{source:{...current.source,url:'javascript:invalid-fixture-source'}});
+        const migrated=new MaterialRepository(db,async()=>[]);await migrated.list();
+        expect(await db.materials.count()).toBe(1);expect((await db.materials.get(current.id))?.references[0].id).toBe('v');
+    });
     it('filters topics/search/archive and preserves soft-deleted data during captures', async () => {
         const a = await repository.capture({source,locator:{kind:'text',quote:'原句'},reference:{kind:'note',id:'n',note:'a useful thought'}},100);
         await repository.update(a.id,{topics:['AI',' ML ','AI'],title:'Reading'});

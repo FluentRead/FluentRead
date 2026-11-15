@@ -681,7 +681,7 @@ export class VideoAiFullCaptureController {
       if (error instanceof Error && (error.message === FULL_CANCELLED_ERROR || error.message === FULL_TOO_LONG_ERROR)) throw error;
     } finally {
       abortFetch();
-      if (fetchTimeout !== undefined) window.clearTimeout(fetchTimeout);
+      window.clearTimeout(fetchTimeout);
       signal?.removeEventListener('abort', abortFetch);
       if (abortDecode) signal?.removeEventListener('abort', abortDecode);
       if (timeout !== undefined) window.clearTimeout(timeout);
@@ -725,7 +725,7 @@ export class VideoAiFullCaptureController {
             scanVideo.removeEventListener('canplay', onReady);
             scanVideo.removeEventListener('error', onError);
             signal.removeEventListener('abort', onAbort);
-            if (timeout !== undefined) window.clearTimeout(timeout);
+            window.clearTimeout(timeout);
           };
           const onReady = () => { cleanup(); resolve(); };
           const onError = () => { cleanup(); reject(new Error('扫描副本无法加载 X 视频音频')); };

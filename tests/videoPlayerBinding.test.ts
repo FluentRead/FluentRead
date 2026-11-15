@@ -158,6 +158,13 @@ function viewportMenuFixture() {
 }
 
 describe('mobile viewport menu host', () => {
+  it('does not treat a mobile settings-only group as the fullscreen entry host',()=>{
+    const f=createMobileYoutubeFixture(),original=f.controls.innerHTML;f.controls.innerHTML='<button aria-label="Settings">settings</button>';
+    const click=vi.fn(),binding=createVideoPlayerBinding({document:f.document,locator:f.locator,getState:()=>({enabled:true}),createButton:f.createButton,onButtonClick:click});
+    expect(f.createButton).not.toHaveBeenCalled();f.controls.innerHTML=original;binding.sync();
+    const button=f.createButton.mock.results[0].value;expect(f.controls.contains(button)).toBe(true);
+    f.setTarget(null);button.click();expect(click).not.toHaveBeenCalled();binding.destroy();
+  });
   it('uses the current body as a calibrated owned fallback when the document root is temporarily unavailable', () => {
     const f = viewportMenuFixture(), body = f.document.body;
     body.style.transform = 'scale(2)'; const original = body.getAttribute('style');

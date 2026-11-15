@@ -53,6 +53,14 @@ const text = (bytes:Uint8Array) => new TextDecoder('utf-8',{fatal:true}).decode(
 const backup = (materials:MaterialRecord[],exportedAt=123) => ({format:'fluentread-learning-materials',version:1,exportedAt,materials});
 
 describe('streamed material backup', () => {
+    it('does not emit an empty tail when compact JSON ends exactly on a frame boundary', async () => {
+        const emptySize = new TextEncoder().encode(JSON.stringify(backup([record('exact-frame', {padding: ''})], 1))).length;
+        const item = record('exact-frame', {padding: 'x'.repeat(MATERIAL_READ_FRAME_BYTES - emptySize)});
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of streamMaterialBackup(fake([item]), {exportedAt: 1})) chunks.push(chunk);
+        expect(chunks.map(chunk => chunk.length)).toEqual([MATERIAL_READ_FRAME_BYTES]);
+        expect(JSON.parse(text(chunks[0]))).toEqual(backup([item], 1));
+    });
     it('propagates a failed count validation without completing the backup',async()=>{
         const failure=new MaterialError('limit-exceeded','材料备份统计超出安全范围'),report=vi.fn();
         const repo=fake([record('count-failure')]);

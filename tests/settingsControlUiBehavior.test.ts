@@ -149,6 +149,9 @@ it.each(['unmount','replace','kind'] as const)('does not focus a prompt insertio
 it('inserts a prompt variable at the selection, preserves blank edits, switches kinds and restores localized defaults',async()=>{
   const preferences=reactive(new Config().harness);preferences.systemPrompt='Hello world';const ui=mount(HarnessPromptSettings,{preferences});
   const field=ui.host.querySelector('textarea') as HTMLTextAreaElement;field.selectionStart=6;field.selectionEnd=11;field.setSelectionRange=vi.fn();const focus=vi.spyOn(field,'focus');
+  const down=new win.Event('mousedown',{bubbles:true,cancelable:true});
+  ui.host.querySelector('.harness-prompt-variables button')!.dispatchEvent(down);
+  expect(down.defaultPrevented).toBe(true);expect(preferences.systemPrompt).toBe('Hello world');
   const token=HARNESS_PROMPT_VARIABLES[0]!.token;await click(ui.host.querySelector('.harness-prompt-variables button')!);
   expect(preferences.systemPrompt).toBe('Hello '+token);expect(focus).toHaveBeenCalledOnce();expect(field.setSelectionRange).toHaveBeenCalledWith(6+token.length,6+token.length);
   await input(field,'');expect(preferences.systemPrompt).toBe('');expect(field.getAttribute('placeholder')).toBe(getDefaultHarnessPrompt('system','zh-CN'));

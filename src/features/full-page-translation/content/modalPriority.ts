@@ -98,7 +98,8 @@ function hasBlockingMask(element: HTMLElement): boolean {
     const candidates = new Set<Element>();
     const root = element.parentElement ?? element.getRootNode();
     if (root.nodeType === 1 && matches(root as Element, MASK_SELECTOR)) candidates.add(root as Element);
-    if ('querySelectorAll' in root) (root as ParentNode).querySelectorAll(MASK_SELECTOR).forEach((node) => candidates.add(node));
+    // HTMLElement 的根只能是 Element、Document 或 DocumentFragment，均实现 ParentNode。
+    (root as ParentNode).querySelectorAll(MASK_SELECTOR).forEach((node) => candidates.add(node));
     for (const mask of candidates) {
         if (mask === element) continue;
         if (isOwned(mask)) continue;

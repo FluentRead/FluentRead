@@ -3,6 +3,15 @@ import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from
 import {normalizeSelectionPageZoom, SELECTION_PAGE_ZOOM_CHANGED, SELECTION_PAGE_ZOOM_REQUEST} from '@/src/features/selection-translation/pageZoom';
 
 describe('selection page zoom', () => {
+    it('settles a zoom notification after its content script has unloaded', async () => {
+        const sendMessage = vi.fn().mockRejectedValue(new Error('Receiving end does not exist'));
+        const addListener = vi.fn();
+        createSelectionPageZoomBrowserPort({sendMessage, onZoomChange: {addListener}}).installZoomChangeListener();
+        addListener.mock.calls[0][0]({tabId: 7, newZoomFactor: 1.5});
+        await Promise.resolve();
+        expect(sendMessage).toHaveBeenCalledOnce();
+        expect(sendMessage).toHaveBeenCalledWith(7, {type: SELECTION_PAGE_ZOOM_CHANGED, zoom: 1.5});
+    });
     it('reads only the sender tab zoom and ignores a tab id supplied in the message', async () => {
         const getZoom = vi.fn(async (_tabId: number) => 2);
         const handler = createSelectionPageZoomHandler(getZoom);

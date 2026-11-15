@@ -288,7 +288,7 @@ describe('Writing context belongs to the selected conversation', () => {
 
     it('excludes stylesheet-hidden title and body fragments while supporting DOM documents without computed styles', () => {
         const doc = page(`<main><bdi data-testid="issue-title" class="css-hidden">Invisible title</bdi><bdi class="js-issue-title">Visible title<span class="css-hidden">Private title fragment</span></bdi>
-          <div class="js-comment-body">Visible body<span class="css-none">Display-none detail</span><span class="css-collapse">Collapsed detail</span></div>
+          <div class="js-comment-body">Visible<!-- private comment metadata --> body<span class="css-none">Display-none detail</span><span class="css-collapse">Collapsed detail</span></div>
           <div class="js-comment-body css-hidden">Invisible reply</div></main>`);
         doc.defaultView!.getComputedStyle = ((element: Element) => ({display: element.classList.contains('css-none') ? 'none' : 'block', visibility: element.classList.contains('css-hidden') ? 'hidden' : element.classList.contains('css-collapse') ? 'collapse' : 'visible'})) as never;
         expect(collectReplyContext(doc, 'github')).toBe('帖子标题：Visible title\n\n原帖：Visible body');

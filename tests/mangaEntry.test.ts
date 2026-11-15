@@ -8,13 +8,13 @@ const mocks = vi.hoisted(() => ({
         imageTranslationMangaPromptEnabled: true, imageTranslationMangaDownloadConfirmed: false,
         imageTranslationMangaSites: [] as unknown[], imageTranslationMangaPrefetchPages:3, animations:false, from: 'auto', to: 'zh-Hans', imageTranslationService: '',theme:'auto'},
     create: vi.fn(), status: vi.fn(), toggle: vi.fn(), subscribe: vi.fn(), persist: vi.fn(), send: vi.fn(),
-    stopStatus: vi.fn(), stopConfig: vi.fn(), listReading:vi.fn(), readReading:vi.fn(), observeReading:vi.fn(), registerHost:vi.fn(), releaseHost:vi.fn(),
+    stopStatus: vi.fn(), stopConfig: vi.fn(), listReading:vi.fn(), readReading:vi.fn(), observeReading:vi.fn(), registerHost:vi.fn(), releaseHost:vi.fn(), registerOpener:vi.fn(), stopOpener:vi.fn(),
 }));
 vi.mock('@/src/platform/shadow-ui', () => ({createVueShadowUi: mocks.create}));
 vi.mock('@/src/services/config/store', () => ({config: mocks.config, subscribeConfig: mocks.subscribe, requestConfigPatch: mocks.persist}));
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: mocks.send}}}));
 vi.mock('@/src/features/image-translation/content/runtime', () => ({subscribeMangaTranslation: mocks.status, toggleMangaTranslation: mocks.toggle,
-    getMangaReadingCandidates:mocks.listReading,readMangaReadingCandidate:mocks.readReading,observeMangaReadingCandidate:mocks.observeReading,registerMangaReadingOverlayHost:mocks.registerHost,registerMangaReadingOpener:()=>()=>{}}));
+    getMangaReadingCandidates:mocks.listReading,readMangaReadingCandidate:mocks.readReading,observeMangaReadingCandidate:mocks.observeReading,registerMangaReadingOverlayHost:mocks.registerHost,registerMangaReadingOpener:mocks.registerOpener}));
 vi.mock('@/src/features/image-translation/ui/MangaEntry.vue', () => ({default: {name: 'MangaEntry'}}));
 import {isImageTranslatorNeeded, isMangaReaderPage, mountMangaEntry, openMangaEntry, openMangaReading, subscribeMangaReading, unmountMangaEntry} from '@/src/features/image-translation/content/mangaEntry';
 
@@ -29,12 +29,40 @@ beforeEach(() => {
         imageTranslationMangaPromptEnabled: true, imageTranslationMangaDownloadConfirmed: false, imageTranslationMangaSites: [], from: 'auto', to: 'zh-Hans', imageTranslationService: '',theme:'auto'});
     mocks.subscribe.mockReturnValue(mocks.stopConfig);mocks.status.mockReturnValue(mocks.stopStatus);
     mocks.registerHost.mockReturnValue(mocks.releaseHost);
+    mocks.registerOpener.mockReturnValue(mocks.stopOpener);
     mocks.create.mockResolvedValue({remove: vi.fn(), mounted: {instance: {open: vi.fn()}}});
     mocks.send.mockResolvedValue({success: true, ready: true, inpaintingReady: true});
 });
 afterEach(() => {unmountMangaEntry();vi.unstubAllGlobals();});
 
 describe('独立漫画入口所有权和配置端口', () => {
+    it('releases a successor activation after cleanup synchronously remounts a pending entry',async()=>{
+        const first=deferred(),second=deferred();mocks.create.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const old=mountMangaEntry({} as never);let successor:Promise<void>|undefined;
+        mocks.stopOpener.mockImplementationOnce(()=>{unmountMangaEntry();successor=mountMangaEntry({} as never);});
+        unmountMangaEntry();first.resolve({remove:vi.fn()});second.resolve({remove:vi.fn(),mounted:{instance:{open:vi.fn()}}});await old;await successor;
+        unmountMangaEntry();expect(mocks.stopOpener).toHaveBeenCalledTimes(2);expect(mocks.stopConfig).toHaveBeenCalledTimes(2);expect(mocks.stopStatus).toHaveBeenCalledTimes(2);
+    });
+    it('registered reading opener preserves an already open panel and is removed with its owner', async () => {
+        const target=document.createElement('button');document.body.append(target);
+        const openReading=vi.fn().mockResolvedValue(true),closeReading=vi.fn();
+        mocks.create.mockResolvedValueOnce({remove:vi.fn(),mounted:{instance:{openReading,closeReading}}});
+        await mountMangaEntry({} as never);
+        mocks.status.mock.calls[0][0]({available:true,active:true,pending:false,errors:0});
+        const event={isTrusted:true,currentTarget:target} as unknown as MouseEvent;
+        const open=mocks.registerOpener.mock.calls[0][0];
+        expect(open(event)).toBe(true);props().readingChanged(true);
+        expect(open(event)).toBe(true);expect(openReading).toHaveBeenCalledOnce();expect(closeReading).not.toHaveBeenCalled();
+        unmountMangaEntry();expect(mocks.stopOpener).toHaveBeenCalledOnce();expect(open(event)).toBe(false);
+    });
+    it('a listener removed during a reading-state notification is not called from the stale iteration', async () => {
+        let stopSecond=()=>{};
+        const stopFirst=subscribeMangaReading(open=>{if(open)stopSecond();}),second=vi.fn();
+        stopSecond=subscribeMangaReading(second);
+        await mountMangaEntry({} as never);props().readingChanged(true);
+        expect(second).toHaveBeenCalledTimes(1);expect(second).toHaveBeenCalledWith(false);
+        stopFirst();stopSecond();
+    });
     it('读取面板沿用界面主题并只在复制操作时访问剪贴板', async () => {
         const writeText=vi.fn().mockResolvedValue(undefined);vi.stubGlobal('navigator',{clipboard:{writeText}});
         await mountMangaEntry({} as never);expect(props().reading.theme).toBe('auto');expect(writeText).not.toHaveBeenCalled();

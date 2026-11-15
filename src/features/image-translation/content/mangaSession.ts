@@ -96,7 +96,7 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
         const [image, page] = next;
         page.attempted = true;
         const owner = epoch;
-        const task = running = {image, page};
+        running = {image, page};
         let started = false;
         let deferred = false;
         notify();
@@ -114,7 +114,8 @@ export function createMangaSession<T = HTMLImageElement>(ports: {
                     else if (page.retained) {page.failed ||= ports.failed(image);page.completed = true;}
                     else {ports.release(image);pages.delete(image);}
                 }
-                if (running === task) running = null;
+                // pump 在 running 非空时不会准入下一页；当前任务始终持有这个串行名额。
+                running = null;
                 notify();
                 pump();
             });

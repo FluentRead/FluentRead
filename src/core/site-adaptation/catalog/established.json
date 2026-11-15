@@ -280,6 +280,7 @@
     ],
     "watchIgnore": [
       "[class*=\"PullsListItem-module__description__\"]",
+      "main:has([data-target=\"react-app.reactRoot\"] > meta[name=\"react-app-name\"][content=\"pull-requests\"]) header[data-component=\"PageLayout.Header\"] h1[data-testid=\"header-title\"]:not(.markdown-body,.markdown-body *)",
       "main [data-listview-component=\"items-list\"] > li:has([data-testid=\"listitem-title-link\"]) [data-testid=\"timestamp-container\"]:not(.markdown-body):not(.markdown-body *):not([data-testid=\"listitem-title-link\"] *):not(:has([data-testid=\"listitem-title-link\"]))",
       "[data-testid=\"issue-labels\"]",
       "span[class*=\"IssueLabel\"]",
@@ -313,6 +314,7 @@
       "[data-listview-item-visibility-label=\"true\"]"
     ],
     "omit": [
+      "main:has([data-target=\"react-app.reactRoot\"] > meta[name=\"react-app-name\"][content=\"pull-requests\"]) header[data-component=\"PageLayout.Header\"] h1[data-testid=\"header-title\"]:not(.markdown-body,.markdown-body *)",
       "main [data-listview-component=\"items-list\"] > li:has([data-testid=\"listitem-title-link\"]) [data-testid=\"timestamp-container\"]:not(.markdown-body):not(.markdown-body *):not([data-testid=\"listitem-title-link\"] *):not(:has([data-testid=\"listitem-title-link\"]))",
       "[class*=\"ReposListItem-module__TopicsList\"]",
       "[data-listview-component=\"items-list\"] [class*=\"TopicsList__\"]",

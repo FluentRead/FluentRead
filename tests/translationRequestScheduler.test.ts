@@ -20,6 +20,16 @@ async function flushMicrotasks(times = 8): Promise<void> {
 }
 
 describe('translation request scheduler', () => {
+    it('压缩大页面等待队列时保留中途取消空槽，所有剩余任务及下一请求仍能完成', async () => {
+        const scheduler = createTranslationRequestScheduler(() => ({maxConcurrentTranslations: 1, translationRequestsPerSecond: 0, translationRequestsPerMinute: 0}));
+        const size = 2300, removed = 2200, caller = new AbortController(), ran: number[] = [];
+        const jobs = Array.from({length: size}, (_, index) => scheduler.schedule(async () => {ran.push(index); return index;}, index === removed ? {signal: caller.signal} : {}));
+        const settled = Promise.allSettled(jobs); caller.abort(); await vi.runAllTimersAsync(); const outcomes = await settled;
+        expect(outcomes[removed]).toMatchObject({status: 'rejected', reason: {name: 'AbortError'}});
+        expect(outcomes.filter(item => item.status === 'fulfilled')).toHaveLength(size - 1);
+        expect(ran).toEqual(Array.from({length: size}, (_, index) => index).filter(index => index !== removed));
+        await expect(scheduler.schedule(async () => 'next')).resolves.toBe('next');
+    });
     beforeEach(() => {
         vi.useFakeTimers();
         vi.setSystemTime(0);

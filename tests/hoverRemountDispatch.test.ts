@@ -52,6 +52,12 @@ function setup() {
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals();});
 
 describe('hover remount dispatch', () => {
+    it('keeps normal translation when the tracker declines an unsafe remount candidate', async () => {
+        vi.useFakeTimers();const h=setup();h.ports.track.mockReturnValueOnce(null as never);
+        await h.launch();h.finishRequest({status:'stale',detachedHoverAttempt:true});await vi.advanceTimersByTimeAsync(0);
+        expect(h.ports.translate).toHaveBeenCalledOnce();expect(h.ports.waitForPaint).not.toHaveBeenCalled();
+        expect(h.ports.warn).not.toHaveBeenCalled();h.instance.scheduler.cancel();
+    });
     it('rechecks visibility, session, scope, generation, cache and invocation identity', async () => {
         vi.useFakeTimers(); const h = setup(); await h.launch();
         expect(h.current()).toBe(true);

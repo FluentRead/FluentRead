@@ -2,6 +2,19 @@ import {describe, expect, it, vi} from 'vitest';
 import {VideoTranslationCache} from '@/src/features/video-subtitle/content/translationCache';
 
 describe('VideoTranslationCache', () => {
+  it('重复预取共享请求，供应商结算与清空交错时不复活缓存', async () => {
+    let complete!: (value: string) => void;
+    const translate = vi.fn(() => new Promise<string>(resolve => {complete = resolve;}));
+    const cache = new VideoTranslationCache(translate), first = cache.request('same', true);
+    expect(cache.request('same', true)).toBe(first); await Promise.resolve(); complete('译文'); await expect(first).resolves.toBe('译文');
+    expect(translate).toHaveBeenCalledOnce();
+    for (let delay = 0; delay <= 16; delay++) {
+      const current = new VideoTranslationCache(async () => 'ready result');
+      const settled = current.request('source').then(value => ({value}), error => ({error}));
+      const cleared = (async () => {for (let step = 0; step < delay; step++) await Promise.resolve(); current.clear();})();
+      await Promise.all([settled, cleared]); expect(current.peek('source')).toBeUndefined();
+    }
+  });
   it('按当前播放窗口预取，当前句优先，单句失败不会中断其他预取', async () => {
     const cache = new VideoTranslationCache(async () => 'ok');
     const current = {startMs: 0, durationMs: 1000, text: 'Current'};

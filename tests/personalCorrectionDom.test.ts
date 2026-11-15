@@ -115,6 +115,10 @@ describe('个人校订的网页所有权端口', () => {
         const orphan = document.createElement('span'); orphan.className = 'fluent-read-bilingual-content';
         vi.spyOn(document, 'querySelectorAll').mockReturnValueOnce([orphan] as any); disableVisiblePersonalCorrections();
     });
+    it('宿主改写了尚未应用个人记录的译文时，关闭不会重新写入底稿',()=>{
+        const plain=pair();plain.content.textContent='Host replacement';fixture.artifact=false;
+        disableVisiblePersonalCorrections();expect(plain.content.textContent).toBe('Host replacement');expect(fixture.refresh).not.toHaveBeenCalled();expect(fixture.restore).not.toHaveBeenCalled();
+    });
     it('关闭的刷新零 IO，在途刷新也不能在关闭后采用返回的个人结果', async () => {
         fixture.config.personalCorrectionsEnabled = false; await refreshVisiblePersonalCorrections(); expect(fixture.lookup).not.toHaveBeenCalled();
         fixture.config.personalCorrectionsEnabled = true; const {state} = pair(true, 'saved');

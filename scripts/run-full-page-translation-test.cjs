@@ -8,6 +8,7 @@
 // 它不会连接用户正在使用的浏览器 profile，也不会通过 JS 合成键盘事件。
 
 const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
+const {encodeControlledTranslation} = require('./site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
@@ -95,7 +96,7 @@ function createFixtureRequestHandler(html) {
 function buildFixtureMicrosoftResponseBody(payload) {
   const texts = Array.isArray(payload) ? payload.map((value) => String(value)) : [];
   return JSON.stringify(texts.map((text) => ({
-    translations: [{text: `测试译文：${text}`}],
+    translations: [{text: encodeControlledTranslation(text, 'microsoft-escaped-text')}],
   })));
 }
 
@@ -2429,6 +2430,8 @@ async function main() {
       clamp.appendChild(paragraph);
       container.appendChild(clamp);
     });
+    // 进度面板专项使用可见区域调度；先让新增候选进入视口，再验证动态 DOM 翻译。
+    await page.locator('#dynamic-paragraph').scrollIntoViewIfNeeded();
     await waitFor(page, () => document.querySelector('#dynamic-paragraph .fluent-read-bilingual-content'), args.timeout);
 
     // React/Vue 页面可能在译文已插入后重建原文节点。确认全文观察器不会把

@@ -7,6 +7,7 @@
  */
 const assert = require('node:assert/strict');
 const {guardBrowserClose} = require('./owned-browser-close.cjs');
+const {controlledProviderRuntime} = require('../site-translation/controlled-provider.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -61,7 +62,7 @@ async function main() {
   let sequence = 0;
   const installedWorkers = new WeakMap();
   const installWorker = current => {
-    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(() => {
+    if (!installedWorkers.has(current)) installedWorkers.set(current, current.evaluate(controlledProviderRuntime, true).then(() => current.evaluate(() => {
       globalThis.nestedListRequests = [];
       globalThis.failNestedListRequests = false;
       globalThis.fetch = async (input, init) => {
@@ -73,12 +74,12 @@ async function main() {
         const texts = JSON.parse(init?.body ?? await input.text());
         globalThis.nestedListRequests.push(texts);
         if (globalThis.failNestedListRequests) return new Response('', {status: 503});
-        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: `测试译文：${text}`}]}))), {
+        return new Response(JSON.stringify(texts.map(text => ({translations: [{text: globalThis.__frCompatibilityTransport.encode(text, 'microsoft-escaped-text')}]}))), {
           status: 200,
           headers: {'content-type': 'application/json'},
         });
       };
-    }));
+    })));
     return installedWorkers.get(current);
   };
   const patchConfig = async updates => {

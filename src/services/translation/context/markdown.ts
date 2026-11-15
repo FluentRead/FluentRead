@@ -85,7 +85,6 @@ function footnoteMarkdown(node: HTMLElement, render: (node: HTMLElement) => stri
     const definitions = items.map(item => {
         const id = item.id.slice(3);
         const clone = item.cloneNode(true) as HTMLElement;
-        clone.querySelectorAll('.footnote-backref').forEach(backlink => backlink.remove());
         const lines = render(clone).split('\n');
         return `[^${id}]: ${lines[0]}` + lines.slice(1).map(line => `\n    ${line}`).join('');
     });

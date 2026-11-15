@@ -301,6 +301,25 @@ describe('audit48 J public lifecycle races and remaining real template actions',
   const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();const pref=deferred<void>(),copy=deferred<void>();ports.patch.mockReturnValueOnce(pref.promise);ctx.event('[data-theme="sky"]');await settle();ctx.write.mockReturnValueOnce(copy.promise);await ctx.paint();const copying=ctx.event('[data-action="copy"]');ctx.studio.close();await ctx.studio.open(ctx.source);pref.reject(Error('late preference'));copy.reject(Error('late clipboard'));await copying;await settle();await ctx.paint();
   expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent||'').not.toContain('shareCard.preferenceFailed');expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent||'').not.toContain('shareCard.copyFailed');
  });
+ it('finishes preference writes after close without rendering another card',async()=>{
+  const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();const pending=deferred<void>();ports.patch.mockReturnValueOnce(pending.promise);
+  ctx.event('[data-theme="sky"]');await settle();ctx.studio.close();await settle();const created=ctx.created.length;
+  pending.resolve();await settle();await vi.runOnlyPendingTimersAsync();
+  expect(ctx.created).toHaveLength(created);expect(ctx.urls.size).toBe(0);expect(ctx.doc.querySelector('[data-theme]')).toBeNull();
+ });
+ it.each([false,true])('does not revive a closed studio when download delivery throws: %s',async throws=>{
+  const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();const create=(ctx.doc.createElement as any).getMockImplementation();
+  vi.spyOn(ctx.doc,'createElement').mockImplementation(((tag:string)=>{const node:any=create(tag);if(tag==='a')node.click=()=>{ctx.studio.close();if(throws)throw Error('download interrupted');};return node;}) as any);
+  ctx.event('.fr-card-primary');await settle();await vi.runOnlyPendingTimersAsync();expect(ctx.urls.size).toBe(0);expect(ctx.doc.querySelector('a')).toBeNull();expect(vi.getTimerCount()).toBe(0);
+  await ctx.studio.open(ctx.source);await ctx.paint();expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent||'').not.toContain('shareCard.save');expect(ctx.doc.querySelector('.fr-card-primary')?.hasAttribute('disabled')).toBe(false);
+ });
+ it('ignores an already queued save unlock callback from the previous session',async()=>{
+  const ctx=await client();await ctx.studio.open(ctx.source);await ctx.paint();const schedule=globalThis.setTimeout;let oldUnlock:(()=>void)|undefined;
+  const timer=vi.spyOn(globalThis,'setTimeout').mockImplementation(((callback:any,delay?:number,...args:any[])=>{if(delay===400)oldUnlock=callback;return schedule(callback,delay,...args);}) as any);
+  ctx.event('.fr-card-primary');timer.mockRestore();expect(oldUnlock).toBeTypeOf('function');ctx.studio.close();await ctx.studio.open(ctx.source);await ctx.paint();
+  const copying=deferred<void>();ctx.write.mockReturnValueOnce(copying.promise);const task=ctx.event('[data-action="copy"]');oldUnlock!();ctx.event('.fr-card-primary');
+  expect(ctx.downloads).toHaveLength(1);expect(ctx.write).toHaveBeenCalledOnce();copying.resolve();await task;await settle();expect(ctx.doc.querySelector('.fr-card-feedback')?.textContent).toContain('shareCard.copied');
+ });
  it('skips creation when the context invalidates after mounting but before an open',async()=>{
   await client();runtime=await import('@/src/features/share-card/public');const context:any={isInvalid:false};runtime.mountShareCard(context);context.isInvalid=true;await runtime.openShareCard({original:'x',translation:'y'});expect(ports.create).not.toHaveBeenCalled();expect(ports.notice).not.toHaveBeenCalled();
  });

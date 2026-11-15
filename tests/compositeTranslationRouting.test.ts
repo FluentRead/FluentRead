@@ -7,6 +7,11 @@ const profile = (strategy: CompositeTranslationProvider['strategy']): CompositeT
 });
 
 describe('composite routing observations', () => {
+    it('preserves the configured order when a future strategy is not recognized', () => {
+        const state = createCompositeTranslationRoutingState();
+        const configured = {...profile('sequential'), strategy:'future-strategy' as never};
+        expect(state.order(configured)).toEqual(configured.services);
+    });
     it('rotates each request through list order and shuffles random members without mutating configuration', () => {
         const state = createCompositeTranslationRoutingState({random: () => 0});
         const sequential = profile('sequential');

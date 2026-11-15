@@ -66,7 +66,8 @@ export async function createMaterialBackupOpfsTarget(filename:string,platform:Ma
         async write(chunk) {
             if(stage!=='writing'||inFlight) throw new Error('材料备份写入状态无效');
             const task=writable.write(chunk);inFlight=task;
-            try {await task;} finally {if(inFlight===task)inFlight=undefined;}
+            // write 在 inFlight 非空时拒绝重入，关闭路径保留该真实任务直到结算。
+            try {await task;} finally {inFlight=undefined;}
         },
         async commit(signal) {
             if(stage!=='writing'||inFlight) throw new Error('材料备份提交状态无效');
@@ -100,7 +101,9 @@ export async function createMaterialBackupOpfsTarget(filename:string,platform:Ma
                         try {
                             void Promise.resolve().then(()=>late.cancel()).catch(()=>{});
                             const terminal=await late.wait();
-                            if(terminal==='complete'||terminal==='interrupted')await cleanup();
+                            if(terminal==='complete'||terminal==='interrupted'){
+                                await cleanup();
+                            }
                         }catch{/* 无法确认终态时保留文件与锁。 */}
                     },async error=>{if(error instanceof MaterialBackupDownloadNotStartedError)try{await cleanup();}catch{/* 清理失败后保留剩余文件。 */}});
                     throw Object.assign(new Error('无法确认材料备份下载是否已开始，临时文件已保留，请检查浏览器下载'),{cause:error});

@@ -1226,7 +1226,7 @@ async function main() {
     });
     await cleanup(async () => {await closeServer(fixture?.server);});
     await cleanup(() => {
-      if (browserClosed) fs.rmSync(profileDir, {recursive: true, force: true});
+      if (browserClosed) fs.rmSync(profileDir, {recursive: true, force: true, maxRetries: 5, retryDelay: 100});
       else if (!launchAttempted) {
         // No browser launch was attempted; only remove an empty initial profile.
         try {fs.rmdirSync(profileDir);} catch (error) {

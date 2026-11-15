@@ -123,7 +123,6 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
     // key 含每个载体的实例 id，活动完成页可按键常数时间定位，无需遍历全部页面。
     const completedByKey = new Map<string,CanvasState>();
     const untrack=(state:CanvasState)=>{if(state.contentKey&&completedByKey.get(state.contentKey)===state)completedByKey.delete(state.contentKey);};
-    const track=(state:CanvasState)=>{if(state.completed&&state.contentKey)completedByKey.set(state.contentKey,state);};
     const ids = new WeakMap<T, number>();
     const revisions = new WeakMap<T, number>();
     const lightCache = createMangaLightCache(ports.lightCacheLimits?.pages,ports.lightCacheLimits?.bytes,(key,page)=>{
@@ -399,7 +398,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 key = `${owner}:${await imageDigest(image)}`;
                 if (!current()) return;
                 if (retained?.contentKey === key) {
-                    state.contentKey = key;state.completed = true;state.validationPending = false;track(state);show(state);return;
+                    state.contentKey = key;state.completed = true;state.validationPending = false;completedByKey.set(key,state);show(state);return;
                 }
                 if(state.readingKey!==undefined)ports.readingSnapshots?.remove(state.readingKey);
                 state.readingKey=undefined;state.readingFailure=undefined;
@@ -460,7 +459,7 @@ export function createMangaCanvas<T extends object = HTMLCanvasElement>(ports: {
                 }
             }catch{state.readingFailure='error';}
             state.presentation = presentation;presentation = undefined;
-            state.surface = surface;surface = null;state.contentKey = key;state.completed = true;state.validationPending = false;track(state);show(state);
+            state.surface = surface;surface = null;state.contentKey = key;state.completed = true;state.validationPending = false;completedByKey.set(key,state);show(state);
         } catch (error) {
             if (current()) {untrack(state);if(state.readingKey!==undefined)try{ports.readingSnapshots?.remove(state.readingKey);}catch{/* 文字快照故障不影响译图错误处理 */}state.readingKey=undefined;restoreSource(canvas, state);state.presentation?.dispose();state.presentation = undefined;state.failed = true;state.validationPending = false;releaseSurface(state.surface);state.surface = null;showFailure(canvas, state, error);throw error;}
         } finally {

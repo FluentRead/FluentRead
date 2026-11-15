@@ -42,6 +42,12 @@ beforeEach(async () => {
 afterEach(() => {for (const release of releases.splice(0)) release();vi.unstubAllGlobals()})
 
 describe('界面根节点和字体异步归属', () => {
+  it('明确设置一个根的字体时不把其他已注册根当成其所有者', async () => {
+    const a=root(),b=root();register(a);register(b);
+    appearance.applyInterfaceFont('system',a);await settle();
+    expect(a.dataset.interfaceFont).toBe('system');expect(b.dataset.interfaceFont).toBeUndefined();
+    appearance.applyInterfaceSkin('compact');expect(b.dataset.interfaceSkin).toBe('compact');
+  })
   it('旧页面释放自己的注册，不能清除新页面根节点；重复释放幂等', () => {
     const a = root(), b = root();const old = register(a);register(b);old();old()
     appearance.applyInterfaceSkin('compact');appearance.applyInterfaceTheme(true)

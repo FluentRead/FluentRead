@@ -399,6 +399,17 @@ describe('记忆区域规则调度', () => {
         await tick(); f.state.href = 'https://other.example/'; f.runtime.refresh(); finish(); await Promise.resolve(); await tick();
         expect(f.ports.translate).toHaveBeenCalledOnce();
     });
+    it('最后一条自动规则等待期间换路由也不恢复旧观察或提醒',async()=>{
+        const f=fixture();let finish!:()=>void;f.ports.translate.mockImplementationOnce(()=>new Promise<void>(resolve=>{finish=resolve;}));await tick();
+        f.state.href='https://other.example/';f.runtime.refresh();finish();await Promise.resolve();await tick();
+        expect(f.ports.translate).toHaveBeenCalledOnce();expect(f.ports.remind).not.toHaveBeenCalled();
+    });
+    it('自动翻译端口移除其 Shadow 宿主时不继续观察已脱离的根',async()=>{
+        const f=fixture([rule('shadow','auto',[['#component','#inside']])]),host=f.document.createElement('custom-article');host.id='component';
+        const shadow=host.attachShadow({mode:'open'});shadow.innerHTML='<article id="inside">Source paragraph</article>';f.document.body.append(host);
+        f.ports.translate.mockImplementationOnce(async()=>{host.remove();});await tick();
+        expect(f.ports.translate).toHaveBeenCalledOnce();expect(ControlledObserver.instances.every(observer=>!observer.roots.has(shadow))).toBe(true);
+    });
 
     it('耗时区域结束前页面隐藏时不再安排下一时间片', async () => {
         const f = fixture(); let stamp = 0;

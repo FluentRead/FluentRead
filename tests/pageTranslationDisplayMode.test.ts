@@ -18,6 +18,7 @@ import {beginTranslation, createBilingualTranslationReplay, getTranslationState,
     setRenderedStyleAttribute, setSingleTextSlotHosts, type BilingualTranslationReplay} from '@/src/features/full-page-translation/content/state';
 import {isTranslationArtifactCurrent, statefulSourceAndTextSlotsAreCurrent} from '@/src/features/full-page-translation/content/translationStability';
 import * as translationState from '@/src/features/full-page-translation/content/state';
+import {readVisibleTranslationRoot} from '@/src/features/full-page-translation/content/visibleTranslation';
 
 let document: Document;
 beforeEach(() => {
@@ -65,6 +66,24 @@ function committed(mode: 'bilingual' | 'single' = 'bilingual', overrides: Partia
 }
 
 describe('已提交网页译文显示切换', () => {
+    it('userscript 仅译文保留原文节点，不注册扩展专属闭合根或字体样式', () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        const roots = new Map<HTMLElement, ShadowRoot>(), nativeAttach = HTMLElement.prototype.attachShadow;
+        const attach = vi.spyOn(HTMLElement.prototype, 'attachShadow').mockImplementation(function (this: HTMLElement, options) {
+            const root = nativeAttach.call(this, options); roots.set(this, root); return root;
+        });
+        try {
+            const {owner, nodes, sourceHTML} = committed('single');
+            const hosts = [...owner.querySelectorAll<HTMLElement>('.fluent-read-single-slot')]; expect(hosts.length).toBeGreaterThan(0);
+            for (const host of hosts) {
+                expect(readVisibleTranslationRoot(host)).toBeUndefined();
+                const root = roots.get(host)!; expect(root.childElementCount).toBe(1);
+                expect(root.firstElementChild!.classList.contains('fluent-read-single-content')).toBe(false);
+            }
+            restoreTranslation(owner); expect(owner.innerHTML).toBe(sourceHTML);
+            expect(nodes.every(node => owner.contains(node))).toBe(true);
+        } finally {attach.mockRestore(); vi.unstubAllEnvs();}
+    });
     it('无页面地址时沿用全局显示，配置订阅和既有骨架重放都不误匹配网站名单', () => {
         const {owner, state} = committed();
         vi.stubGlobal('location', undefined);

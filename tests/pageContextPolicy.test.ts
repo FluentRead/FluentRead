@@ -10,6 +10,12 @@ import {
 } from '@/src/services/translation/context/policy';
 
 describe('compact page summary references', () => {
+    it('ranks multiple matching source lines by relevance and preserves source order for equal scores', () => {
+        const result = buildPageSummaryReference('Summary.', 'TLS first finding.\nLatency only finding.\nTLS latency strongest finding.\nTLS later finding.', ['TLS latency']);
+        expect(result).toContain('TLS latency strongest finding.'); expect(result).toContain('TLS first finding.');
+        expect(result).not.toContain('Latency only finding.'); expect(result).not.toContain('TLS later finding.');
+        expect(result.indexOf('TLS latency strongest finding.')).toBeLessThan(result.indexOf('TLS first finding.'));
+    });
     it('keeps exact relevant facts from a later paragraph instead of replaying the full article', () => {
         const irrelevant = 'Unrelated navigation and announcements.\n'.repeat(35);
         const fact = 'TLS session resumption reduces latency to 40 ms under the stated conditions.';

@@ -22,6 +22,15 @@ function namedError(name: string, message = name): Error {
     return error;
 }
 
+it('检测模型较晚就绪时复用已经创建的翻译模型完成自检',async()=>{
+    const environment=readyEnvironment(),detector=await environment.LanguageDetector!.create(),ready=deferred<typeof detector>();
+    environment.LanguageDetector!.create=vi.fn(()=>ready.promise);const statuses:ChromeTranslationPreparationStatus[]=[];
+    const work=prepareChromeTranslationInPage({from:'fr',to:'en',onStatus:value=>statuses.push(value)},environment);
+    await Promise.resolve();await Promise.resolve();ready.resolve(detector);
+    await expect(work).resolves.toMatchObject({sourceLanguage:'fr',targetLanguage:'en'});
+    expect(environment.Translator!.create).toHaveBeenCalledOnce();expect(statuses.at(-1)?.phase).toBe('verifying');
+});
+
 function readyEnvironment(
     detectedLanguage = 'fr',
     translatedText: unknown = 'The local model is ready.',

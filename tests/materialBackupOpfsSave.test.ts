@@ -12,6 +12,13 @@ function fixture(){
     return {platform,writer,download,terminal,events,release};
 }
 describe('OPFS material backup target',()=>{
+    it('waits for a rejected in-flight write before aborting and removing the temporary file',async()=>{
+        const f=fixture(),pending=deferred<void>();f.writer.write.mockReturnValueOnce(pending.promise);
+        const target=await createMaterialBackupOpfsTarget('backup.json',f.platform),writing=target.write(new Uint8Array([1]));
+        const rejected=expect(writing).rejects.toThrow('disk full'),cleanup=target.abort();await tick();
+        expect(f.writer.abort).not.toHaveBeenCalled();pending.reject(new Error('disk full'));await rejected;await cleanup;
+        expect(f.events).toEqual(['abort','remove','release']);expect(f.platform.startDownload).not.toHaveBeenCalled();
+    });
     it('waits for verified receive and confirmed download before cleanup and saved',async()=>{
         const f=fixture(),target=await createMaterialBackupOpfsTarget('backup.json',f.platform),receive=deferred<void>();
         const work=saveMaterialBackup(target,async consume=>{await consume(new Uint8Array([1]));await receive.promise;});await tick();expect(f.events).toEqual(['write']);
@@ -106,6 +113,14 @@ describe('OPFS material backup target',()=>{
         const f=fixture(),controller=new AbortController();vi.mocked(f.platform.objectURL).mockImplementationOnce(()=>{controller.abort();return 'blob:test';});
         const target=await createMaterialBackupOpfsTarget('backup.json',f.platform);await expect(target.commit(controller.signal)).rejects.toMatchObject({name:'AbortError'});
         expect(f.platform.startDownload).not.toHaveBeenCalled();expect(f.platform.revokeURL).toHaveBeenCalledWith('blob:test');expect(f.platform.remove).toHaveBeenCalledOnce();
+    });
+    it('retains the file and lock if a late-started adapter resolves with an invalid terminal state',async()=>{
+        const f=fixture(),start=deferred<ReturnType<typeof fixture>['download']>(),controller=new AbortController();
+        vi.mocked(f.platform.startDownload).mockReturnValueOnce(start.promise);
+        const target=await createMaterialBackupOpfsTarget('backup.json',f.platform),work=target.commit(controller.signal);
+        const failed=expect(work).rejects.toThrow('无法确认材料备份下载是否已开始');await tick();controller.abort();await failed;
+        start.resolve(f.download);await tick();f.terminal.resolve('invalid' as MaterialBackupDownloadTerminal);await tick();
+        expect(f.platform.remove).not.toHaveBeenCalled();expect(f.release).not.toHaveBeenCalled();
     });
     it('retains the source if a late-started download cannot report its terminal state',async()=>{
         const f=fixture(),start=deferred<ReturnType<typeof fixture>['download']>(),controller=new AbortController();vi.mocked(f.platform.startDownload).mockReturnValueOnce(start.promise);

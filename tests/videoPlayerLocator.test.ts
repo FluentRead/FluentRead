@@ -43,6 +43,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('does not infer a video from a shared native player control when the known player contains two videos',()=>{
+  const f=setup('<div class="html5-video-player"><video></video><video></video><button id="shared-control">Settings</button></div>','https://x.com/home');
+  const locator=createVideoPlayerLocator({document:f.document,window:f.window,isXPage:()=>true});
+  f.document.querySelector('#shared-control')!.dispatchEvent(new (f.window as unknown as {Event:typeof Event}).Event('pointerover',{bubbles:true}));
+  expect(locator.getTarget()).toBeNull();locator.destroy();
+});
+
 describe('video player locator', () => {
   it('ignores native caption span churn but observes media visibility, source and reparenting', () => {
     vi.useFakeTimers();

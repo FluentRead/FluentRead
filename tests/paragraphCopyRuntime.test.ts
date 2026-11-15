@@ -172,6 +172,11 @@ describe('段落复制快捷键手势', () => {
         expect(page.document.querySelector('textarea')).toBeNull();
         expect(harness.notices).toEqual([{message: '复制失败，请选中文字后手动复制', tone: 'error'}]);
     });
+    it('候选读取中已卸载的旧复制请求即使抛错也不再显示提示', async () => {
+        const page=mount();page.pointerTo(5,5);
+        harness.resolveCandidate.mockImplementationOnce(()=>{controller.abort();throw new Error('page disposed');});
+        await page.keydown();expect(page.clipboard.writeText).not.toHaveBeenCalled();expect(harness.notices).toEqual([]);
+    });
     it('读取候选异常时报告失败；指针移动本身不扫描 DOM', async () => {
         const page = mount();
         for (let index = 0; index < 1000; index++) page.pointerTo(index, index);

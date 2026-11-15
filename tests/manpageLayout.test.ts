@@ -366,6 +366,10 @@ describe('man7 shared source column width', () => {
         f.document.body.appendChild(wider);
         addParagraph(f, body.replace('column edge.', 'much wider column edge.'), wider);
         addParagraph(f, '       Shorter prose.\n       More prose.\n', wider);
+        const narrower = f.document.createElement('pre');
+        narrower.getBoundingClientRect = () => ({left: 100, width: 800, height: 100} as DOMRect);
+        f.document.body.appendChild(narrower);
+        addParagraph(f, '       Short verified source.\n       A continuation.\n', narrower);
         const forged = f.document.createElement('pre');
         f.document.body.appendChild(forged);
         addParagraph(f, '       ' + 'Forged huge source '.repeat(100) + '\n       More prose.\n', forged, false);

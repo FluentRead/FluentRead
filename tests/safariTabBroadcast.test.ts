@@ -67,6 +67,15 @@ function deliveries(send: ReturnType<typeof harness>['sendTabMessage']) {
 }
 
 describe('Safari 接收者会话与可信配置读取发送方', () => {
+    it('a throwing warning port cannot poison the next recipient read after a transient storage failure', async () => {
+        const page=harness([21]);
+        page.readSessionRecipients.mockRejectedValueOnce(new Error('session store unavailable'));
+        page.warn.mockImplementationOnce(()=>{throw new Error('warning sink unavailable');});
+        await expect(page.runtime.queryTabs()).rejects.toThrow('warning sink unavailable');
+        await expect(page.runtime.queryTabs()).resolves.toEqual([{id:21}]);
+        await page.runtime.broadcastTabMessage(cacheCleared);
+        expect(deliveries(page.sendTabMessage)).toEqual([{tabId:21,message:cacheCleared}]);
+    });
     it('新后台实例从同一浏览器会话恢复旧接收者，不枚举标签或要求页面重新读取', async () => {
         const page = harness([21, 42]);
         await page.runtime.registerContentReceiver(contentSender(63));
@@ -465,7 +474,7 @@ describe('通知所属生命周期取消', () => {
         expect(page.writeSessionRecipients).not.toHaveBeenCalled();
     });
 
-    it.each(['first', 'latest'] as const)('同类不同 owner 并发，取消 %s 不吞掉另一个 owner 的通知或留下挂起调用', async cancelled => {
+    it.each(['first', 'latest', 'neither'] as const)('同类不同 owner 并发，取消 %s 不吞掉有效 owner 的通知或留下挂起调用', async cancelled => {
         const page = harness([21]);
         const loading = deferred<unknown>();
         const firstOwner = new AbortController();
@@ -477,13 +486,13 @@ describe('通知所属生命周期取消', () => {
         const latest = page.runtime.broadcastTabMessage(latestMessage, latestOwner.signal);
         await vi.waitFor(() => expect(page.readSessionRecipients).toHaveBeenCalledTimes(1));
 
-        (cancelled === 'first' ? firstOwner : latestOwner).abort();
+        if(cancelled!=='neither') (cancelled === 'first' ? firstOwner : latestOwner).abort();
         loading.resolve([21]);
         await expect(Promise.all([first, latest])).resolves.toEqual([undefined, undefined]);
         await page.runtime.queryTabs();
 
         expect(deliveries(page.sendTabMessage)).toEqual([
-            {tabId: 21, message: cancelled === 'first' ? latestMessage : firstMessage},
+            {tabId: 21, message: cancelled === 'latest' ? firstMessage : latestMessage},
         ]);
     });
 

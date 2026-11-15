@@ -100,7 +100,8 @@ export function installMaterialImportRuntime(options: Options): () => void {
             });
             const pending = wait(operation, controller.signal);
             cleanup = pending;
-            void pending.then(() => { if (cleanup === pending) cleanup = undefined; }, () => { if (cleanup === pending) cleanup = undefined; })
+            // cleanup 在持有 pending 期间拒绝替换；结算回调是释放该租约的唯一入口。
+            void pending.then(() => { cleanup = undefined; }, () => { cleanup = undefined; })
                 .finally(() => { clearTimeout(timer); cleanupController.signal.removeEventListener('abort', abort); });
         }
         return cleanup;
@@ -118,13 +119,14 @@ export function installMaterialImportRuntime(options: Options): () => void {
         if (scheduledCount >= MAX_MAINTENANCE_OPERATIONS) return Promise.reject(Object.assign(Error('maintenance busy'), {name: 'MaterialMaintenanceBusyError'}));
         scheduledCount++;
         const result = scheduled.then(task);
-        const release = () => {scheduledCount--; if (scheduledCount < MAX_MAINTENANCE_OPERATIONS) warnedBackpressure = false;};
+        // 入队前已限制总数；释放一个名额后必定低于上限。
+        const release = () => {scheduledCount--; warnedBackpressure = false;};
         scheduled = result.then(release, release); return result;
     };
     const bounded = async <T>(work: Promise<T>): Promise<T> => {
         let timer: ReturnType<typeof setTimeout> | undefined;
         try {return await Promise.race([work, new Promise<never>((_, reject) => {timer = setTimeout(() => reject(Error('maintenance timeout')), 30_000);})]);}
-        finally {if (timer !== undefined) clearTimeout(timer);}
+        finally {clearTimeout(timer);}
     };
     // 修改扩展持久状态的请求即使等待方超时或取消也可能迟到生效；
     // 排程串行租约须一直持有到真实 Promise 结束，避免旧操作覆盖新计划。

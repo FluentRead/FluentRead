@@ -35,6 +35,9 @@ const bytes = Buffer.byteLength(source);
 // This build is hosted outside Greasy Fork, whose separate rules cap scripts at 2 MB.
 // Current main f9ca5ec6f builds to 3,685,253 bytes; provider-default migration adds 2,968 bytes.
 // Raise this cap by the measured 3 kB and retain 1,779 bytes of headroom; Greasy Fork and compact-build limits stay unchanged.
-const maxBytes = 3_690_000;
+// Current local-main locale corrections, with eight obsolete rows removed, add 3,742 bytes to
+// the 1963a380f release candidate (3,688,936 → 3,692,678); use the existing headroom first.
+// Add only the remaining rounded 3 kB for text; dependencies, model assets and compact-build limits stay unchanged.
+const maxBytes = 3_693_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

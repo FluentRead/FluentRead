@@ -349,6 +349,19 @@ describe('mobile YouTube readable control avoidance', () => {
     expect(f.panel.hasAttribute('tabindex')).toBe(false);
   });
 
+  it('重挂滚动卡片时保留其内部原文节点的焦点与原有 tabindex', () => {
+    const f=mobileControlFixture();f.setCue('huge');f.sync();
+    const target=f.original;target.tabIndex=0;
+    let active:Element=target;
+    Object.defineProperty(f.document,'activeElement',{configurable:true,get:()=>active});
+    const focus=vi.spyOn(target,'focus').mockImplementation(()=>{active=target;});
+    const append=f.layer.appendChild.bind(f.layer);
+    Object.defineProperty(f.layer,'appendChild',{value:(node:Node)=>{if(node===f.panel)active=f.document.body;return append(node);}});
+    f.controls.hidden=true;f.sync();
+    expect(focus).toHaveBeenCalledWith({preventScroll:true});expect(f.document.activeElement).toBe(target);
+    expect(target.getAttribute('tabindex')).toBe('0');expect(f.panel.hasAttribute('tabindex')).toBe(false);
+  });
+
   it('退出滚动host只保留卡片原有焦点，不自动聚焦；按压中的Space尾事件仍由该卡片消费', () => {
     const f = mobileControlFixture(); f.setCue('huge'); f.sync();
     let active: Element = f.document.body;

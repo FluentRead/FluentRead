@@ -113,7 +113,9 @@ async function traverse(blob: Blob, input: SourcePlan, visitor: Visitor, signal?
       const record = records[index];
       if (!decoder) {decoder = utf8Decoder(); await wait(visitor.start(index), signal); check(signal);}
       const start = Math.max(record.start, at) - at, end = Math.min(record.end, at + bytes.length) - at;
-      if (end > start) {const text = decoder.decode(bytes.subarray(start, end), {stream: true}); if (text) {await wait(visitor.chunk(encoder.encode(text), index), signal); check(signal);}}
+      // while 已保证记录起点早于块末尾；上一块会结束并推进所有已结束记录，因此交集必为正。
+      const text = decoder.decode(bytes.subarray(start, end), {stream: true});
+      if (text) {await wait(visitor.chunk(encoder.encode(text), index), signal); check(signal);}
       if (record.end > at + bytes.length) break;
       const tail = decoder.decode(); if (tail) {await wait(visitor.chunk(encoder.encode(tail), index), signal); check(signal);}
       await wait(visitor.end(index), signal); check(signal); decoder = undefined; index++;

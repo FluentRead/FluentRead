@@ -385,6 +385,14 @@ describe('Defuddle page snapshot adapter', () => {
         } finally {vi.restoreAllMocks();}
     });
 
+    it('an empty readable-parser result falls back to cleaned text without changing the page', async () => {
+        const {liveDocument}=installFixturePage('mixed-language-and-sanitizer');
+        const before=liveDocument.documentElement.outerHTML;parse.mockReturnValueOnce({content:''});
+        const context=await getPageTranslationContext();
+        expect(context).toContain('English phrases');expect(context).not.toContain('SYNTHETIC-SECRET');
+        expect(parse).toHaveBeenCalledOnce();expect(liveDocument.documentElement.outerHTML).toBe(before);
+    });
+
     it('parser failure uses the sanitized snapshot and a later extraction retries parsing', async () => {
         const {liveDocument} = installFixturePage('mixed-language-and-sanitizer');
         const before = liveDocument.documentElement.outerHTML;

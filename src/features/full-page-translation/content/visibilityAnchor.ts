@@ -32,8 +32,8 @@ export function resolveFullPageVisibilityAnchor(candidate: HTMLElement): HTMLEle
     const pending: Element[] = [];
     const pushChildrenInReverse = (container: ParentNode) => {
         for (let index = container.children.length - 1; index >= 0; index -= 1) {
-            const child = container.children.item(index);
-            if (child) pending.push(child);
+            // 本轮索引严格位于原生集合长度内，读取期间没有会改写 DOM 的回调。
+            pending.push(container.children.item(index)!);
         }
     };
     pushChildrenInReverse(candidate);

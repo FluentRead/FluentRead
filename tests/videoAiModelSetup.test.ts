@@ -88,7 +88,7 @@ describe('video AI model setup', () => {
     expect(dependencies.startGeneration).not.toHaveBeenCalled();
   });
 
-  it('reset stops the old view immediately, and its late download completion cannot stop a new watcher', async () => {
+  it.each(['success','failure'] as const)('reset keeps the new watcher intact when the old download settles with %s', async outcome => {
     const first = deferred<unknown>(), second = deferred<unknown>();
     const firstStop = vi.fn(), secondStop = vi.fn();
     const listeners: Array<(progress: {loaded: number; total: number} | undefined) => void> = [];
@@ -112,8 +112,10 @@ describe('video AI model setup', () => {
     const b = controller.confirm();
     expect(watchDownload).toHaveBeenCalledTimes(2);
     listeners[1]!({loaded: 10, total: 100});
-    first.resolve({success: true});
+    const errorCalls=vi.mocked(dependencies.setError).mock.calls.length;
+    first.resolve(outcome==='success'?{success:true}:{success:false,error:'old disk failure'});
     await a;
+    expect(dependencies.setError).toHaveBeenCalledTimes(errorCalls);
     expect(firstStop).toHaveBeenCalledOnce();
     expect(secondStop).not.toHaveBeenCalled();
     expect(controller.downloading).toBe(true);

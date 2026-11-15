@@ -7,6 +7,9 @@ const measure = (text: string) => Array.from(text).length * 12;
 const textPlan = (text: string): PdfReadingPlan => ({pageNumber: 1, hasTranslation: true, entries: [{kind: 'text', id: 's0', pageNumber: 1, segmentIndex: 0, role: 'paragraph', source: 'Source', text, translated: true, sourceRect: {x: 0, y: 0, width: 100, height: 20}}]});
 
 describe('PDF fixed-font complete-text pagination', () => {
+    it('does not add an empty line when trailing whitespace alone exceeds the line width', () => {
+        expect(wrapPdfReadingText('word   ', 4, body, text => text.length)).toEqual(['word']);
+    });
     it('keeps title, heading, caption, metadata and body hierarchy readable', () => {
         expect(['title', 'heading', 'caption', 'metadata', 'footer', 'note', 'paragraph'].map(role => pdfReadingFont(role).size)).toEqual([20, 16, 11.5, 11, 11, 11, 12]);
         expect(body.lineHeight).toBe(19.2);

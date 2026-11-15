@@ -39,8 +39,8 @@ interface PendingWorkerRequest {
     resolve: (response: WorkerResponse) => void;
     reject: (error: unknown) => void;
     timeout: number;
-    signal?: AbortSignal;
-    onAbort?: () => void;
+    signal: AbortSignal;
+    onAbort: () => void;
 }
 
 type WorkerLifecycleError = Error & {retryableWorkerFailure?: true};
@@ -118,7 +118,7 @@ function scheduleIdleDispose(): void {
 function rejectPending(error: Error): void {
     for (const [requestId, pending] of pendingRequests) {
         window.clearTimeout(pending.timeout);
-        if (pending.signal && pending.onAbort) pending.signal.removeEventListener('abort', pending.onAbort);
+        pending.signal.removeEventListener('abort', pending.onAbort);
         pending.reject(error);
         pendingRequests.delete(requestId);
     }
@@ -149,7 +149,7 @@ function getWorker(): Worker {
         if (!pending) return;
         pendingRequests.delete(requestId);
         window.clearTimeout(pending.timeout);
-        if (pending.signal && pending.onAbort) pending.signal.removeEventListener('abort', pending.onAbort);
+        pending.signal.removeEventListener('abort', pending.onAbort);
         let response: WorkerResponse;
         try { response = parseLocalTtsWorkerResponse(event.data); }
         catch (error) { pending.reject(error); return; }
@@ -171,7 +171,8 @@ function getWorker(): Worker {
     return next;
 }
 
-function requestWorker(message: Omit<WorkerRequest, 'requestId'>, timeoutMs: number, signal?: AbortSignal): Promise<WorkerResponse> {
+// 私有 Worker 请求只由 runSerial 调用，始终持有其内部联动取消信号。
+function requestWorker(message: Omit<WorkerRequest, 'requestId'>, timeoutMs: number, signal: AbortSignal): Promise<WorkerResponse> {
     clearIdleDispose();
     const generation = workerGeneration;
     return withLocalInferenceBudget(() => {
@@ -183,9 +184,9 @@ function requestWorker(message: Omit<WorkerRequest, 'requestId'>, timeoutMs: num
 function requestWorkerNow(
     message: Omit<WorkerRequest, 'requestId'>,
     timeoutMs: number,
-    signal?: AbortSignal,
+    signal: AbortSignal,
 ): Promise<WorkerResponse> {
-    if (signal?.aborted) return Promise.reject(createAbortError());
+    if (signal.aborted) return Promise.reject(createAbortError());
     clearIdleDispose();
     const currentWorker = getWorker();
     const requestId = ++workerRequestId;
@@ -195,16 +196,16 @@ function requestWorkerNow(
         }, timeoutMs);
         const onAbort = () => terminateWorker(createAbortError());
         pendingRequests.set(requestId, {resolve, reject, timeout, signal, onAbort});
-        if (signal?.aborted) {
+        if (signal.aborted) {
             onAbort();
             return;
         }
-        signal?.addEventListener('abort', onAbort, {once: true});
+        signal.addEventListener('abort', onAbort, {once: true});
         try {
             currentWorker.postMessage({requestId, ...message});
         } catch (error) {
             window.clearTimeout(timeout);
-            if (signal) signal.removeEventListener('abort', onAbort);
+            signal.removeEventListener('abort', onAbort);
             pendingRequests.delete(requestId);
             const workerError = toError(error, '无法启动本地 TTS Worker');
             terminateWorker(workerError);
@@ -216,7 +217,7 @@ function requestWorkerNow(
 async function requestWorkerWithCpuFallback(
     message: Omit<WorkerRequest, 'requestId'>,
     timeoutMs: number,
-    signal?: AbortSignal,
+    signal: AbortSignal,
 ): Promise<WorkerResponse> {
     const deadlineAt = Date.now() + timeoutMs;
     const generation = cancellationGeneration;
@@ -224,7 +225,7 @@ async function requestWorkerWithCpuFallback(
     try {
         return await requestWorker(message, firstAttemptTimeout, signal);
     } catch (error) {
-        if (signal?.aborted || generation !== cancellationGeneration) throw createAbortError();
+        if (signal.aborted || generation !== cancellationGeneration) throw createAbortError();
         const remainingMs = deadlineAt - Date.now();
         if (!isWorkerLifecycleError(error) || message.device === 'wasm' || remainingMs <= 0) throw error;
         return requestWorker({...message, device: 'wasm'}, remainingMs, signal);

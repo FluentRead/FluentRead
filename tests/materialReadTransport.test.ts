@@ -1,14 +1,14 @@
 import {describe, expect, it, vi} from 'vitest';
 import {MATERIAL_READ_FRAME_BYTES, MATERIAL_READ_MESSAGE_BYTES, addMaterialReadCount, receiveMaterialRead, sendMaterialRead, startMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
 
-function pair() {
+function pair(synchronous=false) {
   type Listener=(value:unknown)=>void;
   const states=[{messages:new Set<Listener>(),disconnects:new Set<()=>void>(),closed:false},{messages:new Set<Listener>(),disconnects:new Set<()=>void>(),closed:false}];
   const sent:unknown[][]=[[],[]];
   const ports=states.map((state,index)=>({
     onMessage:{addListener(fn:Listener){state.messages.add(fn);},removeListener(fn:Listener){state.messages.delete(fn);}},
     onDisconnect:{addListener(fn:()=>void){state.disconnects.add(fn);},removeListener(fn:()=>void){state.disconnects.delete(fn);}},
-    postMessage(value:unknown){if(state.closed)throw Error('closed');sent[index].push(value);queueMicrotask(()=>{for(const fn of states[1-index].messages)fn(value);});},
+    postMessage(value:unknown){if(state.closed)throw Error('closed');sent[index].push(value);const deliver=()=>{for(const fn of states[1-index].messages)fn(value);};if(synchronous)deliver();else queueMicrotask(deliver);},
     disconnect(){if(state.closed)return;state.closed=true;states[1-index].closed=true;queueMicrotask(()=>{for(const side of states)for(const fn of side.disconnects)fn();});},
   })) as MaterialReadPort[];
   return {ports,states,sent};
@@ -17,6 +17,19 @@ async function* chunks(...items:Uint8Array[]) {yield* items;}
 const bytes=(count:number)=>Uint8Array.from({length:count},(_,index)=>index%251);
 
 describe('material read transport',()=>{
+  it('accepts an acknowledgement already delivered before the sender awaits its mailbox',async()=>{
+    const {ports,states}=pair(true),input=bytes(MATERIAL_READ_FRAME_BYTES+7),output:Uint8Array[]=[];
+    await Promise.all([receiveMaterialRead(ports[1],chunk=>{output.push(chunk);}),sendMaterialRead(ports[0],chunks(input))]);
+    expect(Buffer.concat(output.map(chunk=>Buffer.from(chunk)))).toEqual(Buffer.from(input));
+    expect(states.every(state=>state.messages.size===0&&state.disconnects.size===0)).toBe(true);
+  });
+  it('consumes an empty completion already delivered while the browser listener is being installed',async()=>{
+    const {ports,states,sent}=pair(),add=ports[1].onMessage.addListener;
+    ports[1].onMessage.addListener=listener=>{add(listener);listener({v:1,type:'end',seq:0,bytes:0,digest:'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'});};
+    const consume=vi.fn();await receiveMaterialRead(ports[1],consume);
+    expect(consume).not.toHaveBeenCalled();expect(sent[1]).toEqual([{v:1,type:'done',seq:0}]);
+    expect(states[1].messages.size).toBe(0);expect(states[1].disconnects.size).toBe(0);
+  });
   it('checks sequence and byte counters at the safe integer boundary',()=>{
     expect(addMaterialReadCount(Number.MAX_SAFE_INTEGER-1,1,'Material read is too large')).toBe(Number.MAX_SAFE_INTEGER);
     expect(()=>addMaterialReadCount(Number.MAX_SAFE_INTEGER,1,'Material read is too large')).toThrow('Material read is too large');

@@ -43,6 +43,10 @@ function event(overrides: Partial<ModelUsageEvent> = {}): ModelUsageEvent {
 }
 
 describe('模型用量纯聚合', () => {
+    it.each([undefined,null,'100',NaN,Infinity,-1])('does not coerce an invalid duration %j into latency or output speed', durationMs => {
+        const totals=aggregateModelUsageTotals([{...event({outputTokens:10}),durationMs} as ModelUsageEvent]);
+        expect(totals).toMatchObject({requestCount:1,averageDurationMs:0,outputTokensPerSecond:null,speedReportedRequests:0});
+    });
     it.each([null, 0, 123])('已有记录起点 %s 时不扫描被筛除调用的起点', recordingStartedAt => {
         const now = new Date(2026, 7, 29, 12).getTime(); let timestampReads = 0;
         const events = Array.from({length: 200}, (_, index) => ({...event({serviceId: 'excluded'}),

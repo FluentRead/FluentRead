@@ -56,20 +56,20 @@ function waitingForPreviousCancellation(type: typeof ownedEntryTypes[number]) {
 }
 
 describe('video subtitle background ownership', () => {
-    it('releases a closed tab even if the old offscreen cancellation port rejects', async () => {
-        const f = setup({success: true, model: 'tiny'});
-        const prepare = find(f.handlers, 'fluentReadPrepareLocalVideoModel');
-        await prepare.handle({model: 'tiny', streamId: 'closed-tab', generation: 1, keepWarm: true}, context(91));
-        f.offscreen.sendIfPresent.mockRejectedValueOnce(new Error('old port closed'));
-        releaseVideoSubtitleOwnerForTab(91);
-        await expect(prepare.handle({model: 'tiny', streamId: 'next-tab', generation: 1, keepWarm: true}, context(92))).resolves.toMatchObject({success: true});
+    it('recovers the model receipt queue after a storage write rejects', async () => {
+        const f=setup();f.storage.set.mockRejectedValueOnce(new Error('model receipt storage unavailable'));
+        const prepare=find(f.handlers,'fluentReadPrepareLocalVideoModel');
+        await expect(prepare.handle({model:'tiny'},context(1))).rejects.toThrow('model receipt storage unavailable');
+        await expect(prepare.handle({model:'base'},context(1))).resolves.toMatchObject({success:true,models:['base']});
+        expect(f.storage.set).toHaveBeenCalledTimes(2);
     });
-    it('releases a failed receipt write so a later model preparation can persist normally', async () => {
-        const f = setup({success: true, model: 'tiny'});
-        f.storage.set.mockRejectedValueOnce(new Error('receipt write failed'));
-        const prepare = find(f.handlers, 'fluentReadPrepareLocalVideoModel');
-        await expect(prepare.handle({model: 'tiny', keepWarm: false}, {})).rejects.toThrow('receipt write failed');
-        await expect(prepare.handle({model: 'tiny', keepWarm: false}, {})).resolves.toMatchObject({success: true, models: ['tiny']});
+    it('a rejected offscreen cancellation after tab closure cannot retain ownership', async () => {
+        const f=setup(),prepare=find(f.handlers,'fluentReadPrepareLocalVideoModel');
+        await prepare.handle({model:'tiny',streamId:'old',generation:1,keepWarm:true},context(31));
+        f.offscreen.sendIfPresent.mockRejectedValueOnce(new Error('offscreen owner already gone'));
+        releaseVideoSubtitleOwnerForTab(31);await Promise.resolve();await Promise.resolve();
+        await expect(prepare.handle({model:'tiny',streamId:'new',generation:1,keepWarm:true},context(32))).resolves.toMatchObject({success:true});
+        releaseVideoSubtitleOwnerForTab(32);
     });
     it('does not release a newer warm generation when an old warm response reports failure', async () => {
         const f = setup({success: true, model: 'tiny', text: 'new owner result'}), gate = deferred<{success: false; error: string}>();
@@ -391,6 +391,17 @@ describe('native video background ownership', () => {
             transcribe: (patch = {}, tab = 71) => find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA=', ...patch}, context(tab)),
             cancel: (reason?: string, tab = 71) => find(handlers, 'fluentReadCancelLocalVideoTranscription').handle({...selection, reason}, context(tab))};
     }
+    it('waits for a rejected native window from a closed tab before admitting another tab', async () => {
+        const f=nativeFixture(),transport=deferred<{text:string;model:string;audioDurationMs:number}>();
+        f.nativeTranscribe.mockReturnValueOnce(transport.promise);
+        const old=expect(f.transcribe()).rejects.toThrow('native audio transport closed');
+        await vi.waitFor(()=>expect(f.nativeTranscribe).toHaveBeenCalledOnce());
+        releaseVideoSubtitleOwnerForTab(71);
+        const fresh=f.transcribe({},72);await Promise.resolve();await Promise.resolve();expect(f.nativeTranscribe).toHaveBeenCalledOnce();
+        transport.reject(new Error('native audio transport closed'));await old;
+        await expect(fresh).resolves.toMatchObject({success:true,text:'native result'});expect(f.nativeTranscribe).toHaveBeenCalledTimes(2);
+        await f.cancel('complete',72);
+    });
     it('cancels native preparation without a transport and rejects a missing native address before fetching', async () => {
         const f = nativeFixture(); await f.prepare(); await f.cancel();
         await expect(f.prepare({nativeBaseUrl: undefined, generation: 2})).rejects.toThrow('本机转写选择');
@@ -414,20 +425,6 @@ describe('native video background ownership', () => {
             readNativeSettings: () => ({enabled: true, provider: 'native-qwen', baseUrl: selection.nativeBaseUrl, sourceLanguage: 'en'})});
         await expect(find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA='}, context(96))).resolves.toMatchObject({success: true, text: 'local service result'});
         expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8000/v1/audio/transcriptions', expect.objectContaining({method: 'POST'}));
-    });
-    it('waits for a released tab native request to settle before admitting the next tab', async () => {
-        const f = nativeFixture();
-        const gate = deferred<{text: string; model: string; audioDurationMs: number}>();
-        f.nativeTranscribe.mockImplementationOnce(() => gate.promise);
-        const first = f.transcribe({}, 71);
-        const firstFailed = expect(first).rejects.toThrow('native transport closed');
-        await vi.waitFor(() => expect(f.nativeTranscribe).toHaveBeenCalledOnce());
-        releaseVideoSubtitleOwnerForTab(71);
-        const second = f.transcribe({streamId: 'replacement'}, 72);
-        expect(f.nativeTranscribe).toHaveBeenCalledOnce();
-        gate.reject(new Error('native transport closed')); await firstFailed;
-        await expect(second).resolves.toMatchObject({success: true, text: 'native result'});
-        expect(f.nativeTranscribe).toHaveBeenCalledTimes(2);
     });
     it('warms only client ownership and transcribes without Offscreen or downloads', async () => {
         const f = nativeFixture();

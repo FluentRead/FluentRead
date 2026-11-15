@@ -32,6 +32,10 @@ function reader(initialScale = 1, options: Partial<DocumentZoomOptions> = {}) {
 }
 
 describe('document viewport zoom gestures', () => {
+    it('ignores an already delivered animation callback after the reader has disposed', () => {
+        const f=reader();f.wheel();const queued=[...f.frames.values()][0];f.dispose();queued(0);
+        expect(f.setScale).not.toHaveBeenCalled();expect(f.frames.size).toBe(0);
+    });
     it('leaves normal scrolling alone and batches every pinch delta with the latest document anchor', () => {
         const fixture = reader();
         expect(fixture.wheel({ctrlKey: false, deltaY: 80}).defaultPrevented).toBe(false);

@@ -7,6 +7,7 @@
 import {MATERIAL_READ_FRAME_BYTES,startMaterialRead,type MaterialReadPort} from './materialReadTransport';
 import {MATERIAL_IMPORT_FRAME_BYTES} from './materialProtocol';
 import {MATERIAL_BACKUP_EXPORT_ERROR_CODES,type MaterialBackupExportErrorCode,type MaterialBackupExportStatistics} from './materialBackupExportProtocol';
+import {nextMaterialBackupExportByteCount} from './materialBackupSafeCount';
 
 export class MaterialBackupExportError extends Error {
     constructor(readonly code:MaterialBackupExportErrorCode) {
@@ -56,9 +57,9 @@ export function startMaterialBackupExport(port:MaterialReadPort, onChunk:(chunk:
                 if(lengthBytes===4){if(!length||length>MATERIAL_READ_FRAME_BYTES)throw Error('材料备份分片长度无效');remaining=length;mode='data';}
             } else if(mode === 'data') {
                 const count=Math.min(remaining,chunk.length-at);
-                if(!Number.isSafeInteger(bytes+count))throw Error('材料备份过大');
+                const nextBytes=nextMaterialBackupExportByteCount(bytes,count);
                 await onChunk(chunk.slice(at,at+count));aborted(signal);
-                at+=count;remaining-=count;bytes+=count;
+                at+=count;remaining-=count;bytes=nextBytes;
                 if(!remaining)mode='tag';
             } else if(mode==='statistics') {
                 const count=Math.min(statisticsBytes.length-statisticsLength,chunk.length-at);

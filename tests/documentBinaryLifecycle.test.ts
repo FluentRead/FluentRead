@@ -240,8 +240,9 @@ describe('documentbinaryAudit actual import and package boundaries', () => {
         expect(destroy).toHaveBeenCalledOnce();
     });
 
-    it('destroys a pending PDF import on cancellation and rejects its late completion', async () => {
+    it.each([false,true])('destroys a pending PDF import once on cancellation (cleanup rejects=%s)', async cleanupFails => {
         const pending = deferred<any>();
+        if(cleanupFails)destroy.mockRejectedValueOnce(new Error('PDF cleanup unavailable'));
         port.getDocument.mockReturnValue({promise: pending.promise, destroy});
         const controller = new AbortController();
         const work = parseBinaryDocument('pending.pdf', sourceBytes(), {signal: controller.signal});
@@ -250,7 +251,7 @@ describe('documentbinaryAudit actual import and package boundaries', () => {
         controller.abort(new Error('closed import'));
         expect(destroy).toHaveBeenCalledOnce();
         pending.resolve({numPages: 1, getPage: vi.fn()});
-        await expect(work).rejects.toThrow('closed import');
+        await expect(work).rejects.toThrow(cleanupFails?'PDF cleanup unavailable':'closed import');
         expect(destroy).toHaveBeenCalledOnce();
     });
 

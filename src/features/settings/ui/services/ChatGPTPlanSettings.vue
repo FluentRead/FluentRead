@@ -209,7 +209,7 @@ async function runAction(kind: Exclude<typeof busy.value, ''>, task: () => Promi
         if (actionController === controller) {
             actionController = undefined;controller.abort();
             if (kind !== 'signin' || !succeeded || !status.value.authPending) busy.value = '';
-            if (current(owner)) schedulePoll();
+            schedulePoll();
         }
     }
     return succeeded;
@@ -239,7 +239,7 @@ async function cancelSignIn(): Promise<void> {
             panelError.value = error;
         }
     }
-    finally {if (actionController === controller) {actionController = undefined;busy.value = '';controller.abort();if (current(owner)) schedulePoll();}}
+    finally {if (actionController === controller) {actionController = undefined;busy.value = '';controller.abort();schedulePoll();}}
 }
 async function disconnect(): Promise<void> {
     if (!active.value || busy.value) return;

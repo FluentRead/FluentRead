@@ -10,6 +10,21 @@ function fixture(){
 }
 beforeEach(()=>{ids.create.mockReset();ids.create.mockReturnValue('00000000-0000-4000-8000-000000000001')});
 describe('userscript in-memory vocabulary undo',()=>{
+  it('expires tickets with numeric browser timer handles',async()=>{
+    vi.useFakeTimers();const schedule=globalThis.setTimeout;
+    const timer=vi.spyOn(globalThis,'setTimeout').mockImplementation((...args)=>Number(schedule(...args)) as unknown as ReturnType<typeof setTimeout>);
+    try{const {handle}=fixture();await handle({type,action:'removeWithUndo',entryId:'entry'});
+      await vi.advanceTimersByTimeAsync(86_400_000);expect(await handle({type,action:'listUndo'})).toEqual({success:true,data:[]});handle.dispose();
+    }finally{timer.mockRestore();vi.useRealTimers();}
+  });
+  it('does not restore a disposed receipt after an in-flight restore finishes',async()=>{
+    const {handle,repository}=fixture(),removed=await handle({type,action:'removeWithUndo',entryId:'entry'});if(!removed.success)throw new Error('unexpected');
+    const id=(removed.data as {id:string}).id;let finish!:()=>void;
+    repository.restoreSnapshot.mockImplementationOnce(()=>new Promise<undefined>(resolve=>{finish=()=>resolve(undefined);}));
+    const pending=handle({type,action:'restoreUndo',undoId:id});handle.dispose();finish();
+    expect(await pending).toEqual({success:true,data:'restored'});expect(await handle({type,action:'restoreUndo',undoId:id})).toEqual({success:true,data:'missing'});
+    expect(await handle({type,action:'listUndo'})).toEqual({success:true,data:[]});
+  });
   it('keeps snapshots in memory, sends only tickets, restores once and clears explicitly',async()=>{
     const {handle,repository,notify}=fixture();const removed=await handle({type,action:'removeWithUndo',entryId:'entry'});
     expect(removed.success).toBe(true);if(!removed.success)throw new Error('unexpected failure');const ticket=removed.data as {id:string};
@@ -105,9 +120,9 @@ describe('userscript in-memory vocabulary undo',()=>{
     const pending=handle({type,action:'removeWithUndo',entryId:'entry'});handle.dispose();finish({entry:{id:'entry',term:'old'},reviewLogs:[]});
     expect(await pending).toEqual({success:true,data:null});expect(await handle({type,action:'listUndo'})).toEqual({success:true,data:[]});
   });
-  it('retains an uncertain snapshot and does not replay without another explicit request',async()=>{
+  it.each(['plain','storage-code'] as const)('retains an uncertain %s failure without replaying until requested',async kind=>{
     const {handle,repository}=fixture();const removed=await handle({type,action:'removeWithUndo',entryId:'entry'});if(!removed.success)throw new Error('unexpected');
-    repository.restoreSnapshot.mockRejectedValueOnce(new Error('ambiguous'));const id=(removed.data as {id:string}).id;
+    repository.restoreSnapshot.mockRejectedValueOnce(kind==='plain'?new Error('ambiguous'):Object.assign(new Error('ambiguous'),{name:'VocabularyBookError',code:'storage-error'}));const id=(removed.data as {id:string}).id;
     expect(await handle({type,action:'restoreUndo',undoId:id})).toMatchObject({success:false,error:{code:'storage-error'}});
     expect((await handle({type,action:'listUndo'}))).toMatchObject({success:true,data:[{id}]});expect(repository.restoreSnapshot).toHaveBeenCalledOnce();
     expect(await handle({type,action:'discardUndo',undoId:id})).toEqual({success:true,data:true});expect(repository.restoreSnapshot).toHaveBeenCalledOnce();

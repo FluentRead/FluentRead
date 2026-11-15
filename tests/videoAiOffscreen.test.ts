@@ -5,6 +5,7 @@ vi.mock('@/src/shared/onnx/resources', async original => ({
     withLocalInferenceBudget: budgetMocks.run,
 }));
 import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
+import * as modelCache from '@/src/features/video-subtitle/offscreen/modelCache';
 import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
 import {sharedDirectoryFixture} from './helpers/sharedVideoModelDirectory';
 import {moveVideoAiModelToSharedDirectory, getVideoAiModelFileUrl, VIDEO_AI_Q4_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
@@ -86,11 +87,25 @@ function completeWorker(worker: FakeWorker, model: 'tiny' | 'base' | 'small' = '
 }
 
 describe('video AI offscreen queue', () => {
+    it('keeps completion from discarding a queued warm preparation, then cancels only that queued stream', async () => {
+        vi.useFakeTimers();installWorker();const download=deferred();
+        const cache=vi.spyOn(modelCache,'cacheVideoAiQ4ModelFiles').mockReturnValueOnce(download.promise);
+        try {
+            const storing=prepareLocalVideoTranscriptionModel('tiny');await drain();
+            const other=prepareLocalVideoTranscriptionModel('small',{keepWarm:true,streamId:'queued-other'});
+            const pending=prepareLocalVideoTranscriptionModel('base',{keepWarm:true,streamId:'queued-target'}),failed=expect(pending).rejects.toThrow('已取消');
+            await cancelLocalVideoTranscription('queued-target','complete');await drain();expect(FakeWorker.instances).toHaveLength(0);
+            await cancelLocalVideoTranscription('queued-target');await failed;
+            download.resolve();await storing;await drain();const worker=FakeWorker.instances[0];
+            expect(worker.messages[0]).toMatchObject({type:'prepare',model:'small'});completeWorker(worker,'small');await other;
+            await cancelLocalVideoTranscription('queued-other');expect(vi.getTimerCount()).toBe(0);
+        } finally {download.resolve();cache.mockRestore();}
+    });
     it.each([[0, 'cancel-before-resolve'], [16, 'cancel-before-resolve'], [0, 'resolve-then-cancel'], [16, 'resolve-then-cancel']] as const)('rejects a cancelled legacy decode with %i samples / %s without reading channels or settling a restarted stream', async (sampleCount, order) => {
         vi.useFakeTimers(); installWorker();
         let finishDecode!: (value: {numberOfChannels: number; sampleRate: number; getChannelData(): Float32Array}) => void;
         const decoded = new Promise<{numberOfChannels: number; sampleRate: number; getChannelData(): Float32Array}>(resolve => {finishDecode = resolve;});
-        const close = vi.fn(async () => undefined), decodeAudioData = vi.fn(() => decoded);
+        const close = vi.fn(async () => {if(sampleCount===16)throw new Error('native decoder already closed');}), decodeAudioData = vi.fn(() => decoded);
         vi.stubGlobal('window', {location: {href: 'chrome-extension://test/offscreen.html'}, setTimeout, clearTimeout,
             AudioContext: class {state = 'running'; close = close; decodeAudioData = decodeAudioData;}});
         const streamId = 'cancelled-legacy-decoder';
@@ -563,6 +578,15 @@ describe('模型预热的有界首音频租期', () => {
         await drain();
         return worker;
     }
+    it.each(['pcm','legacy'])('a %s worker response resolved immediately before cancellation cannot renew the cancelled stream lease',async kind=>{
+        vi.useFakeTimers();installWorker();const worker=await warm('same-turn-cancel'),pcm=Buffer.from(new Int16Array(16_000).fill(1310).buffer).toString('base64');
+        (window as any).AudioContext=class {state='running';async close(){this.state='closed';}async decodeAudioData(){return {numberOfChannels:1,sampleRate:16000,getChannelData:()=>new Float32Array(16000).fill(.04)};}};
+        try {
+            const first=transcribeLocalVideoAudio({streamId:'same-turn-cancel',model:'tiny',...(kind==='pcm'?{audioPcm16Base64:pcm}:{audioBase64:'AAAAAA=='})}).catch(error=>error);await vi.waitFor(()=>expect(worker.messages.at(-1)?.type).toBe('transcribe'));completeWorker(worker);
+            await cancelLocalVideoTranscription('same-turn-cancel');await first;expect(worker.terminated).toBe(true);
+            const next=await warm('new-owner');expect(next).not.toBe(worker);expect(next.terminated).toBe(false);
+        } finally {await cancelLocalVideoTranscription('same-turn-cancel');await cancelLocalVideoTranscription('new-owner');}
+    });
 
     it('等音频40秒仍复用已准备的Worker，首窗完成后恢复120秒空闲释放', async () => {
         vi.useFakeTimers();installWorker();

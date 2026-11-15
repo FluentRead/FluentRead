@@ -166,6 +166,11 @@ function createLoadingDocument(): {document: Document; setBody: () => void} {
 }
 
 describe('content document 基础 DOM 就绪边界', () => {
+    it('uses document readiness events when MutationObserver is unavailable', async () => {
+        const {document,setBody}=createLoadingDocument();vi.stubGlobal('MutationObserver',undefined);
+        const ready=waitForContentDocument(document,new AbortController().signal);setBody();document.dispatchEvent(new Event('DOMContentLoaded'));
+        await expect(ready).resolves.toBe(true);
+    });
     afterEach(() => {
         FakeMutationObserver.instance = null;
         vi.unstubAllGlobals();

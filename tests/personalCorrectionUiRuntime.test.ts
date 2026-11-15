@@ -32,6 +32,13 @@ beforeEach(()=>{vi.clearAllMocks();mocks.ui.shadowHost.isConnected=true;mocks.ui
 });
 afterEach(async()=>{unmountPersonalCorrections();await flush();vi.unstubAllGlobals();});
 describe('personal correction content lifecycle',()=>{
+  it('defers a reentrant activation until previous Shadow UI cleanup has finished',async()=>{
+    const old=fixture();old.event();await flush();let successor:ReturnType<typeof fixture>|undefined;
+    mocks.ui.remove.mockImplementationOnce(()=>{unmountPersonalCorrections();successor=fixture();});
+    old.abort.abort();await flush();successor!.event();await flush();expect(mocks.shadow).toHaveBeenCalledTimes(1);
+    const next=fixture();next.event();await flush();expect(mocks.shadow).toHaveBeenCalledTimes(2);
+    unmountPersonalCorrections();expect(mocks.ui.remove).toHaveBeenCalledTimes(2);
+  });
   it('discovers only translated pairs, mounts one closed Shadow UI and opens from a genuine keyboard-shaped gesture',async()=>{
     const f=fixture();f.event('pointerover','#other');expect(mocks.shadow).not.toHaveBeenCalled();f.event();f.event();await flush();
     expect(mocks.shadow).toHaveBeenCalledTimes(1);expect(mocks.shadow.mock.calls[0][1]).toMatchObject({hostId:'fluent-read-personal-corrections',mode:'closed'});

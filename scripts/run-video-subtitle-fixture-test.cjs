@@ -253,13 +253,14 @@ async function main() {
   const focusSafeHelper = arg('focus-safe-helper', process.env.FLUENTREAD_FOCUS_SAFE_HELPER || path.join(__dirname, 'testing/focus-safe-browser.cjs'));
   const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-edge-video-fixture-'));
   let browserSession, providerFixtureServer, evidence; let launchAttempted = false; let primaryError;
+  let releaseSlowTimedTextResponse = () => {};
   try {
   assertDedicatedTemporaryProfile(profileDir);
   if (!fs.existsSync(path.join(extensionDir, 'manifest.json'))) throw new Error(`找不到扩展构建：${extensionDir}`);
   fs.mkdirSync(artifactsDir, { recursive: true });
   // 预取窗口覆盖到 20 秒，媒体本身必须足够长，才能用真实 currentTime 验证显示时间。
   const mediaFile = path.join(artifactsDir, 'fixture.mp4');
-  const media = spawnSync(arg('ffmpeg', '/opt/homebrew/bin/ffmpeg'), ['-y', '-f', 'lavfi', '-i', 'color=c=black:s=16x16:r=1',
+  const media = spawnSync(arg('ffmpeg', '/opt/homebrew/bin/ffmpeg'), ['-y', '-f', 'lavfi', '-i', 'color=c=black:s=160x90:r=1',
     '-t', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mediaFile], {encoding: 'utf8', timeout: 30000, killSignal: 'SIGKILL'});
   if (media.status !== 0) throw new Error(`无法生成视频时间轴夹具：${media.stderr}`);
   const videoFixtureDataUrl = `data:video/mp4;base64,${fs.readFileSync(mediaFile).toString('base64')}`;
@@ -547,7 +548,7 @@ async function main() {
     assertEnabledVideoSettingsState(await readVideoSettingsState(videoSettingsPage), await readExtensionConfig(control));
     // 后续清晰度断言依赖 140% 字号，继续通过原持久化接口写入。
     const videoAppearance = (await readExtensionConfig(control)).videoSubtitleAppearance || {};
-    await persistExtensionConfig(control, {videoSubtitleAppearance: {...videoAppearance, fontScale: 140}});
+    await persistExtensionConfig(control, {videoSubtitleAppearance: {...videoAppearance, fontScale: 140, bilingualOrder: 'translation-first'}});
     await videoSettingsPage.screenshot({path: path.join(artifactsDir, 'video-subtitle-settings.png'), fullPage: true});
     // 结束设置页会话，避免其草稿在播放器真实动作阶段参与保存。
     await videoSettingsPage.close();
@@ -612,7 +613,8 @@ async function main() {
       video.muted = true;
       video.preload = 'auto';
       video.src = videoDataUrl;
-      video.style.cssText = 'position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+      // 字幕层现在按真实视频画面裁切；夹具也须提供与播放器一致的画面几何。
+      video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;pointer-events:none;';
       video.load();
 
       const container = document.createElement('div');
@@ -841,9 +843,10 @@ async function main() {
       { tStartMs: 122000, dDurationMs: 1800, segs: [{ utf8: downloadSources[1] }] },
     ] });
     let slowTimedTextRequests = 0;
+    const slowTimedTextReady = new Promise(resolve => {releaseSlowTimedTextResponse = resolve;});
     await page.route('https://www.youtube.com/api/timedtext**', async (route) => {
       slowTimedTextRequests += 1;
-      await new Promise(resolve => setTimeout(resolve, 2300));
+      await slowTimedTextReady;
       await route.fulfill({ status: 200, contentType: 'application/json', body: downloadTimedTextResponse });
     });
     await page.evaluate(() => {
@@ -872,6 +875,8 @@ async function main() {
       history.replaceState(history.state, '', '/watch?v=fixture-original-slow');
     });
     await page.waitForTimeout(1200);
+    const downloadsDisclosure = page.locator('#fluent-read-video-subtitle-menu [data-action="toggle-subtitle-downloads"]');
+    if (await downloadsDisclosure.getAttribute('aria-expanded') !== 'true') await downloadsDisclosure.click();
 
     let originalDownloadError;
     const originalDownloadPromise = page.waitForEvent('download', { timeout: 15000 }).catch((error) => {
@@ -914,6 +919,7 @@ async function main() {
       state: document.querySelector('#fluent-read-video-subtitle-menu [data-download-status]')?.textContent || '',
       busy: document.querySelector('#fluent-read-video-subtitle-menu [data-action="download-subtitles"]')?.getAttribute('aria-busy') || '',
     }));
+    releaseSlowTimedTextResponse();
     const originalDownload = await originalDownloadPromise;
     if (!originalDownload) {
       const downloadDebug = await page.evaluate(() => {
@@ -1417,7 +1423,7 @@ async function main() {
       const units = Array.from(document.querySelectorAll('#fluent-read-video-subtitle .fluent-read-video-karaoke-unit'));
       const active = units.findIndex(unit => unit.getAttribute('data-fluent-read-karaoke-state') === 'active');
       const fill = active < 0 ? 0 : Number.parseFloat(units[active].style.getPropertyValue('--fluent-read-video-karaoke-fill'));
-      return active < 0 || active > before.activeIndex || fill > before.fill + 5;
+      return active >= 0 && (active > before.activeIndex || fill > before.fill + 5);
     }, karaokeMiddle['fluent-read-video-subtitle'], {timeout: 10000});
     await page.evaluate(() => document.querySelector('video.html5-main-video').pause());
     const karaokePlaying = await readKaraoke();
@@ -1426,7 +1432,14 @@ async function main() {
       video.currentTime = 2.2;
       video.dispatchEvent(new Event('timeupdate'));
     });
-    await page.waitForFunction(() => document.querySelectorAll('#fluent-read-video-subtitle [data-fluent-read-karaoke-state="sung"]').length === 0, null, {timeout: 10000});
+    // seeking 会先撤下旧字幕；空节点不能作为“已复位”的成功状态。
+    await page.waitForFunction((expected) => ['fluent-read-video-subtitle-original', 'fluent-read-video-subtitle'].every(id => {
+      const line = document.getElementById(id);
+      const units = Array.from(line?.querySelectorAll('.fluent-read-video-karaoke-unit') || []);
+      return line?.textContent === expected[id].text && units.length >= 2
+        && units[0].getAttribute('data-fluent-read-karaoke-state') === 'active'
+        && !units.some(unit => unit.getAttribute('data-fluent-read-karaoke-state') === 'sung');
+    }), karaokeDefault, {timeout: 10000});
     const karaokeRewound = await readKaraoke();
     await persistExtensionConfig(control, {videoSubtitleAppearance: {...karaokeAppearance, karaoke: false}});
     await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-layer .fluent-read-video-karaoke-unit'), null, {timeout: 10000});
@@ -1508,6 +1521,7 @@ async function main() {
       throw new Error(`视频字幕浏览器回归未通过：${JSON.stringify({pageErrors, consoleErrors, unexpectedNetworkRequests})}`);
     }
   } catch (error) {primaryError = error; throw error;} finally {
+    releaseSlowTimedTextResponse();
     const cleanupErrors = [];
     let closed = false;
     if (browserSession) {

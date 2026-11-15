@@ -38,6 +38,61 @@ function createFixture(initial: string | undefined = fixtureToken) {
 }
 afterEach(() => {buildMode.enabled = true;setRuntimeFetch();vi.unstubAllGlobals(); vi.useRealTimers();});
 describe('ChatGPT 本机助手端口', () => {
+    it.each(['models', 'status'] as const)('退出与 %s 结算交错时只返回完整结果或会话取消，并释放全部计时器', async action => {
+        vi.useFakeTimers({toFake: ['setTimeout', 'clearTimeout']}); const outcomes = new Set<string>();
+        for (let delay = 0; delay <= 25; delay++) {
+            const fixture = createFixture();
+            const result = fixture.bridge[action]().then(value => {
+                if (action === 'models') expect(value).toEqual(expect.arrayContaining([expect.objectContaining({slug: 'fixture-model'})]));
+                else expect(value).toMatchObject({paired: true, connected: true});
+                outcomes.add('complete');
+            }, error => {expect(error).toMatchObject({code: 'session_changed'}); outcomes.add('cancelled');});
+            const logout = (async () => {
+                if (delay === 25) await new Promise<void>(resolve => setImmediate(resolve));
+                else for (let step = 0; step < delay; step++) await Promise.resolve();
+                await fixture.bridge.disconnect();
+            })();
+            await Promise.all([result, logout]); expect(vi.getTimerCount()).toBe(0);
+        }
+        expect(outcomes).toEqual(new Set(['complete', 'cancelled']));
+    });
+    it('取消与读取响应交错时及时交还流，不遗留请求或未处理拒绝', async () => {
+        const outcomes = new Set<string>();
+        for (let delay = 0; delay <= 24; delay++) {
+            const fixture = createFixture(), caller = new AbortController();
+            const result = fixture.bridge.respond({model: 'fixture', input: []}, caller.signal).then(response => response.text()).then(value => {
+                expect(value).toBe('{}'); outcomes.add('complete');
+            }, error => {expect(error).toMatchObject({name: 'AbortError'}); outcomes.add('cancelled');});
+            const cancel = (async () => {for (let step = 0; step < delay; step++) await Promise.resolve(); caller.abort();})();
+            await Promise.all([result, cancel]);
+        }
+        expect(outcomes).toEqual(new Set(['complete', 'cancelled']));
+    });
+    it('调用者在监听注册边界同步取消时，不派发已失效的传输', async () => {
+        const fixture = createFixture(), caller = new AbortController();
+        const register = caller.signal.addEventListener.bind(caller.signal);
+        const added = vi.spyOn(caller.signal, 'addEventListener').mockImplementation((type, listener, options) => {
+            register(type, listener, options); caller.abort();
+        });
+        try {
+            await expect(fixture.bridge.respond({model: 'fixture', input: []}, caller.signal)).rejects.toMatchObject({name: 'AbortError'});
+            expect(fixture.fetch).not.toHaveBeenCalled();
+        } finally {added.mockRestore();}
+    });
+    it('监听注册端口重入配对时，不把旧请求发送到新的账号会话', async () => {
+        const fixture = createFixture(), caller = new AbortController();
+        let pairing: ReturnType<typeof fixture.bridge.pair> | undefined;
+        const register = caller.signal.addEventListener.bind(caller.signal);
+        const added = vi.spyOn(caller.signal, 'addEventListener').mockImplementation((type, listener, options) => {
+            register(type, listener, options); pairing = fixture.bridge.pair('fixture-next-pairing-code');
+        });
+        try {
+            await expect(fixture.bridge.respond({model: 'fixture', input: []}, caller.signal)).rejects.toMatchObject({code: 'session_changed'});
+            expect(pairing).toBeDefined(); await pairing;
+            expect(fixture.fetch.mock.calls.some(([url]) => String(url).endsWith('/responses'))).toBe(false);
+            expect(fixture.write).toHaveBeenCalledOnce();
+        } finally {added.mockRestore();}
+    });
     it('取消已开始的 SSE 读取不等待底层取消握手，并立即释放上游锁', async () => {
         const fixture = createFixture(), caller = new AbortController();
         const cancel = vi.fn(() => new Promise<void>(() => {}));

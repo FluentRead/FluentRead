@@ -88,16 +88,20 @@ async function loadProtocolWorker(transcriber: any, backend: 'webgpu' | 'wasm' =
 }
 
 describe('视频 AI Worker timestamp parser', () => {
-    it('keeps its serial command queue usable after the response channel rejects both result and error delivery', async () => {
-        const scope = await loadProtocolWorker(vi.fn());
-        scope.postMessage.mockImplementationOnce(() => {throw new Error('response channel closed');})
-            .mockImplementationOnce(() => {throw new Error('response channel closed');});
+    it('语言检测在部分语言 token 为非有限值时保留有效候选并归一化置信度', () => {
+        expect(chooseWhisperSourceLanguage({data: new Float32Array([1, NaN, Infinity]), dims: [1, 1, 3]},
+            {isMultilingual: true, langToId: {'<|en|>': 0, '<|ja|>': 1, '<|ko|>': 2}}))
+            .toEqual({language: 'en', confidence: 1});
+    });
+    it('continues its single-consumer queue after a detached response port rejects both replies for a task', async () => {
+        const scope=await loadProtocolWorker(vi.fn());
         try {
-            scope.onmessage({data: {requestId: 1, type: 'prepare', model: 'tiny'}});
-            await waitForWorkerMessages(scope, 2);
-            scope.onmessage({data: {requestId: 2, type: 'prepare', model: 'tiny'}});
-            await waitForWorkerMessages(scope, 3);
-            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({requestId: 2, success: true}));
+            scope.postMessage.mockImplementationOnce(()=>{throw new Error('success channel closed');}).mockImplementationOnce(()=>{throw new Error('error channel closed');});
+            scope.onmessage({data:{requestId:1,type:'prepare',model:'tiny'}});
+            await waitForWorkerMessages(scope,2);expect(scope.postMessage).toHaveBeenCalledTimes(2);
+            scope.onmessage({data:{requestId:2,type:'prepare',model:'tiny'}});
+            await waitForWorkerMessages(scope,3);expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({requestId:2,success:true}));
+            expect(workerMocks.pipeline).toHaveBeenCalledOnce();
         } finally {vi.unstubAllGlobals();}
     });
     it('gives Transformers the shared cache while disabling duplicate browser and filesystem writes', async () => {

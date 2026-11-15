@@ -125,7 +125,8 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
         // synchronously reenter disposal and must reuse this same cleanup.
         entry.closing=Promise.resolve().then(async()=>{
             try{await Promise.allSettled([Promise.resolve().then(()=>entry.session?.close()),entry.pending??Promise.resolve()]);}
-            finally{if(entries.get(token)===entry)entries.delete(token);notifyDrained();}
+            // token 在 entry.closing 完成前不能重用，且仅本次关闭负责移除。
+            finally{entries.delete(token);notifyDrained();}
         });
         entry.controller.abort();
         return entry.closing;
@@ -160,7 +161,8 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
         const track=<T>(work:Promise<T>):Promise<T>=>{pending.add(work);void work.then(()=>pending.delete(work),()=>pending.delete(work));return work;};
         const entryWork=<T>(entry:Entry,task:()=>Promise<T>):Promise<T>=>{
             const work=Promise.resolve().then(task);entry.pending=work;
-            void work.then(()=>{if(entry.pending===work)entry.pending=undefined;},()=>{if(entry.pending===work)entry.pending=undefined;});
+            // busy 租约覆盖整个请求；同一 entry 的实际工作只能串行交接。
+            void work.then(()=>{entry.pending=undefined;},()=>{entry.pending=undefined;});
             return track(work);
         };
         const onMessage=(input:unknown)=>{
@@ -201,7 +203,7 @@ export function createMaterialPageBridge(options:MaterialPageBridgeOptions):{con
                                     if(!found||found.closing||!found.session)throw new MaterialError('stale-operation','材料读取会话已结束');
                                     if(found.busy)throw new PageBusy();
                                     entry=found;entry.busy=true;borrowed=entry;
-                                    if(entry.timer!==undefined)clearTimeout(entry.timer);
+                                    clearTimeout(entry.timer);
                                 }
                                 if(signal.aborted||entry.controller.signal.aborted)throw new MaterialError('stale-operation','材料读取会话已结束');
                                 if(request.operation==='topics'){

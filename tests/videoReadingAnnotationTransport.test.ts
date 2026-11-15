@@ -47,6 +47,16 @@ describe('读音标注消息边界', () => {
 });
 
 describe('离屏读音Worker资源归属', () => {
+  it.each(['onerror','onmessageerror'] as const)('忽略已释放 Worker 迟到的 %s，不中止新 Worker 的读音请求', async event => {
+    vi.useFakeTimers();const old=fakeWorker(),fresh=fakeWorker();
+    const runtime=createReadingAnnotationRuntime({createWorker:vi.fn().mockReturnValueOnce(old.instance).mockReturnValue(fresh.instance),idleMs:10});
+    const first=runtime.annotate(input);const delayed=old.instance[event] as (()=>void);
+    expect(typeof delayed).toBe('function');old.reply({id:1,ok:true,result:reading});await first;
+    await vi.advanceTimersByTimeAsync(10);expect(old.instance.terminate).toHaveBeenCalledOnce();
+    const next=runtime.annotate(input);delayed();
+    expect(fresh.instance.terminate).not.toHaveBeenCalled();fresh.reply({id:2,ok:true,result:reading});
+    await expect(next).resolves.toEqual(reading);runtime.dispose();
+  });
   it('首次请求才创建Worker，串行处理，忽略无关消息，空闲释放后按需重建', async () => {
     vi.useFakeTimers(); const first = fakeWorker(), second = fakeWorker();
     const createWorker = vi.fn().mockReturnValueOnce(first.instance).mockReturnValue(second.instance);
@@ -139,6 +149,14 @@ describe('离屏读音Worker资源归属', () => {
 });
 
 describe('后台读音发送方与取消隔离', () => {
+  it('请求标识生成失败后释放占位，同一读音请求可重试', async () => {
+    const send = vi.fn(async () => ({success: true, result: reading}));
+    const createRequestId = vi.fn().mockImplementationOnce(() => {throw new Error('random generator unavailable');}).mockReturnValue('offscreen:retry');
+    const handlers = createVideoReadingAnnotationHandlers({runtimeId: 'extension', offscreen: {send} as unknown as OffscreenClient, createRequestId});
+    const request: ReadingAnnotationRequest & {type: 'fluentReadAnnotateVideoReading'} = {type: 'fluentReadAnnotateVideoReading', ...input, requestId: 'page:retry'};
+    await expect(handlers[0].handle(request, owner())).rejects.toThrow('random generator unavailable'); expect(send).not.toHaveBeenCalled();
+    await expect(handlers[0].handle(request, owner())).resolves.toEqual({success: true, result: reading}); expect(send).toHaveBeenCalledOnce();
+  });
   it('真实content信封依次路由到离屏与Worker，只转发正文语言并保留各层自有编号', async () => {
     const worker = fakeWorker();
     const runtime = createReadingAnnotationRuntime({createWorker: () => worker.instance});

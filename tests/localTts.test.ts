@@ -269,6 +269,15 @@ async function loadLocalTtsOwner(overrides: Partial<Pick<typeof import('@/src/fe
 }
 
 describe('local TTS offscreen worker owner', () => {
+    it.each(['live','cancelled'] as const)('consumes a rejected cache lookup for a %s request without constructing a worker', async state => {
+        let reject!:(error:Error)=>void;const cache=vi.fn(()=>new Promise<boolean>((_,no)=>{reject=no;}));
+        const owner=await loadLocalTtsOwner({isLocalTtsModelCached:cache}),controller=new AbortController();
+        const result=owner.synthesizeLocalTts('hello','en','auto',controller.signal);
+        const failed=expect(result).rejects.toMatchObject(state==='cancelled'?{name:'AbortError'}:{message:'cache service unavailable'});
+        await vi.waitFor(()=>expect(cache).toHaveBeenCalledOnce());
+        if(state==='cancelled')controller.abort();reject(new Error('cache service unavailable'));await failed;
+        expect(LocalTtsOwnerFakeWorker.instances).toHaveLength(0);
+    });
     afterEach(() => {
         for (const owner of ownedLocalTtsModules) owner.disposeLocalTtsWorker();
         ownedLocalTtsModules.clear();
@@ -425,6 +434,27 @@ describe('local TTS offscreen worker owner', () => {
         await vi.advanceTimersByTimeAsync(1);
         expect(worker.terminated).toBe(true);
         expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each(['cache','worker'] as const)('ignores an already delivered idle callback while a new synthesis owns %s', async phase => {
+        vi.useFakeTimers();vi.stubGlobal('navigator',{});
+        let finishCheck!:(value:boolean)=>void;
+        const check=vi.fn(async()=>true);
+        const owner=await loadLocalTtsOwner({isLocalTtsModelCached:check});
+        const timers=vi.spyOn(window,'setTimeout');
+        const first=owner.synthesizeLocalTts('first','en-US','auto'),worker=await ownerWorkerAt(0);
+        worker.reply({requestId:worker.lastMessage.requestId,success:true,audio:new ArrayBuffer(4)});await first;
+        const idle=timers.mock.calls.at(-1)!;expect(idle[1]).toBe(120_000);
+        const firstId=worker.lastMessage.requestId;
+        if(phase==='cache')check.mockImplementationOnce(()=>new Promise<boolean>(resolve=>{finishCheck=resolve;}));
+        const next=owner.synthesizeLocalTts('next','en-US','auto');
+        if(phase==='worker')await vi.waitFor(()=>expect(worker.lastMessage.requestId).toBeGreaterThan(firstId));
+        (idle[0] as ()=>void)();expect(worker.terminated).toBe(false);
+        if(phase==='cache')finishCheck(true);
+        await vi.waitFor(()=>expect(worker.lastMessage.requestId).toBeGreaterThan(firstId));
+        worker.reply({requestId:worker.lastMessage.requestId,success:true,audio:new ArrayBuffer(4)});
+        await expect(next).resolves.toMatchObject({contentType:'audio/wav'});
+        owner.disposeLocalTtsWorker();timers.mockRestore();
     });
 
     it('新请求开始校验缓存时撤销旧回收计时，迟到的校验继续使用暖Worker', async () => {

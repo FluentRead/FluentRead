@@ -128,6 +128,14 @@ function mountHarness(
 afterEach(() => vi.useRealTimers());
 
 describe('quick translation content feature', () => {
+    it('无键值的浏览器键盘事件不污染快捷键状态，后续正常组合仍执行', () => {
+        const {deps, windowTarget} = mountHarness();
+        const empty = keyboardEvent({key: '', code: '', ctrlKey: false});
+        windowTarget.emit('keydown', empty); windowTarget.emit('keyup', empty);
+        expect(empty.preventDefault).not.toHaveBeenCalled(); expect(deps.runHover).not.toHaveBeenCalled();
+        windowTarget.emit('keydown', keyboardEvent()); windowTarget.emit('keyup', keyboardEvent());
+        expect(deps.runHover).toHaveBeenCalledOnce();
+    });
     it('悬浮快捷方案等待可信指针样本，第一次纯键盘手势不翻译左上角', () => {
         const {deps, documentTarget, hoverT, windowTarget} = mountHarness({}, new AbortController(), false);
         const trigger = () => {

@@ -201,6 +201,8 @@ describe('saved explanation',()=>{
     await click(button(ui.host,'编辑解释'));
     const editor=ui.host.querySelector('textarea')!;
     expect(menu.open).toBe(false);expect(focus.mock.contexts).toContain(editor);
+    const pageShortcut=vi.fn();ui.host.addEventListener('keydown',pageShortcut);
+    await key(editor,'Enter');expect(pageShortcut).not.toHaveBeenCalled();expect(ports.send).not.toHaveBeenCalled();
     await input(editor,'Discarded draft');await click(button(ui.host,'取消'));
     expect(ui.host.querySelector('textarea')).toBeNull();expect(ui.host.querySelector('.entry-note')?.textContent).toBe('Original');expect(ports.send).not.toHaveBeenCalled();
     await click(button(ui.host,'编辑解释'));expect((ui.host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('Original');

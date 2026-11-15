@@ -526,6 +526,9 @@ describe('selection modal dialog host', () => {
         const rectSpy = vi.spyOn(window.HTMLElement.prototype, 'getBoundingClientRect')
             .mockReturnValue({left: 100, top: 180, width: 0, height: 0} as DOMRect);
         expect(controller.placeForRange(range)).toBe(true);
+        // 模态框保持打开，实际经历两次校准重试之后停止排帧。
+        await new Promise(resolve=>setTimeout(resolve,100));const reads=rectSpy.mock.calls.length;
+        await new Promise(resolve=>setTimeout(resolve,60));expect(rectSpy).toHaveBeenCalledTimes(reads);
         detachedParent.remove();
         dialog.open = false;
         dialog.dispatchEvent(new window.Event('close'));

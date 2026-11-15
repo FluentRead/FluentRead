@@ -5,7 +5,7 @@
  * 用量控制：短参考直接复用；完整 AI 批次中的少数空槽或原文回显只恢复对应槽，整包回显仍触发原有降级。
  * 同图 Google：可信且启用原生合批的图片请求保留重复位置，以整组有序指纹隔离缓存；部分缺失重算完整邻文，逐条回退仍受原截止时间和取消所有权约束。
  * 网页术语：独立的常用词槽在本地原位保留，正文沿用用户词条优先的占位回填，摘要、字幕和图像请求保持各自的保护范围。
- * Emoji 兼容：硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
+ * Emoji 兼容：B站与硅基流动 Hunyuan-MT-7B 的单行正文占位符校验失败后，在原请求预算内尝试字面 emoji 并严格校验。
  *
  * 文件职责：编排翻译请求的配置快照、语言解析、缓存、请求去重、超时与 provider 调用，是后台翻译用例的中心服务。
  * 主要内容：createTranslationBroker 同时支持单条、批量和页面摘要，验证 provider 返回数量、类型及明显的原文回显或错语种，图片文字的内部策略接受有效原样结果并隔离缓存，空来源在本地保留；普通数组无论是否缓存都先合并完全相同的原文，再按原位置回填，AI 多段保留独立槽位与邻段语义；仅在原生批次响应结构异常时以相同取消所有权和剩余 deadline 逐段恢复，整批完成前不发布缓存；对完整多段协议逐槽修复上下文回显并拒绝空译文，以包含 Chrome auto 检测样本的完整身份构建缓存键，并按实际消费的云地域和凭据摘要、匿名额度身份、等待策略、清理代次与剩余 deadline 隔离 pending 请求；入口在等待前复制消息，ready 采用有界水合等待，之后按最终服务解析 AI 配置预算并扣除已等待时间，取消检查后沿用可信配置快照，仅未附着的公开请求复制备用配置；批次摘要与分项缓存键只构建一次并复用，重复身份只读写一次；每次公开请求累计缓存复用、上游调用次数、耗时与免费链线路尝试，结束后向注入的统计端口交付只含规模数值、服务与线路标识的事件。 可核对的公开符号包括 createTranslationBroker、聚合导出。
@@ -593,9 +593,11 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         try {
             return await invoke();
         } catch (error) {
-            if (execution.service !== services.siliconCloud || serializeTranslationError(error).code !== 'GLOSSARY_PLACEHOLDER_INVALID'
-                || getTranslationImageInput(message)
-                || getEffectiveRequestModel(execution.config, execution.service, message.modelOverride) !== 'tencent/Hunyuan-MT-7B') throw error;
+            // B站也可能删除正文内 emoji 的占位符；仅在已有严格字面校验允许时重试一次。
+            if ((execution.service !== services.bilibili && (execution.service !== services.siliconCloud
+                || getEffectiveRequestModel(execution.config, execution.service, message.modelOverride) !== 'tencent/Hunyuan-MT-7B'))
+                || serializeTranslationError(error).code !== 'GLOSSARY_PLACEHOLDER_INVALID'
+                || getTranslationImageInput(message)) throw error;
             const restoreLiteralEmoji = prepareLiteralEmojiRetry(message, execution.config);
             if (!restoreLiteralEmoji) throw error;
             return invoke(restoreLiteralEmoji);

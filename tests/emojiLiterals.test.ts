@@ -1,5 +1,5 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import {findEmojiLiteralRanges, hasEmojiLiterals} from '@/src/core/translation/emojiLiterals';
+import {findEmojiLiteralRanges, hasEmojiLiterals, splitBoundaryEmojiLiterals} from '@/src/core/translation/emojiLiterals';
 import {protectGlossaryText} from '@/src/core/glossary/protection';
 import {splitFreeTextChunks, translateFreeTextChunks} from '@/src/providers/translation/freeTextChunks';
 import {createTranslationIdentityPolicy} from '@/src/services/translation/requestIdentity';
@@ -11,6 +11,20 @@ afterEach(() => vi.unstubAllGlobals());
 const symbols = ['🚚', '👩🏽‍🔬', '🇫🇷', '1️⃣', '#️⃣', '♥️', '✋🏿', '©︎', '🏴\u{E0067}\u{E0062}\u{E007F}'];
 
 describe('complete translation emoji literals', () => {
+    it.each([
+        ['Read the label.', {text: 'Read the label.', prefix: '', suffix: ''}],
+        ['Read 💡 the label.', {text: 'Read 💡 the label.', prefix: '', suffix: ''}],
+        ['💡 Read\nagain.', {text: '💡 Read\nagain.', prefix: '', suffix: ''}],
+        ['💡 👩🏽‍🔬 ', {text: '💡 👩🏽‍🔬 ', prefix: '', suffix: ''}],
+        ['💡 123', {text: '💡 123', prefix: '', suffix: ''}],
+        ['💡 Read the label.', {text: 'Read the label.', prefix: '💡 ', suffix: ''}],
+        ['Read the label. 🥹', {text: 'Read the label.', prefix: '', suffix: ' 🥹'}],
+        ['  💡 👩🏽‍🔬  Read 🚚 the label. 🇫🇷 1️⃣ ', {text: 'Read 🚚 the label.', prefix: '  💡 👩🏽‍🔬  ', suffix: ' 🇫🇷 1️⃣ '}],
+        ['💡Read the label.🥹', {text: 'Read the label.', prefix: '💡', suffix: '🥹'}],
+    ] as const)('keeps complete boundary emoji locally without moving internal content: %s', (source, expected) => {
+        expect(splitBoundaryEmojiLiterals(source)).toEqual(expected);
+        expect(expected.prefix + expected.text + expected.suffix).toBe(source);
+    });
     it('avoids native segmenter construction for complete single-codepoint emoji and shares one within a complex scan', () => {
         const NativeSegmenter = Intl.Segmenter;
         const construct = vi.fn(function(...args: ConstructorParameters<typeof Intl.Segmenter>) {
@@ -77,6 +91,12 @@ describe('complete translation emoji literals', () => {
         const expected = findEmojiLiteralRanges(source);
         vi.stubGlobal('Intl', Object.create(Intl, {Segmenter: {value: undefined}}));
         expect(findEmojiLiteralRanges(source)).toEqual(expected);
+    });
+    it('ignores a standalone prepend character when an older native segmenter splits it from the emoji', () => {
+        vi.stubGlobal('Intl', Object.create(Intl, {Segmenter: {value: class {
+            *segment() {yield {segment: '\u{113D1}', index: 0}; yield {segment: '🚚', index: 2};}
+        }}}));
+        expect(findEmojiLiteralRanges('\u{113D1}🚚')).toEqual([{start: 2, end: 4}]);
     });
     it('user terms may replace whole emoji but cannot rewrite an isolated modifier or half of a ZWJ cluster', () => {
         for (const source of ['👩', '🏽', '\u200d', '🔬']) {

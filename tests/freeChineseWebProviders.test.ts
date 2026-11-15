@@ -97,14 +97,14 @@ describe('free Chinese web providers', () => {
         });
         it('真实准备、adapter 和恢复链允许 emoji 标记后直接出现英文译文', async () => {
             const current = createTranslationProviderConfigSnapshot(providerConfigFixture({from: 'zh-Hans', to: 'en'}));
-            const packet = prepareGlossaryRequest({origin: '🙂猫'}, current);
+            const packet = prepareGlossaryRequest({origin: '看🙂猫'}, current);
             const prepared = String(packet.message.origin);
-            const translated = prepared.replace('猫', 'cat');
-            expect(prepared).toMatch(/^__FRTERM_[a-f0-9]{12}_0__猫$/u);
+            const translated = prepared.replace('看', 'see ').replace('猫', 'cat');
+            expect(prepared).toMatch(/^看__FRTERM_[a-f0-9]{12}_0__猫$/u);
             fetchMock.mockResolvedValueOnce(Response.json({fanyi: {type: 'zh-chs2en', tran: translated}}));
             const result = await translateFreeChineseWebText('youdaoFree', prepared, 'zh-Hans', 'en');
             expect(result).toBe(translated);
-            expect(packet.restore(result)).toBe('🙂cat');
+            expect(packet.restore(result)).toBe('see 🙂cat');
             expect(fetchMock).toHaveBeenCalledOnce();
         });
         it('still rejects an explicitly opposite direction even with recoverable markers', async () => {

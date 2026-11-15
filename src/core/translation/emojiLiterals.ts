@@ -1,7 +1,7 @@
 /**
  * @file src/core/translation/emojiLiterals.ts
  * 文件职责：识别翻译正文中必须逐字保留的完整 emoji 字素范围。
- * 主要内容：普通文字快速跳过，单码点 emoji 直接返回范围；首次遇到复杂图形字素时才构造分段器，同次扫描复用 Intl.Segmenter 边界保留肤色、ZWJ、旗帜、键帽和变体选择符，旧环境使用相同 emoji 结构的 Unicode 后备扫描。
+ * 主要内容：普通文字快速跳过，单码点 emoji 直接返回范围；首次遇到复杂图形字素时才构造分段器，同次扫描复用 Intl.Segmenter 边界保留肤色、ZWJ、旗帜、键帽和变体选择符，旧环境使用相同 emoji 结构的 Unicode 后备扫描；分离段首段尾位置明确的完整 emoji 与间距，供翻译边界本地保留。
  * 模块边界：纯文本范围算法，偏移使用原文 UTF-16，不改写 Unicode、不访问配置或服务；保护与供应商预算由调用方处理。
  */
 
@@ -66,4 +66,24 @@ export function findEmojiLiteralRanges(text: string): EmojiLiteralRange[] {
 export function hasEmojiLiterals(text: string | readonly string[]): boolean {
     return typeof text === 'string' ? emojiSignal.test(text)
         : Array.isArray(text) && text.some(value => typeof value === 'string' && emojiSignal.test(value));
+}
+
+/** 两端图形字素由本地原位保留；正文中的 emoji、多行及没有文字的标签仍沿用原协议。 */
+export function splitBoundaryEmojiLiterals(text: string, ranges = findEmojiLiteralRanges(text)) {
+    const unchanged = {text, prefix: '', suffix: ''};
+    if (!ranges.length || /[\r\n]/u.test(text)) return unchanged;
+    let start = 0, end = text.length;
+    for (const range of ranges) {
+        if (text.slice(start, range.start).trim()) break;
+        start = range.end;
+    }
+    for (let index = ranges.length - 1; index >= 0; index--) {
+        const range = ranges[index]!;
+        if (range.start < start || text.slice(range.end, end).trim()) break;
+        end = range.start;
+    }
+    if ((!start && end === text.length) || !/\p{L}/u.test(text.slice(start, end))) return unchanged;
+    if (start) start += text.slice(start, end).match(/^\s*/u)![0].length;
+    if (end < text.length) end -= text.slice(start, end).match(/\s*$/u)![0].length;
+    return {text: text.slice(start, end), prefix: text.slice(0, start), suffix: text.slice(end)};
 }

@@ -70,7 +70,7 @@ import {
   markVideoUi,
 } from '@/src/features/video-subtitle/content/ui';
 import {audioInit} from './fixtures/hlsAudio';
-import {YOUTUBE_TIMED_TEXT_MESSAGE} from '@/src/features/video-subtitle/content/youtubeTimedTextBridgeCore';
+import {YOUTUBE_BRIDGE_REPLAY_EVENT, YOUTUBE_TIMED_TEXT_MESSAGE} from '@/src/features/video-subtitle/content/youtubeTimedTextBridgeCore';
 import * as subtitleLogic from '@/src/features/video-subtitle/content/subtitleLogic';
 import {createSubtitleLayoutObserver} from '@/src/features/video-subtitle/content/subtitleLayoutObserver';
 import {VIDEO_SUBTITLE_SCROLL_HOST_ID} from '@/src/features/video-subtitle/content/subtitleControlLayout';
@@ -1614,6 +1614,29 @@ describe('public mounted X subtitle track priority and lifecycle', () => {
 
 
 describe('public mounted YouTube 合法重复与滚动字幕', () => {
+  it.each([
+    {source: 'A timed repeated sentence.', parts: ['A timed repeated sentence.', 'A timed repeated sentence.']},
+    {source: 'No no', parts: ['No', 'no']},
+    {source: 'A repeated cue. A repeated cue.', parts: ['A repeated cue.', 'A repeated cue.']},
+  ])('早到时间轴挂载后回放，按当前cue保留完整内容：$source', async ({source, parts}) => {
+    ports.config.videoPreferHumanSubtitles = false;
+    const f = fixture(undefined, 'youtube'); f.video.currentTime = .5; f.setCaptionSegments(parts);
+    const cues = [{startMs: 0, durationMs: 1000, text: source}, {startMs: 1000, durationMs: 1000, text: source}];
+    f.emitTimedText(cues); // 模拟 MAIN world 已发布，而字幕 runtime 尚未挂载。
+    const replay = vi.fn(() => f.emitTimedText(cues));
+    f.document.addEventListener(YOUTUBE_BRIDGE_REPLAY_EVENT, replay);
+    let dispose: (() => void) | undefined;
+    try {
+      dispose = f.start(); await vi.advanceTimersByTimeAsync(400);
+      expect(replay).toHaveBeenCalledTimes(1);
+      expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+      expect(ports.translate.mock.calls.map(([text]) => text)).toEqual([source]);
+      f.video.currentTime = 1.5; f.emitVideo('seeked'); await settle();
+      expect(f.displayed()).toMatchObject({source, translated: translation(source)});
+      expect(replay).toHaveBeenCalledTimes(1);
+    } finally {dispose?.(); f.document.removeEventListener(YOUTUBE_BRIDGE_REPLAY_EVENT, replay);}
+  });
+
   it.each([
     ['Very', 'very', 'Very very'], ['No', 'no', 'No no'], ['Bye', 'bye', 'Bye bye'],
   ])('合法重复：无时间轴的%s/%s完整显示并送翻', async (first, second, source) => {

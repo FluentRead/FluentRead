@@ -539,7 +539,6 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .is-workspace .document-sidebar .document-batch { position: static; width: auto; max-height: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
 .is-workspace .document-sidebar .batch-toggle { display: none; }
 .is-workspace .document-sidebar .batch-toolbar { gap: 6px; padding: 0 2px 8px; }
-.is-workspace .document-sidebar .batch-toolbar:not(:has(> button:not(.batch-toggle), > label)) > span[role="status"] { display: none; }
 .is-workspace .document-sidebar .batch-toolbar > span { flex-basis: 100%; }
 .is-workspace .document-sidebar .batch-toolbar button { padding: 6px 10px; font-size: 11.5px; cursor: pointer; }
 .is-workspace .document-sidebar .batch-files { display: grid !important; grid-template-columns: 1fr; gap: 4px; max-height: none; margin: 0; overflow: visible; }

@@ -30,6 +30,13 @@ it('keeps an unsplit sentence identity across whitespace normalization', () => {
   expect(a.id).not.toBe(buildSemanticLearningTimeline([cue('one two.', 1)])[0].id);
 });
 
+it.each(['R&D.', 'AT&T.'])('does not emit an empty fragment when the next cue contributes only boundary whitespace after %s', source => {
+  const timeline=buildSemanticLearningTimeline([cue(source+'  '),cue('   Next full sentence.',800)]);
+  expect(timeline.map(unit=>unit.text)).toEqual([source,'Next full sentence.']);
+  expect(timeline[0]).toMatchObject({cueIndices:[0,1],startMs:0,endMs:1800});
+  expect(timeline[1]).toMatchObject({cueIndices:[1],startMs:800,endMs:1800});
+});
+
 it('formats split sentences across cue boundaries without changing raw semantic offsets', () => {
   const source = [cue('先结束。我们'), cue('喜欢\n日语。', 800)];
   const document = createSemanticDocument(source);

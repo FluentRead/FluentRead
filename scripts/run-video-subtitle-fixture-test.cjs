@@ -1423,7 +1423,7 @@ async function main() {
       const units = Array.from(document.querySelectorAll('#fluent-read-video-subtitle .fluent-read-video-karaoke-unit'));
       const active = units.findIndex(unit => unit.getAttribute('data-fluent-read-karaoke-state') === 'active');
       const fill = active < 0 ? 0 : Number.parseFloat(units[active].style.getPropertyValue('--fluent-read-video-karaoke-fill'));
-      return active < 0 || active > before.activeIndex || fill > before.fill + 5;
+      return active >= 0 && (active > before.activeIndex || fill > before.fill + 5);
     }, karaokeMiddle['fluent-read-video-subtitle'], {timeout: 10000});
     await page.evaluate(() => document.querySelector('video.html5-main-video').pause());
     const karaokePlaying = await readKaraoke();
@@ -1432,7 +1432,14 @@ async function main() {
       video.currentTime = 2.2;
       video.dispatchEvent(new Event('timeupdate'));
     });
-    await page.waitForFunction(() => document.querySelectorAll('#fluent-read-video-subtitle [data-fluent-read-karaoke-state="sung"]').length === 0, null, {timeout: 10000});
+    // seeking 会先撤下旧字幕；空节点不能作为“已复位”的成功状态。
+    await page.waitForFunction((expected) => ['fluent-read-video-subtitle-original', 'fluent-read-video-subtitle'].every(id => {
+      const line = document.getElementById(id);
+      const units = Array.from(line?.querySelectorAll('.fluent-read-video-karaoke-unit') || []);
+      return line?.textContent === expected[id].text && units.length >= 2
+        && units[0].getAttribute('data-fluent-read-karaoke-state') === 'active'
+        && !units.some(unit => unit.getAttribute('data-fluent-read-karaoke-state') === 'sung');
+    }), karaokeDefault, {timeout: 10000});
     const karaokeRewound = await readKaraoke();
     await persistExtensionConfig(control, {videoSubtitleAppearance: {...karaokeAppearance, karaoke: false}});
     await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-layer .fluent-read-video-karaoke-unit'), null, {timeout: 10000});

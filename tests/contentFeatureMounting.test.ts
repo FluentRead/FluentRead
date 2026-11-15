@@ -370,6 +370,21 @@ describe('划词翻译挂载生命周期', () => {
 });
 
 describe('圈选翻译按需挂载生命周期', () => {
+    it('shares an unfinished UI mount across simultaneous context menu activations', async () => {
+        const pending = pendingUi(), beginSelection = vi.fn(() => true);
+        const mountedUi = ui({beginSelection});
+        mocks.createVueShadowUi.mockReturnValueOnce(pending.promise);
+        const runtime = await import('@/src/features/area-translation/public');
+        const {startAreaTranslationFromContextMenu} = await import('@/src/features/area-translation/content/contextMenuBridge');
+        runtime.mountAreaTranslator({} as never);
+        const first = startAreaTranslationFromContextMenu(), second = startAreaTranslationFromContextMenu();
+        expect(mocks.createVueShadowUi).toHaveBeenCalledOnce();
+        pending.resolve(mountedUi);
+        await expect(Promise.all([first, second])).resolves.toEqual([true, true]);
+        expect(beginSelection).toHaveBeenCalledTimes(2);
+        runtime.unmountAreaTranslator();
+        expect(mountedUi.remove).toHaveBeenCalledOnce();
+    });
     it('reports a rejected lazy mount once and permits a later shortcut to retry', async () => {
         const failure=new Error('shadow UI creation failed'),error=vi.spyOn(console,'error').mockImplementation(()=>undefined);
         const beginSelection=vi.fn(()=>true);mocks.createVueShadowUi.mockRejectedValueOnce(failure).mockResolvedValueOnce(ui({beginSelection}));

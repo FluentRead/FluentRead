@@ -81,7 +81,7 @@ export async function startObservedMaterialDownload(api:MaterialBrowserDownloads
             const entries=await Promise.race([
                 api.search({id}),
                 new Promise<never>((_resolve,reject)=>{deadline=setTimeout(()=>reject(new Error('下载状态查询超时')),30000);}),
-            ]).finally(()=>{if(deadline!==undefined)clearTimeout(deadline);});if(settled)return;
+            ]).finally(()=>{clearTimeout(deadline);});if(settled)return;
             const item=entries.find(entry=>entry.id===id);
             if(!item){finish('erased');return;}
             if(item.state==='complete'||item.state==='interrupted'){finish(item.state);return;}
@@ -194,7 +194,8 @@ export async function createMaterialBrowserFallbackTarget(filename:string,env:Ma
             if(finished||pending)throw new Error('材料备份写入状态无效');
             if(!writable)throw new Error('不能改写临时备份');
             const task=writable.write(chunk);pending=task;
-            try{await task;}finally{if(pending===task)pending=undefined;}
+            // write 在 pending 非空时拒绝重入，只有当前 finally 释放。
+            try{await task;}finally{pending=undefined;}
         },
         async commit(signal){
             if(finished||pending)throw new Error('材料备份提交状态无效');
@@ -203,8 +204,12 @@ export async function createMaterialBrowserFallbackTarget(filename:string,env:Ma
                 if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
                 if(writable)await writable.close();open=false;
                 if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
-                const file=recoveredFile??await writable!.file();
-                if(!recovered)await platform.markReady(name,file);
+                // 显式区分复用与磁盘读取，保留恢复路径的原始文件，也让 async 分支可准确计数。
+                let file=recoveredFile;
+                if(file===undefined){file=await writable!.file();}
+                if(!recovered){
+                    await platform.markReady(name,file);
+                }
                 if(signal.aborted)throw new DOMException('材料导出已取消','AbortError');
                 handedOff=true;
                 await handoff(file,release,signal);

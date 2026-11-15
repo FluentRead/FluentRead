@@ -47,6 +47,16 @@ describe('读音标注消息边界', () => {
 });
 
 describe('离屏读音Worker资源归属', () => {
+  it.each(['onerror','onmessageerror'] as const)('忽略已释放 Worker 迟到的 %s，不中止新 Worker 的读音请求', async event => {
+    vi.useFakeTimers();const old=fakeWorker(),fresh=fakeWorker();
+    const runtime=createReadingAnnotationRuntime({createWorker:vi.fn().mockReturnValueOnce(old.instance).mockReturnValue(fresh.instance),idleMs:10});
+    const first=runtime.annotate(input);const delayed=old.instance[event] as (()=>void);
+    expect(typeof delayed).toBe('function');old.reply({id:1,ok:true,result:reading});await first;
+    await vi.advanceTimersByTimeAsync(10);expect(old.instance.terminate).toHaveBeenCalledOnce();
+    const next=runtime.annotate(input);delayed();
+    expect(fresh.instance.terminate).not.toHaveBeenCalled();fresh.reply({id:2,ok:true,result:reading});
+    await expect(next).resolves.toEqual(reading);runtime.dispose();
+  });
   it('首次请求才创建Worker，串行处理，忽略无关消息，空闲释放后按需重建', async () => {
     vi.useFakeTimers(); const first = fakeWorker(), second = fakeWorker();
     const createWorker = vi.fn().mockReturnValueOnce(first.instance).mockReturnValue(second.instance);

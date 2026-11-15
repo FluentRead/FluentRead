@@ -136,7 +136,8 @@ export function createReadingAssetStore(options: ReadingAssetStoreOptions) {
         if (!pending) {
             const current = run();
             pending = current;
-            void current.then(() => {if (pending === current) pending = undefined;}, () => {if (pending === current) pending = undefined;});
+            // pending 非空时 ensure 只复用当前任务，结算回调是唯一释放入口。
+            void current.then(() => {pending = undefined;}, () => {pending = undefined;});
         }
         return pending;
     };

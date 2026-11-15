@@ -52,7 +52,8 @@ export function withMangaModelAdmission<T>(operation: () => Promise<T>): Promise
 /** 同一模块实例的两个会话队列共用删除边界；失败也须开放后续任务，重复删除复用当前操作。 */
 export function withMangaModelRemoval(operation: () => Promise<void>): Promise<void> {
     if (removal) return removal;
-    const pending = Promise.resolve().then(operation).finally(() => {if (removal === pending) removal = undefined;});
+    // removal 持有期间所有删除都复用它，只有该 finally 能释放。
+    const pending = Promise.resolve().then(operation).finally(() => {removal = undefined;});
     removal = pending;
     return pending;
 }

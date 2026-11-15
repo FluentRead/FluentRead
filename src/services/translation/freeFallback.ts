@@ -143,7 +143,7 @@ function runAttempt(candidate: FreeFallbackCandidate, timeoutMs: number, signal?
 async function boundedStorage<T>(request: Promise<T>, limitMs = 1000, signal?: AbortSignal): Promise<T | undefined> {
     // 调用方已在同一同步段检查取消；此处只监听等待期间发生的取消。
     let timer: ReturnType<typeof setTimeout>;
-    let onAbort: (() => void) | undefined;
+    let onAbort!: () => void;
     try {
         return await Promise.race([
             request.catch(() => undefined),
@@ -153,7 +153,7 @@ async function boundedStorage<T>(request: Promise<T>, limitMs = 1000, signal?: A
                 signal?.addEventListener('abort', onAbort, {once: true});
             }),
         ]);
-    } finally { clearTimeout(timer!); if (onAbort) signal?.removeEventListener('abort', onAbort); }
+    } finally { clearTimeout(timer!); signal?.removeEventListener('abort', onAbort); }
 }
 
 export function createFreeFallbackRunner(maxConcurrency = 3, dependencies: FreeFallbackDependencies = {}): FreeFallbackRunner {

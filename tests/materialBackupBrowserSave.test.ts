@@ -31,6 +31,19 @@ function fixture(){
 }
 afterEach(async()=>{vi.stubEnv('BROWSER','firefox');browserMock.extension.inIncognitoContext=true;await prepareFirefoxMaterialBackupContext();vi.unstubAllEnvs();vi.unstubAllGlobals();vi.clearAllMocks();browserMock.extension.inIncognitoContext=false;browserMock.tabs.getCurrent.mockReset().mockResolvedValue({incognito:false});Object.defineProperty(browserMock,'downloads',{configurable:true,writable:true,value:undefined});});
 describe('browser material backup target',()=>{
+    it('bounds early terminal events before download identity arrives and keeps the selected result observable',async()=>{
+        const d=downloads(),id=deferred<number>();vi.mocked(d.api.download).mockReturnValueOnce(id.promise);
+        const pending=startObservedMaterialDownload(d.api,'blob:test','backup.json');
+        for(let index=0;index<300;index++)d.emit(index,'complete');
+        id.resolve(7);const download=await pending;await expect(download.wait()).resolves.toBe('complete');
+        expect(d.changed.size).toBe(0);expect(d.erased.size).toBe(0);
+    });
+    it('ignores another download and nonterminal changes while waiting for its own completion',async()=>{
+        const d=downloads(),download=await startObservedMaterialDownload(d.api,'blob:test','backup.json');
+        let done=false;const waiting=download.wait().then(state=>{done=true;return state;});
+        d.emit(99,'complete');d.emit(7,'in_progress');for(const listener of d.changed)listener({id:7});await tick();
+        expect(done).toBe(false);d.emit(7,'complete');await expect(waiting).resolves.toBe('complete');expect(d.changed.size).toBe(0);
+    });
     it('retains a disk-backed anchor source until the recipient confirms release',async()=>{
         const f=fixture();let release!:()=>Promise<void>,file!:Blob;
         Object.defineProperty(f.env,'downloads',{get(){throw Error('optional downloads permission must not be read');}});
@@ -69,6 +82,14 @@ describe('browser material backup target',()=>{
         const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async()=>{}),writing=target.write(new Uint8Array([1]));
         const observed=writing.catch(error=>error),stopping=target.abort();gate.reject(failure);
         expect(await observed).toBe(failure);await stopping;await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
+    });
+    it('shares a failed cleanup between concurrent abort callers and permits a later retry',async()=>{
+        const f=fixture(),gate=deferred<void>(),failure=Error('temporary abort failure');
+        f.fs.controls.abort=vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValue(undefined);
+        const target=await createMaterialBrowserFallbackTarget('backup.json',f.env,async()=>{});
+        const first=expect(target.abort()).rejects.toBe(failure),second=expect(target.abort()).rejects.toBe(failure);
+        gate.reject(failure);await Promise.all([first,second]);expect(f.fs.controls.abort).toHaveBeenCalledOnce();
+        expect(f.fs.held).toBe(1);await target.abort();await tick();expect(f.fs.files.size).toBe(0);expect(f.fs.held).toBe(0);
     });
     it('retries partial cleanup and does not release the file lock before deletion succeeds',async()=>{
         const f=fixture();let release!:()=>Promise<void>;

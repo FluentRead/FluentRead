@@ -118,6 +118,7 @@ describe('shared model and browser-cache integration', () => {
     });
     it('keeps the original intact when migration is unconfigured, unsupported or incomplete', async () => {
         const f = sharedDirectoryFixture(); const local = localFixture(false);
+        await expect(moveVideoAiModelToSharedDirectory('unknown')).rejects.toThrow('无效');
         await expect(moveVideoAiModelToSharedDirectory('tiny')).rejects.toThrow('先在');
         f.setStored(f.handle);
         await expect(moveVideoAiModelToSharedDirectory('tiny')).rejects.toThrow('不完整');

@@ -94,8 +94,8 @@ export async function readCachedVideoAiModelState(receipts: unknown): Promise<{
       const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
       const urls = new Set((await cache.keys()).map(request => request.url));
       localModels = models.filter(model => {
-      const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
-      return getVideoAiModelFileSets(model).some(complete);
+        const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
+        return getVideoAiModelFileSets(model).some(complete);
       });
     }
     sharedModels = await readSharedVideoAiModels(await createSharedVideoAiModelCache());
@@ -190,7 +190,9 @@ export async function cacheVideoAiModelFiles(
 export async function moveVideoAiModelToSharedDirectory(
   model: unknown,
   onProgress?: (progress: DownloadProgress) => void,
+  removeLocalModel: (model: unknown) => Promise<void> = removeVideoAiModelFiles,
 ): Promise<void> {
+  if (!VIDEO_LOCAL_TRANSCRIPTION_MODELS.some(item => item.value === model)) throw new Error('无效的本地字幕模型');
   const normalizedModel = normalizeVideoLocalTranscriptionModel(model);
   if (typeof caches === 'undefined') throw new Error('当前浏览器不支持本地模型缓存');
   const sharedCache = await createSharedVideoAiModelCache();
@@ -224,7 +226,8 @@ export async function moveVideoAiModelToSharedDirectory(
     if (!response) throw new Error('共享模型文件校验失败，请重试迁移');
     await verifySharedModelResponse(response);
   }
-  await removeVideoAiModelFiles(normalizedModel);
+  // 应用层传入既有 Worker 生命周期删除入口；活跃识别或下载会拒绝清理并保留本机副本。
+  await removeLocalModel(normalizedModel);
 }
 
 /** 消费受校验的流但不聚合权重，只有 SHA-256 结算成功后才允许删掉本机副本。 */

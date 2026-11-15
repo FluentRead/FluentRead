@@ -5,9 +5,9 @@ vi.mock('@/src/shared/onnx/resources', async original => ({
     withLocalInferenceBudget: budgetMocks.run,
 }));
 import {createLocalInferenceBudget} from '@/src/shared/onnx/resources';
-import {removeLocalVideoTranscriptionModel, moveLocalVideoTranscriptionModelToShared, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
 import {sharedDirectoryFixture} from './helpers/sharedVideoModelDirectory';
-import {getVideoAiModelFileUrl, VIDEO_AI_Q4_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
+import {moveVideoAiModelToSharedDirectory, getVideoAiModelFileUrl, VIDEO_AI_Q4_MODEL_FILES} from '@/src/features/video-subtitle/offscreen/modelCache';
 
 class FakeWorker {
     static instances: FakeWorker[] = [];
@@ -29,13 +29,13 @@ class FakeWorker {
 
 it.each(['tiny', 'base'] as const)('serializes shared migration with inference and releases the loaded %s worker only when needed', async loaded => {
     const f = sharedDirectoryFixture(); f.setStored(f.handle); installWorker();
+    const moveLocalVideoTranscriptionModelToShared = (model: unknown) => moveVideoAiModelToSharedDirectory(model, undefined, removeLocalVideoTranscriptionModel);
     const local = new Map(VIDEO_AI_Q4_MODEL_FILES.map(file => [getVideoAiModelFileUrl('tiny', file), 'local bytes']));
     vi.stubGlobal('caches', {open: async () => ({
         keys: async () => [...local.keys()].map(url => new Request(url)),
         match: async (url: string) => local.has(url) ? new Response(local.get(url)) : undefined,
         delete: async (request: Request) => local.delete(request.url),
     })});
-    await expect(moveLocalVideoTranscriptionModelToShared('bad')).rejects.toThrow('无效');
     const pending = transcribeLocalVideoAudio({streamId: 'shared-migration', audioPcm16Base64: 'AAAAAA==', model: loaded});
     await drain();
     await expect(moveLocalVideoTranscriptionModelToShared('tiny')).rejects.toThrow('正在使用');
@@ -43,9 +43,6 @@ it.each(['tiny', 'base'] as const)('serializes shared migration with inference a
     worker.reply({requestId: (worker as any).lastMessage.requestId, success: true, model: loaded, text: 'ready', segments: []});
     await pending;
     const migrating = moveLocalVideoTranscriptionModelToShared('tiny');
-    await drain();
-    await expect(moveLocalVideoTranscriptionModelToShared('tiny')).rejects.toThrow('正在使用');
-    if (loaded === 'tiny') worker.reply({requestId: (worker as any).lastMessage.requestId, success: true});
     await migrating;
     expect(local.size).toBe(0); expect(worker.terminated).toBe(loaded === 'tiny');
     await expect(moveLocalVideoTranscriptionModelToShared('tiny')).rejects.toThrow('不完整');

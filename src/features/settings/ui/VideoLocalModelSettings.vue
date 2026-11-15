@@ -121,7 +121,7 @@ import {
   getSharedVideoAiDirectoryStatus,
   supportsSharedVideoAiDirectory,
   type SharedVideoAiDirectoryStatus,
-} from '@/src/features/video-subtitle/sharedModelDirectory';
+} from '@/src/features/video-subtitle/model-sharing/public';
 
 const i18n = useUiI18n();
 const {t} = i18n;

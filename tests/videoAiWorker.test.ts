@@ -88,6 +88,18 @@ async function loadProtocolWorker(transcriber: any, backend: 'webgpu' | 'wasm' =
 }
 
 describe('视频 AI Worker timestamp parser', () => {
+    it('keeps its serial command queue usable after the response channel rejects both result and error delivery', async () => {
+        const scope = await loadProtocolWorker(vi.fn());
+        scope.postMessage.mockImplementationOnce(() => {throw new Error('response channel closed');})
+            .mockImplementationOnce(() => {throw new Error('response channel closed');});
+        try {
+            scope.onmessage({data: {requestId: 1, type: 'prepare', model: 'tiny'}});
+            await waitForWorkerMessages(scope, 2);
+            scope.onmessage({data: {requestId: 2, type: 'prepare', model: 'tiny'}});
+            await waitForWorkerMessages(scope, 3);
+            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({requestId: 2, success: true}));
+        } finally {vi.unstubAllGlobals();}
+    });
     it('gives Transformers the shared cache while disabling duplicate browser and filesystem writes', async () => {
         const cache = {match: vi.fn(), put: vi.fn()};
         modelCacheMocks.createVideoAiModelCache.mockResolvedValueOnce({cache, localCache: {}, sharedCache: cache});

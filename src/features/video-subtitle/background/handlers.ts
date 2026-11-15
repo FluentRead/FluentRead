@@ -150,7 +150,8 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
                     })};
                     nativeWork = record;
                     try { return await record.work; }
-                    finally { if (nativeWork === record) nativeWork = null; }
+                    // 下一条原生请求必须先 await 此 work；创建者的 finally 总在等待者接管前清理。
+                    finally { nativeWork = null; }
                 }
                 const response = await sendOffscreenRequest(offscreen, {type: 'VIDEO_AI_TRANSCRIBE', streamId: workerStream(next), model: normalizeVideoLocalTranscriptionModel(message.model), sourceLanguage: message.sourceLanguage, audioPcm16Base64: message.audioPcm16Base64, audioBase64: message.audioBase64}, {signal: requestOwner.controller.signal, timeoutMs: getVideoLocalTranscriptionRequestTimeoutMs(message.model), cancelMessage: {type: 'VIDEO_AI_CANCEL', streamId: workerStream(next)}});
                 assertCurrentOwner(requestOwner);

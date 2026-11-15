@@ -73,6 +73,8 @@ Whisper 模型均支持多语言。原语言未知或对白切换语言时使用
 
 在 **视频翻译设置 → 本地 AI 字幕** 管理 Whisper 模型。首次下载需联网。失败后可重试，完整缓存文件会复用，只补齐缺失项。清理浏览器缓存后可能需要重新下载。识别失败会清除不完整预览，翻译失败则保留已识别原文。
 
+支持文件系统访问 API 的浏览器还可启用 **跨浏览器共享模型**：在每个浏览器中选择同一文件夹并分别授权，模型写入该目录下的 `FluentRead/whisper` 子目录。已有模型可迁移到共享目录；断开授权不会删除共享文件。其他浏览器仍可使用各自的扩展缓存。
+
 ### 使用本机 Qwen3 ASR
 
 若已安装支持该模型的 vLLM，可用以下命令启动本机服务。服务需用固定模型 `Qwen/Qwen3-ASR-1.7B` 提供无需凭据的 `POST /v1/audio/transcriptions` 接口。[vLLM 模型配置](https://github.com/vllm-project/recipes/blob/main/models/Qwen/Qwen3-ASR-1.7B.yaml)

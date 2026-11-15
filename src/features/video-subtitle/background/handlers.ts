@@ -12,7 +12,7 @@ import {sendOffscreenRequest, sendOffscreenRequestIfPresent} from '@/src/platfor
 import type {OffscreenClient} from '@/src/platform/offscreen/client';
 import {VIDEO_LOCAL_TRANSCRIPTION_MODELS, VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY, VIDEO_LOCAL_TRANSCRIPTION_STATE_MESSAGE, getVideoLocalTranscriptionRequestTimeoutMs, normalizeVideoLocalTranscriptionModels, normalizeVideoLocalTranscriptionModel} from '@/src/features/video-subtitle/transcription';
 import {VideoAiCanceledGenerationRegistry} from '@/src/features/video-subtitle/content/video-ai/generationRegistry';
-import {readCachedVideoAiModels} from '@/src/features/video-subtitle/offscreen/modelCache';
+import {readCachedVideoAiModelState} from '@/src/features/video-subtitle/offscreen/modelCache';
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 
 type Owner = {tabId: number; streamId: string; generation: number};
@@ -241,10 +241,13 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
         async handle() {
             await stateWriteQueue;
             const stored = await readStore.get(VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY);
-            const models = await readCachedVideoAiModels(stored[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]);
+            const state = await readCachedVideoAiModelState(stored[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]);
+            const models = state.models;
             return {
                 success: true,
                 models,
+                localModels: state.localModels,
+                sharedModels: state.sharedModels,
                 available: Object.fromEntries(VIDEO_LOCAL_TRANSCRIPTION_MODELS.map(({value}) => [value, models.includes(value)])),
             };
         },
@@ -270,6 +273,27 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
             finally { removingModel = false; }
         },
     };
+    const moveModelToShared: BackgroundMessageHandler<Context> = {
+        type: 'fluentReadMoveLocalVideoModelToShared',
+        async handle(input: unknown) {
+            const message = parseVideoBackgroundMessage(input);
+            if (!VIDEO_LOCAL_TRANSCRIPTION_MODELS.some(item => item.value === message.model)) throw new Error('无效的本地字幕模型');
+            if (owner || activeModelRequests || removingModel) throw new Error('模型正在使用或下载，请结束后再迁移');
+            removingModel = true;
+            const model = normalizeVideoLocalTranscriptionModel(message.model);
+            let models: ReturnType<typeof normalizeVideoLocalTranscriptionModels> = [];
+            const write = stateWriteQueue.then(async () => {
+                const response = await sendOffscreenRequest(offscreen, {type: 'VIDEO_AI_SHARE_MODEL', model}, {timeoutMs: 630_000});
+                if (!response?.success) throw new Error(response?.error || '模型迁移失败');
+                const stored = await readStore.get(VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY);
+                models = normalizeVideoLocalTranscriptionModels(stored[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]).filter(item => item !== model);
+                await readStore.set({[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]: models});
+            });
+            stateWriteQueue = write.then(() => undefined, () => undefined);
+            try { await write; return {success: true, models}; }
+            finally { removingModel = false; }
+        },
+    };
     const guardModelRequest = (handler: BackgroundMessageHandler<Context>): BackgroundMessageHandler<Context> => ({
         ...handler,
         async handle(message, context) {
@@ -279,7 +303,7 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
             finally { activeModelRequests -= 1; }
         },
     });
-    return [guardModelRequest(transcribe), guardModelRequest(prepare), cancel, modelState, removeModel];
+    return [guardModelRequest(transcribe), guardModelRequest(prepare), cancel, modelState, removeModel, moveModelToShared];
 }
 
 export function releaseVideoSubtitleOwnerForTab(tabId: number): void {

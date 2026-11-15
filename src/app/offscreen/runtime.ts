@@ -29,7 +29,7 @@ import {createCoalescedDownloadNotifier, createDownloadProgressPublisher, LOCAL_
 import {normalizeVideoLocalTranscriptionModel} from '@/src/features/video-subtitle/transcription';
 import {createSelectionTtsPlayer} from './ttsPlayback';
 import {disposeChromeTranslationModels, translateWithChromeApi, type ChromeTranslationEnvironment} from './translation';
-import {removeLocalVideoTranscriptionModel, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
+import {removeLocalVideoTranscriptionModel, moveLocalVideoTranscriptionModelToShared, cancelLocalVideoTranscription, prepareLocalVideoTranscriptionModel, transcribeLocalVideoAudio} from '@/src/features/video-subtitle/offscreen/transcription';
 import {
     disposeLocalTtsWorker,
     getLocalTtsModelStatus,
@@ -128,6 +128,10 @@ export function startOffscreenApp(): void {
                 ),
             cancel: cancelLocalVideoTranscription,
             removeModel: request => removeLocalVideoTranscriptionModel(request.model),
+            shareModel: request => downloads.track(
+                videoModelDownloadId(normalizeVideoLocalTranscriptionModel(request.model)),
+                onProgress => moveLocalVideoTranscriptionModelToShared(request.model, onProgress),
+            ),
         },
         localTranslation: {
             translate: (request, signal) => translateLocalText(request, signal),

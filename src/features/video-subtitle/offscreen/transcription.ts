@@ -13,7 +13,7 @@ import {
   normalizeVideoAiRecognitionMetadata,
   resampleToWhisperAudio,
 } from '@/src/features/video-subtitle/transcription';
-import { cacheVideoAiQ4ModelFiles, removeVideoAiModelFiles } from './modelCache';
+import { cacheVideoAiQ4ModelFiles, moveVideoAiModelToSharedDirectory, removeVideoAiModelFiles } from './modelCache';
 import type {DownloadProgress} from '@/src/core/download/progress';
 import type {ModelSourcePreference} from '@/src/platform/http/modelDownloads';
 import type {VideoPreparationResult, VideoTranscriptionCancelReason, VideoTranscriptionResult, VideoTranscriptionSegment} from '@/src/core/messaging/video';
@@ -592,6 +592,27 @@ export async function removeLocalVideoTranscriptionModel(model: unknown): Promis
     firstAudioWarmLease = null;
     if (transcriptionWorkerModel === model) await disposeLoadedTranscriber();
     await removeVideoAiModelFiles(model);
+  } finally {
+    removingModel = false;
+    if (transcriptionWorker) scheduleIdleDisposal();
+  }
+}
+
+/** 迁移期间释放该模型的 ONNX session；只有共享目录完整接收文件后才删除浏览器副本。 */
+export async function moveLocalVideoTranscriptionModelToShared(
+  model: unknown,
+  onProgress?: (progress: DownloadProgress) => void,
+): Promise<void> {
+  if (!VIDEO_LOCAL_TRANSCRIPTION_MODELS.some(item => item.value === model)) throw new Error('无效的本地字幕模型');
+  if (removingModel || queueRunning || pendingTranscription || pendingPrepare.length || pendingPreparePromises.size || workerDisposing) {
+    throw new Error('模型正在使用或下载，请结束后再迁移');
+  }
+  removingModel = true;
+  try {
+    clearIdleDisposal();
+    firstAudioWarmLease = null;
+    if (transcriptionWorkerModel === model) await disposeLoadedTranscriber();
+    await moveVideoAiModelToSharedDirectory(model, onProgress);
   } finally {
     removingModel = false;
     if (transcriptionWorker) scheduleIdleDisposal();

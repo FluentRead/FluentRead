@@ -1,6 +1,6 @@
 /**
  * @file src/features/video-subtitle/ui/videoSentenceLearning.css
- * 文件职责：为完整句学习提供层次清楚、可折叠的播放器内双语阅读卡样式。
+ * 文件职责：为完整句学习提供层次清楚、可折叠的播放器内或浮动双语阅读卡样式。
  * 主要内容：沿用既有视频菜单的局部深灰表面与品牌粉色，突出原句与重播；可选读音使用原句下方的独立可换行正文，不挤入工具栏；短高度下整卡单区滚动、顶栏固定可达，正文不再被底部操作挤空；粗指针下顶栏、导航与底部主操作保留至少44px目标，布局仍保留原播放器控制区。
  * 模块边界：仅匹配 FluentRead 自有面板后代，由字幕 runtime 显式注入和清理，不依赖宿主样式或 WXT Shadow UI 自动挂载。
  */
@@ -151,3 +151,13 @@
   #fluent-read-video-learning-panel .fr-video-learning-translation { font-size: max(14px, var(--fluent-read-video-learning-font-size, 13px)); }
   #fluent-read-video-learning-panel .fr-video-learning textarea { font-size: max(16px, var(--fluent-read-video-learning-font-size, 13px)); }
 }
+
+
+#fluent-read-video-learning-panel .fr-video-learning-resize-handle { display: none; align-items: center; justify-content: center; flex: none; height: 28px; color: var(--fr-learning-muted); cursor: ns-resize; touch-action: none; user-select: none; }
+#fluent-read-video-learning-panel[data-floating=true] .fr-video-learning-resize-handle { display: flex; }
+#fluent-read-video-learning-panel .fr-video-learning-resize-handle span { width: 38px; height: 4px; border-radius: 99px; background: currentColor; opacity: .65; }
+#fluent-read-video-learning-panel .fr-video-learning-resize-handle:focus-visible { outline: 2px solid var(--fr-learning-accent); outline-offset: -3px; }
+@media (any-pointer: coarse) {
+  #fluent-read-video-learning-panel[data-floating=true] .fr-video-learning-resize-handle { height: 36px; }
+}
+#fluent-read-video-learning-panel[data-floating=true] .fr-video-learning { height: 100%; }

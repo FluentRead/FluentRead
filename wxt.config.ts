@@ -413,7 +413,10 @@ export default defineConfig({
             // 同环境 f0daab6d1：共享 Whisper 目录使 Chrome 68,503,659 → 68,545,144 bytes（+41,485），
             // Firefox 68,124,625 → 68,165,889 bytes（+41,264）；模型和 WASM 摘要不变，各追加 42 kB。
             const sharedWhisperBudget = 42_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget));
+            // 同环境 6d1496387：浮动学习卡、七语操作文案及导入布局使 Chrome +15,855、Firefox +15,288 bytes。
+            // 实测为 68,561,219/68,181,391 bytes；仅追加 16 kB 文本代码预算，模型与 WASM 不变。
+            const floatingLearningBudget = 16_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

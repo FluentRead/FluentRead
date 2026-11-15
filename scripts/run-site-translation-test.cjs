@@ -8,7 +8,7 @@
 
 const {guardBrowserClose, getGuardedBrowserPid} = require('./testing/owned-browser-close.cjs');
 const {createSiteFocusGuard} = require('./testing/site-focus-guard.cjs');
-const {installControlledProvider} = require('./site-translation/controlled-provider.cjs');
+const {installControlledProvider, buildSourceLanguagePolicy} = require('./site-translation/controlled-provider.cjs');
 const {interactionHrefsEquivalent} = require('./site-translation/interaction-url.cjs');
 const {runStabilityProbes, runNativeCommentToggle} = require('./site-translation/stability-probes.cjs');
 const {FACEBOOK_PUBLIC_POST_SELECTORS, prepareFacebookPublicPost, isVerifiedFacebookPublicPostPreparation} =
@@ -370,7 +370,9 @@ async function releaseFacebookReadingDialog(page) {
 
 // Predicate and failure details share exactly the same eligibility decisions.
 function readCoverageReadinessInPage({coverageRules, excludedSelector, protectedSelector,
-  nonDialogExcludedSelector, readingPostDialog, technicalWords, diagnostics = false}) {
+  nonDialogExcludedSelector, readingPostDialog, technicalWords, sourceLanguagePolicySource, diagnostics = false}) {
+  // 只编译当前 checkout 的纯语言规则；不执行网站提供的脚本或改写原文。
+  const policy = new Function(sourceLanguagePolicySource)();
   // 只浅复制 Document 壳；在无窗口文档中 import，避免只读探针重新请求来源图片。
   const snapshotDocument = document.cloneNode(false);
   const excludedAncestor = node => {
@@ -391,7 +393,7 @@ function readCoverageReadinessInPage({coverageRules, excludedSelector, protected
       (/^[A-Z][A-Z0-9_-]{3,15}$/u.test(token) && !/[AEIOU]/u.test(token)))) return false;
     const letters = text.match(/[A-Za-z]/gu)?.length || 0;
     const cjk = text.match(/[\u3400-\u9fff]/gu)?.length || 0;
-    return letters >= 2 && letters >= cjk;
+    return letters >= 2 && letters >= cjk && !policy.shouldSkipTranslationForTarget(text, 'zh-Hans', []);
   };
   const sourceText = node => {
     const clone = snapshotDocument.importNode(node, true);
@@ -442,7 +444,7 @@ function readCoverageReadinessInPage({coverageRules, excludedSelector, protected
 
 async function waitForCoverageReady(page, rules, timeout) {
   const argument = {coverageRules: rules, ...coverageEligibilityContext(page),
-    technicalWords: [...SINGLE_TOKEN_TECHNICAL_WORDS]};
+    technicalWords: [...SINGLE_TOKEN_TECHNICAL_WORDS], sourceLanguagePolicySource: buildSourceLanguagePolicy()};
   try {
     await page.waitForFunction(readCoverageReadinessInPage, argument, {timeout});
   } catch (error) {
@@ -457,7 +459,8 @@ async function waitForCoverageReady(page, rules, timeout) {
 
 async function installCoverageTracker(page, rules) {
   await page.evaluate(({coverageRules, trackerKey, excludedSelector, protectedSelector,
-    nonDialogExcludedSelector, nonDialogProtectedSelector, readingPostDialog, technicalWords}) => {
+    nonDialogExcludedSelector, nonDialogProtectedSelector, readingPostDialog, technicalWords, sourceLanguagePolicySource}) => {
+    const policy = new Function(sourceLanguagePolicySource)();
     window[trackerKey]?.stop?.();
     const snapshotDocument = document.cloneNode(false);
     const ownedSelector = [
@@ -487,7 +490,7 @@ async function installCoverageTracker(page, rules) {
         (/^[A-Z][A-Z0-9_-]{3,15}$/u.test(token) && !/[AEIOU]/u.test(token)))) return false;
       const letters = text.match(/[A-Za-z]/gu)?.length || 0;
       const cjk = text.match(/[\u3400-\u9fff]/gu)?.length || 0;
-      return letters >= 2 && letters >= cjk;
+      return letters >= 2 && letters >= cjk && !policy.shouldSkipTranslationForTarget(text, 'zh-Hans', []);
     };
     const metrics = {
       canonicalSnapshotCalls: 0,
@@ -1092,6 +1095,7 @@ async function installCoverageTracker(page, rules) {
     trackerKey: COVERAGE_TRACKER_KEY,
     ...coverageEligibilityContext(page),
     technicalWords: [...SINGLE_TOKEN_TECHNICAL_WORDS],
+    sourceLanguagePolicySource: buildSourceLanguagePolicy(),
   });
 }
 
@@ -2772,7 +2776,7 @@ async function waitForHoverPointer(page, targetConfig, timeout, prepareClickText
     preparation: {text: prepareClickText || '', clicked: prepared}})}`);
 }
 
-async function leaveEditingFocusForHover(page) {
+async function leaveEditingFocusForHover(page, targetConfig) {
   for (let step = 0; step <= 8; step += 1) {
     const editing = await page.evaluate(() => {
       let active = document.activeElement;
@@ -2782,6 +2786,14 @@ async function leaveEditingFocusForHover(page) {
     if (editing !== true) return step;
     if (step === 8) throw new Error('悬浮测试准备失败：原生 Tab 导航后焦点仍在编辑区');
     assertPageFocusAllowed(page);
+    if (step === 0 && targetConfig) {
+      const point = await page.evaluate(findHoverTextPointInPage, targetConfig);
+      const passiveText = point && await page.evaluate(({x, y}) => {
+        const hit = document.elementFromPoint(x, y);
+        return Boolean(hit && !hit.closest('a,button,input,textarea,select,[role="button"],[role="link"],[contenteditable]:not([contenteditable="false"])'));
+      }, point);
+      if (passiveText === true) {assertPageFocusAllowed(page); await page.mouse.click(point.x, point.y); continue;}
+    }
     await page.keyboard.press('Tab');
   }
 }
@@ -2813,8 +2825,8 @@ async function toggleHover(page, target, targetConfig, expectedCount, timeout, a
   });
   // 还原译文会改变布局，宿主也可能继续滚动或播放入场动画。固定等待后取外框
   // 坐标会落到空白容器；按键前等待真实原文行稳定并保持命中，按键只发送一次。
-  // 有些站点自动聚焦搜索框。真实读者先离开输入区；只用原生 Tab 导航，保留产品的输入保护。
-  await leaveEditingFocusForHover(page);
+  // 有些站点自动聚焦搜索框。先可信点击可命中的非交互正文或原生 Tab 导航，保留产品的输入保护。
+  await leaveEditingFocusForHover(page, targetConfig);
   const point = await waitForHoverPointer(page, targetConfig, timeout, prepareClickText);
   const {x, y} = point;
   assertPageFocusAllowed(page); await page.keyboard.down('Control');

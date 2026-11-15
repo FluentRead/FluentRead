@@ -37,6 +37,16 @@ describe('area translation Offscreen adapter', () => {
     const adapter = createAreaTranslationOffscreenAdapter(client);
     const selection = {left: 1, top: 2, width: 3, height: 4, viewportWidth: 100, viewportHeight: 80};
 
+    it.each([undefined, null, {}])('rejects crop results with non-array OCR lines (%j)', async lines => {
+        send.mockResolvedValueOnce({success: true, image: 'crop', lines});
+        await expect(adapter.cropArea('image', selection)).rejects.toThrow('圈选裁剪失败');
+    });
+    it('returns a valid crop through the legacy call without operation options', async () => {
+        send.mockResolvedValueOnce({success: true, image: 'crop', lines: []});
+        await expect(adapter.cropArea('image', selection)).resolves.toEqual({image: 'crop', lines: []});
+        expect(send).toHaveBeenCalledWith({type: 'FLUENT_READ_AREA_CROP_OFFSCREEN', image: 'image', selection});
+    });
+
     it('sends crop-only request and preserves metadata fields', async () => {
         send.mockResolvedValueOnce({success: true, image: 'crop', lines: [], recognitionMethod: 'vision'});
         await expect(adapter.cropArea('data:image/png,area', selection, {requestId: 'crop-1', signal: new AbortController().signal, timeoutMs: 5000}))

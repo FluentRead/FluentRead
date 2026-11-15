@@ -38,6 +38,18 @@ async function readOutline(bytes: Uint8Array) {
 }
 
 describe('downloaded PDF chapter outlines', () => {
+    it('ignores unnamed destination keys and blank chapter titles, bounding native hierarchy at 64 levels', async () => {
+        const {source, document, pages} = await fixture(), destination = [source.getPage(0).ref, name('Fit')];
+        let child = source.context.obj({Title: PDFString.of('Outside depth limit'), Dest: destination});
+        for (let depth = 67; depth >= 1; depth--) child = source.context.obj({Title: PDFString.of(depth === 1 ? '  ' : `Level ${depth}`), Dest: destination, First: child});
+        source.catalog.set(name('Outlines'), source.context.obj({First: child}));
+        source.catalog.set(name('Names'), source.context.obj({Dests: {Names: [PDFNumber.of(7), destination, PDFString.of('valid'), destination]}}));
+        const output = await PDFDocument.create(), outline = createPdfExportOutline(source, output, document, []);
+        outline.layoutPage(pages[0], output.addPage([600, 800])); outline.write();
+        const flatten = (items: Array<{title: string; children: any[]}>): string[] => items.flatMap(item => [item.title, ...flatten(item.children)]);
+        const titles = flatten((await readOutline(await output.save())).items);
+        expect(titles).toHaveLength(63); expect(titles[0]).toBe('Level 2'); expect(titles.at(-1)).toBe('Level 64');
+    });
     it('retains fully translated raster export when optional source-bookmark extraction encounters encryption', async () => {
         const {document} = await fixture();
         const load = vi.spyOn(PDFDocument, 'load').mockRejectedValueOnce(new EncryptedPDFError());

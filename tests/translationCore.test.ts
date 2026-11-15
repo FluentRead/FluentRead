@@ -3314,6 +3314,23 @@ describe('translation candidate core', () => {
         expect(metadata.outerHTML).toBe(before.replace('last month</relative-time>', '2 months ago</relative-time>'));
     });
 
+    it('protects the native GitHub PR-list heading while retaining PR and Markdown titles and non-list pages', () => {
+        const {document, core} = page(`<main><react-app><div data-target="react-app.reactRoot"><meta name="react-app-name" content="pull-requests">
+            <header data-component="PageLayout.Header"><h1 id="list-heading" data-testid="header-title">All pull requests</h1></header>
+            <a id="pr-title" data-testid="listitem-title-link" href="/owner/repo/pull/1">Fix the translated paragraph layout</a>
+            <article class="markdown-body"><header data-component="PageLayout.Header"><h1 id="readme-title" data-testid="header-title">An article heading</h1></header><p id="body">A complete source paragraph.</p></article>
+            </div></react-app></main>`, 'https://github.com/owner/repo/pulls');
+        const heading = document.getElementById('list-heading')!, before = heading.outerHTML;
+        expect(core.shouldStayOriginal(heading)).toBe(true); expect(core.shouldIgnoreMutation(heading)).toBe(true);
+        expect(core.resolve(heading.firstChild)).toBeNull();
+        expect(core.discover(document).map(item => item.element.id)).toEqual(['pr-title', 'readme-title', 'body']);
+        expect(createTranslationSourceSnapshot(document.querySelector('main')!, core.shouldStayOriginal).slots.map(slot => slot.source).join(' ')).not.toContain('All pull requests');
+        expect(heading.outerHTML).toBe(before);
+        document.querySelector('meta')!.setAttribute('content', 'pull-request');
+        expect(core.shouldStayOriginal(heading)).toBe(false); expect(core.shouldIgnoreMutation(heading)).toBe(false);
+        expect(core.resolve(heading.firstChild)?.element).toBe(heading);
+    });
+
     it('protects current GitHub PR list author and timestamp metadata without hiding nearby prose', () => {
         const {document, core} = page(`
             <main>
@@ -4706,6 +4723,9 @@ describe('translation candidate core', () => {
 
     it('guards extreme text ancestry and layout edge cases without provider work', () => {
         const {document, core} = page('<main><div id="root"></div></main>');
+        const shallow = document.createElement('p'); shallow.textContent = 'A readable source paragraph survives absent discovery roots.'; document.body.append(shallow);
+        const sparseRoots = new Array<Node>(2); sparseRoots[1] = shallow;
+        expect(hasMeaningfulTranslationTextInNodes(sparseRoots)).toBe(true);
         const root = document.querySelector('#root')!;
         let parent = root;
         for (let index = 0; index < maxComposedAncestorDepth + 2; index += 1) {

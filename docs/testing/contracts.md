@@ -43,6 +43,8 @@ Chrome/Edge MV3 的公开图标和实际消费的两份内容入口样式使用�
 
 真实站点 runner 与矩阵执行必须显式提供 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs`，不依赖开发者固定安装路径。`--list` 只读取清单，无需该 helper。一键回归的 `--network --allow-network` 同样接收该参数，也可通过 `FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER` 指定；普通改动仍应显式用 `--cases` 选择受影响站点。受控供应商只向首次选定的 `chrome-extension://<id>/` worker 注入响应，网站的 HTTP(S) worker 与其它扩展不被注入、不计入供应商证据；选定扩展的 worker 重启、丢失或身份变化仍会失败。
 
+全文就绪与覆盖追踪使用当前 checkout 编译的纯语言规则，可信识别为中文目标的技术标题无需译文 wrapper；混合、未知与明确外语正文继续保留原 owner 的翻译义务，不将本地跳过记为供应商成功。悬浮测试遇到站点自动聚焦输入框时，先可信点击已有 Range/命中证据的非交互正文，或通过有界原生 Tab 导航离开编辑区，再复核原文位置并发送一次快捷键；不改写焦点、禁用输入保护或点击链接来制造通过。
+
 站点默认使用 `fullPageScope: "finite-page"`，要求滚动到稳定底部。无限信息流可显式配置 `"initial-corpus"`：每轮翻译开始时冻结覆盖选择器中当前已载入的全部可读正文，逐个给予可见机会并要求每个 owner 完成，随后验证恢复原文和再次翻译；第二轮以该轮开始时已载入的集合重新取证。此范围禁止 `trackDynamic`，不会追逐无限新增的节点，不宣称抵达信息流底部，也不代表未配置区域、无限滚动或分页加载验收。结果保存 `fullPageScope`、`fullPageBoundary` 以及各轮完整覆盖数量，缺失初始正文仍会失败。
 
 Bing 普通搜索会在悬停时把 `/ck/a?u=a1<base64>` 跟踪链接改为同目标的直链。交互检查仅在 `https://www.bing.com/search` 对该已观察格式核对解码后的 HTTP(S) 目标，证据仍保存前后原始 href；其它站点、路径、协议、伪造域名或目的地变化继续失败，不按整站忽略链接变化。

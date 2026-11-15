@@ -13,6 +13,10 @@ function domFrom(html: string) {
 }
 
 describe('段落复制取词', () => {
+    it('空代码块与空双语工件不制造译文形态或额外正文', () => {
+        const document = domFrom('<div id="target"><pre>\n  \n</pre><p>Plain text<span class="fluent-read-bilingual-content" data-fr-translation-owned="true"> \n </span></p></div>');
+        expect(readParagraphTexts(document.getElementById('target')!)).toEqual({original: 'Plain text', translation: '', display: 'original'});
+    });
     it('极深的行内 DOM 仍完整复制文字，不耗尽调用栈', () => {
         const document = domFrom('<p id="target"></p>');
         const root = document.getElementById('target')!;

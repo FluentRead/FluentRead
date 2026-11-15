@@ -384,6 +384,17 @@ async function assertSourcePartitions(page, ledger, phase, {restored = false} = 
 }
 
 let originalSlotPolicies;
+let sourceLanguagePolicySource;
+function buildSourceLanguagePolicy() {
+  if (sourceLanguagePolicySource) return sourceLanguagePolicySource;
+  const path = require('node:path'), {createRequire} = require('node:module');
+  const root = path.resolve(__dirname, '../..');
+  const esbuild = createRequire(require.resolve('vite/package.json'))('esbuild');
+  const built = esbuild.buildSync({stdin: {contents: `export {shouldSkipTranslationForTarget} from './src/core/language/detect';`, resolveDir: root},
+    alias: {'@': root}, bundle: true, write: false, platform: 'browser', format: 'iife', globalName: 'fluentReadSourceLanguagePolicy', minify: true, logLevel: 'silent'});
+  sourceLanguagePolicySource = `${built.outputFiles[0].text}\nreturn fluentReadSourceLanguagePolicy;`;
+  return sourceLanguagePolicySource;
+}
 function loadOriginalSlotPolicies() {
   if (originalSlotPolicies) return originalSlotPolicies;
   // Use the tested snapshot's actual pure eligibility rules; a second handwritten language
@@ -497,4 +508,4 @@ async function installControlledProvider(context, createPage, timeout) {
   };
 }
 
-module.exports = {controlledProviderRuntime, installControlledProvider, encodeControlledTranslation, decodeControlledTranslationText, isControlledTranslationForSource, readControlledPageEvidenceInPage, assertControlledPageEvidence, captureSourcePartitions, assertSourcePartitions};
+module.exports = {controlledProviderRuntime, installControlledProvider, encodeControlledTranslation, decodeControlledTranslationText, isControlledTranslationForSource, readControlledPageEvidenceInPage, assertControlledPageEvidence, captureSourcePartitions, assertSourcePartitions, buildSourceLanguagePolicy};

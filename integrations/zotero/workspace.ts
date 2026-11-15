@@ -326,9 +326,20 @@ async function startWorkspace(initial: WorkspaceOptions, mount: HTMLElement): Pr
         ]);
     }});
     app.mount(mount);
+    const closeSelect = () => {openSelect.value = undefined;};
+    const onOutsidePointerDown = (event: PointerEvent) => {
+        const key = openSelect.value?.key;
+        if (!key) return;
+        const dropdown = mount.ownerDocument.getElementById(`zotero-setting-${key}`)?.parentElement;
+        if (!dropdown?.contains(event.target as Node)) closeSelect();
+    };
+    mount.ownerDocument.addEventListener('pointerdown', onOutsidePointerDown, true);
+    window.addEventListener('blur', closeSelect);
     const dispose = async () => {
         if (disposed) return;
         disposed = true; selectionController?.abort(); selectionGeneration++;
+        mount.ownerDocument.removeEventListener('pointerdown', onOutsidePointerDown, true);
+        window.removeEventListener('blur', closeSelect);
         unsubscribe(); app.unmount(); await queue.dispose();
     };
     ownWindow.FluentReadWorkspace = {receive, dispose};

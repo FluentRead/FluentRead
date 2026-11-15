@@ -101,6 +101,29 @@ afterEach(async () => {
 });
 
 describe('Zotero Vue workspace user flows', () => {
+    it('dismisses a pending dropdown choice on outside pointer input or window blur', async () => {
+        await attach();
+        const output = selectControl('输出');
+        await press(output, 'End');
+        const menu = doc.getElementById(output.getAttribute('aria-controls')!)!;
+        menu.dispatchEvent(new win.Event('pointerdown', {bubbles: true}));
+        await settle();
+        expect(output.getAttribute('aria-expanded')).toBe('true');
+        doc.querySelector('h1')!.dispatchEvent(new win.Event('pointerdown', {bubbles: true}));
+        await settle();
+        expect(output.getAttribute('aria-expanded')).toBe('false');
+        expect(selectValue('输出')).toBe('双语 PDF');
+
+        await press(output, 'End');
+        win.dispatchEvent(new win.Event('blur'));
+        await settle();
+        expect(output.getAttribute('aria-expanded')).toBe('false');
+        expect(selectValue('输出')).toBe('双语 PDF');
+        click(namedButton('翻译设置')); await settle();
+        click(namedButton('保存设置')); await settle();
+        expect(host.saveSettings).toHaveBeenCalledWith(expect.objectContaining({output: 'bilingual'}));
+    });
+
     it('navigates and confirms settings by keyboard, keeping the current choice on dismissal', async () => {
         await attach();
         const output = selectControl('输出');

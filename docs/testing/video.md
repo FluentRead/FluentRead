@@ -147,5 +147,7 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 
 `node scripts/run-youtube-subtitle-sync-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-youtube-sync` 在临时 Edge profile 的后台可见窗口中验证文档全屏、菜单操作、整句/逐词字幕定位、时间边界、重复句、延迟译文、真实视频 seek、空字幕、原文模式和关闭清理。夹具使用真实视频进度、受控 YouTube DOM 与模拟翻译响应，不代表真实 YouTube 字幕供应或翻译服务质量。
 
+Issue #1341 的重复字幕回归区分内容与滚动残留：`No no`、`Very very`、`Bye bye` 和重复整句即使分成多个可见片段，也必须完整显示并送翻；只有窗口裁切或匹配当前 cue 的时间轴依据才能排除旧行。无时间轴时不猜测同文就是残留。浏览器专项检查每个原生场景的全部新增请求（另列时间轴预取），以及同文滚动场景的全部相关请求；还验证紧凑原文模式零新请求、重新开启后的缓存复用与 cue 本身合法重复。公共 mount 测试补充动态重分段、重叠旧 cue 的选择和人工目标轨。原 issue 仅提供截图，受控回归不能代替原视频及字幕数据的复现。
+
 该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
 

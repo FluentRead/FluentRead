@@ -76,6 +76,51 @@ describe('YouTube 视频字幕识别', () => {
         expect(readVisibleCaptionText(rollup)).toContain('Outside below.');
     });
 
+    it.each([
+        ['强调', ['Very', 'very'], 'Very very'],
+        ['对话', ['No', 'no'], 'No no'],
+        ['歌词', ['Bye', 'bye'], 'Bye bye'],
+        ['逐词短语', ['Sea', 'otters', 'Sea', 'otters'], 'Sea otters Sea otters'],
+        ['大小写不同的整句', ['Hey! It works.', 'hey!  it WORKS.'], 'Hey! It works. hey! it WORKS.'],
+    ] as const)('合法重复：同一可见行中的%s不因片段边界丢失', (_name, parts, expected) => {
+        const {document} = parseHTML('<div id="captions"><span class="caption-visual-line"></span></div>');
+        const line = document.querySelector('.caption-visual-line')!;
+        for (const text of parts) {
+            const segment = document.createElement('span'); segment.className = 'ytp-caption-segment'; segment.textContent = text;
+            line.appendChild(segment);
+        }
+        expect(readVisibleCaptionText(document.getElementById('captions'))).toBe(expected);
+    });
+
+    it('合法重复：滚动窗口仅排除被裁切的同文旧行，仍保留同时可见的重复行', () => {
+        const {document} = parseHTML('<div id="captions" class="ytp-caption-window-rollup"><span class="caption-visual-line"><span class="ytp-caption-segment">A full sentence.</span></span><span class="caption-visual-line"><span class="ytp-caption-segment">A full sentence.</span></span></div>');
+        const container = document.getElementById('captions')!;
+        const [previous, current] = Array.from(container.querySelectorAll('.ytp-caption-segment'));
+        container.getBoundingClientRect = () => ({top: 100, bottom: 130, height: 30} as DOMRect);
+        previous.getBoundingClientRect = () => ({top: 70, bottom: 100, height: 30} as DOMRect);
+        current.getBoundingClientRect = () => ({top: 100, bottom: 130, height: 30} as DOMRect);
+        expect(readVisibleCaptionText(container)).toBe('A full sentence.');
+        previous.getBoundingClientRect = () => ({top: 90, bottom: 120, height: 30} as DOMRect);
+        expect(readVisibleCaptionText(container)).toBe('A full sentence. A full sentence.');
+    });
+
+    it('合法重复：fallback片段和动态重分段保留同一份完整原文', () => {
+        const {document} = parseHTML('<div id="captions"><span class="captions-text">No</span><span class="captions-text">no</span></div>');
+        const container = document.getElementById('captions')!;
+        expect(readVisibleCaptionText(container)).toBe('No no');
+        container.innerHTML = '<span class="ytp-caption-segment">No no</span>';
+        expect(readVisibleCaptionText(container)).toBe('No no');
+        container.innerHTML = '<span class="ytp-caption-segment">No</span><span class="ytp-caption-segment">no</span>';
+        expect(readVisibleCaptionText(container)).toBe('No no');
+    });
+
+    it('不同句保持拼接且单行内部的合法重复不被折叠', () => {
+        const mixed = parseHTML('<div id="captions"><span class="ytp-caption-segment">They open the shell.</span><span class="ytp-caption-segment">Sea otters have strong teeth.</span></div>');
+        expect(readVisibleCaptionText(mixed.document.getElementById('captions'))).toBe('They open the shell. Sea otters have strong teeth.');
+        const single = parseHTML('<div id="captions"><span class="ytp-caption-segment">Bye bye! Bye bye!</span></div>');
+        expect(readVisibleCaptionText(single.document.getElementById('captions'))).toBe('Bye bye! Bye bye!');
+    });
+
     it('只读取当前播放器内的字幕，忽略页面上残留的其他字幕容器', () => {
         const {document} = parseHTML('<html><body><div class="ytp-caption-window-container"><span class="ytp-caption-segment">Old player</span></div><div id="movie_player"><div id="ytp-caption-window-container"></div></div></body></html>');
         vi.stubGlobal('document', document);

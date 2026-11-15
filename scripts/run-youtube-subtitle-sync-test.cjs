@@ -39,11 +39,19 @@ const translations = {
   'The next caption is ready.': '下一句字幕已就绪。',
   'A native sentence without a timed track.': '这句原文没有时间轨道。',
   'Another native sentence.': '另一句原文。',
+  'No no': '不，不。',
+  'Very very': '非常非常。',
+  'Bye bye': '再见再见。',
+  'An untimed repeated sentence. An untimed repeated sentence.': '一句重复台词。一句重复台词。',
+  'Timed rolling caption.': '当前时间轴字幕。',
+  'A repeated cue. A repeated cue.': '重复的字幕句。重复的字幕句。',
 };
 const cues = [
   {tStartMs: 0, dDurationMs: 1000, segs: [{utf8: 'Sea otters have strong teeth.'}]},
   {tStartMs: 1000, dDurationMs: 1000, segs: [{utf8: 'They open the shell.'}]},
   {tStartMs: 2000, dDurationMs: 1000, segs: [{utf8: 'Sea otters have strong teeth.'}]},
+  {tStartMs: 6000, dDurationMs: 1000, segs: [{utf8: 'Timed rolling caption.'}]},
+  {tStartMs: 7000, dDurationMs: 1000, segs: [{utf8: 'A repeated cue. A repeated cue.'}]},
   {tStartMs: 8000, dDurationMs: 1000, segs: [{utf8: 'The same beginning belongs to a future sentence.'}]},
   {tStartMs: 10000, dDurationMs: 1000, segs: [{utf8: 'Slow translation belongs here.'}]},
   {tStartMs: 11000, dDurationMs: 1000, segs: [{utf8: 'The next caption is ready.'}]},
@@ -119,6 +127,22 @@ let launchAttempted = false;
     }, {time, text});
     await page.waitForFunction(() => !document.querySelector('video').seeking);
   };
+  const setCaptionSegments = async (time, parts, separateLines = false) => {
+    diagnostics.setPhase(`segmented-caption-${time}`);
+    await page.evaluate(({time, parts, separateLines}) => {
+      const container = document.querySelector('#ytp-caption-window-container');
+      const line = document.createElement('span'); line.className = 'caption-visual-line';
+      container.replaceChildren(...(separateLines ? [] : [line]));
+      for (const text of parts) {
+        const segment = document.createElement('span'); segment.className = 'ytp-caption-segment'; segment.textContent = text;
+        if (separateLines) {
+          const row = document.createElement('span'); row.className = 'caption-visual-line'; row.appendChild(segment); container.appendChild(row);
+        } else line.appendChild(segment);
+      }
+      document.querySelector('video').currentTime = time;
+    }, {time, parts, separateLines});
+    await page.waitForFunction(() => !document.querySelector('video').seeking);
+  };
   const sample = () => page.evaluate(() => {
     const original = document.querySelector('#fluent-read-video-subtitle-original');
     const translation = document.querySelector('#fluent-read-video-subtitle');
@@ -137,17 +161,25 @@ let launchAttempted = false;
   const first = await sample();
   check('Whole native cue uses one bilingual panel', first.original === first.native && first.nativeVisibility === 'hidden', first);
   await page.evaluate(() => {
-    window.fixtureNativeFrames = {samples: 0, visibleFrames: 0, failures: [], running: true};
+    window.fixtureNativeFrames = {samples: 0, visibleFrames: 0, failures: [], running: true,
+      expectHidden: true, originalOnlySamples: 0, originalOnlyVisibleFrames: 0, originalOnlyFrames: []};
     const sample = () => {
       const result = window.fixtureNativeFrames;
       if (!result.running) return;
       const native = document.querySelector('#movie_player #ytp-caption-window-container .ytp-caption-segment');
       if (native?.textContent) {
-        result.samples++;
-        if (getComputedStyle(native).visibility !== 'hidden') {
+        const visible = getComputedStyle(native).visibility !== 'hidden';
+        if (!result.expectHidden) {
+          // 原文模式允许原生字幕显示，单独保留观测，不算作双语接管期间的闪现。
+          result.originalOnlySamples++;
+          if (visible) result.originalOnlyVisibleFrames++;
+          if (result.originalOnlyFrames.length < 60) result.originalOnlyFrames.push({time: document.querySelector('video').currentTime,
+            text: native.textContent, visibility: getComputedStyle(native).visibility});
+        } else if (visible) {
           result.visibleFrames++;
           if (result.failures.length < 60) result.failures.push({time: document.querySelector('video').currentTime, text: native.textContent});
         }
+        if (result.expectHidden) result.samples++;
       }
       requestAnimationFrame(sample);
     };
@@ -208,6 +240,57 @@ let launchAttempted = false;
   await setCaption(4, 'The same beginning');
   await page.waitForTimeout(550);
   check('A matching prefix does not borrow a future full sentence', !(await sample()).original.includes('future') && (await sample()).translation === '', await sample());
+  // 片段可以只是同一句中的逐词/样式边界。没有时间轴时，不猜测同文是滚动残留。
+  const timedSources = new Set(cues.map(cue => cue.segs.map(segment => segment.utf8).join('')));
+  const repeatedCaptions = [
+    ['No', 'no'], ['Very', 'very'], ['Bye', 'bye'],
+    ['An untimed repeated sentence.', 'An untimed repeated sentence.'],
+  ];
+  for (const [index, parts] of repeatedCaptions.entries()) {
+    const source = parts.join(' '), requestStart = await worker.evaluate(() => globalThis.fixtureRequests.length);
+    await setCaptionSegments(5.2 + index * .1, parts, index === 3);
+    await waitTranslation(translations[source]);
+    const rendered = await sample();
+    check(`Genuine repeated caption remains complete: ${source}`, rendered.original === source && rendered.translation === translations[source], rendered);
+    const requests = await worker.evaluate(start => globalThis.fixtureRequests.slice(start), requestStart);
+    // 保留完整请求列表；排除当前播放时间触发的已知时间轴预取，检查该原生输入的每次请求。
+    const nativeRequests = requests.filter(text => !timedSources.has(text));
+    check(`Every untracked request preserves repeated content: ${source}`, nativeRequests.length === 1 && nativeRequests[0] === source, {requests, nativeRequests});
+  }
+  const requestsBeforeOriginal = await worker.evaluate(() => globalThis.fixtureRequests.length);
+  const originalWidth = await page.evaluate(() => {
+    const player = document.querySelector('#movie_player'), previous = player.style.width;
+    window.fixtureNativeFrames.expectHidden = false;
+    player.style.width = '560px'; return previous;
+  });
+  await patchConfig({videoSubtitleDisplayMode: 'original-only'});
+  await setCaptionSegments(5.7, ['No', 'no']);
+  await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-original')?.textContent === 'No no'
+    && document.querySelector('#fluent-read-video-subtitle')?.textContent === '');
+  check('Compact original-only mode preserves repeated words without translating', (await worker.evaluate(() => globalThis.fixtureRequests.length)) === requestsBeforeOriginal, await sample());
+  await patchConfig({videoSubtitleDisplayMode: 'bilingual'});
+  await waitTranslation(translations['No no']);
+  const restoredRepeatedCaption = await sample();
+  check('Re-enabling translation keeps the full repeated caption and reuses its cache', restoredRepeatedCaption.original === 'No no'
+    && restoredRepeatedCaption.nativeVisibility === 'hidden'
+    && (await worker.evaluate(() => globalThis.fixtureRequests.length)) === requestsBeforeOriginal, await sample());
+  await page.evaluate(() => {window.fixtureNativeFrames.expectHidden = true;});
+  await page.screenshot({path: path.join(artifacts, 'legal-repetition.png')});
+  await page.evaluate(width => {document.querySelector('#movie_player').style.width = width;}, originalWidth);
+  // 有匹配的当前 cue 时，使用该 cue 的完整文本；原生滚动残留不应拼成双份请求。
+  await setCaptionSegments(6.2, ['Timed rolling caption.', 'Timed rolling caption.'], true);
+  await waitTranslation(translations['Timed rolling caption.']);
+  const rollingDuplicate = await sample();
+  check('A matching current cue displays a repeated rolling sentence once', rollingDuplicate.original === 'Timed rolling caption.'
+    && rollingDuplicate.translation === translations['Timed rolling caption.'], rollingDuplicate);
+  const rollingRequests = await worker.evaluate(() => globalThis.fixtureRequests.filter(source => source.includes('Timed rolling caption.')));
+  check('All rolling-caption requests use the single current cue', rollingRequests.length === 1 && rollingRequests[0] === 'Timed rolling caption.', {rollingRequests});
+  await setCaptionSegments(7.2, ['A repeated cue.', 'A repeated cue.']);
+  await waitTranslation(translations['A repeated cue. A repeated cue.']);
+  const repeatedCueRequests = await worker.evaluate(() => globalThis.fixtureRequests.filter(source => source.includes('A repeated cue.')));
+  check('Genuine repetition within a timed cue remains complete in the panel and every request', (await sample()).original === 'A repeated cue. A repeated cue.'
+    && repeatedCueRequests.length === 1 && repeatedCueRequests[0] === 'A repeated cue. A repeated cue.', {rendered: await sample(), repeatedCueRequests});
+  await page.evaluate(() => {document.querySelector('#ytp-caption-window-container').innerHTML = '<span class="ytp-caption-segment"></span>';});
   await setCaption(10.2, 'Slow translation belongs here.');
   await page.waitForTimeout(150);
   await setCaption(11.2, 'The next caption is ready.');
@@ -348,7 +431,7 @@ let launchAttempted = false;
     window.fixtureNativeFrames.running = false;
     return window.fixtureNativeFrames;
   });
-  check('Animation-frame sampling finds no visible native caption during cue gaps, seeks or container replacement',
+  check('Animation-frame sampling finds no visible native caption during bilingual cue gaps, seeks or container replacement',
     report.nativeCaptionFrames.samples > 0 && report.nativeCaptionFrames.visibleFrames === 0, report.nativeCaptionFrames);
   const unrelated = await page.evaluate(() => {
     const container = document.createElement('div'); container.className = 'ytp-caption-window-container';

@@ -330,6 +330,27 @@ describe('visible Unicode PDF reading export', () => {
         expect(progress).toContainEqual({phase: 'rendering', completedPages: 1, totalPages: 1});
     });
 
+    it('loads one reading font and keeps both translated pages searchable in a multi-page export', async () => {
+        const document = await fixture();
+        if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const source = await PDFDocument.load(document.binary.bytes);
+        source.addPage([600, 800]).drawText('Second source page', {x: 42, y: 720, size: 14});
+        document.binary.bytes = await source.save();
+        document.segments.push(...document.segments.map(segment => ({...segment, id: segment.id + 2, source: `Second ${segment.source}`})));
+        const first = document.binary.pages[0];
+        document.binary.pages.push({...first, pageNumber: 2, segmentIndexes: [2, 3],
+            blocks: first.blocks.map(block => ({...block, segmentIndex: block.segmentIndex + 2})),
+        });
+        const translations = ['第一页标题', '第一页完整译文', '第二页标题', '第二页完整译文'];
+        const loader = vi.fn(async () => fontBytes);
+        const result = await createDocumentDownload(document, translations, 'translated', {
+            pdfPresentation: 'readable', pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: loader,
+        });
+        expect(loader).toHaveBeenCalledOnce();
+        const pages = await extract(result.data as Uint8Array);
+        expect(pages.map(compact)).toEqual([translations.slice(0, 2).join(''), translations.slice(2).join('')]);
+    });
+
     it('attempts an unavailable continuation font only once per multi-page export and closes raster fallback on cancellation', async () => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');

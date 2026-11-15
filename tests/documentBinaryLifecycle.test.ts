@@ -129,6 +129,24 @@ describe('documentbinaryAudit actual import and package boundaries', () => {
         expect(run?.height).toBeCloseTo(Math.hypot(item.transform[2], item.transform[3]) * (source.style.ascent - source.style.descent), 5);
     });
 
+    it('retains full font bounds for multiple unsupported glyphs sharing one font', async () => {
+        const glyphs = ['p', 'g'].map(text => openstaxMathGlyphs.tokens.find(glyph => glyph.text === text)!);
+        page.getViewport = () => ({width: 612, height: 792, transform: [1, 0, 0, -1, 0, 792]});
+        page.getTextContent.mockResolvedValue({items: glyphs.map(glyph => glyph.item), styles: {[glyphs[0].item.fontName]: glyphs[0].style}});
+        page.getOperatorList = async () => ({fnArray: [1, 2], argsArray: [[glyphs[0].item.fontName, 10], [[
+            ...glyphs.map(glyph => ({unicode: glyph.text, fontChar: glyph.text})),
+            {unicode: 'p', fontChar: 'accented', accent: {offset: {x: 0, y: 5}}},
+            {unicode: 'g', fontChar: 'vertical', vmetric: [0, 1, 2]},
+        ]]]});
+        page.commonObjs = {has: () => true, get: (id: string) => outline(glyphs.find(glyph => id.endsWith(`_path_${glyph.text}`))!.path)};
+        const parsed = await parseBinaryDocument('multiple-unsupported-glyphs.pdf', sourceBytes());
+        if (parsed.binary?.kind !== 'pdf') throw new Error('Expected PDF import');
+        const runs = parsed.binary.pages[0].blocks.flatMap(block => block.lines?.flatMap(line => line.runs ?? []) ?? []);
+        for (const {text, item, style} of glyphs) {
+            expect(runs.find(run => run.text === text)?.height).toBeCloseTo(item.height * (style.ascent - style.descent), 5);
+        }
+    });
+
     it.each([
         ['missing', undefined], ['unreadable', new Error('path unavailable')], ['non-object', 'legacy string'], ['null', null], ['wrong type', {}],
         ['ordinary array', {path: [0, 0, 0]}], ['lengthless view', {path: new DataView(new ArrayBuffer(4))}],

@@ -44,7 +44,7 @@
             {{ !modelStateLoaded ? '读取中…' : sharedModels.includes(item.value) ? translateLegacy('共享目录可用') : downloaded.includes(item.value) ? '可离线使用' : '尚未下载' }}
           </span>
           <button v-if="downloaded.includes(item.value) && sharedModels.includes(item.value) && localModels.includes(item.value)" type="button" class="video-model-download-button video-model-remove" :disabled="!active || removing.includes(item.value)" :aria-label="translateLegacy('清除本机副本')" :title="translateLegacy('清除本机副本')" @click.stop="item.remove()"><component :is="removing.includes(item.value) ? Loading : Delete" :class="{'is-loading': removing.includes(item.value)}" aria-hidden="true" /></button>
-          <button v-else-if="downloaded.includes(item.value) && localModels.includes(item.value) && sharedDirectory.configured && sharedDirectory.write === 'granted'" type="button" class="video-model-download-button" :disabled="!active || isMigrating(item.value)" :aria-label="translateLegacy('迁移到共享目录')" :title="translateLegacy('迁移到共享目录')" @click.stop="moveToShared(item.value)">
+          <button v-else-if="downloaded.includes(item.value) && localModels.includes(item.value) && sharedDirectory.configured && sharedDirectory.write === 'granted'" type="button" class="video-model-download-button" :disabled="!active || isMigrating(item.value) || sharedDirectoryBusy" :aria-label="translateLegacy('迁移到共享目录')" :title="translateLegacy('迁移到共享目录')" @click.stop="item.move()">
             <component :is="isMigrating(item.value) ? Loading : Download" :class="{'is-loading': isMigrating(item.value)}" aria-hidden="true" />
             {{ isMigrating(item.value) ? translateLegacy('正在迁移模型') : translateLegacy('迁移到共享目录') }}
           </button>
@@ -69,10 +69,10 @@
       <p v-if="sharedDirectoryError" class="video-model-error" role="alert">{{ sharedDirectoryError }}</p>
     </div>
     <div v-if="sharedDirectory.supported" class="video-ai-shared-model-actions">
-      <button type="button" class="video-model-download-button" :disabled="!active" @click="chooseSharedDirectory()">
+      <button type="button" class="video-model-download-button" :disabled="!active || sharedActionsBusy" :onClick="sharedDirectoryActions.choose">
         {{ sharedDirectory.configured ? translateLegacy('重新授权或更换文件夹') : translateLegacy('选择共享文件夹') }}
       </button>
-      <button v-if="sharedDirectory.configured" type="button" class="video-model-download-button" :disabled="!active" @click="disconnectSharedDirectory()">
+      <button v-if="sharedDirectory.configured" type="button" class="video-model-download-button" :disabled="!active || sharedActionsBusy" :onClick="sharedDirectoryActions.disconnect">
         {{ translateLegacy('断开共享') }}
       </button>
     </div>
@@ -94,6 +94,7 @@
 
 <script lang="ts" setup>
 import {useUiI18n} from '@/src/ui/i18n';
+import {translateSharedVideoModelText} from '../model/sharedVideoModelText';
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import browser from 'webextension-polyfill';
@@ -122,7 +123,11 @@ import {
   type SharedVideoAiDirectoryStatus,
 } from '@/src/features/video-subtitle/sharedModelDirectory';
 
-const {t, translateLegacy} = useUiI18n();
+const i18n = useUiI18n();
+const {t} = i18n;
+function translateLegacy(value: string): string {
+  return translateSharedVideoModelText(value, i18n.language?.value ?? 'zh-CN') ?? i18n.translateLegacy(value);
+}
 const props = withDefaults(defineProps<{config: Config; active?: boolean; context?: unknown}>(), {active: true});
 // 设置页会整体替换草稿；始终读取最新 prop，避免卡片继续编辑旧配置。
 const config = computed(() => props.config);
@@ -160,6 +165,7 @@ const modelCards = computed(() => {
       return download(item.value, current);
     },
     remove: () => removeModel(item.value, current),
+    move: () => moveToShared(item.value, current),
   }));
 });
 const cacheActions = computed(() => {
@@ -181,6 +187,13 @@ const failedDownloads = ref<VideoLocalTranscriptionModel[]>([]);
 const migrating = ref<VideoLocalTranscriptionModel[]>([]);
 const sharedDirectory = ref<SharedVideoAiDirectoryStatus>({supported: supportsSharedVideoAiDirectory(), configured: false, read: 'unavailable', write: 'unavailable'});
 const sharedDirectoryError = ref('');
+const sharedDirectoryBusy = ref(false);
+const sharedActionsBusy = computed(() => sharedDirectoryBusy.value || migrating.value.length > 0
+  || downloading.value.length > 0 || observedDownloads.value.length > 0 || pendingDownloads.value.size > 0);
+const sharedDirectoryActions = computed(() => {
+  const current = capture();
+  return {choose: () => chooseSharedDirectory(current), disconnect: () => disconnectSharedDirectory(current)};
+});
 let stopObserving: (() => void) | undefined;
 const modelReadError = ref('');
 const removing = ref<VideoLocalTranscriptionModel[]>([]);
@@ -192,6 +205,7 @@ const mounted = ref(false);
 const pendingDownloads = ref(new Set<VideoLocalTranscriptionModel>());
 let modelGeneration = 0;
 let cacheGeneration = 0;
+let directoryGeneration = 0;
 
 function selectModel(model: VideoLocalTranscriptionModel, current: () => boolean, target: Config): void {
   if (!current() || target.videoTranscriptionProvider === 'native-qwen' || !target.videoTranslationEnabled || !browserCapabilities.extensionDom) return;
@@ -214,8 +228,14 @@ const sharedDirectoryLabel = computed(() => {
 });
 
 async function refreshSharedDirectory(): Promise<void> {
-  try { sharedDirectory.value = await getSharedVideoAiDirectoryStatus(); }
+  if (sharedDirectoryBusy.value) return;
+  const current = capture(), request = ++directoryGeneration;
+  try {
+    const status = await getSharedVideoAiDirectoryStatus();
+    if (current() && request === directoryGeneration) {sharedDirectory.value = status; sharedDirectoryError.value = '';}
+  }
   catch (error) {
+    if (!current() || request !== directoryGeneration) return;
     sharedDirectory.value = {supported: supportsSharedVideoAiDirectory(), configured: false, read: 'unavailable', write: 'unavailable'};
     sharedDirectoryError.value = error instanceof Error ? translateLegacy(error.message) : translateLegacy('无法读取共享模型目录状态，请重试');
   }
@@ -277,9 +297,9 @@ async function download(model: VideoLocalTranscriptionModel, current = capture()
   } catch (error) {
     if (current()) {
       failedDownloads.value = [...failedDownloads.value, model];
-      downloadError.value = error instanceof Error && error.message
-        ? translateLegacy(error.message)
-        : translateLegacy('模型下载失败，请检查网络后重试');
+      const permissionError = '共享模型目录需要重新授权，请在本地 AI 字幕设置中重新选择同一文件夹';
+      downloadError.value = translateLegacy(error instanceof Error && error.message === permissionError
+        ? permissionError : '模型下载失败，请检查网络后重试');
     }
   } finally {
     pendingDownloads.value.delete(model);
@@ -313,31 +333,39 @@ async function moveToShared(model: VideoLocalTranscriptionModel, current = captu
 }
 
 async function chooseSharedDirectory(current = capture()): Promise<void> {
-  if (!current()) return;
+  if (!current() || sharedActionsBusy.value) return;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = true;
   sharedDirectoryError.value = '';
   downloadError.value = '';
   try {
-    sharedDirectory.value = await chooseSharedVideoAiDirectory();
-    if (current()) await refresh(true);
+    const status = await chooseSharedVideoAiDirectory();
+    if (current()) {sharedDirectory.value = status; await refresh(true);}
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') return;
     if (current()) sharedDirectoryError.value = error instanceof Error
       ? translateLegacy(error.message)
       : translateLegacy('无法打开共享模型目录，请重试');
+  } finally {
+    if (current()) sharedDirectoryBusy.value = false;
   }
 }
 
 async function disconnectSharedDirectory(current = capture()): Promise<void> {
-  if (!current() || !sharedDirectory.value.configured) return;
+  if (!current() || sharedActionsBusy.value || !sharedDirectory.value.configured) return;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = true;
   sharedDirectoryError.value = '';
   try {
     await disconnectSharedVideoAiDirectory();
-    sharedDirectory.value = await getSharedVideoAiDirectoryStatus();
-    if (current()) await refresh(true);
+    const status = await getSharedVideoAiDirectoryStatus();
+    if (current()) {sharedDirectory.value = status; await refresh(true);}
   } catch (error) {
     if (current()) sharedDirectoryError.value = error instanceof Error
       ? translateLegacy(error.message)
       : translateLegacy('无法断开共享模型目录，请重试');
+  } finally {
+    if (current()) sharedDirectoryBusy.value = false;
   }
 }
 
@@ -396,6 +424,8 @@ watch(() => [mounted.value, revision.value], () => {
   stopObserving = undefined;
   modelGeneration++;
   cacheGeneration++;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = false;
   downloading.value = [];
   removing.value = [];
   observedDownloads.value = [];

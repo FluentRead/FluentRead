@@ -27,6 +27,7 @@ import {
   readSharedVideoAiModels,
   sharedModelFileUrl,
   type VideoAiModelCache,
+  type SharedVideoAiModelCache,
 } from '@/src/features/video-subtitle/sharedModelDirectory';
 
 export {
@@ -50,7 +51,7 @@ export function getVideoAiModelFileUrl(model: unknown, file: string): string {
 interface ResolvedVideoAiModelCache {
   cache: VideoAiModelCache;
   localCache: Cache;
-  sharedCache?: VideoAiModelCache;
+  sharedCache?: SharedVideoAiModelCache;
 }
 
 /** Transformers.js 使用共享目录优先、扩展 CacheStorage 兜底的同一缓存接口。 */
@@ -65,9 +66,7 @@ export async function createVideoAiModelCache(): Promise<ResolvedVideoAiModelCac
     cache: {
       match: async request => await sharedCache.match(request) || await localCache.match(request),
       put: (request, response) => sharedCache.put(request, response),
-      putWithProgress: (request, response, onProgress) => sharedCache.putWithProgress
-        ? sharedCache.putWithProgress(request, response, onProgress)
-        : sharedCache.put(request, response),
+      putWithProgress: (request, response, onProgress) => sharedCache.putWithProgress(request, response, onProgress),
     },
   };
 }
@@ -84,25 +83,26 @@ export async function readCachedVideoAiModelState(receipts: unknown): Promise<{
   sharedModels: VideoLocalTranscriptionModel[];
 }> {
   const models = normalizeVideoLocalTranscriptionModels(receipts);
+  if (typeof caches === 'undefined') {
+    if (models.length) throw new Error('当前浏览器不支持本地模型缓存');
+    return {models: [], localModels: [], sharedModels: []};
+  }
   let localModels: VideoLocalTranscriptionModel[] = [];
   let sharedModels: VideoLocalTranscriptionModel[] = [];
-  if (typeof caches !== 'undefined') {
-    try {
-      if (models.length && await caches.has(TRANSFORMERS_CACHE_NAME)) {
-        const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
-        const urls = new Set((await cache.keys()).map(request => request.url));
-        localModels = models.filter(model => {
-          const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
-          return getVideoAiModelFileSets(model).some(complete);
-        });
-      }
-      sharedModels = await readSharedVideoAiModels(await createSharedVideoAiModelCache());
-    } catch (error) {
-      throw new Error('无法读取模型缓存，请重试', {cause: error});
+  try {
+    if (models.length && await caches.has(TRANSFORMERS_CACHE_NAME)) {
+      const cache = await caches.open(TRANSFORMERS_CACHE_NAME);
+      const urls = new Set((await cache.keys()).map(request => request.url));
+      localModels = models.filter(model => {
+      const complete = (files: readonly string[]) => files.every(file => urls.has(getVideoAiModelFileUrl(model, file)));
+      return getVideoAiModelFileSets(model).some(complete);
+      });
     }
+    sharedModels = await readSharedVideoAiModels(await createSharedVideoAiModelCache());
+  } catch (error) {
+    throw new Error('无法读取模型缓存，请重试', {cause: error});
   }
-  const available = new Set([...localModels, ...sharedModels]);
-  return {models: VIDEO_LOCAL_TRANSCRIPTION_MODELS.filter(item => available.has(item.value)).map(item => item.value), localModels, sharedModels};
+  return {models: [...new Set([...localModels, ...sharedModels])], localModels, sharedModels};
 }
 
 export async function readCachedVideoAiModels(receipts: unknown): Promise<VideoLocalTranscriptionModel[]> {
@@ -142,14 +142,17 @@ export async function cacheVideoAiModelFiles(
       if (resolved.sharedCache) {
         const shared = await resolved.sharedCache.match(url);
         if (shared) {
-          progress.cached(Number(shared.headers.get('Content-Length')));
-          await shared.body?.cancel();
-          continue;
+          try {
+            await verifySharedModelResponse(shared);
+            progress.cached(Number(shared.headers.get('Content-Length')));
+            continue;
+          } catch {
+            // 损坏文件的校验记录已失效；优先用本机副本修复，否则重新下载。
+          }
         }
         const local = await resolved.localCache.match(url);
         if (local) {
-          if (resolved.sharedCache.putWithProgress) await resolved.sharedCache.putWithProgress(url, local, progress.advance);
-          else await resolved.sharedCache.put(url, local);
+          await resolved.sharedCache.putWithProgress(url, local, progress.advance);
           progress.complete();
           continue;
         }
@@ -162,7 +165,7 @@ export async function cacheVideoAiModelFiles(
       }
 
       await withModelDownload(url, response => resolved.sharedCache
-        ? resolved.sharedCache.putWithProgress?.(url, response, progress.advance) ?? resolved.sharedCache.put(url, response)
+        ? resolved.sharedCache.putWithProgress(url, response, progress.advance)
         : cache.put(url, response), {
         timeoutMs: normalizedModel === 'small' ? 300_000 : MODEL_FILE_DOWNLOAD_TIMEOUT_MS,
         maxBytes: (normalizedModel === 'small' && file === 'onnx/encoder_model.onnx' ? 384 : 256) * 1024 * 1024,
@@ -201,19 +204,38 @@ export async function moveVideoAiModelToSharedDirectory(
     const progress = tracker.file();
     const existing = await sharedCache.match(sharedModelFileUrl(normalizedModel, file));
     if (existing) {
-      progress.cached(Number(existing.headers.get('Content-Length')));
-      await existing.body?.cancel();
-      continue;
+      try {
+        await verifySharedModelResponse(existing);
+        progress.cached(Number(existing.headers.get('Content-Length')));
+        continue;
+      } catch {
+        // 目录里同长但损坏的文件不能代替浏览器中仍然可用的副本。
+      }
     }
     const cached = await localCache.match(url);
     if (!cached) throw new Error('浏览器缓存中的模型文件不完整，请先重新下载');
-    if (sharedCache.putWithProgress) await sharedCache.putWithProgress(url, cached, progress.advance);
-    else await sharedCache.put(url, cached);
+    await sharedCache.putWithProgress(url, cached, progress.advance);
     progress.complete();
   }
   const sharedModels = await readSharedVideoAiModels(sharedCache);
   if (!sharedModels.includes(normalizedModel)) throw new Error('共享模型文件校验失败，请重试迁移');
+  for (const file of files) {
+    const response = await sharedCache.match(sharedModelFileUrl(normalizedModel, file));
+    if (!response) throw new Error('共享模型文件校验失败，请重试迁移');
+    await verifySharedModelResponse(response);
+  }
   await removeVideoAiModelFiles(normalizedModel);
+}
+
+/** 消费受校验的流但不聚合权重，只有 SHA-256 结算成功后才允许删掉本机副本。 */
+async function verifySharedModelResponse(response: Response): Promise<void> {
+  if (!response.body) throw new Error('共享模型文件校验失败，请重试迁移');
+  const reader = response.body.getReader();
+  try {
+    while (!(await reader.read()).done) { /* 流式 SHA-256 在共享缓存 Response 中结算。 */ }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 async function findCompleteLocalModelFiles(cache: Cache, model: VideoLocalTranscriptionModel): Promise<readonly VideoAiModelFile[] | undefined> {

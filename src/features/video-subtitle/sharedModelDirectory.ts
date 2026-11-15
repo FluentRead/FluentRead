@@ -35,6 +35,10 @@ export interface VideoAiModelCache {
   putWithProgress?(request: RequestInfo | URL, response: Response, onProgress: (loaded: number, total?: number) => void): Promise<void>;
 }
 
+export interface SharedVideoAiModelCache extends VideoAiModelCache {
+  putWithProgress(request: RequestInfo | URL, response: Response, onProgress: (loaded: number, total?: number) => void): Promise<void>;
+}
+
 interface ModelFileIdentity {
   model: VideoLocalTranscriptionModel;
   modelId: string;
@@ -145,8 +149,7 @@ export async function getSharedVideoAiDirectoryStatus(): Promise<SharedVideoAiDi
 export async function chooseSharedVideoAiDirectory(): Promise<SharedVideoAiDirectoryStatus> {
   if (!supportsSharedVideoAiDirectory()) throw new Error('当前浏览器不支持共享模型目录');
   const picker = (window as DirectoryPickerWindow).showDirectoryPicker;
-  if (!picker) throw new Error('当前浏览器不支持共享模型目录');
-  const handle = await picker.call(window, {mode: 'readwrite'});
+  const handle = await picker!.call(window, {mode: 'readwrite'});
   await writeStoredDirectory(handle);
   const [read, write] = await Promise.all([permission(handle, 'read'), permission(handle, 'readwrite')]);
   return {supported: true, configured: true, read, write};
@@ -170,7 +173,7 @@ function parseModelFileIdentity(request: RequestInfo | URL): ModelFileIdentity |
   } catch {
     return undefined;
   }
-  if (url.origin !== 'https://modelscope.cn') return undefined;
+  if (url.origin !== 'https://modelscope.cn' || url.search || url.hash || url.username || url.password) return undefined;
   const match = url.pathname.match(/^\/models\/onnx-community\/whisper-(tiny|base|small)\/resolve\/([^/]+)\/(.+)$/u);
   if (!match) return undefined;
   const model = match[1] as VideoLocalTranscriptionModel;
@@ -182,8 +185,8 @@ function parseModelFileIdentity(request: RequestInfo | URL): ModelFileIdentity |
   } catch {
     return undefined;
   }
-  if (revision !== VIDEO_AI_MODEL_REVISION || !ALLOWED_FILES.has(file)
-    || file.split('/').some(part => !part || part === '.' || part === '..' || !/^[a-zA-Z0-9._-]+$/u.test(part))) return undefined;
+  // 固定清单只有受控的文件名；其他路径（包括点段与额外子目录）一律拒绝。
+  if (revision !== VIDEO_AI_MODEL_REVISION || !ALLOWED_FILES.has(file)) return undefined;
   const modelId = getVideoLocalTranscriptionModelId(model);
   return {model, modelId, revision, file: file as VideoAiModelFile, folder: `whisper-${model}`};
 }
@@ -211,6 +214,7 @@ async function readMetadata(handle: FileSystemDirectoryHandle, identity: ModelFi
     const metadata = JSON.parse(await (await metadataHandle.getFile()).text()) as Partial<ModelFileMetadata>;
     if (metadata.schema !== 1 || metadata.modelId !== identity.modelId || metadata.revision !== identity.revision
       || metadata.file !== identity.file || !Number.isSafeInteger(metadata.bytes) || metadata.bytes! <= 0
+      || metadata.bytes! > MAX_SHARED_MODEL_FILE_BYTES
       || typeof metadata.sha256 !== 'string' || !/^[a-f0-9]{64}$/u.test(metadata.sha256)) return undefined;
     return metadata as ModelFileMetadata;
   } catch (error) {
@@ -261,7 +265,7 @@ async function writeText(handle: FileSystemFileHandle, value: string): Promise<v
   }
 }
 
-function createSharedCache(handle: FileSystemDirectoryHandle): VideoAiModelCache {
+function createSharedCache(handle: FileSystemDirectoryHandle): SharedVideoAiModelCache {
   let readPermission: Promise<PermissionState> | undefined;
   let writePermission: Promise<PermissionState> | undefined;
   const canRead = () => readPermission ||= permission(handle, 'read');
@@ -347,7 +351,8 @@ function createSharedCache(handle: FileSystemDirectoryHandle): VideoAiModelCache
 }
 
 /** 返回每个扩展实例独立的授权句柄；没有配置共享目录时返回 undefined。 */
-export async function createSharedVideoAiModelCache(): Promise<VideoAiModelCache | undefined> {
+export async function createSharedVideoAiModelCache(): Promise<SharedVideoAiModelCache | undefined> {
+  if (typeof indexedDB === 'undefined') return undefined;
   const handle = await readStoredDirectory();
   return handle ? createSharedCache(handle) : undefined;
 }

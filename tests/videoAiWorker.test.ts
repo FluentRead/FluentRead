@@ -50,7 +50,10 @@ const webGpuMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/src/shared/onnx/webgpu', () => webGpuMocks);
-const modelCacheMocks = vi.hoisted(() => ({cacheVideoAiQ8ModelFiles: vi.fn(async () => undefined)}));
+const modelCacheMocks = vi.hoisted(() => ({
+    cacheVideoAiQ8ModelFiles: vi.fn(async () => undefined),
+    createVideoAiModelCache: vi.fn(async (): Promise<any> => ({cache: {}, localCache: {}})),
+}));
 vi.mock('@/src/features/video-subtitle/offscreen/modelCache', () => ({
     VIDEO_AI_MODEL_REMOTE_HOST: 'https://modelscope.cn',
     VIDEO_AI_MODEL_REMOTE_PATH_TEMPLATE: 'models/{model}/resolve/{revision}/',
@@ -85,6 +88,17 @@ async function loadProtocolWorker(transcriber: any, backend: 'webgpu' | 'wasm' =
 }
 
 describe('视频 AI Worker timestamp parser', () => {
+    it('gives Transformers the shared cache while disabling duplicate browser and filesystem writes', async () => {
+        const cache = {match: vi.fn(), put: vi.fn()};
+        modelCacheMocks.createVideoAiModelCache.mockResolvedValueOnce({cache, localCache: {}, sharedCache: cache});
+        const scope = await loadProtocolWorker(vi.fn());
+        try {
+            scope.onmessage({data: {requestId: 1, type: 'prepare', model: 'tiny'}});
+            await waitForWorkerMessages(scope, 1);
+            expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({success: true, model: 'tiny'}));
+            expect(workerMocks.env).toMatchObject({useCustomCache: true, customCache: cache, useBrowserCache: false, useFSCache: false});
+        } finally {vi.unstubAllGlobals();}
+    });
     it('rejects a malformed correlated command before loading a model and still accepts a later valid preparation', async () => {
         const scope = await loadProtocolWorker(vi.fn());
         try {

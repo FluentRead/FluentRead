@@ -169,6 +169,18 @@ describe('Offscreen 消息静态路由', () => {
         expect(mocks.play).toHaveBeenLastCalledWith(admittedGoogle);
     });
 
+    it('共享模型迁移明确处理未启用、缺失能力、成功和文件失败', async () => {
+        const request = {type: 'VIDEO_AI_SHARE_MODEL', model: 'tiny'};
+        expect((await dispatch(request)).response).toMatchObject({success: false});
+        const videoAi = {transcribe: vi.fn(), prepare: vi.fn(), cancel: vi.fn(), shareModel: vi.fn(async () => undefined)};
+        const handler = createOffscreenMessageListener({...mocks, ttsPlayer: {play: mocks.play, stop: mocks.stop, seek: mocks.seek}, videoAi});
+        expect((await dispatch(request, handler)).response).toEqual({success: true});
+        expect(videoAi.shareModel).toHaveBeenCalledWith({type: 'VIDEO_AI_SHARE_MODEL', target: 'offscreen', model: 'tiny'});
+        videoAi.shareModel.mockRejectedValueOnce(new Error('disk disconnected'));
+        expect((await dispatch(request, handler)).response).toEqual({success: false, error: 'disk disconnected'});
+        const withoutShare = createOffscreenMessageListener({...mocks, ttsPlayer: {play: mocks.play, stop: mocks.stop, seek: mocks.seek}, videoAi: {...videoAi, shareModel: undefined}});
+        expect((await dispatch(request, withoutShare)).response).toEqual({success: false, error: '共享模型迁移不可用'});
+    });
     it('视频 AI 接收端复用消息通道，并隔离未启用、失败与非法结果', async () => {
         for (const type of ['VIDEO_AI_TRANSCRIBE', 'VIDEO_AI_PREPARE']) {
             expect((await dispatch({type})).response).toMatchObject({success: false});

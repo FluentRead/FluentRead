@@ -284,7 +284,7 @@ export function createVideoSubtitleBackgroundHandlers(dependencies: VideoSubtitl
             let models: ReturnType<typeof normalizeVideoLocalTranscriptionModels> = [];
             const write = stateWriteQueue.then(async () => {
                 const response = await sendOffscreenRequest(offscreen, {type: 'VIDEO_AI_SHARE_MODEL', model}, {timeoutMs: 630_000});
-                if (!response?.success) throw new Error(response?.error || '模型迁移失败');
+                if (!response.success) throw new Error(response.error);
                 const stored = await readStore.get(VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY);
                 models = normalizeVideoLocalTranscriptionModels(stored[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]).filter(item => item !== model);
                 await readStore.set({[VIDEO_LOCAL_TRANSCRIPTION_STATE_KEY]: models});

@@ -18,7 +18,9 @@ import {
   VIDEO_AI_MODEL_REMOTE_HOST,
   VIDEO_AI_MODEL_REMOTE_PATH_TEMPLATE,
   cacheVideoAiQ8ModelFiles,
+  createVideoAiModelCache,
 } from './modelCache';
+import {VIDEO_AI_MODEL_REVISION} from '@/src/features/video-subtitle/modelFiles';
 import {parseWhisperChunkTimestamps} from './timestampParser';
 import {buildWhisperTranscriptionGenerationOptions, chooseWhisperSourceLanguage, normalizeWhisperSourceLanguage, type WhisperDetectedLanguage} from './transcriptionOptions';
 import {configureOnnxWasmBackend, withCompressedWasmBinary} from '@/src/shared/onnx/wasmBinary';
@@ -90,7 +92,21 @@ if (env.backends.onnx.wasm) {
     wasm: extensionUrl('fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'),
   });
 }
+}
 
+async function configureModelCache(): Promise<void> {
+  const configured = await createVideoAiModelCache();
+  if (configured.sharedCache) {
+    // CacheStorage 仍作为只读兜底；新增或补齐的文件只写进用户选择的共享目录。
+    env.useCustomCache = true;
+    env.customCache = configured.cache;
+    env.useBrowserCache = false;
+    env.useFSCache = false;
+    return;
+  }
+  env.useCustomCache = false;
+  env.customCache = null;
+  env.useBrowserCache = true;
 }
 
 function extensionUrl(path: string): string {
@@ -146,7 +162,7 @@ async function createWasmTranscriber(modelId: string, model: ReturnType<typeof n
       },
       device: 'wasm',
       dtype: model === 'small' ? {encoder_model: 'fp32', decoder_model_merged: dtype} : dtype,
-      revision: 'master',
+      revision: VIDEO_AI_MODEL_REVISION,
     }) as unknown as Promise<LocalTranscriber>;
     const wasm = env.backends.onnx.wasm;
     const transcriber = await paceLocalInitialization(() => wasm
@@ -163,7 +179,7 @@ async function createWasmTranscriber(modelId: string, model: ReturnType<typeof n
     // Small 的质量档位固定 FP32 encoder/q4 decoder；失败不偷偷下载另一整组精度。
     if (model === 'small') throw q4Error;
     console.warn('[FluentRead] Worker WASM/q4 Whisper 初始化失败，退回 WASM/q8', q4Error);
-    // q8 是真实 fallback；先写入同一 Cache Storage，后续重建 worker 不会再次下载。
+    // q8 是真实 fallback；写入当前选择的缓存，后续重建 worker 不会再次下载。
     await cacheVideoAiQ8ModelFiles(model);
     return create('q8');
   }
@@ -173,6 +189,7 @@ async function createLocalTranscriber(
   modelId: string,
   model: ReturnType<typeof normalizeVideoLocalTranscriptionModel>,
 ): Promise<LocalTranscriber> {
+  await configureModelCache();
   if (await canUseWebGpu()) {
     let gpuTranscriber: LocalTranscriber | null = null;
     try {
@@ -184,7 +201,7 @@ async function createLocalTranscriber(
         },
         device: 'webgpu',
         dtype: model === 'small' ? {encoder_model: 'fp32', decoder_model_merged: 'q4'} : 'q4',
-        revision: 'master',
+        revision: VIDEO_AI_MODEL_REVISION,
       }) as unknown as Promise<LocalTranscriber>;
       const wasm = env.backends.onnx.wasm;
       gpuTranscriber = await paceLocalInitialization(() => wasm

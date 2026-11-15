@@ -56,6 +56,54 @@ function waitingForPreviousCancellation(type: typeof ownedEntryTypes[number]) {
 }
 
 describe('video subtitle background ownership', () => {
+    it('releases a closed tab even if the old offscreen cancellation port rejects', async () => {
+        const f = setup({success: true, model: 'tiny'});
+        const prepare = find(f.handlers, 'fluentReadPrepareLocalVideoModel');
+        await prepare.handle({model: 'tiny', streamId: 'closed-tab', generation: 1, keepWarm: true}, context(91));
+        f.offscreen.sendIfPresent.mockRejectedValueOnce(new Error('old port closed'));
+        releaseVideoSubtitleOwnerForTab(91);
+        await expect(prepare.handle({model: 'tiny', streamId: 'next-tab', generation: 1, keepWarm: true}, context(92))).resolves.toMatchObject({success: true});
+    });
+    it('releases a failed receipt write so a later model preparation can persist normally', async () => {
+        const f = setup({success: true, model: 'tiny'});
+        f.storage.set.mockRejectedValueOnce(new Error('receipt write failed'));
+        const prepare = find(f.handlers, 'fluentReadPrepareLocalVideoModel');
+        await expect(prepare.handle({model: 'tiny', keepWarm: false}, {})).rejects.toThrow('receipt write failed');
+        await expect(prepare.handle({model: 'tiny', keepWarm: false}, {})).resolves.toMatchObject({success: true, models: ['tiny']});
+    });
+    it('does not release a newer warm generation when an old warm response reports failure', async () => {
+        const f = setup({success: true, model: 'tiny', text: 'new owner result'}), gate = deferred<{success: false; error: string}>();
+        f.offscreen.send.mockReturnValueOnce(gate.promise);
+        const prepare = find(f.handlers, 'fluentReadPrepareLocalVideoModel');
+        const first = prepare.handle({model: 'tiny', keepWarm: true, streamId: 'warm', generation: 1}, context(93));
+        await prepare.handle({model: 'tiny', keepWarm: true, streamId: 'warm', generation: 2}, context(93));
+        gate.resolve({success: false, error: 'old warm failed'});
+        await expect(first).resolves.toMatchObject({success: false});
+        await expect(find(f.handlers, 'fluentReadTranscribeLocalVideoAudio').handle({model: 'tiny', streamId: 'warm', generation: 2, audioPcm16Base64: 'AAA='}, context(93))).resolves.toMatchObject({success: true});
+    });
+    it('updates only the migrated model receipt after successful offscreen acknowledgement', async () => {
+        const f = setup();
+        f.storage.get.mockResolvedValue({fluentReadVideoLocalTranscriptionModels: ['tiny', 'base']});
+        const move = find(f.handlers, 'fluentReadMoveLocalVideoModelToShared');
+        await expect(move.handle({type: move.type, model: 'invalid'}, {})).rejects.toThrow('无效');
+        await expect(move.handle({type: move.type, model: 'tiny'}, {})).resolves.toEqual({success: true, models: ['base']});
+        expect(f.offscreen.send).toHaveBeenCalledWith({type: 'VIDEO_AI_SHARE_MODEL', model: 'tiny'}, expect.objectContaining({timeoutMs: 630_000}));
+        expect(f.storage.set).toHaveBeenCalledWith({fluentReadVideoLocalTranscriptionModels: ['base']});
+    });
+    it('serializes migration with downloads and releases ownership after failure', async () => {
+        const f = setup(), gate = deferred<{success: boolean; error?: string}>();
+        f.offscreen.send.mockReturnValueOnce(gate.promise);
+        const move = find(f.handlers, 'fluentReadMoveLocalVideoModelToShared');
+        const first = move.handle({type: move.type, model: 'tiny'}, {});
+        const failure = expect(first).rejects.toThrow('shared disk unavailable');
+        await expect(move.handle({type: move.type, model: 'base'}, {})).rejects.toThrow('正在使用');
+        await expect(find(f.handlers, 'fluentReadPrepareLocalVideoModel').handle({model: 'tiny'}, {})).rejects.toThrow('正在清除');
+        gate.resolve({success: false, error: 'shared disk unavailable'}); await failure;
+        expect(f.storage.set).not.toHaveBeenCalled();
+        f.offscreen.send.mockResolvedValueOnce({success: false});
+        await expect(move.handle({type: move.type, model: 'tiny'}, {})).rejects.toThrow('消息格式无效');
+        await expect(move.handle({type: move.type, model: 'tiny'}, {})).resolves.toMatchObject({success: true});
+    });
     it('composes browser storage, local model preparation and sender-bound readings through the production runtime', async () => {
         const fixture = setup(); installModelKeys(['tiny']);
         const values: Record<string, unknown> = {fluentReadVideoLocalTranscriptionModels: []};
@@ -185,7 +233,7 @@ describe('video subtitle background ownership', () => {
     it('returns normalized downloaded model state through a background-only query', async () => {
         const {handlers} = setup();
         const result = await find(handlers, 'fluentReadGetLocalVideoModelState').handle({type: 'fluentReadGetLocalVideoModelState'}, context(1));
-        expect(result).toEqual({success: true, models: [], available: {tiny: false, base: false, small: false}});
+        expect(result).toEqual({success: true, models: [], localModels: [], sharedModels: [], available: {tiny: false, base: false, small: false}});
     });
     it('filters a missing model file from availability while keeping its receipt and avoiding Offscreen or network', async () => {
         const {urls} = installModelKeys(['tiny', 'base', 'small']);
@@ -193,7 +241,7 @@ describe('video subtitle background ownership', () => {
         const {handlers, offscreen, storage} = setup();
         storage.get.mockResolvedValue({fluentReadVideoLocalTranscriptionModels: ['tiny', 'base', 'small']});
         const fetcher = vi.fn(), worker = vi.fn(); vi.stubGlobal('fetch', fetcher); vi.stubGlobal('Worker', worker);
-        await expect(find(handlers, 'fluentReadGetLocalVideoModelState').handle({}, context(1))).resolves.toEqual({success: true, models: ['base', 'small'], available: {tiny: false, base: true, small: true}});
+        await expect(find(handlers, 'fluentReadGetLocalVideoModelState').handle({}, context(1))).resolves.toEqual({success: true, models: ['base', 'small'], localModels: ['base', 'small'], sharedModels: [], available: {tiny: false, base: true, small: true}});
         expect(storage.set).not.toHaveBeenCalled(); expect(offscreen.send).not.toHaveBeenCalled(); expect(offscreen.ensureDocument).not.toHaveBeenCalled();
         expect(fetcher).not.toHaveBeenCalled(); expect(worker).not.toHaveBeenCalled();
     });
@@ -343,6 +391,44 @@ describe('native video background ownership', () => {
             transcribe: (patch = {}, tab = 71) => find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA=', ...patch}, context(tab)),
             cancel: (reason?: string, tab = 71) => find(handlers, 'fluentReadCancelLocalVideoTranscription').handle({...selection, reason}, context(tab))};
     }
+    it('cancels native preparation without a transport and rejects a missing native address before fetching', async () => {
+        const f = nativeFixture(); await f.prepare(); await f.cancel();
+        await expect(f.prepare({nativeBaseUrl: undefined, generation: 2})).rejects.toThrow('本机转写选择');
+        expect(f.nativeTranscribe).not.toHaveBeenCalled();
+    });
+    it('cancels a newly prepared native owner without waiting for another tab old transport', async () => {
+        const f = nativeFixture(), gate = deferred<{text: string; model: string; audioDurationMs: number}>();
+        f.nativeTranscribe.mockImplementationOnce(() => gate.promise);
+        const first = f.transcribe({}, 71);
+        const cancelled = expect(first).rejects.toThrow('generation 已取消');
+        await vi.waitFor(() => expect(f.nativeTranscribe).toHaveBeenCalledOnce());
+        releaseVideoSubtitleOwnerForTab(71);
+        await f.prepare({}, 72); releaseVideoSubtitleOwnerForTab(72);
+        gate.resolve({text: 'obsolete', model: selection.model, audioDurationMs: 0}); await cancelled;
+        expect(f.nativeTranscribe).toHaveBeenCalledOnce();
+    });
+    it('uses the production native transport when no override was supplied', async () => {
+        const f = setup();
+        const fetcher = vi.fn(async () => Response.json({text: 'local service result'})); vi.stubGlobal('fetch', fetcher);
+        const handlers = createVideoSubtitleBackgroundHandlers({offscreen: f.offscreen as any, storage: f.storage,
+            readNativeSettings: () => ({enabled: true, provider: 'native-qwen', baseUrl: selection.nativeBaseUrl, sourceLanguage: 'en'})});
+        await expect(find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA='}, context(96))).resolves.toMatchObject({success: true, text: 'local service result'});
+        expect(fetcher).toHaveBeenCalledWith('http://127.0.0.1:8000/v1/audio/transcriptions', expect.objectContaining({method: 'POST'}));
+    });
+    it('waits for a released tab native request to settle before admitting the next tab', async () => {
+        const f = nativeFixture();
+        const gate = deferred<{text: string; model: string; audioDurationMs: number}>();
+        f.nativeTranscribe.mockImplementationOnce(() => gate.promise);
+        const first = f.transcribe({}, 71);
+        const firstFailed = expect(first).rejects.toThrow('native transport closed');
+        await vi.waitFor(() => expect(f.nativeTranscribe).toHaveBeenCalledOnce());
+        releaseVideoSubtitleOwnerForTab(71);
+        const second = f.transcribe({streamId: 'replacement'}, 72);
+        expect(f.nativeTranscribe).toHaveBeenCalledOnce();
+        gate.reject(new Error('native transport closed')); await firstFailed;
+        await expect(second).resolves.toMatchObject({success: true, text: 'native result'});
+        expect(f.nativeTranscribe).toHaveBeenCalledTimes(2);
+    });
     it('warms only client ownership and transcribes without Offscreen or downloads', async () => {
         const f = nativeFixture();
         await expect(f.prepare()).resolves.toEqual({success: true, model: selection.model, provider: 'native-qwen', preparation: 'client-only'});

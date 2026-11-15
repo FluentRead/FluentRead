@@ -14,6 +14,8 @@ An open-source browser extension for bilingual translation.
 
 FluentRead displays translations alongside the original webpage and provides selection translation, AI reading assistance, image and document translation, and bilingual video subtitles. Its reading card provides contextual explanations and follow-up questions.
 
+We began developing FluentRead in January 2024. Since then, FluentRead has remained open source and free to use.
+
 <div align="center">
 
 [![FluentRead introduction video](./docs/public/videos/fluentread-promo-en-poster.webp)](https://read.thinkstu.com/videos/fluentread-promo-en.mp4)

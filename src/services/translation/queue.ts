@@ -288,10 +288,8 @@ function createQueueAbortError(): Error {
  */
 export function clearTranslationQueue(): void {
   const error = new TranslationQueueCancelledError('翻译队列已清空');
-  const defaultState = sessionStates.get(defaultSession);
-  if (defaultState) {
-    sessionStates.set(defaultSession, {cancelled: true, cancellationError: error});
-  }
+  // 默认会话只由 createSession 创建并持有强引用，始终具有已注册的状态。
+  sessionStates.set(defaultSession, {cancelled: true, cancellationError: error});
 
   queueGeneration += 1;
   const cancelled: PendingTranslation[] = [];

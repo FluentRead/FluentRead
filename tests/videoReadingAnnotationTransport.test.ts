@@ -139,6 +139,14 @@ describe('离屏读音Worker资源归属', () => {
 });
 
 describe('后台读音发送方与取消隔离', () => {
+  it('请求标识生成失败后释放占位，同一读音请求可重试', async () => {
+    const send = vi.fn(async () => ({success: true, result: reading}));
+    const createRequestId = vi.fn().mockImplementationOnce(() => {throw new Error('random generator unavailable');}).mockReturnValue('offscreen:retry');
+    const handlers = createVideoReadingAnnotationHandlers({runtimeId: 'extension', offscreen: {send} as unknown as OffscreenClient, createRequestId});
+    const request: ReadingAnnotationRequest & {type: 'fluentReadAnnotateVideoReading'} = {type: 'fluentReadAnnotateVideoReading', ...input, requestId: 'page:retry'};
+    await expect(handlers[0].handle(request, owner())).rejects.toThrow('random generator unavailable'); expect(send).not.toHaveBeenCalled();
+    await expect(handlers[0].handle(request, owner())).resolves.toEqual({success: true, result: reading}); expect(send).toHaveBeenCalledOnce();
+  });
   it('真实content信封依次路由到离屏与Worker，只转发正文语言并保留各层自有编号', async () => {
     const worker = fakeWorker();
     const runtime = createReadingAnnotationRuntime({createWorker: () => worker.instance});

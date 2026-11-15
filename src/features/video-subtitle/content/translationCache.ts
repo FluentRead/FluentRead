@@ -87,8 +87,7 @@ export class VideoTranslationCache {
           this.translatedVideoCache.set(key, result);
           this.visibleRevision += 1;
           if (this.translatedVideoCache.size > 160) {
-            const oldestKey = this.translatedVideoCache.keys().next().value;
-            if (oldestKey) this.translatedVideoCache.delete(oldestKey);
+            this.translatedVideoCache.delete(this.translatedVideoCache.keys().next().value!);
           }
         }
         return result;
@@ -103,8 +102,7 @@ export class VideoTranslationCache {
             retryAt: Date.now() + retryDelays[attempts - 1],
           });
           if (this.videoTranslationFailures.size > 160) {
-            const oldestKey = this.videoTranslationFailures.keys().next().value;
-            if (oldestKey) this.videoTranslationFailures.delete(oldestKey);
+            this.videoTranslationFailures.delete(this.videoTranslationFailures.keys().next().value!);
           }
         }
         throw error;

@@ -7,7 +7,7 @@
 import {informationHighlightOpacity} from '@/src/features/information-highlight/domain/presentation';
 import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
-import {scoreInformationKeywords, selectInformationSpans} from '@/src/features/information-highlight/domain/keywords';
+import {alignInformationWordSpans, scoreInformationKeywords, selectInformationSpans} from '@/src/features/information-highlight/domain/keywords';
 import {informationGraphemeBoundaries, informationSliceEnd} from '@/src/features/information-highlight/domain/textBoundaries';
 import {collectInformationParagraphs, informationRanges, isInformationParagraphCurrent} from '@/src/features/information-highlight/content/readingText';
 import {installInformationHighlight, INFORMATION_HIGHLIGHT_NAME} from '@/src/features/information-highlight/public';
@@ -115,6 +115,8 @@ describe('local keyword and Unicode coordinates', () => {
         const join = 'ab‍cd'; expect(selectInformationSpans(join, [{start: 0, end: 5, score: 1}], 'high')).toEqual([]);
     });
     it('aggregates model pieces into whole words, rejects bad boundaries, and makes density a bounded paint budget', () => {
+        expect(alignInformationWordSpans('Alpha beta.', [{start: 0, end: 10, score: 1}, {start: 1, end: 2, score: 3}]))
+            .toEqual([{start: 0, end: 5, score: 4}, {start: 6, end: 10, score: 1}]);
         const text = 'extraordinary algorithms preserve cafe\u0301 and emoji 👩‍💻 safely';
         const spans = [...scoreInformationKeywords(text).spans, {start: 0, end: 5, score: 5}, {start: 5, end: 13, score: 5},
             {start: -1, end: 3, score: 10}, {start: 0.5, end: 3, score: 10}, {start: 0, end: 0, score: 2},

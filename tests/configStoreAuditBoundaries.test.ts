@@ -234,6 +234,24 @@ describe('configstoreAudit storage owners, count replay and message authority', 
         expect(await store.incrementConfigCount(2, 'fixture-broadcast')).toBe(8);
         expect(port.setItem).not.toHaveBeenCalled();
     });
+    it('continuous startup broadcasts preserve the newest count replay log after bounded initialization retries', async () => {
+        let reads = 0;
+        const {store, port} = await configstoreAuditLoad({owner: true, configurePort: (port, records, emit) => {
+            const original = vi.mocked(port.getItem).getMockImplementation()!;
+            vi.mocked(port.getItem).mockImplementation(async key => {
+                if (key === 'local:credentials' && ++reads <= 2) {
+                    const count = reads === 1 ? 5 : 8;
+                    emit('local:config', {...records.get('local:config') as object, count, __fluentConfigRevision: 10 + reads,
+                        __fluentCountOperations: [{id: 'fixture-startup-replay', delta: 2, count}]});
+                }
+                return original(key);
+            });
+        }});
+        expect(reads).toBe(2); expect(store.config.count).toBe(8);
+        vi.mocked(port.setItem).mockClear();
+        expect(await store.incrementConfigCount(2, 'fixture-startup-replay')).toBe(8);
+        expect(port.setItem).not.toHaveBeenCalled();
+    });
 
     it('joins an active count operation and rejects a conflicting duplicate increment', async () => {
         const gate = configstoreAuditDeferred<void>(), started = configstoreAuditDeferred<void>();

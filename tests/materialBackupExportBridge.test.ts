@@ -10,6 +10,7 @@ import {describe,expect,it,vi} from 'vitest';
 import {MaterialError} from '@/src/features/vocabulary/materialModel';
 import {createMaterialBackupExportBridge, type MaterialBackupExportPort} from '@/src/features/vocabulary/materialBackupExportBridge';
 import {receiveMaterialBackupExport} from '@/src/features/vocabulary/materialBackupExportClient';
+import {nextMaterialBackupExportByteCount} from '@/src/features/vocabulary/materialBackupSafeCount';
 import {MATERIAL_BACKUP_EXPORT_PORT_NAME} from '@/src/features/vocabulary/materialBackupExportProtocol';
 import {sendMaterialRead, type MaterialReadPort} from '@/src/features/vocabulary/materialReadTransport';
 import * as readTransport from '@/src/features/vocabulary/materialReadTransport';
@@ -39,6 +40,14 @@ class Port {
 }
 function pair(){const a=new Port(),b=new Port();a.peer=b;b.peer=a;return [a,b] as const;}
 const start={v:1,type:'start',operation:'export'};
+it('接收计数在安全整数上限准确累加，越界时保留原有错误且无需构造超大备份',()=>{
+    expect(nextMaterialBackupExportByteCount(0,0)).toBe(0);
+    expect(nextMaterialBackupExportByteCount(Number.MAX_SAFE_INTEGER-1,1)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(nextMaterialBackupExportByteCount(Number.MAX_SAFE_INTEGER,0)).toBe(Number.MAX_SAFE_INTEGER);
+    for(const [bytes,count] of [[Number.MAX_SAFE_INTEGER,1],[0,Infinity],[NaN,1],[0,1.5]] as const) {
+        expect(()=>nextMaterialBackupExportByteCount(bytes,count)).toThrowError('材料备份过大');
+    }
+});
 const tick=()=>new Promise<void>(resolve=>setTimeout(resolve,0));
 function material(id='m'):MaterialRecord{return {id,identityKey:'private-id',kind:'article',title:'Private title',source:{kind:'article',url:'https://example.test/'},
     topics:['topic'],references:[{kind:'note',id:'n',note:'my note'}],createdAt:1,updatedAt:2,lastReadAt:3,archivedAt:null};}

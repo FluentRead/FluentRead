@@ -10,7 +10,7 @@ let app: App, state: Record<string, any>, props: {modelValue: boolean; currentVa
 let doc: Document, active: HTMLElement | null, emitted: Mock, root: HTMLElement;
 const handlers = new WeakMap<Element, Record<string, any>>();
 async function settle() {await nextTick(); await nextTick();}
-async function mount(value = '', initiallyFocused = true, initiallyVisible = true) {
+async function mount(value = '', initiallyFocused = true, initiallyVisible = true, removeBeforeTick=false) {
     const parsed = parseHTML('<html><body><button id="prior">prior</button><div id="mount"></div></body></html>');
     doc = parsed.document as unknown as Document;
     const ElementType = parsed.window.HTMLElement;
@@ -39,9 +39,9 @@ async function mount(value = '', initiallyFocused = true, initiallyVisible = tru
     props = reactive({modelValue: initiallyVisible, currentValue: value}); emitted = vi.fn();
     app = renderer.createApp({setup: () => () => h(component, {...props, onConfirm: (value: string) => emitted('confirm', value),
         onCancel: () => emitted('cancel'), 'onUpdate:modelValue': (value: boolean) => {props.modelValue = value; emitted('visible', value);}})});
-    app.directive('ui-i18n', {}); app.mount(doc.querySelector('#mount')); await settle();
+    app.directive('ui-i18n', {}); app.mount(doc.querySelector('#mount'));
     const instance = (app as any)._instance.subTree.component;
-    state = instance.setupState; root = doc.querySelector('.custom-hotkey-dialog')!;
+    state = instance.setupState;if(removeBeforeTick)app.unmount();await settle();root = doc.querySelector('.custom-hotkey-dialog')!;
     return state;
 }
 function key(value: string, flags: Partial<KeyboardEvent> = {}) {return {key: value, ctrlKey: false, altKey: false, shiftKey: false,
@@ -141,6 +141,15 @@ it('关闭和卸载阻止尚未完成的录制聚焦；旧焦点节点被移除�
     await state.startRecording(); state.handleKeyDown(key('q')); state.handleKeyUp(key('q')); state.handleConfirm();
     app.unmount(); await state.startRecording(); state.handleKeyDown(key('q')); state.handleKeyUp(key('q')); state.handleConfirm();
     expect(vi.getTimerCount()).toBe(0);
+});
+it('关闭阻止已经排队的首次弹窗聚焦',async()=>{
+    await mount('F10',true,false);const prior=active;
+    props.modelValue=true;await nextTick();props.modelValue=false;await settle();
+    expect(active).toBe(prior);expect(doc.querySelector('.custom-hotkey-dialog')).toBeNull();
+});
+it('卸载阻止首次挂载已经排队的弹窗聚焦',async()=>{
+    await mount('F10',true,true,true);
+    expect(active?.id).toBe('prior');expect(doc.querySelector('.custom-hotkey-dialog')).toBeNull();
 });
 it('预置非法组合显示验证错误，重复开始录制保持一次会话，隐藏初始挂载不抢焦点', async () => {
     await mount('invalid hotkey'); expect(state.errorMessage).not.toBe(''); expect(state.canConfirm).toBe(false);

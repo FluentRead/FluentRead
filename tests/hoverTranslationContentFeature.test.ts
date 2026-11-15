@@ -119,6 +119,29 @@ afterEach(() => {
 });
 
 describe('悬浮快捷键让行网页输入（#1163）', () => {
+    it.each(['pointercancel','touchcancel'])('合成的%s事件不能取消正在进行的可信快捷键手势',kind=>{
+        const h=mountHarness();h.windowTarget.emit('keydown',trustedEvent({key:'Control',code:'ControlLeft',ctrlKey:true}));
+        h.documentTarget.emit(kind,trustedEvent({isTrusted:false}));h.windowTarget.emit('keyup',trustedEvent({key:'Control',code:'ControlLeft'}));
+        expect(h.deps.handleTranslation).toHaveBeenCalledOnce();h.controller.abort();
+    });
+    it('重复的完整快捷键按下事件不产生额外单次翻译',()=>{
+        const h=mountHarness(),key=trustedEvent({key:'Control',code:'ControlLeft',ctrlKey:true});
+        h.windowTarget.emit('keydown',key);h.windowTarget.emit('keydown',key);h.windowTarget.emit('keyup',trustedEvent({key:'Control',code:'ControlLeft'}));
+        expect(h.deps.handleTranslation).toHaveBeenCalledOnce();h.controller.abort();
+    });
+    it.each(['keydown','keyup'])('外部手势端口在%s中关闭扩展后不消费快捷键',phase=>{
+        const h=mountHarness();
+        if(phase==='keydown')vi.mocked(h.deps.matchesSelectionTranslatorShortcut).mockImplementationOnce(()=>{h.deps.config.on=false;return false;});
+        h.windowTarget.emit('keydown',trustedEvent({key:'Control',code:'ControlLeft',ctrlKey:true}));
+        if(phase==='keyup')vi.mocked(h.deps.hasActiveSelectionTranslationCandidate).mockImplementationOnce(()=>{h.deps.config.on=false;return false;});
+        const released=trustedEvent({key:'Control',code:'ControlLeft'});h.windowTarget.emit('keyup',released);
+        expect(h.deps.handleTranslation).not.toHaveBeenCalled();expect(released.preventDefault).not.toHaveBeenCalled();h.controller.abort();
+    });
+    it('无法确定触摸中心或当前使用其他手势时不启动翻译',()=>{
+        const h=mountHarness();h.documentTarget.emit('dblclick',trustedEvent({clientX:10,clientY:20}));
+        h.deps.config.hotkey=h.deps.constants.TwoFinger;vi.mocked(h.deps.getCenterPoint).mockReturnValueOnce(undefined as never);
+        h.documentTarget.emit('touchstart',trustedEvent({touches:[]}));expect(h.deps.handleTranslation).not.toHaveBeenCalled();h.controller.abort();
+    });
     const backquote = {key: '`', code: 'Backquote'};
 
     it.each([

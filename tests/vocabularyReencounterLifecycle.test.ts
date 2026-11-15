@@ -37,6 +37,17 @@ beforeEach(() => {
 afterEach(() => {mocks.remove.mockReset(); unmountVocabularyReencounter(); vi.unstubAllGlobals();});
 
 describe('reencounter content ownership and selective reads', () => {
+  it('keeps a successor mounted if host cleanup synchronously starts the next activation',async()=>{
+    const old=mount();await flush();old.callbacks().changed([hit()]);await flush();let successor:ReturnType<typeof mount>|undefined;
+    mocks.ui.remove.mockImplementationOnce(()=>{unmountVocabularyReencounter();successor=mount();});
+    old.controller.abort();await flush();mount();expect(mocks.install).toHaveBeenCalledTimes(2);
+    successor!.controller.abort();mount();expect(mocks.install).toHaveBeenCalledTimes(3);
+  });
+  it('does not clear a newer list when the previous list rejects late',async()=>{
+    const pending=deferred<unknown>();mocks.send.mockReturnValueOnce(pending.promise);mount();
+    mocks.add.mock.calls[0][0]({type:'fluentReadVocabularyBookChanged'});await flush();
+    pending.reject(Error('old list failed'));await flush();expect(mocks.scanner.setEntries).toHaveBeenCalledTimes(1);expect(mocks.scanner.setEntries).toHaveBeenLastCalledWith([term]);
+  });
   it('ignores a queued collection notification after ordinary disposal', async () => {
     mount(); await flush();
     const listener = mocks.add.mock.calls[0][0];

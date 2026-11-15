@@ -38,6 +38,12 @@ beforeEach(() => {vi.useFakeTimers(); vi.clearAllMocks(); vi.stubGlobal('navigat
 afterEach(() => {for (const scope of scopes) scope.stop(); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals();});
 
 describe('快捷键设置草稿生命周期', () => {
+    it.each(groups)('$name 已排队的旧录制定时器在卸载后不能重新打开弹窗',group=>{
+        const {state,scope,config}=mount(),timer=vi.spyOn(globalThis,'setTimeout');
+        state[group.change]('custom');const callback=timer.mock.calls.find(([,delay])=>delay===100)![0] as ()=>void;timer.mockRestore();
+        scope.stop();const before=JSON.stringify(config.value);callback();
+        expect(state[group.visible].value).toBe(false);expect(JSON.stringify(config.value)).toBe(before);expect(vi.getTimerCount()).toBe(0);
+    });
     it.each(groups)('$name 预设、现有自定义与录制确认均保留点选快捷键', group => {
         const {state, config} = mount();
         Object.assign(config.value, {on: false, selectionTranslatorMode: 'bilingual', disableSelectionTranslator: false,

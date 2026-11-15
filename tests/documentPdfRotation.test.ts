@@ -23,6 +23,16 @@ const onePixelPng = Uint8Array.from(Buffer.from(
     'base64',
 ));
 
+it('recognized text on a source page without a content stream retains the blank original in bilingual reading export',async()=>{
+    const source=await PDFDocument.create();source.addPage([420,640]).drawText('Recognized source text',{x:40,y:500});
+    const parsed=await parseBinaryDocument('recognized.pdf',await source.save());if(parsed.binary?.kind!=='pdf')throw Error('PDF expected');
+    expect(parsed.segments.length).toBeGreaterThan(0);
+    const blank=await PDFDocument.create();blank.addPage([420,640]);parsed.binary.bytes=await blank.save();
+    const raster=vi.fn(async function*(){yield {bytes:onePixelPng,width:420,height:640};});
+    const download=await createDocumentDownload(parsed,parsed.segments.map(()=> 'Recognized translated text'),'bilingual',{pdfReadingRasterizer:raster});
+    const result=await PDFDocument.load(download.data as Uint8Array);expect(result.getPageCount()).toBe(2);expect(raster).toHaveBeenCalledOnce();expect(result.getPage(0).getSize()).toEqual({width:420,height:640});
+});
+
 async function rotatedPdf(): Promise<Uint8Array> {
     const pdf = await PDFDocument.create();
     for (const rotation of rotations) {

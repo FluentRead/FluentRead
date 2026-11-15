@@ -12,6 +12,7 @@ import {locateMaterialParagraph, mountMaterialContent} from '@/src/features/voca
 import {beginMaterialCapture, completeMaterialCapture} from '@/src/features/vocabulary/materialCapture';
 import type {MaterialRecord} from '@/src/features/vocabulary/materialProtocol';
 import {getVideoLearningSource} from '@/src/features/video-subtitle/content/public';
+import {normalizeMaterialSource} from '@/src/features/vocabulary/materialModel';
 import {sanitizeVocabularyVideoUrl} from '@/src/features/vocabulary/source';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
@@ -49,6 +50,22 @@ beforeEach(() => {vi.useFakeTimers(); ports.config.uiLanguage = 'zh-CN'; ports.r
 afterEach(() => {dispose.splice(0).forEach(stop => stop()); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('材料来源与继续阅读', () => {
+    it('不会保存无效媒体时间，视频滚动和卸载后的迟到写入均遵守归属',async()=>{
+        const {document,window}=dom('<video></video>','https://example.com/video?__fluentread_material=material-1'),video=document.querySelector('video')!;
+        Object.defineProperties(video,{currentTime:{value:NaN,writable:true},duration:{value:100},readyState:{value:1}});video.pause=vi.fn();
+        ports.resolve.mockResolvedValue(record({kind:'video',identityKey:normalizeMaterialSource({kind:'video',url:'https://example.com/video'}).identityKey,source:{kind:'video',url:'https://example.com/video'},locator:undefined}));
+        const controller=new AbortController();dispose.push(mountMaterialContent(document,controller.signal,()=>true));await tick();
+        document.dispatchEvent(new window.Event('scroll'));await vi.advanceTimersByTimeAsync(6000);expect(ports.capture).not.toHaveBeenCalled();
+        let finish!:(value:MaterialRecord)=>void;ports.capture.mockReturnValueOnce(new Promise(resolve=>{finish=resolve;}));video.currentTime=25;
+        window.dispatchEvent(new window.Event('pagehide'));await tick();expect(ports.capture).toHaveBeenCalledOnce();
+        controller.abort();finish(record());await tick();expect(document.querySelector('[role="status"]')).toBeNull();
+    });
+    it('显式收藏后的后台读取失败不会显示继续阅读专用的失败提示',async()=>{
+        const {document,window}=dom('<p>Original paragraph</p>');ports.resolve.mockResolvedValueOnce(record({locator:undefined}));
+        dispose.push(mountMaterialContent(document,new AbortController().signal,()=>true));await tick();ports.resolve.mockRejectedValueOnce(Error('captured material unavailable'));
+        document.dispatchEvent(new window.CustomEvent('fluentread-material-captured',{detail:'new-material'}));await tick();
+        expect(document.querySelector('[role="status"]')).toBeNull();expect(ports.capture).not.toHaveBeenCalled();
+    });
     it('keeps a saved locator recoverable when the paragraph scanning port rejects', async () => {
         const {document}=dom('<p>unique original sentence</p>');ports.resolve.mockResolvedValue(record());
         const scan=vi.spyOn(paragraphScanner,'scanMaterialParagraphs').mockRejectedValueOnce(new Error('layout projection unavailable'));
@@ -233,9 +250,9 @@ describe('材料来源与继续阅读', () => {
         expect(notice.querySelector('button')?.textContent).toBe('Close');
         notice.querySelector('button')!.click(); expect(document.querySelector('[role="status"]')).toBeNull();
     });
-    it('取消挂载后忽略迟到读取与错误，不插入恢复提示', async () => {
-        const {document} = dom(''); let resolve!: (value: MaterialRecord) => void; ports.resolve.mockReturnValue(new Promise(done => {resolve = done;}));
-        const controller = new AbortController(); mountMaterialContent(document, controller.signal, () => true); controller.abort(); resolve(record()); await tick(); await vi.advanceTimersByTimeAsync(9000);
+    it.each(['success','failure'])('取消挂载后忽略迟到读取的%s，不插入恢复提示', async outcome => {
+        const {document} = dom(''); let resolve!: (value: MaterialRecord) => void,reject!:(error:Error)=>void; ports.resolve.mockReturnValue(new Promise((done,fail) => {resolve = done;reject=fail;}));
+        const controller = new AbortController(); mountMaterialContent(document, controller.signal, () => true); controller.abort();if(outcome==='success')resolve(record());else reject(Error('late read failure'));await tick(); await vi.advanceTimersByTimeAsync(9000);
         expect(document.querySelector('[role="status"]')).toBeNull();
     });
     it('禁用页面、启动前已取消以及读取错误不会留下监听提示，错误提示可关闭', async () => {

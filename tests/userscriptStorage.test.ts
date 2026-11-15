@@ -117,6 +117,17 @@ describe('userscript GM storage adapter', () => {
         } finally {broken(); healthy();}
     });
 
+    it('consumes a rejected initialization from a replaced subscription without warning about its successor',async()=>{
+        let reject!:(error:Error)=>void;const initial=new Promise<unknown>((_resolve,no)=>{reject=no;});
+        globalThis.GM={getValue:vi.fn().mockReturnValueOnce(initial).mockResolvedValue(JSON.stringify({revision:2})),setValue:vi.fn()};
+        const warn=vi.spyOn(console,'warn').mockImplementation(()=>undefined),received=vi.fn();
+        const old=storage.watch('local:replaced-init',vi.fn());old();const fresh=storage.watch('local:replaced-init',received);
+        try{await new Promise(resolve=>setTimeout(resolve,0));reject(new Error('old manager read failed'));await new Promise(resolve=>setTimeout(resolve,0));
+            expect(warn).not.toHaveBeenCalled();await setStoredValue('local:replaced-init',{revision:3});
+            expect(received).toHaveBeenCalledWith({revision:3},{revision:2});
+        }finally{fresh();}
+    });
+
     it('delivers external focus refreshes to remaining observers after an earlier observer fails', async () => {
         const target = new EventTarget();
         const documentTarget = Object.assign(new EventTarget(), {visibilityState: 'visible'});
@@ -138,6 +149,10 @@ describe('userscript GM storage adapter', () => {
             target.dispatchEvent(new Event('focus'));
             await new Promise(resolve => setTimeout(resolve, 0));
             expect(received).toHaveBeenCalledOnce();
+            stored=JSON.stringify({revision:3});documentTarget.visibilityState='hidden';documentTarget.dispatchEvent(new Event('visibilitychange'));
+            await new Promise(resolve=>setTimeout(resolve,0));expect(received).toHaveBeenCalledOnce();
+            documentTarget.visibilityState='visible';documentTarget.dispatchEvent(new Event('visibilitychange'));
+            await vi.waitFor(()=>expect(received).toHaveBeenCalledWith({revision:3},{revision:2}));expect(received).toHaveBeenCalledTimes(2);
         } finally {broken(); healthy();}
     });
 

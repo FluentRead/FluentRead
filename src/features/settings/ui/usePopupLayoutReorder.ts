@@ -1,7 +1,7 @@
 /**
  * @file src/features/settings/ui/usePopupLayoutReorder.ts
  * 文件职责：为 Popup 布局编辑器和实时预览提供共享的拖放与键盘排序状态。
- * 主要内容：校验布局项目、根据放置几何位置计算插入方向，并在保留隐藏项目相对位置的前提下重排可见项目槽位。
+ * 主要内容：校验布局项目、根据放置几何位置计算插入方向，并在保留隐藏项目相对位置的前提下重排可见项目槽位；顺序未变化时不重复提交配置。
  * 模块边界：本模块只处理纯字符串顺序和浏览器拖放事件，不读取配置、不渲染界面，也不依赖具体 Popup 业务。
  */
 import {ref} from 'vue'
@@ -71,7 +71,8 @@ export function usePopupLayoutReorder(options: PopupLayoutReorderOptions) {
 
     const visibleIds = new Set(visible)
     let nextVisibleIndex = 0
-    return order.map((id) => visibleIds.has(id) ? nextVisible[nextVisibleIndex++] : id)
+    const nextOrder = order.map((id) => visibleIds.has(id) ? nextVisible[nextVisibleIndex++] : id)
+    return nextOrder.every((id, index) => id === order[index]) ? null : nextOrder
   }
 
   function start(event: DragEvent, id: string): void {

@@ -36,6 +36,13 @@ beforeEach(() => {
 afterEach(() => {unmountMangaEntry();vi.unstubAllGlobals();});
 
 describe('独立漫画入口所有权和配置端口', () => {
+    it('releases a successor activation after cleanup synchronously remounts a pending entry',async()=>{
+        const first=deferred(),second=deferred();mocks.create.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
+        const old=mountMangaEntry({} as never);let successor:Promise<void>|undefined;
+        mocks.stopOpener.mockImplementationOnce(()=>{unmountMangaEntry();successor=mountMangaEntry({} as never);});
+        unmountMangaEntry();first.resolve({remove:vi.fn()});second.resolve({remove:vi.fn(),mounted:{instance:{open:vi.fn()}}});await old;await successor;
+        unmountMangaEntry();expect(mocks.stopOpener).toHaveBeenCalledTimes(2);expect(mocks.stopConfig).toHaveBeenCalledTimes(2);expect(mocks.stopStatus).toHaveBeenCalledTimes(2);
+    });
     it('registered reading opener preserves an already open panel and is removed with its owner', async () => {
         const target=document.createElement('button');document.body.append(target);
         const openReading=vi.fn().mockResolvedValue(true),closeReading=vi.fn();

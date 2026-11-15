@@ -1037,9 +1037,11 @@ describe('本地 AI 完整模式入口与隐藏副本边界', () => {
     sourceVideo.duration = 0;
     scanVideo.duration = 0;
     FullFakeContext.instances.at(-1)?.processor.emit(new Float32Array(16_000).fill(0.04));
+    const timers=vi.spyOn(window,'setTimeout');scanVideo.emit('ended');const staleFinalize=timers.mock.calls.find(([,delay])=>delay===420)![0] as ()=>void;timers.mockRestore();
     scanVideo.audioTrack.emitEnded();
     expect(controller.getError()).toContain('音轨');
     controller.cancel();
+    scanVideo.audioTrack.emitEnded();staleFinalize();expect(errors).toHaveBeenCalledOnce();
     expect(scanVideo.listenerCount('ended')).toBe(0);
     FullFakeContext.mediaElementError = null;
     vi.useRealTimers();

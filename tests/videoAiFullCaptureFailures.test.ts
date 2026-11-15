@@ -342,7 +342,7 @@ describe('完整 AI 字幕失败与取消边界', () => {
 
   it.each(['base', 'small'] as const)('%s 识别空结果提示检查人声和原语言，不推荐已经使用的 Base', async model => {
     installCustomAudioWindow();
-    const controller = makeInjectedController({model, transcribe: async () => ({text: '', segments: []})});
+    const preview=vi.fn();const controller = makeInjectedController({model, transcribe: async () => ({text: '', segments: []}),onCuesProgress:preview});
     expect(controller.start()).toBe(true);
     await tick(50);
     expect(controller.getPhase()).toBe('error');
@@ -350,6 +350,18 @@ describe('完整 AI 字幕失败与取消边界', () => {
     expect(controller.getError()).toContain('视频原语言');
     expect(controller.getError()).not.toContain('Base');
     expect(controller.getError()).not.toContain('翻译失败');
+    expect(preview).not.toHaveBeenCalled();
+  });
+  it('digital silence completes without dispatching model inference or publishing empty preview cues',async()=>{
+    installCustomAudioWindow();const transcribe=vi.fn(),preview=vi.fn(),completed=vi.fn(async()=>undefined);
+    const controller=makeInjectedController({audio:new Float32Array(16_000),transcribe,onCuesProgress:preview,onComplete:completed});controller.start();await tick(60);
+    expect(transcribe).not.toHaveBeenCalled();expect(preview).not.toHaveBeenCalled();expect(controller.getPhase()).toBe('error');expect(completed).not.toHaveBeenCalled();controller.destroy();
+  });
+  it('skips a fully silent leading window while preserving later speech windows and the final result',async()=>{
+    installCustomAudioWindow();const audio=speechAudio(20_000);audio.fill(0,0,160_000);
+    const transcribe=vi.fn(async(_chunk:VideoAiAudioChunk)=>({text:'Audible later sentence.',segments:[{startMs:1500,endMs:2500,text:'Audible later sentence.'}]})),completed=vi.fn(async()=>undefined),preview=vi.fn();
+    const controller=makeInjectedController({audio,transcribe,onComplete:completed,onCuesProgress:preview});controller.start();await tick(80);
+    await vi.waitFor(()=>expect(controller.getPhase()).toBe('ready'));expect(transcribe).toHaveBeenCalled();expect(transcribe.mock.calls.every(([chunk])=>chunk.startMs>0)).toBe(true);expect(completed).toHaveBeenCalledOnce();controller.destroy();
   });
 
   it('没有可复制音源时清理副本，并吞掉 pause/srcObject 清理异常', async () => {
@@ -1537,7 +1549,7 @@ describe('完整 AI 字幕扫描窗口的暂停边界', () => {
     expect(transcribe).not.toHaveBeenCalled();
   });
 
-  it('多个音频块拼接时忽略窗口结束后的块，并继续完成尾窗', async () => {
+  it.each([{durations:[2500,2500,2500,2500,2500]},{durations:[8800,1200,2500]}])('多个音频块 $durations 拼接时保留精确边界与完整尾窗', async ({durations}) => {
     vi.useFakeTimers();
     const scanVideo = new FakeVideo();
     scanVideo.duration = 12.5;
@@ -1549,7 +1561,7 @@ describe('完整 AI 字幕扫描窗口的暂停边界', () => {
 
     scanVideo.currentTime = 12.5;
     const processor = FakeAudioContext.instances.at(-1)!.processor;
-    for (let index = 0; index < 5; index += 1) processor.emit(speechAudio(2_500));
+    for (const duration of durations) processor.emit(speechAudio(duration));
     scanVideo.ended = true;
     scanVideo.emit('ended');
     vi.advanceTimersByTime(420);

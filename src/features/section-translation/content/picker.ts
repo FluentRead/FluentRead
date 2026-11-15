@@ -728,7 +728,8 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         disposed = true;
         releasePointerSelection();
         drag = null;
-        if (activeSession === session) activeSession = null;
+        // 重复退出由 disposed 拒绝；仍可退出的私有会话就是唯一活动实例。
+        activeSession = null;
         controller.abort();
         if (shadow.activeElement && previousFocus?.isConnected) previousFocus.focus?.({preventScroll: true});
         mutationObserver?.disconnect();
@@ -965,7 +966,8 @@ function createPickerSession(options: SectionPickerOptions): PickerSession {
         updateControls();
         scheduleRender();
     });
-    onButton(confirm, () => {if (target) pick(target);});
+    // onButton 只接收启用控件的可信点击，updateControls 已要求连接的目标与有效摘要。
+    onButton(confirm, () => pick(target!));
     for (const control of [rememberCheckbox, rememberScope, rememberMode]) {
         control.addEventListener('change', (event) => {
             if (!event.isTrusted || remembering) return;

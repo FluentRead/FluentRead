@@ -2,6 +2,18 @@ import {describe, expect, it} from 'vitest';
 import {buildCredentialPreviewChanges} from '@/src/features/settings/model/credentialPreview';
 
 describe('配置凭据变化预览', () => {
+    it('does not preview unchanged secondary cloud credentials as an import replacement', () => {
+        const before={secret:{tencent:'unchanged-private-secondary-key'}},after={secret:{tencent:'unchanged-private-secondary-key'}};
+        expect(buildCredentialPreviewChanges(before,after)).toEqual([]);
+    });
+    it('previews secondary cloud key replacement and removal without showing either key', () => {
+        const changes = buildCredentialPreviewChanges(
+            {secret:{tencent:'old-private-secondary-key',unknown:'removed-private-key'}},
+            {secret:{tencent:'new-private-secondary-key'}},
+        );
+        expect(changes.map(change=>change.key)).toEqual(['secret.tencent','secret.unknown']);
+        expect(JSON.stringify(changes)).not.toMatch(/old-private|new-private|removed-private/);
+    });
     it('只显示新增、替换和清除状态，不泄露任何凭据明文', () => {
         const changes = buildCredentialPreviewChanges({
             token: {openai: 'sk-old-secret'},

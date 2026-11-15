@@ -560,7 +560,8 @@ export async function cancelLocalVideoTranscription(
       || pendingPrepare.some((job) => job.streamId === normalizedStreamId)
     ) return;
     firstAudioWarmLease = null;
-    if (activeStreamId === normalizedStreamId) activeStreamId = '';
+    // ownsStream 的其他归属已在上方排除，此处只可能由 activeStreamId 持有。
+    activeStreamId = '';
     scheduleIdleDisposal();
     return;
   }

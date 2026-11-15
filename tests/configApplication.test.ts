@@ -8,6 +8,9 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {normalizeConfig} from '@/src/core/config/model';
 import {extractConfigCredentials, sanitizeConfigCredentials} from '@/src/core/config/credentials';
 import {createConfigApplication, type ConfigApplication} from '@/src/services/config/application';
+import {createConfigAuthority} from '@/src/services/config/authority';
+import {createConfigMutationClient} from '@/src/services/config/mutationClient';
+import {createConfigHistoryRuntime} from '@/src/services/config/historyRuntime';
 import {createBaselineConfigHistory} from '@/src/services/config/history';
 import {createConfigPersistenceHandler} from '@/src/app/background/handlers/configPersistence';
 import type {ConfigStoragePort} from '@/src/platform/storage/configStorage';
@@ -65,6 +68,16 @@ function application(storage: ConfigStoragePort) {
 }
 
 describe('explicit configuration application ownership', () => {
+    it('an older failed public restore preserves the newer pending deduplication receipt',async()=>{
+        const {port,records}=memoryStorage('en'),authority=createConfigAuthority({storage:port,trustedContext:false,client:()=>client,history:()=>history});
+        const history=createConfigHistoryRuntime({storage:port,ready:()=>authority.configReady,getConfig:()=>authority.config,getRevision:authority.getConfigRevision,isTrusted:()=>false,isWriteOwner:()=>true,commit:authority.restore});
+        const client=createConfigMutationClient({authority:authority.clientPort,applyHistoryAction:history.applyAction});await authority.start();
+        const gate=pending<void>(),started=pending<void>();
+        vi.mocked(port.setItem).mockImplementationOnce(async()=>{started.resolve();await gate.promise;throw Error('old public write failed');});
+        const first=authority.restore(normalizeConfig({to:'ja'})).catch(error=>error);await started.promise;const next=normalizeConfig({to:'fr'}),second=authority.restore(next);
+        gate.resolve();expect(await first).toBeInstanceOf(Error);await second;const writes=vi.mocked(port.setItem).mock.calls.length;await authority.restore(next);
+        expect(vi.mocked(port.setItem).mock.calls.length).toBe(writes);expect((records.get('local:config') as any).to).toBe('fr');expect(authority.config.token).toEqual({});
+    });
     it('keeps hydration and durable saves working when a configuration subscriber throws', async () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const {port, records} = memoryStorage('en');

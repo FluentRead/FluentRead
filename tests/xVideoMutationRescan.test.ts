@@ -22,6 +22,12 @@ function mutation(target: Node, added: readonly Node[] = [], removed: readonly N
 }
 
 describe('X video identity mutation rescan boundaries', () => {
+    it('ignores owned siblings when counting the player native overlays', () => {
+        const {document,player,overlay,video}=page();
+        const owned=document.createElement('div');owned.setAttribute('data-fr-translation-owned','true');owned.setAttribute('data-slot','xds-context-menu-trigger');
+        player.appendChild(owned);video.remove();
+        expect(xVideoChildListRescanRoot(mutation(player,[],[video]))).toBe(overlay);
+    });
     it('rescans only the original overlay when avatar or thumbnail identity is added or removed', () => {
         const {overlay, avatar, image, thumbnail} = page();
         expect(xVideoChildListRescanRoot(mutation(avatar, [], [image]))).toBe(overlay);

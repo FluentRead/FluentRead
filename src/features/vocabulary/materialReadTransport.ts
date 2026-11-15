@@ -164,7 +164,7 @@ export async function sendMaterialRead(port:MaterialReadPort, source:AsyncIterab
           const candidate=await pipe.guard(Promise.race([pending,new Promise<typeof flushNow>(resolve=>{timer=setTimeout(()=>resolve(flushNow),Math.max(0,flushDelay-(performance.now()-bufferedAt)));})]));
           if(candidate===flushNow) {await flush();next=await pipe.guard(pending);}
           else next=candidate;
-        } finally {if(timer!==undefined)clearTimeout(timer);}
+        } finally {clearTimeout(timer);}
       } else next=await pipe.guard(pending);
       if(next.done)break;
       if(!(next.value instanceof Uint8Array)||next.value.length===0)throw Error('Invalid material read bytes');

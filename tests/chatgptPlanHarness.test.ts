@@ -15,6 +15,14 @@ const collect = async (stream: ReadableStream<unknown>) => {
 };
 
 describe('ChatGPT 套餐 Harness 协议', () => {
+    it('keeps only the user-facing answer when completed output also contains reasoning metadata', () => {
+        const generated = readChatGPTPlanHarnessResult(result([
+            {type:'reasoning',summary:[{type:'summary_text',text:'private reasoning summary'}]},
+            textItem('visible answer'),
+        ]));
+        expect(generated.content).toEqual([{type:'text',text:'visible answer'}]);
+        expect(generated.finishReason.unified).toBe('stop');
+    });
     it('保留系统、文本多轮、函数调用与工具结果，仅使用本地namespace', () => {
         const payload = buildChatGPTPlanHarnessPayload('account-model', options([
             {role: 'system', content: '系统一'}, {role: 'system', content: '系统二'},

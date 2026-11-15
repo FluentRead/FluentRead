@@ -254,7 +254,8 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
 
     const mutateDocument = (operation: () => Promise<void>): Promise<void> => {
         const pending = operation().finally(() => {
-            if (documentMutation === pending) documentMutation = null;
+            // 准备队列等待实际文档操作结束后才准入下一次变更。
+            documentMutation = null;
         });
         documentMutation = pending;
         return pending;
@@ -344,7 +345,8 @@ export function createOffscreenClient(dependencies: OffscreenClientDependencies)
             rebuildSignal,
             () => controller.abort(),
         ).finally(() => {
-            if (preparingDocument?.promise === promise) preparingDocument = null;
+            // 在途准备只能被复用或等待；只有本次 finally 可以释放槽位。
+            preparingDocument = null;
         });
         preparingDocument = {forceRecreate, ownerSignal: rebuildSignal, promise};
         return promise;

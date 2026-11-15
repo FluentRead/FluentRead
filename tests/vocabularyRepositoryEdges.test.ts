@@ -68,6 +68,19 @@ function cloneEntry(entry: VocabularyEntry, overrides: Partial<VocabularyEntry>)
   };
 }
 
+it('preserves a newer translation snapshot when the imported entry has newer unrelated metadata',async()=>{
+  const local=await repository.upsert(baseInput({translation:'newer local translation'}),NOW+100);
+  const incoming=cloneEntry(local,{id:'60000000-0000-4000-8000-000000000001',updatedAt:NOW+200,phonetic:'newer metadata',translations:{'zh-cn':{text:'older imported translation',updatedAt:NOW}}});
+  await repository.importData({format:VOCABULARY_BOOK_EXPORT_FORMAT,version:VOCABULARY_BOOK_EXPORT_VERSION,entries:[incoming],reviewLogs:[]},NOW+300);
+  expect((await repository.get(local.id))?.translations['zh-cn'].text).toBe('newer local translation');
+});
+it('does not attach ambiguous imported review IDs to an already existing entry',async()=>{
+  const local=await repository.upsert(baseInput(),NOW),id='60000000-0000-4000-8000-000000000002';
+  const common=cloneEntry(local,{id}),other=cloneEntry(local,{id,term:'Different',normalizedTerm:'Different',identityKey:'ignored'});
+  const result=await repository.importData({format:VOCABULARY_BOOK_EXPORT_FORMAT,version:VOCABULARY_BOOK_EXPORT_VERSION,entries:[common,other],reviewLogs:[]},NOW+100);
+  expect(result.inserted).toBe(1);expect((await repository.get(local.id))?.term).toBe('Common');
+});
+
 function reviewLog(
   id: string,
   entryId: string,

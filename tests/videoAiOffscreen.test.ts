@@ -578,6 +578,15 @@ describe('模型预热的有界首音频租期', () => {
         await drain();
         return worker;
     }
+    it.each(['pcm','legacy'])('a %s worker response resolved immediately before cancellation cannot renew the cancelled stream lease',async kind=>{
+        vi.useFakeTimers();installWorker();const worker=await warm('same-turn-cancel'),pcm=Buffer.from(new Int16Array(16_000).fill(1310).buffer).toString('base64');
+        (window as any).AudioContext=class {state='running';async close(){this.state='closed';}async decodeAudioData(){return {numberOfChannels:1,sampleRate:16000,getChannelData:()=>new Float32Array(16000).fill(.04)};}};
+        try {
+            const first=transcribeLocalVideoAudio({streamId:'same-turn-cancel',model:'tiny',...(kind==='pcm'?{audioPcm16Base64:pcm}:{audioBase64:'AAAAAA=='})}).catch(error=>error);await vi.waitFor(()=>expect(worker.messages.at(-1)?.type).toBe('transcribe'));completeWorker(worker);
+            await cancelLocalVideoTranscription('same-turn-cancel');await first;expect(worker.terminated).toBe(true);
+            const next=await warm('new-owner');expect(next).not.toBe(worker);expect(next.terminated).toBe(false);
+        } finally {await cancelLocalVideoTranscription('same-turn-cancel');await cancelLocalVideoTranscription('new-owner');}
+    });
 
     it('等音频40秒仍复用已准备的Worker，首窗完成后恢复120秒空闲释放', async () => {
         vi.useFakeTimers();installWorker();

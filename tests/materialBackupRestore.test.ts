@@ -22,6 +22,11 @@ beforeEach(()=>{vi.clearAllMocks();mocks.private=false;active=client();mocks.cli
 afterEach(()=>{vi.useRealTimers();vi.restoreAllMocks();});
 
 describe('material backup recovery orchestration',()=>{
+  it('preserves a non-Error file-reader rejection and closes the restore client',async()=>{
+    mocks.send.mockRejectedValueOnce('controlled file read rejection');
+    expect(await restoreLargeMaterialBackup(file,guard,{onCapability:()=>{}})).toMatchObject({kind:'failed',error:'controlled file read rejection',cleanupPending:false});
+    expect(active.discard).toHaveBeenCalledOnce();expect(active.close).toHaveBeenCalledOnce();expect(active.commit).not.toHaveBeenCalled();
+  });
   it.each(['before','after'] as const)('preserves a completed restore when signal listener removal throws %s removal',async mode=>{
     vi.useFakeTimers();
     const controller=new AbortController(),native=controller.signal.removeEventListener.bind(controller.signal);

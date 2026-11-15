@@ -25,6 +25,7 @@ import {
     restoreTranslation,
     setBilingualContent,
     setRenderedStyleAttribute,
+    subscribeTranslationStateChanges,
     tryRepairBilingualTranslationArtifact,
     type TranslationState,
 } from '@/src/features/full-page-translation/content/state';
@@ -82,6 +83,25 @@ function createCommittedScenario(beforeSource = false) {
         record: () => childListRecord(document.body, [replacementOwner], [previousOwner]),
     };
 }
+
+it('重复上报同一移除来源不会把唯一的新 owner 误判成歧义',()=>{
+    const scenario=createCommittedScenario(),oldSection=scenario.document.createElement('section'),newSection=scenario.document.createElement('section');oldSection.appendChild(scenario.previousOwner);
+    scenario.replacementOwner.replaceWith(newSection);newSection.appendChild(scenario.replacementOwner);
+    const result=transferEquivalentBilingualOwners([scenario.record(),childListRecord(scenario.document.body,[newSection],[oldSection])],()=>preparation());
+    expect(result.transfers).toHaveLength(1);expect(scenario.replacementOwner.querySelectorAll(BILINGUAL_SELECTOR)).toHaveLength(1);
+});
+it('其他状态订阅者已接回同一可信译文时不重复移动节点',()=>{
+    const scenario=createCommittedScenario();scenario.replacementOwner.appendChild(scenario.previousWrapper);
+    const stop=subscribeTranslationStateChanges((node,state)=>{if(node===scenario.replacementOwner&&state?.phase==='translated')node.appendChild(scenario.previousWrapper);});
+    try{const result=transferEquivalentBilingualOwners(scenario.record(),()=>preparation());expect(result.transfers).toHaveLength(1);expect(scenario.replacementOwner.querySelector(BILINGUAL_SELECTOR)).toBe(scenario.previousWrapper);}finally{stop();}
+});
+it('熔断清理期间宿主同步移除容器时不登记已经失效的边界',()=>{
+    const scenario=createCommittedScenario(),owner=scenario.previousOwner;scenario.document.body.replaceChildren(owner);
+    for(let i=0;i<3;i++)expect(consumeBilingualArtifactHostWriteBudget(owner,scenario.previousState,true)).toBe(true);
+    scenario.previousWrapper.textContent='host tampering';const remove=scenario.previousWrapper.remove.bind(scenario.previousWrapper);
+    vi.spyOn(scenario.previousWrapper,'remove').mockImplementation(()=>{remove();owner.remove();});
+    const registry=createBilingualRemountCapitulationRegistry();expect(stabilizeBilingualArtifact(owner,scenario.previousState,registry)).toBe('capitulated');expect(registry.hasEntries()).toBe(false);
+});
 
 function countElementGetterReads(element: HTMLElement, property: 'attributes' | 'innerHTML') {
     const original = Object.getOwnPropertyDescriptor(element, property);

@@ -160,6 +160,15 @@ describe('read-only body collection and native mapping', () => {
         Object.defineProperty(inline.document, 'body', {value: inline.document.querySelector('span')});
         expect(collect(inline).paragraphs[0].text).toBe('A readable standalone inline scope.');
     });
+    it('deduplicates discovered root handles when the translation resolver reuses a root during handoff', () => {
+        const f=fixture('<article><span id="first"></span><span id="alias"></span></article>');
+        const host=f.document.querySelector('#first')!,root=host.attachShadow({mode:'closed'});
+        root.innerHTML='<p>Shared translated readable paragraph contents.</p>';
+        const scan=collect(f,element=>element.id==='first'||element.id==='alias'?root:undefined);
+        expect(scan.roots).toEqual([f.document,root]);
+        expect(scan.paragraphs.every(paragraph=>paragraph.root===root&&paragraph.text==='Shared translated readable paragraph contents.')).toBe(true);
+        expect(scan.paragraphs.length).toBeGreaterThan(0);
+    });
     it('reads registered closed translation text only while attached, and discovers open roots and slot projection', () => {
         const f = fixture('<article><span id="closed" class="fluent-read-single-slot" data-fr-translation-owned="true" translate="no">Original preserved hidden text.</span><span id="open"></span><span id="projection"></span></article>');
         const closed = f.document.querySelector('#closed')!; const root = closed.attachShadow({mode: 'closed'});
@@ -213,6 +222,19 @@ describe('read-only body collection and native mapping', () => {
 });
 
 describe('page-owned scoring, paint and cancellation', () => {
+    it('redraws split paragraphs sharing one Text node without retaining ranges from another slice',async()=>{
+        const text='Extraordinary scientific vocabulary preserves algorithmic information. '.repeat(80),f=fixture(`<p>${text}</p>`);
+        const controller=installInformationHighlight(f.document,{...defaults,density:'low'},{scoreLocal:vi.fn()});controller.setEnabled(true);await f.settle();expect(controller.getState().processedParagraphs).toBeGreaterThan(1);
+        controller.updatePreferences({...defaults,density:'high'});await f.settle();
+        const fresh=fixture(`<p>${text}</p>`),expected=installInformationHighlight(fresh.document,{...defaults,density:'high'},{scoreLocal:vi.fn()});expected.setEnabled(true);await fresh.settle();
+        expect(f.painted().sort()).toEqual(fresh.painted().sort());controller.dispose();expected.dispose();
+    });
+    it('does not finish the last paragraph as active after cancellation during its rendering-budget yield',async()=>{
+        const f=fixture();f.slow();const controller=installInformationHighlight(f.document,{...defaults},{scoreLocal:vi.fn()});controller.setEnabled(true);vi.advanceTimersByTime(180);
+        for(let i=0;i<200&&controller.getState().processedParagraphs===0;i++)await f.flush();
+        expect(controller.getState().processedParagraphs).toBe(1);expect(f.frames.size).toBe(1);controller.dispose();await f.flush();
+        expect(controller.getState().enabled).toBe(false);expect(f.painted()).toEqual([]);expect(f.frames.size).toBe(0);
+    });
     it('paints score levels with monotonic density, reuses model scores and keeps legacy styles compatible', async () => {
         const terms = Array.from({length: 30}, (_, index) => `term${String(index).padStart(2, '0')}`);
         const f = fixture(`<article><p>${terms.join(' ')}</p></article>`), before = f.document.body.innerHTML;

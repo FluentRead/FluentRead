@@ -490,6 +490,11 @@ describe('document export workflow ownership', () => {
         await vi.advanceTimersByTimeAsync(4000);expect(f.ports.onNoticeExpired).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1000);expect(f.ports.onNoticeExpired).toHaveBeenCalledOnce();
     });
+    it('ignores a notice expiry callback already queued when the workflow is disposed',async()=>{
+        vi.useFakeTimers();const f=exportFixture(),timer=vi.spyOn(globalThis,'setTimeout');await f.workflow.single(f.current,'bilingual','layout');
+        const callback=timer.mock.calls.find(([,delay])=>delay===5000)![0] as ()=>void;timer.mockRestore();f.workflow.dispose();callback();
+        expect(f.ports.onNoticeExpired).not.toHaveBeenCalled();expect(f.ports.revokeUrl).toHaveBeenCalledOnce();expect(vi.getTimerCount()).toBe(0);
+    });
     it.each(['handoff-reset', 'handoff-dispose', 'feedback-dispose'] as const)('releases resources if %s occurs synchronously inside a browser or UI port', async action => {
         vi.useFakeTimers();const f = exportFixture();
         if (action === 'feedback-dispose') vi.mocked(f.ports.onComplete).mockImplementationOnce(() => f.workflow.dispose());

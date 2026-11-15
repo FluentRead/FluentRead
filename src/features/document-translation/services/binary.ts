@@ -13,6 +13,7 @@ import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive'
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
 import {paginatePdfReadingPlan, type PdfReadingOutputPage, type PdfTextMeasure} from '../core/pdfTextLayout';
+import type {PdfReadingTextEntry} from '../core/pdfReadingRegions';
 
 import {
     getDocumentMaxBytes,
@@ -1480,7 +1481,7 @@ async function renderPdf(
         if (settings.requireText && !generatedPages) throw new Error('PDF 光栅端口没有生成完整译文续页，已停止不完整导出');
     };
     const appendOverflowPages = async (pageData: PdfDocumentPage, notes: PdfOverflowNote[], layoutPage: ReturnType<typeof outputPdf.addPage>) => {
-        const entries: PdfReadingPlan['entries'] = [];
+        const entries: PdfReadingTextEntry[] = [];
         const seen = new Set<number>();
         for (const note of notes) {
             if (seen.has(note.segmentIndex)) continue;
@@ -1497,7 +1498,7 @@ async function renderPdf(
         let embedded: Awaited<ReturnType<typeof prepareReadingFont>>;
         try {
             embedded = await prepareReadingFont();
-            for (const entry of entries) if (entry.kind === 'text') await embedded.prepareText(entry.text);
+            for (const entry of entries) await embedded.prepareText(entry.text);
         } catch (error) {
             options.signal?.throwIfAborted();
             if (!options.pdfReadingRasterizer) throw error;
@@ -1511,7 +1512,8 @@ async function renderPdf(
             options.signal?.throwIfAborted();
             const page = outputPdf.addPage([rendered.width, rendered.height]);
             labelLayoutPage(`${pageData.pageNumber} · 译文续页 ${index + 1}`);
-            for (const item of rendered.items) if (item.kind === 'text' && item.text) embedded.drawText(page, item.text.replace(/\t/gu, ' '), {size: item.font.size,
+            // 此私有计划只含文字；分页器不为其产生区域或空行绘制项。
+            for (const item of rendered.items as Array<Extract<PdfReadingOutputPage['items'][number], {kind: 'text'}>>) embedded.drawText(page, item.text.replace(/\t/gu, ' '), {size: item.font.size,
                 x: item.x, y: rendered.height - item.y - embedded.font.heightAtSize(item.font.size, {descender: false}), color: rgb(0.094, 0.129, 0.184)});
             const footer = `原文第 ${pageData.pageNumber} 页 · 译文续页 ${index + 1}/${pages.length}`;
             await embedded.prepareText(footer);

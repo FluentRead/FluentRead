@@ -74,6 +74,12 @@ beforeEach(() => {
 afterEach(async () => {resetPlatformMessageHandler();await Promise.resolve();expect(state.listeners.size).toBe(0);vi.unstubAllGlobals();});
 
 describe.each([['compact', createPlatformMessageHandler], ['full', createFullPlatformMessageHandler]] as const)('%s userscript public reading', (_name, createHandler) => {
+    it('ignores a pageshow callback already queued before the reading owner was disposed',async()=>{
+        const listener=vi.spyOn(page,'addEventListener'),handler=createHandler(vi.fn());setPlatformMessageHandler(handler);
+        await completed(begin());const callback=listener.mock.calls.find(([name])=>name==='pageshow')![1] as (event:Event)=>void;
+        expect(typeof callback).toBe('function');const count=state.model.mock.calls.length;handler.dispose();callback(event('pageshow',true));
+        await Promise.resolve();expect(state.model).toHaveBeenCalledTimes(count);await expect(handler(request())).resolves.toBe(UNHANDLED_RUNTIME_MESSAGE);
+    });
     it('keeps manual reading available when best-effort history pruning rejects', async () => {
         const storage=await import('@/userscript/readingStorage'),original=storage.createUserscriptReadingStorage;
         const prune=vi.fn(async()=>{throw new Error('history maintenance unavailable');});

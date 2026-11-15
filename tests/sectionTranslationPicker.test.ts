@@ -226,6 +226,18 @@ afterEach(() => {
 });
 
 describe('局部翻译选择模式', () => {
+    it('预览中的正文变化重新盘点，自有操作条的 pointerup 保留原生点击',async()=>{
+        const h=await createHarness();h.picker.startSectionPicker(h.options as never);h.flushFrames();
+        const event=h.emit('pointerup',{composedPath:()=>[h.host(),h.document.body]});expect(event.preventDefault).not.toHaveBeenCalled();expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
+        h.byId('para').append(' New readable text');h.emitMutation(h.byId('para'));vi.advanceTimersByTime(90);h.flushFrames();
+        expect(h.inspect).toHaveBeenCalledWith(h.byId('para'));expect(h.onPick).not.toHaveBeenCalled();h.picker.stopSectionPicker();
+    });
+    it('锁定正文的大批插入与随后的属性变化共用已经排队的开放根扫描',async()=>{
+        const h=await createHarness();h.picker.startSectionPicker(h.options as never);h.flushFrames();h.emit('click',{clientX:50,clientY:70});
+        const added=h.document.createElement('span');added.innerHTML='<span>new text</span>'.repeat(300);h.byId('para').appendChild(added);h.emitMutation(h.byId('para'),[added]);
+        h.emitAttribute(h.byId('para'));h.flushFrames();vi.advanceTimersByTime(90);h.flushFrames();
+        expect(h.host()!.getAttribute('data-selection-state')).toBe('locked');expect(h.inspect).toHaveBeenCalledWith(h.byId('para'));h.picker.stopSectionPicker();
+    });
     it('扩大大量独立区域时避免逐对读取父级，并可缩回原选区', async () => {
         const h = await createHarness({initialPoint: {x: 50, y: 2}});
         const count = 120;

@@ -318,6 +318,7 @@ describe('漫画站点适配与 DOM 生命周期', () => {
         const version={},reading={live:()=>true,version:()=>version,load:async()=>({status:'empty' as const})};
         const f=readerFixture(true,undefined,undefined,undefined,undefined,undefined,{reading});f.reader.toggle();await flush();
         const list=f.reader.readingCandidates();if(list.status!=='ready')throw Error('unexpected');const invalid=vi.fn();
+        expect(f.reader.readingCandidates()).toEqual(list);
         f.reader.observeReadingCandidate(list.items[0].token,invalid);f.window.location.href='';f.reader.schedule();
         expect(invalid).toHaveBeenCalledOnce();f.reader.dispose();
     });

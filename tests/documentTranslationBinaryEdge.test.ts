@@ -326,6 +326,7 @@ describe('binary document low-level contracts', () => {
 
     it('将同一行原子按标点、连字符和栏间距组合', () => {
         expect(pdfTextLines([], 300)).toEqual([]);
+        expect(pdfTextLines([atom(' \t\u00a0 ',0,10)],300)).toEqual([]);
         const lines = pdfTextLines([
             atom('well-', 0, 10),
             atom('known', 22, 10),
@@ -468,6 +469,14 @@ describe('binary document low-level contracts', () => {
             'chapter.xhtml': '<html><body><p>Ignored without media type</p></body></html>',
             'empty.xhtml': '<html><body><script>only protected text</script></body></html>',
         }))).rejects.toThrow('没有找到可翻译的章节文字');
+    });
+    it('没有 spine 时只回退到有效正文清单，忽略残缺项目和样式资源',async()=>{
+        const parsed=await parseBinaryDocument('fallback.epub',await zipBytes({
+            mimetype:'application/epub+zip','META-INF/container.xml':'<rootfile full-path="content.opf"/>',
+            'content.opf':'<package><manifest><item href="missing-id.xhtml"/><item id="missing-href"/><item id="style" href="style.css" media-type="text/css"/><item id="body" href="body.xhtml" media-type="application/xhtml+xml"/></manifest></package>',
+            'style.css':'body {color:red}','body.xhtml':'<html><body><p>Preserved book text.</p></body></html>',
+        }));
+        expect(parsed.segments.map(value=>value.source)).toEqual(['Preserved book text.']);
     });
 
     it('拒绝 DOCX 缺失结构或空正文，并按部件等级稳定排序', async () => {

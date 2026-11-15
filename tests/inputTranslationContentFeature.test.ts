@@ -174,6 +174,59 @@ afterEach(() => {
 });
 
 describe('input translation content feature', () => {
+    it.each(['restore','triple-cleanup'])('a late %s write cannot release the newer editor write lease',async phase=>{
+        const h=mountHarness({config:{inputBoxTranslationTrigger:phase==='restore'?'ctrl_enter':'triple_equal'}}),rich=fakeElement('div',{contenteditable:'true'});rich.innerText=rich.value='Hello';h.fakeDocument.activeElement=rich;
+        if(phase==='restore')await h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));
+        else for(let i=0;i<2;i++){
+            editable.readEditableCaretState.mockReturnValue({text:rich.innerText,caret:rich.innerText.length});await h.fakeDocument.emit('keydown',trustedKey({key:'=',code:'Equal'}));
+            rich.value+='=';rich.innerText+='=';editable.readEditableCaretState.mockReturnValue({text:rich.innerText,caret:rich.innerText.length});await h.fakeDocument.emit('input',{target:rich});
+        }
+        let oldFinish!:(value:string)=>void,newFinish!:(value:string)=>void,oldSignal!:AbortSignal,newSignal!:AbortSignal;
+        editable.replaceEditableText.mockImplementationOnce((_element,_text,_guard,_mode,_symbol,signal)=>{oldSignal=signal;return new Promise(resolve=>{oldFinish=resolve;});});
+        let oldTask=Promise.resolve();
+        if(phase==='restore'){const restore=h.tooltipRecords.at(-1).ui.mounted.children.at(-1);restore.listeners.get('click')[0]({isTrusted:true,preventDefault:vi.fn(),stopPropagation:vi.fn()});}
+        else {editable.readEditableCaretState.mockReturnValue({text:rich.innerText,caret:rich.innerText.length});oldTask=h.fakeDocument.emit('keydown',trustedKey({key:'=',code:'Equal'}));}
+        await vi.waitFor(()=>expect(oldSignal).toBeInstanceOf(AbortSignal));h.feature.invalidate();h.config.inputBoxTranslationTrigger='ctrl_enter';rich.innerText='New source';
+        editable.replaceEditableText.mockImplementationOnce((_element,_text,_guard,_mode,_symbol,signal)=>{newSignal=signal;return new Promise(resolve=>{newFinish=resolve;});});
+        const running=h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));await vi.waitFor(()=>expect(newSignal).toBeInstanceOf(AbortSignal));
+        oldFinish('stale');await oldTask;for(let i=0;i<10;i++)await Promise.resolve();
+        await h.fakeDocument.emit('paste',{isTrusted:false,target:rich});expect(newSignal.aborted).toBe(false);
+        await h.fakeDocument.emit('paste',{isTrusted:true,target:rich});expect(newSignal.aborted).toBe(true);newFinish('stale');await running;
+        expect(rich.innerText).toBe('New source');h.controller.abort();
+    });
+    it('does not cancel a native form control merely because it loses focus',async()=>{
+        let release!:(value:unknown)=>void;const h=mountHarness({sendMessage:()=>new Promise(resolve=>{release=resolve;})}),input=fakeElement('textarea');input.value='Hello';h.fakeDocument.activeElement=input;
+        const running=h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));await vi.waitFor(()=>expect(h.sendMessage).toHaveBeenCalledOnce());
+        h.fakeDocument.activeElement=fakeElement('input');await h.fakeDocument.emit('focusout',{target:input});release({success:true,translatedText:'Translated'});await running;
+        expect(input.value).toBe('Translated');expect(h.sendMessage.mock.calls.some(([message])=>message.type==='fluentReadTranslationCancel')).toBe(false);h.controller.abort();
+    });
+    it('an old retry action does not translate an edited draft',async()=>{
+        const h=mountHarness({sendMessage:async()=>({success:false,error:'controlled provider failure'})}),input=fakeElement('textarea');input.value='Hello';h.fakeDocument.activeElement=input;
+        await h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));const retry=h.tooltipRecords.at(-1).ui.mounted.children.at(-1);input.value='Edited draft';
+        retry.listeners.get('click')[0]({isTrusted:true,preventDefault:vi.fn(),stopPropagation:vi.fn()});for(let i=0;i<10;i++)await Promise.resolve();
+        expect(h.sendMessage).toHaveBeenCalledOnce();expect(input.value).toBe('Edited draft');h.controller.abort();
+    });
+    it('a queued cancel action from the previous request cannot cancel its successor',async()=>{
+        const replies:Array<(value:unknown)=>void>=[],h=mountHarness({sendMessage:()=>new Promise(resolve=>replies.push(resolve))}),input=fakeElement('textarea');input.value='Hello';h.fakeDocument.activeElement=input;
+        const first=h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));await vi.waitFor(()=>expect(replies).toHaveLength(1));const cancel=h.tooltipRecords.at(-1).ui.mounted.children.at(-1);
+        h.feature.invalidate();await first;input.value='New source';const next=h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));await vi.waitFor(()=>expect(replies).toHaveLength(2));
+        cancel.listeners.get('click')[0]({isTrusted:true,preventDefault:vi.fn(),stopPropagation:vi.fn()});
+        expect(h.sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadTranslationCancel')).toHaveLength(1);replies[1]({success:true,translatedText:'Current answer'});await next;expect(input.value).toBe('Current answer');h.controller.abort();
+    });
+    it('reentrant host class cleanup cannot keep stale input visuals or revive a cancelled request',async()=>{
+        let release!:(value:unknown)=>void;const h=mountHarness({sendMessage:()=>new Promise(resolve=>{release=resolve;})}),input=fakeElement('textarea');input.value='Hello';h.fakeDocument.activeElement=input;
+        const running=h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));await vi.waitFor(()=>expect(h.sendMessage).toHaveBeenCalledOnce());
+        input.classList.remove.mockImplementationOnce(()=>h.feature.invalidate());h.feature.invalidate();release({success:true,translatedText:'Stale answer'});await running;
+        expect(input.value).toBe('Hello');expect(input.classList.values.has('fluent-input-translating')).toBe(false);h.controller.abort();
+    });
+    it('does not report a late restore failure after the input feature has been disposed',async()=>{
+        const h=mountHarness(),rich=fakeElement('div',{contenteditable:'true'});rich.innerText='Hello';h.fakeDocument.activeElement=rich;
+        await h.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));let reject!:(error:Error)=>void,started=false;
+        editable.replaceEditableText.mockImplementationOnce(()=>{started=true;return new Promise((_resolve,fail)=>{reject=fail;});});
+        const restore=h.tooltipRecords.at(-1).ui.mounted.children.at(-1);restore.listeners.get('click')[0]({isTrusted:true,preventDefault:vi.fn(),stopPropagation:vi.fn()});
+        await vi.waitFor(()=>expect(started).toBe(true));h.controller.abort();reject(Error('late host restore failure'));
+        for(let i=0;i<10;i++)await Promise.resolve();expect(h.logger.error).not.toHaveBeenCalled();
+    });
     it('keeps a new user draft when the background cancellation notification rejects', async () => {
         let release!:(value:unknown)=>void;
         const harness=mountHarness({sendMessage:()=>new Promise(resolve=>{release=resolve;})});

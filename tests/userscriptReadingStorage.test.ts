@@ -28,6 +28,19 @@ const tick = async () => {for (let count = 0; count < 20; count++) await Promise
 afterEach(() => {vi.unstubAllGlobals(); vi.restoreAllMocks();});
 
 describe('userscript GM 阅读会话', () => {
+    it('does not revive a stale previous snapshot across clear when a current edit loses a duplicate-content conflict',async()=>{
+        const f=fixture(),api=f.create();await api.ready;await api.memories.clear();
+        const winner=await api.memories.save({kind:'note',content:'original B'});
+        const losing=await api.memories.save({kind:'note',content:'original A'});
+        await api.memories.save({id:losing.id,kind:'note',content:'shared'});
+        const rows=[...f.values.values()] as any[];
+        expect(rows.some(row=>row.kind==='memories-clear')).toBe(true);
+        const current=rows.find(row=>row.kind==='memory-save'&&row.memory.id===losing.id&&row.memory.content==='shared');
+        const other=rows.find(row=>row.kind==='memory-save'&&row.memory.id===winner.id);
+        expect(current.previous).toBeDefined();current.previous.fence=[];other.memory.content='shared';
+        const visible=await api.memories.list();expect(visible.map(memory=>memory.id)).toEqual([winner.id]);
+        expect(visible[0].content).toBe('shared');
+    });
     it('只写专用GM命名空间和白名单，保持更新合并、摘要分页及读取对象隔离', async () => {
         const f = fixture(); const api = f.create(); await api.ready;
         f.values.set('local:config', {credential: 'must-stay-outside-reading'});

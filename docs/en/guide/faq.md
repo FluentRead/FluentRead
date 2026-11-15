@@ -60,7 +60,7 @@ Update FluentRead and refresh the webpage. If the conflict remains, temporarily 
 
 ## Where are local translation models stored? Are they cleared on uninstall?
 
-Downloaded models live in this browser’s extension cache. A normal uninstall clears that storage; disabling keeps it. You can also delete individual models in their settings. Chrome manages its own built-in translation packs. Manually downloaded extension archives and extracted folders need separate cleanup.
+By default, downloaded models live in this browser’s extension cache. If you enable a shared model folder, those files live in the folder you selected; uninstalling or disconnecting does not delete them. You can delete browser-local cached models in settings. Chrome manages its own built-in translation packs. Manually downloaded extension archives and extracted folders need separate cleanup.
 
 ## Do local models reload on every request or stay in memory forever?
 

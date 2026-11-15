@@ -6,6 +6,7 @@
  */
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import type {App} from 'vue';
+import {sharedDirectoryFixture} from './helpers/sharedVideoModelDirectory';
 
 const dom = await vi.hoisted(async () => {
     const {parseHTML} = await import('linkedom');
@@ -211,6 +212,40 @@ afterEach(async () => {
     for (const restore of viewEventRestorers.splice(0).reverse()) restore();
     expect(ports.listeners.size).toBe(0); ports.send.mockReset(); ports.get.mockReset(); fixture = undefined;
     renderedEvents.length = 0; dom.document.body.replaceChildren(); vi.unstubAllGlobals();
+    delete (dom.window as any).showDirectoryPicker;
+});
+
+describe('shared directory controls on the mounted settings page', () => {
+    function directoryPort() {
+        const f = sharedDirectoryFixture();
+        vi.stubGlobal('window', dom.window);
+        Object.defineProperty(dom.window, 'showDirectoryPicker', {configurable: true, value: f.picker});
+        return f;
+    }
+    it('shows the unconfigured state, connects once, and disconnects without deleting shared files', async () => {
+        const f = directoryPort(), h = await mount('video');
+        const panel = () => h.host.querySelector('[data-video-ai-shared-models]')!;
+        expect(panel().textContent).toContain('未连接');
+        const choose = panel().querySelector('.video-ai-shared-model-actions button') as HTMLButtonElement;
+        choose.click(); choose.click(); await settle();
+        expect(f.picker).toHaveBeenCalledOnce(); expect(panel().textContent).toContain('已授权');
+        const disconnect = [...panel().querySelectorAll('button')].find(button => button.textContent === '断开共享') as HTMLButtonElement;
+        await vi.waitFor(() => expect(disconnect.disabled).toBe(false));
+        disconnect.click(); await settle();
+        await vi.waitFor(() => expect(panel().textContent).toContain('未连接')); expect(f.removed).toEqual([]);
+    });
+    it('ignores an obsolete rendered action and lets a new view reread an outstanding picker grant', async () => {
+        const f = directoryPort(), h = await mount('video');
+        const old = capture(event => event.props.class === 'video-model-download-button', 'onClick');
+        h.state.config = normalizeConfig({videoTranslationEnabled: true}); await settle();
+        await old(); expect(f.picker).not.toHaveBeenCalled();
+        const pending = deferred<any>(); f.picker.mockReturnValueOnce(pending.promise);
+        (h.host.querySelector('.video-ai-shared-model-actions button') as HTMLButtonElement).click(); await settle();
+        await hide(h, 'hidden'); pending.resolve(f.handle); await settle();
+        await reopen(h);
+        expect(h.host.querySelector('[data-video-ai-shared-models]')!.textContent).toContain('已授权');
+        expect(f.picker).toHaveBeenCalledOnce();
+    });
 });
 function capture(predicate: (event: Captured) => boolean, handler: string) {
     const event = renderedEvents.findLast(item => predicate(item) && typeof item.props[handler] === 'function');

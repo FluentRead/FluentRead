@@ -677,7 +677,7 @@ describe('video settings real template recovery boundaries', () => {
         });
         const {host} = await mount(VideoLocalModelSettings, {config: normalizeConfig({videoTranslationEnabled: true})});
         expect(host.querySelector('.video-ai-cache-panel [role="alert"]')!.textContent).toContain('无法读取已识别字幕缓存');
-        expect(host.querySelector('.video-ai-cache-status')!.textContent).toContain('读取失败');
+        expect(host.querySelector('.video-ai-cache-panel .video-ai-cache-status')!.textContent).toContain('读取失败');
     });
     it.each(['empty', 'Error', 'non-Error', 'reported'])('preserves visible cache entries and allows retry after %s clear failure', async mode => {
         installReplies(async () => {

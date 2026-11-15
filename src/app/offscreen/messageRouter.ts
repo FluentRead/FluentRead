@@ -77,6 +77,7 @@ export interface OffscreenMessageDependencies {
     readonly removeMangaModels?: () => Promise<void>;
     readonly videoAi?: {
         removeModel?(request: OffscreenRequestMap['VIDEO_AI_REMOVE_MODEL']): Promise<void>;
+        shareModel?(request: OffscreenRequestMap['VIDEO_AI_SHARE_MODEL']): Promise<void>;
         transcribe(request: OffscreenRequestMap['VIDEO_AI_TRANSCRIBE']): Promise<VideoTranscriptionResult>;
         prepare(request: OffscreenRequestMap['VIDEO_AI_PREPARE']): Promise<VideoPreparationResult>;
         cancel(streamId: string, reason?: 'cancel' | 'complete'): Promise<void>;
@@ -452,6 +453,12 @@ export function createOffscreenMessageListener(dependencies: OffscreenMessageDep
                 respondWith(async () => {
                     if (!dependencies.videoAi?.removeModel) throw new Error('模型清除不可用');
                     await dependencies.videoAi.removeModel(parseOffscreenRequest('VIDEO_AI_REMOVE_MODEL', message));
+                }, sendResponse, () => ({success: true}));
+                return true;
+            case 'VIDEO_AI_SHARE_MODEL':
+                respondWith(async () => {
+                    if (!dependencies.videoAi?.shareModel) throw new Error('共享模型迁移不可用');
+                    await dependencies.videoAi.shareModel(parseOffscreenRequest('VIDEO_AI_SHARE_MODEL', message));
                 }, sendResponse, () => ({success: true}));
                 return true;
             case 'VIDEO_AI_PREPARE':

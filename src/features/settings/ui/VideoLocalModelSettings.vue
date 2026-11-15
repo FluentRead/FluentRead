@@ -1,7 +1,7 @@
 <!--
  * @file src/features/settings/ui/VideoLocalModelSettings.vue
- * 文件职责：提供本地视频字幕识别方式、浏览器模型下载、本机 Qwen 服务地址与字幕缓存管理。
- * 主要内容：紧凑卡片选择 Tiny/Base/Small，呈现质量、体积、推荐、可用状态和真实下载字节；设备与缓存说明收进悬停/焦点帮助，下载来源始终自动处理且不展示供应方与换源信息；失败可重试，命令结束重读权威缓存；停用时移除 UI 监听，旧配置事件及迟到回包不进入新视图。
+ * 文件职责：提供本地视频字幕识别方式、Whisper 模型下载与跨浏览器共享、本机 Qwen 服务地址和字幕缓存管理。
+ * 主要内容：紧凑卡片选择模型并显示缓存来源，支持授权共享目录、下载到共享位置、迁移已有文件和清除本机副本；下载来源始终自动处理且不展示供应方信息，失败可重试，旧视图迟到回包不会覆盖新状态。
  * 模块边界：沿用设置草稿及显式保存，不在加载/切换时探测本机服务；通过视频 feature 公共配置和后台消息获取浏览器模型状态，不直接执行识别或操作网页播放器；下载进度只读取后台转存的变化事件。
  -->
 <template>
@@ -37,21 +37,45 @@
         <p class="video-model-size">{{ t('modelCache.downloadSize', {size: item.downloadSizeMb}) }}</p>
         <div class="video-model-card-footer">
           <div v-if="isDownloading(item.value)" class="video-model-progress">
-            <DownloadProgress :progress="progress[item.value]" :label="t('video.aiDownloadingModel')" :data-video-model-progress="item.value" />
+            <DownloadProgress :progress="progress[item.value]" :label="isMigrating(item.value) ? translateLegacy('正在迁移模型') : t('video.aiDownloadingModel')" :data-video-model-progress="item.value" />
           </div>
           <span v-else class="video-model-availability" :class="{'is-ready': downloaded.includes(item.value)}" role="status">
             <Check v-if="downloaded.includes(item.value)" aria-hidden="true" />
-            {{ !modelStateLoaded ? '读取中…' : downloaded.includes(item.value) ? '可离线使用' : '尚未下载' }}
+            {{ !modelStateLoaded ? '读取中…' : sharedModels.includes(item.value) ? translateLegacy('共享目录可用') : downloaded.includes(item.value) ? '可离线使用' : '尚未下载' }}
           </span>
-          <button v-if="downloaded.includes(item.value)" type="button" class="video-model-download-button video-model-remove" :disabled="!active || removing.includes(item.value)" :aria-label="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" :title="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" @click.stop="item.remove()"><component :is="removing.includes(item.value) ? Loading : Delete" :class="{'is-loading': removing.includes(item.value)}" aria-hidden="true" /></button>
-          <button v-else type="button" class="video-model-download-button primary" :aria-label="t('video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!active || !modelStateLoaded || isDownloading(item.value) || !config.videoTranslationEnabled || !browserCapabilities.extensionDom" @click.stop="item.download()">
+          <button v-if="downloaded.includes(item.value) && sharedModels.includes(item.value) && localModels.includes(item.value)" type="button" class="video-model-download-button video-model-remove" :disabled="!active || removing.includes(item.value)" :aria-label="translateLegacy('清除本机副本')" :title="translateLegacy('清除本机副本')" @click.stop="item.remove()"><component :is="removing.includes(item.value) ? Loading : Delete" :class="{'is-loading': removing.includes(item.value)}" aria-hidden="true" /></button>
+          <button v-else-if="downloaded.includes(item.value) && localModels.includes(item.value) && sharedDirectory.configured && sharedDirectory.write === 'granted'" type="button" class="video-model-download-button" :disabled="!active || isMigrating(item.value) || sharedDirectoryBusy" :aria-label="translateLegacy('迁移到共享目录')" :title="translateLegacy('迁移到共享目录')" @click.stop="item.move()">
+            <component :is="isMigrating(item.value) ? Loading : Download" :class="{'is-loading': isMigrating(item.value)}" aria-hidden="true" />
+            {{ isMigrating(item.value) ? translateLegacy('正在迁移模型') : translateLegacy('迁移到共享目录') }}
+          </button>
+          <button v-else-if="downloaded.includes(item.value) && localModels.includes(item.value) && !sharedModels.includes(item.value)" type="button" class="video-model-download-button video-model-remove" :disabled="!active || removing.includes(item.value)" :aria-label="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" :title="t('modelCache.removeNamed', {name: translateLegacy(item.label)})" @click.stop="item.remove()"><component :is="removing.includes(item.value) ? Loading : Delete" :class="{'is-loading': removing.includes(item.value)}" aria-hidden="true" /></button>
+          <button v-else-if="!downloaded.includes(item.value)" type="button" class="video-model-download-button primary" :aria-label="t('video.modelDownloadAria', {model: translateLegacy(item.label)})" :disabled="!active || !modelStateLoaded || isDownloading(item.value) || !config.videoTranslationEnabled || !browserCapabilities.extensionDom || (sharedDirectory.configured && sharedDirectory.write !== 'granted')" @click.stop="item.download()">
             <component :is="isDownloading(item.value) ? Loading : Download" :class="{ 'is-loading': isDownloading(item.value) }" aria-hidden="true" />
-            {{ isDownloading(item.value) ? '下载中…' : failedDownloads.includes(item.value) ? t('video.downloadRetry') : '下载模型' }}
+            {{ isDownloading(item.value) ? '下载中…' : failedDownloads.includes(item.value) ? t('video.downloadRetry') : sharedDirectory.configured ? translateLegacy('下载到共享目录') : '下载模型' }}
           </button>
         </div>
       </article>
     </div>
     <p v-if="downloadError || modelReadError" class="video-model-error" role="alert">{{ downloadError || modelReadError }}</p>
+  </section>
+  <section class="video-ai-shared-model-panel" data-video-ai-shared-models aria-labelledby="video-ai-shared-model-title">
+    <div class="video-ai-shared-model-copy">
+      <div class="video-ai-cache-heading">
+        <h3 id="video-ai-shared-model-title">{{ translateLegacy('跨浏览器共享模型') }}</h3>
+        <span v-if="sharedDirectory.supported" class="video-ai-cache-status" role="status">{{ sharedDirectoryLabel }}</span>
+        <FieldHelp :content="translateLegacy('在每个浏览器中选择同一文件夹；Whisper 文件写入 FluentRead/whisper 子目录。已有模型可迁移到共享目录。断开只移除本浏览器授权，不会删除共享文件。')" :label="translateLegacy('共享模型目录说明')" />
+      </div>
+      <p v-if="!sharedDirectory.supported" class="video-ai-cache-status">{{ translateLegacy('当前浏览器不支持目录共享，仍可使用浏览器内模型。') }}</p>
+      <p v-if="sharedDirectoryError" class="video-model-error" role="alert">{{ sharedDirectoryError }}</p>
+    </div>
+    <div v-if="sharedDirectory.supported" class="video-ai-shared-model-actions">
+      <button type="button" class="video-model-download-button" :disabled="!active || sharedActionsBusy" :onClick="sharedDirectoryActions.choose">
+        {{ sharedDirectory.configured ? translateLegacy('重新授权或更换文件夹') : translateLegacy('选择共享文件夹') }}
+      </button>
+      <button v-if="sharedDirectory.configured" type="button" class="video-model-download-button" :disabled="!active || sharedActionsBusy" :onClick="sharedDirectoryActions.disconnect">
+        {{ translateLegacy('断开共享') }}
+      </button>
+    </div>
   </section>
   <section class="video-ai-cache-panel" data-video-ai-cache aria-labelledby="video-ai-cache-title">
     <div class="video-ai-cache-copy">
@@ -70,6 +94,7 @@
 
 <script lang="ts" setup>
 import {useUiI18n} from '@/src/ui/i18n';
+import {translateSharedVideoModelText} from '../model/sharedVideoModelText';
 import {computed, onMounted, onUnmounted, ref, watch} from 'vue';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 import browser from 'webextension-polyfill';
@@ -90,8 +115,19 @@ import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {watchDownloadProgress} from '@/src/platform/storage/downloadProgress';
 import DownloadProgress from '@/src/ui/components/DownloadProgress.vue';
 import FieldHelp from './components/FieldHelp.vue';
+import {
+  chooseSharedVideoAiDirectory,
+  disconnectSharedVideoAiDirectory,
+  getSharedVideoAiDirectoryStatus,
+  supportsSharedVideoAiDirectory,
+  type SharedVideoAiDirectoryStatus,
+} from '@/src/features/video-subtitle/model-sharing/public';
 
-const {t, translateLegacy} = useUiI18n();
+const i18n = useUiI18n();
+const {t} = i18n;
+function translateLegacy(value: string): string {
+  return translateSharedVideoModelText(value, i18n.language?.value ?? 'zh-CN') ?? i18n.translateLegacy(value);
+}
 const props = withDefaults(defineProps<{config: Config; active?: boolean; context?: unknown}>(), {active: true});
 // 设置页会整体替换草稿；始终读取最新 prop，避免卡片继续编辑旧配置。
 const config = computed(() => props.config);
@@ -129,6 +165,7 @@ const modelCards = computed(() => {
       return download(item.value, current);
     },
     remove: () => removeModel(item.value, current),
+    move: () => moveToShared(item.value, current),
   }));
 });
 const cacheActions = computed(() => {
@@ -138,6 +175,8 @@ const cacheActions = computed(() => {
 // 与播放器内的首次下载确认使用同一推荐，避免两处给出不同建议。
 const recommendedModel = VIDEO_LOCAL_TRANSCRIPTION_RECOMMENDED_MODEL;
 const downloaded = ref<VideoLocalTranscriptionModel[]>([]);
+const localModels = ref<VideoLocalTranscriptionModel[]>([]);
+const sharedModels = ref<VideoLocalTranscriptionModel[]>([]);
 const modelStateLoaded = ref(false);
 // 本页发起的请求与播放器里发起、仍在进行的下载都算“下载中”；后者只能从实时进度事件得知。
 const downloading = ref<VideoLocalTranscriptionModel[]>([]);
@@ -145,6 +184,16 @@ const observedDownloads = ref<VideoLocalTranscriptionModel[]>([]);
 const progress = ref<Partial<Record<VideoLocalTranscriptionModel, DownloadProgressValue>>>({});
 const downloadError = ref('');
 const failedDownloads = ref<VideoLocalTranscriptionModel[]>([]);
+const migrating = ref<VideoLocalTranscriptionModel[]>([]);
+const sharedDirectory = ref<SharedVideoAiDirectoryStatus>({supported: supportsSharedVideoAiDirectory(), configured: false, read: 'unavailable', write: 'unavailable'});
+const sharedDirectoryError = ref('');
+const sharedDirectoryBusy = ref(false);
+const sharedActionsBusy = computed(() => sharedDirectoryBusy.value || migrating.value.length > 0
+  || downloading.value.length > 0 || observedDownloads.value.length > 0 || pendingDownloads.value.size > 0);
+const sharedDirectoryActions = computed(() => {
+  const current = capture();
+  return {choose: () => chooseSharedDirectory(current), disconnect: () => disconnectSharedDirectory(current)};
+});
 let stopObserving: (() => void) | undefined;
 const modelReadError = ref('');
 const removing = ref<VideoLocalTranscriptionModel[]>([]);
@@ -156,6 +205,7 @@ const mounted = ref(false);
 const pendingDownloads = ref(new Set<VideoLocalTranscriptionModel>());
 let modelGeneration = 0;
 let cacheGeneration = 0;
+let directoryGeneration = 0;
 
 function selectModel(model: VideoLocalTranscriptionModel, current: () => boolean, target: Config): void {
   if (!current() || target.videoTranscriptionProvider === 'native-qwen' || !target.videoTranslationEnabled || !browserCapabilities.extensionDom) return;
@@ -163,7 +213,32 @@ function selectModel(model: VideoLocalTranscriptionModel, current: () => boolean
 }
 
 function isDownloading(model: VideoLocalTranscriptionModel): boolean {
-  return !downloaded.value.includes(model) && (downloading.value.includes(model) || observedDownloads.value.includes(model) || pendingDownloads.value.has(model));
+  return migrating.value.includes(model) || !downloaded.value.includes(model) && (downloading.value.includes(model) || observedDownloads.value.includes(model) || pendingDownloads.value.has(model));
+}
+
+function isMigrating(model: VideoLocalTranscriptionModel): boolean {
+  return migrating.value.includes(model);
+}
+
+const sharedDirectoryLabel = computed(() => {
+  if (!sharedDirectory.value.supported) return translateLegacy('目录共享不可用');
+  if (!sharedDirectory.value.configured) return translateLegacy('未连接；模型继续保存在此浏览器中。');
+  if (sharedDirectory.value.write === 'granted') return translateLegacy('已授权；新模型会保存到共享目录。');
+  return translateLegacy('需要重新授权；请选择同一文件夹以继续使用。');
+});
+
+async function refreshSharedDirectory(): Promise<void> {
+  if (sharedDirectoryBusy.value) return;
+  const current = capture(), request = ++directoryGeneration;
+  try {
+    const status = await getSharedVideoAiDirectoryStatus();
+    if (current() && request === directoryGeneration) {sharedDirectory.value = status; sharedDirectoryError.value = '';}
+  }
+  catch (error) {
+    if (!current() || request !== directoryGeneration) return;
+    sharedDirectory.value = {supported: supportsSharedVideoAiDirectory(), configured: false, read: 'unavailable', write: 'unavailable'};
+    sharedDirectoryError.value = error instanceof Error ? translateLegacy(error.message) : translateLegacy('无法读取共享模型目录状态，请重试');
+  }
 }
 
 function handleDownloadProgress(id: string, next: DownloadProgressValue | undefined): void {
@@ -174,20 +249,24 @@ function handleDownloadProgress(id: string, next: DownloadProgressValue | undefi
     return;
   }
   // 结束事件不说明成败；不是本页发起的下载需要重新读取已下载列表。
-  const external = observedDownloads.value.includes(model) && !downloading.value.includes(model);
+  const external = observedDownloads.value.includes(model) && !downloading.value.includes(model) && !migrating.value.includes(model);
   observedDownloads.value = observedDownloads.value.filter(item => item !== model);
   if (external) void refresh();
 }
 
 async function refresh(force = false): Promise<void> {
   const current = capture();
-  if (!current() || props.config.videoTranscriptionProvider === 'native-qwen' || !force && (downloading.value.length || removing.value.length)) return;
+  if (!current() || props.config.videoTranscriptionProvider === 'native-qwen' || !force && (downloading.value.length || migrating.value.length || removing.value.length)) return;
   const request = ++modelGeneration;
   try {
-    const response = await browser.runtime.sendMessage({type: VIDEO_LOCAL_TRANSCRIPTION_STATE_MESSAGE}) as {success?: boolean; models?: unknown} | undefined;
+    const response = await browser.runtime.sendMessage({type: VIDEO_LOCAL_TRANSCRIPTION_STATE_MESSAGE}) as {success?: boolean; models?: unknown; localModels?: unknown; sharedModels?: unknown} | undefined;
     if (!current() || request !== modelGeneration) return;
     if (response?.success !== true || !Array.isArray(response.models)) throw new Error('无法读取模型缓存，请重试');
     downloaded.value = normalizeVideoLocalTranscriptionModels(response.models);
+    sharedModels.value = normalizeVideoLocalTranscriptionModels(response.sharedModels);
+    localModels.value = Array.isArray(response.localModels)
+      ? normalizeVideoLocalTranscriptionModels(response.localModels)
+      : downloaded.value.filter(model => !sharedModels.value.includes(model));
     modelReadError.value = '';
   } catch {
     if (current() && request === modelGeneration) {
@@ -215,10 +294,12 @@ async function download(model: VideoLocalTranscriptionModel, current = capture()
     const response = await browser.runtime.sendMessage({type: 'fluentReadPrepareLocalVideoModel', model, preference: 'auto'}) as {success?: boolean; models?: unknown; error?: string} | undefined;
     if (!current()) return;
     if (!response?.success) throw new Error(response?.error || '模型下载失败');
-  } catch {
+  } catch (error) {
     if (current()) {
       failedDownloads.value = [...failedDownloads.value, model];
-      downloadError.value = translateLegacy('模型下载失败，请检查网络后重试');
+      const permissionError = '共享模型目录需要重新授权，请在本地 AI 字幕设置中重新选择同一文件夹';
+      downloadError.value = translateLegacy(error instanceof Error && error.message === permissionError
+        ? permissionError : '模型下载失败，请检查网络后重试');
     }
   } finally {
     pendingDownloads.value.delete(model);
@@ -228,6 +309,63 @@ async function download(model: VideoLocalTranscriptionModel, current = capture()
     }
     // 命令结算后新视图独立重读权威状态，不移交旧回包或错误。
     if (active.value) await refresh();
+  }
+}
+
+async function moveToShared(model: VideoLocalTranscriptionModel, current = capture()): Promise<void> {
+  if (!current() || !localModels.value.includes(model) || !sharedDirectory.value.configured
+    || sharedDirectory.value.write !== 'granted' || migrating.value.includes(model)) return;
+  downloadError.value = '';
+  migrating.value = [...migrating.value, model];
+  progress.value = {...progress.value, [model]: undefined};
+  try {
+    const response = await browser.runtime.sendMessage({type: 'fluentReadMoveLocalVideoModelToShared', model}) as {success?: boolean; error?: string} | undefined;
+    if (!current()) return;
+    if (!response?.success) throw new Error(response?.error || '模型迁移失败，请重试');
+  } catch (error) {
+    if (current()) downloadError.value = error instanceof Error ? translateLegacy(error.message) : translateLegacy('模型迁移失败，请重试');
+  } finally {
+    if (current()) {
+      migrating.value = migrating.value.filter(item => item !== model);
+      await refresh();
+    }
+  }
+}
+
+async function chooseSharedDirectory(current = capture()): Promise<void> {
+  if (!current() || sharedActionsBusy.value) return;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = true;
+  sharedDirectoryError.value = '';
+  downloadError.value = '';
+  try {
+    const status = await chooseSharedVideoAiDirectory();
+    if (current()) {sharedDirectory.value = status; await refresh(true);}
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return;
+    if (current()) sharedDirectoryError.value = error instanceof Error
+      ? translateLegacy(error.message)
+      : translateLegacy('无法打开共享模型目录，请重试');
+  } finally {
+    if (current()) sharedDirectoryBusy.value = false;
+  }
+}
+
+async function disconnectSharedDirectory(current = capture()): Promise<void> {
+  if (!current() || sharedActionsBusy.value || !sharedDirectory.value.configured) return;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = true;
+  sharedDirectoryError.value = '';
+  try {
+    await disconnectSharedVideoAiDirectory();
+    const status = await getSharedVideoAiDirectoryStatus();
+    if (current()) {sharedDirectory.value = status; await refresh(true);}
+  } catch (error) {
+    if (current()) sharedDirectoryError.value = error instanceof Error
+      ? translateLegacy(error.message)
+      : translateLegacy('无法断开共享模型目录，请重试');
+  } finally {
+    if (current()) sharedDirectoryBusy.value = false;
   }
 }
 
@@ -286,12 +424,15 @@ watch(() => [mounted.value, revision.value], () => {
   stopObserving = undefined;
   modelGeneration++;
   cacheGeneration++;
+  directoryGeneration++;
+  sharedDirectoryBusy.value = false;
   downloading.value = [];
   removing.value = [];
   observedDownloads.value = [];
   progress.value = {};
   downloadError.value = '';
   failedDownloads.value = [];
+  migrating.value = [];
   modelReadError.value = '';
   modelStateLoaded.value = false;
   clearingCache.value = false;
@@ -305,6 +446,7 @@ watch(() => [mounted.value, revision.value], () => {
   const refreshVisibleCacheStats = () => {
     if (current() && !clearingCache.value && document.visibilityState !== 'hidden') {
       void refresh();
+      void refreshSharedDirectory();
       void refreshCacheStats();
     }
   };
@@ -321,6 +463,7 @@ watch(() => [mounted.value, revision.value], () => {
     window.removeEventListener('focus', refreshVisibleCacheStats);
   };
   void refresh(true);
+  void refreshSharedDirectory();
   void refreshCacheStats();
 }, {flush: 'sync'});
 onMounted(() => {mounted.value = true;});
@@ -367,12 +510,16 @@ svg { width: 15px; height: 15px; flex: none; }
 .video-model-remove { width: 32px; padding: 0; border-color: transparent; color: var(--muted); background: transparent; }
 .video-model-error, .capability-warning { margin: 0; color: var(--el-color-danger); font-size: 12px; line-height: 1.55; }
 .video-ai-cache-panel { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 16px 20px; border-top: 1px solid var(--line); }
+.video-ai-shared-model-panel { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 16px 20px; border-top: 1px solid var(--line); }
+.video-ai-shared-model-copy { display: grid; gap: 6px; min-width: 0; flex: 1 1 240px; }
+.video-ai-shared-model-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.video-ai-shared-model-copy p { margin: 0; }
 .video-ai-cache-copy { display: grid; gap: 6px; min-width: 0; flex: 1 1 200px; }
 .video-ai-cache-heading { flex-wrap: wrap; gap: 6px; }
 .video-ai-cache-status { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .is-loading { animation: video-model-spin 1s linear infinite; }
 @keyframes video-model-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .is-loading { animation: none; } .video-model-card, .video-model-download-button { transition: none; } }
-@media (max-width: 700px) { .video-model-management { padding: 16px 12px; } .video-ai-cache-panel { padding: 14px 12px; } }
+@media (max-width: 700px) { .video-model-management { padding: 16px 12px; } .video-ai-cache-panel, .video-ai-shared-model-panel { padding: 14px 12px; } }
 @media (max-width: 480px) { .video-model-card { padding: 14px; } }
 </style>

@@ -251,7 +251,7 @@ describe('known local inference wire contracts', () => {
         const listener = createBackgroundRuntimeMessageListener(router, () => ({sender: {tab: {id: 7}}}));
         const send = (message: unknown) => listener(message, {});
         const identity = {streamId: 'content-stream', generation: 1, model: 'tiny'};
-        await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadGetLocalVideoModelState'})).resolves.toEqual({success: true, models: [], available: {tiny: false, base: false, small: false}});
+        await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadGetLocalVideoModelState'})).resolves.toEqual({success: true, models: [], localModels: [], sharedModels: [], available: {tiny: false, base: false, small: false}});
         await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadPrepareLocalVideoModel', ...identity, keepWarm: true})).resolves.toMatchObject({success: true, model: 'tiny', models: ['tiny']});
         await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadTranscribeLocalVideoAudio', ...identity, audioPcm16Base64: 'AAAA'})).resolves.toMatchObject({success: true, text: 'spoken'});
         await expect(sendVideoSubtitleRequest(send, {type: 'fluentReadCancelLocalVideoTranscription', ...identity})).resolves.toEqual({success: true});

@@ -1,4 +1,5 @@
 import {siteRuleTextRows} from '@/src/core/i18n/messages/siteRules';
+import {translateSharedVideoModelText} from '@/src/features/settings/model/sharedVideoModelText';
 import {readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {describe, expect, it} from 'vitest';
@@ -1041,8 +1042,13 @@ describe('i18n 全量界面扫描', () => {
       if (examples.has(source)) continue;
       if (source === '今日はいい天気ですね。' && files.length === 1 && files[0] === readingPreviewFile) continue;
       for (const locale of ['en-US', 'ko-KR', 'fr-FR', 'ru-RU', 'es-ES'] as const) {
-        const result = translateLegacyText(source, locale);
-        if (/[\u3400-\u9fff]/u.test(result)) missing.push(`${locale} ${files.join(', ')}: ${source}`);
+        for (const file of files) {
+          // 共享目录文案只由扩展设置加载，按该组件实际使用的本地词典与公共回退共同验收。
+          const local = file === 'src/features/settings/ui/VideoLocalModelSettings.vue'
+            ? translateSharedVideoModelText(source, locale) : undefined;
+          const result = local ?? translateLegacyText(source, locale);
+          if (/[\u3400-\u9fff]/u.test(result)) missing.push(`${locale} ${file}: ${source}`);
+        }
       }
     }
     expect(audit.files.length).toBeGreaterThan(50);

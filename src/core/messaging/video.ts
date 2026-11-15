@@ -98,13 +98,20 @@ export interface VideoBackgroundRequestMap {
     fluentReadCancelLocalVideoTranscription: {streamId: string; generation: number; reason?: string};
     fluentReadGetLocalVideoModelState: object;
     fluentReadRemoveLocalVideoModel: {model: VideoTranscriptionModel};
+    fluentReadMoveLocalVideoModelToShared: {model: VideoTranscriptionModel};
 }
 export interface VideoBackgroundResponseMap {
     fluentReadTranscribeLocalVideoAudio: InferenceResponse<VideoTranscriptionResult>;
     fluentReadPrepareLocalVideoModel: InferenceResponse<VideoBackgroundPreparationResult>;
     fluentReadCancelLocalVideoTranscription: InferenceResponse;
-    fluentReadGetLocalVideoModelState: InferenceResponse<{models: VideoTranscriptionModel[]; available: {tiny: boolean; base: boolean; small: boolean}}>;
+    fluentReadGetLocalVideoModelState: InferenceResponse<{
+        models: VideoTranscriptionModel[];
+        localModels?: VideoTranscriptionModel[];
+        sharedModels?: VideoTranscriptionModel[];
+        available: {tiny: boolean; base: boolean; small: boolean};
+    }>;
     fluentReadRemoveLocalVideoModel: InferenceResponse<{models: VideoTranscriptionModel[]}>;
+    fluentReadMoveLocalVideoModelToShared: InferenceResponse<{models: VideoTranscriptionModel[]}>;
 }
 export type VideoBackgroundRequestType = keyof VideoBackgroundRequestMap;
 export type VideoBackgroundRequest<K extends VideoBackgroundRequestType = VideoBackgroundRequestType> = {[T in K]: {type: T} & VideoBackgroundRequestMap[T]}[K];
@@ -116,8 +123,14 @@ const videoResponses: {[K in VideoBackgroundRequestType]: Validator<VideoBackgro
             models: (item): item is undefined => item === undefined, backend: (item): item is undefined => item === undefined,
             gpuInfo: (item): item is undefined => item === undefined, threads: (item): item is undefined => item === undefined, dtype: (item): item is undefined => item === undefined})(value)),
     fluentReadCancelLocalVideoTranscription: response(shape<object>({})),
-    fluentReadGetLocalVideoModelState: response(shape<{models: VideoTranscriptionModel[]; available: {tiny: boolean; base: boolean; small: boolean}}>({models: arrayOf(videoModel), available: shape({tiny: isBoolean, base: isBoolean, small: isBoolean})})),
+    fluentReadGetLocalVideoModelState: response(shape<{
+        models: VideoTranscriptionModel[];
+        localModels?: VideoTranscriptionModel[];
+        sharedModels?: VideoTranscriptionModel[];
+        available: {tiny: boolean; base: boolean; small: boolean};
+    }>({models: arrayOf(videoModel), localModels: optional(arrayOf(videoModel)), sharedModels: optional(arrayOf(videoModel)), available: shape({tiny: isBoolean, base: isBoolean, small: isBoolean})})),
     fluentReadRemoveLocalVideoModel: response(shape<{models: VideoTranscriptionModel[]}>({models: arrayOf(videoModel)})),
+    fluentReadMoveLocalVideoModelToShared: response(shape<{models: VideoTranscriptionModel[]}>({models: arrayOf(videoModel)})),
 };
 export function parseVideoBackgroundResponse<K extends VideoBackgroundRequestType>(type: K, value: unknown): VideoBackgroundResponseMap[K] {
     return parseMessage(value, videoResponses[type], `视频 ${type}响应`);

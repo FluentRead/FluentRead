@@ -12,32 +12,29 @@ import {lookupWord} from '@/src/features/selection-translation/services/wordDict
 import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from '@/src/features/selection-translation/background/pageZoomHandler';
 import {synthesizeEdgeTts} from '@/src/features/selection-translation/services/edgeTts';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
-import {createBrowserMaterialHandler, type MaterialBackgroundContext} from './handlers/vocabulary';
+import {createBrowserMaterialHandler} from './handlers/vocabulary';
 import {clearTranslationCache, getTranslationCacheStats, translateWithCache} from '@/src/app/translation/runtime';
 import {serializeTranslationError} from '@/src/services/translation/errors';
 import {createBackgroundMessageRouter, createBackgroundRuntimeMessageListener, type BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
-import {type AreaTranslationBackgroundContext} from './handlers/areaTranslation';
 import {createAreaTranslationRuntime} from './areaRuntime';
 import {createTranslationCacheHandlers, createTranslationCacheInvalidationBroadcaster} from './handlers/translationCache';
-import {type ConfigPersistenceContext} from './handlers/configPersistence';
 import {
     createFullPageTranslationStateHandlers, createQqMailFrameBackgroundHandlers,
-    type FullPageBackgroundContext, type QQMailFrameBackgroundContext,
 } from './handlers/fullPageTranslationState';
-import {createNeteaseMailFrameBackgroundHandlers, type NeteaseMailFrameBackgroundContext} from '@/src/features/full-page-translation/background/neteaseMailFrameHandlers';
+import {createNeteaseMailFrameBackgroundHandlers} from '@/src/features/full-page-translation/background/neteaseMailFrameHandlers';
 import {createImageOcrLanguageRepository} from './handlers/imageTranslation';
 import {createImageTranslationRuntime} from './imageTranslationRuntime';
 import {createInputBoxTranslationHandler} from './handlers/inputTranslation';
 import {createLocalInsightsHandlers} from './localInsightsHandlers';
 import {createFreeTranslationWeightsHandler} from './handlers/freeTranslationWeights';
-import {createPopupNavigationHandlers, type PopupContext} from './popupNavigation';
+import {createPopupNavigationHandlers} from './popupNavigation';
 import {createDownloadProgressHandler, createDownloadProgressQueryHandler} from './handlers/downloadProgress';
 import {createTranslationCancelHandler, createTranslationRequestFallback, createTranslationRequestRegistry} from './handlers/translation';
-import {createSelectionTtsBackgroundHandlers, type SelectionTtsContext} from './handlers/selectionTts';
+import {createSelectionTtsBackgroundHandlers} from './handlers/selectionTts';
 import {createSelectionWordLookupHandler} from './handlers/selectionWordLookup';
-import {isBrowserTabId, type TabTranslationStateStore} from './tabTranslationState';
-import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers, type VocabularyBackgroundContext} from './handlers/vocabulary';
-import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/browser/capabilities';
+import {isBrowserTabId} from './tabTranslationState';
+import {createBrowserVocabularyBookChangedBroadcaster, createBrowserVocabularyUndoOptions, createVocabularyBackgroundHandlers} from './handlers/vocabulary';
+import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {installExtensionPageMessageListener, type ExtensionPageMessageTarget} from '@/src/platform/offscreen/extensionPageMessaging';
 import {selectionTtsOffscreenAdapter} from '@/src/features/selection-translation/background/offscreenAdapter';
 import {createCapabilityGatedBackgroundHandlers, createCapabilityGatedSelectionTtsTransport} from './capabilityRegistry';
@@ -52,17 +49,11 @@ import {installWritingBackgroundRuntime} from './writingRuntime';
 import {installHarnessBackgroundRuntime} from './harnessRuntime';
 import {installMaterialRuntimes} from './materialRuntimes';
 import {createImageGlossaryContext} from './imageGlossaryContext';
-import {createEmbeddedFrameBackgroundHandlers, type EmbeddedFrameBackgroundContext} from '@/src/features/full-page-translation/background/embeddedFrameHandlers';
+import {createEmbeddedFrameBackgroundHandlers} from '@/src/features/full-page-translation/background/embeddedFrameHandlers';
 import {createDocumentNavigationHandlers} from './documentNavigation';
 import {buildGlossaryRevision} from '@/src/core/glossary';
-type BackgroundRuntimeContext = QQMailFrameBackgroundContext & NeteaseMailFrameBackgroundContext
-    & EmbeddedFrameBackgroundContext & ConfigPersistenceContext & VocabularyBackgroundContext & SelectionTtsContext
-    & FullPageBackgroundContext & AreaTranslationBackgroundContext & PopupContext & MaterialBackgroundContext;
-export interface BackgroundMessageRuntimeOptions {
-    tabTranslationStates: TabTranslationStateStore;
-    onFullPageStateChanged(tabId: number): void;
-    capabilities?: BrowserCapabilities;
-}
+import type {BackgroundRuntimeContext, BackgroundMessageRuntimeOptions} from './messageRuntimeTypes';
+export type {BackgroundMessageRuntimeOptions} from './messageRuntimeTypes';
 export function installBackgroundMessageRuntime(options: BackgroundMessageRuntimeOptions): void {
     installMaterialRuntimes(configReady);
     const cancelWriting = installWritingBackgroundRuntime();

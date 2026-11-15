@@ -407,10 +407,14 @@ export default defineConfig({
             // 深色底紧裁空格复核实测：Chrome 从68,501,871增至68,503,598bytes，Firefox 从68,122,872增至68,124,597bytes。
             // 增量仅为既有OCR worker算法与共享限额常量；利用余量后各追加1kB，无新增模型、依赖或Canvas读回。
             const productionBudget = browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000;
+            // 对照 f0daab6d1：学习卡浮动/调高与文档导入布局使 Chrome 从68,503,659增至68,519,417bytes，
+            // Firefox 从68,124,625增至68,139,808bytes，分别增加15,758/15,183bytes；仅代码、样式和七语文案变化。
+            // WASM、模型和其他非代码资源逐文件摘要不变，仅为这组已实测的布局功能各增加16kB预算。
+            const learningCardAndDocumentLayoutBudget = 16_000;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + learningCardAndDocumentLayoutBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -38,6 +38,8 @@ const bytes = Buffer.byteLength(source);
 // Current local-main locale corrections, with eight obsolete rows removed, add 3,742 bytes to
 // the 1963a380f release candidate (3,688,936 → 3,692,678); use the existing headroom first.
 // Add only the remaining rounded 3 kB for text; dependencies, model assets and compact-build limits stay unchanged.
-const maxBytes = 3_693_000;
+// Integrating #1353 adds 751 bytes (3,692,678 → 3,693,429) with no new dependency or model asset.
+// Use the existing 322-byte headroom, then add only the remaining rounded 1 kB.
+const maxBytes = 3_694_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

@@ -426,7 +426,10 @@ export default defineConfig({
             // 合入本地主线有效旧界面译文后，Chrome 68,564,682 → 68,567,508 bytes（+2,826）。
             // 仅六份 i18n JSON 改变，552 份其余产物摘要相同；沿用余量后 Chrome/Edge 仅补1kB。
             const legacyTranslationTextBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget));
+            // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
+            // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
+            const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

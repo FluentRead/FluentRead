@@ -59,6 +59,8 @@ Use **Subtitle options → Recognition model / Regenerate this video** to change
 
 Manage Whisper models under **Video translation settings → Local AI subtitles**. The first download requires a connection. Retry failed downloads to reuse complete files and fill missing ones. Clearing browser caches can require downloading again. A recognition failure removes incomplete previews, while a translation failure preserves the recognized source.
 
+Browsers that support the File System Access API can also enable **Share models across browsers**. Select and authorize the same folder in each browser; models are stored in its `FluentRead/whisper` subfolder. Existing models can be moved there. Disconnecting does not delete shared files. Browser-local extension caches remain available.
+
 ### Use Local Qwen3 ASR
 
 If you have vLLM with support for this model, run the command below to start a local service. It must serve the fixed model `Qwen/Qwen3-ASR-1.7B` at `POST /v1/audio/transcriptions` without credentials. [vLLM model recipe](https://github.com/vllm-project/recipes/blob/main/models/Qwen/Qwen3-ASR-1.7B.yaml)

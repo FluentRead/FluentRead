@@ -4,6 +4,25 @@ import {OPENAI_ERROR_BODY_LIMIT} from '@/src/providers/translation/ai-sdk/bounde
 import {DOUBAO_GUEST_HEADER} from '@/src/platform/http/doubaoGuest';
 
 describe('userscript HTTP transport', () => {
+    it('merges RequestInit headers into a GM Request without mutating the original request', async () => {
+        let received: UserscriptXmlHttpRequestDetails | undefined;
+        globalThis.GM_xmlhttpRequest = details => {received = details; queueMicrotask(() => details.onload?.({status: 200, responseText: 'ok'})); return {abort() {}};};
+        const request = new Request('https://api.example.test/headers', {headers: {'x-original': 'keep', 'x-replaced': 'old'}});
+        expect(await (await userscriptFetch(request, {headers: new Headers({'x-replaced': 'new', 'x-added': 'added'})})).text()).toBe('ok');
+        expect(received?.headers).toMatchObject({'x-original': 'keep', 'x-replaced': 'new', 'x-added': 'added'});
+        expect(request.headers.get('x-replaced')).toBe('old'); expect(request.headers.has('x-added')).toBe(false);
+    });
+    it('keeps upload cancellation authoritative when the shared underlying stream rejects cancellation', async () => {
+        const failure = new Error('source cancellation failed'), cancel = vi.fn().mockRejectedValue(failure);
+        const body = new ReadableStream<Uint8Array>({start(controller) {controller.enqueue(new Uint8Array([1]));}, cancel});
+        const request = new Request('https://api.example.test/cancel-body', {method: 'POST', body, duplex: 'half'} as RequestInit), controller = new AbortController();
+        const dispatch = vi.fn(); globalThis.GM_xmlhttpRequest = dispatch;
+        const pending = userscriptFetch(request, {signal: controller.signal});
+        const rejected = expect(pending).rejects.toMatchObject({name: 'AbortError'});
+        await new Promise(resolve => setTimeout(resolve, 0)); controller.abort(); await rejected;
+        await expect(request.body!.cancel()).rejects.toBe(failure); await Promise.resolve();
+        expect(cancel).toHaveBeenCalledOnce(); expect(dispatch).not.toHaveBeenCalled();
+    });
     afterEach(() => {
         globalThis.GM_xmlhttpRequest = undefined;
         globalThis.GM = undefined;

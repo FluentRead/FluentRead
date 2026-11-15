@@ -155,24 +155,31 @@ describe('full page modal priority', () => {
         expect(findActiveTranslationModal([b, a])).toBe(a);
     });
 
-    it('uses the first page hit for sibling native modals even when DOM order differs', () => {
+    it.each([false,true])('uses the first page hit for sibling native modals with first-hit=%s', firstHit => {
         const window = dom('<html><body><dialog id="first"><p>a</p></dialog><dialog id="second"><p>b</p></dialog></body></html>');
         const first = window.document.querySelector('#first') as HTMLDialogElement;
         const second = window.document.querySelector('#second') as HTMLDialogElement;
         first.open = true; second.open = true; rect(first); rect(second);
         const nativeMatches = (selector: string) => selector.includes(':modal') || selector.includes('dialog');
         Object.defineProperty(first, 'matches', {value: nativeMatches}); Object.defineProperty(second, 'matches', {value: nativeMatches});
-        Object.defineProperty(window.document, 'elementsFromPoint', {configurable: true, value: () => [second, first]});
-        expect(findActiveTranslationModal([window.document])).toBe(second);
+        Object.defineProperty(window.document, 'elementsFromPoint', {configurable: true, value: () => firstHit?[first,second]:[second, first]});
+        expect(findActiveTranslationModal([window.document])).toBe(firstHit?first:second);
     });
 
-    it('promotes a native modal over an aria modal regardless of DOM order', () => {
+    it.each([false,true])('promotes a native modal over an aria modal with native-first=%s', nativeFirst => {
         const window = dom('<html><body><div id="aria" role="dialog" aria-modal="true">a</div><dialog id="native"><p>b</p></dialog></body></html>');
         const aria = window.document.querySelector('#aria') as HTMLElement;
         const native = window.document.querySelector('#native') as HTMLDialogElement;
         rect(aria); rect(native); native.open = true;
         Object.defineProperty(native, 'matches', {value: (selector: string) => selector.includes(':modal') || selector.includes('dialog')});
+        if(nativeFirst)window.document.body.prepend(native);
         expect(findActiveTranslationModal([window.document])).toBe(native);
+    });
+    it.each([[500,800],[1000,300]])('does not treat a positioned %i by %i sibling as a viewport-blocking mask', (width,height) => {
+        const window=dom('<html><body><div class="el-dialog" id="dialog">Body</div><div class="el-overlay" id="mask"></div></body></html>');
+        const dialog=window.document.getElementById('dialog') as HTMLElement,mask=window.document.getElementById('mask') as HTMLElement;
+        dialog.style.position='fixed';mask.style.position='fixed';rect(dialog);rect(mask,0,0,width,height);
+        expect(findActiveTranslationModal([window.document])).toBeNull();
     });
 
     it('recognizes alertdialog and keeps hidden ancestors out of the result', () => {

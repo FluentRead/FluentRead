@@ -62,6 +62,12 @@ afterEach(async () => {
     Reflect.deleteProperty(dom.window, 'visualViewport');
 });
 describe('写作入口真实组件生命周期', () => {
+    it('saves the site exclusion through the shared configuration message transport', async () => {
+        ports.patch.mockImplementationOnce(async (_patch,send)=>{await send({type:'persistConfig',fixture:'site-exclusion'});});
+        const state=mount();await state.saveEntrySetting('site');
+        expect(ports.patch).toHaveBeenCalledWith({writing:{enabled:true,disabledDomains:['github.com']}},expect.any(Function));
+        expect(ports.send).toHaveBeenCalledWith({type:'persistConfig',fixture:'site-exclusion'});expect(state.menuError).toBe('');
+    });
     it('整 body 替换后自动恢复原生操作行入口，后续编辑器变化仍被观察且不重复创建', async () => {
         mount(); expect(entries()).toHaveLength(1);
         const previous = entries()[0];

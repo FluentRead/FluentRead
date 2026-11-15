@@ -99,6 +99,12 @@ beforeEach(() => {
 });
 
 describe('Obsidian plugin job ownership', () => {
+    it('does not display a late translation failure after the plugin unloads', async () => {
+        const {plugin,file,create}=fixture(),translation=deferred<string[]>();state.translator.mockReturnValueOnce(translation.promise);
+        await plugin.onload();const work=plugin.translateFile(file);await vi.waitFor(()=>expect(state.translator).toHaveBeenCalledOnce());
+        plugin.onunload();const count=state.notices.length;translation.reject(new Error('native translation channel closed'));await work;
+        expect(state.notices).toHaveLength(count);expect(create).not.toHaveBeenCalled();
+    });
     it('cleans up a renamed job and prevents a second request for the same moved file', async () => {
         const {plugin, file, entries, create} = fixture();
         const pendingTranslation = deferred<string[]>();
@@ -371,6 +377,17 @@ describe('Obsidian plugin job ownership', () => {
 });
 
 describe('Obsidian plugin commands, menus and settings', () => {
+    it.each([0, 1])('handles a rejected native settings write from dropdown %i and allows the next save', async index => {
+        const {plugin} = fixture(); await plugin.onload();
+        vi.mocked(plugin.addSettingTab).mock.calls[0][0].display();
+        vi.mocked(plugin.saveData).mockRejectedValueOnce(new Error('native settings disk full'));
+        state.dropdowns[index].changed!('fr');
+        await vi.waitFor(() => expect(state.notices.at(-1)?.message).toContain('native settings disk full'));
+        state.dropdowns[index].changed!('de');
+        await vi.waitFor(() => expect(plugin.saveData).toHaveBeenCalledTimes(2));
+        expect(plugin.settings[index === 0 ? 'sourceLanguage' : 'targetLanguage']).toBe('de');
+        plugin.onunload();
+    });
     it('loads validated settings and exposes palette checks without starting work', async () => {
         const {plugin, file, workspace} = fixture();
         vi.mocked(plugin.loadData).mockResolvedValue({sourceLanguage: 'fr', targetLanguage: 'de'});

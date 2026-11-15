@@ -2772,6 +2772,20 @@ async function waitForHoverPointer(page, targetConfig, timeout, prepareClickText
     preparation: {text: prepareClickText || '', clicked: prepared}})}`);
 }
 
+async function leaveEditingFocusForHover(page) {
+  for (let step = 0; step <= 8; step += 1) {
+    const editing = await page.evaluate(() => {
+      let active = document.activeElement;
+      while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+      return Boolean(active?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]'));
+    });
+    if (editing !== true) return step;
+    if (step === 8) throw new Error('悬浮测试准备失败：原生 Tab 导航后焦点仍在编辑区');
+    assertPageFocusAllowed(page);
+    await page.keyboard.press('Tab');
+  }
+}
+
 async function toggleHover(page, target, targetConfig, expectedCount, timeout, attempt, prepareClickText) {
   const {selector, index} = targetConfig;
   assertPageFocusAllowed(page); await target.scrollIntoViewIfNeeded();
@@ -2799,6 +2813,8 @@ async function toggleHover(page, target, targetConfig, expectedCount, timeout, a
   });
   // 还原译文会改变布局，宿主也可能继续滚动或播放入场动画。固定等待后取外框
   // 坐标会落到空白容器；按键前等待真实原文行稳定并保持命中，按键只发送一次。
+  // 有些站点自动聚焦搜索框。真实读者先离开输入区；只用原生 Tab 导航，保留产品的输入保护。
+  await leaveEditingFocusForHover(page);
   const point = await waitForHoverPointer(page, targetConfig, timeout, prepareClickText);
   const {x, y} = point;
   assertPageFocusAllowed(page); await page.keyboard.down('Control');
@@ -4170,6 +4186,7 @@ module.exports = {
   beginCoverageCompletionPass,
   verifyCoverageUnchanged,
   isNaturalLanguageText,
+  leaveEditingFocusForHover,
   newestFile,
   reconcileForbiddenContractState,
   findHoverTextPointInPage,

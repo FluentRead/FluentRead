@@ -269,6 +269,15 @@ async function loadLocalTtsOwner(overrides: Partial<Pick<typeof import('@/src/fe
 }
 
 describe('local TTS offscreen worker owner', () => {
+    it.each(['live','cancelled'] as const)('consumes a rejected cache lookup for a %s request without constructing a worker', async state => {
+        let reject!:(error:Error)=>void;const cache=vi.fn(()=>new Promise<boolean>((_,no)=>{reject=no;}));
+        const owner=await loadLocalTtsOwner({isLocalTtsModelCached:cache}),controller=new AbortController();
+        const result=owner.synthesizeLocalTts('hello','en','auto',controller.signal);
+        const failed=expect(result).rejects.toMatchObject(state==='cancelled'?{name:'AbortError'}:{message:'cache service unavailable'});
+        await vi.waitFor(()=>expect(cache).toHaveBeenCalledOnce());
+        if(state==='cancelled')controller.abort();reject(new Error('cache service unavailable'));await failed;
+        expect(LocalTtsOwnerFakeWorker.instances).toHaveLength(0);
+    });
     afterEach(() => {
         for (const owner of ownedLocalTtsModules) owner.disposeLocalTtsWorker();
         ownedLocalTtsModules.clear();

@@ -174,6 +174,18 @@ afterEach(() => {
 });
 
 describe('input translation content feature', () => {
+    it('keeps a new user draft when the background cancellation notification rejects', async () => {
+        let release!:(value:unknown)=>void;
+        const harness=mountHarness({sendMessage:()=>new Promise(resolve=>{release=resolve;})});
+        harness.sendMessage.mockImplementationOnce(()=>new Promise(resolve=>{release=resolve;})).mockRejectedValueOnce(new Error('background channel closed'));
+        const input=fakeElement('textarea');input.value='Original draft';harness.fakeDocument.activeElement=input;
+        const work=harness.fakeDocument.emit('keydown',trustedKey({key:'Enter',ctrlKey:true}));
+        await vi.waitFor(()=>expect(harness.sendMessage).toHaveBeenCalledOnce());
+        input.value='Updated draft';harness.controller.abort();await work;
+        release({success:true,translatedText:'迟到译文'});await Promise.resolve();await Promise.resolve();
+        expect(input.value).toBe('Updated draft');expect(harness.logger.error).not.toHaveBeenCalled();
+        expect(harness.sendMessage.mock.calls[1][0]).toEqual({type:'fluentReadTranslationCancel',clientRequestId:harness.sendMessage.mock.calls[0][0].clientRequestId});
+    });
     it('含 AI 的输入组合沿用独立预算，AI 默认变更不作废组合事务，超时仍发送精确取消', async () => {
         vi.useFakeTimers();
         const config = new Config();

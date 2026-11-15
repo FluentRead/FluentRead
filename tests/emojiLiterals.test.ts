@@ -11,6 +11,12 @@ afterEach(() => vi.unstubAllGlobals());
 const symbols = ['🚚', '👩🏽‍🔬', '🇫🇷', '1️⃣', '#️⃣', '♥️', '✋🏿', '©︎', '🏴\u{E0067}\u{E0062}\u{E007F}'];
 
 describe('complete translation emoji literals', () => {
+    it('does not protect a prepend sign that an older native Unicode segmenter treats as a separate grapheme', () => {
+        vi.stubGlobal('Intl',Object.create(Intl,{Segmenter:{value:class {
+            segment(){return [{index:0,segment:'\u{113D1}'},{index:2,segment:'😀'}];}
+        }}}));
+        expect(findEmojiLiteralRanges('\u{113D1}😀')).toEqual([{start:2,end:4}]);
+    });
     it('avoids native segmenter construction for complete single-codepoint emoji and shares one within a complex scan', () => {
         const NativeSegmenter = Intl.Segmenter;
         const construct = vi.fn(function(...args: ConstructorParameters<typeof Intl.Segmenter>) {

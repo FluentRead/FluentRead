@@ -49,6 +49,26 @@ beforeEach(() => {vi.useFakeTimers(); ports.config.uiLanguage = 'zh-CN'; ports.r
 afterEach(() => {dispose.splice(0).forEach(stop => stop()); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('材料来源与继续阅读', () => {
+    it('keeps a saved locator recoverable when the paragraph scanning port rejects', async () => {
+        const {document}=dom('<p>unique original sentence</p>');ports.resolve.mockResolvedValue(record());
+        const scan=vi.spyOn(paragraphScanner,'scanMaterialParagraphs').mockRejectedValueOnce(new Error('layout projection unavailable'));
+        dispose.push(mountMaterialContent(document,new AbortController().signal,()=>true));await tick();
+        expect(scan).toHaveBeenCalledOnce();expect(document.querySelector('p')!.scrollIntoView).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(8000);expect(document.body.textContent).toContain('暂时未能确认原文位置');
+        expect(ports.capture).not.toHaveBeenCalled();
+    });
+    it('does not overwrite the saved reading position after a failed viewport scan and retries on later reading input', async () => {
+        const {document,window}=dom('<p>Current viewport original paragraph.</p>');ports.resolve.mockResolvedValue(record({locator:undefined}));
+        const scan=vi.spyOn(paragraphScanner,'scanMaterialParagraphs').mockImplementationOnce(async(_doc,_request,options)=>{
+            expect(options?.isCurrent?.()).toBe(true);throw new Error('viewport projection unavailable');
+        });
+        dispose.push(mountMaterialContent(document,new AbortController().signal,()=>true));await tick();
+        readingInput(document,window);document.dispatchEvent(new window.Event('scroll'));await vi.advanceTimersByTimeAsync(1201);
+        expect(scan).toHaveBeenCalledOnce();expect(ports.capture).not.toHaveBeenCalled();
+        scan.mockResolvedValueOnce({status:'matched',locator:{kind:'text',quote:'Current viewport original paragraph.'},metrics:{} as never});
+        readingInput(document,window);document.dispatchEvent(new window.Event('scroll'));await vi.advanceTimersByTimeAsync(1201);
+        expect(ports.capture).toHaveBeenCalledWith(expect.objectContaining({positionOnly:true,locator:{kind:'text',quote:'Current viewport original paragraph.'}}));
+    });
     it('空来源、文件页与缺少公共文档地址均提供恢复操作', () => {
         expect(materialResumeLink(record({source: {kind: 'article'}})).href).toBeUndefined();
         expect(materialResumeLink(record({source: {kind: 'article', url: 'file:///private/a.txt'}})).recovery).toContain('来源地址');

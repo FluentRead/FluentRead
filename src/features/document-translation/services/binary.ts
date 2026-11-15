@@ -1335,20 +1335,20 @@ async function renderPdf(
     // 光栅层已经承载真实字形；不可见层使用独立 ToUnicode 映射保全任何 Unicode，普通原版导出不必联网下载字体。
     // 这个 CID 字体只能用于 Invisible 模式；可见全文续页仍使用经过字形校验的真实开放字体。
     type SelectableFont = {font: ReturnType<typeof outputPdf.context.register>; unicode: ReturnType<typeof outputPdf.context.register>; descendant: ReturnType<typeof outputPdf.context.register>;
-        characters: Map<string, number>; names: WeakMap<ReturnType<typeof outputPdf.addPage>, ReturnType<ReturnType<typeof outputPdf.addPage>['node']['newFontDictionary']>>};
+        defaultWidth: number; characters: Map<string, number>; names: WeakMap<ReturnType<typeof outputPdf.addPage>, ReturnType<ReturnType<typeof outputPdf.addPage>['node']['newFontDictionary']>>};
     const selectableFonts = new Map<boolean, SelectableFont>();
     const fallbackText = (text: string, bidi = false) => {
         let resource = selectableFonts.get(bidi);
         if (!resource) {
-            const fontName = bidi ? 'FluentReadBidiSourceText' : 'FluentReadSourceText';
+            const fontName = bidi ? 'FluentReadBidiSourceText' : 'FluentReadSourceText', defaultWidth = bidi ? 500 : 1000;
             const unicode = outputPdf.context.register(outputPdf.context.flateStream(''));
             const descriptor = outputPdf.context.register(outputPdf.context.obj({Type: 'FontDescriptor', FontName: fontName,
                 Flags: 4, FontBBox: [0, -200, 1000, 900], ItalicAngle: 0, Ascent: 900, Descent: -200, CapHeight: 700, StemV: 80}));
             const descendant = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'CIDFontType2', BaseFont: fontName,
-                CIDSystemInfo: {Registry: PDFString.of('Adobe'), Ordering: PDFString.of('Identity'), Supplement: 0}, FontDescriptor: descriptor, CIDToGIDMap: 'Identity', DW: bidi ? 500 : 1000}));
+                CIDSystemInfo: {Registry: PDFString.of('Adobe'), Ordering: PDFString.of('Identity'), Supplement: 0}, FontDescriptor: descriptor, CIDToGIDMap: 'Identity', DW: defaultWidth}));
             const font = outputPdf.context.register(outputPdf.context.obj({Type: 'Font', Subtype: 'Type0', BaseFont: fontName,
                 Encoding: 'Identity-H', DescendantFonts: [descendant], ToUnicode: unicode}));
-            resource = {font, unicode, descendant, characters: new Map(), names: new WeakMap()}; selectableFonts.set(bidi, resource);
+            resource = {font, unicode, descendant, defaultWidth, characters: new Map(), names: new WeakMap()}; selectableFonts.set(bidi, resource);
         }
         let hex = '';
         // PDF.js 会过滤独立 Cf 字形；将连接符等格式字符与相邻字符放入同一个 CID，保全组合表情及文字语义。
@@ -1621,11 +1621,11 @@ async function renderPdf(
     options.signal?.throwIfAborted();
     outline.write();
     if (layoutPageLabels.length) outputPdf.catalog.set(PDFName.of('PageLabels'), outputPdf.context.obj({Nums: layoutPageLabels}));
-    for (const [bidi, {unicode, descendant, characters}] of selectableFonts) {
+    for (const [bidi, {unicode, descendant, defaultWidth, characters}] of selectableFonts) {
         // 合并 CID 仍使用原先每码点的 advance，避免修复复制文本时挪动搜索/选择的行几何。
         const widths = [...characters].flatMap(([character, code]) => {
             const length = Array.from(character).length;
-            return length > 1 ? [code, [(bidi ? 500 : 1000) * length]] : [];
+            return length > 1 ? [code, [defaultWidth * length]] : [];
         });
         if (widths.length) outputPdf.context.lookup(descendant, PDFDict).set(PDFName.of('W'), outputPdf.context.obj(widths));
         const pairs = [...characters].map(([character, code]) => `<${code.toString(16).padStart(4, '0')}> <${PDFHexString.fromText(character).asString().slice(4)}>`);

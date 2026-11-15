@@ -56,6 +56,21 @@ function waitingForPreviousCancellation(type: typeof ownedEntryTypes[number]) {
 }
 
 describe('video subtitle background ownership', () => {
+    it('recovers the model receipt queue after a storage write rejects', async () => {
+        const f=setup();f.storage.set.mockRejectedValueOnce(new Error('model receipt storage unavailable'));
+        const prepare=find(f.handlers,'fluentReadPrepareLocalVideoModel');
+        await expect(prepare.handle({model:'tiny'},context(1))).rejects.toThrow('model receipt storage unavailable');
+        await expect(prepare.handle({model:'base'},context(1))).resolves.toMatchObject({success:true,models:['base']});
+        expect(f.storage.set).toHaveBeenCalledTimes(2);
+    });
+    it('a rejected offscreen cancellation after tab closure cannot retain ownership', async () => {
+        const f=setup(),prepare=find(f.handlers,'fluentReadPrepareLocalVideoModel');
+        await prepare.handle({model:'tiny',streamId:'old',generation:1,keepWarm:true},context(31));
+        f.offscreen.sendIfPresent.mockRejectedValueOnce(new Error('offscreen owner already gone'));
+        releaseVideoSubtitleOwnerForTab(31);await Promise.resolve();await Promise.resolve();
+        await expect(prepare.handle({model:'tiny',streamId:'new',generation:1,keepWarm:true},context(32))).resolves.toMatchObject({success:true});
+        releaseVideoSubtitleOwnerForTab(32);
+    });
     it('composes browser storage, local model preparation and sender-bound readings through the production runtime', async () => {
         const fixture = setup(); installModelKeys(['tiny']);
         const values: Record<string, unknown> = {fluentReadVideoLocalTranscriptionModels: []};
@@ -343,6 +358,17 @@ describe('native video background ownership', () => {
             transcribe: (patch = {}, tab = 71) => find(handlers, 'fluentReadTranscribeLocalVideoAudio').handle({...selection, audioPcm16Base64: 'AAA=', ...patch}, context(tab)),
             cancel: (reason?: string, tab = 71) => find(handlers, 'fluentReadCancelLocalVideoTranscription').handle({...selection, reason}, context(tab))};
     }
+    it('waits for a rejected native window from a closed tab before admitting another tab', async () => {
+        const f=nativeFixture(),transport=deferred<{text:string;model:string;audioDurationMs:number}>();
+        f.nativeTranscribe.mockReturnValueOnce(transport.promise);
+        const old=expect(f.transcribe()).rejects.toThrow('native audio transport closed');
+        await vi.waitFor(()=>expect(f.nativeTranscribe).toHaveBeenCalledOnce());
+        releaseVideoSubtitleOwnerForTab(71);
+        const fresh=f.transcribe({},72);await Promise.resolve();await Promise.resolve();expect(f.nativeTranscribe).toHaveBeenCalledOnce();
+        transport.reject(new Error('native audio transport closed'));await old;
+        await expect(fresh).resolves.toMatchObject({success:true,text:'native result'});expect(f.nativeTranscribe).toHaveBeenCalledTimes(2);
+        await f.cancel('complete',72);
+    });
     it('warms only client ownership and transcribes without Offscreen or downloads', async () => {
         const f = nativeFixture();
         await expect(f.prepare()).resolves.toEqual({success: true, model: selection.model, provider: 'native-qwen', preparation: 'client-only'});

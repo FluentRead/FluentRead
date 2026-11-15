@@ -136,7 +136,7 @@ const expectedGeneralSubgroups = [];
 const expectedInterfacePanelOrder = ['translation', 'skin', 'motion', 'layout', 'video-learning', 'font'];
 const expectedInterfaceGroups = ['译文样式', '逐句高亮样式', '界面与弹窗', '翻译加载样式', '菜单栏布局', '完整句学习外观', '界面字体'];
 // 划词触发、翻译卡片与朗读均在划词页；阅读辅助保留在翻译设置首项。
-const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球进阶设置', '段落复制', '局部翻译', '不翻译的语言'];
+const expectedTranslationGroups = ['阅读辅助', '智能高亮', '鼠标悬浮翻译', '输入框翻译', '全文翻译', '右键菜单', '悬浮球设置', '段落复制', '局部翻译', '不翻译的语言'];
 const expectedLoadingStyles = [
   ['ring', '柔和圆环'],
   ['minimal', '简洁'],
@@ -1137,17 +1137,14 @@ function assertCompleteBackupEnvelope(value, sentinels, options = {}) {
 }
 
 async function downloadCompleteBackup(page, includePrivateContext = false) {
-  const downloadPromise = page.waitForEvent('download', {timeout});
   await page.getByRole('button', {name: '导出备份', exact: true}).click();
   const contextDialog = page.locator('.el-message-box:visible');
-  await contextDialog.getByText('是否包含单词上下文？', {exact: true}).waitFor({state: 'visible', timeout});
-  for (const label of ['不包含并导出', '包含并导出']) {
-    await contextDialog.getByRole('button', {name: label, exact: true}).waitFor({state: 'visible', timeout});
-  }
-  await contextDialog.getByRole('button', {
-    name: includePrivateContext ? '包含并导出' : '不包含并导出',
-    exact: true,
-  }).click();
+  const contextOption = contextDialog.locator('.fr-backup-export-option input[type="checkbox"]');
+  await contextOption.waitFor({state: 'visible', timeout});
+  if (await contextOption.isChecked()) throw new Error('完整备份默认包含了私人上下文');
+  await contextOption.setChecked(includePrivateContext);
+  const downloadPromise = page.waitForEvent('download', {timeout});
+  await contextDialog.getByRole('button', {name: '导出备份', exact: true}).click();
   const download = await downloadPromise;
   const downloadedPath = await download.path();
   if (!downloadedPath) throw new Error('完整备份下载未产生可读文件');
@@ -3304,8 +3301,16 @@ async function main() {
     ];
     const expectedPlatformServices = [
       'siliconCloud', 'newapi', 'infini', 'openrouter', 'groq', 'azureOpenai',
-      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel', 'ollama',
+      'mistral', 'cohere', 'cerebras', 'togetherai', 'fireworks', 'deepinfra', 'perplexity', 'ollama',
     ];
+    // 新装时四个未配置的第三方平台默认关闭，旧配置及显式配置仍由配置迁移测试覆盖。
+    const defaultDisabledPlatforms = ['runcrate', 'cloudgpu', 'cheaperinference', 'cheapaimodel'];
+    const hiddenPlatforms = await page.evaluate(async expected => {
+      const stored = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
+      const config = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
+      return config.disabledTranslationServices.filter(service => expected.includes(service)).sort();
+    }, defaultDisabledPlatforms);
+    if (JSON.stringify(hiddenPlatforms) !== JSON.stringify([...defaultDisabledPlatforms].sort())) throw new Error(`默认关闭的平台状态异常：${JSON.stringify(hiddenPlatforms)}`);
     const serviceViews = await serviceCatalog.locator('[data-service-view]')
       .evaluateAll(buttons => buttons.map(button => button.dataset.serviceView));
     if (serviceViews.length !== 0) {
@@ -3736,6 +3741,8 @@ async function main() {
     for (const sectionLabel of ['设置与凭据', '单词本', '模型用量']) {
       await localDataImportDialog.getByText(sectionLabel, {exact: true}).first().waitFor({state: 'visible', timeout});
     }
+    const configDetails = localDataImportDialog.locator('details.config-import-preview');
+    if (!await configDetails.getAttribute('open')) await configDetails.locator('summary').click();
     await localDataImportDialog.locator('.config-change-group h4')
       .filter({hasText: /^凭据安全/u})
       .waitFor({state: 'visible', timeout});

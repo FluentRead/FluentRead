@@ -666,6 +666,19 @@ describe('userscript remote UI language data', () => {
         } finally {register.mockRestore();}
     });
 
+    it('registers a verified remote language for this page even when GM refuses its offline cache write', async () => {
+        vi.stubGlobal('__FLUENTREAD_USERSCRIPT_LANGUAGE_BUNDLES__', {});
+        vi.stubGlobal('__FLUENTREAD_USERSCRIPT_REMOTE_LANGUAGES__', {'fr-FR': fileName});
+        vi.stubGlobal('__FLUENTREAD_USERSCRIPT_RESOURCE_COMMIT__', resourceCommit);
+        const setValue=vi.fn(async()=>{throw new Error('GM quota exceeded');});
+        const xmlHttpRequest=vi.fn(async()=>({status:200,statusText:'OK',responseText:source}));
+        globalThis.GM={async getValue(){return null;},setValue,xmlHttpRequest};
+        const loader=await import('@/userscript/uiLanguageBundles'),core=await import('@/src/core/i18n');
+        await expect(loader.ensureUiLanguageBundle('fr-FR')).resolves.toBe(true);
+        expect(core.hasUiLanguageBundle('fr-FR')).toBe(true);expect(setValue).toHaveBeenCalledOnce();expect(xmlHttpRequest).toHaveBeenCalledOnce();
+        await expect(loader.ensureUiLanguageBundle('fr-FR')).resolves.toBe(true);expect(xmlHttpRequest).toHaveBeenCalledOnce();
+    });
+
     it('shares concurrent loads and rerenders once after availability, while unsupported languages render once', async () => {
         let resolveCache!: (value: unknown) => void;
         globalThis.GM = {async getValue() {return new Promise(resolve => {resolveCache = resolve;});}, xmlHttpRequest() {throw new Error('unexpected request');}};

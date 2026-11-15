@@ -62,6 +62,11 @@ describe('Popup 来源关闭诊断与读取归属',()=>{
   })
 })
 describe('Popup 页面状态与操作所有权',()=>{
+  it.each(['setDisabled','setAlways'] as const)('does not show a stale %s failure after the popup closes during a tab read',async action=>{
+    const f=setup(),tab=deferred<PopupActiveTab>();f.getTab.mockReturnValueOnce(tab.promise);
+    const saving=f.actions[action](true);f.setActive(false);tab.reject(new Error('closed popup tab read'));await saving;
+    expect(f.notice).not.toHaveBeenCalled();expect(f.persistRule).not.toHaveBeenCalled();expect(f.state.savingRule).toBe(false);
+  })
   it('启动状态晚到不能覆盖刚完成的翻译；失败的旧状态也不能回退新结果',async()=>{
     for(const rejected of [false,true]){const {state,actions,send}=setup(),old=deferred();send.mockImplementationOnce(()=>old.promise);const hydrate=actions.hydrate();await settle();await actions.toggle();expect(state.translated).toBe(true);if(rejected)old.reject(Error('old receiver'));else old.resolve({isTranslated:false});await hydrate;expect(state.translated).toBe(true);expect(state.busy).toBe(false)}
   })

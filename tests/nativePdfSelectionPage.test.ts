@@ -108,6 +108,12 @@ describe('原生 PDF 选区交接验证', () => {
 });
 
 describe('原生 PDF 划词窗口生命周期', () => {
+    it('离开后配置水合失败不会在已关闭的页面重建错误提示', async () => {
+        const f = fixture(), ready = deferred<void>(); f.dependencies.ready = ready.promise;
+        const app = f.start(); app.dispose(); ready.reject(new Error('storage unavailable')); await app.ready;
+        expect(f.document.querySelector('#app')!.childNodes).toHaveLength(0);
+        expect(f.dependencies.claim).not.toHaveBeenCalled(); expect(f.dependencies.mountCard).not.toHaveBeenCalled();
+    });
     it('超长原生选区仅显示有限错误码对应的提示，不领取或翻译正文', async () => {
         const f = fixture('#error=too-long'); await f.start().ready;
         expect(f.document.querySelector('[role="status"]')!.textContent).toBe('单次最多翻译 4096 个字符，请缩小选区后重试。');

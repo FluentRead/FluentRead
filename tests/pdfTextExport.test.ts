@@ -1,5 +1,5 @@
 import {mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync} from 'node:fs';
-import {join} from 'node:path';
+import {dirname, join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -16,6 +16,7 @@ import {renderPdfReadingPages} from '@/src/features/document-translation/ui/pdfP
 import {paginatePdfReadingPlan, type PdfReadingOutputPage} from '@/src/features/document-translation/core/pdfTextLayout';
 import {pdfFallbackBidiLine} from '@/src/features/document-translation/core/pdfFallbackBidi';
 
+const standardFontDataUrl = join(dirname(createRequire(import.meta.url).resolve('pdfjs-dist/package.json')), 'standard_fonts') + '/';
 const fontBytes = new Uint8Array(readFileSync(new URL('../assets/pdf-fonts/FluentReadNotoSansSC-Regular.woff2', import.meta.url)));
 const textOnlyOptions = {pdfReadingRenderer: renderPdfReadingPages, pdfFontLoader: async () => fontBytes};
 const compact = (text: string) => text.replace(/\s/gu, '');
@@ -49,7 +50,7 @@ async function fixture(): Promise<ParsedDocument> {
 }
 
 async function extract(bytes: Uint8Array): Promise<string[]> {
-    const task = getDocument({data: bytes.slice(), disableFontFace: true});
+    const task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
     const pdf = await task.promise;
     try {
         const texts: string[] = [];
@@ -63,7 +64,7 @@ async function extract(bytes: Uint8Array): Promise<string[]> {
 }
 
 async function pageLabels(bytes: Uint8Array): Promise<string[] | null> {
-    const task = getDocument({data: bytes.slice(), disableFontFace: true});
+    const task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
     try {return await (await task.promise).getPageLabels();}
     finally {await task.destroy();}
 }
@@ -125,7 +126,7 @@ describe('visible Unicode PDF reading export', () => {
         expect(await pageLabels(download.data as Uint8Array)).toEqual(['1']);
         expect(result[0]).toContain('Original selectable source page');
         expect(compact(result[0])).toContain(compact(translations.join('')));
-        const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+        const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
         try {
             const pdf = await task.promise, page = await pdf.getPage(1);
             const items = (await page.getTextContent({disableNormalization: true})).items.filter((item): item is TextItem => 'str' in item);
@@ -156,7 +157,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, translations, 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: translations.map((text, segmentIndex) => ({segmentIndex, text, x: 42, y: 50 + segmentIndex * 60, width: 312, fontSize: 14,
                     ...(segmentIndex === 1 ? {direction: bidi.direction} : {})}))})});
-            const bytes = download.data as Uint8Array, task = getDocument({data: bytes.slice(), disableFontFace: true});
+            const bytes = download.data as Uint8Array, task = getDocument({standardFontDataUrl, data: bytes.slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1), items = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item);
                 const raw = items.map(item => item.str).join('');
@@ -230,7 +231,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14,
                     ...(direction ? {direction} : {})}]})});
-            const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+            const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1);
                 const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
@@ -249,7 +250,7 @@ describe('visible Unicode PDF reading export', () => {
             const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
                 textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14,
                     ...(direction ? {direction} : {})}]})});
-            const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+            const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
             try {
                 const pdf = await task.promise, page = await pdf.getPage(1);
                 const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');
@@ -266,7 +267,7 @@ describe('visible Unicode PDF reading export', () => {
         // Both engines choose RTL for this four-code-unit line, but stock's RTL transform removes angle characters.
         const download = await createDocumentDownload(document, ['', target], 'translated', {pdfPageRasterizer: async () => ({data: layoutPng, format: 'png',
             textItems: [{segmentIndex: 1, text: target, x: 42, y: 110, width: 312, fontSize: 14, direction: 'rtl'}]})});
-        const task = getDocument({data: (download.data as Uint8Array).slice(), disableFontFace: true});
+        const task = getDocument({standardFontDataUrl, data: (download.data as Uint8Array).slice(), disableFontFace: true});
         try {
             const pdf = await task.promise, page = await pdf.getPage(1);
             const raw = (await page.getTextContent()).items.filter((item): item is TextItem => 'str' in item).map(item => item.str).join('');

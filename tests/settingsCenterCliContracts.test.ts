@@ -90,6 +90,11 @@ function navigationPage(mobileVisible: boolean, initiallyCollapsed = false, pane
     let activeSection = '';
     let collapsed = initiallyCollapsed;
     const {document} = parseHTML('<!doctype html><html><body><nav class="settings-page-tabs"></nav></body></html>');
+    const layout = document.createElement('div');
+    layout.innerHTML = '<select class="mobile-settings-navigation"></select><nav aria-label="设置分类"><button class="nav-group-toggle"></button></nav>';
+    document.body.append(layout);
+    const layoutNodes = [...layout.querySelectorAll('select, button')];
+    layoutNodes.forEach((node, index) => {Object.assign(node, {getClientRects: () => (index === 0 ? mobileVisible : !mobileVisible) ? [{}] : []});});
     const continuousPanels = productionInterfacePanelNames().map(id => {
         const panel = document.createElement('section');
         panel.dataset.settingsAnchor = id;
@@ -98,6 +103,7 @@ function navigationPage(mobileVisible: boolean, initiallyCollapsed = false, pane
     });
     const page = {
         locator(selector: string): any {
+            if (selector === '.settings-app > .sidebar') return {waitFor: async (options: unknown) => {expect(options).toEqual({state: 'visible', timeout: 30000}); actions.push('shell-visible');}};
             if (selector === 'select.mobile-settings-navigation') return {
                 isVisible: async () => mobileVisible,
                 selectOption: async (id: string) => {activeSection = id; actions.push(`mobile:${id}`);},
@@ -134,7 +140,15 @@ function navigationPage(mobileVisible: boolean, initiallyCollapsed = false, pane
                 },
             };
         },
-        waitForFunction: async (predicate: (id: string) => boolean, id: string, options: {timeout: number}) => {
+        waitForFunction: async (predicate: (id?: string) => boolean, id?: string, options?: {timeout: number}) => {
+            if (id === undefined) {
+                expect(predicate()).toBe(true);
+                const saved = layoutNodes.map(node => node.getClientRects);
+                layoutNodes.forEach(node => {Object.assign(node, {getClientRects: () => []});});
+                expect(predicate()).toBe(false);
+                layoutNodes.forEach((node, index) => {Object.assign(node, {getClientRects: saved[index]});});
+                actions.push('layout-ready'); return;
+            }
             expect(options).toEqual({timeout: 30000});
             expect(actions.at(-1)).toBe(`panel:${id}`);
             const button = document.querySelector('.settings-page-tabs button')!;
@@ -157,7 +171,7 @@ describe('settings center CLI navigation interactions', () => {
         const fixture = navigationPage(mobile);
         const {selectSettingsSection} = bindings(['settingsNavigationSelector', 'selectSettingsSection'], {document: fixture.document});
         await selectSettingsSection(fixture.page, 'settings-translation-stats', 'usage');
-        expect(fixture.actions).toEqual([`${mobile ? 'mobile' : 'sidebar'}:settings-translation-stats`, 'active:settings-translation-stats', 'panel:usage', 'panel-active:usage']);
+        expect(fixture.actions).toEqual(['shell-visible', 'layout-ready', `${mobile ? 'mobile' : 'sidebar'}:settings-translation-stats`, 'active:settings-translation-stats', 'panel:usage', 'panel-active:usage']);
         expect(SETTINGS_TABBED_SECTION_IDS.has('settings-translation-stats')).toBe(true);
     });
 
@@ -165,17 +179,17 @@ describe('settings center CLI navigation interactions', () => {
         const fixture = navigationPage(mobile, false, 'anchor');
         const {selectSettingsSection} = bindings(['settingsNavigationSelector', 'selectSettingsSection'], {document: fixture.document});
         await selectSettingsSection(fixture.page, 'settings-interface', 'motion');
-        expect(fixture.actions).toEqual([`${mobile ? 'mobile' : 'sidebar'}:settings-interface`, 'active:settings-interface', 'panel:motion', 'panel-active:motion']);
+        expect(fixture.actions).toEqual(['shell-visible', 'layout-ready', `${mobile ? 'mobile' : 'sidebar'}:settings-interface`, 'active:settings-interface', 'panel:motion', 'panel-active:motion']);
         expect(SETTINGS_TABBED_SECTION_IDS.has('settings-interface')).toBe(false);
         expect(fixture.continuousPanels.map(panel => panel.dataset.settingsAnchor)).toEqual(bindings(['expectedInterfacePanelOrder']).expectedInterfacePanelOrder);
         expect(fixture.continuousPanels.every(panel => !panel.hidden)).toBe(true);
     });
 
     it('reopens a collapsed group before clicking its section', async () => {
-        const {selectSettingsSection} = bindings(['settingsNavigationSelector', 'selectSettingsSection']);
         const fixture = navigationPage(false, true);
+        const {selectSettingsSection} = bindings(['settingsNavigationSelector', 'selectSettingsSection'], {document: fixture.document});
         await selectSettingsSection(fixture.page, 'settings-selection');
-        expect(fixture.actions).toEqual(['expand-group', 'sidebar:settings-selection', 'active:settings-selection']);
+        expect(fixture.actions).toEqual(['shell-visible', 'layout-ready', 'expand-group', 'sidebar:settings-selection', 'active:settings-selection']);
     });
 
     it('requires a visible, in-bounds mobile selection matching the active canonical section', () => {

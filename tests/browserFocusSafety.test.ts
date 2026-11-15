@@ -605,6 +605,7 @@ async function probeFocusSafeCli(
         if (specifier === './testing/owned-browser-close.cjs') return {
             guardBrowserClose: () => {throw new Error('Unexpected browser ownership before launch');},
         };
+        if (specifier === './site-translation/controlled-provider.cjs') return require(resolve(PROJECT_ROOT, 'scripts/site-translation/controlled-provider.cjs'));
         if (specifier === 'playwright') return {
             chromium: {launchPersistentContext: stopAtLaunch('headed')},
             webkit: {launch: stopAtLaunch('webkit')},
@@ -885,8 +886,8 @@ describe('browser regression focus safety', () => {
         expect(missingResponse.end).toHaveBeenCalledWith('Not found');
 
         expect(JSON.parse(buildFixtureMicrosoftResponseBody(['one', '<b>two</b>']))).toEqual([
-            {translations: [{text: '测试译文：one'}]},
-            {translations: [{text: '测试译文：<b>two</b>'}]},
+            {translations: [{text: require(resolve(PROJECT_ROOT, 'scripts/site-translation/controlled-provider.cjs')).encodeControlledTranslation('one', 'microsoft-escaped-text')}]},
+            {translations: [{text: require(resolve(PROJECT_ROOT, 'scripts/site-translation/controlled-provider.cjs')).encodeControlledTranslation('<b>two</b>', 'microsoft-escaped-text')}]},
         ]);
         expect(JSON.parse(buildFixtureMicrosoftResponseBody({text: 'invalid'}))).toEqual([]);
         expect(() => assertNoRuntimeErrors([])).not.toThrow();
@@ -994,7 +995,9 @@ describe('browser regression focus safety', () => {
         expect(source).toContain("name: '自动设置快照'");
         expect(source).toContain("name: '导出备份'");
         expect(source).toContain("name: '从备份恢复'");
-        expect(source).toContain("getByText('是否包含单词上下文？'");
+        expect(source).toContain('.fr-backup-export-option input[type="checkbox"]');
+        expect(source).toContain('if (await contextOption.isChecked()) throw');
+        expect(source).toContain('contextOption.setChecked(includePrivateContext)');
         expect(source).toContain("page.waitForEvent('download'");
         expect(source).toContain("page.waitForEvent('filechooser'");
         expect(source).toContain("getByTestId('restore-source-dialog')");

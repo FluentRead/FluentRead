@@ -55,7 +55,8 @@ export function createInformationHighlightBackgroundHandlers(dependencies: Depen
                 const result = await dependencies.offscreen.score(text, controller.signal, modelId);
                 if (controller.signal.aborted) throw new DOMException('信息高亮已取消', 'AbortError');
                 return {success: true, result};
-            } finally {if (active.get(key) === controller) active.delete(key);}
+            // 同 key 在本轮结束前始终拒绝重入，取消不会移走 active 记录。
+            } finally {active.delete(key);}
         }},
         {type: 'CANCEL_INFORMATION_HIGHLIGHT', handle(message, context) {
             const key = owner(message, context), controller = active.get(key);

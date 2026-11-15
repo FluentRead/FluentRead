@@ -742,6 +742,7 @@ const {
   evaluateProductionBuildFreshness,
   installCoverageTracker,
   isNaturalLanguageText,
+  leaveEditingFocusForHover,
   normalizeCoverageRules,
   normalizeHoverTargets,
   normalizeInteractionScenarios,
@@ -766,6 +767,7 @@ const {
   COVERAGE_EXCLUDED_ANCESTORS: string;
   COVERAGE_PROTECTED_DESCENDANTS: string;
   COVERAGE_TRACKER_KEY: string;
+  leaveEditingFocusForHover: (page: unknown) => Promise<number>;
   assertFreshProductionExtension: (extensionDir: string, projectRoot: string) => unknown;
   waitForHostMathRendering: (page: unknown, timeout: number) => Promise<unknown>;
   waitForStableTarget: (page: unknown, selector: string, timeout: number) => Promise<void>;
@@ -5212,6 +5214,27 @@ describe('site coverage exact owner completion v2', () => {
 
 
 describe('Factorio multilingual live-source catalog', () => {
+  it.each(['input', 'textarea', 'select', 'div contenteditable="true"', 'div role="textbox"'])('leaves an autofocus %s with native Tab before sending a hover shortcut', async markup => {
+    const {document} = parseHTML(`<html><body><${markup} autofocus></${markup.split(' ')[0]}><button>Next control</button></body></html>`);
+    let active: Element | null = document.body.firstElementChild;
+    Object.defineProperty(document, 'activeElement', {get: () => active}); vi.stubGlobal('document', document);
+    const press = vi.fn(async (key: string) => {expect(key).toBe('Tab'); active = document.querySelector('button');});
+    try {
+      await expect(leaveEditingFocusForHover({evaluate: async (fn: () => boolean) => fn(), keyboard: {press}})).resolves.toBe(1);
+      expect(press).toHaveBeenCalledOnce(); expect(active).toBe(document.querySelector('button'));
+      expect(document.querySelector('[autofocus]')).not.toBeNull();
+    } finally {vi.unstubAllGlobals();}
+  });
+  it('fails before the hover hotkey when a native editor keeps focus trapped', async () => {
+    const {document} = parseHTML('<html><body><input autofocus></body></html>');
+    Object.defineProperty(document, 'activeElement', {value: document.querySelector('input')}); vi.stubGlobal('document', document);
+    const press = vi.fn(async () => undefined);
+    try {
+      await expect(leaveEditingFocusForHover({evaluate: async (fn: () => boolean) => fn(), keyboard: {press}})).rejects.toThrow('焦点仍在编辑区');
+      expect(press.mock.calls).toEqual(Array.from({length: 8}, () => ['Tab']));
+      expect(document.querySelector('input')!.hasAttribute('autofocus')).toBe(true);
+    } finally {vi.unstubAllGlobals();}
+  });
   const descriptions = {
     zh: '为异星工厂添加全新生产配方和机器，改善物流与自动化体验。',
     a: 'Adds new production recipes and machines for your factory.',

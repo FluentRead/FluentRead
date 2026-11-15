@@ -45,6 +45,11 @@ describe('PDF canonical complete reading plan', () => {
         expect(plan.entries.filter(entry => entry.kind === 'text' && entry.segmentIndex < 0).every(entry => entry.kind === 'text' && !entry.translated)).toBe(true);
         expect(buildPdfReadingPlan(document([{source: 'Body paragraph'}]), sourcePage, ['正文'])).toEqual(plan);
     });
+    it('retains unsegmented static text reconstructed from source lines with stable block identities', () => {
+        const sourcePage = page([block(-1, {kind: 'metadata', y: 10, lines: [{x: 20, y: 10, width: 100, height: 12, text: 'Ada'}, {x: 20, y: 23, width: 100, height: 12, text: 'Example'}]}), block(-1, {kind: 'footer', y: 740, lines: []})]);
+        const texts = buildPdfReadingPlan(document([]), sourcePage, []).entries.filter(entry => entry.kind === 'text');
+        expect(texts).toHaveLength(1); expect(texts[0]).toMatchObject({id: 'pdf-3-block-0', segmentIndex: -1, source: 'Ada Example', text: 'Ada Example', translated: false});
+    });
     it('does not confuse source-only math and controls with unrelated source-only metadata', () => {
         const sourcePage = page([
             {...block(-1, {kind: 'metadata', y: 10}), source: 'Ada Example'},

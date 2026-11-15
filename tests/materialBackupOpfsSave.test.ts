@@ -12,6 +12,13 @@ function fixture(){
     return {platform,writer,download,terminal,events,release};
 }
 describe('OPFS material backup target',()=>{
+    it('waits for a rejected in-flight write before aborting and removing the temporary file',async()=>{
+        const f=fixture(),pending=deferred<void>();f.writer.write.mockReturnValueOnce(pending.promise);
+        const target=await createMaterialBackupOpfsTarget('backup.json',f.platform),writing=target.write(new Uint8Array([1]));
+        const rejected=expect(writing).rejects.toThrow('disk full'),cleanup=target.abort();await tick();
+        expect(f.writer.abort).not.toHaveBeenCalled();pending.reject(new Error('disk full'));await rejected;await cleanup;
+        expect(f.events).toEqual(['abort','remove','release']);expect(f.platform.startDownload).not.toHaveBeenCalled();
+    });
     it('waits for verified receive and confirmed download before cleanup and saved',async()=>{
         const f=fixture(),target=await createMaterialBackupOpfsTarget('backup.json',f.platform),receive=deferred<void>();
         const work=saveMaterialBackup(target,async consume=>{await consume(new Uint8Array([1]));await receive.promise;});await tick();expect(f.events).toEqual(['write']);

@@ -28,6 +28,14 @@ function noticeEvent(node: Element, type: string, properties: Record<string, unk
 }
 
 describe('page error notice', () => {
+    it('凭据错误转为普通通知时保留用户在正文的焦点，不把焦点移到关闭按钮', () => {
+        const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'error', {key: 'operation'});
+        const close = notice.querySelector<HTMLButtonElement>('.notice-close')!, focus = vi.spyOn(close, 'focus');
+        Object.defineProperty(document, 'activeElement', {value: document.body, configurable: true});
+        showPageNotice('操作已恢复', 'success', {key: 'operation'});
+        expect(notice.querySelector('.notice-action')).toBeNull(); expect(focus).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(document.body);
+    });
     it('成功开始后按功能 key 清理旧提示，保留其他通知且空 key 或不存在的 key 无副作用', async () => {
         const retry = showPageNotice('选区失效', 'error', {key: 'context-menu'});
         const unrelated = showPageNotice('独立反馈', 'success', {key: 'copy'});
@@ -240,6 +248,13 @@ describe('page error notice', () => {
         expect(first.isConnected).toBe(true);expect(second.isConnected).toBe(false);
         expect(third.isConnected).toBe(true);expect(fourth.isConnected).toBe(true);expect(vi.getTimerCount()).toBe(3);
     });
+    it('宿主在首次绘制前移除通知时，已派发的绘制帧不会显示断开的节点', () => {
+        let reveal!: FrameRequestCallback;
+        window.requestAnimationFrame = callback => {reveal = callback; return 1;};
+        window.cancelAnimationFrame = vi.fn();
+        const notice = showPageNotice('尚未显示', 'success'); notice.remove(); reveal(0);
+        expect(notice.classList.contains('is-visible')).toBe(false);
+    });
     it('宿主移走条目或内部堆栈后重建会取消旧帧与信号处理器，保留非通知节点', () => {
         const frames = new Map<number, FrameRequestCallback>();let nextFrame = 0;
         window.requestAnimationFrame = fn => {frames.set(++nextFrame, fn);return nextFrame;};
@@ -273,9 +288,9 @@ describe('page error notice', () => {
     });
     it.each([undefined, {}, {runtime: {}}, {runtime: {getURL: () => ''}}, {runtime: {getURL: () => 3}}])('不可用图标端口仍显示品牌与原文 %j', runtime => {
         Object.defineProperty(globalThis, 'browser', {value: runtime, configurable: true});
-        const notice = showPageNotice('服务需要其他字段，当前尚未配置', 'error');
+        const notice = showPageNotice('服务 需要 其他字段，当前尚未配置', 'error');
         expect(notice.querySelector('.notice-mark-fallback')?.textContent).toBe('流');
-        expect(notice.querySelector('.notice-detail')?.textContent).toBe('服务需要其他字段，当前尚未配置');
+        expect(notice.querySelector('.notice-detail')?.textContent).toBe('服务 需要 其他字段，当前尚未配置');
         expect(notice.querySelector('.notice-action')).toBeNull();
     });
     it('连续复制只更新同一条通知，并保持一个待进入回调与一个关闭计时器', async () => {

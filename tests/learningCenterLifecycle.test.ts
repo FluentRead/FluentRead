@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 // 直接导入实际客户端 SFC，覆盖率归因到生产源码；只替换浏览器、配置、展示与异步模块边界。
-async function mountLearning(initialTab?: string, options: {listGate?: Tab; browser?: string; parentGate?: Promise<void>; parentVisibility?: boolean} = {}) {
+async function mountLearning(initialTab?: string, options: {listGate?: Tab; browser?: string; parentGate?: Promise<void>; parentVisibility?: boolean; configReady?: Promise<void>} = {}) {
   const {window, document} = parseHTML('<html><body></body></html>')
   for (const key of ['window', 'document', 'Node', 'Element', 'HTMLElement', 'SVGElement', 'Event'])
     vi.stubGlobal(key, key === 'window' ? window : window[key as keyof typeof window])
@@ -63,7 +63,7 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
   vi.doMock('webextension-polyfill', () => ({default: {runtime: {sendMessage: send}}}))
   const {normalizeConfig} = await import('../src/core/config/model')
   const config = normalizeConfig({harness: {memoryEnabled: true}})
-  const store = {config, configReady: Promise.resolve(), subscribeConfig: (listener: (value: typeof config) => void) => {
+  const store = {config, configReady: options.configReady ?? Promise.resolve(), subscribeConfig: (listener: (value: typeof config) => void) => {
     configListeners.add(listener);return () => configListeners.delete(listener)
   }}
   const client = await import('../src/features/reading-assistant/client')
@@ -156,6 +156,12 @@ async function mountLearning(initialTab?: string, options: {listGate?: Tab; brow
 }
 
 describe('LearningCenter actual client pane loading and lifetime', () => {
+  it.each(['fulfilled','rejected'] as const)('ignores %s configuration readiness after the learning view unmounts', async outcome => {
+    const ready=deferred<void>(),f=await mountLearning('saved',{configReady:ready.promise});
+    f.stop();f.config.harness.memoryEnabled=false;
+    if(outcome==='fulfilled')ready.resolve();else ready.reject(new Error('configuration owner closed'));
+    await f.settle();expect(f.configListeners.size).toBe(0);expect(f.clientErrors).toEqual([]);expect(f.host.textContent).toBe('');
+  })
   it.each(['history','memory'] as const)('propagates live navigation ownership to %s clear confirmation', async tab => {
     const h=await mountLearning(tab);await h.resolvePanel(tab)
     const clear=tab==='history'?'.harness-history-toolbar .harness-text-button':'.fr-memory-bottom button'

@@ -51,6 +51,12 @@ function range(start: Node, end = start, html = ''): Range {
 }
 
 describe('PDF source selection adapter', () => {
+    it('releases an invalidation subscription independently and makes repeated release harmless', () => {
+        const {root}=dom(),adapter=createPdfSelectionAdapter(root),first=vi.fn(),second=vi.fn();
+        const stop=adapter.subscribeInvalidation!(first);adapter.subscribeInvalidation!(second);
+        adapter.invalidate();expect(first).toHaveBeenCalledOnce();expect(second).toHaveBeenCalledOnce();
+        stop();stop();adapter.invalidate();expect(first).toHaveBeenCalledOnce();expect(second).toHaveBeenCalledTimes(2);
+    });
     it('accepts source glyphs and rejects document controls, translated text and disconnected ranges', () => {
         const {root} = dom('<section data-fluentread-pdf-text><span>Source words</span></section><textarea>Editor words</textarea><div data-fluentread-pdf-translation>Translated words</div>');
         const source = root.querySelector('span')!.firstChild!;
@@ -155,6 +161,17 @@ function lifecycleFixture(source = true) {
 }
 
 describe('document selection lazy lifecycle', () => {
+    it('does not report a rejected overlay mount after disposal has revoked its owner', async () => {
+        const f=lifecycleFixture();f.ready.resolve();await tick();expect(f.mountOverlay).toHaveBeenCalledOnce();
+        f.runtime.dispose();f.mounts[0].pending.reject(new Error('late overlay module failure'));await tick();
+        expect(f.onError).not.toHaveBeenCalled();expect(f.unsubscribe).toHaveBeenCalledOnce();
+    });
+    it.each([false,true])('reports rejected config readiness only for a live owner (disposed=%s)', async disposed => {
+        const f=lifecycleFixture(),failure=new Error('configuration hydration unavailable');
+        if(disposed)f.runtime.dispose();f.ready.reject(failure);await tick();
+        expect(f.mountOverlay).not.toHaveBeenCalled();
+        if(disposed)expect(f.onError).not.toHaveBeenCalled();else expect(f.onError).toHaveBeenCalledWith(failure);
+    });
     it('does not load the card before config hydration or while the page has no PDF source text', async () => {
         const fixture = lifecycleFixture(false);
         fixture.runtime.refresh();
@@ -452,7 +469,7 @@ describe('document-page context menu routing', () => {
         expect(listener(request, background, reply)).toBeUndefined();
     });
 
-    it('responds disabled or failed accurately and does not respond after disposal', async () => {
+    it.each(['fulfilled','rejected'] as const)('responds accurately and ignores a %s result after disposal', async outcome => {
         const test = fixture();
         test.current.resolve({id: 18}); await tick();
         const listener = test.event.addListener.mock.calls[0][0], reply = vi.fn();
@@ -465,7 +482,7 @@ describe('document-page context menu routing', () => {
         const late = deferred<boolean>();
         test.translate.mockImplementation(() => late.promise);
         reply.mockClear(); listener(request, background, reply);
-        test.dispose(); late.resolve(true); await tick();
+        test.dispose(); if(outcome==='fulfilled')late.resolve(true);else late.reject(new Error('late translation failure')); await tick();
         expect(reply).not.toHaveBeenCalled();
     });
 

@@ -45,6 +45,11 @@ afterEach(async () => {
 });
 
 describe('大模型用量 IndexedDB repository', () => {
+    it('lists every distinct model for a service in stable alphabetical order', async () => {
+        const repository = createRepository('model-dimensions'), now = new Date(2026, 7, 29, 12).getTime();
+        await repository.recordMany(['zeta', 'alpha', 'middle', 'alpha'].map((configuredModel, index) => usageEvent({id: `model-${index}`, configuredModel})));
+        expect((await repository.getDashboard({range: 'today'}, now)).dimensions).toEqual([{serviceId: 'moonshot', models: ['alpha', 'middle', 'zeta']}]);
+    });
     it('导入不构造数据库，首次消费和并发消费者共用同一惰性实例', async () => {
         vi.resetModules();
         const {default: Dexie} = await import('dexie');

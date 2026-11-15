@@ -1335,6 +1335,23 @@ describe('document translation retry backoff', () => {
         expect(mocks.translateTextBatch).toHaveBeenCalledTimes(7); expect(committed).toHaveBeenCalledTimes(5);
         expect(waiting.at(-1)).toBe(0);
     });
+    it.each([[90_000,120_000],[120_000,90_000]])('holds a newly available worker behind simultaneous cooldowns %j', async (firstDelay,secondDelay) => {
+        const paragraphs=Array.from({length:5},(_,id)=>({id,source:`Paragraph ${id}`}));
+        const requests:Array<{resolve:(value:string[])=>void;reject:(error:Error)=>void}>=[];
+        mocks.translateTextBatch.mockImplementation((sources:string[])=>requests.length<3
+            ?new Promise((resolve,reject)=>requests.push({resolve,reject})):Promise.resolve(sources.map(source=>`译 ${source}`)));
+        const sleeps:Array<()=>void>=[],committed=vi.fn();
+        const work=translateDocumentSegments(paragraphs,{fileName:'parallel-cooldown.pdf',batchLimits:{items:1},onSegment:committed,
+            retryBackoff:{maxWaitMs:600_000,sleep:()=>new Promise(resolve=>sleeps.push(resolve))}});
+        await vi.waitFor(()=>expect(requests).toHaveLength(3));
+        requests[0].reject(rateLimit(firstDelay));requests[2].reject(rateLimit(secondDelay));
+        await vi.waitFor(()=>expect(sleeps).toHaveLength(2));
+        requests[1].resolve(['已发成功']);await vi.waitFor(()=>expect(committed).toHaveBeenCalledWith({id:1,translation:'已发成功'}));
+        expect(mocks.translateTextBatch).toHaveBeenCalledTimes(3);
+        sleeps.forEach(resolve=>resolve());
+        expect(await work).toEqual(['译 Paragraph 0','已发成功','译 Paragraph 2','译 Paragraph 3','译 Paragraph 4']);
+        expect(committed).toHaveBeenCalledTimes(5);
+    });
 
     it.each(['abort', 'fatal'])('releases shared cooldowns on %s without dispatching queued work or committing late results', async ending => {
         const paragraphs = Array.from({length: 5}, (_, id) => ({id, source: `Paragraph ${id}`}));

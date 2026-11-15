@@ -85,6 +85,17 @@ async function loadProtocolWorker(transcriber: any, backend: 'webgpu' | 'wasm' =
 }
 
 describe('视频 AI Worker timestamp parser', () => {
+    it('continues its single-consumer queue after a detached response port rejects both replies for a task', async () => {
+        const scope=await loadProtocolWorker(vi.fn());
+        try {
+            scope.postMessage.mockImplementationOnce(()=>{throw new Error('success channel closed');}).mockImplementationOnce(()=>{throw new Error('error channel closed');});
+            scope.onmessage({data:{requestId:1,type:'prepare',model:'tiny'}});
+            await waitForWorkerMessages(scope,2);expect(scope.postMessage).toHaveBeenCalledTimes(2);
+            scope.onmessage({data:{requestId:2,type:'prepare',model:'tiny'}});
+            await waitForWorkerMessages(scope,3);expect(scope.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({requestId:2,success:true}));
+            expect(workerMocks.pipeline).toHaveBeenCalledOnce();
+        } finally {vi.unstubAllGlobals();}
+    });
     it('rejects a malformed correlated command before loading a model and still accepts a later valid preparation', async () => {
         const scope = await loadProtocolWorker(vi.fn());
         try {

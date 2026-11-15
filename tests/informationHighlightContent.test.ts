@@ -845,6 +845,17 @@ describe('content composition and runtime score messages', () => {
         const silent = fixture(), quiet = createInformationHighlightContentRuntime({document: silent.document, preferences: {...defaults, mode: 'surprisal-local'}, send: vi.fn(async () => ({success: false}))});
         quiet.mount(new AbortController().signal, () => true); press(silent); await silent.settle(); expect(quiet.getState().phase).toBe('error'); quiet.unmount();
     });
+    it.each(['unmount', 'disable'] as const)('does not revive a model fallback after a notice handler requests %s', async action => {
+        const f = fixture();
+        const runtime = createInformationHighlightContentRuntime({document: f.document, preferences: {...defaults, mode: 'surprisal-local'},
+            send: vi.fn(async () => ({success: false, error: 'INFORMATION_HIGHLIGHT_NOT_DOWNLOADED'})),
+            notice: message => {if (message === 'modelNotReady') {if (action === 'unmount') runtime.unmount(); else runtime.setEnabled(false);}}});
+        runtime.mount(new AbortController().signal, () => true);
+        const event = new f.window.Event('keydown', {bubbles: true, cancelable: true}) as KeyboardEvent;
+        Object.assign(event, {key: 'h', code: 'KeyH', altKey: true, ctrlKey: false, shiftKey: false, metaKey: false, repeat: false});
+        Object.defineProperty(event, 'isTrusted', {value: true}); f.document.dispatchEvent(event); await f.settle();
+        expect(runtime.getState()).toMatchObject({enabled: false, mode: 'surprisal-local'}); expect(f.painted()).toEqual([]); runtime.unmount();
+    });
     it('mounts only current activation, owns abort, maps score messages and returns idle after route change', async () => {
         const f = fixture(), activation = new AbortController();
         const send = vi.fn(async (message: {type: string; text?: string}) => ({success: true, result: scoreInformationKeywords(message.text || '')}));

@@ -68,6 +68,13 @@ beforeEach(async () => {
 afterEach(async () => {app?.unmount(); await server?.close(); delete (globalThis as any)[key]; vi.useRealTimers(); vi.unstubAllGlobals()})
 
 describe('信息高亮真实偏好组件', () => {
+  it('loads the hotkey dialog only when opened and rejects callbacks retained across unmount', async () => {
+    await mount('InformationHighlightPreferences');state.actions.editHotkey();await settle();
+    expect(state.hotkeyDialog).toBe(true);state.closeHotkey();await settle();expect(state.hotkeyDialog).toBe(false);
+    const edit=state.actions.editHotkey,enable=state.actions.enabled,original={...props.config.informationHighlight};
+    app.unmount();edit();enable(true);await settle();
+    expect(state.hotkeyDialog).toBe(false);expect(props.config.informationHighlight).toEqual(original);
+  })
   it('设置偏好不依赖全局 Element Plus 注册：模式选择器与选项编译到明确的本地组件', () => {
     const filename = resolve(process.cwd(), 'src/features/settings/ui/InformationHighlightPreferences.vue')
     const {descriptor} = parse(readFileSync(filename, 'utf8'), {filename})

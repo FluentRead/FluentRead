@@ -471,6 +471,32 @@ describe('review scheduling and logs', () => {
 });
 
 describe('repository transactions', () => {
+  it('orders undo tickets by recency with a stable id tie break for simultaneous removals', async () => {
+    const entries = await Promise.all(['Older', 'First', 'Second'].map(term => repository.upsert(baseInput({term}), NOW)));
+    const older = (await undo.removeWithUndo(entries[0].id, NOW))!;
+    const first = (await undo.removeWithUndo(entries[1].id, NOW + 1))!, second = (await undo.removeWithUndo(entries[2].id, NOW + 1))!;
+    expect((await undo.listUndo(NOW + 2)).map(ticket => ticket.id)).toEqual([[first.id, second.id].sort().reverse(), [older.id]].flat());
+  });
+  it('keeps restored data atomic when restoration races an expiry prune', async () => {
+    const entry = await repository.upsert(baseInput(), NOW), ticket = (await undo.removeWithUndo(entry.id, NOW))!;
+    const restored = undo.restoreUndo(ticket.id, NOW + 1), pruning = undo.pruneUndo(ticket.expiresAt);
+    const outcome = await restored; await pruning;
+    expect(['restored', 'missing']).toContain(outcome); expect(await db.undo.get(ticket.id)).toBeUndefined();
+    const remaining = await repository.get(entry.id);
+    if (outcome === 'restored') expect(remaining).toMatchObject({id: entry.id, term: entry.term}); else expect(remaining).toBeNull();
+  });
+  it('retains a pending undo ticket if the wall clock moves back before expired-write cleanup', async () => {
+    const entry = await repository.upsert(baseInput(), NOW), ticket = (await undo.removeWithUndo(entry.id, NOW))!;
+    let clock = NOW + 1, reads = 0;
+    const date = vi.spyOn(Date, 'now').mockImplementation(() => clock), put = db.undo.put.bind(db.undo), get = db.undo.get.bind(db.undo);
+    const writing = vi.spyOn(db.undo, 'put').mockImplementation((...args) => put(...args).then(result => {clock = ticket.expiresAt; return result;}));
+    const reading = vi.spyOn(db.undo, 'get').mockImplementation((...args) => get(...args).then(result => {if (++reads === 2) clock = NOW + 1; return result;}));
+    try {
+      await expect(undo.restoreUndo(ticket.id)).resolves.toBe('expired');
+      expect(await undo.listUndo(NOW + 2)).toEqual([ticket]); expect(await repository.get(entry.id)).toBeNull();
+    } finally {writing.mockRestore(); reading.mockRestore(); date.mockRestore();}
+    await expect(undo.restoreUndo(ticket.id, NOW + 2)).resolves.toBe('restored');
+  });
   it('refuses to merge an in-memory undo snapshot into a newly saved same-identity entry',async()=>{
     const old=await repository.upsert(baseInput({translation:'old private'}),NOW);
     await repository.review(old.id,'good',NOW+1);const snapshot=(await repository.removeWithSnapshot(old.id))!;

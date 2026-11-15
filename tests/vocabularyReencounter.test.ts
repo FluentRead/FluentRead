@@ -39,6 +39,11 @@ function dom(html: string) {
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();});
 
 describe('saved expressions match real reading text', () => {
+  it('normalizes repeated whitespace in a saved expression while preserving source offsets', () => {
+    const index=createExpressionIndex([saved('take \t  off','flight')]),text='Please TAKE\nOFF now.';
+    expect(matchExpressions(text,index)).toEqual([{entryId:'flight',start:7,end:15}]);
+    expect(matchExpressions(text,index,Infinity)).toEqual([{entryId:'flight',start:7,end:15}]);
+  });
   it('keeps full single-ASCII matching equivalent to streaming through overlap, boundaries, whitespace and literal punctuation', () => {
     for (const [text, term] of [['aa a a', 'a a'], ['a a a', 'a a'], ['art2 2art artful art', 'art'],
       ['art cart art2 art.', 'art'], ['art', 'art'], ['(art) x(art)y', '(art)'], ['a+b(a) a+b(a)', 'a+b(a)'],

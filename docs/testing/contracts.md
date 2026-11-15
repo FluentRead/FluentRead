@@ -140,6 +140,8 @@ node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-
 1. `vitest.coverage.config.ts` 中列出的已迁移 TypeScript 业务模块，V8 statements、branches、functions、lines 必须同时达到 100%。
 2. `tests/architecture/verificationOwnership.test.ts` 审计其余 WXT entrypoint、Vue、CSS、HTML、browser runner、userscript 和文档文件，保证每个文件都由编译、双浏览器构建、静态契约、文档构建或隔离浏览器回归负责。
 
+严格覆盖率使用有界 30 秒用例预算：Vitest 5 会在同步用例返回后检查真实截止时间，完整源码图和冻结像素语料在 V8 插桩下实测需要 7–12 秒。普通回归预算、用例显式声明的超时及性能断言保持原值，四维 100% 门槛和完整测试发现范围保持不变。
+
 新增 `src` 可执行 TypeScript 模块默认必须进入第一道门禁。只有纯类型文件、纯 re-export barrel 和列明理由的静态 composition root 可以由第二道门禁负责；Vue 的业务验证归属按下述独立规则检查。禁止使用 `v8 ignore`、扩大 exclude 或无断言执行来制造 100%。
 
 `src` 与 `userscript` 的 Vue 另受 `tests/architecture/vue-verification-owners.json` 约束：已纳入严格覆盖的组件复用该边界；其他有业务行为的组件必须明确登记实际 SFC 消费者及场景。门禁检查测试存在且已归类、组件依赖可追踪、真实装载/执行与断言形态，并拒绝只出现源码名称、删除执行入口、挂载无关组件或仅 mock 目标 SFC 的登记；这些结构检查仍不能代替对领域断言的审查。纯展示与静态组装例外逐项说明，并检查脚本及模板没有新增状态、方法、事件和副作用。

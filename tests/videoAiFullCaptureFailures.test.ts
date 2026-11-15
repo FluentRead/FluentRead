@@ -222,6 +222,23 @@ afterEach(() => {
 });
 
 describe('完整 AI 字幕失败与取消边界', () => {
+  it.each(['setup-failure', 'cancel'] as const)('releases both fallback media streams even when AudioContext close rejects (%s)', async outcome => {
+    vi.useFakeTimers();
+    const scan = new FakeVideo(), visible = new FakeVideo(), track = new FakeTrack();
+    visible.captureStream = () => new FakeMediaStream([track]) as unknown as MediaStream;
+    installScanDom(scan); vi.stubGlobal('MediaStream', FakeMediaStream); FakeAudioContext.throwMediaElement = true;
+    const stop = vi.spyOn(track, 'stop'), close = vi.spyOn(FakeAudioContext.prototype, 'close').mockRejectedValue(new Error('audio service already closed'));
+    if (outcome === 'setup-failure') vi.spyOn(FakeAudioContext.prototype, 'createScriptProcessor').mockImplementationOnce(() => {throw new Error('processor disconnected');});
+    const errors = vi.fn(), transcribe = vi.fn(async () => ({text: 'must not run'}));
+    const controller = new VideoAiFullCaptureController({getVideo: () => visible as unknown as HTMLVideoElement,
+      getIsolatedVideo: async () => scan as unknown as HTMLVideoElement, getModel: () => 'tiny', isSupported: () => true,
+      transcribe, onTranscriptionComplete: vi.fn(async () => undefined), onError: errors, onStateChange: vi.fn()});
+    controller.start(); await tick(80);
+    if (outcome === 'setup-failure') {expect(controller.getPhase()).toBe('error'); expect(errors.mock.calls[0]?.[0].message).toContain('processor disconnected');}
+    else {expect(controller.getPhase()).toBe('capturing'); controller.cancel();}
+    await tick(); expect(stop).toHaveBeenCalledTimes(2); expect(close).toHaveBeenCalledOnce(); expect(scan.removed).toBe(true);
+    expect(transcribe).not.toHaveBeenCalled(); controller.destroy(); expect(vi.getTimerCount()).toBe(0);
+  });
   it.each(['injected', 'decoded'] as const)('enforces the complete-audio duration limit when %s media metadata is absent', async source => {
     installScanDom(new FakeVideo());
     const video = new FakeVideo(); video.duration = Number.NaN;

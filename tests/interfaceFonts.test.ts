@@ -205,9 +205,10 @@ describe('字体下载、缓存和切换生命周期', () => {
     expect(h.states.at(-1)?.status).toBe('ready')
   })
 
-  it('缓存损坏会删除并重新下载，而不是把坏数据传入字体解析器', async () => {
+  it.each([false, true])('缓存损坏时删除失败=%s 仍重新下载并校验后注册字体', async deletionFails => {
     const h = harness()
     h.cache.match.mockResolvedValueOnce(new Response('corrupt'))
+    if (deletionFails) h.cache.delete.mockRejectedValueOnce(new Error('corrupt cache entry locked'))
     await h.loader.load('noto-sans-sc')
     expect(h.cache.delete).toHaveBeenCalledOnce()
     expect(h.deps.fetch).toHaveBeenCalledOnce()

@@ -1075,7 +1075,7 @@ async function main() {
     const retryNotice = page.locator('.document-taskbar .translation-recovery[role="status"]');
     await retryNotice.waitFor();
     assert.match(await retryNotice.locator('.recovery-error-detail').textContent(), /自动重试/u, '重试详情须说明自动恢复状态');
-    assert.match(await page.locator('.document-status').innerText(), /正在翻译/, '自动重试期间文档仍在翻译，不应显示翻译中断');
+    assert.match(await page.locator('.document-status').innerText(), /等待自动重试/, '退避阶段须显示等待自动恢复，不应显示翻译中断');
     await page.waitForFunction(() => document.querySelector('[role=progressbar][aria-label="文档翻译进度"]')?.getAttribute('aria-valuenow') === '66');
     assert.equal(await page.locator('.pause-button').count(), 1, '重试期间可以暂停');
     const failureRequests = fixture.state.requests.filter(source => source.includes('Failure target paragraph')).length;
@@ -1099,10 +1099,10 @@ async function main() {
     fixture.state.delay = 5;
     await page.getByRole('button', {name: '开始翻译', exact: true}).click();
     await status('翻译完成');
-    assert.match(await page.locator('textarea.document-translation').first().inputValue(), /replacement document/);
+    assert.equal(decodeControlledTranslationText(await page.locator('textarea.document-translation').first().inputValue()), 'A replacement document with independent text.');
     report.cases.push('confirmed restart then replace aborts previous task; late results cannot contaminate new document');
     const recovery = await download('translated');
-    assert(fs.readFileSync(recovery, 'utf8').includes(encodeControlledTranslation('A replacement document')));
+    assert.equal(decodeControlledTranslationText(fs.readFileSync(recovery, 'utf8').trim()), 'A replacement document with independent text.');
     report.cases.push('service failure keeps completed work, shows the automatic-retry notice while still translating, recovers without user action, translated-only export works');
     // 本地历史：结果已下载、没有未保存内容时刷新不再询问，直接恢复当前文档与译文；离开文档后首页“最近翻译”列出它。
     await page.waitForTimeout(600);
@@ -1114,7 +1114,7 @@ async function main() {
     assert.equal(await page.locator('.file-drop-zone').count(), 0, '刷新后应恢复文档而不是回到首页');
     await status('翻译完成');
     await page.getByRole('button', {name: '校订译文', exact: true}).click();
-    assert((await page.locator('textarea.document-translation').first().inputValue()).includes(encodeControlledTranslation('A replacement document')));
+    assert.equal(decodeControlledTranslationText(await page.locator('textarea.document-translation').first().inputValue()), 'A replacement document with independent text.');
     await page.getByRole('button', {name: '阅读', exact: true}).click();
     const restoreRequests = fixture.state.requests.length;
     await newFile();
@@ -1149,14 +1149,15 @@ async function main() {
     const firstRequests = fixture.state.requests.filter(text => text.includes('Batch alpha first paragraph')).length;
     await page.getByRole('button', {name: '翻译剩余文件', exact: true}).click();
     // 持续失败的文件现在会自动重试（累计最多 120 s）而不是立即中断：批量队列停在它上面并显示重试提示，后面的文件仍在等待。
-    await page.locator('.document-taskbar .taskbar-notices .task-notice').filter({hasText: '翻译服务暂时没有响应，将自动重试'}).waitFor();
-    assert.match(await entries.nth(0).innerText(), /翻译完成/); assert.match(await entries.nth(2).innerText(), /正在翻译/); assert.match(await entries.nth(3).innerText(), /等待翻译/);
+    await retryNotice.waitFor();
+    assert.match(await retryNotice.locator('.recovery-error-detail').textContent(), /自动重试/u);
+    assert.match(await entries.nth(0).innerText(), /翻译完成/); assert.match(await entries.nth(2).innerText(), /等待自动重试/); assert.match(await entries.nth(3).innerText(), /等待翻译/);
     assert.equal(await entries.nth(2).evaluate(element => element.classList.contains('selected')), true, '正在重试的文件应是当前文档');
     assert.equal(fixture.state.requests.filter(text => text.includes('Batch alpha first paragraph')).length, firstRequests, '续译不能重新请求已提交的片段');
     // 不等两分钟的重试预算：暂停后失败文件保持未完成，读者可以直接翻译队列里的其他文件。
     await page.getByRole('button', {name: '暂停全部', exact: true}).click();
     await status('已暂停');
-    assert.equal(await page.locator('.document-taskbar .task-notice').filter({hasText: '将自动重试'}).count(), 0, '暂停后重试提示应消失');
+    assert.equal(await retryNotice.count(), 0, '暂停后重试提示应消失');
     await entries.nth(3).locator('.batch-file').click();
     await page.locator('.workspace-heading h1').filter({hasText: 'same.txt'}).waitFor();
     await page.getByRole('button', {name: '开始翻译', exact: true}).click();
@@ -1170,7 +1171,7 @@ async function main() {
     await page.locator('textarea.document-translation').first().fill('批量文件人工校订');
     await entries.nth(3).locator('.batch-file').click();
     await page.getByRole('button', {name: '校订译文', exact: true}).click();
-    assert.match(await page.locator('textarea.document-translation').first().inputValue(), /Batch omega/);
+    assert.equal(decodeControlledTranslationText(await page.locator('textarea.document-translation').first().inputValue()), 'Batch omega successful after failure.');
     await entries.nth(0).locator('.batch-file').click();
     await page.getByRole('button', {name: '校订译文', exact: true}).click();
     assert.equal(await page.locator('textarea.document-translation').first().inputValue(), '批量文件人工校订');
@@ -1189,7 +1190,7 @@ async function main() {
     assert.notEqual(outputs[0].name, outputs[1].name, '同名源文件不覆盖');
     const contents = await Promise.all(outputs.map(file => file.async('string')));
     assert(contents.some(text => text.includes('批量文件人工校订')));
-    assert(contents.some(text => text.includes('Batch omega')));
+    assert(contents.some(text => text.includes(encodeControlledTranslation('Batch omega successful after failure.'))), 'ZIP 必须保留末个文件的完整独立译文');
     await shot('09-batch-completed'); await noOverflow();
     await page.setViewportSize({width: 390, height: 844}); await noOverflow(); await shot('10-batch-mobile');
     await page.emulateMedia({colorScheme: 'dark'}); await shot('11-batch-mobile-dark');

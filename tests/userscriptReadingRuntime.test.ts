@@ -74,6 +74,17 @@ beforeEach(() => {
 afterEach(async () => {resetPlatformMessageHandler();await Promise.resolve();expect(state.listeners.size).toBe(0);vi.unstubAllGlobals();});
 
 describe.each([['compact', createPlatformMessageHandler], ['full', createFullPlatformMessageHandler]] as const)('%s userscript public reading', (_name, createHandler) => {
+    it('keeps manual reading available when best-effort history pruning rejects', async () => {
+        const storage=await import('@/userscript/readingStorage'),original=storage.createUserscriptReadingStorage;
+        const prune=vi.fn(async()=>{throw new Error('history maintenance unavailable');});
+        const create=vi.spyOn(storage,'createUserscriptReadingStorage').mockImplementation(options=>{
+            const actual=original(options);return {...actual,sessions:{...actual.sessions,prune}};
+        });
+        try {
+            setPlatformMessageHandler(createHandler(vi.fn()));await completed(begin());expect(prune).toHaveBeenCalledOnce();
+            expect((await listHarnessSessions()).sessions).toHaveLength(1);
+        } finally {create.mockRestore();}
+    });
     it('streams through the actual client and persists/restores only through GM', async () => {
         setPlatformMessageHandler(createHandler(vi.fn()));const run = begin();const response = await completed(run);
         expect(run.progress.mock.calls.some(([value]) => value.kind === 'text' && value.text.includes('练习'))).toBe(true);

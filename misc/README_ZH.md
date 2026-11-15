@@ -14,6 +14,8 @@
 
 流畅阅读支持在原网页中对照阅读原文与译文，并提供划词翻译、AI 阅读辅助、图片翻译、文档翻译和视频双语字幕。翻译卡片支持结合上下文解释选中文字并连续追问。
 
+我们从 2024 年 1 月开始开发流畅阅读。从那时起，流畅阅读始终保持开源，并免费向用户提供。
+
 <div align="center">
 
 [![流畅阅读介绍视频](../docs/public/videos/fluentread-promo-zh-poster.webp)](https://read.thinkstu.com/videos/fluentread-promo-zh.mp4)

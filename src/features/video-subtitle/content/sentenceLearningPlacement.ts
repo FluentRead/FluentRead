@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/sentenceLearningPlacement.ts
  * 文件职责：管理学习卡的播放器内定位与独立浮动层，避免小播放器挤压阅读和收藏操作。
- * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及调整最大高度，位置和高度仅记在当前页面会话。
+ * 主要内容：浮动层保持原组件状态与焦点，支持在可见窗口内拖动及通过底部把手调整高度，提交抬手时的最终坐标；视口缩小时使用实际可见高度，位置和高度仅记在当前页面会话。
  * 模块边界：只操作自有面板和绘制层，不选择媒体、不更改媒体时间/速度、不保存学习数据或全局配置；host负责创建、同媒体迁移与最终销毁。
  */
 import {normalizeVideoSentenceLearningAppearance, type VideoSentenceLearningAppearance} from '@/src/core/config/videoSentenceLearningAppearance';
@@ -161,7 +161,7 @@ export function createVideoSentenceLearningPlacement(options: {
             const viewport = readViewport();
             const available = Math.max(0, viewport.height - GAP * 2);
             const minimum = Math.min(MIN_FLOATING_HEIGHT, available);
-            floatingHeight = clamp(resizeDrag.height + resizeDrag.y - resizePointerY, minimum, available);
+            floatingHeight = clamp(resizeDrag.height + resizePointerY - resizeDrag.y, minimum, available);
             options.onFloatingHeight?.(floatingHeight);
         }
         syncRenderParent();
@@ -193,7 +193,7 @@ export function createVideoSentenceLearningPlacement(options: {
         const resizeHandle = host.querySelector<HTMLElement>('[data-learning-resize-handle]');
         if (resizeHandle) {
             const available = detached ? Math.max(0, bounds.height - GAP * 2) : DEFAULT_FLOATING_HEIGHT;
-            const current = detached ? floatingHeight ?? bounds.panelHeight : floatingHeight ?? DEFAULT_FLOATING_HEIGHT;
+            const current = detached ? Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight) : floatingHeight ?? DEFAULT_FLOATING_HEIGHT;
             resizeHandle.setAttribute('aria-valuemin', String(Math.round(detached ? Math.min(MIN_FLOATING_HEIGHT, available) : MIN_FLOATING_HEIGHT)));
             resizeHandle.setAttribute('aria-valuemax', String(Math.round(available)));
             resizeHandle.setAttribute('aria-valuenow', String(Math.round(current)));
@@ -207,7 +207,7 @@ export function createVideoSentenceLearningPlacement(options: {
         if (event.button !== 0) return;
         if (target.closest?.('[data-learning-resize-handle]') && detached) {
             const bounds = readFloatingBounds();
-            resizeDrag = {id: event.pointerId, y: event.clientY, height: floatingHeight ?? bounds.panelHeight};
+            resizeDrag = {id: event.pointerId, y: event.clientY, height: Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight)};
             resizePointerY = event.clientY;
             host.dataset.resizing = 'true';
             event.preventDefault(); event.stopPropagation(); return;
@@ -237,12 +237,14 @@ export function createVideoSentenceLearningPlacement(options: {
     const onUp = (event: PointerEvent) => {
         if (resizeDrag?.id === event.pointerId) {
             resizePointerY = event.clientY;
-            if (frame !== undefined) {win.cancelAnimationFrame(frame); paint();}
+            if (frame !== undefined) win.cancelAnimationFrame(frame);
+            paint();
             stopResize(); paint(); return;
         }
         if (!drag || drag.id !== event.pointerId) return;
         pointer = {x: event.clientX, y: event.clientY};
-        if (frame !== undefined) {win.cancelAnimationFrame(frame); paint();}
+        if (frame !== undefined) win.cancelAnimationFrame(frame);
+        paint();
         stopDrag();
         paint();
     };
@@ -274,7 +276,7 @@ export function createVideoSentenceLearningPlacement(options: {
         const bounds = readFloatingBounds();
         const available = Math.max(0, bounds.height - GAP * 2);
         const minimum = Math.min(MIN_FLOATING_HEIGHT, available);
-        const current = floatingHeight ?? bounds.panelHeight;
+        const current = Math.min(floatingHeight ?? bounds.panelHeight, bounds.maxHeight);
         const step = event.shiftKey ? 96 : 32;
         if (event.key === 'ArrowUp' || event.key === 'PageUp') floatingHeight = clamp(current + step, minimum, available);
         else if (event.key === 'ArrowDown' || event.key === 'PageDown') floatingHeight = clamp(current - step, minimum, available);

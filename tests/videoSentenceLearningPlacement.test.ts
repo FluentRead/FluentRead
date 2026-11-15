@@ -1,7 +1,7 @@
 import {parseHTML} from 'linkedom';
 import {describe, expect, it, vi} from 'vitest';
 import {DEFAULT_VIDEO_SENTENCE_LEARNING_APPEARANCE, normalizeVideoSentenceLearningAppearance} from '@/src/core/config/videoSentenceLearningAppearance';
-import {createVideoLearningPlacementOwner, createVideoSentenceLearningPlacement, getVideoLearningPlacement} from '@/src/features/video-subtitle/content/sentenceLearningPlacement';
+import {createVideoLearningPlacementOwner, createVideoSentenceLearningPlacement, getVideoLearningPlacement, getVideoLearningViewportPlacement} from '@/src/features/video-subtitle/content/sentenceLearningPlacement';
 
 // 执行真实定位、事件监听和清理；尺寸、RAF 与 ResizeObserver 是可控的浏览器端口。
 function fixture(options: {width?: number; height?: number; scaleX?: number; scaleY?: number; panelHeight?: number; observer?: boolean; clientSize?: boolean} = {}) {
@@ -46,11 +46,150 @@ function fixture(options: {width?: number; height?: number; scaleX?: number; sca
         emit(document, 'pointermove', {clientX: 100 + dx, clientY: 100 + dy});
         emit(document, 'pointerup', {clientX: 100 + dx, clientY: 100 + dy});
     };
-    return {document, player, host, size, addHost, frames, archivedFrames, request, cancel, addWindow, removeWindow, observers, readPlayer, flush, resize, emit, drag};
+    return {document, player, host, size, addHost, frames, archivedFrames, request, cancel, addWindow, removeWindow, observers, readPlayer, flush, resize, emit, drag, windowPort};
 }
 const appearance = (value: Parameters<typeof normalizeVideoSentenceLearningAppearance>[0] = {}) => normalizeVideoSentenceLearningAppearance(value);
 const left = (host: HTMLElement) => Number.parseFloat(host.style.left);
 const top = (host: HTMLElement) => Number.parseFloat(host.style.top);
+
+function floatingFixture() {
+    const f = fixture();
+    const viewport = {offsetLeft: 20, offsetTop: 30, width: 1000, height: 800,
+        addEventListener: vi.fn(), removeEventListener: vi.fn()};
+    const win = Object.assign(f.windowPort, {innerWidth: 1000, innerHeight: 800, visualViewport: viewport as typeof viewport | undefined});
+    const controls = f.document.createElement('div');
+    controls.innerHTML = '<button data-learning-action="float">Float</button><button data-learning-action="dock">Dock</button><div data-learning-resize-handle></div>';
+    f.host.appendChild(controls);
+    const handle = controls.querySelector<HTMLElement>('[data-learning-resize-handle]')!;
+    f.host.getBoundingClientRect = () => {
+        const x = viewport.offsetLeft + (left(f.host) || 0), y = viewport.offsetTop + (top(f.host) || 0);
+        const width = Number.parseFloat(f.host.style.width) || 360, height = Number.parseFloat(f.host.style.height) || f.size.panelHeight;
+        return {x, y, left: x, top: y, right: x + width, bottom: y + height, width, height, toJSON: () => ({})};
+    };
+    const toggle = () => {f.emit(controls.querySelector('button')!, 'click'); f.flush();};
+    const key = (value: string, shiftKey = false) => {
+        const event = f.emit(handle, 'keydown', {key: value, shiftKey}); f.flush(); return event;
+    };
+    return {...f, viewport, win, controls, handle, toggle, key};
+}
+
+describe('学习卡浮动层与底部高度把手', () => {
+    it('视口四角、拖动比例和极小窗口都保持边界，最大高度不超过可见区域', () => {
+        const base = {viewportWidth: 1000, viewportHeight: 800, panelWidth: 360, panelHeight: 200, maxPanelHeight: 640};
+        expect(getVideoLearningViewportPlacement({...base, position: 'top-left'})).toEqual({left: 8, top: 8, maxHeight: 640, compact: false});
+        expect(getVideoLearningViewportPlacement({...base, position: 'bottom-right'})).toEqual({left: 632, top: 592, maxHeight: 640, compact: false});
+        expect(getVideoLearningViewportPlacement({...base, position: 'bottom-left', dragged: {x: 2, y: -1}})).toMatchObject({left: 632, top: 8});
+        expect(getVideoLearningViewportPlacement({...base, position: 'top-right', viewportWidth: 10, viewportHeight: 10})).toEqual({left: 8, top: 8, maxHeight: 0, compact: true});
+    });
+
+    it('浮出和停靠复用原host，视口偏移与同播放器全屏切换后位置和输入仍保留', () => {
+        const f = floatingFixture(), changed = vi.fn();
+        const input = f.host.querySelector('textarea')!; input.value = 'Keep my draft';
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance({position: 'top-left'}), onDragPosition: changed});
+        f.emit(f.host.querySelector('p')!, 'click'); expect(f.host.dataset.floating).toBe('false');
+        f.toggle();
+        const frame = f.host.parentElement!;
+        expect(frame.parentElement).toBe(f.document.documentElement); expect(frame.style.position).toBe('fixed');
+        expect(frame.style.transform).toBe('translate(20px, 30px)'); expect(f.host.querySelector('textarea')).toBe(input);
+        expect(input.value).toBe('Keep my draft'); expect(placement.isConnected(f.player)).toBe(true);
+        f.viewport.addEventListener.mock.calls.forEach(([, listener]) => (listener as () => void)()); f.flush();
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.player});
+        placement.syncPlayer(f.player); f.flush(); expect(frame.parentElement).toBe(f.player);
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: f.document.body});
+        placement.syncPlayer(f.player); f.flush(); expect(frame.parentElement).toBe(f.document.body);
+        const foreign = f.document.createElement('div'); f.document.body.appendChild(foreign);
+        Object.defineProperty(f.document, 'fullscreenElement', {configurable: true, value: foreign});
+        placement.syncPlayer(f.player); f.flush(); expect(frame.parentElement).toBe(f.document.documentElement);
+        f.toggle(); expect(f.host.parentElement).toBe(f.player); expect(frame.isConnected).toBe(false);
+        expect(f.host.style.height).toBe('auto'); expect(f.host.dataset.floating).toBe('false');
+        placement.destroy();
+    });
+
+    it('一次移动已绘制后仍提交pointerup的最后位置，播放器内与浮动层一致', () => {
+        for (const floating of [false, true]) {
+            const f = floatingFixture(), changed = vi.fn();
+            const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance({position: 'top-left'}), onDragPosition: changed});
+            if (floating) f.toggle();
+            f.emit(f.host.querySelector('.title')!, 'pointerdown');
+            f.emit(f.document, 'pointermove', {clientX: 120, clientY: 120}); f.flush();
+            expect(left(f.host)).toBe(28); expect(top(f.host)).toBe(28);
+            f.emit(f.document, 'pointerup', {clientX: 140, clientY: 140});
+            expect(left(f.host)).toBe(48); expect(top(f.host)).toBe(48); expect(f.host.dataset.dragging).toBeUndefined();
+            if (floating) expect(changed).toHaveBeenLastCalledWith(expect.any(Object), 'floating');
+            placement.destroy();
+        }
+    });
+
+    it('底部把手向下增高、向上缩小；已绘制和仍排队的最终抬手坐标都提交', () => {
+        const f = floatingFixture(), height = vi.fn();
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance({position: 'top-left'}), onDragPosition: vi.fn(), onFloatingHeight: height});
+        f.emit(f.handle, 'pointerdown'); expect(f.host.dataset.resizing).toBeUndefined();
+        f.toggle();
+        f.emit(f.handle, 'pointerdown', {clientY: 300});
+        f.emit(f.document, 'pointermove', {clientY: 350, pointerId: 99}); expect(f.frames.size).toBe(0);
+        f.emit(f.document, 'pointermove', {clientY: 350}); f.flush();
+        expect(f.host.style.height).toBe('250px');
+        f.emit(f.document, 'pointerup', {clientY: 400});
+        expect(f.host.style.height).toBe('300px'); expect(height).toHaveBeenLastCalledWith(300);
+        f.emit(f.handle, 'pointerdown', {clientY: 400}); f.emit(f.document, 'pointermove', {clientY: 360});
+        f.emit(f.document, 'pointerup', {clientY: 340}); expect(f.host.style.height).toBe('240px');
+        f.emit(f.handle, 'pointerdown', {clientY: 340});
+        f.emit(f.document, 'pointerup', {clientY: 350}); expect(f.host.style.height).toBe('250px');
+        expect(f.host.dataset.resizing).toBeUndefined(); expect(f.frames.size).toBe(0); placement.destroy();
+    });
+
+    it('高度键盘、上下限和视口缩小消费实际可见高度，ARIA值不超出范围', () => {
+        const f = floatingFixture(), height = vi.fn();
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance(), onDragPosition: vi.fn(), onFloatingHeight: height});
+        expect(f.key('End').defaultPrevented).toBe(false); f.toggle();
+        expect(f.key('ArrowUp').defaultPrevented).toBe(true); expect(f.host.style.height).toBe('232px');
+        f.key('PageUp', true); expect(f.host.style.height).toBe('328px');
+        f.key('ArrowDown'); expect(f.host.style.height).toBe('296px');
+        f.key('PageDown', true); expect(f.host.style.height).toBe('200px');
+        f.key('Home'); expect(f.host.style.height).toBe('180px');
+        f.key('End'); expect(f.host.style.height).toBe('784px');
+        expect(f.key('Enter').defaultPrevented).toBe(false);
+        f.viewport.height = 400; f.resize(); f.flush();
+        expect(f.host.style.height).toBe('384px'); expect(f.handle.getAttribute('aria-valuenow')).toBe('384');
+        f.key('ArrowDown'); expect(f.host.style.height).toBe('352px');
+        f.viewport.height = 300; f.resize(); f.flush();
+        f.emit(f.handle, 'pointerdown', {clientY: 100}); f.emit(f.document, 'pointerup', {clientY: 90});
+        expect(f.host.style.height).toBe('274px');
+        f.viewport.height = 100; f.resize(); f.flush(); f.key('Home');
+        expect(f.host.style.height).toBe('84px'); expect(f.handle.getAttribute('aria-valuemin')).toBe('84');
+        placement.destroy();
+    });
+
+    it('无visualViewport时回退窗口尺寸，视口暂不可用时安全停靠并清理所有监听', () => {
+        const f = floatingFixture(); f.win.visualViewport = undefined;
+        const placement = createVideoSentenceLearningPlacement({host: f.host, player: f.player, appearance: appearance(), onDragPosition: vi.fn()});
+        f.toggle(); expect(f.host.dataset.floating).toBe('true');
+        f.win.innerWidth = 0; f.win.innerHeight = 0; f.resize(); f.flush();
+        expect(f.host.dataset.floating).toBe('false'); expect(f.host.parentElement).toBe(f.player); placement.destroy();
+        const second = floatingFixture();
+        const next = createVideoSentenceLearningPlacement({host: second.host, player: second.player, appearance: appearance(), onDragPosition: vi.fn()});
+        second.toggle(); second.emit(second.handle, 'pointerdown'); second.emit(second.document, 'pointermove', {clientY: 150});
+        next.destroy(); const style = second.host.getAttribute('style');
+        for (const callback of second.archivedFrames.values()) callback(0);
+        expect(second.host.getAttribute('style')).toBe(style); expect(second.host.dataset.resizing).toBeUndefined();
+        expect(second.viewport.addEventListener.mock.calls.map(call => call[0])).toEqual(['resize', 'scroll']);
+        expect(second.viewport.removeEventListener.mock.calls.map(call => call[0])).toEqual(['resize', 'scroll']);
+        expect(second.host.parentElement).toBe(second.player);
+        const narrow = floatingFixture(); narrow.viewport.width = 100; narrow.viewport.height = 100;
+        const compact = createVideoSentenceLearningPlacement({host: narrow.host, player: narrow.player, appearance: appearance(), onDragPosition: vi.fn()});
+        narrow.toggle(); expect(left(narrow.host)).toBe(8); expect(top(narrow.host)).toBe(8); compact.destroy();
+    });
+
+    it('关闭重开保留浮动高度，外观位置改变后清除旧浮动坐标并使用新角落', () => {
+        const f = floatingFixture(); let value: unknown = {position: 'top-left'}, notify!: () => void;
+        const owner = createVideoLearningPlacementOwner(() => value, listener => {notify = listener; return vi.fn();});
+        const first = owner.place(f.host, f.player); f.toggle(); f.key('End'); first.destroy();
+        const second = owner.place(f.host, f.player); f.toggle(); expect(f.host.style.height).toBe('784px');
+        f.drag(f.host, 200, 100);
+        value = {position: 'top-right'}; notify(); f.flush(); expect(left(f.host)).toBe(632); expect(top(f.host)).toBe(8);
+        second.destroy(); owner.dispose();
+    });
+});
 
 function mobileFixture() {
     const f = fixture({width: 402, height: 226, panelHeight: 120});
@@ -268,7 +407,7 @@ describe('学习面板拖动与 DOM 生命周期', () => {
         expect(f.readPlayer).toHaveBeenCalledTimes(reads); expect(f.host.getAttribute('style')).toBe(snapshot);
         expect(changed).not.toHaveBeenCalled(); expect(f.observers[0].disconnect).toHaveBeenCalledOnce();
         expect(f.observers[0].observe).toHaveBeenCalledTimes(2); expect(f.frames.size).toBe(0);
-        expect(hostRemove.mock.calls.map(call => call[0])).toEqual(['pointerdown']);
+        expect(hostRemove.mock.calls.map(call => call[0])).toEqual(['pointerdown', 'click', 'keydown']);
         expect(docRemove.mock.calls.map(call => call[0])).toEqual(['pointermove', 'pointerup', 'pointercancel']);
         expect(f.removeWindow).toHaveBeenCalledWith('resize', expect.any(Function));
     });

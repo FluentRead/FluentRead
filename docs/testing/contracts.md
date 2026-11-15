@@ -235,7 +235,7 @@ pnpm test:regression:all -- --browser \
 
 修复流程由 Codex 读取总报告与日志，先复现并核对源码，区分环境或语料问题与已确认缺陷，再自动修复已确认的缺陷并运行相关定向测试。修复记录应注明改动、复验范围、剩余失败和未执行项；定向通过后仍需按影响范围补做完整回归。CLI 负责执行和报告，修复代码由 Codex 完成。不得通过删除必要用例或断言、缩小覆盖范围、降低阈值、增加跳过或覆盖率忽略来获得通过。
 
-真实浏览器层必须使用临时 profile、屏幕外正常尺寸窗口和 focus-safe helper；不会连接用户日常 profile，也不会静默退化成抢焦点的普通 Playwright 启动。`--browser` 追加 14 组本地浏览器夹具：首次 popup 高度、划词触发、全文翻译、翻译 DOM 与按钮稳定性、固定高度双语布局、GitHub 间距、嵌套列表和任务列表、视频字幕、文档翻译、设置中心、术语库、隐私边界和 userscript smoke；真实网络站点矩阵还需要单独的网络许可。具体参数以 `node scripts/testing/run-full-regression.mjs --help` 为准。
+真实浏览器层必须使用临时 profile、第二屏可见且不抢焦点的正常尺寸窗口和 focus-safe helper；不会连接用户日常 profile，也不会静默退化成抢焦点的普通 Playwright 启动。`--browser` 追加 14 组本地浏览器夹具：首次 popup 高度、划词触发、全文翻译、翻译 DOM 与按钮稳定性、固定高度双语布局、GitHub 间距、嵌套列表和任务列表、视频字幕、文档翻译、设置中心、术语库、隐私边界和 userscript smoke；真实网络站点矩阵还需要单独的网络许可。具体参数以 `node scripts/testing/run-full-regression.mjs --help` 为准。
 
 CI 或本地报告必须分别说明：确定性回归、隔离浏览器回归、真实网络矩阵是否执行。任何未执行层都不能写成“全量回归已通过”。
 

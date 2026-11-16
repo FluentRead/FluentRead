@@ -1,7 +1,7 @@
 /**
  * @file tests/videoSubtitleTrackPriorityRuntime.test.ts
  * 文件职责：从实际 mountVideoSubtitleTranslation 公共入口验证 X 轨道优先与 YouTube 同轮选择、人工字幕回退及卸载后的异步资格。
- * 主要内容：真实桥消息、video、TextTrack 与配置订阅驱动播放器、轨道 loader、缓存和 DOM；覆盖移动端兄弟底控显隐与字幕布局自动同步、重绑和清理、菜单入口展开语义、两站菜单关闭字幕后保留入口与重新挂载恢复、功能总开关移除入口、关闭后的迟到结果与下载清理、重复外部启用重建、真实模式项保存、同句调用预算、实际服务线路或套餐变化后的缓存失效、时钟漂移、NaN、seek、偏移、人工轨空档与迟到结果。
+ * 主要内容：真实桥消息、video、TextTrack 与配置订阅驱动播放器、轨道 loader、缓存和 DOM；覆盖 YouTube 仅原文使用自有样式并按时间轴显示完整 cue、原生字幕接管、移动端兄弟底控显隐与字幕布局自动同步、重绑和清理、菜单入口展开语义、两站菜单关闭字幕后保留入口与重新挂载恢复、功能总开关移除入口、关闭后的迟到结果与下载清理、重复外部启用重建、真实模式项保存、同句调用预算、实际服务线路或套餐变化后的缓存失效、时钟漂移、NaN、seek、偏移、人工轨空档与迟到结果。
  * 模块边界：linkedom 补齐缺失的浏览器媒体/几何接口并按观察器订阅过滤记录；只 mock 外部端口，命名 selector spy 保留真实实现，不替换业务算法或修改全局数组原型。
  */
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
@@ -1844,6 +1844,33 @@ describe('public mounted video player button follows the video translation switc
 describe('public mounted YouTube native caption visibility ownership', () => {
   const hiddenClass = 'fluent-read-video-native-caption-hidden';
 
+  it('renders the matched full original cue in FluentRead style on desktop without requesting a translation', async () => {
+    Object.assign(ports.config, {videoSubtitleDisplayMode: 'original-only', videoPreferHumanSubtitles: false});
+    const f = fixture(undefined, 'youtube');
+    const visiblePrefix = 'The full original line is ready';
+    const completeCue = `${visiblePrefix} before the YouTube caption window stops scrolling.`;
+    f.setCaptionSegments([visiblePrefix]);
+    const dispose = f.start();
+    f.emitTimedText([{startMs: 0, durationMs: 5000, text: completeCue}]);
+    await vi.advanceTimersByTimeAsync(80);
+
+    expect(f.displayed()).toMatchObject({source: completeCue, translated: ''});
+    expect(f.player.classList.contains(hiddenClass)).toBe(true);
+    expect(f.document.getElementById('ytp-caption-window-container')?.classList.contains('fluent-read-video-display-original-only')).toBe(true);
+    expect(ports.translate).not.toHaveBeenCalled();
+
+    f.changeConfig({videoSubtitleDisplayMode: 'bilingual'});
+    await vi.advanceTimersByTimeAsync(400);
+    expect(f.displayed()).toMatchObject({source: completeCue, translated: translation(completeCue)});
+    expect(ports.translate).toHaveBeenCalledTimes(1);
+
+    f.changeConfig({videoSubtitleDisplayMode: 'original-only'});
+    await vi.advanceTimersByTimeAsync(80);
+    expect(f.displayed()).toMatchObject({source: completeCue, translated: ''});
+    expect(ports.translate).toHaveBeenCalledTimes(1);
+    dispose();
+  });
+
   it('keeps native captions suppressed across empty, expired and replaced cues, and restores mode/config changes', async () => {
     ports.config.videoPreferHumanSubtitles = false;
     const f = fixture(undefined, 'youtube'); f.video.currentTime = .5;
@@ -1868,7 +1895,7 @@ describe('public mounted YouTube native caption visibility ownership', () => {
 
     for (const mode of ['original-only', 'translation-only', 'bilingual'] as const) {
       f.changeConfig({videoSubtitleDisplayMode: mode}); await settle();
-      expect(f.player.classList.contains(hiddenClass)).toBe(mode !== 'original-only');
+      expect(f.player.classList.contains(hiddenClass)).toBe(true);
     }
     f.changeConfig({videoSubtitleVisible: false}); await settle();
     expect(f.player.classList.contains(hiddenClass)).toBe(true);

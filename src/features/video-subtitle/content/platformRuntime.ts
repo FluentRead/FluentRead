@@ -504,7 +504,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             timeline.clear(); courseIdentity = ''; manualEnabled = null;
         }
         const enabled = captionsEnabled();
-        const request = course && video && enabled ? getCourseCaptionRequest(course, new URL(window.location.href), video) : null;
+        const request = course && video && enabled ? getCourseCaptionRequest(course, new URL(window.location.href), video, config.from, config.to) : null;
         const identity = request?.key || '';
         if (identity !== courseIdentity) { courseIdentity = identity; clear(); restoreCaptions(); cache.clear(); readings.clear(); }
         timeline.sync(request, mediaKey);

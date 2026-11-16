@@ -307,6 +307,7 @@
       "tests/videoReadingAssetStore.test.ts",
       "tests/videoReadingJapaneseDictionary.test.ts",
       "tests/videoSubtitleLogic.test.ts",
+      "tests/youtubeNativeCaptionVisibility.test.ts",
       "tests/videoKaraoke.test.ts",
       "tests/localModelReadiness.test.ts",
       "tests/videoSubtitleLanguage.test.ts",

@@ -141,6 +141,7 @@ export default defineConfig({
                 'src/services/diagnostics/index.ts',
                 'src/app/popup/startupFeedback.ts',
                 'src/features/video-subtitle/content/learningSource.ts',
+                'src/features/video-subtitle/content/youtubeNativeCaptionVisibility.ts',
                 'src/features/vocabulary/materialContent.ts',
                 'src/features/vocabulary/materialCapture.ts',
                 'src/features/vocabulary/materialSource.ts',

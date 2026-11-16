@@ -1,17 +1,19 @@
 /**
  * @file src/features/video-subtitle/content/courseCaptionData.ts
  * 文件职责：解析课程视频身份、原文字幕轨道及 B 站和 edX 的完整字幕时间轴。
- * 主要内容：分 P、课程小节和 edX 语言进入身份；人工原文优先，限定字幕资源主机，校验数字与数组边界并复用时间轴规范化。
+ * 主要内容：分 P、课程小节和语言偏好进入身份；B 站先匹配原语言或选择非目标语言候选，再优先人工轨，限定字幕资源主机并校验时间轴边界。
  * 模块边界：只读取传入的地址、视频节点和数据，不调用网络、页面全局、翻译或持久化。
  */
 import type {VideoCoursePlatform} from '@/src/core/config/videoCourse';
 import {finalizeVideoSubtitleCues, type VideoSubtitleCue} from './youtubeSubtitleData';
+import {captionLanguageMatch} from './platforms';
 
 export interface CourseCaptionRequest {
     platform: VideoCoursePlatform;
     key: string;
     id: string;
     language: string;
+    target?: string;
     url: string;
 }
 export interface CourseCaptionTrack {url: string; language: string; manual: boolean}
@@ -41,10 +43,10 @@ export function resolveCourseCaptionUrl(value: unknown, base: URL, platform: Vid
     } catch { return ''; }
 }
 
-export function getCourseCaptionRequest(platform: VideoCoursePlatform, url: URL, video: HTMLVideoElement): CourseCaptionRequest | null {
+export function getCourseCaptionRequest(platform: VideoCoursePlatform, url: URL, video: HTMLVideoElement, sourceLanguage = '', targetLanguage = ''): CourseCaptionRequest | null {
     if (platform === 'bilibili') {
         const id = getBilibiliPart(url);
-        return id ? {platform, key: id, id, language: '', url: ''} : null;
+        return id ? {platform, key: `${id}:${sourceLanguage}:${targetLanguage}`, id, language: sourceLanguage, target: targetLanguage, url: ''} : null;
     }
     if (platform === 'udemy') {
         const match = url.pathname.match(/^\/course\/([^/]+)\/learn\/lecture\/(\d+)\/?$/);
@@ -63,7 +65,7 @@ export function getCourseCaptionRequest(platform: VideoCoursePlatform, url: URL,
     } catch { return null; }
 }
 
-export function chooseBilibiliCaption(value: unknown, base: URL): CourseCaptionTrack | null {
+export function chooseBilibiliCaption(value: unknown, base: URL, sourceLanguage = '', targetLanguage = ''): CourseCaptionTrack | null {
     if (!Array.isArray(value)) return null;
     const tracks = value.flatMap(item => {
         const entry = captionRecord(item);
@@ -71,7 +73,13 @@ export function chooseBilibiliCaption(value: unknown, base: URL): CourseCaptionT
         if (!url || typeof entry.lan !== 'string' || !entry.lan) return [];
         return [{url, language: entry.lan.replace(/^ai-/, ''), manual: !entry.lan.startsWith('ai-')}];
     });
-    return tracks.find(track => track.manual) || tracks[0] || null;
+    const family = (language: string) => language.toLowerCase().split(/[-_]/)[0];
+    // 人工轨也可能是译文，不能直接把列表首项当成原文。简繁中文视为同一目标语言。
+    // 没有原语言元数据时，非目标语言只是候选；仅有目标语言时仍保留可用字幕。
+    // 原语言匹配（4）高于非目标语言（2）和人工轨（1）；同分保持站点原有顺序。
+    const rank = (track: CourseCaptionTrack) => (captionLanguageMatch(track.language, sourceLanguage) ? 4 : 0)
+        + (family(track.language) === family(targetLanguage) ? 0 : 2) + (track.manual ? 1 : 0);
+    return tracks.sort((left, right) => rank(right) - rank(left))[0] || null;
 }
 
 export function chooseUdemyCaption(value: unknown, locale: string, base: URL): CourseCaptionTrack | null {

@@ -40,6 +40,8 @@ export default defineConfig({
     }, createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), clientVue({include: [
         /\/src\/(?:features\/share-card\/ui\/ShareCardStudio|features\/selection-translation\/ui\/SelectionTranslator|features\/settings\/ui\/services\/RequestLimit(?:Settings|Fields)|features\/reading-assistant\/ui\/[^/]+|ui\/components\/(?:MarkdownContent|MarkdownTable|[^/]*Reading[^/]*)|features\/image-translation\/ui\/(?:MangaEntry|MangaReadingPanel)|app\/document-translation\/(?:DocumentApp|DocumentSegmentEditor|PdfSourceEditor)|ui\/components\/(?:CustomHotkeyInput|UiSelect|GlossaryLibrarySelect|ServiceIcon|TranslationLoadingPreview|UiIcon|FeatureEnableCard)|features\/settings\/ui\/components\/(?:FieldHelp|InterfaceSkinPreview|PopupLayoutPreview|PopupLayoutPreviewItem|SettingsGroup|SettingsItem|TranslationColorField|TranslationStylePreview|WritingStylePreview|SegmentedControl))\.vue$/,
         resolve(__dirname, 'src/features/settings/ui/services/RequestHeaderSettings.vue'),
+        resolve(__dirname, 'src/features/settings/ui/DictionaryWorkspaceSettings.vue'),
+        resolve(__dirname, 'src/features/selection-translation/ui/DictionaryCardTools.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/ServiceCatalog.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/FreeTranslationSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/services/ModelPicker.vue'),

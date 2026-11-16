@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/es-ES.json';
 import selfHelpText from './self-help/es-ES.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesSpanishMessages} from './sectionTranslationRulesRomance';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -570,6 +571,7 @@ export const esESMessages = {
     ...aiRequestTimeoutMessages["es-ES"],
     ...privacyProtectionMessages["es-ES"],
     ...selectionDictionaryMessages["es-ES"],
+    ...dictionaryWorkspaceMessages["es-ES"],
     ...sectionTranslationRulesSpanishMessages,
     "settings.requestLimits.retryIntervals": "Intervalos de reintento",
     "settings.requestLimits.apiKeyRecovery": "Enfriamiento de la API key fallida",

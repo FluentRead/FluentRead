@@ -939,7 +939,12 @@
       "tests/youtubeEmbedFrameRuntime.test.ts",
       "tests/translationPrivacy.test.ts",
       "tests/privacySettingsLifecycle.test.ts",
-      "tests/videoAiSharedModelCache.test.ts"
+      "tests/videoAiSharedModelCache.test.ts",
+      "tests/dictionaryWorkspace.test.ts",
+      "tests/dictionaryRuntime.test.ts",
+      "tests/dictionaryUi.test.ts",
+      "tests/dictionaryAdapters.test.ts",
+      "tests/dictionaryScriptInitialization.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

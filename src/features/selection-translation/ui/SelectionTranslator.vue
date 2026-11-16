@@ -105,14 +105,14 @@
                 <pre><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
               </div>
               <div v-else-if="isLoading" class="fr-word-translation-loading">正在翻译释义…</div>
-              <div v-if="wordCard.meanings.length > 0" class="fr-word-meaning-toolbar">
+              <div v-if="wordCard.meanings.length > 0 && !wordCard.dictionaryEntry" class="fr-word-meaning-toolbar">
                 <span>英文释义 · 中文辅助</span>
                 <button type="button" @click="showChineseSupport = !showChineseSupport">{{ showChineseSupport ? '隐藏中文辅助' : '显示中文辅助' }}</button>
               </div>
               <div v-if="isWordCardSupportLoading" class="fr-word-support-loading" role="status">正在补充辅助释义…</div>
               <div v-if="wordCard.meanings.length > 0" class="fr-word-meanings">
                 <div v-for="meaning in wordCard.meanings.slice(0, 4)" :key="meaning.partOfSpeech" class="fr-word-meaning">
-                  <strong class="fr-pos-label" :title="translateLegacy(describePartOfSpeech(meaning.partOfSpeech).description)">{{ translateLegacy(meaning.partOfSpeech) }}</strong>
+                  <strong v-if="meaning.partOfSpeech" class="fr-pos-label" :title="translateLegacy(describePartOfSpeech(meaning.partOfSpeech).description)">{{ translateLegacy(meaning.partOfSpeech) }}</strong>
                   <ol>
                     <li v-for="definition in meaning.definitions.slice(0, 4)" :key="`${meaning.partOfSpeech}-${definition.definition}`">
                       <span class="fr-word-definition-en">{{ definition.definition }}</span>
@@ -127,9 +127,10 @@
               </div>
               <div v-else class="fr-word-empty">暂未找到详细释义，可查看译文。</div>
               <footer class="fr-word-card-footer">
-                <span>数据来自开放词典</span>
-                <a v-for="source in wordCard.sources" :key="source.id" :href="source.url" target="_blank" rel="noreferrer">{{ source.label }}</a>
+                <span v-if="!wordCard.dictionaryEntry">数据来自开放词典</span>
+                <template v-for="source in wordCard.sources" :key="source.id"><a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">{{ source.label }}</a><span v-else>{{ source.label }}</span></template>
               </footer>
+              <DictionaryCardTools v-if="extensionDictionaryWorkspace && dictionaryToolEntry && dictionaryWorkspace" :key="`${wordLookupRequestId}-${wordCard.normalizedWord}`" :entry="dictionaryToolEntry" :workspace="dictionaryWorkspace" :context="dictionaryContext" :explanation="readingPanelRef?.getCompletedAnswer?.() || ''" :dark="isDarkTheme" />
             </template>
           </section>
           <div v-if="isWordSelection && wordCardError" class="fr-word-fallback-note" role="status"><span>{{ wordCardError }}</span><button type="button" @click="retryWordCard">重查词典</button></div>
@@ -208,6 +209,9 @@ import {detectlang, shouldSkipChineseSelection, shouldSkipTranslationForTarget} 
 import { matchesConfiguredHotkey, matchesModifierOnlyHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey';
 import {describePartOfSpeech} from '@/src/core/language/partOfSpeech';
 import type { WordCardData, WordPronunciation } from '@/src/features/selection-translation/services/wordDictionary';
+import DictionaryCardTools from './DictionaryCardTools.vue';
+import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
+import {normalizeDictionaryWord} from '../dictionary/model';
 import { isSingleEnglishWord, normalizeEnglishWord } from '@/src/features/selection-translation/services/wordNormalization';
 import { calculateSelectionPopupPosition, chooseSelectionRect, getSelectionPopupAnchor, getEditableSelectionRoot, getSelectionPresentationDelayRemaining, readSelectionParts, translateSelectionParts, normalizeSpeechLanguage, reconcileSelectionPresentation, resolveSelectionDictionaryFallback, resolveSelectionVocabularyAnswer, selectionReverseTarget, SelectionRequestTokenGate, shouldIgnoreSelection, summarizeSelectionContext, type SelectionAnswerCandidate, type SelectionContentRequest, type SelectionRect, type SelectionTextPart } from '@/src/features/selection-translation/core';
 import {
@@ -511,6 +515,7 @@ watch(() => snapshot.value?.range ?? null, (range) => {
   props.onSelectionRangeChange?.(range);
 }, { flush: 'post' });
 
+const extensionDictionaryWorkspace = import.meta.env.BROWSER !== 'userscript';
 const selectionShortcutTriggers = new Set(['Control', 'Alt', 'Shift', 'custom']);
 const selectionSettings = computed(() => {
   // `config` 与内容脚本运行时共享，且会在 Vue 外部变更；用本地响应式版本让 Popup/Options
@@ -526,7 +531,9 @@ const selectionSettings = computed(() => {
     from: config.from,
     to: config.to,
     bidirectional: config.selectionTranslatorBidirectional,
-    dictionarySource: config.selectionDictionarySource,
+    dictionarySource: extensionDictionaryWorkspace && config.selectionDictionaryRecipe ? JSON.stringify([config.selectionDictionaryRecipe, config.selectionDictionaryWorkspace?.revision, config.selectionDictionaryWorkspace?.recipes.find(item => item.id === config.selectionDictionaryRecipe)]) : config.selectionDictionarySource,
+    dictionaryRecipe: extensionDictionaryWorkspace ? config.selectionDictionaryRecipe || '' : '',
+    dictionaryWorkspace: extensionDictionaryWorkspace ? config.selectionDictionaryWorkspace : undefined,
     service: config.selectionTranslationService || config.service,
     model: `${config.model?.[config.selectionTranslationService || config.service] || ''}:${config.customModel?.[config.selectionTranslationService || config.service] || ''}`,
   };
@@ -549,7 +556,18 @@ const UI_SELECTION_SUPPRESSION_MS = 350;
 const SELECTION_LOSS_GRACE_MS = 160;
 const PENDING_SELECTION_SHORTCUT_MS = 250;
 
-const selectedWord = computed(() => normalizeEnglishWord(selectedText.value));
+const selectedWord = computed(() => extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(selectedText.value) : normalizeEnglishWord(selectedText.value));
+const dictionaryWorkspace = computed(() => selectionSettings.value.dictionaryWorkspace);
+const dictionaryContext = extensionDictionaryWorkspace ? computed(() => {
+  if (!snapshot.value) return selectedText.value;
+  try {return (props.selectionAdapter?.captureReading ?? captureReadingSelection)(snapshot.value.range, selectedText.value, 2000).sentence || selectedText.value;}
+  catch {return selectedText.value;}
+}) : '';
+const dictionaryToolEntry = extensionDictionaryWorkspace ? computed(() => wordCard.value ? wordCard.value.dictionaryEntry || {...EMPTY_DICTIONARY_FIELDS,
+  word: wordCard.value.word, phonetic: wordCard.value.phonetics[0]?.text || '', audio: wordCard.value.phonetics[0]?.audio || '',
+  definition: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.definition)).join('\n'),
+  example: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.example || '')).filter(Boolean).join('\n'),
+  etymology: wordCard.value.origin || '', source: wordCard.value.sources.map(item => item.label).join(', '), sourceUrl: wordCard.value.sources[0]?.url || ''} : null) : null;
 const hasDistinctTranslationResult = computed(() => hasDistinctTranslation(selectedText.value, translationResult.value));
 const reverseTargetLanguage = computed(() => selectionReverseTarget(selectedText.value, selectionSettings.value.to, selectionSettings.value.from));
 const effectiveTargetLanguage = computed(() => (selectionSettings.value.bidirectional || manuallyRequestedSelection.value) && reverseTargetLanguage.value
@@ -558,8 +576,8 @@ const effectiveSourceLanguage = computed(() => {
   return reverseTargetLanguage.value && effectiveTargetLanguage.value === reverseTargetLanguage.value
     ? selectionSettings.value.to : selectionSettings.value.from;
 });
-const isWordSelection = computed(() => Boolean(selectedWord.value) && effectiveTargetLanguage.value !== 'en'
-  && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value)));
+const isWordSelection = computed(() => Boolean(selectedWord.value) && (Boolean(selectionSettings.value.dictionaryRecipe) || effectiveTargetLanguage.value !== 'en'
+  && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value))));
 const isWordCardVisible = computed(() => isWordSelection.value && wordCard.value !== null);
 const isPrivateContext = browser.extension.inIncognitoContext === true;
 const currentContentRequest = computed<SelectionContentRequest | null>(() => {
@@ -670,6 +688,7 @@ function isSelectionReadSuppressed(): boolean {
 }
 
 function isSelectionInTargetLanguage(text: string): boolean {
+  if (extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe && normalizeDictionaryWord(text)) return false;
   if (selectionSettings.value.bidirectional && selectionReverseTarget(text, config.to, config.from)) return false;
   return shouldSkipChineseSelection(text, config.to) || shouldSkipTranslationForTarget(text, config.to);
 }
@@ -818,7 +837,7 @@ function applySelection(next: SelectionSnapshot | null, shortcutTriggered = fals
   dismissedSelection = null;
   cancelSelectionLoss();
   // 右键菜单是用户明确下达的指令：即使选区已是目标语言也照常出卡片，不静默丢弃。
-  if (!forced && shouldSkipChineseSelection(next.text, config.to)
+  if (!forced && !selectionSettings.value.dictionaryRecipe && shouldSkipChineseSelection(next.text, config.to)
     && !(selectionSettings.value.bidirectional && selectionReverseTarget(next.text, config.to, config.from))) { hideAll(); return; }
   if (isSameSelection(snapshot.value, next)) {
     if (forced) manuallyRequestedSelection.value = true;
@@ -1351,6 +1370,7 @@ function openReadingCard(): void {
 }
 
 function shouldUseWordCard(text: string): boolean {
+  if (extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe) return normalizeDictionaryWord(text) !== null;
   return isSingleEnglishWord(text) && effectiveTargetLanguage.value !== 'en'
     && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value));
 }
@@ -1584,7 +1604,7 @@ function retryWordCard(): void {
 
 async function requestWordCard(request: SelectionContentRequest): Promise<void> {
   const text = request.text;
-  const word = normalizeEnglishWord(text);
+  const word = extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(text) : normalizeEnglishWord(text);
   if (!word) return;
   const requestId = ++wordLookupRequestId;
   wordLookupAbortController?.abort();
@@ -1606,6 +1626,7 @@ async function requestWordCard(request: SelectionContentRequest): Promise<void> 
       dictionaryAnswer.value = {...request, answer: dictionaryDefinitions(response.data, request.targetLanguage)};
       isWordCardLoading.value = false;
       schedulePositionUpdate();
+      if (response.data.dictionaryEntry) return;
       isWordCardSupportLoading.value = true;
       try {
         const enriched = await sendWordCardRequest(word, request.targetLanguage, true, controller.signal);
@@ -2803,7 +2824,7 @@ onMounted(() => {
     if (!snapshot.value) return;
     if (languageChanged) manuallyRequestedSelection.value = false;
     if (languageChanged && readingMode.value) { hideAll(); return; }
-    if ((languageChanged || directionEntryChanged) && !manuallyRequestedSelection.value
+    if ((languageChanged || directionEntryChanged) && !manuallyRequestedSelection.value && !selectionSettings.value.dictionaryRecipe
       && (shouldSkipChineseSelection(snapshot.value.text, config.to)
       && !(selectionSettings.value.bidirectional && selectionReverseTarget(snapshot.value.text, config.to, config.from))
       || (!readingEnabled.value && isSelectionInTargetLanguage(snapshot.value.text)))) { hideAll(); return; }

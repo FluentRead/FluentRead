@@ -4,6 +4,8 @@ overrides:
   react: 18.3.1
   react-dom: 18.3.1
   vitepress>vite: 5.4.21
+  # 词典 Worker 仅使用纯 TypeScript LZO，不安装可选的 Node 原生绑定。
+  lzo1x>lzo: '-'
 
 patchedDependencies:
   ppu-paddle-ocr@6.6.0: patches/ppu-paddle-ocr@6.6.0.patch

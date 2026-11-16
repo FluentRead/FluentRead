@@ -1,8 +1,25 @@
 import {describe, expect, it, vi} from 'vitest';
-import {createWebDavConnectionStore, createWebDavSession, normalizeWebDavUrl, parseWebDavConnection, webDavConnectionSummary, WebDavError} from '@/src/platform/webdav/connection';
+import {createWebDavConnectionStore, createWebDavSession, normalizeWebDavBackupPath, normalizeWebDavUrl, parseWebDavConnection, webDavConnectionSummary, WebDavError} from '@/src/platform/webdav/connection';
 
 const input = {url: 'https://dav.fixture.invalid/base', username: 'fixture-user', password: 'fixture-app-password', revision: null};
 describe('WebDAV 本机连接边界', () => {
+    it('自定义备份子目录限定在入口下，支持留空、中文和已有百分号编码，拒绝越界和歧义路径', () => {
+        expect(normalizeWebDavBackupPath(undefined)).toBe('FluentRead/');
+        for (const value of ['', '  ', '/']) expect(normalizeWebDavBackupPath(value)).toBe('');
+        for (const value of [' 备份/My backups/// ', '%E5%A4%87%E4%BB%BD/My%20backups/']) expect(normalizeWebDavBackupPath(value)).toBe('%E5%A4%87%E4%BB%BD/My%20backups/');
+        for (const value of [null, false, 'x'.repeat(4097), 'x'.repeat(1025), '字'.repeat(500), Array(18).join('a/'), '/share', '//other.invalid', 'https://other.invalid/path', 'a//b', '.', '..', 'a/../b', '%2e%2e', 'a%2fb', 'a%5cb', 'a\\b', 'a\nb', 'a%00b', '%', '?query=x', '#fragment']) expect(() => normalizeWebDavBackupPath(value)).toThrow(expect.objectContaining({code: 'path'}));
+        const saved = parseWebDavConnection({...input, backupPath: 'NAS backups/流畅阅读'}, null);
+        expect(saved.backupPath).toBe('NAS%20backups/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/');
+        expect(parseWebDavConnection({...saved, password: '', backupPath: undefined}, saved).backupPath).toBe(saved.backupPath);
+        expect(parseWebDavConnection({...saved, password: '', backupPath: ''}, saved).password).toBe(saved.password);
+    });
+    it('中文路径按解码字符数限制，编码后超过 1024 字符仍可从存储重新读取', async () => {
+        const saved = parseWebDavConnection({...input, backupPath: '字'.repeat(200)}, null);
+        expect(saved.backupPath!.length).toBeGreaterThan(1024);
+        const store = createWebDavConnectionStore({getItem: vi.fn(async () => saved)} as never);
+        expect(await store.read()).toEqual(saved);
+        expect(normalizeWebDavBackupPath('x'.repeat(1024))).toBe('x'.repeat(1024) + '/');
+    });
     it('规范化目录地址，并拒绝凭据 URL、非 HTTP 协议、查询和不安全地址', () => {
         expect(normalizeWebDavUrl(' https://dav.fixture.invalid/base/// ')).toBe('https://dav.fixture.invalid/base/');
         expect(normalizeWebDavUrl('http://127.0.0.1:9000/dav/', true)).toBe('http://127.0.0.1:9000/dav/');
@@ -30,7 +47,10 @@ describe('WebDAV 本机连接边界', () => {
         const next = parseWebDavConnection(input, null);
         await store.write(next);
         expect(await store.read()).toEqual(next);
-        expect(webDavConnectionSummary(next)).toEqual({url: next.url, username: next.username, allowInsecure: false, revision: next.revision, hasPassword: true});
+        expect(webDavConnectionSummary(next)).toEqual({url: next.url, backupPath: 'FluentRead/', username: next.username, allowInsecure: false, revision: next.revision, hasPassword: true});
+        record = {...next}; delete (record as typeof next).backupPath;
+        expect(await store.read()).toEqual(next);
+        expect(webDavConnectionSummary({...next, backupPath: undefined})?.backupPath).toBe('FluentRead/');
         expect(webDavConnectionSummary({...next, password: ''})?.hasPassword).toBe(false);
         expect(JSON.stringify(webDavConnectionSummary(next))).not.toContain(input.password);
         for (const value of [{}, {...next, revision: 1}, {...next, revision: ''}, {...next, password: ''}]) {record = value; await expect(store.read()).rejects.toThrow(WebDavError);}

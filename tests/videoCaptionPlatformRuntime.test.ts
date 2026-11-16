@@ -1,6 +1,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi, type Mock} from 'vitest';
 import {parseHTML} from 'linkedom';
+import type {VideoAiFullCaptureOptions} from '@/src/features/video-subtitle/content/video-ai/fullCapture';
 import {Config} from '@/src/core/config/model';
+import {BilibiliAiSource} from '@/src/features/video-subtitle/content/bilibiliAiSource';
 import {mountPlatformCaptions} from '@/src/features/video-subtitle/content/platformRuntime';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 registerAllUiLanguageBundles();
@@ -9,9 +11,14 @@ const readingPort = vi.hoisted(() => ({annotate: vi.fn()}));
 vi.mock('@/src/features/video-subtitle/content/readingAnnotationClient', () => ({annotateVideoReading: readingPort.annotate}));
 vi.mock('@/src/platform/browser/capabilities', () => ({browserCapabilities: {extensionDom: true}}));
 vi.mock('@/src/services/config/store', () => ({config: {uiLanguage: 'zh-CN'}}));
+const bilibiliCapture = vi.hoisted(() => ({options: null as VideoAiFullCaptureOptions | null, start: vi.fn(), cancel: vi.fn(), destroy: vi.fn()}));
+vi.mock('@/src/features/video-subtitle/content/video-ai/fullCapture', () => ({VideoAiFullCaptureController: class {
+    constructor(options: VideoAiFullCaptureOptions) {bilibiliCapture.options = options;}
+    start = bilibiliCapture.start; cancel = bilibiliCapture.cancel; destroy = bilibiliCapture.destroy; getSessionId = () => 1;
+}}));
 const disposals: Array<() => void> = [];
 beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers(); bilibiliCapture.start.mockReset(); bilibiliCapture.cancel.mockReset(); bilibiliCapture.destroy.mockReset();
     readingPort.annotate.mockReset().mockImplementation(async (text, language) => ({text: `Reading: ${text}`, language, scheme: 'fixture'}));
 });
 afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -863,5 +870,66 @@ describe('平台字幕布局操作预算与失效边界', () => {
         expect(f.shadow()?.querySelector('.translation')?.textContent).toBe('重试成功');
         expect(panel.style.fontSize).toBe('100px'); expect(measureHeight).toHaveBeenCalledTimes(1); measureHeight.mockClear();
         await vi.advanceTimersByTimeAsync(1000); expect(measureHeight).not.toHaveBeenCalled();
+    });
+});
+
+
+describe('B 站无字幕本地识别接入', () => {
+    function aiFixture() {
+        const f = courseFixture('bilibili');
+        const send = vi.fn(async () => ({success: true, models: ['small']}));
+        f.config.videoLocalModel = 'small';
+        Object.assign(f.ports, {createBilibiliAi: (getVideo: () => HTMLVideoElement | null, changed: () => void) => new BilibiliAiSource({
+            send, getVideo, changed, getAudio: async () => new Float32Array(), getModel: () => f.config.videoLocalModel,
+            getLanguage: () => f.config.videoSourceLanguage, getProvider: () => f.config.videoTranscriptionProvider,
+            getNativeBaseUrl: () => f.config.videoNativeAsrBaseUrl,
+        })});
+        f.fetch.mockImplementation(async () => new Response(JSON.stringify({data: {cid: 456, subtitle: {subtitles: []}}})));
+        return {...f, send, generate: () => f.menu().querySelector<HTMLButtonElement>('[data-action="generate-bilibili-ai"]')!};
+    }
+    it('默认不读音频，自动开启只在明确空字幕后启动且逐句翻译，完整后可导出', async () => {
+        const f = aiFixture(); f.start(); await vi.advanceTimersByTimeAsync(100);
+        expect(f.send).not.toHaveBeenCalled(); expect(bilibiliCapture.start).not.toHaveBeenCalled();
+        f.config.videoCourseAutoStart.bilibili = true; f.change(); await vi.advanceTimersByTimeAsync(500);
+        expect(bilibiliCapture.start).toHaveBeenCalledOnce(); expect(f.send).toHaveBeenCalledOnce();
+        expect(f.generate().textContent).toBe('停止生成');
+        const cues = [{startMs: 0, durationMs: 1000, text: 'Hello from the Bilibili audio.', availableAtMs: 0, spokenEndMs: 1000}];
+        bilibiliCapture.options!.onCuesProgress!(cues, 1); await vi.advanceTimersByTimeAsync(200);
+        expect(f.shadow()!.querySelector('.source')!.textContent).toBe(cues[0].text);
+        expect(f.translate).toHaveBeenCalledWith(cues[0].text, expect.any(AbortSignal));
+        const download = f.menu().querySelector<HTMLButtonElement>('[data-action="download-subtitles"]')!;
+        expect(download.disabled).toBe(true);
+        await bilibiliCapture.options!.onTranscriptionComplete(cues, 1);
+        bilibiliCapture.options!.onProgress!({phase: 'ready', progress: 1, capturedMs: 1, durationMs: 1, transcribedMs: 1, windowIndex: 1, windowCount: 1});
+        await vi.advanceTimersByTimeAsync(200); expect(download.disabled).toBe(false);
+        download.click(); expect(f.download).toHaveBeenCalledWith(expect.stringContaining(cues[0].text), '');
+    });
+    it('平台读取失败不自动开始，手动可重试；停止、关闭及换 P 都取消旧会话', async () => {
+        const f = aiFixture(); f.fetch.mockRejectedValue(new Error('network'));
+        f.config.videoCourseAutoStart.bilibili = true; const dispose = f.start(); await vi.advanceTimersByTimeAsync(500);
+        expect(f.send).not.toHaveBeenCalled();
+        f.generate().click(); await vi.advanceTimersByTimeAsync(100); expect(bilibiliCapture.start).toHaveBeenCalledOnce();
+        f.generate().click(); await vi.advanceTimersByTimeAsync(500); expect(bilibiliCapture.start).toHaveBeenCalledOnce();
+        f.generate().click(); await vi.advanceTimersByTimeAsync(100); expect(bilibiliCapture.start).toHaveBeenCalledTimes(2);
+        f.choose('off'); await vi.advanceTimersByTimeAsync(100); expect(f.generate().textContent).toBe('生成 AI 字幕');
+        f.generate().click(); await vi.advanceTimersByTimeAsync(100);
+        const before = bilibiliCapture.cancel.mock.calls.length;
+        Object.defineProperty(f.window, 'location', {value: new URL('https://www.bilibili.com/video/BV1xx411c7mD/?p=2'), configurable: true});
+        f.change(); expect(bilibiliCapture.cancel.mock.calls.length).toBeGreaterThan(before);
+        dispose(); expect(bilibiliCapture.destroy).toHaveBeenCalled();
+    });
+    it('原生轨就绪时保持原生优先，缺模型和识别错误显示明确状态', async () => {
+        const f = aiFixture(); f.send.mockResolvedValueOnce({success: true, models: []});
+        f.config.videoCourseAutoStart.bilibili = true; f.start(); await vi.advanceTimersByTimeAsync(500);
+        expect(f.menu().querySelector('[data-source-status]')!.textContent).toContain('下载');
+        expect(bilibiliCapture.start).not.toHaveBeenCalled();
+        f.generate().click(); await vi.advanceTimersByTimeAsync(100);
+        bilibiliCapture.options!.onError(new Error('音轨不可用')); await vi.advanceTimersByTimeAsync(100);
+        expect(f.menu().querySelector('[data-source-status]')!.textContent).toBe('音轨不可用');
+        f.fetch.mockImplementation(async input => new Response(JSON.stringify(String(input).includes('hdslb.com')
+            ? {body: [{from: 0, to: 1, content: f.source}]}
+            : {data: {cid: 456, subtitle: {subtitles: [{lan: 'en', subtitle_url: '//aisubtitle.hdslb.com/a.json'}]}}})));
+        f.choose('off'); f.choose('bilingual'); await vi.advanceTimersByTimeAsync(500);
+        expect(f.generate().hidden).toBe(true); expect(f.shadow()!.querySelector('.source')!.textContent).toBe(f.source);
     });
 });

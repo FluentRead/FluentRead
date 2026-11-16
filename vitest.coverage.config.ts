@@ -783,6 +783,8 @@ export default defineConfig({
                 'src/features/video-subtitle/content/courseCaptionData.ts',
                 'src/features/video-subtitle/content/courseCaptionSource.ts',
                 'src/features/video-subtitle/content/bilibiliCaptionBridge.ts',
+                'src/features/video-subtitle/content/bilibiliAudio.ts',
+                'src/features/video-subtitle/content/bilibiliAiSource.ts',
                 'src/app/content/bilibiliCaptionBridge.ts',
                 'src/app/content/courseCaptionFrame.ts',
                 'src/app/content/youtubeEmbedFrameRuntime.ts',

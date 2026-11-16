@@ -111,6 +111,10 @@ import {getVideoTranscriptionCacheRequest, getVideoTranscriptionMediaTransition,
 import type {VideoAiSubtitleCacheSource} from '../transcriptionCache';
 import {getCaptionPlatform} from './platforms';
 import {mountPlatformCaptions} from './platformRuntime';
+import {BilibiliAiSource} from './bilibiliAiSource';
+import {readBilibiliAudio} from './bilibiliAudio';
+import {getBilibiliPart} from './courseCaptionData';
+import {requestBilibiliCaptionManifest} from './bilibiliCaptionBridge';
 import {YoutubeHumanCaptions} from './youtubeHumanCaptions';
 import {readVideoCaptionText} from './subtitleTransport';
 import {TimedTextTrackCache} from './timedTextTrackCache';
@@ -128,7 +132,19 @@ type VideoConfigPatch = Partial<Pick<Config, 'videoTranslationEnabled' | 'videoS
 export function mountVideoSubtitleTranslation(): () => void {
   if (getCaptionPlatform(window.location)) return mountPlatformCaptions({
     document, window, config, subscribe: subscribeConfig,
-    translate: translateVideoText,
+    createBilibiliAi: (getVideo, changed) => new BilibiliAiSource({
+      send: sendRuntimeMessage, getVideo, changed,
+      getModel: () => config.videoLocalModel,
+      getLanguage: () => config.videoSourceLanguage,
+      getProvider: () => config.videoTranscriptionProvider,
+      getNativeBaseUrl: () => config.videoNativeAsrBaseUrl,
+      getAudio: (video, signal) => readBilibiliAudio(getBilibiliPart(new URL(window.location.href)), video, signal, {
+        fetch: (input, init) => fetch(input, init),
+        manifest: (part, abort) => requestBilibiliCaptionManifest(window, part, abort),
+        createAudioContext: () => new AudioContext(),
+      }),
+    }),
+    translate: (text, signal) => translateVideoText(text, signal, getCaptionPlatform(window.location) === 'bilibili' ? config.videoSourceLanguage : undefined),
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),
     download: (srt, language) => downloadSubtitleSrt(srt, language),

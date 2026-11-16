@@ -557,7 +557,9 @@
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
-      "tests/sharedVideoModelDirectory.test.ts"
+      "tests/sharedVideoModelDirectory.test.ts",
+      "tests/bilibiliAudio.test.ts",
+      "tests/bilibiliAiSource.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",

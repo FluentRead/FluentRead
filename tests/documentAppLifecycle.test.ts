@@ -2840,8 +2840,10 @@ it('documentbinaryAudit selecting the active PDF preserves its task and reviewed
 });
 
 it('documentbinaryAudit mounts the actual page assembly with its app, document theme and i18n plugin', async () => {
-    const captureDocumentMaterialSelection = vi.fn(() => undefined), markDocumentSelection = vi.fn(() => true);
-    const mount = vi.fn(() => ({captureDocumentMaterialSelection, markDocumentSelection})); const use = vi.fn();
+    const captureDocumentMaterialSelection = vi.fn(() => undefined), markDocumentSelection = vi.fn(() => true), toggleDocumentHypothesis = vi.fn(async () => ({status: 'success'}));
+    const mount = vi.fn(() => ({captureDocumentMaterialSelection, markDocumentSelection, toggleDocumentHypothesis}));
+    const getCurrent = vi.fn(async () => ({id: 7})), add = vi.fn(), remove = vi.fn();
+    vi.stubGlobal('browser', {tabs: {getCurrent}, runtime: {id: 'fixture', getURL: (path: string) => `chrome-extension://fixture${path}`, onMessage: {addListener: add, removeListener: remove}}}); const use = vi.fn();
     const onUnmount = vi.fn();
     const create = vi.fn(() => ({mount, use, onUnmount}));
     const disposeSelection = vi.fn();
@@ -2862,7 +2864,9 @@ it('documentbinaryAudit mounts the actual page assembly with its app, document t
         expect(selectionOptions.markSelection(range as unknown as Range, 'underline')).toBe(true);
         expect(markDocumentSelection).toHaveBeenCalledWith(range, 'underline');
         expect(onUnmount).toHaveBeenCalledWith(disposeSelection);
-        onUnmount.mock.calls[0][0](); expect(disposeSelection).toHaveBeenCalledOnce();
+        await flush(); const hypothesisListener = add.mock.calls[0][0];
+        expect(await hypothesisListener({type: 'toggleDocumentHypothesis', tabId: 7}, {id: 'fixture', url: 'chrome-extension://fixture/popup.html'})).toEqual({status: 'success'});
+        onUnmount.mock.calls.forEach(([dispose]) => dispose()); expect(disposeSelection).toHaveBeenCalledOnce(); expect(remove).toHaveBeenCalledWith(hypothesisListener);
     } finally {vi.doUnmock('vue'); vi.doUnmock('@/src/app/document-translation/selectionRuntime');}
 });
 

@@ -1,5 +1,6 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
+ 协作批注：显式开启官方 Hypothesis 侧栏，复用 PDF 租约与虚拟页定位；重排按实际文字隔离指纹，翻译中暂停，可主动关闭，切换文件撤销；不读取账号或上传文件。
  智能配色：固定版式使用 sRGB SVG 滤镜更换纸张与文字颜色，并合回识别到的原图像素，按解析器确认的图形区域保护原色；遮罩不接管鼠标、选区或页资源，切换主题复用原始画布。
  阅读外观：原文、双语与译文均可单栏重排，字体、字号、行距、段距及六种配色按本机偏好显示；阅读外观变化复用页面资源，并在 DOM 更新前保留段落锚点。
  扫描核对：原页按 OCR 返回的有效页面坐标显示待核对内容的虚线框；识别行叠加透明原文选择层，沿用划词、复制和页内定位，缩放或其他页更新时保留节点；原图与画布不因补入文字层而重建。
@@ -63,6 +64,8 @@
           </div>
         </div>
         <PdfAnnotations ref="annotationControls" :document="document" :root="viewport" :annotations="annotations" :translations="translations" :source-url="sourceUrl" :saved="annotationsSaved" :open="openMenu === 'annotations'" @toggle="openMenu = openMenu === 'annotations' ? null : 'annotations'" @update:annotations="emit('update:annotations', $event)" @jump="jumpTo" />
+        <button class="pdf-tool-button" type="button" data-testid="pdf-hypothesis-toggle" :aria-label="t('document.pdfReading.hypothesisToggle')" :aria-pressed="hypothesisActive" :aria-busy="hypothesisBusy" :title="t('document.pdfReading.hypothesisEmbeddedNotice')" :disabled="hypothesisBusy || translating && !hypothesisRequested" @click="toggleHypothesis">H</button>
+        <span v-if="hypothesisMessage" class="pdf-information-status" role="status">{{ t(hypothesisMessage) }}</span>
         <button v-if="informationHighlight" class="pdf-information-highlight" type="button" :aria-pressed="informationState.enabled" :disabled="!informationHighlight.available" :title="informationState.enabled ? `${t(`informationHighlight.phase.${informationState.phase}`)} · ${t('informationHighlight.progress', {paragraphs: informationState.processedParagraphs, spans: informationState.highlightedSpans})}` : t('informationHighlight.title')" @click="informationController?.setEnabled(!informationState.enabled)">{{ t('informationHighlight.title') }}</button>
         <span v-if="informationState.enabled && informationState.phase === 'error'" class="pdf-information-status" role="status">{{ t('informationHighlight.phase.error') }} <button type="button" @click="informationController?.retry()">{{ t('informationHighlight.retry') }}</button></span>
       </div>
@@ -93,7 +96,7 @@
           </defs></svg>
           <div class="pdf-page-stage" :class="{single: mode !== 'bilingual' || readable, stacked: stackedBilingual}" :style="{'--pdf-page-width': `${layout.width}px`, '--pdf-page-height': `${layout.height}px`, '--pdf-content-width': `${layout.page.width}px`, '--pdf-content-height': `${layout.page.height}px`}">
             <figure v-if="mode !== 'translated' && !readable" class="pdf-page-column" :aria-label="t('document.pdfReading.original')">
-              <div class="pdf-page-frame">
+              <div class="pdf-page-frame" :data-page-number="layout.page.pageNumber">
                 <div class="pdf-page-content" :style="fixedThemeStyle(layout.page.pageNumber)">
                   <div :ref="element => setPageHost(layout.page.pageNumber, 'source', element)" class="pdf-canvas-host" />
                   <i v-if="highlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight" :style="highlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
@@ -106,7 +109,7 @@
               </div>
             </figure>
             <figure v-if="mode !== 'source' || readable" class="pdf-page-column" :class="{translated: mode !== 'source'}" :aria-label="t(mode === 'source' ? 'document.pdfReading.original' : 'document.pdfReading.translated')">
-              <article v-if="presentation === 'readable'" :ref="element => setReadingHost(layout.page.pageNumber, element)" class="pdf-reading-sheet" :data-pdf-reading-page="layout.page.pageNumber" :style="{'--pdf-reading-font-size': `${readingFontSize}px`}">
+              <article v-if="presentation === 'readable'" :ref="element => setReadingHost(layout.page.pageNumber, element)" class="pdf-reading-sheet" :data-page-number="layout.page.pageNumber" :data-pdf-reading-page="layout.page.pageNumber" :style="{'--pdf-reading-font-size': `${readingFontSize}px`}">
                 <template v-for="entry in readingPlans.get(layout.page.pageNumber)?.entries" :key="entry.id">
                   <figure v-if="entry.kind === 'region'" class="pdf-reading-region" :data-pdf-region-id="entry.id" :data-pdf-region-kind="entry.role" :data-pdf-source-rect="JSON.stringify(entry.sourceRect)">
                     <div :ref="element => setRegionHost(layout.page.pageNumber, entry.id, element)" class="pdf-region-canvas" :style="{width: `${entry.sourceRect.width * (entry.role === 'figure' ? 2 : 1.5) * readingFontSize / 16}px`, aspectRatio: `${entry.sourceRect.width} / ${entry.sourceRect.height}`}" :aria-label="t('document.pdfReading.preservedRegion')" />
@@ -114,7 +117,7 @@
                   <p v-else class="pdf-reading-paragraph" :class="paragraphClasses(entry)" :style="paragraphAnnotationStyle(entry)" :data-pdf-segment-index="entry.segmentIndex" :data-pdf-source-text="entry.source" :data-pdf-source-id="entry.id" :data-pdf-role="entry.role" data-i18n-ignore><span v-if="mode === 'bilingual' && entry.translated" class="pdf-reflow-source" dir="auto">{{ entry.source }}</span><span dir="auto">{{ entry.text }}</span><span v-if="mode !== 'source' && translating && !entry.translated && isPending(entry.segmentIndex)" class="pdf-translation-spinner inline" data-fluentread-pdf-decoration aria-hidden="true"><TranslationLoadingPreview :loading-style="loadingStyle" :animated="animated" /></span><button v-if="continuationBySegment.has(entry.segmentIndex)" type="button" class="pdf-cross-page-context" data-fluentread-pdf-decoration :aria-label="t('document.pdfReading.crossPageContext')" :title="t('document.pdfReading.crossPageContext')" @click="openFullPassage(layout.page.pageNumber, entry.segmentIndex)"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" aria-hidden="true"><path d="m6 4-3 3 3 3M3 7h9a4 4 0 0 1 0 8H9m2-3-3 3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg></button></p>
                 </template>
               </article>
-              <div v-else class="pdf-page-frame">
+              <div v-else class="pdf-page-frame" :data-page-number="layout.page.pageNumber">
                 <div class="pdf-page-content" :style="fixedThemeStyle(layout.page.pageNumber)">
                   <div :ref="element => setPageHost(layout.page.pageNumber, 'translated', element)" class="pdf-canvas-host" />
                   <div class="pdf-translation-layer" data-fluentread-pdf-translation :data-pdf-reading-page="layout.page.pageNumber" :style="layerStyle(layout.page)" @pointerleave="highlight = undefined">
@@ -164,7 +167,9 @@ import {findPdfContinuations} from '@/src/features/document-translation/core/pdf
 import type {ParsedDocument, PdfDocumentPage} from '@/src/features/document-translation/core/document';
 import {fitPdfBlockText, pdfOverlayBlocks, type PdfBlockFit, type PdfOverlayBlock} from '@/src/features/document-translation/core/pdfBlockFit';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation, type PdfReadingRegionEntry, type PdfReadingTextEntry} from '@/src/features/document-translation/core/pdfReadingPlan';
-import {sampledPdfBlockColors} from '@/src/features/document-translation/ui/pdfPreview';
+import {sampledPdfBlockColors, acquirePdfDocument} from '@/src/features/document-translation/ui/pdfPreview';
+import {createHypothesisClient, injectHypothesisDocumentScript} from '@/src/features/hypothesis/public';
+import {installPdfHypothesisAdapter} from './pdfHypothesis';
 import {createPdfReaderRenderPort, pdfReaderDisplayRect, pdfReaderPageKey, pdfReaderPageWindow, PdfReaderScheduler, type PdfReaderMode, type PdfReaderPageState} from '@/src/features/document-translation/ui/pdfReader';
 import {updatePdfOcrTextLayer} from './pdfOcrTextLayer';
 import {installInformationHighlight, type InformationHighlightController} from '@/src/features/information-highlight/public';
@@ -965,7 +970,65 @@ function captureMaterialLocation(): number | undefined {
     readyPages: new Set(residentLayouts.value.filter(layout => states.value.get(layout.page.pageNumber)?.status === 'ready').map(layout => layout.page.pageNumber))});
 }
 function markSelection(range: Range, kind: 'highlight' | 'underline'): boolean {return annotationControls.value?.markSelection(range, kind) ?? false;}
-defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection});
+const hypothesisActive = ref(false), hypothesisBusy = ref(false), hypothesisMessage = ref('');
+let hypothesisRequested = false, hypothesisRevision = 0;
+let hypothesisClient: ReturnType<typeof createHypothesisClient> | undefined;
+function documentHypothesisClient() {
+  return hypothesisClient ??= createHypothesisClient({document: globalThis.document, window,
+    assetUrl: path => browser.runtime.getURL(`/${path}`),
+    inject: () => injectHypothesisDocumentScript(globalThis.document, browser.runtime.getURL('/hypothesis/build/scripts/annotator.bundle.js')),
+    prepare: async signal => {
+      const binary = props.document.binary;
+      if (binary?.kind !== 'pdf' || !viewport.value) throw new Error('PDF reader unavailable');
+      const reading = readable.value;
+      const text = reading ? pages.value.map(page => buildPdfReadingPlan(props.document, page, props.mode === 'source' ? [] : props.translations).entries.map(entry => entry.kind === 'text' ? `${props.mode === 'bilingual' && entry.translated ? entry.source : ''}${entry.text}` : '').join('')) : undefined;
+      return installPdfHypothesisAdapter({window, viewport: viewport.value, viewer: viewport.value.querySelector('.pdf-page-list')!,
+        container: viewport.value.closest('.pdf-layout-viewer')!, sourceUrl: props.sourceUrl, text,
+        acquire: () => acquirePdfDocument(binary.bytes), top: index => layouts.value[index]?.top ?? 0,
+        page: index => {
+          const number = index + 1;
+          if (reading) {const frame = readingHosts.get(number); return frame ? {frame, text: frame} : undefined;}
+          const host = sourceHosts.get(number), frame = host?.closest<HTMLElement>('.pdf-page-frame');
+          return frame ? {frame, text: states.value.get(number)?.status === 'ready' ? host!.querySelector<HTMLElement>('[data-fluentread-pdf-text]') ?? undefined : undefined} : undefined;
+        },
+      }, signal);
+    },
+  });
+}
+async function syncHypothesis(): Promise<void> {
+  const revision = ++hypothesisRevision;
+  hypothesisBusy.value = true; hypothesisMessage.value = '';
+  const client = documentHypothesisClient();
+  await client.setEnabled(false);
+  if (closed || revision !== hypothesisRevision) return;
+  let result = {status: 'success', active: false};
+  if (hypothesisRequested && !props.translating) {
+    await nextTick();
+    if (closed || revision !== hypothesisRevision) return;
+    result = await client.setEnabled(true);
+  }
+  if (closed || revision !== hypothesisRevision) return;
+  hypothesisActive.value = result.active; hypothesisBusy.value = false;
+  if (result.status !== 'success') {hypothesisRequested = false; hypothesisMessage.value = result.status === 'external' ? 'document.pdfReading.hypothesisExternal' : 'document.pdfReading.hypothesisFailed';}
+}
+async function toggleHypothesis(): Promise<void> {
+  if (hypothesisBusy.value || props.translating && !hypothesisRequested) return;
+  if (!hypothesisRequested && (props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {choosePresentation('readable'); await nextTick();}
+  hypothesisRequested = !hypothesisRequested;
+  await syncHypothesis();
+}
+watch([presentation, () => props.mode, () => props.translating, () => props.translations, () => props.document], () => {
+  if (!hypothesisRequested) return;
+  if ((props.mode === 'translated' || pages.value.some(page => page.ocrRecognized)) && !readable.value) {hypothesisRequested = false;}
+  void syncHypothesis();
+}, {flush: 'post'});
+watch(() => props.document.binary?.bytes, () => {if (hypothesisClient) {hypothesisRequested = false; void syncHypothesis();}}, {flush: 'sync'});
+async function toggleHypothesisFromPopup() {
+  if (hypothesisBusy.value || props.translating && !hypothesisRequested) return {status: 'unavailable', active: hypothesisActive.value};
+  await toggleHypothesis();
+  return {status: hypothesisMessage.value.endsWith('hypothesisExternal') ? 'external' : hypothesisMessage.value ? 'failed' : 'success', active: hypothesisActive.value};
+}
+defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection, toggleHypothesisFromPopup});
 function jumpToPosition(pageIndex: number, y: number): void {
   materialNavigation.cancel();
   const layout = layouts.value[pageIndex];
@@ -1077,6 +1140,11 @@ onMounted(() => {
   viewportWidth.value = viewport.value?.clientWidth || 920;
   viewportHeight.value = viewport.value?.clientHeight || 720;
   createScheduler();
+  const fragment = new URLSearchParams(window.location.hash.slice(1));
+  if (fragment.get('hypothesis') === '1') {
+    fragment.delete('hypothesis'); window.history.replaceState(window.history.state, '', `#${fragment}`);
+    void toggleHypothesis();
+  }
   window.addEventListener('resize', fitToolbarMenus);
   globalThis.document.addEventListener('selectionchange', handleSelectionChange);
   globalThis.document.addEventListener('keydown', handleInformationHotkey, true);
@@ -1104,6 +1172,7 @@ onMounted(() => {
   }
 });
 onBeforeUnmount(() => {
+  hypothesisRequested = false; hypothesisRevision += 1; void hypothesisClient?.dispose();
   materialNavigation.dispose();
   closed = true;
   fullPassageDialog.value?.close();

@@ -11,7 +11,8 @@ import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlight
 import {scoreInformationKeywords} from '@/src/features/information-highlight/domain/keywords';
 import {INFORMATION_HIGHLIGHT_NAME} from '@/src/features/information-highlight/public';
 
-const ports = vi.hoisted(() => ({getDocument: vi.fn(), textLayers: [] as any[], textPending: undefined as any}));
+const ports = vi.hoisted(() => ({getDocument: vi.fn(), textLayers: [] as any[], textPending: undefined as any, hypothesisClient: vi.fn()}));
+vi.mock('@/src/features/hypothesis/public', async original => ({...await original<typeof import('@/src/features/hypothesis/public')>(), createHypothesisClient: ports.hypothesisClient}));
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string, params?: {page?: number}) => params?.page ? `${key}:${params.page}` : key})}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({GlobalWorkerOptions: {}, getDocument: ports.getDocument, TextLayer: class {
     container: HTMLElement;
@@ -42,7 +43,7 @@ let mountedApp: any;
 let storage: Map<string, string>;
 
 beforeEach(() => {
-    ports.getDocument.mockReset(); ports.textLayers = []; ports.textPending = undefined;
+    ports.hypothesisClient.mockReset(); ports.getDocument.mockReset(); ports.textLayers = []; ports.textPending = undefined;
     models = []; canvases = []; selection = undefined; frames = new Map(); resizeCallback = undefined; mountedApp = undefined;
     const {document} = parseHTML('<html><body></body></html>');
     const createElement = document.createElement.bind(document);
@@ -59,7 +60,7 @@ beforeEach(() => {
         canvases.push(element); return element;
     });
     let nextFrame = 1;
-    win = Object.assign(new EventTarget(), {location: {origin: 'chrome-extension://fixture'}, devicePixelRatio: 3, getSelection: () => selection, requestAnimationFrame: (callback: FrameRequestCallback) => {const id = nextFrame++; frames.set(id, callback); return id;}, cancelAnimationFrame: (id: number) => {frames.delete(id);}});
+    win = Object.assign(new EventTarget(), {location: {origin: 'chrome-extension://fixture', hash: ''}, devicePixelRatio: 3, getSelection: () => selection, requestAnimationFrame: (callback: FrameRequestCallback) => {const id = nextFrame++; frames.set(id, callback); return id;}, cancelAnimationFrame: (id: number) => {frames.delete(id);}});
     disconnect = vi.fn();
     // 译文样式保存在本机；每个用例使用独立的内存存储。
     storage = new Map(); vi.stubGlobal('localStorage', {getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => {storage.set(key, value);}});
@@ -1980,5 +1981,36 @@ describe('PDF fixed-page smart colors', () => {
         view.state.readingTheme = 'auto'; await componentFlush(); expect(view.root.querySelector('.pdf-theme-definitions')).toBeNull(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
         expect(view.root.querySelector('[data-pdf-resource="source"]')).toBe(canvas); expect(pdfPage.render).toHaveBeenCalledTimes(draws);
         view.state.readingTheme = 'dark'; view.currentPresentation.value = 'readable'; await componentFlush(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
+    });
+});
+
+describe('PDF Hypothesis control lifecycle', () => {
+    function client() {
+        const value = {setEnabled: vi.fn(async (active: boolean) => ({status: 'success', active})), dispose: vi.fn(async () => {})};
+        ports.hypothesisClient.mockReturnValue(value); return value;
+    }
+    it('opens collaboration once, restarts on a same-file view change, and never carries activation into another file', async () => {
+        const sdk = client(), view = mountReader(documentModel(2)); await componentFlush();
+        const button = view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')!; click(button); await componentFlush();
+        expect(button.getAttribute('aria-pressed')).toBe('true'); expect(ports.hypothesisClient).toHaveBeenCalledOnce();
+        view.currentPresentation.value = 'readable'; await componentFlush(); expect(sdk.setEnabled.mock.calls.map(call => call[0])).toEqual([false, true, false, true]);
+        view.currentDocument.value = documentModel(1); await componentFlush(); expect(button.getAttribute('aria-pressed')).toBe('false'); expect(sdk.setEnabled.mock.calls.at(-1)).toEqual([false]);
+        mountedApp.unmount(); mountedApp = undefined; expect(sdk.dispose).toHaveBeenCalledOnce();
+    });
+    it('lets the user cancel a paused client during translation and does not resume it afterwards', async () => {
+        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
+        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush();
+        view.currentTranslating.value = true; await componentFlush(); const button = view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')!;
+        expect(button.hasAttribute('disabled')).toBe(false); click(button); await componentFlush(); const calls = sdk.setEnabled.mock.calls.length;
+        view.currentTranslating.value = false; await componentFlush(); expect(sdk.setEnabled).toHaveBeenCalledTimes(calls); expect(button.getAttribute('aria-pressed')).toBe('false');
+    });
+    it('switches translated-only or OCR source collaboration to a readable text view and reports service failures', async () => {
+        const sdk = client(), doc = documentModel(1); doc.binary!.kind === 'pdf' && (doc.binary!.pages[0].ocrRecognized = true);
+        const view = mountReader(doc, 'translated', ['Translated text']); await componentFlush();
+        sdk.setEnabled.mockImplementation(async active => ({status: active ? 'external' : 'success', active: false}));
+        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush(); expect(view.currentPresentation.value).toBe('readable');
+        expect(view.root.textContent).toContain('document.pdfReading.hypothesisExternal');
+        sdk.setEnabled.mockImplementation(async active => ({status: active ? 'failed' : 'success', active: false}));
+        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush(); expect(view.root.textContent).toContain('document.pdfReading.hypothesisFailed');
     });
 });

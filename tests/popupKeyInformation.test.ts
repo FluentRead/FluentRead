@@ -20,7 +20,7 @@ const language = runtime.ref<UiLanguage>('zh-CN');
 const bundleRevision = runtime.ref(0);
 const config = new Config();
 const listeners = new Set<(value: Config) => void>();
-const patches = vi.fn(), openOptions = vi.fn(), createTab = vi.fn();
+const patches = vi.fn(), openOptions = vi.fn(), createTab = vi.fn(), runtimeSend = vi.fn();
 const queryTabs = vi.fn<() => Promise<PopupActiveTab[]>>();
 const send = vi.fn<(id: number, message: {type: string; action?: string}) => Promise<unknown>>();
 const tabUpdated = new Set<(id: number, change: {url?: string; status?: string}, tab: PopupActiveTab & {active?: boolean}) => void>();
@@ -51,7 +51,7 @@ vi.mock('webextension-polyfill', () => {
   return {default: {tabs: {query: () => queryTabs(), sendMessage: (...args: Parameters<typeof send>) => send(...args),
     create: (...args: unknown[]) => createTab(...args), onUpdated: {addListener: (fn: any) => tabUpdated.add(fn), removeListener: (fn: any) => tabUpdated.delete(fn)},
     onActivated: event, onRemoved: event}, runtime: {id: 'fixture-extension', onMessage: event, getManifest: () => ({version: '0.0.35'}),
-      getURL: (path: string) => 'extension://' + path, sendMessage: async () => ({success: true}), openOptionsPage: () => openOptions()}}};
+      getURL: (path: string) => 'extension://' + path, sendMessage: (...args: unknown[]) => runtimeSend(...args), openOptionsPage: () => openOptions()}}};
 });
 vi.mock('@/src/services/config/store', () => ({get config() {return config;}, configReady: Promise.resolve(),
   subscribeConfig: (fn: (value: Config) => void) => {listeners.add(fn);return () => listeners.delete(fn);},
@@ -71,6 +71,7 @@ vi.mock('@/src/app/popup/PopupServices.vue', () => ({__esModule: true, default: 
 
 beforeEach(() => {
   vi.clearAllMocks();listeners.clear();tabUpdated.clear();language.value = 'zh-CN';bundleRevision.value = 0;
+  runtimeSend.mockReset().mockResolvedValue({success: true});
   queryTabs.mockReset().mockResolvedValue([{id: 7, windowId: 3, url: 'https://example.test/a'}]);
   send.mockReset().mockImplementation(async (_id, message) => {
     return message.type === 'getFullPageTranslationState'
@@ -429,3 +430,10 @@ vi.mock('@/src/features/self-help/ui/DiagnosticNotice.vue', () => ({default: {se
 vi.mock('@/src/ui/components/ServiceIcon.vue', () => ({default: {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('div', attrs, slots.default?.());}}}));
 
 vi.mock('@/src/ui/components/UiLanguageOnboarding.vue', () => ({default: {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('div', attrs, slots.default?.());}}}));
+
+it.each([undefined, 'extension:///document.html'])('routes Hypothesis to the exact reader tab when its URL is %s', async url => {
+  queryTabs.mockResolvedValue([{id: 7, windowId: 3, url}]);runtimeSend.mockResolvedValue({status: 'success', active: true});
+  await mount();const button=document.querySelector('[data-testid="hypothesis-toggle"]')!;expect(button.getAttribute('title')).toContain('官方服务');
+  button.dispatchEvent(new window.Event('click'));await settle();
+  expect(runtimeSend).toHaveBeenCalledWith({type: 'toggleDocumentHypothesis', tabId: 7});expect(send).not.toHaveBeenCalledWith(7,{type: 'toggleHypothesis'},expect.anything());
+})

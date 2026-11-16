@@ -1,5 +1,6 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
+ 协作共存：自动翻译卡给实际可见的 Hypothesis 选区工具栏预留上下空间，保留原有选区、事件和手动窗口几何。
  * 弹窗定位：自动卡片避开完整选区的纵向范围，优先放在其上方，必要时切换下方或按较大空间限高并保留滚动；仅在用户拖动或调整尺寸后固定手动位置。
  * 局部限高：整卡滚动跟随实际写入的 maxHeight，加载内容尚短时也保留后续滚动空间，不只依赖定位算法的可选限高结果。
  * 失败呈现：无结果时以简短原因、下一步提示和一个主操作展示；当前鉴权错误优先配置服务，重试按需展开，已有结果仍保留行内提示。
@@ -196,6 +197,7 @@
 import {audioSpeechProgress, boundarySpeechProgress, parseSpeechCues, parseSpeechProgress, parseSpeechPlaybackPosition, seekSpeechTime, type SpeechProgress, type SpeechPlaybackPosition, type SpeechCue} from '@/src/core/tts/speechProgress';
 import SpeechFollowText from './SpeechFollowText.vue';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {hypothesisSelectionAnchor} from '@/src/features/hypothesis/public';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import {addRuntimeMessageListener} from '@/src/platform/browser/runtimeMessages';
@@ -1052,7 +1054,7 @@ function updatePosition(refreshSelection = true, refreshAnchor = false): void {
     const measuredHeight = rect.height;
     const naturalHeight = anchoredPopupMaxHeight.value !== null && measuredHeight >= anchoredPopupMaxHeight.value - 1
       ? Math.max(measuredHeight, 520 * popupScale.value) : measuredHeight;
-    const position = calculateSelectionPopupPosition(current.popupAnchor ?? anchor, { width: rect.width, height: naturalHeight }, viewportSize.value);
+    const position = calculateSelectionPopupPosition(hypothesisSelectionAnchor(current.popupAnchor ?? anchor, document), { width: rect.width, height: naturalHeight }, viewportSize.value);
     manualPopupPosition = {left: position.left, top: position.top};
     anchoredPopupMaxHeight.value = position.maxHeight ?? null;
     applyManualPopupGeometry(rect);

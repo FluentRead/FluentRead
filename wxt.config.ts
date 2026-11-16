@@ -20,6 +20,7 @@ import {createReadingDictionaryAliases} from './scripts/testing/reading-annotati
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
+import {hypothesisAssets} from './scripts/testing/hypothesis-assets';
 import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
 import type {InlineConfig} from 'vite';
 
@@ -218,6 +219,7 @@ export function createExtensionManifest(
         description: '__MSG_extensionDescription__',
         default_locale: 'en',
         permissions: [
+            ...(env.manifestVersion === 3 ? ['scripting'] : []),
             'storage',
             'unlimitedStorage',
             'alarms',
@@ -247,6 +249,7 @@ export function createExtensionManifest(
             'https://*/*',
         ],
         web_accessible_resources: [
+            {resources: ['hypothesis/build/*', 'hypothesis/build/scripts/*', 'hypothesis/build/styles/*'], matches: ['<all_urls>']},
             {
                 // 页内快捷面板只暴露 HTML；任何 iframe 都须先兑换内容脚本持有的一次性凭据，才可加载界面和配置。
                 resources: ['popup.html'],
@@ -437,6 +440,8 @@ export default defineConfig({
             // 先消除异步阅读器未使用导出带入后台的482,943 bytes，最初补12kB文本代码预算；无新增模型、WASM或依赖。
             // 合入主线后，原页 sRGB 配色、插图保色和划词批注让 Chrome 68,609,437 → 68,617,539（+8,102）；合计补20kB代码预算，无新模型或依赖。
             const pdfReadingToolsBudget = 20_000;
+            // 固定 Hypothesis 1.1771.0 官方 Guest、CSS 与许可，Chrome 实测较68,634,324新增292,475bytes；仅按实际增量补预算。
+            const hypothesisClientBudget = 298_000;
             // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
             // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
             const siteRuleEditorBudget = 12_000;
@@ -445,7 +450,7 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -459,6 +464,7 @@ export default defineConfig({
             }
         },
         'build:publicAssets': (wxt, files) => {
+            files.push(...hypothesisAssets(__dirname));
             files.push(...createSafariBackgroundPage(wxt.config));
             // 仅保留本地算法的许可；日语词典与印地语语言数据首次使用时下载校验并缓存。
             for (const [source, destination] of [['@faanau/kuromoji/LICENSE-2.0.txt','kuromoji-Apache-2.0.txt'],['@faanau/kuromoji/NOTICE.md','kuromoji-NOTICE.md'],['kuroshiro/LICENSE','kuroshiro-MIT.txt'],['pinyin-pro/LICENSE','pinyin-pro-MIT.txt'],['thai-rtgs/LICENSE','thai-rtgs-MIT.txt']]) {

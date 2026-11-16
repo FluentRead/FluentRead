@@ -1,5 +1,6 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
+ 协作入口：向已绑定标签页的弹窗公开 PDF 协作开关，回到阅读视图后复验文件身份，拒绝旧文件与卸载后的请求。
  PDF 批注：原文重排与标准 PDF 注释由阅读器呈现；本组合根把批注变更归入当前文件修订，沿用历史保存、冲突检测和隐私窗口边界，不另建存储。
  服务启用：关闭的服务不进入候选，保留独立选择并提示重新启用，翻译动作沿现有可用性检查阻止发送。
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
@@ -806,7 +807,7 @@ let historyRequestEpoch = 0;
 const materialPrivate = browser.extension?.inIncognitoContext === true;
 const materialSaving = ref(false);
 const documentMaterialId = ref('');
-const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean} | null>(null);
+const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean; toggleHypothesisFromPopup?(): Promise<unknown>} | null>(null);
 let pendingMaterialResume: MaterialRecord | undefined;
 let materialPositionTimer: ReturnType<typeof setTimeout> | undefined;
 let materialEpoch = 0;
@@ -833,7 +834,14 @@ function captureDocumentMaterialSelection(range: Range, quote: string): Material
 function markDocumentSelection(range: Range, kind: 'highlight' | 'underline'): boolean {
   return !disposed && config.on && isPdfDocument.value && materialPdfReader.value?.markSelection(range, kind) || false;
 }
-defineExpose({captureDocumentMaterialSelection, markDocumentSelection});
+async function toggleDocumentHypothesis(): Promise<unknown> {
+  if (disposed || !config.on || !isPdfDocument.value) return {status: 'unavailable', active: false};
+  const owner = activeTask.value;
+  readerTab.value = 'read'; await nextTick();
+  if (disposed || activeTask.value !== owner) return {status: 'unavailable', active: false};
+  return materialPdfReader.value?.toggleHypothesisFromPopup?.() ?? {status: 'unavailable', active: false};
+}
+defineExpose({captureDocumentMaterialSelection, markDocumentSelection, toggleDocumentHypothesis});
 function documentMaterialSelection(): MaterialSelection | undefined {
   const item = activeTask.value; const doc = parsedDocument.value;
   if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;

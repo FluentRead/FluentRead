@@ -99,7 +99,7 @@
     "settings.cloud.deleteRecreate": "Ручная синхронизация может создать новую копию. Другие устройства также могут загрузить её повторно.",
     "settings.cloud.deleteUnsupported": "Нет сведений о версии для безопасного удаления. Удаление здесь недоступно.",
     "settings.cloud.deleteManualDrive": "В Google Drive откройте Настройки → Управление приложениями → FluentRead, чтобы удалить данные приложения.",
-    "settings.cloud.deleteManualWebDav": "У провайдера WebDAV вручную удалите FluentRead/fluentread-config.encrypted.json, сохранив остальные файлы.",
+    "settings.cloud.deleteManualWebDav": "В настроенном каталоге WebDAV удалите только fluentread-config.encrypted.json.",
     "settings.cloud.deleteConfirm": "Удалить копию",
     "settings.cloud.deleteFinish": "Готово",
     "settings.cloud.deleteAbsent": "Облачной копии нет",
@@ -113,7 +113,10 @@
     "settings.cloud.deleteCloudEffect": "После подтверждения текущая облачная копия будет удалена из {provider}.",
     "settings.cloud.deleteVerificationPrompt": "Введите «{phrase}», чтобы подтвердить удаление.",
     "settings.webdav.concurrentWarning": "Этот сервис не предотвращает одновременную запись. Перед сохранением, объединением или удалением облачная копия проверяется повторно. Не запускайте синхронизацию на других устройствах одновременно.",
-    "settings.cloud.uploadUnverified": "Конфигурация загружена в Google Drive, но проверка не завершена. Повторно прочитайте облачную копию для подтверждения. Настройки устройства не изменены."
+    "settings.cloud.uploadUnverified": "Конфигурация загружена в Google Drive, но проверка не завершена. Повторно прочитайте облачную копию для подтверждения. Настройки устройства не изменены.",
+    "settings.webdav.backupPath": "Подкаталог резервных копий",
+    "settings.webdav.backupPathHint": "Пустое поле — каталог выше. Можно указать вложенный подкаталог.",
+    "settings.webdav.error.path": "Укажите относительный подкаталог без .. и полного URL или оставьте поле пустым."
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "Облачная копия обычных настроек содержит поля за пределами допустимого объёма. Создайте новую резервную копию.",

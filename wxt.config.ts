@@ -429,7 +429,11 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
+            // #1362 的 WebDAV 子目录、同源 href 识别和七语文案：同环境 e124325e8 的 Chrome
+            // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
+            // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
+            const webDavPathBudget = 5_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + webDavPathBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

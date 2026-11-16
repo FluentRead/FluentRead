@@ -1,7 +1,7 @@
 /**
  * @file src/platform/webdav/connection.ts
  * 文件职责：规范化 WebDAV 连接并把应用密码保存在后台专属加密配置仓库。
- * 主要内容：校验目录地址、用户名与密码；通过修订号防止多页覆盖；只返回无密码的连接摘要。
+ * 主要内容：校验已有目录地址、相对备份子目录、用户名与密码；旧连接保留 FluentRead 子目录；通过修订号防止多页覆盖，只返回无密码摘要。
  * 模块边界：不访问服务器，不导出完整配置；记录独立于配置快照，因此连接凭据不会进入云备份。
  */
 import {CloudSyncError, type CloudSyncSession} from '@/src/core/config/cloudSync';
@@ -9,13 +9,35 @@ import type {ConfigStoragePort} from '@/src/platform/storage/configStorage';
 
 export const WEBDAV_CONNECTION_KEY = 'local:webdavBackupConnection';
 export const WEBDAV_SYNC_STATE_KEY = 'local:webdavEncryptedSyncState';
-export type WebDavErrorCode = 'url' | 'credentials' | 'insecure' | 'missing' | 'changed' | 'auth' | 'forbidden' | 'notFound' | 'locked' | 'quota' | 'conflict' | 'etag' | 'network' | 'timeout' | 'tooLarge' | 'invalidDav' | 'http' | 'encryptedOnly' | 'verify';
+export const WEBDAV_DEFAULT_BACKUP_PATH = 'FluentRead/';
+export type WebDavErrorCode = 'url' | 'path' | 'credentials' | 'insecure' | 'missing' | 'changed' | 'auth' | 'forbidden' | 'notFound' | 'locked' | 'quota' | 'conflict' | 'etag' | 'network' | 'timeout' | 'tooLarge' | 'invalidDav' | 'http' | 'encryptedOnly' | 'verify';
 export class WebDavError extends CloudSyncError {
     constructor(readonly code: WebDavErrorCode, readonly status?: number) {super(`WebDAV ${code}`);}
 }
-export interface WebDavConnection {url: string; username: string; password: string; allowInsecure: boolean; revision: string}
-export interface WebDavConnectionSummary {url: string; username: string; allowInsecure: boolean; hasPassword: boolean; revision: string}
-export interface WebDavConnectionInput {url?: unknown; username?: unknown; password?: unknown; allowInsecure?: unknown; revision?: unknown}
+export interface WebDavConnection {url: string; backupPath?: string; username: string; password: string; allowInsecure: boolean; revision: string}
+export interface WebDavConnectionSummary {url: string; backupPath?: string; username: string; allowInsecure: boolean; hasPassword: boolean; revision: string}
+export interface WebDavConnectionInput {url?: unknown; backupPath?: unknown; username?: unknown; password?: unknown; allowInsecure?: unknown; revision?: unknown}
+
+export function normalizeWebDavBackupPath(value: unknown): string {
+    if (value === undefined) return WEBDAV_DEFAULT_BACKUP_PATH;
+    if (typeof value !== 'string' || value.length > 4096 || /[\\\x00-\x1f\x7f?#]/u.test(value)) throw new WebDavError('path');
+    const path = value.trim().replace(/\/+$/u, '');
+    if (!path) return '';
+    const parts = path.split('/');
+    if (parts.length > 16) throw new WebDavError('path');
+    let decodedLength = -1;
+    try {
+        const encoded = parts.map(part => {
+            const decoded = decodeURIComponent(part);
+            decodedLength += decoded.length + 1;
+            if (decodedLength > 1024) throw new WebDavError('path');
+            if (!decoded || decoded === '.' || decoded === '..' || /[/\\\x00-\x1f\x7f]/u.test(decoded)) throw new WebDavError('path');
+            return encodeURIComponent(decoded);
+        }).join('/') + '/';
+        if (encoded.length > 4096) throw new WebDavError('path');
+        return encoded;
+    } catch {throw new WebDavError('path');}
+}
 
 export function normalizeWebDavUrl(value: unknown, allowInsecure = false): string {
     if (typeof value !== 'string' || value.length > 4096 || !value.trim() || /[\\\x00-\x1f\x7f]/u.test(value)) throw new WebDavError('url');
@@ -31,17 +53,18 @@ function normalizeWebDavConnection(input: WebDavConnectionInput, previous: WebDa
     if (input.revision !== (previous?.revision ?? null)) throw new WebDavError('changed');
     const allowInsecure = input.allowInsecure === true;
     const url = normalizeWebDavUrl(input.url, allowInsecure);
+    const backupPath = normalizeWebDavBackupPath(input.backupPath === undefined ? previous?.backupPath : input.backupPath);
     if (typeof input.username !== 'string' || !input.username.trim() || input.username.length > 512 || /[:\x00-\x1f\x7f]/u.test(input.username)) throw new WebDavError('credentials');
     const username = input.username.trim();
     const password = input.password === '' && previous?.url === url && previous.username === username ? previous.password : input.password;
     if (typeof password !== 'string' || !password || password.length > 4096 || /[\x00-\x1f\x7f]/u.test(password)) throw new WebDavError('credentials');
-    return {url, username, password, allowInsecure};
+    return {url, backupPath, username, password, allowInsecure};
 }
 export function parseWebDavConnection(input: WebDavConnectionInput, previous: WebDavConnection | null): WebDavConnection {
     return {...normalizeWebDavConnection(input, previous), revision: crypto.randomUUID()};
 }
 export function webDavConnectionSummary(value: WebDavConnection | null): WebDavConnectionSummary | null {
-    return value ? {url: value.url, username: value.username, allowInsecure: value.allowInsecure, hasPassword: Boolean(value.password), revision: value.revision} : null;
+    return value ? {url: value.url, backupPath: value.backupPath ?? WEBDAV_DEFAULT_BACKUP_PATH, username: value.username, allowInsecure: value.allowInsecure, hasPassword: Boolean(value.password), revision: value.revision} : null;
 }
 export function createWebDavConnectionStore(storage: Pick<ConfigStoragePort, 'getItem' | 'setItem' | 'removeItem'>) {
     return {

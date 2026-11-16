@@ -1,7 +1,7 @@
 /**
  * @file src/platform/webdav/api.ts
  * 文件职责：在用户指定的 WebDAV 目录下读写、条件删除 FluentRead 配置密文并验证服务器能力。
- * 主要内容：只读连接测试、首次备份识别、补取并核验强 ETag；缺少强版本时在 PUT/DELETE 前重新核对密文摘要，
+ * 主要内容：只读连接测试、可留空的相对备份子目录、确认首次保存后逐级建目录、首次备份识别、补取并核验强 ETag；缺少强版本时在 PUT/DELETE 前重新核对密文摘要，
  * 兼容坚果云等服务返回的无引号 ETag，按服务原始版本值发出条件请求，上传后读回验证。
  * 内容核验无法原子阻止其他设备并发写入，由预览明确提示避免同时同步；不将弱 ETag 或内容摘要当作服务器版本。
  * 禁止跟随重定向、携带浏览器 Cookie 或返回服务器异常正文，防止连接凭据流向其他地址。
@@ -12,9 +12,9 @@ import {canMutateCloudFile, strongCloudEtag, type CloudSyncFile, type CloudSyncR
 import {parseWebDavProperties} from './properties';
 import {GOOGLE_DRIVE_MAX_BYTES} from '@/src/platform/google-drive/constants';
 import {DRIVE_ENCRYPTION_FORMAT} from '@/src/platform/google-drive/encryption';
-import {createWebDavSession, WebDavError, type WebDavConnection, type WebDavSession} from './connection';
+import {createWebDavSession, WEBDAV_DEFAULT_BACKUP_PATH, WebDavError, type WebDavConnection, type WebDavSession} from './connection';
 
-export const WEBDAV_BACKUP_DIRECTORY = 'FluentRead/';
+export const WEBDAV_BACKUP_DIRECTORY = WEBDAV_DEFAULT_BACKUP_PATH;
 export const WEBDAV_BACKUP_FILE = 'fluentread-config.encrypted.json';
 const XML_LIMIT = 128 * 1024;
 function unquotedWebDavEtag(value: string | null): string | undefined {
@@ -73,7 +73,8 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
             })().finally(context.cleanup);
         });
     }
-    const directory = (session: WebDavSession) => new URL(WEBDAV_BACKUP_DIRECTORY, session.connection.url).href;
+    const backupPath = (session: WebDavSession) => session.connection.backupPath ?? WEBDAV_BACKUP_DIRECTORY;
+    const directory = (session: WebDavSession) => new URL(backupPath(session), session.connection.url).href;
     const filename = (session: WebDavSession) => new URL(WEBDAV_BACKUP_FILE, directory(session)).href;
     async function checkDirectory(session: WebDavSession, url: string, allowMissing = false, signal?: AbortSignal): Promise<boolean> {
         return request(session, url, {method: 'PROPFIND', signal, headers: {Depth: '0', 'Content-Type': 'application/xml; charset=utf-8'}, body: '<?xml version="1.0"?><d:propfind xmlns:d="DAV:"><d:prop><d:resourcetype/></d:prop></d:propfind>'}, async response => {
@@ -152,9 +153,15 @@ export function createWebDavApi(fetcher: typeof fetch, options: {timeoutMs?: num
         const headers = previous ? await mutationHeaders(session, previous) : {'If-None-Match': '*'};
         if (!headers) throw new WebDavError('conflict');
         if (!previous) {
-            await request(session, directory(session), {method: 'MKCOL'}, async response => {
-                if (![201, 405].includes(response.status)) throw failure(response.status);
-            });
+            // 用户指定的入口必须已存在，绝不尝试创建 NAS 根目录或共享文件夹。
+            // 子目录留空时直接写入入口；多级子目录仅在确认保存后从入口逐级创建。
+            let parent = session.connection.url;
+            for (const part of backupPath(session).split('/').filter(Boolean)) {
+                parent = new URL(part + '/', parent).href;
+                await request(session, parent, {method: 'MKCOL'}, async response => {
+                    if (![201, 405].includes(response.status)) throw failure(response.status);
+                });
+            }
         }
         await request(session, filename(session), {method: 'PUT', headers: {'Content-Type': 'application/json; charset=utf-8', ...headers}, body: content}, async response => {
             if (![200, 201, 204].includes(response.status)) throw failure(response.status);

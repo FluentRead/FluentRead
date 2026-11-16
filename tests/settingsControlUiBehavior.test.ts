@@ -16,6 +16,7 @@ import ReadingAssistanceSettings from '@/src/features/settings/ui/ReadingAssista
 import ExcludedLanguageSettings from '@/src/features/settings/ui/ExcludedLanguageSettings.vue';
 import HarnessPromptSettings from '@/src/features/settings/ui/HarnessPromptSettings.vue';
 import {Config} from '@/src/core/config/model';
+import {EMPTY_DICTIONARY_FIELDS} from '@/src/core/config/dictionaryWorkspace';
 import {normalizeEagerTranslationCharacters, normalizeMinTranslationTextLength} from '@/src/core/config/pageTranslation';
 import {options, getMultilingualTargetLanguageLabel} from '@/src/core/config/catalog';
 import {SENTENCE_HIGHLIGHT_STYLES} from '@/src/core/config/sentenceHighlight';
@@ -127,6 +128,7 @@ it.each(['bilingual','translation-only','disabled'] as const)('preserves the pre
 });
 it.each(['chrome','userscript'] as const)('updates dictionary source through the actual settings template in %s',async browser=>{
   selectionBrowser.browser=browser;
+  vi.stubEnv('BROWSER',browser);
   const config=reactive(new Config());const ui=mount(SelectionSettings,{config});
   const field=ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
   expect(field.value).toBe('auto');
@@ -136,6 +138,27 @@ it.each(['chrome','userscript'] as const)('updates dictionary source through the
   await input(field,'free-dictionary');expect(config.selectionDictionarySource).toBe('free-dictionary');
   config.selectionDictionarySource='wiktionary-rest';await flush();expect(field.value).toBe('wiktionary-rest');
   await input(field,'auto');expect(config.selectionDictionarySource).toBe('auto');
+});
+it('selects an imported dictionary, switches back to built-in lookup and accepts legacy drafts',async()=>{
+  const config=reactive(new Config());
+  config.selectionDictionaryWorkspace.recipes=[{id:'study',name:'My dictionary',kind:'json',url:'https://example.test/{{word}}',headers:{},fields:{...EMPTY_DICTIONARY_FIELDS},script:'',localId:''}];
+  const ui=mount(SelectionSettings,{config});
+  const field=()=>ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
+  expect(ui.host.querySelector('[data-testid="dictionary-workspace"]')).not.toBeNull();
+  expect(ui.host.querySelector('[data-dictionary-option="recipe:study"]')?.textContent).toBe('My dictionary');
+  await input(field(),'recipe:study');expect(config.selectionDictionaryRecipe).toBe('study');expect(field().value).toBe('recipe:study');
+  await input(field(),'free-dictionary');expect(config.selectionDictionaryRecipe).toBe('');expect(config.selectionDictionarySource).toBe('free-dictionary');
+  const legacy=reactive(new Config());delete (legacy as Partial<Config>).selectionDictionaryWorkspace;
+  ui.props.config=legacy;await flush();expect(field().value).toBe('auto');expect(ui.host.querySelectorAll('[data-dictionary-option]')).toHaveLength(7);
+});
+it('hides extension dictionary recipes in userscript drafts and keeps built-in switching usable',async()=>{
+  const config=reactive(new Config());
+  config.selectionDictionaryWorkspace.recipes=[{id:'study',name:'My dictionary',kind:'json',url:'https://example.test/{{word}}',headers:{},fields:{...EMPTY_DICTIONARY_FIELDS},script:'',localId:''}];
+  config.selectionDictionaryRecipe='study';
+  vi.stubEnv('BROWSER','userscript');selectionBrowser.browser='userscript';
+  const ui=mount(SelectionSettings,{config});const field=ui.host.querySelector<HTMLInputElement>('[data-testid="selection-dictionary-source"] input')!;
+  expect(ui.host.querySelector('[data-dictionary-option="recipe:study"]')).toBeNull();expect(field.value).toBe('auto');expect(ui.host.querySelector('[data-testid="dictionary-workspace"]')).toBeNull();
+  await input(field,'free-dictionary');expect(config.selectionDictionaryRecipe).toBe('');expect(config.selectionDictionarySource).toBe('free-dictionary');
 });
 it.each(['unmount','replace','kind'] as const)('does not focus a prompt insertion after %s invalidates its field',async cause=>{
   const preferences=reactive(new Config().harness);preferences.systemPrompt='Example';const ui=mount(HarnessPromptSettings,{preferences});

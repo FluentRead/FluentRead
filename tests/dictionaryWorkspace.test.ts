@@ -54,11 +54,20 @@ describe('dictionary workspace configuration and cards', () => {
         expect(dictionaryId('../a')).toBe(''); expect(dictionaryId('ok-id')).toBe('ok-id');
     });
     it('keeps dictionary headers in the existing private credential store across normalization', () => {
-        const config = normalizeConfig({selectionDictionaryWorkspace: {recipes: [recipe()]} as any, customHeaders: {'dictionary:test': '{"Authorization":"fixture-only"}', 'dictionary:absent': 'orphan'}});
-        expect(config.customHeaders).toEqual({'dictionary:test': '{"Authorization":"fixture-only"}'});
+        const config = normalizeConfig({selectionDictionaryWorkspace: {recipes: [recipe()]} as any, customHeaders: {'dictionary:test': '{"Authorization":"fixture-only"}', 'dictionary:absent': 'orphan', deepseek: '{"X-Example":"built-in"}', 'custom:removed': 'orphan-provider'}});
+        expect(config.customHeaders).toEqual({'dictionary:test': '{"Authorization":"fixture-only"}', deepseek: '{"X-Example":"built-in"}'});
         const publicConfig = sanitizeConfigCredentials(config);
         expect(JSON.stringify(publicConfig)).not.toContain('fixture-only');
         expect(normalizeConfig(mergeConfigCredentials(publicConfig, extractConfigCredentials(config))).customHeaders).toEqual(config.customHeaders);
+    });
+    it('keeps built-in service headers and the existing online defaults in userscript mode', () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        try {
+            const config = normalizeConfig({customHeaders: {deepseek: '{"X-Example":"built-in"}', 'custom:removed': 'orphan-provider'}});
+            expect(config.customHeaders).toEqual({deepseek: '{"X-Example":"built-in"}'});
+            expect(new Config().selectionDictionaryWorkspace).toBeUndefined();
+            expect(config.selectionDictionarySource).toBe('auto');
+        } finally {vi.unstubAllEnvs();}
     });
     it.each(['javascript:alert(1)', 'file:///etc/passwd', 'http://192.168.1.1/{{word}}', 'https://user:secret@example.com/{{word}}'])('rejects an unsafe recipe URL %s', url => expect(() => validateDictionaryRecipe(recipe({url}))).toThrow());
     it('encodes the word as data and allows loopback servers', () => {

@@ -44,6 +44,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       text: en ? 'Learning & expression' : '学习与表达',
       items: [
         item('学习中心', 'Learning center', '/guide/vocabulary-book'),
+        item('词典与学习卡', 'Dictionaries and study cards', '/guide/dictionaries'),
         item('词性与句法', 'Sentence structure', '/guide/sentence-analysis'),
         item('双语分享卡片', 'Share cards', '/guide/share-cards'),
         item('写作助手', 'Writing assistant', '/guide/writing-assistant'),

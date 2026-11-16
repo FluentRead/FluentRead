@@ -1072,12 +1072,11 @@ function normalizeCustomOpenAIProviderState(normalized: Config, source: Partial<
     normalized.system_role = withoutOrphanCustomProviderEntries(normalized.system_role, configuredIds);
     normalized.user_role = withoutOrphanCustomProviderEntries(normalized.user_role, configuredIds);
     normalized.customBody = withoutOrphanCustomProviderEntries(normalized.customBody, configuredIds);
-    if (import.meta.env?.BROWSER === 'userscript') {
-        normalized.customHeaders = withoutOrphanCustomProviderEntries(normalized.customHeaders, configuredIds);
-    } else {
+    normalized.customHeaders = withoutOrphanCustomProviderEntries(normalized.customHeaders, configuredIds);
+    if (import.meta.env?.BROWSER !== 'userscript') {
         const dictionaryHeaderIds = new Set(normalizeDictionaryWorkspace(source.selectionDictionaryWorkspace).recipes.map(recipe => `dictionary:${recipe.id}`));
         normalized.customHeaders = Object.fromEntries(Object.entries(normalized.customHeaders)
-            .filter(([service]) => configuredIds.has(service) || dictionaryHeaderIds.has(service)));
+            .filter(([service]) => !service.startsWith('dictionary:') || dictionaryHeaderIds.has(service)));
     }
     normalized.apiKeys = withoutOrphanCustomProviderEntries(normalized.apiKeys, configuredIds);
     normalized.serviceRequestLimits = Object.fromEntries(Object.entries(normalized.serviceRequestLimits)

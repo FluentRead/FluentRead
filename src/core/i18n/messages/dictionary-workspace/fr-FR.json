@@ -7,7 +7,7 @@
   "dictionary.offline": "Importer un dictionnaire local",
   "dictionary.offlineHelp": "MDX/MDD, StarDict, DSL et Yomitan. Sélectionnez les fichiers associés ensemble (128 Mio maximum).",
   "dictionary.name": "Nom",
-  "dictionary.kind": "Type",
+  "dictionary.kind": "Type de source",
   "dictionary.url": "URL de recherche",
   "dictionary.urlHelp": "Utilisez {word} pour le mot ; HTTPS et serveurs HTTP locaux acceptés.",
   "dictionary.web": "Site web",
@@ -50,5 +50,7 @@
   "dictionary.frontField": "Champ recto",
   "dictionary.backField": "Champ verso",
   "dictionary.empty": "Aucune source personnalisée",
-  "dictionary.local": "Hors ligne"
+  "dictionary.local": "Hors ligne",
+  "dictionary.customSource": "Dictionnaire personnalisé",
+  "dictionary.updated": "Mis à jour"
 }

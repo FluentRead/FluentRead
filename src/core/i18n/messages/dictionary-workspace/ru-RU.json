@@ -50,5 +50,7 @@
   "dictionary.frontField": "Поле лицевой стороны",
   "dictionary.backField": "Поле оборота",
   "dictionary.empty": "Своих источников пока нет",
-  "dictionary.local": "Офлайн"
+  "dictionary.local": "Офлайн",
+  "dictionary.customSource": "Пользовательский словарь",
+  "dictionary.updated": "Обновлено"
 }

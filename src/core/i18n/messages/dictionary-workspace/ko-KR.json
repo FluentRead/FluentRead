@@ -50,5 +50,7 @@
   "dictionary.frontField": "앞면 필드",
   "dictionary.backField": "뒷면 필드",
   "dictionary.empty": "사용자 지정 출처가 없습니다",
-  "dictionary.local": "오프라인"
+  "dictionary.local": "오프라인",
+  "dictionary.customSource": "사용자 지정 사전",
+  "dictionary.updated": "업데이트됨"
 }

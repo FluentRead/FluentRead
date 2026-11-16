@@ -50,5 +50,7 @@
   "dictionary.frontField": "Campo del anverso",
   "dictionary.backField": "Campo del reverso",
   "dictionary.empty": "Aún no hay fuentes personalizadas",
-  "dictionary.local": "Sin conexión"
+  "dictionary.local": "Sin conexión",
+  "dictionary.customSource": "Diccionario personalizado",
+  "dictionary.updated": "Actualizado"
 }

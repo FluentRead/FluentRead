@@ -50,5 +50,7 @@
   "dictionary.frontField": "Front field",
   "dictionary.backField": "Back field",
   "dictionary.empty": "No custom sources yet",
-  "dictionary.local": "Offline"
+  "dictionary.local": "Offline",
+  "dictionary.customSource": "Custom dictionary",
+  "dictionary.updated": "Updated"
 }

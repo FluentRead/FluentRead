@@ -50,5 +50,7 @@
   "dictionary.frontField": "表面フィールド",
   "dictionary.backField": "裏面フィールド",
   "dictionary.empty": "カスタム参照先はありません",
-  "dictionary.local": "オフライン"
+  "dictionary.local": "オフライン",
+  "dictionary.customSource": "カスタム辞書",
+  "dictionary.updated": "更新済み"
 }

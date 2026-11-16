@@ -50,5 +50,7 @@
   "dictionary.frontField": "正面字段",
   "dictionary.backField": "背面字段",
   "dictionary.empty": "暂无自定义来源",
-  "dictionary.local": "离线"
+  "dictionary.local": "离线",
+  "dictionary.customSource": "自定义词典",
+  "dictionary.updated": "已更新"
 }

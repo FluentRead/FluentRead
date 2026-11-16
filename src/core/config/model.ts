@@ -725,7 +725,7 @@ export class Config {
         this.aiMultiSegmentMaxCharacters = DEFAULT_AI_MULTI_SEGMENT_MAX_CHARACTERS;
         this.nativeBatchTranslationEnabled = {...DEFAULT_NATIVE_BATCH_TRANSLATION_ENABLED};
         this.informationHighlight = {...DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES};
-        this.bilingualSentenceHighlightEnabled = false; // 默认关闭双语逐句高亮，避免改变现有网页视觉
+        this.bilingualSentenceHighlightEnabled = true; // 默认开启双语逐句高亮，便于对照阅读
         this.bilingualSentenceHighlightStyle = DEFAULT_SENTENCE_HIGHLIGHT_STYLE;
         this.bilingualSentenceHighlightAppearance = {...DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE};
         this.bilingualSentenceHighlightProfiles = [];
@@ -1263,7 +1263,7 @@ export function normalizeConfig(value: unknown): Config {
     normalized.privacyProtection = normalizePrivacyPolicy(source.privacyProtection);
     normalized.privacyProtectionSecretTerms = normalizePrivacyTerms(source.privacyProtectionSecretTerms);
     normalized.nativeBatchTranslationEnabled = normalizeNativeBatchTranslationEnabled(source.nativeBatchTranslationEnabled);
-    normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled === true;
+    normalized.bilingualSentenceHighlightEnabled = source.bilingualSentenceHighlightEnabled !== false;
     normalized.bilingualSentenceHighlightStyle = normalizeSentenceHighlightStyle(source.bilingualSentenceHighlightStyle);
     normalized.bilingualSentenceHighlightAppearance = normalizeSentenceHighlightAppearance(source.bilingualSentenceHighlightAppearance);
     normalized.bilingualSentenceHighlightProfiles = normalizeSentenceHighlightProfiles(source.bilingualSentenceHighlightProfiles);

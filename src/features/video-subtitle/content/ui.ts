@@ -18,6 +18,9 @@ import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
 import {getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, resetSubtitlePanelLayout, finishSubtitlePanelLayout,
   prepareSubtitlePanelLayout, findOwnedSubtitlePanel, syncSubtitleScrollHostState, setSubtitlePanelScrollable, VIDEO_SUBTITLE_SCROLL_HOST_ID} from './subtitleControlLayout';
 import {createVideoKaraokeController, setVideoCaptionText, type VideoKaraokeController, VIDEO_KARAOKE_FILL_PROPERTY, VIDEO_KARAOKE_STATE_ATTRIBUTE, VIDEO_KARAOKE_TEXT_ATTRIBUTE, VIDEO_KARAOKE_UNIT_CLASS} from './karaoke';
+import {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
+
+export {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
 
 import {
     normalizeUiLanguage,
@@ -132,7 +135,6 @@ export const VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS = 'fluent-read-video-display-t
 export const VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS = 'fluent-read-video-display-original-only';
 export const VIDEO_DISPLAY_HIDDEN_CLASS = 'fluent-read-video-display-hidden';
 export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-caption';
-export const VIDEO_NATIVE_CAPTION_HIDDEN_CLASS = 'fluent-read-video-native-caption-hidden';
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
 

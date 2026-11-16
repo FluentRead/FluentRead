@@ -527,6 +527,30 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         tabs[0].props.onClick(); await flush(); expect(state.activeSidebarTab).toBe('files');
     });
 
+    it('previews per-chapter EPUB segment coverage and hides stale counts during translation', async () => {
+        const bytes = new Uint8Array(readFileSync('examples/document-translation/sample.epub'));
+        await state.loadFiles([new File([asArrayBufferBytes(bytes)], 'coverage.epub', {type: getDocumentMimeType('epub')})]); await flush();
+        const chapters = state.epubChapters as Array<{segmentOffset: number; segmentCount: number}>;
+        state.sidebarTab = 'outline'; await flush();
+        const rows = () => walkHost(root).filter(entry => entry.type === 'button' && String(entry.props.class).split(' ').includes('document-outline-item') && String(entry.props.class).split(' ').includes('chapter'));
+        const counts = () => rows().map(row => row.children.find(child => child.props.class === 'document-outline-progress')?.text);
+        expect(chapters.length).toBeGreaterThan(0);
+        expect(counts()).toEqual(chapters.map(chapter => `0/${chapter.segmentCount}`));
+        expect(ports.i18n).toHaveBeenCalledWith('document.progressSegments', {completed: 0, total: chapters[0].segmentCount});
+        expect(rows()[0].props['aria-label']).toContain('document.progressSegments');
+
+        state.editSegment(chapters[0].segmentOffset, 'Reviewed chapter heading'); await flush();
+        expect(counts()[0]).toBe(`1/${chapters[0].segmentCount}`);
+
+        state.documentBatchTranslation = false;
+        const pending = deferred<string>(); ports.translate.mockReturnValueOnce(pending.promise);
+        const running = state.startTranslation();
+        await vi.waitFor(() => expect(ports.translate).toHaveBeenCalled()); await flush();
+        expect(rows().every(row => row.children.find(child => child.props.class === 'document-outline-progress')?.props.hidden)).toBe(true);
+        pending.resolve('First pending translation'); await running; await flush();
+        expect(counts()).toEqual(chapters.map(chapter => `${chapter.segmentCount}/${chapter.segmentCount}`));
+    });
+
     it('native JSON reading accepts background pointer focus while retaining interactive controls and gesture scale', async () => {
         await state.loadFiles([file('reader.json', '["Original sentence"]')]); await flush();
         const {document} = parseHTML('<html><body><div><span>Text</span><button>Control</button></div></body></html>');
@@ -1214,6 +1238,57 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.currentFingerprint).toBe(translatedFingerprint);
         state.config.token.openai = 'changed-member-credential'; await flush();
         expect(state.settingsChanged).toBe(true);
+    });
+    it('shows the actual batch context and scoped glossary hits while keeping the AI context override document-local', async () => {
+        Object.assign(state.config, {from: 'en', to: 'zh-CN', documentService: 'openai', enableAIContext: false,
+            glossaryEnabled: true, documentGlossaryIds: ['book-terms'], glossaryLibraries: [{id: 'book-terms', name: 'Book terms', enabled: true,
+                sourceLanguage: 'en', targetLanguage: 'zh-CN', domains: [], entries: [
+                    {id: 'helios-engine', source: 'Helios engine', target: 'Helios 引擎', caseSensitive: false},
+                ]}], token: {openai: 'fixture-document-key'}});
+        state.config.documentModel.openai = 'gpt-4.1-mini';
+        await state.loadFiles([file('context.txt', 'The Helios engine is compact.\n\nThe Helios engine runs locally.')]); await flush();
+        expect(state.parsedDocument.segments).toHaveLength(2);
+        state.editSegment(0, 'Helios 引擎（已确认）');
+        state.documentAIContextPreference = true;
+        expect(state.config.enableAIContext).toBe(false);
+        ports.translate.mockImplementation(async (source: string) => `译 ${source}`);
+        await state.startTranslation(); await flush();
+
+        expect(ports.translate).toHaveBeenCalledOnce();
+        const requestOptions = ports.translate.mock.calls[0][2];
+        expect(requestOptions).toMatchObject({enableAIContext: true, glossaryIds: ['book-terms'], glossaryContext: 'document'});
+        const sentContext = JSON.parse(requestOptions.discourseContext);
+        expect(sentContext.evidence).toEqual(expect.arrayContaining([expect.objectContaining({kind: 'user_confirmed', translation: 'Helios 引擎（已确认）'})]));
+        expect(state.requestEvidence).toMatchObject({segmentCount: 1, contextEnabled: true, glossaryOccurrences: 1, glossaryTermCount: 1, glossaryLibraryCount: 1});
+        expect(state.requestEvidence.positions).toContain('段落 2');
+        expect(state.requestEvidence.contextItems).toEqual(expect.arrayContaining([expect.objectContaining({kind: 'user_confirmed', translation: 'Helios 引擎（已确认）'})]));
+        expect(state.requestEvidence.glossaryTerms).toEqual([{library: 'Book terms', source: 'Helios engine', target: 'Helios 引擎', occurrences: 1}]);
+        const evidence = walkHost(root).find(entry => entry.props['data-testid'] === 'document-request-evidence')!;
+        expect(hostText(evidence)).toContain('Helios engine → Helios 引擎');
+        expect(hostText(evidence)).toContain('Book terms');
+        expect(state.config.enableAIContext).toBe(false);
+
+        await state.loadFiles([file('next.txt', 'A different document.')]); await flush();
+        expect(state.documentAIContextOverride).toBeNull();
+        expect(state.requestEvidence).toBeNull();
+    });
+    it('reports when document context is off without changing the global preference', async () => {
+        Object.assign(state.config, {from: 'en', to: 'zh-CN', documentService: 'openai', enableAIContext: true,
+            token: {openai: 'fixture-document-key'}});
+        state.config.documentModel.openai = 'gpt-4.1-mini';
+        await state.loadFiles([file('no-context.txt', 'A single paragraph.')]); await flush();
+        state.documentAIContextPreference = false;
+        state.documentBatchTranslation = false;
+        expect(state.config.enableAIContext).toBe(true);
+        await state.startTranslation(); await flush();
+
+        expect(ports.translate).toHaveBeenCalledOnce();
+        expect(ports.translate.mock.calls[0][2]).toMatchObject({enableAIContext: false});
+        expect(ports.translate.mock.calls[0][2].discourseContext).toBeUndefined();
+        expect(state.requestEvidence).toMatchObject({contextEnabled: false, contextItems: []});
+        const evidence = walkHost(root).find(entry => entry.props['data-testid'] === 'document-request-evidence')!;
+        expect(hostText(evidence)).toContain('document.requestEvidence.contextDisabled');
+        expect(state.config.enableAIContext).toBe(true);
     });
     it.each([
         ['google', 'composite:first'], ['composite:first', 'google'], ['composite:first', 'composite:second'],

@@ -8,7 +8,7 @@ import {getFreeTranslationWeightSnapshot, createProviderTestRuntimeHandlers} fro
 import {createPersonalCorrectionRuntimeHandlers} from './personalCorrectionRuntime';
 import {createChatGPTPlanHandler} from './chatgptPlanRuntime';
 import {config, configReady} from '@/src/services/config/store';
-import {lookupWord} from '@/src/features/selection-translation/services/wordDictionary';
+import {lookupSelectionDictionary, createDictionaryRuntimeHandler} from './dictionaryRuntime';
 import {createSelectionPageZoomBrowserPort, createSelectionPageZoomHandler} from '@/src/features/selection-translation/background/pageZoomHandler';
 import {synthesizeEdgeTts} from '@/src/features/selection-translation/services/edgeTts';
 import {vocabularyBook} from '@/src/features/vocabulary/repository';
@@ -77,6 +77,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         getGlossaryRevision: () => buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
     });
     const handlers: Array<BackgroundMessageHandler<BackgroundRuntimeContext>> = [
+        createDictionaryRuntimeHandler(),
         ...createDocumentNavigationHandlers(),
         ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(tabBroadcast),
         createChatGPTPlanHandler(),
@@ -110,7 +111,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             onStateChanged: options.onFullPageStateChanged,
         }),
         createSelectionWordLookupHandler({
-            lookupWord: (word) => lookupWord(word, config.selectionDictionarySource),
+            lookupWord: lookupSelectionDictionary,
             getDefaultTargetLanguage: () => config.to,
             translate: (request) => translateWithCache({...request, serviceOverride: config.selectionTranslationService || config.service}),
             warn: (message, error) => console.warn(message, error),

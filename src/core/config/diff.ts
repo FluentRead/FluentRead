@@ -613,6 +613,8 @@ const FIELD_DEFINITIONS: Record<string, FieldDefinition> = {
     selectionTranslatorDelay: {group: 'translation', label: '划词显示延迟', format: (value) => formatNumber(value, ' ms')},
     selectionTranslatorBidirectional: {group: 'translation', label: '中英双向划词', format: (value) => formatBoolean(value)},
     selectionDictionarySource: {group: 'translation', label: '词典来源', format: (value) => formatEnum(value, labelsFor(WORD_DICTIONARY_SOURCE_OPTIONS))},
+    selectionDictionaryRecipe: {group: 'translation', label: '自定义词典'},
+    selectionDictionaryWorkspace: {group: 'translation', label: '词典与学习卡', format: () => '已更新'},
     selectionTtsVoices: {group: 'translation', label: '划词朗读音色'},
     selectionTtsMode: {group: 'translation', label: '朗读合成策略', format: (value) => formatEnum(value, LOCAL_TTS_MODE_LABELS)},
     selectionTtsLocalVoice: {group: 'translation', label: '本地朗读音色'},

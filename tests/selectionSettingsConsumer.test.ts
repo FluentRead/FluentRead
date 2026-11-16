@@ -66,6 +66,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         'element-plus': {ElMessage: {warning}, ElOption: OptionPort},
         '@/src/ui/components/UiSelect.vue': {__esModule: true, default: SelectPort},
         './components/SettingsItem.vue': {__esModule: true, default: SettingsItemPort},
+        './DictionaryWorkspaceSettings.vue': {__esModule: true, default: Vue.defineComponent({setup: () => () => Vue.h('div', {'data-dictionary-workspace-port': ''})})},
         '@/src/core/config/selectionPreview': preview,
         '@/src/features/reading-assistant/ui/answer/public': {ReadingAnswer: ReadingAnswerPort},
         './HarnessSettings.vue': {__esModule: true, default: HarnessSettingsPort},

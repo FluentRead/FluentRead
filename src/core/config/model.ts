@@ -23,6 +23,7 @@ import {DEFAULT_AI_MULTI_SEGMENT_MAX_SEGMENTS, DEFAULT_AI_MULTI_SEGMENT_MAX_CHAR
 import {DEFAULT_CLICK_SELECTION_HOTKEY, normalizeClickSelectionHotkey} from './clickSelection';
 import {DEFAULT_NATIVE_ASR_BASE_URL, normalizeNativeAsrBaseUrl} from './nativeAsr';
 import {normalizeWordDictionarySource, type WordDictionarySourceSetting} from './selectionDictionary';
+import {defaultDictionaryWorkspace, normalizeDictionaryWorkspace, dictionaryId, type DictionaryWorkspace} from './dictionaryWorkspace';
 import {DEFAULT_SENTENCE_HIGHLIGHT_STYLE, DEFAULT_SENTENCE_HIGHLIGHT_APPEARANCE, normalizeSentenceHighlightStyle, normalizeSentenceHighlightAppearance, normalizeSentenceHighlightProfiles, type SentenceHighlightStyle, type SentenceHighlightAppearance, type SentenceHighlightProfile} from './sentenceHighlight';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlightPreferences, type InformationHighlightPreferences} from './informationHighlight';
 import {normalizeMangaSiteRules, normalizeMangaPrefetchPages, normalizeMangaCachePages, type MangaSiteRule} from './mangaNormalization';
@@ -574,6 +575,8 @@ export class Config {
     selectionTranslatorAutoDismiss: boolean; // 继续阅读或复制原文时收起，避免浮层长时间遮挡页面
     selectionTranslatorBidirectional: boolean; // 中英目标下为同语言选区提供反向划词入口
     selectionDictionarySource: WordDictionarySourceSetting; // auto 保留本地优先；指定后只查询所选词典
+    declare selectionDictionaryRecipe: string; // 扩展主动选定的配方；空值继续使用内置词典
+    declare selectionDictionaryWorkspace: DictionaryWorkspace; // 复用加密配置，词库正文另存本地索引
     selectionTtsVoices: string[]; // 划词朗读的 Edge TTS 音色回退顺序
     selectionTtsMode: LocalTtsMode; // 朗读在线/本地合成策略
     selectionTtsLocalVoice: LocalTtsVoiceId; // 本地 Kokoro 音色，auto 表示按语言选择
@@ -802,6 +805,10 @@ export class Config {
         this.selectionTranslatorAutoDismiss = true;
         this.selectionTranslatorBidirectional = false; // 保留默认的同语言跳过，用户可按需开启双向入口
         this.selectionDictionarySource = 'auto';
+        if (import.meta.env?.BROWSER !== 'userscript') {
+            this.selectionDictionaryRecipe = '';
+            this.selectionDictionaryWorkspace = defaultDictionaryWorkspace();
+        }
         this.selectionTtsVoices = []; // 默认按当前语言使用内置音色回退顺序
         this.selectionTtsMode = DEFAULT_LOCAL_TTS_MODE;
         this.selectionTtsLocalVoice = DEFAULT_LOCAL_TTS_VOICE;
@@ -1065,8 +1072,9 @@ function normalizeCustomOpenAIProviderState(normalized: Config, source: Partial<
     normalized.system_role = withoutOrphanCustomProviderEntries(normalized.system_role, configuredIds);
     normalized.user_role = withoutOrphanCustomProviderEntries(normalized.user_role, configuredIds);
     normalized.customBody = withoutOrphanCustomProviderEntries(normalized.customBody, configuredIds);
+    const dictionaryHeaderIds = new Set(normalizeDictionaryWorkspace(source.selectionDictionaryWorkspace).recipes.map(recipe => `dictionary:${recipe.id}`));
     normalized.customHeaders = Object.fromEntries(Object.entries(normalized.customHeaders)
-        .filter(([service]) => configuredIds.has(service)));
+        .filter(([service]) => configuredIds.has(service) || dictionaryHeaderIds.has(service)));
     normalized.apiKeys = withoutOrphanCustomProviderEntries(normalized.apiKeys, configuredIds);
     normalized.serviceRequestLimits = Object.fromEntries(Object.entries(normalized.serviceRequestLimits)
         .filter(([service]) => !isCustomOpenAIProviderId(service) || configuredIds.has(service)));
@@ -1618,6 +1626,11 @@ export function normalizeConfig(value: unknown): Config {
     );
     normalized.selectionTranslatorBidirectional = source.selectionTranslatorBidirectional === true;
     normalized.selectionDictionarySource = normalizeWordDictionarySource(source.selectionDictionarySource);
+    if (import.meta.env?.BROWSER !== 'userscript') {
+        normalized.selectionDictionaryWorkspace = normalizeDictionaryWorkspace(source.selectionDictionaryWorkspace);
+        const recipe = dictionaryId(source.selectionDictionaryRecipe);
+        normalized.selectionDictionaryRecipe = normalized.selectionDictionaryWorkspace.recipes.some(item => item.id === recipe) ? recipe : '';
+    }
     normalized.selectionTranslatorAutoDismiss = typeof source.selectionTranslatorAutoDismiss === 'boolean'
         ? source.selectionTranslatorAutoDismiss : true;
     // 兼容上一版“触发方式 + 可选快捷键”配置，并将最终状态收敛为单一触发方式。

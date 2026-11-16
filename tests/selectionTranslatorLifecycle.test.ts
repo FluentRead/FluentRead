@@ -5560,3 +5560,15 @@ it('marks from the rendered PDF selection toolbar and rejects stale ranges', asy
     fixture.state.snapshot = null; fixture.state.markDocumentSelection('highlight');
     expect(markSelection).toHaveBeenCalledTimes(3); expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });
+
+it('hides annotation actions for unsupported translated or cross-page selections while keeping translation available', async () => {
+    const markSelection=vi.fn(()=>true), canMarkSelection=vi.fn(()=>false);
+    const fixture=mountSelection(false,{acceptsRange:()=>true,markSelection,canMarkSelection},{},true);await Vue.nextTick();
+    const selected=fixture.selectedSnapshot('A translated or cross-page quote.');Object.assign(fixture.state,{snapshot:selected,selectedText:selected.text,showTooltip:true});await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-underline')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-translation-tooltip')).not.toBeNull();
+    fixture.state.markDocumentSelection('highlight');expect(markSelection).not.toHaveBeenCalled();
+    canMarkSelection.mockReturnValue(true);fixture.state.snapshot={...selected};await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).not.toBeNull();
+});

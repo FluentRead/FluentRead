@@ -35,8 +35,8 @@
         </div>
         <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
         <div class="fr-tooltip-actions">
-          <button v-if="selectionAdapter?.markSelection" class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
-          <button v-if="selectionAdapter?.markSelection" class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
+          <button v-if="canMarkDocumentSelection" class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
+          <button v-if="canMarkDocumentSelection" class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
           <button v-if="!readingMode && shareCardAvailable && translationResult && !isLoading" class="fr-action-btn fr-share-card-entry" type="button" :title="t('shareCard.create')" :aria-label="t('shareCard.create')" @click="openShareCard({original: selectedText, translation: translationResult})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></button>
           <button
             v-if="!readingMode && config.vocabularyBookEnabled && selectedText && !isPrivateContext"
@@ -240,6 +240,7 @@ const props = defineProps<{
     captureReading?: (range: Range, text: string, limit: number) => ReadingSelection;
     captureMaterial?: (range: Range, quote: string) => ReturnType<typeof captureMaterialSelection>;
     markSelection?: (range: Range, kind: 'highlight' | 'underline') => boolean;
+    canMarkSelection?: (range: Range) => boolean;
     subscribeInvalidation?: (listener: () => void) => () => void;
   };
 }>();
@@ -343,10 +344,12 @@ const tooltipScaleStyle = computed(() => {
   };
 });
 const snapshot = ref<SelectionSnapshot | null>(null);
+const canMarkDocumentSelection = computed(() => Boolean(props.selectionAdapter?.markSelection && snapshot.value
+  && (props.selectionAdapter.canMarkSelection?.(snapshot.value.range) ?? true)));
 function markDocumentSelection(kind: 'highlight' | 'underline'): void {
   const current = snapshot.value;
   if (!current || !isSelectionRangeConnected(current.range) || current.range.toString() !== current.rangeText
-    || !props.selectionAdapter?.acceptsRange(current.range)) return;
+    || !props.selectionAdapter?.acceptsRange(current.range) || props.selectionAdapter.canMarkSelection?.(current.range) === false) return;
   if (props.selectionAdapter.markSelection?.(current.range, kind) === false) showNotice(t('document.pdfReading.annotationSelectionHint'));
 }
 watch(snapshot, current => {

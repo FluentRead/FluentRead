@@ -30,6 +30,7 @@ interface PdfSelectionAdapter {
     captureReading(range: Range, text: string, limit: number): ReadingSelection;
     captureMaterial?(range: Range, quote: string): MaterialSelection | undefined;
     markSelection?: DocumentSelectionRuntimeOptions['markSelection'];
+    canMarkSelection?: (range: Range) => boolean;
     subscribeInvalidation(listener: () => void): () => void;
     invalidate(): void;
 }
@@ -205,6 +206,11 @@ export function createPdfSelectionAdapter(root: HTMLElement, captureMaterial?: D
         context: (range, text, limit) => sourceContext(range, text, limit, root, translated),
         captureMaterial: captureMaterial ? (range, quote) => acceptsPdfSourceRange(range, root, true) ? captureMaterial(range, quote) : undefined : undefined,
         markSelection: markSelection ? (range, kind) => acceptsPdfSourceRange(range, root, translated) && markSelection(range, kind) : undefined,
+        canMarkSelection: markSelection ? range => {
+            const source = sourceForNode(range.startContainer, root, translated);
+            return Boolean(source && source === sourceForNode(range.endContainer, root, translated)
+                && source.matches(`${PDF_SOURCE_TEXT_SELECTOR},.pdf-reading-paragraph`));
+        } : undefined,
         captureReading(range, text, limit) {
             const context = sourceContext(range, text, limit, root, translated).text;
             return {text, context, sentence: context ? sentenceAroundSelection(context, text) : text};

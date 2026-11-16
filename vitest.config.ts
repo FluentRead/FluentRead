@@ -62,6 +62,7 @@ export default defineConfig({
         resolve(__dirname, 'src/features/settings/ui/HarnessSettings.vue'),
         resolve(__dirname, 'src/features/settings/ui/WritingSettings.vue'),
         resolve(__dirname, 'src/features/document-translation/ui/PdfReader.vue'),
+        resolve(__dirname, 'src/features/document-translation/ui/PdfAnnotations.vue'),
         resolve(__dirname, 'src/app/popup/PopupServices.vue'),
         resolve(__dirname, 'src/app/popup/PopupLanguageSelect.vue'),
         resolve(__dirname, 'src/app/popup/PopupOnboarding.vue'),

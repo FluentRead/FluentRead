@@ -1,5 +1,6 @@
 /**
  * @file src/app/document-translation/document-page.css
+ * PDF 窄屏工具：将批注与显示、搜索、阅读外观排在同一行，信息高亮使用保留可访问名称和提示的紧凑图标。
  * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读；下载面板在工具栏旁以小幅版式示意选择双语或仅译文，排版细项默认收起，在选择之后提供单一品牌下载按钮，不重复文件名，未完成时才确认一次，错误详情按需展开，工具栏消息与持续警告不遮挡正文。
  * 主要内容：让数字进度完整可见，保留零进度和完成进度条，失败后的续译提示保持紧凑单行且仅按需展开技术详情；声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载动作与状态和响应式断点；材料保存按钮在各格式工具栏中保持紧凑宽度，窄屏独立排布并避免覆盖阅读控件。
  * 模块边界：样式仅服务 DocumentApp 的 class 结构，不解析文档、不控制翻译状态，也不覆盖 content 宿主页面；跨页面基础视觉 token 仍由 src/ui/styles/tokens.css 管理。
@@ -769,13 +770,15 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .is-workspace .document-reading-pane .reading-content, .document-reading-pane .reading-content.reading-pdf { min-height: 0; }
 }
 @media (max-width: 599px) {
-  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 7px; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto auto minmax(0, 1fr); gap: 7px; }
   .reader-controls-slot .pdf-page-navigation { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-zoom-control { grid-column: 3 / -1; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-presentation-control { grid-column: 1; grid-row: 2; justify-self: start; }
   .reader-controls-slot .pdf-search { grid-column: 2; grid-row: 2; }
   .reader-controls-slot .pdf-style { grid-column: 3; grid-row: 2; }
-  .reader-controls-slot .pdf-information-highlight { grid-column: 4; grid-row: 2; justify-self: start; }
+  .reader-controls-slot .pdf-annotations { grid-column: 4; grid-row: 2; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight { grid-column: 5; grid-row: 2; justify-self: start; width: 30px; padding: 0; overflow: hidden; font-size: 0; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight::before { content: '✦'; font-size: 17px; }
   .reader-controls-slot .pdf-information-status { grid-column: 1 / -1; grid-row: 3; }
 }
 @media (max-width: 760px) {

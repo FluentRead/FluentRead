@@ -130,7 +130,7 @@
                 <span v-if="!wordCard.dictionaryEntry">数据来自开放词典</span>
                 <template v-for="source in wordCard.sources" :key="source.id"><a v-if="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">{{ source.label }}</a><span v-else>{{ source.label }}</span></template>
               </footer>
-              <DictionaryCardTools v-if="dictionaryToolEntry && dictionaryWorkspace" :key="`${wordLookupRequestId}-${wordCard.normalizedWord}`" :entry="dictionaryToolEntry" :workspace="dictionaryWorkspace" :context="dictionaryContext" :explanation="readingPanelRef?.getCompletedAnswer?.() || ''" :dark="isDarkTheme" />
+              <DictionaryCardTools v-if="extensionDictionaryWorkspace && dictionaryToolEntry && dictionaryWorkspace" :key="`${wordLookupRequestId}-${wordCard.normalizedWord}`" :entry="dictionaryToolEntry" :workspace="dictionaryWorkspace" :context="dictionaryContext" :explanation="readingPanelRef?.getCompletedAnswer?.() || ''" :dark="isDarkTheme" />
             </template>
           </section>
           <div v-if="isWordSelection && wordCardError" class="fr-word-fallback-note" role="status"><span>{{ wordCardError }}</span><button type="button" @click="retryWordCard">重查词典</button></div>
@@ -515,6 +515,7 @@ watch(() => snapshot.value?.range ?? null, (range) => {
   props.onSelectionRangeChange?.(range);
 }, { flush: 'post' });
 
+const extensionDictionaryWorkspace = import.meta.env.BROWSER !== 'userscript';
 const selectionShortcutTriggers = new Set(['Control', 'Alt', 'Shift', 'custom']);
 const selectionSettings = computed(() => {
   // `config` 与内容脚本运行时共享，且会在 Vue 外部变更；用本地响应式版本让 Popup/Options
@@ -530,9 +531,9 @@ const selectionSettings = computed(() => {
     from: config.from,
     to: config.to,
     bidirectional: config.selectionTranslatorBidirectional,
-    dictionarySource: config.selectionDictionaryRecipe ? JSON.stringify([config.selectionDictionaryRecipe, config.selectionDictionaryWorkspace?.revision, config.selectionDictionaryWorkspace?.recipes.find(item => item.id === config.selectionDictionaryRecipe)]) : config.selectionDictionarySource,
-    dictionaryRecipe: config.selectionDictionaryRecipe || '',
-    dictionaryWorkspace: config.selectionDictionaryWorkspace,
+    dictionarySource: extensionDictionaryWorkspace && config.selectionDictionaryRecipe ? JSON.stringify([config.selectionDictionaryRecipe, config.selectionDictionaryWorkspace?.revision, config.selectionDictionaryWorkspace?.recipes.find(item => item.id === config.selectionDictionaryRecipe)]) : config.selectionDictionarySource,
+    dictionaryRecipe: extensionDictionaryWorkspace ? config.selectionDictionaryRecipe || '' : '',
+    dictionaryWorkspace: extensionDictionaryWorkspace ? config.selectionDictionaryWorkspace : undefined,
     service: config.selectionTranslationService || config.service,
     model: `${config.model?.[config.selectionTranslationService || config.service] || ''}:${config.customModel?.[config.selectionTranslationService || config.service] || ''}`,
   };
@@ -555,18 +556,18 @@ const UI_SELECTION_SUPPRESSION_MS = 350;
 const SELECTION_LOSS_GRACE_MS = 160;
 const PENDING_SELECTION_SHORTCUT_MS = 250;
 
-const selectedWord = computed(() => selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(selectedText.value) : normalizeEnglishWord(selectedText.value));
+const selectedWord = computed(() => extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(selectedText.value) : normalizeEnglishWord(selectedText.value));
 const dictionaryWorkspace = computed(() => selectionSettings.value.dictionaryWorkspace);
-const dictionaryContext = computed(() => {
+const dictionaryContext = extensionDictionaryWorkspace ? computed(() => {
   if (!snapshot.value) return selectedText.value;
   try {return (props.selectionAdapter?.captureReading ?? captureReadingSelection)(snapshot.value.range, selectedText.value, 2000).sentence || selectedText.value;}
   catch {return selectedText.value;}
-});
-const dictionaryToolEntry = computed(() => wordCard.value ? wordCard.value.dictionaryEntry || {...EMPTY_DICTIONARY_FIELDS,
+}) : '';
+const dictionaryToolEntry = extensionDictionaryWorkspace ? computed(() => wordCard.value ? wordCard.value.dictionaryEntry || {...EMPTY_DICTIONARY_FIELDS,
   word: wordCard.value.word, phonetic: wordCard.value.phonetics[0]?.text || '', audio: wordCard.value.phonetics[0]?.audio || '',
   definition: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.definition)).join('\n'),
   example: wordCard.value.meanings.flatMap(item => item.definitions.map(definition => definition.example || '')).filter(Boolean).join('\n'),
-  etymology: wordCard.value.origin || '', source: wordCard.value.sources.map(item => item.label).join(', '), sourceUrl: wordCard.value.sources[0]?.url || ''} : null);
+  etymology: wordCard.value.origin || '', source: wordCard.value.sources.map(item => item.label).join(', '), sourceUrl: wordCard.value.sources[0]?.url || ''} : null) : null;
 const hasDistinctTranslationResult = computed(() => hasDistinctTranslation(selectedText.value, translationResult.value));
 const reverseTargetLanguage = computed(() => selectionReverseTarget(selectedText.value, selectionSettings.value.to, selectionSettings.value.from));
 const effectiveTargetLanguage = computed(() => (selectionSettings.value.bidirectional || manuallyRequestedSelection.value) && reverseTargetLanguage.value
@@ -687,7 +688,7 @@ function isSelectionReadSuppressed(): boolean {
 }
 
 function isSelectionInTargetLanguage(text: string): boolean {
-  if (selectionSettings.value.dictionaryRecipe && normalizeDictionaryWord(text)) return false;
+  if (extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe && normalizeDictionaryWord(text)) return false;
   if (selectionSettings.value.bidirectional && selectionReverseTarget(text, config.to, config.from)) return false;
   return shouldSkipChineseSelection(text, config.to) || shouldSkipTranslationForTarget(text, config.to);
 }
@@ -1369,7 +1370,7 @@ function openReadingCard(): void {
 }
 
 function shouldUseWordCard(text: string): boolean {
-  if (selectionSettings.value.dictionaryRecipe) return normalizeDictionaryWord(text) !== null;
+  if (extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe) return normalizeDictionaryWord(text) !== null;
   return isSingleEnglishWord(text) && effectiveTargetLanguage.value !== 'en'
     && (effectiveSourceLanguage.value === 'auto' || /^en(?:-|$)/i.test(effectiveSourceLanguage.value));
 }
@@ -1603,7 +1604,7 @@ function retryWordCard(): void {
 
 async function requestWordCard(request: SelectionContentRequest): Promise<void> {
   const text = request.text;
-  const word = selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(text) : normalizeEnglishWord(text);
+  const word = extensionDictionaryWorkspace && selectionSettings.value.dictionaryRecipe ? normalizeDictionaryWord(text) : normalizeEnglishWord(text);
   if (!word) return;
   const requestId = ++wordLookupRequestId;
   wordLookupAbortController?.abort();

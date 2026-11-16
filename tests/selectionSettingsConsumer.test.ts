@@ -55,7 +55,8 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
     const filename = resolve(process.cwd(), relative);
     if (components.has(filename)) return components.get(filename)!;
     if (!actualComponents.has(filename)) throw new Error(`Unexpected Selection settings component: ${relative}`);
-    const compiled = compileVueInlineFixture(filename, {id: filename});
+    const compiled = compileVueInlineFixture(filename, {id: filename,
+        scriptReplacements: [['import.meta.env.BROWSER', JSON.stringify(browserCapabilities.browser)]]});
     expect(compiled.parseErrors).toEqual([]);
     const dependencies: Record<string, unknown> = {
         vue: Vue,

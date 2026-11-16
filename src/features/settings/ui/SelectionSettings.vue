@@ -30,7 +30,7 @@
           <ElOption v-for="option in dictionarySourceOptions" :key="option.value" :value="option.value" :label="option.label" :disabled="option.value === 'ecdict-local' && browserCapabilities.browser === 'userscript'" />
         </UiSelect>
       </SettingsItem>
-      <DictionaryWorkspaceSettings v-if="browserCapabilities.browser !== 'userscript' && config.selectionDictionaryWorkspace" :config="config" />
+      <DictionaryWorkspaceSettings v-if="extensionDictionaryWorkspace && config.selectionDictionaryWorkspace" :config="config" />
     </SettingsGroup>
     <slot />
     <HarnessSettings :config="config" @navigate="emit('navigate', $event)" />
@@ -58,14 +58,15 @@ import {ReadingAnswer} from '@/src/features/reading-assistant/ui/answer/public';
 const props = defineProps<{config: Config}>();
 const emit = defineEmits<{navigate: [section: string]}>();
 const sentence = ref(false);
+const extensionDictionaryWorkspace = import.meta.env.BROWSER !== 'userscript';
 const dictionarySourceOptions = computed(() => [...WORD_DICTIONARY_SOURCE_OPTIONS.map(option => ({
   value: option.value,
   label: option.value === 'auto' ? t('selection.dictionary.auto')
     : option.value === 'ecdict-local' ? t('selection.dictionary.local') : translateLegacy(option.label),
-})), ...(props.config.selectionDictionaryWorkspace?.recipes || []).map(recipe => ({value: `recipe:${recipe.id}`, label: recipe.name}))]);
-const dictionarySource = computed({get: () => props.config.selectionDictionaryRecipe ? `recipe:${props.config.selectionDictionaryRecipe}` : props.config.selectionDictionarySource,
+})), ...(extensionDictionaryWorkspace ? props.config.selectionDictionaryWorkspace?.recipes || [] : []).map(recipe => ({value: `recipe:${recipe.id}`, label: recipe.name}))]);
+const dictionarySource = computed({get: () => extensionDictionaryWorkspace && props.config.selectionDictionaryRecipe ? `recipe:${props.config.selectionDictionaryRecipe}` : props.config.selectionDictionarySource,
   set: (value: string) => {
-    if (value.startsWith('recipe:')) props.config.selectionDictionaryRecipe = value.slice(7);
+    if (extensionDictionaryWorkspace && value.startsWith('recipe:')) props.config.selectionDictionaryRecipe = value.slice(7);
     else {props.config.selectionDictionaryRecipe = ''; props.config.selectionDictionarySource = value as Config['selectionDictionarySource'];}
   }});
 const previousMode = ref(props.config.selectionTranslatorMode === 'translation-only' ? 'translation-only' : 'bilingual');

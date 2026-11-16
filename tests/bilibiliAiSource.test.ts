@@ -15,6 +15,17 @@ function fixture() {
     return {source, send, ports, options: harness.options!};
 }
 describe('B 站 AI 字幕会话', () => {
+    it('自带字幕标记到达时取消自动模型检查，保留后续手动生成', async () => {
+        const f = fixture(); let resolve!: (value: unknown) => void;
+        f.send.mockImplementationOnce(() => new Promise(done => {resolve = done;}));
+        const pending = f.source.start(true); f.source.stopAutomatic();
+        resolve({success: true, models: ['small']}); await pending;
+        expect(harness.start).not.toHaveBeenCalled(); expect(f.source.status).toBe('idle');
+        f.send.mockResolvedValue({success: true, models: ['small']});
+        await f.source.start(); const cancellations = harness.cancel.mock.calls.length;
+        f.source.stopAutomatic(); expect(harness.cancel).toHaveBeenCalledTimes(cancellations);
+        expect(f.source.status).toBe('running');
+    });
     it('仅使用已下载模型，自动尝试去重且手动停止后不会自动重启', async () => {
         const f = fixture();
         await f.source.start(true); expect(harness.start).toHaveBeenCalledOnce();

@@ -431,7 +431,8 @@ export default defineConfig({
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
             // B 站无字幕音轨与本地识别：同环境 e9f121d 基线 Chrome +14,496、Firefox +13,694 bytes。
             // 仅新增文本代码，没有新增模型、WASM 或权限。
-            const bilibiliAiBudget = browser === 'firefox' ? 14_000 : 15_000;
+            // 相比 eeff18e，已有字幕跳过规则使 Chrome +2,063、Firefox +1,948 bytes；沿用余量后各补 2 kB。
+            const bilibiliAiBudget = browser === 'firefox' ? 16_000 : 17_000;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : bilibiliAiBudget + courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

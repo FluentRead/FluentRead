@@ -12,7 +12,7 @@ import {getVideoSubtitleAppearanceCssVars} from '@/src/core/config/videoSubtitle
 import {selectVideoSubtitleCueAtOffset, getVideoTranslationConfigFingerprint, normalizeVideoCaptionText} from './subtitleLogic';
 import {VIDEO_COURSE_PLATFORMS, type VideoCoursePlatform} from '@/src/core/config/videoCourse';
 import {CourseCaptionSource, type CourseCaptionSourcePorts} from './courseCaptionSource';
-import {getCourseCaptionRequest} from './courseCaptionData';
+import {getCourseCaptionRequest, hasBilibiliCaptionHint} from './courseCaptionData';
 import {requestBilibiliCaptionManifest} from './bilibiliCaptionBridge';
 import {cuesToSrt} from './youtubeSubtitleData';
 import {VideoTranslationCache} from './translationCache';
@@ -531,8 +531,11 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         if (identity !== courseIdentity) { courseIdentity = identity; clear(); restoreCaptions(); cache.clear(); readings.clear(); }
         timeline.sync(request, mediaKey);
         ai?.sync(enabled && request ? `${mediaKey}:${request.key}:${config.videoLocalModel}:${config.videoSourceLanguage}:${config.videoTranscriptionProvider}:${config.videoNativeAsrBaseUrl}` : '');
+        // 内嵌字幕不会出现在平台轨道列表；标题已标注字幕时不自动识别，迟到的标题也停止旧自动任务。
+        const captionHint = ai && hasBilibiliCaptionHint(document.querySelector('h1')?.textContent?.trim() || document.title || '');
+        if (captionHint) ai.stopAutomatic();
         // 自动读取只在平台明确返回空字幕后触发；读取失败需用户重试，不能静默升级为音频识别。
-        if (ai && enabled && timeline.status === 'empty' && config.videoCourseAutoStart.bilibili) void ai.start(true);
+        if (ai && !captionHint && enabled && timeline.status === 'empty' && config.videoCourseAutoStart.bilibili) void ai.start(true);
         if (ai && timeline.status === 'ready' && ai.status !== 'idle') ai.stop();
         syncCourseControls();
         if (!enabled) { clear(); restoreCaptions(); restoreAutoButton(); return; }

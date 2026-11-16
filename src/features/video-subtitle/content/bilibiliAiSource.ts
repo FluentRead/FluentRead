@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/bilibiliAiSource.ts
  * 文件职责：编排 B 站无字幕视频的本地识别会话，复用完整采集器及后台推理协议。
- * 主要内容：仅使用已下载模型；媒体、开关、模型或语言变化时取消旧会话，逐窗发布字幕并保留明确重试状态。
+ * 主要内容：仅使用已下载模型；媒体、开关、模型或语言变化时取消旧会话，迟到的自带字幕标记仅停止自动任务，逐窗发布字幕并保留明确重试状态。
  * 模块边界：不持有 DOM 或翻译服务，音轨读取和后台传输由端口注入；不自动下载模型或循环重试。
  */
 import type {VideoTranscriptionProvider} from '@/src/core/config/model';
@@ -34,6 +34,7 @@ export class BilibiliAiSource {
     private revision = 0;
     private disposed = false;
     private attempted = false;
+    private automatic = false;
     private readonly requests = new VideoAiRequestSession(`bilibili:${crypto.randomUUID()}`);
     private readonly capture: VideoAiFullCaptureController;
     constructor(private readonly ports: BilibiliAiPorts) {
@@ -74,7 +75,7 @@ export class BilibiliAiSource {
     async start(automatic = false): Promise<void> {
         if (this.disposed || !this.key || this.status === 'checking' || this.status === 'running' || this.status === 'ready'
             || (automatic && this.attempted)) return;
-        this.attempted = true; this.error = ''; this.status = 'checking';
+        this.attempted = true; this.automatic = automatic; this.error = ''; this.status = 'checking';
         const revision = ++this.revision;
         const model = this.ports.getModel();
         this.ports.changed();
@@ -93,8 +94,11 @@ export class BilibiliAiSource {
     stop(): void {
         this.reset(); this.attempted = true; this.ports.changed();
     }
+    stopAutomatic(): void {
+        if (this.automatic) this.stop();
+    }
     private reset(): void {
-        ++this.revision; this.capture.cancel(); this.cues = []; this.status = 'idle'; this.error = ''; this.progress = 0; this.attempted = false;
+        ++this.revision; this.capture.cancel(); this.cues = []; this.status = 'idle'; this.error = ''; this.progress = 0; this.attempted = false; this.automatic = false;
     }
     destroy(): void {
         this.disposed = true; ++this.revision; this.capture.destroy(); this.requests.dispose(); this.cues = [];

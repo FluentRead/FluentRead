@@ -1,13 +1,13 @@
 <!--
 @file src/features/settings/ui/WebDavBackup.vue
 文件职责：在左下主要操作区提供 WebDAV 设置与同步入口，右侧显示账号、服务器和同步时间，接入 WebDAV 配置云备份。
-主要内容：应用密码输入、只读测试、测试后保存、多语言错误；同步或删除时刷新并核对连接摘要，密码不回显。
+主要内容：已有 WebDAV 目录和可留空的备份子目录、应用密码输入、只读测试与测试后保存；同步或删除前刷新连接摘要并显示实际备份目录，密码不回显。
 模块边界：只向可信后台发送连接参数，不直接请求 WebDAV；共用 RemoteConfigSync 的预览和确认流程。
 -->
 <template>
   <RemoteConfigSync ref="syncUi" :client="client" provider="WebDAV" kind="webdav" @busy="setSyncBusy">
     <template #delete-account>{{ connection?.username }}</template>
-    <template #delete-location><p v-if="connection" data-testid="webdav-delete-server">{{ connection.url }}</p></template>
+    <template #delete-location><p v-if="connection" data-testid="webdav-delete-server">{{ backupDirectory }}</p></template>
     <template #connection>
       <div v-if="!connection" class="webdav-connection">
         <div><strong>{{ t('settings.webdav.notConfigured') }}</strong><p>{{ t('settings.webdav.connectionHint') }}</p></div>
@@ -21,7 +21,7 @@
     <template #record="{status, statusText}">
       <div v-if="connection" class="webdav-record" role="status">
         <p data-testid="webdav-account">{{ t('settings.cloud.currentAccount', {email: connection.username}) }}</p>
-        <p class="webdav-record-secondary" data-testid="webdav-server">{{ connection.url }}</p>
+        <p class="webdav-record-secondary" data-testid="webdav-server">{{ backupDirectory }}</p>
         <p v-if="status?.account?.id === `webdav:${connection.revision}` && status.lastSyncedAt" class="webdav-record-secondary">{{ statusText }}</p>
       </div>
     </template>
@@ -29,6 +29,8 @@
   <el-dialog v-model="settingsVisible" :title="t('settings.webdav.connectionTitle')" class="webdav-settings-dialog fluentread-webdav-connection-dialog" width="min(540px, calc(100vw - 24px))" :close-on-click-modal="!settingsBusy" :close-on-press-escape="!settingsBusy" :show-close="!settingsBusy" destroy-on-close @closed="draft.password = ''">
     <form id="webdav-connection-form" class="webdav-form" @submit.prevent="save">
       <label for="webdav-url">{{ t('settings.webdav.url') }}</label><el-input id="webdav-url" v-model="draft.url" placeholder="https://cloud.example.com/dav/" :disabled="settingsBusy" :maxlength="4096" autocomplete="off" />
+      <label for="webdav-backup-path">{{ t('settings.webdav.backupPath') }}</label><el-input id="webdav-backup-path" v-model="draft.backupPath" :disabled="settingsBusy" :maxlength="1024" autocomplete="off" aria-describedby="webdav-backup-path-hint" />
+      <p id="webdav-backup-path-hint" class="webdav-hint">{{ t('settings.webdav.backupPathHint') }}</p>
       <label for="webdav-username">{{ t('settings.webdav.username') }}</label><el-input id="webdav-username" v-model="draft.username" :disabled="settingsBusy" :maxlength="512" autocomplete="off" />
       <label for="webdav-password">{{ t('settings.webdav.password') }}</label><el-input id="webdav-password" v-model="draft.password" type="password" show-password :placeholder="canKeepPassword ? t('settings.webdav.passwordSaved') : t('settings.webdav.passwordHint')" :disabled="settingsBusy" :maxlength="4096" autocomplete="new-password" />
       <p class="webdav-hint">{{ t('settings.webdav.connectionHint') }} <a :href="guideUrl" target="_blank" rel="noopener noreferrer">{{ t('settings.webdav.openGuide') }}</a></p>
@@ -47,12 +49,13 @@ import 'element-plus/es/components/alert/style/css';
 import {useUiI18n} from '@/src/ui/i18n';
 import {webDavBackupClient as connectionClient} from '@/src/services/config/webDavBackupClient';
 import {CloudBackupRequestError} from '@/src/services/config/cloudBackupClient';
-import type {WebDavConnectionSummary} from '@/src/platform/webdav/connection';
+import {WEBDAV_DEFAULT_BACKUP_PATH, type WebDavConnectionSummary} from '@/src/platform/webdav/connection';
 import RemoteConfigSync from './RemoteConfigSync.vue';
 import {useSettingsActionContext} from '../model/useSettingsActionContext';
 const emit = defineEmits<{busy: [value: boolean]}>();
 const {t, translateLegacy, language} = useUiI18n();
 const connection = ref<WebDavConnectionSummary | null>(null);
+const backupDirectory = computed(() => connection.value ? new URL(connection.value.backupPath ?? WEBDAV_DEFAULT_BACKUP_PATH, connection.value.url).href : '');
 const settingsVisible = ref(false);
 const settingsBusy = ref(false);
 const syncBusy = ref(false);
@@ -99,7 +102,7 @@ const client = {
     } catch (failure) {await connectionClient.cancel(result.id).catch(() => undefined); throw failure;}
   },
 };
-const draft = reactive({url: '', username: '', password: '', allowInsecure: false, revision: null as string | null});
+const draft = reactive({url: '', backupPath: WEBDAV_DEFAULT_BACKUP_PATH, username: '', password: '', allowInsecure: false, revision: null as string | null});
 const insecure = computed(() => /^http:\/\//iu.test(draft.url.trim()));
 const canKeepPassword = computed(() => Boolean(connection.value?.hasPassword && draft.url.trim().replace(/\/+$/u, '') === connection.value.url.replace(/\/+$/u, '') && draft.username.trim() === connection.value.username));
 const ready = computed(() => Boolean(draft.url.trim() && draft.username.trim() && (draft.password || canKeepPassword.value) && (!insecure.value || draft.allowInsecure)));
@@ -118,7 +121,9 @@ async function openSettings() {
     const saved = await client.settings();
     if (!alive) return;
     connection.value = saved;
-    Object.assign(draft, {url: connection.value?.url ?? '', username: connection.value?.username ?? '', password: '', allowInsecure: connection.value?.allowInsecure ?? false, revision: connection.value?.revision ?? null});
+    // 展示可读目录名，保留开头空白、百分号、问号和片段字符的编码，确保重新提交仍指向同一目录。
+    const backupPath = decodeURIComponent(connection.value?.backupPath ?? WEBDAV_DEFAULT_BACKUP_PATH).replace(/^\s+|[?#%]/gu, encodeURIComponent);
+    Object.assign(draft, {url: connection.value?.url ?? '', backupPath, username: connection.value?.username ?? '', password: '', allowInsecure: connection.value?.allowInsecure ?? false, revision: connection.value?.revision ?? null});
     tested.value = false; settingsVisible.value = true;
   });
 }

@@ -99,7 +99,7 @@
     "settings.cloud.deleteRecreate": "後で手動同期すると新しいバックアップを作成できます。他の端末が再アップロードする場合もあります。",
     "settings.cloud.deleteUnsupported": "安全な削除に必要なバージョン情報がないため、ここでは削除できません。",
     "settings.cloud.deleteManualDrive": "Google Drive の設定 → アプリの管理 → FluentRead でアプリのデータを削除してください。",
-    "settings.cloud.deleteManualWebDav": "WebDAV サービスで FluentRead/fluentread-config.encrypted.json を手動削除し、他のファイルは保持してください。",
+    "settings.cloud.deleteManualWebDav": "設定した WebDAV バックアップディレクトリ内の fluentread-config.encrypted.json だけを削除してください。",
     "settings.cloud.deleteConfirm": "バックアップを削除",
     "settings.cloud.deleteFinish": "完了",
     "settings.cloud.deleteAbsent": "クラウドバックアップはありません",
@@ -113,7 +113,10 @@
     "settings.cloud.deleteCloudEffect": "確認すると、現在のクラウドバックアップを {provider} から削除します。",
     "settings.cloud.deleteVerificationPrompt": "削除を確認するには「{phrase}」と入力してください。",
     "settings.webdav.concurrentWarning": "このサービスでは同時書き込みを防げません。保存・統合・削除の前にクラウドバックアップを再確認します。他の端末で同時に同期しないでください。",
-    "settings.cloud.uploadUnverified": "設定は Google Drive にアップロードされましたが、検証を完了できませんでした。クラウドバックアップを再度読み込んで確認してください。端末の設定は変更されていません。"
+    "settings.cloud.uploadUnverified": "設定は Google Drive にアップロードされましたが、検証を完了できませんでした。クラウドバックアップを再度読み込んで確認してください。端末の設定は変更されていません。",
+    "settings.webdav.backupPath": "バックアップのサブディレクトリ",
+    "settings.webdav.backupPathHint": "空欄で上記のディレクトリに直接保存します。複数階層も指定できます。",
+    "settings.webdav.error.path": ".. や完全な URL を含まない相対サブディレクトリを入力するか、空欄にしてください。"
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "一般設定のクラウドバックアップに対象範囲外の項目が含まれています。バックアップを作成し直してください。",

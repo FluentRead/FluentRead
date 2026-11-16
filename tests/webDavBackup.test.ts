@@ -21,6 +21,19 @@ function fixture(shared={remote:null as CloudSyncRemote|null}) {
     return {service,ports,records,connections,shared,get state(){return state as DriveSyncState;},get local(){return local;},set local(value){local=value;}};
 }
 describe('WebDAV 配置云备份事务',()=>{
+    it('切换备份子目录生成新连接修订并废弃旧预览，省略子目录时保留原位置', async () => {
+        const f = fixture();
+        const saved = await f.service.save(input, 7, 'fixture-page');
+        const pending = await f.service.prepare(password, 7, 'fixture-page', true);
+        const changed = await f.service.save({...saved, password: '', backupPath: ''}, 7, 'fixture-page');
+        expect(changed.backupPath).toBe('');
+        expect(changed.revision).not.toBe(saved.revision);
+        await expect(f.service.commit(pending.id, password, 'upload', {}, 7, 'fixture-page')).rejects.toThrow();
+        expect(f.ports.api.write).not.toHaveBeenCalled();
+        const same = await f.service.save({...changed, password: '', backupPath: undefined}, 7, 'fixture-page');
+        expect(same.backupPath).toBe('');
+        expect(same.revision).toBe(changed.revision);
+    });
     it.each(['download', 'merge'] as const)('普通备份跨设备%s网站规则及正文标签，保留本机连接', async direction => {
         const source = fixture(); await source.service.save(input);
         source.local = config({...source.local, siteAdaptation: {enabled: true, disabledRuleIds: ['reddit'], custom: {

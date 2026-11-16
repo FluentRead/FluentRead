@@ -409,7 +409,11 @@ export default defineConfig({
             // Safari DOM 页面与同源消息传输：Safari 同环境基线67,864,461→68,133,060bytes；Chrome 为68,506,284bytes。
             // 使用既有余量后，Safari 仅需追加9kB，Chrome/Firefox 共用适配器追加3kB；没有新增模型或依赖。
             const domRuntimeBudget = browser === 'safari' ? 9_000 : 3_000;
-            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget;
+            // #1362 的 WebDAV 子目录、同源 href 识别和七语文案：同环境 e124325e8 的 Chrome
+            // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
+            // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
+            const webDavPathBudget = 5_000;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

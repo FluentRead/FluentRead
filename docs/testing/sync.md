@@ -86,3 +86,9 @@ node scripts/testing/run-webdav-backup-ui-test.cjs \
 
 `tests/webDavProperties.test.ts` 直接验证实际 Saxes XML 解析器的命名空间、字符引用、CDATA、资源唯一性、属性状态、强 ETag、DTD 拒绝及长度/深度/元素数量限制。目标 URL 必须为可解析的绝对 URL；无效目标返回未识别结果，避免解析函数向调用方抛出 URL 异常。属性模块进入永久四维 100% 清单，和 `webDavApi`、`webDavConnection`、`webDavHttpIntegration` 联合验证；HTTP 用例只对临时本地服务完成首次/再次保存与版本冲突，不代表用户真实 WebDAV 账号。沙箱若禁止本地 listen，需在允许 127.0.0.1 的环境运行相同测试，不跳过或模拟这组三种 ETag 来源的协议链路。
 
+### 群晖共享目录与自定义备份路径（issue #1362）
+
+连接回归覆盖默认旧路径迁移、留空直接使用入口、中文及百分号编码、多级子目录、路径穿越拒绝和修改路径后的旧预览失效。属性识别兼容同源目录的尾斜杠与编码差异，仍拒绝异源、其他端口、歧义资源和错误文件路径。`webDavHttpIntegration.test.ts` 的受限 NAS 夹具拒绝创建共享入口，检查首次及再次保存、读取恢复、条件冲突和删除均只访问指定目录；此结果不代表真实群晖设备验收。
+
+生产扩展的路径专项使用 `scripts/testing/run-webdav-path-ui-test.cjs`，显式传入 `--extension-dir`、`--playwright-root`、`--runtime-diagnostics`（浏览器测试 skill 的 `runtime-diagnostics.cjs`）和 `--artifacts-dir`。该脚本复用临时 Edge profile、第二屏不抢焦点 helper，在导航前采集扩展页和后台诊断，并持续跟踪重启后的后台。范围包括留空直存、多级目录、后台重启后配置持久化、恢复、路径隔离、条件删除、七语 390px 表单与截图；诊断报告保留启动前和 target 附加空窗等采集限制。
+

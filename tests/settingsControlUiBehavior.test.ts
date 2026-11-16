@@ -64,7 +64,7 @@ beforeEach(() => {
   vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{frames.set(++frameId,callback);return frameId;});
   vi.stubGlobal('cancelAnimationFrame',(id:number)=>frames.delete(id));
   vi.stubGlobal('innerWidth',1000); vi.stubGlobal('innerHeight',800); vi.stubGlobal('visualViewport',undefined);
-  frames.clear(); frameId=0;locale.value.value='zh-CN';for(const fn of Object.values(webdav))fn.mockReset();webdav.settings.mockResolvedValue({url:'https://cloud.example.test/dav',username:'fixture',hasPassword:true,allowInsecure:false,revision:'revision-a'});webdav.clear.mockResolvedValue(undefined);webdav.status.mockResolvedValue({available:true,account:{id:'webdav:revision-a'},lastSyncedAt:100});webdav.prepare.mockResolvedValue({id:'preview-a',account:{id:'webdav:revision-a'}});webdav.prepareDelete.mockResolvedValue({id:'delete-a',account:{id:'webdav:revision-a'}});webdav.cancel.mockResolvedValue(undefined);
+  frames.clear(); frameId=0;locale.value.value='zh-CN';for(const fn of Object.values(webdav))fn.mockReset();webdav.settings.mockResolvedValue({url:'https://cloud.example.test/dav/',username:'fixture',hasPassword:true,allowInsecure:false,revision:'revision-a'});webdav.clear.mockResolvedValue(undefined);webdav.status.mockResolvedValue({available:true,account:{id:'webdav:revision-a'},lastSyncedAt:100});webdav.prepare.mockResolvedValue({id:'preview-a',account:{id:'webdav:revision-a'}});webdav.prepareDelete.mockResolvedValue({id:'delete-a',account:{id:'webdav:revision-a'}});webdav.cancel.mockResolvedValue(undefined);
 });
 afterEach(async()=>{apps.forEach(app=>app.unmount()); apps.clear(); await flush(); frames.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();vi.unstubAllEnvs();});
 function mount(component:Component, initial:Record<string,any>, wrapperClass='') {
@@ -219,9 +219,37 @@ it('keeps the saved WebDAV password implicit, validates edits, tests them and sa
   const ui=mount(WebDavBackup,{});await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);
   const password=ui.host.querySelector('#webdav-password') as HTMLInputElement;expect(password.value).toBe('');expect(password.getAttribute('placeholder')).toBe('settings.webdav.passwordSaved');
   await input(ui.host.querySelector('#webdav-username')!,'new-user');expect(ui.host.querySelector('[data-testid="webdav-save"]')!.hasAttribute('disabled')).toBe(true);
-  await input(password,'fixture-password');webdav.test.mockResolvedValue(undefined);await click(ui.host.querySelector('[data-testid="webdav-test"]')!);expect(webdav.test).toHaveBeenCalledWith({url:'https://cloud.example.test/dav',username:'new-user',password:'fixture-password',allowInsecure:false,revision:'revision-a'});expect(ui.host.textContent).toContain('settings.webdav.testSuccess');
+  await input(password,'fixture-password');webdav.test.mockResolvedValue(undefined);await click(ui.host.querySelector('[data-testid="webdav-test"]')!);expect(webdav.test).toHaveBeenCalledWith({url:'https://cloud.example.test/dav/',backupPath:'FluentRead/',username:'new-user',password:'fixture-password',allowInsecure:false,revision:'revision-a'});expect(ui.host.textContent).toContain('settings.webdav.testSuccess');
   await input(ui.host.querySelector('#webdav-url')!,'https://other.example.test/dav');expect(ui.host.textContent).not.toContain('settings.webdav.testSuccess');
-  webdav.save.mockResolvedValue({url:'https://other.example.test/dav',username:'new-user',hasPassword:true,allowInsecure:false,revision:'revision-b'});await click(ui.host.querySelector('[data-testid="webdav-save"]')!);expect(webdav.save).toHaveBeenCalledWith({url:'https://other.example.test/dav',username:'new-user',password:'fixture-password',allowInsecure:false,revision:'revision-a'});expect(webdav.success).toHaveBeenCalledWith('settings.webdav.saveSuccess');expect(ui.host.querySelector('[data-dialog]')).toBeNull();
+  webdav.save.mockResolvedValue({url:'https://other.example.test/dav',username:'new-user',hasPassword:true,allowInsecure:false,revision:'revision-b'});await click(ui.host.querySelector('[data-testid="webdav-save"]')!);expect(webdav.save).toHaveBeenCalledWith({url:'https://other.example.test/dav',backupPath:'FluentRead/',username:'new-user',password:'fixture-password',allowInsecure:false,revision:'revision-a'});expect(webdav.success).toHaveBeenCalledWith('settings.webdav.saveSuccess');expect(ui.host.querySelector('[data-dialog]')).toBeNull();
+});
+it.each(['', 'Backups/'])('WebDAV 子目录 %j 在保存和重新打开后保留，实际备份目录展示正确', async backupPath => {
+  let saved = {url:'https://nas.example.test:5006/shared/', backupPath:'FluentRead/', username:'fixture', hasPassword:true, allowInsecure:false, revision:'revision-a'};
+  webdav.settings.mockImplementation(async () => saved);
+  webdav.test.mockResolvedValue(undefined);
+  webdav.save.mockImplementation(async draft => saved = {...saved, backupPath:draft.backupPath, revision:'revision-b'});
+  const ui = mount(WebDavBackup, {});
+  await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);
+  expect((ui.host.querySelector('#webdav-backup-path') as HTMLInputElement).value).toBe('FluentRead/');
+  await click(ui.host.querySelector('[data-testid="webdav-test"]')!);
+  expect(ui.host.textContent).toContain('settings.webdav.testSuccess');
+  await input(ui.host.querySelector('#webdav-backup-path')!, backupPath);
+  expect(ui.host.textContent).not.toContain('settings.webdav.testSuccess');
+  expect(ui.host.querySelector('[data-testid="webdav-save"]')!.hasAttribute('disabled')).toBe(false);
+  await click(ui.host.querySelector('[data-testid="webdav-save"]')!);
+  expect(webdav.save).toHaveBeenCalledWith({url:saved.url, backupPath, username:'fixture', password:'', allowInsecure:false, revision:'revision-a'});
+  expect(ui.host.querySelector('[data-testid="webdav-server"]')?.textContent).toBe(saved.url + backupPath);
+  await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);
+  expect((ui.host.querySelector('#webdav-backup-path') as HTMLInputElement).value).toBe(backupPath);
+  expect((ui.host.querySelector('#webdav-password') as HTMLInputElement).value).toBe('');
+});
+it('WebDAV 编辑表单显示可读中文目录，保留特殊字符编码并提交到相同位置', async () => {
+  const saved = {url:'https://nas.example.test/shared/', backupPath:'%20%E5%A4%87%E4%BB%BD/x%25y%3Fz%23q/', username:'fixture', hasPassword:true, allowInsecure:false, revision:'revision-a'};
+  webdav.settings.mockResolvedValue(saved);webdav.test.mockResolvedValue(undefined);
+  const ui = mount(WebDavBackup, {});await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);
+  expect((ui.host.querySelector('#webdav-backup-path') as HTMLInputElement).value).toBe('%20备份/x%25y%3Fz%23q/');
+  await click(ui.host.querySelector('[data-testid="webdav-test"]')!);
+  expect(webdav.test).toHaveBeenCalledWith({url:saved.url, backupPath:'%20备份/x%25y%3Fz%23q/', username:'fixture', password:'', allowInsecure:false, revision:saved.revision});
 });
 it('does not open a late WebDAV settings read or publish a failed request after unmount',async()=>{
   const read=deferred<unknown>();webdav.settings.mockReturnValue(read.promise);const ui=mount(WebDavBackup,{});await click(ui.host.querySelector('[data-testid="webdav-setup"]')!);ui.unmount();read.reject(new Error('late failure'));await flush();expect(ui.host.childNodes).toHaveLength(0);expect(webdav.success).not.toHaveBeenCalled();
@@ -230,7 +258,7 @@ it('does not open a late WebDAV settings read or publish a failed request after 
 
 it('refreshes the WebDAV connection before showing account-bound sync status and forwards sync busy state',async()=>{
   const busy=vi.fn(),ui=mount(WebDavBackup,{onBusy:busy});await click(ui.host.querySelector('[data-webdav-port="status"]')!);
-  expect(webdav.status).toHaveBeenCalledOnce();expect(webdav.settings).toHaveBeenCalledOnce();expect(ui.host.querySelector('[data-testid="webdav-server"]')?.textContent).toBe('https://cloud.example.test/dav');expect(ui.host.textContent).toContain('Synced fixture');expect(busy.mock.calls).toEqual([[true],[false]]);
+  expect(webdav.status).toHaveBeenCalledOnce();expect(webdav.settings).toHaveBeenCalledOnce();expect(ui.host.querySelector('[data-testid="webdav-server"]')?.textContent).toBe('https://cloud.example.test/dav/FluentRead/');expect(ui.host.textContent).toContain('Synced fixture');expect(busy.mock.calls).toEqual([[true],[false]]);
   webdav.status.mockResolvedValue({available:true,account:{id:'webdav:old-account'},lastSyncedAt:100});await click(ui.host.querySelector('[data-webdav-port="status"]')!);expect(ui.host.textContent).not.toContain('Synced fixture');
   await click(ui.host.querySelector('[data-testid="webdav-sync-now"]')!);expect(webdav.prepare).toHaveBeenCalledWith(false);expect(ui.host.querySelector('[data-webdav-port-result]')?.textContent).toContain('preview-a');
 });

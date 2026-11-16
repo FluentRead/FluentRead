@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Production-extension regression with controlled YouTube DOM/time and a mocked
-// translation service. Fullscreen and clicks use the real browser; no live media claim.
+// translation service. --suite original-only checks the listening/reading workflow;
+// the default sync suite also covers fullscreen. No live YouTube acceptance claim.
 const {guardBrowserClose} = require('./testing/owned-browser-close.cjs');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -12,6 +13,8 @@ const arg = (name, fallback) => {
   const index = process.argv.indexOf(`--${name}`);
   return index < 0 ? fallback : process.argv[index + 1];
 };
+const suite = arg('suite', 'sync');
+assert.ok(['sync', 'original-only'].includes(suite), `Unknown suite: ${suite}`);
 const extensionDir = path.resolve(arg('extension-dir', '.output/chrome-mv3'));
 const artifacts = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-youtube-sync'));
 const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'));
@@ -28,7 +31,7 @@ const media = spawnSync(arg('ffmpeg', '/opt/homebrew/bin/ffmpeg'), ['-y', '-f', 
   '-t', '30', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-movflags', '+faststart', mediaFile], {encoding: 'utf8'});
 assert.equal(media.status, 0, media.stderr);
 const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-edge-profile-youtube-sync-'));
-const report = {success: false, evidence: 'Production extension; controlled YouTube DOM and video clock; mocked translations; real fullscreen/clicks', checks: [], errors: []};
+const report = {success: false, suite, evidence: 'Production extension; controlled YouTube DOM and video clock; mocked translations; real fullscreen/clicks', checks: [], errors: []};
 let session, page;
 let primaryError;
 const translations = {
@@ -103,7 +106,8 @@ let launchAttempted = false;
     assert.equal(result.success, true);
   };
   await patchConfig({on: true, uiLanguage: 'zh-CN', from: 'en', to: 'zh-Hans', videoTranslationEnabled: true,
-    videoSubtitleVisible: true, videoSubtitleDisplayMode: 'bilingual', videoService: 'microsoft', videoServiceDefaultMigrated: true});
+    videoSubtitleVisible: true, videoSubtitleDisplayMode: suite === 'original-only' ? 'original-only' : 'bilingual',
+    videoPreferHumanSubtitles: false, videoService: 'microsoft', videoServiceDefaultMigrated: true});
   const url = 'https://www.youtube.com/watch?v=fluentread-sync-fixture';
   await context.route(url, route => route.fulfill({contentType: 'text/html', body: `<!doctype html><html><head><meta charset="utf-8"><title>YouTube fullscreen and subtitle synchronization fixture</title><style>
     html{height:0}body{margin:0;background:#eef2f8;font:18px Arial}#movie_player{position:fixed;left:40px;top:80px;width:960px;height:540px;overflow:hidden;background:#123044;color:white}
@@ -154,32 +158,155 @@ let launchAttempted = false;
       panelDisplay: panel && getComputedStyle(panel).display};
   });
   const waitTranslation = text => page.waitForFunction(text => document.querySelector('#fluent-read-video-subtitle')?.textContent === text, text, {timeout: 10000});
-  await page.evaluate(events => window.postMessage({source: 'fluent-read', type: 'fluent-read-youtube-timedtext',
-    url: 'https://www.youtube.com/api/timedtext?v=fluentread-sync-fixture&lang=en', responseText: JSON.stringify({events})}, location.origin), cues);
+  const publishTrack = () => page.evaluate(events => window.postMessage({source: 'fluent-read', type: 'fluent-read-youtube-timedtext',
+    url: 'https://www.youtube.com/api/timedtext?v=fluentread-sync-fixture&lang=en', responseText: JSON.stringify({events})}, location.origin),
+  suite === 'original-only' ? cues.slice(0, 3) : cues);
+  const finish = async () => {
+    report.requests = await worker.evaluate(() => globalThis.fixtureRequests);
+    await diagnostics.flush();
+    diagnostics.assertClean();
+    report.success = report.checks.every(c => c.pass) && report.errors.length === 0;
+    assert.equal(report.success, true, JSON.stringify(report.checks.filter(c => !c.pass)));
+  };
+  if (suite === 'original-only') {
+    const original = page.locator('#fluent-read-video-subtitle-original');
+    const menu = page.locator('#fluent-read-video-subtitle-menu');
+    const choose = async mode => {
+      diagnostics.setPhase(`learning-mode-${mode}`);
+      if (!await menu.isVisible()) await page.locator('#fluent-read-video-subtitle-button').click();
+      await menu.locator(`[data-mode="${mode}"]`).click();
+      await page.waitForFunction(mode => document.querySelector(`[data-mode="${mode}"]`)?.getAttribute('aria-checked') === 'true', mode);
+    };
+    const waitOriginal = async text => {
+      await page.waitForFunction(text => document.querySelector('#fluent-read-video-subtitle-original')?.textContent === text
+        && document.querySelector('#fluent-read-video-subtitle')?.textContent === '', text);
+      assert.equal(await original.isVisible(), true);
+    };
+    const appearance = () => original.evaluate(element => {
+      const style = getComputedStyle(element), rect = element.getBoundingClientRect();
+      const player = document.querySelector('#movie_player').getBoundingClientRect();
+      return {fontFamily: style.fontFamily, fontSize: style.fontSize, color: style.color,
+        inPlayer: rect.width > 0 && rect.height > 0 && rect.left >= player.left && rect.right <= player.right
+          && rect.top >= player.top && rect.bottom <= player.bottom};
+    });
+    await publishTrack();
+    await setCaption(.5, 'Sea otters');
+    await waitOriginal('Sea otters have strong teeth.');
+    await page.waitForTimeout(350);
+    const desktopAppearance = await appearance();
+    check('Cold original-only uses a complete FluentRead cue, hides native captions and makes no translation requests',
+      (await sample()).nativeVisibility === 'hidden' && desktopAppearance.inPlayer
+        && (await worker.evaluate(() => globalThis.fixtureRequests.length)) === 0, {caption: await sample(), appearance: desktopAppearance});
+    await page.evaluate(() => {
+      window.fixtureOriginalNode = document.querySelector('#fluent-read-video-subtitle-original');
+      window.fixtureOriginalFrames = {samples: 0, visibleNativeFrames: 0, running: true};
+      const sample = () => {
+        const result = window.fixtureOriginalFrames;
+        if (!result.running) return;
+        for (const native of document.querySelectorAll('#movie_player .ytp-caption-segment')) {
+          if (!native.textContent) continue;
+          result.samples++;
+          if (getComputedStyle(native).visibility !== 'hidden') result.visibleNativeFrames++;
+        }
+        requestAnimationFrame(sample);
+      };
+      requestAnimationFrame(sample);
+    });
+    await page.screenshot({path: path.join(artifacts, 'original-desktop.png')});
+    await choose('off');
+    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-original')?.textContent
+      && !document.querySelector('#fluent-read-video-subtitle')?.textContent);
+    check('Listening without subtitles hides both caption layers and keeps the player entry',
+      (await sample()).nativeVisibility === 'hidden' && !await original.isVisible()
+        && await page.locator('#fluent-read-video-subtitle-button').isVisible(), await sample());
+    await choose('original-only');
+    await waitOriginal('Sea otters have strong teeth.');
+    check('Opening original-only from off still makes no translation requests',
+      (await worker.evaluate(() => globalThis.fixtureRequests.length)) === 0);
+    await choose('bilingual');
+    await waitTranslation(translations['Sea otters have strong teeth.']);
+    check('Bilingual keeps the original subtitle font, layout and node',
+      JSON.stringify(await appearance()) === JSON.stringify(desktopAppearance)
+        && await page.evaluate(() => window.fixtureOriginalNode === document.querySelector('#fluent-read-video-subtitle-original')),
+      {caption: await sample(), appearance: await appearance()});
+    await page.locator('#movie_player').click({position: {x: 20, y: 20}});
+    await page.screenshot({path: path.join(artifacts, 'bilingual-desktop.png')});
+    const currentCueRequests = await worker.evaluate(() => globalThis.fixtureRequests.filter(source => source === 'Sea otters have strong teeth.').length);
+    await choose('original-only');
+    await waitOriginal('Sea otters have strong teeth.');
+    await choose('bilingual');
+    await waitTranslation(translations['Sea otters have strong teeth.']);
+    const replayRequests = await worker.evaluate(() => globalThis.fixtureRequests);
+    check('Returning to bilingual reuses the completed current cue; upcoming cues may be prefetched',
+      currentCueRequests === 1 && replayRequests.filter(source => source === 'Sea otters have strong teeth.').length === currentCueRequests,
+      {currentCueRequests, requests: replayRequests});
+    await choose('off');
+    await choose('original-only');
+    await waitOriginal('Sea otters have strong teeth.');
+    const requestsBeforeOriginal = await worker.evaluate(() => globalThis.fixtureRequests.length);
+    await page.locator('#movie_player').evaluate(player => {player.style.width = '560px';});
+    await page.waitForFunction(() => document.querySelector('#fluent-read-video-subtitle-original')?.getBoundingClientRect().width <= 560);
+    await setCaption(1.2, 'They open');
+    await waitOriginal('They open the shell.');
+    check('Compact original-only also uses complete cues in FluentRead styling', (await appearance()).inPlayer
+      && (await appearance()).fontFamily === desktopAppearance.fontFamily && (await sample()).nativeVisibility === 'hidden', await appearance());
+    await page.locator('#movie_player').click({position: {x: 20, y: 20}});
+    await page.screenshot({path: path.join(artifacts, 'original-compact.png')});
+    await setCaption(1.4, '');
+    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-original')?.textContent);
+    await page.evaluate(() => {
+      const old = document.querySelector('#ytp-caption-window-container'), replacement = old.cloneNode(true);
+      replacement.querySelector('.ytp-caption-segment').textContent = 'They open';
+      old.replaceWith(replacement);
+    });
+    await waitOriginal('They open the shell.');
+    check('Replacing the native caption container preserves original-only styling', (await sample()).nativeVisibility === 'hidden', await sample());
+    await setCaption(3.5, 'They open');
+    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-original')?.textContent);
+    check('Expired original cues stay hidden until a current caption arrives', (await sample()).nativeVisibility === 'hidden', await sample());
+    await setCaption(.5, 'Sea otters');
+    await waitOriginal('Sea otters have strong teeth.');
+    check('Original-only cue changes and seeks make no new translation requests',
+      (await worker.evaluate(() => globalThis.fixtureRequests.length)) === requestsBeforeOriginal,
+      {before: requestsBeforeOriginal, after: await worker.evaluate(() => globalThis.fixtureRequests.length)});
+    report.nativeCaptionFrames = await page.evaluate(() => {
+      window.fixtureOriginalFrames.running = false; return window.fixtureOriginalFrames;
+    });
+    check('No native-caption flash occurs across original, bilingual, off, resize, seek and container replacement',
+      report.nativeCaptionFrames.samples > 0 && report.nativeCaptionFrames.visibleNativeFrames === 0, report.nativeCaptionFrames);
+    await page.reload();
+    await page.locator('#fluent-read-video-subtitle-button').waitFor();
+    await page.waitForFunction(() => document.querySelector('video').readyState >= 2);
+    await publishTrack();
+    await setCaption(.5, 'Sea otters');
+    await waitOriginal('Sea otters have strong teeth.');
+    check('Original-only is restored after reload without translating', (await worker.evaluate(() => globalThis.fixtureRequests.length)) === requestsBeforeOriginal);
+    await patchConfig({videoTranslationEnabled: false});
+    await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-button'));
+    check('Disabling video subtitles in settings restores native captions', (await sample()).nativeVisibility === 'visible');
+    diagnostics.setPhase('original-only-unload');
+    await page.goto('about:blank');
+    await finish();
+    return;
+  }
+  await publishTrack();
   await setCaption(.5, 'Sea otters have strong teeth.');
   await waitTranslation(translations['Sea otters have strong teeth.']);
   const first = await sample();
   check('Whole native cue uses one bilingual panel', first.original === first.native && first.nativeVisibility === 'hidden', first);
   await page.evaluate(() => {
-    window.fixtureNativeFrames = {samples: 0, visibleFrames: 0, failures: [], running: true,
-      expectHidden: true, originalOnlySamples: 0, originalOnlyVisibleFrames: 0, originalOnlyFrames: []};
+    window.fixtureNativeFrames = {samples: 0, visibleFrames: 0, failures: [], running: true};
     const sample = () => {
       const result = window.fixtureNativeFrames;
       if (!result.running) return;
       const native = document.querySelector('#movie_player #ytp-caption-window-container .ytp-caption-segment');
       if (native?.textContent) {
         const visible = getComputedStyle(native).visibility !== 'hidden';
-        if (!result.expectHidden) {
-          // 原文模式允许原生字幕显示，单独保留观测，不算作双语接管期间的闪现。
-          result.originalOnlySamples++;
-          if (visible) result.originalOnlyVisibleFrames++;
-          if (result.originalOnlyFrames.length < 60) result.originalOnlyFrames.push({time: document.querySelector('video').currentTime,
-            text: native.textContent, visibility: getComputedStyle(native).visibility});
-        } else if (visible) {
+        if (visible) {
           result.visibleFrames++;
           if (result.failures.length < 60) result.failures.push({time: document.querySelector('video').currentTime, text: native.textContent});
         }
-        if (result.expectHidden) result.samples++;
+        result.samples++;
       }
       requestAnimationFrame(sample);
     };
@@ -260,7 +387,6 @@ let launchAttempted = false;
   const requestsBeforeOriginal = await worker.evaluate(() => globalThis.fixtureRequests.length);
   const originalWidth = await page.evaluate(() => {
     const player = document.querySelector('#movie_player'), previous = player.style.width;
-    window.fixtureNativeFrames.expectHidden = false;
     player.style.width = '560px'; return previous;
   });
   await patchConfig({videoSubtitleDisplayMode: 'original-only'});
@@ -274,7 +400,6 @@ let launchAttempted = false;
   check('Re-enabling translation keeps the full repeated caption and reuses its cache', restoredRepeatedCaption.original === 'No no'
     && restoredRepeatedCaption.nativeVisibility === 'hidden'
     && (await worker.evaluate(() => globalThis.fixtureRequests.length)) === requestsBeforeOriginal, await sample());
-  await page.evaluate(() => {window.fixtureNativeFrames.expectHidden = true;});
   await page.screenshot({path: path.join(artifacts, 'legal-repetition.png')});
   await page.evaluate(width => {document.querySelector('#movie_player').style.width = width;}, originalWidth);
   // 有匹配的当前 cue 时，使用该 cue 的完整文本；原生滚动残留不应拼成双份请求。
@@ -443,7 +568,8 @@ let launchAttempted = false;
   check('Native captions outside the selected player keep their visibility', unrelated === 'visible', unrelated);
   await patchConfig({videoSubtitleDisplayMode: 'original-only'});
   await page.waitForTimeout(150);
-  check('Original-only restores native captions', (await sample()).nativeVisibility === 'visible');
+  check('Original-only keeps native captions hidden and shows the FluentRead original line',
+    (await sample()).nativeVisibility === 'hidden' && (await sample()).original === 'Cached native replay.' && (await sample()).translation === '');
   for (const mode of ['bilingual', 'translation-only']) {
     diagnostics.setPhase(`mode-restoration-${mode}`);
     await patchConfig({videoTranslationEnabled: true, videoSubtitleVisible: true, videoSubtitleDisplayMode: mode});
@@ -460,12 +586,8 @@ let launchAttempted = false;
   await page.waitForFunction(() => !document.querySelector('#fluent-read-video-subtitle-layer'));
   check('Disabling removes menu, layer and native hiding', !await page.locator('#fluent-read-video-subtitle-menu').count()
     && await page.locator('.ytp-caption-segment').evaluate(e => getComputedStyle(e).visibility === 'visible'));
-  report.requests = await worker.evaluate(() => globalThis.fixtureRequests);
   diagnostics.setPhase('disabled-cleanup');
-  await diagnostics.flush();
-  diagnostics.assertClean();
-  report.success = report.checks.every(c => c.pass) && report.errors.length === 0;
-  assert.equal(report.success, true, JSON.stringify(report.checks.filter(c => !c.pass)));
+  await finish();
 })().catch(error => {primaryError = error; report.failure = error.stack; process.exitCode = 1;}).finally(async () => {
   const cleanupErrors = [];
   const cleanup = async action => {

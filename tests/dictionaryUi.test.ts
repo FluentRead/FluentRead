@@ -50,6 +50,7 @@ describe('dictionary settings and card surfaces',()=>{
         Object.defineProperty(input,'files',{value:[{name:'test.dsl',size:10}],configurable:true});input.dispatchEvent(new Event('change'));await settle();expect(root.textContent).toContain('dictionary.importing');const worker=FakeWorker.instances[0];expect(worker.postMessage).toHaveBeenCalled();expect(config.selectionDictionaryWorkspace.recipes).toHaveLength(0);
         worker.onmessage!({data:{success:true,data:{name:'Local'}}} as MessageEvent);await settle();expect(config.selectionDictionaryWorkspace.recipes[0]).toMatchObject({kind:'local',name:'Local'});expect(worker.terminate).toHaveBeenCalledTimes(1);
         input.dispatchEvent(new Event('change'));await settle();const second=FakeWorker.instances[1];button('dictionary.cancel').click();await settle();expect(second.terminate).toHaveBeenCalledTimes(1);expect(root.textContent).not.toContain('dictionary.importing');
+        second.onmessage!({data:{success:true,data:{name:'late canceled import'}}} as MessageEvent);second.onerror!();await settle();expect(config.selectionDictionaryWorkspace.recipes).toHaveLength(1);expect(root.textContent).not.toContain('late canceled import');
         input.dispatchEvent(new Event('change'));await settle();app!.unmount();app=undefined;expect(FakeWorker.instances[2].terminate).toHaveBeenCalledTimes(1);
     });
     it('reports worker errors and invalid formats without retaining busy state',async()=>{

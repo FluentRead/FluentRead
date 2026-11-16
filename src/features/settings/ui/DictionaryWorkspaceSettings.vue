@@ -12,7 +12,7 @@
       <p v-if="!workspace.recipes.length" class="dictionary-note">{{ t('dictionary.empty') }}</p>
       <div v-for="recipe in workspace.recipes" :key="recipe.id" class="dictionary-source-row">
         <span>{{ recipe.name }}<small>{{ recipe.kind === 'local' ? t('dictionary.local') : recipe.kind === 'iframe' ? t('dictionary.web') : recipe.kind === 'script' ? 'JavaScript' : 'JSON API' }}</small></span>
-        <button v-if="recipe.kind !== 'local'" type="button" @click="edit(recipe)">{{ t('dictionary.edit') }}</button>
+        <button v-if="recipe.kind !== 'local'" type="button" :disabled="busy" @click="edit(recipe)">{{ t('dictionary.edit') }}</button>
         <button type="button" :disabled="busy" @click="remove(recipe)">{{ t('dictionary.remove') }}</button>
       </div>
       <div class="dictionary-actions">
@@ -42,7 +42,7 @@
           <label class="dictionary-wide">JavaScript<textarea v-model="draft.script" rows="5" maxlength="16384" spellcheck="false" /></label>
           <p class="dictionary-note dictionary-wide">{{ t('dictionary.scriptHelp') }}</p>
         </template>
-        <div class="dictionary-actions dictionary-wide"><button type="submit">{{ t('dictionary.save') }}</button><button type="button" @click="draft = null">{{ t('dictionary.cancel') }}</button></div>
+        <div class="dictionary-actions dictionary-wide"><button type="submit" :disabled="busy">{{ t('dictionary.save') }}</button><button type="button" @click="draft = null">{{ t('dictionary.cancel') }}</button></div>
       </form>
       <details class="dictionary-templates"><summary>{{ t('dictionary.templates') }}</summary>
         <div class="dictionary-grid"><label>{{ t('dictionary.front') }}<textarea v-model="workspace.front" maxlength="16384" rows="3" spellcheck="false" /></label><label>{{ t('dictionary.back') }}<textarea v-model="workspace.back" maxlength="16384" rows="3" spellcheck="false" /></label></div>
@@ -129,8 +129,10 @@ function importOffline(event: Event): void {
   busy.value = true; notice.value = '';
   try {
     const id = crypto.randomUUID();
-    worker = new Worker(new URL('../../selection-translation/dictionary/importWorker.ts', import.meta.url), {type: 'module'});
-    worker.onmessage = event => {
+    const active = new Worker(new URL('../../selection-translation/dictionary/importWorker.ts', import.meta.url), {type: 'module'});
+    worker = active;
+    active.onmessage = event => {
+      if (worker !== active || disposed) return;
       const result = event.data as {success?: boolean; data?: {name: string}; error?: string};
       cancelImport();
       if (disposed) return;
@@ -138,7 +140,7 @@ function importOffline(event: Event): void {
       workspace.value.recipes = [...workspace.value.recipes, {id, name: result.data.name, kind: 'local', url: '', headers: {}, fields: {...EMPTY_DICTIONARY_FIELDS}, script: '', localId: id}];
       notice.value = t('dictionary.imported');
     };
-    worker.onerror = () => {cancelImport(); if (!disposed) notice.value = t('dictionary.importError');};
+    active.onerror = () => {if (worker !== active || disposed) return; cancelImport(); notice.value = t('dictionary.importError');};
     worker.postMessage({id, files});
   } catch {cancelImport(); notice.value = t('dictionary.importError');}
 }

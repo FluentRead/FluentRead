@@ -168,10 +168,72 @@ describe('RemoteConfigSync actual client interactions',()=>{
 
 async function site(){const state=Vue.reactive({inspectRuleId:'',modelValue:{enabled:true,disabledRuleIds:[],custom:{version:1,rules:[]}} as Settings});const save=vi.fn(async(next:Settings)=>{state.modelValue=structuredClone(Vue.toRaw(next))});const view=await mount(SiteAdaptationSettings,{get modelValue(){return state.modelValue},get inspectRuleId(){return state.inspectRuleId},saveSettings:save});return {...view,state,save};}
 describe('SiteAdaptationSettings actual client form and draft',()=>{
+  it('prevents duplicate in-flight saves and retains newer form values as unsaved work',async()=>{
+    const view=await site();await textClick(view.host,'新建规则');await input(view.host,'[aria-label="规则名称"]','Submitted revision');await input(view.host,'[aria-label="匹配域名"]','example.test');
+    const pending=deferred<void>();view.save.mockImplementationOnce(async next=>{await pending.promise;view.state.modelValue=structuredClone(Vue.toRaw(next));});
+    const editor=view.host.querySelector('form')!;const submit=async()=>{editor.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();};
+    await submit();expect(view.host.querySelector('fieldset')!.hasAttribute('disabled')).toBe(true);
+    // 即使外部组件或程序输入在等待期间改了表单，也只能确认本次实际提交的版本。
+    await input(view.host,'[aria-label="规则名称"]','Newer revision');await submit();expect(view.save).toHaveBeenCalledOnce();
+    pending.resolve();await settle();expect(view.state.modelValue.custom.rules[0].name).toBe('Submitted revision');
+    expect(view.host.querySelector<HTMLInputElement>('[aria-label="规则名称"]')!.value).toBe('Newer revision');
+    expect(view.host.querySelector('.editor-actions [role="status"]')).toBeNull();
+    const leave=new dom.window.Event('beforeunload',{cancelable:true});dom.window.dispatchEvent(leave);expect(leave.defaultPrevented).toBe(true);
+    await submit();expect(view.state.modelValue.custom.rules[0].name).toBe('Newer revision');expect(view.state.modelValue.custom.rules).toHaveLength(1);
+  });
+  it('keeps the same editor through repeated saves and resets leave protection only after each successful save',async()=>{
+    const view=await site();await textClick(view.host,'新建规则');
+    await input(view.host,'[aria-label="规则名称"]','First revision');await input(view.host,'[aria-label="匹配域名"]','example.test');
+    const editor=view.host.querySelector('form')!;
+    const submit=async()=>{editor.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();};
+    const leave=()=>{const event=new dom.window.Event('beforeunload',{cancelable:true});dom.window.dispatchEvent(event);return event.defaultPrevented;};
+    const scroll=vi.mocked(dom.window.HTMLElement.prototype.scrollIntoView);scroll.mockClear();
+    expect(leave()).toBe(true);await submit();
+    const id=view.state.modelValue.custom.rules[0].id;
+    expect(view.host.querySelector('form')).toBe(editor);expect(leave()).toBe(false);
+    expect(view.host.querySelector<HTMLInputElement>('[aria-label="规则标识"]')!.disabled).toBe(true);
+    expect(view.host.querySelector('.editor-actions [role="status"]')?.textContent).toContain('规则已应用');
+    await input(view.host,'[aria-label="规则名称"]','Second revision');expect(leave()).toBe(true);
+    expect(view.host.querySelector('.editor-actions [role="status"]')).toBeNull();
+    view.save.mockRejectedValueOnce(new Error('storage failure'));await submit();
+    expect(view.host.querySelector('form')).toBe(editor);expect(leave()).toBe(true);
+    expect(view.state.modelValue.custom.rules[0].name).toBe('First revision');
+    expect(view.host.querySelector('[role="alert"]')?.textContent).toContain('保存失败');
+    await submit();await input(view.host,'[aria-label="规则名称"]','Third revision');await submit();
+    expect(view.state.modelValue.custom.rules).toHaveLength(1);expect(view.state.modelValue.custom.rules[0]).toMatchObject({id,name:'Third revision'});
+    expect(view.save).toHaveBeenCalledTimes(4);expect(leave()).toBe(false);expect(scroll).not.toHaveBeenCalled();
+    await textClick(view.host,'结束编辑');expect(dom.window.confirm).not.toHaveBeenCalled();expect(view.host.querySelector('form')).toBeNull();
+  });
+  it('keeps built-in overrides editable and blocks concurrent updates after the first save',async()=>{
+    const view=await site();await click(view.host,'.catalog-name');await textClick(view.host,'基于此规则自定义');
+    const id=view.host.querySelector<HTMLInputElement>('[aria-label="规则标识"]')!.value;
+    const submit=async()=>{view.host.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();};
+    await input(view.host,'[aria-label="规则名称"]','Custom revision');await submit();
+    expect(view.host.querySelector('[role="alert"]')?.textContent ?? '').toBe('');
+    await input(view.host,'[aria-label="规则名称"]','Custom revision two');await submit();
+    expect(view.state.modelValue.custom.rules).toHaveLength(1);expect(view.state.modelValue.custom.rules[0]).toMatchObject({id,name:'Custom revision two'});
+    view.state.modelValue={...view.state.modelValue,custom:{...view.state.modelValue.custom,rules:view.state.modelValue.custom.rules.map(rule=>({...rule,name:'External revision'}))}};await settle();
+    expect(view.host.textContent).toContain('规则已从其他页面更新');expect(view.host.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(true);
+    view.host.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();expect(view.save).toHaveBeenCalledTimes(2);
+    expect(view.state.modelValue.custom.rules[0].name).toBe('External revision');
+  });
+  it('shows every region setting without nested disclosure and associates removal and explanations with its region',async()=>{
+    const view=await site();await textClick(view.host,'新建规则');await textClick(view.host,'添加正文区域');await textClick(view.host,'添加正文区域');
+    const rows=[...view.host.querySelectorAll('.content-row')];
+    expect(rows.every(row=>row.querySelector('details')===null)).toBe(true);
+    expect(rows[0].querySelector('h5')?.textContent).toContain('区域 1');expect(rows[1].querySelector('h5')?.textContent).toContain('区域 2');
+    expect(rows[1].querySelector('header [aria-label="移除正文区域 2"]')?.textContent).toBe('移除区域');
+    expect(rows[0].textContent).toContain('一行一个 CSS 选择器');expect(rows[0].textContent).toContain('每个匹配节点分别作为一个翻译单元');
+    const select=rows[0].querySelector('select')!;Object.defineProperty(select,'value',{configurable:true,value:'closest'});select.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();
+    expect(rows[0].textContent).toContain('含自身');expect(rows[0].textContent).toContain('直接子级 <br>');
+    await input(view.host,'[aria-label="区域描述 2"]','Second region');await click(view.host,'[aria-label="移除正文区域 1"]');
+    expect(view.host.querySelectorAll('.content-row')).toHaveLength(1);expect(view.host.querySelector<HTMLInputElement>('[aria-label="区域描述 1"]')!.value).toBe('Second region');
+  });
   it('creates a rule through the form, validates invalid input and saves only the confirmed source scope',async()=>{
     const view=await site();await textClick(view.host,'新建规则');await input(view.host,'input[aria-label="规则名称"]','Fixture article');await input(view.host,'textarea[aria-label="匹配域名"]','https://invalid/path');view.host.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();expect(view.save).not.toHaveBeenCalled();expect(view.host.querySelector('[role="alert"]')).not.toBeNull();
     await input(view.host,'textarea[aria-label="匹配域名"]','example.test');await textClick(view.host,'添加正文区域');await input(view.host,'textarea[aria-label="正文 CSS 选择器 1"]','article p');view.host.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();
-    expect(view.save).toHaveBeenCalledOnce();expect(view.state.modelValue.custom.rules[0]).toMatchObject({name:'Fixture article',match:{hosts:['example.test']},content:[{css:['article p']}]});expect(view.host.querySelector('form')).toBeNull();
+    expect(view.save).toHaveBeenCalledOnce();expect(view.state.modelValue.custom.rules[0]).toMatchObject({name:'Fixture article',match:{hosts:['example.test']},content:[{css:['article p']}]});expect(view.host.querySelector('form')).not.toBeNull();
+    await textClick(view.host,'结束编辑');expect(dom.window.confirm).not.toHaveBeenCalled();
     await textClick(view.host,'从草稿移除');expect(view.state.modelValue.custom.rules).toHaveLength(1);await textClick(view.host,'撤销草稿替换');expect(view.host.textContent).toContain('Fixture article');
   });
   it('edits, validates, restores and imports JSON through real input handlers without saving a partial draft',async()=>{
@@ -214,7 +276,7 @@ it('keeps failed site-rule saves editable, retries the same draft and toggles on
 });
 it('warns about edited site-rule forms, honours cancellation and restores the saved draft after an import race',async()=>{
   const view=await site();await textClick(view.host,'新建规则');await input(view.host,'input[aria-label="规则名称"]','Unsaved draft');const unload=new dom.window.Event('beforeunload',{cancelable:true});dom.window.dispatchEvent(unload);expect(unload.defaultPrevented).toBe(true);
-  (dom.window.confirm as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);await textClick(view.host,'取消编辑');expect(view.host.querySelector('form')).not.toBeNull();await textClick(view.host,'取消编辑');expect(view.host.querySelector('form')).toBeNull();
+  (dom.window.confirm as ReturnType<typeof vi.fn>).mockReturnValueOnce(false);await textClick(view.host,'结束编辑');expect(view.host.querySelector('form')).not.toBeNull();await textClick(view.host,'结束编辑');expect(view.host.querySelector('form')).toBeNull();
   const pending=deferred<string>(),picker=view.host.querySelector<HTMLInputElement>('input[type="file"]')!;Object.defineProperty(picker,'files',{configurable:true,value:[{size:100,text:()=>pending.promise}]});picker.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();
   await textClick(view.host,'插入示例');pending.resolve(JSON.stringify({version:1,rules:[]}));await settle();expect(view.host.textContent).toContain('读取文件期间草稿已更改');expect(view.save).not.toHaveBeenCalled();
   await textClick(view.host,'清空自定义草稿');await textClick(view.host,'撤销草稿替换');await textClick(view.host,'恢复已保存草稿');expect(view.state.modelValue.custom.rules).toEqual([]);
@@ -222,7 +284,7 @@ it('warns about edited site-rule forms, honours cancellation and restores the sa
 });
 it('opens a built-in rule, prepares a custom override, and exports the selected rule without saving it',async()=>{
   const view=await site();await click(view.host,'.catalog-name');expect(view.host.querySelector('[data-rule-detail]')).not.toBeNull();
-  await textClick(view.host,'基于此规则自定义');expect(view.host.querySelector('input[aria-label="规则标识"]')?.hasAttribute('disabled')).toBe(true);await textClick(view.host,'取消编辑');expect(view.save).not.toHaveBeenCalled();
+  await textClick(view.host,'基于此规则自定义');expect(view.host.querySelector('input[aria-label="规则标识"]')?.hasAttribute('disabled')).toBe(true);await textClick(view.host,'结束编辑');expect(view.save).not.toHaveBeenCalled();
   vi.useFakeTimers();try {await textClick(view.host,'导出此规则');expect(URL.createObjectURL).toHaveBeenCalledOnce();const blob=(URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob;expect(JSON.parse(await blob.text()).rules).toHaveLength(1);await vi.advanceTimersByTimeAsync(1000);expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:controlled-export');}finally{vi.useRealTimers()}
   await textClick(view.host,'关闭详情');expect(view.host.querySelector('[data-rule-detail]')).toBeNull();
 });
@@ -307,17 +369,17 @@ it('round-trips advanced visual rule controls into the saved scope and preserves
   const focus=view.host.querySelector<HTMLInputElement>('input[value="focus"]')!;focus.checked=true;focus.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();const augment=view.host.querySelector<HTMLInputElement>('input[value="augment"]')!;augment.checked=true;augment.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();expect(augment.parentElement!.classList.contains('is-active')).toBe(true);expect(focus.parentElement!.classList.contains('is-active')).toBe(false);focus.checked=true;focus.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await settle();
   await textClick(view.host,'添加正文区域');await textClick(view.host,'添加正文区域');await input(view.host,'textarea[aria-label="正文 CSS 选择器 1"]','article p');await click(view.host,'[aria-label="移除正文区域 2"]');
   const row=view.host.querySelector('.content-row')!;const toggles=row.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');toggles[0].checked=false;toggles[0].dispatchEvent(new dom.window.Event('change',{bubbles:true}));toggles[1].checked=true;toggles[1].dispatchEvent(new dom.window.Event('change',{bubbles:true}));
-  const resolve=row.querySelector('select')!;Object.defineProperty(resolve,'value',{configurable:true,value:'closest'});resolve.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await input(view.host,'.content-row details input:not([type="checkbox"])','main-prose');
+  const resolve=row.querySelector('select')!;Object.defineProperty(resolve,'value',{configurable:true,value:'closest'});resolve.dispatchEvent(new dom.window.Event('change',{bubbles:true}));await input(view.host,'[aria-label="区域描述 1"]','main-prose');
   view.host.querySelector('form')!.dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true}));await settle();
   expect(view.save).toHaveBeenCalledOnce();expect(view.state.modelValue.custom.rules[0]).toMatchObject({id:'fixture-scoped-reading',name:'Scoped reading',mode:'focus',priority:23,match:{hosts:['example.test'],paths:['/articles/*'],excludePaths:['/articles/private/*']},content:[{css:['article p'],atomic:false,resolve:'closest',splitOnBr:true,key:'main-prose'}],protect:['code','.math'],exclude:['nav','.advertisement'],watchIgnore:['.clock']});
-  await textClick(view.host,'编辑自定义规则');expect(view.host.querySelector<HTMLInputElement>('[aria-label="规则标识"]')!.disabled).toBe(true);expect(view.host.querySelector<HTMLInputElement>('input[value="focus"]')!.checked).toBe(true);expect(view.host.querySelector<HTMLTextAreaElement>('[aria-label="匹配路径（可选）"]')!.value).toBe('/articles/*');
+  await textClick(view.host,'结束编辑');await textClick(view.host,'编辑自定义规则');expect(view.host.querySelector<HTMLInputElement>('[aria-label="规则标识"]')!.disabled).toBe(true);expect(view.host.querySelector<HTMLInputElement>('input[value="focus"]')!.checked).toBe(true);expect(view.host.querySelector<HTMLTextAreaElement>('[aria-label="匹配路径（可选）"]')!.value).toBe('/articles/*');
 });
 
 it('opens invalid JSON for correction and blocks stale form saves after settings change elsewhere',async()=>{
   const view=await site();await input(view.host,'textarea[aria-label="JSON 编辑草稿"]','{broken');await textClick(view.host,'保存并应用');expect(view.save).not.toHaveBeenCalled();expect(view.host.querySelector<HTMLDetailsElement>('.backup-tools')!.open).toBe(true);expect(view.host.querySelector<HTMLDetailsElement>('.json-editor')!.hasAttribute('open')).toBe(true);
   await textClick(view.host,'新建规则');expect(view.host.querySelector('form')).toBeNull();await textClick(view.host,'恢复已保存草稿');await textClick(view.host,'新建规则');await input(view.host,'[aria-label="匹配域名"]','example.test');
   view.state.modelValue={...view.state.modelValue,custom:structuredClone(SITE_ADAPTATION_EXAMPLE)};await settle();expect(view.host.textContent).toContain('规则已从其他页面更新');expect(view.host.querySelector('button[type="submit"]')!.hasAttribute('disabled')).toBe(true);
-  await textClick(view.host,'取消编辑');expect(view.save).not.toHaveBeenCalled();expect(view.state.modelValue.custom.rules[0].id).toBe(SITE_ADAPTATION_EXAMPLE.rules[0].id);
+  await textClick(view.host,'结束编辑');expect(view.save).not.toHaveBeenCalled();expect(view.state.modelValue.custom.rules[0].id).toBe(SITE_ADAPTATION_EXAMPLE.rules[0].id);
 });
 
 it('uses replacement import, rejects oversized or unreadable files and exports the chosen saved or draft pack',async()=>{

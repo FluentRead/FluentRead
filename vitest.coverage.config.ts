@@ -766,6 +766,7 @@ export default defineConfig({
                 'src/features/settings/model/navigation.ts',
                 'src/features/settings/ui/services/modelOptions.ts',
                 'src/features/selection-translation/core.ts',
+                'src/features/selection-translation/core/selectionSource.ts',
                 'src/features/selection-translation/protocol.ts',
                 'src/features/selection-translation/content/runtime.ts',
                 'src/features/selection-translation/content/modalDialogHost.ts',

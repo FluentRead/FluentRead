@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Editable selection fixture</title>
+<style>body{font:18px sans-serif;margin:40px}section{margin:24px 0}input,textarea{font:18px monospace;width:740px}textarea{height:80px}[contenteditable]{padding:12px;border:1px solid #ccc}#cm5,#cm6{margin:24px 0}</style></head>
+<body>
+<section><input id="input" value="Before Selected input words after"></section>
+<section><textarea id="textarea">Before
+Selected textarea words
+after</textarea></section>
+<section translate="no" class="notranslate" id="rich-shell">
+<div id="rich-a" contenteditable="true" role="textbox"><span id="rich-text-a">Selected rich editor words.</span></div>
+<div id="rich-b" contenteditable="true"><span id="rich-text-b">Selected second editor block.</span></div>
+<div id="rich-blocks" contenteditable="true"><p id="block-a">First selected paragraph.</p><p id="block-b">Last selected paragraph.</p></div>
+</section>
+<section><div id="shadow-host"></div></section>
+<section><input id="password" type="password" value="Unselected secret"></section>
+<section><div id="cm6"></div><div id="cm5"></div></section>
+<script>
+document.querySelector('#shadow-host').attachShadow({mode:'open'}).innerHTML='<div contenteditable="true" id="shadow-editor">Selected shadow editor words.</div>';
+</script>
+</body></html>

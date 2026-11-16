@@ -2784,6 +2784,97 @@ describe('editable text selection capture', () => {
     });
 });
 
+describe('native text control translation', () => {
+    function prepare(tag = 'textarea') {
+        const x = mountSelection();
+        const document = x.document as unknown as Document;
+        const element = document.createElement(tag) as HTMLInputElement | HTMLTextAreaElement;
+        if (tag === 'input') element.setAttribute('type', 'text');
+        element.value = 'Before Good ideas deserve attention. after';
+        Object.assign(element, {selectionStart: 7, selectionEnd: 36, selectionDirection: 'forward'});
+        document.body.appendChild(element);
+        Object.defineProperty(x.document, 'activeElement', {configurable: true, value: element});
+        const box = {left: 40, right: 340, top: 100, bottom: 140, width: 300, height: 40};
+        const range = {startContainer: document.body, endContainer: document.body, startOffset: 0, endOffset: 1,
+            commonAncestorContainer: document.body, collapsed: false, selectNode: vi.fn(),
+            getClientRects: () => [box], getBoundingClientRect: () => box, toString: () => ''};
+        Object.defineProperty(x.document, 'createRange', {configurable: true, value: () => range});
+        Object.assign(x.window, {getSelection: () => null});
+        Object.assign(x.config, {selectionTranslatorTrigger: 'icon', selectionTranslatorDelay: 0});
+        x.notifyConfig();
+        const pointer = {isTrusted: true, button: 0, pointerType: 'mouse', target: element, clientX: 200, clientY: 120};
+        const select = async () => {
+            element.selectionStart = element.selectionEnd = 7;
+            x.state.handlePointerDown(pointer);
+            element.selectionEnd = 36;
+            x.state.handlePointerUp(pointer);
+            await vi.advanceTimersByTimeAsync(32);
+        };
+        return {...x, element, range, pointer, select};
+    }
+
+    it.each(['input', 'textarea'])('translates the selected %s substring through the existing card without writing to the field', async tag => {
+        const x = prepare(tag), value = x.element.value;
+        await x.select();
+        expect(x.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(x.state.showIndicator).toBe(true);expect(x.translateText).not.toHaveBeenCalled();
+        x.state.openTooltip();await Vue.nextTick();
+        expect(x.translateText).toHaveBeenCalledOnce();
+        expect(x.translateText.mock.calls[0][0]).toBe('Good ideas deserve attention.');
+        expect(x.element.value).toBe(value);
+        expect(x.range.selectNode).toHaveBeenCalledWith(x.element);
+        expect(x.state.selectionContextText()).toContain('Good ideas deserve attention.');
+    });
+
+    it('honors a configured shortcut in an editor instead of returning at the input guard', async () => {
+        const x = prepare();
+        x.config.selectionTranslatorTrigger = 'Control';x.notifyConfig();await Vue.nextTick();
+        expect(x.state.readSelectionSnapshot()?.text).toBe('Good ideas deserve attention.');
+        expect(x.state.selectionShortcutConfig).toBe('Control');
+        const key = {isTrusted: true, target: x.element, key: 'Control', code: 'ControlLeft', ctrlKey: true,
+            preventDefault: vi.fn(), stopPropagation: vi.fn()};
+        x.state.handleKeydown(key);await vi.advanceTimersByTimeAsync(32);
+        expect(x.state.showTooltip).toBe(true);expect(x.translateText).toHaveBeenCalledOnce();
+        expect(key.preventDefault).toHaveBeenCalled();expect(x.element.value).toContain('Before');
+    });
+
+    it.each([false, true])('keeps a captured menu selection after native highlight loss, including a retargeted shadow event (%s)', async shadow => {
+        const x = prepare();
+        const host = (x.document as unknown as Document).createElement('custom-editor');
+        x.state.handleContextMenu({isTrusted: true, target: shadow ? host : x.element,
+            composedPath: () => shadow ? [x.element, host] : []});
+        expect(x.state.contextMenuSelection).not.toBeNull();
+        x.element.selectionStart = x.element.selectionEnd = 0;
+        expect(x.state.translateSelectionFromContextMenu('Good ideas deserve attention.')).toBe(true);
+        await Vue.nextTick();expect(x.translateText).toHaveBeenCalledOnce();
+        x.element.value += '!';x.state.restoreSelectionSource();
+        expect(x.state.showTooltip).toBe(false);expect(x.state.snapshot).toBeNull();
+    });
+
+    it('cancels a pending control translation when the source changes and ignores its late result', async () => {
+        const x = prepare();let answer!: (text: string) => void;
+        x.translateText.mockReturnValue(new Promise<string>(resolve => {answer = resolve;}));
+        await x.select();x.state.openTooltip();await Vue.nextTick();
+        x.element.value = 'Replaced source';
+        for (const listener of x.listeners.get('document:input') ?? []) listener({isTrusted: true, target: x.element});
+        expect(x.state.showTooltip).toBe(false);
+        answer('Late answer');await Vue.nextTick();await Vue.nextTick();
+        expect(x.state.translationResult).toBe('');
+    });
+
+    it('uses a trusted release point when a native editor proxy has zero geometry and discards stale positions', async () => {
+        const x = prepare();
+        x.range.getClientRects = () => [];
+        x.range.getBoundingClientRect = () => ({left: 0, right: 0, top: 0, bottom: 0, width: 0, height: 0});
+        expect(x.state.readSelectionSnapshot()).toBeNull();
+        await x.select();expect(x.state.showIndicator).toBe(true);
+        expect(x.state.snapshot.anchor).toMatchObject({left: 200, top: 120});
+        x.element.selectionStart = 8;
+        expect(x.state.readSelectionSnapshot()).toBeNull();
+        x.state.hideAll();expect(x.state.selectionPointerAnchor).toBeNull();
+    });
+});
+
 describe('context menu selection ownership', () => {
     async function prepareMenu(browserTarget: SelectionBuildTarget = 'chrome') {
         const fixture = mountSelection(false, undefined, browserTarget);
@@ -2793,7 +2884,7 @@ describe('context menu selection ownership', () => {
         vi.stubGlobal('Node', FakeNode);
         let nativeText = 'Good ideas deserve attention.';
         const paragraph = {nodeType: 1, tagName: 'P', parentElement: null,
-            getAttribute: () => null, hasAttribute: () => false, closest: () => null,
+            getAttribute: () => null, hasAttribute: () => false, closest: () => null, matches: () => false,
             querySelector: () => null, querySelectorAll: () => []};
         const node = {nodeType: 3, parentElement: paragraph, isConnected: true, ownerDocument: fixture.document};
         const range = Vue.markRaw({startContainer: node, endContainer: node, commonAncestorContainer: node,
@@ -3083,7 +3174,7 @@ describe('context menu selection ownership', () => {
         const fixture = await prepareMenu();
         const editor = Object.assign(Object.create(Object.getPrototypeOf(fixture.inputTarget)), {
             nodeType: 1,
-            closest: () => null, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
+            closest: () => null, matches: () => false, getAttribute: (name: string) => name === 'contenteditable' ? 'true' : null,
             hasAttribute: (name: string) => name === 'contenteditable', parentElement: null,
         });
         fixture.paragraph.parentElement = editor;

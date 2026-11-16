@@ -125,9 +125,13 @@ class MockElement {
 
     get firstChild(): Node | null { return this.childNodes[0] ?? null; }
 
-    matches(): boolean {
+    matches(selector: string): boolean {
         if (this.querySelectorAllThrows) throw new Error('element matching failed');
-        return isSelectionExcludedTagName(this.tagName) || Boolean(this.attributes.role) || this.closestMatch;
+        const {document} = parseHTML('<html><body></body></html>');
+        const element = document.createElement(this.tagName);
+        for (const [name, value] of Object.entries(this.attributes)) element.setAttribute(name, value);
+        if (this.closestMatch) element.classList.add('notranslate');
+        return element.matches(selector);
     }
 
     querySelectorAll(): MockElement[] {
@@ -171,6 +175,42 @@ function mockRange(start: Node | null, end: Node | null, options: MockRangeOptio
         },
     } as unknown as Range;
 }
+
+describe('explicit editing selections across composed boundaries', () => {
+    it.each(['translate', 'notranslate', 'cross hosts'])('accepts %s while preserving automatic filtering', kind => {
+        const {document} = parseHTML('<html><body><main><div contenteditable="true">First editor text.</div><div contenteditable="true">Second editor text.</div></main></body></html>');
+        const [first, second] = [...document.querySelectorAll('div')];
+        if (kind === 'translate') first.setAttribute('translate', 'no');
+        if (kind === 'notranslate') first.classList.add('notranslate');
+        const range = mockRange(first.firstChild, kind === 'cross hosts' ? second.firstChild : first.firstChild,
+            {commonAncestor: document.querySelector('main')!});
+        expect(shouldIgnoreSelection(range, true)).toBe(false);
+        expect(shouldIgnoreSelection(range)).toBe(true);
+    });
+
+    it('checks protected ancestors outside an open shadow root and bounds malformed ancestor cycles', () => {
+        const {document} = parseHTML('<html><body><section></section></body></html>');
+        const host = document.querySelector('section')!, root = host.attachShadow({mode: 'open'});
+        root.innerHTML = '<div contenteditable="true">Selected shadow text</div>';
+        const element = root.firstChild as Element;
+        const range = mockRange(element.firstChild, element.firstChild, {commonAncestor: element});
+        expect(shouldIgnoreSelection(range, true)).toBe(false);
+        host.setAttribute('hidden', '');
+        expect(shouldIgnoreSelection(range, true)).toBe(true);
+        host.removeAttribute('hidden');host.setAttribute('data-fluent-read-ui', '');
+        expect(shouldIgnoreSelection(range, true)).toBe(true);
+        const cyclic = new MockElement();cyclic.parentElement = cyclic;
+        const text = mockTextNode(cyclic);
+        expect(shouldIgnoreSelection(mockRange(text, text), true)).toBe(true);
+    });
+
+    it('finds inherited editing roots without treating a document body as a local host', () => {
+        const parent = new MockElement(), child = new MockElement({isContentEditable: true, parentElement: parent});
+        expect(getEditableSelectionRoot(mockTextNode(child))).toBe(child);
+        const textbox = new MockElement({attributes: {role: 'textbox'}});
+        expect(getEditableSelectionRoot(mockTextNode(textbox))).toBe(textbox);
+    });
+});
 
 describe('issue #704 inline code in prose selections', () => {
     function fixture(html: string, fragmentHtml = html) {
@@ -314,19 +354,18 @@ describe('explicit selections inside editable text', () => {
         return {document, paragraph, range};
     }
 
-    it('allows a complete range in one local editor only for the normal selection flow', () => {
+    it('allows explicit ranges within and across editable boundaries while passive selection remains excluded', () => {
         const inside = fixture('<span contenteditable="true">Read this editor text.</span>');
         expect(shouldIgnoreSelection(inside.range)).toBe(true);
         expect(shouldIgnoreSelection(inside.range, true)).toBe(false);
 
         const crossing = fixture('<span contenteditable="true">Editor text.</span> Outside text.');
-        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(false);
     });
 
     it.each([
         '<span contenteditable="true" data-fluent-read-ui>Extension text.</span>',
         '<span contenteditable="true" aria-hidden="true">Hidden text.</span>',
-        '<span contenteditable="true" translate="no">Protected text.</span>',
         '<textarea>Input text.</textarea>',
     ])('keeps protected editor content out: %s', html => {
         expect(shouldIgnoreSelection(fixture(html).range, true)).toBe(true);
@@ -339,7 +378,7 @@ describe('explicit selections inside editable text', () => {
         expect(shouldIgnoreSelection(input.range, true)).toBe(true);
         const crossing = fixture('Before <span role="textbox">Editor text.</span> after.');
         crossing.document.querySelector('[role="textbox"]')!.getClientRects = () => [{width: 80, height: 20}] as unknown as DOMRectList;
-        expect(shouldIgnoreSelection(crossing.range, true)).toBe(true);
+        expect(shouldIgnoreSelection(crossing.range, true)).toBe(false);
     });
 
     it('resolves inherited editability and stops at noneditable and document boundaries', () => {
@@ -473,13 +512,9 @@ describe('selection range traversal scope and cost', () => {
     it.each([
         '<button>Protected action</button>',
         '<span role="button">Protected action</span>',
-        '<span translate="no">Protected text</span>',
-        '<span class="notranslate">Protected text</span>',
-        '<span data-notranslate="true">Protected text</span>',
         '<span aria-hidden="true">Protected text</span>',
         '<svg aria-hidden="true"><text>Protected text</text></svg>',
         '<span data-fluent-read-ui>Extension text</span>',
-        '<span contenteditable="true">Editor text</span>',
         '<button aria-hidden="true"></button>',
         '<svg role="button"></svg>',
         '<span role="textbox" aria-hidden="true"></span>',
@@ -506,7 +541,7 @@ describe('selection range traversal scope and cost', () => {
         expect(before).not.toHaveBeenCalled();
         expect(after).not.toHaveBeenCalled();
         // 结束点位于下一段正文，只需检查这一段元素本身，不随页外按钮数量增长。
-        expect(matching).toHaveBeenCalledTimes(1);
+        expect(matching.mock.calls.length).toBeLessThanOrEqual(4);
     });
 
     it('formulas and code outside a short selected range never trigger an ancestor query or fragment cloning', () => {

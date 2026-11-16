@@ -558,7 +558,9 @@
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
-      "tests/sharedVideoModelDirectory.test.ts"
+      "tests/sharedVideoModelDirectory.test.ts",
+      "tests/htmlMedia.test.ts",
+      "tests/subtitleExport.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -939,7 +941,8 @@
       "tests/youtubeEmbedFrameRuntime.test.ts",
       "tests/translationPrivacy.test.ts",
       "tests/privacySettingsLifecycle.test.ts",
-      "tests/videoAiSharedModelCache.test.ts"
+      "tests/videoAiSharedModelCache.test.ts",
+      "tests/htmlMediaFrame.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

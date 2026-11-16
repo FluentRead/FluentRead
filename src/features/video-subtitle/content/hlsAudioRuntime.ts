@@ -58,10 +58,10 @@ export class XHlsAudioReader {
         }
     }
 
-    async read(video: HTMLVideoElement, signal: AbortSignal, identity?: VideoAiSubtitleCacheSource): Promise<Float32Array | null> {
+    async read(video: HTMLMediaElement, signal: AbortSignal, identity?: VideoAiSubtitleCacheSource): Promise<Float32Array | null> {
         const mediaId = (url: string) => url.match(/(?:ext_tw_video|amplify_video|tweet_video)(?:_thumb)?\/(\d+)/)?.[1];
         const identityKey = identity ? buildVideoAiSubtitleVideoKey(identity) : null;
-        const sourceId = mediaId(video.currentSrc || video.src) || mediaId(video.poster)
+        const sourceId = mediaId(video.currentSrc || video.src) || mediaId((video as HTMLVideoElement).poster)
             || (identityKey?.startsWith('media:') ? identityKey.slice('media:'.length) : undefined);
         // 首页并行预加载多个视频，MSE 地址不能复制。页面桥只捕获 Fetch/XHR
         // 文本响应，浏览器直接加载或 arraybuffer 清单需要从资源时序补读。

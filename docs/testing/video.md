@@ -163,3 +163,8 @@ Issue #1341 的重复字幕回归区分内容与滚动残留：`No no`、`Very v
 
 该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
 
+## 通用 HTML 音视频（issue #1356）
+
+`tests/htmlMedia.test.ts` 验证无媒体空闲、动态发现、字幕浮层归属、滚动/视口/全屏定位及资源回收。`tests/videoSubtitleTrackPriorityRuntime.test.ts` 的 standard HTML media 用例从公共入口验证音频和视频的原生轨、双语、原文模式和动态卸载；既有 YouTube/X 用例约束兼容性。`tests/videoAiFullCapture.test.ts` 的 playback capture 用例验证实时音轨采集的原始时间戳、结束、跳转/倍速失效及原媒体状态保持，也覆盖 AudioWorklet 批处理、端口清理、加载取消和原始流音轨的克隆归属。`tests/subtitleExport.test.ts` 检查 SRT、WebVTT、Markdown 的时间与文本转义。
+
+浏览器专项 `scripts/testing/run-html-media-subtitle-test.cjs` 使用生产扩展、隔离临时 profile 与 focus-safe helper，验证普通音频、视频、子 frame、切换、学习面板、导出及关闭；缓存与翻译夹具和真实模型识别分别记录，不能把缓存回放当成真实转写验收。完整日志、截图及内容脚本/扩展页面/后台诊断放在工作区证据目录。

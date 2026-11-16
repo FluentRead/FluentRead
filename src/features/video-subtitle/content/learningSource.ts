@@ -7,7 +7,7 @@
 import {sanitizeVocabularyVideoUrl} from '@/src/features/vocabulary/public';
 
 export interface VideoLearningSource {
-    platform: 'youtube' | 'x';
+    platform: 'youtube' | 'x' | 'html';
     sourceUrl?: string;
     title: string;
 }
@@ -15,9 +15,13 @@ export interface VideoLearningSource {
 type SourceLocation = Pick<Location, 'href' | 'hostname'>;
 
 /** 单视频只接受同一帖子内的无歧义候选；编号视频页面与多视频必须由当前 video 的祖先链接给出编号。 */
-export function getVideoLearningSource(video: HTMLVideoElement, location: SourceLocation, document: Document): VideoLearningSource {
+export function getVideoLearningSource(video: HTMLMediaElement, location: SourceLocation, document: Document): VideoLearningSource {
     const platform = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(location.hostname) ? 'youtube' : 'x';
     if (platform === 'youtube') return {platform, sourceUrl: sanitizeVocabularyVideoUrl(location.href, platform), title: document.title};
+    if (!/(^|\.)(x|twitter)\.com$/i.test(location.hostname)) {
+        const url = new URL(location.href); url.username = ''; url.password = ''; url.hash = '';
+        return {platform: 'html', sourceUrl: /^https?:$/.test(url.protocol) ? url.href : undefined, title: document.title};
+    }
     const article = video.closest('article');
     const title = article?.querySelector('[data-testid="tweetText"]')?.textContent?.slice(0, 300) || document.title;
     const linkSource = (link: HTMLAnchorElement): string | undefined => {

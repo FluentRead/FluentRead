@@ -248,6 +248,10 @@ export function createExtensionManifest(
         ],
         web_accessible_resources: [
             {
+                resources: ['videoPcmWorklet.js'],
+                matches: ['<all_urls>'],
+            },
+            {
                 // 页内快捷面板只暴露 HTML；任何 iframe 都须先兑换内容脚本持有的一次性凭据，才可加载界面和配置。
                 resources: ['popup.html'],
                 matches: ['<all_urls>'],
@@ -429,7 +433,10 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
+            // #1356 复用既有字幕 frame；Chrome 对照 e124325e8 净增54,778 bytes，新增媒体定位、词查询、虚拟全文、七语文案、AudioWorklet 与导出格式。
+            // 不增加模型、WASM、权限或依赖；保留可核对的55kB功能预算。
+            const htmlMediaSubtitleBudget = 55_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + htmlMediaSubtitleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

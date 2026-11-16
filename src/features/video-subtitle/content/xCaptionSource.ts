@@ -1,10 +1,10 @@
 /**
  * @file src/features/video-subtitle/content/xCaptionSource.ts
- * 文件职责：把 X 播放器中的原生轨道、sidecar 与本地识别时间轴映射到唯一合成字幕容器。
+ * 文件职责：把 X 与 HTML 音视频中的原生轨道、sidecar 与本地识别时间轴映射到唯一合成字幕容器。
  * 主要内容：清理原生 cue 的时间标记后按播放时间选择正文；每次 sync 在隐藏模式写完后选择一次 live 轨道，供时间轴判定与当前正文读取共用，不跨轮缓存轨道或 cue；仅在内容变化时写入 DOM 并通知帧更新，保留原生 TextTrack 模式并在媒体离开时恢复。
  * 模块边界：不读取配置存储、不识别或翻译音频，也不发起网络请求；运行时注入当前媒体及字幕状态，负责挂载和卸载时序。
  */
-import {VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_CAPTION_SEGMENT_SELECTOR, VIDEO_PLAYER_SELECTOR, findVideoPlayer, isXVideoPage} from './ui';
+import {VIDEO_AI_CAPTION_CONTAINER_ID, VIDEO_CAPTION_SEGMENT_SELECTOR, VIDEO_PLAYER_SELECTOR, findVideoPlayer, isXVideoPage, isHtmlMediaPage} from './ui';
 import {normalizeVideoCaptionText} from './subtitleLogic';
 import {getVisibleVideoAiCue} from './video-ai/cueTimeline';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
@@ -12,7 +12,7 @@ import {cleanSubtitleText, selectXSubtitleLanguageResources} from './xVideoSubti
 
 export class XCaptionSource {
   private readonly changedTracks = new Map<TextTrack, TextTrackMode>();
-  constructor(private readonly read: () => {video: HTMLVideoElement | null; player?: HTMLElement; enabled: boolean; aiActive: boolean; aiCues: VideoSubtitleCue[]; sidecarCues: VideoSubtitleCue[]; language: string}) {}
+  constructor(private readonly read: () => {video: HTMLMediaElement | null; player?: HTMLElement; enabled: boolean; aiActive: boolean; aiCues: VideoSubtitleCue[]; sidecarCues: VideoSubtitleCue[]; language: string}) {}
   restoreTracks(): void {
     for (const [track, mode] of this.changedTracks) {
       // 若宿主已主动改变模式，尊重宿主的新选择。
@@ -20,7 +20,7 @@ export class XCaptionSource {
     }
     this.changedTracks.clear();
   }
-  private getOrCreateContainer(video: HTMLVideoElement | null, boundPlayer?: HTMLElement): HTMLElement | null {
+  private getOrCreateContainer(video: HTMLMediaElement | null, boundPlayer?: HTMLElement): HTMLElement | null {
     const player = boundPlayer || video?.closest<HTMLElement>(VIDEO_PLAYER_SELECTOR) || video?.parentElement || findVideoPlayer();
     if (!player) return null;
     let container = document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID);
@@ -73,7 +73,7 @@ export class XCaptionSource {
 
   /** 映射 TextTrack / sidecar / AI cue，并在帧回调中复用本轮已同步的容器。 */
   sync(onTextChange?: (container: HTMLElement) => void): HTMLElement | null {
-    if (!isXVideoPage()) return null;
+    if (!isXVideoPage() && !isHtmlMediaPage()) return null;
     const {video, player, enabled, aiActive, aiCues, sidecarCues} = this.read();
     const container = this.getOrCreateContainer(video, player);
     if (!container) return null;

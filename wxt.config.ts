@@ -429,12 +429,15 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
+            // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
+            const siteRuleEditorBudget = 12_000;
             // ePub 章级范围预览在同环境 Chrome 构建从68,568,261增至68,569,164bytes（+903）；仅文档页与样式改变，无新资源或依赖。
             // 按既有余量规则追加1kB代码预算，继续由实际产物门禁校验。
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + epubCoveragePreviewBudget + requestEvidenceBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

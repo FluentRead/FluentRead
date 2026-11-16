@@ -1307,7 +1307,7 @@ it('中文展示使用流畅阅读，首启七语品牌与正式目录一致并�
     expect(translate('metadata.popupTitle', 'zh-CN')).toBe('流畅阅读');
     expect(translate('metadata.documentTitle', 'zh-CN')).toBe('流畅阅读 · 文档翻译');
     expect(translate('settings.cloud.deleteManualDrive', 'zh-CN')).toBe('请前往 Google Drive 设置 → 管理应用 → FluentRead，清理该应用的数据。');
-    expect(translate('settings.cloud.deleteManualWebDav', 'zh-CN')).toBe('请在 WebDAV 服务商页面手动删除 FluentRead/fluentread-config.encrypted.json，保留目录内其他文件。');
+    expect(translate('settings.cloud.deleteManualWebDav', 'zh-CN')).toBe('请在已配置的 WebDAV 备份目录中只删除 fluentread-config.encrypted.json。');
     for (const {value} of UI_LANGUAGE_OPTIONS) {
         expect(onboardingMessages.onboardingProductNames[value], value).toBe(translate('common.brand', value));
         expect(translate('common.brand', value)).toBe(value === 'zh-CN' ? '流畅阅读' : 'FluentRead');

@@ -553,7 +553,7 @@ export function createDocumentSegmentTranslator(
                     ...(subtitleContext ? {subtitleContext} : {}),
                     serviceOverride: service, modelOverride: model, sourceLanguage, targetLanguage, maxRetries,
                 };
-                if (callbacksActive && !options.signal?.aborted) options.onRequestPrepared?.({segments: [segment], discourseContext: requestOptions.discourseContext});
+                options.onRequestPrepared?.({segments: [segment], discourseContext: requestOptions.discourseContext});
                 const received = await gateway.translateText(segment.source, context, requestOptions);
                 if (typeof received !== 'string' || !received.trim()) throw new Error('翻译服务返回空译文，请重试');
                 return received;
@@ -590,7 +590,7 @@ export function createDocumentSegmentTranslator(
                             targetLanguage,
                             maxRetries,
                         };
-                        if (callbacksActive && !options.signal?.aborted) options.onRequestPrepared?.({segments: batch, discourseContext: requestOptions.discourseContext});
+                        options.onRequestPrepared?.({segments: batch, discourseContext: requestOptions.discourseContext});
                         const result = single ? [await gateway.translateText(batch[0].source, context, requestOptions)] : await gateway.translateTextBatch(
                             batch.map((segment) => segment.source),
                             context,

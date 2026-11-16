@@ -494,7 +494,6 @@ import {markRaw, computed, defineAsyncComponent, nextTick, onMounted, onUnmounte
 import DocumentSegmentEditor from './DocumentSegmentEditor.vue';
 const PdfSourceEditor = defineAsyncComponent(() => import('./PdfSourceEditor.vue'));
 import browser from 'webextension-polyfill';
-import {findGlossaryMatches, getGlossaryScopeReason, resolveGlossaryEntries} from '@/src/core/glossary';
 import {materialCapture, materialGet, materialGeneration, MATERIAL_RESUME_PARAMETER, type MaterialRecord, type MaterialSelection} from './index';
 import {
   Config,
@@ -522,6 +521,9 @@ import {
   TranslationRequestError,
   serializeTranslationError,
   buildGlossaryRevision,
+  findGlossaryMatches,
+  getGlossaryScopeReason,
+  resolveGlossaryEntries,
   DOCUMENT_MAX_BYTES,
   PDF_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,

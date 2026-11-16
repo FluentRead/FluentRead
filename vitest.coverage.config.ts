@@ -632,6 +632,7 @@ export default defineConfig({
                 'src/features/document-translation/ui/pdfMaterialNavigation.ts',
                 'src/features/document-translation/core/pdfContinuations.ts',
                 'src/features/document-translation/core/pdfReadingPlan.ts',
+                'src/features/document-translation/core/pdfReadingTheme.ts',
                 'src/features/document-translation/core/pdfAnnotations.ts',
                 'src/features/document-translation/services/pdfAnnotationExport.ts',
                 'src/features/document-translation/core/pdfReadingRegions.ts',

@@ -1073,13 +1073,15 @@ describe('i18n 全量界面扫描', () => {
       'contextMenu.groupPlain', 'contextMenu.standalone', 'contextMenu.withShortcut', 'contextMenu.withLanguage', 'contextMenuSettings.withReason']);
     // “Original” 在法语与西班牙语中拼写与英文相同，视频字幕菜单的短标签沿用该词。
     const videoOriginalLabels = ['video.modeOriginal', 'video.downloadOriginalShort'];
-    const frenchCognates = new Set(['learning.memoryNote', 'document.progressSegments', 'document.pageCount', 'document.pageNumber', 'options.aboutDocs', 'settings.advanced.animations', 'settings.advanced.translationLoadingStyle.minimal.label',
+    // Interface 与 Annotations 也是法语原生用词，PDF 菜单沿用紧凑的标准标签。
+    const frenchCognates = new Set(['document.pdfReading.theme.auto', 'document.pdfReading.annotations', 'learning.memoryNote', 'document.progressSegments', 'document.pageCount', 'document.pageNumber', 'options.aboutDocs', 'settings.advanced.animations', 'settings.advanced.translationLoadingStyle.minimal.label',
       // Style、Format、Original 同样是自然的法语短标签。
       'shareCard.style', 'shareCard.format', 'shareCard.original',
       // Page、Zoom 与 Original 也是 PDF 阅读器中自然的法语短标签。
       'document.pdfReading.pageLabel', 'document.pdfReading.pageNumber', 'document.pdfReading.zoom', 'document.pdfReading.original',
       'translationStats.filter.service', 'translationStats.source.network', 'translationStats.log.image', 'translationStats.routes.column.route', ...videoOriginalLabels]);
-    const spanishCognates = new Set([...videoOriginalLabels, 'shareCard.original', 'shareCard.theme.coral', 'document.pdfReading.zoom', 'document.pdfReading.original',
+    // Sepia 是西班牙语中棕褐色的标准名称。
+    const spanishCognates = new Set(['document.pdfReading.theme.sepia', ...videoOriginalLabels, 'shareCard.original', 'shareCard.theme.coral', 'document.pdfReading.zoom', 'document.pdfReading.original',
       // Color 是自然的西班牙语短标签，与英文同形。
       'informationHighlight.color']);
     for (const [locale, catalog] of Object.entries({'ja-JP': jaJPMessages, 'ko-KR': koKRMessages, 'fr-FR': frFRMessages, 'ru-RU': ruRUMessages, 'es-ES': esESMessages})) {

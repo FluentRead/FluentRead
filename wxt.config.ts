@@ -430,8 +430,9 @@ export default defineConfig({
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
             // #1359：同环境 e124325e8 为68,568,810 bytes，原文重排、七语外观和原生批注后为68,579,140（+10,330）。
-            // 先消除异步阅读器未使用导出带入后台的482,943 bytes，再仅补12kB文本代码预算；无新增模型、WASM或依赖。
-            const pdfReadingToolsBudget = 12_000;
+            // 先消除异步阅读器未使用导出带入后台的482,943 bytes，最初补12kB文本代码预算；无新增模型、WASM或依赖。
+            // 合入主线后，原页 sRGB 配色、插图保色和划词批注让 Chrome 68,609,437 → 68,617,539（+8,102）；合计补20kB代码预算，无新模型或依赖。
+            const pdfReadingToolsBudget = 20_000;
             // ePub 章级范围预览在同环境 Chrome 构建从68,568,261增至68,569,164bytes（+903）；仅文档页与样式改变，无新资源或依赖。
             // 按既有余量规则追加1kB代码预算，继续由实际产物门禁校验。
             const epubCoveragePreviewBudget = 1_000;

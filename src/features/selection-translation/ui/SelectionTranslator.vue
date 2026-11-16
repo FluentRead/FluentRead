@@ -12,7 +12,7 @@
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
  * 词典来源：配置切换时只撤销并重查词卡，保留普通译文与学习会话，旧来源的迟到结果不能覆盖新来源。
  * 语音边界：单词朗读在仅本地模式下跳过词典外部音频，由既有后台本地语音链路处理失败与模型提示。
- * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，来源失效时取消当前请求，词书协议独立维护；Safari 仅为可信聚焦的同一追问框、卡片和原文保留初次键盘缩高或明确旋转后的有限宿主页平移窗口，明确方向先于可见视口宽度更新时也保留该固定窗口，宽度追上不续期；极矮可滚动卡片内的可信纵向触摸另有不续期的400ms尾窗，只容许累计2px宿主页偏移，不拦截原生滚动；输入与框内编辑键结束当前窗口，外部手势、缩放、失焦与关闭撤销身份，普通滚动仍收卡；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
+ * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，并把有效当前选区的高亮、下划线动作交还文档拥有者，来源失效时取消当前请求，词书协议独立维护；Safari 仅为可信聚焦的同一追问框、卡片和原文保留初次键盘缩高或明确旋转后的有限宿主页平移窗口，明确方向先于可见视口宽度更新时也保留该固定窗口，宽度追上不续期；极矮可滚动卡片内的可信纵向触摸另有不续期的400ms尾窗，只容许累计2px宿主页偏移，不拦截原生滚动；输入与框内编辑键结束当前窗口，外部手势、缩放、失焦与关闭撤销身份，普通滚动仍收卡；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
  -->
 <template>
   <div v-ui-i18n v-show="showIndicator || showTooltip || noticeMessage || copySuccess || clickSelectionState !== 'idle'" class="fr-selection-translator-root" :class="{'fr-touch-selection': touchInteraction}" :data-display-delay="selectionSettings.delay" @pointerdown.capture="dismissReadingToolsOutside" @pointerdown.stop @focusin="handleReadingInputFocus" @focusout="dismissReadingToolsOnFocusOut" @input="clearReadingKeyboardFocus" @wheel.stop="handleUiWheel">
@@ -35,6 +35,8 @@
         </div>
         <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
         <div class="fr-tooltip-actions">
+          <button v-if="selectionAdapter?.markSelection" class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
+          <button v-if="selectionAdapter?.markSelection" class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
           <button v-if="!readingMode && shareCardAvailable && translationResult && !isLoading" class="fr-action-btn fr-share-card-entry" type="button" :title="t('shareCard.create')" :aria-label="t('shareCard.create')" @click="openShareCard({original: selectedText, translation: translationResult})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></button>
           <button
             v-if="!readingMode && config.vocabularyBookEnabled && selectedText && !isPrivateContext"
@@ -237,6 +239,7 @@ const props = defineProps<{
     context?: (range: Range, text: string, limit: number) => {text: string; title: string; sourceUrl: string};
     captureReading?: (range: Range, text: string, limit: number) => ReadingSelection;
     captureMaterial?: (range: Range, quote: string) => ReturnType<typeof captureMaterialSelection>;
+    markSelection?: (range: Range, kind: 'highlight' | 'underline') => boolean;
     subscribeInvalidation?: (listener: () => void) => () => void;
   };
 }>();
@@ -340,6 +343,12 @@ const tooltipScaleStyle = computed(() => {
   };
 });
 const snapshot = ref<SelectionSnapshot | null>(null);
+function markDocumentSelection(kind: 'highlight' | 'underline'): void {
+  const current = snapshot.value;
+  if (!current || !isSelectionRangeConnected(current.range) || current.range.toString() !== current.rangeText
+    || !props.selectionAdapter?.acceptsRange(current.range)) return;
+  if (props.selectionAdapter.markSelection?.(current.range, kind) === false) showNotice(t('document.pdfReading.annotationSelectionHint'));
+}
 watch(snapshot, current => {
   if (readingKeyboardFocus && current !== readingKeyboardFocus.selection) clearReadingKeyboardFocus();
   if (import.meta.env.BROWSER === 'safari' && readingCardPan && current !== readingCardPan.focus.selection) clearReadingKeyboardFocus();

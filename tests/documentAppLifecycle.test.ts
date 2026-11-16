@@ -2840,8 +2840,8 @@ it('documentbinaryAudit selecting the active PDF preserves its task and reviewed
 });
 
 it('documentbinaryAudit mounts the actual page assembly with its app, document theme and i18n plugin', async () => {
-    const captureDocumentMaterialSelection = vi.fn(() => undefined);
-    const mount = vi.fn(() => ({captureDocumentMaterialSelection})); const use = vi.fn();
+    const captureDocumentMaterialSelection = vi.fn(() => undefined), markDocumentSelection = vi.fn(() => true);
+    const mount = vi.fn(() => ({captureDocumentMaterialSelection, markDocumentSelection})); const use = vi.fn();
     const onUnmount = vi.fn();
     const create = vi.fn(() => ({mount, use, onUnmount}));
     const disposeSelection = vi.fn();
@@ -2856,9 +2856,11 @@ it('documentbinaryAudit mounts the actual page assembly with its app, document t
         expect(mount).toHaveBeenCalledWith('#document-root');
         const {document: selectionDocument} = parseHTML('<html><body><p>Selected document text</p></body></html>');
         const range = selectionDocument.createRange(); range.selectNodeContents(selectionDocument.querySelector('p')!);
-        const selectionOptions = mountSelection.mock.calls[0][0] as unknown as {captureMaterial: (range: Range, quote: string) => unknown};
+        const selectionOptions = mountSelection.mock.calls[0][0] as unknown as {captureMaterial: (range: Range, quote: string) => unknown; markSelection: (range: Range, kind: 'highlight' | 'underline') => boolean};
         expect(selectionOptions.captureMaterial(range as unknown as Range, 'Selected document text')).toBeUndefined();
         expect(captureDocumentMaterialSelection).toHaveBeenCalledWith(range, 'Selected document text');
+        expect(selectionOptions.markSelection(range as unknown as Range, 'underline')).toBe(true);
+        expect(markDocumentSelection).toHaveBeenCalledWith(range, 'underline');
         expect(onUnmount).toHaveBeenCalledWith(disposeSelection);
         onUnmount.mock.calls[0][0](); expect(disposeSelection).toHaveBeenCalledOnce();
     } finally {vi.doUnmock('vue'); vi.doUnmock('@/src/app/document-translation/selectionRuntime');}
@@ -2993,4 +2995,17 @@ it('trusted reading gestures preempt only an active exact resume while unresolve
     try {state.materialPdfReader = api; reading.props.onWheelPassive({isTrusted: true}); state.queueMaterialPositionCapture(); await vi.advanceTimersByTimeAsync(1100); expect(writes).toHaveLength(1);}
     finally {vi.useRealTimers();}
     expect(cancelMaterialResume).toHaveBeenCalledOnce();
+});
+
+it('routes quick PDF marks to the current reader and refuses disabled, unavailable or non-PDF documents', async () => {
+    expect(state.markDocumentSelection({} as Range, 'highlight')).toBe(false);
+    await state.loadFiles([file('mark-action.pdf')]); await flush();
+    const markSelection = vi.fn(() => true);
+    state.materialPdfReader = {markSelection};
+    const range = {} as Range;
+    expect(state.markDocumentSelection(range, 'underline')).toBe(true);
+    expect(markSelection).toHaveBeenCalledWith(range, 'underline');
+    state.config.on = false; expect(state.markDocumentSelection(range, 'highlight')).toBe(false);
+    state.config.on = true; state.materialPdfReader = null; expect(state.markDocumentSelection(range, 'highlight')).toBe(false);
+    expect(markSelection).toHaveBeenCalledOnce();
 });

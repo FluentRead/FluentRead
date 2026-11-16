@@ -1941,7 +1941,7 @@ describe('PDF source reflow and reading appearance', () => {
         expect(view.viewport.getAttribute('data-pdf-theme')).toBe('sepia'); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#f5ecd8');
         view.state.readingTheme = 'mint'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#e8f1ea');
         view.state.readingTheme = 'dark'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-color']).toBe('#e5e7eb');
-        view.state.readingTheme = 'invert'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#20242b');
+        view.state.readingTheme = 'invert'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#000000');
         view.state.readingTheme = 'custom'; view.state.backgroundColor = '#123456'; view.state.textColor = '#fedcba'; await componentFlush();
         expect(view.root.querySelectorAll('input[type="color"]')).toHaveLength(2);
         expect(view.state.readingStyle['--pdf-reading-background']).toBe('#123456');
@@ -1956,5 +1956,29 @@ describe('PDF source reflow and reading appearance', () => {
         const view = mountReader(model(), 'source', [], {presentation: 'readable'}); await componentFlush();
         expect(view.state.readingTheme).toBe('auto'); expect(view.state.lineSpacing).toBeGreaterThanOrEqual(1.3); expect(view.state.lineSpacing).toBeLessThanOrEqual(2.2);
         expect(view.state.paragraphSpacing).toBeGreaterThanOrEqual(.4); expect(view.state.backgroundColor).toBe('#fff7e6'); expect(view.state.textColor).toBe('#302b24');
+    });
+});
+
+describe('PDF fixed-page smart colors', () => {
+    it('protects the same rotated figure in both columns and changes palettes without replacing canvases or text layers', async () => {
+        const doc = model();
+        if (doc.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        Object.assign(doc.binary.pages[0], {rotation: 90, width: 792, height: 612, preservedRegions: [{id: 'diagram', kind: 'figure', x: 50, y: 300, width: 200, height: 30}]});
+        const view = mountReader(doc, 'bilingual', ['Target text']); await componentFlush();
+        await vi.waitFor(() => expect(view.root.querySelector('[data-pdf-resource="source"]')).toBeTruthy());
+        const canvas = view.root.querySelector('[data-pdf-resource="source"]'), text = view.root.querySelector('[data-fluentread-pdf-text]'), draws = pdfPage.render.mock.calls.length;
+        view.state.readingTheme = 'invert'; await componentFlush();
+        expect(view.root.querySelectorAll('.pdf-page-content')).toHaveLength(2); expect(view.root.querySelectorAll('.pdf-theme-definitions')).toHaveLength(1);
+        expect(view.root.querySelectorAll('feFlood')).toHaveLength(1);
+        expect(view.state.themeRegions.get(1)).toEqual([{x: 462 / 792, y: 50 / 612, width: 30 / 792, height: 200 / 612}]);
+        const id = view.root.querySelector('filter')!.getAttribute('id'); expect(view.state.fixedThemeStyle(1).filter).toBe(`url(#${id})`);
+        expect(view.root.querySelector('[data-pdf-resource="source"]')).toBe(canvas); expect(view.root.querySelector('[data-fluentread-pdf-text]')).toBe(text);
+        for (const theme of ['sepia', 'mint', 'dark', 'custom'] as const) {view.state.readingTheme = theme; await componentFlush(); expect(view.root.querySelectorAll('.pdf-page-content')).toHaveLength(2);}
+        view.state.backgroundColor = '#ffeecc'; view.state.textColor = '#112233'; await componentFlush();
+        expect(view.state.themeTransfer[0].intercept).toBeCloseTo(17 / 255); expect(view.state.themeTransfer[0].slope).toBeCloseTo((255 - 17) / 255);
+        expect(pdfPage.render).toHaveBeenCalledTimes(draws);
+        view.state.readingTheme = 'auto'; await componentFlush(); expect(view.root.querySelector('.pdf-theme-definitions')).toBeNull(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
+        expect(view.root.querySelector('[data-pdf-resource="source"]')).toBe(canvas); expect(pdfPage.render).toHaveBeenCalledTimes(draws);
+        view.state.readingTheme = 'dark'; view.currentPresentation.value = 'readable'; await componentFlush(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
     });
 });

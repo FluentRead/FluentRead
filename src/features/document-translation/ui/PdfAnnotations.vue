@@ -1,7 +1,7 @@
 <!--
  @file src/features/document-translation/ui/PdfAnnotations.vue
  文件职责：提供 PDF 选区批注、高亮/下划线管理、原文件批注副本下载与显式 Hypothesis 入口。
- 主要内容：只采集本阅读器原页文字层或单个重排段落，保存归一化原页矩形与选区摘录；工具栏操作保留原生选区，可附加当前段译文或备注；下载期间捕获文件及批注快照，切换文件和卸载后拒绝迟到下载并释放 URL。
+ 主要内容：只采集本阅读器原页文字层或单个重排段落，保存归一化原页矩形与选区摘录；阅读工具栏和划词卡片共用已审核的 Range，快捷批注不带入旧备注；可在阅读工具栏附加当前段译文或备注；下载期间捕获文件及批注快照，切换文件和卸载后拒绝迟到下载并释放 URL。
  模块边界：持久化由文档任务的既有历史流程拥有，本组件只发出批注变更；不注入远程脚本、不上传本地文件、不占用划词卡片的事件或层级。
 -->
 <template>
@@ -50,7 +50,10 @@ function captureSelection(): void {
     if (!props.open) candidate.value = undefined;
     return;
   }
-  const range = selection.getRangeAt(0);
+  captureRange(selection.getRangeAt(0));
+}
+function captureRange(range: Range): void {
+  if (range.collapsed || !range.startContainer.isConnected || !range.endContainer.isConnected) return;
   const element = (node: Node) => node.nodeType === 1 ? node as Element : node.parentElement;
   const start = element(range.startContainer), end = element(range.endContainer);
   if (!start || !end || !props.root?.contains(start) || !props.root.contains(end)) return;
@@ -64,7 +67,7 @@ function captureSelection(): void {
     const block = page?.blocks.find((item, index) => `pdf-${page.pageNumber}-${item.segmentIndex >= 0 ? `segment-${item.segmentIndex}` : `block-${index}`}` === sourceId);
     if (!page || !block || !sourceId) return;
     const rect = pdfReaderDisplayRect(block, page);
-    candidate.value = {page: page.pageNumber, quote: selection.toString().trim().slice(0, 4000), sourceId, translation: props.translations[block.segmentIndex],
+    candidate.value = {page: page.pageNumber, quote: range.toString().trim().slice(0, 4000), sourceId, translation: props.translations[block.segmentIndex],
       rects: [{x: rect.x / page.width, y: rect.y / page.height, width: rect.width / page.width, height: rect.height / page.height}]};
     return;
   }
@@ -73,23 +76,32 @@ function captureSelection(): void {
   const page = binary.pages.find(item => item.pageNumber === Number(layer.getAttribute('data-pdf-page-number')));
   const frame = layer.closest('.pdf-page-frame')?.getBoundingClientRect();
   if (!page || !frame?.width || !frame.height) return;
-  const rects = Array.from(range.getClientRects()).slice(0, 128).filter(rect => rect.width > 0 && rect.height > 0).map(rect => ({
+  const clientRects = Array.from(range.getClientRects()).filter(rect => rect.width > 0 && rect.height > 0);
+  if (clientRects.length > 128) return;
+  const rects = clientRects.map(rect => ({
     x: (rect.left - frame.left) / frame.width, y: (rect.top - frame.top) / frame.height, width: rect.width / frame.width, height: rect.height / frame.height,
   }));
   const first = rects[0];
   const block = first && page.blocks.find(block => {const rect = pdfReaderDisplayRect(block, page); return first.x * page.width < rect.x + rect.width && (first.x + first.width) * page.width > rect.x && first.y * page.height < rect.y + rect.height && (first.y + first.height) * page.height > rect.y;});
-  const value = normalizePdfAnnotations([{id: 'selection', page: page.pageNumber, quote: selection.toString(), note: '', color: color.value, kind: 'highlight', rects}], binary.pages.length)[0];
+  const value = normalizePdfAnnotations([{id: 'selection', page: page.pageNumber, quote: range.toString(), note: '', color: color.value, kind: 'highlight', rects}], binary.pages.length)[0];
   if (value) candidate.value = {...value, translation: block ? props.translations[block.segmentIndex] : undefined};
 }
-function add(kind: PdfAnnotation['kind']): void {
-  if (!candidate.value || props.annotations.length >= PDF_ANNOTATION_LIMIT) return;
+function add(kind: PdfAnnotation['kind']): boolean {
+  if (!candidate.value || props.annotations.length >= PDF_ANNOTATION_LIMIT) return false;
   const {translation, ...selection} = candidate.value;
   const value = normalizePdfAnnotations([{...selection, id: globalThis.crypto.randomUUID(), kind, color: color.value,
     note: [note.value.trim(), includeTranslation.value ? translation : ''].filter(Boolean).join('\n\n')}], props.document.binary?.kind === 'pdf' ? props.document.binary.pages.length : 0)[0];
-  if (!value) return;
+  if (!value) return false;
   emit('update:annotations', [...props.annotations, value]);
   candidate.value = undefined; note.value = ''; includeTranslation.value = false; message.value = '';
+  return true;
 }
+function markSelection(range: Range, kind: PdfAnnotation['kind']): boolean {
+  candidate.value = undefined; note.value = ''; includeTranslation.value = false;
+  captureRange(range);
+  return add(kind);
+}
+defineExpose({markSelection});
 function clearUrls(): void {for (const [url, timer] of urls) {clearTimeout(timer); URL.revokeObjectURL(url);} urls.clear();}
 async function download(): Promise<void> {
   const binary = props.document.binary;

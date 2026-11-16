@@ -47,7 +47,7 @@ function mount() {
 }
 function select(selector: string, quote = 'Selected source') {
     const node = document.querySelector(selector)!.firstChild!;
-    selection = {isCollapsed: false, rangeCount: 1, getRangeAt: () => ({startContainer: node, endContainer: node, getClientRects: () => [{left: 25, top: 60, width: 45, height: 20}, {left: 25, top: 80, width: 30, height: 20}]}), toString: () => quote};
+    selection = {isCollapsed: false, rangeCount: 1, getRangeAt: () => ({startContainer: node, endContainer: node, toString: () => quote, getClientRects: () => [{left: 25, top: 60, width: 45, height: 20}, {left: 25, top: 80, width: 30, height: 20}]}), toString: () => quote};
 }
 
 describe('actual PDF annotation controls', () => {
@@ -118,4 +118,18 @@ describe('actual PDF annotation controls', () => {
         app.unmount(); app = undefined; finish(new Uint8Array([1])); await disposed;
         expect(create).not.toHaveBeenCalled();
     });
+});
+
+it('adds directly from a captured toolbar Range and refuses disconnected, collapsed or overlong geometry without truncating', async () => {
+    const view = mount(); await flush();
+    document.querySelector('.pdf-page-frame')!.getBoundingClientRect = () => ({left: 10, top: 20, width: 150, height: 400} as DOMRect);
+    select('[data-fluentread-pdf-text] span'); const selected = selection.getRangeAt(0);
+    expect(view.state.markSelection({...selected, collapsed: true}, 'highlight')).toBe(false);
+    expect(view.state.markSelection({...selected, startContainer: document.createTextNode('Detached')}, 'highlight')).toBe(false);
+    expect(view.state.markSelection({...selected, getClientRects: () => Array(129).fill({left:25,top:60,width:45,height:20})}, 'highlight')).toBe(false);
+    expect(view.annotations.value).toHaveLength(0);
+    view.state.note = 'Old selection note'; view.state.includeTranslation = true;
+    expect(view.state.markSelection(selected, 'highlight')).toBe(true); await flush();
+    expect(view.annotations.value).toHaveLength(1); expect(view.annotations.value[0].quote).toBe('Selected source'); expect(view.annotations.value[0].note).toBe('');
+    expect(view.annotations.value[0].rects).toHaveLength(2);
 });

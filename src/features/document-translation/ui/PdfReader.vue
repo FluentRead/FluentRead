@@ -1,5 +1,6 @@
 <!--
  @file src/features/document-translation/ui/PdfReader.vue
+ 智能配色：固定版式使用 sRGB SVG 滤镜更换纸张与文字颜色，并合回识别到的原图像素，按解析器确认的图形区域保护原色；遮罩不接管鼠标、选区或页资源，切换主题复用原始画布。
  阅读外观：原文、双语与译文均可单栏重排，字体、字号、行距、段距及六种配色按本机偏好显示；阅读外观变化复用页面资源，并在 DOM 更新前保留段落锚点。
  扫描核对：原页按 OCR 返回的有效页面坐标显示待核对内容的虚线框；识别行叠加透明原文选择层，沿用划词、复制和页内定位，缩放或其他页更新时保留节点；原图与画布不因补入文字层而重建。
  文件职责：以左右对照的连续页面显示可划词的 PDF 原页和保持原版排版的译文页，每个新译文段落用一次有界局部像素读回匹配版面配色，并保留“重排阅读”作为可选的显示方式。
@@ -61,7 +62,7 @@
             <p v-if="!readable" class="pdf-style-hint">{{ t('document.pdfReading.reflowStyleHint') }}</p>
           </div>
         </div>
-        <PdfAnnotations :document="document" :root="viewport" :annotations="annotations" :translations="translations" :source-url="sourceUrl" :saved="annotationsSaved" :open="openMenu === 'annotations'" @toggle="openMenu = openMenu === 'annotations' ? null : 'annotations'" @update:annotations="emit('update:annotations', $event)" @jump="jumpTo" />
+        <PdfAnnotations ref="annotationControls" :document="document" :root="viewport" :annotations="annotations" :translations="translations" :source-url="sourceUrl" :saved="annotationsSaved" :open="openMenu === 'annotations'" @toggle="openMenu = openMenu === 'annotations' ? null : 'annotations'" @update:annotations="emit('update:annotations', $event)" @jump="jumpTo" />
         <button v-if="informationHighlight" class="pdf-information-highlight" type="button" :aria-pressed="informationState.enabled" :disabled="!informationHighlight.available" :title="informationState.enabled ? `${t(`informationHighlight.phase.${informationState.phase}`)} · ${t('informationHighlight.progress', {paragraphs: informationState.processedParagraphs, spans: informationState.highlightedSpans})}` : t('informationHighlight.title')" @click="informationController?.setEnabled(!informationState.enabled)">{{ t('informationHighlight.title') }}</button>
         <span v-if="informationState.enabled && informationState.phase === 'error'" class="pdf-information-status" role="status">{{ t('informationHighlight.phase.error') }} <button type="button" @click="informationController?.retry()">{{ t('informationHighlight.retry') }}</button></span>
       </div>
@@ -79,15 +80,27 @@
     <div ref="viewport" class="pdf-page-scroll" :class="{'pdf-reflow': readable}" :data-pdf-theme="readingTheme" data-pdf-scroll tabindex="0" :data-reader-zoom="scale" :style="{'--pdf-display-scale': scale, ...readingStyle}" :aria-label="t('document.pdfReading.continuousPages')" @scroll.passive="scheduleViewport" @keydown="handleViewportKey">
       <div class="pdf-page-list" :style="{ height: `${totalHeight}px`, width: `${totalWidth}px` }">
         <article v-for="layout in residentLayouts" :key="layout.page.pageNumber" class="pdf-page-row" :aria-label="t('document.pdfReading.pageNumber', {page: layout.page.pageNumber})" :data-page-number="layout.page.pageNumber" :data-render-state="states.get(layout.page.pageNumber)?.status ?? 'pending'" :style="{ top: `${layout.top}px`, height: `${layout.rowHeight}px` }">
+          <svg v-if="fixedTheme" class="pdf-theme-definitions" width="0" height="0" data-fluentread-pdf-decoration aria-hidden="true"><defs>
+            <filter :id="themeId(layout.page.pageNumber)" filterUnits="objectBoundingBox" primitiveUnits="objectBoundingBox" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+              <feComponentTransfer in="SourceGraphic" result="readingColors"><feFuncR type="linear" :slope="themeTransfer[0].slope" :intercept="themeTransfer[0].intercept" /><feFuncG type="linear" :slope="themeTransfer[1].slope" :intercept="themeTransfer[1].intercept" /><feFuncB type="linear" :slope="themeTransfer[2].slope" :intercept="themeTransfer[2].intercept" /></feComponentTransfer>
+              <template v-if="themeRegions.get(layout.page.pageNumber)?.length">
+                <feFlood v-for="(rect, index) in themeRegions.get(layout.page.pageNumber)" :key="index" :x="rect.x" :y="rect.y" :width="rect.width" :height="rect.height" flood-color="white" :result="`figure-${index}`" />
+                <feMerge result="figureMask"><feMergeNode v-for="(_rect, index) in themeRegions.get(layout.page.pageNumber)" :key="index" :in="`figure-${index}`" /></feMerge>
+                <feComposite in="SourceGraphic" in2="figureMask" operator="in" result="originalFigures" />
+                <feMerge><feMergeNode in="readingColors" /><feMergeNode in="originalFigures" /></feMerge>
+              </template>
+            </filter>
+          </defs></svg>
           <div class="pdf-page-stage" :class="{single: mode !== 'bilingual' || readable, stacked: stackedBilingual}" :style="{'--pdf-page-width': `${layout.width}px`, '--pdf-page-height': `${layout.height}px`, '--pdf-content-width': `${layout.page.width}px`, '--pdf-content-height': `${layout.page.height}px`}">
             <figure v-if="mode !== 'translated' && !readable" class="pdf-page-column" :aria-label="t('document.pdfReading.original')">
               <div class="pdf-page-frame">
-                <div class="pdf-page-content">
+                <div class="pdf-page-content" :style="fixedThemeStyle(layout.page.pageNumber)">
                   <div :ref="element => setPageHost(layout.page.pageNumber, 'source', element)" class="pdf-canvas-host" />
                   <i v-if="highlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight" :style="highlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
                   <i v-if="searchHighlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight search" :style="searchHighlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
                   <i v-for="(region, index) in layout.page.ocrReviewRegions" :key="index" class="pdf-ocr-review" :style="{left: `${region.x}px`, top: `${region.y}px`, width: `${region.width}px`, height: `${region.height}px`}" data-fluentread-pdf-decoration aria-hidden="true" />
                 </div>
+
                 <template v-for="annotation in annotationsByPage.get(layout.page.pageNumber)" :key="annotation.id"><i v-for="(rect, index) in annotation.rects" :key="index" class="pdf-user-annotation" :class="annotation.kind" :data-pdf-annotation="annotation.id" :style="{left: `${rect.x * 100}%`, top: `${rect.y * 100}%`, width: `${rect.width * 100}%`, height: `${rect.height * 100}%`, '--annotation-color': PDF_ANNOTATION_COLORS[annotation.color]}" data-fluentread-pdf-decoration aria-hidden="true" /></template>
                 <span v-if="!states.has(layout.page.pageNumber) || states.get(layout.page.pageNumber)?.status === 'loading'" class="pdf-page-loading" data-fluentread-pdf-decoration role="status">{{ t('document.pdfReading.loadingSource') }}</span>
               </div>
@@ -102,7 +115,7 @@
                 </template>
               </article>
               <div v-else class="pdf-page-frame">
-                <div class="pdf-page-content">
+                <div class="pdf-page-content" :style="fixedThemeStyle(layout.page.pageNumber)">
                   <div :ref="element => setPageHost(layout.page.pageNumber, 'translated', element)" class="pdf-canvas-host" />
                   <div class="pdf-translation-layer" data-fluentread-pdf-translation :data-pdf-reading-page="layout.page.pageNumber" :style="layerStyle(layout.page)" @pointerleave="highlight = undefined">
                     <i v-if="searchHighlight?.pageNumber === layout.page.pageNumber" class="pdf-source-highlight search" :style="searchHighlight.style" data-fluentread-pdf-decoration aria-hidden="true" />
@@ -116,6 +129,7 @@
                     </template>
                   </div>
                 </div>
+
                 <span v-if="!states.has(layout.page.pageNumber) || states.get(layout.page.pageNumber)?.status === 'loading'" class="pdf-page-loading" data-fluentread-pdf-decoration role="status">{{ t('document.pdfReading.loadingTranslation') }}</span>
               </div>
             </figure>
@@ -142,6 +156,7 @@ import {computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch, 
 import {useUiI18n} from '@/src/ui/i18n';
 import PdfAnnotations from './PdfAnnotations.vue';
 import {PDF_ANNOTATION_COLORS, type PdfAnnotation} from '../core/pdfAnnotations';
+import {PDF_READING_THEMES as THEME_CHOICES, pdfReadingThemeColors, pdfReadingThemeTransfer, pdfReadingThemeRegions} from '../core/pdfReadingTheme';
 import TranslationLoadingPreview from '@/src/ui/components/TranslationLoadingPreview.vue';
 import {DEFAULT_TRANSLATION_LOADING_STYLE, type TranslationLoadingStyle} from '@/src/core/config/translationLoadingStyle';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -160,6 +175,7 @@ import type {InformationHighlightResult, InformationHighlightState} from '@/src/
 import {installDocumentZoomGestures, type DocumentZoomPoint} from './documentZoom';
 import {captureVisiblePdfMaterialLocation, createPdfMaterialNavigation, resolvePdfMaterialSelection, waitPdfMaterialFrame, type PdfMaterialLocation} from './pdfMaterialNavigation';
 
+const annotationControls = ref<{markSelection(range: Range, kind: 'highlight' | 'underline'): boolean}>();
 const props = withDefaults(defineProps<{document: ParsedDocument; translations?: readonly string[]; annotations?: readonly PdfAnnotation[]; annotationsSaved?: boolean; mode: PdfReaderMode; sourceUrl?: string; presentation?: PdfReadingPresentation; translating?: boolean; controlsTarget?: HTMLElement | null; outlineTarget?: HTMLElement | null; loadingStyle?: TranslationLoadingStyle; animated?: boolean; informationHighlight?: {preferences: InformationHighlightPreferences; scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>; available: boolean}}>(), {translations: () => [], annotations: () => [], annotationsSaved: false, sourceUrl: '', presentation: 'layout', translating: false, controlsTarget: null, outlineTarget: null, loadingStyle: DEFAULT_TRANSLATION_LOADING_STYLE, animated: true});
 const emit = defineEmits<{ 'update:presentation': [value: PdfReadingPresentation]; 'update:annotations': [value: PdfAnnotation[]]; 'page-change': [page: number]; 'material-position-change': [] }>();
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
@@ -291,7 +307,6 @@ const textScale = ref(initialTextStyle.scale);
 const textFont = ref<typeof FONT_CHOICES[number]>(initialTextStyle.font);
 watch([textScale, textFont, hoverHighlight], ([scaleValue, font, highlightValue]) => {if (!highlightValue) highlight.value = undefined; try {globalThis.localStorage?.setItem(STYLE_KEY, JSON.stringify({scale: scaleValue, font, highlight: highlightValue}));} catch { /* 无法写入时只在本次阅读生效。 */ }});
 /** 阅读外观与译文拟合参数分开保存；颜色仅接受十六进制，范围值在存储边界归一。 */
-const THEME_CHOICES = ['auto', 'sepia', 'mint', 'dark', 'invert', 'custom'] as const;
 const READING_STYLE_KEY = 'fluentread.pdfReader.readingStyle';
 function storedReadingStyle() {
   let value: Record<string, unknown> = {};
@@ -305,10 +320,10 @@ function storedReadingStyle() {
 const initialReadingStyle = storedReadingStyle();
 const readingTheme = ref(initialReadingStyle.theme), lineSpacing = ref(initialReadingStyle.lineSpacing), paragraphSpacing = ref(initialReadingStyle.paragraphSpacing);
 const backgroundColor = ref(initialReadingStyle.background), textColor = ref(initialReadingStyle.text);
+const themeColors = computed(() => pdfReadingThemeColors(readingTheme.value, backgroundColor.value, textColor.value));
+const themeTransfer = computed(() => pdfReadingThemeTransfer(themeColors.value ?? {background: '#ffffff', text: '#111827'}));
 const readingStyle = computed(() => {
-  const palette = readingTheme.value === 'sepia' ? ['#f5ecd8', '#3d3428'] : readingTheme.value === 'mint' ? ['#e8f1ea', '#243b30']
-    : readingTheme.value === 'dark' || readingTheme.value === 'invert' ? ['#20242b', '#e5e7eb'] : readingTheme.value === 'custom' ? [backgroundColor.value, textColor.value] : ['var(--surface)', 'var(--ink)'];
-  return {'--pdf-reading-background': palette[0], '--pdf-reading-color': palette[1], '--pdf-reading-line-height': lineSpacing.value,
+  return {'--pdf-reading-background': themeColors.value?.background ?? 'var(--surface)', '--pdf-reading-color': themeColors.value?.text ?? 'var(--ink)', '--pdf-reading-line-height': lineSpacing.value,
     '--pdf-reading-paragraph-gap': `${paragraphSpacing.value}em`, '--pdf-reading-family': textFont.value === 'serif' ? SERIF_FAMILY : SANS_FAMILY};
 });
 watch([readingTheme, lineSpacing, paragraphSpacing, backgroundColor, textColor], () => {
@@ -409,6 +424,16 @@ const totalWidth = computed(() => {
   return layouts.value.reduce((width, layout) => Math.max(width, layout.width * columns + PAGE_GUTTER * (columns + 1)), 0);
 });
 const residentLayouts = computed(() => residentIndexes.value.map(index => layouts.value[index]).filter(Boolean).sort((left, right) => left.index - right.index));
+/** 遮罩只存在于附近五页；SVG 颜色映射与原图合成复用原画布，不重绘或覆盖原生文字层。 */
+const fixedTheme = computed(() => !readable.value && readingTheme.value !== 'auto');
+const themeRegions = computed(() => new Map(residentLayouts.value.map(({page}) => [page.pageNumber, pdfReadingThemeRegions(page).map(region => {
+  const rect = pdfReaderDisplayRect(region, page);
+  return {x: rect.x / page.width, y: rect.y / page.height, width: rect.width / page.width, height: rect.height / page.height};
+})])));
+function themeId(page: number): string {return `fluentread-pdf-colors-${documentIdentity.value}-${page}`;}
+function fixedThemeStyle(page: number): Record<string, string> {
+  return fixedTheme.value ? {filter: `url(#${themeId(page)})`} : {};
+}
 /** 记录指针下页面内的坐标；单独记录栏位，双语间距和居中留白不会被误当作页面一起放大。 */
 function captureZoomAnchor(point?: DocumentZoomPoint): ZoomAnchor | undefined {
   const scroll = viewport.value;
@@ -939,7 +964,8 @@ function captureMaterialLocation(): number | undefined {
     residentPages: residentLayouts.value.map(layout => layout.page),
     readyPages: new Set(residentLayouts.value.filter(layout => states.value.get(layout.page.pageNumber)?.status === 'ready').map(layout => layout.page.pageNumber))});
 }
-defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation});
+function markSelection(range: Range, kind: 'highlight' | 'underline'): boolean {return annotationControls.value?.markSelection(range, kind) ?? false;}
+defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection});
 function jumpToPosition(pageIndex: number, y: number): void {
   materialNavigation.cancel();
   const layout = layouts.value[pageIndex];
@@ -1154,8 +1180,10 @@ onBeforeUnmount(() => {
 .pdf-style-fonts {display: flex; padding: 2px; border-radius: 8px; background: var(--surface-soft);}
 .pdf-viewer-toolbar .pdf-style-fonts button {width: auto; height: 26px; padding: 0 11px; white-space: nowrap; border-radius: 6px; color: var(--muted); font-size: 12px;}
 .pdf-viewer-toolbar .pdf-style-fonts button.selected {color: var(--brand-strong); background: var(--surface); box-shadow: 0 1px 4px rgba(35, 47, 82, .1); font-weight: 700;}
-.pdf-user-annotation {position: absolute; box-sizing: border-box; z-index: 2; pointer-events: none;}
+.pdf-user-annotation {position: absolute; box-sizing: border-box; z-index: 3; pointer-events: none;}
 .pdf-user-annotation.highlight {background: var(--annotation-color); opacity: .35; mix-blend-mode: multiply;}
+.pdf-page-scroll:is([data-pdf-theme="dark"], [data-pdf-theme="invert"]) .pdf-user-annotation.highlight {mix-blend-mode: screen;}
+.pdf-page-scroll[data-pdf-theme="custom"] .pdf-user-annotation.highlight {mix-blend-mode: normal;}
 .pdf-user-annotation.underline {border-bottom: 2px solid var(--annotation-color);}
 .pdf-annotated-highlight {background: color-mix(in srgb, var(--pdf-annotation-highlight), transparent 72%);}
 .pdf-annotated-underline {text-decoration: underline; text-decoration-color: var(--pdf-annotation-underline); text-underline-offset: .15em;}
@@ -1236,7 +1264,9 @@ onBeforeUnmount(() => {
 .pdf-style-row input[type="color"] {width: 32px; height: 24px; padding: 1px; vertical-align: middle; border: 1px solid var(--line); border-radius: 4px; background: transparent;}
 .pdf-style-hint {max-width: 290px; margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted);}
 .pdf-page-scroll:not([data-pdf-theme="auto"]) {background: var(--pdf-reading-background);}
-.pdf-page-scroll[data-pdf-theme="invert"] .pdf-page-frame {filter: invert(.9) hue-rotate(180deg);}
+.pdf-page-frame {isolation: isolate;}
+.pdf-theme-definitions {position: absolute; pointer-events: none;}
+
 .pdf-reading-region {margin: 0 0 1.2em; width: 100%;}
 .pdf-region-canvas {max-width: 100%; margin-inline: auto; background: #fff;}
 .pdf-region-canvas :deep(canvas) {display: block; width: 100%; height: auto;}

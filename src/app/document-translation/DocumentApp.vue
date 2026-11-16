@@ -806,7 +806,7 @@ let historyRequestEpoch = 0;
 const materialPrivate = browser.extension?.inIncognitoContext === true;
 const materialSaving = ref(false);
 const documentMaterialId = ref('');
-const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined} | null>(null);
+const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean} | null>(null);
 let pendingMaterialResume: MaterialRecord | undefined;
 let materialPositionTimer: ReturnType<typeof setTimeout> | undefined;
 let materialEpoch = 0;
@@ -830,7 +830,10 @@ function captureDocumentMaterialSelection(range: Range, quote: string): Material
   return {source: {kind: 'document', fingerprint: item.historyId, title: doc.fileName, ...(item.sourceUrl ? {url: item.sourceUrl} : {})},
     locator: {...locator, quote: quote.slice(0, 6000)}};
 }
-defineExpose({captureDocumentMaterialSelection});
+function markDocumentSelection(range: Range, kind: 'highlight' | 'underline'): boolean {
+  return !disposed && config.on && isPdfDocument.value && materialPdfReader.value?.markSelection(range, kind) || false;
+}
+defineExpose({captureDocumentMaterialSelection, markDocumentSelection});
 function documentMaterialSelection(): MaterialSelection | undefined {
   const item = activeTask.value; const doc = parsedDocument.value;
   if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;

@@ -482,6 +482,7 @@
       "tests/documentPdfRotation.test.ts",
       "tests/pdfReaderLifecycle.test.ts",
       "tests/pdfReadingPlan.test.ts",
+      "tests/pdfReadingTheme.test.ts",
       "tests/pdfAnnotations.test.ts",
       "tests/pdfAnnotationsComponent.test.ts",
       "tests/pdfReadingRegions.test.ts",

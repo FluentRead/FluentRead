@@ -5540,3 +5540,23 @@ it('requires a fresh shortcut after native keyup before translating a changed se
     expect(fixture.state.selectedText).toBe(text);expect(fixture.renderPort!.root.querySelector('[role="dialog"]')).toBeNull();expect(fixture.translateText).toHaveBeenCalledOnce();
     send('keydown',key());await vi.advanceTimersByTimeAsync(100);await Vue.nextTick();expect(fixture.renderPort!.root.querySelector('[role="dialog"]')).not.toBeNull();expect(fixture.translateText).toHaveBeenCalledTimes(2);expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });
+
+it('marks from the rendered PDF selection toolbar and rejects stale ranges', async () => {
+    const markSelection = vi.fn(() => true), acceptsRange = vi.fn(() => true);
+    const fixture = mountSelection(false, {acceptsRange, markSelection}, {}, true); await Vue.nextTick();
+    const selected = fixture.selectedSnapshot('Source annotation quote.');
+    Object.assign(fixture.state, {snapshot: selected, selectedText: selected.text, showTooltip: true}); await Vue.nextTick();
+    const port = fixture.renderPort!;
+    await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    await port.click(port.root.querySelector('.fr-selection-underline')!);
+    expect(markSelection).toHaveBeenNthCalledWith(1, selected.range, 'highlight');
+    expect(markSelection).toHaveBeenNthCalledWith(2, selected.range, 'underline');
+    markSelection.mockReturnValue(false); await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    expect(fixture.state.noticeMessage).toBeTruthy();
+    acceptsRange.mockReturnValue(false); await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    expect(markSelection).toHaveBeenCalledTimes(3);
+    acceptsRange.mockReturnValue(true); selected.range.startContainer.textContent = 'Changed quote';
+    fixture.state.markDocumentSelection('highlight'); expect(markSelection).toHaveBeenCalledTimes(3);
+    fixture.state.snapshot = null; fixture.state.markDocumentSelection('highlight');
+    expect(markSelection).toHaveBeenCalledTimes(3); expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});

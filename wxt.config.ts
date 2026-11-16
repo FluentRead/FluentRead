@@ -429,7 +429,10 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget));
+            // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
+            // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
+            const siteRuleEditorBudget = 12_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

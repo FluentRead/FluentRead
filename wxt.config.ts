@@ -433,7 +433,12 @@ export default defineConfig({
             // #1357 同环境 e124325e8 基线 68,568,810 bytes；高级词典初版 69,642,530（+1,073,720）。
             // 新增本地 QuickJS WASM、离线格式 Worker 和配方/模板 UI；WASM 独立交付，使用脚本时才加载。
             const dictionaryWorkspaceBudget = 1_090_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + dictionaryWorkspaceBudget));
+            // ePub 章级范围预览在同环境 Chrome 构建从68,568,261增至68,569,164bytes（+903）；仅文档页与样式改变，无新资源或依赖。
+            // 按既有余量规则追加1kB代码预算，继续由实际产物门禁校验。
+            const epubCoveragePreviewBudget = 1_000;
+            // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
+            const requestEvidenceBudget = 30_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + epubCoveragePreviewBudget + requestEvidenceBudget + dictionaryWorkspaceBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

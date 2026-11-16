@@ -81,6 +81,19 @@ describe('document translation API', () => {
         expect(mocks.translateText).toHaveBeenCalledOnce();
         expect(mocks.translateText.mock.calls[0][2]).not.toHaveProperty('subtitleContext');
     });
+    it('在批量请求真正发送前报告相同片段和篇章依据', async () => {
+        const prepared = vi.fn();
+        const segments = [{id: 0, source: 'The Helios engine is introduced.'}, {id: 1, source: 'It runs locally.'}];
+        mocks.translateTextBatch.mockImplementation(async (sources: string[], _context: string, options: Record<string, unknown>) => {
+            expect(prepared).toHaveBeenCalledOnce();
+            expect(prepared).toHaveBeenCalledWith({segments, discourseContext: options.discourseContext});
+            return sources.map(source => `译 ${source}`);
+        });
+        await translateDocumentSegments(segments, {fileName: 'sample.txt', enableAIContext: true, onRequestPrepared: prepared});
+        expect(mocks.translateTextBatch).toHaveBeenCalledOnce();
+        const requestOptions = mocks.translateTextBatch.mock.calls[0][2];
+        expect(JSON.parse(requestOptions.discourseContext).version).toBe(1);
+    });
     it('字幕逐条请求携带独立邻句，网页摘要关闭时仍有效且不合并时间轴', async () => {
         mocks.translateText.mockImplementation(async source => `译文 ${source}`);
         const translate = createDocumentSegmentTranslator({waitUntilReady: mocks.waitUntilReady, getDefaultService: () => 'openai',

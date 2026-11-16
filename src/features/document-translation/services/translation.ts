@@ -2,7 +2,7 @@
  * @file src/features/document-translation/services/translation.ts
  * 字幕参考：仅为提示词 AI 的带时间轴片段构建相邻 cue 参考；按 cue 隔离复用，普通文档继续章节内去重，输出不改变片段或时间戳。
  * 文件职责：编排文档片段的批量翻译流程，在固定语言和服务快照下按数量及字符预算拆批，并向调用方持续报告确定性进度。
- * 主要内容：定义进度与逐段提交契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，固定缓存策略并透传至批量和降级请求；在单批请求与重试总预算内尊重 Retry-After，暂时限频时由本任务冻结服务共享冷却派发闸门，自身退避与同伴尚余冷却都计入等待预算；禁用客户端叠加重试，冻结服务单次超时，绝对期限中止请求与等待并拒收迟到结果。按阅读位置变化重排待译片段并复用批次游标，以章节内去重避免重复原文挤占批量预算；构建有界篇章参考并区分人工确认译文，移除服务凭空加入的表情符号，报告真实等待数量。原样返回的专名与短词保留原文，复用已有译文续译，固定文件级上下文；不可恢复故障停止派发但收齐在途成功，显式取消覆盖运行时就绪等待、立即移除监听并禁止迟到提交。
+ * 主要内容：定义进度、逐段提交和实际请求依据回调契约，在本次文档调用中默认启用机器批量或 AI 多段槽请求而不改变全局设置，固定缓存策略并透传至批量和降级请求；在单批请求与重试总预算内尊重 Retry-After，暂时限频时由本任务冻结服务共享冷却派发闸门，自身退避与同伴尚余冷却都计入等待预算；禁用客户端叠加重试，冻结服务单次超时，绝对期限中止请求与等待并拒收迟到结果。按阅读位置变化重排待译片段并复用批次游标，以章节内去重避免重复原文挤占批量预算；构建有界篇章参考并区分人工确认译文，移除服务凭空加入的表情符号，报告真实等待数量。原样返回的专名与短词保留原文，复用已有译文续译，固定文件级上下文；不可恢复故障停止派发但收齐在途成功，显式取消覆盖运行时就绪等待、立即移除监听并禁止迟到提交。
  * 模块边界：该层不解析文件、不持久化配置，也不直接绑定具体 provider；上层负责冻结用户设置并注入 gateway，文档结构由 core 提供，网络和缓存语义由应用翻译客户端承担。
  */
 import {serializeTranslationError, TranslationRequestError} from '@/src/services/translation/errors';
@@ -13,6 +13,11 @@ import {buildSubtitleContext, isTimedSubtitleCue} from '@/src/core/translation/s
 export interface DocumentTranslationProgress {
     completed: number;
     total: number;
+}
+
+export interface DocumentRequestPrepared {
+    segments: readonly DocumentSegment[];
+    discourseContext?: string;
 }
 
 export interface DocumentTranslationOptions {
@@ -60,6 +65,8 @@ export interface DocumentTranslationOptions {
     onRetryStateChange?: (state: {waiting: number}) => void;
     /** 首次不可恢复的请求故障立即通知；id 为片段标识，reason 为完整可读提示，在途成功仍可继续提交。 */
     onFailure?: (failure: {id: number; reason: string}) => void;
+    /** 实际发送前提供当前批次与已序列化的篇章证据，仅供本地界面核对，不进入 provider 请求。 */
+    onRequestPrepared?: (request: DocumentRequestPrepared) => void;
     onSegment?: (segment: {id: number; translation: string}) => void;
     onProgress?: (progress: DocumentTranslationProgress) => void;
 }
@@ -540,12 +547,14 @@ export function createDocumentSegmentTranslator(
             };
             const translateSegment = (segment: DocumentSegment, deadlineAt = retryDeadline(options, singleRequestTimeout)) => withRetryBackoff(async attempt => {
                 const subtitleContext = subtitleContextFor([segment]);
-                const received = await gateway.translateText(segment.source, context, {
+                const requestOptions = {
                     ...glossaryOptions, ...cacheOptions, ...discourseOptions(segment, [segment.source]),
                     enableNativeBatch: false, ...attempt, pageContext,
                     ...(subtitleContext ? {subtitleContext} : {}),
                     serviceOverride: service, modelOverride: model, sourceLanguage, targetLanguage, maxRetries,
-                });
+                };
+                options.onRequestPrepared?.({segments: [segment], discourseContext: requestOptions.discourseContext});
+                const received = await gateway.translateText(segment.source, context, requestOptions);
                 if (typeof received !== 'string' || !received.trim()) throw new Error('翻译服务返回空译文，请重试');
                 return received;
             }, options, () => stopped, retryStop.signal, reportRetryWaiting, cooldown, 1, 0, deadlineAt, singleRequestTimeout);
@@ -581,6 +590,7 @@ export function createDocumentSegmentTranslator(
                             targetLanguage,
                             maxRetries,
                         };
+                        options.onRequestPrepared?.({segments: batch, discourseContext: requestOptions.discourseContext});
                         const result = single ? [await gateway.translateText(batch[0].source, context, requestOptions)] : await gateway.translateTextBatch(
                             batch.map((segment) => segment.source),
                             context,

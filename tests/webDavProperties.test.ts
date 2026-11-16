@@ -6,6 +6,18 @@ const url='https://dav.fixture.invalid/base/';
 const response=(prop='<d:resourcetype><d:collection/></d:resourcetype>',status='HTTP/1.1 200 OK')=>`<d:response><d:href>/base/</d:href><d:propstat><d:prop>${prop}</d:prop><d:status>${status}</d:status></d:propstat></d:response>`;
 const wrap=(body:string)=>`<?xml version="1.0"?><d:multistatus xmlns:d = "DAV:">${body}</d:multistatus>`;
 describe('WebDAV Depth:0 XML 属性识别',()=>{
+    it('同源目录接受尾斜杠与 UTF-8 编码差异，文件仍须精确匹配路径', () => {
+        for (const href of ['/base', 'https://DAV.fixture.invalid:443/base', '/b%61se/']) expect(parseWebDavProperties(wrap(response().replace('/base/', href)), url)).toEqual({collection: true});
+        const unicode = 'https://dav.fixture.invalid:5006/共享/我的 备份/';
+        for (const href of ['/共享/我的 备份', '/%e5%85%b1%e4%ba%ab/%e6%88%91%e7%9a%84%20%e5%a4%87%e4%bb%bd/', 'https://dav.fixture.invalid:5006/共享/我的%20备份/']) expect(parseWebDavProperties(wrap(response().replace('/base/', href)), unicode)).toEqual({collection: true});
+        expect(parseWebDavProperties(wrap(response('<d:getetag>"one"</d:getetag>').replace('/base/', '/base')), url)).toBeUndefined();
+        expect(parseWebDavProperties(wrap(response()), url.slice(0, -1))).toBeUndefined();
+        expect(parseWebDavProperties(wrap(response('<d:getetag>"one"</d:getetag>').replace('/base/', '/b%61se/')), url)).toEqual({collection: false, etag: '"one"'});
+    });
+    it('不接受异源、其他端口、凭据、查询、相对路径、损坏编码或编码路径分隔符', () => {
+        for (const href of ['https://other.invalid/base/', 'http://dav.fixture.invalid/base/', 'https://dav.fixture.invalid:5006/base/', 'https://user:secret@dav.fixture.invalid/base/', '/base/?x=1', '/base/#fragment', '//dav.fixture.invalid/base/', 'base/', '/base\\', '/base%2f', '/base/%ZZ', 'http://[', '/base//']) expect(parseWebDavProperties(wrap(response().replace('/base/', href)), url)).toBeUndefined();
+        expect(parseWebDavProperties(wrap(response()), 'https://dav.fixture.invalid/base%2f')).toBeUndefined();
+    });
     it.each(['', 'not a URL', '/base/', 'http://['])('无效目标 %j 返回未识别结果，不向调用链抛出 URL 异常', target => {
         expect(parseWebDavProperties(wrap(response()), target)).toBeUndefined();
     });

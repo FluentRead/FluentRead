@@ -1,7 +1,7 @@
 <!--
  * @file src/features/floating-ball/ui/FloatingBall.vue
  * 文件职责：呈现可拖动的网页悬浮球，协调翻译状态、漫画入口、快捷面板与隐藏选项的交互。
- * 主要内容：以品牌按钮为固定停靠锚点，辅助工具向可用空间展开；同一按钮支持原生点击、焦点和指针拖动，拖动预览按帧更新变换。
+ * 主要内容：以品牌按钮为固定停靠锚点，辅助工具沿其纵向中线展开并避让视口上下边缘；同一按钮支持原生点击、焦点和指针拖动，拖动预览按帧更新变换。
  * 模块边界：组件只拥有局部布局和交互；content/runtime 负责执行动作、订阅翻译状态与持久化位置，core/config 负责外观配置归一化。
  -->
 <template>
@@ -65,9 +65,17 @@
       <span v-if="manga.pending" class="manga-progress" aria-hidden="true" />
     </button>
 
-    <div v-if="toolCount" class="floating-ball-tools" :inert="!isMenuExpanded">
+    <div
+      v-for="stack in toolLayout.stacks"
+      :key="stack.side"
+      class="floating-ball-tools"
+      :class="{'is-scrollable': stack.scrollable}"
+      :data-stack="stack.side"
+      :style="stack.style"
+      :inert="!isMenuExpanded"
+    >
       <button
-        v-if="showTranslateTool"
+        v-if="stack.tools.includes('translate')"
         class="floating-ball-tool floating-ball-translate"
         type="button"
         :aria-label="translationActionLabel"
@@ -83,7 +91,7 @@
       </button>
 
       <button
-        v-if="showMangaReadingTool"
+        v-if="stack.tools.includes('reading')"
         class="floating-ball-tool floating-ball-reading"
         type="button"
         :aria-label="mangaReadingLabel"
@@ -97,7 +105,7 @@
       </button>
 
       <button
-        v-if="showSettingsTool"
+        v-if="stack.tools.includes('settings')"
         class="floating-ball-tool floating-ball-settings"
         type="button"
         :aria-label="settingsActionLabel"
@@ -112,8 +120,8 @@
       </button>
 
       <button
-        v-if="onHide"
-        ref="hideButton"
+        v-if="stack.tools.includes('hide')"
+        ref="hideButtons"
         class="floating-ball-tool floating-ball-hide"
         type="button"
         :aria-label="hideActionLabel"
@@ -161,7 +169,6 @@ const HOVER_EXIT_DELAY = 140;
 const MANGA_IDLE_DELAY = 2500;
 const EDGE_GAP = 6;
 const TOOL_GAP = 4;
-const TOOL_PADDING = 2;
 
 const props = withDefaults(defineProps<{
   position?: 'left' | 'right';
@@ -207,7 +214,8 @@ const side = ref(props.position);
 const verticalPosition = ref(props.verticalPosition);
 const floatingBall = ref<HTMLElement>();
 const floatingBallMain = ref<HTMLButtonElement>();
-const hideButton = ref<HTMLButtonElement>();
+const hideButtons = ref<HTMLButtonElement[]>([]);
+const hideButton = computed(() => hideButtons.value[0]);
 const hidePanel = ref<HTMLElement>();
 const viewport = shallowRef(getSafeVisualViewportRect());
 const syncingViewport = ref(false);
@@ -232,7 +240,6 @@ const showTranslateTool = computed(() => showPageTools.value && !mainTranslates.
 const showSettingsTool = computed(() => showPageTools.value && presentation.value.settingsEntryVisible
   && presentation.value.clickAction !== 'settings');
 const showMangaReadingTool = computed(() => !!(props.manga?.available && props.manga.active && !props.manga.areaFallback && props.onMangaReading));
-const toolCount = computed(() => [showTranslateTool.value, showSettingsTool.value, showMangaReadingTool.value, !!props.onHide].filter(Boolean).length);
 
 const hideChoices = computed<FloatingBallHideScope[]>(() => props.canHideOnSite ? ['page', 'site', 'global'] : ['page', 'global']);
 const hideActionLabel = computed(() => translateMessage(isUserscript ? 'floatingBall.hide.page' : 'floatingBall.hide.title'));
@@ -291,41 +298,72 @@ const dock = computed(() => {
   return {x, y, restX};
 });
 
-const toolsLayout = computed(() => {
+type Tool = 'translate' | 'reading' | 'settings' | 'hide';
+type StackSide = 'above' | 'below';
+
+const toolLayout = computed(() => {
   const bounds = viewport.value;
   const {x, y} = dock.value;
   const size = ballSize.value;
-  const width = toolSize.value + 2 * TOOL_PADDING;
-  const height = Math.min(toolCount.value * toolSize.value + 2 * TOOL_PADDING,
-    Math.max(1, bounds.height - 2 * EDGE_GAP));
-  const leftSpace = x - bounds.left;
-  const rightSpace = bounds.right - x - size;
-  const preferLeft = side.value === 'right';
-  const space = preferLeft ? leftSpace : rightSpace;
-  const otherSpace = preferLeft ? rightSpace : leftSpace;
-  const onLeft = space < width + TOOL_GAP && otherSpace > space ? !preferLeft : preferLeft;
-  const left = clamp(onLeft ? x - width - TOOL_GAP : x + size + TOOL_GAP, bounds.left, bounds.right - width);
-  const top = clamp(y + (size - height) / 2, bounds.top + EDGE_GAP, bounds.bottom - height - EDGE_GAP);
-  return {left, top, width, height, onLeft};
+  const rowHeight = toolSize.value;
+  const left = clamp(x + (size - rowHeight) / 2, bounds.left, bounds.right - rowHeight);
+  const spaceAbove = y - bounds.top;
+  const spaceBelow = bounds.bottom - y - size;
+  // 漫画入口收起时也可点，展开后保留原来的纵向位置。
+  const mangaBelow = spaceBelow >= size + TOOL_GAP || spaceBelow > spaceAbove;
+  const mangaTop = clamp(mangaBelow ? y + size + TOOL_GAP : y - size - TOOL_GAP, bounds.top, bounds.bottom - size);
+  const clusterTop = props.manga?.available ? Math.min(y, mangaTop) : y;
+  const clusterBottom = props.manga?.available ? Math.max(y, mangaTop) + size : y + size;
+  const stacksBySide = {
+    above: {room: Math.max(0, clusterTop - bounds.top - TOOL_GAP), tools: [] as Tool[]},
+    below: {room: Math.max(0, bounds.bottom - clusterBottom - TOOL_GAP), tools: [] as Tool[]},
+  };
+
+  const heightFor = (count: number) => count * rowHeight + Math.max(0, count - 1) * TOOL_GAP;
+  const place = (tool: Tool, preferred: StackSide) => {
+    const first = stacksBySide[preferred];
+    const second = stacksBySide[preferred === 'above' ? 'below' : 'above'];
+    const stack = first.room >= heightFor(first.tools.length + 1) ? first
+      : second.room >= heightFor(second.tools.length + 1) ? second
+      : first.room >= second.room ? first : second;
+    stack.tools.push(tool);
+  };
+
+  // 优先留出主按钮下方的关闭入口。靠近上下边缘时，把放不下的工具排到另一侧。
+  if (props.onHide) place('hide', 'below');
+  if (showTranslateTool.value) place('translate', 'above');
+  if (showMangaReadingTool.value) place('reading', 'above');
+  if (showSettingsTool.value) place('settings', 'above');
+
+  const stacks = (['above', 'below'] as const).flatMap(side => {
+    const {room, tools} = stacksBySide[side];
+    if (!tools.length || room === 0) return [];
+    const fullHeight = heightFor(tools.length);
+    const height = Math.min(room, fullHeight);
+    const top = side === 'above' ? clusterTop - TOOL_GAP - height : clusterBottom + TOOL_GAP;
+    return [{
+      side, tools, left, top, height,
+      scrollable: height < fullHeight,
+      style: {left: `${left - x}px`, top: `${top - y}px`, maxHeight: `${height}px`},
+    }];
+  });
+  return {stacks, mangaTop, top: Math.min(clusterTop, ...stacks.map(stack => stack.top)),
+    bottom: Math.max(clusterBottom, ...stacks.map(stack => stack.top + stack.height))};
 });
 
 const rootStyle = computed<CSSProperties>(() => {
   const {x, y, restX} = dock.value;
   const bounds = viewport.value;
   const size = ballSize.value;
-  const tools = toolsLayout.value;
-  const mangaOffset = y + 2 * size + EDGE_GAP <= bounds.bottom ? size + EDGE_GAP : -size - EDGE_GAP;
+  const {mangaTop} = toolLayout.value;
   return {
     '--fr-ball-x': `${x}px`,
     '--fr-ball-y': `${y}px`,
     '--fr-ball-size': `${size}px`,
     '--fr-logo-size': `${touchSized.value ? 26 : compact.value ? 22 : 25}px`,
     '--fr-tool-size': `${toolSize.value}px`,
-    '--fr-tool-padding': `${TOOL_PADDING}px`,
-    '--fr-tools-x': `${tools.left - x}px`,
-    '--fr-tools-y': `${tools.top - y}px`,
-    '--fr-tools-height': `${tools.height}px`,
-    '--fr-manga-y': `${clamp(y + mangaOffset, bounds.top, bounds.bottom - size) - y}px`,
+    '--fr-tool-gap': `${TOOL_GAP}px`,
+    '--fr-manga-y': `${mangaTop - y}px`,
     '--fr-manga-x': `${clamp(x, bounds.left, bounds.right - size) - x}px`,
     '--fr-ball-hit-left': `${Math.max(0, x - restX)}px`,
     '--fr-ball-hit-right': `${Math.max(0, restX - x)}px`,
@@ -333,26 +371,32 @@ const rootStyle = computed<CSSProperties>(() => {
   };
 });
 
-// 隐藏菜单独立于可滚动的工具栏，窄视口放不下时改在主按钮上方或下方打开。
+// 隐藏菜单向网页内侧打开，避免覆盖纵向工具，窄视口再使用整组工具的上下空间。
 const hidePanelStyle = computed<CSSProperties>(() => {
   const bounds = viewport.value;
   const {x, y} = dock.value;
-  const tools = toolsLayout.value;
+  const layout = toolLayout.value;
+  const hideStack = layout.stacks.find(stack => stack.tools.includes('hide'));
+  const anchorLeft = hideStack?.left ?? x;
+  // 关闭按钮位于其工具组的最后一行。
+  const anchorTop = hideStack ? hideStack.top + Math.max(0, hideStack.height - toolSize.value) : y;
   const width = Math.min(192, Math.max(1, bounds.width - 2 * EDGE_GAP));
-  const preferredLeft = tools.onLeft ? tools.left - EDGE_GAP - width : tools.left + tools.width + EDGE_GAP;
+  const preferredLeft = side.value === 'right' ? anchorLeft - EDGE_GAP - width : anchorLeft + toolSize.value + EDGE_GAP;
   const minLeft = bounds.left + EDGE_GAP;
   const maxLeft = bounds.right - EDGE_GAP - width;
+  const otherLeft = side.value === 'right' ? anchorLeft + toolSize.value + EDGE_GAP : anchorLeft - EDGE_GAP - width;
   const idealHeight = hideChoices.value.length * (touchSized.value ? 44 : 34) + 12;
-  let left = clamp(preferredLeft, minLeft, maxLeft);
-  let top = clamp(tools.top, bounds.top + EDGE_GAP, bounds.bottom - EDGE_GAP - idealHeight);
-  let maxHeight = bounds.bottom - EDGE_GAP - top;
-  if (left !== preferredLeft) {
-    const above = y - bounds.top - 2 * EDGE_GAP;
-    const below = bounds.bottom - y - ballSize.value - 2 * EDGE_GAP;
-    const openAbove = above > below;
-    maxHeight = Math.max(1, above, below);
+  let left = preferredLeft >= minLeft && preferredLeft <= maxLeft ? preferredLeft : otherLeft;
+  let top = clamp(anchorTop, bounds.top + EDGE_GAP, bounds.bottom - EDGE_GAP - idealHeight);
+  let maxHeight = Math.max(1, bounds.bottom - EDGE_GAP - top);
+  if (left < minLeft || left > maxLeft) {
+    const above = layout.top - bounds.top - 2 * EDGE_GAP;
+    const below = bounds.bottom - layout.bottom - 2 * EDGE_GAP;
     left = clamp(x + (ballSize.value - width) / 2, minLeft, maxLeft);
-    top = openAbove ? y - EDGE_GAP - Math.min(idealHeight, maxHeight) : y + ballSize.value + EDGE_GAP;
+    if (Math.max(above, below) >= (touchSized.value ? 44 : 32)) {
+      maxHeight = Math.max(above, below);
+      top = above > below ? layout.top - EDGE_GAP - Math.min(idealHeight, maxHeight) : layout.bottom + EDGE_GAP;
+    }
   }
   return {left: `${left - x}px`, top: `${top - y}px`, width: `${width}px`, maxHeight: `${maxHeight}px`};
 });
@@ -789,11 +833,11 @@ watch(() => presentation.value.toolsDisplay, () => {
   color: var(--fr-accent);
 }
 
-.fr-floating-ball :is(.floating-ball-tool, .floating-ball-hide-panel button):is(:hover, :focus-visible, [aria-pressed="true"], [aria-expanded="true"]) {
+.fr-floating-ball .floating-ball-hide-panel button:is(:hover, :focus-visible, [aria-pressed="true"], [aria-expanded="true"]) {
   background: var(--fr-active);
 }
 
-.fr-floating-ball :is(.floating-ball-tools, .floating-ball-hide-panel) {
+.fr-floating-ball .floating-ball-hide-panel {
   box-sizing: border-box;
   background-color: var(--fr-surface);
   box-shadow: inset 0 0 0 1px var(--fr-border), var(--fr-shadow);
@@ -811,6 +855,7 @@ watch(() => presentation.value.toolsDisplay, () => {
 }
 
 .floating-ball-main {
+  z-index: 1;
   inset: 0;
   color: var(--fr-accent);
   touch-action: none;
@@ -821,7 +866,7 @@ watch(() => presentation.value.toolsDisplay, () => {
 .fr-floating-ball.is-touch-capable { --fr-face-inset: 4px; }
 
 /* 触屏保留 44px 命中区，视觉底板收紧；收起时让网页透过控件的周边区域。 */
-.fr-floating-ball :is(.floating-ball-main, .floating-ball-manga)::before {
+.fr-floating-ball :is(.floating-ball-main, .floating-ball-manga, .floating-ball-tool)::before {
   position: absolute;
   z-index: -1;
   inset: var(--fr-face-inset);
@@ -834,11 +879,11 @@ watch(() => presentation.value.toolsDisplay, () => {
   content: '';
 }
 
-.fr-floating-ball :is(.floating-ball-main, .floating-ball-manga):is(:hover, [aria-pressed="true"], [aria-expanded="true"])::before {
+.fr-floating-ball :is(.floating-ball-main, .floating-ball-manga, .floating-ball-tool):is(:hover, [aria-pressed="true"], [aria-expanded="true"])::before {
   background: var(--fr-active);
 }
 
-.fr-floating-ball.floating-ball-expanded :is(.floating-ball-main, .floating-ball-manga)::before,
+.fr-floating-ball.floating-ball-expanded :is(.floating-ball-main, .floating-ball-manga, .floating-ball-tool)::before,
 .fr-floating-ball :is(.floating-ball-main, .floating-ball-manga):focus-visible::before,
 .fr-floating-ball.dragging .floating-ball-main::before {
   opacity: 1;
@@ -874,36 +919,37 @@ watch(() => presentation.value.toolsDisplay, () => {
 
 .floating-ball-tools {
   position: absolute;
-  left: var(--fr-tools-x);
-  top: var(--fr-tools-y);
   display: grid;
-  width: calc(var(--fr-tool-size) + 2 * var(--fr-tool-padding));
-  max-height: var(--fr-tools-height);
+  width: var(--fr-tool-size);
   grid-auto-rows: var(--fr-tool-size);
-  justify-content: center;
-  padding: var(--fr-tool-padding) 0;
-  border-radius: 13px;
-  overflow: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
+  gap: var(--fr-tool-gap);
   opacity: 0;
   visibility: hidden;
-  transform: translateY(3px);
-  transition: transform 150ms ease, opacity 150ms ease, visibility 0s linear 150ms;
+  transition: opacity 150ms ease, visibility 0s linear 150ms;
+}
+
+.floating-ball-tools.is-scrollable {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
 }
 
 .floating-ball-expanded .floating-ball-tools {
   opacity: 1;
   visibility: visible;
-  pointer-events: auto;
-  transform: translateY(0);
   transition-delay: 0s;
 }
 
 .floating-ball-tool {
   position: relative;
+  isolation: isolate;
   width: var(--fr-tool-size);
+  height: var(--fr-tool-size);
   border-radius: 10px;
+}
+
+.floating-ball-expanded :is(.floating-ball-tool, .floating-ball-tools.is-scrollable) {
+  pointer-events: auto;
 }
 
 .floating-ball-tool svg { width: 17px; height: 17px; }
@@ -948,6 +994,7 @@ watch(() => presentation.value.toolsDisplay, () => {
 
 .floating-ball-hide-panel {
   position: absolute;
+  z-index: 2;
   display: grid;
   gap: 2px;
   padding: 4px;

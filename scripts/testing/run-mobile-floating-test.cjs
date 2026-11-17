@@ -261,6 +261,15 @@ const server = http.createServer(async (request, response) => {
     await tap('.floating-ball-main');
     report.firstTouch={metrics:await metrics(),events:await inspect('.floating-ball-main','return el.__events;')}; save();
     assert.equal(report.firstTouch.metrics.main.x, idleX, 'Opening the touch tools should keep the button in place');
+    const handle = report.firstTouch.metrics.main;
+    const settingsButton = await box('.floating-ball-settings');
+    const hideButton = await box('.floating-ball-hide');
+    for (const tool of [settingsButton, hideButton]) {
+      assert(tool.width >= 43.9 && tool.height >= 43.9);
+      assert(Math.abs(tool.x + tool.width / 2 - handle.x - handle.width / 2) < 1);
+    }
+    assert(settingsButton.y + settingsButton.height < handle.y && hideButton.y > handle.bottom);
+    record('touch-tools-align-above-and-below-the-anchor', {handle, settingsButton, hideButton});
     const progress = page.locator('.fr-translation-progress:not(.fr-compact)');
     await progress.waitFor({state:'visible'});
     await inExtension(`Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{offsetLeft:15,offsetTop:140,width:360,height:320})});window.dispatchEvent(new Event('resize'));true`);

@@ -154,6 +154,58 @@ describe('FloatingBall actual SFC lifecycle', () => {
     expect(x()).toBe(left ? 0 : 966);
   });
 
+  it('centers settings above and hide below without moving the main button vertically', async () => {
+    const port = mountBall({onHide: vi.fn()});
+    const y = port.style('--fr-ball-y');
+    port.over();
+    await flush();
+    const above = port.ball().querySelector<HTMLElement>('[data-stack="above"]')!;
+    const below = port.ball().querySelector<HTMLElement>('[data-stack="below"]')!;
+    expect(above.querySelector('.floating-ball-settings')).not.toBeNull();
+    expect(below.querySelector('.floating-ball-hide')).not.toBeNull();
+    expect(above.style.left).toBe('2px');
+    expect(below.style.left).toBe('2px');
+    expect(above.style.top).toBe('-34px');
+    expect(below.style.top).toBe('38px');
+    expect(port.style('--fr-ball-y')).toBe(y);
+  });
+
+  it.each([[0, 'below', '38px'], [1, 'above', '-68px']] as const)(
+    'keeps both desktop controls in view with the main button at position %d', async (verticalPosition, stack, top) => {
+      const port = mountBall({verticalPosition, onHide: vi.fn()});
+      port.over();
+      await flush();
+      const groups = port.ball().querySelectorAll<HTMLElement>('.floating-ball-tools');
+      expect(groups).toHaveLength(1);
+      expect(groups[0].getAttribute('data-stack')).toBe(stack);
+      expect(groups[0].style.top).toBe(top);
+      expect(groups[0].querySelector('.floating-ball-settings')).not.toBeNull();
+      expect(groups[0].querySelector('.floating-ball-hide')).not.toBeNull();
+    },
+  );
+
+  it('keeps the manga target in place and makes the vertical stack scroll in a short touch viewport', async () => {
+    const port = mountBall({
+      presentation: {clickAction: 'none'},
+      manga: {available: true, active: true, pending: false, errors: 0},
+      onMangaReading: vi.fn(),
+      onHide: vi.fn(),
+    }, {maxTouchPoints: 5});
+    port.viewport({left: 0, top: 0, right: 390, bottom: 170, width: 390, height: 170});
+    await flush();
+    const mangaOffset = port.style('--fr-manga-y');
+    expect(mangaOffset).toBe(48);
+    port.focus();
+    await flush();
+    const above = port.ball().querySelector<HTMLElement>('[data-stack="above"]')!;
+    expect(above.style.top).toBe('-63px');
+    expect(above.style.maxHeight).toBe('59px');
+    expect(above.classList.contains('is-scrollable')).toBe(true);
+    expect(above.querySelectorAll('button')).toHaveLength(4);
+    expect(port.style('--fr-tool-size')).toBe(44);
+    expect(port.style('--fr-manga-y')).toBe(mangaOffset);
+  });
+
   it.each(['left', 'right'] as const)('keeps equal signed margins stationary and clamps inaccessible values on the %s edge', async side => {
     const port = mountBall({position: side, presentation: {defaultMargin: -4, popoutMargin: -4}});
     const x = () => port.style('--fr-ball-x');

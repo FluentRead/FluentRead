@@ -2,7 +2,7 @@
  * @file src/app/document-translation/selectionRuntime.ts
  * 文件职责：在扩展自有文档页中按需复用划词卡片，接受 PDF.js 原文选区；存在文档模型适配器时也接受当前原版译文与重排段落选区。
  * 主要内容：等待配置水合和首个 PDF 文字层再加载卡片，提供跨页来源校验、排版换行清理、文件标题与页内上下文；在 closed Shadow Root 中复用 Vue、i18n 和构建样式，并在禁用、原文视图消失、页面卸载或异步挂载过期时释放所有资源。
- * 模块边界：本文件是扩展页面组合适配器，不伪造 ContentScriptContext、不实现翻译或朗读协议、不读取或转发凭据，也不修改 PDF 原文与浏览器原生选区。
+ * 模块边界：本文件是扩展页面组合适配器，不伪造 ContentScriptContext、不实现翻译或朗读协议、不读取或转发凭据；原生批注动作经组合层回调交给文档阅读器，不修改 PDF 原文与浏览器原生选区。
  */
 import {createApp, type App, type Component} from 'vue';
 import browser from 'webextension-polyfill';
@@ -29,6 +29,8 @@ interface PdfSelectionAdapter {
     context(range: Range, text: string, limit: number): PdfSelectionContext;
     captureReading(range: Range, text: string, limit: number): ReadingSelection;
     captureMaterial?(range: Range, quote: string): MaterialSelection | undefined;
+    markSelection?: DocumentSelectionRuntimeOptions['markSelection'];
+    canMarkSelection?: (range: Range) => boolean;
     subscribeInvalidation(listener: () => void): () => void;
     invalidate(): void;
 }
@@ -42,6 +44,7 @@ interface OverlayMountOptions {
 export interface DocumentSelectionRuntimeOptions {
     root: HTMLElement;
     captureMaterial?: (range: Range, quote: string) => MaterialSelection | undefined;
+    markSelection?: (range: Range, kind: 'highlight' | 'underline') => boolean;
     onSelectionRangeChange?: (range: Range | null) => void;
 }
 export interface DocumentSelectionRuntimeDependencies {
@@ -193,7 +196,7 @@ function sourceContext(range: Range, text: string, limit: number, root: HTMLElem
     return {title, sourceUrl, text: summarizeSelectionContext(pageText, text, Math.min(4000, Math.max(0, limit)))};
 }
 
-export function createPdfSelectionAdapter(root: HTMLElement, captureMaterial?: DocumentSelectionRuntimeOptions['captureMaterial']): PdfSelectionAdapter {
+export function createPdfSelectionAdapter(root: HTMLElement, captureMaterial?: DocumentSelectionRuntimeOptions['captureMaterial'], markSelection?: DocumentSelectionRuntimeOptions['markSelection']): PdfSelectionAdapter {
     const translated = Boolean(captureMaterial);
     const invalidations = new Set<() => void>();
     return {
@@ -202,6 +205,12 @@ export function createPdfSelectionAdapter(root: HTMLElement, captureMaterial?: D
         normalizeText: normalizePdfSelectionText,
         context: (range, text, limit) => sourceContext(range, text, limit, root, translated),
         captureMaterial: captureMaterial ? (range, quote) => acceptsPdfSourceRange(range, root, true) ? captureMaterial(range, quote) : undefined : undefined,
+        markSelection: markSelection ? (range, kind) => acceptsPdfSourceRange(range, root, translated) && markSelection(range, kind) : undefined,
+        canMarkSelection: markSelection ? range => {
+            const source = sourceForNode(range.startContainer, root, translated);
+            return Boolean(source && source === sourceForNode(range.endContainer, root, translated)
+                && source.matches(`${PDF_SOURCE_TEXT_SELECTOR},.pdf-reading-paragraph`));
+        } : undefined,
         captureReading(range, text, limit) {
             const context = sourceContext(range, text, limit, root, translated).text;
             return {text, context, sentence: context ? sentenceAroundSelection(context, text) : text};
@@ -301,7 +310,7 @@ export function mountDocumentSelectionTranslation(
     let selectedText = '';
     let selectedOwner: ReturnType<typeof sourceOwner> | null = null;
     const translated = Boolean(options.captureMaterial);
-    const adapter = createPdfSelectionAdapter(options.root, options.captureMaterial);
+    const adapter = createPdfSelectionAdapter(options.root, options.captureMaterial, options.markSelection);
     const notifyRange = (range: Range | null) => {
         if (!range && !selectedRange) return;
         selectedRange = range;

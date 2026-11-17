@@ -4,6 +4,7 @@
  * 主要内容：只从当前视频的明确链接或无歧义帖子识别 X 来源；保存完整 video/N 身份，恢复时核对同一来源与安全时间范围；成功定位记录随 document 弱引用保留，功能重挂载不覆盖用户后续进度；向组件同步逻辑player与来源语言，物理挂载可交给placement；同媒体全屏迁移保留原节点，关闭和失联先释放所有权避免卸载重入，只在原媒体及已验证的同视频控件范围内归还入口焦点。
  * 模块边界：不静态导入 Vue 或组件实现、不加载字幕和调用翻译服务；composition root 注入挂载与界面标记，原始媒体与 cue 数据仍由既有运行时持有。
  */
+import {playerOwnsMedia} from './htmlMedia';
 import type VideoSentenceLearning from '../ui/VideoSentenceLearning.vue';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
 import {sanitizeVocabularyVideoSource, sanitizeVocabularyVideoUrl} from '@/src/features/vocabulary/public';
@@ -23,7 +24,7 @@ export interface VideoSentenceLearningHost {
     close(): void;
     isOpen(): boolean;
     isConnected(player?: HTMLElement): boolean;
-    syncPlayer(player: HTMLElement, video: HTMLVideoElement): boolean;
+    syncPlayer(player: HTMLElement, video: HTMLMediaElement): boolean;
     updateCues(cues: VideoSubtitleCue[], sourceLanguage?: string): void;
     hasCues(): boolean;
 }
@@ -75,7 +76,7 @@ export function createVideoSentenceLearningHost(ports: {
         isConnected: player => !!owner && owner.host.isConnected && (!player || owner.player === player)
             && (owner.placement?.isConnected ? owner.placement.isConnected(owner.player) : owner.host.parentElement === owner.player),
         syncPlayer(player, video) {
-            if (!owner || owner.props.video !== video || !video.isConnected || !player.isConnected || !player.contains(video)) return false;
+            if (!owner || owner.props.video !== video || !video.isConnected || !player.isConnected || !playerOwnsMedia(player, video)) return false;
             owner.props.player = player;
             // 支持物理宿主的placement独立持有挂载；媒体归属仍由此处的player/video资格约束。
             if (owner.placement?.isConnected) {
@@ -104,11 +105,11 @@ export function createVideoSentenceLearningHost(ports: {
 }
 
 // 记录属于页面和媒体节点，不属于可随 BFCache／总开关重建的功能实例；不强持有 document 或 video。
-const restoredVideoPositions = new WeakMap<Document, WeakMap<HTMLVideoElement, Set<string>>>();
+const restoredVideoPositions = new WeakMap<Document, WeakMap<HTMLMediaElement, Set<string>>>();
 
 /** 同一 document 的可靠 X 来源与片段只成功恢复一次；元数据未就绪、时长未知或 seek 失败仍可重试。 */
 export function createSavedVideoPositionRestorer(): {
-    restore(video: HTMLVideoElement, location: SourceLocation & Pick<Location, 'hash'>, document: Document): boolean;
+    restore(video: HTMLMediaElement, location: SourceLocation & Pick<Location, 'hash'>, document: Document): boolean;
 } {
     return {
         restore(video, location, document) {
@@ -124,7 +125,7 @@ export function createSavedVideoPositionRestorer(): {
             if (!Number.isFinite(video.duration) || video.duration <= 0 || range.startMs >= video.duration * 1_000) return false;
             try { video.pause(); video.currentTime = range.startMs / 1_000; } catch { return false; }
             if (!restored) {
-                restored = new WeakMap<HTMLVideoElement, Set<string>>();
+                restored = new WeakMap<HTMLMediaElement, Set<string>>();
                 restoredVideoPositions.set(document, restored);
             }
             const keys = restored.get(video) || new Set<string>(); keys.add(key); restored.set(video, keys);

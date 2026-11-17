@@ -137,6 +137,8 @@ node scripts/run-selection-speech-test.cjs \
 
 ## YouTube 全屏与字幕同步
 
+YouTube 的“仅原文”模式（issue #1344）始终使用 FluentRead 自有字幕层，并隐藏原生字幕容器，避免桌面宽屏退回 YouTube 的逐词字幕样式。运行时在可读时仍接入原始 timedtext 时间轴；当前滚动窗口与播放时间匹配时显示完整 cue，不请求译文。`videoSubtitleTrackPriorityRuntime` 覆盖前缀 cue、原文/双语切换、零翻译请求及三种模式下的原生字幕所有权。
+
 `node scripts/run-youtube-subtitle-handover-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --artifacts-dir <证据目录>` 验证 #1341 的早到响应交接。生产扩展使用真实 MAIN-world Fetch 桥与 content runtime；阻塞解析的受控资源让 timedtext 在 `document.readyState=loading` 时先到，之后的补抓明确返回空响应。相同 JSON3、原生滚动窗口结构和媒体时钟分别测试挂载前、挂载后到达，两条同文原生行应按当前 cue 显示及翻译一次；后续重复时段、`No no` 和单 cue 内完整整句重复仍保留。专项保存响应/挂载时刻、请求输入、截图、后台与页面诊断，使用临时 profile、第二屏后台可见窗口。JSON3 窗口结构取自真实 YouTube 播放器观察，文字与网络响应受控；这不等于原视频回放或在线翻译验收。
 
 `tests/mainWorldBridgeLifecycle.test.ts` 验证默认 YouTube 适配器回放早到响应、不消费宿主正文、不因回放重发请求，并在换地址时拒绝旧响应、停用后清空；`tests/videoSubtitleTrackPriorityRuntime.test.ts` 验证实际公共 mount 在初始化监听及页面状态后取回时间轴，既处理滚动同文行，也保留合法重复，seek 不重复请求回放。
@@ -157,7 +159,16 @@ X 另覆盖未预取句子等待原译文成对显示、seek 后迟到结果丢�
 
 `node scripts/run-youtube-subtitle-sync-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-youtube-sync` 在临时 Edge profile 的后台可见窗口中验证文档全屏、菜单操作、整句/逐词字幕定位、时间边界、重复句、延迟译文、真实视频 seek、空字幕、原文模式和关闭清理。夹具使用真实视频进度、受控 YouTube DOM 与模拟翻译响应，不代表真实 YouTube 字幕供应或翻译服务质量。
 
-Issue #1341 的重复字幕回归区分内容与滚动残留：`No no`、`Very very`、`Bye bye` 和重复整句即使分成多个可见片段，也必须完整显示并送翻；只有窗口裁切或匹配当前 cue 的时间轴依据才能排除旧行。无时间轴时不猜测同文就是残留。浏览器专项检查每个原生场景的全部新增请求（另列时间轴预取），以及同文滚动场景的全部相关请求；还验证紧凑原文模式零新请求、重新开启后的缓存复用与 cue 本身合法重复。公共 mount 测试补充动态重分段、重叠旧 cue 的选择和人工目标轨。原 issue 仅提供截图，受控回归不能代替原视频及字幕数据的复现。
+Issue #1341 的重复字幕回归区分内容与滚动残留：`No no`、`Very very`、`Bye bye` 和重复整句即使分成多个可见片段，也必须完整显示并送翻；只有窗口裁切或匹配当前 cue 的时间轴依据才能排除旧行。无时间轴时不猜测同文就是残留。浏览器专项检查每个原生场景的全部新增请求（另列时间轴预取），以及同文滚动场景的全部相关请求；还验证紧凑原文模式零新请求、重新开启后的缓存复用与 cue 本身合法重复。公共 mount 测试补充动态重分段、重叠旧 cue 的选择和人工目标轨。报告者后来补充了原视频链接；受控回归仍不能替代对该视频原始字幕和实际播放器的复现。
 
-该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。双语/译文模式和暂时隐藏字幕时持续接管原生显示，切回原文、关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
+该专项还逐动画帧采样原生字幕的可见性，覆盖前句过期、下一句延迟、seek 和整块字幕容器替换；容器替换会在观察器重新绑定前立即检查样式。原文/双语/译文模式和暂时隐藏字幕时持续接管原生显示，关闭视频翻译或扩展后恢复，未选中的播放器保持原样。`videoSubtitleTrackPriorityRuntime` 补充播放器重绑、离开视频页和卸载清理。脚本通过 `--runtime-diagnostics-helper <浏览器翻译测试技能>/scripts/runtime-diagnostics.cjs` 指定诊断采集器，默认使用本机该技能；在导航前附加网页和 popup，并采集扩展后台，保存错误/告警、上下文归属与采集空窗。Edge 夹具与 Firefox 构建不能代替 Firefox 真实 YouTube 验收。
 
+### YouTube 仅原文与听力流程（issue #1344）
+
+为同一专项添加 `--suite original-only`，只执行本次听力流程验收：首次以原文模式打开、**关闭 → 原文 → 双语 → 关闭**、缓存复用、原文模式重新开启及刷新恢复。桌面与紧凑播放器检查完整 cue、自有原文节点、字体与播放器内布局；逐帧检查切换、播放进度跳转、空档和原生容器替换时没有原生字幕闪现。原文阶段核对全部翻译请求数不增加，双语重播核对当前句没有重复请求，后续字幕的正常预取单独保留；关闭视频字幕总开关才恢复原生字幕，最后导航离开页面并保留运行时诊断。使用生产 Chrome 产物、临时 Edge profile、第二屏可见后台窗口和 focus-safe helper；字幕、媒体及翻译响应受控，不代表 Windows Chrome、Firefox 或真实 YouTube 服务验收。
+
+## 通用 HTML 音视频（issue #1356）
+
+`tests/htmlMedia.test.ts` 验证无媒体空闲、动态发现、字幕浮层归属、滚动/视口/全屏定位及资源回收。`tests/videoSubtitleTrackPriorityRuntime.test.ts` 的 standard HTML media 用例从公共入口验证音频和视频的原生轨、双语、原文模式和动态卸载；既有 YouTube/X 用例约束兼容性。`tests/videoAiFullCapture.test.ts` 的 playback capture 用例验证实时音轨采集的原始时间戳、结束、跳转/倍速失效及原媒体状态保持，也覆盖 AudioWorklet 批处理、端口清理、加载取消和原始流音轨的克隆归属。`tests/subtitleExport.test.ts` 检查 SRT、WebVTT、Markdown 的时间与文本转义。
+
+浏览器专项 `scripts/testing/run-html-media-subtitle-test.cjs` 使用生产扩展、隔离临时 profile 与 focus-safe helper，验证普通音频、视频、子 frame、切换、学习面板、导出及关闭；缓存与翻译夹具和真实模型识别分别记录，不能把缓存回放当成真实转写验收。完整日志、截图及内容脚本/扩展页面/后台诊断放在工作区证据目录。

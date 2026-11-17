@@ -56,7 +56,7 @@ export function createVideoSentenceLearningPlacement(options: {
     let dragged = options.initialPosition;
     let floatingDragged = options.initialFloatingPosition;
     let floatingHeight = options.initialFloatingHeight;
-    let detached = false;
+    let detached = options.player.classList.contains('fluent-read-html-media-host');
     let frame: number | undefined;
     let active = true;
     let drag: {id: number; x: number; y: number; left: number; top: number; scaleX: number; scaleY: number} | undefined;

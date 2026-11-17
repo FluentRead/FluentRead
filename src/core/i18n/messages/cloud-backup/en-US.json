@@ -99,7 +99,7 @@
     "settings.cloud.deleteRecreate": "A later manual sync can create a new backup. Other devices may also upload it again.",
     "settings.cloud.deleteUnsupported": "The provider did not supply the version information required for safe deletion. This backup cannot be deleted here.",
     "settings.cloud.deleteManualDrive": "Open Google Drive Settings → Manage apps → FluentRead to clear the application data.",
-    "settings.cloud.deleteManualWebDav": "In your WebDAV provider, delete FluentRead/fluentread-config.encrypted.json manually and keep other files in the folder.",
+    "settings.cloud.deleteManualWebDav": "In the configured WebDAV backup directory, delete only fluentread-config.encrypted.json.",
     "settings.cloud.deleteConfirm": "Delete backup",
     "settings.cloud.deleteFinish": "Done",
     "settings.cloud.deleteAbsent": "No cloud backup",
@@ -113,7 +113,10 @@
     "settings.cloud.deleteCloudEffect": "Confirmation deletes the current cloud backup from {provider}.",
     "settings.cloud.deleteVerificationPrompt": "Type “{phrase}” to confirm deletion.",
     "settings.webdav.concurrentWarning": "This provider cannot prevent concurrent writes. The cloud backup is checked again before saving, merging, or deleting. Avoid syncing from other devices at the same time.",
-    "settings.cloud.uploadUnverified": "Configuration was uploaded to Google Drive, but verification could not be completed. Read the cloud backup again to confirm. Device settings were not changed."
+    "settings.cloud.uploadUnverified": "Configuration was uploaded to Google Drive, but verification could not be completed. Read the cloud backup again to confirm. Device settings were not changed.",
+    "settings.webdav.backupPath": "Backup subdirectory",
+    "settings.webdav.backupPathHint": "Leave blank to save in the directory above, or enter a nested subdirectory.",
+    "settings.webdav.error.path": "Enter a relative subdirectory without .. or a full URL, or leave blank."
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "The general-settings cloud backup contains fields outside its scope. Generate a new backup.",

@@ -1,5 +1,6 @@
 /**
  * @file src/app/content/runtime.ts
+ * 协作生命周期：按需创建官方 Hypothesis 页面端，挂起、站点停用、导航与失效时撤销自身实例，保持其他扩展的客户端。
  * 文件职责：作为内容脚本应用的顶层 composition root，协调配置就绪、站点规则、公共样式、主世界桥、功能注册表、快捷键和消息监听生命周期。
  * 主要内容：通过既有配置订阅即时重排网页双语与仅译文工件，不重发翻译请求；按全局配置同步当前文档的译文字体，刷新与路由变化保留选择，停用、挂起和销毁只撤销文档样式，恢复时重新应用；装配学习材料继续阅读的来源校验、定位与自动位置更新生命周期；先排除原始 XML 文档与失效扩展上下文，再安装内联 page.css 并按 capability 和配置挂载页面功能；配置变更时更新页面私有网站名单索引，按已提交地址检查自动翻译与站点禁用，锚点跳转保留请求，协调停用、往返缓存暂停恢复与销毁。
  * 模块边界：本文件只负责依赖装配和页面激活所有权，不实现具体翻译算法、组件内部状态、provider 请求或配置存储；这些职责分别属于 features、services 与 platform。
@@ -53,6 +54,7 @@ import {createPageTranslationFontRuntime} from './pageTranslationFont';
 import {consumeArxivPaperReading, mountPaperReading, waitForPaperReadingDom} from './paperReading';
 import {translate} from '@/src/core/i18n';
 import {showPageNotice} from '@/src/features/page-notice/public';
+import {createHypothesisClient} from '@/src/features/hypothesis/public';
 export async function startContentApp(ctx: ContentScriptContext,
     capabilities: BrowserCapabilities = browserCapabilities): Promise<void> {
     if (isRawXmlContentDocument(document) || ctx.isInvalid) return;
@@ -89,6 +91,10 @@ export async function startContentApp(ctx: ContentScriptContext,
     let previousInputBoxConfigKey = inputBoxTranslationConfigKey(config);
     const pageTranslationFont = import.meta.env.BROWSER === 'userscript' ? undefined : createPageTranslationFontRuntime({document, onChange: () => document.dispatchEvent(new Event('fluentread-page-translation-font-changed'))});
     const informationHighlight = import.meta.env.BROWSER === 'userscript' ? undefined : createPageInformationHighlightRuntime({document, config, send: message => browser.runtime.sendMessage(message), canToggle: () => !currentPageSiteDisabled && !pageLifecycle.isSuspended()});
+    const hypothesis = import.meta.env.BROWSER === 'userscript' ? undefined : createHypothesisClient({document, window,
+        assetUrl: path => browser.runtime.getURL(`/${path}`),
+        inject: async () => {const result = await browser.runtime.sendMessage({type: 'installHypothesisClient'}); if (result?.status !== 'success') throw new Error('Hypothesis unavailable');},
+    });
     const hotkeys = createContentHotkeyRuntime(() => currentPageSiteDisabled);
     const inputTranslationFeature = createInputTranslationContentFeature({
         context: ctx,
@@ -115,6 +121,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         installEmbeddedTopFrameBridge(isPageRuntimeEnabled, pageEventController.signal, () => pageTranslationFont?.read() === true);
     }
     const disposePageFeatures = (): void => {
+        if (import.meta.env.BROWSER !== 'userscript') void hypothesis?.setEnabled(false);
         if (import.meta.env.BROWSER !== 'userscript') pageTranslationFont?.reset(); featureController?.abort(); featureController = null;
         optionalContentFeatures?.dispose(); optionalContentFeatures = null;
         restoreOriginalContent(); cancelAllTranslations();
@@ -214,6 +221,7 @@ export async function startContentApp(ctx: ContentScriptContext,
         reconcileFeatures: () => { void activePageFeatureRegistry?.reconcileEnabled(); },
     }), {signal: pageEventController.signal});
     const runtimeMessageListener: ContentRuntimeMessageHandler = createContentRuntimeMessageHandler(ctx, {
+        ...(import.meta.env.BROWSER === 'userscript' ? {} : {hypothesis}),
         ...(import.meta.env.BROWSER === 'userscript' ? {} : {pageTranslationFont}), isSiteDisabled: () => currentPageSiteDisabled, updateSiteDisabled: applySiteDisabledState,
         isPageSuspended: pageLifecycle.isSuspended, ...(import.meta.env.BROWSER === 'userscript' ? {reconcileUserscriptPage: () => reconcileCurrentContentPage(
             () => pageAvailability!.reconcile(), () => activePageFeatureRegistry, () => !cleanedUp && !ctx.isInvalid && !pageLifecycle.isSuspended() && !currentPageSiteDisabled, () => config.on)} : {informationHighlight}),
@@ -221,6 +229,7 @@ export async function startContentApp(ctx: ContentScriptContext,
     cleanup = (): void => {
         if (cleanedUp) return;
         cleanedUp = true;
+        if (import.meta.env.BROWSER !== 'userscript') void hypothesis?.dispose();
         pageEventController.abort();
         setMainWorldBridgesEnabled(document, false);
         // 扩展重载后 browser.runtime 可能已被撤销；使用注册时的事件端口，

@@ -7,6 +7,8 @@
  * 课程菜单：样式工厂可在课程 Shadow Root 内复用同一份品牌色、图标、分段按钮和正文密度，避免各平台维护不同外观。
  */
 
+import {serializeSubtitleFile, type SubtitleExportFormat} from './subtitleExport';
+import {htmlMediaForPlayer} from './htmlMedia';
 import {getVideoSubtitleAppearanceCssVars, normalizeVideoSubtitleAppearance} from '@/src/core/config/videoSubtitleAppearance';
 import {config} from '@/src/services/config/store';
 import {type VideoSubtitleDisplayMode} from '@/src/core/config/model';
@@ -18,6 +20,9 @@ import {getYoutubeSubtitleControlsScope} from './youtubeControlsScope';
 import {getVisibleYoutubeSubtitleControls, positionMobileYoutubeSubtitle, resetSubtitlePanelLayout, finishSubtitlePanelLayout,
   prepareSubtitlePanelLayout, findOwnedSubtitlePanel, syncSubtitleScrollHostState, setSubtitlePanelScrollable, VIDEO_SUBTITLE_SCROLL_HOST_ID} from './subtitleControlLayout';
 import {createVideoKaraokeController, setVideoCaptionText, type VideoKaraokeController, VIDEO_KARAOKE_FILL_PROPERTY, VIDEO_KARAOKE_STATE_ATTRIBUTE, VIDEO_KARAOKE_TEXT_ATTRIBUTE, VIDEO_KARAOKE_UNIT_CLASS} from './karaoke';
+import {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
+
+export {VIDEO_NATIVE_CAPTION_HIDDEN_CLASS} from './youtubeNativeCaptionVisibility';
 
 import {
     normalizeUiLanguage,
@@ -132,7 +137,6 @@ export const VIDEO_DISPLAY_TRANSLATION_ONLY_CLASS = 'fluent-read-video-display-t
 export const VIDEO_DISPLAY_ORIGINAL_ONLY_CLASS = 'fluent-read-video-display-original-only';
 export const VIDEO_DISPLAY_HIDDEN_CLASS = 'fluent-read-video-display-hidden';
 export const VIDEO_NORMALIZED_CAPTION_CLASS = 'fluent-read-video-normalized-caption';
-export const VIDEO_NATIVE_CAPTION_HIDDEN_CLASS = 'fluent-read-video-native-caption-hidden';
 export const VIDEO_NORMALIZED_CAPTION_ACTIVE_CLASS = 'fluent-read-video-normalized-caption-active';
 export const VIDEO_SUBTITLE_PANEL_ACTIVE_CLASS = 'fluent-read-video-subtitle-panel-active';
 
@@ -161,7 +165,7 @@ export function writeVideoCaptionText(element: Element, text: string): void {
 
 /** 为播放器字幕装配逐字高亮：当前句的起点计入手动校时；sync 在配置变化后按新的开关重写已显示的字幕行。 */
 export function createVideoSubtitleKaraoke(
-  getVideo: () => HTMLVideoElement | null,
+  getVideo: () => HTMLMediaElement | null,
   getCue: () => VideoSubtitleCue | null,
   getOffsetMs: () => number,
 ): VideoKaraokeController {
@@ -227,15 +231,16 @@ export function isOriginalTimedTextUrl(url: string): boolean {
   }
 }
 
-export function downloadSubtitleSrt(srt: string, languageCode: string): void {
+export function downloadSubtitleSrt(srt: string, languageCode: string, cues?: readonly VideoSubtitleCue[], format: SubtitleExportFormat = 'srt'): void {
   if (!srt.trim()) throw new Error('字幕轨道没有可下载的内容');
 
   const title = sanitizeSubtitleFilename(document.title.replace(/\s*-\s*(?:YouTube|X)\s*$/i, ''));
   const language = sanitizeSubtitleFilename(languageCode || 'original');
-  const blobUrl = URL.createObjectURL(new Blob([srt], { type: 'application/x-subrip;charset=utf-8' }));
+  const file = cues ? serializeSubtitleFile(cues, format) : {text: srt, extension: 'srt', mime: 'application/x-subrip;charset=utf-8'};
+  const blobUrl = URL.createObjectURL(new Blob([file.text], { type: file.mime }));
   const anchor = document.createElement('a');
   anchor.href = blobUrl;
-  anchor.download = `${title}-${language}.srt`;
+  anchor.download = `${title}-${language}.${file.extension}`;
   anchor.style.display = 'none';
   (document.body || document.documentElement).appendChild(anchor);
   anchor.click();
@@ -262,8 +267,12 @@ export function isXHostPage(locationLike: Pick<Location, 'hostname'> = window.lo
   return /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(locationLike.hostname.toLowerCase());
 }
 
+export function isHtmlMediaPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
+  return Boolean(locationLike.hostname) && !YOUTUBE_HOST_PATTERN.test(locationLike.hostname) && !isXVideoPage(locationLike) && !getCaptionPlatform(locationLike);
+}
+
 export function isSupportedVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
-  return isYouTubeVideoPage(locationLike) || isXVideoPage(locationLike) || getCaptionPlatform(locationLike) !== null;
+  return isYouTubeVideoPage(locationLike) || isXVideoPage(locationLike) || getCaptionPlatform(locationLike) !== null || isHtmlMediaPage(locationLike);
 }
 
 /** 读取当前播放器可见的原生字幕，不读取插件自己的译文节点。 */
@@ -303,7 +312,7 @@ export function readVisibleCaptionText(container: Element | null): string {
 }
 
 export function findCaptionContainer(): HTMLElement | null {
-  if (isXVideoPage()) return document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID);
+  if (isXVideoPage() || isHtmlMediaPage()) return document.getElementById(VIDEO_AI_CAPTION_CONTAINER_ID);
   const candidates = Array.from((findVideoPlayer() || document).querySelectorAll<HTMLElement>(VIDEO_CAPTION_CONTAINER_SELECTOR));
   return candidates.find((candidate) => readVisibleCaptionText(candidate))
     || candidates[0]
@@ -491,7 +500,7 @@ export function deactivateNormalizedVideoCaption(owner: Document): void {
 }
 
 /** 读取当前播放器媒体；暂未挂载或时间无效时不编造播放位置。 */
-export function readVideoPlaybackTimeMs(player: HTMLElement | null, fallback: HTMLVideoElement | null): number {
+export function readVideoPlaybackTimeMs(player: HTMLElement | null, fallback: HTMLMediaElement | null): number {
   const video = player?.querySelector<HTMLVideoElement>('video.html5-main-video, video') || fallback;
   const time = video?.currentTime;
   return typeof time === 'number' && Number.isFinite(time) ? time * 1000 : Number.NaN;
@@ -531,6 +540,8 @@ export function getXSubtitleBottomInset(player: HTMLElement, viewport?: Pick<DOM
 
 /** 将实际视频画面（扣除 contain 留白）换算到字幕层坐标；YouTube 移动页面和 X 共用，不改写宿主视频布局。 */
 export function getVideoSubtitleViewport(player: HTMLElement, layer: HTMLElement) {
+  const media = htmlMediaForPlayer(player);
+  if (media) return {left: 0, top: 0, width: player.clientWidth || player.getBoundingClientRect().width, height: player.clientHeight || player.getBoundingClientRect().height, right: 0, bottom: 0, controlsInset: media.tagName === 'AUDIO' ? 8 : 56};
   const video = player.querySelector('video');
   const layerRect = layer.getBoundingClientRect();
   const playerRect = player.getBoundingClientRect();
@@ -633,7 +644,7 @@ export function syncTranslationOverlayPosition(container: HTMLElement | null): v
     : `${availableWidth}px`, 'important');
   const playerHeight = viewport ? viewport.height : playerRect.height || 540;
   const compactPlayer = playerWidth <= 600 || window.matchMedia?.('(pointer: coarse)').matches === true;
-  const autoBottom = (isXVideoPage() || compactPlayer) && appearance.position === 'bottom' && appearance.autoBottom;
+  const autoBottom = (isXVideoPage() || isHtmlMediaPage() || compactPlayer) && appearance.position === 'bottom' && appearance.autoBottom;
   const requestedOffset = autoBottom ? viewport?.controlsInset ?? getXSubtitleBottomInset(player) : appearance.bottomOffset === 10 ? Math.min(Math.max(playerHeight * .1, 52), 96) : Math.max(12, playerHeight * appearance.bottomOffset / 100);
   const offset = Math.min(requestedOffset, Math.max(0, playerHeight - 24));
   const bottomInset = `${(viewport?.bottom || 0) + offset}px`;
@@ -975,6 +986,11 @@ export function createVideoSubtitleStyle(ownerDocument: Document = document): HT
     .${VIDEO_PLAYER_HOST_CLASS}[data-fluent-read-video-fullscreen="true"] .${VIDEO_FALLBACK_CONTROLS_CLASS} {
       display: flex !important;
     }
+    .fluent-read-html-media-host > .fluent-read-video-controls {
+      top: 4px !important; bottom: auto !important; right: 4px !important;
+      display: flex !important; pointer-events: auto !important;
+    }
+    .fluent-read-html-media-host > #${VIDEO_TRANSLATION_MENU_ID} { pointer-events: auto !important; }
     /* 视频界面的外观只赋给自有节点，不向宿主网页或独立设置页注入主题。 */
     #${VIDEO_TRANSLATION_MENU_ID}, #fluent-read-video-learning-panel {
       --fr-video-menu-brand: #ef4776;

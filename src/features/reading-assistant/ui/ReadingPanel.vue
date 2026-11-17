@@ -322,7 +322,8 @@ function dismissTools(): boolean {
   closeTools(true);
   return true;
 }
-defineExpose({dismissTools, dismissToolsOutside, closeTools, stop});
+defineExpose({dismissTools, dismissToolsOutside, closeTools, stop,
+  getCompletedAnswer: () => busy.value || stopped.value || error.value ? '' : answer.value});
 function dismissToolsOutside(event: Event): void {
   if (toolsMenu.value?.open && !toolsMenu.value.contains(event.target as Node)) closeTools();
 }

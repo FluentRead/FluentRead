@@ -1,12 +1,12 @@
 /**
  * @file src/features/video-subtitle/content/videoPlayerLocator.ts
- * 文件职责：在 X/YouTube 的单页播放器和信息流 DOM 中选择当前视频，并维护稳定的视频身份。
+ * 文件职责：在 X/YouTube 及普通 HTML 音视频 DOM 中选择当前媒体，并维护稳定的视频身份。
  * 主要内容：按全屏、用户悬浮/聚焦、当前帖子和可见性排序候选；视频结构与可见性变化立即重扫，忽略播放器字幕文字更新，繁忙信息流的外部 DOM 更新合并为低频重扫。
  * 模块边界：只读取播放器 DOM 与页面事件，不创建 FluentRead 节点、不处理字幕或配置；绑定和生命周期由上层负责。
  */
 
 export interface VideoPlayerTarget {
-  readonly video: HTMLVideoElement;
+  readonly video: HTMLMediaElement;
   readonly player: HTMLElement;
   readonly key: string;
   readonly fullscreen: boolean;
@@ -17,6 +17,8 @@ export interface VideoPlayerLocatorOptions {
   readonly document?: Document;
   readonly window?: Window;
   readonly isXPage?: () => boolean;
+  readonly includeAudio?: boolean;
+  readonly getPlayer?: (media: HTMLMediaElement) => HTMLElement;
 }
 
 export interface VideoPlayerLocator {
@@ -38,8 +40,8 @@ function objectId(value: object): number {
   return id;
 }
 
-function safeCurrentSource(video: HTMLVideoElement): string {
-  return video.currentSrc || video.src || video.getAttribute('src') || '';
+function safeCurrentSource(video: HTMLMediaElement): string {
+  return video.currentSrc || video.src || video.getAttribute('src') || video.querySelector<HTMLSourceElement>('source[src]')?.src || '';
 }
 
 function isConnected(element: Element | null): element is Element {
@@ -61,8 +63,8 @@ function computedIsHidden(element: HTMLElement, view: Window): boolean {
   return style?.display === 'none' || style?.visibility === 'hidden' || style?.contentVisibility === 'hidden';
 }
 
-function isVisibleVideo(video: HTMLVideoElement, view: Window): boolean {
-  return isConnected(video) && !computedIsHidden(video, view) && rectIsVisible(video);
+function isVisibleVideo(video: HTMLMediaElement, view: Window): boolean {
+  return isConnected(video) && !video.closest('.fluent-read-video-ui') && !computedIsHidden(video, view) && rectIsVisible(video);
 }
 
 function currentStatusId(view: Window): string {
@@ -80,7 +82,7 @@ function isXMediaVideoLink(anchor: HTMLAnchorElement, view: Window, status = '')
   }
 }
 
-function linkCoversVideo(anchor: HTMLAnchorElement, video: HTMLVideoElement): boolean {
+function linkCoversVideo(anchor: HTMLAnchorElement, video: HTMLMediaElement): boolean {
   if (anchor.contains(video) || video.contains(anchor)) return true;
   const anchorRect = anchor.getBoundingClientRect();
   const videoRect = video.getBoundingClientRect();
@@ -95,36 +97,36 @@ function linkCoversVideo(anchor: HTMLAnchorElement, video: HTMLVideoElement): bo
   return overlap >= videoRect.width * videoRect.height * .5;
 }
 
-function hasXVideoLinkIn(scope: Element, video: HTMLVideoElement, view: Window, status = ''): boolean {
+function hasXVideoLinkIn(scope: Element, video: HTMLMediaElement, view: Window, status = ''): boolean {
   return Array.from(scope.querySelectorAll<HTMLAnchorElement>('a[href]'))
     .some((anchor) => isXMediaVideoLink(anchor, view, status) && linkCoversVideo(anchor, video));
 }
 
-function findXVideoScope(video: HTMLVideoElement, view: Window, status = ''): HTMLElement | null {
+function findXVideoScope(video: HTMLMediaElement, view: Window, status = ''): HTMLElement | null {
   const post = video.closest('article');
   if (!post) return null;
   let current: HTMLElement | null = video.parentElement;
   for (let depth = 0; current && depth < 12; depth += 1, current = current.parentElement) {
-    const videos = Array.from(current.querySelectorAll('video'));
+    const videos = Array.from(current.querySelectorAll('video, audio'));
     if (videos.length === 1 && videos[0] === video && hasXVideoLinkIn(current, video, view, status)) return current;
     if (current === post) break;
   }
   return null;
 }
 
-function hasCurrentXVideoLink(video: HTMLVideoElement, view: Window): boolean {
+function hasCurrentXVideoLink(video: HTMLMediaElement, view: Window): boolean {
   const status = currentStatusId(view);
   return Boolean(status && findXVideoScope(video, view, status));
 }
 
-export function getVideoPlayerForVideo(video: HTMLVideoElement, view: Window = window): HTMLElement {
+export function getVideoPlayerForVideo(video: HTMLMediaElement, view: Window = window): HTMLElement {
   const fullscreen = view.document.fullscreenElement;
   const youtubePlayer = video.closest<HTMLElement>('#movie_player, .html5-video-player');
   // YouTube 可以将 html 设为全屏，再用 fixed 撑满实际播放器；html 此时可能
   // 高度为 0。只有播放器在全屏子树之外时才需要改用更内层的全屏容器。
   if (youtubePlayer && (!fullscreen || fullscreen.contains(youtubePlayer))) return youtubePlayer;
   if (fullscreen && fullscreen !== video && fullscreen.contains(video)
-    && fullscreen.querySelectorAll('video').length === 1) {
+    && fullscreen.querySelectorAll('video, audio').length === 1) {
     return fullscreen as HTMLElement;
   }
 
@@ -144,17 +146,17 @@ export function getVideoPlayerForVideo(video: HTMLVideoElement, view: Window = w
   return video.parentElement || video;
 }
 
-function videoKey(video: HTMLVideoElement): string {
-  return `${objectId(video)}:${safeCurrentSource(video)}`;
+function videoKey(video: HTMLMediaElement): string {
+  return `${objectId(video)}:${video.srcObject ? objectId(video.srcObject) : safeCurrentSource(video)}`;
 }
 
-function isFullscreenVideo(video: HTMLVideoElement, document: Document): boolean {
+function isFullscreenVideo(video: HTMLMediaElement, document: Document): boolean {
   const fullscreen = document.fullscreenElement;
   return Boolean(fullscreen && (fullscreen === video || fullscreen.contains(video)))
-    || Boolean((video as HTMLVideoElement & { webkitDisplayingFullscreen?: boolean }).webkitDisplayingFullscreen);
+    || Boolean((video as HTMLMediaElement & { webkitDisplayingFullscreen?: boolean }).webkitDisplayingFullscreen);
 }
 
-function isInteractionVideo(candidate: VideoPlayerTarget, document: Document, activeInteraction: HTMLVideoElement | null): boolean {
+function isInteractionVideo(candidate: VideoPlayerTarget, document: Document, activeInteraction: HTMLMediaElement | null): boolean {
   const video = candidate.video;
   if (activeInteraction === video) return true;
   const active = document.activeElement;
@@ -166,21 +168,21 @@ function interactionVideo(
   document: Document,
   view: Window,
   selected: VideoPlayerTarget | null,
-): HTMLVideoElement | null {
-  const direct = target.closest('video');
-  if (direct && direct.tagName === 'VIDEO') return direct as HTMLVideoElement;
+): HTMLMediaElement | null {
+  const direct = target.closest('video, audio');
+  if (direct && ['VIDEO', 'AUDIO'].includes(direct.tagName)) return direct as HTMLMediaElement;
   if (selected?.player.contains(target)) return selected.video;
 
   const fullscreen = document.fullscreenElement;
   if (fullscreen && fullscreen.contains(target)) {
-    const videos = fullscreen.querySelectorAll('video');
-    if (videos.length === 1) return videos[0] as HTMLVideoElement;
+    const videos = fullscreen.querySelectorAll('video, audio');
+    if (videos.length === 1) return videos[0] as HTMLMediaElement;
   }
 
   const known = target.closest<HTMLElement>(PLAYER_SELECTOR);
   if (known) {
-    const videos = known.querySelectorAll('video');
-    if (videos.length === 1) return videos[0] as HTMLVideoElement;
+    const videos = known.querySelectorAll('video, audio');
+    if (videos.length === 1) return videos[0] as HTMLMediaElement;
   }
 
   // X 的部分播放器没有旧 data-testid，指针会落在 video 的兄弟覆盖层。
@@ -188,16 +190,16 @@ function interactionVideo(
   let scope: Element | null = target;
   for (let depth = 0; scope && scope !== document.body && scope !== document.documentElement && depth < 8;
     depth += 1, scope = scope.parentElement) {
-    const videos = scope.querySelectorAll<HTMLVideoElement>('video');
+    const videos = scope.querySelectorAll<HTMLMediaElement>('video, audio');
     if (videos.length > 1) break;
     if (videos.length === 1 && getVideoPlayerForVideo(videos[0], view).contains(target)) return videos[0];
   }
 
   const post = target.closest('article');
   if (post) {
-    const videos = post.querySelectorAll('video');
+    const videos = post.querySelectorAll('video, audio');
     const owned = Array.from(videos).map((candidate) => {
-      const video = candidate as HTMLVideoElement;
+      const video = candidate as HTMLMediaElement;
       return {video, scope: findXVideoScope(video, view)};
     }).find(({scope}) => scope?.contains(target));
     if (owned) return owned.video;
@@ -210,7 +212,7 @@ function chooseCandidate(
   document: Document,
   view: Window,
   isXPage: boolean,
-  lastInteraction: HTMLVideoElement | null,
+  lastInteraction: HTMLMediaElement | null,
   selected: VideoPlayerTarget | null,
 ): VideoPlayerTarget | null {
   const connected = candidates.filter((candidate) => isConnected(candidate.video) && isConnected(candidate.player));
@@ -237,20 +239,21 @@ function chooseCandidate(
 
   // 信息流中没有用户意图时不猜第一个视频，避免把字幕挂到屏外或其他帖子。
   if (isXPage && connected.length > 1) return null;
-  return connected[0];
+  return connected.find(candidate => candidate.video.paused === false && !candidate.video.ended) || connected[0];
 }
 
 export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}): VideoPlayerLocator {
   const document = options.document || window.document;
   const view = options.window || window;
   const isXPage = options.isXPage?.() ?? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(view.location.hostname);
-  let lastInteraction: HTMLVideoElement | null = null;
-  let activeInteraction: HTMLVideoElement | null = null;
+  let lastInteraction: HTMLMediaElement | null = null;
+  let activeInteraction: HTMLMediaElement | null = null;
   let selected: VideoPlayerTarget | null = null;
   const listeners = new Set<(target: VideoPlayerTarget | null) => void>();
 
   const sync = (): VideoPlayerTarget | null => {
-    const next = selectVideoPlayerTarget(document, {window: view, isXPage, selected, lastInteraction, activeInteraction});
+    const candidate = selectVideoPlayerTarget(document, {window: view, isXPage, selected, lastInteraction, activeInteraction, includeAudio: options.includeAudio});
+    const next = candidate && options.getPlayer ? {...candidate, player: options.getPlayer(candidate.video)} : candidate;
     const changed = next?.key !== selected?.key || next?.player !== selected?.player
       || next?.fullscreen !== selected?.fullscreen || next?.interacting !== selected?.interacting;
     selected = next;
@@ -259,12 +262,14 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
   };
 
   const onPointer = (event: Event) => {
+    // 普通媒体的浮层可能位于另一播放器上方；关闭浮层产生的 hover 不能切走当前学习会话。
+    if (options.includeAudio && event.type !== 'pointerdown') return;
     const target = event.target;
     if (!isElement(target)) return;
     const video = interactionVideo(target, document, view, selected);
     if (video && (lastInteraction !== video || activeInteraction !== video)) {
-      lastInteraction = video as HTMLVideoElement;
-      activeInteraction = video as HTMLVideoElement;
+      lastInteraction = video as HTMLMediaElement;
+      activeInteraction = video as HTMLMediaElement;
       sync();
     }
   };
@@ -334,11 +339,11 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
   const containsVideo = (node: Node): boolean => {
     if (node.nodeType !== 1 && node.nodeType !== 11) return false;
     const element = node as Element;
-    return element.tagName?.toLowerCase() === 'video' || Boolean(element.querySelector?.('video'));
+    return ['video', 'audio'].includes(element.tagName?.toLowerCase()) || Boolean(element.querySelector?.('video, audio'));
   };
   const isVideoContent = (node: Node): boolean => isElement(node)
-    && (node.tagName.toLowerCase() === 'video'
-      || (['source', 'track'].includes(node.tagName.toLowerCase()) && Boolean(node.closest('video'))));
+    && (['video', 'audio'].includes(node.tagName.toLowerCase())
+      || (['source', 'track'].includes(node.tagName.toLowerCase()) && Boolean(node.closest('video, audio'))));
   const onDom = (records: MutationRecord[]) => {
     if (records.length > 0 && records.every((record) => {
       if (isOwnedNode(record.target)) return true;
@@ -366,6 +371,14 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
       scheduleDomSync();
     } else scheduleDeferredDomSync();
   };
+  const onPlay = (event: Event) => {
+    const media = event.target as HTMLMediaElement | null;
+    if (!options.includeAudio || !media || !['AUDIO', 'VIDEO'].includes(media.tagName)) return;
+    // 正在学习的播放不能被网页自动播放的广告抢占；明确点击/聚焦新媒体仍可切换。
+    if (selected && selected.video !== media && selected.video.paused === false && !selected.video.ended) return;
+    lastInteraction = media; sync();
+  };
+  document.addEventListener('play', onPlay, true);
   document.addEventListener('pointerover', onPointer, true);
   document.addEventListener('pointerdown', onPointer, true);
   document.addEventListener('pointerout', onPointerOut, true);
@@ -396,6 +409,7 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
         if (typeof view.cancelAnimationFrame === 'function') view.cancelAnimationFrame(domSyncHandle);
         else view.clearTimeout(domSyncHandle);
       }
+      document.removeEventListener('play', onPlay, true);
       document.removeEventListener('pointerover', onPointer, true);
       document.removeEventListener('pointerdown', onPointer, true);
       document.removeEventListener('pointerout', onPointerOut, true);
@@ -417,11 +431,11 @@ export function createVideoPlayerLocator(options: VideoPlayerLocatorOptions = {}
 export function selectVideoPlayerTarget(
   document: Document,
   options: {window?: Window; isXPage?: boolean; selected?: VideoPlayerTarget | null;
-    lastInteraction?: HTMLVideoElement | null; activeInteraction?: HTMLVideoElement | null} = {},
+    lastInteraction?: HTMLMediaElement | null; activeInteraction?: HTMLMediaElement | null; includeAudio?: boolean} = {},
 ): VideoPlayerTarget | null {
   const view = options.window || window;
   const isXPage = options.isXPage ?? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(view.location.hostname);
-  const candidates = Array.from(document.querySelectorAll<HTMLVideoElement>('video'))
+  const candidates = Array.from(document.querySelectorAll<HTMLMediaElement>(options.includeAudio ? 'video, audio' : 'video'))
     .filter((video) => isVisibleVideo(video, view))
     .map((video) => {
       const player = getVideoPlayerForVideo(video, view);

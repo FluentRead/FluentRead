@@ -222,6 +222,7 @@ async function main() {
     await adaptation.getByRole('button', {name: '保存并应用', exact: true}).click();
     await adaptation.getByRole('status').filter({hasText: '规则已应用；'}).waitFor();
     assert.equal((await readConfig()).siteAdaptation.custom.rules[0].id, 'user-article');
+    await adaptation.getByRole('button', {name: '结束编辑', exact: true}).first().click();
     await adaptation.locator('.catalog-filters').getByRole('button', {name: /^全部规则/}).click();
     await adaptation.getByRole('searchbox', {name: '搜索网站规则', exact: true}).fill('GitHub');
     assert((await adaptation.locator('.catalog-rule').count()) > 0);
@@ -287,6 +288,7 @@ async function main() {
     await adaptation.getByRole('button', {name: '保存并应用', exact: true}).click();
     await adaptation.getByRole('status').filter({hasText: '规则已应用；'}).waitFor();
     assert.equal((await readConfig()).siteAdaptation.custom.rules.length, 3);
+    await adaptation.getByRole('button', {name: '结束编辑', exact: true}).first().click();
     const overrideRow = adaptation.locator('[data-adaptation-rule="' + builtinId + '"]');
     assert.match(await overrideRow.textContent(), /自定义覆盖/);
     await overrideRow.locator('.el-switch').click();

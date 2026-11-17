@@ -10,6 +10,7 @@ import videoLearningText from './video-learning/ja-JP.json';
 import selfHelpText from './self-help/ja-JP.json';
 import {compositeTranslationMessages, compositeTranslationLegacyText} from './compositeTranslation';
 import {aiRequestTimeoutMessages} from './aiRequestTimeout';
+import {dictionaryWorkspaceMessages} from './dictionaryWorkspace';
 import {selectionDictionaryMessages} from './selectionDictionary';
 import {sectionTranslationRulesJapaneseMessages} from './sectionTranslationRulesAsian';
 import {mimoRetirementLegacyText} from './mimoRetirement';
@@ -570,6 +571,7 @@ export const jaJPMessages = {
     ...aiRequestTimeoutMessages["ja-JP"],
     ...privacyProtectionMessages["ja-JP"],
     ...selectionDictionaryMessages["ja-JP"],
+    ...dictionaryWorkspaceMessages["ja-JP"],
     ...sectionTranslationRulesJapaneseMessages,
     "settings.requestLimits.retryIntervals": "再試行の間隔",
     "settings.requestLimits.apiKeyRecovery": "失敗した Key のクールダウン",

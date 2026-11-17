@@ -2,7 +2,7 @@
  * @file src/services/config/webDavBackup.ts
  * 文件职责：编排 WebDAV 连接管理与共用配置云备份事务。
  * 主要内容：只读连接测试、带修订号的保存与清除、同步与删除预览的页面所有权、后台重启恢复；
- * 连接密码单独保存在本机，切换服务器或账号会使旧预览和共同基线失效；关闭页面可取消排队中或正在读取的预览。
+ * 连接密码单独保存在本机，切换服务器、备份子目录或账号会使旧预览和共同基线失效；关闭页面可取消排队中或正在读取的预览。
  * 模块边界：通过端口调用 WebDAV 和配置仓库，不直接访问浏览器，不向 UI 返回密码。
  */
 import {CloudSyncError} from '@/src/core/config/cloudSync';
@@ -53,7 +53,7 @@ export function createWebDavBackup(ports: WebDavBackupPorts) {
     async function candidate(input: WebDavConnectionInput) {
         const previous = await ports.connections.read();
         const next = parseWebDavConnection(input, previous);
-        if (previous && next.url === previous.url && next.username === previous.username && next.password === previous.password && next.allowInsecure === previous.allowInsecure) next.revision = previous.revision;
+        if (previous && next.url === previous.url && next.backupPath === previous.backupPath && next.username === previous.username && next.password === previous.password && next.allowInsecure === previous.allowInsecure) next.revision = previous.revision;
         return next;
     }
     return {

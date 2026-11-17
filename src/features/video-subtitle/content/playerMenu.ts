@@ -218,6 +218,14 @@ function createAiGroup(language: UiLanguage): HTMLElement {
 
 function createDownloadActions(language: UiLanguage): HTMLElement {
     const actions = createTextElement('div', 'fluent-read-video-menu-downloads', '');
+    const format = document.createElement('select');
+    format.dataset.subtitleFormat = 'true';
+    format.setAttribute('aria-label', translateVideoUi('video.exportFormat', language));
+    format.style.cssText = 'margin:4px 8px 8px;padding:5px 8px;max-width:160px;color:inherit;background:#27272a;border:1px solid #52525b;border-radius:6px;';
+    for (const [value, label] of [['srt', 'SRT'], ['vtt', 'WebVTT'], ['md', 'Markdown']]) {
+        const option = document.createElement('option'); option.value = value; option.textContent = label; format.appendChild(option);
+    }
+    actions.appendChild(format);
     for (const [action, key, ariaKey] of [
         ['download-subtitles', 'video.downloadOriginalShort', 'video.downloadOriginal'],
         ['download-translated-subtitles', 'video.downloadTranslatedShort', 'video.downloadTranslated'],
@@ -724,7 +732,7 @@ export function renderVideoAiMenu(menu: HTMLElement, state: VideoAiMenuState, la
     if (state.fullActive) {
         if (state.phase === 'capturing') {
             detail = translateVideoUi('video.aiReadingAudio', language);
-            if (state.progress.capturedMs > 0 && state.progress.durationMs > 0) {
+            if (state.progress.captureMode !== 'playback' && state.progress.capturedMs > 0 && state.progress.durationMs > 0) {
                 percent = Math.round(state.progress.progress * 100);
                 detail = state.progress.transcribedMs > 0
                     ? translateVideoUi('video.aiTranscribing', language, {percent})

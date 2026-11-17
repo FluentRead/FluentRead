@@ -1,5 +1,7 @@
 <!--
  @file src/app/document-translation/DocumentApp.vue
+ 协作入口：向已绑定标签页的弹窗公开 PDF 协作开关，回到阅读视图后复验文件身份，拒绝旧文件与卸载后的请求。
+ PDF 批注：原文重排与标准 PDF 注释由阅读器呈现；本组合根把批注变更归入当前文件修订，沿用历史保存、冲突检测和隐私窗口边界，不另建存储。
  服务启用：关闭的服务不进入候选，保留独立选择并提示重新启用，翻译动作沿现有可用性检查阻止发送。
  文件职责：实现独立文档翻译页面的完整 Vue 应用，提供按已提交段落计算的实时数字与进度条、暂停及等待重试状态，服务或模型变更时取消旧任务并保留已有译文供续译；未完成或设置待应用时突出翻译，完成后突出下载并保留次级、经确认重新请求服务的重译入口；任务提示按处理优先级在工具栏内显示，材料恢复与下载反馈保留独立位置，不覆盖正文；承载简短异常提示、技术详情、文件导入、格式化预览、分段翻译、人工校订、原文结构变化后旧校订的独立保留、保存原文件和双语文件导出的用户流程。
  主要内容：相同译文保留原文且不重复展示；文档打开后按窗口宽度用一行或多行工具栏承载文件、阅读方式、页码缩放、翻译服务与目标语言、翻译与下载，窄窗口用翻译设置弹窗，矮小窗口用覆盖式侧栏保留正文高度；各种格式支持只缩放正文的触控板捏合与键盘操作，复用富文本预览并保持阅读位置；左侧可折叠的侧栏放文件列表与目录，其余空间留给正文；首页列出保存在本机的最近翻译，重新打开同一份文件时接着上次的译文继续；PDF 默认按原版排版左右对照，各种格式都从正在阅读的位置开始翻译，阅读锚点不变时复用批次顺序、翻页或滚动跨段后重排剩余片段；没有文字层的扫描版 PDF 在开始翻译时先逐页识别文字并显示进度；HTML、Markdown、纯文本与 ePub 的隔离预览只载入一次，译文逐段到达后原位更新并保留滚动位置，整篇译文几乎都与原文相同时状态里提示可换目标语言，带标题的文档（含 Word）在侧栏提供可按原文或译文显示的目录，Word 里的表格在阅读视图中仍按表格排版、只有一个部分时不显示部分切换，ePub 的全部章节列在侧栏目录里（按译文显示时用章内标题的译文）、当前章节下接着它其余的各级标题，正文上方不再占一行章节按钮，Word 与文本类预览在宽窗口左右对照；组织文档阅读与翻译、增量统计和人工校订；校订器首次打开才挂载，同一文档往返阅读保留搜索和页码，切换文件释放；人工译法确认只在当前文件阅读会话中参与篇章参考，按原文件身份和冻结语言隔离，重译时清空；导入与在线下载绑定独立取消所有权；PDF 清晰阅读流式显示完整段落和原图区域，源页文字层与译文更新分离，下载按原版布局左右配对，长译文以完整批注保留；切换、删除、重置及卸载释放 PDF 任务和 URL；PDF/ePub/DOCX/ZIP 导出显示进度、支持取消重试，迟到结果不得回写。
@@ -7,6 +9,8 @@
  原文校订：扫描段落对照原图逐行修改，只使改变的译文失效，旧原文和译文进入既有修订列表；显式重新识别当前页跳过 OCR 缓存，保留唯一同框人工校订与未改页，取消或切换任务拒绝迟到提交。
  下载面板：紧邻工具栏用小幅版式示意选择双语或仅译文，在设置之后提供单一品牌下载主按钮；PDF 排版按需展开，复用现有分段控件并独立于阅读视图，原文件保留次级入口；不重复文件名，未完成时说明原文保留规则并确认一次，失败时保留校订、展示明确重试动作，技术详情默认收起。
  材料接入：按原文件内容指纹加入本机学习工作区，恢复文档页码与章节，重解析后只按唯一原句重新匹配位置；原文件记录缺失时重新选择并核对指纹，不把同名文件误认作原件。
+ ePub 范围预览：章节目录在发起翻译前显示每章已译/总片段数；翻译运行中隐藏静态计数，避免显示过期进度。
+ 请求依据：按本次实际发送批次显示有界篇章证据及本地术语命中来源；文档可单独覆盖全局 AI 上下文偏好，但不改变全局配置，摘要只保留在当前页面。
  模块边界：ChatGPT 套餐模型选项保留全局和文档实际 slug，独立选择也直接保存，不经过自定义模型哨兵或新增发现请求；组件负责页面展示与交互，导入、OCR 与导出生命周期由 feature 控制器持有并经显式端口连接唯一任务模型；不自行解析二进制格式、不实现片段翻译队列、配置存储协议或导出编码；解析渲染来自 document-translation feature，配置协调来自 services/config，草稿共享设置编辑会话并保留文档字段与模型映射的原子补丁，运行时适配由本目录 runtime 注入。
 -->
 <!-- 文档页面归 app 层所有；WXT 入口只负责启动。 -->
@@ -67,7 +71,7 @@
             <button type="button" :class="{selected: richOutlineLanguage === 'source'}" :aria-pressed="richOutlineLanguage === 'source'" @click="richOutlineLanguage = 'source'">{{ t('document.pdfReading.original') }}</button>
             <button type="button" :class="{selected: richOutlineLanguage === 'translated'}" :aria-pressed="richOutlineLanguage === 'translated'" @click="richOutlineLanguage = 'translated'">{{ t('document.pdfReading.translated') }}</button>
           </div>
-          <button v-for="row in outlineRows" :key="row.key" type="button" class="document-outline-item" :class="{chapter: row.chapter !== undefined, current: row.current}" :aria-current="row.current ? 'location' : undefined" :style="{paddingLeft: `${12 + (row.level - 1) * 14}px`}" :title="row.title" data-i18n-ignore @click="row.item ? jumpOutline(row.item) : epubChapterIndex = row.chapter!">{{ row.label }}</button>
+          <button v-for="row in outlineRows" :key="row.key" type="button" class="document-outline-item" :class="{chapter: row.chapter !== undefined, current: row.current}" :aria-current="row.current ? 'location' : undefined" :aria-label="row.coverage ? `${row.label}, ${t('document.progressSegments', row.coverage)}` : undefined" :style="{paddingLeft: `${12 + (row.level - 1) * 14}px`}" :title="row.title" data-i18n-ignore @click="row.item ? jumpOutline(row.item) : epubChapterIndex = row.chapter!"><span class="document-outline-label">{{ row.label }}</span><small :hidden="!row.coverage" class="document-outline-progress" aria-hidden="true">{{ row.coverage ? `${row.coverage.completed}/${row.coverage.total}` : '' }}</small></button>
         </nav>
         <button v-if="parsedDocument" class="document-settings-button" type="button" aria-label="调整文档翻译设置" @click="openDocumentSettings"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m9 3-1 3-3 1-2 3 2 2-1 3 3 2 2-1 2 3h3l1-3 3-1 2-3-2-2 1-3-3-2-2 1-2-3H9Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="11.5" cy="11" r="3" stroke="currentColor" stroke-width="1.5"/></svg><strong>{{ translateLegacy('源语言与术语库') }}</strong><span data-i18n-ignore>{{ translationSettingsSummary }}</span><small>调整设置</small></button>
       </aside>
@@ -202,6 +206,27 @@
           </div>
           <p v-else-if="errorMessage" class="notice error task-notice" role="alert">{{ errorMessage }}</p>
           <p v-else-if="settingsChanged" class="notice warning task-notice" role="status">设置已更改。现有译文保留，按新设置翻译会从头开始。</p>
+          <details v-if="requestEvidence" class="document-request-evidence" data-testid="document-request-evidence">
+            <summary><span>{{ t('document.requestEvidence.title') }}</span><small>{{ t('document.requestEvidence.summary', {segments: requestEvidence.segmentCount, context: requestEvidence.contextItems.length, glossaryHits: requestEvidence.glossaryOccurrences}) }}</small></summary>
+            <div class="document-request-evidence-body">
+              <p class="document-request-location">{{ t('document.requestEvidence.location', {section: requestEvidence.section || t('document.requestEvidence.currentSection'), positions: requestEvidence.positions.join(' · ') || t('document.requestEvidence.currentBatch')}) }}</p>
+              <p v-if="!requestEvidence.contextEnabled" class="document-request-empty">{{ t('document.requestEvidence.contextDisabled') }}</p>
+              <p v-else-if="!requestEvidence.contextItems.length" class="document-request-empty">{{ t('document.requestEvidence.contextEmpty') }}</p>
+              <ul v-else class="document-request-context-list">
+                <li v-for="item in requestEvidence.contextItems" :key="`${item.kind}:${item.blockId}:${item.position}`">
+                  <strong>{{ requestEvidenceKindLabel(item.kind) }}</strong><small>{{ item.position || item.section }}</small>
+                  <p data-i18n-ignore>{{ item.source }}</p>
+                  <p v-if="item.translation" class="document-request-evidence-translation">{{ t('document.requestEvidence.translation', {text: item.translation}) }}</p>
+                </li>
+              </ul>
+              <p v-if="requestEvidence.glossaryOccurrences" class="document-request-glossary-summary">{{ t('document.requestEvidence.glossarySummary', {occurrences: requestEvidence.glossaryOccurrences, terms: requestEvidence.glossaryTermCount, libraries: requestEvidence.glossaryLibraryCount}) }}</p>
+              <p v-else class="document-request-empty">{{ t('document.requestEvidence.glossaryNone') }}</p>
+              <ul v-if="requestEvidence.glossaryTerms.length" class="document-request-glossary-list">
+                <li v-for="term in requestEvidence.glossaryTerms" :key="`${term.library}:${term.source}:${term.target}`"><small>{{ term.library }}</small><span>{{ term.source }} → {{ term.target }}</span><b>{{ term.occurrences }}×</b></li>
+              </ul>
+              <p v-if="requestEvidence.omittedGlossaryTerms" class="document-request-empty">{{ t('document.requestEvidence.moreGlossaryTerms', {count: requestEvidence.omittedGlossaryTerms}) }}</p>
+            </div>
+          </details>
           <p v-if="downloadNotice" class="taskbar-toast" role="status">{{ downloadNotice }}</p>
           </div>
         </section>
@@ -214,6 +239,9 @@
           :key="activeDocumentId ?? 0"
           :document="parsedDocument"
           :translations="translatedSegments"
+          :annotations="activeTask?.pdfAnnotations ?? []"
+          :annotations-saved="historyAvailable && activeTask?.revision === activeTask?.savedRevision"
+          @update:annotations="updatePdfAnnotations"
           v-model:presentation="pdfPresentation"
           :mode="effectivePreviewMode"
           :translating="translating"
@@ -385,6 +413,10 @@
           </label>
         </div>
         <label class="document-batch-translation"><input v-model="documentBatchTranslation" type="checkbox" :disabled="queueBusy" /><span><strong>{{ t('document.batchTranslation.label') }}</strong><small>{{ t('document.batchTranslation.hint') }}</small></span></label>
+        <div class="document-context-choice">
+          <label class="document-batch-translation" data-testid="document-ai-context-toggle"><input v-model="documentAIContextPreference" type="checkbox" :disabled="queueBusy || !documentAIContextSupported" /><span><strong>{{ t('document.requestEvidence.contextToggle') }}</strong><small>{{ documentAIContextSupported ? t('document.requestEvidence.contextHint') : t('document.requestEvidence.contextUnavailable') }}</small></span></label>
+          <button v-if="documentAIContextOverride !== null" class="document-context-inherit" type="button" :disabled="queueBusy" @click="documentAIContextOverride = null; requestEvidence = null">{{ t('document.requestEvidence.inheritGlobal') }}</button>
+        </div>
         <GlossaryLibrarySelect
           v-if="config.glossaryLibraries.length || config.glossaryEnabled"
           v-model="config.documentGlossaryIds"
@@ -494,6 +526,9 @@ import {
   TranslationRequestError,
   serializeTranslationError,
   buildGlossaryRevision,
+  findGlossaryMatches,
+  getGlossaryScopeReason,
+  resolveGlossaryEntries,
   DOCUMENT_MAX_BYTES,
   PDF_MAX_BYTES,
   DOCUMENT_QUICK_SAMPLES,
@@ -553,6 +588,8 @@ import {
   type DocumentHistorySummary,
   type DocumentQueueItem,
   type PdfReadingPresentation,
+  type PdfAnnotation,
+  normalizePdfAnnotations,
   type ParsedDocument,
   ElSelect,
   UiIcon,
@@ -566,6 +603,21 @@ type DocumentConfigPatch = Partial<Pick<Config,
   'from' | 'to' | 'documentService' | 'documentModel' | 'documentCustomModel' | 'documentGlossaryIds'
 >>;
 type DocumentModelMapping = Config['documentModel'];
+type DocumentRequestEvidenceKind = 'definition' | 'nearby' | 'section_opening' | 'previous_machine' | 'user_confirmed';
+interface DocumentRequestEvidenceItem {kind: DocumentRequestEvidenceKind; blockId: string; section: string; position: string; source: string; translation?: string}
+interface DocumentRequestGlossaryTerm {library: string; source: string; target: string; occurrences: number}
+interface DocumentRequestEvidenceState {
+  segmentCount: number;
+  contextEnabled: boolean;
+  section: string;
+  positions: string[];
+  contextItems: DocumentRequestEvidenceItem[];
+  glossaryOccurrences: number;
+  glossaryTermCount: number;
+  glossaryLibraryCount: number;
+  glossaryTerms: DocumentRequestGlossaryTerm[];
+  omittedGlossaryTerms: number;
+}
 
 function sameDocumentModelMapping(left: DocumentModelMapping, right: DocumentModelMapping): boolean {
   const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
@@ -614,6 +666,9 @@ function setFocusMode(value: boolean): void {
 function leaveFocusOnEscape(event: KeyboardEvent): void {if (event.key === 'Escape' && focusMode.value) setFocusMode(false);}
 function leaveFocusWithFullscreen(): void {if (!window.document.fullscreenElement && focusMode.value) focusMode.value = false;}
 const sidebarTab = ref<'files' | 'outline'>('outline');
+/** 文档级上下文覆盖只作用于当前打开文档，不写入全局设置或翻译历史。 */
+const documentAIContextOverride = ref<boolean | null>(null);
+const requestEvidence = ref<DocumentRequestEvidenceState | null>(null);
 const recognitionProgress = ref('');
 const retryWaiting = ref(0);
 const richOutline = ref<RichOutlineItem[]>([]);
@@ -707,6 +762,8 @@ function activateDocument(item: DocumentQueueItem): void {
   releaseDocumentPreview(parsedDocument.value);
   recognitionProgress.value = '';
   activeDocumentId.value = item.id;
+  documentAIContextOverride.value = null;
+  requestEvidence.value = null;
   rememberOpenDocument(item.historyReadUnavailable || item.historyConflict ? null : item.historyId);
   settledTranslations.value = [...item.translations];
   downloadNotice.value = '';
@@ -750,7 +807,7 @@ let historyRequestEpoch = 0;
 const materialPrivate = browser.extension?.inIncognitoContext === true;
 const materialSaving = ref(false);
 const documentMaterialId = ref('');
-const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined} | null>(null);
+const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean; toggleHypothesisFromPopup?(): Promise<unknown>} | null>(null);
 let pendingMaterialResume: MaterialRecord | undefined;
 let materialPositionTimer: ReturnType<typeof setTimeout> | undefined;
 let materialEpoch = 0;
@@ -774,7 +831,17 @@ function captureDocumentMaterialSelection(range: Range, quote: string): Material
   return {source: {kind: 'document', fingerprint: item.historyId, title: doc.fileName, ...(item.sourceUrl ? {url: item.sourceUrl} : {})},
     locator: {...locator, quote: quote.slice(0, 6000)}};
 }
-defineExpose({captureDocumentMaterialSelection});
+function markDocumentSelection(range: Range, kind: 'highlight' | 'underline'): boolean {
+  return !disposed && config.on && isPdfDocument.value && materialPdfReader.value?.markSelection(range, kind) || false;
+}
+async function toggleDocumentHypothesis(): Promise<unknown> {
+  if (disposed || !config.on || !isPdfDocument.value) return {status: 'unavailable', active: false};
+  const owner = activeTask.value;
+  readerTab.value = 'read'; await nextTick();
+  if (disposed || activeTask.value !== owner) return {status: 'unavailable', active: false};
+  return materialPdfReader.value?.toggleHypothesisFromPopup?.() ?? {status: 'unavailable', active: false};
+}
+defineExpose({captureDocumentMaterialSelection, markDocumentSelection, toggleDocumentHypothesis});
 function documentMaterialSelection(): MaterialSelection | undefined {
   const item = activeTask.value; const doc = parsedDocument.value;
   if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;
@@ -895,8 +962,16 @@ function persistHistory(): void {
     const completed = item.translations.filter(text => text?.trim()).length;
     if (!item.document || !item.historyId || !item.bytes || item.historyReadUnavailable || item.historyConflict || item.revision === item.savedRevision) continue;
     void historyCommitter.save(item, {id: item.historyId, name: item.name, format: item.document.format, size: item.bytes.byteLength, sourceUrl: item.sourceUrl, mimeType: item.mimeType || '',
-      total: item.document.segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations], ...(item.bypassCache ? {bypassCache: true} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
+      total: item.document.segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations], ...(item.bypassCache ? {bypassCache: true} : {}), ...(item.pdfAnnotations ? {pdfAnnotations: toRaw(item.pdfAnnotations)} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
   }
+}
+/** 批注沿用文件任务和历史版本校验；存储不可用时仍可下载本次副本。 */
+function updatePdfAnnotations(annotations: PdfAnnotation[]): void {
+  const task = activeTask.value;
+  if (!task || task.document?.binary?.kind !== 'pdf') return;
+  task.pdfAnnotations = normalizePdfAnnotations(annotations, task.document.binary.pages.length);
+  task.revision += 1;
+  persistHistory();
 }
 function scheduleHistorySave(): void {
   if (!historyAvailable || historyTimer !== undefined) return;
@@ -1194,6 +1269,13 @@ const selectedDocumentModel = computed({
   },
 });
 const documentModelValue = computed(() => selectedDocumentModel.value);
+const documentAIContextPreference = computed({
+  get: () => documentAIContextOverride.value ?? config.enableAIContext,
+  set: (enabled: boolean) => {documentAIContextOverride.value = enabled; requestEvidence.value = null;},
+});
+const documentAIContextSupported = computed(() => servicesType.isUseAIContext(effectiveDocumentService.value, documentModelValue.value)
+  || hasCompositeTranslationAIContext(config, effectiveDocumentService.value));
+const documentAIContextEnabled = computed(() => Boolean(documentAIContextPreference.value && documentAIContextSupported.value));
 const documentSupportsGlossary = computed(() => isCompositeTranslationProviderId(effectiveDocumentService.value)
   || supportsTranslationGlossary(effectiveDocumentService.value, selectedDocumentModel.value));
 const credentialWarning = computed(() => {
@@ -1234,6 +1316,15 @@ function documentFailureSummary(message: string): string {
   const {kind} = serializeTranslationError(message);
   return t(kind === 'unknown' ? 'document.translationRecovery.interrupted' : kind === 'bad-request' || kind === 'provider' ? 'document.translationRecovery.unavailable' : `translationStats.errorKind.${kind}`);
 }
+function requestEvidenceKindLabel(kind: DocumentRequestEvidenceKind): string {
+  switch (kind) {
+    case 'definition': return t('document.requestEvidence.kind.definition');
+    case 'nearby': return t('document.requestEvidence.kind.nearby');
+    case 'section_opening': return t('document.requestEvidence.kind.sectionOpening');
+    case 'previous_machine': return t('document.requestEvidence.kind.previousMachine');
+    case 'user_confirmed': return t('document.requestEvidence.kind.userConfirmed');
+  }
+}
 // PDF 打开即左右对照，其他格式从翻译开始进入所选方式：译文页先显示原页，各段译文到达后逐段替换。
 const canCompare = computed(() => translating.value || hasTranslation.value || (isPdfDocument.value && Boolean(parsedDocument.value?.segments.length)));
 const effectivePreviewMode = computed(() => canCompare.value ? previewMode.value : 'source');
@@ -1241,6 +1332,7 @@ const currentFingerprint = computed(() => JSON.stringify({
   from: config.from, to: config.to, service: effectiveDocumentService.value, model: selectedDocumentModel.value,
   compositeConnection: getCompositeTranslationConfigFingerprint(config, effectiveDocumentService.value),
   glossaryIds: config.documentGlossaryIds, glossaryRevision: buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
+  documentAIContext: documentAIContextEnabled.value,
 }));
 /** 跨服务与模型切换保留续译；同一组合内部的配置变化仍遵循原有重译确认，语言与术语始终参与兼容判断。 */
 function compatibleTranslationSettings(previous: string, current: string): boolean {
@@ -1252,11 +1344,12 @@ function compatibleTranslationSettings(previous: string, current: string): boole
   };
   const before = readSettings(previous), after = readSettings(current);
   if (!before || !after) return previous === current;
-  const contentSettings = (value: Record<string, unknown>) => JSON.stringify([value.from, value.to, value.glossaryIds, value.glossaryRevision]);
+  const contentSettings = (value: Record<string, unknown>) => JSON.stringify([value.from, value.to, value.glossaryIds, value.glossaryRevision, value.documentAIContext]);
   return contentSettings(before) === contentSettings(after)
     && (before.service !== after.service || before.compositeConnection === after.compositeConnection);
 }
 const settingsChanged = computed(() => Boolean(taskFingerprint.value && !compatibleTranslationSettings(taskFingerprint.value, currentFingerprint.value)));
+watch(currentFingerprint, () => {requestEvidence.value = null;});
 // 只调整操作层级：完成后的下载承接当前结果；任何待应用的设置（含可续译的服务/模型）都重新突出翻译。
 const downloadIsPrimary = computed(() => translationComplete.value && (!taskFingerprint.value || taskFingerprint.value === currentFingerprint.value));
 // 其它文档页或设置页也可切换服务。显示新服务时必须撤销旧任务，避免仍等待旧线路却让读者以为新线路卡住。
@@ -1500,7 +1593,8 @@ async function reviewPdfOcrSource() {
  */
 const outlineRows = computed(() => {
   const label = (item: RichOutlineItem) => richOutlineLanguage.value === 'translated' && item.translation ? item.translation : item.source;
-  const headings = (offset: number) => documentOutline.value.map(item => ({key: `h${item.index}`, level: item.level + offset, label: label(item), title: item.source, item, chapter: undefined as number | undefined, current: false}));
+  type Coverage = {completed: number; total: number};
+  const headings = (offset: number) => documentOutline.value.map(item => ({key: `h${item.index}`, level: item.level + offset, label: label(item), title: item.source, item, chapter: undefined as number | undefined, coverage: undefined as Coverage | undefined, current: false}));
   if (!isEpubDocument.value) return headings(0);
   const segments = parsedDocument.value!.segments, wanted = richOutlineLanguage.value === 'translated';
   return epubChapters.value.flatMap((chapter, index) => {
@@ -1508,7 +1602,11 @@ const outlineRows = computed(() => {
     // 章节名取自章内开头的标题；按译文显示时用那个标题的译文（翻译停下后），没有就仍显示原名。
     const name = chapter.title.toLocaleLowerCase();
     const heading = segments.slice(chapter.segmentOffset, chapter.segmentOffset + Math.min(3, chapter.segmentCount)).find(segment => segment.source.toLocaleLowerCase().includes(name));
-    const row = {key: `c${index}`, level: 1, label: (wanted && heading && settledTranslations.value[heading.id]) || chapter.title, title: chapter.title, item: undefined as RichOutlineItem | undefined, chapter: index, current};
+    const chapterSegments = segments.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount);
+    const coverage = !translating.value && chapter.segmentCount > 0
+      ? {completed: chapterSegments.reduce((count, segment) => count + Number(Boolean(settledTranslations.value[segment.id]?.trim())), 0), total: chapter.segmentCount}
+      : undefined;
+    const row = {key: `c${index}`, level: 1, label: (wanted && heading && settledTranslations.value[heading.id]) || chapter.title, title: chapter.title, item: undefined as RichOutlineItem | undefined, chapter: index, coverage, current};
     // 当前章节下面不重复列出作为章节名的那个标题。
     return [row, ...(current ? headings(1).filter(entry => entry.title !== row.title && entry.title !== heading?.source) : [])];
   });
@@ -1706,6 +1804,8 @@ function handleDrop(event: DragEvent): void {
 
 function resetDocument(): void {
   persistHistory();
+  documentAIContextOverride.value = null;
+  requestEvidence.value = null;
   recognitionProgress.value = '';
   cancelImport();
   releaseDocumentPreview(parsedDocument.value);
@@ -1818,14 +1918,19 @@ async function startTranslation(restart = false): Promise<void> {
   taskFingerprint.value = currentFingerprint.value;
   const glossaryIds = config.documentGlossaryIds === null ? null : [...config.documentGlossaryIds];
   const glossaryRevision = buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled);
+  const glossaryEnabled = config.glossaryEnabled;
+  const glossarySupported = documentSupportsGlossary.value;
+  const glossaryLibraries = toRaw(config.glossaryLibraries).map(library => ({
+    ...library, domains: [...library.domains], entries: library.entries.map(entry => ({...entry})),
+  }));
+  requestEvidence.value = null;
   // OCR 可能持续较久；整个任务使用同一文件身份与设置快照，外部配置更新不混入正在处理的文件。
   const settings = {serviceOverride: effectiveDocumentService.value,
     ...(bypassCache.value ? {useCache: false} : {}),
     modelOverride: documentUsesModel.value ? documentModelValue.value : undefined,
     sourceLanguage: config.from, targetLanguage: config.to, batchTranslation: documentBatchTranslation.value,
     materialId: documentQueue.value.find(item => item.id === activeDocumentId.value)?.historyId || `document:${activeDocumentId.value}`,
-    enableAIContext: config.enableAIContext && (servicesType.isUseAIContext(effectiveDocumentService.value, documentModelValue.value)
-      || hasCompositeTranslationAIContext(config, effectiveDocumentService.value))};
+    enableAIContext: documentAIContextEnabled.value};
   runState.value = 'ready';
   liveCompletedSegments.value = completedSegments.value;
   translating.value = true;
@@ -1888,6 +1993,64 @@ async function startTranslation(restart = false): Promise<void> {
         if (requestId !== translationRequestId || parsedDocument.value !== current || controller.signal.aborted) return;
         runState.value = 'failed';
         showError(reason);
+      },
+      onRequestPrepared: ({segments, discourseContext}) => {
+        if (requestId !== translationRequestId || parsedDocument.value !== current || controller.signal.aborted) return;
+        const kinds: readonly DocumentRequestEvidenceKind[] = ['definition', 'nearby', 'section_opening', 'previous_machine', 'user_confirmed'];
+        let section = segments.find(segment => segment.contextLabel?.trim())?.contextLabel?.slice(0, 160) ?? '';
+        let positions = [...new Set(segments.map(segment => [segment.contextLabel, segment.pathLabel, segment.timeStart, `段落 ${segment.id + 1}`]
+          .filter(Boolean).join(' · ')))].slice(0, 8);
+        let contextItems: DocumentRequestEvidenceItem[] = [];
+        if (discourseContext) {
+          try {
+            const parsed: unknown = JSON.parse(discourseContext);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              const record = parsed as Record<string, unknown>;
+              if (record.version === 1) {
+                if (!section && typeof record.section === 'string' && !/^(?:document|section:\d+)$/u.test(record.section)) section = record.section.slice(0, 160);
+                const rawPositions = Array.isArray(record.positions) ? record.positions : [record.position];
+                positions = [...new Set([...positions, ...rawPositions.filter((position): position is string => typeof position === 'string' && Boolean(position.trim())).map(position => position.slice(0, 160))])].slice(0, 8);
+                if (Array.isArray(record.evidence)) {
+                  contextItems = record.evidence.flatMap((value): DocumentRequestEvidenceItem[] => {
+                    if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+                    const item = value as Record<string, unknown>;
+                    if (!kinds.includes(item.kind as DocumentRequestEvidenceKind)
+                      || typeof item.blockId !== 'string' || typeof item.section !== 'string' || typeof item.position !== 'string'
+                      || typeof item.source !== 'string' || !item.source.trim()
+                      || (item.translation !== undefined && typeof item.translation !== 'string')) return [];
+                    return [{kind: item.kind as DocumentRequestEvidenceKind, blockId: item.blockId.slice(0, 160),
+                      section: item.section.slice(0, 160), position: item.position.slice(0, 160), source: item.source.slice(0, 480),
+                      ...(typeof item.translation === 'string' && item.translation ? {translation: item.translation.slice(0, 480)} : {})}];
+                  }).slice(0, 8);
+                }
+              }
+            }
+          } catch { /* 不显示无法核对的上下文协议 */ }
+        }
+
+        const glossaryContext = {text: segments.map(segment => segment.source), sourceLanguage: settings.sourceLanguage || '',
+          targetLanguage: settings.targetLanguage || '', pageUrl: undefined, glossaryIds};
+        const glossaryTerms = glossaryEnabled && glossarySupported
+          ? resolveGlossaryEntries(glossaryLibraries, glossaryContext).terms.flatMap(term => {
+            const library = glossaryLibraries.find(candidate => getGlossaryScopeReason(candidate, glossaryContext) === 'eligible'
+              && candidate.entries.some(entry => entry.source === term.source && entry.target === term.target && entry.caseSensitive === term.caseSensitive));
+            return library ? [{...term, library: library.name}] : [];
+          }) : [];
+        const matchedTerms = new Map<string, DocumentRequestGlossaryTerm>();
+        let glossaryOccurrences = 0;
+        for (const segment of segments) {
+          for (const {entry} of findGlossaryMatches(segment.source.normalize('NFC'), glossaryTerms)) {
+            const key = JSON.stringify([entry.library, entry.source, entry.target]);
+            const existing = matchedTerms.get(key);
+            if (existing) existing.occurrences += 1;
+            else matchedTerms.set(key, {library: entry.library, source: entry.source, target: entry.target, occurrences: 1});
+            glossaryOccurrences += 1;
+          }
+        }
+        const allGlossaryTerms = [...matchedTerms.values()].sort((left, right) => right.occurrences - left.occurrences || left.source.localeCompare(right.source));
+        requestEvidence.value = {segmentCount: segments.length, contextEnabled: settings.enableAIContext, section, positions, contextItems,
+          glossaryOccurrences, glossaryTermCount: matchedTerms.size, glossaryLibraryCount: new Set(allGlossaryTerms.map(term => term.library)).size,
+          glossaryTerms: allGlossaryTerms.slice(0, 8), omittedGlossaryTerms: Math.max(0, allGlossaryTerms.length - 8)};
       },
       // 默认合并多段，使用 feature 的有界批量与并发；开关只作用于当前文档。
       prioritize: prioritizeReadingPosition,

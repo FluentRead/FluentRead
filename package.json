@@ -91,8 +91,8 @@
     "@uzen/kokoro-js": "1.2.4",
     "@wllama/wllama": "3.6.1",
     "@wxt-dev/storage": "^1.0.1",
-    "bidi-js": "1.1.0",
     "ai": "7.0.165",
+    "bidi-js": "1.1.0",
     "crypto-js": "^4.2.0",
     "defuddle": "^0.19.6",
     "dexie": "^4.4.7",
@@ -116,7 +116,10 @@
     "turndown": "7.2.4",
     "webextension-polyfill": "^0.12.0",
     "x-fetch": "0.3.0",
-    "zod": "4.6.7"
+    "zod": "4.6.7",
+    "quickjs-emscripten-core": "0.32.0",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
+    "lzo1x": "1.0.1"
   },
   "devDependencies": {
     "@gfx/zopfli": "1.0.15",
@@ -132,6 +135,7 @@
     "@wxt-dev/webextension-polyfill": "^1.0.0",
     "esbuild": "0.28.2",
     "fake-indexeddb": "^6.0.0",
+    "hypothesis": "1.1771.0",
     "linkedom": "0.18.12",
     "obsidian": "1.13.1",
     "storybook": "10.6.6",

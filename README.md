@@ -26,7 +26,9 @@ For a closer look, [watch the full official introduction (4+ minutes, in Chinese
 
 </div>
 
-[![FluentRead bilingual webpage translation](./docs/public/screenshots/en/translation.webp)](./docs/public/screenshots/en/translation.webp)
+<table align="center"><tr><td>
+<a href="./docs/public/screenshots/en/translation.webp"><img src="./docs/public/screenshots/en/translation.webp" alt="FluentRead bilingual webpage translation" width="600" /></a>
+</td></tr></table>
 
 ## Features
 
@@ -37,7 +39,7 @@ For a closer look, [watch the full official introduction (4+ minutes, in Chinese
 | Learning center | Save words, phrases, and sentences with their original context for study and review. |
 | Image and area translation | Recognize text in webpage images or selected screen areas and display translations that can be copied. |
 | Document translation | Read PDF, ePub, DOCX, and other supported formats in two languages, edit translations, and export files. |
-| Video subtitles | Bilingual subtitles on YouTube and X; supported X videos can also use local AI transcription. |
+| Video subtitles | Bilingual subtitles on YouTube and X, with original-only and translation-only display modes; supported X videos can also use local AI transcription. |
 | Services and settings | Free translation services, DeepL, AI providers, and local Ollama models, with glossaries, translation styles, shortcuts, and menu layout settings. |
 
 See the [user guide](https://read.thinkstu.com/en/guide/) for instructions and supported formats. AI explanations require a configured AI service. Third-party pricing and availability depend on the provider.
@@ -120,3 +122,9 @@ Thank you to everyone who has contributed to FluentRead, including the many we c
 FluentRead is released under [GPL-3.0](./LICENSE). See [third-party notices](./public/third-party-notices/) for component attribution and licenses.
 
 Settings and learning records stay local by default; cloud translation uses your selected provider. Optional cloud configuration backup supports Google Drive and [WebDAV](https://read.thinkstu.com/en/guide/webdav), including service credentials while excluding wordbooks, conversations, and usage statistics. See the [privacy policy](https://read.thinkstu.com/en/guide/privacy) for permissions, encryption, and deletion details.
+
+## Star History
+
+<table align="center"><tr><td>
+<a href="https://star-history.com/#FluentRead/FluentRead&amp;Date"><img src="https://api.star-history.com/svg?repos=FluentRead/FluentRead&amp;type=Date" alt="FluentRead Star History chart" width="600" /></a>
+</td></tr></table>

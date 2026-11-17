@@ -1888,3 +1888,16 @@ it('keeps an open X menu usable across controls removal and remount, then cleans
   expect(menu.isConnected).toBe(false);
   binding.destroy();
 });
+
+it('preserves a host position declaration whose priority was changed after mounting', () => {
+  const f = createFixture(); let priority = 'important';
+  Object.defineProperty(f.window, 'getComputedStyle', {configurable: true, value: () => ({position: 'static'})});
+  const stylePrototype = Object.getPrototypeOf(f.player.style), previousPriority = Object.getOwnPropertyDescriptor(stylePrototype, 'getPropertyPriority');
+  Object.defineProperty(stylePrototype, 'getPropertyPriority', {configurable: true, value: () => priority});
+  const binding = createVideoPlayerBinding({locator: f.locator, document: f.document, getState: () => ({enabled: true}), createButton: () => f.document.createElement('button')});
+  f.player.style.setProperty('position', 'relative'); priority = '';
+  try {binding.destroy(); expect(f.player.style.position).toBe('relative');} finally {
+    if (previousPriority) Object.defineProperty(stylePrototype, 'getPropertyPriority', previousPriority);
+    else Reflect.deleteProperty(stylePrototype, 'getPropertyPriority');
+  }
+});

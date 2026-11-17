@@ -55,7 +55,8 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
     const filename = resolve(process.cwd(), relative);
     if (components.has(filename)) return components.get(filename)!;
     if (!actualComponents.has(filename)) throw new Error(`Unexpected Selection settings component: ${relative}`);
-    const compiled = compileVueInlineFixture(filename, {id: filename});
+    const compiled = compileVueInlineFixture(filename, {id: filename,
+        scriptReplacements: [['import.meta.env.BROWSER', JSON.stringify(browserCapabilities.browser)]]});
     expect(compiled.parseErrors).toEqual([]);
     const dependencies: Record<string, unknown> = {
         vue: Vue,
@@ -66,6 +67,7 @@ function loadClient(relative: string, components = new Map<string, Vue.Component
         'element-plus': {ElMessage: {warning}, ElOption: OptionPort},
         '@/src/ui/components/UiSelect.vue': {__esModule: true, default: SelectPort},
         './components/SettingsItem.vue': {__esModule: true, default: SettingsItemPort},
+        './DictionaryWorkspaceSettings.vue': {__esModule: true, default: Vue.defineComponent({setup: () => () => Vue.h('div', {'data-dictionary-workspace-port': ''})})},
         '@/src/core/config/selectionPreview': preview,
         '@/src/features/reading-assistant/ui/answer/public': {ReadingAnswer: ReadingAnswerPort},
         './HarnessSettings.vue': {__esModule: true, default: HarnessSettingsPort},

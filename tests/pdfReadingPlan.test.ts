@@ -7,6 +7,14 @@ const page = (blocks: PdfDocumentBlock[], overrides: Partial<PdfDocumentPage> = 
 const document = (sources: Array<{source: string; role?: 'heading' | 'paragraph'}>): ParsedDocument => ({fileName: 'paper.pdf', format: 'pdf', label: 'PDF', parts: [], segments: sources.map((entry, id) => ({id, ...entry}))});
 
 describe('PDF canonical complete reading plan', () => {
+    it.each([0, 90, 180, 270] as const)('keeps an image-only page readable at rotation %i before OCR', rotation => {
+        const sourcePage = page([], {rotation, scanned: true});
+        const before = JSON.stringify(sourcePage);
+        const plan = buildPdfReadingPlan(document([]), sourcePage, []);
+        expect(plan.entries).toEqual([{kind: 'region', id: 'pdf-3-region-page', pageNumber: 3, role: 'figure', segmentIndexes: [],
+            sourceRect: {x: 0, y: 0, width: rotation === 90 || rotation === 270 ? 800 : 600, height: rotation === 90 || rotation === 270 ? 600 : 800}}]);
+        expect(plan.hasTranslation).toBe(false); expect(JSON.stringify(sourcePage)).toBe(before);
+    });
     it('places a preserved table before its translated cells using explicit order even when the source block array is reversed', () => {
         const sourcePage = page([block(1, {kind: 'table', readingOrder: 20, y: 125}), block(0, {kind: 'table', readingOrder: 10, y: 100}), block(2, {kind: 'text', readingOrder: 30, y: 220})], {
             preservedRegions: [{id: 'table', kind: 'table', x: 10, y: 90, width: 200, height: 90}],
@@ -82,7 +90,7 @@ describe('PDF canonical complete reading plan', () => {
         expect(plan.entries.filter(entry => entry.kind === 'text').map(entry => entry.text)).toEqual(['same', 'missing', '有内容']);
         expect(plan.entries[0]).toMatchObject({role: 'paragraph', translated: false});
         expect(plan.hasTranslation).toBe(true);
-        expect(buildPdfReadingPlan(document([]), page([]), []).entries).toEqual([]);
+        expect(buildPdfReadingPlan(document([]), page([]), []).entries).toEqual([expect.objectContaining({kind: 'region', sourceRect: {x: 0, y: 0, width: 600, height: 800}})]);
         expect(buildPdfReadingPlan(document([{source: 'same'}]), page([block(0)]), ['same']).hasTranslation).toBe(false);
     });
 

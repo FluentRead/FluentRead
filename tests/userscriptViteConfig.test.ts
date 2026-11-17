@@ -909,7 +909,8 @@ describe('userscript browser shim injection', () => {
         const learningAppearanceKeys = Object.keys(extension).filter(key => key.startsWith('video.learningAppearance.'));
         expect(learningAppearanceKeys).toHaveLength(19);
         const subtitleExportKeys = Object.keys(extension).filter(key => key.startsWith('video.export'));
-        expect(subtitleExportKeys).toHaveLength(10);
+        expect(subtitleExportKeys).toHaveLength(11);
+        expect(subtitleExportKeys).toContain('video.exportFormat');
         for (const key of [...subtitleAppearanceKeys, ...learningAppearanceKeys, ...subtitleExportKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
@@ -962,7 +963,7 @@ describe('userscript browser shim injection', () => {
         }
         const extensionOnlyUndoKeys = ['learning.collection.undoExtensionNotice'];
         for (const key of extensionOnlyUndoKeys) expect(Object.hasOwn(projected,key)).toBe(false);
-        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !key.startsWith('informationHighlight.')
+        const retainedKeys = Object.keys(extension).filter(key => !extensionOnlyUndoKeys.includes(key) && !key.startsWith('informationHighlight.') && !key.startsWith('dictionary.')
             && (!key.startsWith('learning.collection.speech') || key === 'learning.collection.speechFailed')
             && !noticeKeys.includes(key) && !learningKeys.includes(key) && !readingAnnotationKeys.includes(key) && !subtitleAppearanceKeys.includes(key) && !learningAppearanceKeys.includes(key) && !subtitleExportKeys.includes(key) && !videoAsrKeys.includes(key) && !readerRecoveryKeys.includes(key)
             && !diagnosticKeys.includes(key) && !readerDialogKeys.includes(key)
@@ -1006,6 +1007,26 @@ describe('userscript browser shim injection', () => {
             '@/src/features/vocabulary/ui/public/nested', '@/src/features/vocabulary/ui/VocabularyBook.vue']) {
             expect(boundary.test(path)).toBe(false);
         }
+    });
+    it('builds extension dictionary UI imports as inert userscript components without loading workers', async () => {
+        const {build} = await import('vite-userscript');
+        const entry = '\0dictionary-ui-boundary';
+        const result = await build({root: process.cwd(), configFile: false, publicDir: false, logLevel: 'silent',
+            resolve: {alias: userscriptAliases},
+            plugins: [{name: 'dictionary-ui-boundary-fixture', resolveId: id => id === entry ? id : null,
+                load: id => id === entry ? `import settings from './DictionaryWorkspaceSettings.vue'; import tools from './DictionaryCardTools.vue'; export default [settings.render(), tools.render()];` : null}],
+            build: {write: false, minify: false, target: 'es2018', rollupOptions: {input: entry, preserveEntrySignatures: 'strict', output: {format: 'cjs'}}}});
+        const [output] = Array.isArray(result) ? result : [result];
+        if (!('output' in output)) throw new Error('Expected a dictionary UI boundary build output');
+        const chunk = output.output.find(item => item.type === 'chunk');
+        if (!chunk || chunk.type !== 'chunk') throw new Error('Expected a dictionary UI boundary build chunk');
+        const runtime = {exports: {}};
+        runInNewContext(chunk.code, {module: runtime, exports: runtime.exports});
+        expect(runtime.exports).toEqual([null, null]);
+        const ids = Object.keys(chunk.modules);
+        expect(ids.some(id => id.endsWith('/userscript/dictionaryUi.ts'))).toBe(true);
+        expect(ids.some(id => /Dictionary(?:WorkspaceSettings|CardTools)\.vue|importWorker/u.test(id))).toBe(false);
+        expect(Object.keys(userscriptMessages(extensionChinese)).some(key => key.startsWith('dictionary.'))).toBe(false);
     });
     it('pins each remote language file to a commit containing exactly its built contents', () => {
         const defines = (userscriptConfig as {define: Record<string, string>}).define;

@@ -7,9 +7,10 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import type {ContentScriptContext} from 'wxt/utils/content-script-context';
 const ports = vi.hoisted(() => ({config: {} as Record<string, unknown>, listeners: new Set<(next: Record<string, unknown>) => void>(),
-    mount: vi.fn(), unmount: vi.fn(), language: vi.fn(), bridge: vi.fn(), bridgeMain: vi.fn(),
+    htmlFrame: vi.fn(), mount: vi.fn(), unmount: vi.fn(), language: vi.fn(), bridge: vi.fn(), bridgeMain: vi.fn(),
     actions: null as null | {suspend(): void; resume(): void; dispose(): void}, suspended: false, signal: undefined as AbortSignal | undefined,
 }));
+vi.mock('@/src/app/content/htmlMediaFrame', () => ({startHtmlMediaFrameApp: ports.htmlFrame}));
 vi.mock('@/src/services/config/store', () => ({config: ports.config, configReady: Promise.resolve(),
     subscribeConfig: (fn: (next: Record<string, unknown>) => void) => {ports.listeners.add(fn);return () => ports.listeners.delete(fn);}}));
 vi.mock('@/src/platform/i18n/uiLanguageBundles', () => ({ensureUiLanguageBundle: ports.language}));
@@ -31,6 +32,7 @@ const changed = () => ports.listeners.forEach(fn => fn(ports.config));
 beforeEach(() => {
     for (const key of Object.keys(ports.config)) delete ports.config[key];
     Object.assign(ports.config, {on: true, disabledExtensionDomains: [], uiLanguage: 'en-US'});
+    ports.htmlFrame.mockReset();
     ports.listeners.clear(); ports.suspended = false; ports.actions = null; ports.signal = undefined;
     ports.mount.mockReset().mockReturnValue(ports.unmount); ports.unmount.mockReset(); ports.bridge.mockReset(); ports.bridgeMain.mockReset();
     ports.language.mockReset().mockResolvedValue(true); globals(); vi.stubGlobal('defineContentScript', (entry: unknown) => entry);
@@ -90,7 +92,7 @@ describe('YouTube 内嵌字幕组合根', () => {
         const bridge = (await import('../entrypoints/youtubeEmbedBridge.content')).default;
         const topBridge = (await import('../entrypoints/youtubeBridge.content')).default;
         const matches = ['*://*.youtube.com/embed/*', '*://youtube.com/embed/*'];
-        expect(ui.matches).toEqual(matches); expect(bridge.matches).toEqual(matches);
+        expect(ui.matches).toEqual(['http://*/*', 'https://*/*']); expect(bridge.matches).toEqual(matches);
         expect(topBridge.matches).toEqual(['*://*.youtube.com/*', '*://youtube.com/*']); expect(topBridge.allFrames).not.toBe(true);
         expect(ui.allFrames).toBe(true); expect(bridge.allFrames).toBe(true); expect(ui.runAt).toBe('document_start'); expect(bridge.runAt).toBe('document_start');
         expect(ui.cssInjectionMode).toBe('ui'); expect(bridge.world).toBe('MAIN'); expect(bridge.globalName).toBe(false);

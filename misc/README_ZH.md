@@ -26,7 +26,9 @@
 
 </div>
 
-[![流畅阅读网页双语对照效果](../docs/public/screenshots/translation.webp)](../docs/public/screenshots/translation.webp)
+<table align="center"><tr><td>
+<a href="../docs/public/screenshots/translation.webp"><img src="../docs/public/screenshots/translation.webp" alt="流畅阅读网页双语对照效果" width="600" /></a>
+</td></tr></table>
 
 ## 主要功能
 
@@ -37,7 +39,7 @@
 | 学习中心 | 收藏单词、短语和句子，保留原文语境，支持学习与复习。 |
 | 图片与圈选翻译 | 识别网页图片或选定区域中的文字，并显示可复制的译文。 |
 | 文档翻译 | 支持 PDF、ePub、DOCX 等格式，提供双语阅读、译文校订与文件导出。 |
-| 视频字幕 | 支持 YouTube 和 X 双语字幕；部分 X 视频可通过本地模型生成 AI 字幕。 |
+| 视频字幕 | 支持 YouTube 和 X 双语字幕，可切换仅原文或仅译文；部分 X 视频可通过本地模型生成 AI 字幕。 |
 | 翻译服务与设置 | 支持免费翻译服务、DeepL、AI 服务和本地 Ollama，可配置术语库、译文样式、快捷键及菜单栏布局。 |
 
 各功能的使用方法与支持范围见[使用指南](https://read.thinkstu.com/guide/)。AI 讲解需要配置可用的 AI 服务；第三方服务的费用与可用性由服务商决定。
@@ -119,3 +121,9 @@
 流畅阅读按 [GPL-3.0](../LICENSE) 开源发布，第三方组件的来源与许可见[第三方声明](../public/third-party-notices/)。
 
 设置和学习记录默认保存在本机，云端翻译由所选服务处理。Google Drive 配置同步（Chrome 测试功能）可将完整配置（含服务凭据）备份到自己的云盘，不包含单词本、聊天记录和用量统计。权限、加密及删除方式见[隐私政策](https://read.thinkstu.com/guide/privacy)。
+
+## Star 历史
+
+<table align="center"><tr><td>
+<a href="https://star-history.com/#FluentRead/FluentRead&amp;Date"><img src="https://api.star-history.com/svg?repos=FluentRead/FluentRead&amp;type=Date" alt="FluentRead Star 历史图表" width="600" /></a>
+</td></tr></table>

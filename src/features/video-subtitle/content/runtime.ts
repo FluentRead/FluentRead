@@ -92,7 +92,7 @@ import {
   type VideoAiFullCapturePhase,
   type VideoAiFullCaptureProgress,
 } from './video-ai/fullCapture';
-import { encodeVideoAiPcm16Base64 } from './video-ai/audioWindow';
+import { encodeVideoAiPcm16Base64, VIDEO_AI_SAMPLE_RATE } from './video-ai/audioWindow';
 import type { VideoAiStabilizedCue } from './video-ai/streamingTranscript';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {
@@ -113,6 +113,10 @@ import type {VideoAiSubtitleCacheSource} from '../transcriptionCache';
 import {getCaptionPlatform} from './platforms';
 import {mountPlatformCaptions} from './platformRuntime';
 import {createYoutubeNativeCaptionVisibility} from './youtubeNativeCaptionVisibility';
+import {BilibiliAiSource} from './bilibiliAiSource';
+import {readBilibiliAudio} from './bilibiliAudio';
+import {getBilibiliPart} from './courseCaptionData';
+import {requestBilibiliCaptionManifest} from './bilibiliCaptionBridge';
 import {YoutubeHumanCaptions} from './youtubeHumanCaptions';
 import {readVideoCaptionText} from './subtitleTransport';
 import {TimedTextTrackCache} from './timedTextTrackCache';
@@ -143,8 +147,23 @@ export function mountVideoSubtitleTranslation(): () => void {
 const isMediaSubtitlePage = () => isXVideoPage() || isHtmlMediaPage();
 
 function mountVideoSubtitleRuntime(): () => void {
-  if (getCaptionPlatform(window.location)) return mountPlatformCaptions({
+  const platform = getCaptionPlatform(window.location);
+  if (platform) return mountPlatformCaptions({
     document, window, config, subscribe: subscribeConfig,
+    createBilibiliAi: platform === 'bilibili' && browserCapabilities.extensionDom
+      && window.location.protocol === 'https:' && typeof OfflineAudioContext === 'function'
+      ? (getVideo, changed) => new BilibiliAiSource({
+        send: sendRuntimeMessage, getVideo, changed,
+        getModel: () => config.videoLocalModel,
+        getLanguage: () => config.videoSourceLanguage,
+        getProvider: () => config.videoTranscriptionProvider,
+        getNativeBaseUrl: () => config.videoNativeAsrBaseUrl,
+        getAudio: (video, signal) => readBilibiliAudio(getBilibiliPart(new URL(window.location.href)), video, signal, {
+          fetch: (input, init) => fetch(input, init),
+          manifest: (part, abort) => requestBilibiliCaptionManifest(window, part, abort),
+          decode: audio => new OfflineAudioContext(1, 1, VIDEO_AI_SAMPLE_RATE).decodeAudioData(audio),
+        }),
+      }) : undefined,
     translate: translateVideoText,
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),

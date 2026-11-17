@@ -90,7 +90,7 @@ export async function readBoundedMediaResponse(
     limit: number,
     signal: AbortSignal,
     options: ReadBoundedMediaResponseOptions = {},
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
     if (!response.ok || Number(response.headers.get('content-length')) > limit) {
         cancelUnreadResponseBody(response);
         throw new Error('视频音轨响应无效或过大');

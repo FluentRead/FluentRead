@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/courseCaptionData.ts
  * 文件职责：解析课程视频身份、原文字幕轨道及 B 站和 edX 的完整字幕时间轴。
- * 主要内容：分 P、课程小节和语言偏好进入身份；B 站先匹配原语言或选择非目标语言候选，再优先人工轨，限定字幕资源主机并校验时间轴边界。
+ * 主要内容：分 P、课程小节和语言偏好进入身份；识别 B 站标题中的自带字幕标记，先匹配原语言或选择非目标语言候选，再优先人工轨，限定字幕资源主机并校验时间轴边界。
  * 模块边界：只读取传入的地址、视频节点和数据，不调用网络、页面全局、翻译或持久化。
  */
 import type {VideoCoursePlatform} from '@/src/core/config/videoCourse';
@@ -17,6 +17,11 @@ export interface CourseCaptionRequest {
     url: string;
 }
 export interface CourseCaptionTrack {url: string; language: string; manual: boolean}
+
+/** 标题已声明字幕时保守跳过自动识别，覆盖接口无法枚举的画面内嵌字幕；仍允许手动生成。 */
+export function hasBilibiliCaptionHint(title: string): boolean {
+    return /(?:中文|中英(?:文|双语|雙語)?|双语|雙語|内嵌|內嵌|硬)字幕|字幕版|【中字】|\[中字\]|\b(?:subbed|subtitled)\b|\b(?:english|chinese|bilingual)\s+subtitles?\b/iu.test(title);
+}
 
 export function captionRecord(value: unknown): Record<string, unknown> {
     return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

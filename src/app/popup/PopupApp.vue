@@ -1,5 +1,6 @@
 <!--
  @file src/app/popup/PopupApp.vue
+ 协作入口：以紧凑按钮连接当前网页或已绑定的 PDF 阅读器。
  服务启用：默认服务提示和功能选择同步用户关闭状态，具体候选与旧选择保护由 PopupServices 执行。
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页，并为从划词抽屉打开的设置保留明确返回原网页的入口。
  主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；全文翻译进度与完成状态由主按钮反馈，失败时在主操作内的预留区域呈现自助诊断入口，不挤动网站开关，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
@@ -188,6 +189,7 @@
         :onSetExtensionDisabled="pageButtons.disabled"
         />
         <div :ref="setPageFontFocusAnchor" class="translation-tools" tabindex="-1">
+          <button v-if="!isThunderbird" class="display-mode-button" type="button" data-testid="hypothesis-toggle" :title="t('document.pdfReading.hypothesisEmbeddedNotice')" :aria-label="t('document.pdfReading.hypothesisToggle')" :disabled="!config.on || currentSiteExtensionDisabled || translating || pageState.savingRule" :onClick="pageButtons.hypothesis">H</button>
           <span class="display-mode-slot" :class="{'with-page-font': pageFontEntryVisible}" data-i18n-ignore>
             <ElTooltip v-if="pageFontEntryVisible" :ref="setPageFontTooltip" :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="350" :hide-after="0"
               :persistent="false" :show-arrow="false" :disabled="!pageFontContext.active.value || drawerVisible" placement="top-end" effect="light" popper-class="translation-tool-tooltip page-font-tooltip">
@@ -918,9 +920,10 @@ const tabSource = createPopupTabSource(window.location?.search || '', {
 const pageActions = createPopupPageActions({state: pageState, config: () => config.value, active: () => pageContext.active.value,
   warning: () => credentialWarning.value || '', getTab: tabSource.getTab,
   persistRule: persistSiteRulePatch,
-  openPdf: source => browser.tabs.create({url: createPdfReaderUrl(browser.runtime.getURL('document.html'), source)}),
+  openPdf: (source, hypothesis) => browser.tabs.create({url: createPdfReaderUrl(browser.runtime.getURL('document.html'), source) + (hypothesis ? '&hypothesis=1' : '')}),
   onStatus: readPageResult, onFailure: diagnostic => {pageDiagnostic.value = diagnostic;notice.value = ''},
-  send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0}), notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
+  send: (id, message) => message.type === 'toggleHypothesis' && (!pageState.url || pageState.url.split(/[?#]/u)[0] === browser.runtime.getURL('/document.html'))
+    ? browser.runtime.sendMessage({type: 'toggleDocumentHypothesis', tabId: id}) : browser.tabs.sendMessage(id, message, {frameId: 0}), notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
 const {hydrate: hydrateCurrentSite, toggle: togglePageTranslation, section: startSectionTranslation,
   setAlways: setCurrentSiteAlwaysTranslated, setDisabled: setCurrentSiteExtensionDisabled} = pageActions;
 watch(pageContext.revision, () => {pageActions.invalidate();readPageResult(undefined);if (!config.value.on || currentSiteExtensionDisabled.value) pageTranslated.value = false}, {flush: 'sync'});
@@ -930,6 +933,7 @@ const pageButtons = computed(() => {
   const current = pageContext.capture(), version = pageRenderRevision.value;
   const owns = () => current() && version === pageRenderRevision.value;
   return {toggle: () => {if (owns()) return runPageWithFreePoolAccess('toggle')}, section: () => {if (owns()) return runPageWithFreePoolAccess('section')},
+    hypothesis: () => {if (owns()) return pageActions.hypothesis()},
     always: (value: boolean) => {if (owns()) return setCurrentSiteAlwaysTranslated(value)},
     disabled: (value: boolean) => {if (owns()) return setCurrentSiteExtensionDisabled(value)}};
 });

@@ -512,3 +512,22 @@ it('allows translated/reflow selection only with the document model owner and fo
     expect(adapter.captureMaterial?.(range(root.querySelector('button')!.firstChild!), 'Control')).toBeUndefined();
     expect(capture).toHaveBeenCalledTimes(2);
 });
+
+it('routes annotation actions only for owned source or reflow ranges and preserves the requested kind', () => {
+    const {root} = dom('<main><div data-fluentread-pdf-text><span>Source quote</span></div><p class="pdf-reading-paragraph" data-pdf-segment-index="0">Reflow quote</p><button>Control</button></main>');
+    const mark = vi.fn(() => true), adapter = createPdfSelectionAdapter(root, () => undefined, mark);
+    for(const selector of ['[data-fluentread-pdf-text] span', '.pdf-reading-paragraph']) {
+        const selected = range(root.querySelector(selector)!.firstChild!);
+        expect(adapter.markSelection?.(selected, 'underline')).toBe(true);
+        expect(mark).toHaveBeenLastCalledWith(selected, 'underline');
+    }
+    expect(adapter.markSelection?.(range(root.querySelector('button')!.firstChild!), 'highlight')).toBe(false);
+    expect(mark).toHaveBeenCalledTimes(2);
+    expect(createPdfSelectionAdapter(root).markSelection).toBeUndefined();
+    expect(createPdfSelectionAdapter(root).canMarkSelection).toBeUndefined();
+    for(const selector of ['[data-fluentread-pdf-text] span', '.pdf-reading-paragraph']) expect(adapter.canMarkSelection?.(range(root.querySelector(selector)!.firstChild!))).toBe(true);
+    expect(adapter.canMarkSelection?.(range(root.querySelector('button')!.firstChild!))).toBe(false);
+    expect(adapter.canMarkSelection?.(range(root.querySelector('[data-fluentread-pdf-text] span')!.firstChild!,root.querySelector('.pdf-reading-paragraph')!.firstChild!))).toBe(false);
+    const translation=root.ownerDocument.createElement('p');translation.className='pdf-translation-text';translation.textContent='Translated quote';root.append(translation);
+    expect(adapter.canMarkSelection?.(range(translation.firstChild!))).toBe(false);
+});

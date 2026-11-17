@@ -1,5 +1,6 @@
 /**
  * @file src/app/background/messageRuntime.ts
+ * 协作装配：接入固定本地 Hypothesis 页面端注入，并把阅读器定向消息留给实际拥有该标签页的扩展页面。
  * 文件职责：构建并安装后台消息总运行时，把配置、翻译、OCR、TTS、生词本、扩展面板导航和标签页状态等公开 handler 连接到 browser.runtime。
  * 主要内容：向图片与划词处理注入设置、语言仓库和能力门控，图片邻文由已启用的 AI 上下文开关及当前模型的提示词能力决定，绑定事务页面及术语版本；Safari 为后台 iframe 注册同源接收端，并从可信配置读取网页通知接收者；装配翻译、TTS、下载及文档导航等类型化 router 与生命周期。
  * 模块边界：本文件是 composition root，只决定依赖装配和监听生命周期，不实现各 feature 的业务算法、provider 协议或存储事务；具体实现均来自 features、services、providers 与 platform。
@@ -52,6 +53,7 @@ import {createImageGlossaryContext} from './imageGlossaryContext';
 import {createEmbeddedFrameBackgroundHandlers} from '@/src/features/full-page-translation/background/embeddedFrameHandlers';
 import {createDocumentNavigationHandlers} from './documentNavigation';
 import {buildGlossaryRevision} from '@/src/core/glossary';
+import {createBrowserHypothesisHandler, withHypothesisDocumentPassthrough} from './hypothesisRuntime';
 import type {BackgroundRuntimeContext, BackgroundMessageRuntimeOptions} from './messageRuntimeTypes';
 export type {BackgroundMessageRuntimeOptions} from './messageRuntimeTypes';
 export function installBackgroundMessageRuntime(options: BackgroundMessageRuntimeOptions): void {
@@ -77,6 +79,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
         getGlossaryRevision: () => buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled),
     });
     const handlers: Array<BackgroundMessageHandler<BackgroundRuntimeContext>> = [
+        createBrowserHypothesisHandler(),
         createDictionaryRuntimeHandler(),
         ...createDocumentNavigationHandlers(),
         ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(tabBroadcast),
@@ -154,7 +157,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             requestRegistry: translationRequestRegistry,
         }),
     );
-    const listener = createBackgroundRuntimeMessageListener(router, (sender) => ({sender}) as BackgroundRuntimeContext);
+    const listener = withHypothesisDocumentPassthrough(createBackgroundRuntimeMessageListener(router, (sender) => ({sender}) as BackgroundRuntimeContext));
     browser.runtime.onMessage.addListener(listener);
     if (capabilities.browser === 'safari') {
         const removePageListener = installExtensionPageMessageListener(window as unknown as ExtensionPageMessageTarget, listener);

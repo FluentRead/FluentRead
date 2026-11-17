@@ -363,6 +363,9 @@ importers:
       fake-indexeddb:
         specifier: ^6.0.0
         version: 6.2.5
+      hypothesis:
+        specifier: 1.1771.0
+        version: 1.1771.0
       linkedom:
         specifier: 0.18.12
         version: 0.18.12
@@ -3214,6 +3217,9 @@ packages:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
     engines: {node: '>= 14'}
 
+  hypothesis@1.1771.0:
+    resolution: {integrity: sha512-/QYereFLPY0buOOpG7aiNFXio2iVVKW8KAPYDLDrdmUCLMVKM1Dug1DoxxD67ivcleliyeIfj5XfpT4VsogAlQ==}
+
   iconv-lite@0.6.3:
     resolution: {integrity: sha512-4fCk79wshMdzMp2rH06qWrJE4iolqLhCUH+OiuIgU++RB0+94NlDL81atO7GX55uUKueo0txHNtvEyI6D7WdMw==}
     engines: {node: '>=0.10.0'}
@@ -5858,7 +5864,8 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.18.0
 
-  '@opentelemetry/api@1.9.1': {}
+  '@opentelemetry/api@1.9.1':
+    optional: true
 
   '@oxc-parser/binding-android-arm-eabi@0.127.0':
     optional: true
@@ -7652,6 +7659,8 @@ snapshots:
       debug: 4.4.1(supports-color@7.2.0)
     transitivePeerDependencies:
       - supports-color
+
+  hypothesis@1.1771.0: {}
 
   iconv-lite@0.6.3:
     dependencies:

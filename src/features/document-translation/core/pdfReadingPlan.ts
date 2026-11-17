@@ -1,5 +1,6 @@
 /**
  * @file src/features/document-translation/core/pdfReadingPlan.ts
+ * 空页边界：没有可重排文字或图形区域的页面保留完整原图，使扫描件在识别前可阅读；使用未旋转的内容坐标供统一裁剪。
  * 文件职责：把 PDF 的阅读顺序、完整译文和需要保留的原图区域组织为阅读器与导出共用的纯数据计划。
  * 主要内容：保持稳定的页与片段标识，为没有翻译片段的作者及页脚保留原文与独立块标识，优先采用解析器的多栏顺序；完整段落不缩小、不截断；公式、表格、图形及含不可显示控制编码的未译源块以原坐标区域保留，再把空间相连的数学区域合为完整原图，区域中的有效译文仍作为独立段落呈现；裁剪无效或越界几何并避免相同原图重复输出。
  * 模块边界：不测量字体、不创建 DOM 或 Canvas、不调用翻译和文件 I/O；浏览器阅读与分页导出分别消费相同的文字及原图条目。
@@ -80,5 +81,9 @@ export function buildPdfReadingPlan(document: ParsedDocument, page: PdfDocumentP
     });
     // 原保护规则先确定全部文字；合并后的图片范围不能再参与文字删减。
     const entries = groupPdfReadingRegions(page, [...regions, ...text].sort((left, right) => left.order - right.order).map(({entry}) => entry), sourceControlIndexes);
+    // 扫描页或没有可提取内容的页面仍可先读原图，不能在原文重排时变成空白页。
+    if (!entries.length) entries.push({kind: 'region', id: `pdf-${page.pageNumber}-region-page`, pageNumber: page.pageNumber, role: 'figure', segmentIndexes: [],
+        sourceRect: {x: 0, y: 0, width: page.rotation === 90 || page.rotation === 270 ? page.height : page.width,
+            height: page.rotation === 90 || page.rotation === 270 ? page.width : page.height}});
     return {pageNumber: page.pageNumber, entries, hasTranslation};
 }

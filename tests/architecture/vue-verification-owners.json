@@ -53,6 +53,11 @@
       ],
       "scenario": "真实SFC在隔离DOM中执行快捷键、指针选择互斥、OCR缺包恢复、截图重试、迟到结果和卸载清理"
     },
+    "src/features/document-translation/ui/PdfAnnotations.vue": {
+      "kind": "behavior",
+      "tests": ["tests/pdfAnnotationsComponent.test.ts"],
+      "scenario": "实际选区、批注、译文备注、导出失败与切换卸载后的资源清理"
+    },
     "src/features/document-translation/ui/PdfReader.vue": {
       "kind": "behavior",
       "tests": [

@@ -640,6 +640,20 @@
         "tests/documentAppLifecycle.test.ts"
       ],
       "scenario": "真实原文校订对话框的逐行输入、确认与撤销事件、预览取消和 URL 释放；父页面持久化、显式重识别及迟到结果隔离"
+    },
+    "src/features/settings/ui/DictionaryWorkspaceSettings.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/dictionaryUi.test.ts"
+      ],
+      "scenario": "实际组件表单、配方导入、Worker 成功失败取消与卸载"
+    },
+    "src/features/selection-translation/ui/DictionaryCardTools.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/dictionaryUi.test.ts"
+      ],
+      "scenario": "模板预览、显式网页加载、卡片导出与本地 Anki 反馈"
     }
   }
 }

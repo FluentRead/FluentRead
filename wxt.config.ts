@@ -17,6 +17,7 @@ import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build
 import {PDFJS_DECODER_FILES} from './scripts/testing/pdfjs-assets.mjs';
 import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
+import {dictionaryScriptBuildPlugin, dictionaryScriptAssets} from './scripts/testing/dictionary-script-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
@@ -308,7 +309,7 @@ export default defineConfig({
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            plugins: [dictionaryScriptBuildPlugin(), createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
@@ -442,6 +443,9 @@ export default defineConfig({
             const pdfReadingToolsBudget = 20_000;
             // 固定 Hypothesis 1.1771.0 官方 Guest、CSS 与许可，Chrome 实测较68,634,324新增292,475bytes；仅按实际增量补预算。
             const hypothesisClientBudget = 298_000;
+            // #1357 同环境 e124325e8 基线 68,568,810 bytes；高级词典初版 69,642,530（+1,073,720）。
+            // 新增本地 QuickJS WASM、离线格式 Worker 和配方/模板 UI；WASM 独立交付，使用脚本时才加载。
+            const dictionaryWorkspaceBudget = 1_090_000;
             // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
             // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
             const siteRuleEditorBudget = 12_000;
@@ -450,7 +454,7 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -465,6 +469,7 @@ export default defineConfig({
         },
         'build:publicAssets': (wxt, files) => {
             files.push(...hypothesisAssets(__dirname));
+            files.push(...dictionaryScriptAssets(__dirname));
             files.push(...createSafariBackgroundPage(wxt.config));
             // 仅保留本地算法的许可；日语词典与印地语语言数据首次使用时下载校验并缓存。
             for (const [source, destination] of [['@faanau/kuromoji/LICENSE-2.0.txt','kuromoji-Apache-2.0.txt'],['@faanau/kuromoji/NOTICE.md','kuromoji-NOTICE.md'],['kuroshiro/LICENSE','kuroshiro-MIT.txt'],['pinyin-pro/LICENSE','pinyin-pro-MIT.txt'],['thai-rtgs/LICENSE','thai-rtgs-MIT.txt']]) {

@@ -182,6 +182,7 @@ overrides:
   react: 18.3.1
   react-dom: 18.3.1
   vitepress>vite: 5.4.21
+  lzo1x>lzo: '-'
 
 patchedDependencies:
   ppu-paddle-ocr@6.6.0: 0a64959dceb4d6de9d55787e6d5c81de33fd65fb06e7a57f5c2a3237b00ba60f
@@ -217,6 +218,9 @@ importers:
       '@huggingface/transformers-kokoro':
         specifier: npm:@huggingface/transformers@4.2.0
         version: '@huggingface/transformers@4.2.0'
+      '@jitl/quickjs-wasmfile-release-sync':
+        specifier: 0.32.0
+        version: 0.32.0
       '@noble/hashes':
         specifier: 1.8.0
         version: 1.8.0
@@ -268,6 +272,9 @@ importers:
       kuroshiro:
         specifier: 1.2.1
         version: 1.2.1
+      lzo1x:
+        specifier: 1.0.1
+        version: 1.0.1
       mathml-to-latex:
         specifier: 1.8.0
         version: 1.8.0
@@ -289,6 +296,9 @@ importers:
       ppu-paddle-ocr:
         specifier: 6.6.0
         version: 6.6.0(patch_hash=0a64959dceb4d6de9d55787e6d5c81de33fd65fb06e7a57f5c2a3237b00ba60f)(onnxruntime-node@1.24.3)(onnxruntime-web@1.23.2)
+      quickjs-emscripten-core:
+        specifier: 0.32.0
+        version: 0.32.0
       saxes:
         specifier: 6.0.0
         version: 6.0.0
@@ -1172,6 +1182,12 @@ packages:
   '@isaacs/fs-minipass@4.0.1':
     resolution: {integrity: sha512-wgm9Ehl2jpeqP3zw/7mo3kRHFp5MEDhqAdwy1fTGkHAwnkGOVsgpvQhL8B5n1qlb01jV3n/bI0ZfZp5lWA1k4w==}
     engines: {node: '>=18.0.0'}
+
+  '@jitl/quickjs-ffi-types@0.32.0':
+    resolution: {integrity: sha512-v9T+GQpmk43VDJ7d72sf0Nexhk+ArvtUihW27dy7lqAl0zBObFKtSBBIm5RBjwIhE8VwsPPm9PNuvPvNqLWUEg==}
+
+  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
+    resolution: {integrity: sha512-BKNDI/TPBfGlLNGYpLrhcDGXmIk4xHm4MRAisOBnOzpXVn9HZWsfmMAc9WMBrAHjvvds6HOikKeaOBKdPdpVrg==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -3628,6 +3644,10 @@ packages:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
 
+  lzo1x@1.0.1:
+    resolution: {integrity: sha512-Zlk+Fn2L47oOVFudFxy/hguB1y3Ai3exmwyBu01kTTwbkd+Jmx8BoBS0yQfob47tKekWUofy3iRJx5HBxeTkdA==}
+    engines: {node: '>=20.9.0', pnpm: '>=9.0.0'}
+
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
 
@@ -4119,6 +4139,9 @@ packages:
 
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
+
+  quickjs-emscripten-core@0.32.0:
+    resolution: {integrity: sha512-QFnPfjFey8EqknSrSxe1hZrf1/8z7/6s1QzGOmKo6++02r7QRRX7ZoyNaZh7JuVjWsVW87KnQrbZqnHkOAzUyg==}
 
   rc9@3.1.0:
     resolution: {integrity: sha512-ufjkNVzbRHKcCOmTahZkmVsyc3W+MSk3jY03m+a7tGHkIsdVMG9l10/3HvFbWkkKzY5VFp3pkRsIo/UYgmFL7Q==}
@@ -5680,6 +5703,12 @@ snapshots:
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
       minipass: 7.1.3
+
+  '@jitl/quickjs-ffi-types@0.32.0': {}
+
+  '@jitl/quickjs-wasmfile-release-sync@0.32.0':
+    dependencies:
+      '@jitl/quickjs-ffi-types': 0.32.0
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -7978,6 +8007,8 @@ snapshots:
 
   lz-string@1.5.0: {}
 
+  lzo1x@1.0.1: {}
+
   magic-string@0.30.21:
     dependencies:
       '@jridgewell/sourcemap-codec': 1.6.0
@@ -8586,6 +8617,10 @@ snapshots:
   queue-microtask@1.2.3: {}
 
   quick-format-unescaped@4.0.4: {}
+
+  quickjs-emscripten-core@0.32.0:
+    dependencies:
+      '@jitl/quickjs-ffi-types': 0.32.0
 
   rc9@3.1.0:
     dependencies:

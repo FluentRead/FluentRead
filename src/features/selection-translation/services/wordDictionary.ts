@@ -10,6 +10,7 @@ import {readJsonResponse} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, createRuntimeAbortContext, runtimeFetch} from '@/src/platform/http/runtime';
 import {canCacheOptionalEcdict, downloadFullEcdict, readCachedFullEcdict, type EcdictCompactRow} from './ecdictAsset';
 import {normalizeEnglishWord} from './wordNormalization';
+import type {DictionaryEntry} from '../dictionary/model';
 
 export {isSingleEnglishWord, normalizeEnglishWord} from './wordNormalization';
 
@@ -34,12 +35,13 @@ export interface WordMeaning {
 }
 
 export interface WordDictionarySource {
-    id: WordDictionaryProviderId;
+    id: WordDictionaryProviderId | `recipe:${string}`;
     label: string;
     url: string;
 }
 
 export interface WordCardData {
+    dictionaryEntry?: DictionaryEntry;
     word: string;
     normalizedWord: string;
     phonetics: WordPronunciation[];

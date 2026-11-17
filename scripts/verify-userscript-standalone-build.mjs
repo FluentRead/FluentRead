@@ -40,6 +40,15 @@ const bytes = Buffer.byteLength(source);
 // Add only the remaining rounded 3 kB for text; dependencies, model assets and compact-build limits stay unchanged.
 // Integrating #1353 adds 751 bytes (3,692,678 → 3,693,429) with no new dependency or model asset.
 // Use the existing 322-byte headroom, then add only the remaining rounded 1 kB.
-const maxBytes = 3_694_000;
+// #1360's persistent rule editor and region guidance build to 3,698,213 bytes in CI.
+// The existing cap is exceeded by 4,213 bytes; register only the rounded 5 kB for UI/text.
+// Dependencies, model assets, metadata checks and the compact-build limits stay unchanged.
+// #1362's WebDAV settings and shared Chinese text add 866 bytes on e31c81d89
+// (3,693,429 → 3,694,295). Use the existing 571-byte headroom and add the remaining rounded 1 kB.
+// Keep every protocol assertion, dependency and compact/Greasy Fork budget unchanged.
+// #1356's seven-language media controls and feedback build to 3,702,437 bytes on abdbbcc88.
+// Use the existing headroom, then add only the remaining rounded 3 kB for text and UI.
+// Runtime dependencies, metadata assertions and compact/Greasy Fork limits stay unchanged.
+const maxBytes = 3_703_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

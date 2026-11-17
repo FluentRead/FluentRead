@@ -2,6 +2,21 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## 正文适配连续编辑（issue #1360）
+
+`tests/remoteSiteSettingsLifecycle.test.ts` 覆盖新建和内置规则覆盖后的连续保存、保存失败重试、跨页更新冲突、未保存提醒与区域移除。生产构建后运行编辑器专项：
+
+```sh
+node scripts/testing/run-site-rule-editor-ui-test.cjs --suite editor \
+  --extension-dir .output/chrome-mv3 \
+  --playwright-root <Playwright-Node包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --runtime-diagnostics-helper <UI测试技能的runtime-diagnostics.cjs路径> \
+  --artifacts-dir <证据目录>
+```
+
+专项使用临时 Edge profile、第二屏后台正常窗口，检查三次连续保存后保持同一表单、保存失败后重试、长规则操作入口、20 个区域直接展示、保存后滚动位置、多语窄屏与深色布局、跨页冲突保护及关闭重开后的持久化。诊断覆盖 options 和扩展后台，报告保留启动时的采集空窗；不访问翻译供应商，也不代替 Firefox 原生验收。
+
 ## 设置分组、阅读辅助与右键菜单
 
 右键菜单后台恢复专项：`pnpm test tests/contextMenuRuntimeOwnership.test.ts tests/contextMenu.test.ts tests/backgroundBadgeRuntime.test.ts tests/contentMessageRuntime.test.ts`。受控浏览器端口覆盖 MV3 后台冷启动首击等待配置与菜单就绪、活动页查询暂时失败后的点击、导航/关闭/禁用期间丢弃旧点击，以及失败重试和翻译—恢复—再次翻译。菜单已创建后，活动页查询失败不会清空点击路由。该专项不代表操作系统原生菜单、报告者环境或在线供应商验收。

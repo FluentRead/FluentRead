@@ -99,7 +99,7 @@
     "settings.cloud.deleteRecreate": "Une synchronisation manuelle ultérieure peut créer une nouvelle sauvegarde. Les autres appareils peuvent aussi la téléverser à nouveau.",
     "settings.cloud.deleteUnsupported": "Le service ne fournit pas les informations de version nécessaires à une suppression sûre. La suppression est indisponible ici.",
     "settings.cloud.deleteManualDrive": "Dans Google Drive, ouvrez Paramètres → Gérer les applications → FluentRead pour effacer les données de l’application.",
-    "settings.cloud.deleteManualWebDav": "Supprimez manuellement FluentRead/fluentread-config.encrypted.json chez votre fournisseur WebDAV et conservez les autres fichiers.",
+    "settings.cloud.deleteManualWebDav": "Dans le dossier de sauvegarde WebDAV configuré, supprimez uniquement fluentread-config.encrypted.json.",
     "settings.cloud.deleteConfirm": "Supprimer la sauvegarde",
     "settings.cloud.deleteFinish": "Terminer",
     "settings.cloud.deleteAbsent": "Aucune sauvegarde cloud",
@@ -113,7 +113,10 @@
     "settings.cloud.deleteCloudEffect": "La confirmation supprime la sauvegarde cloud actuelle de {provider}.",
     "settings.cloud.deleteVerificationPrompt": "Saisissez « {phrase} » pour confirmer la suppression.",
     "settings.webdav.concurrentWarning": "Ce fournisseur ne peut pas empêcher les écritures simultanées. La sauvegarde est revérifiée avant tout enregistrement, fusion ou suppression. Évitez de synchroniser plusieurs appareils en même temps.",
-    "settings.cloud.uploadUnverified": "La configuration a été envoyée à Google Drive, mais la vérification n’a pas pu aboutir. Relisez la sauvegarde pour confirmer. Les réglages de cet appareil n’ont pas changé."
+    "settings.cloud.uploadUnverified": "La configuration a été envoyée à Google Drive, mais la vérification n’a pas pu aboutir. Relisez la sauvegarde pour confirmer. Les réglages de cet appareil n’ont pas changé.",
+    "settings.webdav.backupPath": "Sous-dossier de sauvegarde",
+    "settings.webdav.backupPathHint": "Laissez vide pour utiliser le dossier ci-dessus, ou indiquez un sous-dossier.",
+    "settings.webdav.error.path": "Indiquez un sous-dossier relatif sans .. ni URL complète, ou laissez vide."
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La sauvegarde cloud des paramètres généraux contient des champs hors de sa portée. Créez une nouvelle sauvegarde.",

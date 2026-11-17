@@ -190,6 +190,8 @@ const VISIBLE_FIELDS: Record<string, string> = {
     selectionTranslatorAutoDismiss: '继续阅读时自动收起',
     selectionTranslatorBidirectional: '中英双向划词',
     selectionDictionarySource: '词典来源',
+    selectionDictionaryRecipe: '自定义词典',
+    selectionDictionaryWorkspace: '词典与学习卡',
     vocabularyBookEnabled: '单词本',
     vocabularyReencounterEnabled: '再次遇见收藏表达',
     maxConcurrentTranslations: '翻译并发数',

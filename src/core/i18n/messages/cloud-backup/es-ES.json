@@ -99,7 +99,7 @@
     "settings.cloud.deleteRecreate": "Una sincronización manual posterior puede crear una nueva copia. Otros dispositivos también pueden volver a subirla.",
     "settings.cloud.deleteUnsupported": "El proveedor no facilita la información de versión necesaria para eliminar de forma segura. No se puede eliminar aquí.",
     "settings.cloud.deleteManualDrive": "En Google Drive, abre Configuración → Administrar aplicaciones → FluentRead para eliminar los datos de la aplicación.",
-    "settings.cloud.deleteManualWebDav": "Elimina manualmente FluentRead/fluentread-config.encrypted.json en tu proveedor WebDAV y conserva los demás archivos.",
+    "settings.cloud.deleteManualWebDav": "En la carpeta de copias WebDAV configurada, elimina solo fluentread-config.encrypted.json.",
     "settings.cloud.deleteConfirm": "Eliminar copia",
     "settings.cloud.deleteFinish": "Finalizar",
     "settings.cloud.deleteAbsent": "No hay copia en la nube",
@@ -113,7 +113,10 @@
     "settings.cloud.deleteCloudEffect": "Al confirmar, se elimina la copia actual en la nube de {provider}.",
     "settings.cloud.deleteVerificationPrompt": "Escribe «{phrase}» para confirmar la eliminación.",
     "settings.webdav.concurrentWarning": "Este proveedor no puede evitar escrituras simultáneas. La copia se vuelve a comprobar antes de guardar, combinar o eliminar. Evita sincronizar otros dispositivos al mismo tiempo.",
-    "settings.cloud.uploadUnverified": "La configuración se subió a Google Drive, pero no se pudo completar la verificación. Vuelve a leer la copia para confirmar. Los ajustes del dispositivo no cambiaron."
+    "settings.cloud.uploadUnverified": "La configuración se subió a Google Drive, pero no se pudo completar la verificación. Vuelve a leer la copia para confirmar. Los ajustes del dispositivo no cambiaron.",
+    "settings.webdav.backupPath": "Subcarpeta de copias de seguridad",
+    "settings.webdav.backupPathHint": "Déjalo vacío para usar la carpeta anterior. Admite subcarpetas.",
+    "settings.webdav.error.path": "Introduce una subcarpeta relativa sin .. ni una URL completa, o déjalo vacío."
   },
   "legacy": {
     "普通云备份包含不属于此范围的字段，请重新生成备份。": "La copia en la nube de ajustes generales contiene campos fuera de su alcance. Genera una nueva copia.",

@@ -1140,12 +1140,12 @@ describe('双语逐句高亮配置', () => {
                 .toMatchObject({bilingualSentenceHighlightEnabled: true, bilingualSentenceHighlightStyle: 'rose'});
         }
     });
-    it('默认关闭，并只接受显式布尔值开启', () => {
-        expect(new Config().bilingualSentenceHighlightEnabled).toBe(false);
-        expect(normalizeConfig({}).bilingualSentenceHighlightEnabled).toBe(false);
+    it('默认开启，显式关闭优先，非法值回到默认', () => {
+        expect(new Config().bilingualSentenceHighlightEnabled).toBe(true);
+        expect(normalizeConfig({}).bilingualSentenceHighlightEnabled).toBe(true);
         expect(normalizeConfig({bilingualSentenceHighlightEnabled: true}).bilingualSentenceHighlightEnabled).toBe(true);
         expect(normalizeConfig({bilingualSentenceHighlightEnabled: false}).bilingualSentenceHighlightEnabled).toBe(false);
-        expect(normalizeConfig({bilingualSentenceHighlightEnabled: 'true'}).bilingualSentenceHighlightEnabled).toBe(false);
+        expect(normalizeConfig({bilingualSentenceHighlightEnabled: 'true'}).bilingualSentenceHighlightEnabled).toBe(true);
     });
 });
 

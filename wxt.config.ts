@@ -17,6 +17,7 @@ import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build
 import {PDFJS_DECODER_FILES} from './scripts/testing/pdfjs-assets.mjs';
 import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
 import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
+import {dictionaryScriptBuildPlugin, dictionaryScriptAssets} from './scripts/testing/dictionary-script-build';
 import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
 import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
 import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
@@ -309,7 +310,7 @@ export default defineConfig({
         return {
             // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
             resolve: {alias: createReadingDictionaryAliases(__dirname)},
-            plugins: [createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            plugins: [dictionaryScriptBuildPlugin(), createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
             build: {
                 // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
@@ -413,7 +414,11 @@ export default defineConfig({
             // Safari DOM 页面与同源消息传输：Safari 同环境基线67,864,461→68,133,060bytes；Chrome 为68,506,284bytes。
             // 使用既有余量后，Safari 仅需追加9kB，Chrome/Firefox 共用适配器追加3kB；没有新增模型或依赖。
             const domRuntimeBudget = browser === 'safari' ? 9_000 : 3_000;
-            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget;
+            // #1362 的 WebDAV 子目录、同源 href 识别和七语文案：同环境 e124325e8 的 Chrome
+            // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
+            // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
+            const webDavPathBudget = 5_000;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
@@ -436,7 +441,18 @@ export default defineConfig({
             // #1356 复用既有字幕 frame；Chrome 对照 e124325e8 净增54,778 bytes，新增媒体定位、词查询、虚拟全文、七语文案、AudioWorklet 与导出格式。
             // 不增加模型、WASM、权限或依赖；保留可核对的55kB功能预算。
             const htmlMediaSubtitleBudget = 55_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + htmlMediaSubtitleBudget));
+            // #1357 同环境 e124325e8 基线 68,568,810 bytes；高级词典初版 69,642,530（+1,073,720）。
+            // 新增本地 QuickJS WASM、离线格式 Worker 和配方/模板 UI；WASM 独立交付，使用脚本时才加载。
+            const dictionaryWorkspaceBudget = 1_090_000;
+            // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
+            // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
+            const siteRuleEditorBudget = 12_000;
+            // ePub 章级范围预览在同环境 Chrome 构建从68,568,261增至68,569,164bytes（+903）；仅文档页与样式改变，无新资源或依赖。
+            // 按既有余量规则追加1kB代码预算，继续由实际产物门禁校验。
+            const epubCoveragePreviewBudget = 1_000;
+            // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
+            const requestEvidenceBudget = 30_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -450,6 +466,7 @@ export default defineConfig({
             }
         },
         'build:publicAssets': (wxt, files) => {
+            files.push(...dictionaryScriptAssets(__dirname));
             files.push(...createSafariBackgroundPage(wxt.config));
             // 仅保留本地算法的许可；日语词典与印地语语言数据首次使用时下载校验并缓存。
             for (const [source, destination] of [['@faanau/kuromoji/LICENSE-2.0.txt','kuromoji-Apache-2.0.txt'],['@faanau/kuromoji/NOTICE.md','kuromoji-NOTICE.md'],['kuroshiro/LICENSE','kuroshiro-MIT.txt'],['pinyin-pro/LICENSE','pinyin-pro-MIT.txt'],['thai-rtgs/LICENSE','thai-rtgs-MIT.txt']]) {

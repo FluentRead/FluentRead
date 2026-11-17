@@ -165,7 +165,7 @@ export function createSelectionWordLookupHandler(
             return {
                 success: true,
                 data: card
-                    ? message.translateFields === false
+                    ? message.translateFields === false || card.dictionaryEntry
                         ? prepareWordCardForTarget(card, targetLanguage)
                         : await translateVisibleWordCardFields(card, targetLanguage, dependencies.translate, dependencies.warn)
                     : null,

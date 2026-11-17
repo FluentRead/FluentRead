@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   openMangaReading: vi.fn(),
   config: {
     on: true,
+    theme: 'auto',
     disableFloatingBall: false,
     floatingBallPosition: '' as '' | 'left' | 'right',
     floatingBallVerticalPosition: null as number | null,
@@ -281,6 +282,7 @@ describe('悬浮球 content runtime', () => {
       initialTranslationStatus: 'idle',
     }));
     expect(options.props.presentation).toEqual({
+      theme: 'auto',
       toolsDisplay: 'hover',
       hoverDelay: 0,
       clickAction: 'translate',
@@ -397,6 +399,7 @@ describe('悬浮球 content runtime', () => {
     const listener = mocks.subscribeConfig.mock.calls[0][0];
 
     listener({
+      theme: 'dark',
       floatingBallToolsDisplay: 'always',
       floatingBallHoverDelay: 500,
       floatingBallClickAction: 'none',
@@ -408,6 +411,7 @@ describe('悬浮球 content runtime', () => {
     });
 
     expect(presentation).toEqual({
+      theme: 'dark',
       toolsDisplay: 'always',
       hoverDelay: 500,
       clickAction: 'none',

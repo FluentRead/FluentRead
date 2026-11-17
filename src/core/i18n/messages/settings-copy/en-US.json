@@ -142,7 +142,7 @@
     "settings.floatingBall.hoverDelayHelp": "Tools open after the pointer rests for this long; 0 ms opens them immediately. A longer delay reduces accidental opening. Keyboard focus always opens them immediately.",
     "settings.floatingBall.hoverDelayAria": "Floating button expansion delay",
     "settings.floatingBall.defaultMargin": "Default margin",
-    "settings.floatingBall.defaultMarginDescription": "Distance from the screen edge when collapsed or always shown. Negative values are supported. With the default 0 / 20 px margins, the desktop button tucks halfway off-screen when collapsed.",
+    "settings.floatingBall.defaultMarginDescription": "Distance from the screen edge when collapsed or always shown. At 0 px the button sits flush. Negative values tuck part of it off-screen on desktop.",
     "settings.floatingBall.defaultMarginAria": "Floating button default margin",
     "settings.floatingBall.popoutMargin": "Popout margin",
     "settings.floatingBall.popoutMarginDescription": "Used while hover tools are expanded. Match the default margin to keep the button in place. Negative values are supported.",

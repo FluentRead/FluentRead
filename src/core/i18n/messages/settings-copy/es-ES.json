@@ -142,7 +142,7 @@
     "settings.floatingBall.hoverDelayHelp": "Las herramientas se abren tras este tiempo de espera del puntero; 0 ms las abre inmediatamente. Un retardo mayor reduce las aperturas accidentales. Con el foco del teclado siempre se abren al instante.",
     "settings.floatingBall.hoverDelayAria": "Retardo al desplegar el botón flotante",
     "settings.floatingBall.defaultMargin": "Margen predeterminado",
-    "settings.floatingBall.defaultMarginDescription": "Distancia al borde de la pantalla cuando está plegado o siempre visible. Admite valores negativos. Con los márgenes predeterminados de 0 / 20 px, el botón plegado queda medio oculto en el escritorio.",
+    "settings.floatingBall.defaultMarginDescription": "Distancia al borde de la pantalla cuando el botón está plegado o siempre visible. Con 0 px queda pegado al borde. En escritorio, un valor negativo lo oculta en parte.",
     "settings.floatingBall.defaultMarginAria": "Margen predeterminado del botón flotante",
     "settings.floatingBall.popoutMargin": "Margen al desplegar",
     "settings.floatingBall.popoutMarginDescription": "Se usa al desplegar las herramientas al pasar el puntero. Si coincide con el margen predeterminado, el botón no se mueve. Admite valores negativos.",

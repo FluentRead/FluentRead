@@ -8,7 +8,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {parseHTML} from 'linkedom';
 import {normalizeVideoCourseAutoStart} from '@/src/core/config/videoCourse';
 import {Config, normalizeConfig} from '@/src/core/config/model';
-import {captionRecord, chooseBilibiliCaption, chooseUdemyCaption, getBilibiliPart, getCourseCaptionRequest, parseCourseCaptionJson, resolveCourseCaptionUrl, type CourseCaptionRequest} from '@/src/features/video-subtitle/content/courseCaptionData';
+import {captionRecord, chooseBilibiliCaption, chooseUdemyCaption, getBilibiliPart, getCourseCaptionRequest, hasBilibiliCaptionHint, parseCourseCaptionJson, resolveCourseCaptionUrl, type CourseCaptionRequest} from '@/src/features/video-subtitle/content/courseCaptionData';
 import {CourseCaptionSource} from '@/src/features/video-subtitle/content/courseCaptionSource';
 import {installBilibiliCaptionBridge, requestBilibiliCaptionManifest} from '@/src/features/video-subtitle/content/bilibiliCaptionBridge';
 import {startBilibiliCaptionBridgeApp} from '@/src/app/content/bilibiliCaptionBridge';
@@ -27,6 +27,12 @@ const caption = (language = 'en_US', source = 'manual') => ({locale_id: language
 const biliTrack = (lan = 'en') => ({lan, subtitle_url: '//aisubtitle.hdslb.com/source.json'});
 
 describe('课程字幕配置与身份', () => {
+    it('识别标题中的字幕声明，普通视频标题继续允许自动识别', () => {
+        for (const title of ['【CoRL 2026】中文字幕｜Reed Lu - Sharpa 的三条路径，一套技术栈',
+            '【中英字幕】talk', '【中英双语字幕】talk', '【中字】talk', '[中字] talk', '双语字幕',
+            '內嵌字幕', 'English Subtitles', 'subtitled talk']) expect(hasBilibiliCaptionHint(title)).toBe(true);
+        for (const title of ['', 'SuperMimic CoRL 发布会', '中文演讲', 'subtitle generation tutorial']) expect(hasBilibiliCaptionHint(title)).toBe(false);
+    });
     it('新站点默认关闭，Udemy 保留已有行为；旧配置和非法字段不串站点', () => {
         for (const value of [undefined, null, false, {}, []]) expect(normalizeVideoCourseAutoStart(value)).toEqual({bilibili: false, udemy: true, edx: false});
         expect(normalizeVideoCourseAutoStart({bilibili: true, udemy: false, edx: true, unknown: true})).toEqual({bilibili: true, udemy: false, edx: true});
@@ -140,7 +146,7 @@ describe('课程字幕请求生命周期', () => {
         let finishEnglish!: (response: Response) => void;
         f.fetch.mockImplementation(async input => {
             const url = String(input);
-            if (url.includes('api.bilibili.com')) return json({data: {cid: 456, subtitle: {subtitles: [
+            if (url.includes('api.bilibili.com')) return json({code: 0, data: {cid: 456, subtitle: {subtitles: [
                 {...biliTrack('zh-Hans'), subtitle_url: '//aisubtitle.hdslb.com/zh.json'},
                 {...biliTrack('en-US'), subtitle_url: '//aisubtitle.hdslb.com/en.json'},
             ]}}});
@@ -193,23 +199,38 @@ describe('课程字幕请求生命周期', () => {
         expect(f.source.cues).toEqual([]); expect(f.changed).not.toHaveBeenCalled();
     });
     it('B 站优先当前 CID 签名资源，限制域名，元数据错配拒绝提交', async () => {
-        const f = sourceFixture(bili, [{data: {cid: 456, subtitle: {subtitles: [biliTrack('ai-en'), biliTrack()]}}}, biliBody]);
+        const f = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: [biliTrack('ai-en'), biliTrack()]}}}, biliBody]);
         f.resources.mockReturnValue(['https://api.bilibili.com/x/player/v2?cid=456&w_rid=signed', 'bad',
             'https://evil.test/x/player/v2?cid=456', 'https://api.bilibili.com/x/player/wbi/v2?cid=999']);
         f.source.sync(f.request, 'media'); await settled(f.source);
         expect(f.fetch.mock.calls[0][0]).toContain('w_rid=signed'); expect(f.source.cues).toEqual([cue]);
         expect(f.manifest).toHaveBeenCalledWith('BV1xx411c7mD:2', expect.any(AbortSignal));
         f.source.clear();
-        const mismatch = sourceFixture(bili, [{data: {cid: 999}}]); mismatch.source.sync(mismatch.request, 'media'); await settled(mismatch.source);
+        const mismatch = sourceFixture(bili, [{code: 0, data: {cid: 999}}]); mismatch.source.sync(mismatch.request, 'media'); await settled(mismatch.source);
         expect(mismatch.source.status).toBe('error');
     });
     it('B 站无签名资源回退固定接口，没有字幕时保持空状态', async () => {
-        const f = sourceFixture(bili, [{data: {cid: 456, subtitle: {subtitles: []}}}]);
+        const f = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: []}}}]);
         f.source.sync(f.request, 'media'); await settled(f.source);
         expect(f.fetch.mock.calls[0][0]).toBe('https://api.bilibili.com/x/player/v2?cid=456&bvid=BV1xx411c7mD');
         expect(f.source.status).toBe('empty');
         f.source.retry(); f.source.sync({...f.request, id: 'av123:1', key: 'av123:1'}, 'media'); await settled(f.source);
         expect(f.fetch.mock.calls[1][0]).toBe('https://api.bilibili.com/x/player/v2?cid=456&aid=123');
+    });
+    it.each([
+        {code: -400, data: {cid: 456, subtitle: {subtitles: []}}},
+        {data: {cid: 456, subtitle: {subtitles: []}}},
+        {code: 0, data: {cid: 456}},
+        {code: 0, data: {cid: 456, subtitle: {subtitles: null}}},
+        {code: 0, data: {cid: 456, subtitle: {subtitles: [{lan: 'en', subtitle_url: 'https://unavailable.test/subtitle'}]}}},
+    ])('B 站未能确认空轨道列表时保留错误而非空状态 %#', async response => {
+        const f = sourceFixture(bili, [response]); f.source.sync(f.request, 'media'); await settled(f.source);
+        expect(f.source.status).toBe('error'); expect(f.source.cues).toEqual([]);
+    });
+    it.each([{}, {body: []}, {body: [{from: 1, to: 0, content: 'bad'}]}])('已存在字幕轨但内容不可用时不声明无字幕 %#', async body => {
+        const f = sourceFixture(bili, [{code: 0, data: {cid: 456, subtitle: {subtitles: [biliTrack()]}}}, body]);
+        f.source.sync(f.request, 'media'); await settled(f.source);
+        expect(f.source.status).toBe('error'); expect(f.fetch).toHaveBeenCalledTimes(2);
     });
     it('Udemy Business 从当前公司域读取原文，CDN 请求不携带凭据', async () => {
         const f = sourceFixture(udemy, [{id: 77, locale: {locale: 'en_US'}}, {asset: {captions: [caption('zh_CN'), caption()]}}, vtt]);

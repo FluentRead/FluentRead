@@ -1,5 +1,6 @@
 <!--
  * @file src/features/selection-translation/ui/SelectionTranslator.vue
+ 协作共存：自动翻译卡给实际可见的 Hypothesis 选区工具栏预留上下空间，保留原有选区、事件和手动窗口几何。
  * 弹窗定位：自动卡片避开完整选区的纵向范围，优先放在其上方，必要时切换下方或按较大空间限高并保留滚动；仅在用户拖动或调整尺寸后固定手动位置。
  * 局部限高：整卡滚动跟随实际写入的 maxHeight，加载内容尚短时也保留后续滚动空间，不只依赖定位算法的可选限高结果。
  * 失败呈现：无结果时以简短原因、下一步提示和一个主操作展示；当前鉴权错误优先配置服务，重试按需展开，已有结果仍保留行内提示。
@@ -9,10 +10,11 @@
  * 极矮视口：同一卡片改为整卡滚动并收紧顶栏间距，保留输入与请求、手动几何和语音状态；Safari 键盘视口变化后仅在当前有限窗口内滚动卡片自身显露原聚焦输入，主动操作取消待处理显露；恢复尺寸后沿用原定位，不增加监听或计时器。
  * 文件职责：实现划词翻译的主要页面组件，覆盖选区捕获、触摸原生句柄稳定等待、避开原生菜单上下区域的行侧入口、可见视口与安全区定位、后台及宿主恢复来源校验、图标/小点/悬停/快捷键/仅右键菜单/直接弹出、原生菜单可信选区恢复与重复请求复用、翻译与词卡展示、免费 AI 讲解的显式启用、朗读、收藏选中的单词/表达/句子、双语分享卡片、鉴权服务配置入口、重试和关闭。
  * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；普通译文先于完整原文，单行可横向滚动的导航与右侧固定分享、收藏、关闭及更多操作把高度留给正文，次级菜单按可见窗口覆盖显示；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
+ * 原生标注：PDF 专用控件仅在扩展构建中保留，脚本构建不包含其按钮和动作。
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
  * 词典来源：配置切换时只撤销并重查词卡，保留普通译文与学习会话，旧来源的迟到结果不能覆盖新来源。
  * 语音边界：单词朗读在仅本地模式下跳过词典外部音频，由既有后台本地语音链路处理失败与模型提示。
- * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，来源失效时取消当前请求，词书协议独立维护；Safari 仅为可信聚焦的同一追问框、卡片和原文保留初次键盘缩高或明确旋转后的有限宿主页平移窗口，明确方向先于可见视口宽度更新时也保留该固定窗口，宽度追上不续期；极矮可滚动卡片内的可信纵向触摸另有不续期的400ms尾窗，只容许累计2px宿主页偏移，不拦截原生滚动；输入与框内编辑键结束当前窗口，外部手势、缩放、失焦与关闭撤销身份，普通滚动仍收卡；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
+ * 模块边界：组件只通过公共客户端和 runtime 消息触达后台及现有设置入口，不直接持有 provider、IndexedDB 或 Offscreen 资源；纯选区算法在 core，活动 Range 通过回调交给 content/runtime 管理 modal 挂载所有权；扩展 PDF 文档页通过可选来源适配器复用同一卡片、标题和阅读上下文，并把有效当前选区的高亮、下划线动作交还文档拥有者，来源失效时取消当前请求，词书协议独立维护；Safari 仅为可信聚焦的同一追问框、卡片和原文保留初次键盘缩高或明确旋转后的有限宿主页平移窗口，明确方向先于可见视口宽度更新时也保留该固定窗口，宽度追上不续期；极矮可滚动卡片内的可信纵向触摸另有不续期的400ms尾窗，只容许累计2px宿主页偏移，不拦截原生滚动；输入与框内编辑键结束当前窗口，外部手势、缩放、失焦与关闭撤销身份，普通滚动仍收卡；阅读依据的 DOM 锚点只属于当前选区，关闭、换区或卸载释放临时绘制和监听。
  -->
 <template>
   <div v-ui-i18n v-show="showIndicator || showTooltip || noticeMessage || copySuccess || clickSelectionState !== 'idle'" class="fr-selection-translator-root" :class="{'fr-touch-selection': touchInteraction}" :data-display-delay="selectionSettings.delay" @pointerdown.capture="dismissReadingToolsOutside" @pointerdown.stop @focusin="handleReadingInputFocus" @focusout="dismissReadingToolsOnFocusOut" @input="clearReadingKeyboardFocus" @wheel.stop="handleUiWheel">
@@ -35,6 +37,10 @@
         </div>
         <div ref="reading-tools-target" v-show="readingMode && !readingHistoryOnly" class="fr-study-reading-tools" />
         <div class="fr-tooltip-actions">
+          <template v-if="DOCUMENT_ANNOTATIONS && canMarkDocumentSelection">
+          <button class="fr-action-btn fr-selection-highlight" type="button" :title="t('document.pdfReading.annotationHighlight')" :aria-label="t('document.pdfReading.annotationHighlight')" @pointerdown.prevent @click="markDocumentSelection('highlight')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 16 9-12 4 3-9 12H8v-3ZM3 21h16" /></svg></button>
+          <button class="fr-action-btn fr-selection-underline" type="button" :title="t('document.pdfReading.annotationUnderline')" :aria-label="t('document.pdfReading.annotationUnderline')" @pointerdown.prevent @click="markDocumentSelection('underline')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3v8a6 6 0 0 0 12 0V3M4 21h16" /></svg></button>
+          </template>
           <button v-if="!readingMode && shareCardAvailable && translationResult && !isLoading" class="fr-action-btn fr-share-card-entry" type="button" :title="t('shareCard.create')" :aria-label="t('shareCard.create')" @click="openShareCard({original: selectedText, translation: translationResult})"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5" /></svg></button>
           <button
             v-if="!readingMode && config.vocabularyBookEnabled && selectedText && !isPrivateContext"
@@ -195,6 +201,7 @@
 import {audioSpeechProgress, boundarySpeechProgress, parseSpeechCues, parseSpeechProgress, parseSpeechPlaybackPosition, seekSpeechTime, type SpeechProgress, type SpeechPlaybackPosition, type SpeechCue} from '@/src/core/tts/speechProgress';
 import SpeechFollowText from './SpeechFollowText.vue';
 import {hasDistinctTranslation} from '@/src/core/translation/result';
+import {hypothesisSelectionAnchor} from '@/src/features/hypothesis/public';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, useTemplateRef, watch } from 'vue';
 import browser from 'webextension-polyfill';
 import {addRuntimeMessageListener} from '@/src/platform/browser/runtimeMessages';
@@ -241,6 +248,8 @@ const props = defineProps<{
     context?: (range: Range, text: string, limit: number) => {text: string; title: string; sourceUrl: string};
     captureReading?: (range: Range, text: string, limit: number) => ReadingSelection;
     captureMaterial?: (range: Range, quote: string) => ReturnType<typeof captureMaterialSelection>;
+    markSelection?: (range: Range, kind: 'highlight' | 'underline') => boolean;
+    canMarkSelection?: (range: Range) => boolean;
     subscribeInvalidation?: (listener: () => void) => () => void;
   };
 }>();
@@ -344,6 +353,15 @@ const tooltipScaleStyle = computed(() => {
   };
 });
 const snapshot = ref<SelectionSnapshot | null>(null);
+const DOCUMENT_ANNOTATIONS = import.meta.env.BROWSER !== 'userscript';
+const canMarkDocumentSelection = /*@__PURE__*/ computed(() => Boolean(props.selectionAdapter?.markSelection && snapshot.value
+  && (props.selectionAdapter.canMarkSelection?.(snapshot.value.range) ?? true)));
+function markDocumentSelection(kind: 'highlight' | 'underline'): void {
+  const current = snapshot.value;
+  if (!current || !isSelectionRangeConnected(current.range) || current.range.toString() !== current.rangeText
+    || !props.selectionAdapter?.acceptsRange(current.range) || props.selectionAdapter.canMarkSelection?.(current.range) === false) return;
+  if (props.selectionAdapter.markSelection?.(current.range, kind) === false) showNotice(t('document.pdfReading.annotationSelectionHint'));
+}
 watch(snapshot, current => {
   if (readingKeyboardFocus && current !== readingKeyboardFocus.selection) clearReadingKeyboardFocus();
   if (import.meta.env.BROWSER === 'safari' && readingCardPan && current !== readingCardPan.focus.selection) clearReadingKeyboardFocus();
@@ -1059,7 +1077,7 @@ function updatePosition(refreshSelection = true, refreshAnchor = false): void {
     const measuredHeight = rect.height;
     const naturalHeight = anchoredPopupMaxHeight.value !== null && measuredHeight >= anchoredPopupMaxHeight.value - 1
       ? Math.max(measuredHeight, 520 * popupScale.value) : measuredHeight;
-    const position = calculateSelectionPopupPosition(current.popupAnchor ?? anchor, { width: rect.width, height: naturalHeight }, viewportSize.value);
+    const position = calculateSelectionPopupPosition(import.meta.env.BROWSER === 'userscript' ? current.popupAnchor ?? anchor : hypothesisSelectionAnchor(current.popupAnchor ?? anchor, document), { width: rect.width, height: naturalHeight }, viewportSize.value);
     manualPopupPosition = {left: position.left, top: position.top};
     anchoredPopupMaxHeight.value = position.maxHeight ?? null;
     applyManualPopupGeometry(rect);

@@ -1012,3 +1012,22 @@ describe('userscript 当前配置页面协调消息', () => {
         expect(respond).toHaveBeenCalledWith({status: 'unavailable'}); expect(reconcile).not.toHaveBeenCalled();
     });
 });
+
+describe('Hypothesis content lifecycle messages', () => {
+    it('only allows the owning extension to query or toggle an enabled top-level runtime', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        const toggle = vi.fn(async () => ({status: 'success', active: true})), reply = vi.fn();
+        let invalid = false, disabled = false, suspended = false;
+        const state = {isSiteDisabled: () => disabled, isPageSuspended: () => suspended, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => true, toggle}};
+        const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, state);
+        handler({type: 'getHypothesisState'}, {id: 'owned'}, reply); expect(reply).toHaveBeenLastCalledWith({status: 'success', active: true});
+        handler({type: 'toggleHypothesis'}, {id: 'owned'}, reply); await Promise.resolve(); expect(toggle).toHaveBeenCalledOnce();
+        for (const apply of [() => {invalid = true;}, () => {invalid = false; mocks.config.on = false;}, () => {mocks.config.on = true; disabled = true;}, () => {disabled = false; suspended = true;}]) {
+            apply(); handler({type: 'toggleHypothesis'}, {id: 'owned'}, reply); expect(reply).toHaveBeenLastCalledWith({status: 'unavailable', active: false});
+        }
+        suspended = false; handler({type: 'getHypothesisState'}, undefined, reply); handler({type: 'getHypothesisState'}, {id: 'foreign'}, reply);
+        const absent = createContentRuntimeMessageHandler({} as ContentScriptContext, {...state, hypothesis: undefined}); absent({type: 'toggleHypothesis'}, {id: 'owned'}, reply);
+        expect(toggle).toHaveBeenCalledOnce(); expect(reply).toHaveBeenLastCalledWith({status: 'unavailable', active: false});
+    });
+});

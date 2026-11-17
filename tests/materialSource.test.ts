@@ -549,13 +549,25 @@ describe('材料来源与继续阅读', () => {
         expect(document.querySelector('[role="status"]')).toBeNull(); expect(ports.capture).not.toHaveBeenCalled();
     });
     it('通用播放器坏来源或已改成专用平台时拒绝复用，空媒体页不猜测', async () => {
-        for (const source of [{kind: 'video' as const}, {kind: 'video' as const, url: 'bad url'}, {kind: 'video' as const, url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}]) {
+        for (const source of [{kind: 'video' as const}, {kind: 'video' as const, url: 'bad url'}, {kind: 'video' as const, url: 'file:///media/local.mp4'}, {kind: 'video' as const, url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'}]) {
             const {document} = dom('<video></video>', 'https://example.com/video?__fluentread_material=material-1'); const video = document.querySelector('video')!;
             Object.defineProperties(video, {readyState: {value: 1}, duration: {value: 100}, currentTime: {value: 0, writable: true}}); video.pause = vi.fn();
             ports.resolve.mockResolvedValue(record({kind: 'video', identityKey: 'video:https://example.com/video', source, locator: {kind: 'video'}}));
             dispose.push(mountMaterialContent(document, new AbortController().signal, () => true)); await tick();
             if (source.url) expect(video.pause).not.toHaveBeenCalled();
         }
+    });
+    it('X 多媒体帖子缺少明确视频来源时不猜测恢复或保存位置', async () => {
+        const {document, window} = dom('<article><a href="/user/status/123">date</a><video></video><video></video></article>', 'https://x.com/home?__fluentread_material=material-1');
+        const videos = Array.from(document.querySelectorAll('video'));
+        for (const video of videos) {
+            Object.defineProperties(video, {readyState: {value: 1}, duration: {value: 100}, currentTime: {value: 20}}); video.pause = vi.fn();
+        }
+        ports.resolve.mockResolvedValue(record({kind: 'video', identityKey: 'video:x:123', source: {kind: 'video', url: 'https://x.com/user/status/123'}, locator: {kind: 'video', startMs: 5000}}));
+        dispose.push(mountMaterialContent(document, new AbortController().signal, () => true)); await tick();
+        window.dispatchEvent(new window.Event('pagehide')); await tick();
+        for (const video of videos) expect(video.pause).not.toHaveBeenCalled();
+        expect(ports.capture).not.toHaveBeenCalled();
     });
     it('刷新仅用当前标签页的材料标识重新核对来源，归档或清空后删除标识', async () => {
         const {document, window} = dom('<p>unique original sentence</p>'); const values = new Map<string, string>();

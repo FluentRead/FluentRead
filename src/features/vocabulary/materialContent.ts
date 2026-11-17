@@ -1,7 +1,7 @@
 /**
  * @file src/features/vocabulary/materialContent.ts
  * 文件职责：在获准网页恢复本地材料的原段落或视频时间，并维护主动打开材料的阅读位置。
- * 主要内容：仅本地标识进入地址，后台核对来源后读取定位；动态内容按整页游标分片扫描，变更合并后重试；文章只沿可信阅读输入后的滚动链更新，滚轮监听仅在文章材料活跃时挂到页面根元素；收藏和布局变化撤销旧任务及过期恢复提示，关闭及卸载清理监听和异步归属。
+ * 主要内容：仅本地标识进入地址，后台核对来源后读取定位；通用媒体先核验已存来源地址及平台边界，再匹配材料身份；动态内容按整页游标分片扫描，变更合并后重试；文章只沿可信阅读输入后的滚动链更新，滚轮监听仅在文章材料活跃时挂到页面根元素；收藏和布局变化撤销旧任务及过期恢复提示，关闭及卸载清理监听和异步归属。
  * 模块边界：使用配置公开服务与框架无关的界面翻译函数，不读取其他来源材料，不扫描或保存整页正文，不自动收藏新材料；文档恢复由文档页通过公共定位合同接入。
  */
 import {materialCapture, materialGeneration, materialResolve} from './materialClient';
@@ -73,23 +73,25 @@ export function mountMaterialContent(doc: Document, signal: AbortSignal, enabled
         close.addEventListener('click', () => {notice?.remove(); notice = undefined;}, {once: true});
         notice.append(text, close); doc.body.append(notice);
     };
-    const materialVideos = (record: MaterialRecord): HTMLVideoElement[] => Array.from(doc.querySelectorAll('video')).filter(video => {
+    const materialVideos = (record: MaterialRecord): Array<{video: HTMLVideoElement; sourceUrl: string}> => Array.from(doc.querySelectorAll('video')).flatMap(video => {
         const url = getVideoLearningSource(video, view.location, doc).sourceUrl;
         const identities = [record.identityKey, ...(record.aliases || [])];
         try {
-            if (url) return identities.includes(normalizeMaterialSource({kind: 'video', url}).identityKey);
-            // 其他视频网页没有站点专用适配器时，仅同一规范地址上的唯一媒体可恢复。
+            if (!url) return [];
             const platformHost = /(?:^|\.)(?:youtube\.com|youtu\.be|x\.com|twitter\.com)$/u;
-            if (doc.querySelectorAll('video').length !== 1 || platformHost.test(view.location.hostname) || platformHost.test(new URL(record.source.url || view.location.href).hostname)) return false;
-            return identities.includes(normalizeMaterialSource({kind: 'video', url: view.location.href}).identityKey);
-        } catch {return false;}
+            if (!platformHost.test(view.location.hostname) && record.source.url) {
+                const savedSource = new URL(record.source.url);
+                if (!/^https?:$/u.test(savedSource.protocol) || platformHost.test(savedSource.hostname)) return [];
+            }
+            return identities.includes(normalizeMaterialSource({kind: 'video', url}).identityKey) ? [{video, sourceUrl: url}] : [];
+        } catch {return [];}
     });
     // 两个调用点均已核对 video 和待恢复 locator。
     const restoreVideo = (record: MaterialRecord): boolean => {
-        const videos = materialVideos(record).filter(video => video.readyState > 0);
+        const videos = materialVideos(record).filter(({video}) => video.readyState > 0);
         // 复用字幕学习当前媒体来源，X 多视频绝不根据 DOM 顺序猜测。
         if (videos.length !== 1) return false;
-        const video = videos[0]; const time = (record.locator!.startMs || 0) / 1000;
+        const {video} = videos[0]; const time = (record.locator!.startMs || 0) / 1000;
         if (!Number.isFinite(video.duration) || time >= video.duration) return false;
         try {video.pause(); video.currentTime = time; video.scrollIntoView({block: 'center', behavior: 'instant'}); return true;} catch {return false;}
     };
@@ -144,8 +146,8 @@ export function mountMaterialContent(doc: Document, signal: AbortSignal, enabled
         let sourceUrl = url;
         if (record.kind === 'video') {
             const videos = materialVideos(record);
-            if (videos.length === 1 && Number.isFinite(videos[0].currentTime)) {locator = {kind: 'video', startMs: Math.floor(videos[0].currentTime * 1000)};
-                sourceUrl = getVideoLearningSource(videos[0], view.location, doc).sourceUrl || url;}
+            if (videos.length === 1 && Number.isFinite(videos[0].video.currentTime)) {locator = {kind: 'video', startMs: Math.floor(videos[0].video.currentTime * 1000)};
+                sourceUrl = videos[0].sourceUrl;}
         } else {
             const controller = new AbortController(); positionController = controller;
             const result = await scanMaterialParagraphs(doc, {kind: 'viewport'}, {signal: controller.signal,

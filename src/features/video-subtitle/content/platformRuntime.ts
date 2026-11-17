@@ -189,7 +189,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             // 课程菜单保留读音开关，不在悬停时展开下载体积、语言清单和示例说明。
             courseMenu.querySelector('[data-reading-help]')!.removeAttribute('popover');
             courseMenu.querySelector('[data-action="toggle-reading-annotation"]')!.removeAttribute('aria-describedby');
-            for (const selector of ['.fluent-read-video-menu-primary-ai', '.fluent-read-video-menu-secondary-ai', '[data-action="select-ai-model"]', '[data-action="regenerate-ai-subtitle"]', '[data-action="open-sentence-learning"]', '.fluent-read-video-model-prompt', '[data-action="download-translated-subtitles"]', '[data-action="download-bilingual-subtitles"]']) {
+            for (const selector of ['.fluent-read-video-menu-primary-ai', '.fluent-read-video-menu-secondary-ai', '[data-action="select-ai-model"]', '[data-action="regenerate-ai-subtitle"]', '[data-action="open-sentence-learning"]', '.fluent-read-video-model-prompt', '[data-subtitle-format]', '[data-action="download-translated-subtitles"]', '[data-action="download-bilingual-subtitles"]']) {
                 courseMenu.querySelector(selector)?.remove();
             }
             for (const [property, value] of [['position', 'fixed'], ['inset', 'auto'], ['margin', '0']]) courseMenu.style.setProperty(property, value, 'important');

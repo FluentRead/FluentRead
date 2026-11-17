@@ -1,7 +1,7 @@
 /**
  * @file src/features/video-subtitle/content/learningSource.ts
  * 文件职责：识别当前视频对应的可靠材料来源，不加载播放器或学习面板。
- * 主要内容：规范 YouTube 视频身份，按当前 X 媒体祖先链接和单视频帖子消歧，多视频保留编号。
+ * 主要内容：规范 YouTube 视频身份，按当前 X 媒体祖先链接和单视频帖子消歧，多视频保留编号；普通网页保留课程路由片段并移除地址中的账号密码。
  * 模块边界：只读取注入的媒体节点和来源地址，不依赖 Vue、字幕加载、播放状态或个人存储。
  */
 import {sanitizeVocabularyVideoUrl} from '@/src/features/vocabulary/public';
@@ -19,7 +19,7 @@ export function getVideoLearningSource(video: HTMLMediaElement, location: Source
     const platform = ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'].includes(location.hostname) ? 'youtube' : 'x';
     if (platform === 'youtube') return {platform, sourceUrl: sanitizeVocabularyVideoUrl(location.href, platform), title: document.title};
     if (!/(^|\.)(x|twitter)\.com$/i.test(location.hostname)) {
-        const url = new URL(location.href); url.username = ''; url.password = ''; url.hash = '';
+        const url = new URL(location.href); url.username = ''; url.password = '';
         return {platform: 'html', sourceUrl: /^https?:$/.test(url.protocol) ? url.href : undefined, title: document.title};
     }
     const article = video.closest('article');

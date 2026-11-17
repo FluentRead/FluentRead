@@ -569,6 +569,16 @@ describe('材料来源与继续阅读', () => {
         for (const video of videos) expect(video.pause).not.toHaveBeenCalled();
         expect(ports.capture).not.toHaveBeenCalled();
     });
+    it.each([2, 3])('通用媒体保留 SPA 路由并核对材料课程 %s 的位置归属', async lesson => {
+        const {document} = dom('<video></video>', 'https://example.com/course?__fluentread_material=material-1#/lesson/2');
+        const video = document.querySelector('video')!;
+        Object.defineProperties(video, {readyState: {value: 1}, duration: {value: 100}, currentTime: {value: 0, writable: true}}); video.pause = vi.fn();
+        const source = {kind: 'video' as const, url: `https://example.com/course#/lesson/${lesson}`};
+        ports.resolve.mockResolvedValue(record({kind: 'video', identityKey: normalizeMaterialSource(source).identityKey, source, locator: {kind: 'video', startMs: 12000}}));
+        dispose.push(mountMaterialContent(document, new AbortController().signal, () => true)); await tick();
+        expect(video.pause).toHaveBeenCalledTimes(lesson === 2 ? 1 : 0); expect(video.currentTime).toBe(lesson === 2 ? 12 : 0);
+        expect(getVideoLearningSource(video, new URL('https://reader:password@example.com/course#/lesson/2'), document).sourceUrl).toBe('https://example.com/course#/lesson/2');
+    });
     it('刷新仅用当前标签页的材料标识重新核对来源，归档或清空后删除标识', async () => {
         const {document, window} = dom('<p>unique original sentence</p>'); const values = new Map<string, string>();
         const storage = {getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value), removeItem: (key: string) => values.delete(key)};

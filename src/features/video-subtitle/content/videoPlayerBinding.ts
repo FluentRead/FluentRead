@@ -5,6 +5,7 @@
  * 模块边界：只管理 FluentRead 播放器节点的挂载位置与事件；公开菜单宿主校准供既有布局帧调用，不重扫播放器或重建入口；按钮行为、菜单内容和字幕业务由调用方注入。
  */
 
+import {htmlMediaForPlayer, playerOwnsMedia} from './htmlMedia';
 import {
   markVideoUi,
   VIDEO_FALLBACK_CONTROLS_CLASS,
@@ -259,7 +260,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     }
   };
   const isInteractive = (next: VideoPlayerTarget): boolean =>
-    next.fullscreen || activePlayers.has(next.player) || playerIsHovered(controlsScope(next)) || playerIsFocused(controlsScope(next), document)
+    Boolean(htmlMediaForPlayer(next.player)) || next.fullscreen || next.interacting || activePlayers.has(next.player) || playerIsHovered(controlsScope(next)) || playerIsFocused(controlsScope(next), document)
     || Boolean(menu && !menu.hidden && playerIsFocused(menu, document));
 
   const moveWithFocus = (node: HTMLElement, parent: Element) => {
@@ -273,7 +274,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
   };
 
   const menuRenderParent = (next: VideoPlayerTarget, scope: HTMLElement, ownedMenu: HTMLElement): HTMLElement => {
-    const viewport = viewportPresentation();
+    const viewport = Boolean(htmlMediaForPlayer(next.player)) || viewportPresentation();
     if (viewport) ownedMenu.dataset.presentation = 'viewport';
     else delete ownedMenu.dataset.presentation;
     if (!viewport && scope === next.player) return next.player;
@@ -518,7 +519,7 @@ export function createVideoPlayerBinding(options: VideoPlayerBindingOptions): Vi
     sync,
     syncMenuHost() {
       // 帧通知只操作仍存活的同媒体菜单；不调用 locator、按钮工厂或完整绑定同步。
-      if (destroyed || !target || !menu?.isConnected || !target.player.isConnected || !target.player.contains(target.video)) return;
+      if (destroyed || !target || !menu?.isConnected || !target.player.isConnected || !playerOwnsMedia(target.player, target.video)) return;
       syncOwnedMenuHost(target, controlsScope(target));
     },
     getTarget: () => target,

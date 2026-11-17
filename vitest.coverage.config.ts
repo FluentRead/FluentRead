@@ -21,6 +21,9 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/app/content/htmlMediaFrame.ts',
+                'src/features/video-subtitle/content/htmlMedia.ts',
+                'src/features/video-subtitle/content/subtitleExport.ts',
                 'src/core/config/dictionaryWorkspace.ts',
                 'src/core/i18n/messages/dictionaryWorkspace.ts',
                 'src/app/background/dictionaryRuntime.ts',
@@ -835,6 +838,7 @@ export default defineConfig({
                 'src/features/video-subtitle/content/video-ai/speechAlignment.ts',
                 'src/features/video-subtitle/content/video-ai/cueTimeline.ts',
                 'src/features/video-subtitle/content/video-ai/fullCapture.ts',
+                'src/features/video-subtitle/content/video-ai/pcmWorklet.ts',
                 'src/features/video-subtitle/content/video-ai/generationRegistry.ts',
                 'src/features/video-subtitle/content/video-ai/streamingTranscript.ts',
                 'src/features/video-subtitle/offscreen/timestampParser.ts',

@@ -167,3 +167,8 @@ Issue #1341 的重复字幕回归区分内容与滚动残留：`No no`、`Very v
 
 为同一专项添加 `--suite original-only`，只执行本次听力流程验收：首次以原文模式打开、**关闭 → 原文 → 双语 → 关闭**、缓存复用、原文模式重新开启及刷新恢复。桌面与紧凑播放器检查完整 cue、自有原文节点、字体与播放器内布局；逐帧检查切换、播放进度跳转、空档和原生容器替换时没有原生字幕闪现。原文阶段核对全部翻译请求数不增加，双语重播核对当前句没有重复请求，后续字幕的正常预取单独保留；关闭视频字幕总开关才恢复原生字幕，最后导航离开页面并保留运行时诊断。使用生产 Chrome 产物、临时 Edge profile、第二屏可见后台窗口和 focus-safe helper；字幕、媒体及翻译响应受控，不代表 Windows Chrome、Firefox 或真实 YouTube 服务验收。
 
+## 通用 HTML 音视频（issue #1356）
+
+`tests/htmlMedia.test.ts` 验证无媒体空闲、动态发现、字幕浮层归属、滚动/视口/全屏定位及资源回收。`tests/videoSubtitleTrackPriorityRuntime.test.ts` 的 standard HTML media 用例从公共入口验证音频和视频的原生轨、双语、原文模式和动态卸载；既有 YouTube/X 用例约束兼容性。`tests/videoAiFullCapture.test.ts` 的 playback capture 用例验证实时音轨采集的原始时间戳、结束、跳转/倍速失效及原媒体状态保持，也覆盖 AudioWorklet 批处理、端口清理、加载取消和原始流音轨的克隆归属。`tests/subtitleExport.test.ts` 检查 SRT、WebVTT、Markdown 的时间与文本转义。
+
+浏览器专项 `scripts/testing/run-html-media-subtitle-test.cjs` 使用生产扩展、隔离临时 profile 与 focus-safe helper，验证普通音频、视频、子 frame、切换、学习面板、导出及关闭；缓存与翻译夹具和真实模型识别分别记录，不能把缓存回放当成真实转写验收。完整日志、截图及内容脚本/扩展页面/后台诊断放在工作区证据目录。

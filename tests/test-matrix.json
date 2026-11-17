@@ -567,7 +567,9 @@
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
-      "tests/sharedVideoModelDirectory.test.ts"
+      "tests/sharedVideoModelDirectory.test.ts",
+      "tests/htmlMedia.test.ts",
+      "tests/subtitleExport.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -949,6 +951,7 @@
       "tests/translationPrivacy.test.ts",
       "tests/privacySettingsLifecycle.test.ts",
       "tests/videoAiSharedModelCache.test.ts",
+      "tests/htmlMediaFrame.test.ts",
       "tests/dictionaryWorkspace.test.ts",
       "tests/dictionaryRuntime.test.ts",
       "tests/dictionaryUi.test.ts",

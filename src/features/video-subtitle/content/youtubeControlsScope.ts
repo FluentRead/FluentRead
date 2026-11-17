@@ -8,7 +8,7 @@
 export const YOUTUBE_SUBTITLE_CONTROLS_SELECTOR = '.ytp-chrome-bottom, .player-controls-bottom, .ytm-player-controls, .ytp-right-controls, .player-controls-top, .player-controls-middle-core-buttons, player-middle-controls.player-controls-middle, .ytPlayerProgressBarDragContainer';
 
 /** 移动 YouTube 将控件放在 movie_player 外；不能因此把其他视频或整页纳入字幕安全区。 */
-export function getYoutubeSubtitleControlsScope(player: HTMLElement, video: HTMLVideoElement | null = player.querySelector('video')): HTMLElement {
+export function getYoutubeSubtitleControlsScope(player: HTMLElement, video: HTMLMediaElement | null = player.querySelector('video')): HTMLElement {
   if (!video || !player.contains(video) || !player.matches('div#movie_player.html5-video-player.ytp-mweb-player')) return player;
   const scope = player.closest<HTMLElement>('div#player-container-id.player-container');
   if (!scope) return player;

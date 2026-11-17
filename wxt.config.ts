@@ -252,6 +252,10 @@ export function createExtensionManifest(
         web_accessible_resources: [
             {resources: ['hypothesis/build/*', 'hypothesis/build/scripts/*', 'hypothesis/build/styles/*'], matches: ['<all_urls>']},
             {
+                resources: ['videoPcmWorklet.js'],
+                matches: ['<all_urls>'],
+            },
+            {
                 // 页内快捷面板只暴露 HTML；任何 iframe 都须先兑换内容脚本持有的一次性凭据，才可加载界面和配置。
                 resources: ['popup.html'],
                 matches: ['<all_urls>'],
@@ -437,6 +441,9 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            // #1356 复用既有字幕 frame；Chrome 对照 e124325e8 净增54,778 bytes，新增媒体定位、词查询、虚拟全文、七语文案、AudioWorklet 与导出格式。
+            // 不增加模型、WASM、权限或依赖；保留可核对的55kB功能预算。
+            const htmlMediaSubtitleBudget = 55_000;
             // #1359：同环境 e124325e8 为68,568,810 bytes，原文重排、七语外观和原生批注后为68,579,140（+10,330）。
             // 先消除异步阅读器未使用导出带入后台的482,943 bytes，最初补12kB文本代码预算；无新增模型、WASM或依赖。
             // 合入主线后，原页 sRGB 配色、插图保色和划词批注让 Chrome 68,609,437 → 68,617,539（+8,102）；合计补20kB代码预算，无新模型或依赖。
@@ -454,7 +461,7 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

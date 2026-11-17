@@ -206,7 +206,7 @@ describe('字幕下载与人工轨优先', () => {
         expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(second.text);
         expect(f.save).toHaveBeenCalledWith(
             '1\n00:00:00,000 --> 00:00:00,800\nOriginal caption.\n人工字幕\n\n2\n00:00:00,800 --> 00:00:01,800\nSecond original.\n译文：Second original.\n',
-            'zh-Hans-bilingual');
+            'zh-Hans-bilingual', expect.any(Array));
         expect(f.button.getAttribute('aria-busy')).toBeNull();
         await vi.advanceTimersByTimeAsync(2200); expect(f.button.disabled).toBe(false); f.downloads.destroy();
     });
@@ -222,7 +222,7 @@ describe('字幕下载与人工轨优先', () => {
             '1\n00:00:00,000 --> 00:00:00,500\nUp\n上\n',
             '2\n00:00:00,500 --> 00:00:01,000\nDown\n下\n',
             '3\n00:00:01,000 --> 00:00:01,500\nLeft\n左\n',
-        ].join('\n'), 'zh-Hans-bilingual');
+        ].join('\n'), 'zh-Hans-bilingual', expect.any(Array));
         f.downloads.destroy();
     });
 
@@ -231,7 +231,7 @@ describe('字幕下载与人工轨优先', () => {
         f.config.videoPreferHumanSubtitles = false; f.config.to = '';
         await f.downloads.translated(f.menu, f.button, false);
         expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(cue.text);
-        expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n译文：Original caption.\n', 'translated-translated'); f.downloads.destroy();
+        expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n译文：Original caption.\n', 'translated-translated', expect.any(Array)); f.downloads.destroy();
     });
 
     it('关闭功能、翻译失败或取消时不导出，按钮反馈不会遗留计时器', async () => {
@@ -288,7 +288,7 @@ describe('字幕下载与人工轨优先', () => {
         await f.downloads.translated(f.menu, f.button, true);
         expect(f.translate).not.toHaveBeenCalled();
         expect(f.ports.confirm).toHaveBeenCalledWith(f.menu, expect.objectContaining({total: 3, ready: 2, missing: 1, requests: 1, cached: 2}), true, expect.any(AbortSignal));
-        expect(f.save).toHaveBeenCalledWith('1\n00:00:10,000 --> 00:00:13,000\nSecond / Third\n第二句 / 第三句\n', 'zh-Hans-bilingual-partial');
+        expect(f.save).toHaveBeenCalledWith('1\n00:00:10,000 --> 00:00:13,000\nSecond / Third\n第二句 / 第三句\n', 'zh-Hans-bilingual-partial', expect.any(Array));
         expect(f.ports.ui).toHaveBeenCalledWith('video.exportedPartial', {count: 2, total: 3, missing: 1});
         expect(f.status).toHaveBeenLastCalledWith(f.menu, 'video.exportedPartial', 2200);
         f.downloads.destroy();
@@ -303,7 +303,7 @@ describe('字幕下载与人工轨优先', () => {
         expect(f.save).not.toHaveBeenCalled();
         const second = f.downloads.translated(f.menu, f.button, false);
         await vi.advanceTimersByTimeAsync(0); cached = '新缓存'; choose('complete'); await second;
-        expect(f.translate).not.toHaveBeenCalled(); expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n新缓存\n', 'zh-Hans-translated');
+        expect(f.translate).not.toHaveBeenCalled(); expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n新缓存\n', 'zh-Hans-translated', expect.any(Array));
         f.downloads.destroy();
     });
     it.each(['language', 'model', 'glossary', 'prompt', 'headers', 'media', 'page'])('确认期间 %s 改变不能补译或保存旧预览', async change => {
@@ -425,7 +425,7 @@ describe('字幕下载与人工轨优先', () => {
         const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [{...cue, text: '  '}, {...cue, startMs: 5000}]}]});
         await f.downloads.translated(f.menu, f.button, false);
         expect(f.ports.confirm).toHaveBeenCalledWith(f.menu, expect.objectContaining({total: 1, missing: 1, requests: 1}), false, expect.any(AbortSignal));
-        expect(f.translate).toHaveBeenCalledOnce(); expect(f.save).toHaveBeenCalledWith('1\n00:00:05,000 --> 00:00:06,000\n译文：Original caption.\n', 'zh-Hans-translated'); f.downloads.destroy();
+        expect(f.translate).toHaveBeenCalledOnce(); expect(f.save).toHaveBeenCalledWith('1\n00:00:05,000 --> 00:00:06,000\n译文：Original caption.\n', 'zh-Hans-translated', expect.any(Array)); f.downloads.destroy();
     });
     it.each([true, false])('无补译缺口的确认页提供 %s 双语选择，完成后恢复可用焦点', async bilingual => {
         const parsed = parseHTML('<html><body><button id="trigger"></button><div id="menu"><div class="fluent-read-video-menu-main"></div></div></body></html>');
@@ -491,7 +491,7 @@ describe('字幕下载与人工轨优先', () => {
     it('原文下载成功或失败的反馈与等待计时器由下载协调器管理', async () => {
         const ready = fixture(); const errorMessage = vi.fn(() => '原文读取失败');
         await ready.downloads.original(ready.menu, ready.button, errorMessage);
-        expect(ready.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\nOriginal caption.\n', 'en'); expect(errorMessage).not.toHaveBeenCalled();
+        expect(ready.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\nOriginal caption.\n', 'en', expect.any(Array)); expect(errorMessage).not.toHaveBeenCalled();
         expect(ready.status).toHaveBeenLastCalledWith(ready.menu, 'video.downloaded', 2400);
         await vi.advanceTimersByTimeAsync(2400); expect(ready.button.disabled).toBe(false); ready.downloads.destroy();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

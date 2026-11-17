@@ -102,7 +102,7 @@ interface VideoKaraokePorts {
   window: Pick<Window, 'requestAnimationFrame' | 'cancelAnimationFrame'>;
   document: Pick<Document, 'addEventListener' | 'removeEventListener'>;
   isEnabled(): boolean;
-  getVideo(): HTMLVideoElement | null;
+  getVideo(): HTMLMediaElement | null;
   /** 当前的字幕行，原文在前；第一行高亮文本决定“同一句”。 */
   getLines(): Element[];
   /** 当前句在视频时间轴上的起止；没有时间轴时返回 null，由控制器按阅读速度估算。 */

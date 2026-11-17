@@ -71,7 +71,7 @@ interface VideoDownloadPorts {
     confirm(menu: HTMLElement, preview: VideoSubtitleExportPreview, bilingual: boolean, signal: AbortSignal): Promise<VideoSubtitleExportChoice>;
     ui(key: string, params?: Record<string, string | number>): string;
     status(menu: HTMLElement, message: string, delay?: number): void;
-    save(srt: string, language: string): void;
+    save(srt: string, language: string, cues: readonly VideoSubtitleCue[]): void;
     /** 菜单状态拥有者重算当前资格，防止旧反馈把新识别中的导出重新启用。 */
     refreshButtons?(): void;
 }
@@ -118,7 +118,7 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
             const track = captured.find(entry => entry.cues.length > 0);
             if (track) return {languageCode: 'original', cues: track.cues};
             if (ai.length) return {languageCode: 'ai', cues: ai};
-            throw new Error('当前 X 视频还没有可下载的字幕，请先打开原生字幕或请求 AI 字幕');
+            throw new Error('当前媒体还没有可下载的字幕，请先打开原生字幕或请求 AI 字幕');
         }
         const track = captured.find(entry => !new URL(entry.url, ports.location.href).searchParams.get('tlang')) || captured[0];
         if (track) return {languageCode: new URL(track.url, ports.location.href).searchParams.get('lang') || 'original', cues: track.cues};
@@ -155,7 +155,8 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
         try {
             const result = await wait(current, assertCurrent, resolve);
             assertCurrent();
-            ports.save(cuesToSrt(result.cues), result.languageCode);
+            const cues = finalizeVideoSubtitleCues(result.cues);
+            ports.save(serializeSrtCues(cues), result.languageCode, cues);
             feedback = ports.ui('video.downloaded', {count: result.cues.length});
         } catch (error) {
             feedback = errorMessage(error);
@@ -228,10 +229,10 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
             if (!translatedCues.length) { feedback = ports.ui('video.exportEmpty'); return; }
             const partial = translatedCues.length !== originals.length;
             // 失败/取消不会下载看似完整的文件；仅已有结果保留原时间轴并明确标为 partial。
-            const cues = bilingual ? mergeBilingualVideoSubtitleCues(retainedOriginals, translatedCues) : translatedCues;
+            const cues = bilingual ? mergeBilingualVideoSubtitleCues(retainedOriginals, translatedCues) : finalizeVideoSubtitleCues(translatedCues);
             // 双语已经按原译文配对整理，直接写入 SRT，避免再次按单语词流合并。
             const srt = bilingual ? serializeSrtCues(cues) : cuesToSrt(cues);
-            ports.save(srt, `${language}-${bilingual ? 'bilingual' : 'translated'}${partial ? '-partial' : ''}`);
+            ports.save(srt, `${language}-${bilingual ? 'bilingual' : 'translated'}${partial ? '-partial' : ''}`, cues);
             feedback = ports.ui(partial ? 'video.exportedPartial' : 'video.downloaded',
                 {count: partial ? translatedCues.length : cues.length, total: originals.length, missing: originals.length - translatedCues.length});
         } catch (error) {

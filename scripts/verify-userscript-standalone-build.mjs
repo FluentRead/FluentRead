@@ -48,6 +48,8 @@ const bytes = Buffer.byteLength(source);
 // #1362's WebDAV settings and shared Chinese text add 866 bytes on e31c81d89
 // (3,693,429 → 3,694,295). Use the existing 571-byte headroom and add the remaining rounded 1 kB.
 // Keep every protocol assertion, dependency and compact/Greasy Fork budget unchanged.
-const maxBytes = 3_700_000;
+// #1356's media controls and feedback exceed the existing cap by less than 3 kB on abdbbcc88.
+// Register only that rounded text/UI increment; dependencies, metadata checks and compact/Greasy Fork limits stay unchanged.
+const maxBytes = 3_703_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

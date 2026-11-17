@@ -909,7 +909,8 @@ describe('userscript browser shim injection', () => {
         const learningAppearanceKeys = Object.keys(extension).filter(key => key.startsWith('video.learningAppearance.'));
         expect(learningAppearanceKeys).toHaveLength(19);
         const subtitleExportKeys = Object.keys(extension).filter(key => key.startsWith('video.export'));
-        expect(subtitleExportKeys).toHaveLength(10);
+        expect(subtitleExportKeys).toHaveLength(11);
+        expect(subtitleExportKeys).toContain('video.exportFormat');
         for (const key of [...subtitleAppearanceKeys, ...learningAppearanceKeys, ...subtitleExportKeys]) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);

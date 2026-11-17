@@ -879,3 +879,63 @@ it('同一来源范围内快速切句仍认领重播尚未完成的跳转', asyn
   video.dispatchEvent(new Event('seeking'));
   expect(state.mode).toBe('off');
 });
+
+it('HTML transcript renders a bounded window and line clicks seek the original media', async () => {
+  props.platform = 'html'; props.sourceUrl = 'https://podcast.example/episode';
+  props.cues = Array.from({length: 1000}, (_, n) => ({text: `Sentence ${n}.`, startMs: n * 2000, durationMs: 1000}));
+  const host = await mountRendered();
+  state.onTranscriptToggle({target: {open: true}}); await flush();
+  expect(host.querySelectorAll('.fr-video-learning-transcript-scroll button').length).toBeLessThanOrEqual(14);
+  const list = host.querySelector<HTMLElement>('.fr-video-learning-transcript-scroll')!;
+  list.scrollTop = 5600; list.dispatchEvent(new list.ownerDocument.defaultView!.Event('scroll')); await flush();
+  expect(state.visibleTranscript[0].text).toBe('Sentence 97.');
+  const row = host.querySelectorAll('.fr-video-learning-transcript-scroll button')[3];
+  row.dispatchEvent(new row.ownerDocument.defaultView!.Event('click', {bubbles: true})); await flush(); expect(video.currentTime).toBe(200);
+  expect(host.querySelector('.fr-video-learning-transcript-scroll [aria-current="true"]')?.textContent).toContain('Sentence 100.');
+  state.pinned = false; video.currentTime = 202; video.dispatchEvent(new Event('timeupdate')); await flush();
+  expect(state.transcriptList.scrollTop).toBe(101 * 56);
+  state.onTranscriptToggle({target: {open: false}}); await flush();
+  expect(host.querySelector('.fr-video-learning-transcript-scroll')).toBeNull();
+});
+
+it('HTML word lookup reuses dictionary and translation ports, bounds definitions and closes on Escape', async () => {
+  props.platform = 'html';
+  sendRuntimeMessage.mockResolvedValue({success: true, data: {meanings: [{definitions: ['one', 'two', 'three', 'four'].map(definition => ({definition}))}]}});
+  const host = await mountRendered();
+  await state.lookupWord('browser.'); await flush();
+  expect(sendRuntimeMessage).toHaveBeenCalledWith({type: 'selectionWordLookup', word: 'browser', targetLanguage: 'zh-CN', translateFields: false});
+  expect(state.wordLookup).toMatchObject({word: 'browser', text: 'Translated: browser', definitions: ['one', 'two', 'three']});
+  expect(host.querySelector('[data-learning-word-popup]')).not.toBeNull();
+  const event = new Event('keydown', {cancelable: true}); Object.defineProperty(event, 'key', {value: 'Escape'});
+  state.onKeydown(event); await flush(); expect(event.defaultPrevented).toBe(true); expect(state.wordLookup).toBeNull();
+  const calls = translate.mock.calls.length; await state.lookupWord('...'); expect(translate).toHaveBeenCalledTimes(calls);
+});
+
+it('HTML word lookup discards old results and keeps failures local to the word popup', async () => {
+  props.platform = 'html'; await mount();
+  const oldDictionary = deferred<unknown>(), oldTranslation = deferred<string>();
+  sendRuntimeMessage.mockReturnValueOnce(oldDictionary.promise).mockResolvedValue({success: true});
+  translate.mockReturnValueOnce(oldTranslation.promise).mockResolvedValue('New word');
+  const old = state.lookupWord('old'); const signal = translate.mock.calls.at(-1)![1] as AbortSignal;
+  await state.lookupWord('new'); await flush(); expect(signal.aborted).toBe(true);
+  oldDictionary.resolve({success: true, data: {meanings: []}}); oldTranslation.resolve('Late word'); await old;
+  expect(state.wordLookup).toMatchObject({word: 'new', text: 'New word', definitions: []});
+  translate.mockRejectedValueOnce(new Error('fixture word translation failed')); sendRuntimeMessage.mockRejectedValueOnce(new Error('fixture dictionary unavailable'));
+  await state.lookupWord('retry'); await flush(); expect(state.wordLookup.text).toBe('video.learning.translationFailed');
+  state.onTranscriptToggle({target: {open: true}}); close(); await flush();
+});
+
+
+it('HTML empty captions and queued transcript following remain safe when the panel closes', async () => {
+  props.platform = 'html'; props.cues = []; await mount(); expect(state.wordParts).toEqual([]); close();
+  props.cues = [{text: first, startMs: 0, durationMs: 1000}, {text: second, startMs: 2000, durationMs: 1000}];
+  await mount(); state.onTranscriptToggle({target: {open: true}}); await flush();
+  video.currentTime = 2; video.dispatchEvent(new Event('timeupdate')); await vue.nextTick(); close(); await flush();
+});
+
+it('HTML sentence saving retains its web source without claiming a platform-specific deep link', async () => {
+  props.platform = 'html'; props.sourceUrl = 'https://podcast.example/episode'; await mount();
+  await state.save();
+  const input = sendRuntimeMessage.mock.calls.find(([message]) => message.action === 'upsert')![0].input;
+  expect(input.context).toMatchObject({sourceUrl: 'https://podcast.example/episode'}); expect(input.context.video).toBeUndefined();
+});

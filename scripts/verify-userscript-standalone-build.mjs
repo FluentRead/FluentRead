@@ -22,6 +22,8 @@ const assertions = [
     [source.includes('fluentread-userscript-settings'), 'Full Options route is missing'],
     [!source.includes('fluent-read-writing-assistant'), 'Writing assistant runtime must be excluded'],
     [!source.includes('data-fr-slot'), 'Extension-only image context protocol must be excluded'],
+    [!source.includes('fr-selection-highlight') && !source.includes('fr-selection-underline'), 'Native PDF annotation controls must be excluded'],
+    [!source.includes('hypothesis/build/'), 'Packaged Hypothesis client must be excluded'],
     [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'Userscript browser capability marker is missing'],
     [source.includes('pako 2.1.0 —'), 'Bundled gzip fallback or license notice is missing'],
     [source.includes(`@vue/runtime-dom ${vueVersion} — MIT`), 'Bundled Vue or license notice is missing'],

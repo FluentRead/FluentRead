@@ -5572,3 +5572,14 @@ it('hides annotation actions for unsupported translated or cross-page selections
     canMarkSelection.mockReturnValue(true);fixture.state.snapshot={...selected};await Vue.nextTick();
     expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).not.toBeNull();
 });
+
+it('omits native PDF annotation actions from userscript while preserving the selection translation card', async () => {
+    const markSelection = vi.fn(() => true);
+    const fixture = mountSelection(false, {acceptsRange: () => true, markSelection}, 'userscript', true); await Vue.nextTick();
+    const selected = fixture.selectedSnapshot('Read a complete selected sentence.');
+    Object.assign(fixture.state, {snapshot: selected, selectedText: selected.text, showTooltip: true}); await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-underline')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-translation-tooltip')).not.toBeNull();
+    expect(markSelection).not.toHaveBeenCalled(); expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});

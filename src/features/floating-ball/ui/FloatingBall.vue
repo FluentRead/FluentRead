@@ -630,7 +630,9 @@ function handleMainClick(event: MouseEvent) {
 }
 
 function preventRepeatActivation(event: KeyboardEvent) {
-  if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+  if (event.repeat && presentation.value.clickAction !== 'none' && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+  }
 }
 
 function toggleTranslation() {

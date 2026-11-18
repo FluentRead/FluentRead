@@ -177,9 +177,15 @@ export function getServiceCredentialGuide(service: string): ServiceCredentialGui
 /** 自建服务只打开 HTTP(S) origin，避免把 API 路径、账号、密钥或查询参数带入跳转。 */
 export function getServiceWebsite(
   service: string,
-  context: { endpoint?: string; minimaxRegion?: string } = {},
+  context: { endpoint?: string; minimaxRegion?: string; browser?: string } = {},
 ): ServiceWebsite | undefined {
   if (isCompositeTranslationProviderId(service)) return {url: serviceGuide, kind: 'documentation'}
+  if (service === services.chromeTranslator) {
+    const url = context.browser === 'edge' ? 'https://learn.microsoft.com/microsoft-edge/web-platform/translator-api'
+      : context.browser === 'firefox' ? 'https://support.mozilla.org/kb/website-translation'
+        : serviceWebsites.chromeTranslator
+    return {url, kind: 'documentation'}
+  }
   if (isCustomOpenAIProviderId(service) || service === services.custom || service === services.newapi) {
     try {
       const endpoint = new URL(context.endpoint || '')
@@ -200,7 +206,7 @@ export function getServiceWebsite(
     url: service === services.minimax && context.minimaxRegion === 'global'
       ? 'https://platform.minimax.io/login'
       : serviceWebsites[service as keyof typeof serviceWebsites],
-    kind: [services.freeTranslation, services.bilibili, services.chromeTranslator, services.myMemory, services.localTranslation].includes(service)
+    kind: [services.freeTranslation, services.bilibili, services.myMemory, services.localTranslation].includes(service)
       ? 'documentation'
       : 'website',
   }

@@ -211,7 +211,7 @@ import {createClickSelectionController} from '@/src/features/selection-translati
 import {findClickSelectionHotkeyConflict, isClickSelectionAvailable, matchesClickSelectionShortcut} from '@/src/core/config/clickSelection';
 import { config, configReady, requestConfigPatch, subscribeConfig } from '@/src/services/config/store';
 import { translateText, translateTextBatch } from '@/src/services/translation/client';
-import {serializeTranslationError} from '@/src/services/translation/errors';
+import {BROWSER_TRANSLATION_PREPARATION_REQUIRED, BROWSER_TRANSLATION_UNAVAILABLE, serializeTranslationError} from '@/src/services/translation/errors';
 import {detectlang, shouldSkipChineseSelection, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import { matchesConfiguredHotkey, matchesModifierOnlyHotkey, resolveConfiguredHotkey } from '@/src/core/hotkey';
 import {describePartOfSpeech} from '@/src/core/language/partOfSpeech';
@@ -1584,8 +1584,10 @@ async function requestTranslation(request: SelectionContentRequest): Promise<voi
     if (requestId !== translationRequestId || !isResultSourceCurrent(request)) return;
     if (cause instanceof Error && cause.name === 'AbortError') return;
     console.error('Selection translation error:', cause);
-    const kind = serializeTranslationError(cause).kind;
-    error.value = kind === 'authentication' ? '密钥或权限无效' : '翻译失败，请重试';
+    const {kind, code} = serializeTranslationError(cause);
+    error.value = code === BROWSER_TRANSLATION_PREPARATION_REQUIRED || code === BROWSER_TRANSLATION_UNAVAILABLE
+      ? t(`diagnostics.${code}.detail`)
+      : kind === 'authentication' ? '密钥或权限无效' : '翻译失败，请重试';
     authenticationError.value = kind === 'authentication' ? {request, requestId, service: requestedService} : null;
   } finally {
     if (translationAbortController === controller) translationAbortController = null;

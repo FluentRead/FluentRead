@@ -13,7 +13,8 @@
         <strong>{{ item.label }}</strong>
         <span class="library-metadata">
           <ServiceNatureBadge :service="item.value" />
-          <span v-if="isDefault" class="service-badge service-badge--default library-default" :title="t('settings.services.library.defaultBadge')">{{ t('settings.services.library.defaultBadge') }}</span>
+          <span v-if="item.disabled" class="service-badge library-configured">{{ t('settings.services.chromePreparation.unavailableBadge') }}</span>
+          <span v-else-if="isDefault" class="service-badge service-badge--default library-default" :title="t('settings.services.library.defaultBadge')">{{ t('settings.services.library.defaultBadge') }}</span>
           <span v-else-if="isConfigured" class="service-badge library-configured" :title="t('settings.services.library.saved')">{{ t('settings.services.library.saved') }}</span>
           <span v-else-if="isFavorite" class="service-badge library-common" :title="t('settings.services.library.favorites')">{{ t('settings.services.library.favorites') }}</span>
         </span>

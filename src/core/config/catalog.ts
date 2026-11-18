@@ -28,7 +28,7 @@ export const services = {
     google: "google",
     xiaoniu: "xiaoniu",
     youdao: "youdao",
-    chromeTranslator: "chromeTranslator", // Chrome 内置翻译 API
+    chromeTranslator: "chromeTranslator", // 浏览器内置翻译，沿用已有的配置服务 ID
     localTranslation: LOCAL_TRANSLATION_SERVICE_ID, // 浏览器内本地模型翻译
     // 云服务厂商机器翻译：使用云控制台签发的密钥调用官方接口，各家都提供免费额度
     tencent: "tencent", // 腾讯云机器翻译 TMT
@@ -625,7 +625,7 @@ export const options = {
         {value: services.deeplx, label: "DeepLX", description: "非官方公共接口，无需密钥"},
         {value: services.xiaoniu, label: "小牛翻译"},
         {value: services.youdao, label: "有道翻译"},
-        {value: services.chromeTranslator, label: "Chrome内置AI翻译"},
+        {value: services.chromeTranslator, label: "浏览器内置翻译", searchTerms: ["Chrome", "Edge", "Firefox", "Translator API", "离线翻译"]},
         {value: services.localTranslation, label: "本地模型翻译", description: "下载后离线翻译，可选轻量语言包与混元翻译模型。"},
         // 云服务厂商：各家云控制台签发密钥，免费额度用完后按量计费
         {value: "cloud", label: "云服务厂商", disabled: true},

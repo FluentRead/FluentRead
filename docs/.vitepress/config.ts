@@ -72,7 +72,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       text: en ? 'More platforms' : '更多平台',
       collapsed: true,
       items: [
-        item('Chrome 本地翻译', 'Chrome local translation', '/guide/chrome-translator'),
+        item('浏览器内置翻译', 'Built-in browser translation', '/guide/chrome-translator'),
         item('油猴脚本', 'Userscript', '/guide/userscript'),
         item('移动端与 Safari', 'Mobile & Safari', '/guide/mobile-safari'),
         item('Thunderbird 邮件翻译', 'Thunderbird email translation', '/guide/thunderbird'),

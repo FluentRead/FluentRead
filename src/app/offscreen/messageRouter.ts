@@ -229,6 +229,9 @@ function chromeTranslationErrorResponse(error: unknown): Record<string, unknown>
     } else if (error instanceof Error && error.name === 'ChromeModelUnavailableError') {
         response.errorCode = 'model-unavailable';
         response.errorName = error.name;
+    } else if (error instanceof Error && error.name === 'BrowserTranslationApiUnavailableError') {
+        response.errorCode = 'api-unavailable';
+        response.errorName = error.name;
     }
     return response;
 }

@@ -237,6 +237,15 @@ describe('userscript remote UI language data', () => {
             expect(original.messages['sidepanel.title']).toBeTruthy();
         }
     });
+    it('omits browser language pack preparation copy from userscript bundles', () => {
+        const prefix = 'settings.services.chromePreparation.';
+        expect(extensionChinese[`${prefix}action`]).toBeTruthy();
+        expect(Object.keys(zhCNMessages).some(key => key.startsWith(prefix))).toBe(false);
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            expect(extensionBundles[language].messages[`${prefix}action`]).toBeTruthy();
+            expect(Object.keys(currentUserscriptLanguageBundle(language).messages).some(key => key.startsWith(prefix))).toBe(false);
+        }
+    });
     it('keeps the complete settings notice aligned with the shared locale source', () => {
         const component = readFileSync(resolve(process.cwd(), 'src/features/settings/ui/services/ServiceConfiguration.vue'), 'utf8');
         expect(component).toContain("translateLegacy('" + mimoRetirementSource + "')");

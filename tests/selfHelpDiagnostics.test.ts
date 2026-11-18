@@ -30,6 +30,8 @@ describe('self help diagnosis', () => {
     [{kind: 'response'}, 'provider'],
     [{kind: 'bad-request', message: 'invalid parameter'}, 'configuration'],
     [{kind: 'bad-request', code: 'model_not_found'}, 'model-configuration'],
+    [{code: 'browser-translation-preparation-required', message: 'network'}, 'browser-translation-preparation-required'],
+    [{code: 'browser-translation-unavailable', message: 'model not found'}, 'browser-translation-unavailable'],
     [{kind: 'unknown', statusCode: 403}, 'authentication'],
     [{kind: 'invalid', status: 429}, 'rate-limit'],
     [{statusCode: 408}, 'timeout'],

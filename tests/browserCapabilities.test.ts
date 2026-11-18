@@ -11,7 +11,7 @@ import {
 } from '@/src/platform/browser/capabilities';
 import {services} from '@/src/core/config/catalog';
 import {
-    CHROME_TRANSLATOR_UNAVAILABLE_MESSAGE,
+    BROWSER_TRANSLATOR_UNAVAILABLE_MESSAGE,
     filterAvailableTranslationServices,
     getTranslationServiceUnavailableMessage,
     isTranslationServiceAvailable,
@@ -27,7 +27,7 @@ describe('browser capability contract', () => {
             manifestVersion: 3,
             offscreenDocument: true,
             extensionDom: true,
-            chromeTranslation: true,
+            browserTranslation: true,
             imageOcr: true,
             imageTranslation: true,
             areaTranslation: true,
@@ -39,7 +39,7 @@ describe('browser capability contract', () => {
         expect(resolveBrowserCapabilities({browser: 'EDGE', manifestVersion: 3})).toMatchObject({
             browser: 'edge',
             offscreenDocument: true,
-            chromeTranslation: false,
+            browserTranslation: true,
             imageOcr: true,
             imageTranslation: true,
             areaTranslation: true,
@@ -57,7 +57,7 @@ describe('browser capability contract', () => {
         ]) {
             expect(resolveBrowserCapabilities(target)).toMatchObject({
                 offscreenDocument: false,
-                chromeTranslation: false,
+                browserTranslation: false,
                 imageOcr: false,
                 imageTranslation: false,
                 areaTranslation: false,
@@ -71,7 +71,7 @@ describe('browser capability contract', () => {
         expect(resolveBrowserCapabilities({browser, manifestVersion: 2})).toMatchObject({
             offscreenDocument: false,
             extensionDom: true,
-            chromeTranslation: false,
+            browserTranslation: false,
             imageOcr: true,
             imageTranslation: true,
             areaTranslation: true,
@@ -80,20 +80,25 @@ describe('browser capability contract', () => {
         });
     });
 
-    it('runtime-gates Chrome Translation when a Chrome build is loaded by Edge', () => {
+    it('detects Edge and respects the API exposure in extension pages', () => {
         const chrome = resolveBrowserCapabilities({browser: 'chrome', manifestVersion: 3});
         const edge = applyRuntimeBrowserConstraints(
             chrome,
             'Mozilla/5.0 Chrome/131.0.0.0 Safari/537.36 Edg/131.0.0.0',
+            false,
         );
         expect(edge).toMatchObject({
             browser: 'edge',
             manifestVersion: 3,
             offscreenDocument: true,
-            chromeTranslation: false,
+            browserTranslation: false,
             imageTranslation: true,
         });
         expect(Object.isFrozen(edge)).toBe(true);
+        expect(applyRuntimeBrowserConstraints(chrome, 'Edg/148.0', true))
+            .toMatchObject({browser: 'edge', browserTranslation: true});
+        expect(applyRuntimeBrowserConstraints(chrome, 'Chrome/157.0', false).browserTranslation).toBe(false);
+        expect(applyRuntimeBrowserConstraints(chrome, 'Android Chrome/157.0', true).browserTranslation).toBe(false);
         expect(applyRuntimeBrowserConstraints(chrome, 'Mozilla/5.0 Chrome/131.0.0.0')).toBe(chrome);
         const firefox = resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2});
         expect(applyRuntimeBrowserConstraints(firefox, 'EdgA/131.0')).toBe(firefox);
@@ -101,6 +106,28 @@ describe('browser capability contract', () => {
         expect(readRuntimeUserAgent({navigator: {userAgent: 'Edg/131'}})).toBe('Edg/131');
         expect(readRuntimeUserAgent({})).toBe('');
         expect(readRuntimeUserAgent({navigator: {userAgent: 1}})).toBe('');
+    });
+
+    it.each([
+        {context: 'options without Translator', protocol: 'chrome-extension:', hasDocument: true, hasApi: false, available: false},
+        {context: 'offscreen with Translator', protocol: 'chrome-extension:', hasDocument: true, hasApi: true, available: true},
+        {context: 'extension worker', protocol: 'chrome-extension:', hasDocument: false, hasApi: false, available: true},
+        {context: 'web page', protocol: 'https:', hasDocument: true, hasApi: false, available: true},
+    ])('evaluates browser translation on load in $context', async ({protocol, hasDocument, hasApi, available}) => {
+        vi.resetModules();
+        vi.stubEnv('BROWSER', 'chrome');
+        vi.stubGlobal('location', {protocol});
+        vi.stubGlobal('document', hasDocument ? {} : undefined);
+        vi.stubGlobal('Translator', hasApi ? {create: vi.fn()} : undefined);
+        vi.stubGlobal('translation', undefined);
+        try {
+            const {browserCapabilities: runtime} = await import('@/src/platform/browser/capabilities');
+            expect(runtime.browserTranslation).toBe(available);
+        } finally {
+            vi.unstubAllGlobals();
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        }
     });
 
     it('restricts Firefox-shared DOM features when its package runs in Thunderbird', () => {
@@ -142,7 +169,7 @@ describe('browser capability contract', () => {
             browser: 'unknown',
             manifestVersion: 2,
             offscreenDocument: false,
-            chromeTranslation: false,
+            browserTranslation: false,
         });
         expect(browserCapabilityBuildMarker).toBe('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:undefined:mvundefined__');
         expect(browserCapabilities.buildTargetMarker).toBe(browserCapabilityBuildMarker);
@@ -186,6 +213,7 @@ describe('translation service capability contract', () => {
         expect(isTranslationServiceAvailable(services.microsoft, firefox)).toBe(true);
         expect(isTranslationServiceAvailable(services.chromeTranslator, chrome)).toBe(true);
         expect(isTranslationServiceAvailable(services.chromeTranslator, firefox)).toBe(false);
+        expect(isTranslationServiceAvailable(services.chromeTranslator, resolveBrowserCapabilities({browser: 'edge', manifestVersion: 3}))).toBe(true);
         expect(isTranslationServiceAvailable(services.chromeTranslator)).toBe(false);
     });
 
@@ -193,9 +221,13 @@ describe('translation service capability contract', () => {
         expect(getTranslationServiceUnavailableMessage(services.microsoft, firefox)).toBeNull();
         expect(getTranslationServiceUnavailableMessage(services.chromeTranslator, chrome)).toBeNull();
         expect(getTranslationServiceUnavailableMessage(services.chromeTranslator, firefox))
-            .toBe(CHROME_TRANSLATOR_UNAVAILABLE_MESSAGE);
+            .toContain('本地模型翻译');
+        expect(getTranslationServiceUnavailableMessage(services.chromeTranslator, applyRuntimeBrowserConstraints(chrome, 'Edg/131', false)))
+            .toContain('Edge 148');
+        expect(getTranslationServiceUnavailableMessage(services.chromeTranslator, applyRuntimeBrowserConstraints(chrome, 'Chrome/120', false)))
+            .toContain('Chrome 138');
         expect(getTranslationServiceUnavailableMessage(services.chromeTranslator))
-            .toBe(CHROME_TRANSLATOR_UNAVAILABLE_MESSAGE);
+            .toBe(BROWSER_TRANSLATOR_UNAVAILABLE_MESSAGE);
     });
 
     it('filters unsupported Chrome translation without mutating the caller options', () => {

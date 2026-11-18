@@ -220,7 +220,7 @@ describe('audit48F: cancellation at controlled external boundaries', () => {
         });
         const client = createOffscreenClient({getRuntime: () => ({getContexts: async () => [{}], sendMessage}),
             getOffscreen: () => ({createDocument: unexpected}), readyRetryAttempts: 1, preparationTimeoutMs: 1000});
-        const provider = createChromeTranslator({capabilities: {chromeTranslation: true}, offscreenClient: client,
+        const provider = createChromeTranslator({capabilities: {browserTranslation: true}, offscreenClient: client,
             createRequestId: () => 'contract-request', preparationStore: {set: vi.fn()},
         });
         const controller = new AbortController(); controller.abort();
@@ -287,21 +287,21 @@ describe('audit48F: cancellation at controlled external boundaries', () => {
             controller.abort();
             return {success: true, result: 'late', requestId: payload.requestId};
         });
-        const provider = createChromeTranslator({capabilities: {chromeTranslation: true}, offscreenClient: {send} as never, createRequestId: () => 'audit-request'});
+        const provider = createChromeTranslator({capabilities: {browserTranslation: true}, offscreenClient: {send} as never, createRequestId: () => 'audit-request'});
         await expect(provider(withProviderSnapshot({origin: 'hello', abortSignal: controller.signal}, config))).rejects.toMatchObject({name: 'AbortError'});
         expect(send).toHaveBeenCalledOnce();
     });
     it('Chrome does not send an already cancelled request', async () => {
         const controller = new AbortController(); controller.abort();
         const send = vi.fn();
-        const provider = createChromeTranslator({capabilities: {chromeTranslation: true}, offscreenClient: {send}, createRequestId: () => 'audit-request'});
+        const provider = createChromeTranslator({capabilities: {browserTranslation: true}, offscreenClient: {send}, createRequestId: () => 'audit-request'});
         await expect(provider(withProviderSnapshot({origin: 'hello', abortSignal: controller.signal}, config))).rejects.toMatchObject({name: 'AbortError'});
         expect(send).not.toHaveBeenCalled();
     });
     it('Chrome retains model-unavailable identity from offscreen', async () => {
         const send = vi.fn(async () => ({success: false, requestId: 'audit-request', errorCode: 'model-unavailable', error: 'offline'}));
-        const provider = createChromeTranslator({capabilities: {chromeTranslation: true}, offscreenClient: {send} as never, createRequestId: () => 'audit-request'});
-        await expect(provider(withProviderSnapshot({origin: 'hello'}, config))).rejects.toMatchObject({name: 'ChromeModelUnavailableError', message: 'Chrome Translation API 不可用：offline'});
+        const provider = createChromeTranslator({capabilities: {browserTranslation: true}, offscreenClient: {send} as never, createRequestId: () => 'audit-request'});
+        await expect(provider(withProviderSnapshot({origin: 'hello'}, config))).rejects.toMatchObject({name: 'ChromeModelUnavailableError', message: 'offline', code: 'browser-translation-unavailable', retryable: false});
     });
     it('DeepLX refuses a body read that completes after cancellation and does not fail over', async () => {
         config.deeplx = 'https://fixture.invalid/one\nhttps://fixture.invalid/two';

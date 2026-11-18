@@ -5,10 +5,29 @@ import {
     ChromeTranslationPreparationError,
     getChromeTranslationPreparationLanguageLabel,
     prepareChromeTranslationInPage,
+    readChromeLanguagePackAvailability,
     resolveChromeTranslationPreparationPair,
     type ChromeTranslationPreparationEnvironment,
     type ChromeTranslationPreparationStatus,
 } from '@/src/features/settings/model/chromeTranslationPreparation';
+
+it('checks language-pack readiness without creating either model', async () => {
+    const pair = {sourceLanguage: 'fr', targetLanguage: 'zh'};
+    const translator = {create: vi.fn(), availability: vi.fn()};
+    const detector = {create: vi.fn()};
+    const environment = {Translator: translator, LanguageDetector: detector};
+    for (const status of ['available', 'downloadable', 'downloading', 'unavailable']) {
+        translator.availability.mockResolvedValueOnce(status);
+        await expect(readChromeLanguagePackAvailability(pair, environment)).resolves.toBe(status);
+    }
+    translator.availability.mockRejectedValueOnce(new Error('probe failed')).mockResolvedValueOnce('unknown');
+    await expect(readChromeLanguagePackAvailability(pair, environment)).resolves.toBeUndefined();
+    await expect(readChromeLanguagePackAvailability(pair, environment)).resolves.toBeUndefined();
+    await expect(readChromeLanguagePackAvailability(pair, {})).resolves.toBeUndefined();
+    expect(translator.availability).toHaveBeenLastCalledWith(pair);
+    expect(translator.create).not.toHaveBeenCalled();
+    expect(detector.create).not.toHaveBeenCalled();
+});
 
 function deferred<T>() {
     let resolve!: (value: T | PromiseLike<T>) => void;
@@ -351,7 +370,7 @@ describe('Chrome 设置页本地模型准备', () => {
             await expect(prepareChromeTranslationInPage(
                 {from: 'auto', to: 'en'},
                 environment,
-            )).rejects.toThrow('不支持 Chrome 现代 LanguageDetector/Translator API');
+            )).rejects.toThrow('未开放语言检测或翻译接口');
         }
         expect(createDetector).not.toHaveBeenCalled();
         expect(createTranslator).not.toHaveBeenCalled();
@@ -444,7 +463,7 @@ describe('Chrome 设置页本地模型准备', () => {
         await expect(preparation).rejects.toMatchObject({
             code: 'user-activation-required',
             params: {sourceLanguage: 'fr', targetLanguage: 'en'},
-            message: expect.stringContaining('再次点击“准备 Chrome 本地翻译”继续准备 fr → en'),
+            message: expect.stringContaining('再次点击「准备语言包」继续准备 fr → en'),
         });
         expect(translatorCreate).toHaveBeenCalledOnce();
         translatorReady.resolve({translate: vi.fn(async () => 'Ready'), destroy: destroyTranslator});
@@ -483,7 +502,7 @@ describe('Chrome 设置页本地模型准备', () => {
         })).rejects.toMatchObject({
             code: 'model-unavailable',
             params: {sourceLanguage: 'en', targetLanguage: 'zh', detail: 'Unable to create translator for the given source and target language.'},
-            message: expect.stringContaining('当前 Chrome 无法创建本地翻译模型'),
+            message: expect.stringContaining('浏览器无法创建翻译模型'),
         });
         expect(destroyDetector).toHaveBeenCalledOnce();
     });
@@ -575,7 +594,7 @@ describe('Chrome 设置页本地模型准备', () => {
             Translator: {
                 create: vi.fn(async () => { throw 0; }),
             },
-        })).rejects.toThrow('Chrome 本地翻译准备失败');
+        })).rejects.toThrow('语言包准备失败');
         await expect(prepareChromeTranslationInPage({from: 'auto', to: 'en'}, {
             LanguageDetector: {
                 create: vi.fn(async () => ({detect: vi.fn(async () => [{detectedLanguage: 'fr', confidence: 0.99}])})),

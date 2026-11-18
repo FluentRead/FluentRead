@@ -295,15 +295,15 @@ describe('界面 i18n 契约', () => {
     expect(getMultilingualTargetLanguageLabel('unknown')).toBe('unknown');
   });
 
-  it('完整本地化 Chrome 具体语言对准备流程及参数化状态', () => {
+  it('完整本地化浏览器语言包的简短状态、进度与操作', () => {
     const actionByLanguage = {
-      'zh-CN': '准备 Chrome 本地翻译',
-      'en-US': 'Prepare Chrome local translation',
-      'ja-JP': 'Chrome ローカル翻訳を準備',
-      'ko-KR': 'Chrome 로컬 번역 준비',
-      'fr-FR': 'Préparer la traduction locale de Chrome',
-      'ru-RU': 'Подготовить локальный перевод Chrome',
-      'es-ES': 'Preparar la traducción local de Chrome',
+      'zh-CN': '准备语言包',
+      'en-US': 'Prepare language pack',
+      'ja-JP': '言語パックを準備',
+      'ko-KR': '언어 팩 준비',
+      'fr-FR': 'Préparer le pack de langue',
+      'ru-RU': 'Подготовить языковой пакет',
+      'es-ES': 'Preparar el paquete de idioma',
     } as const;
     for (const [language, expectedAction] of Object.entries(actionByLanguage)) {
       expect(translate('settings.services.chromePreparation.action', language as keyof typeof actionByLanguage))
@@ -311,21 +311,16 @@ describe('界面 i18n 契约', () => {
       const status = translate(
         'settings.services.chromePreparation.statusDownloadingProgress',
         language as keyof typeof actionByLanguage,
-        {model: 'MODEL', percentage: 42, sourceLanguage: 'fr', targetLanguage: 'en'},
+        {percentage: 42},
       );
-      expect(status).toContain('MODEL');
       expect(status).toContain('42');
-      expect(status).toContain('fr');
-      expect(status).toContain('en');
-      expect(status).not.toMatch(/\{(?:model|percentage|sourceLanguage|targetLanguage)\}/u);
+      expect(status).not.toMatch(/\{\w+\}/u);
 
       const activationError = translate(
         'settings.services.chromePreparation.error.userActivationRequired',
         language as keyof typeof actionByLanguage,
-        {sourceLanguage: 'fr', targetLanguage: 'en'},
       );
-      expect(activationError).toContain('fr');
-      expect(activationError).toContain('en');
+      expect(activationError).toContain(expectedAction);
     }
 
     const englishChromeMessages = Object.entries(enUSMessages).filter(([key]) => (

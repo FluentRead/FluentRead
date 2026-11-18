@@ -16,7 +16,7 @@ FluentRead sends text to the service you choose. Start with free translation, or
 | Use an existing translation account | Its DeepL, Microsoft, Google, or other service |
 | Use an official cloud API | Google Cloud, Azure, Alibaba Cloud, Tencent Cloud, Baidu, or Volcengine |
 | Translate complex expressions or use AI explanations | An AI service with a working key and model |
-| Process translation text locally | Local model translation, Ollama, or [Chrome local translation](/en/guide/chrome-translator) |
+| Process translation text locally | Local model translation, Ollama, or [Built-in browser translation](/en/guide/chrome-translator) |
 | Rotate services or retry with another provider | Combined translation |
 
 FluentRead is free and open source. Providers may charge separately. Chat subscriptions may not include API allowance; check free quotas, regional availability, and overage rules with your provider.

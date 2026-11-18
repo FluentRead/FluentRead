@@ -12,6 +12,10 @@ import {translate} from '@/src/core/i18n'
 
 // 使用实际客户端 SFC 的 setup；只替换与原 SSR 夹具相同的外部端口。
 vi.mock('@/src/platform/browser/freeProviderPermissions', () => ({readFreePoolAccess: (...args: unknown[]) => readAccess(...args)}))
+vi.mock('@/src/platform/browser/capabilities', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/src/platform/browser/capabilities')>()
+  return {...actual, browserCapabilities: actual.resolveBrowserCapabilities({browser: 'chrome', manifestVersion: 3})}
+})
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: (...args: unknown[]) => send(...args)}}}))
 vi.mock('@/src/services/config/store', () => ({waitForConfigPersistenceQueue: () => queue(), requestConfigSave: (...args: unknown[]) => save(...args)}))
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => (globalThis as any)[key].uiI18n}))
@@ -26,6 +30,7 @@ vi.mock('@/src/platform/browser/chromeTranslationPreparationRequest', () => ({ch
 vi.mock('@/src/features/settings/model/chromeTranslationPreparation', () => ({
   ChromeTranslationPreparationError: class extends Error {code: unknown; params: unknown; constructor(code: unknown, message: string, params: unknown) {super(message); this.code = code; this.params = params}},
   prepareChromeTranslationInPage: (...args: unknown[]) => prepare(...args),
+  readChromeLanguagePackAvailability: (...args: unknown[]) => readPack(...args),
   resolveChromeTranslationPreparationPair: (from: string, to: string) => ({sourceLanguage: from === 'auto' ? 'en' : from, targetLanguage: to}),
   getChromeTranslationPreparationLanguageLabel: (language: string) => language,
 }))
@@ -48,6 +53,7 @@ let visible: import('vue').Ref<boolean>
 let uiLanguage: import('vue').Ref<string>, uiBundleRevision: import('vue').Ref<number>
 let uiCatalogs: Map<string, Record<string, string>>
 const readAccess = vi.fn()
+const readPack = vi.fn()
 const send = vi.fn(), save = vi.fn(), queue = vi.fn(), read = vi.fn(), clear = vi.fn(), prepare = vi.fn(), confirm = vi.fn(), feedback = vi.fn(), emitDelete = vi.fn(), emitProvider = vi.fn()
 const subscriptions: {callback: (value: any) => void; stopped: boolean}[] = []
 const releases: (() => void)[] = [], jobs: Promise<unknown>[] = [], confirmations: {resolve: (value?: unknown) => void; reject: (error: unknown) => void}[] = []
@@ -73,6 +79,7 @@ async function acceptAction(index = 0) {
 beforeEach(async () => {
   vi.clearAllMocks();subscriptions.length = 0;releases.length = 0;jobs.length = 0;confirmations.length = 0
   readAccess.mockReset();readAccess.mockResolvedValue({supported:false,grantedIds:FREE_TRANSLATION_PROVIDERS.map(p=>p.id),preferredGrant:null})
+  readPack.mockReset();readPack.mockResolvedValue(undefined)
   queue.mockResolvedValue(undefined);save.mockResolvedValue(undefined);read.mockResolvedValue(null);clear.mockResolvedValue(undefined)
   send.mockResolvedValue({success: true, durationMs: 25});prepare.mockResolvedValue({sourceLanguage: 'en', targetLanguage: 'zh'})
   confirm.mockImplementation(() => {const item = pending();confirmations.push(item);return item.promise})
@@ -226,10 +233,51 @@ describe('实际服务连接配置的活跃生命周期与确认归属', () => {
     const before = state.connectionTestMessage;input.onStatus({phase: 'verifying', sourceLanguage: 'en', targetLanguage: 'zh'});delayed.resolve({sourceLanguage: 'en', targetLanguage: 'zh'});await job
     expect(state.connectionTestMessage).toBe(before);expect(clear).not.toHaveBeenCalled()
   })
+  it('更换待检查语言对后不展示迟到的语言包状态', async () => {
+    const first = pending()
+    readPack.mockReturnValueOnce(first.promise).mockResolvedValueOnce('available')
+    props.service = 'chromeTranslator'
+    await settle()
+    props.config.from = 'fr'
+    await settle()
+    expect(readPack).toHaveBeenLastCalledWith(expect.objectContaining({sourceLanguage: 'fr'}))
+    expect(state.chromeLanguagePackAvailability).toBe('available')
+    first.resolve('unavailable')
+    await settle()
+    expect(state.chromeLanguagePackAvailability).toBe('available')
+  })
   it('Chrome准备成功不被挂起的提示清理阻塞，清理只接收已完成语言对', async () => {
     props.service = 'chromeTranslator';props.compute.showToken = false;await settle();const delayed = pending();clear.mockReturnValueOnce(delayed.promise)
     let ended = false;const job = check().then(() => {ended = true});await settle();expect(ended).toBe(true)
     expect(state.connectionTestState).toBe('success');expect(clear).toHaveBeenCalledWith({sourceLanguage: 'en', targetLanguage: 'zh'});delayed.resolve();await job
+  })
+  it('准备成功后保留已就绪的语言对，新请求不会继承旧结果', async () => {
+    props.config.from = 'auto'
+    props.config.to = 'zh'
+    props.service = 'chromeTranslator'
+    props.compute.showToken = false
+    await settle()
+    subscriptions.at(-1)!.callback({sourceLanguage: 'fr', targetLanguage: 'zh'})
+    prepare.mockResolvedValueOnce({sourceLanguage: 'fr', targetLanguage: 'zh'})
+    await check()
+    subscriptions.at(-1)!.callback(null)
+    await settle()
+    expect(state.currentChromePreparationPairLabel).toBe('fr → zh')
+    expect(state.chromePreparationState).toBe('success')
+    subscriptions.at(-1)!.callback({sourceLanguage: 'ja', targetLanguage: 'fr'})
+    await settle()
+    expect(state.currentChromePreparationPairLabel).toBe('fr → zh')
+    expect(state.chromePreparationState).toBe('success')
+    subscriptions.at(-1)!.callback({sourceLanguage: 'ja', targetLanguage: 'zh'})
+    await settle()
+    expect(state.currentChromePreparationPairLabel).toBe('ja → zh')
+    expect(state.chromePreparationState).toBe('idle')
+    prepare.mockResolvedValueOnce({sourceLanguage: 'ja', targetLanguage: 'zh'})
+    await check()
+    subscriptions.at(-1)!.callback({sourceLanguage: 'ja', targetLanguage: 'fr'})
+    await settle()
+    expect(state.currentChromePreparationPairLabel).toBe('ja → zh')
+    expect(state.chromePreparationState).toBe('success')
   })
   it('Chrome总等待预算从点击起计，配置保存耗时也在五分钟内', async () => {
     props.service = 'chromeTranslator';props.compute.showToken = false;await settle();vi.useFakeTimers()
@@ -902,16 +950,16 @@ it('updates API-key rotation and model authentication policies through their act
   }finally{await h.finish()}
 })
 
-it('shows real Chrome model preparation phases on the current connection button and ignores late download updates',async()=>{
+it('uses a single status for browser language pack preparation and ignores late download updates',async()=>{
   const h=await mountServiceClient('chromeTranslator');try{
     const waiting=pending();prepare.mockReturnValueOnce(waiting.promise);
-    uiCatalogs.set('zh-CN',{'settings.services.chromePreparation.statusDownloadingProgress':'{model} {percentage}%','settings.services.chromePreparation.statusDownloading':'Downloading {model}','settings.services.chromePreparation.statusInitializing':'Initializing','settings.services.chromePreparation.statusVerifying':'Verifying'});uiBundleRevision.value++;
+    uiCatalogs.set('zh-CN',{'settings.services.chromePreparation.statusDownloadingProgress':'Downloading {percentage}%','settings.services.chromePreparation.statusDownloading':'Downloading','settings.services.chromePreparation.titlePreparing':'Preparing','settings.services.chromePreparation.statusVerifying':'Verifying','settings.services.chromePreparation.titleReady':'Ready'});uiBundleRevision.value++;
     const button=h.allNodes().find(node=>Object.hasOwn(node.props,'data-connection-test-button'))!;const job=(button.props.onClick as ()=>Promise<void>)();await settle();expect(prepare).toHaveBeenCalledOnce();
     const input=prepare.mock.calls[0][0], text=()=>h.allNodes().map(node=>String(node.value??'')).join(' ');
-    input.onStatus({phase:'initializing',sourceLanguage:'en',targetLanguage:'zh'});await settle();expect(text()).toContain('Initializing');
-    input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'language-detector'});await settle();expect(text()).toContain('Downloading');expect(text()).toContain('settings.services.chromePreparation.modelDetector');
-    input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'translator',loaded:.25});await settle();expect(text()).toContain('25%');expect(text()).toContain('settings.services.chromePreparation.modelTranslator');
+    input.onStatus({phase:'initializing',sourceLanguage:'en',targetLanguage:'zh'});await settle();expect(text()).toContain('Preparing');
+    input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'language-detector'});await settle();expect(text()).toContain('Downloading');
+    input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'translator',loaded:.25});await settle();expect(text()).toContain('Downloading 25%');
     input.onStatus({phase:'verifying',sourceLanguage:'en',targetLanguage:'zh'});await settle();expect(text()).toContain('Verifying');
-    waiting.resolve({sourceLanguage:'en',targetLanguage:'zh'});await job;await settle();const completed=text();expect(completed).toContain('settings.services.chromePreparation.titleReady');input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'translator',loaded:.8});await settle();expect(text()).toBe(completed);expect(h.clientErrors).toEqual([]);
+    waiting.resolve({sourceLanguage:'en',targetLanguage:'zh'});await job;await settle();const completed=text();expect(completed).toContain('Ready');input.onStatus({phase:'downloading',sourceLanguage:'en',targetLanguage:'zh',model:'translator',loaded:.8});await settle();expect(text()).toBe(completed);expect(h.clientErrors).toEqual([]);
   }finally{await h.finish()}
 })

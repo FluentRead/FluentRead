@@ -1,3 +1,4 @@
+import {hasBrowserTranslationApi} from '@/src/platform/browser/capabilities';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {MIN_CHROME_LANGUAGE_CONFIDENCE as sharedConfidence} from '@/src/core/language/confidence';
 import {MIN_CHROME_LANGUAGE_CONFIDENCE as detectionConfidence} from '@/src/core/language/detect';
@@ -9,7 +10,6 @@ import {
     friendlyChromeTranslationError,
     createChromePreparationRequiredError,
     isChromePreparationRequiredError,
-    isChromeTranslationSupported,
     mapChromeLanguageCode,
     parseChromeTranslationRequest,
     parseLanguageCode,
@@ -124,9 +124,9 @@ describe('Offscreen Chrome 翻译域', () => {
         expect(mapChromeLanguageCode('zh-TW')).toBe('zh-Hant');
         expect(mapChromeLanguageCode('zh-HK')).toBe('zh-Hant');
         expect(mapChromeLanguageCode('eo')).toBe('eo');
-        expect(isChromeTranslationSupported({translation: {createTranslator: vi.fn()}})).toBe(true);
-        expect(isChromeTranslationSupported({Translator: {create: vi.fn()}})).toBe(true);
-        expect(isChromeTranslationSupported({translation: {}})).toBe(false);
+        expect(hasBrowserTranslationApi({translation: {createTranslator: vi.fn()}})).toBe(true);
+        expect(hasBrowserTranslationApi({Translator: {create: vi.fn()}})).toBe(true);
+        expect(hasBrowserTranslationApi({translation: {}})).toBe(false);
     });
 
     it('脚本兜底只识别 Kana 与 Hangul，共享脚本、纯 Han 与 Latin 保持未知', () => {
@@ -984,9 +984,9 @@ describe('Offscreen Chrome 翻译域', () => {
 
     it('把实验 API 错误映射成可操作提示', () => {
         expect(friendlyChromeTranslationError(new Error('model not available'), 'en', 'ja').message)
-            .toContain('暂时不可用');
+            .toContain('当前不可用');
         expect(friendlyChromeTranslationError(new Error('language not supported'), 'en', 'xx').message)
-            .toContain('en -> xx');
+            .toContain('en → xx');
         expect(friendlyChromeTranslationError(new Error('model download failed'), 'en', 'ja').message)
             .toContain('模型未就绪');
         expect(friendlyChromeTranslationError('plain failure', 'en', 'ja').message).toBe('翻译失败：plain failure');
@@ -994,12 +994,12 @@ describe('Offscreen Chrome 翻译域', () => {
         const notAllowed = new Error('gesture required');
         notAllowed.name = 'NotAllowedError';
         expect(friendlyChromeTranslationError(notAllowed, 'en', 'ja').message)
-            .toContain('已记录 en → ja 待准备请求');
+            .toContain('en → ja 语言包尚未准备');
         expect(friendlyChromeTranslationError(notAllowed, 'auto', 'ja').message)
-            .toContain('无法在自动识别源语言时激活');
+            .toContain('自动识别源语言需要先准备语言检测模型');
         const notSupported = new Error('pair rejected');
         notSupported.name = 'NotSupportedError';
-        expect(friendlyChromeTranslationError(notSupported, 'en', 'xx').message).toContain('Chrome 本地翻译当前不可用');
+        expect(friendlyChromeTranslationError(notSupported, 'en', 'xx').message).toContain('浏览器内置翻译当前不可用');
         const quota = new Error('too much text');
         quota.name = 'QuotaExceededError';
         expect(friendlyChromeTranslationError(quota, 'en', 'ja').message).toContain('长度限制');
@@ -1031,7 +1031,7 @@ describe('Offscreen Chrome 翻译域', () => {
         ['OperationError', '模型未就绪'],
         ['NetworkError', '网络连接'],
         ['InvalidStateError', '模型未就绪'],
-        ['NotSupportedError', 'Chrome 本地翻译当前不可用'],
+        ['NotSupportedError', '浏览器内置翻译当前不可用'],
     ] as const)('auto 检测的 %s 经 translateWithChromeApi 链路保留并友好映射', async (name, expected) => {
         const detectionError = new Error('detector operation failed');
         detectionError.name = name;
@@ -1052,7 +1052,7 @@ describe('Offscreen Chrome 翻译域', () => {
         expect(translatorCreate).not.toHaveBeenCalled();
     });
 
-    it('auto 检测首次需要用户激活时提示选择实际网页语言，而不是不存在的 auto 选项', async () => {
+    it('首次自动检测时提示准备语言检测模型', async () => {
         const activation = new Error('gesture required');
         activation.name = 'NotAllowedError';
         const translatorCreate = vi.fn();
@@ -1070,7 +1070,7 @@ describe('Offscreen Chrome 翻译域', () => {
             () => { throw new Error('expected auto detection preparation to fail'); },
             (reason) => reason instanceof Error ? reason : new Error(String(reason)),
         );
-        expect(error.message).toContain('选择网页实际源语言');
+        expect(error.message).toContain('准备语言检测模型');
         expect(error.message).not.toContain('选为 auto');
         expect(translatorCreate).not.toHaveBeenCalled();
     });
@@ -1153,10 +1153,10 @@ describe('Offscreen Chrome 翻译域', () => {
 
     it('明确报告不支持环境并格式化 translator 创建失败', async () => {
         await expect(translateWithChromeApi({text: 'x', from: 'en', to: 'ja'}, {}))
-            .rejects.toThrow('当前浏览器不支持');
+            .rejects.toThrow('当前浏览器未开放内置翻译接口');
         await expect(translateWithChromeApi({text: 'x', from: 'en', to: 'ja'}, {
             translation: {createTranslator: vi.fn(async () => { throw new Error('not ready'); })},
-        })).rejects.toThrow('暂时不可用');
+        })).rejects.toThrow('当前不可用');
         await expect(translateWithChromeApi({text: 'x', from: 'en', to: 'ja'}, {
             translation: {createTranslator: vi.fn(async () => { throw 'boom'; })},
         })).rejects.toThrow('翻译失败：boom');

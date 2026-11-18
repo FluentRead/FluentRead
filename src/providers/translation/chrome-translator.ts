@@ -1,13 +1,15 @@
 /**
  * @file src/providers/translation/chrome-translator.ts
  *
- * 文件职责：适配 Chrome 内置 Translation API，通过受能力约束的 Offscreen document 执行浏览器本地翻译。
+ * 文件职责：适配 Chrome 和 Edge 的 Translator API，通过离屏文档执行浏览器内置翻译。
  * 主要内容：createChromeTranslator 注入能力、OffscreenClient 与待准备语言存储，校验响应身份和实际缺包语言对，在未取消时保存待准备记录，默认实例使用请求级语言 payload。
  * 模块边界：本文件位于 provider 适配层，只把统一翻译请求转换为外部或浏览器服务协议；不管理页面 DOM、UI 生命周期或配置持久化，缓存、去重和超时总预算由 translation broker 统一协调。
  */
 
 import {abortErrorFromSignal} from '@/src/platform/http/runtime';
 import {requireTranslationProviderConfig} from '@/src/services/translation/requestSnapshot';
+import {BROWSER_TRANSLATOR_UNAVAILABLE_MESSAGE} from '@/src/services/translation/capabilities';
+import {BROWSER_TRANSLATION_PREPARATION_REQUIRED, BROWSER_TRANSLATION_UNAVAILABLE} from '@/src/services/translation/errors';
 import {
     browserCapabilities,
     type BrowserCapabilities,
@@ -41,7 +43,7 @@ interface ChromeTranslationOffscreenResponse {
 const DEFAULT_CHROME_TRANSLATION_TIMEOUT_MS = 300_000;
 
 export interface ChromeTranslatorDependencies {
-    readonly capabilities: Pick<BrowserCapabilities, 'chromeTranslation'>;
+    readonly capabilities: Pick<BrowserCapabilities, 'browserTranslation'>;
     readonly offscreenClient: Pick<OffscreenClient, 'send'>;
     readonly createRequestId: () => string;
     readonly preparationStore?: Pick<typeof chromeTranslationPreparationStore, 'set'>;
@@ -51,14 +53,16 @@ export function createChromeTranslationRequestId(): string {
     return crypto.randomUUID();
 }
 
-/** Chrome Translation provider；Offscreen 生命周期与 transport 由 platform client 所有。 */
+/** 原生翻译 provider，沿用已有服务 ID 和离屏消息协议。 */
 export function createChromeTranslator(dependencies: ChromeTranslatorDependencies) {
     return async (message: ChromeTranslatorMessage): Promise<string> => {
         if (typeof message.origin !== 'string' || !message.origin.trim()) {
             throw new Error('翻译文本不能为空');
         }
-        if (!dependencies.capabilities.chromeTranslation) {
-            throw new Error('当前浏览器不支持 Chrome 内置翻译，请在设置中切换翻译服务');
+        if (!dependencies.capabilities.browserTranslation) {
+            throw Object.assign(new Error(BROWSER_TRANSLATOR_UNAVAILABLE_MESSAGE), {
+                code: BROWSER_TRANSLATION_UNAVAILABLE, retryable: false,
+            });
         }
 
         try {
@@ -85,9 +89,7 @@ export function createChromeTranslator(dependencies: ChromeTranslatorDependencie
             if (message.abortSignal?.aborted) throw abortErrorFromSignal(message.abortSignal);
             if (response?.requestId !== requestId) throw new Error('Offscreen 翻译响应 requestId 不匹配');
             if (!response.success || typeof response.result !== 'string') {
-                if (response.errorCode === 'preparation-required'
-                    && typeof response.sourceLanguage === 'string'
-                    && typeof response.targetLanguage === 'string') {
+                if (response.errorCode === 'preparation-required') {
                     const preparation = {
                         sourceLanguage: response.sourceLanguage,
                         targetLanguage: response.targetLanguage,
@@ -95,18 +97,26 @@ export function createChromeTranslator(dependencies: ChromeTranslatorDependencie
                     if (isChromeTranslationPreparationRequest(preparation)) {
                         await (dependencies.preparationStore || chromeTranslationPreparationStore).set(preparation);
                     }
-                    throw new Error(response.error || 'Chrome 本地翻译模型需要用户激活');
+                    throw Object.assign(
+                        new Error(response.error || '请在「浏览器内置翻译」中点击「准备语言包」后重试。'),
+                        {code: BROWSER_TRANSLATION_PREPARATION_REQUIRED, retryable: false},
+                    );
                 }
                 const unavailable = new Error(response?.error || '无效的翻译响应');
-                if (response.errorCode === 'model-unavailable') {
-                    unavailable.name = response.errorName || 'ChromeModelUnavailableError';
+                if (response.errorCode === 'model-unavailable' || response.errorCode === 'api-unavailable') {
+                    Object.assign(unavailable, {
+                        name: response.errorName || 'ChromeModelUnavailableError',
+                        code: BROWSER_TRANSLATION_UNAVAILABLE,
+                        retryable: false,
+                    });
                 }
                 throw unavailable;
             }
             return response.result;
         } catch (error) {
             const message = error instanceof Error ? error.message : '未知错误';
-            const wrapped = new Error(`Chrome Translation API 不可用：${message}`);
+            if (error instanceof Error && 'retryable' in error && error.retryable === false) throw error;
+            const wrapped = new Error(`浏览器内置翻译失败：${message}`);
             if (error instanceof Error) wrapped.name = error.name;
             throw wrapped;
         }

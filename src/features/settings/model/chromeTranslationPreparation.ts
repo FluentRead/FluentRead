@@ -1,6 +1,6 @@
 /**
  * @file src/features/settings/model/chromeTranslationPreparation.ts
- * 文件职责：在扩展设置页的用户点击上下文中直接准备 Chrome 语言检测与本地翻译模型，并执行一轮确定性的语言识别和翻译自检。
+ * 文件职责：在扩展设置页检查浏览器翻译语言包，并从用户点击中准备 Chrome 或 Edge 的设备端模型。
  * 主要内容：解析自检语言对，首次等待前同步启动两个现代 API；转发有界进度，状态回调取消后停止后续操作，消费取消时的迟到拒绝；私有固定校验样例按自身语言键精化泛中文检测结果，验证置信度、语言与翻译并释放资源。
  * 模块边界：本模块只服务设置页的主动连接检查，不读写配置、不发送 runtime 消息、不兼容 legacy translation API，也不参与网页正文的正式翻译链路。
  */
@@ -57,11 +57,30 @@ export interface ChromeTranslationPreparationEnvironment {
         create(options?: ChromePreparationCreateOptions): Promise<ChromePreparationDetector>;
     };
     readonly Translator?: {
+        availability?(pair: {sourceLanguage: string; targetLanguage: string}): Promise<unknown>;
         create(options: ChromePreparationCreateOptions & {
             sourceLanguage: string;
             targetLanguage: string;
         }): Promise<ChromePreparationTranslator>;
     };
+}
+
+export type ChromeLanguagePackAvailability = 'available' | 'downloadable' | 'downloading' | 'unavailable';
+
+/** 状态预览只读浏览器的语言包状态，不触发模型下载。 */
+export async function readChromeLanguagePackAvailability(
+    {sourceLanguage, targetLanguage}: Pick<ChromeTranslationPreparationPair, 'sourceLanguage' | 'targetLanguage'>,
+    environment: ChromeTranslationPreparationEnvironment = globalThis as unknown as ChromeTranslationPreparationEnvironment,
+): Promise<ChromeLanguagePackAvailability | undefined> {
+    try {
+        const status = await environment.Translator?.availability?.({sourceLanguage, targetLanguage});
+        if (status === 'available' || status === 'downloadable' || status === 'downloading' || status === 'unavailable') {
+            return status;
+        }
+    } catch {
+        // 旧接口或探测失败时仍允许用户主动检查。
+    }
+    return undefined;
 }
 
 export interface ChromeTranslationPreparationOptions {
@@ -83,7 +102,6 @@ export type ChromeTranslationPreparationErrorCode =
     | 'invalid-detection'
     | 'api-unavailable'
     | 'user-activation-required'
-    | 'unsupported-pair'
     | 'model-unavailable'
     | 'detection-mismatch'
     | 'invalid-translation'
@@ -189,7 +207,7 @@ function normalizeLanguageCode(value: string, field: 'from' | 'to', allowAuto: b
     if (!language || !LANGUAGE_CODE_PATTERN.test(language) || (!allowAuto && language.toLowerCase() === 'auto')) {
         throw new ChromeTranslationPreparationError(
             'invalid-language-code',
-            `Chrome 本地翻译 ${field} 语言代码无效`,
+            `浏览器内置翻译 ${field} 语言代码无效`,
             {field},
         );
     }
@@ -223,7 +241,7 @@ export function resolveChromeTranslationPreparationPair(
     if (!sampleText) {
         throw new ChromeTranslationPreparationError(
             'sample-unavailable',
-            `暂时无法为源语言 ${sourceLanguage} 生成 Chrome 本地翻译校验文本`,
+            `暂时无法为源语言 ${sourceLanguage} 生成内置翻译校验文本`,
             {sourceLanguage},
         );
     }
@@ -287,7 +305,7 @@ function safelyDestroy(resource: {destroy?: () => void} | undefined): void {
 }
 
 function createAbortError(): ChromeTranslationPreparationError {
-    const error = new ChromeTranslationPreparationError('aborted', 'Chrome 本地模型准备已取消');
+    const error = new ChromeTranslationPreparationError('aborted', '语言包准备已取消');
     error.name = 'AbortError';
     return error;
 }
@@ -325,7 +343,7 @@ function detectedLanguageFrom(value: unknown): string {
     if (!Array.isArray(value)
         || typeof value[0]?.detectedLanguage !== 'string'
         || typeof value[0]?.confidence !== 'number') {
-        throw new ChromeTranslationPreparationError('invalid-detection', 'Chrome 语言检测器返回了无效结果');
+        throw new ChromeTranslationPreparationError('invalid-detection', '浏览器语言检测器返回了无效结果');
     }
     const detectedLanguage = value[0].detectedLanguage.trim();
     const confidence = value[0].confidence;
@@ -334,7 +352,7 @@ function detectedLanguageFrom(value: unknown): string {
         || !Number.isFinite(confidence)
         || confidence < MIN_CHROME_LANGUAGE_CONFIDENCE
         || confidence > 1) {
-        throw new ChromeTranslationPreparationError('invalid-detection', 'Chrome 语言检测器返回了无效结果');
+        throw new ChromeTranslationPreparationError('invalid-detection', '浏览器语言检测器返回了无效结果');
     }
     return detectedLanguage;
 }
@@ -346,16 +364,16 @@ function friendlyPreparationError(
     if (error instanceof Error && error.name === 'NotAllowedError') {
         return new ChromeTranslationPreparationError(
             'user-activation-required',
-            `Chrome 仍有本地模型需要用户激活；请再次点击“准备 Chrome 本地翻译”继续准备 ${pair.sourceLanguage} → ${pair.targetLanguage}。`,
+            `浏览器需要用户操作才能下载模型。请再次点击「准备语言包」继续准备 ${pair.sourceLanguage} → ${pair.targetLanguage}。`,
             {sourceLanguage: pair.sourceLanguage, targetLanguage: pair.targetLanguage},
         );
     }
     if (error instanceof Error && error.name === 'NotSupportedError') {
         // 两个 create 都可能拒绝，NotSupportedError 并不能证明语言组合不受支持；
-        // Chrome 的模型组件、下载与浏览器策略同样会影响当前环境的可用性。
+        // 模型组件、下载与浏览器策略同样会影响当前环境的可用性。
         return new ChromeTranslationPreparationError(
             'model-unavailable',
-            `当前 Chrome 无法创建本地翻译模型（${pair.sourceLanguage} → ${pair.targetLanguage}）。请检查模型下载和浏览器策略，查看下方官方帮助。`,
+            `浏览器无法创建翻译模型（${pair.sourceLanguage} → ${pair.targetLanguage}）。请检查模型下载和浏览器策略。`,
             {sourceLanguage: pair.sourceLanguage, targetLanguage: pair.targetLanguage, detail: error.message},
         );
     }
@@ -363,7 +381,7 @@ function friendlyPreparationError(
         ? error
         : new ChromeTranslationPreparationError(
             'preparation-failed',
-            String(error || 'Chrome 本地翻译准备失败'),
+            String(error || '语言包准备失败'),
         );
 }
 
@@ -382,7 +400,7 @@ export async function prepareChromeTranslationInPage(
     if (typeof detectorApi?.create !== 'function' || typeof translatorApi?.create !== 'function') {
         throw new ChromeTranslationPreparationError(
             'api-unavailable',
-            '当前页面不支持 Chrome 现代 LanguageDetector/Translator API',
+            '当前浏览器未开放语言检测或翻译接口',
         );
     }
 
@@ -458,12 +476,12 @@ export async function prepareChromeTranslationInPage(
         if (languageComparisonKey(detectedLanguage) !== languageComparisonKey(pair.sourceLanguage)) {
             throw new ChromeTranslationPreparationError(
                 'detection-mismatch',
-                `Chrome 语言检测验证失败：预期 ${pair.sourceLanguage}，实际 ${detectedLanguage}`,
+                `浏览器语言检测验证失败：预期 ${pair.sourceLanguage}，实际 ${detectedLanguage}`,
                 {expectedLanguage: pair.sourceLanguage, detectedLanguage},
             );
         }
         if (typeof translatedValue !== 'string' || !translatedValue.trim()) {
-            throw new ChromeTranslationPreparationError('invalid-translation', 'Chrome 翻译器返回了无效结果');
+            throw new ChromeTranslationPreparationError('invalid-translation', '浏览器翻译器返回了无效结果');
         }
         cleanupResources();
         return {...pair, detectedLanguage, translatedText: translatedValue};

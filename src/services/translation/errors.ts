@@ -17,6 +17,8 @@ export type TranslationErrorKind =
   | 'unknown';
 
 export const TRANSLATION_ERROR_MARKER = 'fluentread-translation-error-v1' as const;
+export const BROWSER_TRANSLATION_PREPARATION_REQUIRED = 'browser-translation-preparation-required';
+export const BROWSER_TRANSLATION_UNAVAILABLE = 'browser-translation-unavailable';
 
 export interface SerializedTranslationError {
   marker: typeof TRANSLATION_ERROR_MARKER;

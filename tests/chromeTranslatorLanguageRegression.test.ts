@@ -22,7 +22,7 @@ import {buildChromeOffscreenTranslationData} from '@/src/providers/translation/c
 import browser from 'webextension-polyfill';
 
 const chromeTranslator = createChromeTranslator({
-    capabilities: {chromeTranslation: true},
+    capabilities: {browserTranslation: true},
     offscreenClient: {send: mocks.send},
     createRequestId: mocks.createRequestId,
 });
@@ -123,7 +123,7 @@ describe('Chrome translator 请求级语言回归', () => {
 
     it('默认 unknown 构建保守拒绝 Chrome provider，且不会触碰 Offscreen', async () => {
         await expect(defaultChromeTranslator(withProviderSnapshot({origin: 'hello'}, mocks.config)))
-            .rejects.toThrow('当前浏览器不支持 Chrome 内置翻译');
+            .rejects.toThrow('当前环境无法使用浏览器内置翻译');
         expect(mocks.send).not.toHaveBeenCalled();
     });
 
@@ -153,7 +153,7 @@ describe('Chrome translator 请求级语言回归', () => {
         expect(receivedOptions?.signal).toBe(controller.signal);
 
         controller.abort();
-        await expect(pending).rejects.toThrow('Chrome Translation API 不可用：cancelled');
+        await expect(pending).rejects.toThrow('浏览器内置翻译失败：cancelled');
     });
 
     it('拒绝缺失或错配 requestId 的迟到响应', async () => {
@@ -173,7 +173,7 @@ describe('Chrome translator 请求级语言回归', () => {
     it('收到待准备 pair 时写入 session 状态，取消请求不写入', async () => {
         const set = vi.fn(async () => undefined);
         const provider = createChromeTranslator({
-            capabilities: {chromeTranslation: true},
+            capabilities: {browserTranslation: true},
             offscreenClient: {send: mocks.send},
             createRequestId: mocks.createRequestId,
             preparationStore: {set},
@@ -187,7 +187,7 @@ describe('Chrome translator 请求级语言回归', () => {
             targetLanguage: 'zh',
             error: 'prepare',
         });
-        await expect(provider(withProviderSnapshot({origin: 'hello'}, mocks.config))).rejects.toThrow('prepare');
+        await expect(provider(withProviderSnapshot({origin: 'hello'}, mocks.config))).rejects.toMatchObject({message: 'prepare', code: 'browser-translation-preparation-required', retryable: false});
         expect(set).toHaveBeenCalledWith({sourceLanguage: 'en', targetLanguage: 'zh'});
 
         set.mockClear();
@@ -202,7 +202,7 @@ describe('Chrome translator 请求级语言回归', () => {
     it('不保存无效的待准备语言对，并向调用者提供缺省提示', async () => {
         const set = vi.fn(async () => undefined);
         const provider = createChromeTranslator({
-            capabilities: {chromeTranslation: true}, offscreenClient: {send: mocks.send},
+            capabilities: {browserTranslation: true}, offscreenClient: {send: mocks.send},
             createRequestId: mocks.createRequestId, preparationStore: {set},
         });
         mocks.send.mockResolvedValueOnce({
@@ -210,7 +210,7 @@ describe('Chrome translator 请求级语言回归', () => {
             sourceLanguage: 'auto', targetLanguage: 'zh',
         });
         await expect(provider(withProviderSnapshot({origin: 'hello'}, mocks.config)))
-            .rejects.toThrow('Chrome 本地翻译模型需要用户激活');
+            .rejects.toMatchObject({code: 'browser-translation-preparation-required', retryable: false, message: expect.stringContaining('准备语言包')});
         expect(set).not.toHaveBeenCalled();
     });
 

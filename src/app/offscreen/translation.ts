@@ -1,17 +1,18 @@
 /**
  * @file src/app/offscreen/translation.ts
- * 文件职责：封装 Chrome 内置 Translation API 在 Offscreen 环境中的能力检查、模型准备、语言检测、规范化、翻译执行和错误解释，并兼容新旧实验接口形态。
+ * 文件职责：在离屏文档中调用 Chrome 和 Edge 的浏览器内置翻译，处理模型状态、语言检测、规范化与错误。
  * 主要内容：定义最小环境与请求契约，验证语言码并映射中文别名；现代 API 按环境复用一个检测器和最多两个语言对，以独立取消、串行租约、空闲 TTL 与 LRU 控制常驻，旧 API 保持独占清理；保留 availability、下载进度、低置信度和保守脚本兜底。
  * 模块边界：这里不读取扩展配置、不选择第三方 provider，也不监听 runtime 消息；调用协议由 offscreen/messageRouter 管理，宿主能力是否开放由 browser capability 层决定。
  */
 import {normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {detectChineseScript, MIN_CHROME_LANGUAGE_CONFIDENCE} from '@/src/core/language/detect';
+import {hasBrowserTranslationApi} from '@/src/platform/browser/capabilities';
 import {localModelIdleMs} from '@/src/shared/onnx/modelResidency';
 
 // 保留既有导出，同时让设置页与 offscreen 共用单一阈值。
 export {MIN_CHROME_LANGUAGE_CONFIDENCE} from '@/src/core/language/detect';
 
-/** Chrome Translation API 在 Offscreen Document 中暴露的最小能力。 */
+/** 浏览器内置翻译在离屏文档中暴露的最小能力。 */
 export interface ChromeTranslationEnvironment {
     readonly translation?: {
         createDetector?: () => Promise<ChromeLanguageDetector>;
@@ -127,11 +128,6 @@ export function mapChromeLanguageCode(language: string): string {
     return normalized === 'zh-Hans' ? 'zh' : normalized;
 }
 
-export function isChromeTranslationSupported(environment: ChromeTranslationEnvironment): boolean {
-    return typeof environment.translation?.createTranslator === 'function'
-        || typeof environment.Translator?.create === 'function';
-}
-
 /** 无检测器或检测器不确定时只接受高置信专属脚本；共享脚本、Latin 与纯 Han 保持未知。 */
 export function detectLanguageByScript(text: string): string | null {
     const hasKana = /\p{Script=Hiragana}|\p{Script=Katakana}/u.test(text);
@@ -173,13 +169,12 @@ export interface ChromePreparationRequiredError extends Error {
 export function createChromePreparationRequiredError(
     sourceLanguage: string,
     targetLanguage: string,
-    cause?: unknown,
 ): ChromePreparationRequiredError {
-    const detail = cause instanceof Error && cause.message ? `: ${cause.message}` : '';
     const error = createNamedError(
         'ChromePreparationRequiredError',
-        `Chrome 本地翻译模型需要用户激活，已记录 ${sourceLanguage} → ${targetLanguage} 待准备请求。`
-            + `请在设置中点击“准备 Chrome 本地翻译”${detail}`,
+        sourceLanguage === 'auto'
+            ? '自动识别源语言需要先准备语言检测模型。请在「浏览器内置翻译」中点击「准备语言包」后重试。'
+            : `浏览器内置翻译的 ${sourceLanguage} → ${targetLanguage} 语言包尚未准备。请在「浏览器内置翻译」中点击「准备语言包」后重试。`,
     ) as ChromePreparationRequiredError;
     Object.assign(error, {code: 'preparation-required', sourceLanguage, targetLanguage});
     return error;
@@ -237,7 +232,7 @@ async function checkModelAvailability(
     if (availability === 'unavailable') {
         throw createNamedError(
             'ChromeModelUnavailableError',
-            model === 'language-detector' ? 'Chrome 语言检测模型不可用' : 'Chrome 翻译语言包不可用',
+            model === 'language-detector' ? '浏览器语言检测模型不可用' : '浏览器翻译语言包不可用',
         );
     }
     reportModelStatus(reporter, {
@@ -787,21 +782,10 @@ export function friendlyChromeTranslationError(
         return new Error(message);
     }
     if (errorName === 'NotAllowedError') {
-        if (sourceLanguage === 'auto') {
-            return new Error(
-                `Chrome 无法在自动识别源语言时激活本地模型（目标语言 ${targetLanguage}）。`
-                + '请在设置中选择网页实际源语言并点击“准备 Chrome 本地翻译”后重试。',
-            );
-        }
-        return createChromePreparationRequiredError(sourceLanguage, targetLanguage, error);
-    }
-    if (errorName === 'NotSupportedError') {
-        return Object.assign(new Error(
-            `Chrome 本地翻译当前不可用（${sourceLanguage} -> ${targetLanguage}）。这可能由设备、浏览器策略或模型下载环境导致，请检查 Chrome 更新、网络和管理策略。`,
-        ), {name: 'ChromeModelUnavailableError', code: 'model-unavailable'});
+        return createChromePreparationRequiredError(sourceLanguage, targetLanguage);
     }
     if (errorName === 'QuotaExceededError') {
-        return new Error('待翻译文本超过 Chrome Translation API 的单次长度限制，请缩短文本后重试。');
+        return new Error('待翻译文本超过浏览器内置翻译的单次长度限制，请缩短文本后重试。');
     }
     if (errorName === 'OperationError'
         || errorName === 'UnknownError'
@@ -809,18 +793,14 @@ export function friendlyChromeTranslationError(
         || errorName === 'InvalidStateError') {
         return new Error('翻译模型未就绪，请稍后重试或检查网络连接。');
     }
-    if (errorName === 'ChromeModelUnavailableError'
+    if (errorName === 'NotSupportedError'
+        || errorName === 'ChromeModelUnavailableError'
         || lowerMessage.includes('not available')
-        || lowerMessage.includes('not ready')) {
-        return Object.assign(new Error('Chrome Translation API 暂时不可用。可能是设备、浏览器策略或模型下载环境问题，请检查 Chrome 更新、网络和管理策略后重试。'), {
-            name: 'ChromeModelUnavailableError',
-            code: 'model-unavailable',
-        });
-    }
-    if (lowerMessage.includes('language') || lowerMessage.includes('not supported')) {
-        return Object.assign(new Error(
-            `Chrome 本地翻译当前不可用（${sourceLanguage} -> ${targetLanguage}）。这可能由设备、浏览器策略或模型下载环境导致，请检查 Chrome 更新、网络和管理策略。`,
-        ), {name: 'ChromeModelUnavailableError', code: 'model-unavailable'});
+        || lowerMessage.includes('not ready')
+        || lowerMessage.includes('language')
+        || lowerMessage.includes('not supported')) {
+        return createNamedError('ChromeModelUnavailableError',
+            `浏览器内置翻译当前不可用（${sourceLanguage} → ${targetLanguage}）。请在翻译服务设置中检查语言包或选择其他服务。`);
     }
     if (lowerMessage.includes('model')) {
         return new Error('翻译模型未就绪，请稍后重试或检查网络连接。');
@@ -838,8 +818,8 @@ export async function translateWithChromeApi(
     throwIfChromeEnvironmentDisposed(environment);
     const request = parseChromeTranslationRequest(requestValue);
     if (!request.text.trim()) return '';
-    if (!isChromeTranslationSupported(environment)) {
-        throw new Error('当前浏览器不支持 Chrome Translation API，请确保使用 Google Chrome 浏览器 v138 stable 或更高版本。');
+    if (!hasBrowserTranslationApi(environment)) {
+        throw createNamedError('BrowserTranslationApiUnavailableError', '当前浏览器未开放内置翻译接口，请检查浏览器版本或选择其他翻译服务。');
     }
 
     let sourceLanguage = request.from;

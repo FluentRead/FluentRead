@@ -70,6 +70,7 @@
     </SettingsItem>
 
     <SettingsItem
+      v-if="props.config.floatingBallClickAction !== 'settings'"
       :label="t('settings.floatingBall.settingsEntry')"
       :description="t(isUserscript ? 'settings.floatingBall.settingsEntryDescriptionUserscript' : 'settings.floatingBall.settingsEntryDescription')"
       :disabled="!enabled || props.config.floatingBallToolsDisplay === 'hidden'"

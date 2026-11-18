@@ -142,7 +142,7 @@
     "settings.floatingBall.hoverDelayHelp": "ポインターが指定時間とどまると展開します。0 ms なら即座に展開します。遅延を長くすると誤操作を減らせます。キーボードでフォーカスした場合は常に即座に展開します。",
     "settings.floatingBall.hoverDelayAria": "フローティングボタンの展開待ち時間",
     "settings.floatingBall.defaultMargin": "デフォルトの余白",
-    "settings.floatingBall.defaultMarginDescription": "折りたたみ時または常時表示時の画面端からの距離です。負の値も使えます。既定の 0 / 20 px では、デスクトップで折りたたむと半分が画面外に隠れます。",
+    "settings.floatingBall.defaultMarginDescription": "折りたたみ時または常時表示時の画面端からの距離です。0 px で画面端に接し、デスクトップでは負の値でボタンの一部を画面外に移せます。",
     "settings.floatingBall.defaultMarginAria": "フローティングボタンのデフォルト余白",
     "settings.floatingBall.popoutMargin": "展開時の余白",
     "settings.floatingBall.popoutMarginDescription": "ホバーでツールを展開したときに使います。デフォルトの余白と同じ値にするとボタンが移動しません。負の値も指定できます。",

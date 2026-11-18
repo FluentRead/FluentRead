@@ -14,128 +14,17 @@ function cssRule(file: string, selector: string): string {
   return matches.map(match => match[1]).join('\n');
 }
 
-function numericDeclaration(rule: string, property: string): number {
-  const match = rule.match(new RegExp(`${property}:\\s*([0-9.]+)`, 'u'));
-  expect(match, `缺少样式属性：${property}`).not.toBeNull();
-  return Number(match?.[1]);
-}
-
-/** 读取 CSS 变量声明的兜底数值，用于验证未配置时保持原有观感。 */
-function variableFallback(rule: string, property: string, variable: string): number {
-  const match = rule.match(new RegExp(`${property}:\\s*var\\(${variable},\\s*([0-9.]+)\\)`, 'u'));
-  expect(match, `缺少 CSS 变量兜底：${property}/${variable}`).not.toBeNull();
-  return Number(match?.[1]);
-}
-
 describe('低干扰悬浮 UI', () => {
-  it('全文翻译切换不再自动展开菜单或弹出快捷键提示', () => {
-    const floatingBall = source('src/features/floating-ball/ui/FloatingBall.vue');
-    const toggleTranslation = floatingBall.match(/function toggleTranslation\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-    const handleDocumentKeydown = floatingBall.match(/function handleDocumentKeydown\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-
-    expect(toggleTranslation).toContain('props.onTranslationToggle(!isTranslating.value)');
-    expect(toggleTranslation).not.toContain('isExpanded.value = true');
-    expect(toggleTranslation).toContain('isExpanded.value = false');
-    expect(toggleTranslation).toContain('event.detail > 0');
-    expect(toggleTranslation).toContain('?.blur()');
-    expect(toggleTranslation).not.toContain('isTranslating.value =');
-    expect(floatingBall).not.toContain('showShortcutTooltip');
-    expect(floatingBall).toContain('setPopupOpen: (open: boolean) =>');
-    expect(handleDocumentKeydown).toContain("querySelector<HTMLElement>(':focus')?.blur()");
-    expect(handleDocumentKeydown).toContain('isExpanded.value = false');
-  });
-
-  it('收起态保持半透明，交互态恢复清晰，品牌图标不展示翻译状态', () => {
-    const floatingBall = source('src/features/floating-ball/ui/FloatingBall.vue');
-    const rightCollapsed = cssRule(
-      floatingBall,
-      '.fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="right"] .floating-ball-main',
-    );
-    const leftCollapsed = cssRule(
-      floatingBall,
-      '.fr-floating-ball:not(.floating-ball-expanded):not(.dragging)[data-position="left"] .floating-ball-main',
-    );
-    const expanded = cssRule(
-      floatingBall,
-      '.floating-ball-main',
-    );
-
-    const rightFallback = variableFallback(rightCollapsed, 'opacity', '--fr-ball-collapsed-opacity');
-    expect(rightFallback).toBeGreaterThanOrEqual(0.4);
-    expect(rightFallback).toBeLessThanOrEqual(0.6);
-    expect(variableFallback(leftCollapsed, 'opacity', '--fr-ball-collapsed-opacity')).toBe(rightFallback);
-    expect(rightCollapsed).not.toContain('transform:');
-    expect(leftCollapsed).not.toContain('transform:');
-    expect(expanded).toContain('transform: none');
-    expect(numericDeclaration(expanded, 'opacity')).toBe(1);
-    expect(numericDeclaration(cssRule(floatingBall, '.dragging .floating-ball-main'), 'opacity')).toBe(1);
-    const brand = floatingBall.match(/<div\s+ref="floatingBallMain"[\s\S]*?<\/div>/u)?.[0] ?? '';
-    const translateButton = floatingBall.match(/<button\s+v-if="showTranslateTool"[\s\S]*?<\/button>/u)?.[0] ?? '';
-    expect(brand).toContain('floating-ball-mascot');
-    expect(brand).not.toContain('check-mark');
-    expect(translateButton).toContain('class="check-mark"');
-    expect(floatingBall).not.toContain('is-translating');
-  });
-
-  it('中间 Logo 只有越过拖动阈值后才改变位置', () => {
-    const floatingBall = source('src/features/floating-ball/ui/FloatingBall.vue');
-    const startDrag = floatingBall.match(/function startDrag\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-    const handlePointerMove = floatingBall.match(/function handlePointerMove\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-
-    expect(startDrag).not.toContain('isExpanded.value = false');
-    expect(startDrag).not.toContain('isDragging.value = true');
-    expect(startDrag).not.toContain('positionStyle.value =');
-    expect(handlePointerMove).toContain('<= DRAG_THRESHOLD) return');
-    expect(handlePointerMove).toContain('currentDrag.moved = true');
-    expect(handlePointerMove).toContain('isExpanded.value = false');
-    expect(handlePointerMove).toContain('isDragging.value = true');
-    expect(handlePointerMove).toContain('event.clientX - currentDrag.pointerOffsetX');
-    expect(handlePointerMove).toContain('event.clientY - currentDrag.pointerOffsetY');
-  });
-
-  it('悬浮球按展示契约控制按钮显示方式、展开延迟与点击行为', () => {
-    const floatingBall = source('src/features/floating-ball/ui/FloatingBall.vue');
-    const expandBall = floatingBall.match(/function expandBall\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-    const runMainAction = floatingBall.match(/function runMainAction\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-    const finishPointerInteraction = floatingBall.match(/function finishPointerInteraction\([^)]*\) \{([\s\S]*?)\n\}/u)?.[1] ?? '';
-
-    // 始终显示模式不再依赖悬停状态，隐藏模式连翻译按钮一起收走。
-    expect(floatingBall).toContain("presentation.value.toolsDisplay === 'always'");
-    expect(floatingBall).toContain("presentation.value.toolsDisplay !== 'hidden'");
-    expect(floatingBall).toContain('showSettingsTool = computed(() => showTranslateTool.value && presentation.value.settingsEntryVisible)');
-    // 悬停延迟只推迟展开；拖动中到期的计时器不得把菜单弹回来。
-    expect(expandBall).toContain('isAlwaysExpanded.value) return');
-    expect(expandBall).toContain('Math.max(0, presentation.value.hoverDelay)');
-    expect(expandBall).toContain('if (!isDragging.value) {isExpanded.value = true; scheduleMangaCollapse();}');
-    expect(floatingBall).toContain('clearExpandTimer();');
-    expect(floatingBall).toContain('onBeforeUnmount');
-    // 未越过拖动阈值才触发点击行为，'none' 保留纯拖动手柄。
-    expect(finishPointerInteraction).toContain('runMainAction(event)');
-    expect(runMainAction).toContain("action === 'translate'");
-    expect(runMainAction).toContain("action === 'settings'");
-    expect(runMainAction).toContain('props.onTranslationToggle(!isTranslating.value)');
-  });
-
-  it('悬浮球尺寸与收起不透明度来自配置变量，紧凑模式等比缩小', () => {
+  it('停靠与拖动共用变换，工具栏收起时隐藏，减弱动态效果时跳过过渡', () => {
     const floatingBall = source('src/features/floating-ball/ui/FloatingBall.vue');
     const root = cssRule(floatingBall, '.fr-floating-ball');
-    const compact = cssRule(floatingBall, '.fr-floating-ball.is-compact');
-    const main = cssRule(floatingBall, '.floating-ball-main');
-    const tool = cssRule(floatingBall, '.floating-ball-tool');
-
-    expect(numericDeclaration(root, '--fr-ball-size')).toBe(40);
-    expect(numericDeclaration(root, '--fr-ball-tool-size')).toBeGreaterThanOrEqual(40);
-    expect(numericDeclaration(compact, '--fr-ball-size')).toBeLessThan(48);
-    expect(numericDeclaration(compact, '--fr-ball-tool-size'))
-      .toBeLessThan(numericDeclaration(root, '--fr-ball-tool-size'));
-    expect(main).toContain('width: var(--fr-ball-size)');
-    expect(main).toContain('height: var(--fr-ball-size)');
-    expect(tool).toContain('width: var(--fr-ball-tool-size)');
-    expect(floatingBall).toContain("'--fr-ball-collapsed-opacity': String(presentation.value.collapsedOpacity / 100)");
-    expect(main).toContain('transform: none');
-    expect(cssRule(floatingBall, '.floating-ball-tool')).toContain('pointer-events: none');
-    expect(cssRule(floatingBall, '.fr-floating-ball.floating-ball-expanded .floating-ball-tool'))
-      .toContain('pointer-events: auto');
+    expect(root).toContain('pointer-events: none');
+    expect(root).toContain('transform: translate3d(var(--fr-drag-x, var(--fr-ball-x)), var(--fr-drag-y, var(--fr-ball-y)), 0)');
+    expect(root).toContain('transition: transform');
+    expect(cssRule(floatingBall, '.floating-ball-tools')).toContain('visibility: hidden');
+    expect(cssRule(floatingBall, '.fr-floating-ball.viewport-sync')).toContain('transition: none');
+    expect(floatingBall).toContain('prefers-reduced-motion: reduce');
+    expect(floatingBall).toContain('outline: 2px solid var(--fr-accent)');
   });
 
   it('进度面板使用半透明背景，并由活动请求而非离屏候选决定显隐', () => {

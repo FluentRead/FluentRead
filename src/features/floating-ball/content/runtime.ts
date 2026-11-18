@@ -94,6 +94,7 @@ function finishMountAttempt(): void {
 /** 把实时配置折叠为组件需要的展示契约；字段语义与归一化都由 core/config 保证。 */
 function readPresentation(source: Config): FloatingBallPresentation {
     return {
+        theme: source.theme,
         toolsDisplay: source.floatingBallToolsDisplay,
         hoverDelay: source.floatingBallHoverDelay,
         clickAction: source.floatingBallClickAction,
@@ -290,13 +291,19 @@ export function mountFloatingBall(ctx?: ContentScriptContext) {
       : [config.floatingBallPosition, config.floatingBallVerticalPosition, config.floatingBallCompact];
     unsubscribePresentationConfig = subscribeConfig((nextConfig) => {
       if (floatingBallPresentation !== presentation) return;
-      Object.assign(presentation, readPresentation(nextConfig));
+      const nextPresentation = readPresentation(nextConfig);
       if (import.meta.env.BROWSER !== 'userscript') {
-        if (!nextConfig.floatingBallSettingsEntryVisible || nextConfig.floatingBallToolsDisplay === 'hidden') anchoredPopup?.close();
         const nextPosition = [nextConfig.floatingBallPosition, nextConfig.floatingBallVerticalPosition, nextConfig.floatingBallCompact];
-        if (nextPosition.some((value, index) => value !== previousPosition[index])) anchoredPopup?.close();
+        const anchorChanged = nextPosition.some((value, index) => value !== previousPosition[index])
+          || nextPresentation.clickAction !== presentation.clickAction
+          || nextPresentation.toolsDisplay !== presentation.toolsDisplay
+          || nextPresentation.settingsEntryVisible !== presentation.settingsEntryVisible
+          || nextPresentation.defaultMargin !== presentation.defaultMargin
+          || nextPresentation.popoutMargin !== presentation.popoutMargin;
+        if (anchorChanged) anchoredPopup?.close();
         previousPosition = nextPosition;
       }
+      Object.assign(presentation, nextPresentation);
       floatingBallInstance?.setPosition?.(nextConfig.floatingBallPosition, nextConfig.floatingBallVerticalPosition);
     });
     floatingBallInstance = (ui.mounted?.instance as FloatingBallExposed | null | undefined) ?? null;

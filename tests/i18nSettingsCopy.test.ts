@@ -132,10 +132,15 @@ describe('设置文案七语一致性', () => {
     expect(ui.config).toMatchObject({floatingBallDefaultMargin:-200,floatingBallPopoutMargin:200});
     number('settings.floatingBall.popoutMarginAria','invalid');await Vue.nextTick();
     expect(ui.config.floatingBallPopoutMargin).toBe(200);
-    await ui.click('[data-value="settings"]');expect(ui.config.floatingBallClickAction).toBe('settings');
+    const settingsEntry = () => ui.document.querySelector(`[aria-label="${ui.t('settings.floatingBall.settingsEntry')}"]`);
+    await ui.click('[data-value="settings"]');
+    expect(ui.config.floatingBallClickAction).toBe('settings');
+    expect(settingsEntry()).toBeNull();
+    await ui.click('[data-value="translate"]');
+    expect(settingsEntry()).not.toBeNull();
     await ui.click('[data-value="hidden"]');expect(ui.config.floatingBallToolsDisplay).toBe('hidden');
     expect(ui.document.querySelector('input')!.getAttribute('aria-label')).toBe(ui.t('settings.floatingBall.collapsedOpacityAria'));
-    expect(ui.document.querySelector(`[aria-label="${ui.t('settings.floatingBall.settingsEntry')}"]`)!.hasAttribute('disabled')).toBe(true);
+    expect(settingsEntry()!.hasAttribute('disabled')).toBe(true);
     await ui.click('[data-value="always"]');expect(ui.document.querySelectorAll('input').length).toBe(1);
     expect(ui.config.floatingBallPopoutMargin).toBe(200);
     ui.config.disableFloatingBall = true;await Vue.nextTick();

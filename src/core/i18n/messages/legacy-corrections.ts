@@ -277,7 +277,6 @@ export const correctionRows: readonly LegacyCorrectionRow[] = [
     ['当前翻译服务详情', 'Current translation service details', '現在の翻訳サービスの詳細', '현재 번역 서비스 세부 정보', 'Détails du service de traduction actuel', 'Сведения о текущем сервисе перевода', 'Detalles del servicio de traducción actual'],
     ['快速插入变量', 'Insert variables quickly', '変数をすばやく挿入', '변수 빠르게 삽입', 'Insérer rapidement des variables', 'Быстрая вставка переменных', 'Inserta variables rápidamente'],
     ['恢复网页原文', 'Restore original page', '元のページに戻す', '원래 페이지로 복원', 'Rétablir la page d’origine', 'Вернуть исходную страницу', 'Restaurar la página original'],
-    ['打开 FluentRead 设置', 'Open FluentRead settings', 'FluentRead の設定を開く', 'FluentRead 설정 열기', 'Ouvrir les réglages de FluentRead', 'Открыть настройки FluentRead', 'Abrir los ajustes de FluentRead'],
     ['打开划词翻译', 'Open selection translation', '選択範囲の翻訳を開く', '선택 영역 번역 열기', 'Ouvrir la traduction de la sélection', 'Открыть перевод выделенного текста', 'Abrir la traducción de la selección'],
     ['打开完整设置', 'Open full settings', 'すべての設定を開く', '전체 설정 열기', 'Ouvrir tous les réglages', 'Открыть все настройки', 'Abrir todos los ajustes'],
     ['打开设置', 'Open settings', '設定を開く', '설정 열기', 'Ouvrir les réglages', 'Открыть настройки', 'Abrir ajustes'],

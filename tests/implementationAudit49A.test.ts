@@ -12,19 +12,22 @@ const dom = await vi.hoisted(async () => {
     Object.defineProperty(globalThis, key, {configurable: true, writable: true, value: (page.window as any)[key]});
   }
   const events = page.document.createElement('window-port');
+  const requestFrame = (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 0);
+  const cancelFrame = (timer: ReturnType<typeof setTimeout>) => clearTimeout(timer);
   const windowPort = {innerWidth: 1000, innerHeight: 800,
+    requestAnimationFrame: requestFrame, cancelAnimationFrame: cancelFrame,
     matchMedia: () => ({matches: false, addEventListener() {}, removeEventListener() {}}),
     addEventListener: events.addEventListener.bind(events), removeEventListener: events.removeEventListener.bind(events),
     dispatchEvent: events.dispatchEvent.bind(events)};
   Object.defineProperty(globalThis, 'window', {configurable: true, writable: true, value: windowPort});
   Object.defineProperty(globalThis, 'navigator', {configurable: true, writable: true, value: {platform: 'Win32'}});
-  Object.defineProperty(globalThis, 'requestAnimationFrame', {configurable: true, writable: true, value: (fn: () => void) => setTimeout(fn, 0)});
-  Object.defineProperty(globalThis, 'cancelAnimationFrame', {configurable: true, writable: true, value: clearTimeout});
+  Object.defineProperty(globalThis, 'requestAnimationFrame', {configurable: true, writable: true, value: requestFrame});
+  Object.defineProperty(globalThis, 'cancelAnimationFrame', {configurable: true, writable: true, value: cancelFrame});
   return {document: page.document, window: page.window, windowPort};
 });
 const ports = vi.hoisted(() => ({sendMessage: vi.fn(), domainCalls: 0, config: {on: true, selectionAreaEnabled: true, animations: true, from: 'auto', theme: 'light', floatingBallHotkey: 'custom', customFloatingBallHotkey: 'Ctrl+Shift++'}}));
 vi.mock('webextension-polyfill', () => ({default: {runtime: {sendMessage: ports.sendMessage, onMessage: {addListener() {}, removeListener() {}}}}}));
-vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({translateLegacy: (text: string) => text, t: (key: string) => key === 'common.brand' ? translate(key, uiLanguage.value) : key})}));
+vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({translateLegacy: (text: string) => text, t: (key: string) => translate(key, uiLanguage.value)})}));
 vi.mock('@/src/features/image-translation/public', () => ({prepareImageOcrLanguages: vi.fn()}));
 vi.mock('@/src/services/config/store', () => ({config: ports.config, subscribeConfig: () => () => undefined}));
 vi.mock('@/src/features/full-page-translation/public', () => ({autoTranslateEnglishPage() {}, restoreOriginalContent() {}, isFullPageTranslationActive: () => false}));
@@ -58,8 +61,15 @@ beforeEach(() => {uiLanguage.value = 'zh-CN'; ports.sendMessage.mockReset(); vi.
 afterEach(() => {app?.unmount(); app = undefined; cleanup.splice(0).forEach(fn => fn()); vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals();});
 function event(type: string, values: Record<string, unknown> = {}) {
   const value = new dom.window.Event(type, {bubbles: true, cancelable: true});
-  Object.assign(value, {pointerId: 1, pointerType: 'mouse', button: 0, clientX: 970, clientY: 400, ...values});
+  Object.assign(value, {pointerId: 1, pointerType: 'mouse', button: 0, clientX: 983, clientY: 400, ...values});
   return value;
+}
+// LinkeDOM 不会在原生按钮的键盘默认动作后派发 click；夹具模拟该结果。
+function pressNativeButton(button: HTMLElement, key: string, repeat = false) {
+  const keydown = event('keydown', {key, repeat});
+  button.dispatchEvent(keydown);
+  if (!keydown.defaultPrevented && (key === 'Enter' || key === ' ')) button.dispatchEvent(event('click', {detail: 0}));
+  return keydown;
 }
 function mountBall(clickAction?: FloatingBallPresentation['clickAction']) {
   const toggle = vi.fn(), position = vi.fn(), settings = vi.fn();
@@ -71,8 +81,7 @@ function mountBall(clickAction?: FloatingBallPresentation['clickAction']) {
   app = createApp({setup: () => () => h(FloatingBall, {...props, ref: instance})}); app.directive('ui-i18n', {}); app.mount(container);
   const root = container.querySelector<HTMLElement>('.fr-floating-ball')!;
   const main = container.querySelector<HTMLElement>('.floating-ball-main')!;
-  root.getBoundingClientRect = () => ({left: 950, top: 330, width: 40, height: 136}) as DOMRect;
-  main.getBoundingClientRect = () => ({left: 950, top: 380, width: 40, height: 40}) as DOMRect;
+  main.getBoundingClientRect = () => ({left: 966, top: 383, width: 34, height: 34}) as DOMRect;
   return {container, root, main, props, toggle, position, settings, instance: instance.value!};
 }
 
@@ -142,107 +151,145 @@ describe('49A production hotkey and site boundaries', () => {
 describe('49A real floating-ball client template', () => {
   it.each(['translate', 'settings', 'none'] as const)('品牌语言刷新保留 %s 入口身份和行为', async action => {
     const f = mountBall(action);
-    const settings = f.container.querySelector('.floating-ball-settings')!;
+    const settings = f.container.querySelector('.floating-ball-settings');
+    expect(f.main.tagName).toBe('BUTTON');
     expect(f.main.getAttribute('aria-label')).toContain('流畅阅读');
     expect(f.main.getAttribute('aria-label')).not.toContain('FluentRead');
-    expect(settings.getAttribute('aria-label')).toBe('打开 流畅阅读 设置');
+    expect(f.main.hasAttribute('aria-disabled')).toBe(action === 'none');
     for (const language of ['en-US', 'ja-JP', 'zh-CN'] as const) {
-      uiLanguage.value = language; await nextTick();
-      const brand = translate('common.brand', language);
-      expect(f.main.getAttribute('aria-label')).toContain(brand);
-      expect(settings.getAttribute('aria-label')).toBe(`打开 ${brand} 设置`);
+      uiLanguage.value = language;
+      await nextTick();
+      const name = f.main.getAttribute('aria-label');
+      const settingsLabel = translate('settings.floatingBall.click.quickPanel', language);
+      expect(name).toContain(translate('common.brand', language));
+      if (action === 'settings') {
+        expect(settings).toBeNull();
+        expect(name).toContain(settingsLabel);
+      } else {
+        expect(settings?.getAttribute('aria-label')).toBe(settingsLabel);
+      }
       expect(f.container.querySelector('.floating-ball-main')).toBe(f.main);
-      expect(f.main.getAttribute('role')).toBe(action === 'none' ? 'img' : 'button');
     }
-    f.main.dispatchEvent(event('keydown', {key: 'Enter', repeat: false}));
+    pressNativeButton(f.main, 'Enter');
     expect(f.toggle).toHaveBeenCalledTimes(action === 'translate' ? 1 : 0);
     expect(f.settings).toHaveBeenCalledTimes(action === 'settings' ? 1 : 0);
   });
   it('仅真实成功显示勾选，加载和失败可区分且保持恢复原文入口', async () => {
     const f = mountBall();
-    const button = f.container.querySelector<HTMLElement>('.floating-ball-translate')!;
+    const indicator = () => f.main.querySelector('.translation-indicator');
     expect(f.root.dataset.translationStatus).toBe('idle');
-    expect(f.container.querySelector('.check-mark')).toBeNull();
-    f.props.initialTranslating = true; f.props.initialTranslationStatus = 'translating';
+    expect(indicator()).toBeNull();
+    expect(f.container.querySelector('.floating-ball-translate')).toBeNull();
+    f.props.initialTranslating = true;
+    f.props.initialTranslationStatus = 'translating';
     await nextTick();
     expect(f.root.dataset.translationStatus).toBe('translating');
-    expect(button.getAttribute('aria-busy')).toBe('true');
-    expect(button.getAttribute('aria-pressed')).toBe('true');
-    expect(f.container.querySelector('.translation-progress')).not.toBeNull();
-    expect(f.container.querySelector('.check-mark')).toBeNull();
-    f.props.initialTranslationStatus = 'error'; await nextTick();
+    expect(f.main.getAttribute('aria-busy')).toBe('true');
+    expect(f.main.getAttribute('aria-pressed')).toBe('true');
+    expect(indicator()).toMatchObject({textContent: '…'});
+
+    f.props.initialTranslationStatus = 'error';
+    await nextTick();
     expect(f.root.dataset.translationStatus).toBe('error');
-    expect(f.container.querySelector('.translation-error')).not.toBeNull();
-    expect(button.getAttribute('aria-label')).toContain('fullPage.progress.failuresTitle');
-    expect(f.container.querySelector('.check-mark')).toBeNull();
-    f.props.initialTranslationStatus = 'translated'; await nextTick();
+    expect(indicator()).toMatchObject({textContent: '!'});
+    expect(f.main.getAttribute('aria-label')).toContain(translate('fullPage.progress.failuresTitle', 'zh-CN'));
+
+    f.props.initialTranslationStatus = 'translated';
+    await nextTick();
     expect(f.root.dataset.translationStatus).toBe('translated');
-    expect(f.container.querySelector('.check-mark')).not.toBeNull();
-    button.dispatchEvent(event('click')); await nextTick();
+    expect(indicator()).toMatchObject({textContent: '✓'});
+    f.main.dispatchEvent(event('click', {detail: 0}));
     expect(f.toggle).toHaveBeenCalledWith(false);
-    f.props.initialTranslating = false; await nextTick();
+
+    f.props.initialTranslating = false;
+    await nextTick();
     expect(f.root.dataset.translationStatus).toBe('idle');
-    expect(button.getAttribute('aria-pressed')).toBe('false');
-    expect(f.container.querySelector('.check-mark')).toBeNull();
-    f.instance.setTranslationState(true); f.instance.setTranslationStatus('error'); await nextTick();
+    expect(f.main.getAttribute('aria-pressed')).toBe('false');
+    expect(indicator()).toBeNull();
+
+    f.instance.setTranslationState(true);
+    f.instance.setTranslationStatus('error');
+    await nextTick();
     expect(f.root.dataset.translationStatus).toBe('error');
-    expect(f.container.querySelector('.check-mark')).toBeNull();
-    f.instance.setTranslationStatus('translated'); await nextTick();
-    expect(f.container.querySelector('.check-mark')).not.toBeNull();
-    f.instance.setTranslationState(false); await nextTick();
+    expect(indicator()).toMatchObject({textContent: '!'});
+    f.instance.setTranslationStatus('translated');
+    await nextTick();
+    expect(indicator()).toMatchObject({textContent: '✓'});
+    f.instance.setTranslationState(false);
+    await nextTick();
     expect(f.root.dataset.translationStatus).toBe('idle');
+    expect(indicator()).toBeNull();
   });
   it('retains the first pointer when a second touch arrives', async () => {
     const f = mountBall();
     f.main.dispatchEvent(event('pointerdown', {pointerId: 1, pointerType: 'touch'}));
-    f.main.dispatchEvent(event('pointerdown', {pointerId: 2, pointerType: 'touch'}));
+    f.main.dispatchEvent(event('pointerdown', {pointerId: 2, pointerType: 'touch', isPrimary: false}));
+    dom.windowPort.dispatchEvent(event('pointermove', {pointerId: 2, clientX: 20, clientY: 100}));
+    vi.advanceTimersByTime(1);
+    await nextTick();
+    expect(f.root.classList.contains('dragging')).toBe(false);
+
     dom.windowPort.dispatchEvent(event('pointermove', {pointerId: 1, clientX: 20, clientY: 100}));
-    await nextTick(); expect(f.root.classList.contains('dragging')).toBe(true);
+    vi.advanceTimersByTime(1);
+    await nextTick();
+    expect(f.root.classList.contains('dragging')).toBe(true);
     dom.windowPort.dispatchEvent(event('pointerup', {pointerId: 1, clientX: 20, clientY: 100}));
-    await nextTick(); expect(f.position).toHaveBeenCalledOnce(); expect(f.position.mock.calls[0][0]).toBe('left');
+    await nextTick();
+    expect(f.position).toHaveBeenCalledExactlyOnceWith('left', 0.125);
     expect(f.toggle).not.toHaveBeenCalled();
   });
   it('cancels a dragged gesture on window blur and accepts the next independent click', async () => {
-    const f = mountBall(); f.main.dispatchEvent(event('pointerdown'));
-    dom.windowPort.dispatchEvent(event('pointermove', {clientX: 700})); await nextTick();
+    const f = mountBall();
+    f.main.dispatchEvent(event('pointerdown'));
+    dom.windowPort.dispatchEvent(event('pointermove', {clientX: 700}));
+    vi.advanceTimersByTime(1);
+    await nextTick();
     expect(f.root.classList.contains('dragging')).toBe(true);
-    dom.windowPort.dispatchEvent(event('blur')); await nextTick(); await nextTick();
+
+    dom.windowPort.dispatchEvent(event('blur'));
+    await nextTick();
     expect(f.root.classList.contains('dragging')).toBe(false);
-    dom.windowPort.dispatchEvent(event('pointerup')); expect(f.toggle).not.toHaveBeenCalled();
-    f.main.dispatchEvent(event('pointerdown')); f.main.dispatchEvent(event('pointerup'));
-    expect(f.toggle).toHaveBeenCalledOnce(); expect(f.position).not.toHaveBeenCalled();
+    dom.windowPort.dispatchEvent(event('pointerup'));
+    f.main.dispatchEvent(event('click', {detail: 1}));
+    expect(f.toggle).not.toHaveBeenCalled();
+
+    f.main.dispatchEvent(event('pointerdown'));
+    dom.windowPort.dispatchEvent(event('pointerup'));
+    f.main.dispatchEvent(event('click', {detail: 1}));
+    expect(f.toggle).toHaveBeenCalledExactlyOnceWith(true);
+    expect(f.position).not.toHaveBeenCalled();
   });
   it('ignores repeated Enter while keeping independent Enter and Space actions', () => {
     const f = mountBall();
-    f.main.dispatchEvent(event('keydown', {key: 'Enter', repeat: false}));
-    f.main.dispatchEvent(event('keydown', {key: 'Enter', repeat: true}));
+    expect(pressNativeButton(f.main, 'Enter').defaultPrevented).toBe(false);
+    expect(pressNativeButton(f.main, 'Enter', true).defaultPrevented).toBe(true);
     expect(f.toggle).toHaveBeenCalledOnce();
-    f.main.dispatchEvent(event('keydown', {key: ' ', repeat: false})); expect(f.toggle).toHaveBeenCalledTimes(2);
+    expect(pressNativeButton(f.main, ' ').defaultPrevented).toBe(false);
+    expect(f.toggle).toHaveBeenCalledTimes(2);
   });
   it.each([
     ['translate', ' '], ['translate', 'Enter'], ['settings', ' '], ['settings', 'Enter'],
   ] as const)('prevents repeated activation default without repeating %s action for key %s', (action, key) => {
     const f = mountBall(action);
-    expect(f.main.getAttribute('role')).toBe('button'); expect(f.main.getAttribute('tabindex')).toBe('0');
-    const first = event('keydown', {key, repeat: false});
-    expect(f.main.dispatchEvent(first)).toBe(false); expect(first.defaultPrevented).toBe(true);
-    const repeated = event('keydown', {key, repeat: true});
-    expect(repeated.cancelable).toBe(true); expect(f.main.dispatchEvent(repeated)).toBe(false);
+    expect(f.main.tagName).toBe('BUTTON');
+    expect(pressNativeButton(f.main, key).defaultPrevented).toBe(false);
+    const repeated = pressNativeButton(f.main, key, true);
+    expect(repeated.cancelable).toBe(true);
     expect(repeated.defaultPrevented).toBe(true);
     expect(f.toggle).toHaveBeenCalledTimes(action === 'translate' ? 1 : 0);
     expect(f.settings).toHaveBeenCalledTimes(action === 'settings' ? 1 : 0);
   });
-  it('does not claim unrelated keys or Enter/Space on the non-actionable image', async () => {
+  it('does not intercept unrelated keys or activate the disabled main button', async () => {
     const f = mountBall('translate');
-    const unrelated = event('keydown', {key: 'ArrowDown', repeat: true});
-    expect(f.main.dispatchEvent(unrelated)).toBe(true); expect(unrelated.defaultPrevented).toBe(false);
-    f.props.presentation!.clickAction = 'none'; await nextTick();
-    expect(f.main.getAttribute('role')).toBe('img'); expect(f.main.hasAttribute('tabindex')).toBe(false);
+    expect(pressNativeButton(f.main, 'ArrowDown', true).defaultPrevented).toBe(false);
+    f.props.presentation!.clickAction = 'none';
+    await nextTick();
+    expect(f.main.getAttribute('aria-disabled')).toBe('true');
     for (const key of [' ', 'Enter']) {
-      const repeated = event('keydown', {key, repeat: true});
-      expect(f.main.dispatchEvent(repeated)).toBe(true); expect(repeated.defaultPrevented).toBe(false);
+      expect(pressNativeButton(f.main, key, true).defaultPrevented).toBe(false);
     }
-    expect(f.toggle).not.toHaveBeenCalled(); expect(f.settings).not.toHaveBeenCalled();
+    expect(f.toggle).not.toHaveBeenCalled();
+    expect(f.settings).not.toHaveBeenCalled();
   });
   it('unmount removes active pointer listeners and hover timers', async () => {
     const f = mountBall(); f.main.dispatchEvent(event('pointerdown'));

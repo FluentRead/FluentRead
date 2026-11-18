@@ -1,6 +1,5 @@
 /**
  * @file src/app/popup/pageActions.ts
- * 协作动作：使用同一标签页与操作归属门禁开关 Hypothesis，原生 PDF 显式带入阅读器，不触发翻译服务。
  * 文件职责：管理 Popup 的标签页状态读取、全文/局部操作和站点规则即时翻译归属。
  * 主要内容：区分状态读取、页面翻译与规则保存的操作归属，确定来源丢失时立即提供重新打开指引；新文档通知只触发去重的只读握手，合并在途完成通知且不撤销当前操作；写规则前复验实际标签页，确认后台保存后反馈；原生在线 PDF 交给扩展阅读器，导航和失活使旧回复失效。
  * 模块边界：只通过注入端口读取标签页、发送已有消息、提交站点字段补丁和修改界面状态，不直接访问存储、创建观察器或实现网页翻译。
@@ -23,7 +22,7 @@ export interface PopupPagePorts {
   getTab: () => Promise<PopupActiveTab | undefined>
   send: (tabId: number, message: {type: string; action?: string}) => Promise<unknown>
   persistRule: (patch: PopupSiteRulePatch) => Promise<void>
-  openPdf?: (sourceUrl: string, hypothesis?: boolean) => Promise<unknown>
+  openPdf?: (sourceUrl: string) => Promise<unknown>
   notice: (message: string, type?: 'success' | 'error') => void
   close: () => void
   translate: (key: string) => string
@@ -143,19 +142,6 @@ export function createPopupPageActions(ports: PopupPagePorts) {
     if (!ports.active() || state.busy || !ports.config().on || disabled()) return
     return translate('section', () => ports.close(), ports.translate('popup.sectionTranslationUnavailable'), true)
   }
-  async function hypothesis() {
-    const task = begin();if (!task) return
-    try {
-      const tabId = await target(task.current);if (tabId === undefined || !task.current()) return
-      const source = getPdfSourceUrl(state.url)
-      if (source && ports.openPdf) {await ports.openPdf(source, true);if (task.current()) ports.close();return}
-      const response = await ports.send(tabId, {type: 'toggleHypothesis'}) as {status?: string} | undefined
-      if (!task.current()) return
-      if (response?.status === 'success') ports.close()
-      else ports.notice(ports.translate(response?.status === 'external' ? 'document.pdfReading.hypothesisExternal' : 'document.pdfReading.hypothesisFailed'), 'error')
-    } catch {if (task.current()) ports.notice(ports.translate('document.pdfReading.hypothesisFailed'), 'error')}
-    finally {task.finish()}
-  }
   function beginRule(enabled: boolean, interrupt = false) {
     if (!ports.active() || state.savingRule || (!interrupt && state.busy) || !state.domain || state.tabId === null || typeof enabled !== 'boolean') return
     const token = Symbol(), before = revision, tabId = state.tabId, url = state.url, domain = state.domain
@@ -244,5 +230,5 @@ export function createPopupPageActions(ports: PopupPagePorts) {
     if (!documentToken || incomingToken !== documentToken) {probeCurrentDocument(incomingToken, response);return}
     stateSequence += 1;state.translated = response.isTranslated === true;ports.onStatus?.(response)
   }
-  return {hydrate, toggle, retry, receiveStatus, section, hypothesis, setAlways, setDisabled, invalidate}
+  return {hydrate, toggle, retry, receiveStatus, section, setAlways, setDisabled, invalidate}
 }

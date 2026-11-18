@@ -455,6 +455,7 @@ describe('后台右键菜单生命周期', () => {
     function stubBrowser() {
         const api = {
             contextMenus: {create: vi.fn(), removeAll: vi.fn().mockResolvedValue(undefined), update: vi.fn().mockResolvedValue(undefined), onClicked: event()},
+            runtime: {getManifest: () => ({manifest_version: 3})},
             tabs: {query: vi.fn().mockResolvedValue([{id: 9}]), sendMessage: vi.fn().mockResolvedValue({status: 'success', isTranslated: true}), onActivated: event(), onUpdated: event(), onRemoved: event()},
         };
         vi.stubGlobal('browser', api);
@@ -475,7 +476,9 @@ describe('后台右键菜单生命周期', () => {
         const api = stubBrowser();
         await install();
         await settle();
-        const created = api.contextMenus.create.mock.calls.map((call: unknown[]) => call[0] as Record<string, unknown>);
+        const created = api.contextMenus.create.mock.calls
+            .map((call: unknown[]) => call[0] as Record<string, unknown>)
+            .filter(menu => menu.id !== 'fluentread-toolbar-hypothesis');
         expect(created.map((menu) => menu.id)).toEqual([
             contextMenuItemId('selection', 'translateSelection'),
             contextMenuItemId('page', 'translatePage'),
@@ -502,15 +505,15 @@ describe('后台右键菜单生命周期', () => {
         );
     });
 
-    it('关闭右键菜单后清空全部入口，点击不再触发任何动作', async () => {
+    it('关闭网页右键菜单后，保留工具栏批注菜单且丢弃旧网页菜单点击', async () => {
         const api = stubBrowser();
         await install();
         await settle();
+        api.contextMenus.create.mockClear();
         state.config.contextMenuEnabled = false;
         subscriptions.at(-1)!(state.config);
         await settle();
-        api.contextMenus.create.mockClear();
-        expect(api.contextMenus.create).not.toHaveBeenCalled();
+        expect(api.contextMenus.create).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({id: 'fluentread-toolbar-hypothesis'}));
         const [handler] = api.contextMenus.onClicked.addListener.mock.calls[0];
         handler({menuItemId: contextMenuItemId('page', 'translatePage')}, {id: 9});
         await settle();

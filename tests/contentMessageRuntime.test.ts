@@ -1017,7 +1017,7 @@ describe('Hypothesis content lifecycle messages', () => {
     it('only allows the owning extension to query or toggle an enabled top-level runtime', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
         vi.stubGlobal('browser', {runtime: {id: 'owned'}});
-        const toggle = vi.fn(async () => ({status: 'success', active: true})), reply = vi.fn();
+        const toggle = vi.fn(async () => ({status: 'success' as const, active: true})), reply = vi.fn();
         let invalid = false, disabled = false, suspended = false;
         const state = {isSiteDisabled: () => disabled, isPageSuspended: () => suspended, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => true, toggle}};
         const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, state);
@@ -1029,5 +1029,25 @@ describe('Hypothesis content lifecycle messages', () => {
         suspended = false; handler({type: 'getHypothesisState'}, undefined, reply); handler({type: 'getHypothesisState'}, {id: 'foreign'}, reply);
         const absent = createContentRuntimeMessageHandler({} as ContentScriptContext, {...state, hypothesis: undefined}); absent({type: 'toggleHypothesis'}, {id: 'owned'}, reply);
         expect(toggle).toHaveBeenCalledOnce(); expect(reply).toHaveBeenLastCalledWith({status: 'unavailable', active: false});
+    });
+
+    it('shows a localized webpage notice for a failed or already active Hypothesis sidebar', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        const ctx = {signal: new AbortController().signal} as ContentScriptContext;
+        const toggle = vi.fn().mockResolvedValueOnce({status: 'external', active: false})
+            .mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({status: 'success', active: true});
+        const handler = createContentRuntimeMessageHandler(ctx, {
+            isSiteDisabled: () => false, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => false, toggle},
+        });
+        const reply = vi.fn(), sender = {id: 'owned'}, request = {type: 'toggleHypothesis'};
+        const noticeOptions = {key: 'hypothesis', signal: ctx.signal};
+        handler(request, sender, reply);await Promise.resolve();
+        expect(mocks.showPageNotice).toHaveBeenLastCalledWith('页面已有 Hypothesis，请使用已有侧栏。', 'error', noticeOptions);
+        handler(request, sender, reply);await Promise.resolve();
+        expect(reply).toHaveBeenLastCalledWith({status: 'failed', active: false});
+        expect(mocks.showPageNotice).toHaveBeenLastCalledWith('Hypothesis 暂不可用，请检查网络或重试。', 'error', noticeOptions);
+        handler(request, sender, reply);await Promise.resolve();
+        expect(mocks.dismissPageNotice).toHaveBeenCalledWith('hypothesis');
     });
 });

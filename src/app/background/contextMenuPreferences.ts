@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/contextMenuPreferences.ts
  * 文件职责：把共享配置和浏览器能力读成右键菜单需要的一份快照，决定哪些入口可用、菜单标题带什么信息。
- * 主要内容：从同一配置来源合并总开关、各入口偏好、工具栏面板入口、功能可用性和界面语言，签名只包含实际影响结构或动作标题的字段；保留旧附加信息字段的读取兼容。
+ * 主要内容：从同一配置来源合并总开关、各入口偏好、工具栏面板及批注入口、功能可用性和界面语言，签名只包含实际影响结构或动作标题的字段；保留旧附加信息字段的读取兼容。
  * 模块边界：本文件只读配置，不创建菜单、不发送消息、不渲染标题；结构推导属于 core/context-menu，菜单生命周期属于 contextMenuRuntime。
  */
 import {
@@ -20,6 +20,8 @@ export interface ContextMenuSettingsSnapshot {
     readonly enabled: boolean;
     /** 工具栏的一键翻译启用时，独立保留打开面板入口，不受网页右键菜单开关影响。 */
     readonly toolbarQuickPanel: boolean;
+    /** 网页批注使用工具栏右键菜单，随扩展总开关启停。 */
+    readonly toolbarHypothesis: boolean;
     readonly toggles: ContextMenuEntryToggles;
     readonly display: ContextMenuDisplayOptions;
     readonly titleContext: ContextMenuTitleContext;
@@ -52,9 +54,10 @@ export function readContextMenuSettings(source: ContextMenuConfigSource = config
     return {
         enabled,
         toolbarQuickPanel,
+        toolbarHypothesis: pluginOn,
         toggles,
         display,
         titleContext,
-        signature: JSON.stringify([enabled, toggles, language, toolbarQuickPanel]),
+        signature: JSON.stringify([enabled, toggles, language, toolbarQuickPanel, pluginOn]),
     };
 }

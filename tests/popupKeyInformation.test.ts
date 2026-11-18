@@ -431,9 +431,9 @@ vi.mock('@/src/ui/components/ServiceIcon.vue', () => ({default: {setup(_: unknow
 
 vi.mock('@/src/ui/components/UiLanguageOnboarding.vue', () => ({default: {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('div', attrs, slots.default?.());}}}));
 
-it.each([undefined, 'extension:///document.html'])('routes Hypothesis to the exact reader tab when its URL is %s', async url => {
-  queryTabs.mockResolvedValue([{id: 7, windowId: 3, url}]);runtimeSend.mockResolvedValue({status: 'success', active: true});
-  await mount();const button=document.querySelector('[data-testid="hypothesis-toggle"]')!;expect(button.getAttribute('title')).toContain('官方服务');
-  button.dispatchEvent(new window.Event('click'));await settle();
-  expect(runtimeSend).toHaveBeenCalledWith({type: 'toggleDocumentHypothesis', tabId: 7});expect(send).not.toHaveBeenCalledWith(7,{type: 'toggleHypothesis'},expect.anything());
+it('keeps only the font and display mode controls in the translation tools row', async () => {
+  await mount();
+  const buttons = [...document.querySelectorAll('.translation-tools button')];
+  expect(buttons.map(button => button.getAttribute('data-testid'))).toEqual(['page-font-entry', 'popup-display-mode']);
+  expect(buttons.every(button => !button.hasAttribute('title'))).toBe(true);
 })

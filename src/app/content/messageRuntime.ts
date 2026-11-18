@@ -1,6 +1,6 @@
 /**
  * @file src/app/content/messageRuntime.ts
- * 协作命令：仅接受本扩展对当前可用页面的 Hypothesis 状态查询与显式开关，具体资源由文档私有客户端拥有。
+ * 协作命令：将工具栏的 Hypothesis 协作请求交给当前文档的消息适配器。
  * 文件职责：创建 content 侧 runtime 消息处理函数，把 popup/background 的设置变化和功能命令映射为当前页面上的精确 mount、unmount 或状态响应。
  * 主要内容：处理悬浮球、划词模式与延迟、区域/图片能力、进度面板、站点禁用及旧缓存清理消息，将当前页字体查询和切换交给文档身份门禁，并把右键菜单的划词、圈选、整页与恢复请求及 Popup 的局部翻译请求转给对应 feature；结合 BrowserCapabilities 对不支持功能确定性拒绝，并更新共享运行时状态。
  * 模块边界：本文件只做消息到 feature 生命周期的适配，右键动作与反馈委托给 contextMenuCommands，全文状态与完成查询委托给 fullPageCompletionQuery，不注册全局监听器、不执行供应商翻译，也不实现组件 UI；监听安装及配置订阅由 content/runtime 负责。
@@ -27,8 +27,8 @@ import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/brow
 import {rejectUnsupportedContentFeature} from './featureRegistry';
 import {handleInformationHighlightMessage, type InformationHighlightMessageState} from './informationHighlight';
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
-export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState {
-    hypothesis?: {isActive(): boolean; toggle(): Promise<unknown>};
+import {handleHypothesisMessage, type HypothesisMessageState} from './hypothesisMessage';
+export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState, HypothesisMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
     reconcileUserscriptPage?(): Promise<boolean>;
 }
@@ -40,14 +40,8 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
         if (import.meta.env.BROWSER !== 'userscript') {
-            if (payload.type === 'toggleHypothesis' || payload.type === 'getHypothesisState') {
-                const sender = _sender as {id?: string} | undefined;
-                if (sender?.id !== browser.runtime.id || ctx.isInvalid || config.on === false || state.isSiteDisabled()
-                    || state.isPageSuspended?.() || !state.hypothesis) {sendResponse({status: 'unavailable', active: false}); return true;}
-                if (payload.type === 'getHypothesisState') sendResponse({status: 'success', active: state.hypothesis.isActive()});
-                else void state.hypothesis.toggle().then(sendResponse);
-                return true;
-            }
+            const hypothesis = handleHypothesisMessage(payload, _sender, ctx, state, sendResponse);
+            if (hypothesis !== undefined) return hypothesis;
             const pageFont = handlePageTranslationFontMessage(payload, _sender, ctx, state, sendResponse);
             if (pageFont !== undefined) return pageFont;
             const notice = handleContextMenuNotice(payload, ctx, state, sendResponse);

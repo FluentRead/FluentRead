@@ -566,6 +566,26 @@ describe('悬浮球 content runtime', () => {
     consoleError.mockRestore();
   });
 
+  it.each([
+    {label: 'theme', patch: {theme: 'dark'}, closeCount: 0},
+    {label: 'settings entry', patch: {floatingBallSettingsEntryVisible: false}, closeCount: 1},
+    {label: 'resting margin', patch: {floatingBallDefaultMargin: 8}, closeCount: 1},
+    {label: 'expanded margin', patch: {floatingBallPopoutMargin: 28}, closeCount: 1},
+  ])('keeps the quick panel tied to its anchor on $label changes', async ({patch, closeCount}) => {
+    const runtime = await import('@/src/features/floating-ball/content/runtime');
+    mocks.createVueShadowUi.mockResolvedValue(ui());
+    await runtime.mountFloatingBall({} as never);
+
+    const {onSettingsClick} = mocks.createVueShadowUi.mock.calls[0][1].props;
+    const button = document.createElement('button');
+    onSettingsClick({isTrusted: true, currentTarget: button});
+    expect(mocks.togglePopup).toHaveBeenCalledWith(button);
+
+    const update = mocks.subscribeConfig.mock.calls[0][0];
+    update({...mocks.config, ...patch});
+    expect(mocks.closePopup).toHaveBeenCalledTimes(closeCount);
+  });
+
   it('隔离设置、保存和挂载失败，并允许重试', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mocks.createVueShadowUi

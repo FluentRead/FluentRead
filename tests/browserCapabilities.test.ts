@@ -108,6 +108,28 @@ describe('browser capability contract', () => {
         expect(readRuntimeUserAgent({navigator: {userAgent: 1}})).toBe('');
     });
 
+    it.each([
+        {context: 'options without Translator', protocol: 'chrome-extension:', hasDocument: true, hasApi: false, available: false},
+        {context: 'offscreen with Translator', protocol: 'chrome-extension:', hasDocument: true, hasApi: true, available: true},
+        {context: 'extension worker', protocol: 'chrome-extension:', hasDocument: false, hasApi: false, available: true},
+        {context: 'web page', protocol: 'https:', hasDocument: true, hasApi: false, available: true},
+    ])('evaluates browser translation on load in $context', async ({protocol, hasDocument, hasApi, available}) => {
+        vi.resetModules();
+        vi.stubEnv('BROWSER', 'chrome');
+        vi.stubGlobal('location', {protocol});
+        vi.stubGlobal('document', hasDocument ? {} : undefined);
+        vi.stubGlobal('Translator', hasApi ? {create: vi.fn()} : undefined);
+        vi.stubGlobal('translation', undefined);
+        try {
+            const {browserCapabilities: runtime} = await import('@/src/platform/browser/capabilities');
+            expect(runtime.browserTranslation).toBe(available);
+        } finally {
+            vi.unstubAllGlobals();
+            vi.unstubAllEnvs();
+            vi.resetModules();
+        }
+    });
+
     it('restricts Firefox-shared DOM features when its package runs in Thunderbird', () => {
         const firefox = resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2});
         const thunderbird = applyRuntimeBrowserConstraints(

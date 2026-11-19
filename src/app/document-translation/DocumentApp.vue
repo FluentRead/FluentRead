@@ -807,7 +807,7 @@ let historyRequestEpoch = 0;
 const materialPrivate = browser.extension?.inIncognitoContext === true;
 const materialSaving = ref(false);
 const documentMaterialId = ref('');
-const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean; toggleHypothesisFromPopup?(): Promise<unknown>} | null>(null);
+const materialPdfReader = ref<{resumePage(page: number): Promise<void>; resumeLocation(segmentIndex: number): Promise<boolean>; cancelMaterialResume(): void; resolveMaterialSelection(range: Range): number | undefined; captureMaterialLocation(): number | undefined; markSelection(range: Range, kind: 'highlight' | 'underline'): boolean} | null>(null);
 let pendingMaterialResume: MaterialRecord | undefined;
 let materialPositionTimer: ReturnType<typeof setTimeout> | undefined;
 let materialEpoch = 0;
@@ -834,14 +834,7 @@ function captureDocumentMaterialSelection(range: Range, quote: string): Material
 function markDocumentSelection(range: Range, kind: 'highlight' | 'underline'): boolean {
   return !disposed && config.on && isPdfDocument.value && materialPdfReader.value?.markSelection(range, kind) || false;
 }
-async function toggleDocumentHypothesis(): Promise<unknown> {
-  if (disposed || !config.on || !isPdfDocument.value) return {status: 'unavailable', active: false};
-  const owner = activeTask.value;
-  readerTab.value = 'read'; await nextTick();
-  if (disposed || activeTask.value !== owner) return {status: 'unavailable', active: false};
-  return materialPdfReader.value?.toggleHypothesisFromPopup?.() ?? {status: 'unavailable', active: false};
-}
-defineExpose({captureDocumentMaterialSelection, markDocumentSelection, toggleDocumentHypothesis});
+defineExpose({captureDocumentMaterialSelection, markDocumentSelection});
 function documentMaterialSelection(): MaterialSelection | undefined {
   const item = activeTask.value; const doc = parsedDocument.value;
   if (!item?.historyId || item.historyReadUnavailable || item.historyConflict || !doc) return;

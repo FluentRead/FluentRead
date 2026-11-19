@@ -1023,12 +1023,7 @@ watch([presentation, () => props.mode, () => props.translating, () => props.tran
   void syncHypothesis();
 }, {flush: 'post'});
 watch(() => props.document.binary?.bytes, () => {if (hypothesisClient) {hypothesisRequested = false; void syncHypothesis();}}, {flush: 'sync'});
-async function toggleHypothesisFromPopup() {
-  if (hypothesisBusy.value || props.translating && !hypothesisRequested) return {status: 'unavailable', active: hypothesisActive.value};
-  await toggleHypothesis();
-  return {status: hypothesisMessage.value.endsWith('hypothesisExternal') ? 'external' : hypothesisMessage.value ? 'failed' : 'success', active: hypothesisActive.value};
-}
-defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection, toggleHypothesisFromPopup});
+defineExpose({resumePage, resumeLocation, cancelMaterialResume, resolveMaterialSelection, captureMaterialLocation, markSelection});
 function jumpToPosition(pageIndex: number, y: number): void {
   materialNavigation.cancel();
   const layout = layouts.value[pageIndex];

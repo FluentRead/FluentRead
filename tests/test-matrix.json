@@ -487,7 +487,6 @@
       "tests/hypothesisInjection.test.ts",
       "tests/hypothesisBackgroundRuntime.test.ts",
       "tests/pdfHypothesis.test.ts",
-      "tests/documentHypothesisRuntime.test.ts",
       "tests/hypothesisAssets.test.ts",
       "tests/pdfAnnotations.test.ts",
       "tests/pdfAnnotationsComponent.test.ts",

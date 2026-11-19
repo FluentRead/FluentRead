@@ -223,28 +223,9 @@ describe('Popup 站点规则与即时翻译',()=>{
   })
 })
 
-describe('Popup Hypothesis page ownership', () => {
-  it('opens a native PDF in the reader with explicit Hypothesis intent', async () => {
-    const f=setup();f.state.url='https://paper.example/a.pdf';f.getTab.mockResolvedValue({id:7,url:f.state.url});
-    await f.actions.hypothesis();expect(f.openPdf).toHaveBeenCalledWith(f.state.url,true);expect(f.close).toHaveBeenCalledOnce();expect(f.send).not.toHaveBeenCalled();
-  })
-  it.each(['success','external','failed',undefined])('handles %s without invoking translation or moving to another tab',async status=>{
-    const f=setup();f.send.mockResolvedValue(status===undefined?undefined:{status});await f.actions.hypothesis();expect(f.send).toHaveBeenCalledWith(7,{type:'toggleHypothesis'});
-    if(status==='success')expect(f.close).toHaveBeenCalledOnce();else expect(f.notice).toHaveBeenCalledWith(status==='external'?'document.pdfReading.hypothesisExternal':'document.pdfReading.hypothesisFailed','error');
-    expect(f.state.busy).toBe(false);
-  })
-  it('rejects repeated, disabled or stale page actions and ignores a late failure after the popup closes',async()=>{
-    const f=setup();f.cfg.on=false;await f.actions.hypothesis();expect(f.getTab).not.toHaveBeenCalled();f.cfg.on=true;
-    const reply=deferred();f.send.mockReturnValueOnce(reply.promise);const pending=f.actions.hypothesis();await settle();await f.actions.hypothesis();expect(f.send).toHaveBeenCalledOnce();f.actions.invalidate();reply.resolve({status:'failed'});await pending;expect(f.notice).not.toHaveBeenCalled();
-    const old=deferred<PopupActiveTab>();f.getTab.mockReturnValueOnce(old.promise);const targeting=f.actions.hypothesis();f.actions.invalidate();old.resolve({id:7,url:f.state.url});await targeting;expect(f.send).toHaveBeenCalledOnce();
-    f.send.mockRejectedValueOnce(Error('closed'));await f.actions.hypothesis();expect(f.notice).toHaveBeenCalledWith('document.pdfReading.hypothesisFailed','error');
-    const closed=deferred();f.send.mockReturnValueOnce(closed.promise);const closing=f.actions.hypothesis();await settle();f.setActive(false);closed.reject(Error('late'));await closing;expect(f.notice).toHaveBeenCalledTimes(1);
-  })
-})
-
 it('restores an already translated page before retry and drops a PDF-open completion after the popup loses ownership',async()=>{
   const f=setup();f.state.translated=true;f.send.mockResolvedValueOnce({status:'success',isTranslated:false}).mockResolvedValueOnce({status:'success',isTranslated:true});await f.actions.retry();expect(f.send.mock.calls.map(call=>call[1].action)).toEqual(['restore','fullPage']);
-  const pending=deferred();f.openPdf.mockReturnValueOnce(pending.promise);f.state.url='https://paper.example/a.pdf';f.getTab.mockResolvedValueOnce({id:7,url:f.state.url});const opening=f.actions.hypothesis();await settle();f.actions.invalidate();pending.resolve(undefined);await opening;expect(f.close).not.toHaveBeenCalled();
+  const pending=deferred();f.openPdf.mockReturnValueOnce(pending.promise);f.state.url='https://paper.example/a.pdf';f.getTab.mockResolvedValueOnce({id:7,url:f.state.url});const opening=f.actions.toggle();await settle();expect(f.openPdf).toHaveBeenCalledWith(f.state.url);f.actions.invalidate();pending.resolve(undefined);await opening;expect(f.close).not.toHaveBeenCalled();
 })
 
 it('retries an untranslated page directly without an unnecessary restore',async()=>{

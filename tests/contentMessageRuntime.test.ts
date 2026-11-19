@@ -1017,7 +1017,7 @@ describe('Hypothesis content lifecycle messages', () => {
     it('only allows the owning extension to query or toggle an enabled top-level runtime', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
         vi.stubGlobal('browser', {runtime: {id: 'owned'}});
-        const toggle = vi.fn(async () => ({status: 'success', active: true})), reply = vi.fn();
+        const toggle = vi.fn(async () => ({status: 'success' as const, active: true})), reply = vi.fn();
         let invalid = false, disabled = false, suspended = false;
         const state = {isSiteDisabled: () => disabled, isPageSuspended: () => suspended, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => true, toggle}};
         const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, state);
@@ -1029,5 +1029,65 @@ describe('Hypothesis content lifecycle messages', () => {
         suspended = false; handler({type: 'getHypothesisState'}, undefined, reply); handler({type: 'getHypothesisState'}, {id: 'foreign'}, reply);
         const absent = createContentRuntimeMessageHandler({} as ContentScriptContext, {...state, hypothesis: undefined}); absent({type: 'toggleHypothesis'}, {id: 'owned'}, reply);
         expect(toggle).toHaveBeenCalledOnce(); expect(reply).toHaveBeenLastCalledWith({status: 'unavailable', active: false});
+    });
+
+    it('shows a localized webpage notice for a failed or already active Hypothesis sidebar', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        const ctx = {signal: new AbortController().signal} as ContentScriptContext;
+        const toggle = vi.fn().mockResolvedValueOnce({status: 'external', active: false})
+            .mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({status: 'success', active: true});
+        const handler = createContentRuntimeMessageHandler(ctx, {
+            isSiteDisabled: () => false, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => false, toggle},
+        });
+        const reply = vi.fn(), sender = {id: 'owned'}, request = {type: 'toggleHypothesis'};
+        const noticeOptions = {key: 'hypothesis', signal: ctx.signal};
+        handler(request, sender, reply);await Promise.resolve();
+        expect(mocks.showPageNotice).toHaveBeenLastCalledWith('页面已有 Hypothesis，请使用已有侧栏。', 'error', noticeOptions);
+        handler(request, sender, reply);await Promise.resolve();
+        expect(reply).toHaveBeenLastCalledWith({status: 'failed', active: false});
+        expect(mocks.showPageNotice).toHaveBeenLastCalledWith('Hypothesis 暂不可用，请检查网络或重试。', 'error', noticeOptions);
+        handler(request, sender, reply);await Promise.resolve();
+        expect(mocks.dismissPageNotice).toHaveBeenCalledWith('hypothesis');
+    });
+
+    it('discards sidebar feedback after the owning document becomes invalid', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        let invalid = false;
+        const ctx = {get isInvalid() {return invalid;}, signal: new AbortController().signal} as ContentScriptContext;
+        const toggle = vi.fn().mockResolvedValue({status: 'failed', active: false});
+        const handler = createContentRuntimeMessageHandler(ctx, {
+            isSiteDisabled: () => false, updateSiteDisabled: vi.fn(), hypothesis: {isActive: () => false, toggle},
+        });
+        const reply = vi.fn();
+
+        expect(handler({type: 'toggleHypothesis'}, {id: 'owned'}, reply)).toBe(true);
+        invalid = true;
+        await Promise.resolve();
+        expect(reply).toHaveBeenCalledWith({status: 'failed', active: false});
+        expect(mocks.showPageNotice).not.toHaveBeenCalled();
+        expect(mocks.dismissPageNotice).not.toHaveBeenCalled();
+    });
+
+    it('lets an owning extension query the page font with the Hypothesis handler present', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const url = 'https://paper.example/article';
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        vi.stubGlobal('window', {location: {href: url}});
+        const toggle = vi.fn();
+        const handler = createContentRuntimeMessageHandler({} as ContentScriptContext, {
+            isSiteDisabled: () => false,
+            updateSiteDisabled: vi.fn(),
+            hypothesis: {isActive: () => false, toggle},
+            pageTranslationFont: {read: () => true, set: vi.fn(), reset: vi.fn(), dispose: vi.fn()},
+        });
+        const reply = vi.fn();
+
+        expect(handler({type: 'getPageTranslationFontState'}, {id: 'owned'}, reply)).toBe(true);
+        expect(reply).toHaveBeenCalledExactlyOnceWith({
+            status: 'success', browserDefault: true, documentToken: 'fixture-document', pageUrl: url,
+        });
+        expect(toggle).not.toHaveBeenCalled();
     });
 });

@@ -15,6 +15,7 @@ vi.mock('@/src/app/background/contextMenuFeedback', () => ({reportContextMenuFai
 function deferred<T = unknown>() {let resolve!: (value: T) => void, reject!: (error: unknown) => void;const promise = new Promise<T>((yes, no) => {resolve = yes;reject = no;});return {promise, resolve, reject};}
 const neutral = {status: 'success', isTranslated: false, isSiteDisabled: false};
 const pageId = 'fluent-read:page:translatePage';
+const hypothesisId = 'fluentread-toolbar-hypothesis';
 let active: number, api: any, translationStates: import('@/src/app/background/tabTranslationState').TabTranslationStateStore;
 async function settle() {for (let i = 0; i < 100; i++) await Promise.resolve();}
 function change(values: Record<string, unknown>) {Object.assign(state.config, values);state.listeners.at(-1)!();}
@@ -66,6 +67,38 @@ describe('右键菜单原生写入的异步归属', () => {
         const error = new Error('panel failed'), log = vi.spyOn(console, 'error').mockImplementation(() => {});
         api.tabs.create.mockRejectedValueOnce(error);click({menuItemId: 'fluentread-toolbar-quick-panel'}, {id: 9});await settle();
         expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] 快捷面板打开失败', error);
+    });
+    it.each([2, 3])('Hypothesis 只在工具栏图标菜单提供，遵循 manifest %s 和扩展总开关', async version => {
+        state.config.contextMenuEnabled = false;
+        api.runtime.getManifest = () => ({manifest_version: version});
+        await install();await settle();
+        expect(api.contextMenus.create).toHaveBeenCalledExactlyOnceWith({
+            id: hypothesisId,
+            title: '开启或关闭 Hypothesis',
+            contexts: [version === 3 ? 'action' : 'browser_action'],
+            documentUrlPatterns: ['http://*/*', 'https://*/*', 'file:///*'],
+        });
+        api.tabs.sendMessage.mockClear();
+        const click = api.contextMenus.onClicked.addListener.mock.calls[0][0];
+        click({menuItemId: hypothesisId}, {id: 9, url: 'https://paper.example/read'});
+        await settle();
+        expect(api.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(9, {type: 'toggleHypothesis'}, {frameId: 0});
+
+        api.contextMenus.create.mockClear();
+        change({on: false});await settle();
+        expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(2);
+        expect(api.contextMenus.create).not.toHaveBeenCalled();
+    });
+    it('工具栏批注菜单创建失败时网页翻译菜单仍可使用', async () => {
+        const error = new Error('toolbar menu unavailable');
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        api.contextMenus.create.mockImplementation((item: {id: string}) => item.id === hypothesisId ? Promise.reject(error) : Promise.resolve());
+        await start();
+        expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] Hypothesis 菜单创建失败', error);
+        const click = api.contextMenus.onClicked.addListener.mock.calls[0][0];
+        click({menuItemId: pageId}, {id: 9});
+        await settle();
+        expect(state.action).toHaveBeenCalledOnce();
     });
     it('结构创建后的活动页查询遇到配置变化时不回源，也不拖住菜单关闭', async () => {
         const query = deferred();
@@ -164,11 +197,11 @@ describe('右键菜单原生写入的异步归属', () => {
         api.tabs.sendMessage.mockResolvedValue({...neutral,isTranslated:true});
         const old = runtime.update(9);await settle();change({contextMenuEntries: {translateSelection: false}});await settle();
         const removalsWhilePending = api.contextMenus.removeAll.mock.calls.length;write.resolve(undefined);await old;await settle();expect(removalsWhilePending).toBe(0);
-        expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(1);expect(api.contextMenus.create.mock.calls.map(([item]: any[]) => item.id)).toEqual([pageId,'fluent-read:image:translateImage']);
+        expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(1);expect(api.contextMenus.create.mock.calls.map(([item]: any[]) => item.id)).toEqual([pageId,'fluent-read:image:translateImage',hypothesisId]);
     });
     it('结构创建期间配置关闭，停止余下条目并撤回本轮', async () => {
         const create = deferred();api.contextMenus.create.mockReturnValueOnce(create.promise);await install();await settle();
-        change({contextMenuEnabled: false});create.resolve(undefined);await settle();
+        change({on: false});create.resolve(undefined);await settle();
         expect(api.contextMenus.create).toHaveBeenCalledTimes(1);expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(3);
     });
     it('点击等待状态时菜单被关闭，不再执行旧动作', async () => {
@@ -278,11 +311,11 @@ describe('右键菜单原生写入的异步归属', () => {
     });
     it('设置突发变化只构建最后一份快照，语言加载期间改变也失效', async () => {
         await start();change({uiLanguage:'en-US'});change({uiLanguage:'ja-JP'});await settle();expect(api.contextMenus.removeAll).toHaveBeenCalledTimes(1);
-        const language = deferred();state.language.mockReturnValueOnce(language.promise);api.contextMenus.create.mockClear();change({uiLanguage:'fr-FR'});await settle();change({contextMenuEnabled:false});language.resolve(undefined);await settle();expect(api.contextMenus.create).not.toHaveBeenCalled();
+        const language = deferred();state.language.mockReturnValueOnce(language.promise);api.contextMenus.create.mockClear();change({uiLanguage:'fr-FR'});await settle();change({on:false});language.resolve(undefined);await settle();expect(api.contextMenus.create).not.toHaveBeenCalled();
     });
     it('等待原生队列的重建失效时不创建，后续创建失败仍可重建', async () => {
-        const runtime = await start(), write = deferred();api.tabs.sendMessage.mockResolvedValue({...neutral,isTranslated:true});api.contextMenus.update.mockReturnValueOnce(write.promise);const old = runtime.update(9);await settle();change({uiLanguage:'en-US'});await settle();change({contextMenuEnabled:false});write.resolve(undefined);await old;await settle();expect(api.contextMenus.create).not.toHaveBeenCalled();
-        const error = vi.spyOn(console,'error').mockImplementation(() => {});api.contextMenus.create.mockRejectedValueOnce(new Error('native create failed'));change({contextMenuEnabled:true});await settle();expect(error).toHaveBeenCalled();api.contextMenus.create.mockClear();change({uiLanguage:'zh-CN'});await settle();expect(api.contextMenus.create).toHaveBeenCalledTimes(3);
+        const runtime = await start(), write = deferred();api.tabs.sendMessage.mockResolvedValue({...neutral,isTranslated:true});api.contextMenus.update.mockReturnValueOnce(write.promise);const old = runtime.update(9);await settle();change({uiLanguage:'en-US'});await settle();change({on:false});write.resolve(undefined);await old;await settle();expect(api.contextMenus.create).not.toHaveBeenCalled();
+        const error = vi.spyOn(console,'error').mockImplementation(() => {});api.contextMenus.create.mockRejectedValueOnce(new Error('native create failed'));change({on:true});await settle();expect(error).toHaveBeenCalled();api.contextMenus.create.mockClear();change({uiLanguage:'zh-CN'});await settle();expect(api.contextMenus.create).toHaveBeenCalledTimes(4);
     });
     it('没有活动页时只建结构，导航和关闭维护状态，缺失点击目标不会发消息', async () => {
         api.tabs.query.mockResolvedValue([]);const runtime = await start();expect(api.contextMenus.update).not.toHaveBeenCalled();api.tabs.onUpdated.addListener.mock.calls[0][0](9,{status:'complete'});api.tabs.onUpdated.addListener.mock.calls[0][0](9,{status:'loading'});api.tabs.onRemoved.addListener.mock.calls[0][0](9);

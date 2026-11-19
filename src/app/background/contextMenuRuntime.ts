@@ -74,11 +74,7 @@ export function installBackgroundContextMenus(
             });
             appliedPresentations.set(item.menuItemId, properties);
         }
-        if (snapshot === settings && snapshot.toolbarHypothesis) {
-            await createToolbarHypothesisMenu(snapshot.titleContext.language).catch(error => {
-                console.error('[FluentRead] Hypothesis 菜单创建失败', error);
-            });
-        }
+        if (snapshot === settings && snapshot.toolbarHypothesis) await createToolbarHypothesisMenu(snapshot.titleContext.language);
         return items;
     };
 

@@ -17,13 +17,17 @@ const TOOLBAR_HYPOTHESIS_MENU_ID = 'fluentread-toolbar-hypothesis';
 const ANNOTATION_DOCUMENT_PATTERNS = ['http://*/*', 'https://*/*', 'file:///*'];
 
 export async function createToolbarHypothesisMenu(language: UiLanguage): Promise<void> {
-    const manifest = browser.runtime.getManifest();
-    await browser.contextMenus.create({
-        id: TOOLBAR_HYPOTHESIS_MENU_ID,
-        title: translate('document.pdfReading.hypothesisToggle', language),
-        contexts: [manifest.manifest_version === 3 ? 'action' : 'browser_action'],
-        documentUrlPatterns: ANNOTATION_DOCUMENT_PATTERNS,
-    });
+    try {
+        const manifest = browser.runtime.getManifest();
+        await browser.contextMenus.create({
+            id: TOOLBAR_HYPOTHESIS_MENU_ID,
+            title: translate('document.pdfReading.hypothesisToggle', language),
+            contexts: [manifest.manifest_version === 3 ? 'action' : 'browser_action'],
+            documentUrlPatterns: ANNOTATION_DOCUMENT_PATTERNS,
+        });
+    } catch (error) {
+        console.error('[FluentRead] Hypothesis 菜单创建失败', error);
+    }
 }
 
 export function handleToolbarHypothesisClick(menuItemId: unknown, tab: ContextMenuClickTab | undefined,

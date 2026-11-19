@@ -35,6 +35,8 @@ Other browsers may place the pin control elsewhere in their extension menu.
 
 The **interface language** controls buttons and settings. The **target language** controls translations. Free translation works without an API key.
 
+The default menu keeps controls in fixed positions across languages. Hover over a truncated label to read it in full. Use **Section** beside **Translate** to select a region. For site rules, a green dot means a rule is on and a gray dot means it is off. Click the rule to toggle it.
+
 <span id="translate-selected-text"></span>
 
 ## Selection translation

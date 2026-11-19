@@ -30,5 +30,5 @@ defineProps<{
 <style scoped>
 /* 与真实菜单栏同宽：窄版跟随皮肤登记的宽度，拉丁字母与西里尔字母语言沿用菜单栏的加宽规则。 */
 .interface-skin-live-preview { --preview-popup-width: var(--interface-popup-width, 320px); width: var(--preview-popup-width); max-width: 100%; }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .interface-skin-live-preview { --preview-popup-width: max(var(--interface-popup-width, 320px), 380px); }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .interface-skin-live-preview:not([data-preview-kind="default"]) { --preview-popup-width: max(var(--interface-popup-width, 320px), 380px); }
 </style>

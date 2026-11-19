@@ -232,9 +232,6 @@ h2 { margin-bottom: 0; font-size: 15px; line-height: 1.35; letter-spacing: -.01e
 .service-more-meta b { color: var(--muted); font-size: 15px; line-height: .7; font-weight: 500; transform: translateY(-1px); transition: transform 160ms ease; }
 .service-more-meta b.open { transform: translateY(1px) rotate(180deg); }
 
-.translate-action { display: flex; align-items: stretch; gap: 6px; margin-top: 8px; }
-.translate-action > .translate-button { flex: 1 1 0; flex-wrap: nowrap; }
-.translate-action > .section-translate-button { flex-direction: column; gap: 2px; min-height: 42px; padding: 4px 5px; }
 .translate-button {
   display: flex; flex: 1 1 auto; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 42px; height: auto; padding: 6px 10px;
   overflow: hidden; border: 0; border-radius: 10px; color: #fff; background: linear-gradient(135deg, #f35482, #e93267);
@@ -706,52 +703,51 @@ footer button { font-weight: 500; color: var(--muted); }
 /* 不显示域名后，两个规则按钮占用整行；覆盖简洁皮肤原先为域名预留的宽度。 */
 :root .popup-shell[data-interface-skin] .site-rule-actions { max-width: 100%; }
 
-/* 拉丁字母与西里尔字母语言保留自然词间换行和操作空间；中文、日文与韩文沿用窄版。 */
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) {
+/* 其他皮肤的拉丁及西里尔文案可换行和拓宽，默认皮肤各语言共用 320px 槽位。 */
+:root[data-interface-skin]:not([data-interface-skin="default"]):is(:lang(en), :lang(fr), :lang(ru), :lang(es)) {
   --fluentread-localized-popup-width: max(var(--interface-popup-width, 320px), 380px);
   width: var(--fluentread-localized-popup-width);
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .popup-header {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .popup-header {
   flex-wrap: wrap;
   gap: 8px 12px;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell { --popup-secondary-action-width: 64px; }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .brand strong { white-space: nowrap; }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .header-actions { margin-inline-start: auto; }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .header-actions > button {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) { --popup-secondary-action-width: 64px; }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .brand strong { white-space: nowrap; }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .header-actions { margin-inline-start: auto; }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .header-actions > button {
   height: auto;
   min-height: 34px;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .header-actions > button > span {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .header-actions > button > span {
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
   line-height: 1.4;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .translate-button {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .translate-button {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell[data-interface-skin] .translate-button .translate-label {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin)[data-interface-skin] .translate-button .translate-label {
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
   overflow-wrap: break-word;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .translate-hotkey { max-width: none; }
-:root:not(:lang(zh)) .popup-shell .feature-card small {
+:root:not(:lang(zh)) .popup-shell:not(.default-skin) .feature-card small {
   overflow: visible;
   white-space: normal;
   text-overflow: clip;
   line-height: 1.4;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell footer {
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) footer {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell .popup-translation-count { white-space: nowrap; }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-shell:not(.default-skin) .popup-translation-count { white-space: nowrap; }
 
-:root:not(:lang(zh)) .popup-shell[data-interface-skin] .translate-button .translate-label {
+:root:not(:lang(zh)) .popup-shell:not(.default-skin)[data-interface-skin] .translate-button .translate-label {
   overflow: visible; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; line-height: 1.4;
 }
 :root:not(:lang(zh)) .popup-shell[data-interface-skin] .translate-button { height: auto; min-height: 40px; padding-block: 7px; }
@@ -817,7 +813,7 @@ footer button { font-weight: 500; color: var(--muted); }
 }
 
 /* 同排操作保持紧凑高度；短标题合并快捷键，完整用途和长组合由按钮提示呈现。 */
-:root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 36px; --diagnostic-color: #fff; position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
+:root .popup-shell[data-interface-skin] .translate-action { --diagnostic-space: 36px; --diagnostic-color: #fff; position: relative; display: flex; flex-wrap: nowrap; align-items: stretch; gap: 6px; margin-top: 8px; }
 :root[data-interface-skin="minimal"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--ink); }
 :root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action { --diagnostic-color: var(--skin-action-text, #fff); }
 :root[data-interface-skin-kind="palette"] .popup-shell[data-interface-skin] .translate-action.is-translated { --diagnostic-color: var(--brand-strong); }
@@ -867,6 +863,7 @@ footer button { font-weight: 500; color: var(--muted); }
 .translation-tool-tooltip.el-popper { max-width: min(240px, calc(100vw - 24px)); padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: 0 3px 10px rgba(23, 32, 51, .1); overflow-wrap: anywhere; }
 .translation-tool-tooltip-copy { display: flex; flex-direction: column; gap: 2px; color: var(--ink); font-size: 11px; line-height: 1.5; }
 .translation-tool-tooltip-copy small { color: var(--muted); font-size: 10px; }
+.popup-label-tooltip-copy { white-space: pre-line; }
 .display-mode-button svg { display: block; width: 18px; height: 18px; flex: none; }
 .display-mode-button:hover:not(:disabled) { border-color: var(--brand); background: var(--brand-soft); }
 .display-mode-button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
@@ -876,6 +873,51 @@ footer button { font-weight: 500; color: var(--muted); }
 .popup-startup-recovery p { color: var(--muted); }
 .popup-startup-recovery button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; }
 .safari-free-pool-note { margin: 8px 0; color: var(--muted, #64748b); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+
+/* 默认卡片沿用原有颜色、圆角和间距，文字在控件的固定槽位内省略。 */
+.default-skin .popup-header { gap: 8px; }
+.default-skin .brand, .default-skin .brand-copy { flex: 1; min-width: 0; }
+.default-skin .brand small { line-height: 13px; }
+.default-skin .header-actions { flex: none; }
+.default-skin .settings-button { width: 68px; padding-inline: 5px; }
+.default-skin .language-pair label > span { line-height: 14px; }
+
+.default-skin .provider-strip { position: relative; display: flow-root; }
+.default-skin .provider-summary { height: 43px; }
+.default-skin .provider-summary-copy {
+  display: grid; grid-template-columns: min(52px, 42%) minmax(0, 1fr); align-items: baseline; gap: 1px 5px; line-height: 15px;
+}
+.default-skin .provider-summary-heading { display: contents; }
+.default-skin .provider-summary-heading > small { font-size: 11px; }
+.default-skin .provider-summary-model { display: block; grid-column: 2; font-size: 10px; line-height: 12px; }
+.default-skin .needs-credentials .provider-summary-icons { visibility: hidden; }
+.default-skin .credential-warning {
+  position: absolute; inset: 8px 0 0 auto; display: grid; width: 46px; margin: 0; padding: 0; border: 0; background: transparent;
+}
+.default-skin .credential-warning > span {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+}
+.default-skin .credential-warning button { min-width: 0; padding: 0 3px; color: var(--fr-warning); text-decoration: none; }
+.default-skin .credential-warning button > span { display: block; padding: 3px 2px; border-radius: 6px; background: var(--fr-warning-soft); }
+
+.default-skin .site-rule-actions { display: grid; grid-template-columns: minmax(0, 10fr) minmax(0, 11fr); }
+.default-skin .site-rule-button { min-width: 0; justify-content: space-between; text-align: start; }
+.default-skin .site-rule-button.enabled > i:not(.site-rule-saving) {
+  background: #24b47e; box-shadow: 0 0 0 4px rgba(36, 180, 126, .12);
+}
+.default-skin :is(.translate-button, .section-translate-button, .donation-button):hover:not(:disabled) { transform: none; }
+.default-skin footer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.default-skin footer > :is(span, button) { line-height: 14px; }
+.default-skin footer > button { width: 100%; text-align: end; }
+.default-skin .opensource-link { min-width: 0; padding-inline: 3px; }
+.default-skin .opensource-link > :is(svg, .external-mark) { flex: none; }
+
+:root .popup-shell.default-skin :is(
+  .brand-copy > *, .settings-button > span, .language-pair label > span, .provider-summary-heading > *,
+  .provider-summary-model, .credential-warning button > span, .translate-action .translate-label,
+  .section-translate-button > span, .site-rule-button > span, .feature-copy > *,
+  .popup-translation-count, .opensource-link > span:not(.external-mark), footer > button
+) { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
 
 /* any-pointer 同时覆盖触屏与连接鼠标的 iPad；46px 为原生 sheet 缩放留余量，并非任意缩放下 44px 的保证。 */
 @media (any-pointer: coarse) {

@@ -654,7 +654,7 @@ export default defineConfig({
                 'src/features/hypothesis/injection.ts',
                 'src/app/background/hypothesisRuntime.ts',
                 'src/features/hypothesis/selection.ts',
-                'src/app/document-translation/hypothesisRuntime.ts',
+                'src/app/content/hypothesisMessage.ts',
                 'src/features/document-translation/core/pdfAnnotations.ts',
                 'src/features/document-translation/services/pdfAnnotationExport.ts',
                 'src/features/document-translation/core/pdfReadingRegions.ts',

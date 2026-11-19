@@ -184,6 +184,7 @@ describe('AI 模型编号列表', () => {
             services.cloudgpu,
             services.cheaperinference,
             services.cheapaimodel,
+            services.rapidmlx,
             services.ollama,
             services.custom,
         ]);
@@ -205,6 +206,7 @@ describe('AI 模型编号列表', () => {
             services.cloudgpu,
             services.cheaperinference,
             services.cheapaimodel,
+            services.rapidmlx,
             services.ollama,
             services.custom,
         ]);

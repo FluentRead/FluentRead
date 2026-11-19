@@ -230,6 +230,18 @@ Ollama 需先安装、启动并下载模型。在**聚合平台与接口 → Oll
 
 电脑处理较慢时，将该服务的**请求限制 → 整个服务 → 自定义**并发设为 **1**。只有对应翻译请求在本机处理；词典、朗读等其他功能仍可能联网，详见[隐私政策](/guide/privacy)。
 
+### Rapid-MLX（Apple Silicon）
+
+使用 `pip install rapid-mlx` 安装 [Rapid-MLX](https://rapidmlx.com)，启动时允许 FluentRead 的 Chrome 商店扩展来源：
+
+```sh
+rapid-mlx serve qwen3.5-4b-4bit --cors-origins chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj
+```
+
+Chrome/Edge 解压加载版请将 ID 换成 `chrome://extensions` / `edge://extensions` 显示的实际 ID。Firefox 请使用 `--cors-origins moz-extension://<uuid>`，UUID 可在 `about:debugging` 查询。未允许的外部 Origin 会被服务端拒绝。
+
+选择 **Rapid-MLX → 自定义模型**，填写 `GET http://127.0.0.1:8000/v1/models` 返回的准确模型 ID，可用 `curl http://127.0.0.1:8000/v1/models` 查看。本服务沿用手动填写模型的方式。默认匿名服务无需密钥。默认完整聊天地址为 `http://127.0.0.1:8000/v1/chat/completions`；修改端口时在服务的代理地址填写完整 URL，`/v1/chat/completions` 只出现一次。
+
 ## ChatGPT 套餐接入状态
 
 当前公开版本未开放 ChatGPT 登录接入。请选用可用服务，详见[接入状态](/config/chatgpt-plan)。

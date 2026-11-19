@@ -1,5 +1,6 @@
 /**
  * @file src/ui/view-model/serviceCatalog.ts
+ * 本地服务入口：Rapid-MLX 指向官方安装与运行文档，复用现有服务目录和搜索机制。
  * 启用边界：只把 machine/cloud/ai 标记视为目录标题；关闭的真实服务保留在原分组，供目录重新启用。
  * 文件职责：为服务与模型选择界面提供无框架的视图模型转换，把扁平配置选项整理成可搜索、可分层和可稳定展示的数据。
  * 主要内容：定义服务目录分组与官方网站入口，提供云服务厂商的免费额度与开通指引，安全派生自定义服务站点，按服务与模型关键词搜索，并把选择面板的服务拆成按使用意图排序的常用区与更多区。
@@ -61,6 +62,7 @@ const serviceWebsites = {
   grok: 'https://console.x.ai/',
   newapi: 'https://docs.newapi.pro/',
   ollama: 'https://ollama.com/',
+  rapidmlx: 'https://rapidmlx.com',
   mistral: 'https://console.mistral.ai/',
   cohere: 'https://dashboard.cohere.com/',
   togetherai: 'https://api.together.ai/',

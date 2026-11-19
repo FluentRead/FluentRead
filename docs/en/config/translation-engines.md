@@ -228,6 +228,18 @@ Ollama needs installation, a running server, and a downloaded model. Select **Ol
 
 For slower computers, set the service’s **Request limits → Entire service → Custom** concurrency to **1**. Only that service’s translation requests are local; dictionaries and read-aloud may still use the network. See the [privacy policy](/en/guide/privacy).
 
+### Rapid-MLX (Apple Silicon)
+
+Install [Rapid-MLX](https://rapidmlx.com) with `pip install rapid-mlx`, then allow FluentRead’s Chrome Web Store origin when starting the server:
+
+```sh
+rapid-mlx serve qwen3.5-4b-4bit --cors-origins chrome-extension://djnlaiohfaaifbibleebjggkghlmcpcj
+```
+
+For unpacked Chrome/Edge builds, replace the ID with the actual ID in `chrome://extensions` / `edge://extensions`. For Firefox, use `--cors-origins moz-extension://<uuid>` with the actual extension UUID from `about:debugging`. Requests carrying a foreign Origin are rejected unless allowed.
+
+Select **Rapid-MLX → Custom model** and enter an exact model ID returned by `GET http://127.0.0.1:8000/v1/models` (inspect it with `curl http://127.0.0.1:8000/v1/models`). This provider uses manual model entry. Leave the key blank for the default anonymous server. The default full chat URL is `http://127.0.0.1:8000/v1/chat/completions`. To change ports, enter the full URL in the service’s proxy field, including `/v1/chat/completions` exactly once.
+
 ## ChatGPT plan availability
 
 ChatGPT sign-in is unavailable in current public releases. Choose an available service; see [integration status](/en/config/chatgpt-plan).

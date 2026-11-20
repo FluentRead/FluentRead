@@ -380,13 +380,14 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
   });
 
   it.each([
-    ['https://reader.openai.azure.com', 'https://reader.openai.azure.com/openai/v1/chat/completions'],
-    ['https://reader.services.ai.azure.com/openai/v1/', 'https://reader.services.ai.azure.com/openai/v1/chat/completions'],
-    ['https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-10-21', 'https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-10-21'],
-  ])('Azure provider 使用部署名称与 api-key 请求 %s', async (endpoint, expected) => {
+    ['https://reader.openai.azure.com', 'https://reader.openai.azure.com/openai/v1/chat/completions', 'gpt-6.1-terra', 'max_completion_tokens'],
+    ['https://reader.services.ai.azure.com/openai/v1/', 'https://reader.services.ai.azure.com/openai/v1/chat/completions', 'o4-mini', 'max_completion_tokens'],
+    ['https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-10-21', 'https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-10-21', 'reader-deployment', 'max_tokens'],
+  ])('Azure provider 使用部署名称与 api-key 请求 %s', async (endpoint, expected, model, budgetKey) => {
     mockConfig.azureOpenaiEndpoint = endpoint;
     mockConfig.token[services.azureOpenai] = ' azure-test-key ';
-    mockConfig.model[services.azureOpenai] = 'reader-deployment';
+    mockConfig.model[services.azureOpenai] = model;
+    mockConfig.customBody[services.azureOpenai] = '{"max_tokens":96}';
     const fetchMock = vi.fn().mockResolvedValue(successResponse('Azure 译文'));
     setRuntimeFetch(fetchMock);
 
@@ -396,7 +397,9 @@ describe.each([['locked SDK', translateWithSdk], ['standalone HTTP', translateWi
     expect(url).toBe(expected);
     expect(new Headers(init.headers).get('api-key')).toBe('azure-test-key');
     expect(new Headers(init.headers).has('authorization')).toBe(false);
-    expect(JSON.parse(String(init.body))).toMatchObject({model: 'reader-deployment', stream: false});
+    const body = JSON.parse(String(init.body));
+    expect(body).toMatchObject({model, stream: false, [budgetKey]: 96});
+    expect(body).not.toHaveProperty(budgetKey === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens');
     expect(fetchMock).toHaveBeenCalledOnce();
   });
 

@@ -354,6 +354,29 @@ it.each(['azureOpenai', 'zhipu', 'custom:reader', 'claude', 'gemini'] as const)(
     expect(before()).toBe(saved);
 });
 
+it.each([
+    ['https://reader.openai.azure.com', 'gpt-6.1-terra', 'max_completion_tokens'],
+    ['https://reader.openai.azure.com/openai/deployments/gpt-5-mini/chat/completions?api-version=2025-04-01-preview', 'gpt-5-mini', 'max_completion_tokens'],
+    ['https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-02-15-preview', 'reader', 'max_tokens'],
+] as const)('uses the expected Azure AI explanation budget at %s for %s', async (endpoint, model, budgetKey) => {
+    const value = config('azureOpenai');
+    value.azureOpenaiEndpoint = endpoint;
+    for (const factory of [nativeGenerator, createHarnessGenerator]) {
+        transport.mockReset().mockImplementation(async (_url, init) => {
+            const body = JSON.parse(String(init?.body));
+            const otherBudgetKey = budgetKey === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens';
+            if (body[budgetKey] !== 1200 || otherBudgetKey in body) {
+                return new Response(JSON.stringify({error: {message: `Expected ${budgetKey}, received ${otherBudgetKey}`}}), {
+                    status: 400, headers: {'content-type': 'application/json'},
+                });
+            }
+            return events([openai('Explanation')]);
+        });
+        await expect(factory(value, 'azureOpenai', model, [])(input())).resolves.toMatchObject({text: 'Explanation'});
+        expect(transport).toHaveBeenCalledOnce();
+    }
+});
+
 it('allows keyless local OpenAI endpoints and rejects malformed custom headers before network activity', async () => {
     const value=config('custom:local');value.customOpenAIProviders=[{id:'custom:local',name:'Local',endpoint:'http://localhost:11434/v1',models:['reader']}];delete value.token['custom:local'];
     transport.mockResolvedValue(events([openai()]));await createHarnessGenerator(value,'custom:local','reader',[])(input());expect(new Headers(transport.mock.calls[0][1]?.headers).has('authorization')).toBe(false);

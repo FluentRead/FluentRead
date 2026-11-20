@@ -26,6 +26,21 @@ describe('WebDAV 本机连接边界', () => {
         expect(() => normalizeWebDavUrl('http://dav.fixture.invalid/')).toThrow(WebDavError);
         for (const value of [null, '', ' ', 'invalid', 'x'.repeat(4097), 'https://a/\nb', 'ftp://a/', 'https://u:p@a/', 'https://a/?token=x', 'https://a/#x', 'https://a/%2f', 'https://a/%5c', 'https://a/%00']) expect(() => normalizeWebDavUrl(value)).toThrow(WebDavError);
     });
+    it('uses the writable Koofr directory for default or blank backup paths under its mount list', async () => {
+        const url = 'https://app.koofr.net/dav/';
+        for (const backupPath of [undefined, '', 'FluentRead/']) {
+            expect(parseWebDavConnection({...input, url, backupPath}, null).url).toBe('https://app.koofr.net/dav/Koofr/');
+        }
+        const shared = parseWebDavConnection({...input, url, backupPath: 'Shared/Backups'}, null);
+        expect(new URL(shared.backupPath!, shared.url).href).toBe('https://app.koofr.net/dav/Shared/Backups/');
+        // An existing connection could already target a shared mount named FluentRead.
+        const existing = {...shared, backupPath: 'FluentRead/'};
+        const store = createWebDavConnectionStore({getItem: vi.fn(async () => existing)} as never);
+        expect(await store.read()).toEqual(existing);
+        expect(parseWebDavConnection({...existing, password: ''}, existing)).toMatchObject({
+            url, password: existing.password,
+        });
+    });
     it('同一账号可保持已存密码，改变账号必须重填，并防止旧页面覆盖新设置', () => {
         const saved = parseWebDavConnection(input, null);
         expect(saved).toMatchObject({url: input.url+'/', username: input.username, password: input.password, allowInsecure: false});

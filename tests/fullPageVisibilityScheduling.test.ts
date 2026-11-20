@@ -63,6 +63,7 @@ const runtime = vi.hoisted(() => ({
         modelThinking: {} as Record<string, Record<string, boolean>>,
         from: "en",
         to: "zh",
+        pageSourceLanguageOnly: false,
         excludedLanguages: [] as string[],
         useCache: true,
         enableAIContext: false,
@@ -115,7 +116,8 @@ vi.mock("@/src/core/config/constants", () => ({
 vi.mock("@/src/services/config/store", () => ({
     config: runtime.config,
 }));
-vi.mock("@/src/core/language/detect", () => ({
+vi.mock("@/src/core/language/detect", async importOriginal => ({
+    isTextInLanguage: (await importOriginal<typeof import('@/src/core/language/detect')>()).isTextInLanguage,
     detectlang: () => "",
     shouldSkipTranslationForTarget: (origin: string, target: string, excluded: readonly string[] = []) =>
         runtime.clearlyTargetLanguage(origin, target, excluded)
@@ -574,6 +576,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.config.modelThinking = {};
         runtime.config.from = "en";
         runtime.config.to = "zh";
+        runtime.config.pageSourceLanguageOnly = false;
         runtime.config.excludedLanguages = [];
         runtime.config.useCache = true;
         runtime.config.enableAIContext = false;
@@ -9293,6 +9296,15 @@ describe("全文翻译可见性锚点", () => {
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('unavailable');
     });
 
+    it('a source-language filter skip does not create an unchanged provider receipt', async () => {
+        runtime.config.from = 'ja';
+        runtime.config.pageSourceLanguageOnly = true;
+        const {owner, sessionId} = await startUnchangedReceiptCase();
+        expect(runtime.requests).not.toHaveBeenCalled();
+        expect(owner.textContent).toBe('Spec');
+        expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('unavailable');
+    });
+
     it('same-text Text replacement, route epoch and restore invalidate exact completion evidence', async () => {
         const {owner, sessionId} = await startUnchangedReceiptCase();
         expect(readFullPageUnchangedCompletion(owner, sessionId, 'Spec').status).toBe('available');
@@ -10697,6 +10709,7 @@ describe("悬停重挂请求与 synthetic 提交回归", () => {
         runtime.config.modelThinking = {};
         runtime.config.from = "en";
         runtime.config.to = "zh";
+        runtime.config.pageSourceLanguageOnly = false;
         runtime.config.excludedLanguages = [];
         runtime.config.useCache = true;
         runtime.config.enableAIContext = false;

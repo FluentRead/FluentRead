@@ -51,7 +51,7 @@ export interface PageTranslationConfigOverrides {
 }
 
 /** 严格模式只让可信识别为用户指定源语言的正文通过。 */
-export function allowsPageSourceLanguage(snapshot: FullPageTranslationConfigSnapshot, source: string): boolean {
+export function allowsPageSourceLanguage(snapshot: Pick<FullPageTranslationConfigSnapshot, 'sourceLanguage' | 'sourceLanguageOnly'>, source: string): boolean {
     return !snapshot.sourceLanguageOnly || snapshot.sourceLanguage === 'auto' || isTextInLanguage(source, snapshot.sourceLanguage);
 }
 

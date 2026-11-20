@@ -1336,7 +1336,7 @@ function beginCompletionUnit(
     completionUnitOwners.add(owner);
     expect(getTranslationState(owner)).toBe(attempt!.state);
     const config = {sessionId: 101, renderCommitGeneration: 7, configIdentity: 'google:zh-CN:content:bilingual',
-        service: 'google', targetLanguage: 'zh-CN', excludedLanguages: [] as readonly string[]};
+        service: 'google', sourceLanguage: 'auto', targetLanguage: 'zh-CN', excludedLanguages: [] as readonly string[]};
     return {document, owner, candidate, slots, config, ...attempt!};
 }
 function captureCompletionUnit(fixture: ReturnType<typeof beginCompletionUnit>,

@@ -12,6 +12,7 @@ import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core
 import {translateText} from '@/src/services/translation/client';
 import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {createSnapshotTranslateOptions, type FullPageTranslationConfigSnapshot} from './translationRequest';
+import {allowsPageSourceLanguage} from './translationConfigSnapshot';
 
 /** SPA 的一次路由切换常连续改写标题；合并抖动，只翻译稳定下来的那一次。 */
 const TITLE_SETTLE_DELAY_MS = 150;
@@ -38,7 +39,8 @@ async function translateCurrentTitle(active: TitleTranslationState): Promise<voi
     const generation = active.generation;
     if (!source.trim()) return;
     // 与正文一致：已是目标语言或命中会话排除列表的标题不再发请求。
-    if (shouldSkipTranslationForTarget(source, active.snapshot.targetLanguage, active.snapshot.excludedLanguages)) return;
+    if (!allowsPageSourceLanguage(active.snapshot, source)
+        || shouldSkipTranslationForTarget(source, active.snapshot.targetLanguage, active.snapshot.excludedLanguages)) return;
 
     let translated: string;
     try {

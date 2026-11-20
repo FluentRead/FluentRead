@@ -40,7 +40,7 @@ import {
     type TranslationQueueSession,
 } from '@/src/services/translation/queue';
 
-import {copyFullPageTranslationConfigSnapshot, type FullPageTranslationConfigSnapshot, type PageTranslationConfigOverrides} from './translationConfigSnapshot';
+import {allowsPageSourceLanguage, copyFullPageTranslationConfigSnapshot, type FullPageTranslationConfigSnapshot, type PageTranslationConfigOverrides} from './translationConfigSnapshot';
 
 const FULL_PAGE_TRANSLATION_CACHE_LIMIT = 512;
 const FULL_PAGE_TRANSLATION_REQUEST_CACHE_LIMIT = 512;
@@ -76,7 +76,7 @@ export function getFullPageTranslationCandidateConcurrency(
 export function getTranslationInvocationIdentity(snapshot: FullPageTranslationConfigSnapshot): string {
     return JSON.stringify([
         snapshot.profileId ?? '', snapshot.service, snapshot.model, snapshot.thinking,
-        snapshot.sourceLanguage, snapshot.targetLanguage, snapshot.displayMode, snapshot.style,
+        snapshot.sourceLanguage, snapshot.sourceLanguageOnly, snapshot.targetLanguage, snapshot.displayMode, snapshot.style,
         snapshot.longParagraphLineBreak ?? false, snapshot.translationBeforeOriginal ?? false,
         snapshot.enableAIContext, snapshot.enableAIMultiSegment, snapshot.enableNativeBatch !== false,
         getAIMultiSegmentLimits(snapshot),
@@ -183,6 +183,7 @@ export function captureFullPageTranslationConfig(
         model,
         thinking: isModelThinkingEnabled(config.modelThinking, service, model),
         sourceLanguage: config.from,
+        ...(config.pageSourceLanguageOnly && config.from !== 'auto' ? {sourceLanguageOnly: true as const} : {}),
         targetLanguage: overrides.targetLanguage?.trim() || config.to,
         excludedLanguages: Object.freeze(normalizeExcludedLanguages(config.excludedLanguages)),
         useCache: config.useCache,
@@ -239,8 +240,8 @@ function throwIfAborted(signal?: AbortSignal): void {
 
 /** 文本槽与整段候选、标题使用同一目标/排除语言判断；是否配置排除语言不改变识别深度。 */
 function shouldKeepOriginalSlot(origin: string, snapshot: FullPageTranslationConfigSnapshot): boolean {
-    return Boolean(origin.trim())
-        && shouldSkipTranslationForTarget(origin, snapshot.targetLanguage, snapshot.excludedLanguages);
+    return !allowsPageSourceLanguage(snapshot, origin) || (Boolean(origin.trim())
+        && shouldSkipTranslationForTarget(origin, snapshot.targetLanguage, snapshot.excludedLanguages));
 }
 
 function restoreSkippedSlots(
@@ -314,7 +315,7 @@ export async function tryTranslateInlineCodeSentence(
         if (entries.length > 64) return true;
         return entries.some(entry => protectGlossaryText(source, [entry]).tokens.length > 0);
     };
-    if (glossaryRequiresProtection() || shouldSkipTranslationForTarget(detectionText, snapshot.targetLanguage, snapshot.excludedLanguages)) return null;
+    if (glossaryRequiresProtection() || shouldKeepOriginalSlot(detectionText, snapshot)) return null;
     if (await shouldSkipTranslationWithEvidence(detectionText, snapshot.targetLanguage, snapshot.excludedLanguages, signal)) {
         throwIfAborted(signal);
         return null;
@@ -442,6 +443,7 @@ function createRequestCacheKey(
         thinking: snapshot.thinking,
         from: snapshot.sourceLanguage,
         to: snapshot.targetLanguage,
+        sourceLanguageOnly: snapshot.sourceLanguageOnly,
         excludedLanguages: snapshot.excludedLanguages,
         useCache: snapshot.useCache,
         enableAIContext: snapshot.enableAIContext,

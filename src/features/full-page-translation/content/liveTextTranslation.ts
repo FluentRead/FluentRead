@@ -17,7 +17,7 @@ import type {InlineCodePacket, TranslationScope, TranslationTextProtectionOption
 import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core/translation/targetResult';
 import {isClearlyWrongLanguageResponse, isUnchangedTranslationResponse} from '@/src/core/translation/resultValidation';
 import type {TranslationQueueSession} from '@/src/services/translation/queue';
-import {copyFullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
+import {allowsPageSourceLanguage, copyFullPageTranslationConfigSnapshot} from './translationConfigSnapshot';
 import {isPersonalCorrectionEnabled, lookupPersonalCorrection, type PersonalCorrectionSnapshot} from './personalCorrections';
 import {
     translateTextSlots,
@@ -223,6 +223,7 @@ export async function createTranslationRequest(
             });
         }
     }
+    if (source && !allowsPageSourceLanguage(snapshot, source)) source = null;
     const personalCorrection = import.meta.env.BROWSER !== 'userscript' && source
         ? await lookupPersonalCorrection(node, source, snapshot.sourceLanguage, snapshot.targetLanguage, signal) : undefined;
     if (personalCorrection?.translation) return {kind: 'snapshot', sources: origins,

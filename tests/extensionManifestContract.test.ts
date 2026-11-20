@@ -19,6 +19,14 @@ import type {InlineConfig} from 'vite';
 const PROJECT_ROOT = resolve(__dirname, '..');
 
 describe('native translation sidepanel artifact contract', () => {
+    it('registers the assignable translation window shortcut only on supported builds', () => {
+        for (const browser of ['chrome', 'edge', 'firefox'] as const) {
+            const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
+            expect(manifest.commands?.['open-translation-window']).toEqual({description: 'Open translation window'});
+        }
+        const safari = createExtensionManifest({browser: 'safari', manifestVersion: 2});
+        expect(safari.commands?.['open-translation-window']).toBeUndefined();
+    });
     it.each(['Chrome', 'Firefox'])('%s validates its own final native panel declaration', async browser => {
         const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
         const manifest = browser === 'Chrome' ? {permissions: ['sidePanel']}

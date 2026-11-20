@@ -21,6 +21,8 @@ In Chrome and Edge, **Current tab only** is the default. The panel hides when yo
 
 In the sidebar, press **Enter** to translate and **Shift + Enter** for a new line. **⌘ + Enter** and **Ctrl + Enter** also work. The button at the top right opens Translation Center in settings. The sidebar and settings page share language and service choices; input and results stay in the current panel and are not saved to settings.
 
+To keep the webpage at its current width, assign **Open translation window** a key combination in the browser's extension shortcuts settings in Chrome, Edge, or desktop Firefox. The shortcut opens the same translation panel in a separate window.
+
 When you select several services, each has its own card with the service name, model when available, and translation or status. You can copy each translation separately.
 
 ## Manage services and results

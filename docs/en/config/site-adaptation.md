@@ -17,6 +17,8 @@ Explicit topic tags and Discourse category badges retain their original text. Ex
 
 In the OpenAI Developer Community, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
 
+Full-page translation on Google Search also includes recognized AI Overview text.
+
 ## Translate every time—or leave it alone
 
 Open **Settings → Tools & learning → Website rules → Site preferences**:

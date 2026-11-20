@@ -643,15 +643,20 @@
   {
     "id": "google-search",
     "url": "https://www.google.com/search?q=example",
-    "html": "<nav id=\"navigation\"><a href=\"/settings\">Navigation remains unchanged</a></nav><div id=\"search\"><h3 id=\"body1\">This readable paragraph describes the behavior and provides enough context for translation. <code id=\"protected\">KEEP_ORIGINAL_TOKEN</code></h3><div class=\"VwiC3b\" id=\"body2\">A second independent paragraph explains the example and should remain stable during repeated translation.</div><cite id=\"source-url\">https://example.test/path</cite></div><p id=\"unrelated\">Search tools and navigation remain original.</p>",
+    "html": "<nav id=\"navigation\"><a href=\"/settings\">Navigation remains unchanged</a></nav><div id=\"m-x-content\"><p id=\"overview\">A generated overview explains the answer using ordinary prose.</p><ul><li id=\"overview-item\">An additional detail provides context for the answer.</li></ul><button id=\"show-more\">Show more of this summary</button><aside><p id=\"overview-source\">Source card metadata should remain original.</p></aside></div><div data-attrid=\"VisualDigestGeneratedDescription\"><p id=\"generated-answer\">Another layout includes a generated description in featured results.</p></div><div id=\"search\"><h3 id=\"body1\">This readable paragraph describes the behavior and provides enough context for translation. <code id=\"protected\">KEEP_ORIGINAL_TOKEN</code></h3><div class=\"VwiC3b\" id=\"body2\">A second independent paragraph explains the example and should remain stable during repeated translation.</div><cite id=\"source-url\">https://example.test/path</cite></div><p id=\"unrelated\">Search tools and navigation remain original.</p>",
     "required": [
       "#body1",
-      "#body2"
+      "#body2",
+      "#overview",
+      "#overview-item",
+      "#generated-answer"
     ],
     "forbidden": [
       "#navigation",
       "#protected",
       "#source-url",
+      "#show-more",
+      "#overview-source",
       "#unrelated"
     ]
   },

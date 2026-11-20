@@ -10,6 +10,7 @@ import {isEditingInPage} from '@/src/shared/dom/editingTarget';
 export interface HoverTranslationContentConfig {
     on?: boolean;
     hotkey?: string;
+    floatingBallHotkey?: string;
     customHotkey?: string;
     mouseHoverTranslationDelay?: number;
 }
@@ -451,6 +452,7 @@ export function mountHoverTranslationContentFeature(
                 coordinate = deps.getCenterPoint(event.touches, 2);
                 break;
             case deps.constants.ThreeFinger:
+                if (deps.config.floatingBallHotkey === deps.constants.ThreeFinger) return;
                 coordinate = deps.getCenterPoint(event.touches, 3);
                 break;
             case deps.constants.FourFinger:

@@ -183,6 +183,7 @@ export default defineConfig({
                 'src/app/background/configMessageHandlers.ts',
                 'src/app/content/messageRuntime.ts',
                 'src/app/content/hotkeyRuntime.ts',
+                'src/app/content/fullPageTouchShortcut.ts',
                 'src/app/content/quickTranslationRuntime.ts',
                 'src/app/background/maintenanceRuntime.ts',
                 'src/features/settings/model/chatgptPlanMessages.ts',

@@ -695,6 +695,7 @@ export const options = {
         {value: "F10", label: "F10"},
         {value: "F11", label: "F11"},
         {value: "F12", label: "F12"},
+        {value: "ThreeFinger", label: "三指翻译"},
         {value: "custom", label: "自定义快捷键"},
     ],
     theme: [

@@ -35,7 +35,7 @@ function isOpaqueFocusHost(element: Element): boolean {
 }
 
 /** 判断按键是否发生在输入场景：事件路径或当前焦点落在可输入元素上时返回 true。 */
-export function isEditingInPage(event: KeyboardEvent, pageDocument: Document = document): boolean {
+export function isEditingInPage(event: Event, pageDocument: Document = document): boolean {
     if (typeof event.composedPath === 'function' && event.composedPath().some(isTypingTarget)) return true;
     const focused = deepActiveElement(pageDocument);
     return Boolean(focused) && (isTypingTarget(focused) || isOpaqueFocusHost(focused!));

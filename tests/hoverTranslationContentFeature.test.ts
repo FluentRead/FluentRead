@@ -1289,6 +1289,19 @@ describe('hover translation content feature', () => {
         expect(deps.handleTranslation).not.toHaveBeenCalled();
     });
 
+    it('does not claim the three-finger gesture when it is assigned to full-page translation', () => {
+        const {deps, documentTarget, controller} = mountHarness({
+            config: {on: true, hotkey: 'threeFinger', floatingBallHotkey: 'threeFinger'},
+        });
+        const event = trustedEvent({touches: [{}, {}, {}]});
+        documentTarget.emit('touchstart', event);
+        expect(deps.handleTranslation).not.toHaveBeenCalled();
+        deps.config.floatingBallHotkey = 'Alt+T';
+        documentTarget.emit('touchstart', event);
+        expect(deps.handleTranslation).toHaveBeenCalledOnce();
+        controller.abort();
+    });
+
     it('支持触摸、双击、长按、中键和屏幕连击触发，并在 abort 时清理计时器', () => {
         vi.useFakeTimers();
         const {deps, documentTarget, controller} = mountHarness();

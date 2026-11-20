@@ -30,6 +30,8 @@ FluentRead is free and open source. Providers may charge separately. Chat subscr
 
 Selecting a directory entry opens its connection settings and leaves the default service selected. You can assign services from **Translation service** in the extension menu or **Services by feature** in General settings. **Services by feature** starts expanded. Select its heading to collapse it.
 
+In desktop Chrome, Edge, or Firefox, favorite the services you use and assign a key to **Cycle favorite translation services** in the browser's extension shortcut settings. Each press on a webpage selects the next available favorite and briefly shows the list with the active choice marked. The next full-page translation session and hover translation that follows the default use the new service.
+
 <figure class="doc-figure"><a href="/screenshots/ui/en-US/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/en-US/settings-services.webp" width="2560" height="1600" alt="FluentRead translation service directory and connection settings" loading="lazy" /></a><figcaption>Configure and check the connection, then choose the default or assign it to a feature.</figcaption></figure>
 
 ## Remove and add back services

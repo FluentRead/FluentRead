@@ -27,6 +27,8 @@ import {createConfigAutoBackupRestoreHandler} from './handlers/configAutoBackup'
 import {createConfigStorageReadHandler, createPopupStartupHandler} from './handlers/configStorage';
 import {createConfigCountIncrementHandler} from './handlers/configCount';
 import {createConfigHistoryHandler} from './handlers/configHistory';
+import {installDefaultServiceShortcut} from './defaultServiceShortcut';
+import type {TabTranslationStateStore} from './tabTranslationState';
 import {
     createConfigMutationCoordinator,
     createConfigPersistenceBatchHandler,
@@ -37,8 +39,10 @@ import {
 /** 把配置保存、计数、历史与备份恢复放入同一 mutation 队列。 */
 export function createConfigBackgroundHandlers<TContext extends ConfigPersistenceContext>(
     registerContentReceiver?: (sender: ConfigPersistenceContext['sender']) => Promise<void>,
+    tabTranslationStates?: TabTranslationStateStore,
 ): Array<BackgroundMessageHandler<TContext>> {
     const mutations = createConfigMutationCoordinator();
+    if (tabTranslationStates) installDefaultServiceShortcut(tabTranslationStates, mutations);
     const persistence = createConfigPersistenceHandler({
         ready: configReady,
         getCurrentConfig: () => config,

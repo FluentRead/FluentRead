@@ -44,6 +44,7 @@ export default defineConfig({
                 'src/services/translation/privacyProtection.ts',
                 'src/features/settings/ui/PrivacyProtectionSettings.vue',
                 'src/app/background/toolbarActionRuntime.ts',
+                'src/app/background/defaultServiceShortcut.ts',
                 'src/features/settings/ui/components/ToolbarClickSetting.vue',
                 'src/ui/confirmExport.ts',
                 'src/core/config/nativeAsr.ts',

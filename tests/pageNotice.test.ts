@@ -2,7 +2,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {parseHTML} from 'linkedom';
 
-import {sendErrorMessage, showPageNotice, dismissPageNotice} from '@/src/features/page-notice/public';
+import {sendErrorMessage, showPageNotice, dismissPageNotice, showFavoriteServiceNotice} from '@/src/features/page-notice/public';
 import {config} from '@/src/services/config/store';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 
@@ -28,6 +28,24 @@ function noticeEvent(node: Element, type: string, properties: Record<string, unk
 }
 
 describe('page error notice', () => {
+    it('updates private service names inside a closed detail root only', () => {
+        const attach = vi.spyOn(window.HTMLElement.prototype, 'attachShadow');
+        try {
+            const notice = showFavoriteServiceNotice(['Private provider label'], 0, false);
+            const detail = notice.querySelector('.notice-detail')!;
+            expect(attach.mock.calls.map(([init]) => init.mode)).toEqual(['open', 'closed']);
+            expect(detail.shadowRoot).toBeNull();
+            expect(notice.textContent).not.toContain('Private provider label');
+            const closed = attach.mock.results[1]!.value as ShadowRoot;
+            expect(closed.firstElementChild!.textContent).toBe('✓ Private provider label');
+            expect(showFavoriteServiceNotice(['Private provider label', 'Another provider'], 1, false)).toBe(notice);
+            expect(closed.firstElementChild!.textContent).toBe('· Private provider label\n✓ Another provider');
+            expect(showFavoriteServiceNotice([], -1, false)).toBe(notice);
+            expect(closed.firstElementChild!.textContent).toContain('收藏可用的服务');
+            expect(showFavoriteServiceNotice([], -1, true)).toBe(notice);
+            expect(closed.firstElementChild!.textContent).toContain('无法切换默认翻译服务');
+        } finally {attach.mockRestore();}
+    });
     it('凭据错误转为普通通知时保留用户在正文的焦点，不把焦点移到关闭按钮', () => {
         const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'error', {key: 'operation'});
         const close = notice.querySelector<HTMLButtonElement>('.notice-close')!, focus = vi.spyOn(close, 'focus');

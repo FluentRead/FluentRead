@@ -219,6 +219,9 @@ export function createExtensionManifest(
         name: '__MSG_extensionName__',
         description: '__MSG_extensionDescription__',
         default_locale: 'en',
+        ...(['chrome', 'edge', 'firefox'].includes(env.browser) ? {
+            commands: {'cycle-favorite-translation-services': {description: 'Cycle favorite translation services'}},
+        } : {}),
         permissions: [
             ...(env.manifestVersion === 3 ? ['scripting'] : []),
             'storage',

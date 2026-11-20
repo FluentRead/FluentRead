@@ -29,6 +29,8 @@ export interface PageNoticeOptions {
     signal?: AbortSignal;
     /** 明确的阅读时长；有限正数限制在 1–30 秒，无效值沿用默认时长。 */
     durationMs?: number;
+    /** 私人配置名称只渲染到封闭的详情节点。 */
+    privateDetail?: boolean;
 }
 interface NoticeEntry {
     node: HTMLElement;
@@ -40,6 +42,7 @@ interface NoticeEntry {
     brand: HTMLElement;
     title: HTMLElement;
     detail: HTMLElement;
+    privateDetail?: boolean;
     body: HTMLElement;
     mark: HTMLElement;
     close: HTMLButtonElement;
@@ -292,7 +295,7 @@ function bindNoticeSignal(entry: NoticeEntry, signal?: AbortSignal): void {
 
 function paintNotice(entry: NoticeEntry, message: string, type: NoticeType, durationMs?: number): void {
     const language = normalizeUiLanguage(config.uiLanguage);
-    const missingCredential = getMissingCredentialNotice(message);
+    const missingCredential = entry.privateDetail ? null : getMissingCredentialNotice(message);
     const credential = missingCredential !== null;
     const tone = credential ? 'warning' : type;
     const node = entry.node;
@@ -374,7 +377,7 @@ export function showPageNotice(message: string, type: NoticeType, options: PageN
         const sameFeedback = options.key
             ? entry.key === options.key
             : !entry.key && entry.message === message && entry.type === type && entry.language === language;
-        if (!sameFeedback) continue;
+        if (!sameFeedback || Boolean(entry.privateDetail) !== Boolean(options.privateDetail)) continue;
         bindNoticeSignal(entry, options.signal);
         paintNotice(entry, message, type, options.durationMs);
         return entry.node;
@@ -393,11 +396,13 @@ export function showPageNotice(message: string, type: NoticeType, options: PageN
     appendTextElement(heading, 'span', 'notice-divider', '·');
     const title = appendTextElement(heading, 'span', 'notice-title', '');
     const body = document.createElement('span');body.className = 'notice-body';
-    const detail = appendTextElement(body, 'span', 'notice-detail', '');
+    const detailHost = appendTextElement(body, 'span', 'notice-detail', '');
+    const detail = options.privateDetail ? document.createElement('span') : detailHost;
+    if (options.privateDetail) detailHost.attachShadow({mode: 'closed'}).appendChild(detail);
     copy.append(heading, body);
     const close = document.createElement('button');close.className = 'notice-close';close.type = 'button';close.textContent = '×';
     notice.append(mark, copy, close);stack.appendChild(notice);
-    const entry: NoticeEntry = {node: notice, stack, key: options.key, message, type, language, brand, title, detail, body, mark, close,
+    const entry: NoticeEntry = {node: notice, stack, key: options.key, message, type, language, brand, title, detail, privateDetail: options.privateDetail, body, mark, close,
         remainingMs: 0, dismissAt: 0, hovered: false, focused: false, returnFocus: deepActiveElement(document) as HTMLElement | null, interactions: []};
     entries.set(notice, entry);
     bindNoticeInteractions(entry);
@@ -413,6 +418,15 @@ export function dismissPageNotice(key: string): void {
     for (const entry of entries.values()) {
         if (entry.key === key) removeNotice(entry);
     }
+}
+
+/** 常用服务选择从浏览器命令触发，名单只展示在封闭详情内。 */
+export function showFavoriteServiceNotice(choices: string[], selectedIndex: number, failed: boolean): HTMLElement {
+    const language = normalizeUiLanguage(config.uiLanguage);
+    const message = failed ? translateLegacyText('无法切换默认翻译服务，请重试。', language)
+        : choices.length ? choices.map((choice, index) => `${index === selectedIndex ? '✓' : '·'} ${translateLegacyText(choice, language)}`).join('\n')
+        : translateLegacyText('请在翻译服务设置中收藏可用的服务。', language);
+    return showPageNotice(message, failed ? 'error' : 'success', {key: 'default-service-shortcut', privateDetail: true, durationMs: 5000});
 }
 
 function _sendErrorMessage(message: string): void {

@@ -282,6 +282,20 @@ describe('page-owned scoring, paint and cancellation', () => {
         click(paragraph, 50);
         click(inline, 20);
         expect(translateRange.mock.calls.map(([range]) => range.toString())).toEqual(['extraordinary', 'extraordinary']);
+
+        const shadowHost = f.document.createElement('div');
+        f.document.body.append(shadowHost);
+        const other = shadowHost.attachShadow({mode: 'open'}).appendChild(f.document.createElement('span'));
+        click(other, 20);
+        expect(translateRange).toHaveBeenCalledTimes(2);
+
+        const first = [...f.registry.values()].flatMap(paint => [...paint]).find(range => range.toString() === 'extra')!;
+        const start = first.startOffset;
+        first.setStart(first.startContainer, start + 1);
+        click(inline, 20);
+        expect(translateRange).toHaveBeenCalledTimes(2);
+        first.setStart(first.startContainer, start);
+
         const hidden = f.document.createElement('span');
         hidden.hidden = true;
         hidden.textContent = 'unpainted';

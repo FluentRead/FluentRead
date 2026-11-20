@@ -94,6 +94,22 @@
     ]
   },
   {
+    "id": "twitch-live-chat",
+    "name": "Twitch 直播聊天",
+    "match": {"hosts": ["twitch.tv", "www.twitch.tv"]},
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          ".chat-scrollable-area__message-container [data-a-target=\"chat-line-message-body\"]",
+          ".chat-scrollable-area__message-container .chat-line__message span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:message"
+      }
+    ]
+  },
+  {
     "id": "bilibili",
     "name": "哔哩哔哩",
     "match": {

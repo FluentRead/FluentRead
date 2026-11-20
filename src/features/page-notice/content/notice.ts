@@ -420,13 +420,13 @@ export function dismissPageNotice(key: string): void {
     }
 }
 
-/** 常用服务选择从浏览器命令触发，名单只展示在封闭详情内。 */
-export function showFavoriteServiceNotice(choices: string[], selectedIndex: number, failed: boolean): HTMLElement {
+/** 常用服务选择从浏览器命令触发，名单只展示在封闭详情内，并随当前内容脚本结束而清理。 */
+export function showFavoriteServiceNotice(choices: string[], selectedIndex: number, failed: boolean, signal: AbortSignal): HTMLElement {
     const language = normalizeUiLanguage(config.uiLanguage);
     const message = failed ? translateLegacyText('无法切换默认翻译服务，请重试。', language)
         : choices.length ? choices.map((choice, index) => `${index === selectedIndex ? '✓' : '·'} ${translateLegacyText(choice, language)}`).join('\n')
         : translateLegacyText('请在翻译服务设置中收藏可用的服务。', language);
-    return showPageNotice(message, failed ? 'error' : 'success', {key: 'default-service-shortcut', privateDetail: true, durationMs: 5000});
+    return showPageNotice(message, failed ? 'error' : 'success', {key: 'default-service-shortcut', privateDetail: true, durationMs: 5000, signal});
 }
 
 function _sendErrorMessage(message: string): void {

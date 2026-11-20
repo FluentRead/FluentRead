@@ -30,22 +30,33 @@ function noticeEvent(node: Element, type: string, properties: Record<string, unk
 describe('page error notice', () => {
     it('updates private service names inside a closed detail root only', () => {
         const attach = vi.spyOn(window.HTMLElement.prototype, 'attachShadow');
+        const {signal} = new AbortController();
         try {
-            const notice = showFavoriteServiceNotice(['Private provider label'], 0, false);
+            const notice = showFavoriteServiceNotice(['Private provider label'], 0, false, signal);
             const detail = notice.querySelector('.notice-detail')!;
             expect(attach.mock.calls.map(([init]) => init.mode)).toEqual(['open', 'closed']);
             expect(detail.shadowRoot).toBeNull();
             expect(notice.textContent).not.toContain('Private provider label');
             const closed = attach.mock.results[1]!.value as ShadowRoot;
             expect(closed.firstElementChild!.textContent).toBe('✓ Private provider label');
-            expect(showFavoriteServiceNotice(['Private provider label', 'Another provider'], 1, false)).toBe(notice);
+            expect(showFavoriteServiceNotice(['Private provider label', 'Another provider'], 1, false, signal)).toBe(notice);
             expect(closed.firstElementChild!.textContent).toBe('· Private provider label\n✓ Another provider');
-            expect(showFavoriteServiceNotice([], -1, false)).toBe(notice);
+            expect(showFavoriteServiceNotice([], -1, false, signal)).toBe(notice);
             expect(closed.firstElementChild!.textContent).toContain('收藏可用的服务');
-            expect(showFavoriteServiceNotice([], -1, true)).toBe(notice);
+            expect(showFavoriteServiceNotice([], -1, true, signal)).toBe(notice);
             expect(closed.firstElementChild!.textContent).toContain('无法切换默认翻译服务');
         } finally {attach.mockRestore();}
     });
+    it('removes a hovered favorite-service notice when its content context ends', () => {
+        const controller = new AbortController();
+        const notice = showFavoriteServiceNotice(['Microsoft'], 0, false, controller.signal);
+        noticeEvent(notice, 'mouseenter');
+        expect(notice.isConnected).toBe(true);
+        controller.abort();
+        expect(notice.isConnected).toBe(false);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('凭据错误转为普通通知时保留用户在正文的焦点，不把焦点移到关闭按钮', () => {
         const notice = showPageNotice('DeepSeek 需要 API Key，当前尚未配置', 'error', {key: 'operation'});
         const close = notice.querySelector<HTMLButtonElement>('.notice-close')!, focus = vi.spyOn(close, 'focus');

@@ -92,7 +92,7 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
                 || !choices.every(choice => typeof choice === 'string' && choice.length > 0 && choice.length <= 128)
                 || typeof selectedIndex !== 'number' || !Number.isInteger(selectedIndex)
                 || (choices.length > 0 ? selectedIndex < 0 || selectedIndex >= choices.length : selectedIndex !== -1)) return false;
-            showFavoriteServiceNotice(choices, selectedIndex, failed === true);
+            showFavoriteServiceNotice(choices, selectedIndex, failed === true, ctx.signal);
             sendResponse({status: 'success'});
             return true;
         }

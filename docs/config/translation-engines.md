@@ -30,7 +30,7 @@ outline: false
 
 点击目录只打开连接配置，不会更换默认服务。可以从扩展菜单的**翻译服务**或通用设置的**按功能选择服务**为各功能分配服务。**按功能选择服务**默认展开，点击标题即可收起。
 
-在桌面版 Chrome、Edge 或 Firefox，可以先收藏常用服务，再在浏览器的扩展快捷键设置中为 **Cycle favorite translation services** 指定按键。在网页上每按一次，就按收藏顺序切换默认服务，临时列表会标记当前项。下一次开启全文翻译时使用新服务，跟随默认服务的悬浮翻译也随之切换。
+在桌面版 Chrome、Edge 或 Firefox，可以先收藏常用服务，再在浏览器的扩展快捷键设置中为 **Cycle favorite translation services** 指定按键。在网页上每按一次，就按收藏顺序切换到下一个可用的默认服务，临时列表会标记当前项。组合翻译服务至少有一个可用成员才参与轮换。下一次开启全文翻译时使用新服务，跟随默认服务的悬浮翻译也随之切换。
 
 <figure class="doc-figure"><a href="/screenshots/ui/zh-CN/settings-services.webp" target="_blank" rel="noopener"><img class="doc-screenshot" src="/screenshots/ui/zh-CN/settings-services.webp" width="2560" height="1600" alt="流畅阅读翻译服务目录与连接配置" loading="lazy" /></a><figcaption>填写连接并检查成功后，再设为默认或分配给某项功能。</figcaption></figure>
 

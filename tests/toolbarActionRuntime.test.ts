@@ -60,6 +60,24 @@ describe('favorite translation service command (#1316)', () => {
         expect(commands()).toEqual([]);
     });
 
+    it.each([
+        {members: [], eligible: false},
+        {members: ['microsoft'], eligible: false},
+        {members: ['openai'], eligible: false},
+        {members: ['microsoft', 'openai', 'myMemory'], eligible: true},
+    ])('cycles a composite with members $members only when it has an eligible member', async ({members, eligible}) => {
+        const id = 'composite:fixture';
+        change({favoriteServices: ['freeTranslation', id], service: 'freeTranslation', display: 1,
+            disabledTranslationServices: ['microsoft'],
+            compositeTranslationProviders: [{id, name: 'Test composite', services: members, strategy: 'sequential', timeoutMs: 12000}]});
+        const {press, tab} = install();
+        press(tab);
+        await settle();
+        expect(env.patch.mock.calls).toEqual(eligible ? [[{service: id}]] : []);
+        expect(api.tabs.sendMessage.mock.calls.map(([, message]: any[]) => [message.selectedIndex, message.choices.length]))
+            .toEqual(eligible ? [[1, 2]] : [[0, 1]]);
+    });
+
     it('does not change config on disabled sites, invalidated documents, or with no eligible services', async () => {
         change({favoriteServices: ['google'], disabledTranslationServices: [], disabledExtensionDomains: ['example.com'], display: 0});
         const {press, tab} = install();

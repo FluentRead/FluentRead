@@ -182,7 +182,7 @@ function renderMarkdownPreview(
         }
         const paragraph = wrapped[wrappedIndex];
         if (paragraph?.part.bilingualGroup === index) {
-            const original = unwrapDocumentSoftLines(paragraph.raw);
+            const original = unwrapDocumentSoftLines(paragraph.raw, 'markdown');
             const translatedParagraph = mode !== 'source' && hasDistinctTranslation(paragraph.part.source, translations[paragraph.part.segmentIndex]);
             const translation = translatedParagraph ? translatedLines[index - translatedLineOffset] : undefined;
             output.push(pairedUnit(original, translation ?? original, mode, 'paragraph'));

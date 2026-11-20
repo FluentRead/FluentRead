@@ -32,6 +32,16 @@ describe('Markdown soft-wrapped paragraphs', () => {
             + second.join(ending) + '\n> 翻译正文时保留 `calculate_bounds()`。');
     });
 
+    it.each([['https://example.com/帮助', ' '], ['#翻译', '']])(
+        'keeps the CJK prose after %s outside the protected token', (token, separator) => {
+            const source = '请参阅 ' + token + '\r\n然后继续阅读。';
+            const document = parse(source);
+            expect(document.segments.map(segment => segment.source)).toEqual(['请参阅' + separator + '<g1/> 然后继续阅读。']);
+            expect(renderDocument(document, ['See' + separator + '<g1/> then continue reading.'], 'translated'))
+                .toBe('See ' + token + ' then continue reading.');
+            expect(createDocumentPreviewHtml(document, [], 'source')).toContain(token + ' 然后继续阅读。');
+        });
+
     it('preserves Markdown hard breaks and structural lines', () => {
         const source = 'A heading\ncontinued\n===\n\nFirst line  \nSecond line\\\nThird line\n\n'
             + '- One item\n- Another item\n\n> Quoted text\n> Next quote line\n\n'

@@ -623,10 +623,14 @@ const UNSPACED_WRAP_END = new RegExp(`${UNSPACED_SCRIPT.source}$`, 'u');
 const UNSPACED_WRAP_START = new RegExp(`^${UNSPACED_SCRIPT.source}`, 'u');
 const maxMarkdownParagraphLength = 3_500;
 
-/** 折行只在发给服务和阅读预览时展开，导出原文保留输入换行。 */
-export function unwrapDocumentSoftLines(source: string): string {
+/** 折行只在发给服务和阅读预览时展开，Markdown 受保护文本的末尾保留分隔，导出原文保留输入换行。 */
+export function unwrapDocumentSoftLines(source: string, format?: DocumentFormat): string {
+    const protectedEnds = format === 'markdown'
+        ? new Set(Array.from(source.matchAll(new RegExp(MARKDOWN_PROTECTED_PATTERN)), match => match.index + match[0].length))
+        : undefined;
     return source.replace(/(?<![^\S\r\n])[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) =>
-        UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset)) && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ');
+        !protectedEnds?.has(offset) && UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset))
+        && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ');
 }
 
 function isMarkdownSoftParagraphLine(line: string): boolean {
@@ -777,7 +781,7 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
                     unjoinedThrough = end;
                 } else if (end > lineIndex) {
                     const raw = content.slice(line.start, last.textEnd);
-                    addMarkdownSentence(parts, segments, unwrapDocumentSoftLines(raw), lineIndex, raw);
+                    addMarkdownSentence(parts, segments, unwrapDocumentSoftLines(raw, 'markdown'), lineIndex, raw);
                     addLiteral(parts, content.slice(last.textEnd, last.end));
                     joinedThrough = end;
                     paragraph = container;

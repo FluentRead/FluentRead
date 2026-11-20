@@ -1,7 +1,7 @@
 /**
  * @file src/features/information-highlight/content/runtime.ts
  * 文件职责：拥有单个阅读页面的信息高亮会话，协调只读分帧扫描、评分取消、文本缓存和原生 CSS Highlight 绘制。
- * 主要内容：按视口优先分帧扫描和绘制，滚动仅复用 Text 映射与原生 Range 端点都未变化的段落；按偏好命中可信点击的当前高亮范围；评分与选区按分析方式、模型和纯文本缓存，切换模型取消旧请求并重新评分；关闭或释放清理本实例的绘制、观察器和请求。
+ * 主要内容：按视口优先分帧扫描和绘制，滚动仅复用 Text 映射与原生 Range 端点都未变化的段落；按偏好命中可信点击的当前高亮片段并复核整词范围；评分与选区按分析方式、模型和纯文本缓存，切换模型取消旧请求并重新评分；关闭或释放清理本实例的绘制、观察器和请求。
  * 模块边界：不访问配置存储或扩展消息、不改变宿主原文、class 和布局；本地模型评分、翻译根及状态通知由应用组合根注入，无原生绘制支持时诚实返回 unsupported。
  */
 import type {InformationHighlightPreferences} from '@/src/core/config/informationHighlight';
@@ -10,14 +10,14 @@ import type {InformationHighlightResult, InformationHighlightSpan, InformationHi
 import {scoreInformationKeywords, selectInformationSpans} from '../domain/keywords';
 import {INFORMATION_HIGHLIGHT_LEVELS, INFORMATION_HIGHLIGHT_PALETTES, informationHighlightOpacity, presentInformationHeatmap} from '../domain/presentation';
 import {informationSliceEnd} from '../domain/textBoundaries';
-import {collectInformationParagraphs, informationRanges, isInformationParagraphCurrent, isInformationMutationExcluded, type InformationReadingScan, type InformationParagraph} from './readingText';
+import {collectInformationParagraphs, informationRangeFragments, isInformationParagraphCurrent, isInformationMutationExcluded, type InformationReadingScan, type InformationParagraph} from './readingText';
 export const INFORMATION_HIGHLIGHT_NAME = 'fluentread-information-highlight';
 type PaintWindow = Window & typeof globalThis & {Highlight?: new (...ranges: Range[]) => Set<Range>; CSS?: {highlights?: Map<string, Set<Range>>}};
 interface CachedParagraph {
     result: InformationHighlightResult;
     selections: Map<string, Array<InformationHighlightSpan & {level?: number}>>;
 }
-interface PaintedRange {paint: Set<Range>; range: Range; startContainer: Node; startOffset: number; endContainer: Node; endOffset: number}
+interface PaintedRange {paint: Set<Range>; range: Range; span: InformationHighlightSpan; startContainer: Node; startOffset: number; endContainer: Node; endOffset: number}
 interface PaintedParagraph {paragraph: InformationParagraph; signature: string; spans: number; ranges: PaintedRange[]}
 export interface InformationHighlightController {
     getState(): InformationHighlightState;
@@ -82,7 +82,16 @@ export function installInformationHighlight(document: Document, initial: Informa
                         && event.clientX >= rect.left && event.clientX < rect.right
                         && event.clientY >= rect.top && event.clientY < rect.bottom);
                     if (hit && isInformationParagraphCurrent(paragraph)) {
-                        ports.translateRange?.(entry.range);
+                        const fragments = ranges.filter(fragment => fragment.span === entry.span);
+                        const first = fragments[0]!, last = fragments.at(-1)!;
+                        if (!rangeIsCurrent(first) || !rangeIsCurrent(last)) return;
+                        const range = first === last ? first.range : document.createRange();
+                        if (first !== last) {
+                            range.setStart(first.startContainer, first.startOffset);
+                            range.setEnd(last.endContainer, last.endOffset);
+                        }
+                        // DOM Range 可能跨过扫描未纳入的节点，送翻前确认只包含已分析文字。
+                        if (range.toString() === paragraph.text.slice(entry.span.start, entry.span.end)) ports.translateRange?.(range);
                         return;
                     }
                 }
@@ -214,13 +223,7 @@ export function installInformationHighlight(document: Document, initial: Informa
                             : selectInformationSpans(paragraph.text, result.spans, preferences.density);
                         cached.selections.set(selection, spans);
                     }
-                    const groups = new Map<string, InformationHighlightSpan[]>();
-                    for (const span of spans) {
-                        const name = heat ? `${INFORMATION_HIGHLIGHT_NAME}-${span.level}` : INFORMATION_HIGHLIGHT_NAME, group = groups.get(name);
-                        if (group) group.push(span); else groups.set(name, [span]);
-                    }
-                    const ranges: Array<[string, Range]> = [];
-                    for (const [name, group] of groups) for (const range of informationRanges(document, paragraph, group)) ranges.push([name, range]);
+                    const ranges = informationRangeFragments(document, paragraph, spans);
                     // 清除起点落在本段正文内的旧绘制：既替换同一位置的旧段，也避免分段变化后新旧范围叠色。
                     for (const run of paragraph.runs) {
                         const entries = painted.get(run.node);
@@ -229,8 +232,12 @@ export function installInformationHighlight(document: Document, initial: Informa
                     if (paintedRanges + ranges.length > 4096) sweep();
                     if (paintedRanges + ranges.length > 4096) {active = -1; notify({phase: 'error', errorCode: 'INFORMATION_HIGHLIGHT_PAGE_LIMIT'}); return;}
                     const entry: PaintedParagraph = {paragraph, signature, spans: spans.length,
-                        ranges: ranges.map(([name, range]) => {const paint = bucket(name); paint.add(range); return {paint, range,
-                            startContainer: range.startContainer, startOffset: range.startOffset, endContainer: range.endContainer, endOffset: range.endOffset};})};
+                        ranges: ranges.map(({span, range}) => {
+                            const paint = bucket(heat ? `${INFORMATION_HIGHLIGHT_NAME}-${span.level}` : INFORMATION_HIGHLIGHT_NAME);
+                            paint.add(range);
+                            return {paint, span, range, startContainer: range.startContainer, startOffset: range.startOffset,
+                                endContainer: range.endContainer, endOffset: range.endOffset};
+                        })};
                     paintedRanges += ranges.length; seen.add(entry); touched = true;
                     let entries = painted.get(first.node);
                     if (!entries) {entries = new Map(); painted.set(first.node, entries);}

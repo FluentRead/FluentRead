@@ -9,7 +9,7 @@ import {parseHTML} from 'linkedom';
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {alignInformationWordSpans, scoreInformationKeywords, selectInformationSpans} from '@/src/features/information-highlight/domain/keywords';
 import {informationGraphemeBoundaries, informationSliceEnd} from '@/src/features/information-highlight/domain/textBoundaries';
-import {collectInformationParagraphs, informationRanges, isInformationParagraphCurrent} from '@/src/features/information-highlight/content/readingText';
+import {collectInformationParagraphs, informationRangeFragments, isInformationParagraphCurrent} from '@/src/features/information-highlight/content/readingText';
 import {installInformationHighlight, INFORMATION_HIGHLIGHT_NAME} from '@/src/features/information-highlight/public';
 import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES as defaultPreferences, normalizeInformationHighlightPreferences} from '@/src/core/config/informationHighlight';
 import {registerVisibleTranslationRoot, readVisibleTranslationRoot} from '@/src/features/full-page-translation/content/visibleTranslation';
@@ -53,7 +53,18 @@ function fixture(html = '<article><p id="paragraph">The extraordinary algorithm 
         setStart(n: Text, s: number) {node = n; start = s;}, setEnd(n: Text, e: number) {endNode = n; end = e;},
         get startContainer() {return node;}, get endContainer() {return endNode;},
         get startOffset() {return start;}, get endOffset() {return end;},
-        toString() {return node.data.slice(start, end);},
+        toString() {
+            if (node === endNode) return node.data.slice(start, end);
+            const walker = document.createTreeWalker(node.getRootNode(), 4); // NodeFilter.SHOW_TEXT
+            let next = walker.nextNode();
+            while (next && next !== node) next = walker.nextNode();
+            let text = node.data.slice(start);
+            for (next = walker.nextNode(); next; next = walker.nextNode()) {
+                if (next === endNode) return text + endNode.data.slice(0, end);
+                text += (next as Text).data;
+            }
+            return '';
+        },
         getBoundingClientRect() {const top = Number(node.parentElement!.getAttribute('data-text-top') ?? 20); return {top, bottom: top + 20};},
         getClientRects() {return [{left: start * 10, right: end * 10, top: 20, bottom: 40, width: (end - start) * 10, height: 20}];},
     } as unknown as Range;};
@@ -140,12 +151,12 @@ describe('read-only body collection and native mapping', () => {
         const before = f.document.body.innerHTML; const scan = collect(f);
         expect(scan.paragraphs.map(p => p.text)).toEqual(['A long inline linked paragraph for reading.', 'Second readable paragraph fragment.', '这是独立分析的译文段落，保留原文结构。']);
         const paragraph = scan.paragraphs[0];
-        expect(informationRanges(f.document, paragraph, [{start: 7, end: 32, score: 1}]).map(r => r.toString()).join('')).toBe(paragraph.text.slice(7, 32));
+        expect(informationRangeFragments(f.document, paragraph, [{start: 7, end: 32, score: 1}]).map(({range}) => range.toString()).join('')).toBe(paragraph.text.slice(7, 32));
         expect(f.document.body.innerHTML).toBe(before);
         expect(isInformationParagraphCurrent(paragraph)).toBe(true);
         paragraph.runs[0].node.replaceWith(paragraph.runs[0].node.cloneNode());
         expect(isInformationParagraphCurrent(paragraph)).toBe(false);
-        expect(informationRanges(f.document, paragraph, [{start: 0, end: 4, score: 1}])).toEqual([]);
+        expect(informationRangeFragments(f.document, paragraph, [{start: 0, end: 4, score: 1}])).toEqual([]);
     });
     it('streams long blocks completely across grapheme-safe chunks with bounded run arrays', () => {
         const text = 'A'.repeat(2399) + '👩‍💻' + 'B'.repeat(5300);
@@ -205,8 +216,8 @@ describe('read-only body collection and native mapping', () => {
         const original = f.document.querySelector('[data-fluentread-pdf-text]')!.innerHTML;
         const scan = collect(f), paragraph = scan.paragraphs.at(-1)!;
         expect(paragraph.text).toBe('Original PDF words ending');
-        expect(informationRanges(f.document, paragraph, [{start: 9, end: 18, score: 1}]).map(r => r.toString())).toEqual(['PDF', 'words']);
-        expect(informationRanges(f.document, paragraph, [{start: 2, end: 3, score: 1}]).map(r => r.toString())).toEqual(['i']);
+        expect(informationRangeFragments(f.document, paragraph, [{start: 9, end: 18, score: 1}]).map(({range}) => range.toString())).toEqual(['PDF', 'words']);
+        expect(informationRangeFragments(f.document, paragraph, [{start: 2, end: 3, score: 1}]).map(({range}) => range.toString())).toEqual(['i']);
         expect(f.document.querySelector('[data-fluentread-pdf-text]')!.innerHTML).toBe(original);
         const run = paragraph.runs[0]; run.node.data += ' changed'; expect(isInformationParagraphCurrent(paragraph)).toBe(false); run.node.data = run.data;
         f.document.querySelector('p')!.append(run.node); expect(isInformationParagraphCurrent(paragraph)).toBe(false);
@@ -217,7 +228,7 @@ describe('read-only body collection and native mapping', () => {
         const f = fixture('<p data-fluentread-pdf-lines><span style="display:block">Translated</span><span style="display:block">paragraphs</span><span style="display:block">保持可读的</span><span style="display:block">科学词汇，</span><span style="display:block">and stay whole.</span></p>');
         const before = f.document.body.innerHTML, paragraph = collect(f).paragraphs.at(-1)!;
         expect(paragraph.text).toBe('Translated paragraphs 保持可读的科学词汇， and stay whole.');
-        expect(informationRanges(f.document, paragraph, [{start: 11, end: 21, score: 1}]).map(r => r.toString())).toEqual(['paragraphs']);
+        expect(informationRangeFragments(f.document, paragraph, [{start: 11, end: 21, score: 1}]).map(({range}) => range.toString())).toEqual(['paragraphs']);
         expect(f.document.body.innerHTML).toBe(before);
     });
 });
@@ -253,6 +264,31 @@ describe('page-owned scoring, paint and cancellation', () => {
         controller.dispose();
         click();
         expect(translateRange).toHaveBeenCalledOnce();
+    });
+
+    it('translates the whole highlighted word from either inline fragment and rejects an intervening mutation', async () => {
+        const f = fixture('<article><p id="paragraph">The extra<em>ordinary</em> algorithm preserves original paragraphs.</p></article>');
+        const register = vi.spyOn(f.document, 'addEventListener');
+        const translateRange = vi.fn();
+        const controller = installInformationHighlight(f.document, {...defaults, clickToTranslate: true}, {scoreLocal: vi.fn(), translateRange});
+        controller.setEnabled(true);
+        await f.settle();
+        const paragraph = f.document.querySelector('#paragraph')!;
+        const inline = paragraph.querySelector('em')!;
+        const listener = register.mock.calls.find(([name]) => name === 'click')![1] as EventListener;
+        const click = (target: Element, clientX: number) => listener({
+            isTrusted: true, button: 0, detail: 1, clientX, clientY: 25, composedPath: () => [target],
+        } as unknown as Event);
+        click(paragraph, 50);
+        click(inline, 20);
+        expect(translateRange.mock.calls.map(([range]) => range.toString())).toEqual(['extraordinary', 'extraordinary']);
+        const hidden = f.document.createElement('span');
+        hidden.hidden = true;
+        hidden.textContent = 'unpainted';
+        inline.before(hidden);
+        click(inline, 20);
+        expect(translateRange).toHaveBeenCalledTimes(2);
+        controller.dispose();
     });
 
     it('redraws split paragraphs sharing one Text node without retaining ranges from another slice',async()=>{

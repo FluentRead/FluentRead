@@ -124,11 +124,16 @@ describe('内容脚本 runtime 消息协议', () => {
         const respond = vi.fn();
         const handler = createContentRuntimeMessageHandler(ctx, {isSiteDisabled: () => false, updateSiteDisabled: vi.fn()});
         vi.stubGlobal('browser', {runtime: {id: 'fluentread-fixture'}});
+        const sender = {id: 'fluentread-fixture'};
         const message = {type: 'defaultServiceShortcutNotice', choices: ['Microsoft'], selectedIndex: 0};
         expect(handler(message, {id: 'other-extension'}, respond)).toBe(false);
-        expect(handler(message, {id: 'fluentread-fixture'}, respond)).toBe(true);
-        expect(respond).toHaveBeenCalledExactlyOnceWith({status: 'success'});
-        expect(mocks.showFavoriteServiceNotice).toHaveBeenCalledExactlyOnceWith(['Microsoft'], 0, false, ctx.signal);
+        expect(handler({...message, choices: []}, sender, respond)).toBe(false);
+        expect(respond).not.toHaveBeenCalled();
+        expect(handler(message, sender, respond)).toBe(true);
+        expect(handler({...message, choices: [], selectedIndex: -1}, sender, respond)).toBe(true);
+        expect(respond.mock.calls).toEqual([[{status: 'success'}], [{status: 'success'}]]);
+        expect(mocks.showFavoriteServiceNotice).toHaveBeenNthCalledWith(1, ['Microsoft'], 0, false, ctx.signal);
+        expect(mocks.showFavoriteServiceNotice).toHaveBeenNthCalledWith(2, [], -1, false, ctx.signal);
     });
 
     it('状态查询与全文及恢复回执共享当前文档标识，不缓存上一个文档标识', async () => {

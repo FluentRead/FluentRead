@@ -9,11 +9,12 @@ import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {TRANSLATION_CANCEL_MESSAGE_TYPE} from '@/src/services/translation/types';
 import type { ContentScriptContext } from 'wxt/utils/content-script-context';
 import type { ShadowRootContentScriptUi } from 'wxt/utils/content-script-ui/shadow-root';
-import {services as translationServices, servicesType} from '@/src/core/config/catalog';
+import {defaultOption, options, services as translationServices, servicesType} from '@/src/core/config/catalog';
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {parseApiKeyRequirementKey} from '@/src/core/config/validation';
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
+import {normalizeLanguageCode} from '@/src/core/language/codes';
 import {clampToVisualViewport, getSafeVisualViewportRect} from '@/src/platform/dom/visualViewport';
 import {normalizeInputBoxTranslationOutputMode, type InputBoxTranslationOutputMode} from '@/src/core/config/inputTranslation';
 import {
@@ -630,7 +631,12 @@ export function createInputTranslationContentFeature(
         const clientRequestId = `${requestPrefix}:${requestId}`;
         const editGeneration = readEditGeneration(element);
         observedInputValues.set(element, inputSnapshot);
-        const targetLanguage = deps.config.inputBoxTranslationTarget;
+        let targetLanguage = deps.config.inputBoxTranslationTarget;
+        if (targetLanguage === 'auto') {
+            const pageLanguage = normalizeLanguageCode(rootDocument.documentElement?.lang);
+            targetLanguage = options.to.some(({value}) => value === pageLanguage)
+                ? pageLanguage : defaultOption.inputBoxTranslationTarget;
+        }
         const service = deps.config.inputBoxTranslationService || deps.config.service || translationServices.freeTranslation;
         const isAI = servicesType.isAI(service);
         const requestTimeoutMs = isAI ? normalizeAiRequestTimeoutMs(deps.config.aiRequestTimeoutMs) : INPUT_MACHINE_PROVIDER_TIMEOUT_MS;

@@ -55,6 +55,7 @@ function fixture(html = '<article><p id="paragraph">The extraordinary algorithm 
         get startOffset() {return start;}, get endOffset() {return end;},
         toString() {return node.data.slice(start, end);},
         getBoundingClientRect() {const top = Number(node.parentElement!.getAttribute('data-text-top') ?? 20); return {top, bottom: top + 20};},
+        getClientRects() {return [{left: start * 10, right: end * 10, top: 20, bottom: 40, width: (end - start) * 10, height: 20}];},
     } as unknown as Range;};
     const flush = async () => {const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(callback => callback(0)); for (let i = 0; i < 6; i++) await Promise.resolve();};
     // 1440ms 覆盖页面只改样式时放慢后的最长稳定窗口。
@@ -222,6 +223,38 @@ describe('read-only body collection and native mapping', () => {
 });
 
 describe('page-owned scoring, paint and cancellation', () => {
+    it('only opens an opted-in translation for a trusted click on a current painted word (#1374)', async () => {
+        const f = fixture('<article><p id="paragraph">The extraordinary algorithm preserves original paragraphs and <a href="/next">unusual vocabulary</a>.</p></article>');
+        const register = vi.spyOn(f.document, 'addEventListener');
+        const translateRange = vi.fn();
+        const controller = installInformationHighlight(f.document, defaults, {scoreLocal: vi.fn(), translateRange});
+        controller.setEnabled(true);
+        await f.settle();
+        const target = f.document.querySelector('#paragraph')!;
+        const click = (overrides: Record<string, unknown> = {}) => {
+            const listener = register.mock.calls.find(([name]) => name === 'click')?.[1] as EventListener | undefined;
+            const event = {isTrusted: true, button: 0, detail: 1, clientX: 50, clientY: 25, composedPath: () => [target],
+                preventDefault: vi.fn(), ...overrides};
+            listener?.(event as unknown as Event);
+            expect(event.preventDefault).not.toHaveBeenCalled();
+        };
+        click();
+        expect(translateRange).not.toHaveBeenCalled();
+        controller.updatePreferences({...defaults, clickToTranslate: true});
+        click({isTrusted: false});
+        click({clientY: 60});
+        click({composedPath: () => [target.querySelector('a')!, target]});
+        expect(translateRange).not.toHaveBeenCalled();
+        click();
+        expect(translateRange).toHaveBeenCalledOnce();
+        expect(translateRange.mock.calls[0][0].toString()).toBe('extraordinary');
+        (target.firstChild as Text).data = 'The extraordinary phrase changed just before the click. ';
+        click();
+        controller.dispose();
+        click();
+        expect(translateRange).toHaveBeenCalledOnce();
+    });
+
     it('redraws split paragraphs sharing one Text node without retaining ranges from another slice',async()=>{
         const text='Extraordinary scientific vocabulary preserves algorithmic information. '.repeat(80),f=fixture(`<p>${text}</p>`);
         const controller=installInformationHighlight(f.document,{...defaults,density:'low'},{scoreLocal:vi.fn()});controller.setEnabled(true);await f.settle();expect(controller.getState().processedParagraphs).toBeGreaterThan(1);

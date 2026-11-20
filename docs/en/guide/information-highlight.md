@@ -10,6 +10,8 @@ Mark words in the text to help you scan and revisit a page. Text stays selectabl
 2. Enable the shortcut, then press **Alt+H** (Option+H on Mac) on a webpage to turn highlighting on or off for that page. The shortcut is off by default and can be changed.
 3. To highlight all pages automatically, enable **Highlight every page automatically**. It applies to open pages and future visits; turn it off to clear the marks.
 
+Enable **Click highlighted words to translate** to open the selection translation card by clicking a highlighted word in a webpage. Keep selection translation enabled.
+
 When enabled only by the shortcut, highlighting turns off after a refresh or navigation and does not affect other pages. The FluentRead PDF reader follows the automatic-highlighting setting and also offers the **Smart Highlighting** toolbar button for the current document. Scanned pages without selectable text cannot be highlighted.
 
 ## Modes

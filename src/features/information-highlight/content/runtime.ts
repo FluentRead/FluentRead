@@ -1,7 +1,7 @@
 /**
  * @file src/features/information-highlight/content/runtime.ts
  * 文件职责：拥有单个阅读页面的信息高亮会话，协调只读分帧扫描、评分取消、文本缓存和原生 CSS Highlight 绘制。
- * 主要内容：按视口优先分帧扫描和绘制，滚动仅复用 Text 映射与原生 Range 端点都未变化的段落；评分与选区按分析方式、模型和纯文本缓存，切换模型取消旧请求并重新评分，迟到结果复验代次和 Text 身份；关闭或释放清理本实例的绘制、观察器和请求。
+ * 主要内容：按视口优先分帧扫描和绘制，滚动仅复用 Text 映射与原生 Range 端点都未变化的段落；按偏好命中可信点击的当前高亮范围；评分与选区按分析方式、模型和纯文本缓存，切换模型取消旧请求并重新评分；关闭或释放清理本实例的绘制、观察器和请求。
  * 模块边界：不访问配置存储或扩展消息、不改变宿主原文、class 和布局；本地模型评分、翻译根及状态通知由应用组合根注入，无原生绘制支持时诚实返回 unsupported。
  */
 import type {InformationHighlightPreferences} from '@/src/core/config/informationHighlight';
@@ -18,7 +18,7 @@ interface CachedParagraph {
     selections: Map<string, Array<InformationHighlightSpan & {level?: number}>>;
 }
 interface PaintedRange {paint: Set<Range>; range: Range; startContainer: Node; startOffset: number; endContainer: Node; endOffset: number}
-interface PaintedParagraph {text: string; signature: string; runs: InformationParagraph['runs']; spans: number; ranges: PaintedRange[]}
+interface PaintedParagraph {paragraph: InformationParagraph; signature: string; spans: number; ranges: PaintedRange[]}
 export interface InformationHighlightController {
     getState(): InformationHighlightState;
     setEnabled(enabled: boolean): InformationHighlightState;
@@ -29,6 +29,7 @@ export interface InformationHighlightController {
 }
 export interface InformationHighlightPorts {
     scoreLocal(text: string, signal: AbortSignal, modelId?: InformationHighlightModelId): Promise<InformationHighlightResult>;
+    translateRange?(range: Range): void;
     isCurrent?(): boolean;
     readTranslationRoot?(host: Element): ShadowRoot | undefined;
     changed?(state: InformationHighlightState): void;
@@ -62,6 +63,32 @@ export function installInformationHighlight(document: Document, initial: Informa
     let cachedCharacters = 0;
     let state: InformationHighlightState = {enabled: false, phase: 'idle', sessionId: '0', processedParagraphs: 0, queuedParagraphs: 0, highlightedSpans: 0, mode: preferences.mode};
     const current = () => !disposed && enabled && (ports.isCurrent?.() ?? true);
+    const rangeIsCurrent = ({range, startContainer, startOffset, endContainer, endOffset}: PaintedRange) =>
+        range.startContainer === startContainer && range.startOffset === startOffset
+        && range.endContainer === endContainer && range.endOffset === endOffset;
+    const translateClickedHighlight = (event: MouseEvent) => {
+        if (!current() || !preferences.clickToTranslate || !event.isTrusted || event.defaultPrevented
+            || event.button !== 0 || event.detail !== 1 || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey
+            || document.getSelection?.()?.isCollapsed === false) return;
+        const target = event.composedPath().find(node => node instanceof view.Element) as Element | undefined;
+        if (!target || target.closest('a, button, summary, input, textarea, select, [role="button"], [role="link"], [role="textbox"], [contenteditable]:not([contenteditable="false"]), [data-fluent-read-ui], [id^="fluent-read-"]')) return;
+        const root = target.getRootNode();
+        for (const entries of painted.values()) {
+            for (const {paragraph, ranges} of entries.values()) {
+                if (paragraph.root !== root) continue;
+                for (const entry of ranges) {
+                    if (!target.contains(entry.startContainer) || !rangeIsCurrent(entry)) continue;
+                    const hit = Array.from(entry.range.getClientRects()).some(rect => rect.width > 0 && rect.height > 0
+                        && event.clientX >= rect.left && event.clientX < rect.right
+                        && event.clientY >= rect.top && event.clientY < rect.bottom);
+                    if (hit && isInformationParagraphCurrent(paragraph)) {
+                        ports.translateRange?.(entry.range);
+                        return;
+                    }
+                }
+            }
+        }
+    };
     const snapshot = () => ({...state});
     const notify = (patch: Partial<InformationHighlightState>) => {
         const next = {...state, ...patch, enabled, mode: preferences.mode};
@@ -167,11 +194,10 @@ export function installInformationHighlight(document: Document, initial: Informa
             try {
                 let count: number;
                 // Text.data 同值重写也会移动 live Range 端点；正文相同不能单独证明旧绘制仍有效。
-                if (previous && previous.text === paragraph.text && previous.signature === signature && previous.runs.length === paragraph.runs.length
-                    && paragraph.runs.every((run, index) => {const before = previous.runs[index]; return run.node === before.node && run.data === before.data
+                if (previous && previous.paragraph.text === paragraph.text && previous.signature === signature && previous.paragraph.runs.length === paragraph.runs.length
+                    && paragraph.runs.every((run, index) => {const before = previous.paragraph.runs[index]; return run.node === before.node && run.data === before.data
                         && run.offset === before.offset && run.start === before.start && run.end === before.end;})
-                    && previous.ranges.every(({range, startContainer, startOffset, endContainer, endOffset}) => range.startContainer === startContainer
-                        && range.startOffset === startOffset && range.endContainer === endContainer && range.endOffset === endOffset)
+                    && previous.ranges.every(rangeIsCurrent)
                     && isInformationParagraphCurrent(paragraph)) {
                     seen.add(previous); count = previous.spans;
                 } else {
@@ -202,7 +228,7 @@ export function installInformationHighlight(document: Document, initial: Informa
                     }
                     if (paintedRanges + ranges.length > 4096) sweep();
                     if (paintedRanges + ranges.length > 4096) {active = -1; notify({phase: 'error', errorCode: 'INFORMATION_HIGHLIGHT_PAGE_LIMIT'}); return;}
-                    const entry: PaintedParagraph = {text: paragraph.text, signature, runs: paragraph.runs, spans: spans.length,
+                    const entry: PaintedParagraph = {paragraph, signature, spans: spans.length,
                         ranges: ranges.map(([name, range]) => {const paint = bucket(name); paint.add(range); return {paint, range,
                             startContainer: range.startContainer, startOffset: range.startOffset, endContainer: range.endContainer, endOffset: range.endOffset};})};
                     paintedRanges += ranges.length; seen.add(entry); touched = true;
@@ -271,6 +297,7 @@ export function installInformationHighlight(document: Document, initial: Informa
         for (const [name, paint] of paints) if (registry!.get(name) === paint) registry!.delete(name);
         paints.clear();
         document.removeEventListener('scroll', scroll, true); view.removeEventListener('resize', scroll);
+        document.removeEventListener('click', translateClickedHighlight);
         for (const event of ['fluentread-shadow-root-attached', 'fluentread-translation-started', 'fluentread-translation-ended']) document.removeEventListener(event, refresh);
     };
     return {
@@ -283,6 +310,7 @@ export function installInformationHighlight(document: Document, initial: Informa
             if (!supported) {notify({phase: 'unsupported', errorCode: 'INFORMATION_HIGHLIGHT_NATIVE_UNSUPPORTED'}); return snapshot();}
             observe(document);
             document.addEventListener('scroll', scroll, true); view.addEventListener('resize', scroll);
+            if (ports.translateRange) document.addEventListener('click', translateClickedHighlight);
             for (const event of ['fluentread-shadow-root-attached', 'fluentread-translation-started', 'fluentread-translation-ended']) document.addEventListener(event, refresh);
             // 用户刚按下开关：页面已稳定，不必再等稳定窗口。
             schedule(false, 0); return snapshot();

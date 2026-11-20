@@ -7,6 +7,7 @@
 export {
     mountSelectionTranslator,
     translateSelectionFromContextMenu,
+    translateSelectionFromRange,
     unmountSelectionTranslator,
 } from './content';
 export {

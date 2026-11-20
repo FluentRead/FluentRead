@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/preview.ts
  * 文件职责：把已解析文档与对应译文转换成安全、可阅读的预览 HTML，统一支持原文、双语和纯译文三种预览模式。
- * 主要内容：包含主动 HTML 剥离、统一提供 HTML5 doctype 的阅读器外壳、无原文占位符的行内 Markdown 渲染、按解析器代码块元数据展示容器围栏、宽窗口下原文与译文左右对照并在翻译进行中为尚无译文的单元显示等待占位的原译配对单元，以及 HTML、Markdown 和普通文本的预览分派，按所需格式生成内容，避免构建未使用的整份导出字符串；相同译文保留原文且不重复展示。
+ * 主要内容：包含主动 HTML 剥离、HTML5 阅读器外壳、无原文占位符的 Markdown 渲染、围栏代码块及连续折行段落对齐，以及 HTML、Markdown 和纯文本的原译配对；相同译文保留原文且不重复展示。
  * 模块边界：本模块只生成展示字符串，不操作真实 DOM、不执行脚本也不修改文档模型；源文件解析由 document.ts 完成，二进制分页预览由 pdfPreview.ts 负责，页面样式由上层 UI 提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -9,6 +9,7 @@ import {
     inspectMarkdownLine,
     parseDocument,
     renderDocument,
+    unwrapDocumentSoftLines,
     type DocumentRenderMode,
     type ParsedDocument,
 } from '@/src/features/document-translation/core/document';
@@ -155,19 +156,40 @@ function pairedUnit(
     return `<section class="reader-unit ${kind}" data-reader-unit>${body}</section>`;
 }
 
-function renderMarkdownPreview(document: ParsedDocument, source: string, translated: string, mode: DocumentPreviewMode): string {
+function renderMarkdownPreview(
+    document: ParsedDocument, source: string, translated: string, translations: readonly string[], mode: DocumentPreviewMode,
+): string {
     const sourceLines = source.replace(/\r\n?/gu, '\n').split('\n');
     const translatedLines = translated.replace(/\r\n?/gu, '\n').split('\n');
     const output: string[] = [];
     // 正常模型复用解析时的结果；外部构造的旧模型也通过同一解析器补齐，不另设围栏状态机。
     const codeBlocks = document.markdownCodeBlocks ?? parseDocument('preview.md', source).markdownCodeBlocks!;
+    const wrapped = document.parts.flatMap(part => {
+        if (part.kind !== 'segment' || part.bilingualGroup === undefined || !part.rawSource) return [];
+        const wraps = part.rawSource.match(/\r\n?|\n/gu)?.length ?? 0;
+        return wraps ? [{part, raw: part.rawSource, wraps}] : [];
+    });
     let codeBlockIndex = 0;
+    let wrappedIndex = 0;
+    let translatedLineOffset = 0;
     for (let index = 0; index < sourceLines.length; index += 1) {
         const block = codeBlocks[codeBlockIndex];
         if (block?.startLine === index) {
             output.push(`<pre data-reader-unit><code>${escapeHtml(block.contentLines.join('\n'))}</code></pre>`);
             index = block.endLine - 1;
             codeBlockIndex += 1;
+            continue;
+        }
+        const paragraph = wrapped[wrappedIndex];
+        if (paragraph?.part.bilingualGroup === index) {
+            const original = unwrapDocumentSoftLines(paragraph.raw);
+            const translatedParagraph = mode !== 'source' && hasDistinctTranslation(paragraph.part.source, translations[paragraph.part.segmentIndex]);
+            const translation = translatedParagraph ? translatedLines[index - translatedLineOffset] : undefined;
+            output.push(pairedUnit(original, translation ?? original, mode, 'paragraph'));
+            // 已翻译段落收为一行，待翻译和原样返回的段落仍保留源行数。
+            if (translatedParagraph) translatedLineOffset += paragraph.wraps;
+            index += paragraph.wraps;
+            wrappedIndex += 1;
             continue;
         }
         const sourceLine = sourceLines[index];
@@ -185,7 +207,7 @@ function renderMarkdownPreview(document: ParsedDocument, source: string, transla
                 : info.quoteDepth > 0
                     ? 'quote'
                     : 'paragraph';
-        output.push(pairedUnit(sourceLine, translatedLines[index] || sourceLine, mode, kind, heading?.[1].length || 2));
+        output.push(pairedUnit(sourceLine, translatedLines[index - translatedLineOffset] || sourceLine, mode, kind, heading?.[1].length || 2));
     }
     return readerShell(`<article class="markdown-article" data-reader-mode="${mode}">${output.join('')}</article>`);
 }
@@ -223,7 +245,7 @@ export function createDocumentPreviewHtml(
     if (document.format === 'markdown') {
         const source = renderDocument(document, [], 'translated');
         const translated = mode === 'source' ? source : renderDocument(document, previewTranslations, 'translated');
-        return renderMarkdownPreview(document, source, translated, mode);
+        return renderMarkdownPreview(document, source, translated, previewTranslations, mode);
     }
     if (document.format === 'txt') {
         return renderTextPreview(

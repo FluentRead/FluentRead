@@ -9,11 +9,15 @@ import {DOUBAO_SEED_TRANSLATION_MODEL_ID} from '@/src/core/config/doubaoSeedTran
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
 import {resolveTranslationLanguages} from '@/src/core/translation/languages';
 import {buildPageSummaryPrompt, buildPageSummarySystemPrompt} from '@/src/core/translation/prompts';
+import {serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
+import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
 import {translateWithOpenAICompatibleAiSdk, type AiSdkTranslationRequest} from '@/src/providers/translation/ai-sdk/openai-compatible';
 import {resolveOpenAICompatibleEndpoint} from '@/src/providers/translation/ai-sdk/endpoints';
 import doubao from '@/src/providers/translation/doubao';
+import gemini from '@/src/providers/translation/gemini';
 import {setRuntimeFetch} from '@/src/platform/http/runtime';
 import {createTranslationBroker} from '@/src/services/translation/broker';
+import {parseCompactBatch} from '@/src/services/translation/compactBatch';
 import type {TranslationConfigSource, TranslationRequestMessage} from '@/src/services/translation/types';
 import {attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
 
@@ -44,6 +48,7 @@ function brokerFor(current: ReturnType<typeof configFor>) {
     providers: {
       [services.custom]: message => translateWithOpenAICompatibleAiSdk(message as unknown as AiSdkTranslationRequest),
       [services.doubao]: message => doubao(message as unknown as Parameters<typeof doubao>[0]),
+      [services.gemini]: message => gemini(message as Parameters<typeof gemini>[0]),
     },
     cache: {get: async () => null, set: async () => true, clear: async () => undefined, cleanup: async () => undefined},
     serviceTypes: servicesType,
@@ -64,11 +69,21 @@ function deferred<T>() {
   return {promise, resolve};
 }
 
-function success(text = '有效中文译文') {
+function success(text = '有效中文译文', finishReason = 'stop') {
   return new Response(JSON.stringify({
-    choices: [{message: {role: 'assistant', content: text}, finish_reason: 'stop'}],
+    choices: [{message: {role: 'assistant', content: text}, finish_reason: finishReason}],
     model: 'audit-model', usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
   }), {status: 200, headers: {'content-type': 'application/json'}});
+}
+
+function quotaFailure(retryAfter?: string) {
+  return new Response(JSON.stringify({error: {message: 'Synthetic quota limit'}}), {
+    status: 429, headers: {'content-type': 'application/json', ...(retryAfter ? {'retry-after': retryAfter} : {})},
+  });
+}
+
+function readRequestBody(init: RequestInit | undefined) {
+  return JSON.parse(String(init?.body)) as {messages: Array<{role: string; content: string}>; response_format?: unknown};
 }
 
 function failure() {
@@ -93,6 +108,117 @@ afterEach(() => {
 });
 
 describe('PR #906 actual SDK settlement and effective pending policy', () => {
+  const paragraphs = ['The first paragraph explains the test conditions.', 'The second explains where to view the results.'];
+  const translations = ['第一段介绍测试条件。', '第二段说明在哪里查看结果。'];
+  const markerResponse = (sources: string[]) => {
+    const packet = serializeTranslationSlots(sources);
+    return success(translations.map((text, index) => `${packet.starts[index]}${text}${packet.ends[index]}`).join('\n'));
+  };
+  const compactResponse = () => success(JSON.stringify(translations.map((text, index) => [index, text])));
+
+  it('rejects non-text replies and non-pair JSON elements at the protocol boundary', () => {
+    for (const invalid of [[[0, '甲']], '[null]', '{"translation":"甲"}']) {
+      expect(() => parseCompactBatch(invalid, 1)).toThrow(expect.objectContaining({code: 'COMPACT_BATCH_RESPONSE_INVALID'}));
+    }
+  });
+
+  it('sends the protected strings as compact JSON and preserves literal tags within the translated strings', async () => {
+    const current = {...configFor(), system_role: {}, user_role: {},
+      privacyProtection: normalizePrivacyPolicy({enabled: true, mode: 'mask', categories: ['email']})};
+    const address = 'reader@example.invalid';
+    const origin = [`Contact "${address}" for details.\nKeep the tag <think>example</think> literal.`, paragraphs[1]!];
+    const requests: ReturnType<typeof readRequestBody>[] = [];
+    setRuntimeFetch(async (_, init) => {
+      const body = readRequestBody(init);
+      requests.push(body);
+      const prompt = body.messages.at(-1)!.content;
+      const input = JSON.parse(prompt.slice(prompt.lastIndexOf('\n\n') + 2)) as string[];
+      expect(input).toEqual([expect.stringContaining('<think>example</think>'), origin[1]]);
+      expect(JSON.stringify(body)).not.toContain(address);
+      expect(body.response_format).toBeUndefined();
+      const token = input[0]!.match(/__FRP_[a-z0-9_]+__/iu)?.[0];
+      expect(token).toBeDefined();
+      return success('<think>scratch</think>\n```json\n' + JSON.stringify([
+        [0, `详情请联系 "${token}"。\n保留字面标记 <think>示例</think>。`], [1, translations[1]],
+      ]) + '\n```');
+    });
+    await expect(brokerFor(current).translateWithCache({origin, aiMultiSegment: true})).resolves.toEqual([
+      `详情请联系 "${address}"。\n保留字面标记 <think>示例</think>。`, translations[1],
+    ]);
+    expect(requests).toHaveLength(1);
+  });
+
+  it.each([
+    '[[0,"翻译"]]', '[[1,"错序"],[0,"错序"]]', '[[0,"重复"],[0,"重复"]]',
+    '[[0,"多余",true],[1,"翻译"]]', '[[0,"中文"],[1,null]]', '[[0,"截断"]',
+    'Here is the translation. [[0,"甲"],[1,"乙"]]',
+  ])('falls back once, remembers the format failure, and probes again after five minutes: %s', async malformed => {
+    const current = {...configFor(), system_role: {}, user_role: {}};
+    const fetchFixture = vi.fn()
+      .mockResolvedValueOnce(success(malformed))
+      .mockResolvedValueOnce(markerResponse(paragraphs))
+      .mockResolvedValueOnce(markerResponse(paragraphs))
+      .mockImplementationOnce(async () => compactResponse());
+    setRuntimeFetch(fetchFixture);
+    const broker = brokerFor(current);
+    const request = () => broker.translateWithCache({origin: paragraphs, aiMultiSegment: true});
+    await expect(request()).resolves.toEqual(translations);
+    await expect(request()).resolves.toEqual(translations);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await expect(request()).resolves.toEqual(translations);
+    const prompts = fetchFixture.mock.calls.map(([, init]) => readRequestBody(init).messages.at(-1)!.content);
+    expect(prompts.map(prompt => prompt.includes('___FLUENTREAD_'))).toEqual([false, true, true, false]);
+  });
+
+  it.each(['custom prompt', 'advanced request body'])('retains legacy slots for %s', async mode => {
+    const current = mode === 'custom prompt' ? configFor() : {...configFor(),
+      system_role: {}, user_role: {}, customBody: {[services.custom]: '{"temperature":0.1}'}};
+    const fetchFixture = vi.fn(async () => markerResponse(paragraphs));
+    setRuntimeFetch(fetchFixture);
+    await expect(brokerFor(current).translateWithCache({origin: paragraphs, aiMultiSegment: true})).resolves.toEqual(translations);
+    expect(fetchFixture).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an explicitly truncated compact response even if the returned JSON parses', async () => {
+    const current = {...configFor(), system_role: {}, user_role: {}};
+    const fetchFixture = vi.fn(async () => success(JSON.stringify(translations.map((text, index) => [index, text])), 'length'));
+    setRuntimeFetch(fetchFixture);
+    await expect(brokerFor(current).translateWithCache({origin: paragraphs, aiMultiSegment: true}))
+      .rejects.toMatchObject({code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID', retryable: false});
+    expect(fetchFixture).toHaveBeenCalledOnce();
+  });
+
+  it('returns the actual long cooldown without waiting out a short request budget or resending the batch', async () => {
+    const current = {...configFor(), translationMaxRetries: 2, system_role: {}, user_role: {}};
+    const fetchFixture = vi.fn(async () => quotaFailure('15'));
+    setRuntimeFetch(fetchFixture);
+    const broker = brokerFor(current);
+    const request = () => broker.translateWithCache({origin: paragraphs, aiMultiSegment: true, requestTimeoutMs: 5_000}).catch(error => error);
+    const first = request();
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(first).resolves.toMatchObject({kind: 'rate-limit', statusCode: 429, retryAfterMs: 15_000});
+    const second = request();
+    await vi.advanceTimersByTimeAsync(0);
+    await expect(second).resolves.toMatchObject({kind: 'rate-limit', statusCode: 429, retryAfterMs: 15_000});
+    expect(fetchFixture).toHaveBeenCalledOnce();
+  });
+
+  it('shares the Gemini 503 cooldown with later requests and leaves another model available', async () => {
+    const fetchFixture = vi.fn()
+      .mockResolvedValueOnce(new Response('{}', {status: 503, headers: {'retry-after-ms': '7500'}}))
+      .mockImplementation(async () => new Response(JSON.stringify({
+        candidates: [{content: {parts: [{text: '这是可用模型返回的中文译文。'}]}}],
+      })));
+    setRuntimeFetch(fetchFixture);
+    const broker = brokerFor(configFor(services.gemini));
+    const request = {origin: paragraphs[0]!, requestTimeoutMs: 5_000};
+    await expect(broker.translateWithCache(request)).rejects.toMatchObject({statusCode: 503, retryAfterMs: 7_500});
+    await expect(broker.translateWithCache(request)).rejects.toMatchObject({kind: 'provider', statusCode: 503, retryAfterMs: 7_500});
+    expect(fetchFixture).toHaveBeenCalledOnce();
+    await expect(broker.translateWithCache({...request, modelOverride: 'another-model'})).resolves.toBe('这是可用模型返回的中文译文。');
+    expect(fetchFixture).toHaveBeenCalledTimes(2);
+  });
+
   it.each(['private-context', 'another-key'] as const)(
     'a 429 cools the frozen quota while %s can use the free transport slot', async isolation => {
       const current = configFor();

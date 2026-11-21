@@ -73,7 +73,7 @@ import {
   createTranslationRequestRegistry,
   type TranslationRequestContext,
 } from '@/src/app/background/handlers/translation';
-import {clearTranslationQueue} from '@/src/services/translation/queue';
+import {cancelTranslationQueueSession, clearTranslationQueue, createTranslationQueueSession} from '@/src/services/translation/queue';
 import {getTranslationRequestControl} from '@/src/services/translation/requestSnapshot';
 
 const originalDocument = globalThis.document;
@@ -670,6 +670,70 @@ describe('translation API request lifecycle performance', () => {
     expect(mocks.sendMessage).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(1);
     await expect(request).resolves.toBe('Retry-After 后的译文');
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(['single', 'batch', 'video'] as const)('%s 退避释放客户端并发槽，并从原始预算扣除等待', async kind => {
+    mocks.config.maxConcurrentTranslations = 1;
+    const result = kind === 'batch' ? ['恢复译文'] : '恢复译文';
+    mocks.sendMessage.mockResolvedValueOnce({
+      marker: 'fluentread-translation-error-v1', message: '暂时限流',
+      kind: 'rate-limit', statusCode: 429, retryable: true, retryAfterMs: 5_000,
+    }).mockResolvedValueOnce('其他服务译文').mockResolvedValueOnce(result);
+    const request = kind === 'single' ? translateText('Cooling source', 'Page')
+      : kind === 'batch' ? translateTextBatch(['Cooling source'], 'Page') : translateVideoText('Cooling source');
+    await flushMicrotasks(30);
+    await expect(translateText('Healthy source', 'Page', {serviceOverride: 'other'})).resolves.toBe('其他服务译文');
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(request).resolves.toEqual(result);
+    expect(mocks.sendMessage.mock.calls[2][0].requestTimeoutMs)
+      .toBe(mocks.sendMessage.mock.calls[0][0].requestTimeoutMs - 5_000);
+  });
+
+  it.each(['signal', 'session', 'clear'] as const)('%s cancels a sleeping retry immediately', async mode => {
+    const controller = new AbortController();
+    const session = mode === 'session' ? createTranslationQueueSession() : undefined;
+    mocks.sendMessage.mockRejectedValueOnce(new Error('temporary failure'));
+    const request = translateText('Cooling source', 'Page', {
+      ...(mode === 'signal' ? {signal: controller.signal} : {}), queueSession: session,
+    }).catch(error => error);
+    await flushMicrotasks(30);
+    expect(mocks.sendMessage).toHaveBeenCalledOnce();
+    if (session) cancelTranslationQueueSession(session);
+    else if (mode === 'signal') controller.abort();
+    else clearTranslationQueue();
+    await expect(request).resolves.toMatchObject({name: mode === 'signal' ? 'AbortError' : 'TranslationQueueCancelledError'});
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(mocks.sendMessage).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('returns the original structured rate-limit error immediately when waiting would exceed the budget', async () => {
+    mocks.sendMessage.mockResolvedValue({
+      marker: 'fluentread-translation-error-v1', message: '暂时限流',
+      kind: 'rate-limit', statusCode: 429, retryable: true, retryAfterMs: 30_000,
+    });
+    await expect(translateText('Cooling source', 'Page', {timeout: 5_000}))
+      .rejects.toMatchObject({kind: 'rate-limit', retryAfterMs: 30_000});
+    expect(mocks.sendMessage).toHaveBeenCalledOnce();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('expires a retry waiting on concurrency without sending after the original deadline', async () => {
+    mocks.config.maxConcurrentTranslations = 1;
+    const busy = deferred<string>();
+    const failure = new Error('temporary failure');
+    mocks.sendMessage.mockRejectedValueOnce(failure).mockReturnValueOnce(busy.promise);
+    const retry = translateText('Cooling source', 'Page', {timeout: 5_000}).catch(error => error);
+    await flushMicrotasks(30);
+    const other = translateText('Other source', 'Page', {timeout: 8_000});
+    await vi.advanceTimersByTimeAsync(3_000);
+    await expect(retry).resolves.toBe(failure);
+    busy.resolve('其他译文');
+    await expect(other).resolves.toBe('其他译文');
     expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
   });
 

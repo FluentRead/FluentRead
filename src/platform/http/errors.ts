@@ -14,20 +14,26 @@ import {abortErrorFromSignal, cancelResponseReader} from './runtime';
 const MAX_PROVIDER_CODE_LENGTH = 16;
 const MAX_IMAGE_ERROR_BYTES = 32_768;
 const IMAGE_ERROR_READ_TIMEOUT_MS = 1000;
+const MAX_RETRY_AFTER_MS = 7 * 86_400_000;
+
+/** 兼容相对毫秒、相对秒数及 HTTP 日期，拒绝会被 Date.parse 当作日期的畸形数字。 */
+export function readRetryAfterMs(headers: Pick<Headers, 'get'>, now = Date.now()): number | undefined {
+    const milliseconds = headers.get('retry-after-ms')?.trim() ?? '';
+    if (/^\d+(?:\.\d+)?$/u.test(milliseconds) && Number.isFinite(Number(milliseconds))) {
+        return Math.min(Number(milliseconds), MAX_RETRY_AFTER_MS);
+    }
+    const value = headers.get('retry-after')?.trim() ?? '';
+    const duration = /^\d+(?:\.\d+)?$/u.test(value) ? Number(value) * 1000
+        : /[A-Za-z]{3}/u.test(value) ? Math.max(0, Date.parse(value) - now) : NaN;
+    return Number.isFinite(duration) ? Math.min(duration, MAX_RETRY_AFTER_MS) : undefined;
+}
 
 /**
  * 构造不回显第三方响应正文的 HTTP 错误。
  * 正文可能包含原文、译文、provider 诊断或代理回显的凭据，因此只暴露协议状态码。
  */
 export function createHttpStatusError(response: HttpStatus, label = '请求失败'): Error {
-    const retryAfter = response.headers?.get('Retry-After');
-    let retryAfterMs: number | undefined;
-    if (retryAfter?.trim()) {
-        const value = retryAfter.trim();
-        const duration = /^\d+(?:\.\d+)?$/u.test(value)
-            ? Number(value) * 1000 : Date.parse(value) - Date.now();
-        if (Number.isFinite(duration) && duration > 0) retryAfterMs = Math.min(duration, 7 * 86_400_000);
-    }
+    const retryAfterMs = response.headers && readRetryAfterMs(response.headers);
     return Object.assign(new Error(`${label}: ${response.status}`), {
         statusCode: response.status,
         ...(retryAfterMs === undefined ? {} : {retryAfterMs}),

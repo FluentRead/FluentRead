@@ -9,7 +9,7 @@
 
 import {stripTranslationReasoning as contentPostHandler} from '@/src/core/translation/prompts';
 import {normalizeChatCompletionRequest} from './chatCompletionRequest';
-import {commonMsgTemplate} from '@/src/services/translation/templates';
+import {buildOpenAIChatPayload} from '@/src/services/translation/templates';
 import {services} from '@/src/core/config/catalog';
 import {isCustomOpenAIProviderId} from '@/src/core/config/customOpenAI';
 import {parseCustomHeaders, mergeCustomHeaders} from '@/src/core/config/customHeaders';
@@ -22,7 +22,8 @@ import {LlmTransportError} from './transport-errors';
 import {createImageInputHttpError} from '@/src/platform/http/errors';
 import {cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {boundErrorResponse, OPENAI_ERROR_BODY_LIMIT} from './boundedErrorResponse';
-import type {TranslationRequestLease} from '@/src/services/translation/requestScheduler';
+import {TranslationRequestCooldownError, type TranslationRequestLease} from '@/src/services/translation/requestScheduler';
+import {TRANSLATION_COMPACT_BATCH} from '@/src/services/translation/types';
 import {
     requireTranslationProviderConfig,
     getTranslationRequestScheduler,
@@ -57,25 +58,7 @@ interface OpenAICompatiblePayload extends Record<string, unknown> {
   messages: unknown[];
 }
 
-function parsePayload(body: string): OpenAICompatiblePayload {
-  let payload: unknown;
-  try {
-    payload = JSON.parse(body);
-  } catch {
-    throw new LlmTransportError('大模型请求体生成失败，请检查自定义请求体配置。', {
-      kind: 'bad-request',
-      retryable: false,
-    });
-  }
-
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new LlmTransportError('大模型请求体必须是 JSON 对象。', {
-      kind: 'bad-request',
-      retryable: false,
-    });
-  }
-
-  const candidate = payload as Record<string, unknown>;
+function validatePayload(candidate: Record<string, unknown>): OpenAICompatiblePayload {
   if (typeof candidate.model !== 'string' || !candidate.model.trim()) {
     throw new LlmTransportError('模型尚未配置，请前往设置页面进行检查。', {
       kind: 'bad-request',
@@ -109,7 +92,7 @@ function providerHeaders(service: string, apiKey: string): Record<string, string
 interface OpenAICompatibleResponseBody {
   model?: unknown;
   usage?: unknown;
-  choices?: Array<{message?: {content?: unknown}; finish_reason?: unknown}>;
+  choices?: Array<{message?: {content?: unknown; refusal?: unknown}; finish_reason?: unknown}>;
 }
 
 function nonNegativeToken(value: unknown): number | undefined {
@@ -197,15 +180,21 @@ function compatibilityFetch(
   endpoint: ResolvedOpenAICompatibleEndpoint,
   request: AiSdkTranslationRequest,
   requestedModel: string,
+  compactBatch: boolean,
 ) {
   return async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-    const startedAt = Date.now();
-    let result: {response: Response; normalized: Awaited<ReturnType<typeof normalizeSuccessfulTextResponse>>};
+    let startedAt: number | undefined;
+    let result: {
+      response: Response;
+      normalized: Awaited<ReturnType<typeof normalizeSuccessfulTextResponse>>;
+      cooldownError?: TranslationRequestCooldownError | void;
+    };
     try {
       const schedulerContext = getTranslationRequestScheduler(request);
       const identity = {...schedulerContext?.identity,
         service: request.serviceOverride || schedulerContext?.identity?.service, model: requestedModel};
       const fetchAttempt = (attemptLease?: TranslationRequestLease) => {
+        startedAt = Date.now();
         // 使用独立的传输 signal：错误正文超限时可终止真实 fetch，且不把这次局部
         // 终止误当作调用方取消（原始 signal 仍负责调度和错误归属）。
         const callerSignal = init?.signal ?? (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
@@ -218,7 +207,9 @@ function compatibilityFetch(
           const upstream = await runtimeFetch(endpoint.exactEndpoint || input, {...init, signal: transport.signal}, {
             errorBodyLimit: OPENAI_ERROR_BODY_LIMIT,
           });
-          schedulerContext?.scheduler.observeResponse(identity, upstream);
+          const cooldownError = schedulerContext?.scheduler.observeResponse(
+            identity, upstream, attemptLease ?? schedulerContext.lease, schedulerContext.deadlineAt,
+          );
           let response = upstream;
           if (!response.ok) {
             const bounded = boundErrorResponse(response, callerSignal ?? undefined, () => transport.abort());
@@ -226,7 +217,7 @@ function compatibilityFetch(
             response = await bounded.result;
           }
           const normalized = await normalizeSuccessfulTextResponse(response);
-          return {response, normalized};
+          return {response, normalized, cooldownError};
         })();
         // 给调用方返回有界错误不代表不合作的底层传输已结束；同时持有真实
         // attempt 与旧外层槽直到原 reader 的 EOF/异常，不由超时提前释放槽位。
@@ -243,11 +234,12 @@ function compatibilityFetch(
         ? await schedulerContext.scheduler.scheduleAttempt(fetchAttempt, {
             signal: init?.signal ?? undefined,
             identity,
+            deadlineAt: schedulerContext.deadlineAt,
             countConcurrency: Boolean(schedulerContext.identity?.quotaScope),
           })
         : await fetchAttempt();
     } catch (error) {
-      reportTranslationModelUsage(request, {
+      if (startedAt !== undefined) reportTranslationModelUsage(request, {
         startedAt,
         durationMs: Math.max(0, Date.now() - startedAt),
         actualModel: requestedModel,
@@ -257,15 +249,32 @@ function compatibilityFetch(
       throw error;
     }
 
-    const {response, normalized} = result;
+    const {response, normalized, cooldownError} = result;
+    const observedStart = startedAt ?? Date.now();
+    const choice = normalized.body?.choices?.[0];
+    const outputLimited = compactBatch && choice?.finish_reason === 'length';
+    const outputUnavailable = compactBatch && (choice?.finish_reason === 'content_filter'
+      || choice?.finish_reason === 'tool_calls' || choice?.finish_reason === 'function_call'
+      || (typeof choice?.message?.refusal === 'string' && Boolean(choice.message.refusal.trim())));
     const usage = normalizeOpenAICompatibleUsage(normalized.body?.usage, normalized.body?.model ?? requestedModel);
     reportTranslationModelUsage(request, {
       ...usage,
-      startedAt,
-      durationMs: Math.max(0, Date.now() - startedAt),
-      outcome: response.status === 408 ? 'timeout' : response.ok ? 'success' : 'error',
+      startedAt: observedStart,
+      durationMs: Math.max(0, Date.now() - observedStart),
+      outcome: response.status === 408 ? 'timeout' : response.ok && !outputLimited && !outputUnavailable ? 'success' : 'error',
       statusCode: response.status,
     });
+    if (cooldownError) {
+      cancelUnreadResponseBody(response);
+      throw cooldownError;
+    }
+    if (outputLimited || outputUnavailable) {
+      cancelUnreadResponseBody(normalized.response);
+      throw new LlmTransportError(outputLimited ? 'AI 批量译文被截断' : '当前翻译服务未返回可用的译文', {
+        kind: 'response', retryable: false,
+        ...(outputLimited ? {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'} : {}),
+      });
+    }
     if (!response.ok && getTranslationImageInput(request)) {
       const error = await createImageInputHttpError(response);
       if ((error as {imageInputUnsupported?: boolean}).imageInputUnsupported) {
@@ -328,13 +337,18 @@ async function runPreparedRequest(
   service: string,
   secrets: readonly string[],
   callerAborted: () => boolean,
+  compactBatch: boolean,
 ): Promise<string> {
   try {
-    const text = contentPostHandler(await execution.run(call) || '');
+    const raw = await execution.run(call) || '';
+    // JSON 字符串内可能包含字面 <think>，由批次解析器仅移除外层推理。
+    if (compactBatch) return raw;
+    const text = contentPostHandler(raw);
     if (!text) throw new LlmTransportError('翻译服务已响应，但没有返回有效译文。', {kind: 'response', retryable: false});
     return text;
   } catch (error) {
-    throw error instanceof LlmTransportError || (error as {imageInputUnsupported?: boolean})?.imageInputUnsupported
+    throw error instanceof LlmTransportError || error instanceof TranslationRequestCooldownError
+      || (error as {imageInputUnsupported?: boolean})?.imageInputUnsupported
       ? error : execution.normalizeError(service, error, secrets, callerAborted());
   }
 }
@@ -360,7 +374,8 @@ async function translateSingle(
     kind: 'bad-request', retryable: false,
   });
   const apiKey = current.token[service]?.trim() || '';
-  const payload = parsePayload(commonMsgTemplate({
+  const imageInput = getTranslationImageInput(request);
+  const body = buildOpenAIChatPayload({
       origin,
       context: request.pageContext,
       subtitleContext: request.subtitleContext,
@@ -371,9 +386,11 @@ async function translateSingle(
       modelOverride: request.modelOverride,
       current,
       thinkingOverride: request.thinkingOverride,
-      imageInput: getTranslationImageInput(request),
-  }
-  ));
+      imageInput,
+  });
+  // 默认请求直接交给 transport 序列化；高级 JSON 保留原有线格式归一化。
+  const payload = validatePayload(!imageInput && current.customBody?.[service]?.trim()
+    ? JSON.parse(JSON.stringify(body)) : body);
 
   // 必须在 customBody 合并及 model 去空白之后处理，覆盖自定义模型、历史快照和
   // 自定义 OpenAI 服务直连官方 API；只改本次 payload，不改保存的别名及 Thinking 偏好。
@@ -382,6 +399,7 @@ async function translateSingle(
   // 协议的 stream 标记由 SDK 管理。自定义请求体仍可替换 model/messages，并添加任意
   // OpenAI 兼容 provider 字段，但不能绕过解析器把 generateText 调用切换为 SSE。
   const requestBody = normalizeChatCompletionRequest(endpoint.endpoint, {...payload, stream: false}, service);
+  const compactBatch = current[TRANSLATION_COMPACT_BATCH] === true;
   const abortContext = createRequestAbortContext(
     normalizedTimeout(request.requestTimeoutMs, current.aiRequestTimeoutMs),
     request.abortSignal,
@@ -393,7 +411,7 @@ async function translateSingle(
       apiKey: service === services.azureOpenai ? undefined : apiKey || undefined,
       headers: providerHeaders(service, apiKey),
       requestBody,
-      fetch: (input, init) => compatibilityFetch(endpoint, request, payload.model)(input, {
+      fetch: (input, init) => compatibilityFetch(endpoint, request, payload.model, compactBatch)(input, {
         ...init, headers: mergeCustomHeaders(init?.headers, customHeaders),
       }),
       signal: abortContext.signal,
@@ -401,7 +419,7 @@ async function translateSingle(
         ? AI_SDK_MAX_RETRIES
         : normalizeTranslationMaxRetries(current.translationMaxRetries),
     }, execution, service,
-      [apiKey, ...Object.values(customHeaders)], abortContext.abortedByCaller);
+    [apiKey, ...Object.values(customHeaders)], abortContext.abortedByCaller, compactBatch);
   } finally {
     abortContext.cleanup();
   }

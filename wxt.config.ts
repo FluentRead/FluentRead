@@ -468,7 +468,9 @@ export default defineConfig({
             // EPUB 目录、Word 行内回填、Markdown 表格、字幕和 CSV/TSV 共用已有依赖，按需加载 XML 解析。
             // 同环境 55bfab088 基线 70,079,902 bytes，整合后增至 70,134,258（+54,356），登记 55 kB 功能预算。
             const documentFormatsBudget = 55_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
+            // Chrome 同环境 55bfab088 对照为 70,079,902 → 70,083,642 bytes，登记 4 kB 翻译链路代码预算。
+            const translationPipelineBudget = browser === 'chrome' ? 4_000 : 0;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

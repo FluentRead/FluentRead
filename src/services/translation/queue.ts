@@ -2,7 +2,7 @@
  * @file src/services/translation/queue.ts
  *
  * 文件职责：提供带会话取消、并发上限和公平调度的翻译任务队列，供全文等批量场景控制 provider 压力。
- * 主要内容：定义 queue session/lease、TranslationQueueCancelledError，支持会话与单条 AbortSignal 的 O(1) 等待取消、出队监听清理、队列压缩及全局清理；单条取消不影响同会话其他任务，已运行任务仍由真实传输租约持槽。 可核对的公开符号包括 TranslationQueueSession、TranslationQueueLease、TranslationQueueCancelledError、createTranslationQueueSession、cancelTranslationQueueSession、enqueueTranslation、clearTranslationQueue。
+ * 主要内容：定义会话、等待和传输租约。重试在延迟期归还并发槽，仍归原会话管理；撤销会话或达到入场期限时清理对应计时器与监听。
  * 模块边界：本文件位于翻译 application service 层，负责用例编排和端口契约；不挂载页面 UI，且不应把某家供应商的网络细节扩散到 feature，具体 HTTP 协议由 providers/platform 实现。
  */
 
@@ -36,6 +36,8 @@ interface PendingTranslation {
   session: TranslationQueueSession;
   /** 在 pendingTranslations 中的槽位；压缩队列时统一平移，保证取消是 O(1) 定位。 */
   slot: number | undefined;
+  delayTimer?: ReturnType<typeof setTimeout>;
+  expiryTimer?: ReturnType<typeof setTimeout>;
   execute: () => Promise<void>;
   cancel: (error: Error) => void;
   removeAbortListener?: () => void;
@@ -76,6 +78,9 @@ function forgetPendingTranslation(entry: PendingTranslation): void {
   entries.delete(entry);
   if (entries.size === 0) pendingBySession.delete(entry.session);
   entry.slot = undefined;
+  clearTimeout(entry.delayTimer);
+  clearTimeout(entry.expiryTimer);
+  entry.delayTimer = undefined;
   entry.removeAbortListener?.();
 }
 
@@ -84,8 +89,10 @@ function forgetPendingTranslation(entry: PendingTranslation): void {
  * 同步移除索引——因此这里不需要再复验槽位归属。
  */
 function detachPendingTranslation(entry: PendingTranslation): void {
-  pendingTranslations[entry.slot!] = undefined;
-  pendingCount -= 1;
+  if (entry.slot !== undefined) {
+    pendingTranslations[entry.slot] = undefined;
+    pendingCount -= 1;
+  }
   forgetPendingTranslation(entry);
 }
 
@@ -179,6 +186,11 @@ export function createTranslationQueueSession(): TranslationQueueSession {
   return createSession();
 }
 
+/** 绑定隐式会话，避免延迟重试在清空队列后进入新的 generation。 */
+export function getDefaultTranslationQueueSession(): TranslationQueueSession {
+  return defaultSession;
+}
+
 /** 取消指定会话中所有尚未开始的任务。 */
 export function cancelTranslationQueueSession(session: TranslationQueueSession, reason?: unknown): void {
   const state = sessionStates.get(session);
@@ -208,6 +220,7 @@ export function enqueueTranslation<T>(
   translationTask: (lease: TranslationQueueLease) => Promise<T>,
   session: TranslationQueueSession = defaultSession,
   signal?: AbortSignal,
+  retry?: {delayMs: number; deadlineAt: number; error: unknown},
 ): Promise<T> {
   try {
     const cancellationError = getSessionCancellationError(session);
@@ -220,9 +233,11 @@ export function enqueueTranslation<T>(
   return new Promise<T>((resolve, reject) => {
     const entry: PendingTranslation = {
       session,
-      slot: pendingTranslations.length,
+      slot: undefined,
       cancel: (error) => {
         entry.slot = undefined;
+        clearTimeout(entry.delayTimer);
+        clearTimeout(entry.expiryTimer);
         entry.removeAbortListener?.();
         reject(error);
       },
@@ -253,13 +268,27 @@ export function enqueueTranslation<T>(
       },
     };
 
-    pendingTranslations.push(entry);
-    pendingCount += 1;
+    const submit = () => {
+      entry.delayTimer = undefined;
+      entry.slot = pendingTranslations.length;
+      pendingTranslations.push(entry);
+      pendingCount += 1;
+      processQueue();
+    };
     sessionPendingEntries(session).add(entry);
+    if (retry) {
+      const expire = () => {
+        detachPendingTranslation(entry);
+        reject(retry.error);
+        compactPendingQueue();
+      };
+      const remaining = retry.deadlineAt - Date.now();
+      if (remaining <= retry.delayMs) return expire();
+      entry.expiryTimer = setTimeout(expire, remaining);
+    }
     if (signal) {
       const onAbort = () => {
-        // 出队或其它取消路径已经归还等待项所有权，不能再减计数或结束活动任务。
-        if (entry.slot === undefined) return;
+        if (!pendingBySession.get(session)?.has(entry)) return;
         detachPendingTranslation(entry);
         entry.cancel(createQueueAbortError());
         compactPendingQueue();
@@ -270,9 +299,10 @@ export function enqueueTranslation<T>(
       };
       signal.addEventListener('abort', onAbort, {once: true});
       // 注册边界可能同步触发取消；既处理漏过的事件，也保持已处理事件的幂等性。
-      if (signal.aborted) onAbort();
+      if (signal.aborted) return onAbort();
     }
-    processQueue();
+    if (retry && retry.delayMs > 0) entry.delayTimer = setTimeout(submit, retry.delayMs);
+    else submit();
   });
 }
 
@@ -292,12 +322,8 @@ export function clearTranslationQueue(): void {
   sessionStates.set(defaultSession, {cancelled: true, cancellationError: error});
 
   queueGeneration += 1;
-  const cancelled: PendingTranslation[] = [];
-  for (let index = pendingHead; index < pendingTranslations.length; index += 1) {
-    const entry = pendingTranslations[index];
-    if (entry) cancelled.push(entry);
-  }
+  const cancelled = [...pendingBySession.values()];
   resetPendingQueue();
-  for (const entry of cancelled) entry.cancel(error);
+  for (const entries of cancelled) for (const entry of entries) entry.cancel(error);
   defaultSession = createSession();
 }

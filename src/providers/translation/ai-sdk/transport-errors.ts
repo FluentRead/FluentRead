@@ -8,6 +8,7 @@
 
 import {formatServiceError} from '@/src/services/translation/serviceErrors';
 import type {TranslationErrorKind} from '@/src/services/translation/errors';
+import {readRetryAfterMs} from '@/src/platform/http/errors';
 
 export interface LlmHttpFailure {
   readonly message: string;
@@ -100,18 +101,7 @@ function sanitizeProviderDetail(value: string, apiKey?: string | readonly string
 
 function parseRetryAfter(headers?: Record<string, string>): number | undefined {
   const normalizedHeaders = Object.fromEntries(Object.entries(headers ?? {}).map(([name, value]) => [name.toLowerCase(), value]));
-  const millisecondValue = normalizedHeaders['retry-after-ms'];
-  if (millisecondValue !== undefined) {
-    const milliseconds = Number(millisecondValue);
-    if (Number.isFinite(milliseconds) && milliseconds >= 0) return milliseconds;
-  }
-
-  const value = normalizedHeaders['retry-after'];
-  if (!value) return undefined;
-  const numeric = Number(value);
-  if (Number.isFinite(numeric) && numeric >= 0) return numeric * 1000;
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? Math.max(0, timestamp - Date.now()) : undefined;
+  return readRetryAfterMs({get: key => normalizedHeaders[key] ?? null});
 }
 
 function requestIdFrom(headers?: Record<string, string>): string | undefined {

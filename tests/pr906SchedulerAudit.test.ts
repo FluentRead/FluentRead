@@ -91,6 +91,55 @@ describe('PR906 scheduler independent audit', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    it('lets one transport probe after cooldown, backs off again on 429, and only then reopens the scope', async () => {
+        const scheduler = createTranslationRequestScheduler(() => limits(5), {random: () => 0.5});
+        const identity = {quotaScope: 'recovering'};
+        const quotaFailure = {status: 429, headers: new Headers()};
+        const retryGate = deferred<void>();
+        const successGate = deferred<void>();
+        scheduler.observeResponse(identity, quotaFailure);
+        const attempt = vi.fn(async lease => {
+            await retryGate.promise;
+            scheduler.observeResponse(identity, quotaFailure, lease);
+        });
+        const recovery = vi.fn(async () => {
+            await successGate.promise;
+        });
+        const following = vi.fn(async () => 'translated');
+        const initial = scheduler.scheduleAttempt(attempt, {identity, countConcurrency: true});
+        const second = scheduler.scheduleAttempt(recovery, {identity, countConcurrency: true});
+        const third = scheduler.scheduleAttempt(following, {identity, countConcurrency: true});
+        await vi.advanceTimersByTimeAsync(2_000);
+        expect(attempt).toHaveBeenCalledOnce();
+        expect(recovery).not.toHaveBeenCalled();
+        expect(following).not.toHaveBeenCalled();
+        await expect(scheduler.scheduleAttempt(async () => 'healthy',
+            {identity: {quotaScope: 'other'}, countConcurrency: true})).resolves.toBe('healthy');
+        retryGate.resolve();
+        await initial;
+        await vi.advanceTimersByTimeAsync(4_499);
+        expect(recovery).not.toHaveBeenCalled();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(recovery).toHaveBeenCalledOnce();
+        expect(following).not.toHaveBeenCalled();
+        successGate.resolve();
+        await second;
+        await expect(third).resolves.toBe('translated');
+    });
+
+    it('returns a typed cooldown when the next possible attempt is outside the request deadline', async () => {
+        const scheduler = createTranslationRequestScheduler(() => limits(1));
+        const identity = {quotaScope: 'limited'};
+        const headers = new Headers({'retry-after-ms': '7500'});
+        scheduler.observeResponse(identity, {status: 429, headers});
+        await vi.advanceTimersByTimeAsync(1_000);
+        const task = vi.fn(async () => undefined);
+        await expect(scheduler.scheduleAttempt(task, {identity, deadlineAt: 5_000}))
+            .rejects.toMatchObject({kind: 'rate-limit', statusCode: 429, retryAfterMs: 6_500, retryable: false});
+        expect(task).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
     it.each(['global-to-service', 'service-to-model', 'model-to-global'] as const)(
         'reprojects unsettled counted attempts across %s without freeing their slots',
         async (transition) => {

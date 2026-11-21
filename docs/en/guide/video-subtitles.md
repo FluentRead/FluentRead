@@ -99,6 +99,8 @@ Enable **Word-by-word highlight** in video appearance settings (off by default) 
 
 Choose **Start sentence learning** in the subtitle menu on YouTube, X, Bilibili, Udemy, or edX. The browser extension can replay and save sentences once a complete subtitle track is available. Its downloads menu exports original, translated, or bilingual **SRT, WebVTT, and Markdown**. It asks before translating any missing captions. Long or unpunctuated captions may appear as fragments.
 
+On Coursera lecture pages that expose a readable WebVTT track, enable **Bilingual** or **Original only** in the FluentRead player menu. The complete track is then available for replay, saving and download. Coursera manages access to the lecture.
+
 The learning panel splits existing captions into sentences using local rules. Each sentence keeps its source text and original caption timing. Sentences from the same caption can share a playback range, so moving between them keeps your current position.
 
 - **Previous / Next** select the adjacent sentence. Moving to a different source passage seeks to its start and preserves the current play or pause state.

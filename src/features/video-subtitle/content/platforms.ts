@@ -1,10 +1,14 @@
 /**
  * @file src/features/video-subtitle/content/platforms.ts
  * 文件职责：定义会议及课程视频的站点边界、字幕节点与明确开启控件，并选择目标语言人工轨。
- * 主要内容：按域名识别 Teams、Zoom、Meet、B 站、Udemy、edX 和 Disney+；规范化语言别名并排除自动生成或机器翻译轨。
+ * 主要内容：识别会议、上课和影视播放的站点入口；规范化语言别名并排除自动生成或机器翻译轨。
  * 模块边界：只处理传入的位置、轨道和节点，不读取配置、请求网络或修改宿主页面。
  */
-export type CaptionPlatform = 'meet' | 'teams' | 'zoom' | 'bilibili' | 'udemy' | 'edx' | 'disney';
+export type CaptionPlatform = 'meet' | 'teams' | 'zoom' | 'bilibili' | 'udemy' | 'edx' | 'coursera' | 'disney';
+
+export function getCourseraLectureId(pathname: string): string {
+    return pathname.match(/^\/learn\/[\w%-]+\/lecture\/([\w-]{1,80})(?:\/[\w%-]+)?\/?$/u)?.[1] ?? '';
+}
 
 export function getCaptionPlatform(location: Pick<Location, 'hostname' | 'pathname'>): CaptionPlatform | null {
     const host = location.hostname.toLowerCase();
@@ -14,6 +18,7 @@ export function getCaptionPlatform(location: Pick<Location, 'hostname' | 'pathna
     if (/(^|\.)udemy\.com$/.test(host)) return 'udemy';
     if (host === 'bilibili.com' || host === 'www.bilibili.com') return 'bilibili';
     if (/(^|\.)edx\.org$/.test(host)) return 'edx';
+    if (import.meta.env.BROWSER !== 'userscript' && (host === 'www.coursera.org' || host === 'coursera.org') && getCourseraLectureId(location.pathname)) return 'coursera';
     if (/(^|\.)disneyplus\.com$/.test(host)) return 'disney';
     return null;
 }
@@ -29,6 +34,7 @@ export const PLATFORM_CAPTION_SELECTORS: Record<CaptionPlatform, string> = {
     udemy: '[data-purpose="captions-cue-text"], .shaka-text-container',
     bilibili: '.bpx-player-subtitle-wrap',
     edx: '.closed-captions',
+    coursera: '.vjs-text-track-display, .vjs-text-track-cue',
     disney: '.dss-hls-subtitle-overlay, .hive-subtitle-renderer, .shaka-text-container',
 };
 

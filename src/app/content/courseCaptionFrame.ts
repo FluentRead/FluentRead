@@ -37,6 +37,7 @@ export async function startCourseCaptionFrameApp(ctx: ContentScriptContext): Pro
             patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
             label: text => translateLegacyText(text, config.uiLanguage),
             iconUrl: browser.runtime.getURL('icon/128.png'),
+            learningStyleUrl: browser.runtime.getURL('content-scripts/supportedFrame.css'),
             openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
             download: (srt, language, cues, format = 'srt') => {
                 const file = cues ? serializeSubtitleFile(cues, format)

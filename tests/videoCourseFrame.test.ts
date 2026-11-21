@@ -52,6 +52,7 @@ describe('edX 课程 frame 组合根', () => {
         await startCourseCaptionFrameApp(ctx()); expect(ports.mount).toHaveBeenCalledOnce();
         changed(); await Promise.resolve(); expect(ports.mount).toHaveBeenCalledOnce();
         const options = ports.mount.mock.calls[0][0];
+        expect(options.learningStyleUrl).toContain('content-scripts/supportedFrame.css');
         expect(options.label('重试')).toBe('Retry');
         options.patch({videoSubtitleOffsetMs: 500}); await Promise.resolve();
         expect(ports.patch).toHaveBeenCalledWith({videoSubtitleOffsetMs: 500}, ports.send);

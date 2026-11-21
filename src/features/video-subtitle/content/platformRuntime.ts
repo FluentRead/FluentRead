@@ -41,6 +41,7 @@ interface PlatformCaptionPorts {
     download?(srt: string, language: string, cues?: readonly VideoSubtitleCue[], format?: SubtitleExportFormat): void;
     createBilibiliAi?(getVideo: () => HTMLVideoElement | null, changed: () => void): BilibiliAiSource;
     iconUrl?: string;
+    learningStyleUrl?: string;
     openSettings?(): void;
     captionSource?: Partial<Omit<CourseCaptionSourcePorts, 'base' | 'changed'>>;
 }
@@ -63,7 +64,9 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     const platform = getCaptionPlatform(window.location);
     if (!platform) return () => undefined;
     const meeting = isMeetingCaptionPlatform(platform);
-    const course = VIDEO_COURSE_PLATFORMS.includes(platform as VideoCoursePlatform) ? platform as VideoCoursePlatform : null;
+    const autoCourse = VIDEO_COURSE_PLATFORMS.includes(platform as VideoCoursePlatform) ? platform as VideoCoursePlatform : null;
+    const coursera = import.meta.env.BROWSER !== 'userscript' && platform === 'coursera';
+    const course = coursera ? 'coursera' : autoCourse;
     const timeline = new CourseCaptionSource({
         base: new URL(window.location.href), fetch: ports.captionSource?.fetch || ((input, init) => fetch(input, init)),
         manifest: ports.captionSource?.manifest || ((part, signal) => requestBilibiliCaptionManifest(window, part, signal)),
@@ -121,12 +124,13 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     let menuLocale = '';
     const courseText = (key: string) => translate(`video.course.${key}`, config.uiLanguage);
     const captionsEnabled = () => config.on && config.videoTranslationEnabled && config.videoSubtitleVisible !== false
-        && (!course || (manualEnabled ?? config.videoCourseAutoStart[course]));
+        && (!course || (manualEnabled ?? (autoCourse ? config.videoCourseAutoStart[autoCourse] : false)));
 
     const playerRoot = () => video?.closest<HTMLElement>(course === 'bilibili' ? '.bpx-player-container'
-        : course === 'edx' ? '.video[data-metadata]' : '[data-purpose="shaka-video-player"]') || video?.parentElement || null;
+        : course === 'edx' ? '.video[data-metadata]' : coursera ? '.video-js, [data-testid="video-player"]'
+            : '[data-purpose="shaka-video-player"]') || video?.parentElement || null;
     const courseTools = import.meta.env.BROWSER !== 'userscript' && course && ports.download ? createCourseSubtitleTools({
-        platform: course, document, location: window.location, config, subscribe: ports.subscribe,
+        platform: course, document, location: window.location, config, subscribe: ports.subscribe, learningStyleUrl: ports.learningStyleUrl,
         readTarget: () => {const player = playerRoot();return player && video ? {player, video} : null;},
         readCompleteTrack: () => {
             if (!video || mediaKey !== `${routeHref()}:${video.currentSrc || video.getAttribute('src') || ''}` ||
@@ -178,10 +182,10 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         const root = playerRoot();
         if (!course || !root || !config.on || !config.videoTranslationEnabled) { removeCourseControls(); return; }
         const barSelector = course === 'bilibili' ? '.bpx-player-control-bottom-right'
-            : course === 'edx' ? '.secondary-controls' : '[data-purpose="video-control-bar"]';
+            : course === 'edx' ? '.secondary-controls' : coursera ? '.vjs-control-bar' : '[data-purpose="video-control-bar"]';
         const nativeSelector = course === 'bilibili' ? '.bpx-player-ctrl-subtitle, .bpx-player-ctrl-setting, .bpx-player-ctrl-full'
             : course === 'udemy' ? '[data-purpose="captions-dropdown-button"], [data-purpose="fullscreen-button"]'
-                : '.toggle-captions, .toggle-fullscreen, [data-role="fullscreen"]';
+                : coursera ? '.vjs-subs-caps-button, .vjs-fullscreen-control' : '.toggle-captions, .toggle-fullscreen, [data-role="fullscreen"]';
         const bars = Array.from(root.querySelectorAll<HTMLElement>(barSelector));
         const anchors = bars.flatMap(bar => Array.from(bar.querySelectorAll<HTMLElement>(nativeSelector)));
         // 退出全屏后可能保留隐藏旧栏；跟随当前可见控件，不把入口留在旧容器中。
@@ -235,6 +239,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             courseRetry.className = 'fluent-read-video-menu-secondary'; courseRetry.setAttribute('role', 'menuitem');
             source.querySelector('.fluent-read-video-menu-source-actions')!.appendChild(courseRetry);
             const autoRow = document.createElement('div'); autoRow.className = 'fluent-read-video-menu-row fluent-read-video-menu-course-auto';
+            if (!autoCourse) autoRow.hidden = true;
             const autoLabel = document.createElement('span'); autoLabel.className = 'fluent-read-video-menu-row-label'; autoLabel.dataset.courseAutoLabel = '';
             courseAuto = document.createElement('button'); courseAuto.type = 'button'; courseAuto.className = 'fluent-read-video-menu-switch';
             courseAuto.dataset.action = 'toggle-course-auto'; courseAuto.setAttribute('role', 'switch');
@@ -263,7 +268,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
                 } else if (handleVideoMenuDisclosure(courseMenu!, action)) positionCourseMenu();
                 else if (action === 'close-menu') { setCourseMenuOpen(false); courseButton!.focus({preventScroll: true}); }
                 else if (action === 'open-subtitle-tools' || action === 'close-subtitle-tools') { setVideoMenuToolsOpen(courseMenu!, action === 'open-subtitle-tools'); positionCourseMenu(); }
-                else if (action === 'toggle-course-auto') ports.patch({videoCourseAutoStart: {...config.videoCourseAutoStart, [course]: !config.videoCourseAutoStart[course]}});
+                else if (action === 'toggle-course-auto' && autoCourse) ports.patch({videoCourseAutoStart: {...config.videoCourseAutoStart, [autoCourse]: !config.videoCourseAutoStart[autoCourse]}});
                 else if (action === 'generate-bilibili-ai' && ai) {
                     if (ai.status === 'running' || ai.status === 'checking') ai.stop();
                     else if (timeline.status !== 'ready') {
@@ -354,7 +359,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         courseStatus!.parentElement!.hidden = !statusText;
         courseRetry!.hidden = !enabled || timeline.status !== 'error'; courseRetry!.textContent = ports.label('重试');
         courseMenu!.querySelector<HTMLButtonElement>('[data-action="retry-subtitle-translation"]')!.hidden = !translationFailed;
-        courseAuto!.setAttribute('aria-checked', String(config.videoCourseAutoStart[course]));
+        courseAuto!.setAttribute('aria-checked', String(Boolean(autoCourse && config.videoCourseAutoStart[autoCourse])));
         courseAuto!.setAttribute('aria-label', courseText('auto'));
         const label = courseMenu!.querySelector('[data-course-auto-label]')!, labelText = courseText('auto');
         if (label.textContent !== labelText) label.textContent = labelText;

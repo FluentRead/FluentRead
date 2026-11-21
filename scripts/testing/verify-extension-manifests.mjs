@@ -246,12 +246,23 @@ export function verifyFrameUiStyles(manifest, files, scripts, browser) {
     const supported = entries.find(entry => entry.js?.includes('content-scripts/supportedFrame.js'));
     assert(!supported.css?.length && supported.match_origin_as_fallback !== true,
         `${browser} 共用子 frame 不应自动注入 CSS 或扩大来源匹配`);
-    assert(!files.includes(supportedCss) && cssRules(supportedCss).length === 0,
-        `${browser} 共用子 frame 保留了无消费的 UI CSS 文件或资源声明`);
     const source = scripts['content-scripts/supportedFrame.js'];
-    assert(typeof source === 'string' && !/["'`]\/?content-scripts\/[^"'`\s]+\.css["'`]/u.test(source)
+    assert(typeof source === 'string' && files.includes(supportedCss)
+        && /\.getURL\s*\(\s*(["'`])\/?content-scripts\/supportedFrame\.css\1\s*\)/u.test(source),
+        `${browser} 共用子 frame 缺少 edX 学习面板样式或实际加载地址`);
+    const cssLiterals = [...source.matchAll(/(["'`])(\/?content-scripts\/[^"'`\s]+\.css)\1/gu)]
+        .map(match => match[2].replace(/^\//u, ''));
+    assert(cssLiterals.every(url => url === supportedCss)
         && !source.includes('WXT Shadow Root Reset') && !source.includes('wxt-shadow-root-document-styles')
-        && !source.includes('Failed to load styles @'), `${browser} 共用子 frame 仍引入 Shadow UI CSS 加载路径`);
+        && !source.includes('Failed to load styles @'), `${browser} 共用子 frame 保留了未消费的 UI CSS 加载路径`);
+    const [edxRule, ...duplicateRules] = cssRules(supportedCss);
+    if (manifest.manifest_version === 3) {
+        assert(edxRule && typeof edxRule === 'object' && !duplicateRules.length && edxRule.resources.includes(supportedCss)
+            && isDeepStrictEqual(edxRule.matches, ['https://courses.edx.org/*']) && !edxRule.extension_ids?.length
+            && edxRule.use_dynamic_url === false, `${browser} 共用子 frame 的 edX 样式资源范围变化`);
+    } else {
+        assert(edxRule === supportedCss && !duplicateRules.length, `${browser} 共用子 frame 的 edX 样式需要精确路径`);
+    }
 }
 
 export function findUnexpectedCurrentVersionArchives(outputFiles, version, expectedArchives) {

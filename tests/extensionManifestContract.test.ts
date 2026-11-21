@@ -47,7 +47,7 @@ describe('stable public content UI resources', () => {
         {resources: [...uiFiles.slice(0, 3), 'i18n/*.json'], matches: ['<all_urls>'], use_dynamic_url: true},
         {resources: [uiFiles[3]], matches: ['<all_urls>'], use_dynamic_url: true},
         {resources: [uiFiles[4]], matches: ['https://*.mail.163.com/*'], use_dynamic_url: true},
-        {resources: [uiFiles[5]], matches: ['https://mail.qq.com/*'], use_dynamic_url: true},
+        {resources: [uiFiles[5]], matches: ['https://mail.qq.com/*', 'https://courses.edx.org/*'], use_dynamic_url: true},
         {resources: ['content-scripts/unrelated.css', 'private.js'], extension_ids: ['other-extension'], use_dynamic_url: true},
     ];
 
@@ -60,7 +60,9 @@ describe('stable public content UI resources', () => {
         for (const resource of uiFiles) {
             const rule = rules.find(rule => rule.resources.includes(resource))!;
             expect(rule.use_dynamic_url).toBe(false);
-            expect(rule.matches).toEqual(before.web_accessible_resources.find(rule => rule.resources.includes(resource))!.matches);
+            const stylesScope = resource === uiFiles[5] ? ['https://courses.edx.org/*']
+                : before.web_accessible_resources.find(rule => rule.resources.includes(resource))!.matches;
+            expect(rule.matches).toEqual(stylesScope);
         }
         expect(rules.find(rule => rule.resources.includes('i18n/*.json'))).toEqual({
             resources: ['i18n/*.json'], matches: ['<all_urls>'], use_dynamic_url: true,
@@ -111,6 +113,15 @@ describe('stable public content UI resources', () => {
             [['icon/128.png'], false], [['i18n/*.json'], true],
         ]);
     });
+    it('不把缺少 edX 匹配的共用 frame 样式扩大到 edX 网页', () => {
+        const manifest = {web_accessible_resources: [{
+            resources: [uiFiles[5], 'other.js'], matches: ['https://mail.qq.com/*'], use_dynamic_url: true,
+        }]};
+        configureStableContentUiResources({browser: 'chrome', manifestVersion: 3}, manifest);
+        expect(manifest.web_accessible_resources).toEqual([
+            {resources: ['other.js'], matches: ['https://mail.qq.com/*'], use_dynamic_url: true},
+        ]);
+    });
 });
 
 describe('frame UI CSS artifact contract', () => {
@@ -147,17 +158,17 @@ describe('frame UI CSS artifact contract', () => {
                         match_about_blank: true, run_at: 'document_end'},
                     {matches: [...sharedMatches], js: [jsFile('supportedFrame')], all_frames: true, run_at: 'document_end'},
                 ],
-                web_accessible_resources: version === 2 ? ui.map(cssFile) : ui.map(name => ({
+                web_accessible_resources: version === 2 ? [...ui.map(cssFile), cssFile('supportedFrame')] : [...ui.map(name => ({
                     resources: [cssFile(name)], matches: name === 'content' ? ['<all_urls>'] : [...neteaseMatches], use_dynamic_url: false,
-                })),
+                })), {resources: [cssFile('supportedFrame')], matches: ['https://courses.edx.org/*'], use_dynamic_url: false}],
             },
-            files: [...ui.flatMap(name => [jsFile(name), cssFile(name)]), jsFile('supportedFrame')],
+            files: [...ui.flatMap(name => [jsFile(name), cssFile(name)]), jsFile('supportedFrame'), cssFile('supportedFrame')],
             scripts: {...Object.fromEntries(ui.map(name => [jsFile(name), script(name)])),
-                [jsFile('supportedFrame')]: '(()=>{browser.runtime.getURL("icon/32.png");})();'},
+                [jsFile('supportedFrame')]: '(()=>{browser.runtime.getURL("icon/32.png");browser.runtime.getURL("content-scripts/supportedFrame.css");})();'},
         };
     }
 
-    it.each([['Chrome', 3], ['Edge', 3], ['Firefox', 2]] as const)('%s MV%s 保留真正消费的 CSS，并允许 supported frame 无 CSS', async (browser, version) => {
+    it.each([['Chrome', 3], ['Edge', 3], ['Firefox', 2]] as const)('%s MV%s 保留顶层、网易邮箱和 edX 按需消费的 CSS', async (browser, version) => {
         const {verifyFrameUiStyles} = await verifier();
         const {manifest, files, scripts} = fixture(version);
         expect(() => verifyFrameUiStyles(manifest, files, scripts, browser)).not.toThrow();
@@ -233,13 +244,15 @@ describe('frame UI CSS artifact contract', () => {
         }
     });
 
-    it('supported frame 不得保留 CSS 文件、精确或通配 WAR、Shadow CSS 加载器', async () => {
+    it('supported frame 只保留 edX 消费的样式，拒绝缺失资源、过宽的 WAR 或通用 Shadow CSS 加载器', async () => {
         const {verifyFrameUiStyles} = await verifier();
         const edits: ((value: FrameFixture) => void)[] = [
-            value => {value.files.push(cssFile('supportedFrame'));},
+            value => {value.files.splice(value.files.indexOf(cssFile('supportedFrame')), 1);},
+            value => {value.manifest.web_accessible_resources.pop();},
+            value => {value.manifest.web_accessible_resources[value.manifest.web_accessible_resources.length - 1] = {resources: [cssFile('supportedFrame')], matches: [...sharedMatches], use_dynamic_url: false};},
             value => {value.manifest.web_accessible_resources.push({resources: [cssFile('supportedFrame')], matches: [...sharedMatches]});},
             value => {value.manifest.web_accessible_resources.push({resources: ['content-scripts/supported*.css'], matches: [...sharedMatches]});},
-            value => {value.scripts[jsFile('supportedFrame')] += ';q.runtime.getURL("/content-scripts/supportedFrame.css")';},
+            value => {value.scripts[jsFile('supportedFrame')] = '(()=>{browser.runtime.getURL("icon/32.png");})();';},
             value => {value.scripts[jsFile('supportedFrame')] += ';q.runtime.getURL("/content-scripts/other.css")';},
             ...['WXT Shadow Root Reset', 'wxt-shadow-root-document-styles', 'Failed to load styles @'].map(marker =>
                 (value: FrameFixture) => {value.scripts[jsFile('supportedFrame')] += JSON.stringify(marker);}),

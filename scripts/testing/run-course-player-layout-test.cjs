@@ -16,7 +16,7 @@ for (let i=0;i<args.length;i++) {
 }
 if(!options.background)throw Error('Use --background for an isolated visible secondary-display browser');
 const sites=(options.sites||'').split(',');
-if(!sites.length||sites.some(site=>!['bilibili','udemy','edx'].includes(site)))throw Error('Specify --sites bilibili,udemy,edx or a non-empty subset');
+if(!sites.length||sites.some(site=>!['bilibili','udemy','edx','coursera'].includes(site)))throw Error('Specify --sites bilibili,udemy,edx,coursera or a non-empty subset');
 const root=path.resolve(__dirname,'../..');
 const extension=path.resolve(options['extension-dir']||path.join(root,'.output/chrome-mv3'));
 const artifacts=path.resolve(options['artifacts-dir']||path.join(os.tmpdir(),'fluentread-course-layout-results'));
@@ -24,9 +24,9 @@ const {chromium}=require(path.join(options['playwright-root']||process.env.PLAYW
 const skill=path.join(os.homedir(),'.codex/skills/fluentread-browser-translation-test/scripts');
 const helper=require(path.join(skill,'focus-safe-browser.cjs'));
 const {createRuntimeDiagnostics}=require(path.join(skill,'runtime-diagnostics.cjs'));
-const urls={bilibili:'https://www.bilibili.com/video/BV1xx411c7mD/',udemy:'https://www.udemy.com/course/python/learn/lecture/123/',edx:'https://courses.edx.org/courseware/layout-test'};
-const captionSelectors={bilibili:'.bpx-player-ctrl-subtitle-result',udemy:'[data-purpose="captions-dropdown-button"] svg',edx:'.toggle-captions svg'};
-const report={kind:'local-native-layout-reproduction',sites,mocked:{page:true,subtitles:true,translation:true},results:[],limitations:['Bilibili dimensions were measured on the live site on 2026-11-14; Udemy and edX are representative layouts, not live-course acceptance.']};
+const urls={bilibili:'https://www.bilibili.com/video/BV1xx411c7mD/',udemy:'https://www.udemy.com/course/python/learn/lecture/123/',edx:'https://courses.edx.org/courseware/layout-test',coursera:'https://www.coursera.org/learn/python/lecture/Ab12/classes'};
+const captionSelectors={bilibili:'.bpx-player-ctrl-subtitle-result',udemy:'[data-purpose="captions-dropdown-button"] svg',edx:'.toggle-captions svg',coursera:'.vjs-subs-caps-button svg'};
+const report={kind:'local-native-layout-reproduction',sites,mocked:{page:true,subtitles:true,translation:true},results:[],limitations:['Bilibili dimensions were measured on the live site on 2026-11-14. Udemy, edX and Coursera use representative layouts; live-course acceptance is separate.']};
 const diagnostics=createRuntimeDiagnostics();
 let session,profile,page;
 
@@ -59,13 +59,16 @@ async function main(){
             const req=route.request(),url=new URL(req.url());
             if(url.protocol==='chrome-extension:')return route.continue();
             const headers={'access-control-allow-origin':req.headers().origin||'*','access-control-allow-credentials':'true'};
+            if(url.hostname==='course-frame.example.test'&&req.isNavigationRequest()){
+                return route.fulfill({contentType:'text/html; charset=utf-8',body:`<iframe title="edX course" src="${urls.edx}" width="1190" height="860"></iframe>`});
+            }
             if(req.isNavigationRequest())return route.fulfill({contentType:'text/html; charset=utf-8',body:coursePlayerFixture(platform,mediaUrl)});
             let body;
             if(url.hostname==='api.bilibili.com')body={code:0,data:{cid:456,subtitle:{subtitles:[{lan:'en',subtitle_url:'https://aisubtitle.hdslb.com/layout.json'}]}}};
             else if(url.hostname==='aisubtitle.hdslb.com')body={body:[{from:0,to:20,content:source}]};
             else if(url.pathname.startsWith('/api-2.0/courses/'))body={id:77,locale:{locale:'en_US'}};
             else if(url.pathname.startsWith('/api-2.0/users/'))body={asset:{captions:[{locale_id:'en_US',source:'manual',status:1,url:'https://captions.udemycdn.com/layout.vtt'}]}};
-            else if(url.hostname==='captions.udemycdn.com')return route.fulfill({contentType:'text/vtt',headers,body:`WEBVTT\n\n00:00.000 --> 00:20.000\n${source}\n`});
+            else if(url.hostname==='captions.udemycdn.com'||(url.hostname==='www.coursera.org'&&url.pathname==='/subtitles/layout.vtt'))return route.fulfill({contentType:'text/vtt',headers,body:`WEBVTT\n\n00:00.000 --> 00:20.000\n${source}\n`});
             else if(url.pathname.startsWith('/transcript/'))body={start:[0],end:[20000],text:[source]};
             else return route.fulfill({status:204,headers});
             return route.fulfill({contentType:'application/json',headers,body:JSON.stringify(body)});
@@ -143,6 +146,27 @@ async function main(){
             await page.evaluate(()=>document.exitFullscreen());await page.waitForFunction(()=>!document.fullscreenElement);await check('restored');
             await page.setViewportSize({width:390,height:844});await check('narrow');await page.setViewportSize({width:1280,height:900});
             await checkCourseActions();
+        }
+        if(sites.includes('edx')){
+            platform='edx';
+            diagnostics.setPhase('edx-embedded-learning-styles');
+            await page.goto('https://course-frame.example.test/edx', {waitUntil:'domcontentloaded'});
+            const frame=page.frameLocator('iframe[title="edX course"]');
+            const frameHost=frame.locator('#fluent-read-course-controls');
+            await frameHost.locator('button[aria-haspopup]').click();
+            await frameHost.locator('[data-action="open-sentence-learning"]').click();
+            const panel=frame.locator('#fluent-read-video-learning-panel .fr-video-learning');
+            await panel.waitFor({state:'visible'});
+            assert.equal((await panel.locator('[data-learning-original]').textContent()).trim(),source);
+            const sheet=frame.locator('link[rel="stylesheet"][href$="/content-scripts/supportedFrame.css"]');
+            await sheet.waitFor({state:'attached'});
+            await sheet.evaluate(link=>link.sheet?true:new Promise((resolve,reject)=>{
+                link.addEventListener('load',()=>resolve(true),{once:true});
+                link.addEventListener('error',()=>reject(new Error('edX learning stylesheet failed to load')),{once:true});
+                setTimeout(()=>reject(new Error('edX learning stylesheet did not load')),5000);
+            }));
+            await page.locator('iframe[title="edX course"]').screenshot({path:path.join(artifacts,'edx-embedded-learning.png')});
+            report.results.push({platform,state:'embedded-reading-stylesheet',passed:true});
         }
         diagnostics.setPhase('teardown');await page.goto('about:blank');await control.reload();await diagnostics.flush();diagnostics.assertClean();report.passed=true;
     }catch(error){report.passed=false;report.failure=error.stack;if(page&&!page.isClosed())await page.screenshot({path:path.join(artifacts,'failure.png')});throw error;}

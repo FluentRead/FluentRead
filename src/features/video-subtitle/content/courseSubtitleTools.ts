@@ -6,7 +6,7 @@
  */
 import {createApp, h, shallowReactive} from 'vue';
 import type {Config} from '@/src/core/config/model';
-import type {VideoCoursePlatform} from '@/src/core/config/videoCourse';
+import type {CourseCaptionPlatform} from './courseCaptionData';
 import sentenceLearningStyles from '../ui/videoSentenceLearning.css?inline';
 import {createVideoSubtitleDownloads} from './downloads';
 import {confirmVideoSubtitleExport} from './exportPrompt';
@@ -21,7 +21,8 @@ import type {VideoSubtitleCue} from './youtubeSubtitleData';
 
 interface CourseTrack {cues: VideoSubtitleCue[]; languageCode: string; sourceLanguage: string}
 interface CourseSubtitleToolsPorts {
-    platform: VideoCoursePlatform;
+    platform: CourseCaptionPlatform;
+    learningStyleUrl?: string;
     config: Config;
     document: Document;
     location: Location;
@@ -42,6 +43,7 @@ export function createCourseSubtitleTools(ports: CourseSubtitleToolsPorts) {
     let exportFormat: SubtitleExportFormat = 'srt';
     let identity = ports.readIdentity();
     let style: HTMLStyleElement | undefined;
+    let viewStylesheet: HTMLLinkElement | undefined;
     const sourceUrl = () => {
         const url = new URL(location.href);
         const part = url.searchParams.get('p');
@@ -67,6 +69,12 @@ export function createCourseSubtitleTools(ports: CourseSubtitleToolsPorts) {
                 style = document.createElement('style');
                 style.textContent = sentenceLearningStyles;
                 document.documentElement.appendChild(style);
+                if (ports.learningStyleUrl) {
+                    viewStylesheet = document.createElement('link');
+                    viewStylesheet.rel = 'stylesheet';
+                    viewStylesheet.href = ports.learningStyleUrl;
+                    document.documentElement.appendChild(viewStylesheet);
+                }
             }
             const app = createApp({render: () => h(view, props)});
             app.mount(host);
@@ -131,6 +139,7 @@ export function createCourseSubtitleTools(ports: CourseSubtitleToolsPorts) {
             learning.destroy();
             placement.dispose();
             style?.remove();
+            viewStylesheet?.remove();
         },
     };
 }

@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {setCurrentTranslationAdapters} from '@/src/core/translation/current';
 import type {TranslationCandidate, TranslationScope} from '@/src/core/translation/types';
 import {createDeclarativeAdapter} from '@/src/core/translation/adapters/declarative';
-import {diagnosePageRuleSelection, readPageRuleSelection} from '@/src/features/full-page-translation/content/pageRuleDiagnosis';
+import {diagnosePageRuleSelection, readCurrentPageRuleDiagnosis, readPageRuleSelection} from '@/src/features/full-page-translation/content/pageRuleDiagnosis';
 import {createLifecycleRetry} from '@/src/features/full-page-translation/content/translationStability';
 
 const state = vi.hoisted(() => ({
@@ -61,8 +61,25 @@ afterEach(() => {
 describe('current page rule diagnosis', () => {
     it('keeps the extension-only selection query out of the userscript', () => {
         vi.stubEnv('BROWSER', 'userscript');
-        const {document} = fixture();
+        const {document, start, readSource} = fixture();
+        const readCandidateText = vi.fn(() => source);
         expect(readPageRuleSelection(document)).toBeUndefined();
+        expect(readCurrentPageRuleDiagnosis(start, 'content', null, readSource, readCandidateText)).toBeUndefined();
+        expect(readCandidateText).not.toHaveBeenCalled();
+    });
+
+    it('uses only the live session and includes inline text for its target-language diagnosis', () => {
+        const {candidate, start, target, session, readSource} = fixture();
+        const current = {...session, active: true, translationConfig: {...session.translationConfig, targetLanguage: 'en', excludedLanguages: []}};
+        current.unchangedCandidates.set(target, createLifecycleRetry(candidate, source, 0));
+        const readCandidateText = vi.fn(() => 'The article describes how readers can check the translation and find the original paragraph.');
+
+        expect(readCurrentPageRuleDiagnosis(start, 'all', current, readSource, readCandidateText)?.selection.reason).toBe('language-filtered');
+        expect(readCandidateText).toHaveBeenCalledWith(expect.objectContaining({element: target}), expect.anything(),
+            expect.objectContaining({includeInlineCodeForLanguage: true}));
+        current.active = false;
+        expect(readCurrentPageRuleDiagnosis(start, 'all', current, readSource, readCandidateText))
+            .toMatchObject({scope: 'all', selection: {reason: 'inactive'}});
     });
 
     it('reads the start of the first selected range and accepts selection from an element offset', () => {

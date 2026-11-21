@@ -4,13 +4,14 @@
  * 主要内容：读取当前范围生效的适配器、选区所在来源、真实译文状态和会话调度结果；确认源文仍一致后才解释已恢复或无需改写。
  * 模块边界：只读当前 DOM 和现有会话，不请求翻译、不检查其他 frame、不回传原文或服务响应。
  */
+import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {composedAncestors, evaluateHardGuard, maxComposedAncestorDepth} from '@/src/core/translation/dom';
 import {getCurrentTranslationCore, getTranslationCandidateKey} from '@/src/core/translation/public';
 import {createTranslationTextProtectionCache, isTranslationTextElementProtected} from '@/src/core/translation/text';
 import type {PageRuleDiagnosis, TranslationCandidate, TranslationScope} from '@/src/core/translation/types';
 import type {FullPageSession} from './fullPageSession';
 import {getTranslationState, resolveTranslationStateNode} from './state';
-import {sameLifecycleRetry} from './translationStability';
+import {getCandidateTranslationTextProtectionOptions, sameLifecycleRetry} from './translationStability';
 
 export function readPageRuleSelection(document: Document): Node | undefined {
     if (import.meta.env.BROWSER === 'userscript') return;
@@ -61,6 +62,25 @@ function describeSelection(
 
 type DiagnosisSession = Pick<FullPageSession,
     'scope' | 'translationConfig' | 'unchangedCandidates' | 'userCancelledCandidates' | 'scheduled' | 'inFlightCandidates'>;
+
+type CandidateTextReader = (
+    candidate: TranslationCandidate,
+    core: ReturnType<typeof getCurrentTranslationCore>,
+    options: ReturnType<typeof getCandidateTranslationTextProtectionOptions>,
+) => string;
+
+export function readCurrentPageRuleDiagnosis(
+    start: Node | undefined, defaultScope: TranslationScope, session: (DiagnosisSession & Pick<FullPageSession, 'active'>) | null,
+    readSource: (candidate: TranslationCandidate) => string, readCandidateText: CandidateTextReader,
+): PageRuleDiagnosis | undefined {
+    if (import.meta.env.BROWSER === 'userscript') return;
+    const activeSession = session?.active ? session : undefined;
+    return diagnosePageRuleSelection(start, defaultScope, activeSession, readSource, (candidate, settings) => {
+        const source = readCandidateText(candidate, getCurrentTranslationCore(candidate.scope),
+            {...getCandidateTranslationTextProtectionOptions(candidate), includeInlineCodeForLanguage: true});
+        return shouldSkipTranslationForTarget(source, settings.targetLanguage, settings.excludedLanguages);
+    });
+}
 
 export function diagnosePageRuleSelection(
     start: Node | undefined, defaultScope: TranslationScope, session: DiagnosisSession | undefined,

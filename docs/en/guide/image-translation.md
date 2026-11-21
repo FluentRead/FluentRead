@@ -27,6 +27,8 @@ Press **Escape** inside the text panel to close it and return to an available en
 
 Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
 
+Image and manga translations use the target language when measuring and drawing text. This helps the browser choose the appropriate glyph forms available on your device for Japanese, Simplified Chinese, Traditional Chinese, and other languages.
+
 During automatic wrapping in ordinary images, closing punctuation stays with the preceding character and opening punctuation with the following text. Small Japanese kana and prolonged sound marks also stay attached. Explicit line breaks are preserved.
 
 When the last line of a short paragraph is much shorter than the others, line widths can be balanced while retaining the current font size, line count and complete words.

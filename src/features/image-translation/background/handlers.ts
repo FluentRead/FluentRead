@@ -358,12 +358,14 @@ async function translateImageTexts(
     dependencies: ImageTranslationBackgroundDependencies,
     options: ImageOperationOptions,
     message: ImageTranslateTextsMessage,
-): Promise<string[]> {
+): Promise<{translations: string[]; targetLanguage?: string}> {
     if (options.signal.aborted) throw imageAbortError(false);
     const glossaryContext = getTranslationGlossaryContext(message);
     const sourceLanguage = glossaryContext ? parseRequiredString(message.sourceLanguage, 'sourceLanguage') : undefined;
     const glossaryConfig = dependencies.getGlossaryConfig?.();
     const targetLanguage = glossaryConfig?.to;
+    // 返回用于这次翻译的目标语言。排版阶段不再读取可能已被修改的设置。
+    const language = targetLanguage ? {targetLanguage} : {};
     const glossaryRevision = glossaryContext ? parseRequiredString(message.glossaryRevision, 'glossaryRevision') : undefined;
     // OCR 事务冻结的词库版本仍须经过 broker 校验；期间关闭或删除词库不能被同目标早退吞掉。
     const glossaryChanged = glossaryRevision !== undefined && glossaryConfig !== undefined
@@ -378,7 +380,7 @@ async function translateImageTexts(
             && (!targetLanguage || glossaryChanged || !shouldSkipTranslationForTarget(text, targetLanguage));
     });
     // 不删 OCR 行，阅读面板与图片坐标仍以原行对齐；纯标识整图无需外发请求。
-    if (uniqueTexts.length === 0) return [...texts];
+    if (uniqueTexts.length === 0) return {translations: [...texts], ...language};
     const service = dependencies.getTranslationService();
     const useImageContext = dependencies.isTextContextEnabled?.(service) === true;
     const batchTranslation = dependencies.supportsBatchTranslation(service) && !useImageContext;
@@ -402,7 +404,7 @@ async function translateImageTexts(
         pageContext: '' as const,
         useCache: true as const,
         serviceOverride: service,
-        ...(targetLanguage ? {targetLanguage} : {}),
+        ...language,
         ...(glossaryContext ? {
             glossaryRevision,
             sourceLanguage: parseRequiredString(message.sourceLanguage, 'sourceLanguage'),
@@ -473,10 +475,10 @@ async function translateImageTexts(
         if (orderedRegions) {
             const result = [...texts];
             sourceIndexes.forEach((sourceIndex, index) => {result[sourceIndex] = translations[index];});
-            return result;
+            return {translations: result, ...language};
         }
         const byText = new Map(uniqueTexts.map((text, index) => [text, translations[index]]));
-        return texts.map(text => byText.get(text) ?? text);
+        return {translations: texts.map(text => byText.get(text) ?? text), ...language};
     } finally {
         options.signal.removeEventListener('abort', abort);
     }
@@ -627,10 +629,10 @@ export function createImageTranslationBackgroundHandlers(
             async handle(message: ImageTranslateTextsMessage) {
                 const texts = parseTexts(message.texts);
                 try {
-                    const translations = await textOperationRegistry.run(message, options => translateImageTexts(
+                    const result = await textOperationRegistry.run(message, options => translateImageTexts(
                         texts, parseOptionalTitle(message.title), dependencies, options, message,
                     ));
-                    return {success: true, translations};
+                    return {success: true, ...result};
                 } catch (error) {
                     if (!imageTranslationFailureCode(error)) throw error;
                     return imageTranslationFailureResponse(error);

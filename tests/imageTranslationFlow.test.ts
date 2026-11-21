@@ -79,7 +79,8 @@ it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker�
     const outcome=await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Image notes'})
         .then(value=>({value,error:undefined}),error=>({value:undefined,error}));
     if(mode==='mask'){
-        expect(outcome.error).toBeUndefined();expect(outcome.value).toEqual({success:true,translations:texts.map(convert)});
+        expect(outcome.error).toBeUndefined();
+        expect(outcome.value).toEqual({success:true,translations:texts.map(convert),targetLanguage:'zh-Hans'});
         expect(provider).toHaveBeenCalledOnce();
     }else{
         expect(outcome.error).toBeInstanceOf(Error);
@@ -96,7 +97,7 @@ it('单段翻译携带相邻原文参考，保留已是目标语言的标题且�
     const current = setup({getGlossaryConfig: () => ({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
     const texts = ['银行服务', 'Account', 'Close', 'Your account will be closed.', 'Contact support', 'Unrelated footer'];
     const response = await current.handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts,title:'Bank settings'});
-    expect(response).toMatchObject({success:true});
+    expect(response).toMatchObject({success:true,targetLanguage:'zh-CN'});
     const requests = current.dependencies.translateTexts.mock.calls.map(call => call[0]) as unknown as Array<{origin:string;context:string;pageContext:string}>;
     const close = requests.find(request => request.origin === 'Close')!;
     expect(close.context).toBe('Bank settings\nOther text from the same image (reference only):\n银行服务\nAccount\nYour account will be closed.\nContact support');
@@ -170,7 +171,7 @@ it.each(['fresh','cached','repeated'] as const)('AI 图片译文出现邻文边�
     });
     const type=IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
     const call=()=>current.handler(type).handle({type,texts:['路线说明','TURN RIGHT.'],title:'Image directions'});
-    const expected={success:true,translations:['路线说明',clean]};
+    const expected={success:true,translations:['路线说明',clean],targetLanguage:'zh-Hans'};
     if(mode==='cached'){
         await expect(call()).resolves.toEqual(expected);
         expect(stored.size).toBe(1);
@@ -598,7 +599,7 @@ describe('图片翻译流程优化',()=>{
         const {handler}=setup({supportsBatchTranslation:()=>batch,translateTexts,getGlossaryConfig:()=>({glossaryEnabled:false,glossaryLibraries:[],from:'auto',to:'zh-CN'})});
         const texts=['FIELD SKETCH 09','GPT-6','CHECK POINT 12','OpenAI GPT-6','FIELD SKETCH 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'];
         const response=await handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type:IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE,texts});
-        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9']});
+        expect(response).toEqual({success:true,translations:['现场速写 09','GPT-6','检查点 12','OpenAI GPT-6','现场速写 09','NVIDIA RTX 5090','22%','https://example.com','INTEL CORE 9'],targetLanguage:'zh-CN'});
         expect(requested).toEqual(batch?['FIELD SKETCH 09','CHECK POINT 12','FIELD SKETCH 09','INTEL CORE 9']:['FIELD SKETCH 09','CHECK POINT 12','INTEL CORE 9']);
         // 普通词加整数也可能是名称；供应商原样返回时仍保留原文，不能声称语法能辨认所有品牌。
         expect(texts[0]).toBe('FIELD SKETCH 09');
@@ -617,7 +618,7 @@ describe('图片翻译流程优化',()=>{
         })});
         const texts = ['docs.sglang.io/cookbook', '22%'];
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle({type: IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, texts}))
-            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook', '22%']});
+            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook', '22%'], targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).toHaveBeenCalledOnce();
     });
     it('技术标识的固定译名仍受可信页面和源语言范围限制', async () => {
@@ -627,11 +628,11 @@ describe('图片翻译流程优化',()=>{
         })});
         const message = {type: IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, texts: ['docs.sglang.io/cookbook'], sourceLanguage: 'en', glossaryRevision: 'revision'};
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle(message))
-            .resolves.toEqual({success: true, translations: message.texts});
+            .resolves.toEqual({success: true, translations: message.texts, targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).not.toHaveBeenCalled();
         const trusted = attachTranslationGlossaryContext(message, {pageUrl: 'https://docs.example.com/article', context: 'page'});
         await expect(handler(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE).handle(trusted))
-            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook']});
+            .resolves.toEqual({success: true, translations: ['译:docs.sglang.io/cookbook'], targetLanguage:'zh-Hans'});
         expect(dependencies.translateTexts).toHaveBeenCalledOnce();
     });
     it('图片读取服务配置时取消同一任务，批量和逐条模式都不得启动翻译', async () => {

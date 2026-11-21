@@ -12,6 +12,7 @@
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  * 倾斜排版：在原像素上独立观察方向，再用原文字核对尺度；普通图与漫画只向对应绘制传递同源样式，不扩大擦字范围，也不绕过透明预检或完整译文要求。
+ * 译文字形：背景返回本次翻译选用的目标语言。原文字体尺度度量完成后，为译文排版画布指定该语言，预检和实际绘制使用相同的字形回退。
  */
 import {createImageTranslationFailure} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
@@ -134,7 +135,7 @@ export async function translateImageTextsInExtension(
     requestId: string | undefined,
     signal?: AbortSignal,
     imageLabelSlots?: number[],
-): Promise<string[]> {
+): Promise<{translations: string[]; targetLanguage?: string}> {
     const operationId = requestId || `legacy-image-text-${++legacyImageTextRequestSequence}`;
     const response = await new Promise<any>((resolve, reject) => {
         let settled = false;
@@ -189,7 +190,8 @@ export async function translateImageTextsInExtension(
     if (!response?.success || !Array.isArray(response.translations)) {
         throw createImageTranslationFailure(response?.error || '图片文字翻译失败', response);
     }
-    return response.translations;
+    const targetLanguage = typeof response.targetLanguage === 'string' ? response.targetLanguage : undefined;
+    return {translations: response.translations, targetLanguage};
 }
 
 async function cropImage(dataUrl: string, selection: AreaTranslationSelection, signal?: AbortSignal): Promise<string> {
@@ -396,6 +398,7 @@ async function prepareTranslatedImage(
     support?:ImageDetectionSupport,
     placementImage?:string,
     mangaViewport?:ImageViewport,
+    targetLanguage?:string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
@@ -418,6 +421,7 @@ async function prepareTranslatedImage(
         const scratch=document.createElement('canvas');
         try{
             scratch.width=scratch.height=1;
+            if(targetLanguage)scratch.lang=targetLanguage;
             const context=scratch.getContext('2d');
             if(!context)throw new Error('浏览器不支持图片处理');
             const budget={remaining:2048,characters:262_144};
@@ -519,6 +523,8 @@ async function prepareTranslatedImage(
         const sourcePixels = context.getImageData(0, 0, canvas.width, canvas.height);
         throwIfImageOperationAborted(signal);
         if (manga) {
+            const backgrounds = translatedLines.length?sampleMangaBackgrounds(sourcePixels.data,canvas.width,canvas.height,selected.map(candidate=>candidate.original as MangaRegion),context):[];
+            if(targetLanguage)canvas.lang=targetLanguage;
             const placed:Array<{index:number;region:MangaRegion}>=[];
             if(blankCandidates.length){
                 const obstacles:OcrLine['bbox'][]=[],seen=new Set<string>();let valid=true;
@@ -560,7 +566,6 @@ async function prepareTranslatedImage(
                     if(!valid)break;
                 }
             }
-            const backgrounds = translatedLines.length?sampleMangaBackgrounds(sourcePixels.data,canvas.width,canvas.height,selected.map(candidate=>candidate.original as MangaRegion),context):[];
             const protection = translatedLines.length?planMangaAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[]):undefined;
             const pixels = translatedLines.length?await mangaInpaintingRuntime.repair(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[],signal,
                 (percent,initializing)=>reportProgress(requestId,initializing?'initializing':'preparing',percent),
@@ -612,6 +617,7 @@ async function prepareTranslatedImage(
             const style=getImageSourceTypographyStyle(context,candidate.original,orientations.get(candidate.original));
             if(style)fontStyles.set(candidate.translated,style);
         }
+        if(targetLanguage)canvas.lang=targetLanguage;
         const drawing=new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout;foreground?:string;background?:string;outline?:string;sourceInkBounds?:OcrLine['bbox'];orientation?:ImageSourceTypographyGeometry}>();
         const expansionBudget={remaining:262_144};
         function* otherTextBoxes(owner:ImageTextRegion){
@@ -730,6 +736,7 @@ async function prepareTranslatedImage(
         } catch(error) {
             if(!(error instanceof MangaAlphaProtectionLimitError)&&!(error instanceof ImageAlphaProtectionUnavailableError))throw error;
             if(sourceUnchanged&&error instanceof ImageAlphaProtectionUnavailableError&&support&&isSingleFrameImageData(source.currentSrc||source.src)){
+                if(targetLanguage)canvas.lang=targetLanguage;
                 const selected=new Set(candidates.filter(candidate=>!skipped.has(candidate.index)).map(candidate=>candidate.original));
                 const rescued=await renderImageMatteRescue(context,canvas,sourcePixels,translatedLines,lines.filter(line=>!selected.has(line)),readingLines,support,signal);
                 if(rescued)return rescued;
@@ -829,15 +836,17 @@ export async function translateImageInOffscreen(
         const lines:ImageTextRegion[]=[...readable,...guards];
         const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !line.guardOnly && !numericProtection(line.text));
         const translations = lines.map(line => line.text);
+        let targetLanguage: string | undefined;
         if (translatable.length) {
             reportProgress(requestId, 'translating');
             const labels = manga ? undefined : getAlignedImageLabelSlots(translatable);
-            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal, labels);
-            translatable.forEach(({index}, position) => {translations[index] = translated[position] ?? lines[index].text;});
+            const result = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal, labels);
+            targetLanguage = result.targetLanguage;
+            translatable.forEach(({index}, position) => {translations[index] = result.translations[position] ?? lines[index].text;});
         }
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, manga ? 'cleaning' : 'rendering');
-        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined,mangaViewport);
+        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined,mangaViewport,targetLanguage);
     } finally {
         source.src = '';
     }

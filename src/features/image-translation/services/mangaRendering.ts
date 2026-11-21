@@ -295,7 +295,7 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                         },safety);
                         if(!plan.accepted)break;
                         const raster=rasterizeMangaGlyphs(plan,bounds,protection!.rectangles,{
-                            fillStyle:ink==='#111827'?'#111111':ink,strokeStyle:textOutline,
+                            fillStyle:ink==='#111827'?'#111111':ink,strokeStyle:textOutline,language:context.canvas?.lang,
                         },glyphLedger??=createMangaGlyphRasterLedger());
                         if(raster.kind==='accepted'){
                             let drawn=false;

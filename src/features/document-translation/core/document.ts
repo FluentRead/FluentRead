@@ -1330,13 +1330,17 @@ export function resolveDocumentTranslation(source: string, translation: string |
     return hasDistinctTranslation(source, translation) ? translation! : source;
 }
 
-function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string, xhtml: boolean): string {
+/** EPUB 2 使用 XHTML 1.1，只允许标准属性标记译文。 */
+type DocumentHtmlOutput = boolean | 'epub2';
+
+function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string, xhtml: DocumentHtmlOutput): string {
     const source = originalPartSource(part);
     const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
         ? preserveSubtitleMarkup(part.source, translation)
         : translation;
     if (document.format === 'html') {
-        return `${part.prefix}${source}${part.suffix}${xhtml ? '<br/>' : '<br>'}<span data-fluent-read-document-translation="true">${renderHtmlTranslation(part, translation)}</span>`;
+        const marker = xhtml === 'epub2' ? 'class="fluentread-document-translation"' : 'data-fluent-read-document-translation="true"';
+        return `${part.prefix}${source}${part.suffix}${xhtml ? '<br/>' : '<br>'}<span ${marker}>${renderHtmlTranslation(part, translation)}</span>`;
     }
     if (document.format === 'markdown') {
         return `${part.prefix}${source}${part.suffix}\n> ${renderMarkdownTranslation(part, translation)}`;
@@ -1350,7 +1354,7 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
     return `${part.prefix}${source}${part.suffix}\n${formattedTranslation}`;
 }
 
-function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, maxLength: number, xhtml: boolean): string {
+function renderParts(document: ParsedDocument, translations: readonly string[], mode: DocumentRenderMode, maxLength: number, xhtml: DocumentHtmlOutput): string {
     const output: string[] = [];
     let length = 0;
     const append = (value: string) => {
@@ -1441,7 +1445,7 @@ export function renderDocument(
     translations: readonly string[],
     mode: DocumentRenderMode = 'bilingual',
     maxLength = Infinity,
-    options: {xhtml?: boolean} = {},
+    options: {xhtml?: DocumentHtmlOutput} = {},
 ): string {
     maxLength = Number.isNaN(maxLength) ? 0 : Math.max(0, Math.trunc(maxLength));
     if (maxLength === 0) return '';

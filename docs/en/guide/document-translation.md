@@ -35,6 +35,8 @@ Changing languages, glossary settings, or some connection parameters requires a 
 
 The selected version is independent of the reading view. Partial downloads require confirmation. Passages without a translation, including cleared translations, retain their source text. Changing settings alone does not retranslate the file; downloads use the results currently kept.
 
+EPUB exports reuse translated chapter headings, including your edits, in the reader’s table of contents. **Bilingual** shows the heading translation after the original label. **Translation only** shows the heading translation by itself. An entry keeps its existing label if it points to an untranslated heading or cannot be matched to a heading.
+
 The panel opens beside the toolbar. PDF versions include a small layout illustration. Expand **PDF layout** to choose **Original** or **Reflow** without changing the reading view. If generation fails, your translation and edits are kept. Use **Retry download**, or expand **Technical details** to inspect the cause.
 
 **Download original** saves the opened source file without translating it first. You can cancel and retry ePub, DOCX, PDF, or batch ZIP generation without losing translations or edits.

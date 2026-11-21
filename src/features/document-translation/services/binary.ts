@@ -2,7 +2,8 @@
  * @file src/features/document-translation/services/binary.ts
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
  * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
- * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
+ * EPUB 目录在归档时复用实际导出的章节标题译文，兼容原有阅读和历史记录。
+ * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，电子书目录规则归 core/epubNavigation，PDF 目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {pdfFallbackBidiLine} from '../core/pdfFallbackBidi';
@@ -14,6 +15,7 @@ import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, t
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
 import {paginatePdfReadingPlan, type PdfReadingOutputPage, type PdfTextMeasure} from '../core/pdfTextLayout';
 import type {PdfReadingTextEntry} from '../core/pdfReadingRegions';
+import type {EpubNavigationEntry, EpubNavigationKind, EpubNavigationTarget} from '../core/epubNavigation';
 
 import {
     getDocumentMaxBytes,
@@ -951,6 +953,29 @@ export function chapterTitle(source: string, fallback: string): string {
     return title || fallback;
 }
 
+interface EpubManifestItem {path: string; mediaType: string; properties: string[]}
+
+async function readEpubPackage(zip: JSZip, container: JSZip.JSZipObject, signal?: AbortSignal) {
+    const containerXml = await readArchiveText(container, signal);
+    const rootfileMatch = containerXml.match(/<rootfile\b([^>]*)\/?\s*>/iu);
+    const opfPath = rootfileMatch ? parseXmlAttributes(rootfileMatch[1])['full-path'] : '';
+    if (!opfPath || !zip.file(opfPath)) return undefined;
+
+    const opfXml = await readArchiveText(zip.file(opfPath)!, signal);
+    const manifest = new Map<string, EpubManifestItem>();
+    for (const [, item] of opfXml.matchAll(/<item\b([^>]*)\/?\s*>/giu)) {
+        const attributes = parseXmlAttributes(item);
+        if (attributes.id && attributes.href) {
+            manifest.set(attributes.id, {
+                path: resolveZipPath(opfPath, attributes.href),
+                mediaType: attributes['media-type'] || '',
+                properties: (attributes.properties || '').split(/\s+/u),
+            });
+        }
+    }
+    return {opfXml, manifest};
+}
+
 async function parseEpub(fileName: string, bytes: Uint8Array, signal?: AbortSignal): Promise<ParsedDocument> {
     let zip: JSZip;
     try {
@@ -973,27 +998,9 @@ async function parseEpub(fileName: string, bytes: Uint8Array, signal?: AbortSign
         throw new Error('ePub 文件签名无效，文件可能已损坏或扩展名不正确');
     }
 
-    const containerXml = await readArchiveText(containerEntry, signal);
-    const rootfileMatch = containerXml.match(/<rootfile\b([^>]*)\/?\s*>/iu);
-    const opfPath = rootfileMatch ? parseXmlAttributes(rootfileMatch[1])['full-path'] : '';
-    if (!opfPath || !zip.file(opfPath)) {
-        throw new Error('ePub 文件结构无效：找不到内容清单 OPF');
-    }
-
-    const opfXml = await readArchiveText(zip.file(opfPath)!, signal);
-    const manifest = new Map<string, {path: string; mediaType: string}>();
-    const itemPattern = /<item\b([^>]*)\/?\s*>/giu;
-    let itemMatch = itemPattern.exec(opfXml);
-    while (itemMatch) {
-        const attributes = parseXmlAttributes(itemMatch[1]);
-        if (attributes.id && attributes.href) {
-            manifest.set(attributes.id, {
-                path: resolveZipPath(opfPath, attributes.href),
-                mediaType: attributes['media-type'] || '',
-            });
-        }
-        itemMatch = itemPattern.exec(opfXml);
-    }
+    const epub = await readEpubPackage(zip, containerEntry, signal);
+    if (!epub) throw new Error('ePub 文件结构无效：找不到内容清单 OPF');
+    const {opfXml, manifest} = epub;
 
     const orderedChapters: Array<{path: string; mediaType: string}> = [];
     const itemrefPattern = /<itemref\b([^>]*)\/?\s*>/giu;
@@ -1650,7 +1657,39 @@ async function renderEpub(document: ParsedDocument, translations: readonly strin
     const zip = await awaitDocumentRead(JSZip.loadAsync(document.binary.bytes), options.signal);
     options.signal?.throwIfAborted();
     assertArchiveSafety(zip, 'ePub');
-    preserveStoredDocumentEntries(zip, document.binary.bytes, new Set(document.binary.chapters.map(chapter => chapter.path)));
+    const {readEpubHeadingTranslations, readEpubNavigation, renderEpubNavigation, resolveEpubNavigationTarget} = await import('../core/epubNavigation');
+    const container = zip.file('META-INF/container.xml');
+    const epub = container && await readEpubPackage(zip, container, options.signal);
+    const packageTag = epub?.opfXml.match(/<package\b([^>]*)>/iu);
+    const epub2 = packageTag && parseXmlAttributes(packageTag[1]).version === '2.0';
+    const navigation = new Map<string, {
+        source: string;
+        kind: EpubNavigationKind;
+        links: EpubNavigationEntry[];
+        targets: Array<EpubNavigationTarget | undefined>;
+        rendered?: string;
+    }>();
+    if (epub) {
+        const {opfXml, manifest} = epub;
+        const navFiles = [...manifest.values()]
+            .filter(item => item.mediaType === 'application/xhtml+xml' && item.properties.includes('nav'))
+            .map(item => ({path: item.path, kind: 'xhtml' as const}));
+        const spine = opfXml.match(/<spine\b([^>]*)>/iu);
+        const ncx = spine ? manifest.get(parseXmlAttributes(spine[1]).toc) : undefined;
+        for (const {path, kind} of [
+            ...navFiles,
+            ...(ncx?.mediaType === 'application/x-dtbncx+xml' ? [{path: ncx.path, kind: 'ncx' as const}] : []),
+        ]) {
+            const entry = zip.file(path);
+            if (!entry) continue;
+            const source = await readArchiveText(entry, options.signal);
+            const links = readEpubNavigation(source, kind);
+            if (links?.length) navigation.set(path, {source, kind, links, targets: links.map(link => resolveEpubNavigationTarget(path, link.href))});
+        }
+    }
+    const destinations = new Set([...navigation.values()].flatMap(file => file.targets.map(target => target?.path)));
+    const headings = new Map<string, Map<string, string>>();
+    const changedPaths = new Set<string>();
     for (const chapter of document.binary.chapters) {
         await yieldDocumentTask();
         options.signal?.throwIfAborted();
@@ -1658,8 +1697,28 @@ async function renderEpub(document: ParsedDocument, translations: readonly strin
         const chapterTranslations = translations.slice(chapter.segmentOffset, chapter.segmentOffset + chapter.segmentCount);
         // XHTML chapters must remain XML; do not rewrite literal source/script text while fixing generated line breaks.
         const xhtml = chapter.mediaType === 'application/xhtml+xml' || !chapter.mediaType && /xmlns\s*=\s*["']http:\/\/www\.w3\.org\/1999\/xhtml["']/iu.test(chapter.source);
-        zip.file(chapter.path, renderDocument(parsedChapter, chapterTranslations, mode, Infinity, {xhtml}));
+        const renderOptions = {xhtml: xhtml && epub2 ? 'epub2' as const : xhtml};
+        const rendered = renderDocument(parsedChapter, chapterTranslations, mode, Infinity, renderOptions);
+        const nav = navigation.get(chapter.path);
+        if (nav) nav.rendered = rendered;
+        headings.delete(chapter.path);
+        if (destinations.has(chapter.path) && parsedChapter.segments.some(({id, source}) => hasDistinctTranslation(source, chapterTranslations[id]))) {
+            const localized = mode === 'translated' ? rendered : renderDocument(parsedChapter, chapterTranslations, 'translated', Infinity, renderOptions);
+            headings.set(chapter.path, readEpubHeadingTranslations(chapter.source, localized));
+        }
+        zip.file(chapter.path, rendered);
+        changedPaths.add(chapter.path);
     }
+    for (const [path, {source, kind, links, targets, rendered = source}] of navigation) {
+        options.signal?.throwIfAborted();
+        const labels = targets.map(target => target && headings.get(target.path)?.get(target.fragment));
+        const updated = renderEpubNavigation(source, links, rendered, kind, mode, labels);
+        if (updated !== rendered) {
+            zip.file(path, updated);
+            changedPaths.add(path);
+        }
+    }
+    preserveStoredDocumentEntries(zip, document.binary.bytes, changedPaths);
     zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
     // 更新文件不会改变 JSZip 的键顺序；EPUB 要求 mimetype 是第一条本地记录。
     const {mimetype, ...resources} = zip.files;

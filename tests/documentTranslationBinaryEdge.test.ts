@@ -3,6 +3,7 @@ import {PDFDocument} from 'pdf-lib';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {parseDocument, type ParsedDocument} from '@/src/features/document-translation/core/document';
+import {readEpubHeadingTranslations, readEpubNavigation, renderEpubNavigation, resolveEpubNavigationTarget} from '@/src/features/document-translation/core/epubNavigation';
 import {pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
 import {
     assertArchiveSafety,
@@ -59,6 +60,77 @@ function atom(text: string, x: number, y: number, width = 20, height = 10): PdfT
 function line(text: string, x: number, y: number, width = 80, height = 10): PdfTextLine {
     return {text, x, y, width, height, fontFamily: 'sans-serif'};
 }
+
+describe('EPUB navigation XML', () => {
+    it('reads title, section and inline anchors, and skips unsafe chapter matches', () => {
+        const source = '<html xmlns="http://www.w3.org/1999/xhtml"><body><aside id="aside"><p>No heading.</p></aside>' +
+            '<section id="start"><svg xmlns="http://www.w3.org/2000/svg"><title>Decoration</title></svg>' +
+            '<h1 xml:id="heading"><a name="alias"></a><![CDATA[Reading]]>&nbsp;<img alt="guide"/> <img src="ornament.svg"/></h1>' +
+            '<h2 id="heading">Duplicate fragment</h2></section></body></html>';
+        const translated = source.replace('Reading', '阅读').replace('alt="guide"', 'alt="指南"');
+        expect([...readEpubHeadingTranslations(source, translated)]).toEqual([
+            ['', '阅读 指南'], ['start', '阅读 指南'], ['heading', '阅读 指南'], ['alias', '阅读 指南'],
+        ]);
+        expect([...readEpubHeadingTranslations('<h1>Reading</h1>', '<h1>阅读</h1>')]).toEqual([['', '阅读']]);
+        for (const [original, output] of [
+            [source, source],
+            [source, translated.replace('&nbsp;', '&custom;')],
+            [source, '<h1>Only one heading</h1>'],
+            ['<p>Body text</p>', '<p>正文</p>'],
+        ]) expect(readEpubHeadingTranslations(original, output).size).toBe(0);
+    });
+
+    it('edits only mapped labels and keeps the content if the label or navigation structure cannot be matched', () => {
+        const source = '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:e="http://www.idpf.org/2007/ops"><body><nav e:type="toc"><ol>' +
+            '<li><a href="chapter.xhtml" title="A > B"><em id="landing">Title</em></a></li>' +
+            '<li><a href="next.xhtml"><![CDATA[下一章]]></a></li><li><a href="third.xhtml"> </a></li>' +
+            '<li><a>Without a target</a></li></ol></nav></body></html>';
+        const entries = readEpubNavigation(source, 'xhtml')!;
+        expect(entries.map(entry => entry.href)).toEqual(['chapter.xhtml', 'next.xhtml', 'third.xhtml', '']);
+        const results = ['标题', '下一章', '第三章', undefined];
+        const rendered = source.replace('<![CDATA[下一章]]>', '早期校订');
+        expect(renderEpubNavigation(source, entries, rendered, 'xhtml', 'translated', results)).toBe(source);
+        expect(renderEpubNavigation(source, entries, source, 'xhtml', 'bilingual', results)).toBe(source.replace('</em>', '</em> / 标题'));
+        for (const incompatible of [
+            rendered.replace('</nav>', ''),
+            rendered.replace('href="next.xhtml"', 'href="different.xhtml"'),
+            rendered.replace('<li><a>Without a target</a></li>', ''),
+        ]) expect(renderEpubNavigation(source, entries, incompatible, 'xhtml', 'translated', results)).toBe(incompatible);
+        expect(readEpubNavigation('<html><nav>', 'xhtml')).toBeUndefined();
+    });
+
+    it('retains legacy labels with absent destinations and ignores invalid archive links', () => {
+        const source = '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap><navPoint>' +
+            '<navLabel><text><![CDATA[Label]]></text></navLabel><content/></navPoint></navMap></ncx>';
+        expect(readEpubNavigation(source, 'ncx')?.map(({href, text}) => ({href, text}))).toEqual([{href: '', text: 'Label'}]);
+        expect(readEpubNavigation(source.replace('</navPoint>', ''), 'ncx')).toBeUndefined();
+        expect(resolveEpubNavigationTarget('Book/nav #1.xhtml', '#notes%3A1')).toEqual({path: 'Book/nav #1.xhtml', fragment: 'notes:1'});
+        for (const href of ['', '//example.invalid/page.xhtml', 'htt\nps://example.invalid/page.xhtml', '\\other.xhtml']) {
+            expect(resolveEpubNavigationTarget('Book/nav.xhtml', href)).toBeUndefined();
+        }
+    });
+
+    it('exports EPUB chapters when optional navigation entries are missing or malformed', async () => {
+        const brokenNav = '<html xmlns="http://www.w3.org/1999/xhtml"><body><nav></body></html>';
+        const book = await parseBinaryDocument('broken-navigation.epub', await zipBytes({
+            mimetype: 'application/epub+zip',
+            'META-INF/container.xml': '<container><rootfile full-path="book.opf"/></container>',
+            'book.opf': `<package><manifest>
+<item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>
+<item id="missing" href="missing.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="broken" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+</manifest></package>`,
+            'chapter.xhtml': '<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Chapter One</h1></body></html>',
+            'nav.xhtml': brokenNav,
+        }));
+        const translations = book.segments.map(segment => segment.source === 'Chapter One' ? '第一章' : '');
+        const {data} = await createDocumentDownload(book, translations, 'translated');
+        const output = await JSZip.loadAsync(data as Uint8Array);
+        expect(await output.file('chapter.xhtml')!.async('string')).toContain('<h1>第一章</h1>');
+        expect(await output.file('nav.xhtml')!.async('string')).toBe(brokenNav);
+        expect(output.file('missing.xhtml')).toBeNull();
+    });
+});
 
 describe('binary document low-level contracts', () => {
     it('限制压缩项数量、单项大小和解压总量', () => {

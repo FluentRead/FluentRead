@@ -416,6 +416,99 @@ describe('binary document translation formats', () => {
         expect(linkedChapter).toContain('href="chapter-1.xhtml"');
         expect(linkedChapter.match(/<title>/gu)).toHaveLength(1);
         expect(linkedChapter).not.toContain('<title>译文：');
+        const navigation = await zip.file('OEBPS/nav.xhtml')!.async('string');
+        expect(navigation).toContain('<a href="chapter-1.xhtml">Fluent reading / 译文：Fluent reading for local books</a>');
+        expect(navigation).toContain('<a href="chapter-2.xhtml">Regression / 译文：Regression coverage</a>');
+    });
+
+    it.each([false, true])('synchronizes EPUB navigation and NCX without changing targets (nav on spine: %s)', async navOnSpine => {
+        const zip = new JSZip();
+        const navPath = 'Book/Navigation/nav.xhtml', ncxPath = 'Book/Navigation/book.ncx';
+        const chapterPath = 'Book/Text/Chapter 1.xhtml';
+        const firstLink = '../Text/Chapter%201.xhtml#start';
+        const secondLink = '../Text/Chapter%201.xhtml#%E7%AC%AC%E4%BA%8C';
+        const pageLink = '../Text/Chapter%201.xhtml';
+        const bodyLink = '../Text/Chapter%201.xhtml#p';
+        const pendingLink = '../Text/Chapter%201.xhtml#untranslated';
+        const invalidLink = '../Text/Chapter%201.xhtml#%FF';
+        const externalLink = 'https://example.invalid/Text/Chapter%201.xhtml#start';
+        const otherNavigation = `<nav ops:type="page-list"><ol><li><a href="${firstLink}">7</a></li></ol></nav>`;
+        const sourceNav = `<?xml version="1.0"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ops="http://www.idpf.org/2007/ops"><head><title>Contents</title></head><body>
+<nav ops:type="toc"><h1>Contents</h1><ol><li><a href="${firstLink}"><em>Chapter One</em></a>
+<ol><li><a href="${secondLink}">Details</a></li><li><a href="${pageLink}">Start</a></li><li><a href="${bodyLink}">Text</a></li>
+<li><a href="${pendingLink}">Pending</a></li><li><a href="${invalidLink}">Unknown anchor</a></li><li><a href="${externalLink}">External</a></li></ol>
+</li></ol></nav>${otherNavigation}</body></html>`;
+        const sourceNcx = `<?xml version="1.0"?>\n<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><docTitle><text>Book Name</text></docTitle><navMap>
+<navPoint id="n1" playOrder="1"><navLabel><text>Chapter One</text></navLabel><content src="${firstLink}"/>
+<navPoint id="n2" playOrder="2"><navLabel><text>Details</text></navLabel><content src="${secondLink}"/></navPoint>
+<navPoint id="n3" playOrder="3"><navLabel><text>Pending</text></navLabel><content src="${pendingLink}"/></navPoint></navPoint>
+</navMap><pageList><pageTarget id="page"><navLabel><text>7</text></navLabel><content src="${firstLink}"/></pageTarget></pageList></ncx>`;
+        zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+        zip.file('META-INF/container.xml', '<container><rootfiles><rootfile full-path="Book/content.opf"/></rootfiles></container>');
+        zip.file('Book/content.opf', `<package><manifest>
+<item id="c1" href="Text/Chapter%201.xhtml" media-type="application/xhtml+xml"/>
+<item id="navigation" href="Navigation/nav.xhtml" media-type="application/xhtml+xml" properties="scripted nav"/>
+<item id="ncx" href="Navigation/book.ncx" media-type="application/x-dtbncx+xml"/>
+</manifest><spine toc="ncx">${navOnSpine ? '<itemref idref="navigation"/>' : ''}<itemref idref="c1"/></spine></package>`);
+        zip.file(navPath, sourceNav);
+        zip.file(ncxPath, sourceNcx);
+        zip.file(chapterPath, `<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Book</title></head><body>
+<section id="start"><h1 id="heading">The <em>first</em> chapter</h1>
+<p id="p">Body excerpt.</p>
+<h2 id="第二">Tools &amp; terms<br/>A worked example</h2><h2 id="untranslated">Waiting</h2>
+</section></body></html>`);
+
+        const parsed = await parseBinaryDocument('navigation.epub', await zip.generateAsync({type: 'uint8array'}));
+        const selected = new Map([
+            ['The <g1>first</g1> chapter', '第<g1>一</g1>章'],
+            ['Tools & terms', '工具 & 术语'],
+            ['A worked example', '示例 <A>'],
+            ['Body excerpt.', '正文摘录。'],
+            ['Chapter One', '单独翻译的目录标签'],
+            ['Waiting', '  '],
+        ]);
+        const translations = parsed.segments.map(segment => selected.get(segment.source) ?? '');
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const {data} = await createDocumentDownload(parsed, translations, mode);
+            const output = await JSZip.loadAsync(data as Uint8Array);
+            const nav = await output.file(navPath)!.async('string');
+            const ncx = await output.file(ncxPath)!.async('string');
+            for (const source of [nav, ncx]) expect(() => new SaxesParser({xmlns: true}).write(source).close()).not.toThrow();
+            const bilingual = mode === 'bilingual';
+            expect(nav).toContain(`<a href="${firstLink}">${bilingual ? '<em>Chapter One</em> / ' : ''}第一章</a>`);
+            expect(nav).toContain(`<a href="${secondLink}">${bilingual ? 'Details / ' : ''}工具 &amp; 术语 示例 &lt;A&gt;</a>`);
+            expect(nav).toContain(`<a href="${pageLink}">${bilingual ? 'Start / ' : ''}第一章</a>`);
+            expect(nav).not.toContain('单独翻译的目录标签');
+            expect(nav).toContain(otherNavigation);
+            for (const [href, label] of [[bodyLink, 'Text'], [pendingLink, 'Pending'], [invalidLink, 'Unknown anchor'], [externalLink, 'External']]) {
+                expect(nav).toContain(`<a href="${href}">${label}</a>`);
+            }
+            expect(ncx).toContain(`<text>${bilingual ? 'Chapter One / ' : ''}第一章</text></navLabel><content src="${firstLink}"/>`);
+            expect(ncx).toContain(`<text>${bilingual ? 'Details / ' : ''}工具 &amp; 术语 示例 &lt;A&gt;</text></navLabel><content src="${secondLink}"/>`);
+            expect(ncx).toContain('<text>Pending</text>');
+            expect(ncx).toContain('<docTitle><text>Book Name</text></docTitle>');
+            expect(ncx).toContain(`<pageTarget id="page"><navLabel><text>7</text></navLabel><content src="${firstLink}"/>`);
+            expect(await output.file('Book/content.opf')!.async('string')).toBe(await zip.file('Book/content.opf')!.async('string'));
+        }
+    });
+
+    it('exports EPUB 2 with an NCX translation and an XHTML 1.1-compatible marker', async () => {
+        const zip = new JSZip();
+        zip.file('mimetype', 'application/epub+zip', {compression: 'STORE'});
+        zip.file('META-INF/container.xml', '<container><rootfile full-path="book.opf"/></container>');
+        zip.file('book.opf', `<package version="2.0"><manifest>
+<item id="body" href="body.xhtml" media-type="application/xhtml+xml"/>
+<item id="ncx" href="book.ncx" media-type="application/x-dtbncx+xml"/>
+</manifest><spine toc="ncx"><itemref idref="body"/></spine></package>`);
+        zip.file('body.xhtml', '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>Book</title></head><body><h1 id="first">Chapter One</h1></body></html>');
+        zip.file('book.ncx', '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/"><navMap><navPoint><navLabel><text>Chapter One</text></navLabel><content src="body.xhtml#first"/></navPoint></navMap></ncx>');
+        const book = await parseBinaryDocument('legacy.epub', await zip.generateAsync({type: 'uint8array'}));
+        const {data} = await createDocumentDownload(book, ['第一章'], 'bilingual');
+        const output = await JSZip.loadAsync(data as Uint8Array);
+        const body = await output.file('body.xhtml')!.async('string');
+        expect(body).toContain('<h1 id="first">Chapter One<br/><span class="fluentread-document-translation">第一章</span></h1>');
+        expect(body).not.toContain('data-fluent-read-document-translation');
+        expect(await output.file('book.ncx')!.async('string')).toContain('<text>Chapter One / 第一章</text>');
     });
 
     it('exports strict XHTML line breaks without rewriting namespaces, styles, resources or literal script text', async () => {

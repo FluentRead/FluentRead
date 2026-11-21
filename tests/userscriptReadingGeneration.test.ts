@@ -357,6 +357,8 @@ it.each(['azureOpenai', 'zhipu', 'custom:reader', 'claude', 'gemini'] as const)(
 it.each([
     ['https://reader.openai.azure.com', 'gpt-6.1-terra', 'max_completion_tokens'],
     ['https://reader.openai.azure.com/openai/deployments/gpt-5-mini/chat/completions?api-version=2025-04-01-preview', 'gpt-5-mini', 'max_completion_tokens'],
+    ['https://reader.openai.azure.com/openai/deployments/gpt-5-mini/chat/completions?api-version=2025-04-01-preview', 'reader', 'max_completion_tokens'],
+    ['https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-02-15-preview', 'gpt-5-mini', 'max_tokens'],
     ['https://reader.openai.azure.com/openai/deployments/reader/chat/completions?api-version=2024-02-15-preview', 'reader', 'max_tokens'],
 ] as const)('uses the expected Azure AI explanation budget at %s for %s', async (endpoint, model, budgetKey) => {
     const value = config('azureOpenai');

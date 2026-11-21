@@ -16,9 +16,12 @@ export function normalizeChatCompletionRequest(endpoint: string, body: Record<st
   const result = {...body};
   const completionLimit = body.max_completion_tokens;
   const legacyLimit = body.max_tokens;
-  // shortcut: Azure 自定义别名沿用旧字段；有可靠的部署能力元数据时再自动识别别名。
-  const azureReasoning = service === services.azureOpenai && typeof body.model === 'string'
-    && /^(?:gpt-[56](?:[.-]|$)|o[134](?:-|$))/iu.test(body.model);
+  // Azure 旧版路由由 URL 选择部署，v1 接口则使用请求体中的部署名称。
+  const azureDeployment = service === services.azureOpenai
+    ? url.pathname.match(/^\/openai\/deployments\/([^/]+)\/chat\/completions\/?$/u)?.[1] ?? body.model
+    : undefined;
+  const azureReasoning = typeof azureDeployment === 'string'
+    && /^(?:gpt-[56](?:[.-]|$)|o[134](?:-|$))/iu.test(azureDeployment);
   const modern = officialChat || azureReasoning || completionLimit != null;
   const limit = completionLimit ?? legacyLimit;
   delete result.max_tokens;

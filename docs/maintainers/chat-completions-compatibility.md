@@ -25,7 +25,7 @@
 
 非流式翻译只读取响应的 `choices[0].message.content`，包括分段返回的文本。供应商单独返回的 `refusal`、思考内容和工具调用不计作译文。
 
-只精确识别官方 origin 和 Chat 路径；相似主机名、不同端口、HTTP 及不同路径不视为官方协议。Azure 使用未知别名时保留旧默认。若该别名对应的部署需要新字段，可在自定义请求体显式设置 `max_completion_tokens`。
+只精确识别官方 origin 和 Chat 路径；相似主机名、不同端口、HTTP 及不同路径不视为官方协议。Azure 旧版 `/openai/deployments/{deployment}/chat/completions` 以 URL 的部署名称为准，v1 接口使用请求体的 `model`。未知别名保留旧默认，若该部署需要新字段，可在自定义请求体显式设置 `max_completion_tokens`。
 
 显式非空 `max_completion_tokens` 高于 `max_tokens`；空值删除而不是作为绕过服务器校验的哨兵。没有预算时不添加预算。不会修改保存的配置，也不增加网络探测、错误重试或自动协议回退。
 

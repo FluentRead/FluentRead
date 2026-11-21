@@ -12,6 +12,8 @@ For an online PDF, choose **Open PDF reader** from the extension menu or paste i
 
 Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
 
+Text imports support UTF-8 and UTF-16 files with a byte order mark. Text exports use UTF-8. If you get an encoding error, save the source file as UTF-8 and import it again.
+
 ## Translate and read
 
 1. Choose the **translation service**, **target language**, and a model for AI services in the toolbar. Set the source language and glossary in the sidebar; narrow windows use **Translation settings**.
@@ -106,6 +108,8 @@ After a PDF is parsed again, edits are restored only when the source text and po
 <summary>Other formats, terminology, and AI context references</summary>
 
 Markdown, HTML, and ePub aim to retain links, emphasis, and inline code. URLs, email addresses, code blocks, and program identifiers remain unchanged. If formatting cannot be preserved, retry or change services. JSON keeps its structure and non-text values; nesting beyond 1000 levels is unsupported. Word tables remain tables, and ePub downloads retain chapters, images, links, and styles.
+
+GitHub Flavored Markdown tables are translated one cell at a time. The reading view and downloads retain rows, columns, and alignment. Bilingual mode shows both texts in the same cell.
 
 Subtitle exports retain numbering, timing, and formatting tags. Translation-only output replaces the cue text; bilingual output keeps both texts in each cue. Fixed-width wrapped text is joined into paragraphs, while headings and lists stay separate where possible.
 

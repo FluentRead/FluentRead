@@ -3,11 +3,13 @@
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
  * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
+ * GFM 表格在单元格内回填译文，字幕导出保护 cue 边界。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {decodeTextareaHtml} from '@/src/shared/text/htmlEntities';
 // 归一规则与服务候选验证共用，避免导出与免费线路接受不同的编号标签写法。
 import {normalizeDocumentInlineMarkers} from '@/src/core/translation/public';
+import {escapeMarkdownTableTranslation, markdownTableAlignments, splitMarkdownTableRow, type MarkdownTable} from './markdownTable';
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** 带插图的论文与扫描件常超过 10 MB；PDF 按页解析、译文量只取决于文字，单独放宽上限。 */
 export const PDF_MAX_BYTES = 50 * 1024 * 1024;
@@ -182,6 +184,8 @@ interface SegmentPart {
     bilingualPrefix?: string;
     /** Markdown 源行分组，用于渲染一条结构完整的双语行。 */
     bilingualGroup?: number;
+    /** 表格单元格的译文回填在当前列内。 */
+    markdownTableCell?: 'withoutLeadingPipe' | 'delimited';
     /** Markdown 整行片段里行内语法的原文：链接是成对的占位符（有 close），代码、网址等是单个占位符。 */
     markdownTokens?: Array<{open: string; close?: string}>;
     /** HTML 整句片段里行内标签的原文：送翻时写成编号占位符 `<gN>…</gN>`，渲染时按编号还原。 */
@@ -218,6 +222,8 @@ export interface ParsedDocument {
     jsonEntries?: readonly JsonSegmentEntry[];
     /** Markdown 围栏与受控缩进代码由解析器统一判定，预览无需复制容器状态机。 */
     markdownCodeBlocks?: readonly MarkdownCodeBlock[];
+    /** 旧解析快照没有表格范围，刷新时会从原文件补齐。 */
+    markdownTables?: readonly MarkdownTable[];
     binary?: BinaryDocumentData;
 }
 
@@ -290,7 +296,7 @@ function trimSource(value: string): {prefix: string; source: string; suffix: str
     return {prefix: value.slice(0, start), source, suffix: value.slice(start + source.length)};
 }
 
-type SegmentOptions = Pick<SegmentPart, 'bilingualPrefix' | 'bilingualGroup'>
+type SegmentOptions = Pick<SegmentPart, 'bilingualPrefix' | 'bilingualGroup' | 'markdownTableCell'>
     & Omit<Partial<DocumentSegment>, 'id' | 'source'>;
 
 function addLiteral(parts: DocumentPart[], value: string, bilingualGroup?: number): void {
@@ -317,7 +323,7 @@ function addSegment(
     }
 
     const segmentIndex = segments.length;
-    const {bilingualPrefix, bilingualGroup, ...segmentOptions} = options;
+    const {bilingualPrefix, bilingualGroup, markdownTableCell, ...segmentOptions} = options;
     const source = transformSource ? transformSource(trimmed.source) : trimmed.source;
     segments.push({id: segmentIndex, source, ...segmentOptions});
     parts.push({
@@ -329,6 +335,7 @@ function addSegment(
         suffix: trimmed.suffix,
         bilingualPrefix,
         bilingualGroup,
+        ...(markdownTableCell ? {markdownTableCell} : {}),
     });
 }
 
@@ -402,13 +409,14 @@ function addMarkdownSentence(
     parts: DocumentPart[],
     segments: DocumentSegment[],
     value: string,
-    bilingualGroup: number,
+    bilingualGroup?: number,
+    markdownTableCell?: SegmentPart['markdownTableCell'],
 ): void {
     // 行首容器和标题语法留在本地：服务可能把 "# Heading" 改成 "#标题"，或擅自改动列表编号。
     const container = inspectMarkdownLine(value);
     const heading = container.content.match(/^#{1,6}[\t ]+/u)?.[0] ?? '';
     const checkbox = container.listIndent ? container.content.match(/^\[[ xX]\][\t ]+/u)?.[0] ?? '' : '';
-    const prefixLength = value.length - container.content.length + heading.length + checkbox.length;
+    const prefixLength = markdownTableCell ? 0 : value.length - container.content.length + heading.length + checkbox.length;
     if (prefixLength) {
         addLiteral(parts, value.slice(0, prefixLength), bilingualGroup);
         value = value.slice(prefixLength);
@@ -452,7 +460,7 @@ function addMarkdownSentence(
         cursor = end;
     }
     source += emphasis(value.slice(cursor));
-    const options: SegmentOptions = {bilingualGroup, markdownLineStart: true};
+    const options: SegmentOptions = {bilingualGroup, markdownLineStart: !markdownTableCell, markdownTableCell};
     // 没有行内语法，或文字本身含有占位符写法（无法区分真假占位符）时，整行按普通文字处理。
     if (!tokens.length || MARKDOWN_PLACEHOLDER.test(value)) {addSegment(parts, segments, value, options); return;}
     const trimmed = trimSource(value)!;
@@ -460,8 +468,9 @@ function addMarkdownSentence(
     if (!source.replace(/<g\d+\/>/gu, '').trim()) {addLiteral(parts, value, bilingualGroup); return;}
     const segmentIndex = segments.length;
     const text = source.trim();
-    segments.push({id: segmentIndex, source: text, markdownLineStart: true});
-    parts.push({kind: 'segment', segmentIndex, source: text, rawSource: trimmed.source, prefix: trimmed.prefix, suffix: trimmed.suffix, bilingualGroup, markdownTokens: tokens});
+    segments.push({id: segmentIndex, source: text, markdownLineStart: !markdownTableCell});
+    parts.push({kind: 'segment', segmentIndex, source: text, rawSource: trimmed.source, prefix: trimmed.prefix, suffix: trimmed.suffix,
+        bilingualGroup, markdownTokens: tokens, ...(markdownTableCell ? {markdownTableCell} : {})});
 }
 
 const MARKDOWN_PLACEHOLDER = /<\s*\/?\s*g\s*\d+\s*\/?\s*>/iu;
@@ -635,7 +644,20 @@ function wrappedTextLines(lines: readonly string[]): boolean[] {
     });
 }
 
-function parseTextDocument(content: string, format: 'txt' | 'markdown', sentences = false): Pick<ParsedDocument, 'parts' | 'segments' | 'markdownCodeBlocks'> {
+function addMarkdownTableRow(parts: DocumentPart[], segments: DocumentSegment[], line: string, body: string, columnCount: number): void {
+    const offset = line.length - body.length;
+    let cursor = 0;
+    for (const {start, end} of splitMarkdownTableRow(body).cells.slice(0, columnCount)) {
+        addLiteral(parts, line.slice(cursor, offset + start));
+        const cell = body.slice(start, end);
+        if (/\p{L}/u.test(cell)) addMarkdownSentence(parts, segments, cell, undefined, start === 0 ? 'withoutLeadingPipe' : 'delimited');
+        else addLiteral(parts, cell);
+        cursor = offset + end;
+    }
+    addLiteral(parts, line.slice(cursor));
+}
+
+function parseTextDocument(content: string, format: 'txt' | 'markdown', sentences = false): Pick<ParsedDocument, 'parts' | 'segments' | 'markdownCodeBlocks' | 'markdownTables'> {
     const parts: DocumentPart[] = [];
     const segments: DocumentSegment[] = [];
     const lines = splitWithEndings(content);
@@ -647,6 +669,8 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
     let list: Container | null = null;
     let indented: (Container & {indent: number; block: CodeBlock}) | null = null;
     let paragraph: Container | null = null;
+    let table: (Container & {range: MarkdownTable}) | undefined;
+    const markdownTables: MarkdownTable[] = [];
     let inFrontmatter = format === 'markdown' && /^\uFEFF?---\s*$/u.test(lines[0]?.text ?? '');
     const wrapped = format === 'txt' ? wrappedTextLines(lines.map(line => line.text)) : undefined;
     let wrapStart: number | undefined;
@@ -675,6 +699,7 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
             }
             if (!info.content || paragraph && (info.quoteDepth !== paragraph.quoteDepth || info.indent < paragraph.listIndent)) paragraph = null;
             if (!fence && !math && info.content && info.indent >= info.codeBaseIndent + 4 && !paragraph) {
+                table = undefined;
                 const indent = info.codeBaseIndent + 4;
                 const block: CodeBlock = {
                     startLine: lineIndex, endLine: lineIndex + 1, info: '', closed: true,
@@ -726,7 +751,21 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
             // 单独成行的 HTML/组件标签也只负责结构，带引号的属性仍按 HTML 扫描器识别。
             const html = findNextHtmlToken(info.content, 0);
             const htmlOnly = html?.index === 0 && html.value.length === info.content.length;
-            if (marker || isMathLine || horizontalRule || calloutHeader || directive || htmlOnly) {
+            const structure = marker || isMathLine || horizontalRule || calloutHeader || directive || htmlOnly;
+            const newBlock = /^(?:#{1,6}(?:\s|$)|\[[^\]]+\]:)/u.test(info.content);
+            if (table && lineIndex === table.range.startLine + 1) {
+                addLiteral(parts, content.slice(line.start, line.end));
+                return;
+            }
+            if (table && info.content && !structure && !newBlock && !info.listIndent
+                && info.quoteDepth === table.quoteDepth && info.indent >= table.listIndent) {
+                addMarkdownTableRow(parts, segments, line.text, info.content, table.range.alignments.length);
+                addLiteral(parts, content.slice(line.textEnd, line.end));
+                table.range.endLine = lineIndex + 1;
+                return;
+            }
+            table = undefined;
+            if (structure) {
                 paragraph = null;
                 if (marker) {
                     const block: CodeBlock = {
@@ -743,6 +782,20 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
             if (!info.content) {
                 addLiteral(parts, content.slice(line.start, line.end));
                 return;
+            }
+            if (!newBlock && info.content.includes('|') && lineIndex + 1 < lines.length) {
+                const delimiter = inspectMarkdownLine(lines[lineIndex + 1].text);
+                const alignments = delimiter.quoteDepth === info.quoteDepth && delimiter.indent === info.indent
+                    ? markdownTableAlignments(info.content, delimiter.content) : undefined;
+                if (alignments) {
+                    const range = {startLine: lineIndex, endLine: lineIndex + 2, alignments};
+                    table = {...container, range};
+                    markdownTables.push(range);
+                    paragraph = null;
+                    addMarkdownTableRow(parts, segments, line.text, info.content, alignments.length);
+                    addLiteral(parts, content.slice(line.textEnd, line.end));
+                    return;
+                }
             }
             (sentences ? addMarkdownSentence : addMarkdownProtectedText)(parts, segments, line.text, lineIndex);
             if (info.content) paragraph = /^#{1,6}\s/u.test(info.content) ? null : container;
@@ -762,7 +815,7 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
         addLiteral(parts, content.slice(line.textEnd, line.end));
     });
 
-    return {parts, segments, ...(format === 'markdown' ? {markdownCodeBlocks} : {})};
+    return {parts, segments, ...(format === 'markdown' ? {markdownCodeBlocks, markdownTables} : {})};
 }
 
 const HTML_ENTITY_FALLBACKS: Record<string, string> = {
@@ -1300,6 +1353,16 @@ function preserveSubtitleMarkup(source: string, received: string): string {
     return restoreSubtitleBreaks(source, translation);
 }
 
+function formatSubtitleExport(format: DocumentFormat, source: string, received: string): string {
+    const styled = preserveSubtitleMarkup(source, received);
+    if (format === 'ass') return styled.replace(/\r\n?|\n/gu, '\\N');
+    // 空行会结束 SRT/VTT cue；WebVTT 也禁止时间箭头出现在任何 cue 文本行内。
+    return styled.split(/\r\n?|\n/u).filter(line => line.trim()).map(line => {
+        if (format === 'vtt') return line.replaceAll('-->', '--&gt;');
+        return TIMED_SUBTITLE_PATTERN.test(line) ? line.replace('-->', '→') : line;
+    }).join('\n');
+}
+
 function originalPartSource(part: SegmentPart): string {
     return part.rawSource ?? part.source;
 }
@@ -1336,7 +1399,7 @@ type DocumentHtmlOutput = boolean | 'epub2';
 function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart, translation: string, xhtml: DocumentHtmlOutput): string {
     const source = originalPartSource(part);
     const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
-        ? preserveSubtitleMarkup(part.source, translation)
+        ? formatSubtitleExport(document.format, part.source, translation)
         : translation;
     if (document.format === 'html') {
         const marker = xhtml === 'epub2' ? 'class="fluentread-document-translation"' : 'data-fluent-read-document-translation="true"';
@@ -1346,7 +1409,7 @@ function formatBilingualTranslation(document: ParsedDocument, part: SegmentPart,
         return `${part.prefix}${source}${part.suffix}\n> ${renderMarkdownTranslation(part, translation)}`;
     }
     if (document.format === 'ass') {
-        return `${part.prefix}${source}${part.suffix}\\N${formattedTranslation.replace(/\r?\n/gu, '\\N')}`;
+        return `${part.prefix}${source}${part.suffix}\\N${formattedTranslation}`;
     }
     if (part.bilingualPrefix) {
         return `${part.prefix}${source}${part.suffix}\n${part.bilingualPrefix}${formattedTranslation}`;
@@ -1405,6 +1468,13 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             append(`${part.prefix}${originalPartSource(part)}${part.suffix}`);
             continue;
         }
+        if (part.markdownTableCell) {
+            const cell = escapeMarkdownTableTranslation(renderMarkdownTranslation(part, translation));
+            const value = mode === 'bilingual' ? `${originalPartSource(part)}<br>${cell}`
+                : part.markdownTableCell === 'withoutLeadingPipe' ? `| ${cell}` : cell;
+            append(`${part.prefix}${value}${part.suffix}`);
+            continue;
+        }
         if (mode === 'bilingual') {
             append(formatBilingualTranslation(document, part, translation, xhtml));
             continue;
@@ -1414,7 +1484,7 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             continue;
         }
         const formattedTranslation = ['srt', 'vtt', 'ass'].includes(document.format)
-            ? preserveSubtitleMarkup(part.source, translation)
+            ? formatSubtitleExport(document.format, part.source, translation)
             : renderMarkdownTranslation(part, translation);
         append(`${part.prefix}${formattedTranslation}${part.suffix}`);
     }

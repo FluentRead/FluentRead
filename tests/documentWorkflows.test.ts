@@ -191,6 +191,32 @@ describe('document import workflow ownership', () => {
         f.load.mockResolvedValueOnce(null);await f.workflow.openHistory('missing');expect(f.ports.onHistoryMissing).toHaveBeenCalledOnce();
     });
 
+    it('rebuilds Markdown tables in legacy history and retains old whole-row corrections for review', async () => {
+        const f = importFixture();
+        f.ports.history = f.history;
+        const row = '| Name | Status |';
+        const source = `Source.\n\n${row}\n| --- | --- |\n`;
+        const old: ParsedDocument = {
+            ...document('table.md'), segments: [{id: 0, source: 'Source.'}, {id: 1, source: row}],
+        };
+        delete old.markdownTables;
+        const saved = {...record(old), bytes: new TextEncoder().encode(source), total: 2, completed: 2,
+            translations: ['保留正文校订。', '| 名称 | 状态 |']};
+        f.load.mockResolvedValue(saved);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).toHaveBeenCalledOnce();
+        expect(f.tasks[0].document?.markdownTables).toHaveLength(1);
+        expect(f.tasks[0].document?.segments.map(item => item.source)).toEqual(['Source.', 'Name', 'Status']);
+        expect(f.tasks[0].translations).toEqual(['保留正文校订。', '', '']);
+        expect(f.tasks[0].retainedRevisions).toEqual([{source: row, translation: '| 名称 | 状态 |'}]);
+        expect(saved.translations).toEqual(['保留正文校订。', '| 名称 | 状态 |']);
+        f.load.mockResolvedValue({...saved, parsed: f.tasks[0].document!, total: 3, translations: ['保留正文校订。', '名称', '状态']});
+        vi.mocked(f.ports.parseFile).mockClear();
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).not.toHaveBeenCalled();
+        expect(f.tasks[1].translations).toEqual(['保留正文校订。', '名称', '状态']);
+    });
+
     it.each(['missing binary', 'wrong binary kind', 'missing bytes', 'untyped bytes', 'different length', 'different values', 'wrong snapshot format and missing binary'] as const)
         ('reparses a current PDF cache with %s from the actual record bytes without borrowing another source target', async invalid => {
             const f = importFixture(); f.ports.history = f.history;

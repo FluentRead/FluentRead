@@ -152,6 +152,35 @@ describe('document translation parser', () => {
         expect(output).toContain('Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\i1}Hello\\N{\\i1}你好');
     });
 
+    it.each(['srt', 'vtt'] as const)('keeps generated paragraphs and arrows inside their %s cue', format => {
+        const ending = '\r\n';
+        const ms = format === 'srt' ? ',' : '.';
+        const firstTiming = `00:00:01${ms}000 --> 00:00:02${ms}500`;
+        const secondTiming = `00:00:03${ms}000 --> 00:00:04${ms}000`;
+        const source = [format === 'vtt' ? 'WEBVTT\r\n\r\nfirst' : '1', firstTiming + (format === 'vtt' ? ' align:start' : ''),
+            'First line', '', format === 'vtt' ? 'second' : '2', secondTiming, 'Next line', ''].join(ending);
+        const doc = parseDocument(`clip.${format}`, source);
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const result = renderDocument(doc, [`译文第一行\n \n第二行\r\n${firstTiming}\n末尾`, '下一条'], mode);
+            const reparsed = parseDocument(`clip.${format}`, result);
+            expect(reparsed.segments.map(({timeStart, timeEnd}) => [timeStart, timeEnd])).toEqual(doc.segments.map(({timeStart, timeEnd}) => [timeStart, timeEnd]));
+            expect(reparsed.segments[0].source).toContain('第二行');
+            expect(reparsed.segments[0].source).toContain('末尾');
+            expect(reparsed.segments[1].source).toContain('下一条');
+            expect(result.split(firstTiming)).toHaveLength(2);
+            expect(result).toContain(firstTiming + (format === 'vtt' ? ' align:start' : '') + ending);
+        }
+    });
+
+    it('writes provider line breaks as ASS/SSA drawing-safe line markers in both exports', () => {
+        const doc = parseDocument('clip.ssa', '[Events]\nDialogue: Marked=0,0:00:01.00,0:00:02.00,Default,,0,0,0,,Original\n');
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const result = renderDocument(doc, ['第一行\r第二行\n第三行'], mode);
+            expect(result.match(/^Dialogue:.*$/gmu)).toHaveLength(1);
+            expect(result).toContain(mode === 'bilingual' ? 'Original\\N第一行\\N第二行\\N第三行' : ',,第一行\\N第二行\\N第三行');
+        }
+    });
+
     it('保留 LRC 时间标签，并将 JSON 字符串值重组为合法 JSON', () => {
         const lrc = parseDocument('song.lrc', '[00:01.00]Hello\n[00:02.00]World');
         expect(lrc.segments.map((segment) => segment.source)).toEqual(['Hello', 'World']);

@@ -423,7 +423,9 @@ export default defineConfig({
             // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
             // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
             const webDavPathBudget = 5_000;
-            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget;
+            // 浅底彩字词界复核实测 Chrome 增加615字节，超原预算517字节。Firefox 增加616字节且仍在原预算内。
+            const lightColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

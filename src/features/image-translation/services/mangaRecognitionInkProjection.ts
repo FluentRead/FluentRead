@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/mangaRecognitionInkProjection.ts
- * 文件职责：为抗锯齿残色、灰度起伏或深色底紧裁的识别裁图提供相互核对的字形间隙。
+ * 文件职责：为抗锯齿残色、灰度起伏或颜色对比造成紧裁的识别裁图提供相互核对的字形间隙。
  * 主要内容：恒色外周路径仅接收48像素高、完整不透明恒色外周的有界裁图；所有颜色必须能由同一实测墨色与底色混合得到。墨色差1/8和1/4两层须有相同的4–64个字形、逐项嵌套及同位置显著词隙；更弱1/16层只允许至多两个字形通过不超过两像素的词内抗锯齿连合，词隙仍须在该层为空。返回共同空列和前一字形序号；全部组件扫描预付共享余额。
  * 灰度裁图：完整不透明、逐像素色差不超过16且左右边缘亮度至少220时，借用既有80/120/160灰度阈值核对字形；上下边缘允许紧裁字形，不要求整个气泡恒色。三层沿用相同组件与词隙约束，由调用方使用独立的页级额度。
  * 浅色底裁图：左右完整边缘须为同一不透明浅色，内部仍须符合共同墨色混合；背景色差超过16时再使用同一80/120/160分层，避免弱抗锯齿把词内相邻字形连成一个。该路径不放宽原灰度或恒色外周的判断。
  * 深色底裁图：允许字形触及四边；最多4096种颜色中占比至少20%的唯一主导暗色（各通道不超过64）须与实测高对比墨色共同解释全部不透明像素。沿用三层字形后，每个词隙还须有至少三列完整同色背景，至多裁去两侧各两列弱抗锯齿，中间有杂色就撤回该间隙。此证明不推断字符框外的像素或文字。
+ * 浅中性底彩字：复用允许触边的紧裁算法，底色各通道至少220且色差至多16，墨色通道差至少24。用实测颜色差分层，以覆盖品红等单通道接近白底的文字。
  * 模块边界：只读既有RGBA，不运行模型、不创建Canvas、不猜词或改变字符；调用方仍须核对原SDK文本、CTC字符数量、唯一blank-run及空格峰。各路径的底色、墨色或字形对应不明时不提供旁证，不能用作清字蒙版。
  */
 import {getImageRgbContrast} from './rendering';
@@ -70,8 +71,22 @@ export function observeMangaRecognitionTintedProjection(data:Uint8ClampedArray,w
     return observePaletteProjection(data,width,budget,true);
 }
 
+export function isMangaRecognitionLightNeutral(maximum:number,minimum:number):boolean {
+    return minimum>=220&&maximum-minimum<=16;
+}
+
 /** 深色紧裁不借用角点猜底色；调用方预付两遍完整像素扫描，间隙必须另有完整源色空列。 */
 export function observeMangaRecognitionDarkProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget):MangaRecognitionInkProjection|undefined {
+    return observeTightPaletteProjection(data,width,budget,false);
+}
+
+/** 浅中性底的饱和彩字也可能触及四边；沿同一实测墨色方向分层，不按单通道亮度筛墨迹。 */
+export function observeMangaRecognitionLightColorProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget):MangaRecognitionInkProjection|undefined {
+    return observeTightPaletteProjection(data,width,budget,true);
+}
+
+function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget,
+    lightColor:boolean):MangaRecognitionInkProjection|undefined {
     if(!Number.isSafeInteger(width)||width<8||width*48>262_144||!(data instanceof Uint8ClampedArray)||data.length!==width*48*4
         ||!Number.isSafeInteger(budget.remaining)||budget.remaining<=0)return;
     const colors=new Map<number,number>(),rgb=(key:number)=>[key&255,key>>>8&255,key>>>16&255];
@@ -81,7 +96,8 @@ export function observeMangaRecognitionDarkProjection(data:Uint8ClampedArray,wid
     }
     let backgroundKey=0,backgroundCount=0,ambiguous=false;
     for(const [key,count]of colors){
-        if(Math.max(...rgb(key))>64)continue;
+        const [red,green,blue]=rgb(key),maximum=Math.max(red,green,blue);
+        if(lightColor?!isMangaRecognitionLightNeutral(maximum,Math.min(red,green,blue)):maximum>64)continue;
         if(count>backgroundCount){backgroundKey=key;backgroundCount=count;ambiguous=false;}
         else if(count===backgroundCount)ambiguous=true;
     }
@@ -91,6 +107,7 @@ export function observeMangaRecognitionDarkProjection(data:Uint8ClampedArray,wid
     for(const [key,n]of colors){if(distance(rgb(key))<24)continue;significantPixels+=n;if(n>count){candidate=key;count=n;}}
     if(count<8)return;
     const ink=rgb(candidate);let support=0;
+    if(lightColor&&Math.max(...ink)-Math.min(...ink)<24)return;
     for(const [key,n]of colors)if(rgb(key).every((value,c)=>Math.abs(value-ink[c])<=1))support+=n;
     if(support<significantPixels*.1||getImageRgbContrast(ink,background)<3)return;
     for(const key of colors.keys())if(!matchesImageSourceInk(rgb(key),background,ink))return;

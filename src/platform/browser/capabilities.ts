@@ -2,7 +2,7 @@
  * @file src/platform/browser/capabilities.ts
  *
  * 文件职责：集中计算编译目标与运行时浏览器能力，为 Chrome、Edge、Firefox 和 userscript 的功能装配提供确定契约。
- * 主要内容：定义 BrowserBuildTarget、BrowserCapabilities 与 feature 类型，从 import.meta.env 生成构建标记，并结合 userAgent 约束 Chrome Translator、Offscreen、OCR、区域翻译和 TTS。 可核对的公开符号包括 BrowserBuildTarget、BrowserCapabilities、BrowserFeatureCapability、resolveBrowserCapabilities、applyRuntimeBrowserConstraints、readRuntimeUserAgent、browserBuildTargetFromEnv。
+ * 主要内容：由构建目标和宿主 UA 决定浏览器能力；可信扩展页面还探测原生 Translator，网页和后台 Worker 由离屏文档确认 API 可用性。
  * 模块边界：本文件属于 platform 基础设施边界，只封装浏览器、网络、存储上下文或 Shadow DOM 机制；不决定翻译业务策略，不直接实现 feature，业务层通过类型化端口消费这里的能力。
  */
 
@@ -16,7 +16,8 @@ export interface BrowserCapabilities extends BrowserBuildTarget {
     readonly offscreenDocument: boolean;
     /** 可承载共享 DOM 运行时：Chromium MV3 Offscreen 或 Firefox MV2 后台 iframe。 */
     readonly extensionDom: boolean;
-    readonly chromeTranslation: boolean;
+    /** 扩展可使用浏览器原生翻译的候选能力，扩展文档会进一步检查 API 是否存在。 */
+    readonly browserTranslation: boolean;
     readonly imageOcr: boolean;
     readonly imageTranslation: boolean;
     readonly areaTranslation: boolean;
@@ -27,7 +28,7 @@ export interface BrowserCapabilities extends BrowserBuildTarget {
 
 export type BrowserFeatureCapability =
     | 'areaTranslation'
-    | 'chromeTranslation'
+    | 'browserTranslation'
     | 'imageOcr'
     | 'imageTranslation'
     | 'offscreenDocument'
@@ -57,7 +58,7 @@ export function resolveBrowserCapabilities(target: BrowserBuildTarget): BrowserC
         offscreenDocument: chromiumMv3,
         extensionDom,
         // Offscreen 只是传输前提；offscreen runtime 仍会动态检查 Translator API 就绪状态。
-        chromeTranslation: target.manifestVersion === 3 && browser === 'chrome',
+        browserTranslation: chromiumMv3,
         imageOcr: extensionDom,
         imageTranslation: extensionDom,
         areaTranslation: extensionDom,
@@ -66,18 +67,35 @@ export function resolveBrowserCapabilities(target: BrowserBuildTarget): BrowserC
     });
 }
 
-/** Chrome 产物也可由 Edge 加载；宿主 UA 必须在运行时关闭 Edge 不提供的 Chrome Translation API。 */
+/** Edge 可加载 Chrome 产物；只有宿主扩展文档能可靠检查原生翻译 API。 */
 export function applyRuntimeBrowserConstraints(
     capabilities: BrowserCapabilities,
     userAgent: string,
+    translationApiAvailable?: boolean,
 ): BrowserCapabilities {
     // Thunderbird 复用 Firefox MV2 产物，但不具备浏览器标签页的共享 DOM 容器。
     // 邮件正文的基础全文/划词翻译仍可用；OCR、圈选和本地语音需另行适配。
     if (capabilities.browser === 'firefox' && /\bThunderbird\//i.test(userAgent)) {
         return resolveBrowserCapabilities({browser: 'thunderbird', manifestVersion: capabilities.manifestVersion});
     }
-    if (capabilities.browser !== 'chrome' || !/\bEdg(?:A|iOS)?\//i.test(userAgent)) return capabilities;
-    return Object.freeze({...capabilities, browser: 'edge', chromeTranslation: false});
+    const browser = capabilities.browser === 'chrome' && /\bEdg(?:A|iOS)?\//i.test(userAgent)
+        ? 'edge'
+        : capabilities.browser;
+    const browserTranslation = capabilities.browserTranslation
+        && !/\b(?:Android\b|Edg(?:A|iOS)\/)/i.test(userAgent)
+        && translationApiAvailable !== false;
+    if (browser === capabilities.browser && browserTranslation === capabilities.browserTranslation) return capabilities;
+    return Object.freeze({...capabilities, browser, browserTranslation});
+}
+
+interface BrowserTranslationApiHost {
+    readonly Translator?: {readonly create?: unknown};
+    readonly translation?: {readonly createTranslator?: unknown};
+}
+
+export function hasBrowserTranslationApi(host: BrowserTranslationApiHost): boolean {
+    return typeof host.Translator?.create === 'function'
+        || typeof host.translation?.createTranslator === 'function';
 }
 
 export function readRuntimeUserAgent(host: {navigator?: {userAgent?: unknown}}): string {
@@ -109,6 +127,10 @@ const compiledBrowserBuildTarget = browserBuildTargetFromEnv({
 const runtimeBrowserCapabilities = applyRuntimeBrowserConstraints(
     resolveBrowserCapabilities(compiledBrowserBuildTarget),
     readRuntimeUserAgent(globalThis),
+    // Translator 不在 Worker 中开放，网站权限策略也可能影响内容脚本看到的 API。
+    globalThis.location?.protocol === 'chrome-extension:' && typeof globalThis.document !== 'undefined'
+        ? hasBrowserTranslationApi(globalThis as BrowserTranslationApiHost)
+        : undefined,
 );
 
 /** 生产环境单例；组合根允许覆盖它，以便能力测试获得确定结果。 */

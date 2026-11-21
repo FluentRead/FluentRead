@@ -372,3 +372,8 @@ describe('saved X video position restoration', () => {
         expect(restore.restore(ambiguous.video, ambiguous.location, ambiguous.document)).toBe(false); expect(ambiguous.video.pause).not.toHaveBeenCalled();
     });
 });
+
+it('keeps generic media titles while rejecting non-web source links', () => {
+  const f = fixture('<video></video><audio></audio>');
+  expect(getVideoLearningSource(f.document.querySelector('audio')! as HTMLMediaElement, new URL('file:///lecture.wav'), f.document)).toMatchObject({platform: 'html', sourceUrl: undefined});
+});

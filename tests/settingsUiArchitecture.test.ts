@@ -654,7 +654,8 @@ describe('options UI composition architecture', () => {
     expect(drawerSettings!.getAttribute('@click')).toBeNull()
     expect(videoRuntime).toContain("import {browserCapabilities} from '@/src/platform/browser/capabilities'")
     const playerMenu = source('src/features/video-subtitle/content/playerMenu.ts')
-    expect(videoRuntime).toContain('available: isXVideoPage() && browserCapabilities.extensionDom')
+    expect(videoRuntime).toContain('available: isMediaSubtitlePage() && browserCapabilities.extensionDom')
+    expect(videoRuntime).toContain('const isMediaSubtitlePage = () => isXVideoPage() || isHtmlMediaPage()')
     expect(videoRuntime).toContain('renderVideoAiMenu(menu,')
     expect(playerMenu).toContain('button.disabled = !state.available || state.checking || downloading')
     expect(playerMenu).toContain("!state.available ? 'video.aiUnavailable'")
@@ -749,7 +750,7 @@ describe('options UI composition architecture', () => {
     expect(document).toContain('documentServiceUnavailableMessage')
     expect(translationCenter).toContain('filterAvailableTranslationServices(withCompositeTranslationServiceOptions(withCustomOpenAIServiceOptions(')
     expect(translationCenter).toContain('getCustomOpenAIProviderModels(customOpenAIProviders.value')
-    expect(translationCenter).toContain('原配置会保留')
+    expect(translationCenter).toContain('部分对比服务在当前环境不可用')
     expect(translationCenter).toContain('if (!isTranslationServiceAvailable(service)) return [service]')
   })
 
@@ -926,11 +927,11 @@ describe('options UI composition architecture', () => {
     expect(testConnection).toContain('service: testedService')
   })
 
-  it('uses the configured language pair and exposes official Chrome help', () => {
+  it('presents browser translation in one status row for the active language pair', () => {
     const serviceConfiguration = source('src/features/settings/ui/services/ServiceConfiguration.vue')
     const chromePreparation = source('src/features/settings/model/chromeTranslationPreparation.ts')
 
-    expect(serviceConfiguration).toContain("t('settings.services.keys.checkConnection')")
+    expect(serviceConfiguration).toContain("'settings.services.chromePreparation.check' : 'settings.services.chromePreparation.action'")
     expect(serviceConfiguration).toContain("t('settings.services.chromePreparation.titleReady')")
     expect(serviceConfiguration).not.toContain('class="setup-status"')
     expect(serviceConfiguration).toContain("const { language, t, translateLegacy } = useUiI18n()")
@@ -938,16 +939,15 @@ describe('options UI composition architecture', () => {
     expect(serviceConfiguration).not.toContain('chromePreparationSourceLanguage')
     expect(serviceConfiguration).toContain('from: pair.sourceLanguage')
     expect(serviceConfiguration).toContain('chromeTranslationPreparationStore')
-    expect(serviceConfiguration).toContain('data-chrome-preparation-help')
-    expect(serviceConfiguration).toContain('helpSummary')
-    expect(serviceConfiguration).toContain("t('settings.services.chromePreparation.sourceDescription')")
+    expect(serviceConfiguration).toContain('data-chrome-preparation-language-pair')
+    expect(serviceConfiguration).toContain('chromePreparationHint')
+    expect(serviceConfiguration).not.toContain('data-chrome-preparation-help')
     expect(serviceConfiguration).toContain('CHROME_PREPARATION_TIMEOUT_MS = 300_000')
     expect(serviceConfiguration).toContain('activeConnection?.abort()')
-    expect(serviceConfiguration).toContain("'settings.services.chromePreparation.success'")
     expect(serviceConfiguration).toContain('ChromeTranslationPreparationError')
     expect(serviceConfiguration).toContain('CHROME_PREPARATION_ERROR_KEYS[error.code]')
     expect(serviceConfiguration).not.toContain('Chrome 本地翻译已全部准备')
-    expect(chromePreparation).toContain('再次点击“准备 Chrome 本地翻译”继续准备')
+    expect(chromePreparation).toContain('再次点击「准备语言包」继续准备')
     expect(chromePreparation).toContain("'user-activation-required'")
   })
 
@@ -1034,7 +1034,7 @@ describe('options UI composition architecture', () => {
       expect(group.match(/data-configuration-group=/gu)).toHaveLength(1)
       expect(connectionGroup).not.toContain(group)
     }
-    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked" :to="connectionActionTarget">')
+    expect(serviceConfiguration).toContain('<Teleport v-if="connectionActionTarget && !publicPlanBlocked && !browserTranslationUnavailable" :to="connectionActionTarget">')
     expect(catalog).toContain('class="hero-connection-action"')
     expect(apiKeyList).not.toContain('data-connection-test-button')
     expect(serviceConfiguration).toContain(':disabled="connectionTestDisabled"')

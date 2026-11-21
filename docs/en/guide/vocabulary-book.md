@@ -2,6 +2,8 @@
 
 Save words, phrases, and sentences from your reading. Understand them in context, try your own sentences, and review them later.
 
+For offline dictionaries, custom lookup sources, and selection card templates, see [Dictionaries and study cards](./dictionaries.md).
+
 <GuideVisual kind="learning" en />
 
 ## Save something from a page

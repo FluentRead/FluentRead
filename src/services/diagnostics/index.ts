@@ -5,12 +5,13 @@
  * 模块边界：本模块仅包含纯数据转换，不读取配置、网页正文或浏览器状态，不记录日志，不保存、下载或发送报告；具体界面决定何时展示及响应用户明确的导出操作。
  */
 
-import type {TranslationErrorKind} from '../translation/errors';
+import {BROWSER_TRANSLATION_PREPARATION_REQUIRED, BROWSER_TRANSLATION_UNAVAILABLE, type TranslationErrorKind} from '../translation/errors';
 import {resolveUiLanguageFromLocale, translate} from '@/src/core/i18n';
 
 export const DIAGNOSTIC_CODES = [
   'cancelled', 'offline', 'no-content', 'unsupported-page', 'page-unavailable', 'source-closed', 'context-invalid',
   'authentication', 'model-configuration', 'configuration', 'configuration-save', 'rate-limit',
+  BROWSER_TRANSLATION_PREPARATION_REQUIRED, BROWSER_TRANSLATION_UNAVAILABLE,
   'timeout', 'network', 'provider', 'unknown',
 ] as const;
 export type DiagnosticCode = typeof DIAGNOSTIC_CODES[number];
@@ -40,6 +41,8 @@ const actions: Record<DiagnosticCode, DiagnosticAction[]> = {
   'model-configuration': ['services', 'retry', 'dismiss'],
   configuration: ['services', 'retry', 'dismiss'],
   'configuration-save': ['retry', 'dismiss'],
+  [BROWSER_TRANSLATION_PREPARATION_REQUIRED]: ['services', 'retry', 'dismiss'],
+  [BROWSER_TRANSLATION_UNAVAILABLE]: ['services', 'dismiss'],
   'rate-limit': ['services', 'retry', 'dismiss'],
   timeout: ['retry', 'services', 'dismiss'],
   network: ['retry', 'services', 'dismiss'],
@@ -69,7 +72,7 @@ export function normalizeDiagnostic(value: unknown): Diagnostic | undefined {
   const candidate = record(value);
   if (!DIAGNOSTIC_CODES.includes(candidate.code as DiagnosticCode)) return undefined;
   const code = candidate.code as DiagnosticCode;
-  return makeDiagnostic(code, code === 'rate-limit' ? duration(candidate.retryAfterMs) : undefined);
+  return makeDiagnostic(code, code === 'rate-limit' || code === 'provider' ? duration(candidate.retryAfterMs) : undefined);
 }
 
 const kinds: readonly TranslationErrorKind[] = [
@@ -86,6 +89,9 @@ export function diagnoseFailure(error: unknown, context: DiagnosticContext = {})
     return makeDiagnostic('cancelled');
   }
   if (context.reason) return makeDiagnostic(context.reason);
+  if (code === BROWSER_TRANSLATION_PREPARATION_REQUIRED || code === BROWSER_TRANSLATION_UNAVAILABLE) {
+    return makeDiagnostic(code);
+  }
   if (/extension context invalidated/iu.test(message)) return makeDiagnostic('context-invalid');
   const status = typeof candidate.statusCode === 'number' ? candidate.statusCode : candidate.status;
   const knownKind = kinds.includes(candidate.kind as TranslationErrorKind) ? candidate.kind as TranslationErrorKind : undefined;
@@ -101,7 +107,8 @@ export function diagnoseFailure(error: unknown, context: DiagnosticContext = {})
   if (kind === 'rate-limit') return makeDiagnostic('rate-limit', duration(candidate.retryAfterMs));
   if (kind === 'timeout') return makeDiagnostic('timeout');
   if (kind === 'network') return makeDiagnostic(context.online === false ? 'offline' : 'network');
-  if (kind === 'provider' || kind === 'response') return makeDiagnostic('provider');
+  if (kind === 'provider' || kind === 'response') return makeDiagnostic('provider',
+    status === 503 ? duration(candidate.retryAfterMs) : undefined);
   if (kind === 'bad-request') {
     return makeDiagnostic(/model|deployment|模型/iu.test(code + ' ' + message) ? 'model-configuration' : 'configuration');
   }

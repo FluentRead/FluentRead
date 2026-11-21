@@ -1,5 +1,6 @@
 /**
  * @file src/app/document-translation/document-page.css
+ * PDF 窄屏工具：将批注与显示、搜索、阅读外观排在同一行，信息高亮使用保留可访问名称和提示的紧凑图标。
  * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读；下载面板在工具栏旁以小幅版式示意选择双语或仅译文，排版细项默认收起，在选择之后提供单一品牌下载按钮，不重复文件名，未完成时才确认一次，错误详情按需展开，工具栏消息与持续警告不遮挡正文。
  * 主要内容：让数字进度完整可见，保留零进度和完成进度条，失败后的续译提示保持紧凑单行且仅按需展开技术详情；声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载动作与状态和响应式断点；材料保存按钮在各格式工具栏中保持紧凑宽度，窄屏独立排布并避免覆盖阅读控件。
  * ePub 章节目录在闲置时显示本地已译/总片段数，翻译期间隐藏静态计数；数值采用紧凑的等宽字形，不改变侧栏层级和跳转行为。
@@ -189,6 +190,8 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .json-table-row code { color: #16855e; background: transparent; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .json-source { color: var(--ink); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .json-translation { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 64px; resize: vertical; color: var(--ink); background: var(--surface-soft); font-size: 13px; line-height: 1.55; }
+.delimited-document-reader .json-table-header, .delimited-document-reader .json-table-row { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr) minmax(0, 1fr); }
+.delimited-document-reader .json-table-header.single, .delimited-document-reader .json-table-row.single { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr); }
 .document-reader { overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 15px 34px rgba(46, 63, 106, .06); }
 .reader-block { padding: 22px 34px 23px; border-top: 1px solid var(--line); }
 .reader-block:first-child { border-top: 0; }
@@ -721,6 +724,11 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .taskbar-actions { display: flex; grid-column: 3; grid-row: 1; align-items: center; min-width: 0; margin-left: 0; gap: 10px; flex-wrap: nowrap; }
 .toolbar-translation-settings, .toolbar-primary-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .toolbar-primary-actions { flex: none; }
+.document-taskbar .delimited-column-picker { flex: none; width: min(132px, 33vw); }
+.document-taskbar .delimited-column-picker .el-select__wrapper { min-height: 32px; padding: 0 8px; border-radius: 9px; }
+.delimited-column-picker .el-select__selection { flex-wrap: nowrap; min-width: 0; gap: 4px; }
+.delimited-column-count { flex: none; white-space: nowrap; color: var(--ink); font-size: 12px; }
+.document-column-options .el-select-dropdown__item { max-width: min(340px, calc(100vw - 28px)); }
 .document-taskbar .toolbar-settings-toggle { display: none; }
 .document-taskbar .toolbar-field { min-width: 0; }
 .document-taskbar .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -783,6 +791,7 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .document-taskbar.has-pdf-controls:has(.material-save-button) .taskbar-actions { grid-row: 5; }
   .document-taskbar .toolbar-translation-settings { display: none; }
   .toolbar-primary-actions { width: 100%; }
+  .document-taskbar .delimited-column-picker { flex: 1 1 106px; width: auto; min-width: 80px; max-width: 158px; }
   .document-taskbar .toolbar-settings-toggle { display: inline-flex; align-items: center; justify-content: center; margin-right: auto; }
   .document-taskbar .toolbar-primary-actions .translation-actions { flex: 0 1 auto; min-width: 0; }
   .document-taskbar .toolbar-primary-actions button { overflow: hidden; text-overflow: ellipsis; }
@@ -793,13 +802,15 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .is-workspace .document-reading-pane .reading-content, .document-reading-pane .reading-content.reading-pdf { min-height: 0; }
 }
 @media (max-width: 599px) {
-  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 7px; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto auto minmax(0, 1fr); gap: 7px; }
   .reader-controls-slot .pdf-page-navigation { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-zoom-control { grid-column: 3 / -1; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-presentation-control { grid-column: 1; grid-row: 2; justify-self: start; }
   .reader-controls-slot .pdf-search { grid-column: 2; grid-row: 2; }
   .reader-controls-slot .pdf-style { grid-column: 3; grid-row: 2; }
-  .reader-controls-slot .pdf-information-highlight { grid-column: 4; grid-row: 2; justify-self: start; }
+  .reader-controls-slot .pdf-annotations { grid-column: 4; grid-row: 2; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight { grid-column: 5; grid-row: 2; justify-self: start; width: 30px; padding: 0; overflow: hidden; font-size: 0; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight::before { content: '✦'; font-size: 17px; }
   .reader-controls-slot .pdf-information-status { grid-column: 1 / -1; grid-row: 3; }
 }
 @media (max-width: 760px) {

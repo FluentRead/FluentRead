@@ -22,11 +22,16 @@ export function createThunderbirdManifest(firefox) {
     const gecko = {...firefox.browser_specific_settings.gecko, id: thunderbirdId};
     // Firefox AMO 的数据收集分类不是 Thunderbird MailExtension manifest 字段。
     delete gecko.data_collection_permissions;
-    const {content_scripts: _webContentScripts, ...shared} = firefox;
+    const {content_scripts: _webContentScripts, commands, ...shared} = firefox;
+    // 独立网页翻译窗口只对浏览器开放，保留邮件版可用的命令。
+    const {'open-translation-window': _browserWindowShortcut, ...mailCommands} = commands || {};
     return {
         ...shared,
+        ...(Object.keys(mailCommands).length ? {commands: mailCommands} : {}),
         name: `${firefox.name} (Thunderbird)`,
         description: '在 Thunderbird 邮件正文中使用 FluentRead 双语翻译。',
+        // 邮件工具栏沿用扩展名称，网页功能提示只用于浏览器。
+        ...(firefox.browser_action && {browser_action: {...firefox.browser_action, default_title: firefox.name}}),
         // Thunderbird 只暴露 menus 权限；浏览器版的 contextMenus 声明会产生安装警告。
         // 邮件操作由 message_display_action 完成，无需请求菜单权限。
         permissions: [...new Set([...firefox.permissions.filter(permission => permission !== 'contextMenus'), 'messagesModify'])],

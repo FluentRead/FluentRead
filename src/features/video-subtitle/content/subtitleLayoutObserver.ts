@@ -9,7 +9,7 @@ import {getYoutubeSubtitleControlsScope, YOUTUBE_SUBTITLE_CONTROLS_SELECTOR} fro
 export function createSubtitleLayoutObserver(onLayout: () => void, isYoutubePage: () => boolean) {
   let destroyed = false;
   let layoutPlayer: HTMLElement | null = null;
-  let layoutVideo: HTMLVideoElement | null = null;
+  let layoutVideo: HTMLMediaElement | null = null;
   let layoutControlsScope: HTMLElement | null = null;
   let layoutControls: HTMLElement[] = [];
   let layoutFrame: number | undefined;
@@ -49,7 +49,7 @@ export function createSubtitleLayoutObserver(onLayout: () => void, isYoutubePage
     layoutControls = currentControls;
     if (changed) scheduleSubtitleLayout();
   });
-  const observeSubtitleLayout = (player: HTMLElement | null, video: HTMLVideoElement | null) => {
+  const observeSubtitleLayout = (player: HTMLElement | null, video: HTMLMediaElement | null) => {
     const scope = player && video && isYoutubePage() ? getYoutubeSubtitleControlsScope(player, video) : null;
     if (layoutPlayer === player && layoutVideo === video && layoutControlsScope === scope) return;
     layoutObserver?.disconnect();

@@ -499,7 +499,7 @@ watch(active, (enabled, previous) => {
   if (enabled && !previous) resetConfigurationScroll(false)
 }, {flush: 'post'})
 function selectService(service: string): void {
-  if (!active.value || !allServices.value.some(item => item.value === service && !item.disabled)) return
+  if (!active.value || !allServices.value.some(item => item.value === service && (!item.disabled || item.value === services.chromeTranslator))) return
   expandGroupOf(service)
   if (service === props.service) {
     const restoreFocus = directoryOpen.value

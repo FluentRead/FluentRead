@@ -345,6 +345,8 @@
       "tests/imageOcrNormalization.test.ts",
       "tests/ocrDualViewDifferential.test.ts",
       "tests/imageTranslationRendering.test.ts",
+      "tests/imageTextFont.test.ts",
+      "tests/imageEraseCoverage.test.ts",
       "tests/imageMatteRepair.test.ts",
       "tests/imageTextSegmentation.test.ts",
       "tests/imageMattePage.test.ts",
@@ -482,6 +484,12 @@
       "tests/documentPdfRotation.test.ts",
       "tests/pdfReaderLifecycle.test.ts",
       "tests/pdfReadingPlan.test.ts",
+      "tests/pdfReadingTheme.test.ts",
+      "tests/hypothesisClient.test.ts",
+      "tests/pdfHypothesis.test.ts",
+      "tests/hypothesisAssets.test.ts",
+      "tests/pdfAnnotations.test.ts",
+      "tests/pdfAnnotationsComponent.test.ts",
       "tests/pdfReadingRegions.test.ts",
       "tests/pdfBlockFit.test.ts",
       "tests/documentHistory.test.ts",
@@ -558,7 +566,11 @@
       "tests/videoCourseCaptions.test.ts",
       "tests/imageFlatTextRepair.test.ts",
       "tests/privacyProtection.test.ts",
-      "tests/sharedVideoModelDirectory.test.ts"
+      "tests/sharedVideoModelDirectory.test.ts",
+      "tests/htmlMedia.test.ts",
+      "tests/subtitleExport.test.ts",
+      "tests/bilibiliAudio.test.ts",
+      "tests/bilibiliAiSource.test.ts"
     ],
     "functional": [
       "tests/affectedTests.test.ts",
@@ -721,6 +733,8 @@
       "tests/mangaRecognitionInkProjection.test.ts",
       "tests/mangaRecognitionTintedWhitespace.test.ts",
       "tests/mangaRecognitionDarkWhitespace.test.ts",
+      "tests/mangaRecognitionTightColorWhitespace.test.ts",
+      "tests/mangaRecognitionConnectedBands.test.ts",
       "tests/mangaDetectionCore.test.ts",
       "tests/mangaDetectionRefinement.test.ts",
       "tests/mangaDetectionRecovery.test.ts",
@@ -939,7 +953,13 @@
       "tests/youtubeEmbedFrameRuntime.test.ts",
       "tests/translationPrivacy.test.ts",
       "tests/privacySettingsLifecycle.test.ts",
-      "tests/videoAiSharedModelCache.test.ts"
+      "tests/videoAiSharedModelCache.test.ts",
+      "tests/htmlMediaFrame.test.ts",
+      "tests/dictionaryWorkspace.test.ts",
+      "tests/dictionaryRuntime.test.ts",
+      "tests/dictionaryUi.test.ts",
+      "tests/dictionaryAdapters.test.ts",
+      "tests/dictionaryScriptInitialization.test.ts"
     ],
     "regression": [
       "tests/discordServerIconBoundary.test.ts",

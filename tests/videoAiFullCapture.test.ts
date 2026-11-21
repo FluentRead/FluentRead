@@ -5,12 +5,31 @@ import {
   VideoAiFullCaptureController,
 } from '@/src/features/video-subtitle/content/video-ai/fullCapture';
 import {normalizeCompletedVideoAiSubtitleCues} from '@/src/features/video-subtitle/transcriptionCache';
-import type { VideoAiAudioChunk } from '@/src/features/video-subtitle/content/video-ai/fullCapture';
+import type { VideoAiAudioChunk, VideoAiFullCaptureOptions } from '@/src/features/video-subtitle/content/video-ai/fullCapture';
+import {registerVideoPcmWorklet, type PcmWorkletScope} from '@/src/features/video-subtitle/content/video-ai/pcmWorklet';
 import {VideoAiTranscriptStabilizer} from '@/src/features/video-subtitle/content/video-ai/streamingTranscript';
 import {mergeVideoAiSubtitleCues, normalizeVideoAiSubtitleTimeline} from '@/src/features/video-subtitle/content/video-ai/cueTimeline';
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('PCM AudioWorklet renderer', () => {
+  it('batches variable stereo quanta into transferred mono PCM and keeps absent inputs silent', () => {
+    const postMessage = vi.fn(); let Processor!: new () => {process(inputs: Float32Array[][]): boolean};
+    const scope: PcmWorkletScope = {sampleRate: 16000, AudioWorkletProcessor: class {port = {postMessage};},
+      registerProcessor(name, value) {expect(name).toBe('fluent-read-video-pcm'); Processor = value;}};
+    registerVideoPcmWorklet(scope); const processor = new Processor();
+    expect(processor.process([])).toBe(true); expect(processor.process([[]])).toBe(true);
+    processor.process([[new Float32Array(128).fill(.6), new Float32Array(128).fill(.2)]]);
+    expect(postMessage).not.toHaveBeenCalled();
+    processor.process([[new Float32Array(4096 - 128).fill(.4), new Float32Array(4096 - 128).fill(.4)]]);
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    const first = postMessage.mock.calls[0]!, second = postMessage.mock.calls[1]!;
+    expect(first[0].sampleRate).toBe(16000); expect(first[0].pcm.length).toBe(2048);
+    expect(first[0].pcm[0]).toBeCloseTo(.4); expect(first[0].pcm[2047]).toBeCloseTo(.4);
+    expect(first[1]).toEqual([first[0].pcm.buffer]); expect(second[0].pcm).not.toBe(first[0].pcm);
+  });
 });
 
 describe('本地 AI 完整视频字幕合并', () => {
@@ -367,7 +386,7 @@ describe('本地 AI 完整生成控制器的安全边界', () => {
     };
     const transcribe = vi.fn(async () => ({ text: 'HLS audio works.' }));
     const onTranscriptionComplete = vi.fn(async () => undefined);
-    const getAudio = vi.fn(async (_video: HTMLVideoElement, signal: AbortSignal) => {
+    const getAudio = vi.fn(async (_video: HTMLMediaElement, signal: AbortSignal) => {
       expect(signal.aborted).toBe(false);
       return speech;
     });
@@ -508,6 +527,8 @@ class FullFakeContext {
   static processorError: unknown = null;
   static mediaStreamError: unknown = null;
   static resumeGate: { promise: Promise<void>; resolve: () => void } | null = null;
+  static worklet: {addModule: (url: string) => Promise<void>} | undefined;
+  get audioWorklet() { return FullFakeContext.worklet; }
   state: AudioContextState = 'running';
   readonly destination = new FullFakeNode();
   readonly processor = new FullFakeProcessor();
@@ -609,6 +630,7 @@ beforeEach(() => {
   FullFakeContext.processorError = null;
   FullFakeContext.mediaStreamError = null;
   FullFakeContext.resumeGate = null;
+  FullFakeContext.worklet = undefined;
 });
 
 describe('本地 AI 完整生成控制器扫描与收尾', () => {
@@ -1470,5 +1492,143 @@ describe('完整识别缓存恢复', () => {
     expect(controller.restore(cues)).toBe(true);
     await vi.waitFor(() => expect(controller.getPhase()).toBe('ready'));
     controller.destroy();
+  });
+});
+
+describe('HTML live and long-media playback capture', () => {
+  function live(extra: Partial<VideoAiFullCaptureOptions> = {}) {
+    const source = new FullFakeVideo(); source.duration = Infinity; source.currentTime = 70;
+    const capturedTrack = new FullFakeTrack();
+    source.captureStream = () => new FullFakeMediaStream([capturedTrack]) as unknown as MediaStream;
+    const play = vi.spyOn(source, 'play'), pause = vi.spyOn(source, 'pause'), stop = vi.spyOn(capturedTrack, 'stop');
+    vi.stubGlobal('window', {AudioContext: FullFakeContext, setTimeout, clearTimeout});
+    vi.stubGlobal('MediaStream', FullFakeMediaStream);
+    const complete = vi.fn(async (_cues: {startMs: number}[]) => undefined), error = vi.fn(), progress = vi.fn();
+    const controller = new VideoAiFullCaptureController({getVideo: () => source as unknown as HTMLMediaElement,
+      capturePlayback: () => true, getModel: () => 'tiny', isSupported: () => true,
+      transcribe: vi.fn(async () => ({text: 'A live spoken sentence.', segments: [{startMs: 0, endMs: 1500, text: 'A live spoken sentence.'}]})),
+      onTranscriptionComplete: complete, onError: error, onStateChange: vi.fn(), onCuesProgress: progress, ...extra});
+    return {source, controller, complete, error, progress, play, pause, stop, capturedTrack};
+  }
+  class Worklet extends FullFakeNode {
+    static last: Worklet;
+    port = {onmessage: null as ((event: {data: {pcm: Float32Array; sampleRate: number}}) => void) | null, close: vi.fn()};
+    onprocessorerror: (() => void) | null = null;
+    constructor(..._args: unknown[]) {super(); Worklet.last = this;}
+  }
+  function worklet(extra: Partial<VideoAiFullCaptureOptions> = {}) {
+    const f = live({pcmWorkletUrl: 'chrome-extension://fixture/videoPcmWorklet.js', ...extra});
+    FullFakeContext.worklet = {addModule: vi.fn(async () => undefined)};
+    vi.stubGlobal('AudioWorkletNode', Worklet); return f;
+  }
+  it('uses transferred worklet PCM and releases its port without touching original playback', async () => {
+    const f = worklet(); f.controller.start();
+    await vi.waitFor(() => expect(Worklet.last.port.onmessage).toBeTypeOf('function'));
+    expect(FullFakeContext.worklet!.addModule).toHaveBeenCalledWith('chrome-extension://fixture/videoPcmWorklet.js');
+    const message = Worklet.last.port.onmessage!, error = Worklet.last.onprocessorerror!;
+    message({data: {pcm: new Float32Array(160000).fill(.04), sampleRate: 16000}});
+    f.controller.finishPlaybackCapture(); await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    expect(Worklet.last.port.onmessage).toBeNull(); expect(Worklet.last.port.close).toHaveBeenCalledOnce();
+    expect(f.complete).toHaveBeenCalledOnce(); expect(f.play).not.toHaveBeenCalled(); expect(f.pause).not.toHaveBeenCalled();
+    f.controller.cancel(); error(); message({data: {pcm: new Float32Array(1), sampleRate: 16000}});
+    expect(f.error).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it('reports worklet processing failure and disconnects its graph', async () => {
+    const f = worklet(); f.controller.start(); await vi.waitFor(() => expect(Worklet.last.onprocessorerror).toBeTypeOf('function'));
+    Worklet.last.onprocessorerror!(); expect(f.error).toHaveBeenCalledOnce();
+    expect(Worklet.last.port.close).toHaveBeenCalledOnce(); expect(Worklet.last.onprocessorerror).toBeNull(); f.controller.destroy();
+  });
+  it.each(['worklet', 'constructor', 'module'])('reports unavailable %s without invoking deprecated capture', async missing => {
+    const f = worklet();
+    if (missing === 'worklet') FullFakeContext.worklet = undefined;
+    if (missing === 'constructor') vi.stubGlobal('AudioWorkletNode', undefined);
+    if (missing === 'module') FullFakeContext.worklet!.addModule = vi.fn(async () => {throw new Error('Module denied');});
+    const legacy = vi.spyOn(FullFakeContext.prototype, 'createScriptProcessor');
+    f.controller.start(); await vi.waitFor(() => expect(f.error).toHaveBeenCalledOnce());
+    expect(legacy).not.toHaveBeenCalled(); expect(FullFakeContext.instances.at(-1)!.state).toBe('closed'); f.controller.destroy(); legacy.mockRestore();
+  });
+  it('rejects a worklet module that finishes loading after cancellation', async () => {
+    const f = worklet(); let resolve!: () => void;
+    FullFakeContext.worklet!.addModule = vi.fn(() => new Promise<void>(yes => {resolve = yes;}));
+    f.controller.start(); await vi.waitFor(() => expect(resolve).toBeTypeOf('function'));
+    f.controller.cancel(); resolve(); await new Promise(yes => setTimeout(yes, 0));
+    expect(f.error).not.toHaveBeenCalled(); expect(f.complete).not.toHaveBeenCalled();
+    expect(FullFakeContext.instances.at(-1)!.state).toBe('closed'); f.controller.destroy();
+  });
+  it('captures the current range with original timestamps and leaves visible playback untouched', async () => {
+    const f = live(); f.source.volume = .6;
+    expect(f.controller.start()).toBe(true);
+    for (let n = 0; n < 8; n++) await Promise.resolve();
+    FullFakeContext.instances.at(-1)!.processor.emit(new Float32Array(160000).fill(.04));
+    for (let n = 0; n < 12; n++) await Promise.resolve();
+    expect(f.controller.finishPlaybackCapture()).toBe(true);
+    await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    const cues = f.complete.mock.calls[0]![0] as {startMs: number}[];
+    expect(cues[0]!.startMs).toBeGreaterThanOrEqual(60000);
+    expect(f.source.volume).toBe(.6); expect(f.source.muted).toBe(false);
+    expect(f.play).not.toHaveBeenCalled(); expect(f.pause).not.toHaveBeenCalled();
+    expect(f.controller.finishPlaybackCapture()).toBe(false);
+    expect(f.stop).toHaveBeenCalled(); expect(f.error).not.toHaveBeenCalled();
+    f.controller.destroy();
+  });
+  it('finalizes a naturally ended live audio track as a captured range', async () => {
+    const f = live(); f.controller.start(); for (let n = 0; n < 8; n++) await Promise.resolve();
+    FullFakeContext.instances.at(-1)!.processor.emit(new Float32Array(160000).fill(.04));
+    f.capturedTrack.emitEnded(); await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    expect(f.complete).toHaveBeenCalledOnce(); expect(f.error).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it.each(['seeking', 'ratechange'])('invalidates discontinuous %s timestamps and cleans listeners', async event => {
+    const f = live(); f.controller.start();
+    for (let n = 0; n < 8; n++) await Promise.resolve();
+    expect(f.source.listenerCount(event)).toBe(1);
+    f.source.emit(event);
+    expect(f.controller.getPhase()).toBe('error'); expect(f.error).toHaveBeenCalledOnce();
+    expect(f.complete).not.toHaveBeenCalled(); expect(f.source.listenerCount(event)).toBe(0);
+    expect(f.play).not.toHaveBeenCalled(); expect(f.pause).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it.each([false, true])('reads cloned srcObject audio when captureStream is %s and keeps the original track alive', async emptyCapture => {
+    const f = live(); const original = new FullFakeTrack(), clone = new FullFakeTrack();
+    const originalStop = vi.spyOn(original, 'stop'), cloneStop = vi.spyOn(clone, 'stop');
+    vi.spyOn(original, 'clone').mockReturnValue(clone as unknown as MediaStreamTrack);
+    f.source.srcObject = new FullFakeMediaStream([original]) as unknown as MediaStream;
+    f.source.captureStream = emptyCapture ? () => new FullFakeMediaStream([]) as unknown as MediaStream : undefined as any;
+    const capture = emptyCapture ? vi.spyOn(f.source, 'captureStream') : undefined;
+    expect(f.controller.start()).toBe(true); for (let n = 0; n < 8; n++) await Promise.resolve();
+    FullFakeContext.instances.at(-1)!.processor.emit(new Float32Array(160000).fill(.04));
+    f.controller.finishPlaybackCapture(); await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    expect(originalStop).not.toHaveBeenCalled(); expect(cloneStop).toHaveBeenCalled(); expect(capture?.mock.calls.length || 0).toBe(0); f.controller.destroy();
+  });
+  it('reports media without an audio track and releases its graph', async () => {
+    const f = live(); f.source.captureStream = () => new FullFakeMediaStream([]) as unknown as MediaStream;
+    f.controller.start(); await vi.waitFor(() => expect(f.error).toHaveBeenCalledOnce());
+    expect(f.error.mock.calls[0]![0].message).toContain('音轨'); expect(f.complete).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it('rejects an empty supplied stream when no capture API can provide audio', async () => {
+    const f = live(); f.source.srcObject = new FullFakeMediaStream([]) as unknown as MediaStream;
+    f.source.captureStream = undefined as any; f.controller.start();
+    await vi.waitFor(() => expect(f.error).toHaveBeenCalledOnce());
+    expect(f.error.mock.calls[0]![0].message).toContain('音轨'); expect(f.complete).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it('stops a growing inference backlog without modifying visible playback', async () => {
+    const f = live(); f.controller.start(); for (let n = 0; n < 8; n++) await Promise.resolve();
+    FullFakeContext.instances.at(-1)!.processor.emit(new Float32Array(61 * 16000).fill(.04));
+    expect(f.error.mock.calls[0]![0].message).toContain('跟不上播放'); expect(f.pause).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it('finishes a live session at twenty minutes while consuming bounded rolling windows', async () => {
+    const f = live(); f.source.currentTime = 0; f.controller.start(); for (let n = 0; n < 8; n++) await Promise.resolve();
+    const block = new Float32Array(160000).fill(.04); const processor = FullFakeContext.instances.at(-1)!.processor;
+    for (let n = 0; n < 120; n++) {
+      f.source.currentTime = (n + 1) * 10; processor.emit(block);
+      for (let turn = 0; turn < 20; turn++) await Promise.resolve();
+      // 与真实媒体一样让出宏任务，允许有界识别 producer 的公平调度继续消费。
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    await vi.waitFor(() => expect(f.controller.getPhase()).toBe('ready'));
+    expect(f.complete).toHaveBeenCalledOnce(); expect(f.error).not.toHaveBeenCalled(); expect(f.pause).not.toHaveBeenCalled(); f.controller.destroy();
+  });
+  it('rejects a nonstandard playback rate without changing it', () => {
+    const f = live(); f.source.playbackRate = 2;
+    expect(f.controller.start()).toBe(false); expect(f.error.mock.calls[0]![0].message).toContain('1 倍速');
+    expect(f.source.playbackRate).toBe(2); f.controller.destroy();
   });
 });

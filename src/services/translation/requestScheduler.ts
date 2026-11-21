@@ -2,7 +2,7 @@
  * @file src/services/translation/requestScheduler.ts
  *
  * 文件职责：统一执行翻译任务的并发和请求启动速率限制，支持取消、截止时间、服务/模型 bucket 与真实 HTTP attempt；复用未解锁等待前沿，避免同批入队与取消反复扫描整队。
- * 主要内容：保留 global/服务/模型动态 bucket、FIFO、取消、deadline 与真实 transport lease；同一可信 quota scope 共享 Retry-After 冷却，broker SDK 的真实 attempt 单独计并发和速率，旧直调 attempt 仍复用外层槽。
+ * 主要内容：保留 global/服务/模型动态 bucket、FIFO、取消、deadline 与真实 transport lease；同一可信额度范围共享冷却，恢复时先放行一个真实请求，持续限流则延长退避。
  * 模块边界：本模块只管理调度时序，不选择服务、不实现重试、不读取或写入配置；配置由调用方通过 getConfig 提供。
  */
 
@@ -12,6 +12,7 @@ import {
     normalizeTranslationRequestsPerSecond,
 } from '@/src/core/config/scheduling';
 import {normalizeTranslationRequestLimits} from '@/src/core/config/requestLimits';
+import {readRetryAfterMs} from '@/src/platform/http/errors';
 
 export interface TranslationRequestLimits {
     maxConcurrentTranslations?: unknown;
@@ -62,8 +63,9 @@ export interface TranslationRequestScheduler {
     schedule<T>(task: (lease: TranslationRequestLease) => Promise<T>, options?: TranslationRequestSchedulerTaskOptions): Promise<T>;
     /** 真实 HTTP attempt 可取得并发和速率；缺省仍复用直调的外层并发 lease。 */
     scheduleAttempt<T>(task: (lease: TranslationRequestLease) => Promise<T>, options?: TranslationRequestAttemptOptions): Promise<T>;
-    /** transport 收到响应后、归还 attempt 前反馈；不增加重试或修改供应商响应。 */
-    observeResponse(identity: TranslationRequestIdentity | undefined, response: Pick<Response, 'status' | 'headers'>): void;
+    /** 收到响应后反馈；服务等待超出本次预算时返回可直接展示的诊断。 */
+    observeResponse(identity: TranslationRequestIdentity | undefined, response: Pick<Response, 'status' | 'headers'>,
+        lease?: TranslationRequestLease, deadlineAt?: number): TranslationRequestCooldownError | undefined | void;
 }
 
 export class TranslationRequestSchedulerDeadlineError extends Error {
@@ -73,6 +75,27 @@ export class TranslationRequestSchedulerDeadlineError extends Error {
         this.name = 'TranslationRequestSchedulerDeadlineError';
     }
 }
+
+export class TranslationRequestCooldownError extends Error {
+    readonly kind: 'rate-limit' | 'provider';
+    readonly retryable = false;
+
+    constructor(readonly statusCode: number, readonly retryAfterMs: number) {
+        super(statusCode === 429 ? '当前翻译服务的请求频率或配额已达上限（HTTP 429），请稍后重试。'
+            : `当前翻译服务暂时不可用（HTTP ${statusCode}），请稍后重试。`);
+        this.name = 'TranslationRequestCooldownError';
+        this.kind = statusCode === 429 ? 'rate-limit' : 'provider';
+    }
+}
+
+interface Cooldown {
+    until: number;
+    failures: number;
+    status: number;
+    probe?: PendingRequest<unknown>;
+}
+
+const COOLDOWN_RECOVERY_WINDOW_MS = 60_000;
 
 interface BucketLimit {
     concurrency: number;
@@ -99,10 +122,13 @@ interface PendingRequest<T> {
     waitingKeys?: readonly string[];
     wakeAt?: number;
     removeAbortListener?: () => void;
+    lease?: TranslationRequestLease;
+    recoveryFailed?: boolean;
 }
 
 export interface TranslationRequestSchedulerDependencies {
     now?: () => number;
+    random?: () => number;
 }
 
 function createAbortError(): Error {
@@ -118,26 +144,14 @@ function clean(value: unknown): string {
     return typeof value === 'string' ? value.trim() : '';
 }
 
-function retryAfterMs(headers: Headers, current: number): number | undefined {
-    const milliseconds = headers.get('retry-after-ms')?.trim();
-    const ms = milliseconds && /^\d+(?:\.\d+)?$/u.test(milliseconds) ? Number(milliseconds) : NaN;
-    if (Number.isFinite(ms)) return Math.min(ms, 7 * 86_400_000);
-    const value = headers.get('retry-after')?.trim();
-    if (!value) return undefined;
-    // 不把带符号、指数、尾随垃圾或单个无效数字误当成日期。
-    const numeric = /^\d+(?:\.\d+)?$/u.test(value);
-    const duration = numeric ? Number(value) * 1000
-        : /[A-Za-z]{3}/u.test(value) ? Date.parse(value) - current : NaN;
-    return Number.isFinite(duration) && duration >= 0 ? Math.min(duration, 7 * 86_400_000) : undefined;
-}
-
 export function createTranslationRequestScheduler(
     getConfig: () => TranslationRequestSchedulerConfig,
     dependencies: TranslationRequestSchedulerDependencies = {},
 ): TranslationRequestScheduler {
     const now = dependencies.now ?? (() => Date.now());
+    const random = dependencies.random ?? Math.random;
     const buckets = new Map<string, BucketState>();
-    const cooldowns = new Map<string, number>();
+    const cooldowns = new Map<string, Cooldown>();
     const activeRequests = new Set<PendingRequest<unknown>>();
     let pending: Array<PendingRequest<unknown> | undefined> = [];
     let head = 0;
@@ -159,7 +173,9 @@ export function createTranslationRequestScheduler(
             for (const state of buckets.values()) state.starts.length = 0;
             cooldowns.clear();
         }
-        for (const [scope, until] of cooldowns) if (until <= current) cooldowns.delete(scope);
+        for (const [scope, cooldown] of cooldowns) {
+            if (!cooldown.probe && cooldown.until + COOLDOWN_RECOVERY_WINDOW_MS <= current) cooldowns.delete(scope);
+        }
         lastNow = current;
         return current;
     }
@@ -362,10 +378,13 @@ export function createTranslationRequestScheduler(
         };
     }
 
-    async function execute(entry: PendingRequest<unknown>): Promise<void> {
+    async function execute(entry: PendingRequest<unknown>, scope: string): Promise<void> {
         const leaseState = createLease();
+        if (scope) entry.lease = leaseState.lease;
+        let completed = false;
         try {
             const result = await entry.task(leaseState.lease);
+            completed = true;
             if (!entry.settled) {
                 entry.settled = true;
                 entry.removeAbortListener?.();
@@ -382,6 +401,13 @@ export function createTranslationRequestScheduler(
             leaseState.close();
             await Promise.all(leaseState.waits);
             activeRequests.delete(entry);
+            // 只有恢复请求能解除自己的冷却。旧请求迟到或收到新一轮限流时，状态归属不同。
+            const cooldown = cooldowns.get(scope);
+            if (cooldown?.probe === entry) {
+                if (completed && !entry.recoveryFailed && !entry.signal?.aborted) cooldowns.delete(scope);
+                else cooldown.probe = undefined;
+            }
+            entry.lease = undefined;
             drain();
         }
     }
@@ -412,7 +438,7 @@ export function createTranslationRequestScheduler(
                     && !Number.isFinite(reusable.fairnessReadyAt)
                     && (!Number.isFinite(cancelledWakeAt) || cancelledWakeAt !== reusable.wakeAt)) {
                     compact();
-                    if (pendingCount === 0 && cooldowns.size === 0) {
+                    if (pendingCount === 0) {
                         // 最后一个有限唤醒项的取消必走完整扫描；此处不可能残留 timer。
                         timer = undefined;
                         frontier = undefined;
@@ -459,11 +485,23 @@ export function createTranslationRequestScheduler(
                         rejectPending(entry, new TranslationRequestSchedulerDeadlineError());
                         continue;
                     }
-                    const cooldownWait = (cooldowns.get(clean(entry.identity?.quotaScope)) ?? current) - current;
-                    if (cooldownWait > 0) {
-                        earliest = Math.min(earliest, cooldownWait);
-                        // 冷却只约束同一可信 quota scope，不反向阻塞健康线路。
-                        continue;
+                    const scope = clean(entry.identity?.quotaScope);
+                    const cooldown = cooldowns.get(scope);
+                    if (cooldown) {
+                        const remaining = cooldown.until - current;
+                        if (remaining > 0 && entry.deadlineAt !== undefined && cooldown.until >= entry.deadlineAt) {
+                            detach(entry);
+                            rejectPending(entry, new TranslationRequestCooldownError(cooldown.status, remaining));
+                            continue;
+                        }
+                        if (remaining > 0 || cooldown.probe) {
+                            if (remaining > 0) {
+                                earliest = Math.min(earliest, remaining);
+                                entry.wakeAt = Math.min(entry.wakeAt ?? Infinity, cooldown.until);
+                            }
+                            // 暂停的线路不参与 FIFO 阻塞，健康线路可继续请求。
+                            continue;
+                        }
                     }
                     const keys = keysFor(entry.identity, config);
                     const blocking = entry.attemptOnly && !entry.countConcurrency ? waitingAttemptKeys : waitingKeys;
@@ -488,13 +526,14 @@ export function createTranslationRequestScheduler(
                         continue;
                     }
                     detach(entry);
+                    if (cooldown && entry.countRate) cooldown.probe = entry;
                     if (entry.countConcurrency) activeRequests.add(entry);
                     for (const key of keys) {
                         const state = stateFor(key);
                         if (entry.countConcurrency) state.active += 1;
                         if (entry.countRate) state.starts.push(current);
                     }
-                    void execute(entry);
+                    void execute(entry, scope);
                 }
                 let nextDeadline = Number.POSITIVE_INFINITY;
                 for (let index = incremental ? start : head; index < pending.length; index += 1) {
@@ -504,8 +543,7 @@ export function createTranslationRequestScheduler(
                 const deadlineWait = nextDeadline === Number.POSITIVE_INFINITY
                     ? Number.POSITIVE_INFINITY
                     : Math.max(0, nextDeadline - current);
-                let nextWait = Math.min(earliest, deadlineWait);
-                for (const until of cooldowns.values()) nextWait = Math.min(nextWait, until - current);
+                const nextWait = Math.min(earliest, deadlineWait);
                 compact();
                 frontier = {signature, at: current, wakeAt: current + nextWait, fairnessReadyAt,
                     waitingKeys, waitingAttemptKeys, readyBehindEarlier};
@@ -555,16 +593,28 @@ export function createTranslationRequestScheduler(
     }
 
     return {
-        observeResponse: (identity, response) => {
+        observeResponse: (identity, response, lease, deadlineAt) => {
             const scope = clean(identity?.quotaScope);
-            if (!scope || (response.status !== 429 && response.status !== 503)) return;
+            if (!scope) return;
+            const probe = lease && cooldowns.get(scope)?.probe;
+            const recovering = probe?.lease === lease && probe !== undefined;
+            if (recovering && response.status >= 500) probe.recoveryFailed = true;
+            if (response.status !== 429 && response.status !== 503) return;
             const current = readNow();
-            const retryAfter = retryAfterMs(response.headers, current);
-            // 真实 429 的无效/缺省头沿用 SDK 的首个 2 秒退避；503 只有有效服务端头才共享冷却。
-            const delay = retryAfter ?? (response.status === 429 ? 2000 : 0);
+            const previous = cooldowns.get(scope);
+            const failures = (previous?.failures ?? 0) + (!previous || recovering ? 1 : 0);
+            const retryAfter = readRetryAfterMs(response.headers, current);
+            // 首次限流等待 2 秒；只有恢复请求再次被限流才提高级别，给重复退避加入抖动。
+            const delay = retryAfter ?? (response.status === 429
+                ? Math.min(60_000, 2000 * 2 ** Math.min(5, failures - 1) * (failures > 1 ? 1 + random() / 4 : 1))
+                : 0);
             if (delay <= 0) return;
-            cooldowns.set(scope, Math.max(cooldowns.get(scope) ?? 0, current + delay));
+            const until = Math.max(previous?.until ?? -Infinity, current + delay);
+            cooldowns.set(scope, {until, failures, status: response.status});
             drain();
+            if (deadlineAt !== undefined && until >= deadlineAt) {
+                return new TranslationRequestCooldownError(response.status, until - current);
+            }
         },
         schedule: <T>(task: (lease: TranslationRequestLease) => Promise<T>, options: TranslationRequestSchedulerTaskOptions = {}) => enqueue({
             task,

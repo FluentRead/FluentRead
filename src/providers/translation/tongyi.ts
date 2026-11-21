@@ -15,6 +15,7 @@ import {createHttpStatusError, createImageInputHttpError, readJsonResponse} from
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
     getTranslationImageInput,
@@ -63,6 +64,7 @@ async function tongyi(message: TranslationProviderRequest<string>) {
             body,
             signal: message.abortSignal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, configuredModel, resp.status);
             attemptReported = true;

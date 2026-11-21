@@ -1,5 +1,6 @@
 <!--
  @file src/app/popup/PopupApp.vue
+ 默认布局：以原有玫红配色和独立卡片组织语言、服务与翻译，各控件使用固定槽位；完整服务名和局部翻译用途可由悬停或聚焦查看。
  服务启用：默认服务提示和功能选择同步用户关闭状态，具体候选与旧选择保护由 PopupServices 执行。
  文件职责：实现浏览器 Popup 的主交互界面，连接当前标签页状态、翻译配置、可插拔皮肤、功能抽屉和高频操作，让现场开关与显示操作保持简短，将长期偏好引导到对应设置页，并为从划词抽屉打开的设置保留明确返回原网页的入口。
  主要内容：Aa 按钮通过既有配置补丁保存全局译文字体偏好，以固定尺寸的衬线／无衬线图标、按下状态和紧凑操作提示反馈选择；保存失败时在翻译卡片内显示居中提示与重试按钮，重试时将焦点交回字体按钮；已有配置订阅同步其他页面的选择，导航不撤销已接受保存，关闭与失活只取消界面等待和迟到反馈；翻译卡片右下角的双语/仅译文图标与网站规则同行，两种按钮共用提示样式并支持 Escape 收起，模式回调随服务和操作变化失效；品牌官网入口保留稳定点击区域，内部图标在悬停和键盘聚焦时缓慢单次摇摆并遵循动画偏好，停留后显示可用 Escape 关闭的官网提示；全文翻译进度与完成状态由主按钮反馈，失败时在主操作内的预留区域呈现自助诊断入口，不挤动网站开关，配置修复定位当前服务，本地报告由用户预览并手动导出；在配置 hydration 后汇总翻译服务，直接展示网页默认服务与适用的配置模型；翻译与局部同排，主操作用短标题合并平台快捷键并保留加载状态，长组合在悬停提示中完整显示，站点开关保留独立按钮；赞赏码在当前弹窗内切换放大与还原，关闭后重置；悬停、划词与图片抽屉优先展示开关和操作示意，首次单屏语言选择独占内容，保存后立即显示主菜单；页面操作、抽屉和导航绑定活跃会话，等待期间独占请求，关闭和配置切换使旧回复失效；网站规则写前复验标签页，等待后台确认并呈现保存忙碌、暂停与失败反馈；Safari 免费池精确授权，焦点复查保留已就绪按钮，点击接管旧读取并重新确认实际许可，撤权取消待发操作，授权事件合并刷新，错误随语言资源更新；打开的实际 teleport 抽屉复用平台可见视口订阅跟随键盘与缩放，极矮区域由同一订阅派生紧凑布局，整页遮罩保持背景拦截，可见高度扩大时仅修正当前聚焦服务搜索被吸顶标题遮住的外框，关闭、缓存失活和卸载立即释放，根画布保持固有尺寸。
@@ -12,7 +13,7 @@
 <template>
   <main
     class="popup-shell"
-    :class="{ 'config-loading': !hydrated, 'language-onboarding-shell': showLanguageOnboarding }"
+    :class="{ 'config-loading': !hydrated, 'language-onboarding-shell': showLanguageOnboarding, 'default-skin': config.interfaceSkin === 'default' }"
     :aria-busy="!hydrated"
     :data-config-ready="hydrated ? 'true' : 'false'"
     :data-interface-skin="config.interfaceSkin"
@@ -61,10 +62,10 @@
             <img src="/icon/128.png" alt="" />
           </a>
         </ElTooltip>
-        <div>
+        <div class="brand-copy">
           <strong>流畅阅读</strong>
-          <small class="brand-version" data-testid="popup-version">v{{ version }}</small>
-          <small v-if="!config.on">{{ t('popup.heroDisabled') }}</small>
+          <small class="brand-version" data-testid="popup-version" :title="!config.on ? t('popup.heroDisabled') : undefined"
+            >v{{ version }}<template v-if="!config.on"> · {{ t('popup.heroDisabled') }}</template></small>
         </div>
       </div>
       <div class="header-actions">
@@ -132,32 +133,41 @@
       <div class="language-pair">
         <label>
           <span>源语言</span>
-          <PopupLanguageSelect aria-label="源语言" source v-model="config.from" :disabled="!config.on" />
+          <PopupLanguageSelect aria-label="源语言" source v-model="config.from" :disabled="!config.on" :single-line="config.interfaceSkin === 'default'" />
         </label>
         <span class="arrow">→</span>
         <label>
           <span>目标语言</span>
-          <PopupLanguageSelect aria-label="目标语言" v-model="config.to" :disabled="!config.on" />
+          <PopupLanguageSelect aria-label="目标语言" v-model="config.to" :disabled="!config.on" :single-line="config.interfaceSkin === 'default'" />
         </label>
       </div>
 
-      <button class="provider-summary" type="button" data-testid="popup-feature-services" data-i18n-ignore
-        :aria-label="providerSummaryLabel" :title="providerSummaryTitle" aria-haspopup="dialog"
-        :aria-expanded="drawerVisible && activeDrawer === 'services'" :onClick="popupActions.services">
-        <span class="provider-summary-copy">
-          <span class="provider-summary-heading"><small>{{ t('popup.providers.title') }}</small><strong>{{ providerLabel(config.service) }}</strong></span>
-          <small v-if="providerSummaryModel" class="provider-summary-model" :title="providerSummaryModelLabel">{{ providerSummaryModel }}</small>
-        </span>
-        <span class="provider-summary-icons" aria-hidden="true">
-          <span class="provider-avatar">
-            <ServiceIcon :service="config.service" :label="providerLabel(config.service)" size="small" />
-          </span>
-          <span class="provider-summary-chevron">›</span>
-        </span>
-      </button>
-      <div v-if="credentialWarning" class="credential-warning" role="alert">
-        <span><strong>配置提醒</strong>{{ credentialWarning }}</span>
-        <button type="button" :onClick="popupActions.serviceSettings">去设置</button>
+      <div class="provider-strip" :class="{'needs-credentials': Boolean(credentialWarning)}">
+        <ElTooltip :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="400" :hide-after="0"
+          :persistent="false" :show-arrow="false" :enterable="false" :disabled="!popupContext.active.value || drawerVisible || donationVisible"
+          placement="top" effect="light" popper-class="translation-tool-tooltip">
+          <template #content><span class="translation-tool-tooltip-copy popup-label-tooltip-copy" data-i18n-ignore>{{ providerSummaryTitle }}</span></template>
+          <button class="provider-summary" type="button" data-testid="popup-feature-services" data-i18n-ignore
+            :aria-label="providerSummaryLabel" :aria-description="providerSummaryHelp" aria-haspopup="dialog"
+            :aria-expanded="drawerVisible && activeDrawer === 'services'" :onClick="popupActions.services">
+            <span class="provider-summary-copy">
+              <span class="provider-summary-heading"><small>{{ t('popup.providers.title') }}</small><strong>{{ providerLabel(config.service) }}</strong></span>
+              <small v-if="providerSummaryModel" class="provider-summary-model">{{ providerSummaryModel }}</small>
+            </span>
+            <span class="provider-summary-icons" aria-hidden="true">
+              <span class="provider-avatar">
+                <ServiceIcon :service="config.service" :label="providerLabel(config.service)" size="small" />
+              </span>
+              <span class="provider-summary-chevron">›</span>
+            </span>
+          </button>
+        </ElTooltip>
+        <div v-if="credentialWarning" class="credential-warning" role="alert">
+          <span><strong>配置提醒</strong>{{ credentialWarning }}</span>
+          <button type="button" :title="translateLegacy(credentialWarning)"
+            :aria-label="`${translateLegacy('去设置')} · ${translateLegacy(credentialWarning)}`"
+            :onClick="popupActions.serviceSettings"><span>去设置</span></button>
+        </div>
       </div>
       <p v-if="safariFreePool" class="safari-free-pool-note" data-testid="safari-free-pool" role="status">
         {{ t('safari.freePool.policy') }} · {{ freePoolStatus }}
@@ -171,12 +181,17 @@
           <span v-if="translationInProgress" class="spinner" aria-hidden="true" />
           <span class="translate-label">{{ pageTranslationButtonLabel }}</span>
         </button>
-        <button v-if="!isThunderbird && !currentPdfSource" class="section-translate-button" type="button" data-testid="section-translation"
-          :disabled="!config.on || currentSiteExtensionDisabled || translating || pageState.savingRule || (safariFreePool && (freePoolLoading || freePoolBusy))" :aria-label="sectionTranslationLabel" :title="sectionTranslationLabel"
-          :onClick="pageButtons.section">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15M10 10l7 2.6-3 1.1-1.1 3z" /></svg>
-          <span>{{ t('popup.sectionTranslation') }}</span>
-        </button>
+        <ElTooltip v-if="!isThunderbird && !currentPdfSource" :trigger="['hover', 'focus']" :trigger-keys="[]" :show-after="400" :hide-after="0"
+          :persistent="false" :show-arrow="false" :enterable="false" :disabled="!popupContext.active.value || drawerVisible || donationVisible"
+          placement="top" effect="light" popper-class="translation-tool-tooltip">
+          <template #content><span class="translation-tool-tooltip-copy popup-label-tooltip-copy" data-i18n-ignore>{{ sectionTranslationLabel }}</span></template>
+          <button class="section-translate-button" type="button" data-testid="section-translation"
+            :disabled="!config.on || currentSiteExtensionDisabled || translating || pageState.savingRule || (safariFreePool && (freePoolLoading || freePoolBusy))"
+            :aria-label="sectionTranslationLabel" :onClick="pageButtons.section">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15M10 10l7 2.6-3 1.1-1.1 3z" /></svg>
+            <span>{{ t('popup.sectionTranslation') }}</span>
+          </button>
+        </ElTooltip>
         <DiagnosticNotice v-if="pageDiagnostic" :diagnostic="pageDiagnostic" :language="config.uiLanguage" :busy="translating" :version="version" @action="diagnosticAction" />
       </div>
 
@@ -284,13 +299,14 @@
       data-popup-module="footer"
       :data-popup-module-last="lastVisiblePopupModule === 'footer'"
     >
-      <span class="popup-translation-count" data-i18n-ignore>{{ t('popup.translationCount', {count: config.count}) }}</span>
+      <span class="popup-translation-count" :title="t('popup.translationCount', {count: config.count})" data-i18n-ignore>{{ t('popup.translationCount', {count: config.count}) }}</span>
       <a
         class="opensource-link"
         href="https://github.com/Bistutu/FluentRead"
         target="_blank"
         rel="noreferrer"
         aria-label="在 GitHub 查看流畅阅读开源项目"
+        :title="t('popup.openSourceProject')"
       >
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 .3a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.26c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.77.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.62-2.81 5.65-5.49 5.95.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .3" />
@@ -298,7 +314,7 @@
         <span>开源项目</span>
         <span class="external-mark" aria-hidden="true">↗</span>
       </a>
-      <button type="button" :disabled="clearingCache" :onClick="popupActions.cache">{{ clearingCache ? '清理中…' : '清除缓存' }}</button>
+      <button type="button" :disabled="clearingCache" :title="translateLegacy(clearingCache ? '清理中…' : '清除缓存')" :onClick="popupActions.cache">{{ clearingCache ? '清理中…' : '清除缓存' }}</button>
     </footer>
     </template>
 
@@ -656,7 +672,8 @@ const providerSummaryModelLabel = computed(() => providerSummaryModel.value
   ? t('featureServices.configuredModel', {model: providerSummaryModel.value}) : '');
 const providerSummaryLabel = computed(() => [t('featureServices.open'), t('featureServices.default'),
   providerLabel(config.value.service), providerSummaryModelLabel.value].filter(Boolean).join(' · '));
-const providerSummaryTitle = computed(() => `${providerSummaryLabel.value}\n${t('featureServices.shortHelp')}\n${assignedProviders.value.map(providerLabel).join(' · ')}`);
+const providerSummaryHelp = computed(() => `${t('featureServices.shortHelp')}\n${assignedProviders.value.map(providerLabel).join(' · ')}`);
+const providerSummaryTitle = computed(() => [providerLabel(config.value.service), providerSummaryModelLabel.value].filter(Boolean).join('\n'));
 const canUseAIContext = computed(() => servicesType.isUseAIContext(
   selectedCustomOpenAIProvider.value ? 'custom' : config.value.service,
   aiContextModel.value,
@@ -920,7 +937,8 @@ const pageActions = createPopupPageActions({state: pageState, config: () => conf
   persistRule: persistSiteRulePatch,
   openPdf: source => browser.tabs.create({url: createPdfReaderUrl(browser.runtime.getURL('document.html'), source)}),
   onStatus: readPageResult, onFailure: diagnostic => {pageDiagnostic.value = diagnostic;notice.value = ''},
-  send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0}), notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
+  send: (id, message) => browser.tabs.sendMessage(id, message, {frameId: 0}),
+  notice: showNotice, close: closePopupSurface, translate: t, thunderbird: isThunderbird});
 const {hydrate: hydrateCurrentSite, toggle: togglePageTranslation, section: startSectionTranslation,
   setAlways: setCurrentSiteAlwaysTranslated, setDisabled: setCurrentSiteExtensionDisabled} = pageActions;
 watch(pageContext.revision, () => {pageActions.invalidate();readPageResult(undefined);if (!config.value.on || currentSiteExtensionDisabled.value) pageTranslated.value = false}, {flush: 'sync'});

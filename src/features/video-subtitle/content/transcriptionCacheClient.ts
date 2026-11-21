@@ -1,9 +1,10 @@
 /**
  * @file src/features/video-subtitle/content/transcriptionCacheClient.ts
- * 文件职责：从当前 X 视频提取可跨刷新复用的身份，并通过后台消息读写完整识别字幕。
+ * 文件职责：从当前 X 或 HTML 媒体提取可跨刷新复用的身份，并通过后台消息读写完整识别字幕。
  * 主要内容：使用视频所属帖子的链接、媒体缩略图和稳定源定位缓存；比较逐步补全的媒体身份，校验返回 cue，容忍存储暂时不可用。
  * 模块边界：内容页只传递文本和媒体身份，不直接打开数据库、不保存音频、不决定播放器会话的恢复时机。
  */
+import {sha256Hex} from '@/src/shared/function/sha256';
 import type {VideoSubtitleCue} from './youtubeSubtitleData';
 import {buildVideoAiSubtitleVideoKey, normalizeCompletedVideoAiSubtitleCues, type VideoAiSubtitleCacheRequest, type VideoAiSubtitleCacheSource} from '../transcriptionCache';
 
@@ -47,20 +48,35 @@ export function getVideoTranscriptionMediaTransition(
   return {sameMedia, identity, key: identity ? buildVideoAiSubtitleVideoKey(identity) || nextSource : ''};
 }
 
+const streamIds = new WeakMap<object, string>();
+const htmlIdentities = new WeakMap<HTMLMediaElement, {source: string; mediaId: string}>();
+let streamSequence = 0;
+
 export function getVideoTranscriptionCacheRequest(
-  video: HTMLVideoElement | null, model: unknown, language: string, href: string, confirmedIdentity?: VideoAiSubtitleCacheSource | null,
+  video: HTMLMediaElement | null, model: unknown, language: string, href: string, confirmedIdentity?: VideoAiSubtitleCacheSource | null,
 ): VideoAiSubtitleCacheRequest | null {
   if (!video) return null;
   if (confirmedIdentity) return {source: confirmedIdentity, model, videoSourceLanguage: language};
+  const page = new URL(href);
+  if (!/(^|\.)(x|twitter)\.com$/i.test(page.hostname)) {
+    const stream = video.srcObject;
+    if (stream && !streamIds.has(stream)) streamIds.set(stream, `stream:${++streamSequence}`);
+    const source = stream ? streamIds.get(stream) : video.currentSrc || video.src || video.querySelector<HTMLSourceElement>('source[src]')?.src;
+    if (!source) return null;
+    // 完整地址只参与摘要，查询参数中的媒体 ID 不丢失，签名和凭据也不写入缓存身份。
+    let identity = htmlIdentities.get(video);
+    if (!identity || identity.source !== source) {identity = {source, mediaId: `html:${sha256Hex(source)}`}; htmlIdentities.set(video, identity);}
+    return {source: {mediaId: identity.mediaId}, model, videoSourceLanguage: language};
+  }
   const post = video.closest('article');
   const links = Array.from(post?.querySelectorAll<HTMLAnchorElement>('a[href]') || []);
   const permalink = links.find(link => /\/status\/\d+(?:\/|$)/.test(link.pathname));
   const statusUrl = permalink?.href || href;
   const explicitIndex = statusUrl.match(/\/status\/\d+\/video\/(\d+)(?:[/?#]|$)/)?.[1];
-  const videos = Array.from(post?.querySelectorAll('video') || []);
+  const videos = Array.from(post?.querySelectorAll<HTMLMediaElement>('video') || []);
   const index = videos.indexOf(video);
   const videoIndex = explicitIndex || (index >= 0 ? String(index + 1) : '');
-  let poster = video.poster;
+  let poster = (video as HTMLVideoElement).poster;
   // X 首页有时把缩略图放在 video 的兄弟 img，而非 video.poster；只在当前唯一视频的局部容器找媒体缩略图。
   let scope = video.parentElement;
   for (let depth = 0; !poster && scope && depth < 6; depth += 1, scope = scope.parentElement) {

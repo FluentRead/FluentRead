@@ -1,11 +1,13 @@
 /**
  * @file src/features/document-translation/ui/useDocumentTasks.ts
+ * PDF 批注：当前文件的可选批注数组由同一个任务拥有，切换文件不共享批注状态，历史提交沿用文件修订。
  * 文件职责：持有文档阅读页面的任务队列和当前任务选择，为阅读、校订、翻译与导出提供同一份响应式任务状态。
  * 主要内容：定义每份文件的译文、人工确认、重译缓存策略、修订、导出和历史读取失败状态，以可写 computed 将当前任务字段交给页面；没有打开文件时使用独立空状态，切换不复制译文或修订，清空后不保留旧任务引用。
  * 模块边界：只管理文档 feature 的页面模型，不发起网络、OCR、解析、历史保存或下载；异步提交资格和资源释放由任务运行时与页面生命周期负责，配置草稿独立管理。
  */
 import {computed, reactive, ref, type WritableComputedRef} from 'vue';
 import type {ParsedDocument} from '../core/document';
+import type {PdfAnnotation} from '../core/pdfAnnotations';
 import type {DocumentRetainedRevision} from '../services/history';
 
 export interface DocumentTaskState {
@@ -23,6 +25,8 @@ export interface DocumentTaskState {
 }
 
 export interface DocumentQueueItem extends DocumentTaskState {
+    pdfAnnotations?: PdfAnnotation[];
+    delimitedColumns?: readonly number[];
     id: number;
     name: string;
     originalFile?: File;

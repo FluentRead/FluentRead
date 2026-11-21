@@ -16,6 +16,7 @@ import {abortErrorFromSignal, cancelUnreadResponseBody, createRuntimeAbortContex
 import {normalizeAiRequestTimeoutMs} from '@/src/core/config/aiRequestTimeout';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
     getTranslationImageInput,
@@ -66,6 +67,7 @@ async function claude(message: TranslationProviderRequest<string>) {
             body,
             signal: abortContext.signal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, configuredModel, resp.status);
             attemptReported = true;

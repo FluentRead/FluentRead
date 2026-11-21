@@ -20,7 +20,7 @@ const language = runtime.ref<UiLanguage>('zh-CN');
 const bundleRevision = runtime.ref(0);
 const config = new Config();
 const listeners = new Set<(value: Config) => void>();
-const patches = vi.fn(), openOptions = vi.fn(), createTab = vi.fn();
+const patches = vi.fn(), openOptions = vi.fn(), createTab = vi.fn(), runtimeSend = vi.fn();
 const queryTabs = vi.fn<() => Promise<PopupActiveTab[]>>();
 const send = vi.fn<(id: number, message: {type: string; action?: string}) => Promise<unknown>>();
 const tabUpdated = new Set<(id: number, change: {url?: string; status?: string}, tab: PopupActiveTab & {active?: boolean}) => void>();
@@ -51,7 +51,7 @@ vi.mock('webextension-polyfill', () => {
   return {default: {tabs: {query: () => queryTabs(), sendMessage: (...args: Parameters<typeof send>) => send(...args),
     create: (...args: unknown[]) => createTab(...args), onUpdated: {addListener: (fn: any) => tabUpdated.add(fn), removeListener: (fn: any) => tabUpdated.delete(fn)},
     onActivated: event, onRemoved: event}, runtime: {id: 'fixture-extension', onMessage: event, getManifest: () => ({version: '0.0.35'}),
-      getURL: (path: string) => 'extension://' + path, sendMessage: async () => ({success: true}), openOptionsPage: () => openOptions()}}};
+      getURL: (path: string) => 'extension://' + path, sendMessage: (...args: unknown[]) => runtimeSend(...args), openOptionsPage: () => openOptions()}}};
 });
 vi.mock('@/src/services/config/store', () => ({get config() {return config;}, configReady: Promise.resolve(),
   subscribeConfig: (fn: (value: Config) => void) => {listeners.add(fn);return () => listeners.delete(fn);},
@@ -71,6 +71,7 @@ vi.mock('@/src/app/popup/PopupServices.vue', () => ({__esModule: true, default: 
 
 beforeEach(() => {
   vi.clearAllMocks();listeners.clear();tabUpdated.clear();language.value = 'zh-CN';bundleRevision.value = 0;
+  runtimeSend.mockReset().mockResolvedValue({success: true});
   queryTabs.mockReset().mockResolvedValue([{id: 7, windowId: 3, url: 'https://example.test/a'}]);
   send.mockReset().mockImplementation(async (_id, message) => {
     return message.type === 'getFullPageTranslationState'
@@ -269,7 +270,6 @@ describe('Popup 首页关键信息', () => {
       .toEqual(['page-translation', 'section-translation']);
     expect(summary().querySelector('strong')?.textContent).toBe('OpenAI');
     expect(model()?.textContent).toBe('saved-model');
-    expect(model()?.getAttribute('title')).toBe('配置模型：saved-model');
     expect(summary().getAttribute('aria-label')).toBe('按功能选择服务 · 网页默认服务 · OpenAI · 配置模型：saved-model');
     expect(summary().getAttribute('aria-haspopup')).toBe('dialog');
     expect(patches).not.toHaveBeenCalled();
@@ -281,7 +281,7 @@ describe('Popup 首页关键信息', () => {
     const before = JSON.stringify(config);
     await mount();
     expect(model()?.textContent).toBe('custom/active');
-    expect(summary().getAttribute('title')).toContain('custom/active');
+    expect(summary().getAttribute('aria-label')).toContain('配置模型：custom/active');
     expect(summary().textContent).not.toContain('body-override');
     expect(summary().textContent).not.toContain('当前模型');
     expect(JSON.stringify(config)).toBe(before);expect(patches).not.toHaveBeenCalled();
@@ -323,9 +323,8 @@ describe('Popup 首页关键信息', () => {
   it('英文摘要和外部语言同步使用现有配置模型文案', async () => {
     language.value = 'en-US';await mount();
     expect(model()?.textContent).toBe('saved-model');
-    expect(model()?.getAttribute('title')).toBe('Configured model: saved-model');
     expect(summary().getAttribute('aria-label')).toBe('Services by feature · Default page service · OpenAI · Configured model: saved-model');
-    language.value = 'zh-CN';await settle();expect(model()?.getAttribute('title')).toBe('配置模型：saved-model');
+    language.value = 'zh-CN';await settle();expect(summary().getAttribute('aria-label')).toContain('配置模型：saved-model');
   });
 
   it('多个功能服务仍只展示网页默认服务，其余分配保留在完整提示中', async () => {
@@ -335,7 +334,7 @@ describe('Popup 首页关键信息', () => {
     expect(summary().querySelectorAll('.provider-avatar')).toHaveLength(1);
     expect(summary().querySelector('.provider-overflow')).toBeNull();
     expect(summary().querySelector('strong')?.textContent).toBe('OpenAI');
-    expect(summary().getAttribute('title')).toContain('DeepSeek');
+    expect(summary().getAttribute('aria-description')).toContain('DeepSeek');
     expect(model()?.textContent).toBe('saved-model');
   });
 
@@ -346,7 +345,6 @@ describe('Popup 首页关键信息', () => {
     config.model['custom:private'] = saved;
     await mount();
     expect(summary().querySelector('strong')?.textContent).toBe(name);expect(model()?.textContent).toBe(saved);
-    expect(model()?.getAttribute('title')).toBe(`配置模型：${saved}`);
     expect(summary().getAttribute('aria-label')).toContain(`${name} · 配置模型：${saved}`);
   });
 
@@ -378,7 +376,6 @@ describe('Popup 首页关键信息', () => {
       await vi.waitFor(() => expect(document.querySelector('.settings-button > span')?.textContent).toBe('Settings'));
       expect(model()?.textContent).toBe('文');
       expect(summary().querySelector('strong')?.textContent).toBe('文');
-      expect(model()?.getAttribute('title')).toBe('Configured model: 文');
       expect(summary().getAttribute('aria-label')).toContain(' · 文 · Configured model: 文');
       expect(JSON.stringify(config)).toBe(before);expect(patches).not.toHaveBeenCalled();
     } finally {
@@ -429,3 +426,10 @@ vi.mock('@/src/features/self-help/ui/DiagnosticNotice.vue', () => ({default: {se
 vi.mock('@/src/ui/components/ServiceIcon.vue', () => ({default: {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('div', attrs, slots.default?.());}}}));
 
 vi.mock('@/src/ui/components/UiLanguageOnboarding.vue', () => ({default: {setup(_: unknown, {attrs, slots}: any) {return () => runtime.h('div', attrs, slots.default?.());}}}));
+
+it('keeps only the font and display mode controls in the translation tools row', async () => {
+  await mount();
+  const buttons = [...document.querySelectorAll('.translation-tools button')];
+  expect(buttons.map(button => button.getAttribute('data-testid'))).toEqual(['page-font-entry', 'popup-display-mode']);
+  expect(buttons.every(button => !button.hasAttribute('title'))).toBe(true);
+})

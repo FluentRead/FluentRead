@@ -14,6 +14,8 @@ If the store is unavailable, follow [offline installation](/en/guide/offline-ins
 
 In Chrome, click the puzzle-shaped **Extensions** button beside the address bar. Find **FluentRead** and click its pin icon. Use the toolbar icon to open FluentRead’s menu.
 
+Hover over the icon to see a short description of page and selection translation in your browser’s language.
+
 <details class="guide-details">
 <summary>See where to pin the icon</summary>
 
@@ -34,6 +36,8 @@ Other browsers may place the pin control elsewhere in their extension menu.
 <GuideVisual kind="first-translation" en />
 
 The **interface language** controls buttons and settings. The **target language** controls translations. Free translation works without an API key.
+
+The default menu keeps controls in fixed positions across languages. Hover over a truncated label to read it in full. Use **Section** beside **Translate** to select a region. For site rules, a green dot means a rule is on and a gray dot means it is off. Click the rule to toggle it.
 
 <span id="translate-selected-text"></span>
 

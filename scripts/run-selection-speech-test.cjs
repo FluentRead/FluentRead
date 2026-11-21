@@ -53,6 +53,51 @@ async function screenshot(name) {
  const file=path.join(output,name+'.png');focusSample(`${name}:before`);await page.screenshot({path:file,clip:box});report.screenshots.push(file);focusSample(`${name}:after`);
 }
 
+async function verifyBilingualLayout(name, labels) {
+ const details=await inspect(`function(){
+  const rect=node=>{const {left,right,top,bottom,width,height}=node.getBoundingClientRect();return {left,right,top,bottom,width,height};};
+  const root=this.getRootNode(),toolbar=this.querySelector('.fr-study-toolbar');
+  const source=this.querySelector('.fr-original-text'),translation=this.querySelector('.fr-translation-result');
+  const blocks=[...(source?.parentElement?.querySelectorAll('.fr-text-block')||[])];
+  const hits=[...this.querySelectorAll('.fr-study-toolbar button,.fr-tooltip-actions button')].map(button=>{
+   const {left,right,top,bottom}=rect(button);
+   const middle=root.elementFromPoint((left+right)/2,(top+bottom)/2);
+   return {label:button.textContent.trim()||button.getAttribute('aria-label'),hit:middle?.closest('button')===button};
+  });
+  return {source:rect(source),translation:rect(translation),toolbar:rect(toolbar),overflow:toolbar.scrollWidth>toolbar.clientWidth+1,
+   order:blocks.map(block=>block.querySelector('.fr-text-label').textContent.trim()),
+   labelHeights:blocks.map(block=>rect(block.querySelector('.fr-text-label')).height),hits};
+ }`);
+ (report.bilingualLayouts ||= []).push({name,...details});
+ if(!baselineProbe){
+  assert.deepEqual(details.order,labels);
+  assert(details.source.bottom<=details.translation.top+.5,JSON.stringify(details));
+  assert(details.labelHeights.every(height=>height>1),JSON.stringify(details));
+  assert(!details.overflow&&details.hits.every(item=>item.hit),JSON.stringify(details));
+ }
+ await screenshot(name);
+}
+
+async function verifyCompactToolbar() {
+ const count=await inspect(`function(){
+  const buttons=this.querySelectorAll('.fr-study-toolbar button');
+  buttons[0].focus({preventScroll:true});
+  return buttons.length;
+ }`);
+ for(let index=1;index<count;index++) await page.keyboard.press('Tab');
+ await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const details=await inspect(`function(){
+  const root=this.getRootNode(),toolbar=this.querySelector('.fr-study-toolbar');
+  const last=toolbar.querySelector('button:last-of-type'),bounds=last.getBoundingClientRect(),lane=toolbar.getBoundingClientRect();
+  const content=this.querySelector('.fr-tooltip-content:not(.fr-reading-content)');
+  return {focused:root.activeElement===last,visible:bounds.left>=lane.left-.5&&bounds.right<=lane.right+.5,
+   scrollLeft:toolbar.scrollLeft,contentHeight:content.clientHeight};
+ }`);
+ assert(details.focused&&details.visible&&details.scrollLeft>0&&details.contentHeight>=55,JSON.stringify(details));
+ report.compactToolbar=details;
+ record('short card keeps the reading area and reveals the last action with Tab');
+}
+
 async function layout(name,{idle=false}={}) {
  const state=await inspect(`function(){
   const rect=element=>{const r=element.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height}};
@@ -75,9 +120,12 @@ async function wheelContent(delta) {
 async function scrollEnd(name) {
  await wheelContent(5000);await wheelContent(5000);
  const state=await layout(name);
- const end=await inspect(`function(){const content=this.querySelector('.fr-tooltip-content:not(.fr-reading-content)'),source=this.querySelector('.fr-original-text'),r=source.getBoundingClientRect(),c=content.getBoundingClientRect();return {text:source.querySelector('pre').textContent,bottom:r.bottom,top:r.top,contentBottom:c.bottom,padding:parseFloat(getComputedStyle(content).paddingBottom),buttons:[...source.querySelectorAll('button')].map(b=>{const r=b.getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right}})}}`);
+ const end=await inspect(`function(){
+  const blocks=[...this.querySelectorAll('.fr-translation-container > .fr-text-block')];
+  return {texts:blocks.map(block=>block.querySelector('pre').textContent),bottom:blocks.at(-1).getBoundingClientRect().bottom};
+ }`);
  report.layouts.at(-1).end=end;
- if(!baselineProbe){assert.equal(end.text,sentence);assert(state.scrollTop+state.clientHeight>=state.scrollHeight-1,`${name}: text end not reachable`);assert(end.bottom<=state.content.bottom+.5,`${name}: text end is obscured`);}
+ if(!baselineProbe){assert.deepEqual(end.texts,[sentence,translation]);assert(state.scrollTop+state.clientHeight>=state.scrollHeight-1,`${name}: text end not reachable`);assert(end.bottom<=state.content.bottom+.5,`${name}: text end is obscured`);}
  return state;
 }
 async function scrollTop() {await wheelContent(-5000);await wheelContent(-5000);}
@@ -122,9 +170,16 @@ async function main() {
   await worker.evaluate(({audioBase64,translation})=>{
    const native=fetch.bind(globalThis);globalThis.__speechFixtureCalls=0;
    globalThis.fetch=async(input,init)=>{
-    const url=String(input);globalThis.__speechFixtureUrls||=[];globalThis.__speechFixtureUrls.push(new URL(url).hostname);
+    const url=typeof input==='string'||input instanceof URL ? String(input) : input.url;
+    globalThis.__speechFixtureUrls||=[];globalThis.__speechFixtureUrls.push(new URL(url).hostname);
     if(url.startsWith('https://edge.microsoft.com/translate/translatetext')){
-     const texts=JSON.parse(init.body);return new Response(JSON.stringify(texts.map(()=>({translations:[{text:translation,to:'zh-Hans'}]}))),{headers:{'content-type':'application/json'}});
+     const texts=JSON.parse(init?.body ?? await input.clone().text());
+     const translations=texts.map(source=>{
+      // The production translator restores its protected GitHub term after the response.
+      const protectedName=source.match(/__FRTERM_[a-z0-9]+_\d+__/iu)?.[0];
+      return {translations:[{text:protectedName ? translation.replace('GitHub',protectedName) : translation,to:'zh-Hans'}]};
+     });
+     return new Response(JSON.stringify(translations),{headers:{'content-type':'application/json'}});
     }
     if(url.startsWith('https://dev.microsofttranslator.com/apps/endpoint'))return new Response(JSON.stringify({t:'speech-fixture',r:'fixture'}),{headers:{'content-type':'application/json'}});
     if(url.includes('.tts.speech.microsoft.com/cognitiveservices/v1')){
@@ -144,13 +199,16 @@ async function main() {
   assert(!cardUi.header&&!cardUi.language&&cardUi.brand);
   record('translation card starts with action tabs and keeps share and close without a language header');
   await layout('idle',{idle:true});
+  await verifyBilingualLayout('bilingual-light',['原文','译文']);
   const original=await inspect(`function(){this.__speechWordNodes=Array.from(this.querySelectorAll('.fr-original-text .fr-speech-word'));this.__speechWordRects=this.__speechWordNodes.map(node=>{const r=node.getBoundingClientRect();return [r.x,r.y,r.width,r.height]});return this.querySelector('.fr-original-text pre').textContent}`);assert.equal(original,sentence);
   await startAudio('source','source-light');
   await scrollEnd('source-light:end');await screenshot('source-light-end');
   if(baselineProbe){report.ok=true;return;}
   if(layoutOnly){
    await support.patchStoredConfig(popup,{theme:'dark'});await wait(250);await layout('source-dark');await screenshot('speech-dark');
-   await resizeCard(280,140);await scrollEnd('manual-minimum:end');await screenshot('speech-manual-minimum');
+   await resizeCard(320,300);await scrollTop();
+   await verifyBilingualLayout('bilingual-dark-320',['原文','译文']);
+   await resizeCard(280,140);await verifyCompactToolbar();await scrollEnd('manual-minimum:end');await screenshot('speech-manual-minimum');
    await resizeCard(320,180);await scrollEnd('manual-small:end');await screenshot('speech-manual-small');
    await page.setViewportSize({width:390,height:800});await wait(250);await layout('source-narrow');await screenshot('speech-narrow');
    await click(node=>support.cdpAttribute(node,'aria-label')==='停止播放');await layout('stopped',{idle:true});
@@ -164,6 +222,15 @@ async function main() {
    await screenshot('speech-short-viewport');
    await page.setViewportSize({width:390,height:800});await wait(250);
    await click(node=>support.cdpAttribute(node,'aria-label')==='停止播放');await layout('source-restarted-stopped',{idle:true});
+   await support.patchStoredConfig(popup,{uiLanguage:'en-US'});
+   await until(async()=>await inspect("function(){return this.querySelector('.fr-study-toolbar button').textContent.trim()}")==='Translation','English card is not localized');
+   await resizeCard(280,280);await scrollTop();
+   await verifyBilingualLayout('bilingual-english-280',['Original','Translation']);
+   await resizeCard(280,140);
+   await inspect("function(){this.querySelector('.fr-study-toolbar button:last-of-type').focus({preventScroll:true})}");
+   await page.keyboard.press('Enter');
+   await until(()=>inspect("function(){return this.querySelector('.fr-study-toolbar button:last-of-type').getAttribute('aria-pressed')==='true'}"),'Enter does not activate the last action in the compact toolbar');
+   record('original precedes translation and the wrapped toolbar keeps labels and actions reachable in light and dark cards');
    assert.deepEqual(report.consoleErrors,[]);await diagnostics.flush();diagnostics.assertClean();
    record('generation, playback, stop/restart, source/translation, manual small size and narrow dark card keep text and speech controls separate');report.ok=true;return;
   }

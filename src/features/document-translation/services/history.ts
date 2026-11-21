@@ -1,11 +1,13 @@
 /**
  * @file src/features/document-translation/services/history.ts
+ * PDF 批注：高亮、下划线及备注与原文件同记录保存，恢复时校验页号、归一矩形和容量；删除或淘汰文档时一并清除。
  * 文件职责：在浏览器本地保存最近翻译过的文档及其译文，使文档翻译首页可以列出记录并一键恢复阅读。
  * 主要内容：以文件内容摘要为稳定标识，在独立的 IndexedDB 库中保存原始文件字节、解析结果快照、译文、进度与设置指纹；解析规则变化后按原文与双向唯一的原生位置或邻文恢复未变化片段的独立校订，歧义校订独立保留，复用同文件中页号、展示尺寸与旋转一致的已识别扫描页；原文件、逐行及逐项稳定几何均一致时，保留因字体指标修正而合并的连续普通文字段，使用新字形重建边界而不拼接译文；其余文字页保持新解析结果，统一重编号全文片段；本次复用的旧索引保留独立校订与空槽并从原文匹配池排除，不写入解析快照；列表与淘汰使用游标逐条提取摘要和原始字节数，不聚合持有所有原文件及解析快照，按事务内保存序列排序（旧记录按更新时间排序），并在超过条数或总字节上限时淘汰最旧的记录；普通查询在数据库不可用时降级为默认值，受检读取则明确报告不可用；其他标签页需要升级或删除时让出连接，不影响打开和翻译文档。
  * 保存生命周期：提供可区分读取失败与确实没有记录的检查接口；超时撤销后续写入资格并取消活跃写事务，只有真实事务提交后才确认保存成功；放弃的数据库打开请求迟到成功时关闭旧连接，旧连接事件不能重置已恢复连接；重译跳过缓存只接受并保存显式 true，刷新后继续当前重译不会恢复旧缓存。
  * 模块边界：只负责本地存取与已有译文匹配，不解析文档、不发起翻译、不读取配置，也不把任何内容发送到网络；页面状态、解析版本与何时保存由文档页面组合根决定。
  */
 import {documentSourceLocators, matchDocumentSourceLocators} from '../core/materialLocator';
+import {normalizePdfAnnotations, type PdfAnnotation} from '../core/pdfAnnotations';
 import type {DocumentSegment, ParsedDocument, PdfDocumentBlock, PdfDocumentLine, PdfDocumentPage, PdfDocumentRun} from '../core/document';
 
 export const DOCUMENT_HISTORY_MAX_ENTRIES = 20;
@@ -32,6 +34,10 @@ export interface DocumentHistorySummary {
     historyVersion?: string;
 }
 export interface DocumentHistoryRecord extends DocumentHistorySummary {
+    /** 批注与原始文件同生命周期、同一事务保存；删除历史时一起清除。 */
+    pdfAnnotations?: PdfAnnotation[];
+    /** CSV/TSV 文件最后选择的源列号；缺省表示全部可译列。 */
+    delimitedColumns?: readonly number[];
     bytes: Uint8Array;
     mimeType: string;
     translations: string[];
@@ -131,11 +137,11 @@ export function normalizeDocumentRetainedRevisions(values: readonly unknown[]): 
 
 /** 调用方先按文件身份选中历史记录；沿用安全匹配，并保留无法消费的独立旧校订供用户查看。 */
 export function restoreDocumentHistoryRevisions(
-    record: Pick<DocumentHistoryRecord, 'parsed' | 'parsedVersion' | 'total' | 'translations' | 'retainedRevisions'>,
+    record: Pick<DocumentHistoryRecord, 'parsed' | 'parsedVersion' | 'total' | 'translations' | 'retainedRevisions' | 'pdfAnnotations'>,
     document: ParsedDocument,
     currentVersion: number,
     segmentOrigins?: readonly (number | undefined)[],
-): {translations: string[]; retainedRevisions: DocumentRetainedRevision[]} {
+): {translations: string[]; retainedRevisions: DocumentRetainedRevision[]; pdfAnnotations?: PdfAnnotation[]} {
     const normalized = {...record, translations: Array.isArray(record.translations) ? record.translations : []};
     const {translations, consumed} = matchDocumentHistoryTranslations(normalized, document, currentVersion, segmentOrigins);
     const snapshot = record.parsed && typeof record.parsed === 'object' ? record.parsed as {segments?: unknown} : undefined;
@@ -146,7 +152,8 @@ export function restoreDocumentHistoryRevisions(
         const slot = typeof segment.id === 'number' && Number.isInteger(segment.id) && segment.id >= 0 ? segment.id : index;
         return [{source: segment.source, translation: normalized.translations[slot], contextLabel: segment.contextLabel}];
     });
-    return {translations, retainedRevisions: normalizeDocumentRetainedRevisions([...(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []), ...unused])};
+    return {translations, retainedRevisions: normalizeDocumentRetainedRevisions([...(Array.isArray(record.retainedRevisions) ? record.retainedRevisions : []), ...unused]),
+        ...(record.pdfAnnotations && document.binary?.kind === 'pdf' ? {pdfAnnotations: normalizePdfAnnotations(record.pdfAnnotations, document.binary.pages.length)} : {})};
 }
 
 export interface DocumentHistoryPdfOcrRestore {

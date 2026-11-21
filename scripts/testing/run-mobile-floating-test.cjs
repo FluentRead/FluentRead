@@ -186,7 +186,7 @@ const server = http.createServer(async (request, response) => {
     const cdp = await context.newCDPSession(page);
     const worlds=[]; cdp.on('Runtime.executionContextCreated',event=>worlds.push(event.context)); cdp.on('Runtime.executionContextsCleared',()=>worlds.splice(0)); await cdp.send('Runtime.enable');
     const extensionWorld = () => worlds.find(value => value.origin?.includes(new URL(origin).host) && value.auxData?.type==='isolated') || worlds.find(value => value.name?.includes(new URL(origin).host));
-    const inExtension = async expression => {const world=extensionWorld();assert(world,'Extension isolated world missing');const result=await cdp.send('Runtime.evaluate',{contextId:world.id,expression,returnByValue:true});assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));return result.result.value;};
+    const inExtension = async expression => {const world=extensionWorld();assert(world,'Extension isolated world missing');const result=await cdp.send('Runtime.evaluate',{contextId:world.id,expression,awaitPromise:true,returnByValue:true});assert(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));return result.result.value;};
     await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 5});
     // 触摸能力必须在生产组件的新文档挂载前生效，避免仅由动态媒体查询撑绿。
     await step('reload-with-touch-capability-before-mount', () => page.reload());
@@ -209,7 +209,7 @@ const server = http.createServer(async (request, response) => {
     const metrics = () => inspect('', `
       const r = this.getBoundingClientRect();
       const main = this.querySelector('.floating-ball-main'), m = main.getBoundingClientRect();
-      const css = getComputedStyle(main), shadow = this.getRootNode(), host = shadow instanceof ShadowRoot ? shadow.host : this;
+      const css = getComputedStyle(main), face = getComputedStyle(main, '::before'), shadow = this.getRootNode(), host = shadow instanceof ShadowRoot ? shadow.host : this;
       const visual = window.visualViewport;
       const left = visual?.offsetLeft ?? 0, top = visual?.offsetTop ?? 0;
       const width = visual?.width ?? innerWidth, height = visual?.height ?? innerHeight;
@@ -228,7 +228,7 @@ const server = http.createServer(async (request, response) => {
         visualViewport:{left,top,width,height,right:left+width,bottom:top+height,scale:visual?.scale ?? 1},
         coarse:matchMedia('(pointer:coarse)').matches, anyPointerCoarse:matchMedia('(any-pointer:coarse)').matches,
         maxTouchPoints:navigator.maxTouchPoints ?? 0, hardwareTouchClass:this.classList.contains('is-touch-capable'),
-        computedStyle:{display:css.display,visibility:css.visibility,opacity:css.opacity,pointerEvents:css.pointerEvents,
+        computedStyle:{display:css.display,visibility:css.visibility,opacity:css.opacity,faceOpacity:face.opacity,pointerEvents:css.pointerEvents,
           transform:css.transform,transformIsIdentity:css.transform === 'none' || new DOMMatrixReadOnly(css.transform).isIdentity,clipPath:css.clipPath}, hitSamples};
     `);
     function assertMainTouchable(m, label, fixtureBounds) {
@@ -238,7 +238,7 @@ const server = http.createServer(async (request, response) => {
       assert(m.main.width >= 43.9 && m.main.height >= 43.9, detail);
       assert(m.main.x >= viewport.left - .5 && m.main.right <= viewport.right + .5 && m.main.y >= viewport.top - .5 && m.main.bottom <= viewport.bottom + .5, detail);
       assert(m.computedStyle.display !== 'none' && m.computedStyle.visibility === 'visible' && m.computedStyle.pointerEvents === 'auto', detail);
-      assert(Number(m.computedStyle.opacity) >= .699 && m.computedStyle.transformIsIdentity && m.computedStyle.clipPath === 'none', detail);
+      assert(Number(m.computedStyle.opacity) >= .519 && m.computedStyle.transformIsIdentity && m.computedStyle.clipPath === 'none', detail);
       assert(m.hitSamples.length === 5 && m.hitSamples.every(point => point.rootHitTarget && point.documentHitOwn), detail);
     }
     async function box(selector) {return inspect(selector, 'const r = el.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height};');}
@@ -253,10 +253,23 @@ const server = http.createServer(async (request, response) => {
     await page.setViewportSize({width:390,height:844});
     await delay(600);
     let m = await metrics(); assert(m.coarse); assertMainTouchable(m, 'portrait-idle');
+    assert.equal(m.computedStyle.opacity, '0.52');
+    assert.equal(m.computedStyle.faceOpacity, '0');
+    const idleX = m.main.x;
     record('touch-handle-full-44px',{metrics:m}); await shot('portrait-idle');
     await inspect('.floating-ball-main',`el.__events=[]; for(const name of ['pointerdown','pointerup','pointercancel','click']) el.addEventListener(name,event=>el.__events.push({type:event.type,pointerId:event.pointerId,button:event.button,detail:event.detail,trusted:event.isTrusted}));window.addEventListener('blur',()=>el.__events.push({type:'windowblur'}));return true;`);
     await tap('.floating-ball-main');
     report.firstTouch={metrics:await metrics(),events:await inspect('.floating-ball-main','return el.__events;')}; save();
+    assert.equal(report.firstTouch.metrics.main.x, idleX, 'Opening the touch tools should keep the button in place');
+    const handle = report.firstTouch.metrics.main;
+    const settingsButton = await box('.floating-ball-settings');
+    const hideButton = await box('.floating-ball-hide');
+    for (const tool of [settingsButton, hideButton]) {
+      assert(tool.width >= 43.9 && tool.height >= 43.9);
+      assert(Math.abs(tool.x + tool.width / 2 - handle.x - handle.width / 2) < 1);
+    }
+    assert(settingsButton.y + settingsButton.height < handle.y && hideButton.y > handle.bottom);
+    record('touch-tools-align-above-and-below-the-anchor', {handle, settingsButton, hideButton});
     const progress = page.locator('.fr-translation-progress:not(.fr-compact)');
     await progress.waitFor({state:'visible'});
     await inExtension(`Object.defineProperty(window,'visualViewport',{configurable:true,value:Object.assign(new EventTarget(),{offsetLeft:15,offsetTop:140,width:360,height:320})});window.dispatchEvent(new Event('resize'));true`);
@@ -267,7 +280,15 @@ const server = http.createServer(async (request, response) => {
     record('progress-loading-visible-above-keyboard-fixture',{evidence:'production loading state, isolated-world keyboard geometry fixture',bounds:progressBounds});await shot('progress-keyboard-fixture');
     await tap('.floating-ball-main');
     await delay(2600);assert.equal(await page.locator('.fluent-read-bilingual-content').count(),0);assert.equal((await metrics()).status,'idle');record('cancel-loading-rejects-late-provider-response');
-    await inExtension(`delete window.visualViewport;window.dispatchEvent(new Event('resize'));true`);
+    await inExtension(`(async () => {
+      delete window.visualViewport;
+      window.dispatchEvent(new Event('resize'));
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      return true;
+    })()`);
+    m = await metrics();
+    assert(Math.abs(m.main.y + m.main.height / 2 - 422) < 1, JSON.stringify(m));
+    record('touch-anchor-follows-viewport-without-animated-travel', {metrics: m});
     translationDelayMs=0;await tap('.floating-ball-main');
     await page.locator('.fluent-read-bilingual-content').first().waitFor({state:'visible'});
     await step('full-page-translation-settles',async()=>{for(let i=0;i<100;i++){if((await metrics()).status==='translated')return;await delay(100);}throw new Error('Translation did not reach success');}); record('touch-full-page-translation',{count:await page.locator('.fluent-read-bilingual-content').count()}); await shot('portrait-translated');

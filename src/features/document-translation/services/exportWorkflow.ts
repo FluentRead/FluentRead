@@ -6,7 +6,7 @@
  */
 import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import type JSZip from 'jszip';
-import type {DocumentRenderMode} from '../core/document';
+import {documentTranslationsInColumns, type DocumentRenderMode} from '../core/document';
 import type {PdfReadingPresentation} from '../core/pdfReadingPlan';
 import type {createDocumentDownload, PdfExportProgress} from './binary';
 import type {generateDocumentArchive} from './archive';
@@ -69,7 +69,8 @@ export function createDocumentExportWorkflow(ports: DocumentExportPorts) {
         }
     }
     function snapshot(task: DocumentQueueItem) {
-        return {task, document: task.document!, translations: [...task.translations], revision: task.revision};
+        const document = task.document!;
+        return {task, document, translations: [...documentTranslationsInColumns(document, task.translations, task.delimitedColumns)], revision: task.revision};
     }
     type Snapshot = ReturnType<typeof snapshot>;
     function validSnapshot(value: Snapshot, kind: ExportKind): boolean {

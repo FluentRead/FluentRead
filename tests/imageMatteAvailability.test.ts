@@ -385,6 +385,92 @@ function pair(){
     return{width,height,pixels,expected,lines,art};
 }
 
+describe('不透明原字超出旧清字框时复用模型授权',()=>{
+    function clipped(){
+        const f=fixture(255);
+        for(const r of f.art)fill(f.pixels,f.width,r,f.matte);f.art=[];
+        const r={x0:24,y0:40,x1:33,y1:48};fill(f.pixels,f.width,r,[255,255,255,255]);
+        for(let y=r.y0;y<r.y1;y++)for(let x=r.x0;x<r.x1;x++)f.ink.add(y*f.width+x);
+        install(f);evidenceMode='missing';return f;
+    }
+    it('仅用真实受控分割授权，清掉旧框外原字并保留样式、单次读回和图外像素',async()=>{
+        const f=clipped();mocks.prepareSeg.mockResolvedValue(true);
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            expect(canvases[0].writes).toBe(0);expect(factory().pixels).toEqual(f.pixels);
+            return new Uint8Array(1024*1024).fill(255);
+        });
+        const result=await translate();expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();
+        expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).toHaveBeenCalledOnce();
+        completeGlyphs();checkFrame(f);expect(canvases[0].reads).toEqual([[0,0,f.width,f.height]]);
+        expect(canvases[0].uploads.length).toBeGreaterThan(0);
+        for(const rect of canvases[0].uploads){expect(rect.args).toBe(7);for(let y=rect.y0;y<rect.y1;y++)for(let x=rect.x0;x<rect.x1;x++)expect(f.ink.has(y*f.width+x)).toBe(true);}
+    });
+    it('已有同帧检测覆盖遗漏墨迹时直接修补，不准备分割；竖排仍按原对齐绘制',async()=>{
+        const f=clipped();f.line.vertical=true;setRegions([f.line]);evidenceMode='valid';
+        detectorCore=[...MODEL_CORE,[25,41,.94],[29,41,.94],[25,45,.94],[29,45,.94],[31,45,.94],[31,41,.94]];
+        expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).not.toHaveBeenCalled();completeGlyphs();checkFrame(f);
+    });
+    it('整页另一行不能证明完整墨迹时，不启用局部扩大擦除或准备分割',async()=>{
+        const f=clipped();setRegions([f.line,{text:'SECOND',bbox:{x0:20,y0:60,x1:100,y1:70}}]);translations=['FULL TEXT','SECOND TEXT'];
+        expect((await translate()).image).toBeTruthy();expect(mocks.prepareSeg).not.toHaveBeenCalled();
+    });
+    it('另一行的彩色图案进入绘字框时保留整图，不能凭第一行纯色观察覆盖它',async()=>{
+        const first=clipped(),second=fixture(255),width=256,height=176,pixels=new Pixels(width*height*4);
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},first.matte);
+        for(const r of second.art)fill(second.pixels,second.width,r,[230,60,20,255]);
+        for(const[f,dx,dy]of [[first,0,0],[second,128,80]]as const)for(let y=0;y<f.height;y++)for(let x=0;x<f.width;x++)pixels.set(f.pixels.subarray((y*f.width+x)*4,(y*f.width+x+1)*4),((y+dy)*width+x+dx)*4);
+        const move=(b:Rect)=>({x0:b.x0+128,x1:b.x1+128,y0:b.y0+80,y1:b.y1+80});
+        source={width,height,pixels};setRegions([first.line,{...second.line,text:'SECOND',bbox:move(second.line.bbox),sourceBoxes:[move(second.line.bbox)]}]);translations=['FULL TEXT','SECOND TEXT'];
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(mocks.prepareSeg).not.toHaveBeenCalled();preserved();
+    });
+    it('缺少可选资源时仍可生成译图，保留原清字范围外的笔画',async()=>{
+        const f=clipped();const result=await translate();
+        expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();expect(result.retryWhenSegmentationReady).toBeUndefined();
+        expect(result.lines[0]).toMatchObject({text:'FULL TEXT',sourceText:'SOURCE'});completeGlyphs();
+        expect(at(encoded[0],f.width,24,47)).toEqual(at(f.pixels,f.width,24,47));
+        expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).not.toHaveBeenCalled();released();
+    });
+    it('无保护孔的半透明段落也不能进入不透明整页修补',async()=>{
+        const first=clipped(),second=fixture(224),width=256,height=176,pixels=new Pixels(width*height*4);
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},first.matte);
+        for(const art of second.art)fill(second.pixels,second.width,art,second.matte);
+        for(let y=0;y<first.height;y++)for(let x=0;x<first.width;x++){
+            pixels.set(at(first.pixels,first.width,x,y),(y*width+x)*4);
+            pixels.set(at(second.pixels,second.width,x,y),((y+80)*width+128+x)*4);
+        }
+        const move=(b:Rect)=>({x0:b.x0+128,x1:b.x1+128,y0:b.y0+80,y1:b.y1+80});
+        const secondBox=move(second.line.bbox);
+        source={width,height,pixels};setRegions([first.line,{...second.line,text:'SECOND',bbox:secondBox,sourceBoxes:[secondBox]}]);
+        translations=['FULL TEXT','SECOND TEXT'];mocks.prepareSeg.mockResolvedValue(true);
+        expect((await translate()).image).toBeTruthy();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();released();
+    });
+    it('分割拒绝原字时不得退回旧边缘扩散，也不误报资源缺失',async()=>{
+        clipped();mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockResolvedValue(new Uint8Array(1024*1024));
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.retryWhenSegmentationReady).toBeUndefined();preserved();
+    });
+    it.each(['prepare','input','result']as const)('%s阶段取消时不回写、不编码',async stage=>{
+        clipped();const controller=new AbortController();
+        mocks.prepareSeg.mockImplementation(async()=>{if(stage==='prepare')controller.abort();return true;});
+        mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            if(stage==='input')controller.abort();factory();if(stage==='result')controller.abort();return new Uint8Array(1024*1024).fill(255);
+        });
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});preserved();
+    });
+    it.each(['already-aborted','queued']as const)('预检失败撤回前处理%s取消，不发布原图保留响应',async stage=>{
+        clipped();metrics='missing';const controller=new AbortController();let triggered=false;
+        action=event=>{if(event==='measure'&&!triggered){triggered=true;if(stage==='queued')setTimeout(()=>controller.abort(),0);else controller.abort();}};
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();preserved();
+    });
+    it.each(['before','after']as const)('完整字形指标在%s模型等待时失效，原图与全文仍保留',async stage=>{
+        clipped();if(stage==='before')metrics='missing';
+        mocks.prepareSeg.mockResolvedValue(true);mocks.segment.mockImplementation(async()=>{metrics='missing';return new Uint8Array(1024*1024).fill(255);});
+        const result=await translate();expect(result.imageUnchanged).toBe(true);expect(result.retryWhenSegmentationReady).toBeUndefined();preserved();
+        expect(mocks.prepareSeg).toHaveBeenCalledTimes(stage==='before'?0:1);
+    });
+});
+
 describe('完整RGBA matte救援只在已证源墨上写入，整页通过才发布',()=>{
     it('独立pure负控：白moat不能授权吞掉灰牌并遗漏灰牌上的完整白字',async()=>{
         // Exact peer counterexample. The physical source box stays two pixels larger

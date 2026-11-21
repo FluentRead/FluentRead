@@ -46,7 +46,8 @@ describe('popup feature visibility', () => {
         const entry = elements.find(node => node.tag === 'button'
             && node.props.some(prop => prop.type === 6 && prop.name === 'data-testid' && prop.value?.content === 'section-translation'))!;
         expect(entry).toBeDefined();
-        const visible = directive(entry, 'if')!;
+        const hint = elements.find(node => node.tag === 'ElTooltip' && node.children.includes(entry))!;
+        const visible = directive(hint, 'if')!;
         expect(visible).toBe('!isThunderbird && !currentPdfSource');
         expect(runInNewContext(visible, {isThunderbird: false, currentPdfSource: undefined})).toBe(true);
         expect(runInNewContext(visible, {isThunderbird: true, currentPdfSource: undefined})).toBe(false);

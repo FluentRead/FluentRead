@@ -142,7 +142,7 @@
     "settings.floatingBall.hoverDelayHelp": "Les outils s’ouvrent après ce délai de survol ; 0 ms les ouvre immédiatement. Un délai plus long réduit les ouvertures involontaires. Le focus clavier les ouvre toujours immédiatement.",
     "settings.floatingBall.hoverDelayAria": "Délai d’ouverture du bouton flottant",
     "settings.floatingBall.defaultMargin": "Marge par défaut",
-    "settings.floatingBall.defaultMarginDescription": "Distance au bord de l’écran lorsque le bouton est replié ou toujours affiché. Les valeurs négatives sont acceptées. Avec les marges par défaut de 0 / 20 px, le bouton replié se masque à moitié sur ordinateur.",
+    "settings.floatingBall.defaultMarginDescription": "Distance au bord de l’écran au repos. Les valeurs négatives sont admises. Sur ordinateur, 0 px et une marge de déploiement positive masquent la moitié du bouton.",
     "settings.floatingBall.defaultMarginAria": "Marge par défaut du bouton flottant",
     "settings.floatingBall.popoutMargin": "Marge déployée",
     "settings.floatingBall.popoutMarginDescription": "Utilisée lorsque les outils s’ouvrent au survol. Une marge identique à la marge par défaut empêche le bouton de bouger. Les valeurs négatives sont acceptées.",

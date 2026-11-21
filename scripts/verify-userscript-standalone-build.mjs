@@ -22,6 +22,8 @@ const assertions = [
     [source.includes('fluentread-userscript-settings'), 'Full Options route is missing'],
     [!source.includes('fluent-read-writing-assistant'), 'Writing assistant runtime must be excluded'],
     [!source.includes('data-fr-slot'), 'Extension-only image context protocol must be excluded'],
+    [!source.includes('fr-selection-highlight') && !source.includes('fr-selection-underline'), 'Native PDF annotation controls must be excluded'],
+    [!source.includes('hypothesis/build/'), 'Packaged Hypothesis client must be excluded'],
     [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'Userscript browser capability marker is missing'],
     [source.includes('pako 2.1.0 —'), 'Bundled gzip fallback or license notice is missing'],
     [source.includes(`@vue/runtime-dom ${vueVersion} — MIT`), 'Bundled Vue or license notice is missing'],
@@ -40,6 +42,15 @@ const bytes = Buffer.byteLength(source);
 // Add only the remaining rounded 3 kB for text; dependencies, model assets and compact-build limits stay unchanged.
 // Integrating #1353 adds 751 bytes (3,692,678 → 3,693,429) with no new dependency or model asset.
 // Use the existing 322-byte headroom, then add only the remaining rounded 1 kB.
-const maxBytes = 3_694_000;
+// #1360's persistent rule editor and region guidance build to 3,698,213 bytes in CI.
+// The existing cap is exceeded by 4,213 bytes; register only the rounded 5 kB for UI/text.
+// Dependencies, model assets, metadata checks and the compact-build limits stay unchanged.
+// #1362's WebDAV settings and shared Chinese text add 866 bytes on e31c81d89
+// (3,693,429 → 3,694,295). Use the existing 571-byte headroom and add the remaining rounded 1 kB.
+// Keep every protocol assertion, dependency and compact/Greasy Fork budget unchanged.
+// #1356's media controls and feedback exceed the existing cap by less than 3 kB on abdbbcc88.
+// Register only that rounded text/UI increment; dependencies, metadata checks and compact/Greasy Fork limits stay unchanged.
+// JSON 合批与共享退避增加代码，按 1 kB 步长利用原余量后追加 4 kB。
+const maxBytes = 3_707_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

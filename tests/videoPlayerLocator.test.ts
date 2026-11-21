@@ -26,7 +26,7 @@ function setup(markup: string, url = 'https://x.com/cerebras') {
     observe() {}
     disconnect() {}
   });
-  for (const video of Array.from(parsed.document.querySelectorAll('video'))) {
+  for (const video of Array.from(parsed.document.querySelectorAll('video, audio'))) {
     Object.defineProperty(video, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
     Object.defineProperty(video, 'offsetWidth', {configurable: true, value: 640});
     Object.defineProperty(video, 'offsetHeight', {configurable: true, value: 360});
@@ -35,7 +35,7 @@ function setup(markup: string, url = 'https://x.com/cerebras') {
     if (!/\/status\/\d+\/video\/\d+\/?$/i.test(anchor.getAttribute('href') || '')) continue;
     Object.defineProperty(anchor, 'getBoundingClientRect', {configurable: true, value: () => ({width: 640, height: 360, top: 0, left: 0, right: 640, bottom: 360})});
   }
-  return {document: parsed.document, window: view, videos: Array.from(parsed.document.querySelectorAll('video')) as HTMLVideoElement[]};
+  return {document: parsed.document, window: view, videos: Array.from(parsed.document.querySelectorAll('video, audio')) as HTMLVideoElement[]};
 }
 
 afterEach(() => {
@@ -722,4 +722,37 @@ describe('video player locator', () => {
       return player.contains(videos[0]);
     })()).toBe(true);
   });
+});
+
+
+it('selects standard audio and follows the latest playback without selecting owned scan copies', () => {
+  const f = setup('<section><audio id="first"></audio></section><section><audio id="second"></audio></section><video class="fluent-read-video-ui"></video>', 'https://podcast.example/');
+  const first = f.document.getElementById('first') as HTMLMediaElement;
+  const second = f.document.getElementById('second') as HTMLMediaElement;
+  const host = f.document.createElement('div'); f.document.body.appendChild(host);
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true, getPlayer: () => host});
+  expect(locator.sync()!.video).toBe(first); expect(locator.getTarget()!.player).toBe(host);
+  second.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('pointerover', {bubbles: true}));
+  expect(locator.getTarget()!.video).toBe(first);
+  Object.defineProperty(first, 'paused', {configurable: true, value: false});
+  second.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()!.video).toBe(first);
+  Object.defineProperty(first, 'ended', {configurable: true, value: true});
+  second.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()!.video).toBe(second);
+  second.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('pointerdown', {bubbles: true}));
+  second.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()!.video).toBe(second);
+  Object.defineProperty(second, 'srcObject', {configurable: true, value: {}}); const key = locator.sync()!.key;
+  Object.defineProperty(second, 'srcObject', {configurable: true, value: {}}); expect(locator.sync()!.key).not.toBe(key);
+  locator.destroy();
+});
+
+
+it('adopts a playing HTML audio element before the first scan', () => {
+  const f = setup('<section><audio></audio></section>', 'https://podcast.example/');
+  const media = f.document.querySelector('audio')!;
+  const locator = createVideoPlayerLocator({document: f.document, window: f.window, includeAudio: true});
+  media.dispatchEvent(new (f.window as unknown as {Event: typeof Event}).Event('play', {bubbles: true}));
+  expect(locator.getTarget()!.video).toBe(media); locator.destroy();
 });

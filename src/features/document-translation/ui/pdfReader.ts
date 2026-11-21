@@ -1,5 +1,6 @@
 /**
  * @file src/features/document-translation/ui/pdfReader.ts
+ * 重排边界：原文、双语与译文统一使用计划中的原图区域；裁剪后释放整页栅格且不创建隐藏文字层，正文由响应式 HTML 提供。
  * 文件职责：为 PDF 阅读器提供有界页面调度和浏览器原页渲染，使用锁定版本的 PDF.js TextLayer 让文字选择与原版面一致。
  * 主要内容：按可见页优先维护五页窗口与两项并发，同源 OCR 检查点更新模型并复用底图；原版阅读缩放复用已就绪的页面，可见页需要更高分辨率时在总像素预算内准备新画布并替换，原文文字层持续挂载；重排裁剪使用界面当前的原图区域，普通译文更新复用像素；译文页复制原页像素，译文文字由阅读器叠加；共享 PDF 加载租约，离屏和卸载释放资源，失败可重试。
  * 模块边界：调度器只调用注入的渲染端口；浏览器渲染端口依赖 PDF.js 和文档预览资源，不发起翻译请求、不修改原始文件或负责入口挂载。
@@ -172,8 +173,8 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                 controller.signal.throwIfAborted();
                 const viewport = page.getViewport({scale: settings.scale});
                 const readable = settings.presentation === 'readable';
-                const showSource = settings.mode !== 'translated';
-                const regionEntries = readable && settings.mode !== 'source'
+                const showSource = !readable && settings.mode !== 'translated';
+                const regionEntries = readable
                     ? settings.regionEntries ?? buildPdfReadingPlan(document, model, []).entries.filter(entry => entry.kind === 'region') : [];
                 const regionArea = regionEntries.reduce((sum, entry) => sum + entry.sourceRect.width * entry.sourceRect.height * settings.scale ** 2, 0);
                 const canvasCount = readable ? 1 + regionArea / Math.max(1, viewport.width * viewport.height) : settings.mode === 'bilingual' ? 2 : 1;
@@ -241,7 +242,7 @@ export function createPdfReaderRenderPort(document: ParsedDocument): PdfReaderRe
                         crop.setAttribute('data-pdf-region-id', entry.id);
                         crop.setAttribute('data-pdf-source-rect', JSON.stringify(entry.sourceRect));
                     }
-                    if (!showSource) canvas.width = canvas.height = 0;
+                    canvas.width = canvas.height = 0;
                 } else if (settings.mode !== 'source') {
                     // 译文页以原页像素为底：图表、公式和尚未翻译的段落保持原样，译文段落由阅读器的文字层覆盖。
                     if (showSource) {

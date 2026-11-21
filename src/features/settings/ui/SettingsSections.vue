@@ -166,7 +166,7 @@
         :website="selectedConfigurationWebsite"
         :credential-guide="selectedConfigurationCredentialGuide"
         :selected-model="selectedConfigurationModel"
-        :services="platformAvailableServiceOptions"
+        :services="catalogServiceOptions"
         :favorite-services="config.favoriteServices"
         :disabled-services="config.disabledTranslationServices"
         :configured-services="configuredServiceIds"
@@ -951,7 +951,7 @@ const selectedConfigurationWebsite = computed(() => {
   const endpoint = isCustomOpenAIProviderId(service)
     ? getCustomOpenAIProvider(config.value.customOpenAIProviders, service)?.endpoint
     : service === services.newapi ? config.value.newApiUrl : config.value.custom;
-  return getServiceWebsite(service, {endpoint, minimaxRegion: config.value.minimaxRegion});
+  return getServiceWebsite(service, {endpoint, minimaxRegion: config.value.minimaxRegion, browser: browserCapabilities.browser});
 });
 const selectedConfigurationCredentialGuide = computed(
   () => getServiceCredentialGuide(selectedConfigurationService.value),
@@ -984,6 +984,16 @@ const serviceOptionsWithCustomProviders = computed(() => localizeServiceOptions(
   translateLegacy,
 ));
 const platformAvailableServiceOptions = computed(() => filterAvailableTranslationServices(serviceOptionsWithCustomProviders.value));
+const catalogServiceOptions = computed(() => {
+  if (browserCapabilities.browserTranslation || !['chrome', 'edge', 'firefox'].includes(browserCapabilities.browser)) {
+    return platformAvailableServiceOptions.value;
+  }
+  // 可浏览服务说明，但不能把当前环境无法运行的服务设为默认。
+  const available = new Set(platformAvailableServiceOptions.value.map(option => option.value));
+  return serviceOptionsWithCustomProviders.value.flatMap(option => option.value === services.chromeTranslator
+    ? [{...option, disabled: true}]
+    : available.has(option.value) ? [option] : []);
+});
 const availableServiceOptions = computed(() => markDisabledTranslationServices(platformAvailableServiceOptions.value, config.value.disabledTranslationServices));
 // 显式设为默认沿用通用设置的配置补丁链；目录浏览本身只改变编辑目标。
 const setDefaultConfigurationService = (value: string) => {

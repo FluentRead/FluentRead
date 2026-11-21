@@ -19,12 +19,25 @@ Open **Settings → Backup and restore → Cloud backup**, select **WebDAV**, th
 | Field | Nutstore value |
 | --- | --- |
 | WebDAV directory URL | `https://dav.jianguoyun.com/dav/` |
+| Backup subdirectory | Keep the default `FluentRead/` to use the existing backup location |
 | Username | Your Nutstore account email, such as `yourname@example.com` |
 | App password | The app password generated above |
 
 Copy the full URL rather than a homepage, sharing link, or file URL. Do not append `FluentRead/` or create that folder in advance. See the [official connection parameters](https://help.jianguoyun.com/?p=5677).
 
 Choose **Test connection**, then **Test and save**. Neither uploads a backup. Testing checks directory access and does not prove write permission. The saved connection stays on this device.
+
+## Synology NAS and custom directories
+
+Enable WebDAV Server on your NAS and grant the account read and write access to the shared folder. Enter the final WebDAV directory URL, such as `https://nas.example.com:5006/shared-folder/`, using your configured port and reverse-proxy path. Do not use the DSM sign-in page or a sharing link.
+
+- The **WebDAV directory URL** can include a shared folder and existing subdirectories. This directory must already exist. If the service root does not allow folder creation, enter a shared-folder URL that the account can access.
+- **Backup subdirectory** defaults to `FluentRead/`. You can enter a nested path such as `Backups/FluentRead`. Its folders are created within the directory above only after you confirm the first save.
+- If the URL already points to the final backup directory, **leave the backup subdirectory blank**. FluentRead saves `fluentread-config.encrypted.json` directly there, without appending `FluentRead/` or attempting to create the service root or shared folder.
+
+For example, the URL `https://nas.example.com:5006/shared-folder/backups/` with a blank subdirectory stores the file at `https://nas.example.com:5006/shared-folder/backups/fluentread-config.encrypted.json`. Use the same URL and backup subdirectory on other devices.
+
+Changing the subdirectory invalidates old previews and does not move or delete the previous backup. Existing connections without this setting continue to use `FluentRead/`.
 
 ## Save your first backup
 
@@ -33,7 +46,7 @@ Choose **Test connection**, then **Test and save**. Neither uploads a backup. Te
 3. Choose **Sync with WebDAV now**, check the account, scope, and preview, then **Save to cloud**.
 4. After completion, check the account, server URL, and last-sync time.
 
-Confirming the first save creates:
+With the default subdirectory, confirming the first save creates:
 
 ```text
 FluentRead/fluentread-config.encrypted.json
@@ -46,7 +59,7 @@ The backup is encrypted locally without a separate backup password, using a fixe
 ## Restore or merge on another device
 
 1. Install FluentRead on the new device, preferably updating both devices first.
-2. Enter the same Nutstore directory and account. You can generate a separate app password for this device. Choose **Test and save**; connection credentials are not migrated in backups.
+2. Enter the same WebDAV directory URL, backup subdirectory, and account. You can generate a separate app password for this device. Choose **Test and save**; connection credentials are not migrated in backups.
 3. To restore backed-up keys, enable sensitive settings on this device and acknowledge the risk.
 4. Start sync, choose **Restore cloud configuration → Continue**, review the changes, then **Restore to device**.
 
@@ -61,7 +74,7 @@ Previews last ten minutes. Cancel or leave settings to end a preview. Local or c
 | Problem | What to check |
 | --- | --- |
 | Incorrect username or password | Use your account email and app password; regenerate a revoked password and update the connection |
-| Missing or invalid directory | Check `https://dav.jianguoyun.com/dav/`, not a homepage or sharing link |
+| Missing or invalid directory | For Nutstore, check `https://dav.jianguoyun.com/dav/`. For a NAS, enter an existing shared directory with account access, not a homepage or sharing link |
 | Test passed but no file appeared | Start sync, review, and confirm a save |
 | Keys or translation services are missing | Check whether the file contains sensitive settings and whether they are enabled on this device |
 | Cloud backup changed | Check other devices and generate a new preview |

@@ -1,5 +1,10 @@
 import brandTaglines from '../../src/core/i18n/messages/brand-taglines.json'
 import { defineConfig, type DefaultTheme } from 'vitepress'
+import localizedLanding from './landing-locales.json'
+import { getLandingLocale, landingLocales } from './landing-locales'
+
+const siteUrl = 'https://read.thinkstu.com'
+const internationalLandings = landingLocales.filter(({ lang }) => lang !== 'zh-CN' && lang !== 'en')
 
 const guide = (en = false): DefaultTheme.SidebarItem[] => {
   const p = en ? '/en' : ''
@@ -44,6 +49,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       text: en ? 'Learning & expression' : '学习与表达',
       items: [
         item('学习中心', 'Learning center', '/guide/vocabulary-book'),
+        item('词典与学习卡', 'Dictionaries and study cards', '/guide/dictionaries'),
         item('词性与句法', 'Sentence structure', '/guide/sentence-analysis'),
         item('双语分享卡片', 'Share cards', '/guide/share-cards'),
         item('写作助手', 'Writing assistant', '/guide/writing-assistant'),
@@ -71,7 +77,7 @@ const guide = (en = false): DefaultTheme.SidebarItem[] => {
       text: en ? 'More platforms' : '更多平台',
       collapsed: true,
       items: [
-        item('Chrome 本地翻译', 'Chrome local translation', '/guide/chrome-translator'),
+        item('浏览器内置翻译', 'Built-in browser translation', '/guide/chrome-translator'),
         item('油猴脚本', 'Userscript', '/guide/userscript'),
         item('移动端与 Safari', 'Mobile & Safari', '/guide/mobile-safari'),
         item('Thunderbird 邮件翻译', 'Thunderbird email translation', '/guide/thunderbird'),
@@ -140,16 +146,45 @@ export default defineConfig({
   lang: 'zh-CN',
   appearance: false,
   base: '/',
-  sitemap: { hostname: 'https://read.thinkstu.com' },
+  sitemap: { hostname: siteUrl },
+  transformPageData(pageData) {
+    const landing = getLandingLocale(pageData.relativePath)
+    if (landing) {
+      pageData.title = landing.title
+      pageData.description = landing.description
+    }
+  },
   transformHead({ pageData }) {
     if (pageData.relativePath === '404.md') {
       return [['meta', { name: 'robots', content: 'noindex' }]]
+    }
+    const landing = getLandingLocale(pageData.relativePath)
+    if (landing) {
+      const url = siteUrl + landing.path
+      const image = `${siteUrl}/brand/share/${landing.assetLocale}.jpg`
+      return [
+        ['link', { rel: 'canonical', href: url }],
+        ...landingLocales.map(({ lang, path }): [string, Record<string, string>] => [
+          'link', { rel: 'alternate', hreflang: lang, href: siteUrl + path },
+        ]),
+        ['link', { rel: 'alternate', hreflang: 'x-default', href: siteUrl + localizedLanding.en.path }],
+        ['meta', { property: 'og:type', content: 'website' }],
+        ['meta', { property: 'og:url', content: url }],
+        ['meta', { property: 'og:locale', content: landing.socialLocale }],
+        ['meta', { property: 'og:title', content: landing.title }],
+        ['meta', { property: 'og:description', content: landing.description }],
+        ['meta', { property: 'og:image', content: image }],
+        ['meta', { property: 'og:image:width', content: '1200' }],
+        ['meta', { property: 'og:image:height', content: '630' }],
+        ['meta', { property: 'og:image:alt', content: landing.imageAlt }],
+        ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+      ]
     }
     let route = pageData.relativePath.replace(/index\.md$/, '').replace(/\.md$/, '')
     route = route.replace(/^(en\/)?guide\/$/, '$1docs/')
     route = route.replace(/^(en\/)?writing-assistant$/, '$1guide/writing-assistant')
     route = route.replace(/^(en\/)?guide\/privacy-policy$/, '$1guide/privacy')
-    const canonical = `https://read.thinkstu.com/${route}`
+    const canonical = `${siteUrl}/${route}`
     const opposite = route.startsWith('en/') ? route.slice(3) : `en/${route}`
     return [
       ['link', { rel: 'canonical', href: canonical }],
@@ -162,7 +197,7 @@ export default defineConfig({
         {
           rel: 'alternate',
           hreflang: route.startsWith('en/') ? 'zh-CN' : 'en',
-          href: `https://read.thinkstu.com/${opposite}`,
+          href: `${siteUrl}/${opposite}`,
         },
       ],
       ['meta', { property: 'og:type', content: 'website' }],
@@ -202,6 +237,15 @@ export default defineConfig({
       description: `${brandTaglines['en-US']} An open-source browser extension for bilingual translation.`,
       themeConfig: theme(true),
     },
+    ...Object.fromEntries(internationalLandings.map(({ lang, brand, description }) => [
+      lang, {
+        label: '',
+        lang,
+        title: brand,
+        description,
+        head: [['meta', { property: 'og:site_name', content: brand }]],
+      },
+    ])),
   },
   themeConfig: {
     logo: '/brand-icon.webp',

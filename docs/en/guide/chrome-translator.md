@@ -1,25 +1,21 @@
-# Use Chrome’s local translation
+# Built-in browser translation
 
-Chrome’s built-in AI translator processes text on your device. The first use of a language pair requires an internet connection to download its model.
+FluentRead can translate on your device using the Translator API in desktop Chrome 138+ and Edge 148+. The first language pack download requires an internet connection. Once downloaded, the pack works offline. Availability depends on the browser version, device, language pair, and managed policies.
 
-<GuideVisual kind="chrome-local" en />
+Firefox provides on-device translation for pages and selected text through its browser menus. Its translation engine is currently unavailable to extensions. For offline translation in FluentRead on Firefox, choose “Local model translation”.
 
-## Prepare a language pair
+## Prepare a language pack
 
-1. Open **Settings → General → Basics** and select **Chrome built-in AI translation** as the default page service.
-2. Choose the source and target languages. Open **Configure service** and choose **Check connection**.
-3. If a model download starts, keep settings open until it finishes.
-4. Return to the webpage and translate again.
+1. Open **Settings → Translation services → Built-in browser translation** to see the language pair and pack status.
+2. Click **Prepare language pack** to download the required models and verify the pair. If the pack is already downloaded, click **Check language pack**.
+3. When the status shows **Ready**, you can **Set as default** and return to the page to translate. When a new pair needs a language pack, follow the preparation prompt.
 
-Models are prepared for specific language pairs. A different pair may need another download. If automatic language detection fails, select the source language yourself.
+Existing “Chrome built-in AI translation” settings appear under “Built-in browser translation”.
 
-## Why is it unavailable?
+## Check availability
 
-Availability depends on your Chrome version, device, management policy, and language support. Update Chrome, check the selected languages, and stay online for the initial download. You can use another translation service while the model is unavailable.
+Settings indicates whether the browser exposes the API. If a pair is unavailable, check the browser’s language support, internet connection, and policies. You can also switch to another translation service.
 
-For further checks, follow [Chrome’s model troubleshooting guide](https://developer.chrome.com/docs/ai/debug-built-in-model).
-
-## Related guides
-
-- [Choose a translation service](/en/config/translation-engines)
-- [Data and privacy](/en/guide/privacy)
+- [Chrome Translator API](https://developer.chrome.com/docs/ai/translator-api) · [Chrome model diagnostics](https://developer.chrome.com/docs/ai/debug-built-in-model)
+- [Microsoft Edge Translator API](https://learn.microsoft.com/microsoft-edge/web-platform/translator-api)
+- [Firefox on-device translation help](https://support.mozilla.org/kb/website-translation)

@@ -15,6 +15,7 @@
     :disabled="!context.active.value"
     :title="selectedLabel"
     filterable
+    :wrap-label="!props.singleLine"
     :show-search-icon="false"
     :persistent="false"
     :onUpdate:modelValue="selectActions.choose"
@@ -36,7 +37,7 @@ import {useUiI18n} from '@/src/ui/i18n';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
 import {getVisualViewportRect, observeVisualViewport, type VisualViewportRect} from '@/src/platform/dom/visualViewport';
 
-const props = defineProps<{modelValue: string; source?: boolean; disabled?: boolean}>();
+const props = defineProps<{modelValue: string; source?: boolean; disabled?: boolean; singleLine?: boolean}>();
 const emit = defineEmits<{(event: 'update:modelValue', value: string): void}>();
 const {language, t, translateLegacy} = useUiI18n();
 const menuOpen = ref(false);

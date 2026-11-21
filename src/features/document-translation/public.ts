@@ -11,9 +11,11 @@ export * from './core/pdfSource';
 export {documentSourceLocators, createDocumentMaterialReference, resolveDocumentMaterialReference, normalizeDocumentMaterialReference, DOCUMENT_MATERIAL_REFERENCE_LIMITS} from './core/materialLocator';
 export type {DocumentSourceLocator, DocumentMaterialReference} from './core/materialLocator';
 export type {PdfReadingPresentation} from './core/pdfReadingPlan';
+export type {PdfAnnotation} from './core/pdfAnnotations';
+export {normalizePdfAnnotations} from './core/pdfAnnotations';
 export {fetchOnlinePdf} from './services/pdfSource';
-// 解析与导出公共 API 可独立使用；进入 PDF 阅读界面时才加载 Vue 组件及扩展配置。
-export const PdfReader = defineAsyncComponent(() => import('./ui/PdfReader.vue').then(module => module.default));
+// 解析与导出公共 API 可独立使用；异步组件工厂无外部副作用，允许未使用阅读器的后台移除其完整依赖图。
+export const PdfReader = /* @__PURE__ */ defineAsyncComponent(() => import('./ui/PdfReader.vue').then(module => module.default));
 export * from './core/preview';
 export {
     parseDocumentFile,

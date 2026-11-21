@@ -142,7 +142,7 @@
     "settings.floatingBall.hoverDelayHelp": "鼠标停留达到设定时间后展开；0 毫秒表示立即展开。增加延迟可减少误触，键盘聚焦时始终立即展开。",
     "settings.floatingBall.hoverDelayAria": "悬浮球展开延迟",
     "settings.floatingBall.defaultMargin": "默认边距",
-    "settings.floatingBall.defaultMarginDescription": "收起或常驻时与屏幕边缘的距离，支持负数。桌面悬停模式使用默认的 0 / 20 px 时，收起会半藏在边缘。",
+    "settings.floatingBall.defaultMarginDescription": "收起或常驻时距屏幕边缘的距离，支持负数。桌面上设为 0 px 并使用正的弹出边距，移开时会半藏。",
     "settings.floatingBall.defaultMarginAria": "悬浮球默认边距",
     "settings.floatingBall.popoutMargin": "弹出边距",
     "settings.floatingBall.popoutMarginDescription": "悬停展开时使用；与默认边距相同即可避免位置移动。支持负数。",

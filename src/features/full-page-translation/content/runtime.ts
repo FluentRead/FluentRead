@@ -16,7 +16,7 @@ import {getFullPageTranslationStateRevision, getFullPageTranslationDiagnostic, n
 import {diagnoseFailure, type Diagnostic} from '@/src/services/diagnostics';
 import type {FrameTranslationState} from './frameSession';
 import { checkConfig } from "@/src/features/full-page-translation/content/configCheck";
-import {insertFailedTip} from '@/src/features/full-page-translation/ui/translationIndicators';
+import {insertFailedTip, showTranslationRetryWait} from '@/src/features/full-page-translation/ui/translationIndicators';
 import {scheduleTranslationLoadingIndicator} from './loadingIndicator';
 import {syncModalTranslationHint} from '../ui/modalProgressHint';
 import { styles } from "@/src/core/config/constants";
@@ -350,18 +350,21 @@ function markFailedTranslation(
     }
     const retryIsCurrent = () => node.isConnected && getTranslationState(node) === attempt.state && attempt.state.phase === 'error'
         && (!owner || owner.active && fullPageSession === owner);
+    const diagnostic = diagnoseFailure(error, {online: typeof navigator === 'undefined' ? undefined : navigator.onLine});
+    const retryAt = diagnostic.retryAfterMs ? Date.now() + diagnostic.retryAfterMs : undefined;
+    const remainingWait = () => retryAt === undefined || (!retryIsCurrent())
+        || (!owner && !snapshot?.requestOverridesApplied && snapshot?.service !== config.service)
+        ? 0 : Math.max(0, retryAt - Date.now());
     if (owner?.active && fullPageSession === owner) {
-        const diagnostic = diagnoseFailure(error, {online: typeof navigator === 'undefined' ? undefined : navigator.onLine});
         if (diagnostic.code !== 'cancelled') {
             const failures = sessionFailureDiagnostics.get(owner) ?? new Map();
             failures.delete(node);
-            failures.set(node, {diagnostic, state: attempt.state, ...(diagnostic.retryAfterMs ? {retryAt: Date.now() + diagnostic.retryAfterMs} : {})});
+            failures.set(node, {diagnostic, state: attempt.state, retryAt});
             sessionFailureDiagnostics.set(owner, failures);
-            syncFullPageFailureDiagnostic(owner);
         }
     }
     const retry = (): boolean => {
-        if (!retryIsCurrent()) return false;
+        if (!retryIsCurrent() || remainingWait() > 0) return false;
         if (owner) return queueFullPageFailedCandidate(owner, candidate, attempt.state.sourceText,
             () => { scheduleFullPageProgressPublish(owner); scheduleFullPageDrain(owner); }, retryIsCurrent);
         const retrySnapshot = snapshot?.requestOverridesApplied ? snapshot : undefined;
@@ -372,7 +375,10 @@ function markFailedTranslation(
     };
     const retryWrapper = withFullPageViewportAnchor(() => {
         spinner?.remove();
-        return insertFailedTip(node, error instanceof Error ? error.message : String(error || "翻译失败"), retry);
+        const message = error instanceof Error ? error.message : String(error || "翻译失败");
+        return retryAt === undefined ? insertFailedTip(node, message, retry) : insertFailedTip(node, message, retry, {
+            remainingMs: remainingWait, code: diagnostic.code === 'provider' ? 'provider' : 'rate-limit',
+        });
     }, [node]);
     if (owner?.active) {
         owner.outcomes.setRetry(node, retry);
@@ -2035,7 +2041,8 @@ function createFullPageSession(
         finishProgress: finishFullPageTranslationProgress,
     });
     session.unsubscribeOutcomeChanges = bindFullPageOutcomeRecovery(session,
-        () => fullPageSession === session, () => scheduleFullPageProgressPublish(session));
+        () => fullPageSession === session, () => scheduleFullPageProgressPublish(session),
+        () => showTranslationRetryWait(getFullPageTranslationDiagnostic()));
     return session;
 }
 

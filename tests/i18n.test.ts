@@ -295,15 +295,15 @@ describe('界面 i18n 契约', () => {
     expect(getMultilingualTargetLanguageLabel('unknown')).toBe('unknown');
   });
 
-  it('完整本地化 Chrome 具体语言对准备流程及参数化状态', () => {
+  it('完整本地化浏览器语言包的简短状态、进度与操作', () => {
     const actionByLanguage = {
-      'zh-CN': '准备 Chrome 本地翻译',
-      'en-US': 'Prepare Chrome local translation',
-      'ja-JP': 'Chrome ローカル翻訳を準備',
-      'ko-KR': 'Chrome 로컬 번역 준비',
-      'fr-FR': 'Préparer la traduction locale de Chrome',
-      'ru-RU': 'Подготовить локальный перевод Chrome',
-      'es-ES': 'Preparar la traducción local de Chrome',
+      'zh-CN': '准备语言包',
+      'en-US': 'Prepare language pack',
+      'ja-JP': '言語パックを準備',
+      'ko-KR': '언어 팩 준비',
+      'fr-FR': 'Préparer le pack de langue',
+      'ru-RU': 'Подготовить языковой пакет',
+      'es-ES': 'Preparar el paquete de idioma',
     } as const;
     for (const [language, expectedAction] of Object.entries(actionByLanguage)) {
       expect(translate('settings.services.chromePreparation.action', language as keyof typeof actionByLanguage))
@@ -311,21 +311,16 @@ describe('界面 i18n 契约', () => {
       const status = translate(
         'settings.services.chromePreparation.statusDownloadingProgress',
         language as keyof typeof actionByLanguage,
-        {model: 'MODEL', percentage: 42, sourceLanguage: 'fr', targetLanguage: 'en'},
+        {percentage: 42},
       );
-      expect(status).toContain('MODEL');
       expect(status).toContain('42');
-      expect(status).toContain('fr');
-      expect(status).toContain('en');
-      expect(status).not.toMatch(/\{(?:model|percentage|sourceLanguage|targetLanguage)\}/u);
+      expect(status).not.toMatch(/\{\w+\}/u);
 
       const activationError = translate(
         'settings.services.chromePreparation.error.userActivationRequired',
         language as keyof typeof actionByLanguage,
-        {sourceLanguage: 'fr', targetLanguage: 'en'},
       );
-      expect(activationError).toContain('fr');
-      expect(activationError).toContain('en');
+      expect(activationError).toContain(expectedAction);
     }
 
     const englishChromeMessages = Object.entries(enUSMessages).filter(([key]) => (
@@ -1073,13 +1068,15 @@ describe('i18n 全量界面扫描', () => {
       'contextMenu.groupPlain', 'contextMenu.standalone', 'contextMenu.withShortcut', 'contextMenu.withLanguage', 'contextMenuSettings.withReason']);
     // “Original” 在法语与西班牙语中拼写与英文相同，视频字幕菜单的短标签沿用该词。
     const videoOriginalLabels = ['video.modeOriginal', 'video.downloadOriginalShort'];
-    const frenchCognates = new Set(['learning.memoryNote', 'document.progressSegments', 'document.pageCount', 'document.pageNumber', 'options.aboutDocs', 'settings.advanced.animations', 'settings.advanced.translationLoadingStyle.minimal.label',
+    // Interface 与 Annotations 也是法语原生用词，PDF 菜单沿用紧凑的标准标签。
+    const frenchCognates = new Set(['document.pdfReading.theme.auto', 'document.pdfReading.annotations', 'learning.memoryNote', 'document.progressSegments', 'document.pageCount', 'document.pageNumber', 'options.aboutDocs', 'settings.advanced.animations', 'settings.advanced.translationLoadingStyle.minimal.label',
       // Style、Format、Original 同样是自然的法语短标签。
       'shareCard.style', 'shareCard.format', 'shareCard.original',
       // Page、Zoom 与 Original 也是 PDF 阅读器中自然的法语短标签。
       'document.pdfReading.pageLabel', 'document.pdfReading.pageNumber', 'document.pdfReading.zoom', 'document.pdfReading.original',
       'translationStats.filter.service', 'translationStats.source.network', 'translationStats.log.image', 'translationStats.routes.column.route', ...videoOriginalLabels]);
-    const spanishCognates = new Set([...videoOriginalLabels, 'shareCard.original', 'shareCard.theme.coral', 'document.pdfReading.zoom', 'document.pdfReading.original',
+    // Sepia 是西班牙语中棕褐色的标准名称。
+    const spanishCognates = new Set(['document.pdfReading.theme.sepia', ...videoOriginalLabels, 'shareCard.original', 'shareCard.theme.coral', 'document.pdfReading.zoom', 'document.pdfReading.original',
       // Color 是自然的西班牙语短标签，与英文同形。
       'informationHighlight.color']);
     for (const [locale, catalog] of Object.entries({'ja-JP': jaJPMessages, 'ko-KR': koKRMessages, 'fr-FR': frFRMessages, 'ru-RU': ruRUMessages, 'es-ES': esESMessages})) {
@@ -1307,7 +1304,7 @@ it('中文展示使用流畅阅读，首启七语品牌与正式目录一致并�
     expect(translate('metadata.popupTitle', 'zh-CN')).toBe('流畅阅读');
     expect(translate('metadata.documentTitle', 'zh-CN')).toBe('流畅阅读 · 文档翻译');
     expect(translate('settings.cloud.deleteManualDrive', 'zh-CN')).toBe('请前往 Google Drive 设置 → 管理应用 → FluentRead，清理该应用的数据。');
-    expect(translate('settings.cloud.deleteManualWebDav', 'zh-CN')).toBe('请在 WebDAV 服务商页面手动删除 FluentRead/fluentread-config.encrypted.json，保留目录内其他文件。');
+    expect(translate('settings.cloud.deleteManualWebDav', 'zh-CN')).toBe('请在已配置的 WebDAV 备份目录中只删除 fluentread-config.encrypted.json。');
     for (const {value} of UI_LANGUAGE_OPTIONS) {
         expect(onboardingMessages.onboardingProductNames[value], value).toBe(translate('common.brand', value));
         expect(translate('common.brand', value)).toBe(value === 'zh-CN' ? '流畅阅读' : 'FluentRead');

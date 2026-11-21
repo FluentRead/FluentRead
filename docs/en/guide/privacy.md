@@ -24,6 +24,7 @@ FluentRead does not run its own translation server. The features you enable and 
 | Images and local OCR area capture | Images recognized locally; recognized text to the translation provider |
 | Area capture with model recognition | When enabled and supported, the cropped selection goes to the area provider for recognition, followed by text translation; the full screen is not uploaded |
 | Documents | Files parsed in the browser; text to translate sent to the chosen provider |
+| Hypothesis collaboration | After you enable Hypothesis in the FluentRead PDF reader, the official service receives the PDF fingerprint, document title, selected text and annotations. An eligible public PDF URL can identify a PDF without a fingerprint. The official sidebar handles login and account data. PDF files are not uploaded. Local paths, recognized local hosts and PDF URLs with query parameters are withheld |
 | Video subtitles | Caption text to the subtitle translation provider; X local AI audio recognition runs on the device |
 | Dictionary and read-aloud | Requested words or text to the corresponding dictionary or voice provider |
 | Google Drive backup | Deliberate operations read or write your hidden application data within the confirmed scope, as explained below |

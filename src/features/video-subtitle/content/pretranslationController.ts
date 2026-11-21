@@ -6,7 +6,7 @@
  */
 export class VideoPretranslationController {
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private video: HTMLVideoElement | null = null;
+  private video: HTMLMediaElement | null = null;
   private tracks: TextTrack[] = [];
   private destroyed = false;
   constructor(private readonly prime: () => void, private readonly onTrackChange: () => void) {}
@@ -21,7 +21,7 @@ export class VideoPretranslationController {
     if (this.timer !== undefined) clearTimeout(this.timer);
     this.timer = undefined;
   }
-  observe(video: HTMLVideoElement | null): void {
+  observe(video: HTMLMediaElement | null): void {
     if (this.destroyed || this.video === video) return;
     this.video?.removeEventListener('load', this.handleLoad, true);
     for (const type of ['addtrack', 'removetrack', 'change']) this.video?.textTracks.removeEventListener(type, this.handleChange);

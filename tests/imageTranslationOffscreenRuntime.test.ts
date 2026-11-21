@@ -7,6 +7,11 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {page,word} from './helpers/imageTypographyFixture';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn(), setBackend:vi.fn()}));
+const prepareRareFont = vi.hoisted(() => vi.fn());
+vi.mock('@/src/features/image-translation/services/imageTextFont', async importOriginal => ({
+    ...await importOriginal<typeof import('@/src/features/image-translation/services/imageTextFont')>(),
+    prepareRareImageFont: prepareRareFont,
+}));
 vi.mock('@/src/features/image-translation/services/mangaAlphaProtection',async importOriginal=>({...await importOriginal<typeof import('@/src/features/image-translation/services/mangaAlphaProtection')>(),planMangaAlphaProtection:mocks.alphaProtection}));
 vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeImageCanvas:mocks.encode}));
 vi.mock('@/src/features/image-translation/services/mangaOcr',()=>({mangaOcrRuntime:{recognize:mocks.mangaRecognize}}));
@@ -119,6 +124,7 @@ function ordinaryFitFixture(configure?:(canvas:ReturnType<typeof createCanvasStu
 
 beforeEach(() => {
     vi.resetAllMocks();
+    prepareRareFont.mockResolvedValue(undefined);
     mocks.encode.mockResolvedValue('data:image/png;base64,translated');
     mocks.sampleManga.mockReturnValue([{color:'rgb(255,255,255)',uniform:false}]);
     imageOptions.length = 0;
@@ -138,6 +144,35 @@ beforeEach(() => {
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+it.each([false, true])('等待扩展字形时还未开始度量或清字，cancelled=%s', async cancelled => {
+    const controller = new AbortController();
+    let announcePreparation!: () => void;
+    let finishPreparation!: () => void;
+    const started = new Promise<void>(resolve => { announcePreparation = resolve; });
+    prepareRareFont.mockImplementationOnce(() => {
+        announcePreparation();
+        return new Promise<void>(resolve => { finishPreparation = resolve; });
+    });
+    sendMessage.mockImplementation((message, callback) => callback(message.type === 'fluentReadImageTranslateTexts'
+        ? {success: true, translations: ['𠀀']} : undefined));
+    const result = translateImageInOffscreen('rare-han-image', 'en', 'Page', controller.signal);
+    await started;
+    expect(prepareRareFont).toHaveBeenCalledExactlyOnceWith(controller.signal);
+    expect(canvases).toHaveLength(0);
+    expect(mocks.inpaint).not.toHaveBeenCalled();
+    if (cancelled) controller.abort();
+    finishPreparation();
+    if (cancelled) {
+        await expect(result).rejects.toMatchObject({name: 'AbortError'});
+        expect(mocks.draw).not.toHaveBeenCalled();
+        expect(canvases).toHaveLength(0);
+    } else {
+        const rendered = await result;
+        expect(rendered.lines[0]).toMatchObject({text: '𠀀', sourceText: 'Hello'});
+        expect(mocks.draw.mock.calls[0][1]).toBe('𠀀');
+    }
+});
 
 it.each([false,true])('倾斜原字在清字前核对并传到对应绘制入口，manga=%s',async manga=>{
     const p=page(),source={...word(p),fontSize:21},before=structuredClone(source),pixels=p.pixels.slice();
@@ -1853,6 +1888,17 @@ describe('漫画原文冲突后的纯白空处补绘',()=>{
         expect(mocks.encode).toHaveBeenCalledOnce();expect(result.mangaPatches?.patches).toHaveLength(1);expect(mocks.mangaRecognize).toHaveBeenCalledOnce();
         expect(sendMessage.mock.calls.filter(([message])=>message.type==='fluentReadImageTranslateTexts')).toHaveLength(1);
         expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);expect(images[0].src).toBe('');
+    });
+    it('需要在气泡空处补绘扩展汉字时也先准备同一个字体',async()=>{
+        const f=fixture('blank-rare-han');
+        sendMessage.mockImplementation((message, callback) => callback(message.type==='fluentReadImageTranslateTexts'
+            ? {success:true,translations:['𠀀','KEEP']} : undefined));
+        const result=await f.run();
+        expect(prepareRareFont).toHaveBeenCalledOnce();
+        expect(prepareRareFont.mock.invocationCallOrder[0]).toBeLessThan(canvases[0].context.measureText.mock.invocationCallOrder[0]);
+        expect(mocks.mangaDraw.mock.calls[0][4][0].text).toBe('𠀀');
+        expect(result.lines[0].text).toBe('𠀀');
+        expect(mocks.repair).not.toHaveBeenCalled();
     });
     it('同值clone不能继承气泡提示，无提示的旧快路径仍不分配画布',async()=>{
         const f=fixture('blank-clone');f.rows[0]={...f.target,bbox:{...f.target.bbox},sourceBoxes:f.target.sourceBoxes?.map(box=>({...box}))};

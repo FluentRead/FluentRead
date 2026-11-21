@@ -5443,6 +5443,23 @@ it('shares only the currently displayed completed translation from the actual to
     fixture.state.isLoading=true;await Vue.nextTick();expect(port.root.querySelector('.fr-share-card-entry')).toBeNull();
 });
 
+it.each([
+    {mode: 'bilingual', translated: '所选句子的译文。', labels: ['原文', '译文']},
+    {mode: 'translation-only', translated: '所选句子的译文。', labels: ['译文']},
+    {mode: 'translation-only', translated: 'Read this selected sentence.', labels: ['原文']},
+] as const)('renders selection blocks in reading order for $mode and $translated', async ({mode, translated, labels}) => {
+    const fixture = mountSelection(false, {acceptsRange: () => true}, {}, true);
+    fixture.config.selectionTranslatorMode = mode;
+    fixture.notifyConfig();
+    const text = 'Read this selected sentence.';
+    Object.assign(fixture.state, {snapshot: fixture.selectedSnapshot(text), selectedText: text, translationResult: translated, translationParts: [{kind: 'text', text: translated}], showTooltip: true});
+    await Vue.nextTick();
+    const blocks = [...fixture.renderPort!.root.querySelectorAll('.fr-translation-container > .fr-text-block')];
+    expect(blocks.map(block => block.querySelector('.fr-text-label')?.textContent)).toEqual(labels);
+    expect(blocks.map(block => block.querySelector('pre')?.textContent)).toEqual(labels.map(label => label === '原文' ? text : translated));
+    expect(blocks.map(block => block.querySelector('[data-copy-kind]')?.getAttribute('data-copy-kind'))).toEqual(labels.map(label => label === '原文' ? 'source' : 'translation'));
+});
+
 it('retries the dictionary from its rendered error, copies the selected word and translation, and toggles Chinese support',async()=>{
     const fixture=mountSelection(false,{acceptsRange:()=>true},{},true);await Vue.nextTick();
     const card={word:'hello',normalizedWord:'hello',phonetics:[],sources:[{id:'fixture',label:'Dictionary',url:'https://dictionary.test/hello'}],meanings:[{partOfSpeech:'感叹词',definitions:[{definition:'A greeting',translatedDefinition:'打招呼',example:'Hello again',translatedExample:'再次问好'}]}]};
@@ -5539,4 +5556,47 @@ it('requires a fresh shortcut after native keyup before translating a changed se
     send('keyup',{isTrusted:true,key:'Control'});text='Read a different complete sentence.';range.endOffset=text.length;send('selectionchange',{isTrusted:true});await vi.advanceTimersByTimeAsync(100);await Vue.nextTick();
     expect(fixture.state.selectedText).toBe(text);expect(fixture.renderPort!.root.querySelector('[role="dialog"]')).toBeNull();expect(fixture.translateText).toHaveBeenCalledOnce();
     send('keydown',key());await vi.advanceTimersByTimeAsync(100);await Vue.nextTick();expect(fixture.renderPort!.root.querySelector('[role="dialog"]')).not.toBeNull();expect(fixture.translateText).toHaveBeenCalledTimes(2);expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});
+
+it('marks from the rendered PDF selection toolbar and rejects stale ranges', async () => {
+    const markSelection = vi.fn(() => true), acceptsRange = vi.fn(() => true);
+    const fixture = mountSelection(false, {acceptsRange, markSelection}, {}, true); await Vue.nextTick();
+    const selected = fixture.selectedSnapshot('Source annotation quote.');
+    Object.assign(fixture.state, {snapshot: selected, selectedText: selected.text, showTooltip: true}); await Vue.nextTick();
+    const port = fixture.renderPort!;
+    await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    await port.click(port.root.querySelector('.fr-selection-underline')!);
+    expect(markSelection).toHaveBeenNthCalledWith(1, selected.range, 'highlight');
+    expect(markSelection).toHaveBeenNthCalledWith(2, selected.range, 'underline');
+    markSelection.mockReturnValue(false); await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    expect(fixture.state.noticeMessage).toBeTruthy();
+    acceptsRange.mockReturnValue(false); await port.click(port.root.querySelector('.fr-selection-highlight')!);
+    expect(markSelection).toHaveBeenCalledTimes(3);
+    acceptsRange.mockReturnValue(true); selected.range.startContainer.textContent = 'Changed quote';
+    fixture.state.markDocumentSelection('highlight'); expect(markSelection).toHaveBeenCalledTimes(3);
+    fixture.state.snapshot = null; fixture.state.markDocumentSelection('highlight');
+    expect(markSelection).toHaveBeenCalledTimes(3); expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
+});
+
+it('hides annotation actions for unsupported translated or cross-page selections while keeping translation available', async () => {
+    const markSelection=vi.fn(()=>true), canMarkSelection=vi.fn(()=>false);
+    const fixture=mountSelection(false,{acceptsRange:()=>true,markSelection,canMarkSelection},{},true);await Vue.nextTick();
+    const selected=fixture.selectedSnapshot('A translated or cross-page quote.');Object.assign(fixture.state,{snapshot:selected,selectedText:selected.text,showTooltip:true});await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-underline')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-translation-tooltip')).not.toBeNull();
+    fixture.state.markDocumentSelection('highlight');expect(markSelection).not.toHaveBeenCalled();
+    canMarkSelection.mockReturnValue(true);fixture.state.snapshot={...selected};await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).not.toBeNull();
+});
+
+it('omits native PDF annotation actions from userscript while preserving the selection translation card', async () => {
+    const markSelection = vi.fn(() => true);
+    const fixture = mountSelection(false, {acceptsRange: () => true, markSelection}, 'userscript', true); await Vue.nextTick();
+    const selected = fixture.selectedSnapshot('Read a complete selected sentence.');
+    Object.assign(fixture.state, {snapshot: selected, selectedText: selected.text, showTooltip: true}); await Vue.nextTick();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-highlight')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-selection-underline')).toBeNull();
+    expect(fixture.renderPort!.root.querySelector('.fr-translation-tooltip')).not.toBeNull();
+    expect(markSelection).not.toHaveBeenCalled(); expect(fixture.lifecycleErrors).not.toHaveBeenCalled();
 });

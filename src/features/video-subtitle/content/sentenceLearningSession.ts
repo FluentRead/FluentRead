@@ -4,10 +4,11 @@
  * 主要内容：加载前后检查资格、媒体连接与容器包含关系，加载期间全屏容器改变时使用同一媒体的最新挂载位置；关闭、连续打开和销毁淘汰旧结果与旧失败，复用 host 的节点移动、字幕更新和清理契约。
  * 模块边界：不导入 Vue 实现、不读取全局配置或字幕来源，不持有媒体播放控制；composition root 注入视图加载、挂载、可靠目标与业务 props。
  */
+import {playerOwnsMedia} from './htmlMedia';
 import {createVideoSentenceLearningHost, type MutableVideoSentenceLearningProps, type VideoSentenceLearningHost} from './sentenceLearningHost';
 
 export interface VideoSentenceLearningTarget {
-    video: HTMLVideoElement;
+    video: HTMLMediaElement;
     player: HTMLElement;
 }
 
@@ -17,7 +18,7 @@ export interface VideoSentenceLearningSession extends Omit<VideoSentenceLearning
 }
 
 function isConnectedTarget(target: VideoSentenceLearningTarget | null): target is VideoSentenceLearningTarget {
-    return !!target && target.video.isConnected && target.player.isConnected && target.player.contains(target.video);
+    return !!target && target.video.isConnected && target.player.isConnected && playerOwnsMedia(target.player, target.video);
 }
 
 export function createVideoSentenceLearningSession<View>(ports: {

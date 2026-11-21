@@ -301,6 +301,7 @@ def generate_epub(output: Path) -> None:
     <dc:identifier id="book-id">fluentread-document-example</dc:identifier>
     <dc:title>Document Translation Example</dc:title>
     <dc:language>en</dc:language>
+    <meta property="dcterms:modified">2026-11-21T00:00:00Z</meta>
   </metadata>
   <manifest>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>

@@ -95,6 +95,6 @@ const previewAriaLabel = computed(() => `${t('settings.interface.popupLayout.pre
   width: min(100%, var(--preview-popup-width));
   margin: 0 auto;
 }
-:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-layout-live-preview { --preview-popup-width: max(var(--interface-popup-width, 320px), 380px); }
+:root:is(:lang(en), :lang(fr), :lang(ru), :lang(es)) .popup-layout-live-preview:not([data-preview-kind="default"]) { --preview-popup-width: max(var(--interface-popup-width, 320px), 380px); }
 .layout-preview-announcement { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); }
 </style>

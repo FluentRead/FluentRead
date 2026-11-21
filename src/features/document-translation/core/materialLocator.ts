@@ -5,6 +5,7 @@
  * 模块边界：只消费解析模型，不读取文件、配置、数据库或网络；引用包含原文，仅供本地使用，不含 URL、令牌或用户配置，调用方不得将其自动上传或写入日志。
  */
 import type {DocumentSegment, ParsedDocument} from './document';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 
 export interface DocumentSourceLocator {
     version: 1;
@@ -61,10 +62,11 @@ export function documentSourceLocators(snapshot: SourceSnapshot): Array<Document
     const locators = segments.map((value: unknown): DocumentSourceLocator | undefined => {
         if (!value || typeof value !== 'object' || typeof (value as DocumentSegment).source !== 'string') return undefined;
         const segment = value as DocumentSegment;
-        const locator: DocumentSourceLocator = {version: 1, source: segment.source};
+        const locator: DocumentSourceLocator = {version: 1, source: segment.docxInline ? stripDocumentInlineMarkers(segment.source).trim() : segment.source};
         // DOCX 的 pathLabel 是“正文/页眉”等展示标签，不能与 ZIP 内原生路径竞争身份。
         if (!binary) {
-            if (snapshot.format === 'json' && typeof segment.pathLabel === 'string' && segment.pathLabel) locator.scope = `path:${segment.pathLabel}`;
+            if ((snapshot.format === 'json' || snapshot.format === 'csv' || snapshot.format === 'tsv')
+                && typeof segment.pathLabel === 'string' && segment.pathLabel) locator.scope = `path:${segment.pathLabel}`;
             else if (typeof segment.timeStart === 'string' && segment.timeStart && typeof segment.timeEnd === 'string' && segment.timeEnd) {
                 locator.scope = `time:${JSON.stringify([segment.timeStart, segment.timeEnd])}`;
             }

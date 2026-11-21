@@ -222,3 +222,12 @@ describe('Popup 站点规则与即时翻译',()=>{
     const {actions,cfg,state,send,notice}=setup(),pending=deferred();send.mockReturnValueOnce(pending.promise);const old=actions.setAlways(true);await settle();cfg.alwaysTranslateDomains=[];pending.resolve({status:'success',isTranslated:true});await old;expect(state.translated).toBe(false);expect(notice).not.toHaveBeenCalled()
   })
 })
+
+it('restores an already translated page before retry and drops a PDF-open completion after the popup loses ownership',async()=>{
+  const f=setup();f.state.translated=true;f.send.mockResolvedValueOnce({status:'success',isTranslated:false}).mockResolvedValueOnce({status:'success',isTranslated:true});await f.actions.retry();expect(f.send.mock.calls.map(call=>call[1].action)).toEqual(['restore','fullPage']);
+  const pending=deferred();f.openPdf.mockReturnValueOnce(pending.promise);f.state.url='https://paper.example/a.pdf';f.getTab.mockResolvedValueOnce({id:7,url:f.state.url});const opening=f.actions.toggle();await settle();expect(f.openPdf).toHaveBeenCalledWith(f.state.url);f.actions.invalidate();pending.resolve(undefined);await opening;expect(f.close).not.toHaveBeenCalled();
+})
+
+it('retries an untranslated page directly without an unnecessary restore',async()=>{
+  const f=setup();await f.actions.retry();expect(f.send).toHaveBeenCalledWith(7,{type:'contextMenuTranslate',action:'fullPage'});expect(f.send).toHaveBeenCalledOnce();
+})

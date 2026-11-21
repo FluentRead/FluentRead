@@ -30,6 +30,8 @@ describe('self help diagnosis', () => {
     [{kind: 'response'}, 'provider'],
     [{kind: 'bad-request', message: 'invalid parameter'}, 'configuration'],
     [{kind: 'bad-request', code: 'model_not_found'}, 'model-configuration'],
+    [{code: 'browser-translation-preparation-required', message: 'network'}, 'browser-translation-preparation-required'],
+    [{code: 'browser-translation-unavailable', message: 'model not found'}, 'browser-translation-unavailable'],
     [{kind: 'unknown', statusCode: 403}, 'authentication'],
     [{kind: 'invalid', status: 429}, 'rate-limit'],
     [{statusCode: 408}, 'timeout'],
@@ -117,7 +119,7 @@ describe('self help diagnosis', () => {
     expect(getDiagnosticText(saveFailure).detail).toContain('连接检查尚未开始');
   });
 
-  it('only supplies a finite positive cooldown for rate limits, without scheduling retries', () => {
+  it('only carries finite positive waits for rate limits and explicit 503 delays', () => {
     expect(diagnoseFailure({kind: 'rate-limit', retryAfterMs: 1234.1}).retryAfterMs).toBe(1235);
     expect(diagnoseFailure({message: '429', retryAfterMs: 30_000}).retryAfterMs).toBe(30_000);
     expect(diagnoseFailure({kind: 'rate-limit', retryAfterMs: 172_800_000}).retryAfterMs).toBe(172_800_000);
@@ -125,6 +127,10 @@ describe('self help diagnosis', () => {
       expect(diagnoseFailure({kind: 'rate-limit', retryAfterMs})).not.toHaveProperty('retryAfterMs');
     }
     expect(diagnoseFailure({kind: 'authentication', retryAfterMs: 5000})).not.toHaveProperty('retryAfterMs');
+    const unavailable = diagnoseFailure({kind: 'provider', statusCode: 503, retryAfterMs: 2000});
+    expect(unavailable).toMatchObject({code: 'provider', retryAfterMs: 2000});
+    expect(normalizeDiagnostic(unavailable)).toEqual(unavailable);
+    expect(diagnoseFailure({kind: 'provider', statusCode: 502, retryAfterMs: 2000})).not.toHaveProperty('retryAfterMs');
   });
 
   it('rebuilds untrusted runtime diagnostics and rejects unsupported codes', () => {

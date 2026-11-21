@@ -78,21 +78,22 @@ describe('浏览器构建与运行能力契约', () => {
     });
     it('仅提供确定的构建支持范围，不从 UA 打开功能', () => {
         for (const [browser, manifestVersion, dom, translator] of [
-            ['chrome', 3, true, true], ['edge', 3, true, false], ['firefox', 2, true, false],
+            ['chrome', 3, true, true], ['edge', 3, true, true], ['firefox', 2, true, false],
             ['firefox', 3, false, false], ['chrome', 2, false, false], ['edge', 2, false, false],
             ['userscript', 2, false, false], ['unknown', 3, false, false], ['', 2, false, false],
         ] as const) {
             const result = resolveBrowserCapabilities({browser, manifestVersion});
-            expect(result).toMatchObject({extensionDom: dom, imageOcr: dom, imageTranslation: dom, areaTranslation: dom, selectionTtsExtensionPlayback: dom, chromeTranslation: translator, selectionTtsPageFallback: true});
+            expect(result).toMatchObject({extensionDom: dom, imageOcr: dom, imageTranslation: dom, areaTranslation: dom, selectionTtsExtensionPlayback: dom, browserTranslation: translator, selectionTtsPageFallback: true});
             expect(result.offscreenDocument).toBe(dom && browser !== 'firefox');
             expect(Object.isFrozen(result)).toBe(true);
         }
     });
-    it('Chrome 包在 Edge 上收紧翻译能力，Firefox 包在 Thunderbird 上收紧 DOM 能力', () => {
+    it('识别桌面 Edge，并区分移动端和 Thunderbird 的能力', () => {
         const chrome = resolveBrowserCapabilities({browser: 'chrome', manifestVersion: 3});
         const firefox = resolveBrowserCapabilities({browser: 'firefox', manifestVersion: 2});
-        for (const ua of ['Edg/130', 'EdgA/130', 'EdgiOS/130']) {
-            expect(applyRuntimeBrowserConstraints(chrome, ua)).toMatchObject({browser: 'edge', extensionDom: true, chromeTranslation: false});
+        expect(applyRuntimeBrowserConstraints(chrome, 'Edg/148')).toMatchObject({browser: 'edge', browserTranslation: true});
+        for (const ua of ['EdgA/148', 'EdgiOS/148']) {
+            expect(applyRuntimeBrowserConstraints(chrome, ua)).toMatchObject({browser: 'edge', extensionDom: true, browserTranslation: false});
         }
         expect(applyRuntimeBrowserConstraints(chrome, 'Thunderbird/130')).toBe(chrome);
         expect(applyRuntimeBrowserConstraints(firefox, 'Edg/130')).toBe(firefox);

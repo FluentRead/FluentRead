@@ -14,7 +14,7 @@ import {filterEnabledTranslationServices, isTranslationServiceDisabled, markDisa
 const options = [
   { value: 'machine', label: '机器翻译', disabled: true },
   { value: 'microsoft', label: '微软翻译' },
-  { value: 'chromeTranslator', label: 'Chrome内置AI翻译⭐' },
+  { value: 'chromeTranslator', label: '浏览器内置翻译⭐' },
   { value: 'ai', label: 'AI翻译', disabled: true },
   { value: 'deepseek', label: 'DeepSeek️', catalogKind: 'provider' },
   { value: 'openai', label: 'OpenAI', catalogKind: 'provider' },
@@ -37,6 +37,10 @@ describe('service catalog helpers', () => {
       url: 'https://console.cloud.tencent.com/hunyuan', kind: 'website',
     })
     expect(getServiceWebsite(services.chromeTranslator)?.kind).toBe('documentation')
+    expect(getServiceWebsite(services.chromeTranslator, {browser: 'edge'})?.url)
+      .toBe('https://learn.microsoft.com/microsoft-edge/web-platform/translator-api')
+    expect(getServiceWebsite(services.chromeTranslator, {browser: 'firefox'})?.url)
+      .toBe('https://support.mozilla.org/kb/website-translation')
     expect(getServiceWebsite(services.freeTranslation)?.kind).toBe('documentation')
     expect(getServiceWebsite(services.myMemory)).toEqual({url: 'https://mymemory.translated.net/doc/spec.php', kind: 'documentation'})
   })
@@ -88,7 +92,7 @@ describe('service catalog helpers', () => {
         label: '机器翻译',
         items: [
           { value: 'microsoft', label: '微软翻译' },
-          { value: 'chromeTranslator', label: 'Chrome内置AI翻译' },
+          { value: 'chromeTranslator', label: '浏览器内置翻译' },
         ],
       },
       {
@@ -115,7 +119,7 @@ describe('service catalog helpers', () => {
           itemKind: '机器翻译',
           items: [
             { value: 'microsoft', label: '微软翻译' },
-            { value: 'chromeTranslator', label: 'Chrome内置AI翻译' },
+            { value: 'chromeTranslator', label: '浏览器内置翻译' },
           ],
         }],
       },

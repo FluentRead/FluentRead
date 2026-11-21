@@ -1012,3 +1012,17 @@ describe('userscript 当前配置页面协调消息', () => {
         expect(respond).toHaveBeenCalledWith({status: 'unavailable'}); expect(reconcile).not.toHaveBeenCalled();
     });
 });
+
+describe('PDF collaboration stays in the document reader', () => {
+    it.each(['getHypothesisState', 'toggleHypothesis'])('ignores the retired webpage command %s', async type => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        vi.stubGlobal('browser', {runtime: {id: 'owned'}});
+        const reply = vi.fn();
+        const handler = createContentRuntimeMessageHandler({} as ContentScriptContext, {
+            isSiteDisabled: () => false, updateSiteDisabled: vi.fn(),
+        });
+
+        expect(handler({type}, {id: 'owned'}, reply)).toBe(false);
+        expect(reply).not.toHaveBeenCalled();
+    });
+});

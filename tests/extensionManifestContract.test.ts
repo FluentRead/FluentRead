@@ -19,6 +19,14 @@ import type {InlineConfig} from 'vite';
 const PROJECT_ROOT = resolve(__dirname, '..');
 
 describe('native translation sidepanel artifact contract', () => {
+    it('registers the assignable translation window shortcut only on supported builds', () => {
+        for (const browser of ['chrome', 'edge', 'firefox'] as const) {
+            const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
+            expect(manifest.commands?.['open-translation-window']).toEqual({description: 'Open translation window'});
+        }
+        const safari = createExtensionManifest({browser: 'safari', manifestVersion: 2});
+        expect(safari.commands?.['open-translation-window']).toBeUndefined();
+    });
     it.each(['Chrome', 'Firefox'])('%s validates its own final native panel declaration', async browser => {
         const {verifyTranslationSidepanelManifest} = await import(/* @vite-ignore */ pathToFileURL(resolve(PROJECT_ROOT, 'scripts/testing/verify-extension-manifests.mjs')).href);
         const manifest = browser === 'Chrome' ? {permissions: ['sidePanel']}
@@ -1226,9 +1234,14 @@ describe('extension manifest capability contract', () => {
         };
         const firefox = {
             manifest_version: 2,
-            name: 'FluentRead',
+            name: '__MSG_extensionName__',
             version: '0.0.35',
             background: {scripts: ['background.js']},
+            browser_action: {default_title: '__MSG_extensionToolbarTitle__', default_popup: 'popup.html'},
+            commands: {
+                'open-translation-window': {description: 'Open translation window'},
+                '_execute_message_display_action': {description: 'Translate current message'},
+            },
             permissions: ['storage', '<all_urls>'],
             browser_specific_settings: {gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
@@ -1240,6 +1253,11 @@ describe('extension manifest capability contract', () => {
         const mail = createThunderbirdManifest(firefox);
         expect(mail.manifest_version).toBe(2);
         expect(mail.background).toEqual(firefox.background);
+        expect(mail.browser_action).toEqual({default_title: '__MSG_extensionName__', default_popup: 'popup.html'});
+        expect(mail.commands).toEqual({'_execute_message_display_action': firefox.commands._execute_message_display_action});
+        expect(createThunderbirdManifest({...firefox, commands: {
+            'open-translation-window': firefox.commands['open-translation-window'],
+        }}).commands).toBeUndefined();
         expect(mail.content_scripts).toBeUndefined();
         expect(mail.permissions).toContain('messagesModify');
         expect(mail.permissions).not.toContain('contextMenus');

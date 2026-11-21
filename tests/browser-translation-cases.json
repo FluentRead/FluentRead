@@ -1,4 +1,27 @@
 {
+  "inco-blog-splash": {
+    "url": "https://inco.ai/blog/splash/",
+    "hoverSelector": "main#content > .post-page > header.post-head > p.post-dek",
+    "requiredSelectors": [
+      "main#content > .post-page > header.post-head > p.post-dek",
+      "header.post-head > h1.post-title",
+      "article.prose > p:first-of-type"
+    ],
+    "coverageRules": [
+      {"name": "article-summary", "selector": "main#content > .post-page > header.post-head > p.post-dek", "kind": "content", "minInitial": 1, "sourcePartition": {"excludeSelectors": []}},
+      {"name": "article-title", "selector": "header.post-head > h1.post-title", "kind": "heading", "minInitial": 1},
+      {"name": "first-body-paragraph", "selector": "article.prose > p:first-of-type", "kind": "content", "minInitial": 1}
+    ],
+    "forbiddenSelectors": ["header.nav", "header.post-head time", "article.prose pre"],
+    "interactionSelectors": ["header.post-head a.post-back[href='/blog/']", "article.prose > p:first-of-type a[href]"],
+    "modes": ["hover", "full"],
+    "tier": "required",
+    "fullPageScope": "initial-corpus",
+    "hoverHotkey": "Control",
+    "fullPageHotkey": "Alt+T",
+    "service": "freeTranslation",
+    "notes": "The article summary is a paragraph inside the article header. Check its complete source, repeated translation and restoration, and guard the site header, publication date, command blocks and links."
+  },
   "llamaperf-mac-m5": {
     "url": "https://llamaperf.com/mac/m5?utm_source=chatgpt.com",
     "hoverSelector": "#main-content > div > header:has(> h1) > p",

@@ -11,7 +11,8 @@ import {DEFAULT_INFORMATION_HIGHLIGHT_PREFERENCES, normalizeInformationHighlight
 import {scoreInformationKeywords} from '@/src/features/information-highlight/domain/keywords';
 import {INFORMATION_HIGHLIGHT_NAME} from '@/src/features/information-highlight/public';
 
-const ports = vi.hoisted(() => ({getDocument: vi.fn(), textLayers: [] as any[], textPending: undefined as any}));
+const ports = vi.hoisted(() => ({getDocument: vi.fn(), textLayers: [] as any[], textPending: undefined as any, hypothesisClient: vi.fn()}));
+vi.mock('@/src/features/hypothesis/public', async original => ({...await original<typeof import('@/src/features/hypothesis/public')>(), createHypothesisClient: ports.hypothesisClient}));
 vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string, params?: {page?: number}) => params?.page ? `${key}:${params.page}` : key})}));
 vi.mock('pdfjs-dist/legacy/build/pdf.mjs', () => ({GlobalWorkerOptions: {}, getDocument: ports.getDocument, TextLayer: class {
     container: HTMLElement;
@@ -42,7 +43,7 @@ let mountedApp: any;
 let storage: Map<string, string>;
 
 beforeEach(() => {
-    ports.getDocument.mockReset(); ports.textLayers = []; ports.textPending = undefined;
+    ports.hypothesisClient.mockReset(); ports.getDocument.mockReset(); ports.textLayers = []; ports.textPending = undefined;
     models = []; canvases = []; selection = undefined; frames = new Map(); resizeCallback = undefined; mountedApp = undefined;
     const {document} = parseHTML('<html><body></body></html>');
     const createElement = document.createElement.bind(document);
@@ -59,7 +60,7 @@ beforeEach(() => {
         canvases.push(element); return element;
     });
     let nextFrame = 1;
-    win = Object.assign(new EventTarget(), {location: {origin: 'chrome-extension://fixture'}, devicePixelRatio: 3, getSelection: () => selection, requestAnimationFrame: (callback: FrameRequestCallback) => {const id = nextFrame++; frames.set(id, callback); return id;}, cancelAnimationFrame: (id: number) => {frames.delete(id);}});
+    win = Object.assign(new EventTarget(), {location: {origin: 'chrome-extension://fixture', hash: ''}, devicePixelRatio: 3, getSelection: () => selection, requestAnimationFrame: (callback: FrameRequestCallback) => {const id = nextFrame++; frames.set(id, callback); return id;}, cancelAnimationFrame: (id: number) => {frames.delete(id);}});
     disconnect = vi.fn();
     // 译文样式保存在本机；每个用例使用独立的内存存储。
     storage = new Map(); vi.stubGlobal('localStorage', {getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => {storage.set(key, value);}});
@@ -413,13 +414,13 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         ]};
         const reader = createPdfReaderRenderPort(doc);
         const result = await reader.render(page, {...settings('readable', 1.5, 'bilingual'), presentation: 'readable'}, new AbortController().signal);
-        expect(result.sourceCanvas).toBeTruthy(); expect(result.sourceText).toBeTruthy(); expect(result.translatedCanvas).toBeUndefined();
+        expect(result.sourceCanvas).toBeUndefined(); expect(result.sourceText).toBeUndefined(); expect(result.translatedCanvas).toBeUndefined();
         expect([...result.regions!.keys()]).toEqual(['pdf-1-region-architecture', 'pdf-1-region-math']);
         expect(canvases.reduce((sum, canvas) => sum + canvas.width * canvas.height, 0)).toBeLessThanOrEqual(PDF_READER_MAX_PAGE_PIXELS);
-        expect(result.sourceCanvas!.getContext('2d')!.fillText).not.toHaveBeenCalled();
+        expect(canvases.find(canvas => canvas.getAttribute('data-pdf-resource') === 'source')!.getContext('2d')!.fillText).not.toHaveBeenCalled();
         for (const canvas of result.regions!.values()) {
             expect(canvas.getAttribute('data-pdf-resource')).toBe('region');
-            expect(canvas.getContext('2d')!.drawImage).toHaveBeenCalledWith(result.sourceCanvas, expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), 0, 0, canvas.width, canvas.height);
+            expect(canvas.getContext('2d')!.drawImage).toHaveBeenCalledWith(expect.objectContaining({width: 0, height: 0}), expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number), 0, 0, canvas.width, canvas.height);
         }
         result.dispose(); expect(canvases.every(canvas => canvas.width === 0 && canvas.height === 0)).toBe(true); reader.dispose();
     });
@@ -439,7 +440,7 @@ describe('PDF reader actual PDF.js resource adapter', () => {
                 const crop = result.regions!.get(entry.id)!;
                 expect(crop.getAttribute('data-pdf-region-id')).toBe(entry.id);
                 expect(crop.getAttribute('data-pdf-source-rect')).toBe(JSON.stringify(entry.sourceRect));
-                expect(crop.getContext('2d')!.drawImage).toHaveBeenCalledWith(result.sourceCanvas, entry.sourceRect.x * 2, entry.sourceRect.y * 2,
+                expect(crop.getContext('2d')!.drawImage).toHaveBeenCalledWith(expect.objectContaining({width: 0, height: 0}), entry.sourceRect.x * 2, entry.sourceRect.y * 2,
                     entry.sourceRect.width * 2, entry.sourceRect.height * 2, 0, 0, crop.width, crop.height);
             }
             expect(canvases.reduce((sum, canvas) => sum + canvas.width * canvas.height, 0)).toBeLessThanOrEqual(PDF_READER_MAX_PAGE_PIXELS);
@@ -448,7 +449,7 @@ describe('PDF reader actual PDF.js resource adapter', () => {
             const sourcePort = createPdfReaderRenderPort(actual.document);
             const sourceOnly = await sourcePort.render(actual.page, {scale: 1, mode: 'source', presentation: 'readable', regionEntries: sourceEntries,
                 key: pdfReaderPageKey(actual.page, 1, 'source', 'readable', sourceEntries)}, new AbortController().signal);
-            expect(sourceOnly.sourceCanvas).toBeTruthy(); expect(sourceOnly.regions!.size).toBe(0);
+            expect(sourceOnly.sourceCanvas).toBeUndefined(); expect([...sourceOnly.regions!.keys()]).toEqual(sourceEntries.map(entry => entry.id));
             sourceOnly.dispose(); sourcePort.dispose();
         }
     });
@@ -467,11 +468,11 @@ describe('PDF reader actual PDF.js resource adapter', () => {
         expect(crop).toMatchObject({width: 400, height: 60});
         expect(context.translate).toHaveBeenCalledWith(...(rotation === 90 ? [0, 60] : rotation === 180 ? [400, 60] : [400, 0]));
         expect(context.rotate).toHaveBeenCalledWith(rotation === 90 ? -Math.PI / 2 : rotation === 180 ? -Math.PI : Math.PI / 2);
-        expect(context.drawImage).toHaveBeenCalledWith(result.sourceCanvas, rect.x * 2, rect.y * 2, rect.width * 2, rect.height * 2, 0, 0, rotation === 180 ? 400 : 60, rotation === 180 ? 60 : 400);
+        expect(context.drawImage).toHaveBeenCalledWith(expect.objectContaining({width: 0, height: 0}), rect.x * 2, rect.y * 2, rect.width * 2, rect.height * 2, 0, 0, rotation === 180 ? 400 : 60, rotation === 180 ? 60 : 400);
         expect(context.save).toHaveBeenCalledOnce(); expect(context.restore).toHaveBeenCalledOnce();
         expect(pdfPage.render.mock.calls[0][0].viewport.rotation).toBe(rotation);
-        expect(ports.textLayers[0].viewport.rotation).toBe(rotation);
-        expect(result.sourceCanvas!.getContext('2d')!.rotate).not.toHaveBeenCalled();
+        expect(ports.textLayers).toHaveLength(0);
+        expect(canvases.find(canvas => canvas.getAttribute('data-pdf-resource') === 'source')!.getContext('2d')!.rotate).not.toHaveBeenCalled();
         expect(canvases.reduce((sum, canvas) => sum + canvas.width * canvas.height, 0)).toBeLessThanOrEqual(PDF_READER_MAX_PAGE_PIXELS);
         result.dispose(); reader.dispose();
     });
@@ -567,7 +568,7 @@ describe('PDF reader color readback performance', () => {
         expect(markers()).toHaveLength(1); expect(markers()[0].style.left).toBe('42px'); expect(markers()[0].style.top).toBe('80px');
         expect(markers()[0].style.width).toBe('8px'); expect(markers()[0].getAttribute('aria-hidden')).toBe('true');
         expect(markers()[0].closest('figure')?.getAttribute('aria-label')).toBe('document.pdfReading.original');
-        reader.state.scale = 1.5; await componentFlush(); expect(markers()[0].style.left).toBe('42px');
+        reader.state.chooseZoom('1.5'); await componentFlush(); expect(markers()[0].style.left).toBe('42px');
         reader.currentMode.value = 'translated'; await componentFlush(); expect(markers()).toHaveLength(0);
         reader.currentMode.value = 'source'; await componentFlush(); expect(markers()).toHaveLength(1);
     });
@@ -1020,9 +1021,9 @@ describe('PDF reader actual Vue component reading interaction', () => {
         // 模拟浏览器对布局更新后的 scrollTop 自动限制；Linkedom 不提供真实滚动几何。
         Object.defineProperty(viewport, 'scrollTop', {configurable: true, get: () => {top = Math.max(0, Math.min(top, extent())); return top;}, set: value => {top = Math.max(0, Math.min(Number(value), extent()));}});
         resizeCallback!([{target: viewport, contentRect: {} as DOMRectReadOnly, borderBoxSize: [], contentBoxSize: [], devicePixelContentBoxSize: []}], {} as ResizeObserver);
-        const measureResidentText = async () => {
+        const measureResidentText = async (height = 1500) => {
             const sheets = [...root.querySelectorAll('[data-pdf-reading-page]')];
-            for (const sheet of sheets) sheet.getBoundingClientRect = () => ({height: 1500} as DOMRect);
+            for (const sheet of sheets) sheet.getBoundingClientRect = () => ({height} as DOMRect);
             resizeCallback!(sheets.map(target => ({target, contentRect: {} as DOMRectReadOnly, borderBoxSize: [], contentBoxSize: [], devicePixelContentBoxSize: []})), {} as ResizeObserver);
             await componentFlush(); flushFrames(); await componentFlush();
         };
@@ -1030,7 +1031,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         state.jumpTo(pageNumber); await componentFlush(); await measureResidentText();
         expect(state.currentPage).toBe(pageNumber);
         const before = viewport.scrollTop;
-        currentMode.value = 'translated'; await componentFlush(); flushFrames(); await componentFlush();
+        currentMode.value = 'translated'; await componentFlush(); await measureResidentText(200); flushFrames(); await componentFlush();
         if (pageNumber === 120) expect(extent()).toBeLessThan(before);
         expect(state.currentPage).toBe(pageNumber);
         expect(root.querySelector(`.pdf-page-row[data-page-number="${pageNumber}"]`)).toBeTruthy();
@@ -1062,7 +1063,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         expect(root.querySelector('[data-pdf-resource="region"]')!.getAttribute('data-pdf-source-rect')).toBe(JSON.stringify(rect));
         state.zoom = '1.5'; await componentFlush();
         expect(host.style.width).toBe(`${rect.width * 1.5 * 1.5}px`); expect(host.style.getPropertyValue('aspectRatio')).toBe(`${rect.width} / ${rect.height}`);
-        expect(root.querySelector('[data-pdf-resource="source"]')).toBeTruthy();
+        expect(root.querySelector('[data-pdf-resource="source"]')).toBeNull();
     });
 
     it('keeps the same visible paragraph at the same viewport offset when an earlier paragraph expands and when zoom changes', async () => {
@@ -1094,10 +1095,10 @@ describe('PDF reader actual Vue component reading interaction', () => {
     it('keeps actual plan source-control crops identical to the DOM and redraws only when their geometry or identity changes', async () => {
         const actual = actualControlModel(18);
         const {root, state, currentTranslations} = mountReader(actual.document, 'bilingual', actual.translations, {presentation: 'readable'});
-        await vi.waitFor(() => expect(root.querySelector('[data-pdf-resource="source"]')).toBeTruthy());
+        await vi.waitFor(() => expect(root.querySelector('.pdf-page-row')?.getAttribute('data-render-state')).toBe('ready'));
         await componentFlush(); flushFrames(); await componentFlush();
         expect(root.querySelectorAll('[data-pdf-resource="region"]')).toHaveLength(0);
-        const firstSource = root.querySelector('[data-pdf-resource="source"]') as HTMLCanvasElement;
+        const firstSource = canvases.find(canvas => canvas.getAttribute('data-pdf-resource') === 'source')!;
         const initialRenders = pdfPage.render.mock.calls.length;
         const changed = [...actual.translations]; changed[244] = actual.document.segments[244].source;
         currentTranslations.value = changed;
@@ -1113,7 +1114,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         const retainedSource = root.querySelector('[data-pdf-resource="source"]');
         const updated = [...changed]; updated[245] += '追加校订。'; currentTranslations.value = updated;
         await componentFlush(); flushFrames(); await componentFlush();
-        expect(root.querySelector('[data-pdf-segment-index="245"]')!.textContent).toBe(updated[245]);
+        expect(root.querySelector('[data-pdf-segment-index="245"]')!.textContent).toBe(actual.document.segments[245].source + updated[245]);
         expect(pdfPage.render).toHaveBeenCalledTimes(geometryRenders);
         expect(root.querySelector('[data-pdf-resource="source"]')).toBe(retainedSource);
         expect(figure.querySelector('[data-pdf-resource="region"]')).toBe(crop);
@@ -1135,10 +1136,10 @@ describe('PDF reader actual Vue component reading interaction', () => {
         const changed = [...actual.translations]; changed[502] = '实际校订后的恒等映射Γ'; currentTranslations.value = changed;
         await componentFlush(); flushFrames(); await componentFlush();
         await vi.waitFor(() => expect(pdfPage.render).toHaveBeenCalledTimes(2));
-        await vi.waitFor(() => expect(root.querySelector('[data-pdf-resource="source"]')).toBeTruthy());
+        await vi.waitFor(() => expect(root.querySelector('.pdf-page-row')?.getAttribute('data-render-state')).toBe('ready'));
         expect(cancel).toHaveBeenCalled(); expect(staleSource).toMatchObject({width: 0, height: 0});
         expect(root.querySelectorAll('[data-pdf-resource="region"]')).toHaveLength(0);
-        expect(root.querySelector('[data-pdf-segment-index="502"]')!.textContent).toBe(changed[502]);
+        expect(root.querySelector('[data-pdf-segment-index="502"]')!.textContent).toBe(actual.document.segments[502].source + changed[502]);
         const currentSource = root.querySelector('[data-pdf-resource="source"]');
         pending.resolve(); await componentFlush(); flushFrames(); await componentFlush();
         expect(root.querySelector('[data-pdf-resource="source"]')).toBe(currentSource);
@@ -1153,13 +1154,13 @@ describe('PDF reader actual Vue component reading interaction', () => {
         const {root, viewport, state, currentTranslations} = mountReader(doc, 'bilingual', [full, 'second translation'], {presentation: 'readable'});
         await vi.waitFor(() => expect(root.querySelector('[data-pdf-region-id="pdf-1-region-graph"] canvas')).toBeTruthy());
         const paragraph = root.querySelector('[data-pdf-segment-index="0"]')!;
-        expect(paragraph.textContent).toBe(full); expect(paragraph.getAttribute('data-pdf-source-text')).toBe('Source 1');
-        expect(root.querySelectorAll('[data-fluentread-pdf-text]')).toHaveLength(2);
+        expect(paragraph.querySelector('.pdf-reflow-source')!.textContent).toBe('Source 1'); expect(paragraph.textContent).toBe('Source 1' + full); expect(paragraph.getAttribute('data-pdf-source-text')).toBe('Source 1');
+        expect(root.querySelectorAll('[data-fluentread-pdf-text]')).toHaveLength(0);
         const draws = pdfPage.render.mock.calls.length;
         const original = root.querySelector('[data-pdf-resource="source"]');
         currentTranslations.value = [full + '末尾仍然可读。', 'second translation'];
         await componentFlush(); flushFrames(); await componentFlush();
-        expect(root.querySelector('[data-pdf-segment-index="0"]')!.textContent).toBe(full + '末尾仍然可读。');
+        expect(root.querySelector('[data-pdf-segment-index="0"]')!.textContent).toBe('Source 1' + full + '末尾仍然可读。');
         expect(pdfPage.render).toHaveBeenCalledTimes(draws); expect(root.querySelector('[data-pdf-resource="source"]')).toBe(original);
         const sheet = root.querySelector('[data-pdf-reading-page="1"]') as HTMLElement;
         let height = 1500; sheet.getBoundingClientRect = () => ({height} as DOMRect);
@@ -1313,7 +1314,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         currentPresentation.value = 'readable'; await componentFlush(); flushFrames(); await componentFlush();
         expect(state.presentation).toBe('readable'); expect(presentations).toEqual(['readable', 'layout']); expect(root.querySelector('.pdf-reading-sheet')).toBeTruthy();
         currentMode.value = 'source'; await componentFlush(); flushFrames(); await componentFlush();
-        expect(root.querySelector('.pdf-presentation-control')).toBeNull(); expect(root.querySelector('.pdf-reading-sheet')).toBeNull(); expect(root.querySelector('.pdf-translation-layer')).toBeNull(); expect(root.querySelector('.pdf-page-column.translated')).toBeNull();
+        expect(root.querySelector('.pdf-presentation-control')).toBeTruthy(); expect(root.querySelector('.pdf-reading-sheet')).toBeTruthy(); expect(root.querySelector('.pdf-translation-layer')).toBeNull(); expect(root.querySelector('.pdf-page-column.translated')).toBeNull();
         expect(pageChanges).toEqual([1, 3, 1]);
     });
 
@@ -1355,7 +1356,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         click(menuButton); await componentFlush();
         expect([...menu.querySelectorAll('ul.pdf-menu-list[role="listbox"] > li > button[role="option"]')].map(option => option.getAttribute('data-value'))).toEqual(['fit', 'page', '0.5', '0.75', '1', '1.25', '1.5', '2', '3']);
         click(menuButton); await componentFlush(); expect(menu.querySelector('.pdf-menu-list')).toBeNull();
-        expect(root.querySelector('.pdf-selection-hint')).toBeNull(); expect(root.querySelector('.pdf-presentation-control')).toBeNull(); expect(root.querySelector('.pdf-style')).toBeNull();
+        expect(root.querySelector('.pdf-selection-hint')).toBeNull(); expect(root.querySelector('.pdf-presentation-control')).toBeTruthy(); expect(root.querySelector('.pdf-style')).toBeTruthy();
         // 适合宽度：(920 − 24) / 612 ≈ 1.46；＋ 进到下一档 150%，− 退到 125%；适合页面受 600px 视口高度限制。
         const [zoomOut, zoomIn] = Array.from(root.querySelectorAll('.pdf-zoom-control > button'));
         expect(state.zoom).toBe('fit'); expect(state.scale).toBeCloseTo((920 - 24) / 612, 12); expect(menuButton.textContent).toBe('document.pdfReading.fitWidth');
@@ -1621,7 +1622,7 @@ describe('PDF reader actual Vue component reading interaction', () => {
         click(fonts[2]); await componentFlush(); expect(pressed()).toEqual([false, false, true]); expect(font(root).family).toBe(SANS); expect(stored()).toEqual({scale: 0.8, font: 'sans', highlight: true});
         click(fonts[1]); await componentFlush();
         expect(text(root).textContent).toBe('第一段译文'); expect(pdfPage.render).toHaveBeenCalledTimes(draws);
-        first.currentMode.value = 'source'; await componentFlush(); expect(root.querySelector('.pdf-style')).toBeNull(); expect(root.querySelector('.pdf-style-panel')).toBeNull();
+        first.currentMode.value = 'source'; await componentFlush(); expect(root.querySelector('.pdf-style')).toBeTruthy(); expect(root.querySelector('.pdf-style-panel')).toBeTruthy(); expect(root.querySelector('.pdf-style-switch')).toBeNull();
         mountedApp.unmount(); await componentFlush();
         // 下次打开沿用保存的字号与字体；越界或无法解析的记录回到可用范围与默认值。
         const second = mountReader(model(), 'translated', ['第一段译文']);
@@ -1906,4 +1907,167 @@ it('programmatic scrolling alone does not claim trusted navigation ownership or 
     reader.viewport.scrollTop = 850; reader.viewport.dispatchEvent(new document.defaultView!.Event('scroll'));
     for (let attempt = 0; attempt < 4; attempt++) {flushFrames(); await componentFlush();}
     expect(await restoring).toBe(true); expect(reader.viewport.scrollTop).not.toBe(850);
+});
+
+describe('PDF source reflow and reading appearance', () => {
+    it('reflows untranslated source in a narrow single column and switches bilingual text without duplicating fallback paragraphs', async () => {
+        const view = mountReader(model(120), 'source', ['Translated first paragraph'], {presentation: 'readable'});
+        await componentFlush(); flushFrames(); await componentFlush();
+        Object.assign(view.viewport, {clientWidth: 390}); resizeCallback!([], {} as ResizeObserver); await componentFlush(); flushFrames(); await componentFlush();
+        expect(view.root.querySelector('.pdf-presentation-control')).toBeTruthy();
+        expect(view.root.querySelector('.pdf-reading-paragraph')!.textContent).toBe('Source 1');
+        expect(view.root.textContent).not.toContain('Translated first paragraph');
+        expect(view.root.querySelector('[data-fluentread-pdf-text]')).toBeNull();
+        expect(view.state.totalWidth).toBe(390); expect(view.state.layouts[0].width).toBe(366);
+        expect(view.root.querySelectorAll('.pdf-page-row').length).toBeLessThanOrEqual(5);
+        view.currentMode.value = 'bilingual'; await componentFlush(); flushFrames(); await componentFlush();
+        expect(view.state.totalWidth).toBe(390);
+        expect(view.root.querySelector('.pdf-reflow-source')!.textContent).toBe('Source 1');
+        expect(view.root.querySelector('[data-pdf-segment-index="0"]')!.textContent).toBe('Source 1Translated first paragraph');
+        expect(view.root.querySelector('[data-pdf-segment-index="1"]')!.textContent).toBe('Source 2');
+        view.currentMode.value = 'translated'; await componentFlush();
+        expect(view.root.querySelector('.pdf-reflow-source')).toBeNull();
+        expect(view.root.querySelector('[data-pdf-segment-index="0"]')!.textContent).toBe('Translated first paragraph');
+    });
+    it('applies and restores spacing, colors, family and font scale while preserving the bounded page window', async () => {
+        const view = mountReader(model(8), 'source', [], {presentation: 'readable'}); await componentFlush();
+        click(view.root.querySelector('.pdf-style > button')); await componentFlush();
+        const sliders = view.root.querySelectorAll<HTMLInputElement>('input[type="range"]');
+        expect(sliders).toHaveLength(2);
+        sliders[0].value = '2'; sliders[0].dispatchEvent(new document.defaultView!.Event('input'));
+        sliders[1].value = '0.6'; sliders[1].dispatchEvent(new document.defaultView!.Event('input'));
+        view.state.readingTheme = 'sepia'; view.state.textFont = 'serif'; view.state.textScale = 1.25; await componentFlush();
+        expect(view.state.readingFontSize).toBe(20); expect(view.state.readingStyle['--pdf-reading-line-height']).toBe(2);
+        expect(view.state.readingStyle['--pdf-reading-paragraph-gap']).toBe('0.6em'); expect(view.state.readingStyle['--pdf-reading-family']).toContain('serif');
+        expect(view.viewport.getAttribute('data-pdf-theme')).toBe('sepia'); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#f5ecd8');
+        view.state.readingTheme = 'mint'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#e8f1ea');
+        view.state.readingTheme = 'dark'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-color']).toBe('#e5e7eb');
+        view.state.readingTheme = 'invert'; await componentFlush(); expect(view.state.readingStyle['--pdf-reading-background']).toBe('#000000');
+        view.state.readingTheme = 'custom'; view.state.backgroundColor = '#123456'; view.state.textColor = '#fedcba'; await componentFlush();
+        expect(view.root.querySelectorAll('input[type="color"]')).toHaveLength(2);
+        expect(view.state.readingStyle['--pdf-reading-background']).toBe('#123456');
+        expect(view.root.querySelectorAll('.pdf-page-row').length).toBeLessThanOrEqual(5);
+        mountedApp.unmount(); mountedApp = undefined; await componentFlush();
+        const next = mountReader(model(), 'source', [], {presentation: 'readable'}); await componentFlush();
+        expect(next.state.readingTheme).toBe('custom'); expect(next.state.lineSpacing).toBe(2); expect(next.state.paragraphSpacing).toBe(.6);
+        expect(next.state.readingStyle['--pdf-reading-color']).toBe('#fedcba'); expect(next.state.readingFontSize).toBe(20);
+    });
+    it.each(['null', '{"theme":"unknown","lineSpacing":100,"paragraphSpacing":0,"background":"url(secret)","text":42}', '{broken'])('normalizes unavailable or invalid reading preferences: %s', async value => {
+        storage.set('fluentread.pdfReader.readingStyle', value);
+        const view = mountReader(model(), 'source', [], {presentation: 'readable'}); await componentFlush();
+        expect(view.state.readingTheme).toBe('auto'); expect(view.state.lineSpacing).toBeGreaterThanOrEqual(1.3); expect(view.state.lineSpacing).toBeLessThanOrEqual(2.2);
+        expect(view.state.paragraphSpacing).toBeGreaterThanOrEqual(.4); expect(view.state.backgroundColor).toBe('#fff7e6'); expect(view.state.textColor).toBe('#302b24');
+    });
+});
+
+describe('PDF fixed-page smart colors', () => {
+    it('protects the same rotated figure in both columns and changes palettes without replacing canvases or text layers', async () => {
+        const doc = model();
+        if (doc.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        Object.assign(doc.binary.pages[0], {rotation: 90, width: 792, height: 612, preservedRegions: [{id: 'diagram', kind: 'figure', x: 50, y: 300, width: 200, height: 30}]});
+        const view = mountReader(doc, 'bilingual', ['Target text']); await componentFlush();
+        await vi.waitFor(() => expect(view.root.querySelector('[data-pdf-resource="source"]')).toBeTruthy());
+        const canvas = view.root.querySelector('[data-pdf-resource="source"]'), text = view.root.querySelector('[data-fluentread-pdf-text]'), draws = pdfPage.render.mock.calls.length;
+        view.state.readingTheme = 'invert'; await componentFlush();
+        expect(view.root.querySelectorAll('.pdf-page-content')).toHaveLength(2); expect(view.root.querySelectorAll('.pdf-theme-definitions')).toHaveLength(1);
+        expect(view.root.querySelectorAll('feFlood')).toHaveLength(1);
+        expect(view.state.themeRegions.get(1)).toEqual([{x: 462 / 792, y: 50 / 612, width: 30 / 792, height: 200 / 612}]);
+        const id = view.root.querySelector('filter')!.getAttribute('id'); expect(view.state.fixedThemeStyle(1).filter).toBe(`url(#${id})`);
+        expect(view.root.querySelector('[data-pdf-resource="source"]')).toBe(canvas); expect(view.root.querySelector('[data-fluentread-pdf-text]')).toBe(text);
+        for (const theme of ['sepia', 'mint', 'dark', 'custom'] as const) {view.state.readingTheme = theme; await componentFlush(); expect(view.root.querySelectorAll('.pdf-page-content')).toHaveLength(2);}
+        view.state.backgroundColor = '#ffeecc'; view.state.textColor = '#112233'; await componentFlush();
+        expect(view.state.themeTransfer[0].intercept).toBeCloseTo(17 / 255); expect(view.state.themeTransfer[0].slope).toBeCloseTo((255 - 17) / 255);
+        expect(pdfPage.render).toHaveBeenCalledTimes(draws);
+        view.state.readingTheme = 'auto'; await componentFlush(); expect(view.root.querySelector('.pdf-theme-definitions')).toBeNull(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
+        expect(view.root.querySelector('[data-pdf-resource="source"]')).toBe(canvas); expect(pdfPage.render).toHaveBeenCalledTimes(draws);
+        view.state.readingTheme = 'dark'; view.currentPresentation.value = 'readable'; await componentFlush(); expect(view.root.querySelector('.pdf-page-theme')).toBeNull();
+    });
+});
+
+describe('PDF Hypothesis control lifecycle', () => {
+    const toggle = (root: Element) => root.querySelector('[data-testid="pdf-hypothesis-toggle"]');
+    async function openAnnotations(root: Element) {
+        click(root.querySelector('.pdf-annotations > .pdf-menu-button'));
+        await componentFlush();
+    }
+    function client() {
+        const value = {setEnabled: vi.fn(async (active: boolean) => ({status: 'success', active})), dispose: vi.fn(async () => {})};
+        ports.hypothesisClient.mockReturnValue(value); return value;
+    }
+    it('opens collaboration once, restarts on a same-file view change, and never carries activation into another file', async () => {
+        const sdk = client(), view = mountReader(documentModel(2)); await componentFlush();
+        expect(toggle(view.root)).toBeNull();
+        await openAnnotations(view.root);
+        expect(view.root.querySelector('.pdf-annotations [role="dialog"]')?.textContent).toContain('document.pdfReading.annotationEmpty');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        expect(toggle(view.root)?.textContent).toContain('document.pdfReading.hypothesisToggle');
+        expect(ports.hypothesisClient).not.toHaveBeenCalled();
+        click(toggle(view.root)); await componentFlush();
+        expect(toggle(view.root)).toBeNull(); expect(ports.hypothesisClient).toHaveBeenCalledOnce();
+        await openAnnotations(view.root);
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('true');
+        view.currentPresentation.value = 'readable'; await componentFlush(); expect(sdk.setEnabled.mock.calls.map(call => call[0])).toEqual([false, true, false, true]);
+        view.currentDocument.value = documentModel(1); await componentFlush(); expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('false'); expect(sdk.setEnabled.mock.calls.at(-1)).toEqual([false]);
+        mountedApp.unmount(); mountedApp = undefined; expect(sdk.dispose).toHaveBeenCalledOnce();
+    });
+    it('explains translation availability and lets the user cancel a paused client', async () => {
+        const sdk = client(), view = mountReader(documentModel(1), 'source', [], {translating: true}); await componentFlush();
+        await openAnnotations(view.root);
+        expect(toggle(view.root)?.getAttribute('aria-disabled')).toBe('true');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        click(toggle(view.root)); await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisWaiting');
+        expect(ports.hypothesisClient).not.toHaveBeenCalled();
+        view.currentTranslating.value = false; await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        click(toggle(view.root)); await componentFlush();
+        view.currentTranslating.value = true; await componentFlush();
+        await openAnnotations(view.root);
+        const button = toggle(view.root)!;
+        expect(button.hasAttribute('disabled')).toBe(false); expect(button.getAttribute('aria-pressed')).toBe('true');
+        click(button); await componentFlush(); const calls = sdk.setEnabled.mock.calls.length;
+        view.currentTranslating.value = false; await componentFlush(); expect(sdk.setEnabled).toHaveBeenCalledTimes(calls); expect(button.getAttribute('aria-pressed')).toBe('false');
+    });
+    it('cancels a slow connection and ignores its late result', async () => {
+        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
+        let finish!: (value: {status: string; active: boolean}) => void;
+        sdk.setEnabled.mockImplementation(async active => active ? new Promise(resolve => {finish = resolve;}) : {status: 'success', active: false});
+        await openAnnotations(view.root);
+        click(toggle(view.root)); await componentFlush();
+        expect(toggle(view.root)?.textContent).toContain('document.pdfReading.hypothesisCancelConnection');
+        expect(toggle(view.root)?.hasAttribute('disabled')).toBe(false);
+        click(toggle(view.root)); await componentFlush();
+        expect(sdk.setEnabled.mock.calls.map(call => call[0])).toEqual([false, true, false]);
+        finish({status: 'success', active: true}); await componentFlush();
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('false');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+    });
+    it('keeps a reopened annotation panel visible when the earlier collaboration request resolves', async () => {
+        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
+        let finish!: (value: {status: string; active: boolean}) => void;
+        sdk.setEnabled.mockImplementation(async active => active ? new Promise(resolve => {finish = resolve;}) : {status: 'success', active: false});
+        await openAnnotations(view.root);
+        click(toggle(view.root)); await componentFlush();
+        const original = toggle(view.root);
+        await openAnnotations(view.root);
+        await openAnnotations(view.root);
+        expect(toggle(view.root)).not.toBe(original);
+        finish({status: 'success', active: true}); await componentFlush();
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('true');
+    });
+    it('switches translated-only or OCR source collaboration to a readable text view and reports service failures', async () => {
+        const sdk = client(), doc = documentModel(1); doc.binary!.kind === 'pdf' && (doc.binary!.pages[0].ocrRecognized = true);
+        const view = mountReader(doc, 'translated', ['Translated text']); await componentFlush();
+        await openAnnotations(view.root);
+        sdk.setEnabled.mockImplementation(async active => ({status: active ? 'external' : 'success', active: false}));
+        click(toggle(view.root)); await componentFlush(); expect(view.currentPresentation.value).toBe('readable');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisExternal');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback details')).toBeNull();
+        sdk.setEnabled.mockImplementation(async active => ({status: active ? 'failed' : 'success', active: false}));
+        click(toggle(view.root)); await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisFailed');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('href')).toBe('https://via.hypothes.is/https://arxiv.org/pdf/1706.03762');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(toggle(view.root)?.hasAttribute('disabled')).toBe(false);
+    });
 });

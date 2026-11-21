@@ -239,6 +239,9 @@ describe('Offscreen 消息静态路由', () => {
         mocks.translate.mockRejectedValueOnce(unavailable);
         await expect(dispatch({type: 'CHROME_TRANSLATE_OFFSCREEN', requestId: 'model-1', data: {}}))
             .resolves.toMatchObject({response: {success: false, errorCode: 'model-unavailable', errorName: 'ChromeModelUnavailableError'}});
+        mocks.translate.mockRejectedValueOnce(Object.assign(new Error('API unavailable'), {name: 'BrowserTranslationApiUnavailableError'}));
+        await expect(dispatch({type: 'CHROME_TRANSLATE_OFFSCREEN', requestId: 'api-1', data: {}}))
+            .resolves.toMatchObject({response: {success: false, errorCode: 'api-unavailable', errorName: 'BrowserTranslationApiUnavailableError'}});
     });
 
     it('取消 active Chrome 翻译会立即响应一次，迟到结果不会再次提交', async () => {

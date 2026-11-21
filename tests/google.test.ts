@@ -77,9 +77,12 @@ beforeEach(async () => {
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('Google 批量传输与换线', () => {
-    async function imageRequest(origin: string[], options: {abortSignal?: AbortSignal; requestTimeoutMs?: number; enableNativeBatch?: boolean} = {}) {
+    async function imageRequest(origin: string[], options: {abortSignal?: AbortSignal; requestTimeoutMs?: number; enableNativeBatch?: boolean; labelSlots?: readonly number[]} = {}) {
         const {markImageTextBatch} = await import('@/src/services/translation/requestSnapshot');
-        return api.default(withProviderSnapshot(markImageTextBatch({origin, sourceLanguage: 'en', targetLanguage: 'zh-Hans', ...options}), {from: 'en', to: 'zh-Hans'}));
+        const {labelSlots, ...requestOptions} = options;
+        return api.default(withProviderSnapshot(markImageTextBatch(
+            {origin, sourceLanguage: 'en', targetLanguage: 'zh-Hans', ...requestOptions}, labelSlots,
+        ), {from: 'en', to: 'zh-Hans'}));
     }
     it('userscript 即使收到内部图片标记或显式邻文选项，也保留普通网页批次和原始换行', async () => {
         vi.stubEnv('BROWSER', 'userscript');
@@ -109,6 +112,23 @@ describe('Google 批量传输与换线', () => {
             .resolves.toEqual(['标题', '对。', '转弯。', '右边。', '读 <b> 然后走。']);
         expect(hosts()).toEqual([HTML]);
         expect(requestData(...fetchMock.mock.calls[0]).texts).toHaveLength(2);
+    });
+    it('短标签位置正确映射到第二个传输子批次，临时句号随译文回填去掉', async () => {
+        const sources = [...Array<string>(32).fill('Wait.'), 'Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+        fetchMock.mockImplementation(async (url, init) => {
+            const {texts} = requestData(url, init);
+            return response([texts.map(html => html.replaceAll('Wait.', '等待。')
+                .replace('Look at the notary stamp.', '查看公证印章。').replace('CHECK THE SEAL.', '检查印章。')
+                .replace('Compare the stamp.', '比对印章。'))]);
+        });
+        await expect(flush(imageRequest(sources, {labelSlots: [33]}))).resolves.toEqual([
+            ...Array<string>(32).fill('等待。'), '查看公证印章。', '检查印章', '比对印章。',
+        ]);
+        expect(hosts()).toEqual([HTML, HTML]);
+        const documents = fetchMock.mock.calls.flatMap(([url, init]) => requestData(url, init).texts);
+        expect(documents.find(html => html.includes('CHECK THE SEAL'))).toBe(
+            '<p><span data-fr-slot="0">Look at the notary stamp.</span> <span data-fr-slot="1">CHECK THE SEAL.</span> <span data-fr-slot="2">Compare the stamp.</span></p>',
+        );
     });
     it.each(['comma', 'missing', 'stray', 'duplicate'] as const)('同图 HTML %s 异常回退普通协议，保留原始文本和顺序', async shape => {
         fetchMock.mockImplementation(async (url, init) => {

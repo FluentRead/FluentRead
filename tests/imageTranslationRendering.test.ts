@@ -3,6 +3,7 @@ import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '@/src/features/i
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {
     drawTranslatedImageText,
+    canDrawTranslatedImageText,
     getImageTextBackgroundColor,
     getImageTextColor,
     getImageSourceFontLimit,
@@ -673,5 +674,46 @@ describe('图片译文颜色', () => {
         expect(getImageTextColor('rgb(0,0,0)')).toBe('#ffffff');
         expect(getImageTextColor('invalid')).toBe('#111827');
         expect(getImageTextColor('rgb(12,34)')).toBe('#111827');
+    });
+});
+
+
+describe('完整译文字形使用实际绘制路径预检',()=>{
+    const budget=()=>({remaining:8192,characters:4_194_304});
+    function measured(){
+        const c=canvasContext();c.measureText.mockImplementation(text=>{
+            const size=Number(c.font.match(/([\d.]+)px/)![1]),width=text.length*size*.6;
+            return {width,actualBoundingBoxLeft:0,actualBoundingBoxRight:width,actualBoundingBoxAscent:size*.8,actualBoundingBoxDescent:size*.2}as never;
+        });return c;
+    }
+    it('预检不绘字、不创建裁剪路径，源墨迹锚点与完整译文沿用原绘制参数',()=>{
+        const c=measured();
+        expect(canDrawTranslatedImageText(budget(),c as never,'COMPLETE TEXT',10,10,200,80,'black',18,'center',undefined,'cyan',undefined,{x0:30,y0:25,x1:170,y1:55})).toBe(true);
+        expect(c.fillText).not.toHaveBeenCalled();expect(c.strokeText).not.toHaveBeenCalled();expect(c.beginPath).not.toHaveBeenCalled();expect(c.clip).not.toHaveBeenCalled();expect(c.restore).toHaveBeenCalledOnce();
+    });
+    it('未知真实指标、零墨迹、空文本及超出原裁剪框的预排版均拒绝',()=>{
+        const c=canvasContext();expect(canDrawTranslatedImageText(budget(),c as never,'TEXT',0,0,120,50,'black',18)).toBe(false);
+        c.measureText.mockReturnValue({width:10,actualBoundingBoxLeft:0,actualBoundingBoxRight:0,actualBoundingBoxAscent:0,actualBoundingBoxDescent:0}as never);
+        expect(canDrawTranslatedImageText(budget(),c as never,'TEXT',0,0,120,50,'black',18)).toBe(false);
+        expect(canDrawTranslatedImageText(budget(),c as never,'',0,0,120,50,'black',18)).toBe(false);
+        const m=measured();expect(canDrawTranslatedImageText(budget(),m as never,'TEXT',0,0,10,10,'black',18,'center',{lines:['TEXT'],fontSize:20,lineHeight:24})).toBe(false);
+    });
+    it('空行不制造可见墨迹；倾角预检使用变换后坐标且不变换Canvas',()=>{
+        const c=measured();expect(canDrawTranslatedImageText(budget(),c as never,'TEXT\n\nEND',0,0,200,100,'black',16,'center')).toBe(true);
+        const source={text:'SOURCE',bbox:{x0:10,y0:20,x1:210,y1:100}},orientation={owner:source,sourceText:source.text,radians:-Math.PI/36,originX:110,originY:60,bounds:{x0:-80,y0:-10,x1:80,y1:10},width:160,height:20,count:1,heightGain:10};
+        expect(canDrawTranslatedImageText(budget(),c as never,'完整译文',10,20,200,80,'black',20,'left',undefined,'cyan',undefined,undefined,orientation)).toBe(true);
+        expect(c.transform).not.toHaveBeenCalled();expect(c.fillText).not.toHaveBeenCalled();
+    });
+    it.each([0,.01])('浏览器描边往返舍入后只容忍数值噪声，附加宽度%s',extra=>{
+        const c=measured();let width=1;
+        Object.defineProperty(c,'lineWidth',{get:()=>width,set:value=>{width=Math.fround(value)+extra;}});
+        expect(canDrawTranslatedImageText(budget(),c as never,'COMPLETE TEXT',0,0,200,80,'black',18,'left')).toBe(extra===0);
+        expect(c.fillText).not.toHaveBeenCalled();expect(c.restore).toHaveBeenCalledOnce();
+    });
+    it('共享度量及字符预算耗尽时退出，原生字体错误仍抛出首因并恢复context',()=>{
+        const c=measured();expect(canDrawTranslatedImageText({remaining:0,characters:100},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
+        expect(canDrawTranslatedImageText({remaining:100,characters:2},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
+        expect(canDrawTranslatedImageText({remaining:1,characters:100},c as never,'TEXT',0,0,100,50,'black')).toBe(false);
+        const failure=new Error('native metrics');c.measureText.mockImplementation(()=>{throw failure;});expect(()=>canDrawTranslatedImageText(budget(),c as never,'TEXT',0,0,100,50,'black')).toThrow(failure);expect(c.restore).toHaveBeenCalledTimes(2);
     });
 });

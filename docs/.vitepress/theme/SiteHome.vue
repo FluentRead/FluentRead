@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { withBase } from 'vitepress'
 import FeatureDemo from './FeatureDemo.vue'
-import HeroOrbit from './HeroOrbit.vue'
+import MarketingHero from './MarketingHero.vue'
 import BrowserInstall from './BrowserInstall.vue'
 import PromoVideo from './PromoVideo.vue'
 import brandTaglines from '../../../src/core/i18n/messages/brand-taglines.json'
@@ -105,57 +105,9 @@ const faqs = [
 </script>
 <template>
   <div class="bv-site product-home">
-    <section class="bv-hero" :class="{ 'bv-hero-en': en }" aria-labelledby="fr-title">
-      <HeroOrbit :en="en" />
-      <div class="bv-hero-copy">
-        <img
-          class="bv-hero-icon"
-          :src="withBase('/brand-icon.webp')"
-          width="64"
-          height="64"
-          alt=""
-        />
-        <h1 id="fr-title" class="bv-hero-slogan product-tagline" :lang="en ? 'en' : 'zh-CN'">
-          <span class="bv-slogan-line"
-            ><span>{{ t('让语言更近', 'Closer languages') }}</span
-            ><span class="bv-slogan-punctuation">{{ t('，', '. ') }}</span></span
-          >
-          <span class="bv-slogan-line"
-            ><span>{{ t('让世界更大', 'A bigger world') }}</span
-            ><span class="bv-slogan-punctuation">{{ t('。', '.') }}</span></span
-          >
-        </h1>
-        <p class="bv-hero-intro">
-          <span
-            ><span class="bv-hero-name">{{ t('流畅阅读', 'FluentRead') }}</span
-            >{{
-              t(
-                '，一款开源的浏览器双语翻译插件',
-                ' is an open-source browser extension for bilingual translation.'
-              )
-            }}</span
-          >
-          <span v-if="!en" class="bv-hero-capabilities"
-            ><span
-              v-for="(capability, index) in [
-                '双语翻译',
-                '划词翻译',
-                '文档翻译',
-                '图片/漫画翻译',
-                '视频翻译',
-              ]"
-              :key="capability"
-              >{{ index === 0 ? '支持' : '' }}{{ capability }}{{ index === 4 ? '。' : '、' }}</span
-            ></span
-          >
-          <span v-else
-            >Translate webpages, selected text, documents, images and comics, and video
-            captions.</span
-          >
-        </p>
-        <BrowserInstall :en="en" show-docs />
-      </div>
-    </section>
+    <MarketingHero :locale="en ? 'en' : 'zh'">
+      <BrowserInstall :en="en" show-docs />
+    </MarketingHero>
     <section class="bv-section bv-promo" aria-labelledby="bv-promo-title">
       <span class="bv-section-number">{{ t('56 秒介绍', 'A 56-SECOND TOUR') }}</span>
       <h2 id="bv-promo-title">{{ t('先看一遍，再往下读', 'Watch first, then read on') }}</h2>

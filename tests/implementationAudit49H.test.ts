@@ -79,7 +79,7 @@ import FeatureDemo from '@/docs/.vitepress/theme/FeatureDemo.vue';
 import GuideVisual from '@/docs/.vitepress/theme/GuideVisual.vue';
 import SettingsGuide from '@/docs/.vitepress/theme/SettingsGuide.vue';
 import GuideLayout from '@/docs/.vitepress/theme/GuideLayout.vue';
-import HeroOrbit from '@/docs/.vitepress/theme/HeroOrbit.vue';
+import MarketingHero from '@/docs/.vitepress/theme/MarketingHero.vue';
 import PromoVideo from '@/docs/.vitepress/theme/PromoVideo.vue';
 import ProductHome from '@/docs/.vitepress/theme/ProductHome.vue';
 import ProductHomeEn from '@/docs/.vitepress/theme/ProductHomeEn.vue';
@@ -291,11 +291,22 @@ describe('public docs client lifecycle', () => {
     dom.location.hash = '#%E7%AB%A0%E8%8A%82'; dom.window.dispatchEvent(new Event('hashchange')); view.unmount(); await settle(); expect(dom.scrolls).toHaveLength(1);
   });
 
-  it('hero pauses on document visibility and disconnects its observer', async () => {
-    const view = await mount(HeroOrbit); const observer = dom.observers.at(-1); observer.deliver(); await settle();
-    expect(view.root.firstElementChild?.getAttribute('data-active')).toBe('true');
-    dom.visible(false); await settle(); expect(view.root.firstElementChild?.getAttribute('data-active')).toBe('false');
-    view.unmount(); expect(observer.disconnected).toBe(true);
+  it('the homepage sample switches to original and reveals both translations without scheduling JavaScript timers', async () => {
+    const view = await mount(MarketingHero, {locale: 'zh'});
+    const reader = view.root.querySelector('.fr-sample-reader')!;
+    const source = [...reader.querySelectorAll('.fr-source')].map(line => line.textContent);
+    expect(reader.getAttribute('data-first-reveal')).toBe('true');
+    expect(reader.getAttribute('data-view')).toBe('bilingual');
+    await click(reader, '.fr-reader-switch button', 0);
+    expect(reader.getAttribute('data-view')).toBe('original');
+    expect(reader.getAttribute('data-first-reveal')).toBe('false');
+    expect(reader.querySelectorAll('.fr-translation[aria-hidden="true"]')).toHaveLength(2);
+    await click(reader, '.fr-reader-switch button', 1);
+    expect(reader.getAttribute('data-view')).toBe('bilingual');
+    expect(reader.querySelectorAll('.fr-translation[aria-hidden]')).toHaveLength(0);
+    expect([...reader.querySelectorAll('.fr-source')].map(line => line.textContent)).toEqual(source);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('video timeout switches Chinese fallback and releases the original resource', async () => {
@@ -367,11 +378,18 @@ describe('public docs client lifecycle', () => {
 
   it('public head transformation preserves canonical language counterparts and noindexes 404', () => {
     const transform = config.transformHead as any;
-    for (const [path, canonical] of [['guide/index.md', 'docs/'], ['en/writing-assistant.md', 'en/guide/writing-assistant'], ['guide/privacy-policy.md', 'guide/privacy'], ['index.md', '']]) {
+    for (const [path, canonical] of [['guide/index.md', 'docs/'], ['en/writing-assistant.md', 'en/guide/writing-assistant'], ['guide/privacy-policy.md', 'guide/privacy']]) {
       const head = transform({pageData: {relativePath: path}});
       expect(head[0][1].href).toBe('https://read.thinkstu.com/' + canonical);
       expect(head[2][1].href).toBe('https://read.thinkstu.com/' + (canonical.startsWith('en/') ? canonical.slice(3) : 'en/' + canonical));
     }
+    const landing = transform({pageData: {relativePath: 'fr/index.md'}});
+    expect(landing[0][1].href).toBe('https://read.thinkstu.com/fr/');
+    expect(landing.filter(([, attributes]: [string, Record<string, string>]) => attributes.rel === 'alternate')
+      .map(([, attributes]: [string, Record<string, string>]) => attributes.hreflang))
+      .toEqual(['zh-CN', 'en', 'ja', 'ko', 'fr', 'es', 'ru', 'x-default']);
+    expect(landing.find(([, attributes]: [string, Record<string, string>]) => attributes.property === 'og:image')?.[1].content)
+      .toBe('https://read.thinkstu.com/brand/share/fr-FR.jpg');
     expect(transform({pageData: {relativePath: '404.md'}})).toEqual([['meta', {name: 'robots', content: 'noindex'}]]);
   });
 });

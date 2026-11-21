@@ -8,6 +8,7 @@
  * 短末行：仅对有界短段落进行五次以内的行宽平衡，使用浏览器词边界与原字素/标点边界的交集，保留字号、行数和完整词；候选须重新通过实际墨迹高度及宽度检查，不扩大清字或绘字范围。
  * 原字尺度与位置：优先使用同帧观察到的逐行墨迹，独立核对原文字的参考宽度与字高；多行要求独立上下排列、相近字高及宽度区间同时吻合，未知断行空格不能人为提高字号。采用实测尺度时也保留墨迹位置，按源边线和垂直中心放置完整译文并夹紧到原绘字框；不改源框、字体族、字重、裁剪或修补范围。透视和混合字号无法一致解释时沿用原路径。
  * 倾斜译文：源方向须与原文字尺度分别核对；真实回退字形和描边旋转后仍须完整位于原框内，同行数参考源行距，只作最小整体平移。既有透明避让计划或缺失指标保持原布局，不新增清字权限。
+ * 完整字形预检：复用绘字的实际字体、对齐、源墨迹锚点及倾角变换，在共享度量预算内检查描边与抗锯齿足迹；不绘字、不授权原图修补。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
@@ -470,6 +471,27 @@ export function drawTranslatedImageText(
     sourceInkBounds?: OcrLine['bbox'],
     orientation?:ImageSourceTypographyGeometry,
 ): void {
+    renderTranslatedImageText([context,text,left,top,width,height,backgroundColor,maxFontSize,textAlign,
+        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation]);
+}
+
+type ImageTextDrawing=Parameters<typeof drawTranslatedImageText>;
+export interface ImageTextMeasureBudget {remaining:number;characters:number}
+const IMAGE_TEXT_PREFLIGHT_LIMIT=Symbol('image-text-preflight-limit');
+
+/** 复用实际排版、描边和倾角坐标；只度量，不裁剪或绘字。共享预算不能被多段译文重置。 */
+export function canDrawTranslatedImageText(budget:ImageTextMeasureBudget,...args:ImageTextDrawing):boolean {
+    try {return renderTranslatedImageText(args,budget);}
+    catch(error){if(error===IMAGE_TEXT_PREFLIGHT_LIMIT)return false;throw error;}
+}
+
+function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMeasureBudget):boolean {
+    const [context,text,left,top,width,height,backgroundColor,maxFontSize=Infinity,textAlign='center',
+        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation]=args;
+    const charge=(value:string)=>{
+        if(preflight&&(--preflight.remaining<0||(preflight.characters-=value.length)<0))throw IMAGE_TEXT_PREFLIGHT_LIMIT;
+    };
+    charge(text);
     const paddingX = Math.min(2, width * 0.03);
     const paddingY = Math.min(1, height * 0.05);
     context.save();
@@ -488,6 +510,7 @@ export function drawTranslatedImageText(
             }
             let result = metrics.get(line);
             if (!result) {
+                charge(line);
                 result = context.measureText(line);
                 if (metrics.size >= 512) metrics.clear();
                 metrics.set(line, result);
@@ -511,10 +534,12 @@ export function drawTranslatedImageText(
         const tilted=plane?layoutImageTranslationText(text,plane.width,plane.height,textWidth,maxFontSize,textInk,plane.constraints):undefined;
         const placement=tilted&&plane!.plan(tilted);
         const layout = placement?tilted!:prepared ?? layoutImageTranslationText(text,width-paddingX*2,height-paddingY*2,textWidth,maxFontSize,textInk);
-        if (layout.lines.length === 0) return;
-        context.beginPath();
-        context.rect(left, top, width, height);
-        context.clip();
+        if (layout.lines.length === 0) return false;
+        if(!preflight){
+            context.beginPath();
+            context.rect(left, top, width, height);
+            context.clip();
+        }
         context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
         context.textAlign = layout.ink ? 'left' : textAlign;
         context.textBaseline = layout.ink ? 'alphabetic' : 'middle';
@@ -522,10 +547,28 @@ export function drawTranslatedImageText(
         context.strokeStyle = outlineColor ?? backgroundColor;
         context.lineWidth = Math.max(0.35, layout.fontSize * (outlineColor ? 0.025 : 0.06));
         context.lineJoin = 'round';
+        const paint=(line:string,x:number,y:number):boolean=>{
+            if(!preflight){context.strokeText(line,x,y);context.fillText(line,x,y);return true;}
+            if(!line.trim())return true;
+            charge(line);
+            // measure 的缓存采用 alphabetic/left；预排版也可能使用 middle/right，必须读取当前真实基线与对齐。
+            const m=context.measureText(line),radius=context.lineWidth/2+1;
+            if(![m.width,m.actualBoundingBoxLeft,m.actualBoundingBoxRight,m.actualBoundingBoxAscent,m.actualBoundingBoxDescent].every(Number.isFinite)
+                ||m.actualBoundingBoxLeft+m.actualBoundingBoxRight<=0||m.actualBoundingBoxAscent+m.actualBoundingBoxDescent<=0)return false;
+            const xs=[x-m.actualBoundingBoxLeft-radius,x+m.actualBoundingBoxRight+radius];
+            const ys=[y-m.actualBoundingBoxAscent-radius,y+m.actualBoundingBoxDescent+radius];
+            // 原生描边宽度往返可能量化为float32；只容忍万分之一像素的数值误差。
+            const epsilon=1e-4;
+            for(const px of xs)for(const py of ys){
+                const t=placement?.transform;
+                const dx=t?t[0]*px+t[2]*py+t[4]:px,dy=t?t[1]*px+t[3]*py+t[5]:py;
+                if(!Number.isFinite(dx)||!Number.isFinite(dy)||dx<left-epsilon||dy<top-epsilon||dx>left+width+epsilon||dy>top+height+epsilon)return false;
+            }
+            return true;
+        };
         if(placement){
-            context.transform(...placement.transform);
-            layout.lines.forEach((line,index)=>{const {x,y}=placement.points[index];context.strokeText(line,x,y);context.fillText(line,x,y);});
-            return;
+            if(!preflight)context.transform(...placement.transform);
+            return layout.lines.every((line,index)=>{const {x,y}=placement.points[index];return paint(line,x,y);});
         }
         const firstLine = textAlign === 'center'
             ? top + (height - layout.lineHeight * layout.lines.length) / 2 + layout.lineHeight / 2
@@ -536,7 +579,7 @@ export function drawTranslatedImageText(
         const inkTop=layout.ink?(anchor
             ?Math.max(top+paddingY,Math.min(top+height-paddingY-layout.ink.height,(anchor.y0+anchor.y1-layout.ink.height)/2))
             :top+(textAlign==='center'?(height-layout.ink.height)/2:paddingY)):0;
-        layout.lines.forEach((line, index) => {
+        return layout.lines.every((line, index) => {
             const y = layout.ink
                 ? inkTop + layout.ink.baselines[index]
                 : firstLine + index * layout.lineHeight;
@@ -553,8 +596,7 @@ export function drawTranslatedImageText(
                     inkX=Math.max(left+paddingX,Math.min(left+width-paddingX-span,start))+metric!.actualBoundingBoxLeft+bleed(layout.fontSize);
                 }
             }
-            context.strokeText(line, inkX, y);
-            context.fillText(line, inkX, y);
+            return paint(line,inkX,y);
         });
     } finally {
         context.restore();

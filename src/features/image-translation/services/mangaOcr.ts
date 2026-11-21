@@ -11,6 +11,7 @@
  * 气泡补绘：仅漫画结果将收集阶段记录的局部气泡提示绑定到当前原图与尺寸，不向公开行属性附加坐标，也不增加 Worker 消息或模型调用；提示只供后续纯白空处复核。
  * 检测核心：借用同次原概率与未加留白组件，将完全没有0.3响应的候选绑定到原SDK Box；保留原检测和识别批次，原数字证据先进入保护，再在识别重试结束后排除弱结果。反向重检的新候选仍按其自身检测旁证核对，不改弱边缘修补侧车；页内有界观察，取消和失败清除引用。
  * 弱连接复核：仅原像素视图记录大框内的完整紧凑核心，原整页、瓦片、气泡及既有重试全部结束后，独立复核有限双裁图；两次高置信文字一致且实际墨迹完整才替换低置信父框或补充漏行。复用原会话和原像素，不重跑检测、不改变原批次或复识别预算，其他原文和数值始终作为障碍。
+ * 旋转标签：同一原像素检测框提供深色窄带候选；逐页最多复核两个紧凑亮字区域，双向识别共用预处理像素预算，原图方向与字框同时通过才替换粗框。
  * 模块边界：不访问宿主 DOM、不翻译文本、不处理译图；仅漫画及显式选择 PaddleOCR 的单张图片使用本模型；通用识别与圈选继续由 Tesseract 负责。
  */
 import {localWasmThreads, paceLocalInference} from '@/src/shared/onnx/resources';
@@ -37,6 +38,7 @@ import {bindImageParagraphGapEvidence,produceImageParagraphGapProofs} from './im
 import {bindMangaBubblePlacements} from './mangaBubblePlacement';
 import {createMangaDetectionCore} from './mangaDetectionCore';
 import {planMangaDetectionRecovery,recoverMangaDetectionRegions} from './mangaDetectionRecovery';
+import {isMangaRotatedLabelParent,recoverMangaRotatedLabels,rotatedLabelPadding,type MangaLabelTurn} from './mangaRotatedLabel';
 
 interface MangaOcrPort {
     recognize(image: string, options: {flatten: true; noCache: true; strategy: 'per-box';signal?:AbortSignal; decodedImage?: HTMLImageElement; progress?: MangaInferenceProgress;imageDetectionEvidence?:true;mangaParagraphGapEvidence?:true}): Promise<MangaOcrPage>;
@@ -285,6 +287,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
     let detectionBudget:ReturnType<typeof createImageDetectionEvidenceBudget>|undefined;
     let detectionObservation:{canvas:HTMLCanvasElement|OffscreenCanvas;frame:Omit<ImageDetectionFrameSource,'resizeRatio'>}|undefined;
     let activeDetectionFrame:(ImageDetectionFrameSource&{canvas:HTMLCanvasElement|OffscreenCanvas})|undefined;
+    const rotatedLabelParents:MangaOcrItem['box'][]=[];
     class MangaDetection extends DetectionService {
         private readonly evidenceSideLimit:number|undefined;
         readonly detectionCore=createMangaDetectionCore();
@@ -314,7 +317,19 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 const frame=observation.frame;
                 activeDetectionFrame={...frame,canvas:observation.canvas,resizeRatio:Math.min(1,limit/Math.max(frame.width,frame.height))};
             }
-            try{const boxes=await super.run(image);this.detectionCore.bindBoxes(ticket,boxes);return boxes;}
+            try{
+                const boxes=await super.run(image);
+                this.detectionCore.bindBoxes(ticket,boxes);
+                if(observation?.canvas===image){
+                    const {frame}=observation;
+                    for(const box of boxes){
+                        if(rotatedLabelParents.length>=16)break;
+                        if(isMangaRotatedLabelParent(box,frame.width,frame.height))
+                            rotatedLabelParents.push({...box,x:box.x+frame.x,y:box.y+frame.y});
+                    }
+                }
+                return boxes;
+            }
             finally{this.detectionCore.endFrame(ticket);activeDetectionFrame=undefined;}
         }
     }
@@ -349,6 +364,35 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
             }
             page.results=recovered.results;
         }
+        async recoverRotatedLabels(canvas:HTMLCanvasElement|OffscreenCanvas,pixels:Uint8ClampedArray,page:MangaOcrPage,bubbles:NonNullable<MangaOcrPage['bubbles']>):Promise<void>{
+            if(!rotatedLabelParents.length)return;
+            const detector=this.detector as MangaDetection;
+            const checkActive=()=>assertMangaOcrActive(activeSignal);
+            const protectedItems=[...(page.numericEvidence??[]),...bubbles.flatMap(bubble=>[...bubble.results,...(bubble.numericEvidence??[])])];
+            page.results=await recoverMangaRotatedLabels(pixels,canvas.width,canvas.height,rotatedLabelParents,page.results,protectedItems,async parent=>{
+                const {x,y}=rotatedLabelPadding,width=parent.height+2*x,height=parent.width+2*y;
+                const cost=2*width*height;
+                if(cost>this.remainingPreprocessingPixels)return [[],[]];
+                this.remainingPreprocessingPixels-=cost;
+                const recognize=async(turn:MangaLabelTurn)=>{
+                    checkActive();
+                    const crop=createOcrCanvas();
+                    try{
+                        crop.width=width;crop.height=height;
+                        const context=crop.getContext('2d',{willReadFrequently:true});
+                        if(!context)throw new Error('浏览器不支持图片处理');
+                        context.fillStyle='#d2d2d2';context.fillRect(0,0,width,height);
+                        context.translate(turn===1?x+parent.height:x,turn===1?y:y+parent.width);
+                        context.rotate(turn*Math.PI/2);
+                        context.drawImage(canvas,parent.x,parent.y,parent.width,parent.height,0,0,parent.width,parent.height);
+                        const result=await this.recognize(crop,{flatten:true,noCache:true,strategy:'per-box'});
+                        checkActive();this.checkInferenceFailure();
+                        return result.results.filter(item=>!detector.detectionCore.rejects(item.box));
+                    }finally{crop.width=0;crop.height=0;}
+                };
+                return [await recognize(1),await recognize(-1)];
+            },checkActive);
+        }
         beginMangaPage(): void {this.remainingRetries=4;this.remainingRubyRescues=2;this.remainingPreprocessingPixels=MANGA_DESKEW_PIXEL_BUDGET;this.originalSource=undefined;colorAdapter.beginPage(activeSignal);whitespace.beginPage(activeSignal);if(this.detector instanceof MangaDetection)this.detector.detectionCore.beginPage(activeSignal);}
         tryReserveMangaRubyRescue(sourcePixels:number):boolean {
             if(this.remainingRubyRescues<=0||!Number.isSafeInteger(sourcePixels)||sourcePixels<=0||sourcePixels>this.remainingPreprocessingPixels)return false;
@@ -357,7 +401,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         bindMangaSource(image:ImageBitmap|HTMLImageElement,width:number,height:number):void {
             this.originalSource={image,width,height,...('naturalWidth' in image?{identity:{src:image.src,currentSrc:image.currentSrc}}:{})};
         }
-        clearMangaSource():void {this.originalSource=undefined;if(this.detector instanceof MangaDetection)this.detector.detectionCore.endPage();}
+        clearMangaSource():void {this.originalSource=undefined;rotatedLabelParents.length=0;if(this.detector instanceof MangaDetection)this.detector.detectionCore.endPage();}
         /** 供本页私有质量规划共用原图/预算；不保留整页alpha副本，失败尝试也不返还已扣读回成本。 */
         readMangaSourceRegion(region:{left:number;top:number;width:number;height:number},maxPixels=131072):Uint8ClampedArray|undefined {
             const source=this.originalSource;if(!source)return;
@@ -730,6 +774,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     }
                     assertMangaOcrActive(options.signal);
                     await service.recoverDetectionFrames(canvas,pixels.data,page,bubbles);
+                    await service.recoverRotatedLabels(canvas,pixels.data,page,bubbles);
                     assertMangaOcrActive(options.signal);
                     const layoutBubbles=assignMangaLayoutBubbles(pixels.data,canvas.width,canvas.height,ownership,page.results);
                     const hasLargeAlphaHoles=alphaProfile.totalPixels>0&&alphaProfile.transparentPixels/alphaProfile.totalPixels>=.2;

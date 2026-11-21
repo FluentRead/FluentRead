@@ -231,6 +231,7 @@ export async function cropAreaInOffscreen(
 
 /** 单图译文裁剪框既决定绘制范围，也用于保护附近保留的原文。 */
 function imageDrawBounds(line: ImageTextRegion, width: number, height: number): OcrLine['bbox'] {
+    if(line.quarterTurn)return line.bbox;
     const sourceHeight = line.fontSize ?? line.bbox.y1 - line.bbox.y0;
     const paddingX = line.vertical ? 3 : 2;
     const paddingY = line.vertical ? 2 : Math.max(2, Math.round(sourceHeight * 0.18));
@@ -303,6 +304,7 @@ function imageAlphaUnchanged(lines:OffscreenImageTranslationLine[]):OffscreenIma
 async function renderImageMatteRescue(context:CanvasRenderingContext2D,canvas:HTMLCanvasElement,sourcePixels:ImageData,
     translated:ImageTextRegion[],retained:ImageTextRegion[],reading:OffscreenImageTranslationLine[],support:ImageDetectionSupport,signal?:AbortSignal,
 ):Promise<OffscreenImageTranslationResult|undefined> {
+    if(translated.some(line=>line.quarterTurn))return;
     const proposal=proposeImageMattePage(sourcePixels.data,canvas.width,canvas.height,translated,retained,imageDrawBounds);
     if(!proposal)return;
     try {
@@ -401,8 +403,29 @@ async function prepareTranslatedImage(
     lines.forEach((line,index) => {
         const changed = line.guardOnly || numericProtection(line.text) ? [] : selectChangedTranslations([line], [translations[index]]);
         if (changed.length) candidates.push({index,original:line,translated:changed[0]});
-        else originals.push(line);
+        if (!changed.length || line.preserveSource) {
+            originals.push(line);
+            if(changed.length)skipped.add(index);
+        }
     });
+    const rotated=candidates.filter(candidate=>candidate.original.quarterTurn&&!skipped.has(candidate.index));
+    if(rotated.length){
+        if(rotated.some(({translated})=>mightNeedRareImageFont(translated.text)))await prepareRareImageFont(signal);
+        throwIfImageOperationAborted(signal);
+        const scratch=document.createElement('canvas');
+        try{
+            scratch.width=scratch.height=1;
+            const context=scratch.getContext('2d');
+            if(!context)throw new Error('浏览器不支持图片处理');
+            const budget={remaining:2048,characters:262_144};
+            for(const {index,original,translated} of rotated){
+                const b=original.bbox,{fontSize,orientation}=getImageSourceTextStyle(context,original);
+                if(canDrawTranslatedImageText(budget,context,translated.text,b.x0,b.y0,b.x1-b.x0,b.y1-b.y0,'#000',
+                    fontSize,'center',undefined,undefined,undefined,undefined,orientation))continue;
+                skipped.add(index);originals.push(original);
+            }
+        }finally{scratch.width=scratch.height=0;}
+    }
     if (candidates.length && originals.length) {
         // 所有保留原文（含碰撞后未绘制的译文）都必须避开后续修补和排版。
         const protectedBoxes: OcrLine['bbox'][] = [], seen = new Set<string>();
@@ -462,7 +485,7 @@ async function prepareTranslatedImage(
     const placementBounds=manga?mangaPlacementBounds(mangaViewport,width,height):undefined;
     // 不撤回原文保护。只有实际局部气泡、同源对象和尺寸仍有效的横排候选可尝试在空白处另画完整译文。
     const blankCandidates=manga&&placementImage&&!protectionExhausted&&placementBounds!==null?candidates.flatMap(candidate=>{
-        if(!skipped.has(candidate.index)||candidate.original.vertical)return [];
+        if(!skipped.has(candidate.index)||candidate.original.vertical||candidate.original.quarterTurn||candidate.original.preserveSource)return [];
         const owner=getMangaBubblePlacement(candidate.original as MangaRegion,placementImage,width,height);
         if(!owner)return [];
         if(placementBounds){
@@ -575,7 +598,8 @@ async function prepareTranslatedImage(
         const baseBounds=new Map(lines.map(line=>[line,imageDrawBounds(line,canvas.width,canvas.height)]));
         const appearances=observeImageSourceAppearances(sourcePixels.data,canvas.width,canvas.height,selected.map(c=>c.original),line=>baseBounds.get(line)!);
         const fontStyles=new Map(selected.map(candidate=>[candidate.translated,getImageSourceTextStyle(context,candidate.original,appearances.get(candidate.original)?.inkBoxes)]));
-        const orientations=observeImageSourceTypographyGeometry(sourcePixels.data,canvas.width,canvas.height,selected.filter(candidate=>!fontStyles.get(candidate.translated)!.inkBounds).map(candidate=>candidate.original));
+        const orientations=observeImageSourceTypographyGeometry(sourcePixels.data,canvas.width,canvas.height,
+            selected.filter(candidate=>!candidate.original.quarterTurn&&!fontStyles.get(candidate.translated)!.inkBounds).map(candidate=>candidate.original));
         for(const candidate of selected){
             const style=getImageSourceTypographyStyle(context,candidate.original,orientations.get(candidate.original));
             if(style)fontStyles.set(candidate.translated,style);
@@ -612,6 +636,7 @@ async function prepareTranslatedImage(
                 for(const candidate of available){const size=(candidate.x1-candidate.x0)*(candidate.y1-candidate.y0);if(size>area){bounds=candidate;area=size;}}
                 if(!bounds)throw new ImageAlphaProtectionUnavailableError();
                 const changed=bounds.x0!==original.x0||bounds.y0!==original.y0||bounds.x1!==original.x1||bounds.y1!==original.y1;
+                if(changed&&line.quarterTurn)throw new ImageAlphaProtectionUnavailableError();
                 const maxFontSize=fontStyles.get(line)!.fontSize;
                 const prepared=changed?prepareImageAlphaTextLayout(context,line.text,bounds,maxFontSize,line.vertical?'center':line.textAlign??'left'):undefined;
                 if(changed&&!prepared)throw new ImageAlphaProtectionUnavailableError();

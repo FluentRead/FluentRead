@@ -219,6 +219,17 @@ beforeEach(()=>{
 });
 
 describe('RGBA救援全文预算和原始源相位边界',()=>{
+    it('普通透明修补降级时仍保护旋转标签的方向，整图保持原像素',async()=>{
+        const f=install(fixture(224)),bbox={x0:106,y0:16,x1:124,y1:65};
+        fill(f.pixels,f.width,{x0:104,y0:14,x1:126,y1:67},mattes[255]);
+        setRegions([f.line,{text:'READ EDGE',bbox,sourceBoxes:[bbox],fontSize:18,textAlign:'center',quarterTurn:1}]);
+        translations=['FULL TEXT','EDGE'];
+        const result=await translate();
+        expect(result).toMatchObject({image:'',imageUnchanged:true});
+        expect(result.lines.map(line=>[line.text,line.renderSkipped])).toEqual([['FULL TEXT',true],['EDGE',true]]);
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        preserved();
+    });
     it.each([false,true])('真实像素续行证据在翻译前合段，已过滤的数字guard仍可阻断%s',async guarded=>{
         const f=fixture(224),width=f.width,height=160,pixels=new Pixels(width*height*4);
         fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);

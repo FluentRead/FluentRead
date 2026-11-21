@@ -738,6 +738,7 @@
       "tests/mangaDetectionCore.test.ts",
       "tests/mangaDetectionRefinement.test.ts",
       "tests/mangaDetectionRecovery.test.ts",
+      "tests/mangaRotatedLabel.test.ts",
       "tests/imageTextPunctuation.test.ts",
       "tests/imageTextBalance.test.ts",
       "tests/mangaRecognitionWhitespaceRecordings.test.ts",

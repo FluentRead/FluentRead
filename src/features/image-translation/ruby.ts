@@ -7,14 +7,14 @@
 import type {OcrLine} from '@/src/shared/image/types';
 import {numericProtection} from './services/mangaNumeric';
 
-interface RubyRegion extends OcrLine {guardOnly?:true}
+interface RubyRegion extends OcrLine {guardOnly?:true;preserveSource?:true}
 const kana=/^[\p{Script=Hiragana}\p{Script=Katakana}ー]{1,8}$/u;
 const sameBox=(a:OcrLine['bbox'],b:OcrLine['bbox'])=>a.x0===b.x0&&a.y0===b.y0&&a.x1===b.x1&&a.y1===b.y1;
 const intersects=(a:OcrLine['bbox'],b:OcrLine['bbox'])=>a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;
 
 function physical(line:RubyRegion):boolean {
     const b=line.bbox;
-    return !line.guardOnly&&!line.ruby?.length&&[b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)
+    return !line.guardOnly&&!line.preserveSource&&!line.ruby?.length&&[b.x0,b.y0,b.x1,b.y1].every(Number.isFinite)
         &&b.x1>b.x0&&b.y1>b.y0&&(!line.sourceBoxes||(line.sourceBoxes.length===1&&sameBox(line.sourceBoxes[0],b)));
 }
 

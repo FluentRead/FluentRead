@@ -25,7 +25,9 @@ import {
     insertFailedTip,
     insertLoadingSpinner,
 } from '@/src/features/full-page-translation/ui/translationIndicators';
-import {appendBilingualTranslation} from '@/src/features/full-page-translation/content/renderer';
+import {appendBilingualTranslation, appendSingleTranslationSlots} from '@/src/features/full-page-translation/content/renderer';
+import {collectLiveTranslationTextSlots} from '@/src/core/translation/public';
+import {createTranslationCore} from './helpers/translationCore';
 
 const originalDocument = globalThis.document;
 const originalWindow = globalThis.window;
@@ -110,5 +112,46 @@ describe('issue #170：翻译不得改写宿主 class 属性', () => {
         wrapper.querySelector<HTMLElement>('.fluent-read-retry')!.click();
 
         expect(target.getAttribute('class')).toBe('lead intro');
+    });
+});
+
+describe('X timeline expansion', () => {
+    it.each(['content', 'all'] as const)('keeps the native expansion label attached in %s scope', scope => {
+        const post = hostParagraph('<main><article data-testid="tweet"><div id="target" data-testid="tweetText">'
+            + 'The first part of an English timeline post.</div>'
+            + '<button data-testid="tweet-text-show-more-link">Show more</button></article></main>');
+        const document = post.ownerDocument;
+        const card = post.closest('article')!;
+        const showMore = card.querySelector('button')!;
+        const nativeLabel = showMore.firstChild!;
+        const core = createTranslationCore({url: new URL('https://x.com/home'), scope});
+        const translateCard = () => {
+            for (const candidate of core.discover(card)) {
+                if (candidate.kind === 'control') {
+                    const slots = collectLiveTranslationTextSlots(candidate.element, core.shouldStayOriginal);
+                    appendSingleTranslationSlots(candidate.element, slots.map(({node}) => ({node, text: '显示更多'})));
+                }
+                if (candidate.element === post) appendBilingualTranslation(post, '帖子译文。');
+            }
+        };
+        // A framework holds the original label reference and removes it from its own button.
+        showMore.addEventListener('click', () => {
+            if (nativeLabel.parentNode !== showMore) {
+                card.remove();
+                return;
+            }
+            showMore.removeChild(nativeLabel);
+            showMore.remove();
+            post.textContent = 'The expanded English timeline post has more paragraphs.';
+        });
+        translateCard();
+        expect(post.querySelector('.fluent-read-bilingual-content')).not.toBeNull();
+        expect(showMore.firstChild).toBe(nativeLabel);
+        showMore.click();
+        expect(card.isConnected).toBe(true);
+        expect(post.textContent).toContain('The expanded English timeline post');
+        translateCard();
+        expect(post.querySelectorAll('.fluent-read-bilingual-content')).toHaveLength(1);
+        expect(document.querySelector('[data-testid="tweet-text-show-more-link"]')).toBeNull();
     });
 });

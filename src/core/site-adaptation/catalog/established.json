@@ -377,6 +377,22 @@
     ]
   },
   {
+    "id": "x-post-expand-control",
+    "name": "X 帖子展开控件",
+    "allScopes": true,
+    "match": {
+      "hosts": [
+        "*.x.com",
+        "*.twitter.com"
+      ]
+    },
+    "priority": 410,
+    "mode": "augment",
+    "omit": [
+      "main article [data-testid=\"tweet-text-show-more-link\"]"
+    ]
+  },
+  {
     "id": "reddit",
     "name": "Reddit",
     "match": {

@@ -33,6 +33,19 @@ function fragmentedSpaces(){
 }
 
 describe('只在已证明白底放置完整漫画译文',()=>{
+    it.each([1,-1] as const)('旋转标签保持原方向和物理剪裁，识别转向=%s',turn=>{
+        const c=context(),bbox=box(123,35,148,183);
+        const r:MangaRegion={text:'分区导览',fontSize:25,bbox,sourceBoxes:[bbox],quarterTurn:turn};
+        drawMangaTranslations(c as never,new Uint8ClampedArray(W*H*4).fill(35),W,H,[r],true,
+            [{color:'rgb(35,35,35)',uniform:false}]);
+        expect(c.rect).toHaveBeenCalledExactlyOnceWith(123,35,25,148);
+        expect(c.clip.mock.invocationCallOrder[0]).toBeLessThan(c.transform.mock.invocationCallOrder[0]);
+        const [a,b,cc,d,x,y]=c.transform.mock.calls[0];
+        expect([a,d]).toEqual([expect.closeTo(0,4),expect.closeTo(0,4)]);
+        expect([b,cc,x,y]).toEqual([-turn,turn,135.5,109]);
+        expect(c.fillText).toHaveBeenCalledExactlyOnceWith(r.text,expect.any(Number),expect.any(Number));
+        expect(c.fillRect).not.toHaveBeenCalled();
+    });
     it('有方向的源字样式在修补前观察，原清字盒不随译文倾角改变',()=>{
         const p=page(),source={...word(p),fontSize:21},c=context(),native=c.measureText.getMockImplementation()!;
         c.measureText.mockImplementation(text=>c.font.includes('100px Arial')?{width:600,actualBoundingBoxLeft:0,actualBoundingBoxRight:600,actualBoundingBoxAscent:105,actualBoundingBoxDescent:0}:native(text));

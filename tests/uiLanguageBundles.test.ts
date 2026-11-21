@@ -1,6 +1,7 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {createExtensionSiteActionText} from '@/src/core/i18n/messages/siteRules';
 
 type I18nModule = typeof import('@/src/core/i18n');
 type BundlesModule = typeof import('./helpers/uiLanguageBundles');
@@ -66,7 +67,13 @@ describe('界面语言注册表', () => {
         for (const {relativeDest, contents} of files) {
             const language = relativeDest.slice('i18n/'.length, -'.json'.length) as keyof typeof bundles.UI_LANGUAGE_BUNDLES;
             expect(contents).not.toContain('\n');
-            expect(JSON.parse(contents)).toEqual(bundles.UI_LANGUAGE_BUNDLES[language]);
+            const shared = bundles.UI_LANGUAGE_BUNDLES[language];
+            const siteActions = createExtensionSiteActionText(language);
+            const extensionBundle = JSON.parse(contents);
+            expect(extensionBundle).toEqual({...shared, legacyText: {...shared.legacyText, ...siteActions}});
+            expect(shared.legacyText).not.toHaveProperty('打开正文');
+            i18n.registerUiLanguageBundle(language, extensionBundle);
+            expect(i18n.translateLegacyText('打开正文', language)).toBe(siteActions['打开正文']);
         }
 
         bundles.registerAllUiLanguageBundles();

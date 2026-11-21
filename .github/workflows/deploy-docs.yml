@@ -12,6 +12,8 @@ on:
       - 'src/core/config/translationLoadingStyle.ts'
       - 'src/core/config/customOpenAI.ts'
       - 'src/core/download/progress.ts'
+      - 'src/core/site-adaptation/catalog/*.json'
+      - 'scripts/site-translation/sign-official-site-rules.mjs'
       - 'src/features/settings/ui/settings-page.css'
       - '.storybook/**'
       - 'storybook/**'
@@ -37,6 +39,8 @@ on:
       - 'src/core/config/translationLoadingStyle.ts'
       - 'src/core/config/customOpenAI.ts'
       - 'src/core/download/progress.ts'
+      - 'src/core/site-adaptation/catalog/*.json'
+      - 'scripts/site-translation/sign-official-site-rules.mjs'
       - 'src/features/settings/ui/settings-page.css'
       - '.storybook/**'
       - 'storybook/**'
@@ -93,6 +97,12 @@ jobs:
         run: pnpm storybook:check
       - name: Check website links and assets
         run: pnpm docs:check
+      - name: Sign official site rules
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.WXT_SITE_RULES_PUBLIC_KEY != ''
+        env:
+          WXT_SITE_RULES_PUBLIC_KEY: ${{ vars.WXT_SITE_RULES_PUBLIC_KEY }}
+          FLUENTREAD_SITE_RULES_PRIVATE_KEY: ${{ secrets.FLUENTREAD_SITE_RULES_PRIVATE_KEY }}
+        run: node scripts/site-translation/sign-official-site-rules.mjs docs/.vitepress/dist/site-rules/v1/official.json "$GITHUB_RUN_NUMBER" 0.0.42
       - name: Upload website
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v4

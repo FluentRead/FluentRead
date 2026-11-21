@@ -101,6 +101,8 @@ By default, FluentRead prepares the next **3 images** already loaded by the webs
 
 Failed pages keep their originals while other pages continue. Switch to originals and back to retry. Changing chapters, leaving the page, or disabling manga translation stops old work. Image translation and floating-button switches are independent of manga; adjust its separate entry under **Standalone manga button**.
 
+With PaddleOCR, short Latin labels turned 90° on a narrow dark strip can be recovered as separate lines, such as captions on book spines or panel edges. When their direction and extent are clear, the translation follows the original orientation within the tight text box. If the translation would be too small or its placement is uncertain, the image keeps the original there and any translated text remains available in the text panel.
+
 When the original background opacity can be established, transparent cutouts are protected. Text flows around them inside the original text box, preserving its size and whole words where possible. Less available space can still require smaller text; open the text panel to read the full translation. Very complex cutouts or a fully blocked text area leave the original page with an error message.
 
 Search **Supported websites** by name or domain and check the reader type. Some support continuous translation; others offer **Select manga area to translate**, which requires area translation and a drag over visible artwork. Listing a site does not verify every chapter. Login, paid, and protected content still depends on what the website can display. Elsewhere, try a single image or [area translation](/en/guide/area-translation).

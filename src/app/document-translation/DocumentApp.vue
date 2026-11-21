@@ -140,7 +140,9 @@
           <div class="workspace-heading">
             <button class="sidebar-toggle" type="button" :class="{active: sidebarOpen}" :aria-expanded="sidebarOpen" :aria-label="translateLegacy('文件与目录')" :title="translateLegacy('文件与目录')" @click="sidebarOpen = !sidebarOpen"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.4"/></svg><small v-if="documentQueue.length > 1">{{ documentQueue.length }}</small></button>
             <img class="taskbar-logo" src="/icon/128.png" alt="" />
-            <div class="file-heading"><div><h1 data-i18n-ignore :title="parsedDocument.fileName">{{ parsedDocument.fileName }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="showTranslationProgress" class="document-translation-count" data-testid="document-translation-count">{{ translationProgressLabel }}</span></p></div></div>
+            <div class="file-heading"><div><h1 data-i18n-ignore :title="documentHeading">{{ documentHeading }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="showTranslationProgress" class="document-translation-count" data-testid="document-translation-count">{{ translationProgressLabel }}</span></p>
+              <a v-if="articleSourceUrl" class="article-source-link" :href="articleSourceUrl" target="_blank" rel="noopener noreferrer" data-testid="web-article-source">{{ translateLegacy('查看原网页') }}</a>
+            </div></div>
           </div>
           <div class="reader-toolbar">
             <div class="mode-buttons reader-tabs" role="group" aria-label="文档工作区">
@@ -209,7 +211,9 @@
             <details :key="retryNotice" class="recovery-details"><summary>{{ t('document.translationRecovery.details') }}</summary><p class="recovery-error-detail" data-i18n-ignore>{{ retryNotice }}</p></details>
           </div>
           <p v-else-if="errorMessage" class="notice error task-notice" role="alert">{{ errorMessage }}</p>
-          <p v-else-if="settingsChanged" class="notice warning task-notice" role="status">设置已更改。现有译文保留，按新设置翻译会从头开始。</p>
+          <p v-else-if="settingsChanged && !pendingGlossaryRetranslation" class="notice warning task-notice" role="status">设置已更改。现有译文保留，按新设置翻译会从头开始。</p>
+          <button v-if="pendingGlossaryRetranslation && !queueBusy" class="ghost-button task-notice" type="button" @click="resumeGlossaryRetranslation">{{ glossaryCopy.retry }}</button>
+          <p v-if="glossaryNotice" class="notice task-notice" role="status">{{ glossaryNotice }}</p>
           <details v-if="requestEvidence" class="document-request-evidence" data-testid="document-request-evidence">
             <summary><span>{{ t('document.requestEvidence.title') }}</span><small>{{ t('document.requestEvidence.summary', {segments: requestEvidence.segmentCount, context: requestEvidence.contextItems.length, glossaryHits: requestEvidence.glossaryOccurrences}) }}</small></summary>
             <div class="document-request-evidence-body">
@@ -384,10 +388,10 @@
       </div>
     </main>
 
-    <dialog ref="documentSettingsDialog" class="document-dialog document-settings-dialog" aria-labelledby="document-settings-heading">
-      <h2 id="document-settings-heading">翻译设置</h2>
+    <dialog ref="documentSettingsDialog" class="document-dialog document-settings-dialog" aria-labelledby="document-settings-heading" @close="clearGlossaryReview">
+      <h2 id="document-settings-heading" ref="documentSettingsHeading" tabindex="-1">{{ glossaryReviewOpen ? glossaryCopy.title : translateLegacy('翻译设置') }}</h2>
         <!-- 弹窗外壳先挂载；导入后再创建下拉控件，确保 Teleport 目标已存在。 -->
-        <section v-if="parsedDocument" class="translation-setup" aria-label="翻译设置">
+        <section v-if="parsedDocument && !glossaryReviewOpen" class="translation-setup" aria-label="翻译设置">
         <div class="control-panel">
           <label class="language-control">
             <span>源语言</span>
@@ -438,6 +442,7 @@
             </ElSelect>
           </template>
         </GlossaryLibrarySelect>
+        <button v-if="canExtractGlossary" ref="glossaryReviewButton" type="button" class="ghost-button document-glossary-extract" :disabled="queueBusy" @click="extractGlossaryCandidates">{{ glossaryCopy.extract }}</button>
         <div v-if="isPdfDocument" class="pdf-source-actions">
           <button v-if="canEditPdfSource" type="button" class="ghost-button" :disabled="queueBusy" @click="openSourceEditor()">{{ t('document.sourceEdit.open') }}</button>
           <button type="button" class="ghost-button" :disabled="queueBusy || !hydrated || !config.on" @click="rerecognizePdfPage">{{ t('document.sourceEdit.rerecognize', {page: pdfPage}) }}</button>
@@ -447,9 +452,47 @@
         <p v-if="settingsChanged" class="notice warning">设置已更改。现有译文和下载内容仍使用之前的结果，按新设置翻译会从头开始。</p>
         <p class="setup-privacy">文件在本地解析，文字发送至所选服务。</p>
         </section>
-      <p v-if="configSaveError" class="notice error" role="alert">{{ configSaveError }}</p>
-      <div class="document-settings-footer"><button class="sidebar-change-file" type="button" :aria-label="documentQueue.length > 1 ? t('document.batch.clear') : translateLegacy('打开新文件')" :disabled="queueBusy" @click="changeDocument">{{ documentQueue.length > 1 ? t('document.batch.clear') : translateLegacy('更换文件') }}</button><button class="settings-link" type="button" @click="openSettings">服务连接设置 ↗</button></div>
-      <div class="dialog-actions"><button class="ghost-button" type="button" autofocus @click="documentSettingsDialog?.close()">返回文档</button><button class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning) || !parsedDocument" @click="translateFromSettings">{{ translationActionLabel }}</button></div>
+      <template v-if="glossaryReviewOpen">
+          <div class="document-glossary-review">
+            <p v-if="glossarySuggesting" class="notice" role="status">{{ glossaryCopy.suggesting }}</p>
+            <p v-if="glossaryReviewError" class="notice warning" role="status">{{ glossaryReviewError }}</p>
+            <p v-if="!glossaryChoices.length" class="notice" role="status">{{ glossaryCopy.empty }}</p>
+            <template v-else>
+              <label class="document-glossary-destination">
+                <span>{{ glossaryCopy.destination }}</span>
+                <ElSelect v-model="glossaryDestinationId" class="document-select" :wrap-label="false" :show-search-icon="false"
+                  append-to=".document-settings-dialog" :empty-values="[null, undefined]" :aria-label="glossaryCopy.destination" :disabled="queueBusy">
+                  <ElOption v-for="library in glossaryDestinations" :key="library.id" :value="library.id" :label="library.name" data-i18n-ignore />
+                  <ElOption value="" :label="glossaryCopy.newLibrary" />
+                </ElSelect>
+                <small data-i18n-ignore>{{ glossaryScope }}</small>
+              </label>
+              <ul class="document-glossary-list">
+                <li v-for="choice in glossaryChoices" :key="choice.source">
+                  <label class="document-glossary-term">
+                    <input v-model="choice.selected" type="checkbox" :disabled="queueBusy" />
+                    <strong data-i18n-ignore>{{ choice.source }}</strong>
+                  </label>
+                  <input v-model="choice.target" type="text" class="document-glossary-translation" maxlength="200" :disabled="queueBusy || glossarySuggesting"
+                    :aria-label="`${glossaryCopy.target} · ${choice.source}`" :placeholder="glossaryCopy.target" data-i18n-ignore />
+                  <p class="document-glossary-evidence" data-i18n-ignore>{{ choice.evidence }}</p>
+                </li>
+              </ul>
+              <p class="setup-privacy">{{ glossaryCopy.effects }}</p>
+            </template>
+          </div>
+        <div class="dialog-actions document-glossary-actions">
+          <button class="ghost-button" type="button" :disabled="glossarySaving" @click="returnFromGlossaryReview">{{ glossaryCopy.back }}</button>
+          <button v-if="glossaryChoices.length" class="translate-document-button" type="button" :disabled="!canApplyGlossary" @click="applyGlossaryChoices">
+            {{ config.glossaryEnabled ? glossaryCopy.apply : glossaryCopy.enableAndApply }}
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <p v-if="configSaveError" class="notice error" role="alert">{{ configSaveError }}</p>
+        <div class="document-settings-footer"><button class="sidebar-change-file" type="button" :aria-label="documentQueue.length > 1 ? t('document.batch.clear') : translateLegacy('打开新文件')" :disabled="queueBusy" @click="changeDocument">{{ documentQueue.length > 1 ? t('document.batch.clear') : translateLegacy('更换文件') }}</button><button class="settings-link" type="button" @click="openSettings">服务连接设置 ↗</button></div>
+        <div class="dialog-actions"><button class="ghost-button" type="button" autofocus @click="documentSettingsDialog?.close()">返回文档</button><button class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning) || !parsedDocument" @click="translateFromSettings">{{ translationActionLabel }}</button></div>
+      </template>
     </dialog>
     <dialog ref="confirmDialog" class="document-dialog" aria-labelledby="confirm-document-heading" @close="clearConfirmation">
       <h2 id="confirm-document-heading">{{ pendingAction === 'remove' ? t('document.batch.removeTitle') : pendingAction === 'reset' ? (documentQueue.length > 1 ? t('document.batch.clearTitle') : '打开另一份文档？') : '重新翻译这份文档？' }}</h2>
@@ -515,6 +558,9 @@ import {
   scrollRichOutline,
   markRichPreviewBusy,
   richPreviewPosition,
+  trackWebArticleReading,
+  normalizeWebArticleUrl,
+  WEB_ARTICLE_PARAMETER,
   installDocumentZoomGestures,
   pdfPagesNeedingOcr,
   recognizePdfDocument,
@@ -585,6 +631,11 @@ import {
   hasCompositeTranslationAIContext,
   isCompositeTranslationProviderId,
   GlossaryLibrarySelect,
+  documentGlossaryDestinations,
+  extractDocumentGlossaryCandidates,
+  filterDocumentGlossaryCandidates,
+  planDocumentGlossaryUpdate,
+  type DocumentGlossaryChoice,
   supportsTranslationGlossary,
   useUiI18n,
   useDocumentTasks,
@@ -604,6 +655,7 @@ import {
   SegmentedControl,
 } from '@/src/app/document-translation';
 import {getDocumentDownloadCopy, getDocumentDownloadErrorCopy} from './downloadCopy';
+import {getDocumentGlossaryCopy} from './glossaryCopy';
 
 const READER_PAGE_SIZE = 80;
 
@@ -731,6 +783,8 @@ const downloadPdfPresentation = ref<PdfReadingPresentation>('layout');
 const pendingDownloadMode = ref<DocumentRenderMode | null>(null);
 const queueExpanded = ref(false);
 const documentSettingsDialog = ref<HTMLDialogElement | null>(null);
+const documentSettingsHeading = ref<HTMLElement | null>(null);
+const glossaryReviewButton = ref<HTMLButtonElement | null>(null);
 const configSaveError = ref('');
 const pendingAction = ref<'reset' | 'restart' | 'remove' | null>(null);
 let pendingRemoval: DocumentQueueItem | null = null;
@@ -759,6 +813,17 @@ const importRatio = ref(0);
 const epubChapterIndex = ref(0);
 const docxPartIndex = ref(0);
 const hydrated = ref(false);
+type GlossaryRetranslation = {document: ParsedDocument; fingerprint: string; pending: Set<number>};
+const glossaryRetranslation = shallowRef<GlossaryRetranslation | null>(null);
+let activeGlossaryRetranslation: GlossaryRetranslation | null = null;
+const glossaryReviewOpen = ref(false);
+const glossarySaving = ref(false);
+const glossarySuggesting = ref(false);
+const glossaryReviewError = ref('');
+const glossaryNotice = ref('');
+const glossaryDestinationId = ref('');
+const glossaryChoices = ref<(DocumentGlossaryChoice & {selected: boolean})[]>([]);
+let glossaryController: AbortController | null = null;
 const colorSchemeMedia = window.matchMedia('(prefers-color-scheme: dark)');
 const isDark = ref(colorSchemeMedia.matches);
 let abortController: AbortController | null = null;
@@ -769,7 +834,7 @@ const batchRunning = ref(false);
 const batchNotice = ref('');
 let nextDocumentId = 0;
 let batchGeneration = 0;
-const queueBusy = computed(() => translating.value || batchRunning.value || openingFile.value || downloadingPdf.value || preparingDownload.value);
+const queueBusy = computed(() => translating.value || batchRunning.value || openingFile.value || downloadingPdf.value || preparingDownload.value || glossarySaving.value);
 const completeItem = (item: DocumentQueueItem) => {
   const segments = taskSegments(item);
   return Boolean(segments.length
@@ -1379,7 +1444,35 @@ function compatibleTranslationSettings(previous: string, current: string): boole
     && (before.service !== after.service || before.compositeConnection === after.compositeConnection);
 }
 const settingsChanged = computed(() => Boolean(taskFingerprint.value && !compatibleTranslationSettings(taskFingerprint.value, currentFingerprint.value)));
-watch(currentFingerprint, () => {requestEvidence.value = null;});
+const glossaryCopy = computed(() => getDocumentGlossaryCopy(language.value));
+const glossaryDestinations = computed(() => documentGlossaryDestinations(config));
+const glossaryScope = computed(() => {
+  const library = glossaryDestinations.value.find(item => item.id === glossaryDestinationId.value);
+  const source = library ? library.sourceLanguage : config.from === 'auto' ? 'en' : config.from;
+  const target = library ? library.targetLanguage : config.to;
+  const label = (code: string) => code ? getMultilingualTargetLanguageLabel(code, code, language.value) : glossaryCopy.value.anyLanguage;
+  return `${label(source)} → ${label(target)}`;
+});
+const canExtractGlossary = computed(() => hydrated.value && config.on && documentSupportsGlossary.value
+  && activeSegments.value.length > 0 && !isSubtitleDocumentFormat(parsedDocument.value?.format ?? 'txt')
+  && (config.from === 'auto' || /^en(?:-|$)/iu.test(config.from)));
+const canApplyGlossary = computed(() => canExtractGlossary.value && !queueBusy.value && !glossarySuggesting.value && !credentialWarning.value
+  && glossaryChoices.value.some(choice => choice.selected) && glossaryChoices.value.every(choice => !choice.selected || Boolean(choice.target.trim())));
+const pendingGlossaryRetranslation = computed(() => {
+  const task = glossaryRetranslation.value;
+  if (!task || task.document !== parsedDocument.value || task.fingerprint !== currentFingerprint.value) return null;
+  const scope = columnScope.value;
+  return [...task.pending].some(id => !scope || scope.has(id)) ? task : null;
+});
+watch(currentFingerprint, fingerprint => {
+  requestEvidence.value = null;
+  if (!glossarySaving.value) clearGlossaryReview();
+  if (activeGlossaryRetranslation && activeGlossaryRetranslation.fingerprint !== fingerprint) pauseTranslation();
+});
+watch(parsedDocument, () => {
+  clearGlossaryReview();
+  glossaryNotice.value = '';
+});
 // 只调整操作层级：完成后的下载承接当前结果；任何待应用的设置（含可续译的服务/模型）都重新突出翻译。
 const downloadIsPrimary = computed(() => translationComplete.value && (!taskFingerprint.value || taskFingerprint.value === currentFingerprint.value));
 // 其它文档页或设置页也可切换服务。显示新服务时必须撤销旧任务，避免仍等待旧线路却让读者以为新线路卡住。
@@ -1406,6 +1499,12 @@ const isDocxDocument = computed(() => parsedDocument.value?.binary?.kind === 'do
 const isSubtitleDocument = computed(() => isSubtitleDocumentFormat(parsedDocument.value?.format));
 const isJsonDocument = computed(() => parsedDocument.value?.format === 'json');
 const isRichDocument = computed(() => isRichDocumentFormat(parsedDocument.value?.format));
+const articleSourceUrl = computed(() => parsedDocument.value?.format === 'html'
+  ? normalizeWebArticleUrl(activeTask.value?.sourceUrl) : null);
+const documentHeading = computed(() => {
+  const name = parsedDocument.value?.fileName || '';
+  return articleSourceUrl.value ? name.replace(/\.html$/u, '') : name;
+});
 const epubChapters = computed(() => parsedDocument.value?.binary?.kind === 'epub'
   ? parsedDocument.value.binary.chapters
   : []);
@@ -1446,6 +1545,7 @@ type ReaderZoomPoint = {clientX: number; clientY: number};
 type ReaderZoomSurface = {content: HTMLElement; viewport: HTMLElement; xScroller: HTMLElement; yScroller: HTMLElement; document: Document; frame: boolean};
 let readerZoomDisposer: (() => void) | undefined;
 let loadedRichDocument: Document | null = null;
+let stopArticleReading: (() => void) | undefined;
 let readerZoomRevision = 0;
 
 /** 缩放只影响正文，工具栏和滚动视口保持原尺寸。 */
@@ -1537,13 +1637,26 @@ function focusNativeReader(event: PointerEvent): void {
   readingContent.value?.focus?.({preventScroll: true});
 }
 function handleRichFrameLoad(): void {
+  stopArticleReading?.();
+  stopArticleReading = undefined;
   loadedRichDocument = richFrame.value?.contentDocument || null;
   refreshRichPreview();
   bindReaderZoomGestures();
+  const id = activeTask.value?.historyId;
+  if (articleSourceUrl.value && id && loadedRichDocument) {
+    stopArticleReading = trackWebArticleReading(loadedRichDocument, id, history, url => {
+      void browser.tabs.create({url}).catch(() => {downloadNotice.value = translateLegacy('无法打开原网页');});
+    });
+  }
 }
 watch([parsedDocument, readerTab], ([document], [previousDocument]) => {
   clearReaderZoomGestures();
-  if (document !== previousDocument) {readerScale.value = 1; loadedRichDocument = null;}
+  if (document !== previousDocument) {
+    readerScale.value = 1;
+    loadedRichDocument = null;
+    stopArticleReading?.();
+    stopArticleReading = undefined;
+  }
   const revision = readerZoomRevision;
   void nextTick().then(() => {if (revision === readerZoomRevision) bindReaderZoomGestures();});
 }, {flush: 'sync'});
@@ -1834,6 +1947,8 @@ function handleDrop(event: DragEvent): void {
 }
 
 function resetDocument(): void {
+  stopArticleReading?.();
+  stopArticleReading = undefined;
   persistHistory();
   documentAIContextOverride.value = null;
   requestEvidence.value = null;
@@ -1882,6 +1997,116 @@ function translateFromSettings(): void {
   requestTranslation();
 }
 
+function clearGlossaryReview(): void {
+  glossaryController?.abort();
+  glossaryController = null;
+  glossaryReviewOpen.value = false;
+  glossarySuggesting.value = false;
+  glossaryChoices.value = [];
+  glossaryReviewError.value = '';
+}
+
+function returnFromGlossaryReview(): void {
+  clearGlossaryReview();
+  void nextTick(() => glossaryReviewButton.value?.focus?.());
+}
+
+async function extractGlossaryCandidates(): Promise<void> {
+  const document = parsedDocument.value;
+  if (!document || !canExtractGlossary.value || queueBusy.value) return;
+  clearGlossaryReview();
+  glossaryReviewOpen.value = true;
+  void nextTick(() => documentSettingsHeading.value?.focus?.());
+  glossaryDestinationId.value = glossaryDestinations.value[0]?.id ?? '';
+  const candidates = filterDocumentGlossaryCandidates(config, extractDocumentGlossaryCandidates(activeSegments.value));
+  glossaryChoices.value = candidates.map(candidate => ({...candidate, target: '', selected: false}));
+  if (!candidates.length) return;
+  if (credentialWarning.value) {
+    glossaryReviewError.value = glossaryCopy.value.suggestionUnavailable;
+    return;
+  }
+  const controller = glossaryController = new AbortController();
+  glossarySuggesting.value = true;
+  try {
+    const result = await translateDocumentSegments(candidates.map(({source}, id) => ({id, source})), {
+      fileName: document.fileName, signal: controller.signal, glossaryIds: [],
+      sourceLanguage: config.from === 'auto' ? 'en' : config.from, targetLanguage: config.to,
+      serviceOverride: effectiveDocumentService.value, modelOverride: documentUsesModel.value ? documentModelValue.value : undefined,
+    });
+    if (glossaryController !== controller) return;
+    glossaryChoices.value.forEach((choice, id) => {choice.target = result[id]?.trim().slice(0, 200) ?? '';});
+  } catch {
+    if (glossaryController === controller) glossaryReviewError.value = glossaryCopy.value.suggestionUnavailable;
+  } finally {
+    if (glossaryController === controller) {
+      glossaryController = null;
+      glossarySuggesting.value = false;
+    }
+  }
+}
+
+async function applyGlossaryChoices(): Promise<void> {
+  const document = parsedDocument.value;
+  if (!document || !canApplyGlossary.value) return;
+  if (settingsChanged.value) {
+    glossaryReviewError.value = glossaryCopy.value.settingsChanged;
+    return;
+  }
+  const choices = glossaryChoices.value.filter(choice => choice.selected);
+  const destinationId = glossaryDestinationId.value;
+  const reviewedFingerprint = currentFingerprint.value;
+  const reviewedColumns = columnScope.value;
+  glossarySaving.value = true;
+  glossaryReviewError.value = '';
+  glossaryNotice.value = '';
+  try {
+    await configEditor.save();
+    if (disposed || parsedDocument.value !== document) return;
+    if (reviewedFingerprint !== currentFingerprint.value || reviewedColumns !== columnScope.value || settingsChanged.value) {
+      glossaryReviewError.value = glossaryCopy.value.settingsChanged;
+      return;
+    }
+    const plan = planDocumentGlossaryUpdate(runtimeConfig, document.segments, choices, destinationId, glossaryCopy.value.libraryName);
+    if ('error' in plan) {
+      glossaryReviewError.value = glossaryCopy.value[plan.error];
+      return;
+    }
+    const {affectedIds, ...patch} = plan;
+    const fingerprint = JSON.stringify({...JSON.parse(currentFingerprint.value), glossaryIds: patch.documentGlossaryIds,
+      glossaryRevision: buildGlossaryRevision(patch.glossaryLibraries, patch.glossaryEnabled)});
+    await requestConfigPatch(patch, browser.runtime.sendMessage.bind(browser.runtime));
+    await nextTick();
+    if (disposed || parsedDocument.value !== document) return;
+    if (currentFingerprint.value !== fingerprint || reviewedColumns !== columnScope.value || !config.on || credentialWarning.value) {
+      glossaryNotice.value = glossaryCopy.value.changedAfterSave;
+      documentSettingsDialog.value?.close();
+      return;
+    }
+    documentSettingsDialog.value?.close();
+    // 当前未选且未翻译的表格列会在第一次翻译时使用新词库。已有旧译文继续等待该列被选中。
+    const pending = reactive(new Set([...affectedIds].filter(id => !reviewedColumns || reviewedColumns.has(id) || Boolean(translatedSegments.value[id]?.trim()))));
+    glossaryNotice.value = glossaryCopy.value.saved;
+    if (!pending.size) {
+      taskFingerprint.value = fingerprint;
+      editRevision.value += 1;
+      scheduleHistorySave();
+      return;
+    }
+    const task = {document, fingerprint, pending};
+    glossaryRetranslation.value = task;
+    if (pendingGlossaryRetranslation.value) void startTranslation(false, task);
+  } catch {
+    if (!disposed && parsedDocument.value === document) glossaryReviewError.value = glossaryCopy.value.saveFailed;
+  } finally {
+    glossarySaving.value = false;
+  }
+}
+
+function resumeGlossaryRetranslation(): void {
+  const task = pendingGlossaryRetranslation.value;
+  if (task && !queueBusy.value) void startTranslation(false, task);
+}
+
 function requestReset(): void {
   if (openingFile.value || preparingDownload.value || batchRunning.value) return;
   if (hasUnsavedWork.value) {
@@ -1923,6 +2148,7 @@ function pauseTranslation(): void {
   translationRequestId += 1;
   abortController?.abort();
   abortController = null;
+  activeGlossaryRetranslation = null;
   recognitionWorkflow.cancel();
   translating.value = false;
   runState.value = 'paused';
@@ -1933,12 +2159,14 @@ function pauseAndChangeService(): void {
   openDocumentSettings();
 }
 
-async function startTranslation(restart = false): Promise<void> {
+async function startTranslation(restart = false, glossaryTask?: GlossaryRetranslation): Promise<void> {
   let document = parsedDocument.value;
   // 扫描版 PDF 还没有任何文字：先逐页识别，再翻译识别出的段落。
-  const scanned = needsOcr.value;
+  const scanned = !glossaryTask && needsOcr.value;
   if (!config.on || !document || !(activeSegments.value.length || scanned) || translating.value || !hydrated.value || preparingDownload.value || credentialWarning.value) return;
   const segmentIds = columnScope.value;
+  const retranslateIds = glossaryTask ? new Set([...glossaryTask.pending].filter(id => !segmentIds || segmentIds.has(id))) : undefined;
+  if (retranslateIds?.size === 0) return;
   if (restart) {
     if (segmentIds && !settingsChanged.value) {
       translatedSegments.value = translatedSegments.value.map((text, id) => segmentIds.has(id) ? '' : text);
@@ -1952,7 +2180,11 @@ async function startTranslation(restart = false): Promise<void> {
     editRevision.value += 1;
     scheduleHistorySave();
   }
-  taskFingerprint.value = currentFingerprint.value;
+  if (!glossaryTask) {
+    if (glossaryRetranslation.value?.document === document) glossaryRetranslation.value = null;
+    taskFingerprint.value = currentFingerprint.value;
+  }
+  activeGlossaryRetranslation = glossaryTask ?? null;
   const glossaryIds = config.documentGlossaryIds === null ? null : [...config.documentGlossaryIds];
   const glossaryRevision = buildGlossaryRevision(config.glossaryLibraries, config.glossaryEnabled);
   const glossaryEnabled = config.glossaryEnabled;
@@ -1963,7 +2195,7 @@ async function startTranslation(restart = false): Promise<void> {
   requestEvidence.value = null;
   // OCR 可能持续较久；整个任务使用同一文件身份与设置快照，外部配置更新不混入正在处理的文件。
   const settings = {serviceOverride: effectiveDocumentService.value,
-    ...(bypassCache.value ? {useCache: false} : {}),
+    ...(bypassCache.value || glossaryTask ? {useCache: false} : {}),
     modelOverride: documentUsesModel.value ? documentModelValue.value : undefined,
     sourceLanguage: config.from, targetLanguage: config.to, batchTranslation: documentBatchTranslation.value,
     materialId: documentQueue.value.find(item => item.id === activeDocumentId.value)?.historyId || `document:${activeDocumentId.value}`,
@@ -2014,6 +2246,7 @@ async function startTranslation(restart = false): Promise<void> {
       glossaryIds, glossaryRevision,
       initialTranslations: [...translatedSegments.value],
       ...(segmentIds ? {segmentIds} : {}),
+      ...(retranslateIds ? {retranslateIds} : {}),
       confirmedTranslationIds: [...confirmedTranslationIds.value],
       signal: controller.signal,
       // 文档层统一退避重试，单批请求与等待默认最多十分钟，保留更长的服务预算；失败时显示原因。
@@ -2095,6 +2328,11 @@ async function startTranslation(restart = false): Promise<void> {
       priorityKey: readingPriorityKey,
       onSegment: ({id, translation}) => {
         if (requestId !== translationRequestId || parsedDocument.value !== current || controller.signal.aborted) return;
+        if (glossaryTask) {
+          if (!translation.trim()) return;
+          glossaryTask.pending.delete(id);
+          confirmedTranslationIds.value = confirmedTranslationIds.value.filter(confirmed => confirmed !== id);
+        }
         if (!retryWaiting.value) retryNotice.value = '';
         liveCompletedSegments.value += Number(Boolean(translation.trim())) - Number(Boolean(translatedSegments.value[id]?.trim()));
         translatedSegments.value[id] = translation;
@@ -2103,6 +2341,12 @@ async function startTranslation(restart = false): Promise<void> {
         scheduleRichPreview();
       },
     });
+    if (glossaryTask && !glossaryTask.pending.size && requestId === translationRequestId && parsedDocument.value === current) {
+      taskFingerprint.value = glossaryTask.fingerprint;
+      glossaryRetranslation.value = null;
+      glossaryNotice.value = glossaryCopy.value.saved;
+      editRevision.value += 1;
+    }
   } catch (error) {
     if (requestId !== translationRequestId || parsedDocument.value !== document) return;
     if (error instanceof TranslationRequestError && error.code === 'TRANSLATION_DISABLED') {
@@ -2113,6 +2357,7 @@ async function startTranslation(restart = false): Promise<void> {
     showError(error instanceof Error ? error.message : String(error));
   } finally {
     if (requestId === translationRequestId) {
+      activeGlossaryRetranslation = null;
       translating.value = false;
       retryNotice.value = '';
       retryWaiting.value = 0;
@@ -2330,6 +2575,13 @@ onMounted(() => {
   try {materialUrl = new URL(window.location.href);} catch { /* 只在完整浏览器页面解析继续阅读参数。 */ }
   const materialId = materialUrl?.searchParams.get(MATERIAL_RESUME_PARAMETER);
   if (materialUrl && materialId && !materialPrivate) {materialUrl.searchParams.delete(MATERIAL_RESUME_PARAMETER); window.history.replaceState(window.history.state, '', materialUrl.href); void restoreMaterialDocument(materialId); return;}
+  const articleId = materialUrl?.searchParams.get(WEB_ARTICLE_PARAMETER);
+  if (articleId && /^[a-f0-9]{32}$/u.test(articleId)) {
+    void importWorkflow.openHistory(articleId).then(() => {
+      if (!disposed && !activeTask.value && !importError.value) importError.value = t('document.historyOpenUnavailable');
+    });
+    return;
+  }
   const source = readPdfSourceFragment(window.location.hash || '');
   if (source) {onlinePdfUrl.value = source; void openOnlinePdf();}
   else void restoreOpenDocument();
@@ -2338,6 +2590,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('resize', positionDownloadPanel);
   disposed = true;
+  clearGlossaryReview();
   materialEpoch++; clearTimeout(materialPositionTimer);
   configEditor.dispose();
   importWorkflow.dispose();

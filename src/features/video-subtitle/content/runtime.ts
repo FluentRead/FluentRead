@@ -111,6 +111,7 @@ import {createVideoPlayerBinding, type VideoPlayerBinding} from './videoPlayerBi
 import {getVideoTranscriptionCacheRequest, getVideoTranscriptionMediaTransition, VideoTranscriptionCacheClient} from './transcriptionCacheClient';
 import type {VideoAiSubtitleCacheSource} from '../transcriptionCache';
 import {getCaptionPlatform} from './platforms';
+import {getCourseCaptionRequest} from './courseCaptionData';
 import {mountPlatformCaptions} from './platformRuntime';
 import {createYoutubeNativeCaptionVisibility} from './youtubeNativeCaptionVisibility';
 import {BilibiliAiSource} from './bilibiliAiSource';
@@ -148,7 +149,10 @@ const isMediaSubtitlePage = () => isXVideoPage() || isHtmlMediaPage();
 
 function mountVideoSubtitleRuntime(): () => void {
   const platform = getCaptionPlatform(window.location);
-  if (platform) return mountPlatformCaptions({
+  // Coursera 只在播放器已发布可读取的完整轨时使用课程入口，其余播放器沿用 HTML 媒体路径。
+  const courseraHasTrack = import.meta.env.BROWSER !== 'userscript' && platform === 'coursera'
+    && Array.from(document.querySelectorAll('video')).some(video => getCourseCaptionRequest('coursera', new URL(window.location.href), video));
+  if (platform && (platform !== 'coursera' || courseraHasTrack)) return mountPlatformCaptions({
     document, window, config, subscribe: subscribeConfig,
     createBilibiliAi: platform === 'bilibili' && browserCapabilities.extensionDom
       && window.location.protocol === 'https:' && typeof OfflineAudioContext === 'function'
@@ -167,7 +171,7 @@ function mountVideoSubtitleRuntime(): () => void {
     translate: translateVideoText,
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),
-    download: (srt, language) => downloadSubtitleSrt(srt, language),
+    download: downloadSubtitleSrt,
     iconUrl: browser.runtime.getURL('icon/128.png'),
     openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
   });

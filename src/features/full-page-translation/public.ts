@@ -11,6 +11,7 @@ export {
     invalidateFullPageTranslationSessionCache,
     isFullPageTranslationActive,
     getFullPageTranslationFrameState,
+    readPageRuleDiagnosis,
     getFullPageTranslationSessionId,
     readFullPageUnchangedCompletion,
     resetFullPageTranslationRouteState,
@@ -32,6 +33,7 @@ export {
 } from './progress';
 
 export {getTranslationToolbarStatus, subscribeTranslationToolbarStatus, getFullPageTranslationDiagnostic, getFullPageTranslationDocumentToken} from './content/stateNotification';
+export {readPageRuleSelection} from './content/pageRuleDiagnosis';
 export type {TranslationToolbarStatus} from './toolbarStatus';
 
 export {readBilingualExcerpt} from './content/excerpt';

@@ -11,6 +11,10 @@ import {endsEastAsianText, startsEastAsianText} from './textBoundary';
 import {attachImageRuby} from './ruby';
 export interface ImageTextRegion extends OcrLine {
     sourceBoxes?: OcrLine['bbox'][];
+    /** 顺时针转多少个直角可读原文，用于把横排译文放回原方向。 */
+    quarterTurn?: 1 | -1;
+    /** 粗检测框覆盖画面，需保留其原像素。 */
+    preserveSource?: true;
     /** 不可信数值的物理保护框，不参与翻译或阅读。 */
     guardOnly?: true;
     numericUncertain?: true;

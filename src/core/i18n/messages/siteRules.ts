@@ -181,3 +181,41 @@ const columns = {'en-US': 1, 'ja-JP': 2, 'ko-KR': 3, 'fr-FR': 4, 'ru-RU': 5, 'es
 export function createSiteRuleText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
   return Object.fromEntries(siteRuleTextRows.map(row => [row[0], row[columns[language]]]));
 }
+
+const extensionSiteActionRows: readonly Row[] = [
+  ['官方规则', 'Official rules', '公式ルール', '공식 규칙', 'Règles officielles', 'Официальные правила', 'Reglas oficiales'],
+  ['检查规则更新', 'Check for rule updates', 'ルールの更新を確認', '규칙 업데이트 확인', 'Vérifier les mises à jour', 'Проверить обновления правил', 'Buscar actualizaciones de reglas'],
+  ["打开正文","Open article","本文を開く","본문 열기","Ouvrir l’article","Открыть статью","Abrir artículo"],
+  ["在流畅阅读中打开正文","Open this article in FluentRead","FluentRead で本文を開く","FluentRead에서 본문 열기","Ouvrir cet article dans FluentRead","Открыть статью во FluentRead","Abrir este artículo en FluentRead"],
+  ["未找到可打开的网页正文。","No readable article was found.","読み取り可能な本文が見つかりませんでした。","읽을 수 있는 본문을 찾지 못했습니다.","Aucun article lisible n’a été trouvé.","На странице не удалось найти текст статьи.","No se encontró un artículo legible."],
+  ["网页正文太长，无法完整打开。","This article is too long to open in full.","本文が長すぎるため、全文を開けません。","본문이 너무 길어 전체를 열 수 없습니다.","L’article est trop long pour être ouvert en entier.","Статья слишком длинная для полного открытия.","El artículo es demasiado largo para abrirlo completo."],
+  ["暂时无法打开这篇正文。","This article could not be opened.","この本文を開けませんでした。","본문을 열 수 없습니다.","Impossible d’ouvrir cet article.","Не удалось открыть эту статью.","No se pudo abrir este artículo."],
+  ["查看原网页","View original webpage","元のページを開く","원래 웹페이지 보기","Voir la page d’origine","Открыть исходную страницу","Ver la página original"],
+  ["无法打开原网页","Could not open the original webpage","元のページを開けませんでした","원래 웹페이지를 열 수 없습니다","Impossible d’ouvrir la page d’origine","Не удалось открыть исходную страницу","No se pudo abrir la página original"],
+  ["网页翻译诊断","Page translation diagnosis","ページ翻訳の診断","페이지 번역 진단","Diagnostic de traduction","Диагностика перевода страницы","Diagnóstico de traducción"],
+  ["命中规则","Matching rules","一致したルール","일치한 규칙","Règles correspondantes","Совпавшие правила","Reglas coincidentes"],
+  ["无专站规则","No site-specific rules","サイト専用ルールなし","사이트별 규칙 없음","Aucune règle propre au site","Нет правил для этого сайта","Sin reglas específicas"],
+  ["全部节点","All nodes","すべてのノード","모든 노드","Tous les nœuds","Все узлы","Todos los nodos"],
+  ["正文范围","Main content","本文","본문","Contenu principal","Основной текст","Contenido principal"],
+  ["当前网页的诊断暂不可用","Diagnosis is unavailable on this page.","このページは診断できません。","이 페이지는 진단할 수 없습니다.","Le diagnostic est indisponible sur cette page.","Диагностика на этой странице недоступна.","El diagnóstico no está disponible en esta página."],
+  ["先在网页选中一段文字，再打开诊断。","Select some text on the page, then open diagnosis.","ページ上で文字を選び、診断を開いてください。","페이지에서 글을 선택한 다음 진단을 여세요.","Sélectionnez du texte sur la page, puis ouvrez le diagnostic.","Выделите текст на странице и откройте диагностику.","Selecciona texto en la página y abre el diagnóstico."],
+  ["所选文字在站点规则排除的区域内。","A site rule excludes the selected text.","選んだ文字はサイトルールの除外範囲内です。","사이트 규칙이 선택한 글을 번역에서 제외합니다.","Une règle du site exclut le texte sélectionné.","Текст выделен в области, исключённой правилом сайта.","Una regla del sitio excluye el texto seleccionado."],
+  ["站点规则将所选文字保留为原文。","A site rule keeps the selected text in its original language.","サイトルールにより選んだ文字は原文のままです。","사이트 규칙에 따라 선택한 글을 원문으로 유지합니다.","Une règle du site conserve le texte sélectionné dans sa langue d’origine.","Правило сайта сохраняет выделенный текст в исходном виде.","Una regla del sitio conserva el texto seleccionado en su idioma original."],
+  ["站点规则只翻译指定区域，所选文字未命中翻译区域。","A site rule limits translation to designated areas. The selection falls outside them.","サイトルールでは指定範囲のみ翻訳します。選択はその範囲外です。","사이트 규칙은 지정된 영역만 번역합니다. 선택한 글은 그 밖에 있습니다.","Une règle réserve la traduction à certaines zones. La sélection se trouve en dehors.","Правило разрешает перевод только в заданных областях. Выделение находится вне их.","Una regla limita la traducción a ciertas áreas. La selección queda fuera."],
+  ["所选文字受网页翻译保护。","Page translation protects the selected text.","選んだ文字はページ翻訳の保護対象です。","선택한 글은 페이지 번역에서 보호됩니다.","Le texte sélectionné est protégé par la traduction de page.","Выделенный текст защищён от перевода страницы.","La traducción de página protege el texto seleccionado."],
+  ["所选文字未识别为可翻译段落。","Page translation did not detect a translatable paragraph in the selection.","選んだ文字は翻訳可能な段落として認識されませんでした。","선택한 글을 번역 가능한 단락으로 인식하지 못했습니다.","La traduction de page n’a détecté aucun paragraphe traduisible dans la sélection.","Выделенный текст не распознан как абзац для перевода.","La traducción de página no detectó un párrafo traducible en la selección."],
+  ["已识别所选段落，当前未启动网页翻译。","The paragraph was detected. Start page translation to translate it.","段落を認識しました。ページ翻訳を開始すると翻訳できます。","단락을 인식했습니다. 번역하려면 페이지 번역을 시작하세요.","Le paragraphe a été détecté. Lancez la traduction de page pour le traduire.","Абзац распознан. Чтобы перевести его, запустите перевод страницы.","Se detectó el párrafo. Inicia la traducción de página para traducirlo."],
+  ["所选段落正在等待可见或调度。","The paragraph is waiting to become visible or to be processed.","選んだ段落は表示または処理を待っています。","선택한 단락이 화면 표시 또는 처리를 기다리고 있습니다.","Le paragraphe attend d’être visible ou pris en charge.","Абзац ожидает появления на экране или начала обработки.","El párrafo espera a ser visible o a que se procese."],
+  ["所选段落正在翻译。","The paragraph is being translated.","選んだ段落を翻訳しています。","선택한 단락을 번역하고 있습니다.","Le paragraphe est en cours de traduction.","Абзац переводится.","El párrafo se está traduciendo."],
+  ["所选段落已有译文。","The paragraph has a translation.","選んだ段落には翻訳があります。","선택한 단락에 번역이 있습니다.","Le paragraphe dispose d’une traduction.","У абзаца уже есть перевод.","El párrafo ya tiene traducción."],
+  ["所选段落的翻译失败。","The paragraph could not be translated.","選んだ段落の翻訳に失敗しました。","선택한 단락을 번역하지 못했습니다.","La traduction du paragraphe a échoué.","Не удалось перевести абзац.","No se pudo traducir el párrafo."],
+  ["所选段落已是目标语言或命中语言排除设置。","The paragraph is in the target language or a language you excluded.","選んだ段落は翻訳先言語か、除外した言語で書かれています。","선택한 단락은 대상 언어 또는 제외한 언어로 작성되었습니다.","Le paragraphe est dans la langue cible ou une langue que vous avez exclue.","Абзац написан на языке перевода или на исключённом языке.","El párrafo está en el idioma de destino o en un idioma excluido."],
+  ["所选段落本次没有生成不同的译文。","This run produced no different text for the paragraph.","今回は選んだ段落に原文と異なる訳文が生成されませんでした。","이번 번역에서는 선택한 단락에 원문과 다른 결과가 생성되지 않았습니다.","Cette tentative n’a produit aucun texte différent pour le paragraphe.","В этот раз для абзаца не получен текст, отличающийся от оригинала.","Esta vez el párrafo no obtuvo un texto distinto del original."],
+  ["所选段落已手动恢复为原文。","The paragraph was manually restored to the original.","選んだ段落は手動で原文に戻されています。","선택한 단락을 원문으로 수동 복원했습니다.","Le paragraphe a été rétabli manuellement dans sa version originale.","Исходный текст абзаца был восстановлен вручную.","El párrafo se restauró manualmente al original."],
+  ["已识别所选段落，当前会话尚未排入翻译队列。","The paragraph was detected and is currently absent from the translation queue.","選んだ段落を認識しましたが、現在の翻訳キューにはありません。","선택한 단락을 인식했지만 현재 번역 대기열에 없습니다.","Le paragraphe a été détecté. Il est actuellement absent de la file de traduction.","Абзац распознан, но сейчас отсутствует в очереди перевода.","Se detectó el párrafo y actualmente está fuera de la cola de traducción."],
+];
+
+/** 官方规则更新、网页诊断和正文工作台文案仅随扩展资源生成。 */
+export function createExtensionSiteActionText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
+  return Object.fromEntries(extensionSiteActionRows.map(row => [row[0], row[columns[language]]]));
+}

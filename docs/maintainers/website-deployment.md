@@ -27,6 +27,12 @@ pnpm docs:preview
 
 自定义域名使用根路径，VitePress 的 `base` 保持 `/`。不需要把构建文件提交到 `main`，也不需要 `gh-pages` 分支。维护文档不进入公开网站，见 VitePress 的 `srcExclude`。
 
+## 官方网站规则发布
+
+官网构建与扩展发布使用同一份正文适配规则源。启用签名更新时，将 P-256 公钥的 DER SPKI 以 Base64 写入仓库公开变量 `WXT_SITE_RULES_PUBLIC_KEY`，并将配对的 PEM 私钥放入 Actions secret `FLUENTREAD_SITE_RULES_PRIVATE_KEY`。官网的签名步骤会核对配对关系，扩展发布只读公钥。私钥仅提供给主线官网构建中的签名步骤。
+
+部署流程按本工作流的运行序号签发 `/site-rules/v1/official.json`。扩展验证签名、最低版本、规则包格式和发布序号后才替换缓存。需要回退某条规则时，将修正提交到主线并生成更高序号的发布。部署签名和扩展读取可先用一对仅用于测试的密钥验收。
+
 ## Google OAuth 使用的公开地址
 
 | 用途 | 地址 |

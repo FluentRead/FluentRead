@@ -71,6 +71,18 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .privacy-note { white-space: nowrap; color: var(--muted); font-size: 11px; }
 .privacy-note i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #2db483; box-shadow: 0 0 0 4px rgba(45, 180, 131, .12); }
 .ghost-button { white-space: nowrap; min-height: 36px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 700; cursor: pointer; }
+.document-glossary-extract { justify-self: start; margin-top: 8px; }
+.document-glossary-review { display: grid; gap: 10px; margin-top: 16px; }
+.document-glossary-destination { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 8px; color: var(--ink); font-size: 12px; }
+.document-glossary-destination small { grid-column: 2; color: var(--muted); }
+.document-glossary-translation { min-width: 0; width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); font: inherit; }
+.document-glossary-list { display: grid; max-height: min(48dvh, 340px); overflow: auto; margin: 0; padding: 0 6px 0 0; list-style: none; font-size: 12px; }
+.document-glossary-list > li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr); align-items: center; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.document-glossary-term { display: flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.document-glossary-term input { flex: none; accent-color: var(--brand-strong); }
+.document-glossary-evidence { grid-column: 1 / -1; margin: 0; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.document-glossary-review .setup-privacy { margin: 0; }
+.document-glossary-actions .translate-document-button { white-space: normal; }
 .ghost-button:hover:not(:disabled) { border-color: rgba(239, 71, 118, .42); color: var(--brand-strong); background: var(--brand-soft); }
 .ghost-button:disabled { cursor: not-allowed; opacity: .55; }
 
@@ -714,6 +726,7 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; width: 100%; max-width: none; min-width: 0; flex-wrap: nowrap; gap: 8px; }
 .document-taskbar .file-heading, .document-taskbar .file-heading > div { min-width: 0; }
 .document-taskbar .document-status { overflow: hidden; text-overflow: ellipsis; }
+.document-taskbar .article-source-link { display: inline-block; margin-top: 3px; color: var(--brand); font-size: 11px; }
 .document-taskbar .reader-toolbar { grid-column: 2; grid-row: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; padding-left: 10px; }
 .document-taskbar .reader-tabs { flex: none; }
 .document-taskbar .reader-reading-controls { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }

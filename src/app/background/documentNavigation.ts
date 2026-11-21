@@ -11,6 +11,9 @@ import {isBrowserTabId} from '@/src/platform/browser/ids';
 import {config, configReady} from '@/src/services/config/store';
 import type {BackgroundMessageHandler} from '@/src/services/messaging/backgroundRouter';
 import {createNativePdfSelectionHandler} from './nativePdfSelection';
+import {createWebArticleOpenHandler} from './webArticleRuntime';
+import {createDocumentHistory} from '@/src/features/document-translation/services/history';
+import type {TabTranslationStateStore} from './tabTranslationState';
 
 type DocumentNavigationContext = {
     sender?: {
@@ -54,14 +57,24 @@ export function createPaperPdfHandler(
     };
 }
 
-export function createDocumentNavigationHandlers<Context extends DocumentNavigationContext>(): readonly BackgroundMessageHandler<Context>[] {
+export function createDocumentNavigationHandlers<Context extends DocumentNavigationContext>(
+    documents: Pick<TabTranslationStateStore, 'captureDocument'>,
+): readonly BackgroundMessageHandler<Context>[] {
+    const isDisabled = (url: string) => config.on === false || isExtensionDisabledOnSite(url, config.disabledExtensionDomains);
+    const openDocument = (url: string, windowId?: number) => browser.tabs.create({
+        url, ...(windowId === undefined ? {} : {windowId}),
+    });
+    const documentUrl = browser.runtime.getURL('/document.html');
     return [createNativePdfSelectionHandler<Context>(), createPaperPdfHandler({
         ready: configReady,
         extensionId: browser.runtime.id,
-        isDisabled: url => config.on === false || isExtensionDisabledOnSite(url, config.disabledExtensionDomains),
-        openPdf: (source, windowId) => browser.tabs.create({
-            url: createPdfReaderUrl(browser.runtime.getURL('/document.html'), source),
-            ...(windowId === undefined ? {} : {windowId}),
-        }),
+        isDisabled,
+        openPdf: (source, windowId) => openDocument(createPdfReaderUrl(documentUrl, source), windowId),
+    }), createWebArticleOpenHandler<Context>({
+        ready: configReady, extensionId: browser.runtime.id, popupUrl: browser.runtime.getURL('/popup.html'),
+        documentUrl, history: createDocumentHistory(), isDisabled, now: Date.now, openDocument,
+        captureDocument: id => documents.captureDocument(id),
+        getTab: id => browser.tabs.get(id),
+        askForArticle: (id, expectedUrl) => browser.tabs.sendMessage(id, {type: 'extractWebArticle', expectedUrl}, {frameId: 0}),
     })];
 }

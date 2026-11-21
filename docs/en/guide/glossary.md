@@ -22,6 +22,12 @@ To keep a particular word untranslated, add it as an entry and leave its transla
 
 Glossary settings save automatically; entry edits require **Save**. Switching glossaries keeps drafts within the current page, but save them before closing it.
 
+## Find glossary candidates in a document
+
+Open an English paper with a text layer in the document workspace, or import a long web page with **Open article**. In the document's translation settings, select **Find glossary candidates**. The workspace looks for defined English abbreviations, their full forms and recurring proper names locally. It sends the candidate terms to your current translation service for suggestions and shows the original sentence alongside each suggestion.
+
+Select the entries you want, edit the suggested translations and choose a compatible glossary or create one for the language pair. Confirm to save the terms and retranslate the paragraphs where glossary matches changed. Each new translation replaces the existing translation and its edits only after the request succeeds. If you pause, use **Resume glossary retranslation** in the current workspace.
+
 ## Set the scope
 
 Use **Glossary settings** to change its name, languages, and websites. An empty website scope applies everywhere. Website-specific glossaries do not apply to local documents without a URL. Documents and videos can also select their own glossaries.

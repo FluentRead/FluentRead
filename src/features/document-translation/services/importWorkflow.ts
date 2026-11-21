@@ -7,6 +7,7 @@
  */
 import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {getDocumentFormat, getDocumentMaxBytes, normalizeDelimitedColumns, type ParsedDocument} from '../core/document';
+import {webArticleIdentityBytes} from '../core/webArticle';
 import type {parseDocumentFile} from './binary';
 import type {fetchOnlinePdf, PdfDownloadProgress} from './pdfSource';
 import {documentHistoryId, restoreDocumentHistoryPdfOcr, restoreDocumentHistoryRevisions, type DocumentHistory} from './history';
@@ -72,7 +73,9 @@ export function createDocumentImportWorkflow(ports: DocumentImportPorts) {
                 if (ports.history) {
                     const bytes = parsed.binary?.bytes ?? new Uint8Array(await file.arrayBuffer());
                     if (!operation.current()) return;
-                    const historyId = await documentHistoryId(bytes);
+                    const historyId = await documentHistoryId(
+                        parsed.format === 'html' && sourceUrl ? webArticleIdentityBytes(sourceUrl, bytes) : bytes,
+                    );
                     if (!operation.current()) return;
                     const result = historyId ? await ports.history.loadChecked(historyId) : {status: 'unavailable' as const};
                     if (!operation.current()) return;

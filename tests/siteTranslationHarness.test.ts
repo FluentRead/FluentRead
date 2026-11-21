@@ -4287,6 +4287,22 @@ describe('real-site translation matrix gates', () => {
     expect(inspectFixtureTranslationParts({parts, requireAll: true}, document)).toBe(false);
   });
 
+  it('checks the original prose and preserved markup with the production fixture codec', () => {
+    const {encode, decodeText} = require('../scripts/site-translation/controlled-provider.cjs').controlledProviderRuntime();
+    const {document} = parseHTML(`<p id="owner"><span class="fluent-read-bilingual-content">${encode('Open a ')}<a href="/reference">${encode('readable reference')}</a>${encode(' with ')}<code>run()</code>${encode('.')}</span></p>`);
+    const parts = [{selector: '#owner', sourceIncludes: 'Open a readable reference with run().',
+      preservedText: ['run()'], omittedText: ['Control caption'],
+      preservedMarkup: [{selector: 'a[href="/reference"]', text: '测试译文：readable reference'}, {selector: 'code', text: 'run()'}]}];
+    vi.stubGlobal('__frAdaptationFixtureDecode', decodeText);
+    try {
+      expect(inspectFixtureTranslationParts({parts, requireAll: true}, document)).toBe(true);
+      document.querySelector('.fluent-read-bilingual-content')!.append(encode(' Control caption'));
+      expect(inspectFixtureTranslationParts({parts, requireAll: true}, document)).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('still rejects missing Chinese, missing prose, duplicate owners and duplicate wrappers in slot echoes', () => {
     const {document} = parseHTML('<main><p id="owner"><span class="fluent-read-bilingual-content">测试译文：Readable <em>测试译文：inline source</em>测试译文： remains complete.</span></p></main>');
     const parts = [{selector: '#owner', sourceIncludes: 'Readable inline source remains complete.'}];

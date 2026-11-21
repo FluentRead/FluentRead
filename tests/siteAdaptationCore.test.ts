@@ -16,6 +16,36 @@ const rule = (extra: Partial<SiteRule> = {}): SiteRule => ({
 });
 const pack = (rules: SiteRule[] = [rule()]): SiteRulePack => ({version: 1, rules});
 
+describe('Twitch live chat (#1382)', () => {
+    it('discovers English and Japanese messages in an aside and in live updates', () => {
+        const {document} = parseHTML(`<html><body>
+            <nav><a href="/monstercat"><div><div class="side-nav-card__title">
+                <p data-a-target="side-nav-title" id="channel">Monstercat live music stream</p>
+            </div></div></a></nav>
+            <main><p id="intro">This channel broadcasts electronic music.</p></main>
+            <aside><div class="chat-scrollable-area__message-container"><div class="chat-line__message">
+                <button class="chat-line__username-container">Chat author</button>
+                <span data-a-target="chat-line-message-body" id="english">
+                    <span data-a-target="chat-message-text">Thanks for this wonderful stream.</span>
+                </span>
+            </div></div><p>Join the daily music chat</p></aside>
+        </body></html>`);
+        const adapters = compileSiteRulePack(builtinSiteRulePack);
+        const url = new URL('https://www.twitch.tv/monstercat');
+        const core = new TranslationCandidateCore({url, adapters});
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['intro', 'english']);
+        const chat = document.querySelector('.chat-scrollable-area__message-container')!;
+        chat.insertAdjacentHTML('beforeend', '<div class="chat-line__message"><span id="japanese" data-a-target="chat-message-text">今日も素敵な配信をありがとうございます。</span></div>');
+        const japanese = document.getElementById('japanese')!;
+        expect(core.discover(japanese).map(candidate => candidate.element)).toEqual([japanese]);
+        expect(core.resolve(japanese.firstChild)?.element).toBe(japanese);
+        expect(new TranslationCandidateCore({url, adapters, includeSidebarRegions: true})
+            .discover(document).map(candidate => candidate.element.id)).toContain('channel');
+        expect(new TranslationCandidateCore({url: new URL('https://twitch.tv.example.org/'), adapters})
+            .discover(document).map(candidate => candidate.element.id)).toEqual(['intro']);
+    });
+});
+
 describe('issue #1251: explicit no-translate overrides', () => {
     const url = new URL('https://example.test/comments');
     const custom = () => pack([rule({forceTranslate: ['#comments'], content: [{css: ['.post_body p']}], protect: ['.author']})]);

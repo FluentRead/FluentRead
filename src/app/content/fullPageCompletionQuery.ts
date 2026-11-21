@@ -13,6 +13,8 @@ import {
     getFullPageTranslationDocumentToken,
     readFullPageUnchangedCompletion,
     getFullPageTranslationFrameState,
+    readPageRuleDiagnosis,
+    readPageRuleSelection,
 } from '@/src/app/content/features';
 
 interface FullPageCompletionQueryState {
@@ -28,6 +30,16 @@ export function handleFullPageCompletionQuery(
     state: FullPageCompletionQueryState,
     sendResponse: (response?: unknown) => void,
 ): boolean {
+    if (import.meta.env.BROWSER !== 'userscript' && payload.explainSelection === true) {
+        const sender = _sender as {id?: unknown} | null;
+        if (ctx.isInvalid || !sender?.id || sender.id !== browser.runtime.id || config.on === false ||
+            state.isSiteDisabled() || state.isPageSuspended?.() || payload.pageUrl !== window.location.href) {
+            sendResponse({status: 'unavailable'});
+            return true;
+        }
+        sendResponse({status: 'success', diagnosis: readPageRuleDiagnosis(readPageRuleSelection(document))});
+        return true;
+    }
     if (payload.unchangedQueries !== undefined) {
         const sender = _sender as {id?: unknown} | null;
         if (!sender || typeof browser.runtime.id !== 'string' || sender.id !== browser.runtime.id ||

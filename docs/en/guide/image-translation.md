@@ -83,6 +83,8 @@ Scaling small text on solid backgrounds, or dark text on slightly varying light 
 
 Bright text on dark backgrounds also checks complete blank columns and model evidence when strokes touch the recognition crop edges, for example restoring `CHECKTHE OXYGEN` to `CHECK THE OXYGEN`. Existing spaces, characters and positions are preserved. Mixed colors, uncertain backgrounds, connected strokes or insufficient evidence retain the original recognition result.
 
+For tightly cropped colored text with a verified word break, image translation checks new spaces against the spacing on the same line to avoid splitting a word such as `OUTDOOR`.
+
 Image translation also checks text detection evidence alongside recognition to reduce highlights, textures and decorative lines being mistaken for text.
 
 Some horizontal text missed because of surrounding background interference can receive an additional recognition pass. Complex perspective, very small text and faint lettering may still be missed; check the original image.

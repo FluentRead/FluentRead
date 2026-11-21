@@ -11,7 +11,8 @@
  * 倾斜横排：仅在原字号证据不足时独立观察方向并核对原文尺度；同源原框及物理框绑定不变、未受透明孔洞影响时，按真实字形旋转后完整适配。原清字范围、透明裁剪与颜色证明保持独立。
  */
 import type {MangaRegion} from './mangaRegions';
-import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection,getImageSourceInkFontSize,getImageSourceTypographyStyle} from './rendering';
+import {getImageTextColor, getImageTextBackgroundColor,getImageTextDirection,getImageSourceInkFontSize,getImageSourceTypographyStyle,
+    drawTranslatedImageText,getImageSourceTextStyle} from './rendering';
 import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
 import {createImageTypographyPlane} from './sourceTypographyPlane';
 import {createMangaTranslationSearch, layoutMangaTranslationText, MANGA_TEXT_FONT} from './mangaTypography';
@@ -189,6 +190,12 @@ export function drawMangaTranslations(context: CanvasRenderingContext2D, pixels:
                         context.fillRect(source.x0, source.y0, source.x1 - source.x0, source.y1 - source.y0);
                     }
                 } else context.fillRect(left, top, right - left, bottom - top);
+            }
+            if(region.quarterTurn){
+                const {fontSize,orientation}=getImageSourceTextStyle(context,region);
+                drawTranslatedImageText(context,region.text,left,top,right-left,bottom-top,sampled.textBackground??sampled.color,
+                    fontSize,'center',undefined,sampled.foreground,sampled.foregroundOutline,undefined,orientation);
+                continue;
             }
             const display = !sampled.uniform && !region.vertical && region.fontSize >= width * .045;
             const weight = display ? 800 : 600;

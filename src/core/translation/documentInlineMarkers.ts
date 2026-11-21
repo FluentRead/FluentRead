@@ -7,7 +7,8 @@
 import {isLikelyUntranslatedInlineResponse} from './resultValidation';
 
 export interface DocumentInlineValidationContext {
-    targetLanguage: string;
+    /** 导出仅校验标记和词槽可见性；翻译请求凭真实目标语进一步核对原文回显。 */
+    targetLanguage?: string;
     protectedTokens?: readonly string[];
 }
 
@@ -34,6 +35,11 @@ export class DocumentInlineMarkerError extends Error {
 export function normalizeDocumentInlineMarkers(text: string): string {
     return text.replace(/(?:&(?:lt|#0*60|#x0*3c);|[<＜〈（(])\s*([\/／]?)\s*[gＧｇ]\s*([0-9０-９]+)\s*([\/／]?)\s*(?:&(?:gt|#0*62|#x0*3e);|[>＞〉）)])/giu,
         (_, open: string, id: string, close: string) => `<${open ? '/' : ''}g${id.replace(/[０-９]/gu, value => String(value.charCodeAt(0) - 0xff10))}${close ? '/' : ''}>`);
+}
+
+/** 文档有生成标记时，从可见文字和原文索引中只移除协议编号。 */
+export function stripDocumentInlineMarkers(text: string): string {
+    return normalizeDocumentInlineMarkers(text).replace(/<\/?g\d+\/?>/gu, '');
 }
 
 /** Canonical 内部语法从术语正文匹配中排除，用户的同名短词仍可匹配标签之间的文字。 */
@@ -95,6 +101,7 @@ export function validateDocumentInlineMarkers(origin: string, result: unknown, c
     if (context) {
         // 按结构身份累计，允许重复编号/兄弟重排；含子节点文字的父节点也算非空，扫描保持线性。
         if ([...expected.filled].some(([key, count]) => (actual.filled.get(key) ?? 0) < count)) throw new DocumentInlineMarkerError();
+        if (!context.targetLanguage) return normalized;
         const occurrences = new Map<string, number>();
         for (const [key, count] of expected.counts) {
             const id = key.slice(0, key.indexOf(':'));

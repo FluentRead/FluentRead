@@ -9,7 +9,7 @@ import {createImageControls} from '@/src/features/image-translation/content/cont
 import {IMAGE_READER_CSS} from '@/src/features/image-translation/content/textReader';
 import {sendCancellableImageOperation, prepareImageOcrLanguages} from '@/src/features/image-translation/services/client';
 import {imageTranslationProgressTransport} from '@/src/features/image-translation/background/offscreenAdapter';
-import {getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
+import {getImageLabelSlots, getTranslationRequestControl, attachTranslationGlossaryContext} from '@/src/services/translation/requestSnapshot';
 import {registerAllUiLanguageBundles} from './helpers/uiLanguageBundles';
 import {Config} from '@/src/core/config/model';
 import {normalizePrivacyPolicy} from '@/src/core/privacy/policy';
@@ -25,6 +25,21 @@ function setup(extra = {}) {
     const handlers=createImageTranslationBackgroundHandlers(dependencies);
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
+
+it('同栏标签随筛选后的数组重新定位，缺少真实相邻位置时不携带标签标记', async () => {
+    const translateTexts = vi.fn(async ({origin}: {origin: string[]}) => origin.map(() => '译文'));
+    const type = IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
+    const h = setup({supportsBatchTranslation: () => true, translateTexts});
+    const texts = ['123', 'Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+    await expect(h.handler(type).handle({type, texts, imageLabelSlots: [2]})).resolves.toMatchObject({success: true});
+    expect(translateTexts.mock.calls[0][0].origin).toEqual(texts.slice(1));
+    expect(getImageLabelSlots(translateTexts.mock.calls[0][0])).toEqual([1]);
+    await expect(h.handler(type).handle({type, texts: [texts[1], '123', ...texts.slice(2)], imageLabelSlots: [2]}))
+        .resolves.toMatchObject({success: true});
+    expect(getImageLabelSlots(translateTexts.mock.calls[1][0])).toBeUndefined();
+    await expect(h.handler(type).handle({type, texts, imageLabelSlots: [2, 2, 2, 2, 2]})).resolves.toMatchObject({success: true});
+    expect(getImageLabelSlots(translateTexts.mock.calls[2][0])).toBeUndefined();
+});
 
 it.each(['ru-RU','ko-KR','ar-SA','he-IL'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
     const assertLanguagesDownloaded=vi.fn()

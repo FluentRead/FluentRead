@@ -3,6 +3,36 @@ import { getOcrLanguages, normalizeOcrLines, selectChangedTranslations } from '@
 import { imageMaskBoxIntersects, inpaintTextRegions } from '@/src/features/image-translation/services/inpainting';
 import { getImageOcrModelLanguages, IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_RECOMMENDED_LANGUAGES, normalizeImageOcrLanguageCodes } from '@/src/features/image-translation/ocrLanguages';
 import { getImageTextBackgroundColor, getImageTextColor } from '@/src/features/image-translation/services/rendering';
+import {getAlignedImageLabelSlots} from '@/src/features/image-translation/labelContext';
+import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
+
+it('短标签只能借原图中连续同栏的独立横排行', () => {
+    const create = () => ['Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'].map((text, index) => ({
+        line: {text, bbox: {x0: 44, x1: 320, y0: 32 + index * 66, y1: 61 + index * 66}} as ImageTextRegion,
+        index,
+    }));
+    expect(getAlignedImageLabelSlots(create())).toEqual([1]);
+    const controls = [
+        (rows: ReturnType<typeof create>) => {rows[1].line.text = 'AN ACCOUNT NUMBER THAT IS TOO LONG TO FIT IN THE SHORT LABEL WINDOW';},
+        (rows: ReturnType<typeof create>) => {rows[1].line.text = 'LABEL 103';},
+        (rows: ReturnType<typeof create>) => {rows[0].index = -1;},
+        (rows: ReturnType<typeof create>) => {rows[2].index = 3;},
+        (rows: ReturnType<typeof create>) => {rows[0].line.vertical = true;},
+        (rows: ReturnType<typeof create>) => {rows[1].line.quarterTurn = 1;},
+        (rows: ReturnType<typeof create>) => {rows[2].line.sourceBoxes = [rows[1].line.bbox, rows[2].line.bbox];},
+        (rows: ReturnType<typeof create>) => {rows[1].line.bbox.x0 += 300;},
+        (rows: ReturnType<typeof create>) => {rows[1].line.bbox.y1 = Infinity;},
+        (rows: ReturnType<typeof create>) => {rows[1].line.bbox.y1 = NaN;},
+        (rows: ReturnType<typeof create>) => {rows[1].line.bbox.y1 = rows[1].line.bbox.y0;},
+        (rows: ReturnType<typeof create>) => {rows[2].line.bbox.y0 += 100; rows[2].line.bbox.y1 += 100;},
+        (rows: ReturnType<typeof create>) => {rows[2].line.bbox.y0 -= 48; rows[2].line.bbox.y1 -= 48;},
+    ];
+    for (const change of controls) {
+        const rows = create();
+        change(rows);
+        expect(getAlignedImageLabelSlots(rows)).toEqual([]);
+    }
+});
 
 it.each([
     [{x0:0,y0:0,x1:5,y1:5},{x0:6,y0:0,x1:8,y1:4},true],

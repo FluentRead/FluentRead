@@ -50,7 +50,8 @@ export function createTranslationRequestSnapshot<T extends object>(message: T): 
         const descriptor = descriptors[key];
         const value = 'value' in descriptor ? descriptor.value : Reflect.get(message, key);
         descriptors[key] = {
-            value: (key === 'origin' || key === 'glossaryIds' || key === 'texts') && Array.isArray(value) ? [...value] : value,
+            value: (key === 'origin' || key === 'glossaryIds' || key === 'texts'
+                || (import.meta.env.BROWSER !== 'userscript' && key === 'imageLabelSlots')) && Array.isArray(value) ? [...value] : value,
             enumerable: descriptor.enumerable,
             configurable: descriptor.configurable,
             writable: descriptor.writable ?? false,
@@ -61,15 +62,27 @@ export function createTranslationRequestSnapshot<T extends object>(message: T): 
 
 const TRANSLATION_ACCEPT_UNCHANGED_RESULT = Symbol('fluentread.translation-accept-unchanged-result');
 const TRANSLATION_IMAGE_TEXT_BATCH = Symbol('fluentread.image-text-batch');
+type ImageTextBatchMark = {[TRANSLATION_IMAGE_TEXT_BATCH]?: true | {readonly originCount: number; readonly labelSlots: readonly number[]}};
 
 /** 同图文字批次保留位置和邻文；标记只在后台流转，不能由 runtime JSON 自报。 */
-export function markImageTextBatch<T extends object>(message: T): T {
-    return Object.assign(message, {[TRANSLATION_IMAGE_TEXT_BATCH]: true});
+export function markImageTextBatch<T extends {origin: string | string[]}>(message: T, labelSlots?: readonly number[]): T {
+    return Object.assign(message, {
+        [TRANSLATION_IMAGE_TEXT_BATCH]: labelSlots?.length && Array.isArray(message.origin)
+            ? {originCount: message.origin.length, labelSlots: Object.freeze([...labelSlots])}
+            : true,
+    });
 }
 
 export function isImageTextBatch(message: {origin: string | string[]}): boolean {
     return import.meta.env.BROWSER !== 'userscript' && Array.isArray(message.origin)
-        && (message as {[TRANSLATION_IMAGE_TEXT_BATCH]?: unknown})[TRANSLATION_IMAGE_TEXT_BATCH] === true;
+        && (message as ImageTextBatchMark)[TRANSLATION_IMAGE_TEXT_BATCH] !== undefined;
+}
+
+/** 裁剪数组后不能沿用原始槽位。相同长度的逐槽术语保护保留位置。 */
+export function getImageLabelSlots(message: {origin: string | string[]}): readonly number[] | undefined {
+    const mark = (message as ImageTextBatchMark)[TRANSLATION_IMAGE_TEXT_BATCH];
+    return mark && mark !== true && Array.isArray(message.origin) && mark.originCount === message.origin.length
+        ? mark.labelSlots : undefined;
 }
 
 /** 图片文字允许有效原样结果；内部标记随后台对象展开保留，不进入 runtime 或网络 JSON。 */

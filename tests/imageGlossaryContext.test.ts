@@ -62,8 +62,13 @@ describe('图片及圈选术语的后台来源上下文', () => {
         ready.resolve();
         await entered.promise;
         h.change();
-        const result = await h.call(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, {requestId: 'image-1', glossaryRevision: 'forged'}, offscreen) as object;
-        expect(result).toMatchObject({sourceLanguage: 'en', glossaryRevision: 'ready-revision'});
+        const imageLabelSlots = [1];
+        const reply = h.call(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, {requestId: 'image-1', glossaryRevision: 'forged', imageLabelSlots}, offscreen);
+        imageLabelSlots.push(2);
+        const result = await reply as object;
+        expect(result).toMatchObject({sourceLanguage: 'en', glossaryRevision: 'ready-revision', imageLabelSlots: [1]});
+        const pageReply = await h.call(IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE, {requestId: 'image-1', imageLabelSlots}, page(OFFSCREEN_URL));
+        expect(pageReply).not.toHaveProperty('imageLabelSlots');
         expect(getTranslationGlossaryContext(result)).toEqual({pageUrl: 'https://docs.example.com/article', context: 'page'});
         expect(Object.isFrozen(getTranslationGlossaryContext(result))).toBe(true);
         ocr.resolve('done');

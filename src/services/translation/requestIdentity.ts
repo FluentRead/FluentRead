@@ -114,6 +114,7 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         modelOverride?: string,
         sourceLanguageDetectionText?: string,
         subtitleContext?: string,
+        imageLabelSlots?: readonly number[],
     ): string {
         const {config: current, service, sourceLanguage, targetLanguage} = execution;
         // 公开入口已冻结本次匹配范围；普通键复用保护条目，避免两次扫描同一术语库。
@@ -126,6 +127,8 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         return deps.buildTranslationCacheKey({
             requestMode: mode,
             sourceText: origin,
+            ...(import.meta.env.BROWSER !== 'userscript' && imageLabelSlots
+                ? {imageLabelContext: {version: 1, slots: imageLabelSlots}} : {}),
             // 仅含 emoji 的正文采用新恢复契约；不能复用保护前已经丢失字素的结果。
             ...(hasEmojiLiterals(origin) ? {emojiLiteralProtection: {version: 1}} : {}),
             sourceLanguage,

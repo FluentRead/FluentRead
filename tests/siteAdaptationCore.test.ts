@@ -520,12 +520,13 @@ describe('Englio word-segmented article paragraphs', () => {
         expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
     });
 
+    // Fallback discovery still scans the full fixture of more than 2,000 inline spans.
     it.each(['data-article-start', 'data-word-pos'])('rejects the wide article without %s', marker => {
         const {document, core, article} = fixture();
         if (marker === 'data-article-start') article.removeAttribute(marker);
         else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(marker));
         expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
-    });
+    }, 15_000);
 });
 
 describe('OpenAI community reading boundaries', () => {

@@ -11,6 +11,17 @@ export type TranslationCandidateKind = 'content' | 'control';
 /** 正文范围保留站点阅读边界；全部节点范围额外覆盖可见界面文字。 */
 export type TranslationScope = 'content' | 'all';
 
+export type SelectionDiagnosisReason = 'no-selection' | 'rule-excluded' | 'rule-protected' | 'rule-focus' |
+    'protected' | 'unrecognized' | 'inactive' | 'waiting' | 'loading' | 'translated' | 'error' |
+    'language-filtered' | 'unchanged' | 'restored' | 'unscheduled';
+
+/** 可传给 Popup 的本地诊断。只含规则标识和状态，不携带原文、DOM 或服务响应。 */
+export interface PageRuleDiagnosis {
+    scope: TranslationScope;
+    ruleIds: readonly string[];
+    selection: {reason: SelectionDiagnosisReason; ruleId?: string; detail?: string};
+}
+
 /** 站点适配器是否允许没有显式 selector 命中的通用候选。 */
 export type TranslationGenericCandidatePolicy = 'allow' | 'targets-only';
 

@@ -26,6 +26,8 @@ import {browserCapabilities, type BrowserCapabilities} from '@/src/platform/brow
 import {rejectUnsupportedContentFeature} from './featureRegistry';
 import {handleInformationHighlightMessage, type InformationHighlightMessageState} from './informationHighlight';
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
+import {handleWebArticleMessage} from './webArticleMessage';
+
 export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
     reconcileUserscriptPage?(): Promise<boolean>;
@@ -38,6 +40,8 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
         if (import.meta.env.BROWSER !== 'userscript') {
+            const article = handleWebArticleMessage(payload, _sender, ctx, state, sendResponse);
+            if (article !== undefined) return article;
             const pageFont = handlePageTranslationFontMessage(payload, _sender, ctx, state, sendResponse);
             if (pageFont !== undefined) return pageFont;
             const notice = handleContextMenuNotice(payload, ctx, state, sendResponse);

@@ -5,6 +5,7 @@
  * 模块边界：只连接核心与现有公开生命周期能力，不实现候选算法、配置存储或额外监听器。
  */
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
+import type {OfficialSiteRuleRelease} from '@/src/core/site-adaptation/officialRelease';
 import {createSiteAdaptationSession, type SiteAdaptationSession} from '@/src/core/site-adaptation/session';
 import {setCurrentTranslationAdapters, setCurrentTranslationSidebarRegions} from '@/src/core/translation/current';
 import {setMinimumTranslationTextLength} from '@/src/core/translation/text';
@@ -40,8 +41,9 @@ export function createContentSiteAdaptationRuntime(
     initialSettings: unknown,
     url: URL,
     invalidate: () => void = invalidatePageTranslation,
+    officialRelease?: OfficialSiteRuleRelease | null,
 ): SiteAdaptationSession {
-    const session = createSiteAdaptationSession(builtinSiteRulePack, {
+    const session = createSiteAdaptationSession(officialRelease?.pack ?? builtinSiteRulePack, {
         apply: setCurrentTranslationAdapters, invalidate,
     });
     session.update(initialSettings);

@@ -5446,7 +5446,10 @@
       {
         "css": [
           "#search h3",
-          "#search .VwiC3b"
+          "#search .VwiC3b",
+          "#m-x-content :is(p, li, [role=\"listitem\"])",
+          "[data-attrid=\"VisualDigestGeneratedDescription\"]",
+          "[data-attrid=\"VisualDigestGeneratedDescription\"] :is(p, li, [role=\"listitem\"])"
         ],
         "atomic": false
       }

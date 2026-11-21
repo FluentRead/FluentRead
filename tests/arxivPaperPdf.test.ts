@@ -104,7 +104,7 @@ describe('Open paper PDF background message', () => {
             runtime: {id: 'fluentread', getURL: (path: string) => `chrome-extension://fluentread${path}`},
             tabs: {create},
         });
-        const router = createBackgroundMessageRouter(createDocumentNavigationHandlers());
+        const router = createBackgroundMessageRouter(createDocumentNavigationHandlers({captureDocument: () => () => true}));
         const check = (status: string, context = {sender}) =>
             expect(router.dispatch(message, context)).resolves.toEqual({handled: true, response: {status}});
         config.on = false;
@@ -123,5 +123,25 @@ describe('Open paper PDF background message', () => {
         await expect(router.dispatch(message, {sender: {...sender, tab: {id: 0}}}))
             .resolves.toEqual({handled: true, response: {status: 'success'}});
         expect(create).toHaveBeenLastCalledWith({url: options.url});
+    });
+
+    it('routes the popup article request to the current top frame', async () => {
+        const url = 'https://example.test/news';
+        const get = vi.fn(async () => ({url, windowId: 4}));
+        const sendMessage = vi.fn(async () => ({status: 'no-article'}));
+        const create = vi.fn();
+        vi.stubGlobal('browser', {
+            runtime: {id: 'fluentread', getURL: (path: string) => `chrome-extension://fluentread${path}`},
+            tabs: {get, sendMessage, create},
+        });
+        const captureDocument = vi.fn(() => () => true);
+        const router = createBackgroundMessageRouter(createDocumentNavigationHandlers({captureDocument}));
+        await expect(router.dispatch({type: 'openWebArticle', tabId: 7, expectedUrl: url}, {
+            sender: {id: 'fluentread', url: 'chrome-extension://fluentread/popup.html'},
+        })).resolves.toEqual({handled: true, response: {status: 'no-article'}});
+        expect(captureDocument).toHaveBeenCalledWith(7);
+        expect(get).toHaveBeenCalledWith(7);
+        expect(sendMessage).toHaveBeenCalledWith(7, {type: 'extractWebArticle', expectedUrl: url}, {frameId: 0});
+        expect(create).not.toHaveBeenCalled();
     });
 });

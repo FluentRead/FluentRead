@@ -1,5 +1,46 @@
 [
   {
+    "id": "x-post-expand-control",
+    "url": "https://x.com/home",
+    "html": "<nav id=\"navigation\">Home timeline controls</nav><main><article id=\"post\" data-testid=\"tweet\"><div id=\"initial-post\" data-testid=\"tweetText\">The first part of an English timeline post appears before its native expansion button.</div><button id=\"show-more\" data-testid=\"tweet-text-show-more-link\">Show more</button></article></main>",
+    "modes": ["full"],
+    "required": ["#initial-post"],
+    "forbidden": ["#navigation", "#show-more"],
+    "restoreSelectors": ["#post"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#post",
+          "click": "#show-more",
+          "html": "<div id=\"expanded-post\" data-testid=\"tweetText\">The expanded timeline post reveals more readable source material without losing the original card.</div>",
+          "required": ["#expanded-post"],
+          "sourceIncludes": ["The expanded timeline post reveals more readable source material"],
+          "sourceExcludes": ["Show more"]
+        }
+      ]
+    }
+  },
+  {
+    "id": "twitch-live-chat",
+    "url": "https://www.twitch.tv/monstercat",
+    "html": "<nav id=\"navigation\">Twitch navigation links</nav><main><p id=\"intro\">This live channel broadcasts independent electronic music around the clock.</p></main><aside id=\"chat\"><div id=\"messages\" class=\"chat-scrollable-area__message-container\"><div class=\"chat-line__message\"><button id=\"author\">Chat author</button><span id=\"first-message\" data-a-target=\"chat-line-message-body\">Thanks for this wonderful live stream, and greetings to everyone in the chat.</span></div></div></aside>",
+    "modes": ["full"],
+    "required": ["#intro", "#first-message"],
+    "forbidden": ["#navigation", "#author"],
+    "restoreSelectors": ["main", "#chat"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#messages",
+          "html": "<div class=\"chat-line__message\" style=\"margin-top:140vh\"><span id=\"late-message\" data-a-target=\"chat-message-text\">This new live chat message appears below the fold and enters the translation session after scrolling.</span></div>",
+          "scroll": "#late-message",
+          "required": ["#late-message"],
+          "sourceIncludes": ["This new live chat message appears below the fold"]
+        }
+      ]
+    }
+  },
+  {
     "id": "topic-tag-metadata",
     "url": "https://community.openai.com/hot",
     "html": "<main id=\"reading\"><h2 id=\"title\">How can ChatGPT help readers follow a discussion?</h2><ul class=\"discourse-tags\" id=\"tags\" aria-label=\"Tags\"><li><a class=\"discourse-tag simple\" href=\"/tag/chatgpt/16\">chatgpt</a><span class=\"discourse-tags__tag-separator\">,</span></li><li><a class=\"discourse-tag simple\" href=\"/tag/rate-limit/77\">rate-limit</a></li></ul><a class=\"discourse-tag\" id=\"standalone\" href=\"/tag/plugin-development/20\">plugin-development</a><div class=\"cooked\"><p id=\"body\">This readable discussion explains a topic with enough context for translation.</p><p id=\"mixed\">This paragraph refers to <a class=\"discourse-tag\" id=\"inline\" href=\"/tag/image-generation/42\">image-generation</a> while the surrounding explanation remains readable.</p></div></main>",

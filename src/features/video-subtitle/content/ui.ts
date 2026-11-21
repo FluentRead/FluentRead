@@ -268,7 +268,9 @@ export function isXHostPage(locationLike: Pick<Location, 'hostname'> = window.lo
 }
 
 export function isHtmlMediaPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {
-  return Boolean(locationLike.hostname) && !YOUTUBE_HOST_PATTERN.test(locationLike.hostname) && !isXVideoPage(locationLike) && !getCaptionPlatform(locationLike);
+  const platform = getCaptionPlatform(locationLike);
+  return Boolean(locationLike.hostname) && !YOUTUBE_HOST_PATTERN.test(locationLike.hostname) && !isXVideoPage(locationLike)
+    && (!platform || (import.meta.env.BROWSER !== 'userscript' && platform === 'coursera'));
 }
 
 export function isSupportedVideoPage(locationLike: Pick<Location, 'hostname' | 'pathname'> = window.location): boolean {

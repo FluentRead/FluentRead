@@ -5,6 +5,7 @@
  * 模块边界：本文件是后台组合层，不实现注册筛选、到期算法、快照格式或缓存清理策略；具体行为分别留在相邻纯模块和 services/config。
  */
 import {installTranslationCacheCleanup} from './cacheCleanup';
+import {installOfficialSiteRuleMaintenance} from './officialSiteRuleRuntime';
 import {vocabularyBookDb} from '@/src/features/vocabulary/repository';
 import {VocabularyPersistentUndo} from '@/src/features/vocabulary/background/persistentUndo';
 import {installVocabularyUndoMaintenance} from '@/src/features/vocabulary/background/undoMaintenance';
@@ -40,4 +41,5 @@ export function installBackgroundMaintenance(): void {
         warn: (message, error) => console.warn(message, error),
     });
     installTranslationCacheCleanup();
+    installOfficialSiteRuleMaintenance();
 }

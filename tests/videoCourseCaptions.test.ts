@@ -17,6 +17,7 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const bili = new URL('https://www.bilibili.com/video/BV1xx411c7mD/?p=2');
 const udemy = new URL('https://company.udemy.com/course/programming/learn/lecture/123/');
 const edx = new URL('https://courses.edx.org/courses/courseware/unit');
+const coursera = new URL('https://www.coursera.org/learn/python/lecture/Ab12/why-program');
 const video = () => parseHTML('<video></video>').document.querySelector('video') as unknown as HTMLVideoElement;
 const cue = {startMs: 0, durationMs: 1000, text: 'Original sentence.'};
 const biliBody = {body: [{from: 0, to: 1, content: cue.text}]};
@@ -39,6 +40,26 @@ describe('课程字幕配置与身份', () => {
         expect(normalizeVideoCourseAutoStart({bilibili: 'true', udemy: 0, edx: 1})).toEqual(new Config().videoCourseAutoStart);
         expect(normalizeConfig({videoCourseAutoStart: {edx: true}}).videoCourseAutoStart).toEqual({bilibili: false, udemy: true, edx: true});
         expect(captionRecord(null)).toEqual({}); expect(captionRecord([])).toEqual({}); expect(captionRecord(1)).toEqual({});
+    });
+    it('Coursera 从当前课时播放器的 WebVTT 字幕选择原语言，拒绝章节、非法域和非法语言', () => {
+        const {document} = parseHTML(`<video>
+          <track kind="chapters" srclang="en" src="/chapters.vtt">
+          <track kind="captions" srclang="en" src="https://evil.test/token.vtt">
+          <track kind="captions" src="/unlabelled.vtt">
+          <track kind="captions" srclang="@@@" src="/invalid-language.vtt">
+          <track kind="subtitles" srclang="zh-Hans" src="/local-zh.vtt" default>
+          <track srclang="en-US" src="https://d3c33hcgiwev3.cloudfront.net/audio.en.vtt">
+          <track kind="captions" srclang="fr" src="https://captions.coursera.org/audio.fr.vtt">
+        </video>`);
+        const element = document.querySelector('video') as unknown as HTMLVideoElement;
+        expect(getCourseCaptionRequest('coursera', coursera, element, 'auto', 'zh-Hans')).toMatchObject({
+            id: 'Ab12', language: 'en-US', url: 'https://d3c33hcgiwev3.cloudfront.net/audio.en.vtt',
+        });
+        const french = getCourseCaptionRequest('coursera', coursera, element, 'fr', 'zh-Hans');
+        expect(french).toMatchObject({language: 'fr', url: 'https://captions.coursera.org/audio.fr.vtt'});
+        expect(getCourseCaptionRequest('coursera', new URL('/learn/python/', coursera), element)).toBeNull();
+        expect(getCourseCaptionRequest('coursera', coursera, video())).toBeNull();
+        expect(resolveCourseCaptionUrl('https://captions.coursera.org.evil.test/test.vtt', coursera, 'coursera')).toBe('');
     });
     it.each([
         ['/video/BV1xx411c7mD/?p=2', 'BV1xx411c7mD:2'], ['/zh-Hans/video/av123?p=3', 'av123:3'],
@@ -141,6 +162,22 @@ function sourceFixture(base = edx, bodies: unknown[] = [transcript]) {
 async function settled(source: CourseCaptionSource) { await vi.waitFor(() => expect(source.status).not.toBe('loading')); }
 
 describe('课程字幕请求生命周期', () => {
+    it('读取 Coursera 完整 VTT，跨域不带凭据，错误响应不给学习和导出提供时间轴', async () => {
+        const f = sourceFixture(coursera, [vtt, 'Not a VTT response']);
+        const request: CourseCaptionRequest = {platform: 'coursera', id: 'Ab12', key: 'Ab12:en', language: 'en-US',
+            url: 'https://d3c33hcgiwev3.cloudfront.net/audio.en.vtt'};
+        f.source.sync(request, 'first lecture');
+        await settled(f.source);
+        expect(f.source.status).toBe('ready');
+        expect(f.source.cues).toEqual([cue]);
+        expect(f.source.language).toBe('en-US');
+        expect(f.fetch).toHaveBeenCalledExactlyOnceWith(request.url, expect.objectContaining({credentials: 'omit'}));
+        f.source.sync({...request, key: 'Ab13:en', url: new URL('/vtt/en.vtt', coursera).href}, 'next lecture');
+        await settled(f.source);
+        expect(f.source.status).toBe('error');
+        expect(f.source.cues).toEqual([]);
+        expect(f.fetch).toHaveBeenLastCalledWith('https://www.coursera.org/vtt/en.vtt', expect.objectContaining({credentials: 'include'}));
+    });
     it('B 站目标语言变化会取消旧轨道加载，迟到的英文字幕不会覆盖新选中的中文', async () => {
         const f = sourceFixture(bili);
         let finishEnglish!: (response: Response) => void;

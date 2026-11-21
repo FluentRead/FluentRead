@@ -10,6 +10,7 @@
 
 import {getUiLanguageBundlePath, translate} from './index';
 import {createLegacyPatternSet} from './messages/legacy-patterns';
+import {createExtensionSiteActionText} from './messages/siteRules';
 import {enUSLegacyText, enUSMessages} from './messages/en-US';
 import {esESLegacyText, esESMessages} from './messages/es-ES';
 import {frFRLegacyText, frFRMessages} from './messages/fr-FR';
@@ -32,9 +33,12 @@ export const UI_LANGUAGE_BUNDLES: Readonly<Record<RegisteredUiLanguage, UiLangua
 
 /** 生成扩展产物中的语言资源文件；紧凑 JSON 解析远快于等价的 JavaScript 对象字面量。 */
 export function createUiLanguageBundleFiles(): Array<{relativeDest: string; contents: string}> {
-    return Object.entries(UI_LANGUAGE_BUNDLES).map(([language, bundle]) => ({
-        relativeDest: getUiLanguageBundlePath(language as RegisteredUiLanguage),
-        contents: JSON.stringify(bundle),
+    return (Object.keys(UI_LANGUAGE_BUNDLES) as RegisteredUiLanguage[]).map(language => ({
+        relativeDest: getUiLanguageBundlePath(language),
+        contents: JSON.stringify({
+            ...UI_LANGUAGE_BUNDLES[language],
+            legacyText: {...UI_LANGUAGE_BUNDLES[language].legacyText, ...createExtensionSiteActionText(language)},
+        }),
     }));
 }
 

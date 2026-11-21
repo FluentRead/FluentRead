@@ -11,6 +11,7 @@ export {
     invalidateFullPageTranslationSessionCache,
     isFullPageTranslationActive, getTranslationToolbarStatus, getFullPageTranslationDiagnostic, getFullPageTranslationDocumentToken, readFullPageUnchangedCompletion,
     getFullPageTranslationFrameState,
+    readPageRuleDiagnosis, readPageRuleSelection,
     noteBilingualHostGesture,
     resetFullPageTranslationRouteState,
     createPageTranslationDisplayModeSync,

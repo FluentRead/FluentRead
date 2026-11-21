@@ -8,6 +8,10 @@ import {defineAsyncComponent} from 'vue';
 
 export * from './core/document';
 export * from './core/pdfSource';
+export {
+    documentGlossaryDestinations, extractDocumentGlossaryCandidates, filterDocumentGlossaryCandidates, planDocumentGlossaryUpdate,
+    type DocumentGlossaryChoice,
+} from './core/glossaryCandidates';
 export {documentSourceLocators, createDocumentMaterialReference, resolveDocumentMaterialReference, normalizeDocumentMaterialReference, DOCUMENT_MATERIAL_REFERENCE_LIMITS} from './core/materialLocator';
 export type {DocumentSourceLocator, DocumentMaterialReference} from './core/materialLocator';
 export type {PdfReadingPresentation} from './core/pdfReadingPlan';
@@ -34,6 +38,8 @@ export {
 } from './ui/pdfPreview';
 export * from './ui/presentation';
 export * from './ui/richPreviewSync';
+export {trackWebArticleReading} from './ui/webArticleReading';
+export {normalizeWebArticleUrl, WEB_ARTICLE_PARAMETER} from './core/webArticle';
 export {installDocumentZoomGestures} from './ui/documentZoom';
 export type {DocumentZoomOptions, DocumentZoomPoint} from './ui/documentZoom';
 export {createDocumentTaskState, useDocumentTasks} from './ui/useDocumentTasks';

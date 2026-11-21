@@ -57,4 +57,19 @@ describe('content site adaptation composition', () => {
         child.update({enabled: false});
         expect(effects.events).toEqual(['apply', 'suspend-frame', 'apply']);
     });
+
+    it('uses the verified catalog with the same user override and disable precedence', () => {
+        const root = new URL('https://example.test/');
+        const library = {id: 'library', name: 'Library', match: {hosts: ['example.test'], paths: ['/library/*']}, content: [{css: ['p']}]};
+        const session = createContentSiteAdaptationRuntime(undefined, new URL('/library/one', root), undefined, {
+            revision: 101, minimumVersion: '0.0.42', pack: {version: 1, rules: [library]},
+        });
+        expect(session.routeChanged(new URL('/library/two', root))).toBe(false);
+        expect(session.routeChanged(new URL('/docs/start', root))).toBe(true);
+        session.update({custom: {version: 1, rules: [{...library, match: {...library.match, paths: ['/override/*']}}]}});
+        expect(session.routeChanged(new URL('/library/three', root))).toBe(false);
+        expect(session.routeChanged(new URL('/override/start', root))).toBe(true);
+        session.update({disabledRuleIds: [library.id]});
+        expect(session.routeChanged(new URL('/override/next', root))).toBe(false);
+    });
 });

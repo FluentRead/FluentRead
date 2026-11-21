@@ -55,7 +55,7 @@ export function configureSafariBackgroundPage(
  * Chromium 重载扩展会更换动态资源 UUID，旧页面保存的 CSS/图标地址因此失效。
  * WXT 在生成清单时才追加 Shadow UI CSS，故在 manifestGenerated 阶段
  * 仅将这几项已公开的界面资源改为稳定地址；语言包和其他资源继续保持原规则。
- * 不增加可访问文件、站点或权限；稳定地址的公开 UI 资产可被网页按固定 ID 探测。
+ * edX 学习面板的共用 frame 样式只在对应课程源公开；稳定地址的公开 UI 资产可被网页按固定 ID 探测。
  */
 export function configureStableContentUiResources(
     env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>,
@@ -68,15 +68,19 @@ export function configureStableContentUiResources(
         'icon/32.png', 'icon/48.png', 'icon/128.png',
         'content-scripts/content.css',
         'content-scripts/neteaseMailFrame.css',
-        'content-scripts/supportedFrame.css',
     ]);
+    const courseStylesheet = 'content-scripts/supportedFrame.css';
+    const courseOrigin = 'https://courses.edx.org/*';
     manifest.web_accessible_resources = rules.flatMap(rule => {
         if (typeof rule === 'string') return [];
         const stable = rule.resources.filter(resource => stableResources.has(resource));
-        if (stable.length === 0) return [rule];
-        const remaining = rule.resources.filter(resource => !stableResources.has(resource));
+        const course = rule.resources.includes(courseStylesheet);
+        if (stable.length === 0 && !course) return [rule];
+        const remaining = rule.resources.filter(resource => resource !== courseStylesheet && !stableResources.has(resource));
         return [
-            {...rule, resources: stable, use_dynamic_url: false},
+            ...(stable.length ? [{...rule, resources: stable, use_dynamic_url: false}] : []),
+            ...(course && rule.matches?.includes(courseOrigin)
+                ? [{...rule, resources: [courseStylesheet], matches: [courseOrigin], use_dynamic_url: false}] : []),
             ...(remaining.length ? [{...rule, resources: remaining}] : []),
         ];
     });
@@ -476,7 +480,17 @@ export default defineConfig({
             const documentFormatsBudget = 55_000;
             // Chrome 同环境 55bfab088 对照为 70,079,902 → 70,083,642 bytes，登记 4 kB 翻译链路代码预算。
             const translationPipelineBudget = browser === 'chrome' ? 4_000 : 0;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget));
+            // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
+            const pageRuleDiagnosisBudget = 12_000;
+            // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
+            const webArticleBudget = 26_000;
+            // 课程复用逐句学习组件，edX 子 frame 需要独立的 UI 和播放装配；Chrome 实测代码与样式增量约 204 kB。
+            const courseSubtitleLearningBudget = 214_000;
+            // Coursera 复用课程菜单和 WebVTT 读取；术语候选新增文档页文本、匹配与审核 UI，未引入新依赖或模型。
+            const courseraCaptionBudget = 4_000;
+            // 与 CSV/TSV 选列流程整合后，Chrome 实测 70,406,656 字节，较原组合预算超出 2,656 字节。
+            const documentGlossaryCandidateBudget = 16_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -44,6 +44,10 @@ const materialSources = new Set(Object.keys(learningMaterialLegacyText['en-US'])
 const materialPatternSources = new Set(learningMaterialPatterns.map(({pattern}) => pattern));
 const nativeOnlyLegacySources = new Set([
     '移动端 / X 自动贴底', '未绘制译文', '查看全文', '复制全文',
+    // 图片语言包与漫画首次下载提示由扩展提供。
+    '识别阿拉伯语图片文字', '识别希伯来语图片文字',
+    '需要准备阿拉伯语和英语识别资源，约 4.6 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+    '需要准备希伯来语和英语识别资源，约 3.5 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
     // 独立文档工作台专用的旧文案。共享的翻译、校订和下载操作仍由脚本词典提供。
     '文档换一种语言，阅读依然流畅',
     '论文、电子书、工作资料与字幕，从打开文件到双语阅读。',

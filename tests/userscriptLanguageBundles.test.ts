@@ -226,15 +226,24 @@ describe('userscript remote UI language data', () => {
         }
         expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText['校订译文']).toBe(extensionBundles['en-US'].legacyText['校订译文']);
     });
-    it('keeps native manga filter labels in extension locales without adding them to userscript bundles', () => {
-        const nativeLabels=['未绘制译文','查看全文','复制全文'];
-        for(const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]){
-            const original=extensionBundles[language],projected=currentUserscriptLanguageBundle(language);
-            for(const source of nativeLabels){expect(original.legacyText[source]).toBeTruthy();expect(projected.legacyText).not.toHaveProperty(source);}
-            for(const source of ['复制全部','原文对照','漫画文字'])expect(projected.legacyText[source]).toBe(original.legacyText[source]);
-            for(const source of nativeLabels)expect(original.legacyText[source]).toBeTruthy();
+    it('keeps native manga filters and model preparation in extension locales', () => {
+        const nativeLabels = [
+            '未绘制译文', '查看全文', '复制全文', '识别阿拉伯语图片文字', '识别希伯来语图片文字',
+            '需要准备阿拉伯语和英语识别资源，约 4.6 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+            '需要准备希伯来语和英语识别资源，约 3.5 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+        ];
+        for (const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]) {
+            const original = extensionBundles[language];
+            const projected = currentUserscriptLanguageBundle(language);
+            for (const source of nativeLabels) {
+                expect(original.legacyText[source]).toBeTruthy();
+                expect(Object.hasOwn(projected.legacyText, source)).toBe(false);
+            }
+            for (const source of ['复制全部', '原文对照', '漫画文字']) {
+                expect(projected.legacyText[source]).toBe(original.legacyText[source]);
+            }
         }
-        for(const source of nativeLabels)expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText).not.toHaveProperty(source);
+        for (const source of nativeLabels) expect(Object.hasOwn(UI_LANGUAGE_BUNDLES['en-US'].legacyText, source)).toBe(false);
     });
     it('keeps native sidebar messages in extension locales and omits them from every userscript locale', () => {
         expect(extensionChinese['sidepanel.title']).toBeTruthy();

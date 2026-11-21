@@ -1238,6 +1238,10 @@ describe('extension manifest capability contract', () => {
             version: '0.0.35',
             background: {scripts: ['background.js']},
             browser_action: {default_title: '__MSG_extensionToolbarTitle__', default_popup: 'popup.html'},
+            commands: {
+                'open-translation-window': {description: 'Open translation window'},
+                '_execute_message_display_action': {description: 'Translate current message'},
+            },
             permissions: ['storage', '<all_urls>'],
             browser_specific_settings: {gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
@@ -1250,6 +1254,10 @@ describe('extension manifest capability contract', () => {
         expect(mail.manifest_version).toBe(2);
         expect(mail.background).toEqual(firefox.background);
         expect(mail.browser_action).toEqual({default_title: '__MSG_extensionName__', default_popup: 'popup.html'});
+        expect(mail.commands).toEqual({'_execute_message_display_action': firefox.commands._execute_message_display_action});
+        expect(createThunderbirdManifest({...firefox, commands: {
+            'open-translation-window': firefox.commands['open-translation-window'],
+        }}).commands).toBeUndefined();
         expect(mail.content_scripts).toBeUndefined();
         expect(mail.permissions).toContain('messagesModify');
         expect(mail.permissions).not.toContain('contextMenus');

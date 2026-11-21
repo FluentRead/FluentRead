@@ -7,6 +7,12 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {page,word} from './helpers/imageTypographyFixture';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn(), setBackend:vi.fn()}));
+function drawArguments(index = 0) {
+    const args = mocks.draw.mock.calls[index].slice(1, 14);
+    while (args.length && args.at(-1) === undefined) args.pop();
+    return args;
+}
+
 const prepareRareFont = vi.hoisted(() => vi.fn());
 vi.mock('@/src/features/image-translation/services/imageTextFont', async importOriginal => ({
     ...await importOriginal<typeof import('@/src/features/image-translation/services/imageTextFont')>(),
@@ -289,7 +295,7 @@ it.each(['gradient','flat'])('普通图%s源色沿用旧绘字框和清字框，
     ordinaryAlphaCanvas(width,height,pixels);mocks.recognize.mockResolvedValueOnce([source]);
     const result=await translateImageInOffscreen('gradient-style','en','Page');expect(result.image).toBeTruthy();
     const observedSize=(50/(6*50-2)*100+15/90*100)/2;
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['你好',38,36,124,32,kind==='gradient'?'rgb(240,240,240)':'rgb(20,30,50)',observedSize,kind==='gradient'?'right':'left',undefined,'rgb(245,245,250)',kind==='gradient'?'#111827':undefined,{x0:50,y0:45,x1:100,y1:60}]);
+    expect(drawArguments()).toEqual(['你好',38,36,124,32,kind==='gradient'?'rgb(240,240,240)':'rgb(20,30,50)',observedSize,kind==='gradient'?'right':'left',undefined,'rgb(245,245,250)',kind==='gradient'?'#111827':undefined,{x0:50,y0:45,x1:100,y1:60}]);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);
 });
 
@@ -326,7 +332,7 @@ it.each(['clear','art','retained','retained-physical','far-retained','fits','wra
     const result=await translateImageInOffscreen('source-style','en','Page');expect(result.image).toBeTruthy();
     expect(mocks.draw).toHaveBeenCalledOnce();
     const expanded=mode==='clear'||mode==='far-retained';
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual([target,38,expanded?25:36,124,expanded?54:32,'rgb(255,255,255)',48,'left',undefined,'rgb(25,48,75)']);
+    expect(drawArguments()).toEqual([target,38,expanded?25:36,124,expanded?54:32,'rgb(255,255,255)',48,'left',undefined,'rgb(25,48,75)']);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);expect(pixels).toEqual(before);
     expect(result.lines.find(line=>line.sourceText==='SOURCE')).not.toHaveProperty('renderSkipped');
 });
@@ -341,7 +347,7 @@ it.each(['flat','gradient'] as const)('竖排原色沿用居中和原有绘字�
     sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['风']}:undefined));
     const result=await translateImageInOffscreen('vertical-source-style','ja','Page');
     expect(result.image).toBeTruthy();expect(mocks.draw).toHaveBeenCalledOnce();
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(background==='gradient'
+    expect(drawArguments()).toEqual(background==='gradient'
         ?['风',37,18,30,84,'rgb(240,240,240)',Infinity,'center',undefined,'rgb(245,245,250)','#111827']
         :['风',37,18,30,84,'rgb(255,255,255)',Infinity,'center',undefined,'rgb(25,48,75)']);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);expect(pixels).toEqual(before);
@@ -383,7 +389,10 @@ it('普通opaque图沿用原修补和原绘字坐标，不因alpha保护增加�
     const pixels=opaqueAlphaPixels(64,48),line={text:'ORIGINAL',bbox:{x0:8,y0:10,x1:56,y1:30},fontSize:20};
     ordinaryAlphaCanvas(64,48,pixels);mocks.recognize.mockResolvedValueOnce([line]);
     await translateImageInOffscreen('ordinary-opaque','en','Page');
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['你好',6,6,52,28,'rgb(240,240,240)',24,'left']);
+    expect(drawArguments()).toEqual(['你好',6,6,52,28,'rgb(240,240,240)',24,'left']);
+    const {pixels: backdrop, width, height, remaining} = mocks.draw.mock.calls[0][14];
+    expect(backdrop === pixels).toBe(true);
+    expect([width,height,remaining]).toEqual([64,48,8192]);
     expect(mocks.inpaint).toHaveBeenCalledWith(pixels,64,48,[{...line,text:'你好'}],true);
 });
 
@@ -473,7 +482,9 @@ it('alpha只校验孔确实改变的行，prepared复用后未受影响行仍用
     const original=await vi.importActual<typeof rendering>('@/src/features/image-translation/services/rendering');
     const layout=vi.spyOn(rendering,'layoutImageTranslationText').mockImplementation(original.layoutImageTranslationText);
     await translateImageInOffscreen('alpha-unchanged-bounds','en','Page');
-    expect(layout).toHaveBeenCalledOnce();expect(mocks.draw.mock.calls[0]).toHaveLength(10);expect(mocks.draw.mock.calls[1]).toHaveLength(9);
+    expect(layout).toHaveBeenCalledOnce();
+    expect(drawArguments()).toHaveLength(9);expect(drawArguments(1)).toHaveLength(8);
+    expect([mocks.draw.mock.calls[0][14],mocks.draw.mock.calls[1][14]].every(value=>value===undefined)).toBe(true);
 });
 
 it('面积更大的400×6细带不能只凭完整metadata放行，实际字形不fit时保留完整文本',async()=>{
@@ -712,8 +723,9 @@ describe('Offscreen 图片完整操作生命周期', () => {
         });
         const result = await translateImageInOffscreen('manga', 'ja', 'Page');
         expect(result.lines[1]).toMatchObject({text: '今天真的很开心。', vertical: true});
-        expect(mocks.draw).toHaveBeenNthCalledWith(1, expect.anything(), '第三话', 58, 43, 264, 54, 'rgb(240,240,240)', 48, 'left');
-        expect(mocks.draw).toHaveBeenNthCalledWith(2, expect.anything(), '今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)', Infinity, 'center');
+        expect(drawArguments()).toEqual(['第三话', 58, 43, 264, 54, 'rgb(240,240,240)', 48, 'left']);
+        expect(drawArguments(1)).toEqual(['今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)', Infinity, 'center']);
+        expect(mocks.draw.mock.calls[0][14]===mocks.draw.mock.calls[1][14]).toBe(true);
     });
 
     it.each(['tesseract', 'paddle'] as const)('%s 普通图片将跨行说明整段送翻译，擦除和字号保持源行粒度', async engine => {
@@ -730,7 +742,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(result.lines).toHaveLength(1);
         expect(result.lines[0].sourceText).toBe(request.texts[0]);
         expect(mocks.inpaint.mock.calls[0][3][0].sourceBoxes).toEqual(source.map(line => line.bbox));
-        expect(mocks.draw).toHaveBeenCalledWith(expect.anything(), '你好', 59, 76, 310, 44, 'rgb(240,240,240)', 12 * 1.2, 'left');
+        expect(drawArguments()).toEqual(['你好', 59, 76, 310, 44, 'rgb(240,240,240)', 12 * 1.2, 'left']);
         if (engine === 'paddle') expect(mocks.mangaRecognize.mock.calls[0][7]).toBe('image');
     });
 

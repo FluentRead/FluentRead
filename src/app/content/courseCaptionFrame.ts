@@ -14,6 +14,7 @@ import {translateVideoText} from '@/src/services/translation/client';
 import {isExtensionDisabledOnSite} from '@/src/features/site-rules/domain';
 import {mountPlatformCaptions} from '@/src/features/video-subtitle/content/platformRuntime';
 import {sanitizeSubtitleFilename} from '@/src/features/video-subtitle/content/youtubeSubtitleData';
+import {serializeSubtitleFile} from '@/src/features/video-subtitle/content/subtitleExport';
 import {downloadTextFile} from '@/src/shared/dom/downloadTextFile';
 import {installContentPageLifecycle} from './pageLifecycle';
 
@@ -37,7 +38,11 @@ export async function startCourseCaptionFrameApp(ctx: ContentScriptContext): Pro
             label: text => translateLegacyText(text, config.uiLanguage),
             iconUrl: browser.runtime.getURL('icon/128.png'),
             openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
-            download: (srt, language) => { downloadTextFile(`${sanitizeSubtitleFilename(document.title)}-${sanitizeSubtitleFilename(language)}.srt`, srt, 'application/x-subrip;charset=utf-8'); },
+            download: (srt, language, cues, format = 'srt') => {
+                const file = cues ? serializeSubtitleFile(cues, format)
+                    : {extension: 'srt', text: srt, mime: 'application/x-subrip;charset=utf-8'};
+                downloadTextFile(`${sanitizeSubtitleFilename(document.title)}-${sanitizeSubtitleFilename(language)}.${file.extension}`, file.text, file.mime);
+            },
         });
     };
     await configReady;

@@ -47,13 +47,10 @@ export function planVideoSubtitleExport(cues: readonly VideoSubtitleCue[], human
 
 interface SubtitleTrack {languageCode: string; cues: VideoSubtitleCue[]}
 interface CapturedTrack {url: string; cues: VideoSubtitleCue[]}
-interface VideoDownloadPorts {
-    config: Config;
+interface VideoDownloadSourcePorts {
     document: ParentNode;
-    location: Pick<Location, 'hostname' | 'pathname' | 'search' | 'href'>;
     request: typeof fetch;
     isX(): boolean;
-    isDisposed(): boolean;
     isAiActive(): boolean;
     /** 完整识别中的预览只供观看，不能冒充完整 SRT。实时字幕旧入口可省略。 */
     isAiComplete?(): boolean;
@@ -61,8 +58,14 @@ interface VideoDownloadPorts {
     aiCues(): VideoSubtitleCue[];
     captured(): CapturedTrack[];
     remember(track: CapturedTrack): void;
+}
+
+type VideoDownloadPorts = {
+    config: Config;
+    location: Pick<Location, 'hostname' | 'pathname' | 'search' | 'href'>;
+    isDisposed(): boolean;
     human: {ready(): Promise<void>; at(time: number): string};
-    translate(source: string): Promise<string>;
+    translate(source: string, signal: AbortSignal): Promise<string>;
     /** 结束失败或取消的补译请求，保留已经完成的同媒体缓存。 */
     cancelTranslations?(): void;
     peek(source: string): string | undefined;
@@ -74,7 +77,7 @@ interface VideoDownloadPorts {
     save(srt: string, language: string, cues: readonly VideoSubtitleCue[]): void;
     /** 菜单状态拥有者重算当前资格，防止旧反馈把新识别中的导出重新启用。 */
     refreshButtons?(): void;
-}
+} & (VideoDownloadSourcePorts | {readCompleteTrack(): SubtitleTrack | null});
 
 export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
     let controller: AbortController | undefined;
@@ -107,6 +110,11 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
         }
     });
     const resolve = async (): Promise<SubtitleTrack> => {
+        if ('readCompleteTrack' in ports) {
+            const track = ports.readCompleteTrack();
+            if (track?.cues.length) return track;
+            throw new Error(ports.ui('video.sourcePreparing'));
+        }
         const requestController = controller, href = ports.location.href, context = ports.contextKey?.();
         const captured = ports.captured();
         const ai = ports.aiCues();
@@ -161,7 +169,7 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
         } catch (error) {
             feedback = errorMessage(error);
             feedbackDelay = 3200;
-            console.warn('[FluentRead] 字幕下载失败', error);
+            if (!(error instanceof Error && error.name === 'AbortError')) console.warn('[FluentRead] 字幕下载失败', error);
         } finally {
             clearTimeout(slowFeedbackTimer); timers.delete(slowFeedbackTimer);
             if (buttonOwners.get(button) === current) {
@@ -211,7 +219,7 @@ export function createVideoSubtitleDownloads(ports: VideoDownloadPorts) {
                     assertCurrent();
                     const cached = ports.peek(source)?.trim();
                     if (cached) return cached;
-                    return wait(current, assertCurrent, () => ports.translate(source));
+                    return wait(current, assertCurrent, () => ports.translate(source, current.signal));
                 }, {concurrency: 3, signal: current.signal,
                     onProgress: (completed, total) => { assertCurrent(); ports.status(menu, ports.ui('video.translating', {completed, total})); },
                 });

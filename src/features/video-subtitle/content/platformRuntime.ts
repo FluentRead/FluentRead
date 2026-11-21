@@ -25,6 +25,9 @@ import {annotateVideoReading} from './readingAnnotationClient';
 import {createVideoPlayerMenu, renderVideoMenuMode, renderVideoSubtitleOrder, renderVideoSubtitleTiming, handleVideoMenuNavigation, handleVideoMenuDisclosure, closeVideoMenuDisclosure, resetVideoMenuDisclosures, setVideoMenuToolsOpen} from './playerMenu';
 import {createVideoSubtitleStyle, refreshVideoUiText, VIDEO_TRANSLATION_BUTTON_ID, VIDEO_TRANSLATION_MENU_ID, VIDEO_TRANSLATION_ACTIVE_CLASS} from './ui';
 import {getVideoServiceLabel} from './serviceProfile';
+import {createCourseSubtitleTools} from './courseSubtitleTools';
+import type {SubtitleExportFormat} from './subtitleExport';
+import type {VideoSubtitleCue} from './youtubeSubtitleData';
 import type {BilibiliAiSource} from './bilibiliAiSource';
 
 interface PlatformCaptionPorts {
@@ -35,7 +38,7 @@ interface PlatformCaptionPorts {
     translate(text: string, signal: AbortSignal, sourceLanguage?: string): Promise<string>;
     patch(patch: Partial<Config>): void;
     label(text: string): string;
-    download?(srt: string, language: string): void;
+    download?(srt: string, language: string, cues?: readonly VideoSubtitleCue[], format?: SubtitleExportFormat): void;
     createBilibiliAi?(getVideo: () => HTMLVideoElement | null, changed: () => void): BilibiliAiSource;
     iconUrl?: string;
     openSettings?(): void;
@@ -98,6 +101,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     let sourceTrack: TextTrack | null = null;
     let targetTrack: TextTrack | null = null;
     let mediaKey = '';
+    let mediaEpoch = 0;
     let fingerprint = getVideoTranslationConfigFingerprint(config);
     let pendingTimer: ReturnType<typeof setTimeout> | undefined;
     let layoutInputs: {width: number; height: number; maximumHeight: number; fontSize: number; fontFamily: string; lineSpacing: string} | null = null;
@@ -121,6 +125,23 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
 
     const playerRoot = () => video?.closest<HTMLElement>(course === 'bilibili' ? '.bpx-player-container'
         : course === 'edx' ? '.video[data-metadata]' : '[data-purpose="shaka-video-player"]') || video?.parentElement || null;
+    const courseTools = import.meta.env.BROWSER !== 'userscript' && course && ports.download ? createCourseSubtitleTools({
+        platform: course, document, location: window.location, config, subscribe: ports.subscribe,
+        readTarget: () => {const player = playerRoot();return player && video ? {player, video} : null;},
+        readCompleteTrack: () => {
+            if (!video || mediaKey !== `${routeHref()}:${video.currentSrc || video.getAttribute('src') || ''}` ||
+                !captionsEnabled() || !completeTimeline()) return null;
+            return {
+                cues: activeCues(), languageCode: usingAiCues ? 'ai' : timeline.language || 'original',
+                sourceLanguage: (usingAiCues ? config.videoSourceLanguage : timeline.language) || config.from,
+            };
+        },
+        readIdentity: () => `${mediaEpoch}:${courseIdentity}:${timeline.language}:${usingAiCues}:${fingerprint}`,
+        translate: (text, signal, language) => isVideoSubtitleInTargetLanguage(text, config.to)
+            ? Promise.resolve(text) : ports.translate(text, signal, language),
+        peek: source => cache.peek(source),
+        save: ports.download, updateMenu: () => syncCourseControls(),
+    }) : undefined;
     const positionCourseMenu = () => {
         if (!courseMenu || courseMenu.hidden || !courseButton) return;
         const button = courseButton.getBoundingClientRect?.();
@@ -140,6 +161,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             syncCourseControls();
             courseMenu.querySelector<HTMLButtonElement>('[data-mode][aria-checked="true"]')?.focus({preventScroll: true});
         } else {
+            courseTools?.cancelExports();
             if (courseMenu.isConnected) courseMenu.hidePopover?.();
             resetVideoMenuDisclosures(courseMenu);
             setVideoMenuToolsOpen(courseMenu, false);
@@ -148,6 +170,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         courseButton.setAttribute('aria-expanded', String(open));
     };
     const removeCourseControls = () => {
+        courseTools?.cancelExports();
         controlsHost?.remove(); controlsHost = null; courseMenu = null; courseButton = null;
         courseStatus = null; courseAuto = null; courseRetry = null; courseDownload = null; menuLocale = '';
     };
@@ -173,7 +196,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             // 与 YouTube/X 共用品牌图标、菜单构造器及整份样式，课程只适配来源与可用动作。
             const style = document.createElement('style');
             style.textContent = `:host{all:initial;display:inline-flex;position:relative;flex:0 0 auto;align-self:auto;z-index:1000}
-                #${VIDEO_TRANSLATION_MENU_ID}[data-course] .fluent-read-video-menu-downloads{grid-template-columns:minmax(0,1fr)!important}
+                #${VIDEO_TRANSLATION_MENU_ID}[data-original-download-only] .fluent-read-video-menu-downloads{grid-template-columns:minmax(0,1fr)!important}
                 #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-course-auto{justify-content:space-between!important;gap:12px!important}
                 #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-switch{width:30px!important;height:18px!important;min-height:18px!important;border-radius:9px!important;position:relative!important;background:var(--fr-video-menu-control-hover)!important;padding:0!important}
                 #${VIDEO_TRANSLATION_MENU_ID} .fluent-read-video-menu-switch::after{content:'';position:absolute;width:12px;height:12px;top:3px;left:3px;border-radius:50%;background:var(--fr-video-menu-text)}
@@ -190,12 +213,17 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
             courseButton.appendChild(icon);
             courseMenu = createVideoPlayerMenu(config.uiLanguage, true);
             courseMenu.dataset.course = course;
+            courseMenu.toggleAttribute('data-original-download-only', !courseTools);
             courseMenu.setAttribute('popover', 'manual');
             courseMenu.querySelector('[data-subtitle-order-hint]')!.remove();
             // 课程菜单保留读音开关，不在悬停时展开下载体积、语言清单和示例说明。
             courseMenu.querySelector('[data-reading-help]')!.removeAttribute('popover');
             courseMenu.querySelector('[data-action="toggle-reading-annotation"]')!.removeAttribute('aria-describedby');
-            for (const selector of ['.fluent-read-video-menu-primary-ai', '.fluent-read-video-menu-secondary-ai', '[data-action="select-ai-model"]', '[data-action="regenerate-ai-subtitle"]', '[data-action="open-sentence-learning"]', '.fluent-read-video-model-prompt', '[data-subtitle-format]', '[data-action="download-translated-subtitles"]', '[data-action="download-bilingual-subtitles"]']) {
+            const unavailable = ['.fluent-read-video-menu-primary-ai', '.fluent-read-video-menu-secondary-ai',
+                '[data-action="select-ai-model"]', '[data-action="regenerate-ai-subtitle"]', '.fluent-read-video-model-prompt'];
+            if (!courseTools) unavailable.push('[data-action="open-sentence-learning"]', '[data-subtitle-format]',
+                '[data-action="download-translated-subtitles"]', '[data-action="download-bilingual-subtitles"]');
+            for (const selector of unavailable) {
                 courseMenu.querySelector(selector)?.remove();
             }
             for (const [property, value] of [['position', 'fixed'], ['inset', 'auto'], ['margin', '0']]) courseMenu.style.setProperty(property, value, 'important');
@@ -251,6 +279,13 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
                 else if (action === 'subtitle-earlier' || action === 'subtitle-later' || action === 'reset-subtitle-timing') {
                     ports.patch({videoSubtitleOffsetMs: action === 'reset-subtitle-timing' ? 0 : Math.max(-10_000, Math.min(10_000, config.videoSubtitleOffsetMs + (action === 'subtitle-earlier' ? -500 : 500)))});
                 } else if (action === 'open-settings') { setCourseMenuOpen(false); ports.openSettings?.(); }
+                else if (action === 'open-sentence-learning' && courseTools) {
+                    setCourseMenuOpen(false);
+                    void courseTools.openLearning().catch(error => console.warn('[FluentRead] 无法打开字幕学习面板', error));
+                } else if (courseTools && (action === 'download-subtitles' || action === 'download-translated-subtitles' || action === 'download-bilingual-subtitles')) {
+                    const mode = action === 'download-subtitles' ? 'original' : action === 'download-bilingual-subtitles' ? 'bilingual' : 'translated';
+                    void courseTools.startDownload(courseMenu!, target as HTMLButtonElement, mode);
+                }
                 else if (action === 'download-subtitles') {
                     try { ports.download?.(cuesToSrt(activeCues()), timeline.language); }
                     catch { courseStatus!.textContent = courseText('downloadFailed'); source.hidden = false; }
@@ -323,7 +358,14 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         courseAuto!.setAttribute('aria-label', courseText('auto'));
         const label = courseMenu!.querySelector('[data-course-auto-label]')!, labelText = courseText('auto');
         if (label.textContent !== labelText) label.textContent = labelText;
-        courseDownload!.disabled = !completeTimeline();
+        if (courseTools) {
+            const ready = courseTools.canOpen();
+            const study = courseMenu!.querySelector<HTMLButtonElement>('[data-action="open-sentence-learning"]')!;
+            study.disabled = !ready;
+            for (const button of courseMenu!.querySelectorAll<HTMLButtonElement>('[data-subtitle-downloads] button')) {
+                button.disabled = !ready || button.getAttribute('aria-busy') === 'true';
+            }
+        } else courseDownload!.disabled = !completeTimeline();
         courseMenu!.querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.hidden = !ports.download;
         const reading = courseMenu!.querySelector<HTMLButtonElement>('[data-action="toggle-reading-annotation"]')!;
         reading.hidden = !browserCapabilities.extensionDom;
@@ -511,6 +553,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         }
         const activePlatform = getCaptionPlatform(window.location) === platform;
         if (!activePlatform || !config.on || !config.videoTranslationEnabled) {
+            courseTools?.sync();
             clear(); restoreCaptions(); restoreAutoButton(); timeline.clear(); ai?.sync(''); removeCourseControls(); return;
         }
         if (!course && config.videoSubtitleVisible === false) { clear(); restoreCaptions(); restoreAutoButton(); return; }
@@ -531,6 +574,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         const nextVideo = selection?.video || null;
         const nextKey = nextVideo ? `${route}:${nextVideo.currentSrc || nextVideo.getAttribute('src') || ''}` : '';
         if (nextVideo !== video || nextKey !== mediaKey) {
+            mediaEpoch++;
             clear(); restoreCaptions(); cache.clear(); readings.clear(); video = nextVideo; mediaKey = nextKey; sourceTrack = null; targetTrack = null;
             timeline.clear(); ai?.sync(''); courseIdentity = ''; manualEnabled = null;
         }
@@ -552,6 +596,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
         }
         const hasAiCues = timeline.status !== 'ready' && Boolean(ai?.cues.length);
         if (hasAiCues !== usingAiCues) { usingAiCues = hasAiCues; cache.clear(); clear(); }
+        courseTools?.sync();
         syncCourseControls();
         if (!enabled) { clear(); restoreCaptions(); restoreAutoButton(); return; }
         if (!meeting && (!video || video.seeking || video.ended || video.readyState === 0)) { clear(); restoreCaptions(); return; }
@@ -666,7 +711,7 @@ export function mountPlatformCaptions(ports: PlatformCaptionPorts): () => void {
     document.fonts?.addEventListener('loadingdone', invalidateLayout);
     sync();
     return () => {
-        disposed = true; ai?.destroy(); clear(); cache.clear(); readings.destroy(); restoreCaptions(); restoreAutoButton(); timeline.clear(); removeCourseControls();
+        disposed = true; courseTools?.destroy(); ai?.destroy(); clear(); cache.clear(); readings.destroy(); restoreCaptions(); restoreAutoButton(); timeline.clear(); removeCourseControls();
         if (sourceLine?.parentElement) resetSubtitlePanelLayout(sourceLine.parentElement, true);
         observer.disconnect(); clearInterval(timer); if (pendingTimer !== undefined) clearTimeout(pendingTimer);
         unsubscribe(); document.removeEventListener('fullscreenchange', invalidateLayout); document.removeEventListener('seeking', schedule, true);

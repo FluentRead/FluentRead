@@ -907,6 +907,7 @@
       "tests/videoAiRequestSession.test.ts",
       "tests/videoAiSubtitleSession.test.ts",
       "tests/videoCaptionPlatformRuntime.test.ts",
+      "tests/courseSubtitleTools.test.ts",
       "tests/videoNativeFullscreen.test.ts",
       "tests/videoSentenceLearningAppearanceSettingsLifecycle.test.ts",
       "tests/videoSentenceLearningHost.test.ts",

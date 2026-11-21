@@ -465,7 +465,9 @@ export default defineConfig({
             const pageRuleDiagnosisBudget = 12_000;
             // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
             const webArticleBudget = 26_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget));
+            // 课程复用逐句学习组件，edX 子 frame 需要独立的 UI 和播放装配；Chrome 实测代码与样式增量约 204 kB。
+            const courseSubtitleLearningBudget = 214_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

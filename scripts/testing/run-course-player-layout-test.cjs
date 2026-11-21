@@ -52,7 +52,7 @@ async function main(){
         await control.goto(`chrome-extension://${extensionId}/options.html`,{waitUntil:'domcontentloaded'});
         const result=await control.evaluate(async()=>{
             const stored=await chrome.runtime.sendMessage({type:'configStorageRead',key:'local:config'});const config=typeof stored.value==='string'?JSON.parse(stored.value):stored.value;
-            return chrome.runtime.sendMessage({type:'persistConfig',clientId:'course-layout-test',sequence:1,baseRevision:config.__fluentConfigRevision,config:{...config,on:true,uiLanguageSetupCompleted:true,uiLanguage:'zh-CN',from:'en',to:'zh-Hans',service:'microsoft',videoService:'microsoft',videoTranslationEnabled:true,videoSubtitleVisible:true,videoSubtitleDisplayMode:'original-only',videoCourseAutoStart:{bilibili:true,udemy:true,edx:true}}});
+            return chrome.runtime.sendMessage({type:'persistConfig',clientId:'course-layout-test',sequence:1,baseRevision:config.__fluentConfigRevision,config:{...config,on:true,uiLanguageSetupCompleted:true,uiLanguage:'zh-CN',from:'en',to:'zh-Hans',service:'microsoft',videoService:'microsoft',videoTranslationEnabled:true,videoSubtitleVisible:true,videoSubtitleDisplayMode:'original-only',videoCourseAutoStart:{bilibili:true,udemy:true,edx:true},vocabularyBookEnabled:true}});
         });assert.equal(result.success,true,JSON.stringify(result));
         let platform;
         await context.route('**/*',async route=>{
@@ -61,7 +61,7 @@ async function main(){
             const headers={'access-control-allow-origin':req.headers().origin||'*','access-control-allow-credentials':'true'};
             if(req.isNavigationRequest())return route.fulfill({contentType:'text/html; charset=utf-8',body:coursePlayerFixture(platform,mediaUrl)});
             let body;
-            if(url.hostname==='api.bilibili.com')body={data:{cid:456,subtitle:{subtitles:[{lan:'en',subtitle_url:'https://aisubtitle.hdslb.com/layout.json'}]}}};
+            if(url.hostname==='api.bilibili.com')body={code:0,data:{cid:456,subtitle:{subtitles:[{lan:'en',subtitle_url:'https://aisubtitle.hdslb.com/layout.json'}]}}};
             else if(url.hostname==='aisubtitle.hdslb.com')body={body:[{from:0,to:20,content:source}]};
             else if(url.pathname.startsWith('/api-2.0/courses/'))body={id:77,locale:{locale:'en_US'}};
             else if(url.pathname.startsWith('/api-2.0/users/'))body={asset:{captions:[{locale_id:'en_US',source:'manual',status:1,url:'https://captions.udemycdn.com/layout.vtt'}]}};
@@ -104,6 +104,36 @@ async function main(){
             report.results.push({platform,state,centerDeltaCssPx:delta,icon:a,nativeButton:b,menu:bounds,viewport,fullscreen:await page.evaluate(()=>!!document.fullscreenElement),passed:true});
             console.log(`${platform} ${state}: aligned (${delta.toFixed(2)}px), menu fits`);
         };
+        const checkCourseActions = async () => {
+            diagnostics.setPhase(platform + '-study-export');
+            await button().click();
+            const downloadToggle = menu().locator('[data-action="toggle-subtitle-downloads"]');
+            await downloadToggle.click();
+            await menu().locator('[data-subtitle-format]').selectOption('vtt');
+            await menu().locator('[data-action="download-bilingual-subtitles"]').click();
+            const exportChoice = menu().locator('[data-export-choice="complete"]');
+            await exportChoice.waitFor({state:'visible'});
+            const [download] = await Promise.all([page.waitForEvent('download'), exportChoice.click()]);
+            const file = path.join(artifacts, platform + '-bilingual.vtt');
+            await download.saveAs(file);
+            const text = fs.readFileSync(file, 'utf8');
+            assert.ok(text.startsWith('WEBVTT') && text.includes(source) && text.includes('类是创建对象的蓝图。'));
+            assert.ok(text.includes('00:00:00.000 --> 00:00:20.000'));
+
+            await menu().locator('[data-action="open-sentence-learning"]').click();
+            const panel = page.locator('#fluent-read-video-learning-panel .fr-video-learning');
+            await panel.waitFor({state:'visible'});
+            assert.equal((await panel.locator('[data-learning-original]').textContent()).trim(), source);
+            await panel.locator('[data-learning-action="play"]').click();
+            await page.waitForFunction(() => !document.querySelector('.player video').paused);
+            await page.locator('.player video').evaluate(video => {video.pause();});
+            await panel.locator('[data-learning-action="save"]').click();
+            await panel.locator('[data-learning-action="save"][data-learning-saved="true"]').waitFor();
+            await page.screenshot({path:path.join(artifacts, platform + '-course-learning.png')});
+            await panel.locator('[data-learning-action="close"]').click();
+            await panel.waitFor({state:'detached'});
+            report.results.push({platform,state:'sentence-study-and-bilingual-vtt',passed:true});
+        };
         for(platform of sites){
             diagnostics.setPhase(platform+'-navigation');await page.goto(urls[platform],{waitUntil:'domcontentloaded'});await helper.activateExtensionTabWithoutForeground(context,page);
             await host().waitFor({state:'visible'});await page.locator('video').waitFor({state:'visible'});
@@ -112,6 +142,7 @@ async function main(){
             await page.locator('[data-fixture-web]').click();await page.locator('[data-fixture-full]').click();await page.waitForFunction(()=>!!document.fullscreenElement);await check('native-fullscreen');
             await page.evaluate(()=>document.exitFullscreen());await page.waitForFunction(()=>!document.fullscreenElement);await check('restored');
             await page.setViewportSize({width:390,height:844});await check('narrow');await page.setViewportSize({width:1280,height:900});
+            await checkCourseActions();
         }
         diagnostics.setPhase('teardown');await page.goto('about:blank');await control.reload();await diagnostics.flush();diagnostics.assertClean();report.passed=true;
     }catch(error){report.passed=false;report.failure=error.stack;if(page&&!page.isClosed())await page.screenshot({path:path.join(artifacts,'failure.png')});throw error;}

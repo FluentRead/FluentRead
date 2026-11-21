@@ -203,7 +203,7 @@ describe('字幕下载与人工轨优先', () => {
         const f = fixture({captured: () => [{url: 'https://www.youtube.com/api/timedtext?lang=en', cues: [cue, second]}],
             human: {ready: async () => undefined, at: time => time < 1000 ? '人工字幕' : ''}});
         await f.downloads.translated(f.menu, f.button, true);
-        expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(second.text);
+        expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(second.text, expect.any(AbortSignal));
         expect(f.save).toHaveBeenCalledWith(
             '1\n00:00:00,000 --> 00:00:00,800\nOriginal caption.\n人工字幕\n\n2\n00:00:00,800 --> 00:00:01,800\nSecond original.\n译文：Second original.\n',
             'zh-Hans-bilingual', expect.any(Array));
@@ -230,7 +230,7 @@ describe('字幕下载与人工轨优先', () => {
         const f = fixture({human: {ready: async () => undefined, at: () => '人工字幕'}});
         f.config.videoPreferHumanSubtitles = false; f.config.to = '';
         await f.downloads.translated(f.menu, f.button, false);
-        expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(cue.text);
+        expect(f.translate).toHaveBeenCalledOnce(); expect(f.translate).toHaveBeenCalledWith(cue.text, expect.any(AbortSignal));
         expect(f.save).toHaveBeenCalledWith('1\n00:00:00,000 --> 00:00:01,000\n译文：Original caption.\n', 'translated-translated', expect.any(Array)); f.downloads.destroy();
     });
 

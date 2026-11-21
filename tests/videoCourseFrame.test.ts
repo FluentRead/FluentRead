@@ -61,6 +61,9 @@ describe('edX 课程 frame 组合根', () => {
         expect(ports.mount).toHaveBeenCalledOnce();
         expect(options.iconUrl).toBe('chrome-extension://fixture/icon/128.png');
         options.download('SRT source', 'en'); expect(ports.download).toHaveBeenCalledWith(expect.stringMatching(/\.srt$/), 'SRT source', 'application/x-subrip;charset=utf-8');
+        options.download('SRT source', 'zh-Hans-bilingual', [{startMs: 300, durationMs: 1000, text: 'Source\n译文'}], 'vtt');
+        expect(ports.download).toHaveBeenLastCalledWith(expect.stringMatching(/-zh-Hans-bilingual\.vtt$/),
+            expect.stringContaining('00:00:00.300 --> 00:00:01.300\nSource\n译文'), 'text/vtt;charset=utf-8');
         ports.config.videoTranslationEnabled = false; changed(); expect(ports.unmount).toHaveBeenCalledOnce();
         ports.config.videoTranslationEnabled = true; ports.config.on = false; changed();
         ports.config.on = true; ports.config.disabledExtensionDomains = ['edx.org']; changed(); expect(ports.mount).toHaveBeenCalledOnce();

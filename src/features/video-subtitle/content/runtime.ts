@@ -167,7 +167,7 @@ function mountVideoSubtitleRuntime(): () => void {
     translate: translateVideoText,
     patch: patch => { void requestConfigPatch(patch, sendRuntimeMessage).catch(() => undefined); },
     label: text => localizeVideoUiText(text, getVideoUiLanguage(config.uiLanguage)),
-    download: (srt, language) => downloadSubtitleSrt(srt, language),
+    download: downloadSubtitleSrt,
     iconUrl: browser.runtime.getURL('icon/128.png'),
     openSettings: () => { void sendRuntimeMessage({type: 'openOptionsPage', section: 'settings-video'}).catch(() => undefined); },
   });

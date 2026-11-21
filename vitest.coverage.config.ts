@@ -826,6 +826,7 @@ export default defineConfig({
                 'src/app/content/youtubeEmbedFrameRuntime.ts',
                 'src/features/video-subtitle/content/youtubeHumanCaptions.ts',
                 'src/features/video-subtitle/content/downloads.ts',
+                'src/features/video-subtitle/content/courseSubtitleTools.ts',
                 'src/features/video-subtitle/content/youtubeTimedTextBridgeCore.ts',
                 'src/features/video-subtitle/content/youtubeTimedTextMessage.ts',
                 'src/features/video-subtitle/content/timedTextTrackCache.ts',

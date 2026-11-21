@@ -163,6 +163,11 @@ The AI SDK simplifies this through three kinds of prompts: text, message, and sy
             '<webpage_context>译文保留标记</webpage_context>',
             '页面摘要：无关材料。',
         )).toBe(false);
+        expect(isDefinitePageContextLeak(
+            '<discourse_evidence>原文标记</discourse_evidence>',
+            '<discourse_evidence>Source tag</discourse_evidence>',
+            '<discourse_evidence>Nearby text</discourse_evidence>',
+        )).toBe(false);
     });
 
     it('原文已包含中文参考片段时保留阈值内的展开', () => {

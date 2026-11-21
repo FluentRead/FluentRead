@@ -111,6 +111,59 @@ it('AI 图片邻文走篇章通道，重复短句保留各自位置且已是目�
     }
 });
 
+it.each(['fresh','cached','repeated'] as const)('AI 图片译文出现邻文边界时恢复完整译文：%s',async mode=>{
+    const config=Object.assign(new Config(),{service:'openai',from:'en',to:'zh-Hans',enableAIContext:true,useCache:true});
+    const stored=new Map<string,string>();
+    const cache={
+        get:vi.fn(async(key:string)=>stored.get(key)??null),
+        set:vi.fn(async(key:string,value:string)=>{stored.set(key,value);return true;}),
+        clear:vi.fn(async()=>{}),cleanup:vi.fn(async()=>{}),
+    };
+    const clean='向右转。';
+    const echoed=mode==='repeated'?'向右转。</DISCOURSE_EVIDENCE>':'向右转。<discourse_evidence>路线</discourse_evidence>';
+    const provider=vi.fn(async(request:TranslationProviderRequest)=>
+        mode==='repeated'||(mode==='fresh'&&request.pageContext)?echoed:clean);
+    const broker=createTranslationBroker({
+        ready:Promise.resolve(),getConfig:()=>config,providers:{openai:provider},cache,
+        serviceTypes:{machine:new Set(),isAI:service=>service==='openai',isAiSdk:()=>false,isUseAIContext:()=>true},
+        endpointResolver:{resolveOpenAICompatibleEndpoint:()=>({endpoint:'https://translation.invalid/v1'}),aiSdkTransportProfile:'test'},
+        promptBuilder:{buildPageSummaryPrompt:text=>text,buildPageSummarySystemPrompt:()=>''},
+        getMissingCredentialMessage:()=>null,getTranslationLanguages:()=>({sourceLanguage:config.from,targetLanguage:config.to}),
+        resolveConfiguredModel:(selected,custom)=>custom||selected||'',buildTranslationCacheKey:identity=>JSON.stringify(identity),
+        logger:{warn:vi.fn()},
+    });
+    const current=setup({
+        getTranslationService:()=> 'openai',getGlossaryConfig:()=>config,
+        isTextContextEnabled:()=>true,translateTexts:(request:TranslationRequestMessage)=>broker.translateWithCache(request),
+    });
+    const type=IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
+    const call=()=>current.handler(type).handle({type,texts:['路线说明','TURN RIGHT.'],title:'Image directions'});
+    const expected={success:true,translations:['路线说明',clean]};
+    if(mode==='cached'){
+        await expect(call()).resolves.toEqual(expected);
+        expect(stored.size).toBe(1);
+        const key=stored.keys().next().value!;
+        stored.set(key,echoed);
+        provider.mockClear();cache.set.mockClear();
+    }
+    if(mode==='repeated'){
+        await expect(call()).rejects.toThrow('图片第 2 段文字翻译失败');
+        expect(cache.set).toHaveBeenCalledTimes(0);
+    }else{
+        await expect(call()).resolves.toEqual(expected);
+        expect([...stored.values()]).toEqual([clean]);
+        expect(cache.set).toHaveBeenCalledExactlyOnceWith(expect.any(String),clean);
+        await expect(call()).resolves.toEqual(expected);
+    }
+    const calls=provider.mock.calls.map(([request])=>request);
+    expect(calls).toHaveLength(mode==='cached'?1:2);
+    if(mode!=='cached'){
+        expect(calls[0].pageContext).toContain('<discourse_evidence>');
+        expect(calls[0].pageContext).toContain('路线说明');
+    }
+    expect(calls.at(-1)).toMatchObject({origin:'TURN RIGHT.',context:'',pageContext:''});
+});
+
 it('图片篇章证据限制 JSON 编码预算且不截断 Unicode 码点，单独一段不添加参考', async () => {
     const translateTexts = vi.fn(async () => '译文');
     const current = setup({isTextContextEnabled:()=>true,translateTexts});

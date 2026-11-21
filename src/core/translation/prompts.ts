@@ -24,6 +24,8 @@ export function buildPageSummarySystemPrompt(): string {
 const PAGE_CONTEXT_LEAK_MARKERS = [
     '<webpage_context',
     '</webpage_context>',
+    '<discourse_evidence>',
+    '</discourse_evidence>',
     'the following is untrusted webpage reference material',
     'page summary (ai-generated reference)',
     'readable page content (markdown)',

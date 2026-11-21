@@ -115,15 +115,17 @@ for (const [file, doc] of docs) {
       assert.equal(doc.querySelector('title')?.textContent, landing.title)
       assert.equal(doc.querySelector('meta[name="description"]')?.getAttribute('content'), landing.description)
       assert(resolve(shareImage), `Missing share artwork: ${shareImage}`)
+      const reader = doc.querySelector('.fr-marketing-hero .fr-sample-reader')
+      assert(reader && reader.getAttribute('data-view') === 'bilingual', `Missing bilingual sample: ${route}`)
+      assert.equal(reader.querySelectorAll('.fr-reader-switch button').length, 2)
+      assert.equal(reader.querySelectorAll('.fr-reader-switch button[aria-pressed="true"]').length, 1)
+      assert.equal(reader.querySelectorAll('.fr-source[lang] + .fr-translation').length, 2)
       if (landing.lang !== 'zh-CN' && landing.lang !== 'en') {
         const installLinks = [...doc.querySelectorAll('.fr-install-actions a')].map(link => link.href)
         assert.equal(installLinks.length, 3, `Missing browser installs: ${route}`)
         assert(installLinks.some(url => new URL(url).hostname === 'chromewebstore.google.com'))
         assert(installLinks.some(url => new URL(url).hostname === 'microsoftedge.microsoft.com'))
         assert(installLinks.some(url => new URL(url).hostname === 'addons.mozilla.org'))
-        assert.equal(doc.querySelectorAll('.fr-try-controls button').length, 2)
-        assert.equal(doc.querySelectorAll('.fr-try-controls button[aria-pressed="true"]').length, 1)
-        assert.equal(doc.querySelectorAll('.fr-sample-translation').length, 2)
       }
     } else {
       const alternatePath = (route.startsWith('en/') ? route.slice(3) : 'en/' + route)
@@ -227,7 +229,7 @@ for (const prefix of ['', '/en']) {
     ),
     'Video and meeting platforms missing'
   )
-  assert(!home.querySelector('.bv-hero [data-demo]'), 'Full demonstration belongs below the hero')
+  assert(!home.querySelector('.fr-marketing-hero [data-demo]'), 'Full demonstration belongs below the hero')
   assert(home.querySelector('.bv-home-header'), 'Homepage must use focused marketing navigation')
   assert(
     !home.querySelector('.bv-identity,.bv-platforms'),
@@ -238,13 +240,13 @@ for (const prefix of ['', '/en']) {
     'Translation demo must appear below the hero'
   )
   assert(!home.querySelector('.bv-walkthrough'), 'Numbered walkthrough controls must be removed')
-  assert.equal(home.querySelectorAll('.bv-hero h1').length, 1, 'Hero needs one primary headline')
+  assert.equal(home.querySelectorAll('.fr-marketing-hero h1').length, 1, 'Hero needs one primary headline')
   assert.equal(
-    home.querySelectorAll('.bv-hero .bv-install-actions > a.bv-primary').length,
+    home.querySelectorAll('.fr-marketing-hero .bv-install-actions > a.bv-primary').length,
     1,
     'Hero needs one primary install action'
   )
-  const docsAction = home.querySelector('.bv-hero .bv-docs-link')
+  const docsAction = home.querySelector('.fr-marketing-hero .bv-docs-link')
   assert.equal(docsAction?.getAttribute('href'), `${prefix}/docs/`)
   assert.equal(docsAction?.textContent.trim(), prefix ? 'Documentation' : '使用文档')
   const workflows = [...home.querySelectorAll('.bv-feature-row .ds')]
@@ -302,11 +304,8 @@ for (const prefix of ['', '/en']) {
     'Primary feature needs a visible bilingual translation heading'
   )
   assert(
-    home.querySelector('.bv-hero-intro > span')?.textContent.trim() ===
-      (prefix
-        ? 'FluentRead is an open-source browser extension for bilingual translation.'
-        : '流畅阅读，一款开源的浏览器双语翻译插件') &&
-      home.querySelector('.bv-hero h1.bv-hero-slogan')?.textContent.trim() ===
+    home.querySelector('.fr-hero-copy > p')?.textContent.includes(prefix ? 'FluentRead' : '流畅阅读') &&
+      home.querySelector('.fr-marketing-hero h1')?.textContent.trim() ===
         (prefix ? brandTaglines['en-US'] : brandTaglines['zh-CN']),
     'Canonical slogan must be the headline, with the product name in the localized introduction'
   )
@@ -314,21 +313,10 @@ for (const prefix of ['', '/en']) {
     home.querySelector('.bv-home-brand')?.textContent.includes(prefix ? 'FluentRead' : '流畅阅读'),
     'Localized product name missing'
   )
-  assert(
-    home.querySelector('.bv-hero-orbit')?.textContent.includes('Hello') &&
-      home.querySelector('.bv-hero-orbit')?.textContent.includes('你好'),
-    'Multilingual greetings missing'
-  )
   assert.equal(
     home.querySelectorAll('.bv-feature-row').length,
     5,
     'Five consistent feature sections required'
-  )
-  assert(
-    ['page', 'document', 'grammar'].every((kind) =>
-      home.querySelector(`.bv-hero-orbit .bv-orbit-${kind}`)
-    ),
-    'Hero scene decorations must stay present'
   )
   assert(
     home.querySelector(
@@ -349,7 +337,7 @@ for (const prefix of ['', '/en']) {
     'Homepage carries one introduction video'
   )
   assert(
-    !home.querySelector('.bv-hero video,.bv-hero iframe'),
+    !home.querySelector('.fr-marketing-hero video,.fr-marketing-hero iframe'),
     'Introduction video belongs below the hero'
   )
   const promo = home.querySelector('.bv-promo video')
@@ -379,7 +367,7 @@ for (const prefix of ['', '/en']) {
     'Confusing cursor paths and repeated installation section must be removed'
   )
   assert(
-    !home.querySelector('.bv-hero')?.textContent.includes('AI'),
+    !home.querySelector('.fr-marketing-hero')?.textContent.includes('AI'),
     'Hero should foreground translation, without AI marketing'
   )
   assert(

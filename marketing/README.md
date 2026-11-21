@@ -50,6 +50,6 @@
 
 ## 官网宣传入口
 
-首页覆盖简体中文、英语、日语、韩语、法语、西语和俄语。中文与英文使用原有首页，其他语种提供本地化介绍、双语网页示例和三个浏览器商店入口。链接到英文使用文档时，在当地语言的入口上标明文档语言。
+首页覆盖简体中文、英语、日语、韩语、法语、西语和俄语。七语首屏共用阅读示例，首次进入时译文按段出现，也可切换原文和双语。链接到英文使用文档时，在当地语言的入口上标明文档语言。
 
-官网标题、简介、语言导航和分享卡图路径统一维护在 [landing-locales.json](../docs/.vitepress/landing-locales.json)。[international-home-copy.json](../docs/.vitepress/theme/international-home-copy.json) 保存演示和功能介绍。1200×630 的分享图位于 [docs/public/brand/share](../docs/public/brand/share)，使用原有产品图标与宣传包的双层纸页主图。更新后运行 `pnpm docs:build` 和 `pnpm docs:check` 验证页面、语言链接、分享图和 sitemap。
+官网标题、简介、语言导航和分享卡图路径统一维护在 [landing-locales.json](../docs/.vitepress/landing-locales.json)。[marketing-hero-copy.json](../docs/.vitepress/theme/marketing-hero-copy.json) 保存首屏阅读示例，[international-home-copy.json](../docs/.vitepress/theme/international-home-copy.json) 保存功能介绍。1200×630 的分享图位于 [docs/public/brand/share](../docs/public/brand/share)，使用产品图标、书刊式排版和粉色译文标记。更新后运行 `pnpm docs:build:site` 和 `pnpm docs:check` 验证页面、语言链接、分享图和 sitemap。

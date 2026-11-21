@@ -1,99 +1,129 @@
 {
   "ja": {
-    "headline": "ウェブを原文と訳文で。",
     "addChrome": "Chrome に追加",
     "mobile": "モバイルと Safari の対応状況（英語）",
-    "original": "原文",
-    "bilingual": "原文と訳文",
-    "example": "ウェブ翻訳の表示例",
-    "exampleTitle": "小さな好奇心が、大きな発見につながります。",
-    "exampleText": "身近なことを一つ選び、疑問を持つところから始めてみましょう。答えをたどると、思いがけない発見があるかもしれません。",
     "featuresTitle": "記事から、文書や動画まで",
     "features": [
-      { "title": "選んだ言葉を翻訳", "description": "単語や一文を選び、読んでいるページで訳を確認できます。" },
-      { "title": "文書を対訳で読む", "description": "PDF、EPUB、DOCX を読み込み、原文と訳文を見比べられます。" },
-      { "title": "画像や漫画の文字を翻訳", "description": "対応する画像や漫画の中のテキストを翻訳できます。" },
-      { "title": "動画を二言語字幕で見る", "description": "対応する動画で、元の字幕と訳文を一緒に表示します。" }
+      {
+        "title": "選んだ言葉を翻訳",
+        "description": "単語や一文を選び、読んでいるページで訳を確認できます。"
+      },
+      {
+        "title": "文書を対訳で読む",
+        "description": "PDF、EPUB、DOCX を読み込み、原文と訳文を見比べられます。"
+      },
+      {
+        "title": "画像や漫画の文字を翻訳",
+        "description": "対応する画像や漫画の中のテキストを翻訳できます。"
+      },
+      {
+        "title": "動画を二言語字幕で見る",
+        "description": "対応する動画で、元の字幕と訳文を一緒に表示します。"
+      }
     ],
     "free": "無料の翻訳サービスを内蔵しています。一部の追加サービスにはキーや利用料金が必要です。",
     "source": "ソースコード",
     "privacy": "プライバシー（英語）"
   },
   "ko": {
-    "headline": "웹페이지를 두 언어로 읽어 보세요.",
     "addChrome": "Chrome에 추가",
     "mobile": "모바일 및 Safari 이용 안내 (영어)",
-    "original": "원문",
-    "bilingual": "원문과 번역",
-    "example": "웹페이지 번역 예시",
-    "exampleTitle": "작은 호기심이 더 큰 발견으로 이어집니다.",
-    "exampleText": "익숙한 것에 대해 질문 하나를 떠올려 보세요. 답을 찾다 보면 뜻밖의 발견을 할 수도 있어요.",
     "featuresTitle": "웹페이지에서 문서와 동영상까지",
     "features": [
-      { "title": "선택한 문장 번역", "description": "단어나 문장을 선택하면 읽던 페이지에서 번역을 볼 수 있어요." },
-      { "title": "문서의 원문과 번역을 함께", "description": "PDF, EPUB, DOCX를 가져와 원문과 번역을 함께 읽어 보세요." },
-      { "title": "이미지와 만화 번역", "description": "지원되는 이미지와 만화 속 글자를 번역할 수 있어요." },
-      { "title": "두 언어 자막", "description": "지원되는 동영상에서 원본 자막과 번역을 함께 볼 수 있어요." }
+      {
+        "title": "선택한 문장 번역",
+        "description": "단어나 문장을 선택하면 읽던 페이지에서 번역을 볼 수 있어요."
+      },
+      {
+        "title": "문서의 원문과 번역을 함께",
+        "description": "PDF, EPUB, DOCX를 가져와 원문과 번역을 함께 읽어 보세요."
+      },
+      {
+        "title": "이미지와 만화 번역",
+        "description": "지원되는 이미지와 만화 속 글자를 번역할 수 있어요."
+      },
+      {
+        "title": "두 언어 자막",
+        "description": "지원되는 동영상에서 원본 자막과 번역을 함께 볼 수 있어요."
+      }
     ],
     "free": "내장된 무료 번역 서비스로 시작하세요. 일부 추가 서비스는 키가 필요하거나 요금이 부과됩니다.",
     "source": "소스 코드",
     "privacy": "개인정보 처리방침 (영어)"
   },
   "fr": {
-    "headline": "Lisez le Web en deux langues.",
     "addChrome": "Ajouter à Chrome",
     "mobile": "Mobile et Safari (en anglais)",
-    "original": "Original",
-    "bilingual": "Version bilingue",
-    "example": "Exemple de traduction d’une page Web",
-    "exampleTitle": "Un peu de curiosité peut mener loin.",
-    "exampleText": "Posez-vous une question sur quelque chose qui vous est familier. La réponse pourrait vous mener là où vous ne vous y attendiez pas.",
     "featuresTitle": "Des articles aux documents et aux vidéos",
     "features": [
-      { "title": "Traduire une sélection", "description": "Sélectionnez un mot ou une phrase et consultez la traduction sur la même page." },
-      { "title": "Lire un document en deux langues", "description": "Importez un PDF, un EPUB ou un DOCX et lisez le texte d’origine avec sa traduction." },
-      { "title": "Traduire des images et des BD", "description": "Lisez le texte traduit dans les images et bandes dessinées compatibles." },
-      { "title": "Afficher des sous-titres bilingues", "description": "Suivez les sous-titres d’origine et leur traduction sur les vidéos compatibles." }
+      {
+        "title": "Traduire une sélection",
+        "description": "Sélectionnez un mot ou une phrase et consultez la traduction sur la même page."
+      },
+      {
+        "title": "Lire un document en deux langues",
+        "description": "Importez un PDF, un EPUB ou un DOCX et lisez le texte d’origine avec sa traduction."
+      },
+      {
+        "title": "Traduire des images et des BD",
+        "description": "Lisez le texte traduit dans les images et bandes dessinées compatibles."
+      },
+      {
+        "title": "Afficher des sous-titres bilingues",
+        "description": "Suivez les sous-titres d’origine et leur traduction sur les vidéos compatibles."
+      }
     ],
     "free": "Des services de traduction gratuits sont intégrés. Certains services supplémentaires peuvent demander une clé ou être payants.",
     "source": "Code source",
     "privacy": "Confidentialité (en anglais)"
   },
   "es": {
-    "headline": "Lee la web en dos idiomas.",
     "addChrome": "Añadir a Chrome",
     "mobile": "Móviles y Safari (en inglés)",
-    "original": "Original",
-    "bilingual": "Vista bilingüe",
-    "example": "Ejemplo de traducción de una página web",
-    "exampleTitle": "Un poco de curiosidad puede llevarte muy lejos.",
-    "exampleText": "Hazte una pregunta sobre algo que conozcas. Puede que la respuesta te lleve por un camino que no esperabas.",
     "featuresTitle": "De los artículos a los documentos y los vídeos",
     "features": [
-      { "title": "Traduce lo que selecciones", "description": "Selecciona una palabra o una frase y consulta su traducción en la misma página." },
-      { "title": "Lee documentos en dos idiomas", "description": "Importa un PDF, EPUB o DOCX y lee el original junto con la traducción." },
-      { "title": "Traduce imágenes y cómics", "description": "Lee el texto traducido en imágenes y cómics compatibles." },
-      { "title": "Mira vídeos con subtítulos bilingües", "description": "Lee los subtítulos originales y su traducción en los vídeos compatibles." }
+      {
+        "title": "Traduce lo que selecciones",
+        "description": "Selecciona una palabra o una frase y consulta su traducción en la misma página."
+      },
+      {
+        "title": "Lee documentos en dos idiomas",
+        "description": "Importa un PDF, EPUB o DOCX y lee el original junto con la traducción."
+      },
+      {
+        "title": "Traduce imágenes y cómics",
+        "description": "Lee el texto traducido en imágenes y cómics compatibles."
+      },
+      {
+        "title": "Mira vídeos con subtítulos bilingües",
+        "description": "Lee los subtítulos originales y su traducción en los vídeos compatibles."
+      }
     ],
     "free": "Incluye servicios de traducción gratuitos. Algunos servicios adicionales pueden requerir una clave o tener un coste.",
     "source": "Código fuente",
     "privacy": "Privacidad (en inglés)"
   },
   "ru": {
-    "headline": "Читайте сайты на двух языках.",
     "addChrome": "Добавить в Chrome",
     "mobile": "Мобильные браузеры и Safari (на английском)",
-    "original": "Оригинал",
-    "bilingual": "Оригинал и перевод",
-    "example": "Пример перевода веб-страницы",
-    "exampleTitle": "Немного любопытства может привести к большим открытиям.",
-    "exampleText": "Задайте себе вопрос о чём-то знакомом. Возможно, ответ приведёт вас туда, где вы совсем не ожидали оказаться.",
     "featuresTitle": "От статей до документов и видео",
     "features": [
-      { "title": "Переводите выделенный текст", "description": "Выберите слово или фразу и откройте перевод на той же странице." },
-      { "title": "Читайте документы на двух языках", "description": "Импортируйте PDF, EPUB или DOCX и читайте оригинал вместе с переводом." },
-      { "title": "Переводите изображения и комиксы", "description": "Читайте перевод текста на поддерживаемых изображениях и в комиксах." },
-      { "title": "Смотрите видео с субтитрами", "description": "Читайте оригинальные и переведённые субтитры на поддерживаемых видео." }
+      {
+        "title": "Переводите выделенный текст",
+        "description": "Выберите слово или фразу и откройте перевод на той же странице."
+      },
+      {
+        "title": "Читайте документы на двух языках",
+        "description": "Импортируйте PDF, EPUB или DOCX и читайте оригинал вместе с переводом."
+      },
+      {
+        "title": "Переводите изображения и комиксы",
+        "description": "Читайте перевод текста на поддерживаемых изображениях и в комиксах."
+      },
+      {
+        "title": "Смотрите видео с субтитрами",
+        "description": "Читайте оригинальные и переведённые субтитры на поддерживаемых видео."
+      }
     ],
     "free": "Доступны встроенные бесплатные сервисы перевода. Некоторым дополнительным сервисам нужен ключ, а их использование может быть платным.",
     "source": "Исходный код",

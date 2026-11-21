@@ -20,7 +20,7 @@
     gap: 28px;
   }
 }
-/* 首屏以居中图标和两行口号为主，两侧悬浮卡片只用变换动画，不占据文档流。 */
+/* 标题栏品牌标记。 */
 .bv-home-brand img {
   width: 38px;
   height: 38px;
@@ -39,92 +39,6 @@
 .bv-home-brand-text small {
   font-size: 12px;
   font-weight: 650;
-}
-.bv-hero {
-  position: relative;
-  isolation: isolate;
-  max-width: 1440px;
-  min-height: 570px;
-  margin: auto;
-  padding: 82px 24px 96px;
-  text-align: center;
-}
-.bv-hero-copy {
-  position: relative;
-  z-index: 2;
-  max-width: 780px;
-  margin: auto;
-}
-/* 品牌图标在各屏宽下都独立居中，显式尺寸避免载入时推动口号。 */
-.bv-hero-icon {
-  display: block;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 24px;
-}
-/* 两行口号以字面宽度居中，行末标点悬挂以校正视觉偏移。 */
-.bv-site .bv-hero-slogan {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin: 0;
-  font-size: clamp(48px, 5vw, 64px);
-  font-weight: 780;
-  color: #202025;
-  line-height: 1.22;
-  letter-spacing: -0.055em;
-}
-.bv-hero-slogan > .bv-slogan-line {
-  display: block;
-  position: relative;
-  width: max-content;
-  white-space: nowrap;
-}
-.bv-slogan-punctuation {
-  position: absolute;
-  left: 100%;
-}
-.bv-hero-en .bv-hero-slogan {
-  letter-spacing: -0.045em;
-}
-.bv-site .bv-hero-intro {
-  margin-top: 28px;
-  font-size: 16px;
-  color: var(--fr-muted);
-  line-height: 1.8;
-}
-.bv-hero-intro > span {
-  display: block;
-  text-wrap: balance;
-}
-.bv-hero-intro > span:first-child {
-  color: #4e4954;
-  font-size: 18px;
-}
-.bv-hero-name {
-  position: relative;
-  isolation: isolate;
-  white-space: nowrap;
-}
-.bv-hero-name::before {
-  content: '';
-  position: absolute;
-  z-index: -1;
-  inset: 48% -0.12em 0.03em;
-  border-radius: 0.2em 0.1em 0.18em 0.08em;
-  background: #f4d8787a;
-  transform: skewX(-8deg) rotate(-1deg);
-}
-.bv-hero-capabilities > span {
-  display: inline-block;
-  white-space: nowrap;
-}
-.bv-hero .bv-install-actions .bv-button {
-  border-radius: 12px;
-  box-shadow: none;
-}
-.bv-hero .bv-install-actions {
-  margin-top: 30px;
 }
 .bv-install-fallbacks,
 .bv-install-fallback-links {
@@ -165,181 +79,6 @@
   font-weight: 600;
   line-height: 1.8;
 }
-.bv-hero-orbit {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  overflow: hidden;
-}
-.bv-hero-orbit > * {
-  position: absolute;
-  animation: bv-orbit-float 9s ease-in-out infinite;
-  animation-play-state: paused;
-  transform: rotate(var(--orbit-angle, 0deg));
-}
-.bv-hero-orbit[data-active='true'] > * {
-  animation-play-state: running;
-}
-.bv-orbit-card {
-  padding: 20px;
-  text-align: left;
-  background: white;
-  border: 1px solid var(--fr-line);
-  border-radius: 20px;
-  box-shadow: 0 15px 35px #26232c06;
-  color: #48454e;
-}
-.bv-orbit-card small {
-  display: block;
-  color: #87838d;
-  font-size: 10px;
-}
-.bv-orbit-window {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 18px;
-}
-.bv-orbit-window i {
-  height: 5px;
-  width: 5px;
-  border-radius: 50%;
-  background: #dfdce2;
-}
-.bv-orbit-page {
-  left: 4%;
-  top: 205px;
-  width: 198px;
-  --orbit-angle: -7deg;
-  animation-delay: -2s;
-}
-.bv-orbit-page p {
-  font-size: 16px;
-}
-.bv-orbit-page .bv-orbit-translation {
-  color: #c34870;
-  margin-top: 12px;
-  margin-bottom: 18px;
-  border-left: 2px solid #d67b99;
-  padding-left: 10px;
-}
-.bv-orbit-document {
-  right: 5%;
-  top: 125px;
-  width: 176px;
-  --orbit-angle: 7deg;
-  animation-delay: -4s;
-}
-.bv-orbit-document > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 22px;
-}
-.bv-orbit-document > div span {
-  border: 1px solid #eed7e0;
-  padding: 3px 5px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: #c34870;
-}
-.bv-orbit-document > i {
-  display: block;
-  height: 5px;
-  border-radius: 4px;
-  background: #eae8ed;
-  margin: 7px 0;
-}
-.bv-orbit-document > i:nth-last-of-type(1) {
-  width: 65%;
-  background: #eedce4;
-}
-.bv-orbit-document p {
-  font-size: 10px;
-  color: #87838d;
-  margin-top: 20px;
-}
-.bv-orbit-grammar {
-  right: 4%;
-  top: 360px;
-  width: 180px;
-  --orbit-angle: -5deg;
-  animation-delay: -6s;
-}
-.bv-orbit-grammar > span {
-  display: block;
-  font-size: 28px;
-  font-weight: 700;
-}
-.bv-orbit-grammar small {
-  padding-bottom: 10px;
-  border-bottom: 2px solid #d66e94;
-}
-.bv-orbit-grammar p {
-  font-size: 10px;
-  color: #87838d;
-  margin-top: 16px;
-}
-.bv-orbit-greeting {
-  color: #b8b4be;
-  opacity: 0.38;
-  font-size: 16px;
-  font-weight: 450;
-}
-.bv-greeting-fr {
-  left: 5%;
-  top: 12%;
-}
-.bv-greeting-en {
-  right: 25%;
-  top: 7%;
-}
-.bv-greeting-es {
-  left: 22%;
-  top: 83%;
-}
-.bv-greeting-zh {
-  left: 25%;
-  top: 7%;
-}
-/* 桌面问候语放在卡片上方的留白区，避开旋转边界和浮动动画范围。 */
-.bv-greeting-ja {
-  right: 5%;
-  top: 7%;
-  font-size: 14px;
-}
-.bv-greeting-ko {
-  left: 5%;
-  top: 86%;
-  font-size: 14px;
-}
-.bv-greeting-de {
-  left: 5%;
-  top: 20%;
-}
-.bv-greeting-ru {
-  right: 15%;
-  top: 7%;
-}
-.bv-greeting-ar {
-  left: 5%;
-  top: 77%;
-}
-.bv-greeting-pt {
-  right: 22%;
-  top: 83%;
-}
-
-@keyframes bv-orbit-float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(var(--orbit-angle, 0deg));
-  }
-  50% {
-    transform: translateY(-6px) rotate(var(--orbit-angle, 0deg));
-  }
-}
-
 /* 首屏下方的介绍视频：优先显示原封面与视频，中文加载失败时回退到 B 站，保持 16:9。 */
 .bv-site .bv-promo {
   max-width: 1180px;
@@ -950,91 +689,18 @@
 }
 
 /* 较窄的桌面屏幕为中间的中英文简介留出完整间距。 */
-@media (min-width: 1101px) and (max-width: 1279px) {
-  .bv-orbit-page {
-    left: 2%;
-  }
-  .bv-orbit-document,
-  .bv-orbit-grammar {
-    right: 2%;
-  }
-}
 @media (max-width: 1100px) {
-  .bv-orbit-card {
-    display: none;
-  }
   .bv-site .bv-feature-row {
     gap: 40px;
     grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
   }
 }
-@media (max-width: 1100px) {
-  .bv-hero {
-    padding: 54px 24px 64px;
-    min-height: 0;
-  }
-  .bv-orbit-greeting {
-    font-size: 17px;
-    opacity: 0.3;
-  }
-  .bv-greeting-fr {
-    top: 4%;
-    left: 5%;
-  }
-  .bv-greeting-en {
-    top: 8%;
-    right: 2%;
-  }
-  .bv-greeting-es {
-    top: 66%;
-    left: 2%;
-  }
-  .bv-greeting-zh {
-    top: 83%;
-    left: auto;
-    right: 5%;
-  }
-  .bv-greeting-ja {
-    top: 48%;
-    right: -24px;
-    font-size: 16px;
-  }
-  .bv-greeting-ko {
-    display: block;
-    top: 86%;
-    left: -12px;
-    right: auto;
-    font-size: 14px;
-  }
-  .bv-greeting-de {
-    top: 27%;
-    left: -15px;
-  }
-  .bv-greeting-ru {
-    top: 28%;
-    right: -12px;
-  }
-  .bv-greeting-ar {
-    top: 47%;
-    left: 0;
-  }
-  .bv-greeting-pt {
-    top: 86%;
-    right: 17%;
-  }
-}
 @media (max-width: 760px) {
-  .bv-hero {
-    padding-top: 72px;
-  }
   .bv-site .bv-feature-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 28px;
     padding: 44px 24px;
     max-width: 640px;
-  }
-  .bv-site .bv-hero-slogan {
-    font-size: clamp(40px, 7vw, 54px);
   }
 }
 @media (max-width: 640px) {
@@ -1067,21 +733,6 @@
   .bv-home-links svg {
     width: 18px;
     height: 18px;
-  }
-  .bv-hero {
-    padding: 72px 20px 64px;
-  }
-  .bv-site .bv-hero-slogan {
-    font-size: clamp(34px, 9.5vw, 42px);
-  }
-  .bv-site .bv-hero-en .bv-hero-slogan {
-    font-size: clamp(32px, 9vw, 42px);
-  }
-  .bv-hero-intro {
-    font-size: 14px;
-  }
-  .bv-hero-intro > span:first-child {
-    font-size: 15px;
   }
   .bv-install-actions {
     gap: 10px;
@@ -1192,9 +843,6 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .bv-hero-orbit > * {
-    animation: none;
-  }
   .fd-sound-wave i,
   .fd-spinner,
   .fd-loading-bar::after,

@@ -484,7 +484,7 @@ export default defineConfig({
             }
             // 非中文界面文案只生成一份 JSON，由各运行上下文按当前语言加载，不再内联进每个 bundle。
             files.push(...createUiLanguageBundleFiles());
-            // 安装名称与功能说明由浏览器原生 locale 解析，复用七语资源，不复制完整界面目录。
+            // 安装名称、功能说明和工具栏提示由浏览器按界面语言解析，复用七语资源。
             files.push(...createExtensionMetadataLocaleFiles());
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});

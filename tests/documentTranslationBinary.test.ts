@@ -19,7 +19,7 @@ import {
 } from '@/src/features/document-translation/services/binary';
 import {pdfPagesNeedingOcr} from '@/src/features/document-translation/services/pdfOcr';
 
-const exampleRoot = new URL('../examples/document-translation/', import.meta.url);
+const exampleRoot = new URL('./fixtures/document-translation/', import.meta.url);
 const onePixelPng = Uint8Array.from(Buffer.from(
     'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZlY4AAAAASUVORK5CYII=',
     'base64',

@@ -9,18 +9,17 @@ import {auditVueOwners, isDeclarativeVue, sourceHash, type VueOwner} from '../he
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const AUDITED_EXTENSIONS = /\.(?:cjs|css|html|js|mjs|ts|vue)$/u;
 const PRODUCT_ROOTS = [
+    'assets/styles',
     'docs/.vitepress',
     'entrypoints',
-    'examples',
     'scripts',
     'src',
-    'styles',
+    'tests/config',
+    'tests/fixtures/document-translation',
     'userscript',
 ] as const;
 const ROOT_FILES = [
     'vitest.config.ts',
-    'vitest.coverage.config.ts',
-    'vitest.cloud-backup.config.ts',
     'wxt.config.ts',
 ] as const;
 const PRODUCT_TOOL_SCRIPTS = [
@@ -86,7 +85,7 @@ function listFiles(directory: string): string[] {
 }
 
 function coverageSourcePaths(): Set<string> {
-    const file = projectPath('vitest.coverage.config.ts');
+    const file = projectPath('tests/config/vitest.coverage.config.ts');
     const sourceFile = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     const declaration = sourceFile.statements.find(ts.isExportAssignment);
     if (!declaration || !ts.isCallExpression(declaration.expression)
@@ -121,7 +120,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('components/')
         || path.startsWith('entrypoints/')
         || path.startsWith('src/')
-        || path.startsWith('styles/')
+        || path.startsWith('assets/styles/')
         || path === 'wxt.config.ts') {
         owners.add('chrome-firefox-build');
     }
@@ -136,7 +135,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('docs/.vitepress/')) owners.add('docs-build');
     if (path === 'scripts/verify-docs-build.mjs' || path === 'scripts/verify-storybook-build.mjs') owners.add('docs-build');
     if (path === 'scripts/verify-brand-copy.mjs') owners.add('brand-copy-functional');
-    if (path.startsWith('examples/')) owners.add('isolated-browser-regression');
+    if (path.startsWith('tests/fixtures/document-translation/')) owners.add('isolated-browser-regression');
     if (path.startsWith('scripts/run-') || path.startsWith('scripts/site-translation/')
         || path === 'scripts/quality/review-browser.cjs'
         || path === 'scripts/capture-docs-ui.cjs') {
@@ -164,7 +163,8 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path === 'scripts/verify-userscript-standalone-build.mjs'
         || path === 'scripts/export-site-rule-pack.mjs'
         || path === 'scripts/update-readme-contributors.mjs'
-        || path.startsWith('vitest.')) {
+        || path.startsWith('vitest.')
+        || path.startsWith('tests/config/')) {
         owners.add('test-infrastructure-contract');
     }
 

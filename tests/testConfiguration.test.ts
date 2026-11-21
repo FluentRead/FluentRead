@@ -2,7 +2,7 @@ import {readFileSync, realpathSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {describe, expect, it} from 'vitest';
 import base from '../vitest.config';
-import strict from '../vitest.coverage.config';
+import strict from './config/vitest.coverage.config';
 
 describe('shared Vitest regression configuration', () => {
     it('uses identical plugins, resolution and isolated execution settings for regular and coverage tests', () => {

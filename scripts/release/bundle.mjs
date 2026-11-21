@@ -136,7 +136,7 @@ async function collectTarget(root, target, productVersion, userscriptVersion, ou
             const sourceArchive = await openArchive(sourceBytes, sourceName);
             const sourcePackage = JSON.parse((await archiveFile(sourceArchive, 'package.json', sourceName)).toString());
             assert.equal(sourcePackage.version, productVersion, 'Firefox source package version does not match the product version');
-            for (const input of ['.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'patches/ppu-paddle-ocr@6.6.0.patch', 'wxt.config.ts']) {
+            for (const input of ['.nvmrc', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'scripts/patches/ppu-paddle-ocr@6.6.0.patch', 'wxt.config.ts']) {
                 await archiveFile(sourceArchive, input, sourceName);
             }
             assets.push(asset(target, sourceName, productVersion, 'browser-extension-source', await normalizeArchive(sourceArchive)));

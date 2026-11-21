@@ -444,7 +444,7 @@ async function main() {
         for (const [number, name] of [[11, 'sample.docx'], [12, 'sample.epub']]) {
             step(`real native ${name} correction persists through production refresh`);
             await page.goto(`${origin}/document.html`, {waitUntil: 'domcontentloaded'}); await page.locator('.reader-tabs').waitFor();
-            const sourceFile = path.join(repository, 'examples/document-translation', name);
+            const sourceFile = path.join(repository, 'tests/fixtures/document-translation', name);
             await page.locator('input[type=file]').setInputFiles(sourceFile);
             await page.locator('.workspace-heading h1').filter({hasText: name}).waitFor(); await showEdit();
             const row = page.locator('.segment-edit-row[data-segment-id]').first();

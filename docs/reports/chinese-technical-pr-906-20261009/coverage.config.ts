@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import base from '../../../vitest.coverage.config';
+import base from '../../../tests/config/vitest.coverage.config';
 
 // 仅检查本次语言与 DOM 边界；沿用仓库四维 100% 门禁，不扩大到全仓回归。
 export default defineConfig({...base, test: {...base.test,

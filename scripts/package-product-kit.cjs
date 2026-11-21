@@ -21,7 +21,7 @@ const allFiles = (dir) =>
   fs.mkdirSync(output, { recursive: true })
   for (const locale of ['zh-CN', 'en']) {
     const zip = new JSZip()
-    const folder = path.join(root, 'marketing/chrome-web-store', locale)
+    const folder = path.join(root, 'docs/maintainers/marketing/chrome-web-store', locale)
     for (const file of allFiles(folder))
       zip.file(path.relative(folder, file), fs.readFileSync(file))
     const instructions = fs
@@ -35,44 +35,44 @@ const allFiles = (dir) =>
     zip.file('README.md', instructions)
     zip.file(
       'community.md',
-      fs.readFileSync(path.join(root, 'marketing/copy', locale + '.md'))
+      fs.readFileSync(path.join(root, 'docs/maintainers/marketing/copy', locale + '.md'))
     )
-    const promo = path.join(root, 'marketing/chrome-web-store/promo')
+    const promo = path.join(root, 'docs/maintainers/marketing/chrome-web-store/promo')
     for (const file of allFiles(promo).filter((f) =>
       path.basename(f).startsWith(locale + '-')
     ))
       zip.file('promo/' + path.basename(file), fs.readFileSync(file))
     const originals = path.join(
       root,
-      'marketing/source',
+      'docs/maintainers/marketing/source',
       locale === 'en' ? 'screenshots-en' : 'screenshots'
     )
     for (const file of allFiles(originals).filter((f) => f.endsWith('.png')))
       zip.file('originals/' + path.basename(file), fs.readFileSync(file))
     for (const [source, dest] of [
-      ['marketing/chrome-web-store/icon-128.png', 'icon-128.png'],
+      ['docs/maintainers/marketing/chrome-web-store/icon-128.png', 'icon-128.png'],
       ['LICENSE', 'LICENSE'],
       [
         'public/third-party-notices/deepseek-harness-MIT.txt',
         'third-party-notices/deepseek-harness-MIT.txt',
       ],
       [
-        `marketing/source/capture-report${locale === 'en' ? '-en' : ''}.json`,
+        `docs/maintainers/marketing/source/capture-report${locale === 'en' ? '-en' : ''}.json`,
         'source/capture-report.json',
       ],
       [
-        `marketing/source/article${locale === 'en' ? '-en' : ''}.html`,
+        `docs/maintainers/marketing/source/article${locale === 'en' ? '-en' : ''}.html`,
         'source/article.html',
       ],
       [
-        `marketing/source/translations${locale === 'en' ? '-en' : ''}.json`,
+        `docs/maintainers/marketing/source/translations${locale === 'en' ? '-en' : ''}.json`,
         'source/translations.json',
       ],
       [
-        `marketing/source/reading-answer-${locale}.md`,
+        `docs/maintainers/marketing/source/reading-answer-${locale}.md`,
         'source/reading-answer.md',
       ],
-      [`marketing/source/document-${locale}.html`, 'source/document.html'],
+      [`docs/maintainers/marketing/source/document-${locale}.html`, 'source/document.html'],
     ])
       zip.file(dest, fs.readFileSync(path.join(root, source)))
     const buffer = await zip.generateAsync({

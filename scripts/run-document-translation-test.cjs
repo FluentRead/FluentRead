@@ -94,7 +94,7 @@ async function main() {
   const suite = arg('suite', 'full');
   assert(['full', 'formats', 'archives', 'experience', 'pdf-export', 'scanned', 'scanned-cjk'].includes(suite), 'suite 仅支持 full、formats、archives、experience、pdf-export、scanned 或 scanned-cjk');
   const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json,sample.csv,sample.tsv').split(',');
-  const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
+  const exampleDir = path.resolve(arg('example-dir', 'tests/fixtures/document-translation'));
   const packages = arg('playwright-root');
   const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'));
   const diagnosticsPath = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);

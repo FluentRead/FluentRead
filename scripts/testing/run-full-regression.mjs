@@ -321,7 +321,7 @@ function deterministicSteps(options) {
             label: 'complete Vitest suite with strict coverage',
             command: 'pnpm',
             args: [
-                'exec', 'vitest', 'run', '--coverage', '--config', 'vitest.coverage.config.ts',
+                'exec', 'vitest', 'run', '--coverage', '--config', 'tests/config/vitest.coverage.config.ts',
                 '--reporter=default', '--reporter=json',
                 `--outputFile=${path.join(options.artifactsDir, 'vitest-results.json')}`,
                 `--coverage.reportsDirectory=${path.join(options.artifactsDir, 'coverage')}`,

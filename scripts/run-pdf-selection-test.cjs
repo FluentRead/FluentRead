@@ -1011,7 +1011,7 @@ async function main() {
       report.ok = true; record('actual paper Chinese layout baseline captured; readability failures recorded without claiming a layout pass'); return;
     }
 
-    page = await openDocument(); await load('sample.pdf', fs.readFileSync(path.join(__dirname, '..', 'examples/document-translation/sample.pdf'))); await resourceState('local sample'); await shot('sample-local'); record('local sample PDF retains canvas and a selectable PDF.js text layer');
+    page = await openDocument(); await load('sample.pdf', fs.readFileSync(path.join(__dirname, '..', 'tests/fixtures/document-translation/sample.pdf'))); await resourceState('local sample'); await shot('sample-local'); record('local sample PDF retains canvas and a selectable PDF.js text layer');
     if (arxivPath) {
       page = await openDocument(); await load('attention-is-all-you-need.pdf', fs.readFileSync(arxivPath));
       const text = await page.locator('[data-fluentread-pdf-text][data-pdf-page-number="1"]').innerText(); assert(/attention/iu.test(text), '论文第一页文字层必须含 Attention');

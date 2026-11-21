@@ -16,7 +16,7 @@ const sharp = runtime('sharp')
 const { chromium } = runtime('playwright')
 const promoOnly = process.argv.includes('--promo-only')
 const entries = promoOnly
-  ? JSON.parse(fs.readFileSync(path.join(root, 'marketing/asset-manifest.json'), 'utf8')).entries.filter(entry => entry.kind !== 'chrome-promo')
+  ? JSON.parse(fs.readFileSync(path.join(root, 'docs/maintainers/marketing/asset-manifest.json'), 'utf8')).entries.filter(entry => entry.kind !== 'chrome-promo')
   : []
 const record = async (file, source, kind) => {
   const m = await sharp(file).metadata()
@@ -47,7 +47,7 @@ async function buildScreenshotAssets() {
   for (const locale of ['zh-CN', 'en']) {
     const raw = path.join(
       root,
-      'marketing/source',
+      'docs/maintainers/marketing/source',
       locale === 'en' ? 'screenshots-en' : 'screenshots'
     )
     const web = path.join(
@@ -58,7 +58,7 @@ async function buildScreenshotAssets() {
     mkdir(web)
     const store = path.join(
       root,
-      'marketing/chrome-web-store',
+      'docs/maintainers/marketing/chrome-web-store',
       locale,
       'screenshots'
     )
@@ -119,7 +119,7 @@ async function buildScreenshotAssets() {
       path.join(root, 'docs/public/screenshots', name + '.webp'),
       path.join(root, 'misc/screenshots', name + '.webp')
     )
-  const icon = path.join(root, 'marketing/chrome-web-store/icon-128.png')
+  const icon = path.join(root, 'docs/maintainers/marketing/chrome-web-store/icon-128.png')
   // The current icon already includes its own transparent surround. Preserve its approved artwork.
   await sharp(path.join(root, 'public/icon/128.png'))
     .png({ compressionLevel: 9 })
@@ -129,7 +129,7 @@ async function buildScreenshotAssets() {
 ;(async () => {
   if (!promoOnly) await buildScreenshotAssets()
   const logo = path.join(root, 'assets/brand/icon-512.png')
-  const promo = path.join(root, 'marketing/chrome-web-store/promo')
+  const promo = path.join(root, 'docs/maintainers/marketing/chrome-web-store/promo')
   mkdir(promo)
   const browser = await chromium.launch({
     headless: true,
@@ -181,7 +181,7 @@ async function buildScreenshotAssets() {
         }</div></html>`
         const source = path.join(
           root,
-          'marketing/source',
+          'docs/maintainers/marketing/source',
           `promo-${locale}-${kind}.html`
         )
         fs.writeFileSync(source, html)
@@ -211,7 +211,7 @@ async function buildScreenshotAssets() {
       .readFileSync(
         path.join(
           root,
-          'marketing/chrome-web-store',
+          'docs/maintainers/marketing/chrome-web-store',
           locale,
           'short-description.txt'
         ),
@@ -227,7 +227,7 @@ async function buildScreenshotAssets() {
       .filter((x) => x.kind === 'web-lossless')
       .reduce((n, x) => n + x.bytes, 0)
   fs.writeFileSync(
-    path.join(root, 'marketing/asset-manifest.json'),
+    path.join(root, 'docs/maintainers/marketing/asset-manifest.json'),
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),

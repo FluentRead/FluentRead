@@ -79,7 +79,7 @@ describe('full regression runner', () => {
         expect(vitestSteps).toHaveLength(1);
         expect(vitestSteps[0]).toMatchObject({id: 'strict-coverage', command: 'pnpm',
             args: [
-                'exec', 'vitest', 'run', '--coverage', '--config', 'vitest.coverage.config.ts',
+                'exec', 'vitest', 'run', '--coverage', '--config', 'tests/config/vitest.coverage.config.ts',
                 '--reporter=default', '--reporter=json',
                 '--outputFile=/tmp/fluentread-local-only/vitest-results.json',
                 '--coverage.reportsDirectory=/tmp/fluentread-local-only/coverage',

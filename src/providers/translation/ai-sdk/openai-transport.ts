@@ -381,7 +381,7 @@ async function translateSingle(
 
   // 协议的 stream 标记由 SDK 管理。自定义请求体仍可替换 model/messages，并添加任意
   // OpenAI 兼容 provider 字段，但不能绕过解析器把 generateText 调用切换为 SSE。
-  const requestBody = normalizeChatCompletionRequest(endpoint.endpoint, {...payload, stream: false});
+  const requestBody = normalizeChatCompletionRequest(endpoint.endpoint, {...payload, stream: false}, service);
   const abortContext = createRequestAbortContext(
     normalizedTimeout(request.requestTimeoutMs, current.aiRequestTimeoutMs),
     request.abortSignal,

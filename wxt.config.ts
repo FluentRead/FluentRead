@@ -219,6 +219,9 @@ export function createExtensionManifest(
         name: '__MSG_extensionName__',
         description: '__MSG_extensionDescription__',
         default_locale: 'en',
+        ...(['chrome', 'edge', 'firefox'].includes(env.browser) ? {
+            commands: {'open-translation-window': {description: 'Open translation window'}},
+        } : {}),
         permissions: [
             ...(env.manifestVersion === 3 ? ['scripting'] : []),
             'storage',
@@ -250,7 +253,6 @@ export function createExtensionManifest(
             'https://*/*',
         ],
         web_accessible_resources: [
-            {resources: ['hypothesis/build/*', 'hypothesis/build/scripts/*', 'hypothesis/build/styles/*'], matches: ['<all_urls>']},
             {
                 resources: ['videoPcmWorklet.js'],
                 matches: ['<all_urls>'],

@@ -16,6 +16,86 @@ const parse = (markdown: string) => parseDocument('note.md', markdown, {markdown
 const sources = (markdown: string) => parse(markdown).segments.map(segment => segment.source);
 const output = (markdown: string, translations: string[], mode: 'translated' | 'bilingual' = 'translated') => renderDocument(parse(markdown), translations, mode);
 
+describe('Markdown soft-wrapped paragraphs', () => {
+    it.each([
+        ['变量\n说明', '变量 说明'],
+        ['变量 \r\n 说明', '变量   说明'],
+        ['变量\r说明', '变量 说明'],
+    ])('preserves CommonMark whitespace inside a wrapped code span %j', (wrapped, normalized) => {
+        const source = 'This contains `' + wrapped + '` in a code span.';
+        const document = parse(source);
+        const translated = renderDocument(document, ['译文保留 <g1/>。'], 'translated');
+        const code = /<code>([^<]*)<\/code>/u;
+        const originalCode = standardMarkdown.render(source).match(code)?.[1];
+        expect(originalCode).toBe(normalized);
+        expect(standardMarkdown.render(translated).match(code)?.[1]).toBe(originalCode);
+    });
+
+    it.each(['\n', '\r\n', '\r'])('sends each prose paragraph once and preserves original %j line endings', ending => {
+        const first = ['The source is read one line at a time.', 'Its paragraph continues on the next line.'];
+        const second = ['Keep the original code in', '`calculate_bounds()` while translating the prose.'];
+        const source = [...first, '', ...second].join(ending);
+        const document = parse(source);
+        expect(document.segments.map(segment => segment.source)).toEqual([
+            first.join(' '), 'Keep the original code in <g1/> while translating the prose.',
+        ]);
+        const translations = ['这一段一起翻译。', '翻译正文时保留 <g1/>。'];
+        expect(renderDocument(document, [])).toBe(source);
+        expect(renderDocument(document, translations, 'translated')).toBe('这一段一起翻译。' + ending.repeat(2) + '翻译正文时保留 `calculate_bounds()`。');
+        expect(renderDocument(document, translations)).toBe(first.join(ending) + '\n> 这一段一起翻译。' + ending.repeat(2)
+            + second.join(ending) + '\n> 翻译正文时保留 `calculate_bounds()`。');
+    });
+
+    it.each([['https://example.com/帮助', ' '], ['#翻译', '']])(
+        'keeps the CJK prose after %s outside the protected token', (token, separator) => {
+            const source = '请参阅 ' + token + '\r\n然后继续阅读。';
+            const document = parse(source);
+            expect(document.segments.map(segment => segment.source)).toEqual(['请参阅' + separator + '<g1/> 然后继续阅读。']);
+            expect(renderDocument(document, ['See' + separator + '<g1/> then continue reading.'], 'translated'))
+                .toBe('See ' + token + ' then continue reading.');
+            expect(createDocumentPreviewHtml(document, [], 'source')).toContain(token + ' 然后继续阅读。');
+        });
+
+    it('preserves Markdown hard breaks and structural lines', () => {
+        const source = 'A heading\ncontinued\n===\n\nFirst line  \nSecond line\\\nThird line\n\n'
+            + '- One item\n- Another item\n\n> Quoted text\n> Next quote line\n\n'
+            + '| Column |\n| --- |\n| Cell |\n\n' + '~~~text\nnot prose\nnor this\n~~~';
+        expect(sources(source)).toEqual([
+            'A heading', 'continued', '===', 'First line', 'Second line\\', 'Third line',
+            'One item', 'Another item', 'Quoted text', 'Next quote line', 'Column', 'Cell',
+        ]);
+        expect(output(source, [])).toBe(source);
+        expect(sources('Another heading\ncontinued\n--')).toEqual(['Another heading', 'continued', '--']);
+        const longLines = ['abc '.repeat(700).trim(), 'def '.repeat(700).trim(), 'Last line.'];
+        expect(sources(longLines.join('\n'))).toEqual(longLines);
+        const internalSpaces = ['Words' + ' '.repeat(1800) + 'within a line.', 'The paragraph continues.'];
+        expect(sources(internalSpaces.join('\n'))).toEqual([internalSpaces.join(' ')]);
+    });
+
+    it('keeps each preview translation with its own paragraph when another paragraph is pending', () => {
+        const document = parse('First line\ncontinues.\n\nPending line\nstill waiting.\n\n~~~\nkeep this block\n~~~\n\nLast line\ncontinues.');
+        const preview = createDocumentPreviewHtml(document, ['第一段。\n补充。', '', '最后一段。'], 'bilingual');
+        expect(preview).toContain('>First line continues.</p><p class="reader-translation fluentread-translation">第一段。<br>补充。</p>');
+        expect(preview).toContain('>Pending line still waiting.</p></section>');
+        expect(preview).toContain('<pre data-reader-unit><code>keep this block</code></pre>');
+        expect(preview).toContain('>Last line continues.</p><p class="reader-translation fluentread-translation">最后一段。</p>');
+    });
+
+    it('keeps GFM table translations and following prose aligned after a translated soft-wrapped paragraph', () => {
+        const source = 'First line\r\ncontinues.\r\n\r\n| Title | Note |\r\n| :--- | ---: |\r\n| Read | Pending |\r\n\r\nLast line\r\ncontinues.';
+        const document = parse(source);
+        const translations = ['第一段。', '标题', '备注', '阅读', '', '最后一段。'];
+        const preview = createDocumentPreviewHtml(document, translations, 'bilingual');
+        expect(preview).toContain('>First line continues.</p><p class="reader-translation fluentread-translation">第一段。</p>');
+        expect(preview).toContain('<th style="text-align:left">Title<span class="reader-translation fluentread-translation">标题</span></th>');
+        expect(preview).toContain('<td style="text-align:right">Pending</td>');
+        expect(preview).toContain('>Last line continues.</p><p class="reader-translation fluentread-translation">最后一段。</p>');
+        const exported = renderDocument(document, translations, 'bilingual');
+        expect(exported).toContain('First line\r\ncontinues.\n> 第一段。');
+        expect(exported).toContain('| Read<br>阅读 | Pending |');
+    });
+});
+
 describe('Markdown whole-sentence translation', () => {
     const line = 'Read the [setup guide](https://example.com/setup) before `npm install` starts, and keep **bold** words.';
 

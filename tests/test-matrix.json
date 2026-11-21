@@ -619,6 +619,7 @@
       "tests/pdfScanPreview.test.ts",
       "tests/pdfOcrTextLayer.test.ts",
       "tests/documentTranslation.test.ts",
+      "tests/documentGlossaryCandidates.test.ts",
       "tests/documentTranslationApi.test.ts",
       "tests/documentTranslationBinary.test.ts",
       "tests/documentTranslationBinaryEdge.test.ts",

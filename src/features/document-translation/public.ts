@@ -8,6 +8,10 @@ import {defineAsyncComponent} from 'vue';
 
 export * from './core/document';
 export * from './core/pdfSource';
+export {
+    documentGlossaryDestinations, extractDocumentGlossaryCandidates, filterDocumentGlossaryCandidates, planDocumentGlossaryUpdate,
+    type DocumentGlossaryChoice,
+} from './core/glossaryCandidates';
 export {documentSourceLocators, createDocumentMaterialReference, resolveDocumentMaterialReference, normalizeDocumentMaterialReference, DOCUMENT_MATERIAL_REFERENCE_LIMITS} from './core/materialLocator';
 export type {DocumentSourceLocator, DocumentMaterialReference} from './core/materialLocator';
 export type {PdfReadingPresentation} from './core/pdfReadingPlan';

@@ -140,6 +140,43 @@ beforeEach(async () => {
 afterEach(async () => {ports.pagePending?.resolve(ports.tasks.find(value => value.role === 'preview')?.page); ports.renderPending?.resolve(); app?.unmount(); await flush(); await vi.dynamicImportSettled(); windowTimers.forEach(timer => clearTimeout(timer)); windowTimers.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals();});
 
 describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
+    it('saves confirmed glossary terms and retries only matching paragraphs while retaining previous edits', async () => {
+        state.config.from = 'en';
+        state.config.to = 'zh-Hans';
+        state.config.documentService = 'microsoft';
+        ports.sendMessage.mockImplementation(async (message: {patch?: Partial<Config>}) => {
+            if (message.patch) {
+                Object.assign(ports.config, message.patch);
+                ports.observer(ports.config);
+            }
+        });
+        const selected = 'This article defines retrieval-augmented generation (RAG).';
+        const unrelated = 'This article contains an unrelated passage.';
+        await state.loadFiles([file('glossary.txt', `${selected}\n\n${unrelated}`)]);
+        await state.startTranslation(); await flush();
+        state.editSegment(0, 'Old edit in the matched paragraph.');
+        state.editSegment(1, 'Independent human edit.');
+        await state.extractGlossaryCandidates(); await flush();
+        expect(state.glossaryChoices).toHaveLength(2);
+        expect(state.glossaryChoices.every((choice: {selected: boolean}) => !choice.selected)).toBe(true);
+        expect(state.glossaryChoices.find((choice: {source: string}) => choice.source === 'RAG')).toMatchObject({evidence: selected});
+        const acronym = state.glossaryChoices.find((choice: {source: string}) => choice.source === 'RAG');
+        Object.assign(acronym, {target: '检索增强生成', selected: true});
+        ports.batch.mockClear().mockRejectedValueOnce(Object.assign(new Error('Provider refused this request'), {retryable: false}));
+        await state.applyGlossaryChoices();
+        await vi.waitFor(() => expect(state.runState).toBe('failed')); await flush();
+        expect(ports.config.glossaryLibraries[0].entries).toEqual([expect.objectContaining({source: 'RAG', target: '检索增强生成'})]);
+        expect(state.pendingGlossaryRetranslation.pending).toEqual(new Set([0]));
+        expect(state.translatedSegments).toEqual(['Old edit in the matched paragraph.', 'Independent human edit.']);
+        expect(ports.batch).toHaveBeenLastCalledWith([selected], 'glossary.txt', expect.objectContaining({useCache: false}));
+        ports.batch.mockClear();
+        state.resumeGlossaryRetranslation();
+        await vi.waitFor(() => expect(state.pendingGlossaryRetranslation).toBeNull()); await flush();
+        expect(ports.batch).toHaveBeenCalledExactlyOnceWith([selected], 'glossary.txt', expect.objectContaining({useCache: false}));
+        expect(state.translatedSegments).toEqual([`译 ${selected}`, 'Independent human edit.']);
+        expect(state.settingsChanged).toBe(false);
+    });
+
     it('translates a recovered source through the configured default service when no document override is supplied',async()=>{
         ports.config.service='microsoft';const onSegment=vi.fn();
         await translateWithDefaultService([{id:0,source:'Recognized source.'}],{fileName:'scanned.pdf',batchTranslation:false,onSegment});

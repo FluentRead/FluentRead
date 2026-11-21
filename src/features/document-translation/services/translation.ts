@@ -40,6 +40,8 @@ export interface DocumentTranslationOptions {
     maxRetries?: number;
     /** 同一文档和语言对下已完成或人工校订的译文；切换服务或模型时仍复用，仅空白位置继续翻译。 */
     initialTranslations?: readonly string[];
+    /** 重译指定片段时保留其余片段和篇章位置，强制重新请求这些片段。 */
+    retranslateIds?: ReadonlySet<number>;
     /** 当前阅读会话里经用户编辑确认的片段，历史机器译文不能冒充用户确认。 */
     confirmedTranslationIds?: readonly number[];
     /** 仅本次文档调用生效，默认开启；关闭时逐段请求，不修改网页或全局 AI 多段翻译设置。 */
@@ -392,8 +394,10 @@ export function createDocumentSegmentTranslator(
 
         if (segments.length === 0) return [];
         const translations = new Array<string>(segments.length).fill('');
-        segments.forEach(({id}) => { translations[id] = options.initialTranslations?.[id] || ''; });
-        const pending = segments.filter(({id}) => !translations[id].trim());
+        segments.forEach(({id}) => {
+            translations[id] = options.retranslateIds?.has(id) ? '' : options.initialTranslations?.[id] || '';
+        });
+        const pending = segments.filter(({id}) => options.retranslateIds ? options.retranslateIds.has(id) : !translations[id].trim());
         const context = options.fileName || 'FluentRead 文档';
         const pageContext = buildDocumentContext(segments, context, options.pageContext);
         // 步骤 1：一次文档任务固定语言对，不能被设置页同步更新或用户中途改选污染后续批次。
@@ -487,7 +491,9 @@ export function createDocumentSegmentTranslator(
             // 继续未完成的任务时，已有译文的原文直接复用给后面相同的片段，不再请求。
             const known = new Map<string, string>();
             for (const segment of segments) if (translations[segment.id].trim() && !known.has(reuseKey(segment))) known.set(reuseKey(segment), translations[segment.id]);
-            for (const segment of pending) if (!translations[segment.id].trim() && known.has(reuseKey(segment))) commit(segment.id, known.get(reuseKey(segment))!);
+            if (!options.retranslateIds) {
+                for (const segment of pending) if (!translations[segment.id].trim() && known.has(reuseKey(segment))) commit(segment.id, known.get(reuseKey(segment))!);
+            }
             reportProgress();
 
             // 先只保留每个原文的一段，再分配批量字符和数量预算；字幕重复台词和表格重复单元格不会挤成小请求。

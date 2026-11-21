@@ -12,6 +12,8 @@ Write your message in a chat, email or other webpage, then translate it into the
 
 Settings save automatically. Changing a language or provider does not enable the feature. Password fields and code editors are excluded.
 
+Select **Auto-detect** as the target language to use the current page's declared language. FluentRead uses English when the page has no supported language declaration.
+
 ## Keep both languages
 
 | Output | Result |

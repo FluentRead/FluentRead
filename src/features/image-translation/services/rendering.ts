@@ -17,8 +17,10 @@ import type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './text
 export type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './textLayoutTypes';
 import type {ImageTextRegion} from '../paragraphs';
 import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
+import {getImageTextDirection} from '../textBoundary';
 import {bindImageTextPunctuation} from './imageTextPunctuation';
 import {IMAGE_TEXT_FONT} from './imageTextFont';
+export {getImageTextDirection} from '../textBoundary';
 
 /** 从 OCR 框外围采样主色，忽略透明像素且不遍历框内面积。 */
 export function getImageTextBackgroundColor(
@@ -217,11 +219,6 @@ export function getImageSingleLineHeight(context:CanvasRenderingContext2D,text:s
         if(Math.max(m.width,inkWidth)+stroke>width-Math.min(2,width*.03)*2)return;
         return Math.ceil(inkHeight+stroke+2);
     }finally{context.restore();}
-}
-/** 离屏文档的默认方向不能决定译文中的数字与标点；预检和绘制使用同一首强字符方向。 */
-export function getImageTextDirection(text:string):CanvasDirection {
-    const firstLetter=text.match(/\p{Letter}/u)?.[0]??'';
-    return /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}]/u.test(firstLetter)?'rtl':'ltr';
 }
 // 补充平面汉字、假名与韩文 Jamo 要与英文分词，附着的组合标记和连接符仍属于前一字素。
 const CJK_TOKENS = /\s+|[\uFF66-\uFF9D][\uFF9E\uFF9F](?:\p{Mark}|[\u200c\u200d])*|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af](?:\p{Mark}|[\u200c\u200d])*|[^\s\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}\uff66-\uff9d\u2e80-\u9fff\u3040-\u30ff\uac00-\ud7af]+/gu;

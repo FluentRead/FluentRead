@@ -43,6 +43,8 @@ Text on a smooth gradient can also retain a verified source color, with a thin c
 
 Manga translations use the direction of their paragraph when measuring and drawing text. This helps keep numbers, brackets and punctuation in Arabic and Hebrew text from following an unrelated default canvas direction.
 
+When recognized words match a full right-to-left row, image and manga translation use that reading order. Text separated by a large gap keeps its own region.
+
 Manga layout measures the visible sides of glyphs, including their outlines. When strokes or marks extend to one side, the translation can shift within the original text box, wrap, or use a smaller font to reduce clipping.
 
 Manga wrapping tries to keep complete words and graphemes together, reducing splits within short Chinese words. Word boundaries depend on the browser's language support; words that exceed the available width can still wrap at complete graphemes.

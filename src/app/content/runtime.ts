@@ -47,6 +47,7 @@ import {
 import {installContentPageLifecycle, waitForContentDocument} from './pageLifecycle';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {officialSiteRuleUpdatesEnabled, readOfficialSiteRuleRelease} from '@/src/services/site-adaptation/officialClient';
 import {createOptionalContentFeatureRuntime, type OptionalContentFeatureRuntime} from './optionalFeatures';
 import {createPageInformationHighlightRuntime} from './informationHighlight';
 import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
@@ -75,7 +76,9 @@ export async function startContentApp(ctx: ContentScriptContext,
     const paperDom = import.meta.env.BROWSER === 'userscript' ? undefined
         : waitForPaperReadingDom(document, window.location.href, pageEventController.signal);
     if (paperDom && (!await paperDom || ctx.isInvalid || cleanedUp)) { cleanup(); return; }
-    const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href));
+    const officialSiteRules = officialSiteRuleUpdatesEnabled ? await readOfficialSiteRuleRelease() : null;
+    if (ctx.isInvalid || cleanedUp) { cleanup(); return; }
+    const siteAdaptation = createContentSiteAdaptationRuntime(config.siteAdaptation, new URL(window.location.href), undefined, officialSiteRules);
     applyCoreTranslationPreferences(config); clearLegacyPageTranslationCache();
     const siteRules = createSiteRuleMatcher(config);
     let currentPageSiteDisabled = siteRules.isExtensionDisabled(window.location.href);

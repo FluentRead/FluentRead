@@ -7,6 +7,8 @@
 import type {RegisteredUiLanguage} from '../types';
 type Row = readonly [string, string, string, string, string, string, string];
 export const siteRuleTextRows: readonly Row[] = [
+  ['官方规则', 'Official rules', '公式ルール', '공식 규칙', 'Règles officielles', 'Официальные правила', 'Reglas oficiales'],
+  ['检查规则更新', 'Check for rule updates', 'ルールの更新を確認', '규칙 업데이트 확인', 'Vérifier les mises à jour', 'Проверить обновления правил', 'Buscar actualizaciones de reglas'],
   ['仅显示译文网站', 'Translation-only sites', '訳文のみを表示するサイト', '번역만 표시하는 사이트', 'Sites avec traduction seule', 'Сайты только с переводом', 'Sitios con solo traducción'],
   ["仅此网站使用仅译文，其他网站沿用全局显示模式；谷歌翻译仅支持双语", "Use translation only on this site; other sites follow the global mode. Google Translate supports bilingual mode only.", "このサイトでは訳文のみを表示し、他のサイトは全体設定に従います。Google 翻訳は対訳表示のみ対応します。", "이 사이트에서는 번역만 표시하며 다른 사이트는 전역 설정을 따릅니다. Google 번역은 이중 언어만 지원합니다.", "Traduction seule sur ce site ; les autres suivent le mode global. Google Traduction ne prend en charge que le mode bilingue.", "Только перевод на этом сайте; другие используют общий режим. Google Переводчик поддерживает только двуязычный режим.", "Solo traducción en este sitio; los demás siguen el modo global. Google Traductor solo admite el modo bilingüe."],
   ["此网站已设为仅译文，可在网站偏好中修改", "This site uses translation only. Change it in Site preferences.", "このサイトは訳文のみの表示です。サイト設定で変更できます。", "이 사이트는 번역만 표시합니다. 사이트 환경설정에서 변경하세요.", "Ce site affiche uniquement la traduction. Modifiez ce choix dans les préférences du site.", "На этом сайте показан только перевод. Измените это в настройках сайта.", "Este sitio muestra solo la traducción. Cámbialo en las preferencias del sitio."],

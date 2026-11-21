@@ -353,6 +353,8 @@
       "tests/videoTranscriptionCacheClient.test.ts",
       "tests/xCaptionSource.test.ts",
       "tests/siteAdaptationCore.test.ts",
+      "tests/siteAdaptationOfficialRelease.test.ts",
+      "tests/siteAdaptationOfficialRuntime.test.ts",
       "tests/bbcCreditCaption.test.ts",
       "tests/xGifLabel.test.ts",
       "tests/xVideoMutationRescan.test.ts",

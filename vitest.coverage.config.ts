@@ -21,6 +21,10 @@ export default defineConfig({
             reportsDirectory: 'coverage/core',
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
+                'src/core/site-adaptation/officialRelease.ts',
+                'src/app/background/officialSiteRuleRuntime.ts',
+                'src/services/site-adaptation/officialClient.ts',
+                'src/services/site-adaptation/officialUpdates.ts',
                 'src/app/content/htmlMediaFrame.ts',
                 'src/features/video-subtitle/content/htmlMedia.ts',
                 'src/features/video-subtitle/content/subtitleExport.ts',

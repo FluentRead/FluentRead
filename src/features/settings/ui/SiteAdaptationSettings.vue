@@ -14,6 +14,12 @@
         <span>{{ tr('启用网站适配') }}</span>
         <el-switch :model-value="modelValue.enabled" :disabled="saving" :aria-label="tr('启用网站适配')" @update:model-value="setEnabled(Boolean($event))" />
       </div>
+      <div v-if="canShowOfficialUpdates && officialUpdatesEnabled && !form" class="rule-toggle-row">
+        <span aria-live="polite">{{ tr('官方规则') }} · {{ officialRelease?.revision ?? tr('内置') }}</span>
+        <button type="button" :disabled="checkingOfficialRules" :aria-busy="checkingOfficialRules" @click="emit('refresh-official')">
+          {{ tr('检查规则更新') }}
+        </button>
+      </div>
       <p v-if="!modelValue.enabled" class="rule-notice">{{ tr('正文适配已关闭，规则仍保留；网页使用通用正文识别') }}</p>
       <div v-if="(isDirty || saving) && !form" class="draft-bar" role="status"><span>{{ tr(saving ? '正在保存，等待后台确认' : '草稿未保存，网页仍使用已保存规则') }}</span><button type="button" class="rule-primary" :disabled="saving || !!form || draftConflict" :aria-busy="saving" @click="saveDraft">{{ tr(saving ? '正在保存' : '保存并应用') }}</button></div>
       <p v-if="draftConflict" class="rule-error" role="alert">{{ tr('已保存规则在其他页面发生变化。草稿已保留，请先导出或复制草稿，再恢复最新配置并重新合并。') }}</p>
@@ -105,6 +111,7 @@ import UiSelect from '@/src/ui/components/UiSelect.vue';
 import {downloadTextFile} from '@/src/shared/dom/downloadTextFile';
 import {computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch} from 'vue';
 import {builtinSiteRulePack} from '@/src/core/site-adaptation/catalog';
+import type {OfficialSiteRuleRelease} from '@/src/core/site-adaptation/officialRelease';
 import {resolveSiteRule} from '@/src/core/site-adaptation/compiler';
 import {SITE_RULE_LIMITS} from '@/src/core/site-adaptation/schema';
 import type {SiteAdaptationSettings, SiteRule, SiteRuleIssue, SiteRulePack} from '@/src/core/site-adaptation/types';
@@ -113,7 +120,12 @@ import {buildSiteRuleFromForm, completeSiteRuleDraftSave, copySiteRuleToDraft, c
   createSiteRuleDraftImportGuard, createSiteRuleForm, formatSiteRulePack, listSiteRuleCatalog, mergeSiteRuleDraft,
   parseSiteAdaptationDraft, reconcileSiteRuleDraft, searchSiteRules, setSiteRuleEnabled, SITE_ADAPTATION_EXAMPLE,
   upsertSiteRuleDraft, type SiteRuleCatalogItem, type SiteRuleForm} from '../model/siteAdaptationEditor';
-const props = withDefaults(defineProps<{modelValue: SiteAdaptationSettings; saveSettings: (value: SiteAdaptationSettings) => Promise<void>; inspectRuleId?: string; active?: boolean}>(), {active: true});
+const props = withDefaults(defineProps<{modelValue: SiteAdaptationSettings; saveSettings: (value: SiteAdaptationSettings) => Promise<void>;
+  inspectRuleId?: string; active?: boolean; officialRelease?: OfficialSiteRuleRelease | null; officialUpdatesEnabled?: boolean;
+  checkingOfficialRules?: boolean}>(), {active: true});
+const emit = defineEmits<{'refresh-official': []}>();
+const canShowOfficialUpdates = import.meta.env.BROWSER !== 'userscript';
+const baseRulePack = computed(() => canShowOfficialUpdates ? props.officialRelease?.pack ?? builtinSiteRulePack : builtinSiteRulePack);
 const {translateLegacy: tr, t} = useUiI18n();
 const search = ref(''); const filter = ref('all'); const visibleLimit = ref(30); const selectedId = ref('');
 const draft = ref(formatSiteRulePack(props.modelValue.custom)); const draftOwned = ref(false);
@@ -143,7 +155,7 @@ onBeforeUnmount(() => {alive = false; window.removeEventListener('beforeunload',
 const draftConflict = computed(() => draftOwned.value && isDirty.value && !saving.value && draftBase.value !== formatSiteRulePack(props.modelValue.custom));
 const parsedDraft = computed(() => parseSiteAdaptationDraft(draft.value, document));
 const workingPack = computed(() => parsedDraft.value.ok ? parsedDraft.value.pack : props.modelValue.custom);
-const catalog = computed(() => listSiteRuleCatalog(builtinSiteRulePack, {...props.modelValue, custom: workingPack.value}));
+const catalog = computed(() => listSiteRuleCatalog(baseRulePack.value, {...props.modelValue, custom: workingPack.value}));
 const filters = computed(() => [{id: 'all', label: '全部规则', count: catalog.value.length},
   {id: 'custom', label: '自定义', count: catalog.value.filter(item => item.source === 'custom').length},
   {id: 'builtin', label: '内置', count: catalog.value.filter(item => item.source === 'builtin').length},
@@ -216,7 +228,7 @@ function cancelForm() {
 async function saveForm() {
   if (!form.value || formConflict.value || draftConflict.value || saving.value) return;
   clearFeedback();
-  if (!editingId.value && builtinSiteRulePack.rules.some(rule => rule.id === form.value!.id.trim())) {
+  if (!editingId.value && baseRulePack.value.rules.some(rule => rule.id === form.value!.id.trim())) {
     issues.value = [{path: '$.id', message: '该标识属于内置规则，请从目录选择“基于此规则自定义”'}]; return;
   }
   const result = upsertSiteRuleDraft(draft.value, buildSiteRuleFromForm(form.value, originalRule.value), editingId.value, document);

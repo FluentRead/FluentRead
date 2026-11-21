@@ -14,6 +14,14 @@ Use the share or save buttons to keep a result. Drag the top or blank space arou
 
 For “Invalid key or permission”, choose **Configure service**, then check the key and permissions under **General → Service assignments → Selection translation → Configure connection**. Return and retry manually.
 
+## Selecting editable text
+
+Select text in a text input, textarea, rich-text editor or code editor and use your existing icon, direct translation, selection shortcut or context menu. Text controls translate only the selected substring. The card keeps its captured source after taking focus; editing that source discards stale results. Translation does not rewrite source content or editor attributes.
+
+Explicit selections may cross editing blocks and include text marked `translate="no"` or `notranslate`. Password fields, disabled controls, buttons, hidden document content and extension UI remain excluded. An active hidden textarea used by an editor can supply explicitly selected text. When a valid selection has no text rectangle, the icon uses the end of the same mouse selection gesture.
+
+The browser must expose a native text or text-control selection. Canvas-only text, closed components and child documents without an injected content script are not guaranteed to work.
+
 ## Optional AI explanations
 
 Enable **AI explanations** in selection settings, choose a service and model, then select an action in the card. Opening the card alone does not request an AI explanation.

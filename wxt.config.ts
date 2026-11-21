@@ -441,6 +441,9 @@ export default defineConfig({
             // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
             // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
             const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            // 通用可编辑选区读取、组合祖先校验及来源失效处理：Chrome 同环境 LF 基线
+            // 68,569,600 → 68,577,224 bytes；追加 9 kB 有界代码余量，不新增依赖或资源。
+            const editableSelectionBudget = 9_000;
             // #1356 复用既有字幕 frame；Chrome 对照 e124325e8 净增54,778 bytes，新增媒体定位、词查询、虚拟全文、七语文案、AudioWorklet 与导出格式。
             // 不增加模型、WASM、权限或依赖；保留可核对的55kB功能预算。
             const htmlMediaSubtitleBudget = 55_000;
@@ -461,7 +464,7 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + editableSelectionBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

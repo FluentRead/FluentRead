@@ -129,6 +129,24 @@ function visibleSelection(text: string): Selection {
 }
 
 describe('全文翻译快捷键状态联动', () => {
+    it.each(['selected', 'collapsed', 'password'])('arbitrates %s native control selection without using a stale document selection', async mode => {
+        const element = {tagName: 'INPUT', type: mode === 'password' ? 'password' : 'text',
+            disabled: false, selectionStart: 0, selectionEnd: mode === 'collapsed' ? 0 : 20,
+            value: 'Selected input words', matches: () => false, parentElement: null};
+        Object.assign(document, {activeElement: element});
+        mocks.getSelection.mockReturnValue(visibleSelection('Stale document selection'));
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        expect(createContentHotkeyRuntime(() => false).selectionShortcutPorts.hasActiveSelectionTranslationCandidate()).toBe(mode === 'selected');
+        expect(mocks.getSelection).not.toHaveBeenCalled();
+    });
+    it('ignores untrusted key releases', async () => {
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        const toggle = vi.fn();
+        createContentHotkeyRuntime(() => false, {toggleFullPage: toggle}).installFloatingBallHotkey(new AbortController().signal);
+        const listeners = (document as typeof document & {__listeners: Map<string, Listener[]>}).__listeners;
+        listeners.get('keyup')![0](keyboardEvent({isTrusted: false}));
+        expect(toggle).not.toHaveBeenCalled();
+    });
     it.each([false,true])('an existing translation card is excluded only when it is contained by the selection (%s)', async contains => {
         const host={} as HTMLElement,selection={...visibleSelection('Selected English text'),containsNode:vi.fn(()=>contains)};
         vi.mocked(document.getElementById).mockReturnValue(host);mocks.getSelection.mockReturnValue(selection as unknown as Selection);

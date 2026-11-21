@@ -1,10 +1,10 @@
 /**
  * @file src/features/selection-translation/core.ts
  * 文件职责：集中划词翻译的纯交互与内容算法，包括请求代次、词典回退、触发展示状态、选区过滤、上下文摘要、弹窗锚点和语音语言规范化。
- * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、文档根禁译外壳放行、同一编辑区内显式选区放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及单遍祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
+ * 主要内容：定义 SelectionRequestTokenGate、Presentation 状态机、选区/视口类型，处理中英划词反向目标、同语种判断、文本清理、公式单份文本提取、正文中的行内代码片段保护、主动代码选区提取、显式跨编辑宿主选区及语言禁译标记放行、按实际 Range 边界遍历的敏感区域排除、无文本装饰图标放行及组合 DOM 祖先保护检查（不扫描未选中的共同祖先子树）、多矩形选择与完整选区避让、按页面缩放补偿并在空间不足时约束高度的弹窗定位及仅用于朗读的普通话语言别名。
  * 模块边界：本模块不监听 document selection、不发消息、不渲染 Vue 或播放音频；组件负责连接 DOM，词典和 TTS 由 services/background 提供，函数保持确定性以供单元测试。DOM 安全判断直接复用 translation/dom 的同一实现，不初始化翻译候选或站点规则 registry。
  */
-import {getElementTagName, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell} from '@/src/core/translation/dom';
+import {getElementTagName, getComposedParent, isDocumentSurfaceNoTranslateShell, isTopLevelApplicationShell, maxComposedAncestorDepth} from '@/src/core/translation/dom';
 import {getChineseScript, normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 import {isLanguageCodeMatch, normalizeDetectedLanguageCode} from '@/src/core/language/codes';
 import {isTextInLanguage, shouldSkipChineseSelection} from '@/src/core/language/detect';
@@ -271,15 +271,15 @@ export async function translateSelectionParts(
 }
 
 /** 相交的公式可留在正文选区内，交互控件与外层显式排除区域仍受原规则保护。 */
-function isInlineSelectionFormulaPart(element: Element): boolean {
+function isInlineSelectionFormulaPart(element: Element, explicitSelection = false): boolean {
     const root = element.closest(selectionFormulaSelector);
     if (!root) return false;
-    if (isEditableSelectionElement(element)) return false;
+    if (!explicitSelection && isEditableSelectionElement(element)) return false;
     const tag = getElementTagName(element);
     if ((selectionExcludedTagNames.has(tag) && tag !== 'math' && tag !== 'svg') ||
         selectionExcludedRoles.has(element.getAttribute('role')?.trim().toLowerCase() ?? '')) return false;
     const outer = root.parentElement?.closest(selectionFormulaSelector) ?? root;
-    return !isSelectionExcludedElement(outer.parentElement);
+    return !isSelectionExcludedElement(outer.parentElement, explicitSelection);
 }
 
 const selectionExcludedTagNames = new Set([
@@ -305,6 +305,8 @@ const selectionProtectedMarkerSelector = [
     '.fluent-read-loading',
     '.fluent-read-retry-wrapper',
     '[aria-hidden="true"]',
+    '[hidden]',
+    '[inert]',
     '[data-fluent-read-ui]',
     '[role="button"]',
     '[role="checkbox"]',
@@ -342,39 +344,33 @@ function isEditableSelectionElement(element: Element): boolean {
     return false;
 }
 
-function isIntrinsicallyExcludedSelectionElement(element: Element, editableRoot: Element | null): boolean {
+function isIntrinsicallyExcludedSelectionElement(element: Element, explicitSelection: boolean): boolean {
     if (isSelectionExcludedTagName(getElementTagName(element))) return true;
 
     const role = element.getAttribute('role')?.trim().toLowerCase();
     if (role && selectionExcludedRoles.has(role)
-        && !(role === 'textbox' && isWithinEditableSelectionRoot(element, editableRoot))) return true;
-    return isEditableSelectionElement(element) && !isWithinEditableSelectionRoot(element, editableRoot);
+        && !(role === 'textbox' && explicitSelection)) return true;
+    return isEditableSelectionElement(element) && !explicitSelection;
 }
 
-function isSelectionExcludedElement(element: Element | null, editableRoot: Element | null = null): boolean {
+function isSelectionExcludedElement(element: Element | null, explicitSelection = false): boolean {
     if (!element) return false;
     let current: Element | null = element;
+    let depth = 0;
     while (current) {
-        // 每层只检查自身，不能为每个祖先再次向上寻找编辑状态；仅共享的局部宿主可放行。
+        if (++depth > maxComposedAncestorDepth) return true;
+        // 显式选区只读原文；编辑边界和语言禁译标记不阻止读取，控件、隐藏内容及扩展 UI 仍排除。
         const role = current.getAttribute('role')?.trim().toLowerCase();
-        const insideEditableRoot = isWithinEditableSelectionRoot(current, editableRoot);
         if (isSelectionExcludedTagName(getElementTagName(current))
-            || role && selectionExcludedRoles.has(role) && !(role === 'textbox' && insideEditableRoot)
+            || role && selectionExcludedRoles.has(role) && !(role === 'textbox' && explicitSelection)
             || ((current as HTMLElement).isContentEditable
                 || current.hasAttribute('contenteditable') && current.getAttribute('contenteditable')?.trim().toLowerCase() !== 'false')
-                && !insideEditableRoot) return true;
-        current = current.parentElement;
-    }
-
-    let excluded = element.closest(selectionExcludedSelector);
-    while (excluded) {
-        // DeepSeek 等页面在 html/body 上禁止浏览器整页翻译；显式划词仍可读取正文。
-        // 文档根禁译标记可放行；UI、隐藏、本地禁译标记和授权编辑宿主之外的编辑边界仍逐层检查。
-        const shell = isDocumentSurfaceNoTranslateShell(excluded) ||
-            excluded !== element && isTopLevelApplicationShell(excluded);
-        if ((!shell && !isAllowedEditableSelectionMarker(excluded, editableRoot))
-            || isSelectionNonMarkerExcluded(excluded, editableRoot)) return true;
-        excluded = excluded.parentElement?.closest(selectionExcludedSelector) ?? null;
+                && !explicitSelection) return true;
+        if (current.matches(selectionProtectedMarkerSelector)) return true;
+        if (!explicitSelection && current.matches(selectionExcludedSelector)
+            && !isDocumentSurfaceNoTranslateShell(current)
+            && !(current !== element && isTopLevelApplicationShell(current))) return true;
+        current = getComposedParent(current);
     }
     return false;
 }
@@ -384,7 +380,7 @@ function elementFromSelectionNode(node: Node | null): Element | null {
     return node.nodeType === 1 ? node as Element : node.parentElement;
 }
 
-/** 只把两个边界共享的同一个局部编辑宿主视为可放行范围；文档根编辑模式仍保持排除。 */
+/** 定位右键目标所关联的局部编辑宿主；显式选区可跨宿主，文档根由普通文档路径处理。 */
 export function getEditableSelectionRoot(node: Node | null): Element | null {
     const document = node?.nodeType === 9 ? node as Document : node?.ownerDocument ?? null;
     const documentRoot = document?.documentElement ?? null;
@@ -406,36 +402,6 @@ export function getEditableSelectionRoot(node: Node | null): Element | null {
         current = current.parentElement;
     }
     return root;
-}
-
-function isWithinEditableSelectionRoot(element: Element, root: Element | null): boolean {
-    if (!root) return false;
-    if (element === root) return true;
-    if (typeof root.contains === 'function') {
-        try {return root.contains(element);}
-        catch {/* 使用父链回退，单个宿主代理异常不能放宽选区校验。 */}
-    }
-    for (let current: Element | null = element; current; current = current.parentElement) {
-        if (current === root) return true;
-    }
-    return false;
-}
-
-function isAllowedEditableSelectionMarker(element: Element, root: Element | null): boolean {
-    if (!root || !isWithinEditableSelectionRoot(element, root) || !element.matches(selectionEditableMarkerSelector)) return false;
-    const editable = element.getAttribute('contenteditable');
-    return !(editable !== null && editable.trim().toLowerCase() === 'false')
-        && !element.matches(selectionProtectedMarkerSelector)
-        && !element.matches('.notranslate,[translate="no"],[data-notranslate="true"]');
-}
-
-function isSelectionNonMarkerExcluded(element: Element, root: Element | null): boolean {
-    return element.matches(selectionNonMarkerExcludedSelector) && !isAllowedEditableSelectionMarker(element, root);
-}
-
-function getSharedEditableSelectionRoot(range: Range): Element | null {
-    const start = getEditableSelectionRoot(range.startContainer);
-    return start && start === getEditableSelectionRoot(range.endContainer) ? start : null;
 }
 
 /** 跳过已访问的子树；只沿祖先回退，绝不越过当前选区的共同祖先。 */
@@ -512,28 +478,26 @@ function isTextlessSelectionDecoration(element: Element): boolean {
 }
 
 /**
- * 划词翻译处理用户主动选中的正文与代码文字，不处理交互控件；显式启用编辑区时只放行
- * 完整位于同一宿主内的选区。检查两端与实时 DOM 中相交且具有可见几何的排除元素，跳过空装饰图标。
+ * 划词翻译处理用户主动选中的正文与代码文字；显式选区允许跨编辑宿主并忽略语言禁译标记。
+ * 检查两端、组合祖先与实时 DOM 中相交且具有可见几何的排除元素，跳过空装饰图标。
  */
 export function shouldIgnoreSelection(range: Range, allowEditableSelection = false): boolean {
-    const editableRoot = allowEditableSelection ? getSharedEditableSelectionRoot(range) : null;
     const unselectedEnd = firstUnselectedSelectionEnd(range);
     const boundaries = [
         elementFromSelectionNode(range.startContainer),
         elementFromSelectionNode(unselectedEnd ? unselectedEnd.parentNode : range.endContainer),
     ];
-    if (boundaries.some(element => isSelectionExcludedElement(element, editableRoot) &&
-        !(element && isInlineSelectionFormulaPart(element)))) return true;
+    if (boundaries.some(element => isSelectionExcludedElement(element, allowEditableSelection) &&
+        !(element && isInlineSelectionFormulaPart(element, allowEditableSelection)))) return true;
 
     try {
         for (const element of selectionExcludedDescendants(range, unselectedEnd)) {
             try {
-                if (!isIntrinsicallyExcludedSelectionElement(element, editableRoot) &&
-                    (isDocumentSurfaceNoTranslateShell(element) || isTopLevelApplicationShell(element)
-                        || isAllowedEditableSelectionMarker(element, editableRoot)) &&
-                    !isSelectionNonMarkerExcluded(element, editableRoot)) continue;
-                if (!isSelectionExcludedElement(element, editableRoot)) continue;
-                if (isInlineSelectionFormulaPart(element)) continue;
+                if (!isIntrinsicallyExcludedSelectionElement(element, allowEditableSelection) &&
+                    (allowEditableSelection || isDocumentSurfaceNoTranslateShell(element) || isTopLevelApplicationShell(element)) &&
+                    !element.matches(selectionProtectedMarkerSelector)) continue;
+                if (!isSelectionExcludedElement(element, allowEditableSelection)) continue;
+                if (isInlineSelectionFormulaPart(element, allowEditableSelection)) continue;
                 if (isTextlessSelectionDecoration(element)) continue;
                 if (range.intersectsNode(element) && hasNonZeroClientRect(element)) return true;
             } catch {

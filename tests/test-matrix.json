@@ -227,6 +227,7 @@
       "tests/documentTranslationPresentation.test.ts",
       "tests/documentZoom.test.ts",
       "tests/selectionTranslatorCore.test.ts",
+      "tests/selectionSource.test.ts",
       "tests/selectionTranslatorLifecycle.test.ts",
       "tests/selectionTtsContentController.test.ts",
       "tests/selectionTtsProtocol.test.ts",

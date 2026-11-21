@@ -1,11 +1,12 @@
 /**
  * @file src/features/image-translation/services/client.ts
  * 文件职责：封装网页与扩展页面调用图片翻译后台的 runtime 消息，统一支持跨域图片读取与整图翻译两种可取消客户端操作。
- * 主要内容：提供 fetchImageInExtension 与 translateImageInExtension，生成跨页面安全请求标识，固定开始时的取消信号、进度回调与登记端口，清理异常不阻止结束等待；校验并传播普通图片保留宿主原图状态，包括合法空识别结果，仅在未绘制译文与保留原图同时成立时接纳私有缺资源重试标记，传播超时与本地模型失败原因，订阅当前任务真实阶段和百分比，并在消息断线时按共享截止时间恢复一次；语言准备的状态预读有独立短上限，不能阻塞正式下载。
+ * 主要内容：提供 fetchImageInExtension 与 translateImageInExtension，生成跨页面安全请求标识，固定开始时的取消信号、进度回调与登记端口，清理异常不阻止结束等待；校验并传播普通图片保留宿主原图状态和可选分割就绪后重试的标记，传播超时与本地模型失败原因，订阅当前任务真实阶段和百分比，并在消息断线时按共享截止时间恢复一次；语言准备的状态预读有独立短上限，不能阻塞正式下载。
  * 模块边界：可选漫画可见范围只原样透传，由绘制端按实际图片校验；客户端不读取图片像素、不直接访问网络或 Offscreen；跨域 URL 只作为受控消息交给 background，再由 Offscreen 校验和读取，页面 UI 由 content/runtime 决定。
  */
 import {createImageTranslationFailure} from '../failure';
 import {parseMangaPatchPacket, type MangaPatchPacket} from '../mangaPatchResult';
+import {canRetryImageAfterSegmentationImport} from '../resultReadiness';
 import {getRequiredImageOcrLanguages, normalizeImageOcrLanguageCodes, type ImageOcrStatusResponse} from '../ocrLanguages';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress, type ImageTranslationStage} from '../progress';
 import type { OcrLine } from '@/src/features/image-translation/core';
@@ -218,8 +219,7 @@ export async function translateImageInExtension(
                 message, {...options, requestId, timeoutMs: remainingMs}, '图片翻译超时',
             );
             const unchanged = response?.imageUnchanged === true && !options.manga && response.image === '' && response.mangaPatches === undefined;
-            const retry = response?.retryWhenSegmentationReady === true && unchanged && Array.isArray(response.lines)
-                && response.lines.some(line => line && typeof line === 'object' && line.renderSkipped === true);
+            const retry = canRetryImageAfterSegmentationImport(response, unchanged, options.manga === true);
             if (!response?.success || (response.imageUnchanged !== undefined && !unchanged)
                 || (response.retryWhenSegmentationReady !== undefined && !retry)
                 || (!response.image && !unchanged && !(options.manga && response.mangaPatches !== undefined)) || !Array.isArray(response.lines)

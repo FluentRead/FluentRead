@@ -452,6 +452,7 @@ export default defineConfig({
                 'src/features/image-translation/services/mangaInpainting.ts',
                 'src/features/image-translation/services/imageEncoding.ts',
                 'src/features/image-translation/mangaPatchResult.ts',
+                'src/features/image-translation/resultReadiness.ts',
                 'src/features/image-translation/content/mangaCompositor.ts',
                 'src/features/image-translation/services/mangaSessionFallback.ts',
                 'src/features/image-translation/content/presentation.ts',

@@ -439,9 +439,9 @@ describe('不透明原字超出旧清字框时复用模型授权',()=>{
         source={width,height,pixels};setRegions([first.line,{...second.line,text:'SECOND',bbox:move(second.line.bbox),sourceBoxes:[move(second.line.bbox)]}]);translations=['FULL TEXT','SECOND TEXT'];
         const result=await translate();expect(result.imageUnchanged).toBe(true);expect(mocks.prepareSeg).not.toHaveBeenCalled();preserved();
     });
-    it('缺少可选资源时仍可生成译图，保留原清字范围外的笔画',async()=>{
+    it('缺少可选资源时仍生成常规译图，保留框外笔画并明确可在导入分割后重试',async()=>{
         const f=clipped();const result=await translate();
-        expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();expect(result.retryWhenSegmentationReady).toBeUndefined();
+        expect(result.image).toBeTruthy();expect(result.imageUnchanged).toBeUndefined();expect(result.retryWhenSegmentationReady).toBe(true);
         expect(result.lines[0]).toMatchObject({text:'FULL TEXT',sourceText:'SOURCE'});completeGlyphs();
         expect(at(encoded[0],f.width,24,47)).toEqual(at(f.pixels,f.width,24,47));
         expect(mocks.prepareSeg).toHaveBeenCalledOnce();expect(mocks.segment).not.toHaveBeenCalled();released();

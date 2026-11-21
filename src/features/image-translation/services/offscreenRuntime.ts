@@ -4,7 +4,7 @@
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，常规擦除按原始行框，完整墨迹修补须另外逐点授权；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明常规修补不额外复制整页，可选分割沿用独立 Worker 快照；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 漏擦救援：不透明纯色文字有原墨迹落在旧掩码外时，复用完整 RGBA 提案与缓存分割逐像素授权；整页成功才回填原字像素，保留原色、字号与坐标，绘字框含图案或完整字形无法容纳时保留原图与阅读译文。提案不成立、混合透明度或缺可选缓存时仍可按原范围生成译图。
- * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
+ * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹。确实到达分割而缺文件时，为保留原图或临时译图携带私有重试标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
  * 字号尺度与原色：普通图先通过透明准入，再在原图中观察背景、字色及逐行墨迹，优先用原文字与实测字形核对字号，同次核对通过的位置用于原绘字框内的译文对齐；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。可确认的渐变字色不借此扩框。漫画修补前也用原文字保存源色和可信字号，不把译文长度当作原字体比例，不从修补结果反推样式；原OCR字号、物理框和白底旁置规则保持独立。
@@ -605,6 +605,7 @@ async function prepareTranslatedImage(
             return {image: '', mangaPatches: {width: canvas.width, height: canvas.height, patches}, lines: readingLines};
         }
         let sourceUnchanged=true;
+        let retryWhenSegmentationReady=false;
         try {
         // 先在原图上准入整个擦字/绘字足迹。undefined在严格模式下仅表示已确认无需保护。
         const protection=planMaskAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines,imageAlphaSamplingAndWriteBoxes,{requireConfirmedTransparency:true});
@@ -689,7 +690,10 @@ async function prepareTranslatedImage(
                 if(!plan){
                     const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
                     await checkImageCancellation(signal);
-                    if(!ready)break repairClippedInk;
+                    if(!ready){
+                        retryWhenSegmentationReady=true;
+                        break repairClippedInk;
+                    }
                     const seg=await mangaInferenceClient.segmentText(()=>{
                         throwIfImageOperationAborted(signal);
                         return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
@@ -732,7 +736,7 @@ async function prepareTranslatedImage(
         await checkImageCancellation(signal);
         const image = await encodeImageCanvas(canvas, signal);
         throwIfImageOperationAborted(signal);
-        return { image, lines: readingLines };
+        return { image, lines: readingLines, ...(retryWhenSegmentationReady ? {retryWhenSegmentationReady: true as const} : {}) };
         } catch(error) {
             if(!(error instanceof MangaAlphaProtectionLimitError)&&!(error instanceof ImageAlphaProtectionUnavailableError))throw error;
             if(sourceUnchanged&&error instanceof ImageAlphaProtectionUnavailableError&&support&&isSingleFrameImageData(source.currentSrc||source.src)){

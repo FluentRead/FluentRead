@@ -507,7 +507,9 @@ export default defineConfig({
             const imageBoundarySamplingBudget = 1_200;
             // 紧裁彩字的词界复核使 Chrome 从 70,538,403 增至 70,538,723 字节，增量为代码。
             const imageClippedSpacingBudget = 350;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget));
+            // 临时译图在导入可选文字分割后可重试，限额覆盖消息校验及资源状态回退代码。
+            const imageSegmentationRetryBudget = 700;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -434,7 +434,14 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + epubCoveragePreviewBudget + requestEvidenceBudget));
+            // 合入混元段落分组、推理恢复及下载来源后，Chrome 由 68,600,232 增至 68,601,308 字节。
+            // Firefox 实测 68,221,411 字节，各追加 2 kB 代码预算，继续校验实际安装包大小。
+            const localTranslationRecoveryBudget = 2_000;
+            const featureBudget = courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget
+                + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget
+                + legacyTranslationTextBudget + boundaryEmojiBudget + epubCoveragePreviewBudget
+                + requestEvidenceBudget + localTranslationRecoveryBudget;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : featureBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

@@ -2,7 +2,7 @@
  * @file src/features/local-translation/offscreen/artifactStore.ts
  *
  * 文件职责：保存本地翻译模型的分块文件并执行可恢复的多源下载。
- * 主要内容：固定版本与 SHA-256 校验、流式写入、Range 续传、来源回退和离线读取，下载内存有明确上限；拒绝响应立即释放未读正文，清理不阻塞镜像回退。
+ * 主要内容：按浏览器语言排列固定版本的下载来源，支持流式写入、Range 续传、SHA-256 校验和离线读取；拒绝响应立即释放未读正文，清理不阻塞来源回退。
  * 模块边界：只操作专属 Cache Storage，不保存页面状态、不初始化推理引擎，也不向下载源发送翻译文本。
  */
 import {huggingFaceDownloadOrigins} from '@/src/platform/http/modelDownloads';
@@ -21,6 +21,9 @@ export interface TranslationArtifact {
 export const LOCAL_MODEL_CACHE = 'fluent-read-local-models-v2';
 export const MODEL_CHUNK_SIZE = 4 * 1024 * 1024;
 const OFFICIAL_ORIGIN = 'https://huggingface.co';
+// 腾讯在两个平台发布的这个 GGUF 文件具有相同 SHA-256，可共用缓存键和续传分块。
+const HUNYUAN_MODELSCOPE_SHA256 = 'dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699';
+const HUNYUAN_MODELSCOPE_URL = 'https://modelscope.cn/models/Tencent-Hunyuan/Hy-MT2-1.8B-GGUF/resolve/ef1d40b8b315575d30d1eb6579996130b8fc0bb2/Hy-MT2-1.8B-Q4_K_M.gguf';
 const metadata = frozenArtifacts as Record<string, {revision: string; files: Omit<TranslationArtifact, 'repo' | 'revision'>[]}>;
 
 export function getTranslationArtifacts(model: unknown): TranslationArtifact[] {
@@ -138,7 +141,7 @@ async function verifyArtifact(file: TranslationArtifact, signal: AbortSignal): P
 
 async function receiveArtifact(
     file: TranslationArtifact,
-    origin: string,
+    url: string,
     signal: AbortSignal,
     progress: (bytes: number, verifying: boolean) => void,
 ): Promise<void> {
@@ -162,7 +165,7 @@ async function receiveArtifact(
     try {
         abortIfNeeded(signal);
         armTimeout(15_000);
-        response = await fetch(artifactUrl(file).replace(OFFICIAL_ORIGIN, origin), {
+        response = await fetch(url, {
             signal: controller.signal,
             credentials: 'omit',
             referrerPolicy: 'no-referrer',
@@ -235,12 +238,18 @@ export async function downloadTranslationArtifact(
     // 旧收据可能指向缺块；修复期间不能让其他读取者看到未经重新校验的文件。
     await invalidateTranslationArtifactReceipt(file);
     abortIfNeeded(signal);
-    const sources = huggingFaceDownloadOrigins();
+    const origins = huggingFaceDownloadOrigins();
+    const canonical = artifactUrl(file);
+    const sources = origins.map((origin) => canonical.replace(OFFICIAL_ORIGIN, origin));
+    if (file.sha256 === HUNYUAN_MODELSCOPE_SHA256) {
+        if (origins[0] === OFFICIAL_ORIGIN) sources.push(HUNYUAN_MODELSCOPE_URL);
+        else sources.unshift(HUNYUAN_MODELSCOPE_URL);
+    }
     let lastError: unknown;
-    for (const origin of sources) {
+    for (const url of sources) {
         abortIfNeeded(signal);
         try {
-            await receiveArtifact(file, origin, signal, progress);
+            await receiveArtifact(file, url, signal, progress);
             return;
         } catch (error) {
             abortIfNeeded(signal);

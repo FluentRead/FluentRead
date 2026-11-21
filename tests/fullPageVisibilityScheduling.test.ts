@@ -120,6 +120,8 @@ vi.mock("@/src/core/language/detect", () => ({
     shouldSkipTranslationForTarget: (origin: string, target: string, excluded: readonly string[] = []) =>
         runtime.clearlyTargetLanguage(origin, target, excluded)
         || (excluded.includes('zh-Hant') && origin.includes('這個')) || (excluded.includes('ja') && origin.includes('これは')),
+    // 段落级中文目标跳过由专属用例直接控制；默认保持既有请求契约。
+    shouldSkipChineseTargetParagraph: () => false,
 }));
 vi.mock("@/src/services/translation/client", () => ({
     translateText: async (origin: string, _context: string, options: Record<string, unknown>) => {

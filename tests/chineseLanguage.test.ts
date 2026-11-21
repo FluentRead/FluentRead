@@ -1,7 +1,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import posts from './fixtures/chinese-language-posts.json';
 import modelPost from './fixtures/chinese-language-model-post.json';
-import {detectChineseScript, shouldSkipChineseSelection, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
+import {detectChineseScript, shouldSkipChineseSelection, shouldSkipChineseTargetParagraph, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {getChineseScript, normalizeChineseLanguageCode} from '@/src/core/language/chinese';
 
 describe('中文书写体系与语言代码', () => {
@@ -282,5 +282,58 @@ describe('网页翻译排除语言', () => {
         }
         expect(shouldSkipTranslationForTarget('한국어 설명입니다.', 'zh-Hans', ['ko'])).toBe(true);
         expect(shouldSkipTranslationForTarget('This is a deliberately long English paragraph with enough alphabetic characters for reliable language detection.', 'und', ['en'])).toBe(true);
+    });
+});
+
+describe('全文翻译的中文目标段落预检', () => {
+    it.each([
+        // 识别为混合或未知的中文正文段落：八个以上汉字夹英文术语、链接、代码、版权行与英文句子。
+        '在 Vue 3 中，组合式 API（Composition API）让逻辑复用变得更加自然。与 Options API 不同，你可以把相关逻辑放在一起。',
+        '在终端中运行以下命令即可完成安装：npm install -g pnpm，然后执行 pnpm install 安装依赖。整个过程大约需要 30 秒。',
+        'Copyright © 2024 某某博客 保留所有权利',
+        '价格：免费 | 语言：中文 | 平台：Windows / macOS / Linux',
+        '这是中文段落。This is a full English sentence embedded in it. 这句又是中文。',
+        '这些算法使用 AI，可以降低成本，但是 Please translate this sentence.',
+        // 表情或 emoji 开头的评论短句：句末标点提供完整句架，两个汉字即可确认。
+        '🤔🤔🤔移动？',
+        '🤔🤔🤔移动?',
+        '好的。',
+        '这个可以吗？',
+        // 有句号的完整中文短句。
+        '转载请注明出处。',
+    ])('中文目标的混合与未知正文段落不再翻译 %#', text => {
+        expect(shouldSkipChineseTargetParagraph(text, 'zh-Hans')).toBe(true);
+        expect(shouldSkipChineseTargetParagraph(text, 'zh-CN')).toBe(true);
+    });
+
+    it.each([
+        ['在 Vue 3 中，组合式 API 让逻辑复用变得更加自然。', 'en'],
+        ['Hello world, this is a plain English paragraph.', 'zh-Hans'],
+        ['123?! 🎉', 'zh-Hans'],
+        ['中', 'zh-Hans'],
+        // 八字阈值之下保持 fail-open：短词可能是日文汉字、繁体短语或界面残片。
+        ['—— 本文完 ——', 'zh-Hans'],
+        ['時間', 'zh-Hans'],
+        ['日本国立大学', 'zh-Hans'],
+        ['趨勢', 'zh-Hans'],
+        // 假名或谚文正文不跳过：日文、韩文段落仍需翻译。
+        ['今日は良い天気です。', 'zh-Hans'],
+        ['한국어 설명입니다.', 'zh-Hans'],
+        ['この文章には漢字が含まれていますが、かな文字があるため翻訳を続けます。', 'zh-Hans'],
+        // 与目标书写体系相反的简繁字形保留简繁转换。
+        ['这是简体中文段落，可以转换为繁体。', 'zh-Hant'],
+        ['這是繁體中文段落，可以轉換為簡體。', 'zh-Hans'],
+    ])('不满足段落跳过条件时继续翻译 %s -> %s', (text, target) => {
+        expect(shouldSkipChineseTargetParagraph(text, target)).toBe(false);
+    });
+
+    it('简繁体系与目标一致时跳过，八字同形与中性字段落对两目标都跳过', () => {
+        expect(shouldSkipChineseTargetParagraph('这是简体中文段落。', 'zh-Hans')).toBe(true);
+        expect(shouldSkipChineseTargetParagraph('這是繁體中文段落。', 'zh-Hant')).toBe(true);
+        expect(shouldSkipChineseTargetParagraph('本文完整段落保留原文。', 'zh-Hans')).toBe(true);
+        expect(shouldSkipChineseTargetParagraph('本文完整段落保留原文。', 'zh-Hant')).toBe(true);
+        // 非中文目标不受段落规则影响。
+        expect(shouldSkipChineseTargetParagraph('这是简体中文段落。', 'ja')).toBe(false);
+        expect(shouldSkipChineseTargetParagraph('', 'zh-Hans')).toBe(false);
     });
 });

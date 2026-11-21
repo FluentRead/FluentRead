@@ -126,15 +126,18 @@ describe('actual local translation Worker message boundary', () => {
         if (mode === 'fallback') mocks.engine.mockReturnValueOnce(failed);
         const artifact = {repo: 'hunyuan', revision: 'pinned'};const blob = new Blob(['verified model']);
         mocks.artifacts.mockReturnValue([artifact]);mocks.artifactBlob.mockResolvedValue(blob);
-        const scope = await start(), hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, text: '  Hello.\n\nWorld!  '};
+        const scope = await start(), hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, text: '  Hello. How are you?\r\n\r\nWorld!  '};
         const result = await reply(scope, {...hunyuanCommand, requestId: 1});
-        expect(result).toMatchObject({success: true, result: '  你好\n\n你好  '});
+        expect(result).toMatchObject({success: true, result: '  你好\r\n\r\n你好  '});
         if (mode === 'gpu') expect(result).not.toHaveProperty('backend');
         else expect(result.backend).toBe('wasm');
         expect(active.setCompat).toHaveBeenCalledWith(null);
         expect(active.loadModel).toHaveBeenCalledWith([blob], expect.objectContaining({n_gpu_layers: mode === 'gpu' ? 99 : 0, n_threads: 1, n_ctx: 2048}));
         expect(active.createChatCompletion).toHaveBeenCalledTimes(2);
-        expect(active.createChatCompletion).toHaveBeenCalledWith(expect.objectContaining({abortSignal: expect.any(AbortSignal), max_tokens: 768, cache_prompt: false}));
+        expect(active.createChatCompletion).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            messages: [{role: 'user', content: expect.stringContaining('\n\nHello. How are you?')}],
+            abortSignal: expect.any(AbortSignal), max_tokens: 768, cache_prompt: false,
+        }));
         if (mode === 'fallback') expect(failed.exit).toHaveBeenCalledOnce();
         expect(await reply(scope, {...hunyuanCommand, requestId: 2})).toMatchObject({success: true});
         expect(active.loadModel).toHaveBeenCalledOnce();expect(mocks.artifactBlob).toHaveBeenCalledOnce();
@@ -225,6 +228,79 @@ describe('actual local translation Worker message boundary', () => {
         expect(await reply(scope, {...hunyuanCommand, requestId: 1})).toMatchObject({success: false, error: mode === 'length' ? 'LOCAL_TRANSLATION_OUTPUT_LIMIT' : 'LOCAL_TRANSLATION_EMPTY'});
         expect(await reply(scope, {...hunyuanCommand, requestId: 2})).toMatchObject({success: true, result: '你好'});
         expect(engine.loadModel).toHaveBeenCalledOnce();
+    });
+
+    it.each(['runtime failure', 'repetitive output', 'empty output'] as const)('recovers from Hunyuan WebGPU %s on the current chunk and reuses CPU', async mode => {
+        vi.stubGlobal('navigator', {gpu: {}});
+        vi.stubGlobal('WebAssembly', {Suspending: class {}});
+        mocks.artifacts.mockReturnValue([{}]);
+        mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const gpu = hunyuanEngine(), cpu = hunyuanEngine();
+        mocks.engine.mockReturnValueOnce(gpu).mockReturnValueOnce(cpu);
+        gpu.createChatCompletion.mockResolvedValueOnce({choices: [{finish_reason: 'stop', message: {content: '第一行'}}]});
+        if (mode === 'runtime failure') gpu.createChatCompletion.mockRejectedValueOnce(new Error('device lost'));
+        else if (mode === 'repetitive output') gpu.createChatCompletion.mockResolvedValueOnce({
+            choices: [{finish_reason: 'length', message: {content: '坏'.repeat(100)}}],
+        });
+        else gpu.createChatCompletion.mockResolvedValueOnce({choices: []});
+        const scope = await start();
+        const hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, text: 'First line.\nSecond line.\nThird line.'};
+        expect(await reply(scope, {...hunyuanCommand, requestId: 1})).toMatchObject({success: true, result: '第一行\n你好\n你好', backend: 'wasm'});
+        expect(gpu.createChatCompletion).toHaveBeenCalledTimes(2);
+        expect(cpu.createChatCompletion).toHaveBeenCalledTimes(2);
+        expect(cpu.createChatCompletion.mock.calls[0]).toEqual(gpu.createChatCompletion.mock.calls[1]);
+        expect(gpu.exit).toHaveBeenCalledOnce();
+        expect(cpu.loadModel).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({n_gpu_layers: 0}));
+        expect(gpu.exit.mock.invocationCallOrder[0]).toBeLessThan(cpu.loadModel.mock.invocationCallOrder[0]);
+        expect(await reply(scope, {...hunyuanCommand, requestId: 2, text: 'Next request.'})).toMatchObject({success: true, backend: 'wasm'});
+        expect(cpu.createChatCompletion).toHaveBeenCalledTimes(3);
+        expect(mocks.engine).toHaveBeenCalledTimes(2);
+    });
+
+    it.each([false, true])('retries a truncated Hunyuan paragraph in smaller pieces once (second piece fails=%s)', async failed => {
+        vi.stubGlobal('navigator', {gpu: {}});
+        vi.stubGlobal('WebAssembly', {Suspending: class {}});
+        mocks.threads.mockReturnValue(4);
+        const engine = hunyuanEngine();
+        mocks.engine.mockReturnValue(engine);
+        mocks.artifacts.mockReturnValue([{}]);
+        mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const first = 'The ' + 'long '.repeat(19) + 'first sentence.';
+        const second = 'The ' + 'wide '.repeat(19) + 'second sentence.';
+        const truncated = {choices: [{finish_reason: 'length', message: {content: '未完成的译文'}}]};
+        engine.createChatCompletion.mockResolvedValueOnce(truncated)
+            .mockResolvedValueOnce({choices: [{finish_reason: 'stop', message: {content: '第一句。'}}]})
+            .mockResolvedValueOnce(failed ? truncated : {choices: [{finish_reason: 'stop', message: {content: '第二句。'}}]});
+        const scope = await start();
+        const result = await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, requestId: 1, text: `  ${first} ${second}  `});
+        if (failed) expect(result).toEqual({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_OUTPUT_LIMIT'});
+        else expect(result).toMatchObject({success: true, result: '  第一句。 第二句。  '});
+        expect(engine.createChatCompletion.mock.calls.map(([options]) => options.messages[0].content.split('\n\n')[1]))
+            .toEqual([`${first} ${second}`, first, second]);
+        expect(engine.exit).not.toHaveBeenCalled();
+        expect(mocks.engine).toHaveBeenCalledOnce();
+    });
+
+    it('rejects a generation failure after the deadline without loading the Hunyuan CPU fallback', async () => {
+        vi.useFakeTimers();
+        vi.stubGlobal('navigator', {gpu: {}});
+        vi.stubGlobal('WebAssembly', {Suspending: class {}});
+        mocks.artifacts.mockReturnValue([{}]);
+        mocks.artifactBlob.mockResolvedValue(new Blob(['model']));
+        const engine = hunyuanEngine();
+        mocks.engine.mockReturnValue(engine);
+        let fail!: (error: Error) => void;
+        engine.createChatCompletion.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject; }));
+        const scope = await start();
+        const hunyuanCommand = {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan};
+        scope.send({...hunyuanCommand, requestId: 1});
+        await vi.advanceTimersByTimeAsync(90_000);
+        fail(new Error('late WebGPU failure'));
+        await vi.advanceTimersByTimeAsync(0);
+        expect(scope.postMessage).toHaveBeenLastCalledWith({requestId: 1, success: false, error: 'LOCAL_TRANSLATION_TIMEOUT'});
+        expect(vi.getTimerCount()).toBe(0);
+        expect(mocks.engine).toHaveBeenCalledOnce();
+        expect(engine.exit).not.toHaveBeenCalled();
     });
 
     it('interrupts an overdue inference, rejects its late output, and keeps the queue usable', async () => {

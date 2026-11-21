@@ -137,7 +137,9 @@ Under **Translation services → Local model translation**, choose and download 
 | Hunyuan Hy-MT2 1.8B | 1.13 GB | More languages and complex expressions, with higher memory needs |
 | Lightweight Japanese–English pack | 214 MB | Japanese-to-English; limited English-to-Japanese quality |
 
-Pause, resume, or retry downloads; leaving settings does not stop background downloading. Files must finish verification before use. If a source fails, another source supplies the same fixed, verified version.
+Downloads continue when you leave settings. You can pause, resume, or retry them. Files must finish verification before use. If a source fails, another source supplies the same pinned file. Browsers set to Simplified Chinese try Tencent's ModelScope download first for Hunyuan Hy-MT2.
+
+Hunyuan Hy-MT2 translates consecutive sentences on the same line together and preserves line breaks. If a long passage reaches the generation limit, it retries in smaller pieces. If WebGPU inference fails, translation continues on the CPU with the same model.
 
 Models stay in this browser and are excluded from configuration backups. Deletion requires confirmation and affects only the chosen model. Download size is not runtime memory use: loading can noticeably increase CPU, RAM, or GPU use, and idle resources are released. See the [local-model FAQ](/en/guide/faq#do-local-models-reload-on-every-request-or-stay-in-memory-forever).
 

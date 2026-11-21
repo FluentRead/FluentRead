@@ -32,11 +32,12 @@
 }
 
 /* 文字效果 */
-/* 彩色文字以 60% 基色与 40% 父级文字色调配，保持色相并提高常见浅深页面上的正文对比度。
+/* 彩色文字与父级文字色调配，保持色相并提高常见浅深页面上的正文对比度。
    先写纯色作为旧浏览器回退，用户明确设置的文字颜色由自有容器的后置 !important 声明覆盖。 */
 .fluent-read-bilingual-content.fluent-display-text-green {
     color: #15803d;
-    color: color-mix(in srgb, #15803d 60%, var(--fluent-read-translation-inherited-color));
+    /* 提高原文字色的权重，让浅底上的绿更深，深底上的绿随浅色原文提亮。 */
+    color: color-mix(in srgb, #007824 40%, var(--fluent-read-translation-inherited-color));
 }
 
 .fluent-read-bilingual-content.fluent-display-text-blue {

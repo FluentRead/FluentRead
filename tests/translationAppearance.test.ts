@@ -397,9 +397,9 @@ describe('译文外观声明与页面样式表', () => {
 // 直接校验内容脚本与设置预览共同读取的真实 CSS；以下颜色计算只属于回归夹具，不新增生产实现。
 describe('共享颜色预设在代表网页配色中的正文对比度', () => {
     const scenarios = [
-        {name: '浅色网页深蓝文字', background: '#ffffff', parent: '#172033'},
-        {name: '浅色网页中性文字', background: '#ffffff', parent: '#1f2328'},
-        {name: '深色网页浅色文字', background: '#17191e', parent: '#e5e7eb'},
+        {name: '浅色网页深蓝文字', background: '#ffffff', parent: '#172033', forestGreenContrast: 10},
+        {name: '浅色网页中性文字', background: '#ffffff', parent: '#1f2328', forestGreenContrast: 10},
+        {name: '深色网页浅色文字', background: '#17191e', parent: '#e5e7eb', forestGreenContrast: 7},
     ];
 
     async function sharedCss(): Promise<string> {
@@ -441,7 +441,7 @@ describe('共享颜色预设在代表网页配色中的正文对比度', () => {
         return stops.slice(1).flatMap((stop, index) => Array.from({length: 257}, (_, sample) => mix(stop, stops[index], sample / 256)));
     }
 
-    it('九种纯色读取真实的基色与混合比例，在浅深网页上均达到 4.5 正文对比度', async () => {
+    it('九种纯色在浅深网页上均达到 4.5 正文对比度，森林绿达到更高对比度', async () => {
         const css = await sharedCss();
         expect(ruleBody(css, '.fluent-read-bilingual-content')).toContain('--fluent-read-translation-inherited-color: currentColor;');
         const solids = TRANSLATION_STYLE_PRESETS.filter(({value}) => value >= 49 && value <= 57);
@@ -451,10 +451,12 @@ describe('共享颜色预设在代表网页配色中的正文对比度', () => {
             expect(body).toContain('var(--fluent-read-translation-inherited-color)');
             const stops = colorMixStops(body);
             expect(stops, preset.label).toHaveLength(1);
-            expect(stops[0].weight, preset.label).toBe(0.6);
+            const isForestGreen = preset.value === 49;
+            expect(stops[0].weight, preset.label).toBe(isForestGreen ? 0.4 : 0.6);
             for (const scenario of scenarios) {
                 const foreground = mix(stops[0].base, rgb(scenario.parent), stops[0].weight);
-                expect(contrast(foreground, rgb(scenario.background)), `${preset.label} / ${scenario.name}`).toBeGreaterThanOrEqual(4.5);
+                const minimumContrast = isForestGreen ? scenario.forestGreenContrast : 4.5;
+                expect(contrast(foreground, rgb(scenario.background)), `${preset.label} / ${scenario.name}`).toBeGreaterThanOrEqual(minimumContrast);
             }
         }
     });

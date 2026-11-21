@@ -44,6 +44,28 @@ function importFixture() {
 }
 
 describe('document import workflow ownership', () => {
+    it('keeps imported HTML history separate for each source URL and for local files', async () => {
+        const f = importFixture();
+        f.ports.history = f.history;
+        const html = '<article><p>Source.</p></article>';
+        const article = new File([html], 'article.html', {type: 'text/html'});
+        const firstUrl = 'https://example.test/article';
+        const secondUrl = 'https://example.org/article';
+        await f.workflow.loadFiles([article], firstUrl);
+        await f.workflow.loadFiles([article], secondUrl);
+        await f.workflow.loadFiles([article]);
+        await f.workflow.loadFiles([article], firstUrl);
+
+        const [first, second, local, reopened] = f.tasks;
+        const localId = await documentHistoryId(new TextEncoder().encode(html));
+        expect(first.historyId).toEqual(expect.any(String));
+        expect(second.historyId).toEqual(expect.any(String));
+        expect(new Set([first.historyId, second.historyId, local.historyId]).size).toBe(3);
+        expect(local.historyId).toBe(localId);
+        expect(reopened.historyId).toBe(first.historyId);
+        expect(f.load.mock.calls).toEqual([[first.historyId], [second.historyId], [localId], [first.historyId]]);
+    });
+
     it.each(['blocked', 'timeout'] as const)('preserves existing history after a transient %s read and a later successful save', async failure => {
         const f = importFixture(), factory = new IDBFactory(), history = createDocumentHistory(factory);
         const bytes = new TextEncoder().encode('Source.'), id = await documentHistoryId(bytes);
@@ -118,6 +140,23 @@ describe('document import workflow ownership', () => {
         expect(vi.mocked(f.ports.onPhase).mock.calls.map(([phase]) => phase)).toEqual(['idle', 'downloading', 'reading', 'idle']);
         vi.mocked(f.ports.fetchPdf).mockRejectedValueOnce('network failed');await f.workflow.openOnlinePdf('bad');
         expect(f.ports.onOnlineError).toHaveBeenCalledWith('network failed');expect(f.tasks).toHaveLength(1);
+    });
+
+    it('discards a completed online PDF download after cancellation', async () => {
+        const f = importFixture();
+        const file = new File(['PDF'], 'online.pdf');
+        const download = pending(file);
+        vi.mocked(f.ports.fetchPdf).mockReturnValueOnce(download.promise);
+        const running = f.workflow.openOnlinePdf('https://example.test/paper.pdf');
+        const {signal} = vi.mocked(f.ports.fetchPdf).mock.calls[0][1]!;
+        f.workflow.cancel();
+        download.resolve(file);
+        await running;
+
+        expect(signal?.aborted).toBe(true);
+        expect(f.ports.parseFile).not.toHaveBeenCalled();
+        expect(f.tasks).toEqual([]);
+        expect(f.ports.onOnlineError).not.toHaveBeenCalled();
     });
 
     it.each(['cancel', 'dispose'] as const)('discards late parsing and progress after %s and releases its unowned document', async action => {

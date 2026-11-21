@@ -16,6 +16,7 @@ import * as richPreviewSync from '@/src/features/document-translation/ui/richPre
 import * as pdfOcr from '@/src/features/document-translation/services/pdfOcr';
 import * as documentTasks from '@/src/features/document-translation/ui/useDocumentTasks';
 import * as downloadCopy from '@/src/app/document-translation/downloadCopy';
+import * as glossaryCopy from '@/src/app/document-translation/glossaryCopy';
 import * as materialResume from '@/src/app/document-translation/materialResume';
 import {asArrayBufferBytes} from '@/src/shared/function/arrayBufferBytes';
 import {useConfigEditor} from '@/src/features/settings/model/useConfigEditor';
@@ -82,6 +83,7 @@ beforeEach(async () => {
     if (id === 'vue') return {...vue, onMounted: () => {}, onUnmounted: (fn: () => void) => unload.push(fn)};
     if (id === './index' || id === '@/src/app/document-translation' || id === '@/src/core/translation/result') return api;
     if (id === './downloadCopy') return downloadCopy;
+    if (id === './glossaryCopy') return glossaryCopy;
     if (id === './materialResume') return materialResume;
     if (id === 'webextension-polyfill') return {runtime: {sendMessage: materialTransport.sendMessage}, extension: {inIncognitoContext: false}};
     if (id.startsWith('element-plus') || id.endsWith('.css') || id.endsWith('.vue')) return {};

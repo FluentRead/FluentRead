@@ -83,6 +83,9 @@ for (const [file, doc] of docs) {
     assert(canonical?.startsWith('https://read.thinkstu.com/'), `Missing canonical: ${file}`)
     assert(resolve(canonical), `Missing canonical target: ${canonical}`)
     const alternates = [...doc.querySelectorAll('link[rel="alternate"][hreflang]')]
+    for (const alternate of alternates) {
+      assert(resolve(alternate.getAttribute('href')), `Missing translated URL: ${file}`)
+    }
     const landing = landingByFile.get(route)
     if (landing) {
       const languageLinks = [...doc.querySelectorAll('.bv-home-language a[hreflang]')]
@@ -136,9 +139,6 @@ for (const [file, doc] of docs) {
         '/' + alternatePath,
         `Language switch must preserve the page without a language-specific hash: ${route}`
       )
-    }
-    for (const alternate of alternates) {
-      assert(resolve(alternate.getAttribute('href')), `Missing translated URL: ${file}`)
     }
   }
   for (const demo of doc.querySelectorAll('[data-visual],[data-demo]')) {

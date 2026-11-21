@@ -12,6 +12,12 @@ For an online PDF, choose **Open PDF reader** from the extension menu or paste i
 
 Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
 
+## Open an article from a webpage
+
+On a news, blog, or documentation page, open the extension popup and choose **Open article** in the current website section. FluentRead extracts the loaded title, headings, text, and links into the document workbench. Choose a translation service to read in two languages, edit translations, or export HTML.
+
+Choose **View original webpage** beneath the title to open the source. Reopen the article from local document history, or open it again from the source while the article is unchanged, to recover your reading position, translations, and edits.
+
 ## Translate and read
 
 1. Choose the **translation service**, **target language**, and a model for AI services in the toolbar. Set the source language and glossary in the sidebar; narrow windows use **Translation settings**.

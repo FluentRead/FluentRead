@@ -140,7 +140,9 @@
           <div class="workspace-heading">
             <button class="sidebar-toggle" type="button" :class="{active: sidebarOpen}" :aria-expanded="sidebarOpen" :aria-label="translateLegacy('文件与目录')" :title="translateLegacy('文件与目录')" @click="sidebarOpen = !sidebarOpen"><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 3.5v13" stroke="currentColor" stroke-width="1.4"/></svg><small v-if="documentQueue.length > 1">{{ documentQueue.length }}</small></button>
             <img class="taskbar-logo" src="/icon/128.png" alt="" />
-            <div class="file-heading"><div><h1 data-i18n-ignore :title="parsedDocument.fileName">{{ parsedDocument.fileName }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="showTranslationProgress" class="document-translation-count" data-testid="document-translation-count">{{ translationProgressLabel }}</span></p></div></div>
+            <div class="file-heading"><div><h1 data-i18n-ignore :title="documentHeading">{{ documentHeading }}</h1><p class="document-status" role="status">{{ statusLabel }}<span v-if="showTranslationProgress" class="document-translation-count" data-testid="document-translation-count">{{ translationProgressLabel }}</span></p>
+              <a v-if="articleSourceUrl" class="article-source-link" :href="articleSourceUrl" target="_blank" rel="noopener noreferrer" data-testid="web-article-source">{{ translateLegacy('查看原网页') }}</a>
+            </div></div>
           </div>
           <div class="reader-toolbar">
             <div class="mode-buttons reader-tabs" role="group" aria-label="文档工作区">
@@ -510,6 +512,9 @@ import {
   scrollRichOutline,
   markRichPreviewBusy,
   richPreviewPosition,
+  trackWebArticleReading,
+  normalizeWebArticleUrl,
+  WEB_ARTICLE_PARAMETER,
   installDocumentZoomGestures,
   pdfPagesNeedingOcr,
   recognizePdfDocument,
@@ -1369,6 +1374,12 @@ const isDocxDocument = computed(() => parsedDocument.value?.binary?.kind === 'do
 const isSubtitleDocument = computed(() => isSubtitleDocumentFormat(parsedDocument.value?.format));
 const isJsonDocument = computed(() => parsedDocument.value?.format === 'json');
 const isRichDocument = computed(() => isRichDocumentFormat(parsedDocument.value?.format));
+const articleSourceUrl = computed(() => parsedDocument.value?.format === 'html'
+  ? normalizeWebArticleUrl(activeTask.value?.sourceUrl) : null);
+const documentHeading = computed(() => {
+  const name = parsedDocument.value?.fileName || '';
+  return articleSourceUrl.value ? name.replace(/\.html$/u, '') : name;
+});
 const epubChapters = computed(() => parsedDocument.value?.binary?.kind === 'epub'
   ? parsedDocument.value.binary.chapters
   : []);
@@ -1409,6 +1420,7 @@ type ReaderZoomPoint = {clientX: number; clientY: number};
 type ReaderZoomSurface = {content: HTMLElement; viewport: HTMLElement; xScroller: HTMLElement; yScroller: HTMLElement; document: Document; frame: boolean};
 let readerZoomDisposer: (() => void) | undefined;
 let loadedRichDocument: Document | null = null;
+let stopArticleReading: (() => void) | undefined;
 let readerZoomRevision = 0;
 
 /** 缩放只影响正文，工具栏和滚动视口保持原尺寸。 */
@@ -1500,13 +1512,26 @@ function focusNativeReader(event: PointerEvent): void {
   readingContent.value?.focus?.({preventScroll: true});
 }
 function handleRichFrameLoad(): void {
+  stopArticleReading?.();
+  stopArticleReading = undefined;
   loadedRichDocument = richFrame.value?.contentDocument || null;
   refreshRichPreview();
   bindReaderZoomGestures();
+  const id = activeTask.value?.historyId;
+  if (articleSourceUrl.value && id && loadedRichDocument) {
+    stopArticleReading = trackWebArticleReading(loadedRichDocument, id, history, url => {
+      void browser.tabs.create({url}).catch(() => {downloadNotice.value = translateLegacy('无法打开原网页');});
+    });
+  }
 }
 watch([parsedDocument, readerTab], ([document], [previousDocument]) => {
   clearReaderZoomGestures();
-  if (document !== previousDocument) {readerScale.value = 1; loadedRichDocument = null;}
+  if (document !== previousDocument) {
+    readerScale.value = 1;
+    loadedRichDocument = null;
+    stopArticleReading?.();
+    stopArticleReading = undefined;
+  }
   const revision = readerZoomRevision;
   void nextTick().then(() => {if (revision === readerZoomRevision) bindReaderZoomGestures();});
 }, {flush: 'sync'});
@@ -1796,6 +1821,8 @@ function handleDrop(event: DragEvent): void {
 }
 
 function resetDocument(): void {
+  stopArticleReading?.();
+  stopArticleReading = undefined;
   persistHistory();
   documentAIContextOverride.value = null;
   requestEvidence.value = null;
@@ -2285,6 +2312,13 @@ onMounted(() => {
   try {materialUrl = new URL(window.location.href);} catch { /* 只在完整浏览器页面解析继续阅读参数。 */ }
   const materialId = materialUrl?.searchParams.get(MATERIAL_RESUME_PARAMETER);
   if (materialUrl && materialId && !materialPrivate) {materialUrl.searchParams.delete(MATERIAL_RESUME_PARAMETER); window.history.replaceState(window.history.state, '', materialUrl.href); void restoreMaterialDocument(materialId); return;}
+  const articleId = materialUrl?.searchParams.get(WEB_ARTICLE_PARAMETER);
+  if (articleId && /^[a-f0-9]{32}$/u.test(articleId)) {
+    void importWorkflow.openHistory(articleId).then(() => {
+      if (!disposed && !activeTask.value && !importError.value) importError.value = t('document.historyOpenUnavailable');
+    });
+    return;
+  }
   const source = readPdfSourceFragment(window.location.hash || '');
   if (source) {onlinePdfUrl.value = source; void openOnlinePdf();}
   else void restoreOpenDocument();

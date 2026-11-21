@@ -10,7 +10,7 @@
 
 import {getUiLanguageBundlePath, translate} from './index';
 import {createLegacyPatternSet} from './messages/legacy-patterns';
-import {createSiteRuleDiagnosisText} from './messages/siteRules';
+import {createExtensionSiteActionText} from './messages/siteRules';
 import {enUSLegacyText, enUSMessages} from './messages/en-US';
 import {esESLegacyText, esESMessages} from './messages/es-ES';
 import {frFRLegacyText, frFRMessages} from './messages/fr-FR';
@@ -36,7 +36,7 @@ export function createUiLanguageBundleFiles(): Array<{relativeDest: string; cont
         relativeDest: getUiLanguageBundlePath(language),
         contents: JSON.stringify({
             ...UI_LANGUAGE_BUNDLES[language],
-            legacyText: {...UI_LANGUAGE_BUNDLES[language].legacyText, ...createSiteRuleDiagnosisText(language)},
+            legacyText: {...UI_LANGUAGE_BUNDLES[language].legacyText, ...createExtensionSiteActionText(language)},
         }),
     }));
 }

@@ -46,13 +46,14 @@
         <i aria-hidden="true" :class="{'site-rule-saving': props.saving}" />
       </button>
     </div>
-    <component :is="diagnosisPanel" v-if="diagnosisPanel && props.diagnose" :read="props.diagnose" :active="props.active" />
+    <component :is="diagnosisPanel" v-if="diagnosisPanel && props.tools" v-bind="props.tools" :active="props.active" />
   </div>
 </template>
 
 <script lang="ts" setup>
 import {computed, defineAsyncComponent} from 'vue';
 import type {PageRuleDiagnosis} from '@/src/core/translation/types';
+import type {WebArticleOpenStatus} from '@/src/features/document-translation/core/webArticle';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
 import {useUiI18n} from '@/src/ui/i18n';
 const {t, translateLegacy} = useUiI18n();
@@ -69,7 +70,7 @@ const props = withDefaults(defineProps<{
   saving?: boolean
   switchLabel: string
   extensionSwitchLabel: string
-  diagnose?: () => Promise<PageRuleDiagnosis | undefined>
+  tools?: {read: () => Promise<PageRuleDiagnosis | undefined>; openArticle?: () => Promise<WebArticleOpenStatus>}
 }>(), {active: true})
 
 const diagnosisPanel = import.meta.env.BROWSER === 'userscript' ? undefined

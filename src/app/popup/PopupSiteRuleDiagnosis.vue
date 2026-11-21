@@ -1,14 +1,21 @@
 <!--
  * @file src/app/popup/PopupSiteRuleDiagnosis.vue
- * 文件职责：紧凑展示当前网页的生效规则和选区翻译原因。
- * 主要内容：显式打开时读取一次诊断，页面身份变化或组件停用后丢弃旧回执；只渲染生效标识、范围和选区状态。
+ * 文件职责：提供当前网页的正文打开和翻译诊断入口。
+ * 主要内容：显式打开时查询诊断或打开正文，页面身份变化或组件停用后丢弃旧回执；紧凑展示规则和操作反馈。
  * 模块边界：仅使用 Popup 注入的本地查询入口，不直接读取网页、不翻译所选文字、不修改网站规则。
 -->
 <template>
   <div class="site-diagnosis">
-    <button type="button" class="site-diagnosis-toggle" :aria-expanded="opened" :disabled="pending" @click="toggle">
-      {{ tr('网页翻译诊断') }}
-    </button>
+    <div class="page-site-tools">
+      <button v-if="props.openArticle" type="button" class="site-diagnosis-toggle" :disabled="openingArticle"
+        :aria-busy="openingArticle" :title="tr('在流畅阅读中打开正文')" @click="requestArticle">
+        {{ tr('打开正文') }}
+      </button>
+      <button type="button" class="site-diagnosis-toggle" :aria-expanded="opened" :disabled="pending" @click="toggle">
+        {{ tr('网页翻译诊断') }}
+      </button>
+    </div>
+    <p v-if="articleError" class="article-open-error" role="status">{{ tr(articleError) }}</p>
     <div v-if="opened" class="site-diagnosis-result" aria-live="polite">
       <p v-if="pending">{{ t('glossary.importReading') }}</p>
       <template v-else-if="result">
@@ -29,15 +36,27 @@
 <script setup lang="ts">
 import {computed, ref, shallowRef, watch} from 'vue';
 import type {PageRuleDiagnosis, SelectionDiagnosisReason} from '@/src/core/translation/types';
+import type {WebArticleOpenStatus} from '@/src/features/document-translation/core/webArticle';
 import {useSettingsActionContext} from '@/src/features/settings/model/useSettingsActionContext';
 import {useUiI18n} from '@/src/ui/i18n';
 
-const props = defineProps<{read: () => Promise<PageRuleDiagnosis | undefined>; active: boolean}>();
+const props = defineProps<{
+  read: () => Promise<PageRuleDiagnosis | undefined>;
+  openArticle?: () => Promise<WebArticleOpenStatus>;
+  active: boolean;
+}>();
 const {t, translateLegacy: tr} = useUiI18n();
 const opened = ref(false);
 const pending = ref(false);
 const result = shallowRef<PageRuleDiagnosis>();
-const context = useSettingsActionContext(() => props.active, () => [props.read]);
+const context = useSettingsActionContext(() => props.active, () => [props.read, props.openArticle]);
+const openingArticle = ref(false);
+const articleError = ref('');
+const articleErrors: Record<Exclude<WebArticleOpenStatus, 'opened'>, string> = {
+  'no-article': '未找到可打开的网页正文。',
+  'too-large': '网页正文太长，无法完整打开。',
+  unavailable: '暂时无法打开这篇正文。',
+};
 const selectionDetail = computed(() => {
   if (!result.value) return undefined;
   const {ruleId, detail} = result.value.selection;
@@ -66,7 +85,24 @@ watch(context.revision, () => {
   opened.value = false;
   pending.value = false;
   result.value = undefined;
+  openingArticle.value = false;
+  articleError.value = '';
 }, {flush: 'sync'});
+
+async function requestArticle() {
+  if (!context.active.value || openingArticle.value || !props.openArticle) return;
+  const current = context.capture();
+  openingArticle.value = true;
+  articleError.value = '';
+  try {
+    const status = await props.openArticle();
+    if (current() && status !== 'opened') articleError.value = articleErrors[status] ?? articleErrors.unavailable;
+  } catch {
+    if (current()) articleError.value = articleErrors.unavailable;
+  } finally {
+    if (current()) openingArticle.value = false;
+  }
+}
 
 async function toggle() {
   if (!context.active.value || pending.value) return;
@@ -87,6 +123,8 @@ async function toggle() {
 
 <style scoped>
 .site-diagnosis { min-width: 0; }
+.page-site-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.article-open-error { margin: 4px 2px 0; font-size: 11px; color: var(--ink); }
 .site-diagnosis-toggle {
   padding: 3px 2px 0; border: 0; background: none; color: var(--brand-strong);
   font: inherit; font-size: 11px; cursor: pointer;

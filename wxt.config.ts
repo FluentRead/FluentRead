@@ -463,7 +463,9 @@ export default defineConfig({
             const requestEvidenceBudget = 30_000;
             // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
             const pageRuleDiagnosisBudget = 12_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget));
+            // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
+            const webArticleBudget = 26_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

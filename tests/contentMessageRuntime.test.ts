@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
     readFullPageUnchangedCompletion: vi.fn(),
     readPageRuleDiagnosis: vi.fn(),
     readPageRuleSelection: vi.fn(),
+    extractWebArticle: vi.fn(),
     mountAreaTranslator: vi.fn(),
     mountFloatingBall: vi.fn(),
     toggleContextMenuImage: vi.fn(),
@@ -48,6 +49,7 @@ const mocks = vi.hoisted(() => ({
     dismissPageNotice: vi.fn(),
 }));
 vi.mock('@/src/features/page-notice/public', () => ({showPageNotice: mocks.showPageNotice, dismissPageNotice: mocks.dismissPageNotice}));
+vi.mock('@/src/features/document-translation/content/extractWebArticle', () => ({extractWebArticle: mocks.extractWebArticle}));
 
 // Context 是受控外部生命周期端口；用原生 AbortController 驱动 invalid 门禁，避免伪造强转。
 // 本 suite 验证实际 handler，不声称执行 WXT 的启动广播或浏览器环境检测。
@@ -170,6 +172,56 @@ describe('内容脚本 runtime 消息协议', () => {
         });
         handler({type: 'contextMenuTranslate', action: 'restore'}, {}, respond);
         expect(respond).toHaveBeenLastCalledWith({status: 'success', action: 'restored', isTranslated: false, documentToken: 'fixture-document', toolbarStatus: 'idle'});
+    });
+    it('正文抽取只接受本扩展的当前 HTTP(S) 文档请求，丢弃跨导航的结果', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const expectedUrl = 'https://example.test/article';
+        const location = {href: expectedUrl};
+        const {document} = parseHTML('<html><body><article><p>Readable content.</p></article></body></html>');
+        vi.stubGlobal('window', {location});
+        vi.stubGlobal('document', document);
+        vi.stubGlobal('browser', {runtime: {id: 'fixture-extension'}});
+        let disabled = false, suspended = false, invalid = false;
+        const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, {
+            isSiteDisabled: () => disabled, isPageSuspended: () => suspended, updateSiteDisabled: vi.fn(),
+        });
+        const request = {type: 'extractWebArticle', expectedUrl}, sender = {id: 'fixture-extension'}, send = vi.fn();
+        handler(request, null, send);
+        handler(request, {id: ''}, send);
+        handler(request, {id: 'untrusted'}, send);
+        const unsupportedUrl = 'file:///tmp/example';
+        location.href = unsupportedUrl;
+        handler({...request, expectedUrl: unsupportedUrl}, sender, send);
+        location.href = expectedUrl;
+        for (const restriction of ['config', 'site', 'suspend', 'context']) {
+            mocks.config.on = restriction !== 'config';
+            disabled = restriction === 'site';suspended = restriction === 'suspend';invalid = restriction === 'context';
+            expect(handler(request, sender, send)).toBe(true);
+        }
+        expect(send.mock.calls).toEqual(Array.from({length: 8}, () => [{status: 'unavailable'}]));
+        expect(mocks.extractWebArticle).not.toHaveBeenCalled();
+        invalid = false;
+        const snapshot = {status: 'ok', title: 'News', html: '<p>Readable content.</p>', sourceUrl: expectedUrl};
+        mocks.extractWebArticle.mockResolvedValueOnce(snapshot);
+        expect(handler(request, sender, send)).toBe(true);
+        await vi.waitFor(() => expect(send).toHaveBeenLastCalledWith(snapshot));
+        expect(mocks.extractWebArticle).toHaveBeenCalledWith(document, expectedUrl);
+        mocks.extractWebArticle.mockImplementationOnce(async () => {
+            location.href = 'https://example.test/next';
+            return snapshot;
+        });
+        handler(request, sender, send);
+        await vi.waitFor(() => expect(send).toHaveBeenLastCalledWith({status: 'unavailable'}));
+        location.href = expectedUrl;
+        handler(request, sender, send);
+        location.href = 'https://example.test/next';
+        await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(11));
+        expect(mocks.extractWebArticle).toHaveBeenCalledTimes(2);
+        location.href = expectedUrl;
+        mocks.extractWebArticle.mockRejectedValueOnce(new Error('Extractor unavailable'));
+        handler(request, sender, send);
+        await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(12));
+        expect(send).toHaveBeenLastCalledWith({status: 'unavailable'});
     });
     it('网页诊断只接受可信扩展对当前 URL 的显式请求，不转发正文', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');

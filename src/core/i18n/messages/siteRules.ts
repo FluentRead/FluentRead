@@ -184,7 +184,14 @@ export function createSiteRuleText(language: RegisteredUiLanguage): Readonly<Rec
   return Object.fromEntries(siteRuleTextRows.map(row => [row[0], row[columns[language]]]));
 }
 
-const siteRuleDiagnosisRows: readonly Row[] = [
+const extensionSiteActionRows: readonly Row[] = [
+  ["打开正文","Open article","本文を開く","본문 열기","Ouvrir l’article","Открыть статью","Abrir artículo"],
+  ["在流畅阅读中打开正文","Open this article in FluentRead","FluentRead で本文を開く","FluentRead에서 본문 열기","Ouvrir cet article dans FluentRead","Открыть статью во FluentRead","Abrir este artículo en FluentRead"],
+  ["未找到可打开的网页正文。","No readable article was found.","読み取り可能な本文が見つかりませんでした。","읽을 수 있는 본문을 찾지 못했습니다.","Aucun article lisible n’a été trouvé.","На странице не удалось найти текст статьи.","No se encontró un artículo legible."],
+  ["网页正文太长，无法完整打开。","This article is too long to open in full.","本文が長すぎるため、全文を開けません。","본문이 너무 길어 전체를 열 수 없습니다.","L’article est trop long pour être ouvert en entier.","Статья слишком длинная для полного открытия.","El artículo es demasiado largo para abrirlo completo."],
+  ["暂时无法打开这篇正文。","This article could not be opened.","この本文を開けませんでした。","본문을 열 수 없습니다.","Impossible d’ouvrir cet article.","Не удалось открыть эту статью.","No se pudo abrir este artículo."],
+  ["查看原网页","View original webpage","元のページを開く","원래 웹페이지 보기","Voir la page d’origine","Открыть исходную страницу","Ver la página original"],
+  ["无法打开原网页","Could not open the original webpage","元のページを開けませんでした","원래 웹페이지를 열 수 없습니다","Impossible d’ouvrir la page d’origine","Не удалось открыть исходную страницу","No se pudo abrir la página original"],
   ["网页翻译诊断","Page translation diagnosis","ページ翻訳の診断","페이지 번역 진단","Diagnostic de traduction","Диагностика перевода страницы","Diagnóstico de traducción"],
   ["命中规则","Matching rules","一致したルール","일치한 규칙","Règles correspondantes","Совпавшие правила","Reglas coincidentes"],
   ["无专站规则","No site-specific rules","サイト専用ルールなし","사이트별 규칙 없음","Aucune règle propre au site","Нет правил для этого сайта","Sin reglas específicas"],
@@ -208,7 +215,7 @@ const siteRuleDiagnosisRows: readonly Row[] = [
   ["已识别所选段落，当前会话尚未排入翻译队列。","The paragraph was detected and is currently absent from the translation queue.","選んだ段落を認識しましたが、現在の翻訳キューにはありません。","선택한 단락을 인식했지만 현재 번역 대기열에 없습니다.","Le paragraphe a été détecté. Il est actuellement absent de la file de traduction.","Абзац распознан, но сейчас отсутствует в очереди перевода.","Se detectó el párrafo y actualmente está fuera de la cola de traducción."],
 ];
 
-/** Popup 诊断仅随扩展资源生成，userscript 沿用已有语言包。 */
-export function createSiteRuleDiagnosisText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
-  return Object.fromEntries(siteRuleDiagnosisRows.map(row => [row[0], row[columns[language]]]));
+/** 网页诊断和正文工作台文案仅随扩展资源生成。 */
+export function createExtensionSiteActionText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
+  return Object.fromEntries(extensionSiteActionRows.map(row => [row[0], row[columns[language]]]));
 }

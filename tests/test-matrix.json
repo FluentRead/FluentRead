@@ -624,6 +624,7 @@
       "tests/documentTranslationBinaryEdge.test.ts",
       "tests/documentUserActions.test.ts",
       "tests/documentWorkflows.test.ts",
+      "tests/webArticleWorkbench.test.ts",
       "tests/documentationToolContracts.test.ts",
       "tests/doubaoSeedTranslation.test.ts",
       "tests/featureMenuSettingsLifecycle.test.ts",

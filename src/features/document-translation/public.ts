@@ -34,6 +34,8 @@ export {
 } from './ui/pdfPreview';
 export * from './ui/presentation';
 export * from './ui/richPreviewSync';
+export {trackWebArticleReading} from './ui/webArticleReading';
+export {normalizeWebArticleUrl, WEB_ARTICLE_PARAMETER} from './core/webArticle';
 export {installDocumentZoomGestures} from './ui/documentZoom';
 export type {DocumentZoomOptions, DocumentZoomPoint} from './ui/documentZoom';
 export {createDocumentTaskState, useDocumentTasks} from './ui/useDocumentTasks';

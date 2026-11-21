@@ -13,6 +13,7 @@ import {createApp, defineComponent, h, KeepAlive, nextTick, reactive, ref, type 
 import PopupSiteRule from '@/src/app/popup/PopupSiteRule.vue';
 import PopupSiteRuleDiagnosis from '@/src/app/popup/PopupSiteRuleDiagnosis.vue';
 import type {PageRuleDiagnosis} from '@/src/core/translation/types';
+import type {WebArticleOpenStatus} from '@/src/features/document-translation/core/webArticle';
 
 let app: App | undefined;
 let host: HTMLDivElement;
@@ -21,7 +22,7 @@ const Empty = defineComponent({render: () => null});
 const defaults = () => ({active: true, context: {}, domain: 'example.com', supported: true,
     alwaysTranslated: false, alwaysPaused: false, extensionDisabled: false, autoTranslate: false,
     translating: false, saving: false, switchLabel: '始终翻译 example.com', extensionSwitchLabel: '禁用 example.com',
-    diagnose: undefined as (() => Promise<PageRuleDiagnosis | undefined>) | undefined});
+    tools: undefined as {read: () => Promise<PageRuleDiagnosis | undefined>} | undefined});
 type Props = ReturnType<typeof defaults>;
 
 async function mount(overrides: Partial<Props> = {}, keepAlive = false) {
@@ -53,7 +54,7 @@ describe('PopupSiteRule 真实组件的网站规则与事件归属', () => {
     it('按需显示诊断入口，打开时查询一次并显示当前规则', async () => {
         const read = vi.fn(async (): Promise<PageRuleDiagnosis> =>
             ({scope: 'content', ruleIds: ['product-docs'], selection: {reason: 'rule-protected', ruleId: 'product-docs'}}));
-        await mount({diagnose: read});
+        await mount({tools: {read}});
         const toggle = await vi.waitFor(() => {
             const element = host.querySelector<HTMLButtonElement>('.site-diagnosis-toggle');
             expect(element).not.toBeNull();
@@ -88,6 +89,30 @@ describe('PopupSiteRule 真实组件的网站规则与事件归属', () => {
         button.click();
         await nextTick();
         expect(host.querySelector('.site-diagnosis-result')).toBeNull();
+    });
+
+    it('正文入口等待时去重，切换页面后丢弃迟到反馈并允许重试', async () => {
+        let finish!: (status: WebArticleOpenStatus) => void;
+        const open = vi.fn(() => new Promise<WebArticleOpenStatus>(resolve => {finish = resolve;}));
+        const props = reactive({active: true, read: async () => undefined, openArticle: open});
+        app = createApp(defineComponent({render: () => h(PopupSiteRuleDiagnosis, props)}));
+        app.mount(host);
+        const button = Array.from(host.querySelectorAll('button')).find(element => element.textContent?.trim() === '打开正文')!;
+        button.click();button.click();
+        await nextTick();
+        expect(open).toHaveBeenCalledOnce();
+        expect(button.disabled).toBe(true);
+        props.openArticle = vi.fn(async (): Promise<WebArticleOpenStatus> => 'too-large');
+        await nextTick();
+        finish('no-article');
+        await nextTick();
+        expect(host.textContent).not.toContain('未找到可打开的网页正文');
+        button.click();
+        await vi.waitFor(() => expect(host.textContent).toContain('网页正文太长'));
+        props.openArticle.mockResolvedValueOnce('opened');
+        button.click();
+        await vi.waitFor(() => expect(button.disabled).toBe(false));
+        expect(host.querySelector('.article-open-error')).toBeNull();
     });
     it('显示域名、作用域与可访问状态，发送开启和关闭意图', async () => {
         const {props} = await mount();

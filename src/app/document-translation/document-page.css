@@ -712,6 +712,7 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; width: 100%; max-width: none; min-width: 0; flex-wrap: nowrap; gap: 8px; }
 .document-taskbar .file-heading, .document-taskbar .file-heading > div { min-width: 0; }
 .document-taskbar .document-status { overflow: hidden; text-overflow: ellipsis; }
+.document-taskbar .article-source-link { display: inline-block; margin-top: 3px; color: var(--brand); font-size: 11px; }
 .document-taskbar .reader-toolbar { grid-column: 2; grid-row: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; padding-left: 10px; }
 .document-taskbar .reader-tabs { flex: none; }
 .document-taskbar .reader-reading-controls { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }

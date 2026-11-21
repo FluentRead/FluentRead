@@ -28,6 +28,7 @@ import {rejectUnsupportedContentFeature} from './featureRegistry';
 import {handleInformationHighlightMessage, type InformationHighlightMessageState} from './informationHighlight';
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
 import {handleHypothesisMessage, type HypothesisMessageState} from './hypothesisMessage';
+import {handleWebArticleMessage} from './webArticleMessage';
 export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState, HypothesisMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
     reconcileUserscriptPage?(): Promise<boolean>;
@@ -40,6 +41,8 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         if (!message || typeof message !== 'object') return false;
         const payload = message as Record<string, unknown>;
         if (import.meta.env.BROWSER !== 'userscript') {
+            const article = handleWebArticleMessage(payload, _sender, ctx, state, sendResponse);
+            if (article !== undefined) return article;
             const hypothesis = handleHypothesisMessage(payload, _sender, ctx, state, sendResponse);
             if (hypothesis !== undefined) return hypothesis;
             const pageFont = handlePageTranslationFontMessage(payload, _sender, ctx, state, sendResponse);

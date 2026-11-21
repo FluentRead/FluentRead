@@ -104,7 +104,7 @@ describe('Open paper PDF background message', () => {
             runtime: {id: 'fluentread', getURL: (path: string) => `chrome-extension://fluentread${path}`},
             tabs: {create},
         });
-        const router = createBackgroundMessageRouter(createDocumentNavigationHandlers());
+        const router = createBackgroundMessageRouter(createDocumentNavigationHandlers({captureDocument: () => () => true}));
         const check = (status: string, context = {sender}) =>
             expect(router.dispatch(message, context)).resolves.toEqual({handled: true, response: {status}});
         config.on = false;

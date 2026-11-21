@@ -2,6 +2,20 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## X 长帖、Twitch 聊天和 Google AI 概览
+
+```sh
+node scripts/run-site-adaptation-test.cjs \
+  --cases x-post-expand-control,twitch-live-chat,google-search \
+  --full-only --skip-settings-ui --extension-dir .output/chrome-mv3 \
+  --playwright-root <捆绑 Node 包目录> \
+  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --runtime-diagnostics-helper <浏览器测试技能的 runtime-diagnostics.cjs 路径> \
+  --artifacts-dir <本次证据目录>
+```
+
+生产构建在隔离 Edge 中运行。夹具验证 X 展开按钮保持原文字节点、Twitch 滚到新聊天仍能翻译，以及 Google 概览展开和站内跳转后的正文识别。三个用例都检查原站控件、译文唯一性、精确还原和再次翻译。报告记录内容脚本和扩展后台的诊断。网页和翻译响应均为夹具，登录后的真实页面需另行验收。
+
 ## man7 Linux 手册正文
 
 man7 的 Linux 手册将自然语言正文、参数说明、终端会话和源码混放在 `pre` 中。翻译时按手册段落建立可恢复的正文边界，保留原来的换行、缩进和行内链接；命令会话与程序源码继续保持原文。此能力限定于经过结构核验的 man7 Linux 手册，普通网页代码块和 RFC 的格式化文本仍遵守原有保护策略。

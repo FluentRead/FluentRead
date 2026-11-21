@@ -10,7 +10,9 @@ const os = require('node:os');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const {inspectFixtureTranslationParts} = require('./site-translation/fixture-translation-parts.cjs');
-const {assertFreshProductionExtension, waitForTranslationIdle} = require('./run-site-translation-test.cjs');
+const {controlledProviderRuntime} = require('./site-translation/controlled-provider.cjs');
+const {assertFreshProductionExtension, waitForTranslationIdle, loadRuntimeDiagnostics,
+  finishRuntimeDiagnostics, unloadRuntimePage} = require('./run-site-translation-test.cjs');
 const argument = (key, fallback) => {
   const index = process.argv.indexOf(`--${key}`);
   return index < 0 ? fallback : process.argv[index + 1];
@@ -23,6 +25,8 @@ const helperPath = argument('focus-safe-helper', path.join(__dirname, 'testing/f
 if (!packages || !helperPath) throw new Error('需要 --playwright-root 和 --focus-safe-helper');
 const {chromium} = require(path.join(packages, 'playwright'));
 const helper = require(path.resolve(helperPath));
+const diagnosticsPath = argument('runtime-diagnostics-helper', '');
+const runtimeDiagnostics = diagnosticsPath ? loadRuntimeDiagnostics(diagnosticsPath).diagnostics : null;
 const timeout = 15000;
 const wrapper = '.fluent-read-bilingual-content';
 let profileDir;
@@ -60,6 +64,12 @@ let popup;
 let options;
 let worker;
 let context;
+let testPage;
+let runtimeStarted = false;
+function setStage(item, stage) {
+  item.stage = stage;
+  runtimeDiagnostics?.setPhase(`${item.id}/${stage}`);
+}
 async function configRead() {
   return popup.evaluate(async () => {
     const result = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
@@ -110,7 +120,7 @@ function inspectFixtureOwnerInPage({selector, count, text, wrapper}) {
     (node.parentElement?.matches('[data-fr-translation-segment="true"]') && node.parentElement.parentElement === owner));
   if (count !== undefined) return owned.length === count;
   const translatedText = owned.map(node => node.textContent).join('\n');
-  if (text !== undefined) return translatedText.includes(text);
+  if (text !== undefined) return (globalThis.__frAdaptationFixtureDecode(translatedText, () => true) ?? '').includes(text);
   return {count: owned.length, text: translatedText};
 }
 async function waitCount(page, selector, count) {
@@ -312,7 +322,7 @@ async function verifyProtected(page, item, original) {
     assert.equal(await node.textContent(), original[index].text, `${item.id} protected text`);
     assert.equal(await node.evaluate(element => element.outerHTML), original[index].html, `${item.id} protected HTML`);
   }
-  assert.equal(page.url(), item.url);
+  assert.equal(page.url(), item.expectedUrl ?? item.url);
   assert.equal(await page.locator(`${wrapper} ${wrapper}`).count(), 0, 'nested wrappers');
 }
 
@@ -340,10 +350,11 @@ async function verifyLatestFixtureRestore(page, item, forbidden) {
 
 // Optional authored-fixture operations. The detached expected host is captured before
 // translation, receives only these declared host writes, and is never a product runtime hook.
-// dynamic: {appendHtml:[{selector,html,required,forbidden,sourceIncludes,sourceExcludes}],
+// dynamic: {appendHtml:[{selector,html,required,forbidden,sourceIncludes,sourceExcludes,click,route,scroll}],
 //   inlineText:[{selector,owner,from,to}], noiseSelector,noiseText,remountSelector,
 //   override:{protect,required,lateText?:{selector,owner,from,to}}}
 async function fixtureHostWrite(page, operation) {
+  const nextUrl = operation.route ? new URL(operation.route, page.url()).href : null;
   await page.evaluate(operation => {
     const one = (root, selector) => {
       const nodes = [...root.querySelectorAll(selector)].filter(node =>
@@ -359,8 +370,26 @@ async function fixtureHostWrite(page, operation) {
       throw new Error('Host write cannot target a document surface or owned translation');
     }
     if (operation.kind === 'append') {
-      actual.insertAdjacentHTML('beforeend', operation.html);
-      template.insertAdjacentHTML('beforeend', operation.html);
+      const append = () => {
+        if (operation.route) {
+          const url = new URL(operation.route, location.href);
+          if (url.origin !== location.origin) throw new Error('Fixture navigation must stay on the same origin');
+          history.pushState({}, '', url.href);
+        }
+        actual.insertAdjacentHTML('beforeend', operation.html);
+        template.insertAdjacentHTML('beforeend', operation.html);
+      };
+      if (operation.click) {
+        const control = one(document, operation.click);
+        const nativeLabel = window.__adaptationFixtureControls.get(operation.click);
+        control.addEventListener('click', () => {
+          // Mimic a renderer committing removal against the original Text node.
+          // Removing it throws if translation reparented the host's label.
+          control.removeChild(nativeLabel);
+          control.append(nativeLabel);
+          append();
+        }, {once: true});
+      } else append();
     } else if (operation.kind === 'text') {
       const replace = root => {
         const matches = [];
@@ -382,6 +411,9 @@ async function fixtureHostWrite(page, operation) {
       actual.replaceWith(template.cloneNode(true));
     } else throw new Error(`Unknown fixture host write: ${operation.kind}`);
   }, operation);
+  if (operation.click) await page.locator(operation.click).click();
+  if (nextUrl) await page.waitForURL(nextUrl, {timeout});
+  return nextUrl;
 }
 
 async function runFixtureDynamic(page, item, evidence) {
@@ -402,16 +434,21 @@ async function runFixtureDynamic(page, item, evidence) {
   const exactRestore = () => verifyLatestFixtureRestore(page, item, forbidden);
   evidence.dynamic = {steps: [], restoreSelectors: item.restoreSelectors, restoreScope: 'declared-container-innerHTML'};
   for (const operation of dynamic.appendHtml ?? []) {
-    item.stage = 'dynamic-append';
+    setStage(item, operation.click ? 'dynamic-expand' : operation.route ? 'dynamic-route' : 'dynamic-append');
     assert.ok(typeof operation.html === 'string' && operation.required?.length, 'appendHtml requires html and required targets');
-    await fixtureHostWrite(page, {...operation, kind: 'append'});
+    const navigatedUrl = await fixtureHostWrite(page, {...operation, kind: 'append'});
+    if (navigatedUrl) item.expectedUrl = navigatedUrl;
+    if (operation.scroll) await page.locator(operation.scroll).scrollIntoViewIfNeeded();
     required.push(...operation.required.filter(selector => !required.includes(selector)));
     forbidden.push(...(operation.forbidden ?? []).filter(selector => !forbidden.includes(selector)));
     includes.push(...(operation.sourceIncludes ?? [])); excludes.push(...(operation.sourceExcludes ?? []));
-    await verify(); evidence.dynamic.steps.push({kind: 'append', selector: operation.selector, required: operation.required});
+    await verify(); evidence.dynamic.steps.push({kind: 'append', selector: operation.selector, required: operation.required,
+      ...(operation.click ? {clicked: operation.click} : {}),
+      ...(operation.scroll ? {scrolledTo: operation.scroll} : {}),
+      ...(operation.route ? {navigatedTo: page.url()} : {})});
   }
   for (const operation of dynamic.inlineText ?? []) {
-    item.stage = 'dynamic-inline-text';
+    setStage(item, 'dynamic-inline-text');
     assert.ok(typeof operation.from === 'string' && typeof operation.to === 'string' && operation.from !== operation.to && operation.owner,
       'inlineText requires a changed original Text slot and its translation owner');
     await fixtureHostWrite(page, {...operation, kind: 'text'});
@@ -420,7 +457,7 @@ async function runFixtureDynamic(page, item, evidence) {
     await verify(); evidence.dynamic.steps.push({kind: 'inlineText', selector: operation.selector, owner: operation.owner, text: operation.to});
   }
   if (dynamic.noiseSelector) {
-    item.stage = 'dynamic-protected-noise';
+    setStage(item, 'dynamic-protected-noise');
     assert.ok(typeof dynamic.noiseText === 'string' && dynamic.noiseText.trim(), 'noiseSelector requires a unique nonempty noiseText');
     await verify();
     const beforeRequests = await worker.evaluate(() => __adaptationRequests.length);
@@ -442,7 +479,7 @@ async function runFixtureDynamic(page, item, evidence) {
     evidence.dynamic.steps.push({kind: 'protectedNoise', selector: dynamic.noiseSelector, writes: 4, providerWork: 0, sameWrappers: true});
   }
   if (dynamic.remountSelector) {
-    item.stage = 'dynamic-equivalent-remount';
+    setStage(item, 'dynamic-equivalent-remount');
     await fixtureHostWrite(page, {kind: 'remount', selector: dynamic.remountSelector});
     await verify(); evidence.dynamic.steps.push({kind: 'equivalentRemount', selector: dynamic.remountSelector});
   }
@@ -452,10 +489,10 @@ async function runFixtureDynamic(page, item, evidence) {
   for (const guard of await guardSnapshot(page, forbidden, true)) if (guard.text.trim()) {
     assert.ok(!payload.includes(guard.text.trim()), `${item.id}: dynamic protected guard reached provider`);
   }
-  item.stage = 'dynamic-restore'; await fullToggle(page);
+  setStage(item, 'dynamic-restore'); await fullToggle(page);
   await page.waitForFunction(wrapper => !document.querySelector(wrapper), wrapper, {timeout});
   await exactRestore(); evidence.dynamic.restoreExact = true;
-  item.stage = 'dynamic-retranslate'; await fullToggle(page); await verify();
+  setStage(item, 'dynamic-retranslate'); await fullToggle(page); await verify();
   evidence.dynamic.retranslated = true;
   if (dynamic.override) {
     const settings = (await configRead()).siteAdaptation;
@@ -472,13 +509,13 @@ async function runFixtureDynamic(page, item, evidence) {
     updated.custom.rules.push(replacement);
     try {
       if (dynamic.override.lateText) {
-        item.stage = 'dynamic-held-source';
+        setStage(item, 'dynamic-held-source');
         await worker.evaluate(() => { __adaptationHold = true; });
         await fixtureHostWrite(page, {...dynamic.override.lateText, kind: 'text'});
         await waitForAsyncCondition(() => worker.evaluate(() => __adaptationReleases.length > 0),
           {timeoutMs: timeout, message: `${item.id}: held provider response`});
       }
-      item.stage = 'dynamic-same-id-override';
+      setStage(item, 'dynamic-same-id-override');
       await configPatchAfterRuleInvalidation(page, {siteAdaptation: updated});
       await page.waitForFunction(wrapper => !document.querySelector(wrapper), wrapper, {timeout});
       await worker.evaluate(() => { __adaptationHold = false; __adaptationReleases.splice(0).forEach(release => release()); });
@@ -508,7 +545,7 @@ async function runFixtureDynamic(page, item, evidence) {
   }
 }
 async function runCase(page, item) {
-  item.stage = 'navigation';
+  setStage(item, 'navigation');
   await page.goto(item.url, {waitUntil: 'domcontentloaded'});
   await page.locator('#fluent-read-page-styles').waitFor({state: 'attached', timeout});
   await page.waitForTimeout(200);
@@ -542,9 +579,15 @@ async function runCase(page, item) {
     }
     item.requestedUrl = item.url; item.url = page.url();
   }
-  if (!isLive && item.dynamic) await page.evaluate(() => {
+  if (!isLive && item.dynamic) await page.evaluate(controls => {
     window.__adaptationFixtureHost = new DOMParser().parseFromString(document.documentElement.outerHTML, 'text/html');
-  });
+    window.__adaptationFixtureControls = new Map(controls.map(selector => {
+      const control = document.querySelector(selector);
+      const label = [...(control?.childNodes ?? [])].find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (!label) throw new Error(`Missing original fixture control label: ${selector}`);
+      return [selector, label];
+    }));
+  }, (item.dynamic.appendHtml ?? []).map(operation => operation.click).filter(Boolean));
   const requestStart = await worker.evaluate(() => __adaptationRequests.length);
   const original = await guardSnapshot(page, item.forbidden);
   const steamBaseline = new URL(item.url).hostname === 'steamcommunity.com' && /^\/app\/[^/]+\/discussions\/$/u.test(new URL(item.url).pathname)
@@ -558,7 +601,7 @@ async function runCase(page, item) {
   const hoverEnabled = !process.argv.includes('--full-only') && (!item.modes || item.modes.includes('hover'));
   if (!hoverEnabled) evidence.hoverSkipped = 'Explicit full-only scope; no physical hover acceptance claimed';
   for (const count of hoverEnabled ? [1, 0, 1, 0] : []) {
-    item.stage = `hover-${evidence.hover.length}-${count}`;
+    setStage(item, `hover-${evidence.hover.length}-${count}`);
     await hoverToggle(page, item.required[0], 0, item.forbidden);
     await waitCount(page, item.required[0], count);
     await page.waitForTimeout(350);
@@ -571,7 +614,7 @@ async function runCase(page, item) {
     evidence.hover.push(count);
   }
   for (const count of [1, 0, 1]) {
-    item.stage = `full-${evidence.full.length}-${count}`;
+    setStage(item, `full-${evidence.full.length}-${count}`);
     await fullToggle(page);
     for (const selector of item.required) await waitCount(page, selector, count);
     if (item.dynamic || item.sourceAssertions) {
@@ -667,7 +710,7 @@ async function runCase(page, item) {
     const dynamicForbidden = [...item.forbidden, ...(item.dynamic.appendHtml ?? []).flatMap(operation => operation.forbidden ?? [])];
     await verifyLatestFixtureRestore(page, item, dynamicForbidden);
     evidence.dynamic.finalRestoreExact = true;
-    await page.evaluate(() => { delete window.__adaptationFixtureHost; });
+    await page.evaluate(() => { delete window.__adaptationFixtureHost; delete window.__adaptationFixtureControls; });
   }
   report.fixtureCases.push(evidence);
   fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
@@ -696,22 +739,35 @@ async function main() {
     if (!testSettingsUi) report.ui.skipped = isLive ? 'Live-page scope' : 'Explicit --skip-settings-ui scope';
     if (isLive) await context.setExtraHTTPHeaders({'Accept-Language': 'en-US,en;q=0.9'});
     Object.assign(report, {launchMode: session.launchMode, focusPolicy: session.focusPolicy, windowPlacement: session.windowPlacement});
-    const attach = page => page.on('pageerror', error => report.consoleErrors.push(error.message));
-    const installWorker = async current => current.evaluate(() => {
-      globalThis.__adaptationRequests = [];
-      globalThis.__adaptationHold = false; globalThis.__adaptationReleases = [];
-      globalThis.fetch = async (input, init) => {
-        const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
-        if (url.hostname === 'edge.microsoft.com' && url.pathname === '/translate/translatetext') {
-          const body = init?.body ?? await input.text();
-          const texts = JSON.parse(body);
-          globalThis.__adaptationRequests.push(texts);
-          if (globalThis.__adaptationHold) await new Promise(resolve => globalThis.__adaptationReleases.push(resolve));
-          return new Response(JSON.stringify(texts.map(text => ({translations: [{text: `测试译文：${text}`}]}))), {status: 200, headers: {'content-type': 'application/json'}});
-        }
-        throw new Error(`External worker fetch disabled: ${url.origin}`);
-      };
-    });
+    if (runtimeDiagnostics) {
+      runtimeDiagnostics.setPhase('extension-initialization');
+      await runtimeDiagnostics.start(context);
+      runtimeStarted = true;
+    } else report.limitations.push('No isolated-world or service-worker runtime diagnostic collector');
+    await context.addInitScript(`globalThis.__frAdaptationFixtureDecode = (${controlledProviderRuntime.toString()})(false).decodeText;`);
+    const attach = async page => {
+      page.on('pageerror', error => report.consoleErrors.push(error.message));
+      await runtimeDiagnostics?.attachPage(page, 'site-adaptation-fixture');
+    };
+    const installWorker = async current => {
+      await current.evaluate(controlledProviderRuntime, true);
+      await current.evaluate(() => {
+        const {encode} = globalThis.__frCompatibilityTransport;
+        globalThis.__adaptationRequests = [];
+        globalThis.__adaptationHold = false; globalThis.__adaptationReleases = [];
+        globalThis.fetch = async (input, init) => {
+          const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
+          if (url.hostname === 'edge.microsoft.com' && url.pathname === '/translate/translatetext') {
+            const body = init?.body ?? await input.text();
+            const texts = JSON.parse(body);
+            globalThis.__adaptationRequests.push(texts);
+            if (globalThis.__adaptationHold) await new Promise(resolve => globalThis.__adaptationReleases.push(resolve));
+            return new Response(JSON.stringify(texts.map(text => ({translations: [{text: encode(text, 'microsoft-escaped-text')}]}))), {status: 200, headers: {'content-type': 'application/json'}});
+          }
+          throw new Error(`External worker fetch disabled: ${url.origin}`);
+        };
+      });
+    };
     context.on('serviceworker', next => { void installWorker(next).catch(error => report.consoleErrors.push(error.message)); });
     worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker');
     await installWorker(worker);
@@ -727,7 +783,8 @@ async function main() {
       return route.continue();
     });
     const id = new URL(worker.url()).host;
-    popup = await helper.newPageWithoutForeground(context); attach(popup);
+    runtimeDiagnostics?.setExtensionId(id);
+    popup = await helper.newPageWithoutForeground(context); await attach(popup);
     await popup.goto(`chrome-extension://${id}/popup.html`);
     await popup.waitForTimeout(1000);
     await configPatch({service: 'microsoft', from: 'en', to: 'zh-Hans', display: 1, autoTranslate: false, hotkey: 'Control', mouseHoverTranslationDelay: 0,
@@ -735,7 +792,7 @@ async function main() {
       uiLanguage: 'zh-CN', uiLanguageSetupCompleted: true,
       siteAdaptation: {enabled: true, disabledRuleIds: [], custom: customPack}});
     if (testSettingsUi) {
-    options = await helper.newPageWithoutForeground(context); attach(options);
+    options = await helper.newPageWithoutForeground(context); await attach(options);
     await options.goto(`chrome-extension://${id}/options.html#settings-sites`);
     await options.waitForTimeout(600);
     let card = await openAdaptation();
@@ -825,7 +882,8 @@ async function main() {
     await options.setViewportSize({width: 1280, height: 900});
     }
     await configPatch({siteAdaptation: {enabled: true, disabledRuleIds: [], custom: isLive ? {version: 1, rules: []} : customPack}});
-    const page = await helper.newPageWithoutForeground(context); attach(page);
+    const page = await helper.newPageWithoutForeground(context); await attach(page);
+    testPage = page;
     for (const item of cases) {
       try { await runCase(page, item); }
       catch (error) {
@@ -853,6 +911,17 @@ async function main() {
     let browserClosed = false;
     report.ownedBrowserClosed = false;
     report.temporaryProfileRemoved = false;
+    if (runtimeStarted) {
+      await cleanup(async () => {
+        report.runtimeUnload = await unloadRuntimePage(testPage, runtimeDiagnostics, 'site-adaptation-unload');
+      });
+      await cleanup(async () => {
+        const result = {ok: true};
+        const failures = await finishRuntimeDiagnostics(runtimeDiagnostics, result, artifactsDir);
+        report.runtimeDiagnostics = result.runtimeDiagnostics;
+        if (failures.length) throw new AggregateError(failures.map(({error}) => error), 'Site adaptation runtime diagnostics failed');
+      });
+    }
     await cleanup(async () => {
       if (session) {await session.close(); browserClosed = true; report.ownedBrowserClosed = true;}
     });

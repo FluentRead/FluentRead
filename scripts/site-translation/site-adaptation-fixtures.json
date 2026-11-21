@@ -658,7 +658,26 @@
       "#show-more",
       "#overview-source",
       "#unrelated"
-    ]
+    ],
+    "restoreSelectors": ["#m-x-content", "#search"],
+    "dynamic": {
+      "appendHtml": [
+        {
+          "selector": "#m-x-content",
+          "click": "#show-more",
+          "html": "<p id=\"expanded-overview\">More generated overview prose becomes readable after expanding the summary.</p>",
+          "required": ["#expanded-overview"],
+          "sourceIncludes": ["More generated overview prose becomes readable"]
+        },
+        {
+          "selector": "#m-x-content",
+          "route": "/search?q=next-example",
+          "html": "<p id=\"new-overview\">A second search route brings a new paragraph into the generated overview.</p>",
+          "required": ["#new-overview"],
+          "sourceIncludes": ["A second search route brings a new paragraph"]
+        }
+      ]
+    }
   },
   {
     "id": "google-scholar",

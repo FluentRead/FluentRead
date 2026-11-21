@@ -236,7 +236,7 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
 };
 
 const PROTECTED_HTML_TAGS = new Set(['head', 'script', 'style', 'pre', 'code', 'textarea']);
-const MARKDOWN_PROTECTED_PATTERN = /(`{1,3}[^`\n]+`{1,3}|<https?:\/\/[^>]+>|https?:\/\/[^\s)]+|\$[^$\r\n]+\$|%%[^%\r\n]+%%|(?:^|\s)#[\p{L}\p{N}_/-]+)/gu;
+const MARKDOWN_PROTECTED_PATTERN = /(`{1,3}[^`]+`{1,3}|<https?:\/\/[^>]+>|https?:\/\/[^\s)]+|\$[^$\r\n]+\$|%%[^%\r\n]+%%|(?:^|\s)#[\p{L}\p{N}_/-]+)/gu;
 const TIMED_SUBTITLE_PATTERN = /^\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}\s*-->\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}(?:\s+.*)?$/u;
 const LRC_TIME_PATTERN = /^(\s*(?:\[[^\]\r\n]+\])+)/u;
 
@@ -625,12 +625,21 @@ const maxMarkdownParagraphLength = 3_500;
 
 /** 折行只在发给服务和阅读预览时展开，Markdown 受保护文本的末尾保留分隔，导出原文保留输入换行。 */
 export function unwrapDocumentSoftLines(source: string, format?: DocumentFormat): string {
-    const protectedEnds = format === 'markdown'
-        ? new Set(Array.from(source.matchAll(new RegExp(MARKDOWN_PROTECTED_PATTERN)), match => match.index + match[0].length))
-        : undefined;
-    return source.replace(/(?<![^\S\r\n])[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) =>
-        !protectedEnds?.has(offset) && UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset))
-        && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ');
+    const protectedEnds = new Set<number>();
+    const codeBreaks = new Set<number>();
+    if (format === 'markdown') {
+        for (const mark of source.matchAll(new RegExp(MARKDOWN_PROTECTED_PATTERN))) {
+            protectedEnds.add(mark.index + mark[0].length);
+            if (!mark[0].startsWith('`')) continue;
+            for (const lineBreak of mark[0].matchAll(/\r\n?|\n/gu)) codeBreaks.add(mark.index + lineBreak.index);
+        }
+    }
+    return source.replace(/(?<![^\S\r\n])[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) => {
+        // CommonMark 只替换行内代码的行尾，保留行尾两侧已有空格。
+        if (codeBreaks.size && codeBreaks.has(offset + wrap.search(/[\r\n]/u))) return wrap.replace(/\r\n?|\n/u, ' ');
+        return !protectedEnds.has(offset) && UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset))
+            && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ';
+    });
 }
 
 function isMarkdownSoftParagraphLine(line: string): boolean {

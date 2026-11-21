@@ -17,6 +17,20 @@ const sources = (markdown: string) => parse(markdown).segments.map(segment => se
 const output = (markdown: string, translations: string[], mode: 'translated' | 'bilingual' = 'translated') => renderDocument(parse(markdown), translations, mode);
 
 describe('Markdown soft-wrapped paragraphs', () => {
+    it.each([
+        ['变量\n说明', '变量 说明'],
+        ['变量 \r\n 说明', '变量   说明'],
+        ['变量\r说明', '变量 说明'],
+    ])('preserves CommonMark whitespace inside a wrapped code span %j', (wrapped, normalized) => {
+        const source = 'This contains `' + wrapped + '` in a code span.';
+        const document = parse(source);
+        const translated = renderDocument(document, ['译文保留 <g1/>。'], 'translated');
+        const code = /<code>([^<]*)<\/code>/u;
+        const originalCode = standardMarkdown.render(source).match(code)?.[1];
+        expect(originalCode).toBe(normalized);
+        expect(standardMarkdown.render(translated).match(code)?.[1]).toBe(originalCode);
+    });
+
     it.each(['\n', '\r\n', '\r'])('sends each prose paragraph once and preserves original %j line endings', ending => {
         const first = ['The source is read one line at a time.', 'Its paragraph continues on the next line.'];
         const second = ['Keep the original code in', '`calculate_bounds()` while translating the prose.'];

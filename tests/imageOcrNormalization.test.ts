@@ -46,6 +46,43 @@ it('Tesseract竖排合段保留各列清字范围，缩放后不擦除列间图�
     }
 });
 
+describe('OCR 横排右到左词序',()=>{
+    const box=(x0:number,x1:number)=>({x0,y0:20,x1,y1:44});
+    const word=(text:string,x0:number,x1:number)=>({text,bbox:box(x0,x1),confidence:92});
+    const views=(text:string,words:ReturnType<typeof word>[])=>normalizeOcrLineViews([{
+        paragraphs:[{lines:[{text,bbox:box(10,340),words}]}],
+    }]);
+
+    it.each([
+        ['اتجه نحو اليمين', ['اتجه','نحو','اليمين']],
+        ['פנה ימינה עכשיו', ['פנה','ימינה','עכשיו']],
+    ] as const)('保留识别器给出的 %s 词序与原框', (text,words)=>{
+        const input=words.map((value,index)=>word(value,190-index*60,230-index*60));
+        const snapshot=structuredClone(input);
+        const {ordinary,manga}=views(text,input);
+        expect(ordinary).toEqual([{text,bbox:box(70,230)}]);
+        expect(manga).toHaveLength(1);
+        expect(manga[0]).toMatchObject(ordinary[0]);
+        expect(input).toEqual(snapshot);
+    });
+
+    it('混合英文数字按原顺序保留，跨大片空白的区域仍独立',()=>{
+        const {ordinary}=views('باب A 12 פנה ימינה',[
+            word('باب',300,340),word('A',242,258),word('12',266,282),
+            word('פנה',66,98),word('ימינה',10,57),
+        ]);
+        expect(ordinary).toEqual([
+            {text:'باب A 12',bbox:box(242,340)},
+            {text:'פנה ימינה',bbox:box(10,98)},
+        ]);
+    });
+
+    it('识别词组无法与整行核对时继续按位置恢复已有分组',()=>{
+        const {ordinary}=views('باب صحيح', [word('باب',140,180),word('فرعي',75,125)]);
+        expect(ordinary).toEqual([{text:'فرعي باب',bbox:box(75,180)}]);
+    });
+});
+
 describe('普通图片按完整段落翻译', () => {
     const line = (text: string, x0: number, y0: number, width = 200, h = 12): ImageTextRegion =>
         ({text, bbox: {x0, y0, x1: x0 + width, y1: y0 + h}});

@@ -1,7 +1,7 @@
 /**
  * @file src/features/information-highlight/content/readingText.ts
  * 文件职责：以只读、有界工作迭代器收集页面可见正文和独立译文，并保存原生 Text 到 UTF-16 段落坐标的映射。
- * 主要内容：保留内联链接与强调文字，排除交互界面、编辑器、代码和公式，以及过短的片段和由多个链接组成的标签或导航列表；按块及翻译边界流式分段，PDF 原文定位层与按行排好的 PDF 译文把各行并回同一段，行间只在分析字符串里补空格（中日韩文字之间不补），限制单段字符与映射节点，不截去长段剩余正文；块按自身位置裁剪到阅读区域，超高的块（整篇文章只用换行分段的页面）再按文字片段的位置裁剪，检查原节点身份与快照后才生成 Range。
+ * 主要内容：保留内联链接与强调文字，排除交互界面、编辑器、代码和公式，以及过短的片段和由多个链接组成的标签或导航列表；按块及翻译边界流式分段，PDF 原文定位层与按行排好的 PDF 译文把各行并回同一段，行间只在分析字符串里补空格（中日韩文字之间不补），限制单段字符与映射节点，不截去长段剩余正文；块按自身位置裁剪到阅读区域，超高的块（整篇文章只用换行分段的页面）再按文字片段的位置裁剪，检查原节点身份与快照后才生成 Range，绘制片段保留完整词语的分析坐标。
  * 模块边界：不监听页面、不改写宿主属性或原文、不调用模型；闭合译文根由调用方通过只读端口提供，评分与生命周期由 content runtime 管理。
  */
 import type {InformationHighlightSpan} from '../protocol';
@@ -124,9 +124,11 @@ export function isInformationParagraphCurrent(paragraph: InformationParagraph): 
     return paragraph.runs.every(run => run.node.isConnected && run.node.parentNode === run.parent && run.node.data === run.data && run.node.getRootNode() === paragraph.root);
 }
 
-export function informationRanges(document: Document, paragraph: InformationParagraph, spans: readonly InformationHighlightSpan[]): Range[] {
+export function informationRangeFragments<Span extends InformationHighlightSpan>(
+    document: Document, paragraph: InformationParagraph, spans: readonly Span[],
+): Array<{span: Span; range: Range}> {
     if (!isInformationParagraphCurrent(paragraph)) return [];
-    const ranges: Range[] = [];
+    const ranges: Array<{span: Span; range: Range}> = [];
     for (const span of spans) {
         for (const run of paragraph.runs) {
             if (run.end <= span.start) continue;
@@ -134,7 +136,7 @@ export function informationRanges(document: Document, paragraph: InformationPara
             const range = document.createRange();
             range.setStart(run.node, run.offset + Math.max(0, span.start - run.start));
             range.setEnd(run.node, run.offset + Math.min(run.end - run.start, span.end - run.start));
-            ranges.push(range);
+            ranges.push({span, range});
         }
     }
     return ranges;

@@ -6,6 +6,7 @@
  */
 export {
     mountSelectionTranslator,
+    translateSelectionFromRange,
     unmountSelectionTranslator,
 } from './runtime';
 export {translateSelectionFromContextMenu} from './contextMenuBridge';

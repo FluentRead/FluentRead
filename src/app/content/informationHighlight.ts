@@ -47,6 +47,7 @@ export function createInformationHighlightContentRuntime(ports: {
     preferences: InformationHighlightPreferences;
     send(message: {type: string; text?: string; requestId: string}): Promise<unknown>;
     readTranslationRoot?(host: Element): ShadowRoot | undefined;
+    translateRange?(range: Range): void;
     canToggle?(): boolean;
     notice?(message: InformationHighlightNotice): void;
 }): InformationHighlightContentRuntime {
@@ -60,7 +61,8 @@ export function createInformationHighlightContentRuntime(ports: {
             if (signal.aborted || !isCurrent() || controller) return;
             // 只有快捷键开启的会话才提示问题，且每次开启最多提示一次；自动高亮在后台页面保持安静。
             let announce = false;
-            const owner = installInformationHighlight(ports.document, preference, {scoreLocal, isCurrent, readTranslationRoot: ports.readTranslationRoot, changed(state) {
+            const owner = installInformationHighlight(ports.document, preference, {scoreLocal, isCurrent, readTranslationRoot: ports.readTranslationRoot,
+                translateRange: ports.translateRange, changed(state) {
                 if (state.phase !== 'error' && state.phase !== 'unsupported') return;
                 // 本地模型还没下载或这台设备跑不了：这一页改用关键词方式，读者仍然得到高亮；设置不变，之后的页面仍先尝试模型。
                 const code = state.mode === 'surprisal-local' ? String(state.errorCode) : '';
@@ -108,10 +110,14 @@ export function createPageInformationHighlightRuntime(ports: {
     config: {on: boolean; uiLanguage?: string; informationHighlight: InformationHighlightPreferences};
     send(message: {type: string; text?: string; requestId: string}): Promise<unknown>;
     canToggle?(): boolean;
+    translateRange?(range: Range): void;
     notice?(message: InformationHighlightNotice): void;
 }): InformationHighlightContentRuntime & {feature: ContentFeatureDefinition} {
     const runtime = createInformationHighlightContentRuntime({document: ports.document, preferences: ports.config.informationHighlight,
         send: ports.send, readTranslationRoot: readVisibleTranslationRoot, canToggle: ports.canToggle,
+        translateRange: ports.translateRange && (range => {
+            if (ports.canToggle?.() !== false) ports.translateRange?.(range);
+        }),
         notice: ports.notice ?? (message => showPageNotice(translate(`informationHighlight.notice.${message}`, normalizeUiLanguage(ports.config.uiLanguage)),
             /^(?:o|model)/u.test(message) ? 'success' : 'error', {key: 'information-highlight'}))});
     return {...runtime, feature: {id: 'information-highlight', isEnabled: () => ports.config.on !== false,

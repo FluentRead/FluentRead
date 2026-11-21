@@ -36,6 +36,7 @@ export {
 } from '@/src/features/input-translation/public';
 export { mountHoverTranslationContentFeature } from '@/src/features/hover-translation/public';
 export { mountQuickTranslationContentFeature } from '@/src/features/quick-translation/public';
+export {translateSelectionFromRange} from '@/src/features/selection-translation/public';
 export { mountParagraphCopyContentFeature } from '@/src/features/paragraph-copy/public';
 export {
     mountSectionTranslationContentFeature,

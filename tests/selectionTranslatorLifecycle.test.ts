@@ -2828,6 +2828,18 @@ describe('context menu selection ownership', () => {
         expect(translateSelectionThroughBridge('Good ideas deserve attention.')).toBe(false);
     });
 
+    it('opens a translation card for an explicit highlighted range without replacing the native selection', async () => {
+        const fixture = await prepareMenu();
+        fixture.getSelection.mockReturnValue(null);
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(true);
+        expect(fixture.state.showTooltip).toBe(true);
+        expect(fixture.state.selectedText).toBe('Good ideas deserve attention.');
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+        fixture.node.isConnected = false;
+        expect(fixture.state.translateExplicitRange(fixture.range)).toBe(false);
+        expect(fixture.translateText).toHaveBeenCalledOnce();
+    });
+
     it.each(['chrome', 'userscript'] as const)('registers and cleans native listeners only for the extension target %s while keeping its live-selection bridge', browserTarget => {
         const fixture = mountSelection(false, undefined, browserTarget);
         expect(fixture.registerContextMenu).toHaveBeenCalledOnce();

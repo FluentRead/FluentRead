@@ -626,14 +626,14 @@ function isExtensionSelection(selection: Selection): boolean {
   return Boolean(host && selection.containsNode(host, true));
 }
 
-function readSelectionSnapshot(): SelectionSnapshot | null {
+function readSelectionSnapshot(explicitRange?: Range): SelectionSnapshot | null {
   try {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed || isExtensionSelection(selection)) return null;
-    const range = selection.getRangeAt(0).cloneRange();
+    const selection = explicitRange ? null : window.getSelection();
+    if (!explicitRange && (!selection || selection.rangeCount === 0 || selection.isCollapsed || isExtensionSelection(selection))) return null;
+    const range = (explicitRange ?? selection!.getRangeAt(0)).cloneRange();
     if (!isSelectionRangeConnected(range)
       || (props.selectionAdapter ? !props.selectionAdapter.acceptsRange(range) : shouldIgnoreSelection(range, true))) return null;
-    const nativeText = selection.toString();
+    const nativeText = selection ? selection.toString() : range.toString();
     const sourceText = props.selectionAdapter?.extractText?.(range, nativeText) ?? nativeText;
     const parts = props.selectionAdapter?.normalizeText
       ? [{kind: 'text' as const, text: props.selectionAdapter.normalizeText(sourceText)}]
@@ -643,7 +643,7 @@ function readSelectionSnapshot(): SelectionSnapshot | null {
 
     const rects = Array.from(range.getClientRects()).map(toSelectionRect).filter(rect => rect.width > 0 || rect.height > 0);
     const visualRects = rects.length > 0 ? rects : [toSelectionRect(range.getBoundingClientRect())];
-    const isForward = selection.anchorNode === range.startContainer && selection.anchorOffset === range.startOffset;
+    const isForward = !selection || (selection.anchorNode === range.startContainer && selection.anchorOffset === range.startOffset);
     const anchor = chooseSelectionRect(visualRects, isForward);
     if (!anchor || (anchor.width === 0 && anchor.height === 0)) return null;
     // 跨段时 Selection 会插入段落换行，Range 的序列化则可能直接拼接文本；各自只与同一种序列化核对。
@@ -652,6 +652,16 @@ function readSelectionSnapshot(): SelectionSnapshot | null {
     // 文档/Range 在导航或宿主重绘期间失效时，据实返回缺选区，不让页面事件或菜单消息抛错。
     return null;
   }
+}
+
+function translateExplicitRange(range: Range): boolean {
+  if (!config.on || config.disableSelectionTranslator || selectionSettings.value.mode === 'disabled') return false;
+  const next = readSelectionSnapshot(range);
+  if (!next) return false;
+  isSelecting = false;
+  suppressSelectionRead();
+  applySelection(next, true, false, true);
+  return showTooltip.value;
 }
 
 function isSelectionRangeConnected(range: Range): boolean {
@@ -2738,7 +2748,7 @@ function restoreSelectionSource(): void {
 }
 
 // 内容装配层恢复被网页移除的 host 时，先检查组件持有的原文快照。
-defineExpose({revalidateSource: restoreSelectionSource});
+defineExpose({revalidateSource: restoreSelectionSource, translateExplicitRange});
 
 function handlePageHide(): void {
   isSelecting = false;

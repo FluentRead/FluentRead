@@ -484,8 +484,6 @@
       "tests/pdfReadingPlan.test.ts",
       "tests/pdfReadingTheme.test.ts",
       "tests/hypothesisClient.test.ts",
-      "tests/hypothesisInjection.test.ts",
-      "tests/hypothesisBackgroundRuntime.test.ts",
       "tests/pdfHypothesis.test.ts",
       "tests/hypothesisAssets.test.ts",
       "tests/pdfAnnotations.test.ts",

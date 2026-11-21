@@ -1,7 +1,7 @@
 /**
  * @file src/app/background/contextMenuRuntime.ts
  * 文件职责：管理后台右键菜单的安装、状态同步和点击路由，让菜单结构随设置重建，让标题随当前标签页的翻译与网站状态更新。
- * 主要内容：等待配置就绪后创建菜单并记录已落地属性，串行执行原生写入与重建，接入点击结果快照的文档和值归属检查；冷启动点击只等待结构就绪，轻量动作直接发往目标 frame，全文和网站开关按文档排队，旧文档回复及失败提示均受归属门禁保护；工具栏右键菜单提供批注入口，一键翻译模式还提供快捷面板。
+ * 主要内容：等待配置就绪后创建菜单并记录已落地属性，按顺序执行原生写入与重建。轻量动作直接发往目标 frame，全文和网站开关按文档排队，旧文档回复及失败提示均受归属检查。一键翻译模式在工具栏右键菜单提供快捷面板。
  * 模块边界：这里只编排 browser.contextMenus、tabs 与 app 层状态，不推导菜单结构、不渲染文案、不执行翻译；结构归 core/context-menu，文案归 core/context-menu/presentation，动作归 contextMenuActions。
  */
 import {buildContextMenuPlan, resolveContextMenuPresentation, type ContextMenuPlanItem} from '@/src/core/context-menu/domain';
@@ -16,7 +16,6 @@ import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {createContextMenuStateCapture, createContextMenuUpdater, type ContextMenuNativePresentation} from './contextMenuUpdates';
 import {createContextMenuClickHandler} from './contextMenuClicks';
 import {createToolbarQuickPanelMenu, handleToolbarQuickPanelClick} from './toolbarActionRuntime';
-import {createToolbarHypothesisMenu, handleToolbarHypothesisClick} from './hypothesisRuntime';
 
 const NEUTRAL_STATE: TabTranslationState = {isTranslated: false, isSiteDisabled: false};
 
@@ -74,7 +73,6 @@ export function installBackgroundContextMenus(
             });
             appliedPresentations.set(item.menuItemId, properties);
         }
-        if (snapshot === settings && snapshot.toolbarHypothesis) await createToolbarHypothesisMenu(snapshot.titleContext.language);
         return items;
     };
 
@@ -135,7 +133,6 @@ export function installBackgroundContextMenus(
 
         browser.contextMenus.onClicked.addListener((info: any, tab: any) => {
             if (handleToolbarQuickPanelClick(info.menuItemId, tab)) return;
-            if (handleToolbarHypothesisClick(info.menuItemId, tab, tabTranslationStates)) return;
             void clicks.handleClick(info as ContextMenuClickInfo, (tab ?? {}) as ContextMenuClickTab);
         });
     }

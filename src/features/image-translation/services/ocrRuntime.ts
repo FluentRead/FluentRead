@@ -298,10 +298,14 @@ export async function recognizeImage(
     if (signal?.aborted) throw abortRecognition();
     const packs = getOcrLanguages(sourceLanguage);
     const models = getImageOcrModelLanguages(packs);
-    const languages = models.join('+');
+    const profile = options.profile ?? 'image';
+    // 希伯来语图片与漫画已加载英语包。优先识别拉丁编号，保留希伯来语字符识别。
+    const recognitionModels = profile === 'image' && packs[0] === 'heb'
+        ? ['eng', ...models.filter(model => model !== 'eng')]
+        : models;
+    const languages = recognitionModels.join('+');
     // PSM 11 不做竖排判定，会把竖列逐行横读成乱序；PSM 12 在同样的稀疏分割上按版面判定方向，
     // 竖排页交给 *_vert 模型，横排页结果与 PSM 11 一致。缺少 osd 模型只跳过文字方向旋转检测。
-    const profile = options.profile ?? 'image';
     const layoutMode = profile === 'document' ? options.documentLayout === 'sparse' ? PSM.SPARSE_TEXT : PSM.AUTO : models.length > packs.length ? PSM.SPARSE_TEXT_OSD : undefined;
     const cacheKey = `${profile}${profile === 'document' ? `:${layoutMode}` : ''}\0${languages}\0${image}`;
     const cached = options.useCache === false ? undefined : completedRecognitionCache.get(cacheKey);

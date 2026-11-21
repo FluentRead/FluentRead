@@ -9,7 +9,7 @@
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import { getRequiredImageOcrLanguages, type ImageOcrLanguageCode } from './ocrLanguages';
-import {getImageTextDirection} from './textBoundary';
+import {containsRightToLeftLetters} from './textBoundary';
 import type {OcrLine} from '@/src/shared/image/types';
 import {numericEvidenceKey,numericInformation,numericProtection} from './services/mangaNumeric';
 
@@ -396,7 +396,7 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
 
         const rawText = line.text.trim();
         const rawLine = rawText.replace(/\s/gu, '');
-        const sourceOrder = !vertical && words.length>1 && getImageTextDirection(rawText)==='rtl'
+        const sourceOrder = !vertical && words.length>1 && containsRightToLeftLetters(rawText)
             && rawLine===rawWords.map(word=>word.text).join('').replace(/\s/gu,'')
             ? {positions:new Map(rawWords.map((word,index)=>[word,index])), groups:[] as Array<{row:ParsedOcrLine;firstWord:number}>}
             : undefined;

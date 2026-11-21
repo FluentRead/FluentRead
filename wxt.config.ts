@@ -223,6 +223,9 @@ export function createExtensionManifest(
         name: '__MSG_extensionName__',
         description: '__MSG_extensionDescription__',
         default_locale: 'en',
+        ...(['chrome', 'edge', 'firefox'].includes(env.browser) ? {
+            commands: {'open-translation-window': {description: 'Open translation window'}},
+        } : {}),
         permissions: [
             ...(env.manifestVersion === 3 ? ['scripting'] : []),
             'storage',
@@ -254,7 +257,6 @@ export function createExtensionManifest(
             'https://*/*',
         ],
         web_accessible_resources: [
-            {resources: ['hypothesis/build/*', 'hypothesis/build/scripts/*', 'hypothesis/build/styles/*'], matches: ['<all_urls>']},
             {
                 resources: ['videoPcmWorklet.js'],
                 matches: ['<all_urls>'],
@@ -425,7 +427,9 @@ export default defineConfig({
             // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
             // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
             const webDavPathBudget = 5_000;
-            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget;
+            // 浅底彩字词界复核实测 Chrome 增加615字节，超原预算517字节。Firefox 增加616字节且仍在原预算内。
+            const lightColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
@@ -465,6 +469,9 @@ export default defineConfig({
             const epubCoveragePreviewBudget = 1_000;
             // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
             const requestEvidenceBudget = 30_000;
+            // EPUB 目录、Word 行内回填、Markdown 表格、字幕和 CSV/TSV 共用已有依赖，按需加载 XML 解析。
+            // 同环境 55bfab088 基线 70,079,902 bytes，整合后增至 70,134,258（+54,356），登记 55 kB 功能预算。
+            const documentFormatsBudget = 55_000;
             // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
             const pageRuleDiagnosisBudget = 12_000;
             // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
@@ -474,7 +481,7 @@ export default defineConfig({
             // Coursera 复用课程菜单和 WebVTT 读取；术语候选新增文档页文本、匹配与审核 UI，未引入新依赖或模型。
             const courseraCaptionBudget = 4_000;
             const documentGlossaryCandidateBudget = 12_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
@@ -497,7 +504,7 @@ export default defineConfig({
             }
             // 非中文界面文案只生成一份 JSON，由各运行上下文按当前语言加载，不再内联进每个 bundle。
             files.push(...createUiLanguageBundleFiles());
-            // 安装名称与功能说明由浏览器原生 locale 解析，复用七语资源，不复制完整界面目录。
+            // 安装名称、功能说明和工具栏提示由浏览器按界面语言解析，复用七语资源。
             files.push(...createExtensionMetadataLocaleFiles());
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});

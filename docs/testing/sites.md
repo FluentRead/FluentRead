@@ -9,12 +9,18 @@ node scripts/run-site-adaptation-test.cjs \
   --cases x-post-expand-control,twitch-live-chat,google-search \
   --full-only --skip-settings-ui --extension-dir .output/chrome-mv3 \
   --playwright-root <捆绑 Node 包目录> \
-  --focus-safe-helper scripts/testing/focus-safe-browser.cjs \
+  --focus-safe-helper <网页翻译技能目录>/scripts/focus-safe-browser.cjs \
   --runtime-diagnostics-helper <浏览器测试技能的 runtime-diagnostics.cjs 路径> \
   --artifacts-dir <本次证据目录>
 ```
 
 生产构建在隔离 Edge 中运行。夹具验证 X 展开按钮保持原文字节点、Twitch 滚到新聊天仍能翻译，以及 Google 概览展开和站内跳转后的正文识别。三个用例都检查原站控件、译文唯一性、精确还原和再次翻译。报告记录内容脚本和扩展后台的诊断。网页和翻译响应均为夹具，登录后的真实页面需另行验收。
+
+## Inco 博客文章摘要
+
+Inco 把文章摘要放在页眉里的 `p.post-dek`。内置 `inco-blog` 规则将博客文章模板里的这个段落纳入正文范围，供全文和悬浮翻译共用。
+
+生产 Chrome 构建后，用 `scripts/run-site-translation-matrix.cjs --cases inco-blog-splash --mode both --controlled-provider` 验证摘要、标题和首段正文的翻译、恢复和再次翻译。提供网络许可、focus-safe helper、runtime-diagnostics helper 和证据目录，检查摘要的完整来源以及导航、日期、链接和代码块的保留。
 
 ## man7 Linux 手册正文
 

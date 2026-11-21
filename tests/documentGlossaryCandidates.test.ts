@@ -128,7 +128,7 @@ describe('document glossary candidates', () => {
             supportsBatch: () => false, translateText, translateTextBatch: vi.fn()});
         const result = await translate(segments('same phrase', 'keep this', 'same phrase', 'untranslated'), {
             fileName: 'paper.txt', initialTranslations: ['old', 'manually corrected', 'retained'],
-            retranslateIds: new Set([2]), onSegment,
+            segmentIds: new Set([0, 2, 3]), retranslateIds: new Set([1, 2]), onSegment,
         });
         expect(translateText).toHaveBeenCalledTimes(1);
         expect(translateText.mock.calls[0][0]).toBe('same phrase');

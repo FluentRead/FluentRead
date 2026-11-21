@@ -2,7 +2,7 @@
 /**
  * @file scripts/testing/run-settings-search-results-layout-test.cjs
  * 文件职责：在真实生产扩展中验证设置搜索结果面板的尺寸与对齐。
- * 主要内容：在通用设置、翻译服务和关于页分别搜索单条、多条和无结果的关键词，检查面板完整显示全部内容、超出上限后在面板内滚动、与页内导航和设置内容同列，并为下方设置保留可用高度；覆盖桌面、平板、窄屏和矮视口。
+ * 主要内容：在通用设置、翻译服务和关于页验证单条、多条和无结果的查询，检查宽屏结果同列、窄屏搜索浮层边界、内容区尺寸与键盘焦点。
  * 模块边界：只使用临时 Edge profile 和不抢焦点 helper，不读取用户配置、不修改设置，也不代表 Firefox 实机表现。
  */
 const fs = require('node:fs');
@@ -63,11 +63,12 @@ async function main() {
         };
       });
     }
-    for (const [width, height] of [[1440, 900], [1024, 700], [390, 720], [1440, 480]]) {
+    for (const [width, height] of [[1440, 900], [1024, 700], [390, 720], [320, 480], [568, 320], [1440, 480]]) {
       await page.setViewportSize({width, height});
       for (const section of ['settings-general', 'settings-services', 'settings-about']) {
         await page.goto(`${origin}/options.html#${section}`, {waitUntil: 'domcontentloaded'});
         await page.locator(section === 'settings-services' ? '.service-catalog' : `#${section}`).waitFor({state: 'visible', timeout});
+        const cardBeforeSearch = await page.locator('.settings-card').boundingBox();
         for (const [query, expectation] of [['langu', 'single'], ['翻译', 'many'], ['no-such-setting-xyz', 'empty']]) {
           const name = `${width}x${height} ${section} ${expectation}`;
           await search.fill(query);
@@ -84,12 +85,19 @@ async function main() {
             assert(expectation === 'empty' ? state.kind === 'search-empty' : state.results === 1, `${name}: 结果数量异常 ${state.results}`);
             assert(state.scrollHeight <= state.clientHeight + 1, `${name}: 面板内容被裁切 ${state.clientHeight}/${state.scrollHeight}`);
           }
-          for (const [label, reference] of [['页内导航', state.topbar], ['设置内容', state.column]]) {
-            if (!reference) continue;
-            assert(Math.abs(state.box.left - reference.left) <= 3 && Math.abs(state.box.right - reference.right) <= 3,
-              `${name}: 面板未与${label}同列 ${JSON.stringify({box: state.box, reference})}`);
+          if (width <= 700) {
+            assert(state.box.top >= 0 && state.box.bottom <= height && state.box.left >= 0 && state.box.right <= width,
+              `${name}: 搜索浮层超出视口 ${JSON.stringify(state.box)}`);
+            assert(Math.abs(state.card.top - cardBeforeSearch.y) <= 1 && Math.abs(state.card.height - cardBeforeSearch.height) <= 1,
+              `${name}: 搜索改变了窄屏设置区的高度或位置`);
+          } else {
+            for (const [label, reference] of [['页内导航', state.topbar], ['设置内容', state.column]]) {
+              if (!reference) continue;
+              assert(Math.abs(state.box.left - reference.left) <= 3 && Math.abs(state.box.right - reference.right) <= 3,
+                `${name}: 面板未与${label}同列 ${JSON.stringify({box: state.box, reference})}`);
+            }
+            assert(state.box.bottom <= state.card.top + 1 && state.card.height >= 120, `${name}: 面板挤占设置内容 ${JSON.stringify(state.card)}`);
           }
-          assert(state.box.bottom <= state.card.top + 1 && state.card.height >= 120, `${name}: 面板挤占设置内容 ${JSON.stringify(state.card)}`);
           if (section === 'settings-general' || width === 1440 && height === 900) {
             const target = path.join(artifactsDir, `${width}x${height}-${section}-${expectation}.png`);
             await page.screenshot({path: target});
@@ -98,6 +106,16 @@ async function main() {
         }
         await search.fill('');
         await panel.first().waitFor({state: 'detached', timeout});
+        if (width === 320 && section === 'settings-general') {
+          await search.fill('翻译');
+          const first = page.locator('.search-results button').first();
+          await first.waitFor({state: 'visible', timeout});
+          await search.press('ArrowDown');
+          assert(await first.evaluate(button => button === document.activeElement), '方向键未进入搜索结果');
+          await first.press('Escape');
+          await panel.first().waitFor({state: 'detached', timeout});
+          assert(await search.evaluate(input => input === document.activeElement), '关闭搜索后键盘焦点未返回搜索框');
+        }
       }
     }
     assert(report.consoleErrors.length === 0, '浏览器控制台存在异常');

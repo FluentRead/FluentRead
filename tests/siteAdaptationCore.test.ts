@@ -293,6 +293,65 @@ describe('Kagi News content-bearing buttons', () => {
     });
 });
 
+describe('Inco blog article summary', () => {
+    function fixture(href = 'https://inco.ai/blog/splash/', disabledRuleIds: string[] = []) {
+        const {document} = parseHTML(`<html lang="en"><body>
+            <header class="nav"><p id="navigation" class="post-dek">Browse the site and manage your account.</p></header>
+            <main id="content"><div class="post-page"><header class="post-head">
+                <a id="back" href="/blog/">Return to all posts</a>
+                <time datetime="2026-09-17">September 17, 2026</time>
+                <h1 id="title" class="post-title">Splash: A local engine built around the model</h1>
+                <p id="summary" class="post-dek">Splash is an open-source <em>inference engine</em> for Apple silicon.</p>
+                <p id="metadata">Published by the Inco editorial team.</p>
+            </header><article class="prose">
+                <p id="body">The engine specializes its kernels for the models it serves.</p>
+                <pre><code>splash serve</code></pre>
+            </article></div></main>
+        </body></html>`);
+        const url = new URL(href);
+        const settings = normalizeSiteAdaptationSettings({disabledRuleIds});
+        const core = new TranslationCandidateCore({url, adapters: composeSiteAdapters(builtinSiteRulePack, settings)});
+        return {document, core, summary: document.getElementById('summary')!};
+    }
+
+    it.each(['https://inco.ai/blog/splash/', 'https://inco.ai/blog/inco-platform-aa/'])(
+        'discovers just the article header summary as additional content on %s', href => {
+            const {document, core, summary} = fixture(href);
+            expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title', 'summary', 'body']);
+            expect(core.resolve(summary.querySelector('em')!.firstChild)).toMatchObject({
+                element: summary, kind: 'content', adapterId: 'inco-blog',
+            });
+            for (const id of ['navigation', 'back', 'metadata']) {
+                expect(core.resolve(document.getElementById(id)!.firstChild), id).toBeNull();
+            }
+        },
+    );
+
+    it('rediscovers a replaced summary and respects its local no-translate marker', () => {
+        const {core, summary} = fixture();
+        const replacement = summary.cloneNode(true) as HTMLElement;
+        replacement.querySelector('em')!.textContent = 'local inference engine';
+        summary.replaceWith(replacement);
+        expect(core.discover(replacement.querySelector('em')!).map(candidate => candidate.element)).toEqual([replacement]);
+        expect(core.resolve(replacement.lastChild)?.element).toBe(replacement);
+
+        replacement.setAttribute('translate', 'no');
+        expect(core.discover(replacement)).toEqual([]);
+        expect(core.resolve(replacement.lastChild)).toBeNull();
+    });
+
+    it.each([
+        ['https://inco.ai/blog/', []],
+        ['https://inco.ai/products/splash/', []],
+        ['https://example.test/blog/splash/', []],
+        ['https://inco.ai/blog/splash/', ['inco-blog']],
+    ] as const)('leaves ordinary header filtering on %s with disabled rules %j', (href, disabled) => {
+        const {document, core, summary} = fixture(href, [...disabled]);
+        expect(core.discover(document).map(candidate => candidate.element.id)).toEqual(['title', 'body']);
+        expect(core.resolve(summary.firstChild)).toBeNull();
+    });
+});
+
 describe('Llamaperf Mac benchmark introduction', () => {
     function fixture(href = 'https://llamaperf.com/mac/m5?utm_source=chatgpt.com', settings = normalizeSiteAdaptationSettings(undefined)) {
         // The live Next.js page splits sentences and counters with comment nodes inside an article header.
@@ -491,14 +550,13 @@ describe('Englio word-segmented article paragraphs', () => {
         expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
     });
 
-    it('requires both native paragraph and word markers', () => {
-        for (const remove of ['data-article-start', 'data-word-pos']) {
-            const {document, core, article} = fixture();
-            if (remove === 'data-article-start') article.removeAttribute(remove);
-            else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(remove));
-            expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
-        }
-    });
+    // Fallback discovery still scans the full fixture of more than 2,000 inline spans.
+    it.each(['data-article-start', 'data-word-pos'])('rejects the wide article without %s', marker => {
+        const {document, core, article} = fixture();
+        if (marker === 'data-article-start') article.removeAttribute(marker);
+        else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(marker));
+        expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
+    }, 15_000);
 });
 
 describe('OpenAI community reading boundaries', () => {

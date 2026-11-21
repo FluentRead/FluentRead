@@ -177,6 +177,45 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.settingsChanged).toBe(false);
     });
 
+    it('respects selected spreadsheet columns when reviewing and reapplying glossary terms', async () => {
+        state.config.from = 'en';
+        state.config.to = 'zh-Hans';
+        state.config.documentService = 'microsoft';
+        ports.sendMessage.mockImplementation(async (message: {patch?: Partial<Config>}) => {
+            if (message.patch) {
+                Object.assign(ports.config, message.patch);
+                ports.observer(ports.config);
+            }
+        });
+        const selected = 'This article defines retrieval-augmented generation (RAG).';
+        const excluded = 'RAG supports the Private Body Pattern (PBP).';
+        await state.loadFiles([file('glossary.csv', `Title,Notes\n${selected},${excluded}\n`)]);
+        await state.startTranslation(); await flush();
+        const excludedId = state.parsedDocument.segments.find((segment: {source: string}) => segment.source === excluded).id;
+        state.editSegment(excludedId, 'Human correction in the other column.');
+        state.updateDelimitedColumns([0]); await flush();
+        await state.extractGlossaryCandidates(); await flush();
+        expect(state.glossaryChoices.map((choice: {source: string}) => choice.source)).toEqual(['retrieval-augmented generation', 'RAG']);
+        const acronym = state.glossaryChoices.find((choice: {source: string}) => choice.source === 'RAG');
+        Object.assign(acronym, {target: '检索增强生成', selected: true});
+        ports.batch.mockClear();
+        await state.applyGlossaryChoices();
+        await vi.waitFor(() => {
+            expect(ports.batch).toHaveBeenCalledExactlyOnceWith([selected], 'glossary.csv', expect.objectContaining({useCache: false}));
+            expect(state.translating).toBe(false);
+        });
+        expect(state.translatedSegments[excludedId]).toBe('Human correction in the other column.');
+        expect(state.pendingGlossaryRetranslation).toBeNull();
+        expect(state.settingsChanged).toBe(true);
+        state.updateDelimitedColumns([1]); await flush();
+        expect(state.pendingGlossaryRetranslation.pending).toEqual(new Set([excludedId]));
+        ports.batch.mockClear();
+        state.resumeGlossaryRetranslation();
+        await vi.waitFor(() => expect(state.settingsChanged).toBe(false));
+        expect(ports.batch).toHaveBeenCalledExactlyOnceWith([excluded], 'glossary.csv', expect.objectContaining({useCache: false}));
+        expect(state.translatedSegments[excludedId]).toBe(`译 ${excluded}`);
+    });
+
     it('translates a recovered source through the configured default service when no document override is supplied',async()=>{
         ports.config.service='microsoft';const onSegment=vi.fn();
         await translateWithDefaultService([{id:0,source:'Recognized source.'}],{fileName:'scanned.pdf',batchTranslation:false,onSegment});

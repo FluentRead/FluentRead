@@ -51,7 +51,7 @@ node scripts/run-selection-trigger-test.cjs --context-menu-only \
 
 生产包构建后运行 `node scripts/testing/run-settings-viewport-ui-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-settings-viewport`。脚本通过临时 Edge profile 和后台可见窗口验证首次打开、全部菜单、搜索与下拉菜单、原生锚点滚动、通用/视频长表单底部、刷新深链接、窄屏、矮窗口及深色主题。报告保存页面高度、文档/容器滚动位置、截图、焦点隔离信息和控制台异常。Firefox 构建通过不等于 Firefox 实机验证；完整 UI 套件单独执行并报告。
 
-搜索结果面板位于页内导航与设置内容之间，高度随结果数量变化，超过上限后在面板内滚动，宽度与导航和内容同列。运行 `node scripts/testing/run-settings-search-results-layout-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-settings-search-results-layout`，在通用设置、翻译服务和关于页分别搜索单条、多条和无结果的关键词，覆盖 1440×900、1024×700、390×720 与 1440×480，检查面板内容完整、不挤占设置内容并保持对齐。
+搜索结果在宽屏与设置内容同列，在窄屏以浮层展示，保留设置区的位置和滚动空间。面板高度随结果数量变化，多条结果可以在面板内滚动。运行 `node scripts/testing/run-settings-search-results-layout-test.cjs --extension-dir .output/chrome-mv3 --playwright-root <Node包目录> --focus-safe-helper <focus-safe-browser.cjs路径> --artifacts-dir /private/tmp/fluentread-settings-search-results-layout`，在通用设置、翻译服务和关于页分别验证单条、多条和无结果的查询。用 320×480 竖屏和 568×320 横屏检查浮层边界，并验证方向键进入结果和 Esc 返回搜索框。
 
 ## 统一下拉选择器
 
@@ -175,7 +175,7 @@ node scripts/testing/run-translation-stats-ui-test.cjs \
 
 ## 悬浮球边距（issue #1225）
 
-`model`、`configDiff` 和 `googleDriveConfig` 验证默认/弹出边距的有符号整数规范化、旧配置默认值、px 差异摘要及备份恢复。`floatingBallLifecycle`、`contentUiRuntime` 和 `i18nSettingsCopy` 验证左右停靠、两种边距相等时不移动、非悬停模式只使用默认边距、实时配置和七语数值控件。
+`model`、`configDiff` 和 `googleDriveConfig` 验证默认/弹出边距的有符号整数规范化、旧配置默认值、px 差异摘要及备份恢复。`floatingBallLifecycle`、`contentUiRuntime` 和 `i18nSettingsCopy` 验证桌面左右半藏、默认 0 / 20 px 的展开回收、触屏可点击范围、相等边距、实时配置和七语数值控件。
 
 生产浏览器回归覆盖左右停靠、不同边距、悬停展开期间的连续命中、工具栏外网页可点击、同一点完成翻译—恢复—再次翻译，以及拖动、键盘和触屏。测试检查齿轮与隐藏入口沿主图标上下对齐、停靠在视口顶端或底端时自动换边，以及增减工具时主图标的位置。额外检查普通关闭后的数值持久化、390px 设置页与 44px 触屏目标；本地微软响应及触屏模拟不代表真实供应商或手机实机验收。
 

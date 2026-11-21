@@ -93,7 +93,7 @@ async function main() {
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-experience'));
   const suite = arg('suite', 'full');
   assert(['full', 'formats', 'archives', 'experience', 'pdf-export', 'scanned', 'scanned-cjk'].includes(suite), 'suite 仅支持 full、formats、archives、experience、pdf-export、scanned 或 scanned-cjk');
-  const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json').split(',');
+  const formats = arg('formats', 'sample.pdf,sample.epub,sample.docx,sample.html,sample.txt,sample.md,sample.srt,sample.vtt,sample.ass,sample.ssa,sample.lrc,sample.json,sample.csv,sample.tsv').split(',');
   const exampleDir = path.resolve(arg('example-dir', 'examples/document-translation'));
   const packages = arg('playwright-root');
   const helperPath = arg('focus-safe-helper', path.join(__dirname, 'testing/focus-safe-browser.cjs'));
@@ -187,6 +187,19 @@ async function main() {
       await page.getByRole('option', {name: label, exact: true}).click();
       if (name.startsWith('文档')) await page.locator('.document-settings-dialog[open]').getByRole('button', {name: '返回文档', exact: true}).click();
     };
+    const selectDelimitedColumn = async number => {
+      const picker = page.getByTestId('document-column-picker');
+      const input = picker.getByRole('combobox', {name: '要翻译的列'});
+      await picker.locator('.el-select__wrapper').click();
+      const desired = page.getByRole('option', {name: new RegExp(`^第 ${number} 列(?: ·|$)`, 'u')});
+      await desired.waitFor();
+      if (await desired.getAttribute('aria-selected') !== 'true') await desired.click();
+      for (const option of await page.getByRole('option', {name: /^第 \d+ 列/u}).all()) {
+        if (!((await option.textContent()).trim().startsWith(`第 ${number} 列`)) && await option.getAttribute('aria-selected') === 'true') await option.click();
+      }
+      await input.press('Escape');
+      await desired.waitFor({state: 'hidden'});
+    };
     const status = label => page.locator('.document-status').filter({hasText: label}).waitFor();
     const load = async (name, buffer) => {
       await page.locator('input[type=file]').setInputFiles({name, mimeType: 'application/octet-stream', buffer});
@@ -222,7 +235,7 @@ async function main() {
       const [file] = await Promise.all([page.waitForEvent('download', {timeout: suite === 'pdf-export' ? 120000 : 30000}), submit.click()]);
       const dest = path.join(artifactsDir, file.suggestedFilename()); await file.saveAs(dest); report.downloads.push(dest); return dest;
     };
-    assert.equal(await page.locator('.format-card').count(), 8);
+    assert.equal(await page.locator('.format-card').count(), 9);
     if (suite === 'pdf-export') {
       const {PDFDocument, rgb} = require('pdf-lib');
       const pdf = await PDFDocument.create();
@@ -711,6 +724,21 @@ async function main() {
     for (const name of formats) {
       const requestsBeforeLoad = fixture.state.requests.length;
       await load(name, fs.readFileSync(path.join(exampleDir, name)));
+      const delimited = ['sample.csv', 'sample.tsv'].includes(name);
+      const wordInline = name === 'word-inline.docx';
+      if (delimited) {
+        await selectDelimitedColumn(2);
+        assert.deepEqual(await page.locator('[data-document-reader="delimited"] .json-table-row code').allTextContents(), ['R1C2', 'R2C2', 'R3C2']);
+        if (name === 'sample.csv') {
+          await page.setViewportSize({width: 390, height: 844});
+          await noOverflow();
+          const columnPicker = await page.getByTestId('document-column-picker').boundingBox();
+          assert(columnPicker && columnPicker.height <= 38, '列选择器须保持单行');
+          assert(await page.locator('.delimited-document-reader .json-table-row').evaluateAll(rows => rows.every(row => row.scrollWidth <= row.clientWidth + 1)), '窄屏单元格须在当前列折行');
+          await shot('reader-sample-csv-mobile');
+          await page.setViewportSize({width: 1440, height: 960});
+        }
+      }
       recordScripts(`import:${name}`);
       assert.equal(fixture.state.requests.length, requestsBeforeLoad, '打开文件不得自动开始翻译');
       // 工具栏只有一行：文件名、状态、工作区页签、阅读方式、服务/目标语言选择、下载与最右侧的翻译按钮；设置入口和添加文件都在侧栏。
@@ -755,11 +783,19 @@ async function main() {
       await page.getByRole('button', {name: '开始翻译', exact: true}).click();
       await status('翻译完成');
       assert.equal(await page.getByRole('progressbar', {includeHidden: true}).getAttribute('aria-valuenow'), '100');
+      if (delimited) {
+        const sent = fixture.state.requests.slice(requestsBeforeLoad).flatMap(requestSources);
+        assert.equal(sent.length, 3);
+        assert(sent.includes('Description'));
+        assert(sent.every(text => !/Private (?:inventory|record)|Reference|Spare equipment|https:\/\/|SUM\(/u.test(text)));
+      }
       await page.getByRole('button', {name: '校订译文', exact: true}).click();
       assert.match(await page.locator('textarea.document-translation').first().inputValue(), /测试译文/);
       const editedSegment = await page.locator('.segment-edit-row').first().getAttribute('data-segment-id');
-      await page.locator('textarea.document-translation').first().fill(`人工校订：${name}`);
-      const corrections = new Map([[editedSegment, `人工校订：${name}`]]);
+      const correction = wordInline ? '人工校订：先完成<g2>关键</g2>步骤，再读<g1>安装指南</g1>。' : `人工校订：${name}`;
+      if (wordInline) assert.match(await page.locator('textarea.document-translation').first().inputValue(), /<g1>.*<\/g1>.*<g2>.*<\/g2>/su);
+      await page.locator('textarea.document-translation').first().fill(correction);
+      const corrections = new Map([[editedSegment, correction]]);
       let forcedPdfOverflow = [];
       if (name === 'sample.pdf') {
         // 三个相同原文的独立单元格均校订成长 Unicode 文本，确保导出的局部表格框必定放不下。
@@ -780,6 +816,23 @@ async function main() {
       }
       await page.getByRole('button', {name: '阅读', exact: true}).click();
       await noOverflow();
+      if (delimited) {
+        await selectDelimitedColumn(1);
+        await status('准备就绪');
+        await page.getByRole('button', {name: '开始翻译', exact: true}).click();
+        await status('翻译完成');
+        await selectDelimitedColumn(2);
+        await status('翻译完成');
+        assert.match(await page.locator('[data-document-reader="delimited"] .json-translation').first().textContent(), /人工校订/u);
+        const translated = fs.readFileSync(await download('translated'), 'utf8');
+        assert.match(translated, /^Reference[,\t]人工校订：/u);
+        assert.match(translated, /Private (?:inventory|record)[,\t]/u);
+        report.cases.push(`${name}: only selected columns enter provider requests and downloads; switching columns retains proofread text`);
+      }
+      if (wordInline) {
+        assert.equal(await page.locator('.docx-translation').first().textContent(), '人工校订：先完成关键步骤，再读安装指南。');
+        await download('translated');
+      }
       let expectedPdfTranslations = [];
       if (name === 'sample.pdf') {
         // 译文不再画进图片：译页是原页画布副本，上面叠着每段一个 HTML 译文块；校订只改文字，不重新渲染页面。
@@ -827,7 +880,12 @@ async function main() {
         // “重排阅读”仍以 HTML 段落列出同一页的全部片段并标明角色；页眉页脚与元数据（footer/metadata）在阅读器里保留原文，因此在原版排版里没有译文块。
         await pdfPresentation('readable');
         await page.locator('.pdf-page-row[data-page-number="1"] .pdf-reading-sheet .pdf-reading-paragraph').first().waitFor(); await page.locator('.pdf-page-row[data-page-number="2"] .pdf-reading-sheet .pdf-reading-paragraph').first().waitFor();
-        const readable = await page.locator('.pdf-reading-sheet .pdf-reading-paragraph').evaluateAll(elements => elements.map(element => ({page: element.closest('[data-pdf-reading-page]').dataset.pdfReadingPage, segment: element.dataset.pdfSegmentIndex, id: element.dataset.pdfSourceId, source: element.dataset.pdfSourceText, role: element.dataset.pdfRole, text: element.textContent})));
+        const readable = await page.locator('.pdf-reading-sheet .pdf-reading-paragraph').evaluateAll(elements => elements.map(element => ({
+          page: element.closest('[data-pdf-reading-page]').dataset.pdfReadingPage, segment: element.dataset.pdfSegmentIndex,
+          id: element.dataset.pdfSourceId, source: element.dataset.pdfSourceText, role: element.dataset.pdfRole,
+          original: element.querySelector(':scope > .pdf-reflow-source')?.textContent ?? null,
+          text: element.querySelector(':scope > span[dir]:not(.pdf-reflow-source)')?.textContent,
+        })));
         const isKeptSource = entry => Number(entry.segment) < 0 || ['footer', 'metadata'].includes(entry.role);
         expectedPdfTranslations = readable.filter(entry => !isKeptSource(entry));
         assert.equal(await page.locator('.pdf-translation-layer').count(), 0, '重排阅读不显示原版排版的译文层');
@@ -839,6 +897,7 @@ async function main() {
             assert.equal(entry.id, `pdf-${entry.page}-segment-${entry.segment}`, '重排阅读的段落身份必须准确对应来源页与片段');
           }
           const corrected = corrections.get(entry.segment);
+          assert.equal(entry.original, isKeptSource(entry) ? null : entry.source, `双语重排片段 ${entry.segment} 的原文须单独显示`);
           assert.equal(isKeptSource(entry) || corrected !== undefined ? entry.text : decodeControlledTranslationText(entry.text, literal => entry.source.includes(literal)), corrected ?? entry.source, `重排阅读片段 ${entry.segment}（${entry.role}）内容不符`);
         }
         assert.equal(new Set(readable.map(entry => entry.id)).size, readable.length, '重排阅读不能重复来源块');
@@ -907,7 +966,7 @@ async function main() {
         }
       } else assert(bytes.toString().includes('人工校订'));
       report.exampleLoads[name] = {translated: true, edited: true, exported: true, bytes: bytes.length};
-      if (['sample.pdf', 'sample.epub', 'sample.docx', 'sample.md', 'sample.srt', 'sample.json'].includes(name)) await shot(`reader-${name.replace('.', '-')}`);
+      if (delimited || wordInline || ['sample.pdf', 'sample.epub', 'sample.docx', 'sample.md', 'sample.srt', 'sample.json'].includes(name)) await shot(`reader-${name.replace('.', '-')}`);
       if (['formats', 'archives'].includes(suite) && name === formats.at(-1)) {
         if (await page.locator('.batch-files li').count() < 2) {
           await page.locator('input[type=file]').setInputFiles({name: 'batch-extra.txt', mimeType: 'text/plain', buffer: Buffer.from('An extra document.')});

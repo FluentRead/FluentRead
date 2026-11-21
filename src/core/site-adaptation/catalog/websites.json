@@ -1,5 +1,22 @@
 [
   {
+    "id": "inco-blog",
+    "name": "Inco 博客文章摘要",
+    "match": {
+      "hosts": ["inco.ai"],
+      "paths": ["/blog/*"],
+      "excludePaths": ["/blog/"]
+    },
+    "mode": "augment",
+    "content": [
+      {
+        "css": ["main#content > .post-page > header.post-head > p.post-dek"],
+        "resolve": "closest"
+      }
+    ],
+    "protect": ["code", "pre", "input", "textarea"]
+  },
+  {
     "id": "llamaperf-mac",
     "name": "Llamaperf Mac 基准测试",
     "match": {

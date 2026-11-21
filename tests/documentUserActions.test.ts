@@ -592,6 +592,23 @@ describe('document user actions: download consumers', () => {
 });
 
 describe('document user actions: real editor events and parent consumers', () => {
+    it('filters spreadsheet proofreading by the selected columns and keeps cell identities for edits', async () => {
+        apps.pop()!.unmount();
+        const document = parseDocument('table.csv', 'Name,Description\nPrivate label,Visible description');
+        const scope = ref(new Set([1, 3]));
+        const translations = ['名称', '说明', '原有校订', '可见译文'];
+        const update = vi.fn();
+        mount({setup: () => () => h(DocumentSegmentEditor, {document, translations, scopeIds: scope.value, disabled: false, onUpdate: update})});
+        expect(walk(editor()).filter(node => node.tag === 'textarea')).toHaveLength(2);
+        expect(textOf(editor())).not.toContain('Private label');
+        expect(textarea(3).value).toBe('可见译文');
+        await fire(textarea(3), 'input', {value: '校订说明'});
+        expect(update).toHaveBeenLastCalledWith(3, '校订说明');
+        scope.value = new Set([0, 2]); await flush();
+        expect(textarea(2).value).toBe('原有校订');
+        expect(textOf(editor())).not.toContain('Visible description');
+    });
+
     it('keeps retained revisions collapsed and read-only, renders forty at a time and resets disclosure on document changes', async () => {
         apps.pop()!.unmount();
         const current = ref<ParsedDocument>(parseDocument('retained-first.txt', 'Current source wording.'));

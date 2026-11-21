@@ -10,7 +10,9 @@ Choose **Document translation** in the extension menu, then drop a file onto the
 
 For an online PDF, choose **Open PDF reader** from the extension menu or paste its direct link on the document start page. FluentRead opens the original in its own reader. If a link requires a login and cannot be opened, download the file first and import it.
 
-Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
+Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, CSV, TSV, and SRT, VTT, ASS, SSA, or LRC subtitles. The limit is **50 MB for a PDF** and **10 MB for other formats**. Convert older `.doc` files to `.docx` first.
+
+Text imports support UTF-8 and UTF-16 files with a byte order mark. Text exports use UTF-8. If you get an encoding error, save the source file as UTF-8 and import it again.
 
 ## Open an article from a webpage
 
@@ -23,6 +25,8 @@ Choose **View original webpage** beneath the title to open the source. Reopen th
 1. Choose the **translation service**, **target language**, and a model for AI services in the toolbar. Set the source language and glossary in the sidebar; narrow windows use **Translation settings**.
 2. Check the file, then start translation.
 3. Switch between original, bilingual, and translated views. Translation starts near your current reading position and completed passages appear as they arrive.
+
+For CSV and TSV, use **Columns to translate** to choose which cells to translate, including the first row. Empty cells, numbers, formulas, and links retain their source values. Switching columns keeps existing translations. With the same language and glossary settings, retranslating replaces translations only in the selected columns. Downloads apply the current selection, and bilingual exports put the source and translation on separate lines inside the same cell.
 
 Use **Files** in the sidebar to switch documents and **Outline** to jump to chapters. Detected PDF bylines, affiliations, and contact details appear on the page itself. **Focus reading** hides surrounding controls; Esc exits. Zoom with the toolbar, a trackpad pinch, or Ctrl with the mouse wheel. After clicking the document, **Ctrl/Cmd +, −, and 0** also work. Zoom affects only the reading preview.
 
@@ -41,6 +45,10 @@ Changing languages, glossary settings, or some connection parameters requires a 
 
 The selected version is independent of the reading view. Partial downloads require confirmation. Passages without a translation, including cleared translations, retain their source text. Changing settings alone does not retranslate the file; downloads use the results currently kept.
 
+EPUB exports reuse translated chapter headings, including your edits, in the reader’s table of contents. **Bilingual** shows the heading translation after the original label. **Translation only** shows the heading translation by itself. An entry keeps its existing label if it points to an untranslated heading or cannot be matched to a heading.
+
+Word exports preserve hyperlinks and character formatting such as bold and italics in ordinary paragraphs. Keep formatting markers such as `<g1>…</g1>` when editing translations. Paragraphs containing fields, drawings, or incomplete formatting markers keep their original content and place the translation immediately after it.
+
 The panel opens beside the toolbar. PDF versions include a small layout illustration. Expand **PDF layout** to choose **Original** or **Reflow** without changing the reading view. If generation fails, your translation and edits are kept. Use **Retry download**, or expand **Technical details** to inspect the cause.
 
 **Download original** saves the opened source file without translating it first. You can cancel and retry ePub, DOCX, PDF, or batch ZIP generation without losing translations or edits.
@@ -55,15 +63,15 @@ PDFs default to **Original layout**. Bilingual pages appear side by side, transl
 
 **Reflowed text** also works before translation. Bilingual reflow places each source paragraph and its translation in one responsive column. **Reading appearance** controls text size, font, line and paragraph spacing, sepia, mint, dark and custom text/background colors. Reflow preserves figure colors. Image-only pages keep their original image until text recognition is available. Original layout also supports sepia, mint, dark, custom colors and **Smart inversion** while preserving the colors of identified figures. Scanned page images and exceptionally dense vector graphics keep their original appearance. Appearance preferences stay on this device and do not change exported layouts.
 
-Select original text on one page, or text in one reflow paragraph. The selection popup has highlight and underline actions for quick marking. Open **Annotations** to choose a color, add a note or include the paragraph’s translation. Original-page annotations keep selection rectangles; reflow annotations mark the whole corresponding original paragraph. The list supports navigation and deletion. Annotations use the existing document history and conflict protection, and disappear when that history is deleted. Download a copy to keep them in private windows or when history is unavailable or conflicted. Each document supports up to 1000 annotations.
+Open **Annotations** in the reader toolbar to see saved notes, excerpts, and page numbers. Select an entry to close the list and jump to the marked location or its page in reflow mode. Select text on one original page or within one reflow paragraph to highlight or underline it. Reflow annotations mark the entire corresponding paragraph in the original PDF. To write a note, open **Note**, choose a mark style, and select **Save annotation**. You can include the translation once it is ready for a selection within one paragraph. Reopen the panel to continue a draft on the same selection. Use **More actions** next to a saved annotation to read the full note, edit it, or delete the mark. Document history stores up to 1,000 annotations per document.
 
-**Download original PDF with annotations** keeps original pages, selectable text and existing annotations, and adds standard PDF highlights, underlines and notes. It is separate from bilingual/translation downloads and does not embed reading colors or reflow. Encrypted or damaged PDFs may fail to export; the source and local annotations remain intact.
+**Export PDF** in the annotation panel saves a copy of the original PDF with standard annotations and preserves existing marks. You can also save this copy if history is unavailable or a save conflict occurs. Encrypted or damaged PDFs may fail to export.
 
-If your browser supports extension toolbar context menus, right-click the FluentRead toolbar icon and choose **Toggle Hypothesis** to switch the official sidebar on or off for the current web page. Choosing the same action from the browser's built-in online PDF viewer opens the FluentRead PDF reader. Use **H** in the reader toolbar to switch the sidebar on or off there.
+In the FluentRead PDF reader, choose **Annotations → Hypothesis annotations** to open or close the official sidebar. You can cancel a connection in progress.
 
 Activation connects to the official service and shares document identity and selected text. The official origin handles login; FluentRead does not receive login tokens or upload the PDF. Original PDFs use the standard fingerprint. Local paths, recognized local hosts and download URLs with query parameters are withheld. Reflow and translated views save annotations against their own text view, keeping incompatible text offsets separate. The sidebar pauses during translation and resumes when it finishes. Starting collaboration in a translated-only fixed layout switches to reflow.
 
-The selection translation card leaves room for the Hypothesis selection toolbar so both remain usable. Collaborative annotations belong to your Hypothesis account and are separate from local marks and PDF annotation export. An existing Hypothesis instance is preserved. The annotation menu retains the [official proxy](https://web.hypothes.is/help/what-is-the-via-proxy/) and [local PDF guide](https://web.hypothes.is/help/annotating-locally-saved-pdfs/) for connection or browser-policy restrictions.
+Collaborative annotations belong to your Hypothesis account. The selection translation card leaves room for the Hypothesis toolbar. If the sidebar cannot connect, **Other ways to open** offers the [official proxy](https://web.hypothes.is/help/what-is-the-via-proxy/) or [local PDF guide](https://web.hypothes.is/help/annotating-locally-saved-pdfs/).
 
 Proofreading, full-passage comparisons, outline titles, and search terms each follow their own text direction, while the source and translation columns keep their order.
 
@@ -110,6 +118,10 @@ After a PDF is parsed again, edits are restored only when the source text and po
 <summary>Other formats, terminology, and AI context references</summary>
 
 Markdown, HTML, and ePub aim to retain links, emphasis, and inline code. URLs, email addresses, code blocks, and program identifiers remain unchanged. If formatting cannot be preserved, retry or change services. JSON keeps its structure and non-text values; nesting beyond 1000 levels is unsupported. Word tables remain tables, and ePub downloads retain chapters, images, links, and styles.
+
+GitHub Flavored Markdown tables are translated one cell at a time. The reading view and downloads retain rows, columns, and alignment. Bilingual mode shows both texts in the same cell.
+
+Soft line breaks inside ordinary Markdown paragraphs are joined for translation. Blank lines still separate paragraphs, and headings, lists, quotes, and explicit line breaks keep their boundaries. Bilingual exports retain the original line breaks.
 
 Subtitle exports retain numbering, timing, and formatting tags. Translation-only output replaces the cue text; bilingual output keeps both texts in each cue. Fixed-width wrapped text is joined into paragraphs, while headings and lists stay separate where possible.
 

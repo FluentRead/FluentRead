@@ -26,6 +26,7 @@ export interface DocumentTaskState {
 
 export interface DocumentQueueItem extends DocumentTaskState {
     pdfAnnotations?: PdfAnnotation[];
+    delimitedColumns?: readonly number[];
     id: number;
     name: string;
     originalFile?: File;

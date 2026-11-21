@@ -495,8 +495,10 @@ const translation = computed(() =>
             :number="step + 1"
           />
           <div v-if="kind === 'selection' && step === 4" class="bg-selection-result">
+            <small>{{ t('原文', 'Original') }}</small>
+            <p>{{ original }}</p>
             <small>{{ t('译文', 'Translation') }}</small>
-            <p>{{ translation }}</p>
+            <p class="bg-selection-result-translation">{{ translation }}</p>
             <span>{{ t('朗读原文 · 朗读译文', 'Read original · Read translation') }}</span>
           </div>
         </template>
@@ -1001,7 +1003,9 @@ const translation = computed(() =>
   font-size: 10px;
 }
 .bg-selection-result p {
-  margin-block: 8px 14px;
+  margin-block: 4px 8px;
+}
+.bg-selection-result p.bg-selection-result-translation {
   color: var(--vp-c-brand-1);
 }
 .bg-selection-result > span {

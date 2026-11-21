@@ -180,11 +180,15 @@
             </ElSelect></label>
             </div>
             <div class="toolbar-primary-actions" :data-primary-action="downloadIsPrimary ? 'download' : 'translate'">
+            <ElSelect v-if="parsedDocument.delimitedColumns" class="document-select delimited-column-picker" data-testid="document-column-picker" :aria-label="t('document.delimited.columns')" :placeholder="t('document.delimited.columns')" :model-value="selectedDelimitedColumns" :disabled="queueBusy" :fit-input-width="false" :wrap-label="false" :show-search-icon="false" popper-class="document-column-options" append-to=".document-app" multiple filterable @update:model-value="updateDelimitedColumns">
+              <template #tag><span class="delimited-column-count">{{ t('document.delimited.count', {selected: selectedDelimitedColumns.length, total: parsedDocument.delimitedColumns.length}) }}</span></template>
+              <ElOption v-for="column in parsedDocument.delimitedColumns" :key="column.index" :value="column.index" :label="delimitedColumnLabel(column)" :disabled="selectedDelimitedColumns.length === 1 && selectedDelimitedColumns[0] === column.index" />
+            </ElSelect>
             <button class="ghost-button toolbar-settings-toggle" type="button" :title="translationSettingsSummary" @click="openDocumentSettings">{{ translateLegacy('翻译设置') }}</button>
             <button ref="downloadButton" class="download-button" type="button" aria-haspopup="dialog" aria-controls="document-download-panel" :aria-expanded="downloadOpen" :disabled="!originalDownloadSource && (!hasTranslation || queueBusy)" @click="openDownload">{{ downloadCopy.download }}<UiIcon name="chevron-down" :size="14" /></button>
             <div class="translation-actions">
               <button v-if="translating" class="ghost-button pause-button" type="button" @click="pauseTranslation"><i class="spinner dark-spinner" aria-hidden="true" />暂停翻译</button>
-              <button v-else-if="parsedDocument.segments.length || needsOcr" class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning)" @click="requestTranslation">{{ translationActionLabel }}</button>
+              <button v-else-if="activeSegments.length || needsOcr" class="translate-document-button" type="button" :disabled="!config.on || !hydrated || queueBusy || Boolean(credentialWarning)" @click="requestTranslation">{{ translationActionLabel }}</button>
             </div>
             </div>
           </div>
@@ -235,7 +239,7 @@
           </div>
         </section>
         <article class="document-reading-pane" aria-label="文档内容">
-        <DocumentSegmentEditor v-if="editorRequested" :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :document="parsedDocument" :translations="translatedSegments" :retained-revisions="documentQueue.find(item => item.id === activeDocumentId)?.retainedRevisions" :disabled="queueBusy" @update="editSegment" @source-edit="openSourceEditor" />
+        <DocumentSegmentEditor v-if="editorRequested" :key="activeDocumentId ?? 0" v-show="readerTab === 'edit'" :document="parsedDocument" :translations="translatedSegments" :scope-ids="columnScope" :retained-revisions="documentQueue.find(item => item.id === activeDocumentId)?.retainedRevisions" :disabled="queueBusy" @update="editSegment" @source-edit="openSourceEditor" />
         <div v-show="readerTab === 'read'" ref="readingContent" class="reading-content" :class="{'reading-pdf': isPdfDocument}" :data-fluentread-material-fingerprint="activeTask?.historyId || undefined" :data-fluentread-material-title="parsedDocument.fileName" :data-fluentread-material-source="activeTask?.sourceUrl || undefined" :data-fluentread-material-page="isPdfDocument ? pdfPage : readerPage" :data-fluentread-material-section="isEpubDocument ? `epub:${epubChapterIndex}` : isDocxDocument ? `docx:${docxPartIndex}` : undefined" :data-reader-zoom="isPdfDocument ? undefined : readerScale" :tabindex="isPdfDocument || isRichDocument ? undefined : 0" @pointerdown="materialReadingPointerDown" @wheel.passive="markMaterialReadingIntent" @keydown.capture="markMaterialReadingIntent">
         <PdfReader
           ref="materialPdfReader"
@@ -244,7 +248,7 @@
           :document="parsedDocument"
           :translations="translatedSegments"
           :annotations="activeTask?.pdfAnnotations ?? []"
-          :annotations-saved="historyAvailable && activeTask?.revision === activeTask?.savedRevision"
+          :annotation-storage-unavailable="!historyAvailable || activeTask?.historyVersion === undefined || !!(activeTask.historyReadUnavailable || activeTask.historyConflict)"
           @update:annotations="updatePdfAnnotations"
           v-model:presentation="pdfPresentation"
           :mode="effectivePreviewMode"
@@ -347,15 +351,16 @@
         </section>
 
         <section
-          v-else-if="isJsonDocument"
+          v-else-if="isJsonDocument || parsedDocument.delimitedColumns"
           class="json-document-reader"
-          data-document-reader="json"
-          :data-segment-count="parsedDocument.segments.length"
-          aria-label="JSON 字符串路径翻译表格"
+          :class="{'delimited-document-reader': !isJsonDocument}"
+          :data-document-reader="isJsonDocument ? 'json' : 'delimited'"
+          :data-segment-count="activeSegments.length"
+          :aria-label="isJsonDocument ? translateLegacy('JSON 字符串路径翻译表格') : t('document.delimited.cells')"
         >
           <div :style="readerZoomStyle" data-native-zoom-content>
-          <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>JSONPath</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
-          <article v-for="row in jsonRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
+          <div class="json-table-header" :class="{ single: effectivePreviewMode !== 'bilingual' }"><span>{{ isJsonDocument ? 'JSONPath' : t('document.delimited.cell') }}</span><span v-if="effectivePreviewMode !== 'translated'">原字符串</span><span v-if="effectivePreviewMode !== 'source'">译文</span></div>
+          <article v-for="row in previewRows" :key="row.index" class="json-table-row" :class="{ single: effectivePreviewMode !== 'bilingual' || (row.translation && !hasDistinctTranslation(row.source, row.translation)) }">
             <code>{{ row.pathLabel || '$' }}</code>
             <p v-if="effectivePreviewMode !== 'translated' || (row.translation && !hasDistinctTranslation(row.source, row.translation))" class="json-source document-source" data-i18n-ignore>{{ row.source }}</p>
             <p v-if="effectivePreviewMode !== 'source' && (!row.translation || hasDistinctTranslation(row.source, row.translation))" class="json-translation document-translation" data-i18n-ignore>{{ row.translation || translateLegacy('等待翻译…') }}</p>
@@ -499,7 +504,7 @@
       <div v-if="preparingDownload" class="export-progress"><p role="status" aria-live="polite">{{ downloadProgress || downloadCopy.preparing }}</p><progress v-if="downloadPdfProgress" :value="downloadPdfProgress.phase === 'rendering' ? downloadPdfProgress.completedPages : undefined" :max="downloadPdfProgress.totalPages || 1" :aria-label="downloadProgress || downloadCopy.preparing" /><button class="download-cancel" type="button" :disabled="cancelingDownload" @click="cancelDownload">{{ t(cancelingDownload ? 'document.export.canceling' : 'document.export.cancel') }}</button></div>
       <section v-else-if="pendingDownloadMode" class="download-confirmation">
         <h3>{{ downloadCopy.partialTitle }}</h3>
-        <p class="notice">{{ t("document.untranslatedWarning", {count: (parsedDocument?.segments.length || 0) - completedSegments}) }}</p>
+        <p class="notice">{{ t("document.untranslatedWarning", {count: activeSegments.length - completedSegments}) }}</p>
         <div class="dialog-actions"><button class="ghost-button" type="button" @click="backToDownloadChoices">{{ downloadCopy.back }}</button><button class="translate-document-button" type="button" :disabled="queueBusy" @click="confirmPartialDownload">{{ downloadCopy.confirm }}</button></div>
       </section>
       <template v-else>
@@ -642,6 +647,9 @@ import {
   type PdfAnnotation,
   normalizePdfAnnotations,
   type ParsedDocument,
+  documentSegmentsInColumns,
+  normalizeDelimitedColumns,
+  type DelimitedColumn,
   ElSelect,
   UiIcon,
   SegmentedControl,
@@ -699,6 +707,28 @@ const documentTasks = useDocumentTasks();
 const {documentQueue, activeDocumentId, activeTask, parsedDocument, translatedSegments,
   confirmedTranslationIds, taskFingerprint, runState, editRevision, downloadedRevision,
   errorMessage, documentBatchTranslation, bypassCache} = documentTasks;
+const taskSegments = (item: DocumentQueueItem) => item.document ? documentSegmentsInColumns(item.document, item.delimitedColumns) : [];
+const activeSegments = computed(() => activeTask.value ? taskSegments(activeTask.value) : []);
+const columnScope = computed(() => activeTask.value?.delimitedColumns ? new Set(activeSegments.value.map(segment => segment.id)) : undefined);
+const selectedDelimitedColumns = computed(() => activeTask.value?.delimitedColumns ?? parsedDocument.value?.delimitedColumns?.map(column => column.index) ?? []);
+function delimitedColumnLabel(column: DelimitedColumn): string {
+  const number = t('document.delimited.column', {column: column.index + 1});
+  return column.label ? `${number} · ${column.label}` : number;
+}
+function updateDelimitedColumns(values: unknown): void {
+  const item = activeTask.value;
+  if (queueBusy.value || !item?.document?.delimitedColumns || !Array.isArray(values) || !values.length) return;
+  const columns = normalizeDelimitedColumns(item.document, values);
+  if (JSON.stringify(columns) === JSON.stringify(item.delimitedColumns)) return;
+  item.delimitedColumns = columns;
+  item.state = 'ready';
+  item.error = '';
+  item.revision += 1;
+  readerPage.value = 1;
+  requestEvidence.value = null;
+  downloadNotice.value = '';
+  scheduleHistorySave();
+}
 const outputMode = ref<DocumentRenderMode>('bilingual');
 const previewMode = ref<'source' | DocumentRenderMode>('bilingual');
 const pdfPresentation = ref<PdfReadingPresentation>('layout');
@@ -805,10 +835,13 @@ const batchNotice = ref('');
 let nextDocumentId = 0;
 let batchGeneration = 0;
 const queueBusy = computed(() => translating.value || batchRunning.value || openingFile.value || downloadingPdf.value || preparingDownload.value || glossarySaving.value);
-const completeItem = (item: DocumentQueueItem) => Boolean(item.document?.segments.length
-  && !pdfPagesNeedingOcr(item.document).length
-  && !(item.id === activeDocumentId.value && translating.value)
-  && item.document.segments.every(segment => item.translations[segment.id]?.trim()));
+const completeItem = (item: DocumentQueueItem) => {
+  const segments = taskSegments(item);
+  return Boolean(segments.length
+    && !pdfPagesNeedingOcr(item.document).length
+    && !(item.id === activeDocumentId.value && translating.value)
+    && segments.every(segment => item.translations[segment.id]?.trim()));
+};
 const batchCompletedCount = computed(() => documentQueue.value.filter(completeItem).length);
 const batchPendingCount = computed(() => documentQueue.value.filter(item => item.document && !completeItem(item)).length);
 
@@ -841,8 +874,8 @@ function activateDocument(item: DocumentQueueItem): void {
 
 function queueProgress(item: DocumentQueueItem): number {
   if (item.id === activeDocumentId.value) return progress.value;
-  const total = item.document?.segments.length || 0;
-  return total ? Math.min(pdfPagesNeedingOcr(item.document).length ? 99 : 100, Math.floor(item.translations.filter(text => text?.trim()).length / total * 100)) : 0;
+  const segments = taskSegments(item);
+  return segments.length ? Math.min(pdfPagesNeedingOcr(item.document).length ? 99 : 100, Math.floor(segments.filter(segment => item.translations[segment.id]?.trim()).length / segments.length * 100)) : 0;
 }
 
 // 最近翻译：只在浏览器提供 IndexedDB 时启用；记录留在本机，重新打开同一份文件会接着上次的译文继续。
@@ -1017,10 +1050,12 @@ function persistHistory(): void {
   if (historyTimer !== undefined) {clearTimeout(historyTimer); historyTimer = undefined;}
   if (!historyAvailable) return;
   for (const item of documentQueue.value) {
-    const completed = item.translations.filter(text => text?.trim()).length;
     if (!item.document || !item.historyId || !item.bytes || item.historyReadUnavailable || item.historyConflict || item.revision === item.savedRevision) continue;
+    const segments = taskSegments(item);
+    const completed = segments.filter(segment => item.translations[segment.id]?.trim()).length;
     void historyCommitter.save(item, {id: item.historyId, name: item.name, format: item.document.format, size: item.bytes.byteLength, sourceUrl: item.sourceUrl, mimeType: item.mimeType || '',
-      total: item.document.segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations], ...(item.bypassCache ? {bypassCache: true} : {}), ...(item.pdfAnnotations ? {pdfAnnotations: toRaw(item.pdfAnnotations)} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
+      total: segments.length, completed, updatedAt: Date.now(), bytes: item.bytes, translations: [...item.translations],
+      ...(item.delimitedColumns ? {delimitedColumns: [...item.delimitedColumns]} : {}), ...(item.bypassCache ? {bypassCache: true} : {}), ...(item.pdfAnnotations ? {pdfAnnotations: toRaw(item.pdfAnnotations)} : {}), retainedRevisions: item.retainedRevisions ? toRaw(item.retainedRevisions) : undefined, fingerprint: item.fingerprint, parsed: toRaw(item.document), parsedVersion: PARSED_VERSION}).then(written => {if (written) void refreshHistory();});
   }
 }
 /** 批注沿用文件任务和历史版本校验；存储不可用时仍可下载本次副本。 */
@@ -1172,8 +1207,9 @@ function queueStatus(item: DocumentQueueItem): string {
   if (!item.document.segments.length && item.document.binary?.kind === 'pdf') return t('document.pdfReading.selectableSource');
   if (item.id === activeDocumentId.value) return `${translateLegacy(statusLabel.value)} · ${progress.value}%`;
   if (completeItem(item)) return translateLegacy('翻译完成');
-  const done = item.translations.filter(text => text?.trim()).length;
-  return `${translateLegacy(item.state === 'failed' ? '翻译中断' : item.state === 'paused' ? '已暂停' : '等待翻译')} · ${done}/${item.document.segments.length}`;
+  const segments = taskSegments(item);
+  const done = segments.filter(segment => item.translations[segment.id]?.trim()).length;
+  return `${translateLegacy(item.state === 'failed' ? '翻译中断' : item.state === 'paused' ? '已暂停' : '等待翻译')} · ${done}/${segments.length}`;
 }
 
 async function startBatch(): Promise<void> {
@@ -1251,6 +1287,7 @@ const formatCards = [
   {code: 'EPUB', label: '电子书', tone: 'teal'},
   {code: 'HTML', label: '网页', tone: 'coral'},
   {code: 'JSON', label: '语言文件', tone: 'teal'},
+  {code: 'CSV', label: 'CSV / TSV', tone: 'teal'},
   {code: 'TXT', label: '纯文本', tone: 'slate'},
   {code: 'DOCX', label: 'Word 文档', tone: 'slate'},
   {code: 'MD', label: 'Markdown', tone: 'sand'},
@@ -1356,17 +1393,17 @@ const rowForSegment = (segment: ParsedDocument['segments'][number]) => ({
   ...segment, index: segment.id, translation: isSubtitleDocument.value ? restoreSubtitleTags(segment.source, translatedSegments.value[segment.id] || '') : translatedSegments.value[segment.id] || '',
 });
 const pageRows = <T,>(rows: readonly T[]) => rows.slice((readerPage.value - 1) * READER_PAGE_SIZE, readerPage.value * READER_PAGE_SIZE);
-const previewRows = computed(() => pageRows(parsedDocument.value?.segments || []).map(rowForSegment));
-const hasTranslation = computed(() => translatedSegments.value.some((item) => Boolean(item?.trim())));
+const previewRows = computed(() => pageRows(activeSegments.value).map(rowForSegment));
+const hasTranslation = computed(() => activeSegments.value.some(segment => Boolean(translatedSegments.value[segment.id]?.trim())));
 const completedSegments = computed(() => translating.value ? liveCompletedSegments.value
-  : parsedDocument.value?.segments.filter(segment => translatedSegments.value[segment.id]?.trim()).length || 0);
-const translationComplete = computed(() => Boolean(!translating.value && !needsOcr.value && parsedDocument.value?.segments.length && completedSegments.value === parsedDocument.value.segments.length));
+  : activeSegments.value.filter(segment => translatedSegments.value[segment.id]?.trim()).length);
+const translationComplete = computed(() => Boolean(!translating.value && !needsOcr.value && activeSegments.value.length && completedSegments.value === activeSegments.value.length));
 // 只有已提交译文计入分子；请求和重试不增加进度，最后一段提交后仍等任务收敛才显示 100%。
-const progress = computed(() => parsedDocument.value?.segments.length
-  ? Math.min(translating.value || needsOcr.value ? 99 : 100, Math.floor(completedSegments.value / parsedDocument.value.segments.length * 100)) : 0);
-const showTranslationProgress = computed(() => Boolean(parsedDocument.value?.segments.length && !recognitionProgress.value));
+const progress = computed(() => activeSegments.value.length
+  ? Math.min(translating.value || needsOcr.value ? 99 : 100, Math.floor(completedSegments.value / activeSegments.value.length * 100)) : 0);
+const showTranslationProgress = computed(() => Boolean(activeSegments.value.length && !recognitionProgress.value));
 const translationProgressLabel = computed(() => t('document.translationProgress.count', {
-  completed: completedSegments.value, total: parsedDocument.value?.segments.length || 0, percent: progress.value,
+  completed: completedSegments.value, total: activeSegments.value.length, percent: progress.value,
 }));
 /** 默认只显示现有错误分类的短提示；完整供应商原因按需展开，重试复用工具栏唯一主按钮。 */
 const translationFailureVisible = computed(() => Boolean(runState.value === 'failed' && errorMessage.value && !credentialWarning.value && !configSaveError.value));
@@ -1417,13 +1454,15 @@ const glossaryScope = computed(() => {
   return `${label(source)} → ${label(target)}`;
 });
 const canExtractGlossary = computed(() => hydrated.value && config.on && documentSupportsGlossary.value
-  && Boolean(parsedDocument.value?.segments.length) && !isSubtitleDocumentFormat(parsedDocument.value?.format ?? 'txt')
+  && activeSegments.value.length > 0 && !isSubtitleDocumentFormat(parsedDocument.value?.format ?? 'txt')
   && (config.from === 'auto' || /^en(?:-|$)/iu.test(config.from)));
 const canApplyGlossary = computed(() => canExtractGlossary.value && !queueBusy.value && !glossarySuggesting.value && !credentialWarning.value
   && glossaryChoices.value.some(choice => choice.selected) && glossaryChoices.value.every(choice => !choice.selected || Boolean(choice.target.trim())));
 const pendingGlossaryRetranslation = computed(() => {
   const task = glossaryRetranslation.value;
-  return task && task.document === parsedDocument.value && task.fingerprint === currentFingerprint.value ? task : null;
+  if (!task || task.document !== parsedDocument.value || task.fingerprint !== currentFingerprint.value) return null;
+  const scope = columnScope.value;
+  return [...task.pending].some(id => !scope || scope.has(id)) ? task : null;
 });
 watch(currentFingerprint, fingerprint => {
   requestEvidence.value = null;
@@ -1446,12 +1485,12 @@ const translationActionLabel = computed(() => settingsChanged.value ? '按新设
  * 片段太少时不下这个判断（专名、数字本来就会原样返回）。
  */
 const sameAsSource = computed(() => {
-  const segments = parsedDocument.value?.segments ?? [];
+  const segments = activeSegments.value;
   if (translating.value || segments.length < 5 || !translationComplete.value) return false;
   const unchanged = segments.filter(segment => !hasDistinctTranslation(segment.source, translatedSegments.value[segment.id])).length;
   return unchanged >= segments.length * 0.9;
 });
-const statusLabel = computed(() => translating.value ? recognitionProgress.value || (runState.value === 'failed' ? t('document.translationProgress.collectingAfterFailure') : retryWaiting.value ? t('document.translationProgress.waitingRetry') : completedSegments.value === parsedDocument.value?.segments.length ? t('document.translationProgress.finishing') : '正在翻译') : runState.value === 'paused' ? '已暂停' : runState.value === 'failed' ? '翻译中断' : needsOcr.value ? t('document.pdfReading.scanned') : isPdfDocument.value && !parsedDocument.value?.segments.length ? t('document.pdfReading.selectableSource') : translationComplete.value ? (sameAsSource.value ? '译文与原文相同，可换目标语言' : '翻译完成') : hasTranslation.value ? '部分完成' : '准备就绪');
+const statusLabel = computed(() => translating.value ? recognitionProgress.value || (runState.value === 'failed' ? t('document.translationProgress.collectingAfterFailure') : retryWaiting.value ? t('document.translationProgress.waitingRetry') : completedSegments.value === activeSegments.value.length ? t('document.translationProgress.finishing') : '正在翻译') : runState.value === 'paused' ? '已暂停' : runState.value === 'failed' ? '翻译中断' : needsOcr.value ? t('document.pdfReading.scanned') : isPdfDocument.value && !activeSegments.value.length ? t('document.pdfReading.selectableSource') : translationComplete.value ? (sameAsSource.value ? '译文与原文相同，可换目标语言' : '翻译完成') : hasTranslation.value ? '部分完成' : '准备就绪');
 const hasUnsavedWork = computed(() => translating.value || batchRunning.value || openingFile.value || editRevision.value > downloadedRevision.value
   || documentQueue.value.some(item => item.id !== activeDocumentId.value && item.revision > item.downloaded));
 const isPdfDocument = computed(() => parsedDocument.value?.binary?.kind === 'pdf');
@@ -1656,7 +1695,9 @@ const docxOutline = computed<RichOutlineItem[]>(() => {
   return document.binary.parts.flatMap(part => part.paragraphSegments).flatMap(({segmentIndex}) => {
     const segment = document.segments[segmentIndex];
     return segment?.role === 'title' || segment?.role === 'heading'
-      ? [{index: segmentIndex, level: segment.role === 'title' ? 1 : 2, source: segment.source, translation: settledTranslations.value[segmentIndex] || ''}] : [];
+      ? [{index: segmentIndex, level: segment.role === 'title' ? 1 : 2,
+        source: formatDocumentReaderText('docx', segment.source, segment.docxInline),
+        translation: formatDocumentReaderText('docx', settledTranslations.value[segmentIndex] || '', segment.docxInline)}] : [];
   });
 });
 const documentOutline = computed(() => isDocxDocument.value ? docxOutline.value : richOutline.value);
@@ -1730,9 +1771,9 @@ const currentDocxRows = computed(() => {
     const segment = document.segments[segmentIndex];
     return {
       index: segmentIndex,
-      source: segment?.source || '',
+      source: formatDocumentReaderText('docx', segment?.source || '', segment?.docxInline),
       role: segment?.role,
-      translation: translatedSegments.value[segmentIndex] || '',
+      translation: formatDocumentReaderText('docx', translatedSegments.value[segmentIndex] || '', segment?.docxInline),
       table,
     };
   });
@@ -1755,9 +1796,8 @@ const currentDocxBlocks = computed(() => {
   return blocks;
 });
 const subtitleRows = computed(() => previewRows.value);
-const jsonRows = computed(() => previewRows.value);
 const emptyReaderHint = computed(() => isPdfDocument.value ? t(parsedDocument.value?.segments.length ? 'document.pdfReading.startHint' : 'document.pdfReading.selectableSource') : getDocumentEmptyReaderHint(parsedDocument.value));
-const readerPageCount = computed(() => isPdfDocument.value || isRichDocument.value ? 1 : Math.max(1, Math.ceil((isDocxDocument.value ? currentDocxPart.value?.paragraphSegments.length || 0 : parsedDocument.value?.segments.length || 0) / READER_PAGE_SIZE)));
+const readerPageCount = computed(() => isPdfDocument.value || isRichDocument.value ? 1 : Math.max(1, Math.ceil((isDocxDocument.value ? currentDocxPart.value?.paragraphSegments.length || 0 : activeSegments.value.length) / READER_PAGE_SIZE)));
 
 const pdfSegmentPages = computed(() => {
   const binary = parsedDocument.value?.binary;
@@ -1783,7 +1823,7 @@ function readingPriorityKey(): ReadingPrioritySnapshot {
     const offset = (readerPage.value - 1) * READER_PAGE_SIZE;
     const chapter = currentEpubChapter.value;
     const anchor = chapter?.segmentOffset
-      ?? (currentDocxPart.value ? currentDocxPart.value.paragraphSegments[offset]?.segmentIndex ?? 0 : isRichDocument.value ? 0 : offset);
+      ?? (currentDocxPart.value ? currentDocxPart.value.paragraphSegments[offset]?.segmentIndex ?? 0 : isRichDocument.value ? 0 : activeSegments.value[offset]?.id ?? 0);
     const scrolled = isRichDocument.value ? Math.floor(richPreviewPosition(richFrame.value) * (chapter ? chapter.segmentCount : total)) : 0;
     start = anchor + scrolled;
   }
@@ -1978,7 +2018,7 @@ async function extractGlossaryCandidates(): Promise<void> {
   glossaryReviewOpen.value = true;
   void nextTick(() => documentSettingsHeading.value?.focus?.());
   glossaryDestinationId.value = glossaryDestinations.value[0]?.id ?? '';
-  const candidates = filterDocumentGlossaryCandidates(config, extractDocumentGlossaryCandidates(document.segments));
+  const candidates = filterDocumentGlossaryCandidates(config, extractDocumentGlossaryCandidates(activeSegments.value));
   glossaryChoices.value = candidates.map(candidate => ({...candidate, target: '', selected: false}));
   if (!candidates.length) return;
   if (credentialWarning.value) {
@@ -2015,13 +2055,14 @@ async function applyGlossaryChoices(): Promise<void> {
   const choices = glossaryChoices.value.filter(choice => choice.selected);
   const destinationId = glossaryDestinationId.value;
   const reviewedFingerprint = currentFingerprint.value;
+  const reviewedColumns = columnScope.value;
   glossarySaving.value = true;
   glossaryReviewError.value = '';
   glossaryNotice.value = '';
   try {
     await configEditor.save();
     if (disposed || parsedDocument.value !== document) return;
-    if (reviewedFingerprint !== currentFingerprint.value || settingsChanged.value) {
+    if (reviewedFingerprint !== currentFingerprint.value || reviewedColumns !== columnScope.value || settingsChanged.value) {
       glossaryReviewError.value = glossaryCopy.value.settingsChanged;
       return;
     }
@@ -2036,22 +2077,24 @@ async function applyGlossaryChoices(): Promise<void> {
     await requestConfigPatch(patch, browser.runtime.sendMessage.bind(browser.runtime));
     await nextTick();
     if (disposed || parsedDocument.value !== document) return;
-    if (currentFingerprint.value !== fingerprint || !config.on || credentialWarning.value) {
+    if (currentFingerprint.value !== fingerprint || reviewedColumns !== columnScope.value || !config.on || credentialWarning.value) {
       glossaryNotice.value = glossaryCopy.value.changedAfterSave;
       documentSettingsDialog.value?.close();
       return;
     }
     documentSettingsDialog.value?.close();
-    if (!affectedIds.size) {
+    // 当前未选且未翻译的表格列会在第一次翻译时使用新词库。已有旧译文继续等待该列被选中。
+    const pending = reactive(new Set([...affectedIds].filter(id => !reviewedColumns || reviewedColumns.has(id) || Boolean(translatedSegments.value[id]?.trim()))));
+    glossaryNotice.value = glossaryCopy.value.saved;
+    if (!pending.size) {
       taskFingerprint.value = fingerprint;
       editRevision.value += 1;
       scheduleHistorySave();
-      glossaryNotice.value = glossaryCopy.value.saved;
       return;
     }
-    const task = {document, fingerprint, pending: affectedIds};
+    const task = {document, fingerprint, pending};
     glossaryRetranslation.value = task;
-    void startTranslation(false, task);
+    if (pendingGlossaryRetranslation.value) void startTranslation(false, task);
   } catch {
     if (!disposed && parsedDocument.value === document) glossaryReviewError.value = glossaryCopy.value.saveFailed;
   } finally {
@@ -2073,8 +2116,8 @@ function requestReset(): void {
 }
 
 function requestTranslation(): void {
-  if (!config.on || queueBusy.value || !(parsedDocument.value?.segments.length || needsOcr.value)) return;
-  if (translationComplete.value || (settingsChanged.value && hasTranslation.value)) {
+  if (!config.on || queueBusy.value || !(activeSegments.value.length || needsOcr.value)) return;
+  if (translationComplete.value || (settingsChanged.value && translatedSegments.value.some(text => text?.trim()))) {
     pendingAction.value = 'restart';
     confirmDialog.value?.showModal();
   } else void startTranslation(settingsChanged.value);
@@ -2120,11 +2163,19 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
   let document = parsedDocument.value;
   // 扫描版 PDF 还没有任何文字：先逐页识别，再翻译识别出的段落。
   const scanned = !glossaryTask && needsOcr.value;
-  if (!config.on || !document || !(document.segments.length || scanned) || translating.value || !hydrated.value || preparingDownload.value || credentialWarning.value) return;
+  if (!config.on || !document || !(activeSegments.value.length || scanned) || translating.value || !hydrated.value || preparingDownload.value || credentialWarning.value) return;
+  const segmentIds = columnScope.value;
+  const retranslateIds = glossaryTask ? new Set([...glossaryTask.pending].filter(id => !segmentIds || segmentIds.has(id))) : undefined;
+  if (retranslateIds?.size === 0) return;
   if (restart) {
-    translatedSegments.value = [];
-    settledTranslations.value = [];
-    confirmedTranslationIds.value = [];
+    if (segmentIds && !settingsChanged.value) {
+      translatedSegments.value = translatedSegments.value.map((text, id) => segmentIds.has(id) ? '' : text);
+      confirmedTranslationIds.value = confirmedTranslationIds.value.filter(id => !segmentIds.has(id));
+    } else {
+      translatedSegments.value = [];
+      confirmedTranslationIds.value = [];
+    }
+    settledTranslations.value = [...translatedSegments.value];
     bypassCache.value = true;
     editRevision.value += 1;
     scheduleHistorySave();
@@ -2194,7 +2245,8 @@ async function startTranslation(restart = false, glossaryTask?: GlossaryRetransl
       ...settings,
       glossaryIds, glossaryRevision,
       initialTranslations: [...translatedSegments.value],
-      retranslateIds: glossaryTask ? new Set(glossaryTask.pending) : undefined,
+      ...(segmentIds ? {segmentIds} : {}),
+      ...(retranslateIds ? {retranslateIds} : {}),
       confirmedTranslationIds: [...confirmedTranslationIds.value],
       signal: controller.signal,
       // 文档层统一退避重试，单批请求与等待默认最多十分钟，保留更长的服务预算；失败时显示原因。
@@ -2391,7 +2443,7 @@ async function rerecognizePdfPage(): Promise<void> {
 }
 
 function editSegment(index: number, value: string): void {
-  if (queueBusy.value || !parsedDocument.value?.segments.some(segment => segment.id === index)) return;
+  if (queueBusy.value || !activeSegments.value.some(segment => segment.id === index)) return;
   if (!taskFingerprint.value) taskFingerprint.value = currentFingerprint.value;
   translatedSegments.value[index] = value;
   confirmedTranslationIds.value = confirmedTranslationIds.value.filter(id => id !== index);

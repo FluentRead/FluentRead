@@ -59,7 +59,7 @@ beforeEach(async () => {
     document: {createElement: () => ({click: vi.fn()})}});
   parseFile = vi.fn(async (input: File) => documentCore.parseDocument(input.name, await input.text()));
   translate = vi.fn(async (segments, options) => {
-    for (const segment of segments) if (!options.initialTranslations[segment.id]) {
+    for (const segment of segments) if ((!options.segmentIds || options.segmentIds.has(segment.id)) && !options.initialTranslations[segment.id]) {
       options.onSegment({id: segment.id, translation: `translated ${segment.source}`});
     }
   });
@@ -99,6 +99,27 @@ afterEach(() => {
 });
 
 describe('document batch page lifecycle', () => {
+  it('updates spreadsheet progress and exports against the current column selection while keeping other edits', async () => {
+    await state.loadFiles([file('labels.csv', 'Name,Description\nPrivate label,Visible description')]);
+    state.updateDelimitedColumns([1]);
+    expect(state.activeSegments.map((segment: {id: number}) => segment.id)).toEqual([1, 3]);
+    await state.startTranslation();
+    expect(translate.mock.calls[0][1].segmentIds).toEqual(new Set([1, 3]));
+    state.editSegment(3, '人工修订');
+    state.updateDelimitedColumns([0]);
+    expect(state.progress).toBe(0);
+    await state.startTranslation();
+    state.editSegment(0, '另一列的修订');
+    state.updateDelimitedColumns([1]);
+    expect(state.progress).toBe(100);
+    expect(state.hasTranslation).toBe(true);
+    await state.downloadDocument();
+    expect(download.mock.calls[0][1]).toEqual(['', 'translated Description', '', '人工修订']);
+    await state.startTranslation(true);
+    expect(translate.mock.calls[2][1].initialTranslations[0]).toBe('另一列的修订');
+    expect(state.translatedSegments[0]).toBe('另一列的修订');
+  });
+
   it('saves a material only after a document has a persisted file identity through the public material port', async () => {
     await state.loadFiles([file('material.txt', 'An original paragraph stays with its document.')]);
     await state.saveDocumentMaterial();

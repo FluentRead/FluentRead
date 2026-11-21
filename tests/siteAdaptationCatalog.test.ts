@@ -1045,7 +1045,7 @@ describe('网站正文规则目录', () => {
             if (standalone.content?.length) {
                 expect(standalone.protect, rule.id).toEqual(expect.arrayContaining(['code', 'pre', 'input', 'textarea']));
                 // 只补充文章 header 正文的规则沿用通用侧边栏设置，避免强制排除导航。
-                if (['jetbrains-idea-whatsnew', 'llamaperf-mac'].includes(rule.id)) {
+                if (['inco-blog', 'jetbrains-idea-whatsnew', 'llamaperf-mac'].includes(rule.id)) {
                     expect(standalone.exclude).toBeUndefined();
                 } else {
                     expect(standalone.exclude, rule.id).toContain('nav');

@@ -40,6 +40,8 @@ export interface DocumentTranslationOptions {
     maxRetries?: number;
     /** 同一文档和语言对下已完成或人工校订的译文；切换服务或模型时仍复用，仅空白位置继续翻译。 */
     initialTranslations?: readonly string[];
+    /** CSV/TSV 列选择只限制本次送翻范围，片段编号和其余列已有译文照旧保留。 */
+    segmentIds?: ReadonlySet<number>;
     /** 重译指定片段时保留其余片段和篇章位置，强制重新请求这些片段。 */
     retranslateIds?: ReadonlySet<number>;
     /** 当前阅读会话里经用户编辑确认的片段，历史机器译文不能冒充用户确认。 */
@@ -380,7 +382,7 @@ function documentDiscourseBlocks(segments: readonly DocumentSegment[]): Discours
 export function createDocumentSegmentTranslator(
     gateway: DocumentTranslationGateway,
 ): TranslateDocumentSegments {
-    return async (segments, options) => {
+    return async (allSegments, options) => {
         throwIfAborted(options.signal);
         await waitWithAbort(Promise.resolve(gateway.waitUntilReady()), options.signal);
         throwIfAborted(options.signal);
@@ -392,12 +394,12 @@ export function createDocumentSegmentTranslator(
             glossaryRevision: options.glossaryRevision ?? glossary?.glossaryRevision,
         };
 
-        if (segments.length === 0) return [];
-        const translations = new Array<string>(segments.length).fill('');
-        segments.forEach(({id}) => {
-            translations[id] = options.retranslateIds?.has(id) ? '' : options.initialTranslations?.[id] || '';
-        });
+        const segments = options.segmentIds ? allSegments.filter(({id}) => options.segmentIds!.has(id)) : allSegments;
+        const translations = new Array<string>(allSegments.length).fill('');
+        allSegments.forEach(({id}) => { translations[id] = options.initialTranslations?.[id] || ''; });
+        if (segments.length === 0) return translations;
         const pending = segments.filter(({id}) => options.retranslateIds ? options.retranslateIds.has(id) : !translations[id].trim());
+        if (options.retranslateIds) for (const {id} of pending) translations[id] = '';
         const context = options.fileName || 'FluentRead 文档';
         const pageContext = buildDocumentContext(segments, context, options.pageContext);
         // 步骤 1：一次文档任务固定语言对，不能被设置页同步更新或用户中途改选污染后续批次。
@@ -489,9 +491,9 @@ export function createDocumentSegmentTranslator(
                 }
             };
             // 继续未完成的任务时，已有译文的原文直接复用给后面相同的片段，不再请求。
-            const known = new Map<string, string>();
-            for (const segment of segments) if (translations[segment.id].trim() && !known.has(reuseKey(segment))) known.set(reuseKey(segment), translations[segment.id]);
             if (!options.retranslateIds) {
+                const known = new Map<string, string>();
+                for (const segment of segments) if (translations[segment.id].trim() && !known.has(reuseKey(segment))) known.set(reuseKey(segment), translations[segment.id]);
                 for (const segment of pending) if (!translations[segment.id].trim() && known.has(reuseKey(segment))) commit(segment.id, known.get(reuseKey(segment))!);
             }
             reportProgress();

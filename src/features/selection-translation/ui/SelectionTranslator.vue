@@ -9,7 +9,7 @@
  * 通知布局：收藏与语音设置通知沿用安全可见视口订阅，触摸动作保留完整命中区；通知不增加独立监听或请求。
  * 极矮视口：同一卡片改为整卡滚动并收紧顶栏间距，保留输入与请求、手动几何和语音状态；Safari 键盘视口变化后仅在当前有限窗口内滚动卡片自身显露原聚焦输入，主动操作取消待处理显露；恢复尺寸后沿用原定位，不增加监听或计时器。
  * 文件职责：实现划词翻译的主要页面组件，覆盖选区捕获、触摸原生句柄稳定等待、避开原生菜单上下区域的行侧入口、可见视口与安全区定位、后台及宿主恢复来源校验、图标/小点/悬停/快捷键/仅右键菜单/直接弹出、原生菜单可信选区恢复与重复请求复用、翻译与词卡展示、免费 AI 讲解的显式启用、朗读、收藏选中的单词/表达/句子、双语分享卡片、鉴权服务配置入口、重试和关闭。
- * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；普通译文先于完整原文，单行可横向滚动的导航与右侧固定分享、收藏、关闭及更多操作把高度留给正文，次级菜单按可见窗口覆盖显示；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
+ * 主要内容：相同译文保留原文且不重复展示；Firefox 触摸入口为原生手柄保留独立侧距，以绑定来源快照的可信触摸处理缺少 click 的情况并取消拖动；Safari/Firefox 触摸入口成功开卡后保留当前快照并清空同一原生选区，异步空选区不误关卡片；组件管理可信手势、已关闭选区与选择丢失宽限、继续阅读或复制原文时自动收起、请求 token、按既有错误种类显示有限提示并仅为当前鉴权失败提供通用设置入口、行内代码保护与纯文本安全渲染、按标签页页面缩放补偿的弹窗定位、空白拖动、边角缩放、主题及可换行的多语言标题；双语卡片先展示原文再展示译文；导航标签按卡片宽度换行，极矮视口使用单行滚动，保留分享、收藏、关闭和学习入口；指针移动按帧合并并在结束时提交最后位置，已定位卡片不重复读取选区几何；富文本 UTF-16 跟读偏移一次计算并复用；默认过滤同语言选区，按配置开放中英反向入口，翻译方向始终按现有语言配置判断；统一卡片默认显示翻译并以同一导航进入学习；首次定位后保持弹窗锚点，手动尺寸下内容与播放状态变化只影响内部布局；闲置语音栏不占空间，自动卡生成与播放期间按底栏实际高度自然增高，达到视口上限后正文独立滚动；学习短回答自然收拢、长回答受高度上限约束，完整原文和译文按需对照并允许翻译继续完成；单词先展示原文与可用词卡，再补充辅助释义，以紧凑状态提示等待、未命中与网络失败；关闭或更换选区取消等待并阻止旧响应覆盖新结果；区分语音生成和播放，按实际音频时钟或浏览器词边界显示完整词高亮，并提供真实音频时间与前后 5 秒跳转。
  * 原生标注：PDF 专用控件仅在扩展构建中保留，脚本构建不包含其按钮和动作。
  * 材料关联：主动收藏与阅读时捕获当前选区的稳定来源和文本位置，词书真实保存后才关联材料引用，隐私窗口不采集。
  * 词典来源：配置切换时只撤销并重查词卡，保留普通译文与学习会话，旧来源的迟到结果不能覆盖新来源。
@@ -23,13 +23,13 @@
       <span class="fr-selection-indicator-glyph" aria-hidden="true">译</span>
     </button>
 
-    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-short-viewport': isShortViewport() || Number.parseFloat(tooltipStyle.maxHeight) < 140 }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
+    <section v-if="showTooltip" ref="tooltip-ref" class="fr-translation-tooltip" :class="{ 'fr-dark-theme': isDarkTheme, 'fr-reading-tooltip': readingMode, 'fr-popup-manipulating': popupManipulating, 'fr-short-viewport': isShortViewport() || Number.parseFloat(tooltipStyle.maxHeight) < 140, 'fr-compact-toolbar': Number.parseFloat(tooltipStyle.height ?? tooltipStyle.maxHeight) < 180 }" :data-placement="popupPlacement" :style="[tooltipScaleStyle, tooltipStyle]" role="dialog" aria-label="划词翻译结果" data-presentation="card" @pointerdown.stop="beginPopupGesture" @pointermove="movePopupGesture" @pointerup="stopPopupGesture" @pointercancel="stopPopupGesture" @lostpointercapture="stopPopupGesture">
       <div class="fr-study-navigation">
         <img class="fr-tooltip-brand-icon" :src="selectionTranslatorIconUrl" alt="" aria-hidden="true" draggable="false" />
-        <div class="fr-study-toolbar" role="group" aria-label="划词卡片内容" :title="isWordSelection ? '词典释义 · 按词性分类' : '先看译文，按需深入'" @focusin="handleStudyToolbarFocus">
+        <div class="fr-study-toolbar" role="group" aria-label="划词卡片内容" @focusin="handleStudyToolbarFocus">
           <button type="button" :aria-pressed="!readingMode" @click="openTooltip()">翻译</button>
           <template v-if="readingEnabled">
-            <button v-for="action in readingActions" :key="action.id" type="button" :title="action.description" :aria-pressed="readingMode && !readingHistoryOnly && readingInitialAction === action.id" @click="openReading(action.id)">{{ action.id === 'grammar' ? '词性与句法' : action.label }}</button>
+            <button v-for="action in readingActions" :key="action.id" type="button" :title="action.description" :aria-pressed="readingMode && !readingHistoryOnly && readingInitialAction === action.id" @click="openReading(action.id)">{{ action.label }}</button>
             <button v-if="!isPrivateContext" type="button" :aria-pressed="readingMode && readingHistoryOnly" @click="openReadingHistory">记录</button>
           </template>
           <button v-else-if="canEnableFreeReading || freeReadingPending" type="button" :disabled="freeReadingPending" title="B站免费基础读懂/用法，无需 API Key；完整语法、练习和追问可切换 AI 服务" @click="enableFreeReading">{{ freeReadingPending ? '正在启用…' : '免费 AI 讲解' }}</button>
@@ -108,7 +108,7 @@
                     <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
                   </button>
                 </div>
-                <pre><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
+                <pre dir="auto"><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
               </div>
               <div v-else-if="isLoading" class="fr-word-translation-loading">正在翻译释义…</div>
               <div v-if="wordCard.meanings.length > 0 && !wordCard.dictionaryEntry" class="fr-word-meaning-toolbar">
@@ -140,23 +140,6 @@
             </template>
           </section>
           <div v-if="isWordSelection && wordCardError" class="fr-word-fallback-note" role="status"><span>{{ wordCardError }}</span><button type="button" @click="retryWordCard">重查词典</button></div>
-          <div v-if="(selectionSettings.mode === 'bilingual' || selectionSettings.mode === 'translation-only') && hasDistinctTranslationResult && !isWordCardVisible" class="fr-text-block fr-translation-result">
-            <div class="fr-text-block-header">
-              <span class="fr-text-label">译文</span>
-              <div class="fr-text-actions">
-                <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('translation') }" data-copy-kind="translation" type="button" :title="copyButtonTitle('translation')" :aria-label="copyButtonTitle('translation')" @click="copyText(translationResult, 'translation')">
-                  <svg v-if="isCopied('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                  <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
-                </button>
-                <button class="fr-text-audio-btn" type="button" :aria-label="audioLabel('translation')" :title="audioLabel('translation')" @click="toggleAudio(translationResult, 'translation')">
-                  <svg v-if="isCurrentAudio('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
-                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
-                </button>
-              </div>
-            </div>
-            <pre><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
-          </div>
           <div v-if="(selectionSettings.mode === 'bilingual' || (translationResult && !hasDistinctTranslationResult)) && !isWordCardVisible" class="fr-text-block fr-original-text">
             <div class="fr-text-block-header">
               <span class="fr-text-label">原文</span>
@@ -172,7 +155,24 @@
                 </button>
               </div>
             </div>
-            <pre><template v-for="(part, index) in sourceTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="sourceAudioProgress" /></template></pre>
+            <pre dir="auto"><template v-for="(part, index) in sourceTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="sourceAudioProgress" /></template></pre>
+          </div>
+          <div v-if="(selectionSettings.mode === 'bilingual' || selectionSettings.mode === 'translation-only') && hasDistinctTranslationResult && !isWordCardVisible" class="fr-text-block fr-translation-result">
+            <div class="fr-text-block-header">
+              <span class="fr-text-label">译文</span>
+              <div class="fr-text-actions">
+                <button class="fr-text-copy-btn" :class="{ 'fr-copied': isCopied('translation') }" data-copy-kind="translation" type="button" :title="copyButtonTitle('translation')" :aria-label="copyButtonTitle('translation')" @click="copyText(translationResult, 'translation')">
+                  <svg v-if="isCopied('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6" /></svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                  <span>{{ isCopied('translation') ? '已复制' : '复制' }}</span>
+                </button>
+                <button class="fr-text-audio-btn" type="button" :aria-label="audioLabel('translation')" :title="audioLabel('translation')" @click="toggleAudio(translationResult, 'translation')">
+                  <svg v-if="isCurrentAudio('translation')" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6v12M16 6v12" /></svg>
+                  <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z" /><path d="M16 9.5a4.5 4.5 0 0 1 0 5M18.5 7a8 8 0 0 1 0 10" /></svg>
+                </button>
+              </div>
+            </div>
+            <pre dir="auto"><template v-for="(part, index) in translatedTextParts" :key="index"><code v-if="part.kind === 'code'" class="fr-inline-code">{{ part.text }}</code><SpeechFollowText v-else :text="part.text" :offset="part.offset" :progress="translationAudioProgress" /></template></pre>
           </div>
           <div v-if="error && (translationResult || wordCard)" class="fr-inline-error"><span>{{ error }}</span><span class="fr-error-actions"><button type="button" @click="retryTranslation">重试</button><button v-if="isAuthenticationErrorCurrent(authenticationError)" type="button" :disabled="!!openingAuthenticationSettings" @click="openAuthenticationSettings">{{ translateLegacy('配置服务') }}</button></span></div>
         </div>
@@ -2572,7 +2572,7 @@ function handleStudyToolbarFocus(event: FocusEvent): void {
   const toolbar = event.currentTarget;
   const button = event.target;
   if (!(toolbar instanceof HTMLElement) || !(button instanceof HTMLElement)
-    || button.tagName !== 'BUTTON' || !toolbar.contains(button)) return;
+    || button.tagName !== 'BUTTON' || !toolbar.contains(button) || toolbar.scrollWidth <= toolbar.clientWidth) return;
   // 浏览器可能只露出聚焦按钮的一部分；仅滚动自己的导航，不移动正文或宿主页。
   const frame = toolbar.getBoundingClientRect();
   const item = button.getBoundingClientRect();
@@ -2952,6 +2952,14 @@ onBeforeUnmount(() => {
 .fr-selection-indicator-glyph { font-size: 12px; font-weight: 700; line-height: 1; }
 .fr-translation-tooltip, .fr-translation-tooltip * { box-sizing: border-box; }
 .fr-translation-tooltip { position: fixed; display: flex; flex-direction: column; width: min(388px, calc(100vw - 24px)); max-height: min(520px, calc(100vh - 20px)); overflow: hidden; border: 1px solid rgba(35, 35, 43, .12); border-radius: 11px; background: #fff; box-shadow: 0 5px 20px rgba(35, 33, 43, .12); -webkit-user-select: none; user-select: none; }
+.fr-translation-tooltip {
+  --fr-card-toolbar: #f7f8fb;
+  --fr-card-line: #e7e8ee;
+  --fr-card-muted: #625f6d;
+  --fr-card-active-ink: #9e3158;
+  --fr-card-active-bg: #faeaf1;
+  --fr-card-focus: #b34169;
+}
 .fr-popup-manipulating, .fr-popup-manipulating * { cursor: grabbing !important; user-select: none !important; }
 .fr-popup-resize-handle { position: absolute; z-index: 2; touch-action: none; }
 .fr-popup-resize-n, .fr-popup-resize-s { left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
@@ -2969,28 +2977,81 @@ onBeforeUnmount(() => {
 /* 自动卡用内在高度收拢；达到外框上限后将收缩量传给真正的阅读滚动区。 */
 .fr-reading-content > :deep(.fr-reading) { flex: 1; height: auto; }
 .fr-pos-label { display:flex; gap:6px; align-items:center; }
-.fr-study-navigation { flex: none; display: flex; align-items: center; gap: 3px; padding: 4px 8px; border-bottom: 1px solid var(--fr-border, #eeedf0); cursor: move; }
-.fr-tooltip-brand-icon { display:block; flex:none; width:18px; height:18px; border-radius:4px; object-fit:contain; opacity:1; pointer-events:none; }
-.fr-study-toolbar { flex: 1; min-width: 0; display: flex; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior: contain; scrollbar-width: thin; gap: 3px; }
+.fr-study-navigation {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--fr-card-line);
+  background: var(--fr-card-toolbar);
+  cursor: move;
+}
+.fr-tooltip-brand-icon {
+  display: block;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-block-start: 5px;
+  margin-inline-end: 2px;
+  border-radius: 4px;
+  object-fit: contain;
+  pointer-events: none;
+}
+.fr-study-toolbar {
+  display: flex;
+  flex: 1 1 112px;
+  flex-wrap: wrap;
+  min-width: 0;
+  gap: 2px;
+}
 .fr-study-reading-tools { flex: none; cursor: default; }
-.fr-study-toolbar button { flex:none; white-space:nowrap; font:inherit; font-size:11px; border:0; background:transparent; color:#62616c; border-radius:5px; padding:5px 8px; cursor:pointer; }
-/* 状态环向内绘制，避开滚动裁剪边界并保持按钮尺寸。 */
-.fr-study-toolbar button[aria-pressed=true], .fr-study-toolbar button:hover, .fr-study-toolbar button:focus-visible { background:#f4f0f3; color:#8e4867; outline:1px solid #dcc3d0; outline-offset:-1px; }
-.fr-dark-theme .fr-study-navigation { border-color:#4d404a; }
-.fr-dark-theme .fr-study-toolbar button { background:transparent; color:#cbc2c9; }
-.fr-dark-theme .fr-study-toolbar button[aria-pressed=true], .fr-dark-theme .fr-study-toolbar button:hover { background:#443541; color:#efbdd2; }
-.fr-tooltip-actions { flex: none; display: flex; align-items: center; gap: 2px; }
+.fr-study-toolbar button {
+  max-width: 100%;
+  min-height: 28px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fr-card-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.fr-study-toolbar button:disabled { cursor: wait; }
+.fr-tooltip-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  max-width: 100%;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: auto;
+}
 .fr-action-btn, .fr-close-btn, .fr-text-audio-btn, .fr-playing-status button { border: 0; background: transparent; color: #777780; cursor: pointer; }
-.fr-action-btn { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 6px; }
+.fr-action-btn, .fr-close-btn {
+  display: grid;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  place-items: center;
+  border-radius: 7px;
+  color: var(--fr-card-muted);
+}
 .fr-action-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.fr-action-btn:hover, .fr-action-btn:focus-visible { background: #f7eaf0; color: #d63f76; outline: none; }
-.fr-action-btn:disabled { cursor: not-allowed; opacity: .38; }
+.fr-study-toolbar button:hover:not(:disabled), .fr-action-btn:hover:not(:disabled), .fr-close-btn:hover { background: color-mix(in srgb, currentColor 9%, transparent); }
+.fr-study-toolbar button[aria-pressed=true] { background: var(--fr-card-active-bg); color: var(--fr-card-active-ink); }
+.fr-study-toolbar button:focus-visible, .fr-action-btn:focus-visible, .fr-close-btn:focus-visible { outline: 2px solid var(--fr-card-focus); outline-offset: -2px; }
+.fr-action-btn:disabled, .fr-study-toolbar button:disabled { opacity: .45; }
+.fr-action-btn:disabled { cursor: not-allowed; }
 .fr-vocabulary-btn.fr-saved { color: #ef4b86; }
 .fr-vocabulary-btn.fr-saved svg { fill: currentColor; stroke: currentColor; }
-.fr-close-btn { width: 26px; height: 26px; font-size: 19px; line-height: 1; border-radius: 6px; }
-.fr-close-btn:hover, .fr-close-btn:focus-visible { background: #f1f1f5; color: #303038; outline: none; }
-.fr-tooltip-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 12px 14px; scrollbar-color: rgba(108, 105, 112, .4) transparent; scrollbar-width: thin; }
-.fr-translation-container { display: grid; gap: 9px; }
+.fr-tooltip-content { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; padding: 8px 12px 10px; scrollbar-color: rgba(108, 105, 112, .4) transparent; scrollbar-width: thin; }
+.fr-translation-container { display: grid; gap: 8px; }
 .fr-loading-state, .fr-error-state { display: flex; align-items: center; justify-content: center; gap: 9px; min-height: 80px; color: #777780; font-size: 13px; }
 .fr-error-state { align-items: stretch; flex-direction: column; gap: 0; padding: 10px 8px 12px; color: #1d2535; }
 .fr-error-state h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.5; }
@@ -3056,16 +3117,16 @@ onBeforeUnmount(() => {
 .fr-inline-error { flex-wrap: wrap; }
 .fr-inline-error .fr-error-actions { margin-left: auto; justify-content: flex-end; }
 .fr-word-fallback-note button { flex-shrink: 0; white-space: nowrap; }
-.fr-text-block { display:flow-root; padding: 0; }
-.fr-text-block + .fr-text-block { padding-top: 9px; border-top: 1px solid rgba(127, 127, 140, .12); }
-.fr-original-text { color: #666570; }
+.fr-text-block { min-width: 0; }
+.fr-text-block + .fr-text-block { padding-top: 4px; border-top: 1px solid var(--fr-card-line); }
+.fr-original-text { color: #5d5a66; }
 .fr-inline-code { padding: 1px 4px; border-radius: 4px; background: rgba(127, 127, 127, .14); color: inherit; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .92em; white-space: pre-wrap; }
 .fr-translation-result { color: #39373d; }
-.fr-text-block-header { float:inline-end; margin-inline-start:8px; }
-.fr-text-label { margin: 0; color: #9797a4; font-size: 11px; font-weight: 750; letter-spacing: .01em; }
+.fr-text-block-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+.fr-text-label { margin: 0; color: var(--fr-card-muted); font-size: 11px; font-weight: 600; }
 .fr-text-actions { display: flex; flex: none; align-items: center; gap: 1px; }
 .fr-text-copy-btn { display: inline-flex; align-items: center; justify-content: center; width:26px; height:26px; padding:0; border:1px solid transparent; border-radius:5px; background:transparent; color:#85858e; cursor:pointer; font:inherit; line-height:1; }
-.fr-text-copy-btn span, .fr-text-block-header > .fr-text-label, .fr-word-translation-header > .fr-text-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.fr-text-copy-btn span, .fr-word-translation-header > .fr-text-label { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .fr-text-copy-btn svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
 .fr-text-copy-btn:hover, .fr-text-copy-btn:focus-visible { border-color: rgba(214, 63, 118, .35); background: #fff; color: #d63f76; outline: none; transform: translateY(-1px); }
 .fr-text-copy-btn.fr-copied { border-color: rgba(214, 63, 118, .2); background: rgba(255, 255, 255, .72); color: #b85c7b; }
@@ -3074,7 +3135,7 @@ onBeforeUnmount(() => {
 .fr-text-audio-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .fr-text-audio-btn:hover, .fr-text-audio-btn:focus-visible { border-color: rgba(214, 63, 118, .25); background: rgba(255, 255, 255, .72); color: #d63f76; outline: none; transform: translateY(-1px); }
 .fr-text-block pre { overflow-wrap:anywhere; margin:0; white-space:pre-wrap; word-break:break-word; font:inherit; font-size:14px; line-height:1.7; user-select:text; }
-.fr-original-text pre { font-size:12.5px; line-height:1.65; }
+.fr-original-text pre { font-size: 13px; }
 .fr-playing-status { flex: none; box-sizing: border-box; min-height: 38px; padding: 5px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap:6px 8px; border-top: 1px solid #eeedf0; background: inherit; color: #777780; font-size: 12px; line-height: 1.4; }
 .fr-playing-status.is-idle { display: none; }
 .fr-playing-status button { flex: none; min-height: 27px; border: 1px solid #e8a4bc; border-radius: 7px; padding: 3px 8px; color: #d83e70; font: inherit; line-height: 1.2; }
@@ -3092,9 +3153,17 @@ onBeforeUnmount(() => {
 .fr-action-toast > span { min-width: 0; max-height: var(--fr-notice-content-height); overflow: auto; overflow-wrap: anywhere; }
 .fr-action-toast button { flex: none; padding: 0; border: 0; color: #ffc2d5; background: transparent; cursor: pointer; font: inherit; font-weight: 700; }
 .fr-action-toast button:focus-visible { outline: 2px solid currentColor; outline-offset: -2px; }
-.fr-dark-theme { border-color: #44444e; background: rgba(40, 40, 48, .98); color: #f1f1f4; }
-.fr-reading-tooltip.fr-dark-theme { background: #282830; }
-.fr-dark-theme .fr-action-btn:hover, .fr-dark-theme .fr-close-btn:hover { background: #50505b; color: #fff; }
+.fr-dark-theme {
+  --fr-card-toolbar: #2c2d36;
+  --fr-card-line: #484852;
+  --fr-card-muted: #c1bfca;
+  --fr-card-active-ink: #ffc4d9;
+  --fr-card-active-bg: #523443;
+  --fr-card-focus: #f493b8;
+  border-color: #44444e;
+  background: #282830;
+  color: #f1f1f4;
+}
 .fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn) { border-color:transparent; background:transparent; color:#b4aab3; }
 .fr-dark-theme :is(.fr-text-copy-btn, .fr-text-audio-btn):is(:hover, :focus-visible) { border-color: #c96a8b; background: #553846; color: #ffd9e7; }
 .fr-dark-theme .fr-text-copy-btn.fr-copied { border-color: #98617a; background: rgba(93, 52, 71, .62); color: #f2bdcd; }
@@ -3120,19 +3189,28 @@ onBeforeUnmount(() => {
 .fr-touch-selection .fr-selection-indicator--dot::after { content:''; position:absolute; inset:18px; border-radius:50%; background:#ef4b86; }
 .fr-touch-selection .fr-translation-tooltip button, .fr-touch-selection .fr-action-toast button { min-width:44px; min-height:44px; touch-action:manipulation; }
 .fr-touch-selection .fr-study-navigation { touch-action:none; }
-.fr-touch-selection .fr-study-toolbar { touch-action:pan-x; }
+.fr-touch-selection .fr-tooltip-brand-icon { margin-block-start: 13px; }
 .fr-touch-selection .fr-popup-resize-handle { display:none; }
 .fr-touch-selection .fr-playing-status { height:auto; min-height:52px; flex-wrap:wrap; }
 .fr-touch-selection .fr-tooltip-content { -webkit-overflow-scrolling:touch; }
 .fr-touch-selection .fr-copy-success-toast { right:max(12px, env(safe-area-inset-right)); bottom:max(12px, env(safe-area-inset-bottom)); }
 @media (any-pointer: coarse) {
   .fr-translation-tooltip button, .fr-action-toast button { min-width:44px; min-height:44px; touch-action:manipulation; }
+  .fr-tooltip-brand-icon { margin-block-start: 13px; }
   .fr-playing-status { height:auto; min-height:52px; flex-wrap:wrap; }
 }
 /* 极矮时标题、正文和语音栏共用外框滚动；不替换或隐藏已聚焦的阅读输入。 */
 .fr-translation-tooltip.fr-short-viewport { overflow-y:auto; border-block-width:0; overscroll-behavior:contain; }
-.fr-short-viewport .fr-study-navigation { align-items:flex-start; padding-block:var(--fr-pad); border-bottom:0; touch-action:auto; }
-.fr-short-viewport .fr-study-toolbar { touch-action:auto; overscroll-behavior-y:auto; }
+.fr-short-viewport .fr-study-navigation { padding-block:var(--fr-pad, 4px); border-bottom:0; touch-action:auto; }
+.fr-compact-toolbar .fr-study-toolbar, .fr-short-viewport .fr-study-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  touch-action: pan-x;
+}
+.fr-short-viewport .fr-study-toolbar { touch-action: auto; }
+:is(.fr-compact-toolbar, .fr-short-viewport) .fr-study-toolbar button { flex: none; max-width: none; white-space: nowrap; }
 .fr-short-viewport .fr-close-btn { min-width:44px; min-height:44px; }
 .fr-short-viewport .fr-tooltip-content, .fr-short-viewport :deep(.fr-reading), .fr-short-viewport :deep(.fr-reading-scroll) { flex:none; height:auto; max-height:none; overflow:visible; }
 .fr-short-viewport .fr-popup-resize-handle { display:none; }

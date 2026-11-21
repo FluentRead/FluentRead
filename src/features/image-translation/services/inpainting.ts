@@ -5,12 +5,14 @@
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
  * 细线背景：在原纯色与渐变规则之后，按单次修补共享的预付面积预算验证细线背景；只在完整不透明蒙版内采用源线条与横截面计划，保留已确认背景，少量跨度外像素仍走原扩散；透明保护路径保持原样。
  * 旋转短标签：独立物理字框可先验证书脊的逐列底色和真实墨迹，原清字蒙版与保护规则继续生效。
+ * 斜向背景：独立窄横排框中的不透明背景经原图四边确认方向后沿斜边修补，整图共享独立工作预算。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from './mangaAlphaProtection';
 import {IMAGE_RULED_REPAIR_LIMITS,planImageRuledTextRepair} from './ruledTextRepair';
 import {planImageFlatTextRepair} from './flatTextRepair';
+import {IMAGE_DIRECTIONAL_REPAIR_BUDGET,repairDirectionalImageBackground} from './directionalTextRepair';
 
 interface MaskRectangle {
     left: number;
@@ -110,11 +112,13 @@ export function inpaintTextRegions(
     if (rectangles.length === 0) return result;
 
     const ruleBudget={remaining:IMAGE_RULED_REPAIR_LIMITS.pagePixels};
-    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection,ruleBudget);
+    const directionBudget={remaining:IMAGE_DIRECTIONAL_REPAIR_BUDGET};
+    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection,ruleBudget,directionBudget);
     return result;
 }
 
-function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[], protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number}): void {
+function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[],
+    protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number},directionBudget:{remaining:number}): void {
     const bounds = rectangles.reduce(union);
     if(!protection&&rectangles.length===1&&bounds.rotatedSource){
         const source=bounds.rotatedSource,mask={x0:bounds.left,y0:bounds.top,x1:bounds.right,y1:bounds.bottom};
@@ -180,8 +184,9 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
     }
 
     // 只使用真实四边，且逐像素验证；边缘被裁切、透明孔、相接多框和纹理继续原来的扩散路径。
-    if (!protection && rectangles.length === 1 && bounds.left > 0 && bounds.top > 0
-        && bounds.right < imageWidth && bounds.bottom < imageHeight) {
+    const hasFullBorder = rectangles.length === 1 && bounds.left > 0 && bounds.top > 0
+        && bounds.right < imageWidth && bounds.bottom < imageHeight;
+    if (!protection && hasFullBorder) {
         const repair = planImageGradientRepair(result, imageWidth, left, top, width, height);
         if (repair) {repair(result); return;}
     }
@@ -198,7 +203,8 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
                 mask[index]=0;maskedCount--;
             }
             if(maskedCount===0)return;
-        }
+        } else if (hasFullBorder && !bounds.rotatedSource
+            && repairDirectionalImageBackground(result,imageWidth,left,top,width,height,directionBudget)) return;
     }
 
     const queue = new Uint32Array(maskedCount);

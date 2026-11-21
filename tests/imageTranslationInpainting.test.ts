@@ -1,6 +1,7 @@
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
+import {IMAGE_DIRECTIONAL_REPAIR_BUDGET,repairDirectionalImageBackground} from '@/src/features/image-translation/services/directionalTextRepair';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
 
@@ -67,9 +68,99 @@ function knownHoleFixture() {
     return {source, width, height, boxes};
 }
 
+function diagonalImage(direction: number) {
+    const width = 160, height = 96, clean = new Uint8ClampedArray(width * height * 4);
+    const region = line(31, 34, 129, 49);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        const distance = x - direction * (y - 41);
+        const start = distance < 65 ? [26, 70, 125] : [230, 222, 200];
+        const color = distance < 78 ? start : [155, 58, 29];
+        clean.set([...color, 255], (y * width + x) * 4);
+    }
+    const source = clean.slice();
+    for (let y = 34; y < 49; y++) for (let x = 31; x < 129; x++) {
+        if (x % 8 < 3 || y === 34 || y === 48) source.set([245, 244, 242, 255], (y * width + x) * 4);
+    }
+    return {source, clean, width, height, region};
+}
+
+function directionalFrame(direction = 1) {
+    const {source, clean, width, height, region} = diagonalImage(direction);
+    const [box] = imageMaskBoxes(region, width, height);
+    return {source, clean, width, height, left: box.x0 - 1, top: box.y0 - 1,
+        columns: box.x1 - box.x0 + 2, rows: box.y1 - box.y0 + 2};
+}
+
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it.each([-1, 1])('沿四边可核实的斜向背景恢复字框里的图案 %s', direction => {
+        const {source, clean, width, height, region} = diagonalImage(direction);
+        const original = source.slice();
+        expect(inpaintTextRegions(source, width, height, [region])).toEqual(clean);
+        expect(source).toEqual(original);
+    });
+    it('沿半像素斜向采样时只修补框内，已核实的斜边没有被摊开成色带', () => {
+        const {source, clean, width, left, top, columns, rows} = directionalFrame(.5);
+        const original = source.slice();
+        expect(repairDirectionalImageBackground(source, width, left, top, columns, rows,
+            {remaining: IMAGE_DIRECTIONAL_REPAIR_BUDGET})).toBe(true);
+        let edgePixels = 0, outsideChanges = 0;
+        for (let y = 0; y < source.length / (width * 4); y++) for (let x = 0; x < width; x++) {
+            const offset = (y * width + x) * 4;
+            if (x <= left || x >= left + columns - 1 || y <= top || y >= top + rows - 1) {
+                for (let c = 0; c < 4; c++) {
+                    if (source[offset + c] !== original[offset + c]) outsideChanges++;
+                }
+            } else if (source[offset] !== clean[offset]) edgePixels++;
+        }
+        expect(outsideChanges).toBe(0);
+        expect(edgePixels).toBeLessThanOrEqual(2 * rows);
+    });
+    it.each([[47, 20], [90, 8], [150, 57], [60, 35], [350, 56]])(
+        '过窄、过深或过大的观察区保持原样 %s × %s', (columns, rows) => {
+            const width = columns + 2, source = solidPixels(width, rows + 2), original = source.slice();
+            const budget = {remaining: IMAGE_DIRECTIONAL_REPAIR_BUDGET};
+            expect(repairDirectionalImageBackground(source, width, 1, 1, columns, rows, budget)).toBe(false);
+            expect(source).toEqual(original);
+            expect(budget.remaining).toBe(IMAGE_DIRECTIONAL_REPAIR_BUDGET);
+        },
+    );
+    it.each(['budget', 'transparent', 'poor-match', 'independent-columns', 'repeated', 'left-side', 'right-side'] as const)(
+        '斜向条件未确认则不改写原像素 %s', kind => {
+            const {source, width, left, top, columns, rows} = directionalFrame();
+            const right = left + columns - 1, bottom = top + rows - 1;
+            const maxShift = Math.min(32, Math.floor((columns - 1) / 4), Math.floor((rows - 1) * 1.5));
+            const at = (x: number, y: number) => (y * width + x) * 4;
+            if (kind === 'transparent') source[at(left + 12, top + 10) + 3] = 120;
+            if (kind === 'poor-match') {
+                for (let x = left; x <= right; x++) {
+                    const offset = at(x, bottom);
+                    for (let c = 0; c < 3; c++) source[offset + c] = Math.min(255, source[offset + c] + 58);
+                }
+            }
+            if (kind === 'independent-columns') {
+                const parity = (maxShift + rows - 1 + 1) % 2;
+                for (let x = left + parity; x <= right; x += 2) source.set([255, 0, 255, 255], at(x, bottom));
+            }
+            if (kind === 'repeated') {
+                for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+                    const color = ((x - y + 140) % 7) < 3 ? [20, 54, 72, 255] : [224, 198, 140, 255];
+                    source.set(color, at(x, y));
+                }
+            }
+            if (kind === 'left-side' || kind === 'right-side') {
+                const x = kind === 'left-side' ? left : right;
+                for (let y = top + 1; y < bottom; y++) source.set([255, 0, 255, 255], at(x, y));
+            }
+            const budget = {remaining: kind === 'budget' ? 1 : IMAGE_DIRECTIONAL_REPAIR_BUDGET};
+            const original = source.slice(), remaining = budget.remaining;
+            expect(repairDirectionalImageBackground(source, width, left, top, columns, rows, budget)).toBe(false);
+            expect(source).toEqual(original);
+            if (kind === 'budget') expect(budget.remaining).toBe(remaining);
+            else expect(budget.remaining).toBeLessThan(remaining);
+        },
+    );
     it('普通图片的独立旋转字框恢复书脊逐列原像素，未知、相接或组合框沿用既有修补',()=>{
         const f=rotatedSpineFixture(),before=f.pixels.slice(),{width,height,region}=f;
         expect(inpaintTextRegions(f.pixels,width,height,[region])).toEqual(f.background);

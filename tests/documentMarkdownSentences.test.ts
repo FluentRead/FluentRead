@@ -94,6 +94,17 @@ describe('Markdown soft-wrapped paragraphs', () => {
         expect(exported).toContain('First line\r\ncontinues.\n> 第一段。');
         expect(exported).toContain('| Read<br>阅读 | Pending |');
     });
+
+    it('keeps legacy previews usable and leaves table delimiters in a different block quote alone', () => {
+        const source = 'Left | Right\n> --- | ---';
+        const document = parse(source);
+        expect(document.markdownTables).toEqual([]);
+        expect(renderDocument(document, [])).toBe(source);
+        const legacy = {...parse('## Heading\n\nA paragraph.'), markdownTables: undefined};
+        const preview = createDocumentPreviewHtml(legacy, ['标题', '一段文字。'], 'bilingual');
+        expect(preview).toContain('>Heading</h2><h2 class="reader-translation fluentread-translation">标题</h2>');
+        expect(preview).toContain('>A paragraph.</p><p class="reader-translation fluentread-translation">一段文字。</p>');
+    });
 });
 
 describe('Markdown whole-sentence translation', () => {

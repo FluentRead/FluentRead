@@ -528,6 +528,11 @@ describe('binary document low-level contracts', () => {
         expect(await renderDocxPart(document, part, ['译文'], 'bilingual')).toContain('E83B6B');
         expect(await renderDocxPart({...document, segments: []}, part, [], 'translated')).toBe(part.source);
         expect(await renderDocxPart(document, part, ['译文'], 'translated')).toContain('Keep');
+        const broken = '<w:p><w:r><w:t>One</w:t></w:p>';
+        expect(await renderDocxPart(document, {...part, source: broken}, ['译文'], 'translated')).toBe(broken);
+        const linked = '<w:p><w:r><w:t>Read </w:t></w:r><w:hyperlink w:anchor="guide"><w:r><w:t>guide</w:t></w:r></w:hyperlink></w:p>';
+        const linkedDocument = {...document, segments: [{id: 0, source: 'Read <g1>guide</g1>', docxInline: true as const}]};
+        expect(await renderDocxPart(linkedDocument, {...part, source: linked}, ['Read guide'], 'translated')).toBe(linked);
     });
 
     it('公共入口拒绝错误格式，并覆盖文本下载与二进制状态不变量', async () => {

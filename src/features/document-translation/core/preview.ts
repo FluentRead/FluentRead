@@ -169,7 +169,7 @@ function renderMarkdownTablePreview(
     };
     const row = (index: number, tag: 'td' | 'th') => {
         const original = cells(source[index]);
-        const localized = mode === 'source' ? original : cells(translated[index - translatedLineOffset] || source[index]);
+        const localized = mode === 'source' ? original : cells(translated[index - translatedLineOffset]);
         const values = original.slice(0, table.alignments.length).map((value, column) => {
             const translation = localized[column];
             const distinct = hasDistinctTranslation(value, translation);

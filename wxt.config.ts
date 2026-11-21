@@ -253,7 +253,6 @@ export function createExtensionManifest(
             'https://*/*',
         ],
         web_accessible_resources: [
-            {resources: ['hypothesis/build/*', 'hypothesis/build/scripts/*', 'hypothesis/build/styles/*'], matches: ['<all_urls>']},
             {
                 resources: ['videoPcmWorklet.js'],
                 matches: ['<all_urls>'],

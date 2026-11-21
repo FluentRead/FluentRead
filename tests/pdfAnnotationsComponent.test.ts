@@ -14,6 +14,7 @@ const doc = (): ParsedDocument => ({fileName: 'paper.pdf', format: 'pdf', label:
 const mark = (): PdfAnnotation => ({id: 'existing', page: 1, color: 'pink', kind: 'underline', quote: 'Old quote', note: 'Old note', rects: [{x: .1, y: .1, width: .6, height: .15}]});
 const flush = async () => {for (let i = 0; i < 10; i++) {await nextTick(); await Promise.resolve();}};
 const click = (element: Element) => element.dispatchEvent(new document.defaultView!.Event('click'));
+const submitNote = (root: Element) => root.querySelector('form')!.dispatchEvent(new document.defaultView!.Event('submit', {cancelable: true}));
 
 beforeEach(() => {
     const {document, window} = parseHTML('<html><body><main><div class="pdf-page-frame"><div data-fluentread-pdf-text data-pdf-page-number="1"><span>Original source</span></div></div><article data-pdf-reading-page="1"><p class="pdf-reading-paragraph" data-pdf-source-id="pdf-1-segment-0"><span>Reflow source</span></p></article></main></body></html>');
@@ -25,7 +26,8 @@ beforeEach(() => {
 afterEach(() => {app?.unmount(); app = undefined; vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 function mount() {
-    const current = ref(doc()), annotations = ref<PdfAnnotation[]>([]), open = ref(false), sourceUrl = ref('https://arxiv.org/pdf/1706.03762'), saved = ref(false), jumps: number[] = [];
+    const current = ref(doc()), annotations = ref<PdfAnnotation[]>([]), open = ref(false), storageUnavailable = ref(false), jumps: PdfAnnotation[] = [];
+    const translations = ref(['本段译文']);
     const renderer = createRenderer<any, any>({
         createElement: tag => document.createElement(tag), createText: value => document.createTextNode(value), createComment: value => document.createComment(value),
         setText: (node, text) => {node.nodeValue = text;}, setElementText: (node, text) => {node.textContent = text;},
@@ -40,14 +42,17 @@ function mount() {
         },
     });
     const root = document.createElement('aside'); document.body.append(root);
-    app = renderer.createApp({setup: () => () => h(PdfAnnotations, {document: current.value, annotations: annotations.value, open: open.value, root: document.querySelector('main')!, sourceUrl: sourceUrl.value, saved: saved.value, translations: ['本段译文'],
-        onToggle: () => {open.value = !open.value;}, 'onUpdate:annotations': (value: PdfAnnotation[]) => {annotations.value = value;}, onJump: (page: number) => {jumps.push(page);}})});
+    app = renderer.createApp({setup: () => () => h(PdfAnnotations, {document: current.value, annotations: annotations.value, open: open.value,
+        root: document.querySelector('main')!, storageUnavailable: storageUnavailable.value, translations: translations.value,
+        onToggle: () => {open.value = !open.value;}, 'onUpdate:annotations': (value: PdfAnnotation[]) => {annotations.value = value;},
+        onJump: (annotation: PdfAnnotation) => {jumps.push(annotation);}})});
     app.mount(root);
-    return {root, current, annotations, open, sourceUrl, saved, jumps, state: app._instance.subTree.component.setupState};
+    return {root, current, annotations, open, storageUnavailable, jumps, translations, state: app._instance.subTree.component.setupState};
 }
-function select(selector: string, quote = 'Selected source') {
+function select(selector: string, quote = 'Selected source', offset = 0) {
     const node = document.querySelector(selector)!.firstChild!;
-    selection = {isCollapsed: false, rangeCount: 1, getRangeAt: () => ({startContainer: node, endContainer: node, toString: () => quote, getClientRects: () => [{left: 25, top: 60, width: 45, height: 20}, {left: 25, top: 80, width: 30, height: 20}]}), toString: () => quote};
+    selection = {isCollapsed: false, rangeCount: 1, getRangeAt: () => ({startContainer: node, startOffset: offset, endContainer: node,
+        endOffset: offset + quote.length, toString: () => quote, getClientRects: () => [{left: 25, top: 60, width: 45, height: 20}, {left: 25, top: 80, width: 30, height: 20}]}), toString: () => quote};
 }
 
 describe('actual PDF annotation controls', () => {
@@ -57,16 +62,29 @@ describe('actual PDF annotation controls', () => {
         click(view.root.querySelector('.pdf-menu-button')!); await flush();
         expect(view.root.querySelector('blockquote')!.textContent).toBe('Selected source');
         expect(view.root.textContent).toContain('document.pdfReading.annotationReflowHint');
+        expect(view.root.querySelector('textarea')).toBeNull();
         const colors = view.root.querySelectorAll('.pdf-annotation-colors button'); click(colors[1]); await flush();
+        click(view.root.querySelector('.pdf-annotation-note-toggle')!); await flush();
         view.state.note = 'My note'; view.state.includeTranslation = true;
-        click(view.root.querySelector('.pdf-annotation-actions button')!); await flush();
+        click(view.root.querySelectorAll('.pdf-annotation-actions > button')[1]); await flush();
+        expect(view.annotations.value).toEqual([]);
+        expect(view.root.querySelectorAll('.pdf-annotation-actions > button')[1].getAttribute('aria-pressed')).toBe('true');
+        submitNote(view.root); await flush();
         expect(view.annotations.value).toHaveLength(1);
-        expect(view.annotations.value[0]).toMatchObject({page: 1, kind: 'highlight', color: 'green', sourceId: 'pdf-1-segment-0', note: 'My note\n\n本段译文', rects: [{x: .1, y: .1, width: .6, height: .15}]});
+        expect(view.annotations.value[0]).toMatchObject({page: 1, kind: 'underline', color: 'green', sourceId: 'pdf-1-segment-0', note: 'My note\n\n本段译文', rects: [{x: .1, y: .1, width: .6, height: .15}]});
+        expect(view.root.querySelector('.pdf-annotation-primary')?.textContent).toBe('My note\n\n本段译文');
+        expect(view.root.querySelector('.pdf-annotation-excerpt')?.textContent).toBe('Selected source');
+        view.state.captureSelection(); await flush();
+        expect(view.root.querySelector('.pdf-annotation-composer')).toBeNull();
+        expect(view.root.textContent).not.toContain('document.pdfReading.annotationUnsaved');
+        view.storageUnavailable.value = true; await flush();
         expect(view.root.textContent).toContain('document.pdfReading.annotationUnsaved');
-        view.saved.value = true; await flush(); expect(view.root.textContent).toContain('document.pdfReading.annotationSaved');
-        click(view.root.querySelector('.pdf-annotation-location')!); expect(view.jumps).toEqual([1]);
-        click(view.root.querySelector('.pdf-annotation-list li > button:last-child')!); await flush(); expect(view.annotations.value).toEqual([]);
-        expect(view.root.querySelector('.pdf-annotation-download')!.hasAttribute('disabled')).toBe(true);
+        click(view.root.querySelector('.pdf-annotation-location')!); expect(view.jumps).toEqual(view.annotations.value);
+        expect(view.root.querySelector('.pdf-annotation-delete')).toBeNull();
+        click(view.root.querySelector('.pdf-annotation-more')!); await flush();
+        click(view.root.querySelector('.pdf-annotation-delete')!); await flush();
+        expect(view.annotations.value).toEqual([]);
+        expect(view.root.querySelector('.pdf-annotation-download')).toBeNull();
     });
     it('captures precise multiline original coordinates, ignores cross-layer and foreign selections, and clears on a new file', async () => {
         const view = mount(); await flush();
@@ -82,17 +100,65 @@ describe('actual PDF annotation controls', () => {
         select('.pdf-reading-paragraph span'); view.state.captureSelection(); expect(view.state.candidate).toBeTruthy();
         view.current.value = doc(); await flush(); expect(view.state.candidate).toBeUndefined(); expect(view.state.note).toBe('');
     });
-    it('offers only explicit official Hypothesis navigation and clears captured selection on a new reading gesture', async () => {
+    it('keeps an open draft bound to its original selection when the panel closes or the reader changes selection', async () => {
         const view = mount(); click(view.root.querySelector('.pdf-menu-button')!); await flush();
-        expect(view.root.querySelector('script')).toBeNull(); expect(view.root.querySelector('.pdf-hypothesis a')!.getAttribute('href')).toBe('https://via.hypothes.is/https://arxiv.org/pdf/1706.03762');
-        expect(view.root.querySelector('.pdf-hypothesis a')!.getAttribute('rel')).toBe('noopener noreferrer');
-        view.sourceUrl.value = 'file:///private/paper.pdf'; await flush();
-        expect(view.root.textContent).toContain('document.pdfReading.hypothesisLocal'); expect(view.root.querySelector('.pdf-hypothesis a')!.getAttribute('href')).toContain('annotating-locally-saved-pdfs');
-        select('.pdf-reading-paragraph span'); view.state.captureSelection();
+        expect(view.root.textContent).toContain('document.pdfReading.annotationEmpty');
+        expect(view.root.querySelector('.pdf-annotation-composer')).toBeNull();
+        expect(view.root.querySelector('.pdf-annotation-download')).toBeNull();
+        select('.pdf-reading-paragraph span'); view.state.captureSelection(); await flush();
+        click(view.root.querySelector('.pdf-annotation-note-toggle')!); await flush();
+        view.state.note = 'Draft for selection 1';
+        view.state.includeTranslation = true;
+        view.state.captureSelection();
+        expect(view.state.note).toBe('Draft for selection 1');
+        view.open.value = false; await flush();
+        document.querySelector('main')!.dispatchEvent(new document.defaultView!.Event('pointerdown', {bubbles: true}));
+        select('.pdf-reading-paragraph span', 'New text', 2); view.state.captureSelection(); await flush();
+        view.open.value = true; await flush();
+        expect(view.state.note).toBe('Draft for selection 1');
+        expect(view.root.querySelector('blockquote')?.textContent).toBe('Selected source');
+        click(view.root.querySelector('.pdf-annotation-note-actions button')!); await flush();
+        expect(view.state.note).toBe('');
+        expect(view.state.includeTranslation).toBe(false);
+        expect(view.root.querySelector('textarea')).toBeNull();
+        expect(view.root.querySelector('blockquote')?.textContent).toBe('New text');
         document.querySelector('main')!.dispatchEvent(new document.defaultView!.Event('pointerdown', {bubbles: true}));
         expect(view.state.candidate).toBeUndefined();
         app.unmount(); app = undefined;
         expect(removed.mock.calls.map((call: any[]) => call[0])).toEqual(expect.arrayContaining(['selectionchange', 'pointerup', 'pointerdown']));
+    });
+    it('lets the user read and edit the full saved note without creating a second mark', async () => {
+        const view = mount(), existing = mark();
+        existing.note = 'Full note\n'.repeat(20);
+        view.annotations.value = [existing]; view.open.value = true; await flush();
+        click(view.root.querySelector('.pdf-annotation-more')!); await flush();
+        click(view.root.querySelector('.pdf-annotation-row-actions button')!); await flush();
+        expect(view.state.note).toBe(existing.note);
+        expect(view.root.querySelector('.pdf-annotation-footer')).toBeNull();
+        view.state.note = 'Revised note';
+        submitNote(view.root); await flush();
+        expect(view.annotations.value).toEqual([{...existing, note: 'Revised note'}]);
+        expect(view.root.querySelector('.pdf-annotation-primary')?.textContent).toBe('Revised note');
+    });
+    it('attaches the current translation only when the original selection belongs to one segment', async () => {
+        const view = mount();
+        const binary = view.current.value.binary!;
+        if (binary.kind !== 'pdf') throw new Error('PDF fixture expected');
+        binary.pages[0].blocks.push({...binary.pages[0].blocks[0], y: 100, segmentIndex: 1});
+        document.querySelector('.pdf-page-frame')!.getBoundingClientRect = () => ({left: 10, top: 20, width: 150, height: 400} as DOMRect);
+        select('[data-fluentread-pdf-text] span'); view.state.captureSelection();
+        view.translations.value = ['', 'Second translation']; view.open.value = true; await flush();
+        click(view.root.querySelector('.pdf-annotation-note-toggle')!); await flush();
+        expect(view.root.querySelector('.pdf-annotation-translation')).toBeNull();
+        view.translations.value = ['Ready translation', 'Second translation']; await flush();
+        expect(view.root.querySelector('.pdf-annotation-translation')).toBeTruthy();
+        click(view.root.querySelector('.pdf-annotation-note-actions button')!); await flush();
+        select('[data-fluentread-pdf-text] span', 'Two paragraphs', 1);
+        const range = selection.getRangeAt(0);
+        selection.getRangeAt = () => ({...range, getClientRects: () => [...range.getClientRects(), {left: 25, top: 230, width: 45, height: 20}]});
+        view.state.captureSelection(); await flush();
+        click(view.root.querySelector('.pdf-annotation-note-toggle')!); await flush();
+        expect(view.root.querySelector('.pdf-annotation-translation')).toBeNull();
     });
     it('downloads an annotation snapshot, releases the URL and reports export failures without losing marks', async () => {
         const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:annotation'), revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});

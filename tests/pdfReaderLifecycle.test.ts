@@ -1985,32 +1985,89 @@ describe('PDF fixed-page smart colors', () => {
 });
 
 describe('PDF Hypothesis control lifecycle', () => {
+    const toggle = (root: Element) => root.querySelector('[data-testid="pdf-hypothesis-toggle"]');
+    async function openAnnotations(root: Element) {
+        click(root.querySelector('.pdf-annotations > .pdf-menu-button'));
+        await componentFlush();
+    }
     function client() {
         const value = {setEnabled: vi.fn(async (active: boolean) => ({status: 'success', active})), dispose: vi.fn(async () => {})};
         ports.hypothesisClient.mockReturnValue(value); return value;
     }
     it('opens collaboration once, restarts on a same-file view change, and never carries activation into another file', async () => {
         const sdk = client(), view = mountReader(documentModel(2)); await componentFlush();
-        const button = view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')!; click(button); await componentFlush();
-        expect(button.getAttribute('aria-pressed')).toBe('true'); expect(ports.hypothesisClient).toHaveBeenCalledOnce();
+        expect(toggle(view.root)).toBeNull();
+        await openAnnotations(view.root);
+        expect(view.root.querySelector('.pdf-annotations [role="dialog"]')?.textContent).toContain('document.pdfReading.annotationEmpty');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        expect(toggle(view.root)?.textContent).toContain('document.pdfReading.hypothesisToggle');
+        expect(ports.hypothesisClient).not.toHaveBeenCalled();
+        click(toggle(view.root)); await componentFlush();
+        expect(toggle(view.root)).toBeNull(); expect(ports.hypothesisClient).toHaveBeenCalledOnce();
+        await openAnnotations(view.root);
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('true');
         view.currentPresentation.value = 'readable'; await componentFlush(); expect(sdk.setEnabled.mock.calls.map(call => call[0])).toEqual([false, true, false, true]);
-        view.currentDocument.value = documentModel(1); await componentFlush(); expect(button.getAttribute('aria-pressed')).toBe('false'); expect(sdk.setEnabled.mock.calls.at(-1)).toEqual([false]);
+        view.currentDocument.value = documentModel(1); await componentFlush(); expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('false'); expect(sdk.setEnabled.mock.calls.at(-1)).toEqual([false]);
         mountedApp.unmount(); mountedApp = undefined; expect(sdk.dispose).toHaveBeenCalledOnce();
     });
-    it('lets the user cancel a paused client during translation and does not resume it afterwards', async () => {
-        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
-        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush();
-        view.currentTranslating.value = true; await componentFlush(); const button = view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')!;
-        expect(button.hasAttribute('disabled')).toBe(false); click(button); await componentFlush(); const calls = sdk.setEnabled.mock.calls.length;
+    it('explains translation availability and lets the user cancel a paused client', async () => {
+        const sdk = client(), view = mountReader(documentModel(1), 'source', [], {translating: true}); await componentFlush();
+        await openAnnotations(view.root);
+        expect(toggle(view.root)?.getAttribute('aria-disabled')).toBe('true');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        click(toggle(view.root)); await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisWaiting');
+        expect(ports.hypothesisClient).not.toHaveBeenCalled();
+        view.currentTranslating.value = false; await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+        click(toggle(view.root)); await componentFlush();
+        view.currentTranslating.value = true; await componentFlush();
+        await openAnnotations(view.root);
+        const button = toggle(view.root)!;
+        expect(button.hasAttribute('disabled')).toBe(false); expect(button.getAttribute('aria-pressed')).toBe('true');
+        click(button); await componentFlush(); const calls = sdk.setEnabled.mock.calls.length;
         view.currentTranslating.value = false; await componentFlush(); expect(sdk.setEnabled).toHaveBeenCalledTimes(calls); expect(button.getAttribute('aria-pressed')).toBe('false');
+    });
+    it('cancels a slow connection and ignores its late result', async () => {
+        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
+        let finish!: (value: {status: string; active: boolean}) => void;
+        sdk.setEnabled.mockImplementation(async active => active ? new Promise(resolve => {finish = resolve;}) : {status: 'success', active: false});
+        await openAnnotations(view.root);
+        click(toggle(view.root)); await componentFlush();
+        expect(toggle(view.root)?.textContent).toContain('document.pdfReading.hypothesisCancelConnection');
+        expect(toggle(view.root)?.hasAttribute('disabled')).toBe(false);
+        click(toggle(view.root)); await componentFlush();
+        expect(sdk.setEnabled.mock.calls.map(call => call[0])).toEqual([false, true, false]);
+        finish({status: 'success', active: true}); await componentFlush();
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('false');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback')).toBeNull();
+    });
+    it('keeps a reopened annotation panel visible when the earlier collaboration request resolves', async () => {
+        const sdk = client(), view = mountReader(documentModel(1)); await componentFlush();
+        let finish!: (value: {status: string; active: boolean}) => void;
+        sdk.setEnabled.mockImplementation(async active => active ? new Promise(resolve => {finish = resolve;}) : {status: 'success', active: false});
+        await openAnnotations(view.root);
+        click(toggle(view.root)); await componentFlush();
+        const original = toggle(view.root);
+        await openAnnotations(view.root);
+        await openAnnotations(view.root);
+        expect(toggle(view.root)).not.toBe(original);
+        finish({status: 'success', active: true}); await componentFlush();
+        expect(toggle(view.root)?.getAttribute('aria-pressed')).toBe('true');
     });
     it('switches translated-only or OCR source collaboration to a readable text view and reports service failures', async () => {
         const sdk = client(), doc = documentModel(1); doc.binary!.kind === 'pdf' && (doc.binary!.pages[0].ocrRecognized = true);
         const view = mountReader(doc, 'translated', ['Translated text']); await componentFlush();
+        await openAnnotations(view.root);
         sdk.setEnabled.mockImplementation(async active => ({status: active ? 'external' : 'success', active: false}));
-        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush(); expect(view.currentPresentation.value).toBe('readable');
-        expect(view.root.textContent).toContain('document.pdfReading.hypothesisExternal');
+        click(toggle(view.root)); await componentFlush(); expect(view.currentPresentation.value).toBe('readable');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisExternal');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback details')).toBeNull();
         sdk.setEnabled.mockImplementation(async active => ({status: active ? 'failed' : 'success', active: false}));
-        click(view.root.querySelector('[data-testid="pdf-hypothesis-toggle"]')); await componentFlush(); expect(view.root.textContent).toContain('document.pdfReading.hypothesisFailed');
+        click(toggle(view.root)); await componentFlush();
+        expect(view.root.querySelector('.pdf-hypothesis-feedback [role="status"]')?.textContent).toContain('document.pdfReading.hypothesisFailed');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('href')).toBe('https://via.hypothes.is/https://arxiv.org/pdf/1706.03762');
+        expect(view.root.querySelector('.pdf-hypothesis-feedback a')?.getAttribute('rel')).toBe('noopener noreferrer');
+        expect(toggle(view.root)?.hasAttribute('disabled')).toBe(false);
     });
 });

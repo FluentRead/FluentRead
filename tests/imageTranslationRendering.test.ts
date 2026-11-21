@@ -226,6 +226,121 @@ function canvasContext() {
 
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.resetModules(); });
 
+describe('照片译文局部对比度', () => {
+    function paintFixture(sample: (x: number, y: number) => number[]) {
+        const width = 200, height = 80, pixels = new Uint8ClampedArray(width * height * 4);
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            pixels.set(sample(x, y), (y * width + x) * 4);
+        }
+        const context = canvasContext();
+        context.measureText.mockReturnValue({
+            width: 54, actualBoundingBoxLeft: 0, actualBoundingBoxRight: 54,
+            actualBoundingBoxAscent: 7, actualBoundingBoxDescent: 5,
+        } as never);
+        const colors: Array<[string, string]> = [];
+        const canvas = context as unknown as CanvasRenderingContext2D;
+        context.fillText.mockImplementation(() => colors.push([canvas.fillStyle as string, canvas.strokeStyle as string]));
+        return {canvas, context, colors, background: {pixels, width, height, remaining: 8192}};
+    }
+
+    const light = [234, 223, 201, 255], dark = [23, 30, 42, 255];
+    const ring = 'rgb(23,30,42)', oneLine = {lines:['译文'], fontSize:18, lineHeight:22};
+
+    it('外框是深色但文字实际落在浅色图案时，选择深色字', () => {
+        const {canvas, context, colors, background} = paintFixture((x, y) => x < 70 && y < 32 ? light : dark);
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,ring,18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#111827',ring]]);
+        expect(context.rect).toHaveBeenCalledWith(12,10,170,60);
+        expect(context.fillText).toHaveBeenCalledWith('译文',14,22);
+    });
+
+    it('译文横跨明暗两块背景时保留一致的字色并增加对比描边', () => {
+        const {canvas, colors, background} = paintFixture(x => x < 41 ? light : dark);
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,ring,18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#ffffff','#111827']]);
+    });
+
+    it('半透明区域继续使用既有字色与描边', () => {
+        const {canvas, colors, background} = paintFixture(() => [234,223,201,148]);
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,ring,18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#ffffff',ring]]);
+    });
+
+    it('文字落在暗处时，外框采到的浅色也可以纠正', () => {
+        const {canvas, colors, background} = paintFixture(() => dark);
+        const border = 'rgb(234,223,201)';
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,border,18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#ffffff',border]]);
+    });
+
+    it('使用深色字的混色区采用浅色描边', () => {
+        const {canvas, colors, background} = paintFixture(x => x < 41 ? light : dark);
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,'rgb(234,223,201)',18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#111827','#ffffff']]);
+    });
+
+    it('从同张图扣除采样预算，每行没有足够样点时恢复该行原选色', () => {
+        const {canvas, colors, background} = paintFixture(() => light);
+        background.remaining = 32;
+        const layout = {...oneLine,lines:['第一行','第二行']};
+        drawTranslatedImageText(canvas,'第一行\n第二行',12,10,170,60,ring,18,'left',layout,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#111827',ring],['#ffffff',ring]]);
+        expect(background.remaining).toBe(0);
+    });
+
+    it.each([
+        [25, -25, 7, 5],
+        [0, Infinity, 7, 5],
+        [25, 54, 7, 5],
+        [0, 220, 7, 5],
+        [0, 54, 23, 5],
+        [0, 54, 7, 77],
+    ])('不完整或越界的字形指标使用原选色 %j', (left, right, ascent, descent) => {
+        const {canvas, context, colors, background} = paintFixture(() => light);
+        context.measureText.mockReturnValue({
+            width:54, actualBoundingBoxLeft:left, actualBoundingBoxRight:right,
+            actualBoundingBoxAscent:ascent, actualBoundingBoxDescent:descent,
+        } as never);
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,ring,18,'left',oneLine,
+            undefined,undefined,undefined,undefined,background);
+        expect(colors).toEqual([['#ffffff',ring]]);
+    });
+
+    it.each([
+        ['#eeeeee', undefined, '译文', ['#eeeeee', ring]],
+        [undefined, '#121212', '译文', ['#ffffff', '#121212']],
+        [undefined, undefined, 'x'.repeat(4097), ['#ffffff', ring]],
+    ] as const)('已确认的字色、描边或很长的行无需采样 %#', (foreground, outline, text, style) => {
+        const {canvas, colors, background} = paintFixture(() => light);
+        drawTranslatedImageText(canvas,text,12,10,170,60,ring,18,'left',{...oneLine,lines:[text]},
+            foreground,outline,undefined,undefined,background);
+        expect(colors).toEqual([style]);
+        expect(background.remaining).toBe(8192);
+    });
+
+    it('按倾角变换后的图像位置取样，并继续使用真实字体度量', () => {
+        const {canvas, context, colors, background} = paintFixture(() => light);
+        context.measureText.mockImplementation(text=>{
+            const size=Number(context.font.match(/([\d.]+)px/)![1]), width=text.length*size*.6;
+            return {width,actualBoundingBoxLeft:0,actualBoundingBoxRight:width,
+                actualBoundingBoxAscent:size*.8,actualBoundingBoxDescent:size*.2} as never;
+        });
+        const source={text:'SOURCE',bbox:{x0:12,y0:10,x1:182,y1:70}};
+        const orientation={owner:source,sourceText:source.text,radians:-Math.PI/12,originX:98,originY:40,
+            bounds:{x0:-52,y0:-10,x1:52,y1:10},width:104,height:20,count:1,heightGain:10};
+        drawTranslatedImageText(canvas,'译文',12,10,170,60,ring,18,'left',undefined,
+            undefined,undefined,undefined,orientation,background);
+        expect(context.transform).toHaveBeenCalledOnce();
+        expect(colors).toEqual([['#111827',ring]]);
+    });
+});
+
 describe('图片译文排版与绘制', () => {
     it('倾斜译文只在原世界坐标裁剪后变换，保存全部正文并在异常时恢复状态',()=>{
         const source={text:'SOURCE',bbox:{x0:10,y0:20,x1:210,y1:100}},orientation={owner:source,sourceText:source.text,radians:-Math.PI/36,originX:110,originY:60,bounds:{x0:-80,y0:-10,x1:80,y1:10},width:160,height:20,count:1,heightGain:10};

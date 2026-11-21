@@ -714,27 +714,14 @@ async function prepareTranslatedImage(
         await checkImageCancellation(signal);
         context.putImageData(sourcePixels, 0, 0);
 
-        const renderedLines = translatedLines.map(line => ({
-            ...line,
-            backgroundColor: drawing.get(line)!.background??getImageTextBackgroundColor(pixels, canvas.width, canvas.height, line.bbox),
-            drawing:drawing.get(line)!,
-            maxFontSize:fontStyles.get(line)!.fontSize,
-        }));
-        for(const line of renderedLines){
+        const background = protection ? undefined : {pixels, width:canvas.width, height:canvas.height, remaining:8192};
+        for(const line of translatedLines){
             throwIfImageOperationAborted(signal);
-            const plan=line.drawing,bounds=plan.bounds,alignment=line.vertical?'center':line.textAlign??'left';
-            if(plan.orientation)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds,plan.orientation);
-            else if(plan.sourceInkBounds)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds);
-            else if(plan.outline)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline);
-            else if(plan.foreground)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground);
-            else if(plan.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared);
-            else drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment);
+            const plan=drawing.get(line)!,bounds=plan.bounds,alignment=line.vertical?'center':line.textAlign??'left';
+            const color=plan.background??getImageTextBackgroundColor(pixels,canvas.width,canvas.height,line.bbox);
+            drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                color,fontStyles.get(line)!.fontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds,plan.orientation,
+                plan.background?undefined:background);
         }
         await checkImageCancellation(signal);
         const image = await encodeImageCanvas(canvas, signal);

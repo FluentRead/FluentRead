@@ -220,15 +220,22 @@ export function attachTranslationRequestScheduler<T extends object>(
     scheduler: TranslationRequestScheduler,
     identity?: TranslationRequestIdentity,
     lease?: TranslationRequestLease,
+    deadlineAt?: number,
 ): T & TranslationProviderRequestContext {
     return Object.assign(message, {
-        [TRANSLATION_REQUEST_SCHEDULER]: Object.freeze({scheduler, identity: identity ? Object.freeze({...identity}) : undefined, lease}),
+        [TRANSLATION_REQUEST_SCHEDULER]: Object.freeze({scheduler, identity: identity ? Object.freeze({...identity}) : undefined, lease, deadlineAt}),
     });
 }
 
 export function getTranslationRequestScheduler(message: unknown): TranslationProviderRequestContext[typeof TRANSLATION_REQUEST_SCHEDULER] {
     if (!message || typeof message !== 'object') return undefined;
     return (message as TranslationProviderRequestContext)[TRANSLATION_REQUEST_SCHEDULER];
+}
+
+/** 非 SDK 的 HTTP 适配器已经占用外层请求租约，直接反馈真实响应。 */
+export function observeTranslationHttpResponse(message: unknown, response: Pick<Response, 'status' | 'headers'>): void {
+    const context = getTranslationRequestScheduler(message);
+    context?.scheduler.observeResponse(context.identity, response, context.lease);
 }
 
 /** 为后台内部调用附加不可序列化的取消所有权；runtime payload 无法构造 symbol key。 */

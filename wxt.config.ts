@@ -474,6 +474,8 @@ export default defineConfig({
             // EPUB 目录、Word 行内回填、Markdown 表格、字幕和 CSV/TSV 共用已有依赖，按需加载 XML 解析。
             // 同环境 55bfab088 基线 70,079,902 bytes，整合后增至 70,134,258（+54,356），登记 55 kB 功能预算。
             const documentFormatsBudget = 55_000;
+            // Chrome 同环境 55bfab088 对照为 70,079,902 → 70,083,642 bytes，登记 4 kB 翻译链路代码预算。
+            const translationPipelineBudget = browser === 'chrome' ? 4_000 : 0;
             // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
             const pageRuleDiagnosisBudget = 12_000;
             // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
@@ -484,7 +486,7 @@ export default defineConfig({
             const courseraCaptionBudget = 4_000;
             // 与 CSV/TSV 选列流程整合后，Chrome 实测 70,406,656 字节，较原组合预算超出 2,656 字节。
             const documentGlossaryCandidateBudget = 16_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

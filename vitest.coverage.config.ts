@@ -1010,6 +1010,7 @@ export default defineConfig({
                 'src/services/translation/freeFallback.ts',
                 'src/providers/translation/usage.ts',
                 'src/services/translation/broker.ts',
+                'src/services/translation/compactBatch.ts',
                 'src/services/translation/client.ts',
                 'src/services/translation/languagePreflight.ts',
                 'src/services/translation/requestIdentity.ts',

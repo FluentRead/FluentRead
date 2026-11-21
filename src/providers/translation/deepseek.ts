@@ -19,6 +19,7 @@ import {createHttpStatusError, createImageInputHttpError, readJsonResponse} from
 import {abortErrorFromSignal, cancelUnreadResponseBody, runtimeFetch} from '@/src/platform/http/runtime';
 import {
     requireTranslationProviderConfig,
+    observeTranslationHttpResponse,
     getTranslationImageInput,
     reportTranslationModelUsage,
     reportTranslationModelUsageFailure,
@@ -84,6 +85,7 @@ async function deepseek(message: TranslationProviderRequest<string>) {
             body,
             signal: message.abortSignal,
         });
+        observeTranslationHttpResponse(message, resp);
         if (!resp.ok) {
             reportTranslationModelUsageFailure(message, undefined, startedAt, configuredModel, resp.status);
             attemptReported = true;

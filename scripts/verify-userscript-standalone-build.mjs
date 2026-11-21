@@ -50,6 +50,7 @@ const bytes = Buffer.byteLength(source);
 // Keep every protocol assertion, dependency and compact/Greasy Fork budget unchanged.
 // #1356's media controls and feedback exceed the existing cap by less than 3 kB on abdbbcc88.
 // Register only that rounded text/UI increment; dependencies, metadata checks and compact/Greasy Fork limits stay unchanged.
-const maxBytes = 3_703_000;
+// JSON 合批与共享退避增加代码，按 1 kB 步长利用原余量后追加 4 kB。
+const maxBytes = 3_707_000;
 if (bytes > maxBytes) throw new Error(`Standalone userscript grew past ${maxBytes.toLocaleString('en-US')} bytes: ${bytes}`);
 console.log(`Verified ${artifact} (${bytes.toLocaleString()} bytes; no @require)`);

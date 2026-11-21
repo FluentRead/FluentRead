@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3'
-import UiIcon from '../../src/ui/components/UiIcon.vue'
+import UiIcon from '@/src/ui/components/UiIcon.vue'
 
 const names = ['home', 'layout', 'plug', 'translate', 'card', 'image', 'scan', 'captions', 'globe', 'pen', 'swap', 'book', 'glossary', 'chart', 'gauge', 'sliders', 'history', 'info', 'close', 'plus', 'search', 'chevron-down', 'arrow-right', 'external', 'grip', 'check', 'star', 'shield', 'keyboard']
 const meta = {

@@ -1,7 +1,7 @@
 /** Storybook-only language context: the production UI and its configuration store remain independent. */
 import { readonly, ref } from 'vue'
-import { registerUiLanguageBundle, translate, translateLegacyText, type TranslationParams, type UiLanguage } from '../src/core/i18n'
-import { enUSMessages, enUSLegacyText } from '../src/core/i18n/messages/en-US'
+import { registerUiLanguageBundle, translate, translateLegacyText, type TranslationParams, type UiLanguage } from '@/src/core/i18n'
+import { enUSMessages, enUSLegacyText } from '@/src/core/i18n/messages/en-US'
 
 registerUiLanguageBundle('en-US', { messages: enUSMessages, legacyText: enUSLegacyText, legacyPatterns: { early: [], late: [] } })
 export const previewLanguage = ref<UiLanguage>('zh-CN')

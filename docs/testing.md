@@ -26,6 +26,8 @@ pnpm compile
 
 ## 专项入口
 
+专项 Vitest 配置见 [`tests/config/`](../tests/config/)。可以直接运行 `pnpm test:cloud-backup`、`pnpm test:video:learning` 和 `pnpm test:zotero`。
+
 - [范围、诊断与完整流水线](testing/contracts.md)
 - [网页翻译与站点兼容](testing/webpage.md)
 - [真实站点与 DOM 兼容](testing/sites.md)

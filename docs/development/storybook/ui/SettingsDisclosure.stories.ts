@@ -1,8 +1,8 @@
 import type {Meta, StoryObj} from '@storybook/vue3'
 import {ref} from 'vue'
 import {ElInput} from 'element-plus'
-import SettingsDisclosure from '../../src/features/settings/ui/components/SettingsDisclosure.vue'
-import SettingsItem from '../../src/features/settings/ui/components/SettingsItem.vue'
+import SettingsDisclosure from '@/src/features/settings/ui/components/SettingsDisclosure.vue'
+import SettingsItem from '@/src/features/settings/ui/components/SettingsItem.vue'
 
 const meta = {
   title: 'UI/SettingsDisclosure', component: SettingsDisclosure, tags: ['autodocs'],

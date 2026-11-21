@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3'
-import TranslationLoadingPreview from '../../src/ui/components/TranslationLoadingPreview.vue'
-import { translationLoadingStyleOptions } from '../../src/core/config/translationLoadingStyle'
+import TranslationLoadingPreview from '@/src/ui/components/TranslationLoadingPreview.vue'
+import { translationLoadingStyleOptions } from '@/src/core/config/translationLoadingStyle'
 
 const meta = {
   title: 'UI/TranslationLoading', component: TranslationLoadingPreview, tags: ['autodocs'],

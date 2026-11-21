@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3'
-import ServiceIcon from '../../src/ui/components/ServiceIcon.vue'
+import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
 
 const meta = {
   title: 'UI/ServiceIcon', component: ServiceIcon, tags: ['autodocs'],

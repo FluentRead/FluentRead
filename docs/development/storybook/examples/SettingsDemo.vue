@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import {ElButton, ElInput, ElOption, ElSwitch} from 'element-plus'
-import SettingsGroup from '../../src/features/settings/ui/components/SettingsGroup.vue'
-import SettingsItem from '../../src/features/settings/ui/components/SettingsItem.vue'
-import SettingsDisclosure from '../../src/features/settings/ui/components/SettingsDisclosure.vue'
-import SettingsNumberInput from '../../src/features/settings/ui/components/SettingsNumberInput.vue'
-import '../../src/features/settings/ui/components/settings-controls.css'
-import UiSelect from '../../src/ui/components/UiSelect.vue'
+import SettingsGroup from '@/src/features/settings/ui/components/SettingsGroup.vue'
+import SettingsItem from '@/src/features/settings/ui/components/SettingsItem.vue'
+import SettingsDisclosure from '@/src/features/settings/ui/components/SettingsDisclosure.vue'
+import SettingsNumberInput from '@/src/features/settings/ui/components/SettingsNumberInput.vue'
+import '@/src/features/settings/ui/components/settings-controls.css'
+import UiSelect from '@/src/ui/components/UiSelect.vue'
 withDefaults(defineProps<{longLabels?: boolean; needsSetup?: boolean}>(), {longLabels: false, needsSetup: false})
 const enabled = ref(true)
 const language = ref('zh-CN')

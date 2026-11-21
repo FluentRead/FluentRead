@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { ElOption } from 'element-plus'
-import UiSelect from '../../src/ui/components/UiSelect.vue'
+import UiSelect from '@/src/ui/components/UiSelect.vue'
 import { useUiI18n } from '../preview-i18n'
 
 const props = withDefaults(defineProps<{ filterable?: boolean; multiple?: boolean; disabled?: boolean; longLabels?: boolean }>(), { filterable: true })

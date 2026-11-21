@@ -11,8 +11,8 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "paths": {
       "@/src/ui/i18n": ["./preview-i18n.ts"],
-      "@/*": ["../*"]
+      "@/*": ["../../../*"]
     }
   },
-  "include": ["./**/*.ts", "./**/*.vue", "../.storybook/**/*.ts"]
+  "include": ["./**/*.ts", "./**/*.vue"]
 }

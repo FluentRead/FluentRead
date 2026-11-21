@@ -9,18 +9,18 @@ import {auditVueOwners, isDeclarativeVue, sourceHash, type VueOwner} from '../he
 const PROJECT_ROOT = resolve(__dirname, '../..');
 const AUDITED_EXTENSIONS = /\.(?:cjs|css|html|js|mjs|ts|vue)$/u;
 const PRODUCT_ROOTS = [
+    'assets/styles',
     'docs/.vitepress',
     'entrypoints',
     'examples',
     'scripts',
     'src',
-    'styles',
+    'tests/config',
     'userscript',
 ] as const;
 const ROOT_FILES = [
     'vitest.config.ts',
     'vitest.coverage.config.ts',
-    'vitest.cloud-backup.config.ts',
     'wxt.config.ts',
 ] as const;
 const PRODUCT_TOOL_SCRIPTS = [
@@ -121,7 +121,7 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
     if (path.startsWith('components/')
         || path.startsWith('entrypoints/')
         || path.startsWith('src/')
-        || path.startsWith('styles/')
+        || path.startsWith('assets/styles/')
         || path === 'wxt.config.ts') {
         owners.add('chrome-firefox-build');
     }
@@ -164,7 +164,8 @@ function verificationOwners(path: string, strictCoverage: Set<string>): Verifica
         || path === 'scripts/verify-userscript-standalone-build.mjs'
         || path === 'scripts/export-site-rule-pack.mjs'
         || path === 'scripts/update-readme-contributors.mjs'
-        || path.startsWith('vitest.')) {
+        || path.startsWith('vitest.')
+        || path.startsWith('tests/config/')) {
         owners.add('test-infrastructure-contract');
     }
 

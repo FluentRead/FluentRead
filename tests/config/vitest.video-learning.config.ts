@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import base from './vitest.config';
+import base from '../../vitest.config';
 
 // 有界的视频学习专项。显式替换 include，避免 mergeConfig 把全量测试拼进来。
 export default defineConfig({

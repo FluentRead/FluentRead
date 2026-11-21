@@ -1,6 +1,6 @@
 import { ref, watch } from 'vue'
 import type { Meta, StoryObj } from '@storybook/vue3'
-import FeatureEnableCard from '../../src/ui/components/FeatureEnableCard.vue'
+import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue'
 
 const meta = {
   title: 'UI/FeatureEnableCard', component: FeatureEnableCard, tags: ['autodocs'],

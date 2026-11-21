@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import base from './vitest.config';
+import base from '../../vitest.config';
 
 // ChatGPT 套餐接入的专属行为门禁，显式范围避免启动全量回归。
 export default defineConfig({...base, test: {...base.test,

@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import base from './vitest.config';
+import base from '../../vitest.config';
 
 // 单独验证本次新增业务模块，不因聚焦回归重跑其它功能。
 export default defineConfig({

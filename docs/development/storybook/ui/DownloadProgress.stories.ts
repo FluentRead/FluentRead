@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/vue3'
-import DownloadProgress from '../../src/ui/components/DownloadProgress.vue'
+import DownloadProgress from '@/src/ui/components/DownloadProgress.vue'
 
 const meta = {
   title: 'UI/DownloadProgress', component: DownloadProgress, tags: ['autodocs'],

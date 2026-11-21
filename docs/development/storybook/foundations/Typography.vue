@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { interfaceFontOptions } from '../../src/core/config/interfaceAppearance'
+import { interfaceFontOptions } from '@/src/core/config/interfaceAppearance'
 const sizes = [{ size: 26, title: '页面标题' }, { size: 18, title: '分区标题' }, { size: 14, title: '控件标题' }, { size: 13, title: '表单文字' }, { size: 12, title: '辅助说明' }, { size: 11, title: '进度详情' }]
 </script>
 <template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElButton, ElDialog, ElInput, ElSwitch, ElTooltip } from 'element-plus'
-import '../../src/features/settings/ui/components/settings-controls.css'
+import '@/src/features/settings/ui/components/settings-controls.css'
 const prompt = ref('把选中的文字翻译成简体中文。')
 const enabled = ref(true)
 const open = ref(false)

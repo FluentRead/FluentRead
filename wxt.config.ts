@@ -340,7 +340,7 @@ export default defineConfig({
         // 文件，点文件只明确允许 .nvmrc，避免带入 .env 等本地配置。
         includeSources: [
             '.nvmrc', 'LICENSE', 'README.md', 'PRIVACY.md', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
-            'entrypoints/**', 'src/**', 'styles/**', 'assets/**', 'misc/**', 'public/**', 'scripts/**', 'patches/**',
+            'entrypoints/**', 'src/**', 'assets/**', 'misc/**', 'public/**', 'scripts/**', 'patches/**',
             'docs/development/service-icons.md', 'docs/guide/deepseek-harness.md',
         ],
         excludeSources: ['coverage/**', 'scripts/testing/evidence/**', '**/.DS_Store'],

@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import base from './vitest.config';
+import base from '../../vitest.config';
 
 // 独立导航覆盖报告与模型、内容及设置生命周期报告分开写，避免并行验证互相覆盖证据。
 export default defineConfig({

@@ -18,7 +18,7 @@ import {buildGlossaryRevision, resolveGlossaryEntries, type GlossaryLibrary} fro
 import {IMAGE_PROGRESS_MESSAGE_TYPE, isImageTranslationStage, normalizeImageProgress, type ImageTranslationStage} from '../progress';
 import {
     IMAGE_OCR_LANGUAGE_PACKS,
-    getMangaOcrEngine,
+    getImageOcrEngine,
     normalizeImageOcrLanguageCodes,
     type ImageOcrLanguageCode,
     type ImageOcrDownloadState,
@@ -562,8 +562,7 @@ export function createImageTranslationBackgroundHandlers(
                 try {
                     const result = parseObjectResult(
                         await operationRegistry.run(message, async (options) => {
-                            const paddle = message.manga ? getMangaOcrEngine(sourceLanguage) === 'paddle'
-                                : dependencies.getImageOcrEngine?.() === 'paddle';
+                            const paddle = getImageOcrEngine(sourceLanguage, message.manga ? 'paddle' : dependencies.getImageOcrEngine?.()) === 'paddle';
                             if (!paddle) await dependencies.assertLanguagesDownloaded(sourceLanguage);
                             if (options.signal.aborted) throw imageAbortError(false);
                             const progressOwner = {context};

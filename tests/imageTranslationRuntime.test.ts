@@ -1445,6 +1445,20 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.roots[0].querySelector('.fr-image-controls')).not.toBeNull();
     });
 
+    it.each(['ru-RU','ko-KR'])('单图语言模型 %s 缺包时点准备并继续当前图片',async sourceLanguage=>{
+        settings.from=sourceLanguage;
+        settings.imageTranslationOcrEngine='paddle';
+        client.translate.mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'));
+        const env=setup();env.hover();env.click();await flush();
+        const prepare=env.roots[0].querySelector('.fr-image-prepare') as HTMLButtonElement;
+        expect(prepare.hidden).toBe(false);
+        expect(client.prepare).not.toHaveBeenCalled();
+        env.dispatch(prepare,'click');await flush();
+        expect(client.prepare).toHaveBeenCalledExactlyOnceWith(sourceLanguage,expect.any(AbortSignal),expect.any(Function));
+        expect(client.translate.mock.calls.map(call=>call[1])).toEqual([sourceLanguage,sourceLanguage]);
+        expect(env.button().dataset.phase).toBe('translated');
+    });
+
     it('语言包准备从当前图片原地继续，并展示后台真实进度', async () => {
         client.translate.mockRejectedValueOnce(new Error('请先下载语言包'));
         const env = setup(); env.hover(); env.click(); await flush();

@@ -42,7 +42,7 @@ import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
 import {mangaMaskBoxes, mangaMaskBoxIntersects, createMangaMaskFontResolver, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
-import {getMangaOcrEngine} from '../ocrLanguages';
+import {getImageOcrEngine} from '../ocrLanguages';
 
 export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
 
@@ -769,7 +769,7 @@ export async function translateImageInOffscreen(
     const source = await loadImage(image, signal);
     try {
         throwIfImageOperationAborted(signal);
-        const usePaddle = (manga ? getMangaOcrEngine(sourceLanguage) : ocrEngine) === 'paddle';
+        const usePaddle = getImageOcrEngine(sourceLanguage, manga ? 'paddle' : ocrEngine) === 'paddle';
         if (!usePaddle) reportProgress(requestId, 'recognizing');
         const recognized = usePaddle ? await mangaOcrRuntime.recognize(image, sourceLanguage, source.naturalWidth || source.width,
             source.naturalHeight || source.height, signal,

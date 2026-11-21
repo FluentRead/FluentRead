@@ -18,8 +18,11 @@
       <SettingsPreviewLayout :label="t('图片翻译效果预览')">
         <template #preview><ImageTranslationSettingsPreview /></template>
         <div class="manga-preview-preferences">
-          <SettingsItem :label="t('图片识别方式')" :description="t(settings.imageTranslationOcrEngine === 'paddle' ? '适合普通图片、截图和漫画文字。首次翻译下载约 30 MB，与漫画共用，已下载无需重复下载。' : '适合截图、图表与清晰排版文字。按原文语言准备语言包。')" stacked>
-            <UiSelect v-model="settings.imageTranslationOcrEngine" :disabled="!available" :aria-label="t('图片识别方式')"><el-option value="paddle" :label="t('PaddleOCR（标准模型）')" /><el-option value="tesseract" :label="t('Tesseract（轻量模型）')" /></UiSelect>
+          <SettingsItem :label="t('图片识别方式')" :description="t(imageOcrEngine === 'paddle' ? '适合普通图片、截图和漫画文字。首次翻译下载约 30 MB，与漫画共用，已下载无需重复下载。' : '适合截图、图表与清晰排版文字。按原文语言准备语言包。')" stacked>
+            <UiSelect v-model="imageOcrEngine" :disabled="!available" :aria-label="t('图片识别方式')">
+              <el-option value="paddle" :label="t('PaddleOCR（标准模型）')" :disabled="!paddleSupportsSource" />
+              <el-option value="tesseract" :label="t('Tesseract（轻量模型）')" />
+            </UiSelect>
           </SettingsItem>
           <SettingsItem :label="t('image.hover')" :description="t('鼠标停在图片上时显示翻译入口')" :disabled="!available || !imageEnabled"><el-switch v-model="settings.imageTranslationHoverEnabled" :disabled="!available || !imageEnabled" :aria-label="t('image.hover')" /></SettingsItem>
           <SettingsItem :label="t('image.context')" :description="t('右键点击图片时提供翻译操作')" :disabled="!available || !imageEnabled"><el-switch v-model="settings.imageTranslationContextMenuEnabled" :disabled="!available || !imageEnabled" :aria-label="t('image.context')" /></SettingsItem>
@@ -41,7 +44,7 @@
     </SettingsGroup>
     <slot />
     <SettingsGroup v-if="available" :title="t('识别资源')" data-settings-anchor="resources" :data-settings-anchor-label="t('识别资源')">
-      <div class="manga-resource-body"><MangaModelSettings v-if="settings.imageTranslationMangaEnabled || settings.imageTranslationOcrEngine === 'paddle'" embedded :image-recognition="settings.imageTranslationOcrEngine === 'paddle'" :show-inpainting="settings.imageTranslationMangaEnabled" /><slot name="resources" /></div>
+      <div class="manga-resource-body"><MangaModelSettings v-if="settings.imageTranslationMangaEnabled || imageOcrEngine === 'paddle'" embedded :image-recognition="imageOcrEngine === 'paddle'" :show-inpainting="settings.imageTranslationMangaEnabled" /><slot name="resources" /></div>
     </SettingsGroup>
     <section class="manga-settings-card manga-sites" data-settings-anchor="sites" :data-settings-anchor-label="t('支持的网站')">
       <header class="settings-card-heading"><h2>{{ t('支持的网站') }}</h2></header>
@@ -77,10 +80,16 @@ import {SettingsGroup, SettingsItem, SettingsPreviewLayout} from '@/src/features
 import FeatureEnableCard from '@/src/ui/components/FeatureEnableCard.vue';
 import ImageTranslationSettingsPreview from './ImageTranslationSettingsPreview.vue';
 import MangaModelSettings from './MangaModelSettings.vue';
+import {getImageOcrEngine, getMangaOcrEngine} from '../ocrLanguages';
 const props = defineProps<{settings: Config; imageEnabled: boolean; available: boolean; serviceOptions: {label: string; value: string; disabled?: boolean}[]}>();
 const emit = defineEmits<{'update:imageEnabled': [enabled: boolean]}>();
 const {t: message, translateLegacy} = useUiI18n();
 const t = (source: string) => /^(image|area)\./.test(source) ? message(source) : translateLegacy(source);
+const paddleSupportsSource = computed(() => getMangaOcrEngine(props.settings.from) === 'paddle');
+const imageOcrEngine = computed({
+  get: () => getImageOcrEngine(props.settings.from, props.settings.imageTranslationOcrEngine),
+  set: engine => {props.settings.imageTranslationOcrEngine = engine;},
+});
 const targetLanguages = options.to, sourceLanguages = options.from;
 const url = ref(''), selector = ref('main img, article img'), error = ref('');
 const siteSearch = ref('');

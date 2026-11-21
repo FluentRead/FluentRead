@@ -46,7 +46,7 @@ async function fixture(): Promise<Uint8Array> {
 
 describe('real PDF structural parsing', () => {
     it('contains real Helvetica-Bold p/g outlines in both sample titles without changing their typography', async () => {
-        const bytes = new Uint8Array(readFileSync(new URL('../examples/document-translation/sample.pdf', import.meta.url)));
+        const bytes = new Uint8Array(readFileSync(new URL('./fixtures/document-translation/sample.pdf', import.meta.url)));
         const before = bytes.slice();
         class BinaryDataFactory {
             async fetch({filename}: {filename: string}): Promise<Uint8Array> {
@@ -99,7 +99,7 @@ describe('real PDF structural parsing', () => {
     });
 
     it('keeps real standard-font serif paragraphs and bounds their preceding heading in the repository sample', async () => {
-        const bytes = new Uint8Array(readFileSync(new URL('../examples/document-translation/sample.pdf', import.meta.url)));
+        const bytes = new Uint8Array(readFileSync(new URL('./fixtures/document-translation/sample.pdf', import.meta.url)));
         const before = bytes.slice();
         const loadedFonts: string[] = [];
         // 跟踪 PDF.js 6 通过 BinaryDataFactory 读取的本地标准字体。

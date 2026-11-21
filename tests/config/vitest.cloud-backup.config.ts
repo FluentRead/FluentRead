@@ -1,4 +1,4 @@
-import base from '../../vitest.coverage.config';
+import base from './vitest.coverage.config';
 
 // 针对 Google Drive / WebDAV 的事务与协议验证；保持完整覆盖率阈值，不运行无关产品套件。
 export default {

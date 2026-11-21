@@ -2,6 +2,8 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+[文档翻译样例](../../tests/fixtures/document-translation/)包含 PDF、ePub、DOCX 和字幕文件，可以下载后导入扩展。
+
 ## 字幕文件上下文（issue #1182）
 
 `documentTranslationApi`、`documentTranslationExamplesApi` 验证 SRT/VTT/ASS 邻句与当前 cue 身份、1200 字符预算、长 cue、断续批次、重复台词、普通 AI 文档去重、组合 AI 和专用 MT 模型边界；导出后重解析，cue 数量、时间戳及原结构保持一致。

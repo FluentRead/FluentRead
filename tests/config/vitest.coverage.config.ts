@@ -1,5 +1,5 @@
 import {defineConfig} from 'vitest/config';
-import baseConfig from './vitest.config';
+import baseConfig from '../../vitest.config';
 
 /**
  * 普通回归与严格覆盖率共用 Vue、环境、隔离、资源预算和完整测试发现规则。

@@ -21,16 +21,16 @@ for (const [language, tagline] of Object.entries(taglines)) {
     assert.ok(typeof description === 'string' && description.trim() === description && description.length > 0, `${language}: empty or untrimmed product description`);
     assert.ok(description.length <= 132 && !/[\r\n]/u.test(description), `${language}: native manifest description limit`);
     assert.ok(read(`src/core/i18n/messages/${language}.ts`).includes(`"brand.tagline": brandTaglines['${language}']`), `${language}: interface resource`);
-    assert.ok(read('marketing/brand.md').includes(tagline), `${language}: copyable brand guide`);
+    assert.ok(read('docs/maintainers/marketing/brand.md').includes(tagline), `${language}: copyable brand guide`);
 }
 for (const [locale, language] of [['en', 'en-US'], ['zh-CN', 'zh-CN']]) {
-    const folder = `marketing/chrome-web-store/${locale}`;
+    const folder = `docs/maintainers/marketing/chrome-web-store/${locale}`;
     const short = read(`${folder}/short-description.txt`).trim();
     assert.equal(short, descriptions[language], `${locale}: localized product short description`);
     assert.ok([...short].length <= 132, `${locale}: short description length`);
     assert.equal(JSON.parse(read(`${folder}/listing.json`)).shortDescription, short, `${locale}: listing`);
     assert.ok(read(`${folder}/description.txt`).startsWith(`${taglines[language]}\n\n`), `${locale}: full description`);
-    assert.ok(read(`marketing/copy/${locale}.md`).includes(taglines[language]), `${locale}: community copy`);
+    assert.ok(read(`docs/maintainers/marketing/copy/${locale}.md`).includes(taglines[language]), `${locale}: community copy`);
 }
 for (const [file, language, counterpart] of [
     ['README.md', 'en-US', './misc/README_ZH.md'],

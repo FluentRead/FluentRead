@@ -45,7 +45,7 @@ async function main() {
   const repository = path.resolve(__dirname, '../..');
   const extensionDir = path.resolve(arg('extension-dir', path.join(repository, '.output/chrome-mv3')));
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-zoom-production'));
-  const exampleDir = path.resolve(arg('example-dir', path.join(repository, 'examples/document-translation')));
+  const exampleDir = path.resolve(arg('example-dir', path.join(repository, 'tests/fixtures/document-translation')));
   const suites = arg('suite', 'all').split(',');
   const extremeOnly = process.argv.includes('--extreme-only');
   assert(suites.every(suite => ['all', 'pdf', 'readers', 'lifecycle', 'responsive'].includes(suite)), 'suite supports all, pdf, readers, lifecycle, responsive (comma separated)');

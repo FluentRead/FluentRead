@@ -1,4 +1,4 @@
-examples/document-translation/*.pdf binary
+tests/fixtures/document-translation/*.pdf binary
 public/pdfjs/cmaps/*.bcmap binary
 public/pdfjs/standard_fonts/*.pfb binary
 public/pdfjs/standard_fonts/*.ttf binary

@@ -201,4 +201,4 @@ Edge 商店使用 `pnpm zip:edge` 生成的独立无 `key` 包，不使用这份
 | `src/platform/google-drive/auth.ts` | 默认客户端的扩展 ID 检查与后续授权流程 |
 | `scripts/testing/verify-extension-manifests.mjs` | 统一 Chrome 包的身份、清单与文件内容检查，以及同版本旧商店包残留检查 |
 
-`.env.example` 中的 `WXT_EXTENSION_KEY` 和 `WXT_GOOGLE_CLIENT_ID` 也是公开应用标识。默认已配置官方身份；只有维护者需要独立开发身份时才覆盖，并同时核对新扩展 ID 与新 Google 客户端的登记。不要把签名私钥、访问令牌、翻译 API Key 或 Google 密码填入这两个变量。
+`docs/development/.env.example` 中的 `WXT_EXTENSION_KEY` 和 `WXT_GOOGLE_CLIENT_ID` 也是公开应用标识。默认已配置官方身份；只有维护者需要独立开发身份时才覆盖，并同时核对新扩展 ID 与新 Google 客户端的登记。不要把签名私钥、访问令牌、翻译 API Key 或 Google 密码填入这两个变量。

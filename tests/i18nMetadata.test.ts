@@ -64,13 +64,13 @@ describe('localized installation and publication descriptions', () => {
     it('keeps English and Chinese store short descriptions in the listing language', () => {
         expect(JSON.parse(read('package.json')).description).toBe(productDescriptions['en-US']);
         for (const [locale, language] of [['en', 'en-US'], ['zh-CN', 'zh-CN']] as const) {
-            const folder = `marketing/chrome-web-store/${locale}`;
+            const folder = `docs/maintainers/marketing/chrome-web-store/${locale}`;
             const short = read(`${folder}/short-description.txt`).trim();
             expect(short).toBe(productDescriptions[language]);
             expect(JSON.parse(read(`${folder}/listing.json`)).shortDescription).toBe(short);
             expect(read(`${folder}/description.txt`).startsWith(`${brandTaglines[language]}\n\n`)).toBe(true);
         }
-        expect(read('marketing/chrome-web-store/en/short-description.txt')).not.toMatch(/[\u3400-\u9fff]/u);
+        expect(read('docs/maintainers/marketing/chrome-web-store/en/short-description.txt')).not.toMatch(/[\u3400-\u9fff]/u);
     });
 
     it('accepts generated locale artifacts and rejects unlocalized manifest fields', async () => {

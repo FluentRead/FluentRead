@@ -24,9 +24,9 @@
 
 ## 维护入口
 
-七种语言的宣传语来源为 [`src/core/i18n/messages/brand-taglines.json`](../src/core/i18n/messages/brand-taglines.json)。界面语言目录的 `brand.tagline`、官网和宣传图生成脚本复用该文件。README 和本页保留可直接复制的宣传语。
+七种语言的宣传语来源为 [`src/core/i18n/messages/brand-taglines.json`](../../../src/core/i18n/messages/brand-taglines.json)。界面语言目录的 `brand.tagline`、官网和宣传图生成脚本复用该文件。README 和本页保留可直接复制的宣传语。
 
-安装页需要说明产品用途，扩展和用户脚本的 description 使用 [`src/core/i18n/messages/product-descriptions.json`](../src/core/i18n/messages/product-descriptions.json) 中的七语功能说明。扩展的 `_locales/*/messages.json` 在构建时生成，名称继续复用界面品牌资源，不手工维护第二套语言目录。浏览器安装 metadata 跟随浏览器语言；应用内界面跟随用户选择的界面语言。
+安装页需要说明产品用途，扩展和用户脚本的 description 使用 [`src/core/i18n/messages/product-descriptions.json`](../../../src/core/i18n/messages/product-descriptions.json) 中的七语功能说明。扩展的 `_locales/*/messages.json` 在构建时生成，名称继续复用界面品牌资源，不手工维护第二套语言目录。浏览器安装 metadata 跟随浏览器语言；应用内界面跟随用户选择的界面语言。
 
 商店中英文短介绍与 `package.json` 保留可直接复制的功能说明，同步修改后运行 `pnpm verify:brand` 检查语言覆盖、长度限制和一致性。完整商店介绍仍以当地语言的宣传语开头，再解释能力与使用条件；不要用宣传语替代功能说明，也不要把浏览器扩展专属能力写进用户脚本的描述。仓库只有中英文商店上架资料；其他五语安装描述不代表已有对应的商店完整介绍。
 

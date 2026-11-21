@@ -7,7 +7,7 @@
   "entries": [
     {
       "file": "docs/public/screenshots/translation.webp",
-      "source": "marketing/source/screenshots/translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots/translation.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -17,7 +17,7 @@
     },
     {
       "file": "docs/public/screenshots/translation-small.webp",
-      "source": "marketing/source/screenshots/translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots/translation.png",
       "kind": "web-responsive",
       "width": 1280,
       "height": 800,
@@ -27,7 +27,7 @@
     },
     {
       "file": "docs/public/screenshots/selection.webp",
-      "source": "marketing/source/screenshots/selection.png",
+      "source": "docs/maintainers/marketing/source/screenshots/selection.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -37,7 +37,7 @@
     },
     {
       "file": "docs/public/screenshots/selection-detail.webp",
-      "source": "marketing/source/screenshots/selection-detail.png",
+      "source": "docs/maintainers/marketing/source/screenshots/selection-detail.png",
       "kind": "web-lossless",
       "width": 1400,
       "height": 960,
@@ -47,7 +47,7 @@
     },
     {
       "file": "docs/public/screenshots/reading-card.webp",
-      "source": "marketing/source/screenshots/reading-card.png",
+      "source": "docs/maintainers/marketing/source/screenshots/reading-card.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -57,7 +57,7 @@
     },
     {
       "file": "docs/public/screenshots/reading-card-detail.webp",
-      "source": "marketing/source/screenshots/reading-card-detail.png",
+      "source": "docs/maintainers/marketing/source/screenshots/reading-card-detail.png",
       "kind": "web-lossless",
       "width": 840,
       "height": 1140,
@@ -67,7 +67,7 @@
     },
     {
       "file": "docs/public/screenshots/popup.webp",
-      "source": "marketing/source/screenshots/popup.png",
+      "source": "docs/maintainers/marketing/source/screenshots/popup.png",
       "kind": "web-lossless",
       "width": 720,
       "height": 1120,
@@ -77,7 +77,7 @@
     },
     {
       "file": "docs/public/screenshots/settings-general.webp",
-      "source": "marketing/source/screenshots/settings-general.png",
+      "source": "docs/maintainers/marketing/source/screenshots/settings-general.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -87,7 +87,7 @@
     },
     {
       "file": "docs/public/screenshots/settings-services.webp",
-      "source": "marketing/source/screenshots/settings-services.png",
+      "source": "docs/maintainers/marketing/source/screenshots/settings-services.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -97,7 +97,7 @@
     },
     {
       "file": "docs/public/screenshots/document.webp",
-      "source": "marketing/source/screenshots/document.png",
+      "source": "docs/maintainers/marketing/source/screenshots/document.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -106,8 +106,8 @@
       "bytes": 108230
     },
     {
-      "file": "marketing/chrome-web-store/zh-CN/screenshots/01-translation.png",
-      "source": "marketing/source/screenshots/translation.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/zh-CN/screenshots/01-translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots/translation.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -116,8 +116,8 @@
       "bytes": 229165
     },
     {
-      "file": "marketing/chrome-web-store/zh-CN/screenshots/02-reading-card.png",
-      "source": "marketing/source/screenshots/reading-card.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/zh-CN/screenshots/02-reading-card.png",
+      "source": "docs/maintainers/marketing/source/screenshots/reading-card.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -126,8 +126,8 @@
       "bytes": 202579
     },
     {
-      "file": "marketing/chrome-web-store/zh-CN/screenshots/03-selection.png",
-      "source": "marketing/source/screenshots/selection.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/zh-CN/screenshots/03-selection.png",
+      "source": "docs/maintainers/marketing/source/screenshots/selection.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -136,8 +136,8 @@
       "bytes": 245262
     },
     {
-      "file": "marketing/chrome-web-store/zh-CN/screenshots/04-document.png",
-      "source": "marketing/source/screenshots/document.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/zh-CN/screenshots/04-document.png",
+      "source": "docs/maintainers/marketing/source/screenshots/document.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -146,8 +146,8 @@
       "bytes": 182708
     },
     {
-      "file": "marketing/chrome-web-store/zh-CN/screenshots/05-settings-services.png",
-      "source": "marketing/source/screenshots/settings-services.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/zh-CN/screenshots/05-settings-services.png",
+      "source": "docs/maintainers/marketing/source/screenshots/settings-services.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -157,7 +157,7 @@
     },
     {
       "file": "docs/public/screenshots/en/translation.webp",
-      "source": "marketing/source/screenshots-en/translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/translation.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -167,7 +167,7 @@
     },
     {
       "file": "docs/public/screenshots/en/translation-small.webp",
-      "source": "marketing/source/screenshots-en/translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/translation.png",
       "kind": "web-responsive",
       "width": 1280,
       "height": 800,
@@ -177,7 +177,7 @@
     },
     {
       "file": "docs/public/screenshots/en/selection.webp",
-      "source": "marketing/source/screenshots-en/selection.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/selection.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -187,7 +187,7 @@
     },
     {
       "file": "docs/public/screenshots/en/selection-detail.webp",
-      "source": "marketing/source/screenshots-en/selection-detail.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/selection-detail.png",
       "kind": "web-lossless",
       "width": 1400,
       "height": 960,
@@ -197,7 +197,7 @@
     },
     {
       "file": "docs/public/screenshots/en/reading-card.webp",
-      "source": "marketing/source/screenshots-en/reading-card.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/reading-card.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -207,7 +207,7 @@
     },
     {
       "file": "docs/public/screenshots/en/reading-card-detail.webp",
-      "source": "marketing/source/screenshots-en/reading-card-detail.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/reading-card-detail.png",
       "kind": "web-lossless",
       "width": 840,
       "height": 1140,
@@ -217,7 +217,7 @@
     },
     {
       "file": "docs/public/screenshots/en/popup.webp",
-      "source": "marketing/source/screenshots-en/popup.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/popup.png",
       "kind": "web-lossless",
       "width": 720,
       "height": 1120,
@@ -227,7 +227,7 @@
     },
     {
       "file": "docs/public/screenshots/en/settings-general.webp",
-      "source": "marketing/source/screenshots-en/settings-general.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/settings-general.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -237,7 +237,7 @@
     },
     {
       "file": "docs/public/screenshots/en/settings-services.webp",
-      "source": "marketing/source/screenshots-en/settings-services.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/settings-services.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -247,7 +247,7 @@
     },
     {
       "file": "docs/public/screenshots/en/document.webp",
-      "source": "marketing/source/screenshots-en/document.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/document.png",
       "kind": "web-lossless",
       "width": 2560,
       "height": 1600,
@@ -256,8 +256,8 @@
       "bytes": 125038
     },
     {
-      "file": "marketing/chrome-web-store/en/screenshots/01-translation.png",
-      "source": "marketing/source/screenshots-en/translation.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/en/screenshots/01-translation.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/translation.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -266,8 +266,8 @@
       "bytes": 227948
     },
     {
-      "file": "marketing/chrome-web-store/en/screenshots/02-reading-card.png",
-      "source": "marketing/source/screenshots-en/reading-card.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/en/screenshots/02-reading-card.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/reading-card.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -276,8 +276,8 @@
       "bytes": 191074
     },
     {
-      "file": "marketing/chrome-web-store/en/screenshots/03-selection.png",
-      "source": "marketing/source/screenshots-en/selection.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/en/screenshots/03-selection.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/selection.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -286,8 +286,8 @@
       "bytes": 218596
     },
     {
-      "file": "marketing/chrome-web-store/en/screenshots/04-document.png",
-      "source": "marketing/source/screenshots-en/document.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/en/screenshots/04-document.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/document.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -296,8 +296,8 @@
       "bytes": 215204
     },
     {
-      "file": "marketing/chrome-web-store/en/screenshots/05-settings-services.png",
-      "source": "marketing/source/screenshots-en/settings-services.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/en/screenshots/05-settings-services.png",
+      "source": "docs/maintainers/marketing/source/screenshots-en/settings-services.png",
       "kind": "chrome-screenshot",
       "width": 1280,
       "height": 800,
@@ -306,7 +306,7 @@
       "bytes": 223782
     },
     {
-      "file": "marketing/chrome-web-store/icon-128.png",
+      "file": "docs/maintainers/marketing/chrome-web-store/icon-128.png",
       "source": "public/icon/128.png",
       "kind": "chrome-icon",
       "width": 128,
@@ -316,8 +316,8 @@
       "bytes": 14826
     },
     {
-      "file": "marketing/chrome-web-store/promo/zh-CN-small-440x280.png",
-      "source": "marketing/source/promo-zh-CN-small.html",
+      "file": "docs/maintainers/marketing/chrome-web-store/promo/zh-CN-small-440x280.png",
+      "source": "docs/maintainers/marketing/source/promo-zh-CN-small.html",
       "kind": "chrome-promo",
       "width": 440,
       "height": 280,
@@ -326,8 +326,8 @@
       "bytes": 13849
     },
     {
-      "file": "marketing/chrome-web-store/promo/zh-CN-marquee-1400x560.png",
-      "source": "marketing/source/promo-zh-CN-marquee.html",
+      "file": "docs/maintainers/marketing/chrome-web-store/promo/zh-CN-marquee-1400x560.png",
+      "source": "docs/maintainers/marketing/source/promo-zh-CN-marquee.html",
       "kind": "chrome-promo",
       "width": 1400,
       "height": 560,
@@ -336,8 +336,8 @@
       "bytes": 72265
     },
     {
-      "file": "marketing/chrome-web-store/promo/en-small-440x280.png",
-      "source": "marketing/source/promo-en-small.html",
+      "file": "docs/maintainers/marketing/chrome-web-store/promo/en-small-440x280.png",
+      "source": "docs/maintainers/marketing/source/promo-en-small.html",
       "kind": "chrome-promo",
       "width": 440,
       "height": 280,
@@ -346,8 +346,8 @@
       "bytes": 13666
     },
     {
-      "file": "marketing/chrome-web-store/promo/en-marquee-1400x560.png",
-      "source": "marketing/source/promo-en-marquee.html",
+      "file": "docs/maintainers/marketing/chrome-web-store/promo/en-marquee-1400x560.png",
+      "source": "docs/maintainers/marketing/source/promo-en-marquee.html",
       "kind": "chrome-promo",
       "width": 1400,
       "height": 560,

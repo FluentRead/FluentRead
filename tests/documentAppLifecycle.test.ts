@@ -584,7 +584,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     });
 
     it('renders actual Word table cells and part headings, navigates their outline and preserves source and correction', async () => {
-        const zip = await JSZip.loadAsync(readFileSync('examples/document-translation/sample.docx'));
+        const zip = await JSZip.loadAsync(readFileSync('tests/fixtures/document-translation/sample.docx'));
         const paragraph = (text: string, heading = false) => `<w:p>${heading ? '<w:pPr><w:pStyle w:val="Heading1"/></w:pPr>' : ''}<w:r><w:t>${text}</w:t></w:r></w:p>`;
         zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paragraph('Main heading', true)}<w:tbl><w:tr><w:tc>${paragraph('Left table cell')}</w:tc><w:tc>${paragraph('Right table cell')}</w:tc></w:tr></w:tbl></w:body></w:document>`);
         zip.file('word/header1.xml', `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${paragraph('Header heading', true)}${paragraph('Header body')}</w:hdr>`);
@@ -604,7 +604,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     });
 
     it('previews per-chapter EPUB segment coverage and hides stale counts during translation', async () => {
-        const bytes = new Uint8Array(readFileSync('examples/document-translation/sample.epub'));
+        const bytes = new Uint8Array(readFileSync('tests/fixtures/document-translation/sample.epub'));
         await state.loadFiles([new File([asArrayBufferBytes(bytes)], 'coverage.epub', {type: getDocumentMimeType('epub')})]); await flush();
         const chapters = state.epubChapters as Array<{segmentOffset: number; segmentCount: number}>;
         state.sidebarTab = 'outline'; await flush();
@@ -1016,13 +1016,13 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
     });
 
     it('derives keyed priority from native DOCX parts, EPUB chapters, and paginated reader anchors', async () => {
-        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('examples/document-translation/sample.docx'))], 'priority.docx', {type: getDocumentMimeType('docx')})]); await flush();
+        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('tests/fixtures/document-translation/sample.docx'))], 'priority.docx', {type: getDocumentMimeType('docx')})]); await flush();
         const body = state.readingPriorityKey();
         state.docxPartIndex = 1; await flush();
         const part = state.readingPriorityKey();
         expect(part).not.toBe(body); expect(part.start).toBe(state.currentDocxPart.paragraphSegments[0].segmentIndex);
         expect(state.readingPriorityKey()).toBe(part);
-        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('examples/document-translation/sample.epub'))], 'priority.epub', {type: getDocumentMimeType('epub')})]); await flush();
+        await state.loadFiles([new File([asArrayBufferBytes(readFileSync('tests/fixtures/document-translation/sample.epub'))], 'priority.epub', {type: getDocumentMimeType('epub')})]); await flush();
         const chapter = state.readingPriorityKey();
         state.epubChapterIndex = 1; await flush();
         expect(state.readingPriorityKey()).not.toBe(chapter);
@@ -1089,7 +1089,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.documentMaterialId).toBe(''); expect(state.parsedDocument.fileName).toBe('second.txt');
     });
     it('material section mapping captures and restores the second DOCX part on its second reader page', async () => {
-        const zip = await JSZip.loadAsync(readFileSync('examples/document-translation/sample.docx'));
+        const zip = await JSZip.loadAsync(readFileSync('tests/fixtures/document-translation/sample.docx'));
         zip.file('word/header1.xml', `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">${Array.from({length: 85}, (_, index) => `<w:p><w:r><w:t>Second part unique paragraph ${index + 1}.</w:t></w:r></w:p>`).join('')}</w:hdr>`);
         const bytes = await zip.generateAsync({type: 'uint8array'});
         const fingerprint = await documentHistoryId(bytes); expect(fingerprint).toMatch(/^[a-f\d]{32}$/u);
@@ -1123,7 +1123,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(state.downloadNotice).toContain('原文位置已变化或无法唯一匹配');
     });
     it('material section mapping captures and restores the second EPUB chapter with its real segment offset', async () => {
-        const bytes = new Uint8Array(readFileSync('examples/document-translation/sample.epub'));
+        const bytes = new Uint8Array(readFileSync('tests/fixtures/document-translation/sample.epub'));
         const fingerprint = await documentHistoryId(bytes); expect(fingerprint).toMatch(/^[a-f\d]{32}$/u);
         await state.loadFiles([new File([bytes], 'material-chapters.epub', {type: getDocumentMimeType('epub')})]); await flush();
         state.documentQueue[0].historyId = fingerprint;
@@ -1414,7 +1414,7 @@ describe('documentbinaryAudit actual DocumentApp SFC ownership', () => {
         expect(walkHost(root).find(entry => entry.props.class === 'download-original')!.props.title).toBe('Keeps the original file without translation or edits.');
     });
     it.each(['pdf', 'epub', 'docx', 'html', 'md', 'txt', 'json', 'srt', 'vtt', 'ass', 'ssa', 'lrc'])('downloads the exact original %s file before translation without another read or export', async extension => {
-        const bytes = readFileSync(`examples/document-translation/sample.${extension}`);
+        const bytes = readFileSync(`tests/fixtures/document-translation/sample.${extension}`);
         const name = `sample.${extension}`;
         const input = new File([asArrayBufferBytes(bytes)], name, {type: getDocumentMimeType(extension === 'md' ? 'markdown' : extension as any)});
         const read = vi.spyOn(input, 'arrayBuffer');

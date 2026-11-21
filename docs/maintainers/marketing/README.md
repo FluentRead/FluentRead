@@ -38,7 +38,7 @@
 
 ## 重新生成
 
-在本 worktree 构建扩展后，运行 `scripts/capture-product-assets.cjs`，用 `--runtime` 指定含 Playwright 的 Node 包目录，用 `--helper` 指定 focus-safe-browser.cjs。默认采集中文；英文另加 `--locale en --output marketing/source/screenshots-en`。脚本只创建临时浏览器配置，采集后关闭本次实例。
+在本 worktree 构建扩展后，运行 `scripts/capture-product-assets.cjs`，用 `--runtime` 指定含 Playwright 的 Node 包目录，用 `--helper` 指定 focus-safe-browser.cjs。默认采集中文；英文另加 `--locale en --output docs/maintainers/marketing/source/screenshots-en`。脚本只创建临时浏览器配置，采集后关闭本次实例。
 
 随后运行 `scripts/build-product-assets.cjs --runtime <Node 包目录>` 生成官网与商店图片。仅更新宣传语时可加 `--promo-only`，保留现有产品截图与图标。`scripts/verify-product-site.cjs` 检查站点语言、链接、图片、桌面与窄屏表现。运行 `node scripts/package-product-kit.cjs --output <输出目录>` 可生成独立的中英文 ZIP，各自附带商店资料、宣传图、社区文案、2x 原图和示例来源。所有中间产物和截图原图都有明确来源，便于以后更新。
 
@@ -52,4 +52,4 @@
 
 首页覆盖简体中文、英语、日语、韩语、法语、西语和俄语。七语首屏共用阅读示例，首次进入时译文按段出现，也可切换原文和双语。链接到英文使用文档时，在当地语言的入口上标明文档语言。
 
-官网标题、简介、语言导航和分享卡图路径统一维护在 [landing-locales.json](../docs/.vitepress/landing-locales.json)。[marketing-hero-copy.json](../docs/.vitepress/theme/marketing-hero-copy.json) 保存首屏阅读示例，[international-home-copy.json](../docs/.vitepress/theme/international-home-copy.json) 保存功能介绍。1200×630 的分享图位于 [docs/public/brand/share](../docs/public/brand/share)，使用产品图标、书刊式排版和粉色译文标记。更新后运行 `pnpm docs:build:site` 和 `pnpm docs:check` 验证页面、语言链接、分享图和 sitemap。
+官网标题、简介、语言导航和分享卡图路径统一维护在 [landing-locales.json](../../.vitepress/landing-locales.json)。[marketing-hero-copy.json](../../.vitepress/theme/marketing-hero-copy.json) 保存首屏阅读示例，[international-home-copy.json](../../.vitepress/theme/international-home-copy.json) 保存功能介绍。1200×630 的分享图位于 [docs/public/brand/share](../../public/brand/share)，使用产品图标、书刊式排版和粉色译文标记。更新后运行 `pnpm docs:build:site` 和 `pnpm docs:check` 验证页面、语言链接、分享图和 sitemap。

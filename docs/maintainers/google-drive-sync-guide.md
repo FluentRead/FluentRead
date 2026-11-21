@@ -206,7 +206,7 @@ https://www.googleapis.com/auth/drive.appdata
 
 ### 6.6 添加测试用户
 
-进入 **目标对象 / Audience**，应用保持 Testing 时，在 **测试用户 / Test users** 添加你要用于联调的账号并保存。测试邮箱只在这里填写，不能写入 `.env.example`、测试夹具、代码或 PR 描述。
+进入 **目标对象 / Audience**，应用保持 Testing 时，在 **测试用户 / Test users** 添加你要用于联调的账号并保存。测试邮箱只在这里填写，不能写入 `docs/development/.env.example`、测试夹具、代码或 PR 描述。
 
 这意味着客户端创建弹窗中的“只有测试用户拥有访问权限”是开发阶段限制，不是创建失败。公开发布需要完成目标对象的发布设置及 Google 实际要求的验证。
 
@@ -232,7 +232,7 @@ Chrome 扩展原生路线不需要把 Client Secret 放进扩展，也不需要�
 
 当前 Chrome 构建已连接默认公开 Client ID 和商店公开公钥。公钥从已发布 CRX 的签名信息取得，并核对其 SHA-256 派生的扩展 ID；它只稳定身份，不授予账号访问权。
 
-如需自己的独立开发客户端，复制 `.env.example` 为 `.env.local`，设置公开标识：
+如需自己的独立开发客户端，复制 `docs/development/.env.example` 为 `.env.local`，设置公开标识：
 
 ```dotenv
 WXT_GOOGLE_CLIENT_ID=你的开发客户端.apps.googleusercontent.com

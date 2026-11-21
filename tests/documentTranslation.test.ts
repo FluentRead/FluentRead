@@ -2,12 +2,16 @@ import {describe, expect, it} from 'vitest';
 
 import {
     createDocumentDownloadName,
+    documentSegmentsInColumns,
+    documentTranslationsInColumns,
     getDocumentFormat,
     getDocumentMimeType,
+    normalizeDelimitedColumns,
     parseDocument,
     renderDocument,
 } from '@/src/features/document-translation/core/document';
 import {createDocumentPreviewHtml} from '@/src/features/document-translation/core/preview';
+import {readDelimitedCells} from '@/src/features/document-translation/core/delimited';
 
 describe('document translation parser', () => {
     it('识别首批支持的文件格式并生成下载文件名', () => {
@@ -23,8 +27,67 @@ describe('document translation parser', () => {
         expect(createDocumentDownloadName('episode.srt', 'translated')).toBe('episode.translated.srt');
         expect(getDocumentMimeType('html')).toBe('text/html;charset=utf-8');
         expect(getDocumentMimeType('json')).toBe('application/json;charset=utf-8');
+        expect(getDocumentFormat('catalog.CSV')).toBe('csv');
+        expect(getDocumentFormat('catalog.tsv')).toBe('tsv');
+        expect(getDocumentMimeType('csv')).toBe('text/csv;charset=utf-8');
+        expect(getDocumentMimeType('tsv')).toBe('text/tab-separated-values;charset=utf-8');
         expect(getDocumentMimeType('markdown')).toBe('text/plain;charset=utf-8');
         expect(() => parseDocument('paper.pdf', '%PDF-')).toThrow('需要按二进制文件解析');
+    });
+
+    it('preserves CSV field positions, quotes, embedded line breaks, protected values, and original row endings', () => {
+        const input = '\ufeffID,Description,Price,Link,Formula\r\n0123,"  Read, ""save""\r\nthen go  ",-2.50,https://example.com,=SUM(A2)\r\n999,Update,42,,\rTrailing text,https://example.com/support,\n';
+        const document = parseDocument('inventory.csv', input);
+        expect(document.segments.map(segment => [segment.pathLabel, segment.source])).toEqual([
+            ['R1C1', 'ID'], ['R1C2', 'Description'], ['R1C3', 'Price'], ['R1C4', 'Link'], ['R1C5', 'Formula'],
+            ['R2C2', 'Read, "save"\r\nthen go'], ['R3C2', 'Update'], ['R4C1', 'Trailing text'],
+        ]);
+        expect(document.delimitedColumns).toEqual(['ID', 'Description', 'Price', 'Link', 'Formula'].map((label, index) => ({index, label})));
+        const translations = ['', '介绍', '', '', '', '阅读，"保存"\n再继续', '更新,可用', ''];
+        expect(renderDocument(document, [], 'bilingual')).toBe(input);
+        expect(renderDocument(document, translations, 'translated')).toBe(input.replace('Description', '介绍')
+            .replace('  Read, ""save""\r\nthen go  ', '  阅读，""保存""\n再继续  ').replace('999,Update,', '999,"更新,可用",'));
+        const bilingual = renderDocument(document, translations, 'bilingual');
+        expect([...readDelimitedCells(bilingual, ',')].find(cell => cell.row === 1 && cell.column === 1)?.value)
+            .toBe('  Read, "save"\r\nthen go\n阅读，"保存"\n再继续  ');
+        expect(bilingual).toContain('999,"Update\n更新,可用",42,,\rTrailing text,');
+        expect(renderDocument(document, translations, 'bilingual', 6)).toBe(bilingual.slice(0, 6));
+    });
+
+    it('selects TSV columns with stable coordinates and preserves stale translations outside the selected columns', () => {
+        const input = '\tMemo\tExample\nKeep me\tA note\t"quoted\tvalue"\r\n\t\tEnd\tExtra';
+        const document = parseDocument('inventory.tsv', input);
+        const columns = normalizeDelimitedColumns(document, [2, 0, 2, -1, '0']);
+        expect(columns).toEqual([0, 2]);
+        expect(document.delimitedColumns).toEqual([{index: 0, label: ''}, {index: 1, label: 'Memo'}, {index: 2, label: 'Example'}, {index: 3, label: ''}]);
+        expect(documentSegmentsInColumns(document, columns).map(segment => segment.pathLabel)).toEqual(['R1C3', 'R2C1', 'R2C3', 'R3C3']);
+        const saved = ['便笺', '示例', '保留', '说明', '有\t引号', '末尾', '额外'];
+        const chosen = documentTranslationsInColumns(document, saved, columns);
+        expect(chosen).toEqual(['', '示例', '保留', '', '有\t引号', '末尾', '']);
+        expect(renderDocument(document, chosen, 'translated')).toBe('\tMemo\t示例\n保留\tA note\t"有\t引号"\r\n\t\t末尾\tExtra');
+        expect(documentTranslationsInColumns(document, ['只有表头'], columns)).toEqual(new Array(document.segments.length).fill(''));
+        expect(documentSegmentsInColumns(document)).toBe(document.segments);
+        expect(documentTranslationsInColumns(document, saved)).toBe(saved);
+        expect(normalizeDelimitedColumns(document, [3, 2, 1, 0])).toBeUndefined();
+        expect(normalizeDelimitedColumns(document, ['0'])).toBeUndefined();
+        expect(normalizeDelimitedColumns(document, null)).toBeUndefined();
+        const txt = parseDocument('plain.txt', 'Hello world');
+        expect(normalizeDelimitedColumns(txt, [0])).toBeUndefined();
+        expect(documentSegmentsInColumns(txt, [0])).toBe(txt.segments);
+        expect(documentTranslationsInColumns(txt, saved, [0])).toBe(saved);
+    });
+
+    it('retains spreadsheet literals and rejects ambiguous quoting or formula-like results', () => {
+        const input = 'Keep,TRUE,false,null,NaN,1.2e-5,2026-11-21T16:00:00Z,123e4567-e89b-12d3-a456-426614174000,docs@example.com,+SUM(A1),＠SUM(A1),""\n';
+        const document = parseDocument('data.csv', input);
+        expect(document.segments.map(segment => segment.source)).toEqual(['Keep']);
+        expect(renderDocument(document, ['\t =1+2'], 'translated')).toBe(input);
+        expect(renderDocument(document, ['@INVALID'], 'bilingual')).toBe(input);
+        expect(renderDocument(document, ['Keep'], 'translated')).toBe(input);
+        expect(renderDocument(parseDocument('data.tsv', 'Use "quotes"\t"short"'), ['使用引号', '译文'], 'translated')).toBe('使用引号\t"译文"');
+        expect(parseDocument('empty.csv', '\ufeff').segments).toEqual([]);
+        expect(() => parseDocument('open.csv', 'a,"unterminated')).toThrow('R1C2');
+        expect(() => parseDocument('tail.csv', 'a,"closed"bad')).toThrow('R1C2');
     });
 
     it('保留 HTML 标签、属性和脚本内容，只替换可见文本', () => {

@@ -633,6 +633,8 @@ export default defineConfig({
                 'src/features/area-translation/content/runtime.ts',
                 'src/features/area-translation/services/client.ts',
                 'src/features/document-translation/core/document.ts',
+                'src/features/document-translation/core/delimited.ts',
+                'src/features/document-translation/core/docxInline.ts',
                 'src/features/document-translation/core/epubNavigation.ts',
                 'src/features/document-translation/core/markdownTable.ts',
                 'src/features/document-translation/public.ts',

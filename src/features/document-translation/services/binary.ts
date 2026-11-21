@@ -3,11 +3,13 @@
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
  * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
  * EPUB 目录在归档时复用实际导出的章节标题译文，兼容原有阅读和历史记录。
+ * Word 由 core/docxInline 验证和回填链接与字符样式；复杂段落原位保留，译文另起一段。
  * 文本上传在此按原始字节检查大小并识别 UTF-8 或带 BOM 的 UTF-16，防止乱码进入后续分段。
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，电子书目录规则归 core/epubNavigation，PDF 目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {pdfFallbackBidiLine} from '../core/pdfFallbackBidi';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import type JSZip from 'jszip';
 import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
@@ -38,7 +40,7 @@ import {
 } from '@/src/features/document-translation/core/document';
 
 const BINARY_DOCUMENT_FORMATS = new Set<DocumentFormat>(['pdf', 'epub', 'docx']);
-const DOCX_PARAGRAPH_PATTERN = /<w:p\b[^>]*>[\s\S]*?<\/w:p>/gu;
+const DOCX_PARAGRAPH_PATTERN = /<w:p(?=[\s/>])(?:[^"'<>]|"[^"]*"|'[^']*')*?(?:\/>|>[\s\S]*?<\/w:p\s*>)/gu;
 
 /**
  * 按文档顺序回答“这个位置在哪个表格的第几行第几格”。位置必须递增地询问；嵌套表格里的段落归到外层表格的那一格。
@@ -1096,6 +1098,7 @@ async function parseDocx(fileName: string, bytes: Uint8Array, signal?: AbortSign
     if (!zip.file('[Content_Types].xml') || !zip.file('word/document.xml')) {
         throw new Error('DOCX 文件结构无效，文件可能已损坏或扩展名不正确');
     }
+    const {analyzeDocxInlineParagraph} = await import('../core/docxInline');
 
     const partPaths = Object.keys(zip.files)
         .filter((path) => /^word\/(?:document|header\d+|footer\d+|footnotes|endnotes)\.xml$/u.test(path))
@@ -1124,7 +1127,8 @@ async function parseDocx(fileName: string, bytes: Uint8Array, signal?: AbortSign
         DOCX_PARAGRAPH_PATTERN.lastIndex = 0;
         let paragraphMatch = DOCX_PARAGRAPH_PATTERN.exec(source);
         while (paragraphMatch) {
-            const text = docxParagraphText(paragraphMatch[0]);
+            const inline = analyzeDocxInlineParagraph(paragraphMatch[0]);
+            const text = inline.kind === 'free' ? inline.source : docxParagraphText(paragraphMatch[0]);
             if (text) {
                 const segmentIndex = segments.length;
                 segments.push({
@@ -1133,6 +1137,7 @@ async function parseDocx(fileName: string, bytes: Uint8Array, signal?: AbortSign
                     contextLabel: partSegmentIndex === 0 ? docxPartTitle(path) : undefined,
                     pathLabel: docxPartTitle(path),
                     role: docxParagraphRole(paragraphMatch[0], path),
+                    ...(inline.kind === 'free' && inline.spans.length ? {docxInline: true as const} : {}),
                 });
                 const table = tableAt(paragraphMatch.index);
                 paragraphSegments.push({paragraphIndex, segmentIndex, ...(table ? {table} : {})});
@@ -1151,7 +1156,7 @@ async function parseDocx(fileName: string, bytes: Uint8Array, signal?: AbortSign
         label: getDocumentFormatLabel('docx'),
         parts: [],
         segments,
-        binary: {kind: 'docx', bytes, parts},
+        binary: {kind: 'docx', bytes, parts, inlineFormatting: true},
     };
 }
 
@@ -1193,7 +1198,7 @@ export async function parseDocumentFile(file: DocumentFileLike, options: ParseDo
         const encoding = first === 0xff && second === 0xfe ? 'utf-16le'
             : first === 0xfe && second === 0xff ? 'utf-16be' : 'utf-8';
         try {
-            source = new TextDecoder(encoding, {fatal: true}).decode(input);
+            source = new TextDecoder(encoding, {fatal: true, ignoreBOM: format === 'csv' || format === 'tsv'}).decode(input);
         } catch (error) {
             throw new Error('文件编码无效，请另存为 UTF-8 后重试', {cause: error});
         }
@@ -1750,7 +1755,7 @@ async function renderEpub(document: ParsedDocument, translations: readonly strin
 }
 
 export function docxTextNodes(value: string): string {
-    const tokens = value.replace(/\r\n?/gu, '\n').split(/(\n|\t)/u);
+    const tokens = value.replace(/[^\u0009\u000a\u000d\u0020-\ud7ff\ue000-\ufffd\u{10000}-\u{10ffff}]/gu, '').replace(/\r\n?/gu, '\n').split(/(\n|\t)/u);
     const content = tokens.map((token) => {
         if (token === '\n') return '<w:br/>';
         if (token === '\t') return '<w:tab/>';
@@ -1759,25 +1764,16 @@ export function docxTextNodes(value: string): string {
     return content || '<w:t></w:t>';
 }
 
-function translatedDocxParagraph(value: string): string {
-    return `<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr><w:r><w:rPr><w:color w:val="E83B6B"/></w:rPr>${docxTextNodes(value)}</w:r></w:p>`;
-}
+const DOCX_TRANSLATED_PROPERTIES = '<w:rPr><w:color w:val="E83B6B"/></w:rPr>';
+const DOCX_TRANSLATED_PARAGRAPH = '<w:p><w:pPr><w:spacing w:before="0" w:after="120"/></w:pPr>';
 
-function replaceDocxParagraphText(paragraph: string, value: string): string {
-    let replaced = false;
-    return paragraph.replace(/<w:t\b[^>]*>[\s\S]*?<\/w:t>|<w:tab\b[^>]*\/>|<w:(?:br|cr)\b[^>]*\/>/gu, () => {
-        if (replaced) return '';
-        replaced = true;
-        return docxTextNodes(value);
-    });
-}
-
-export function renderDocxPart(
+export async function renderDocxPart(
     document: ParsedDocument,
     part: DocxDocumentPart,
     translations: readonly string[],
     mode: DocumentRenderMode,
-): string {
+): Promise<string> {
+    const {analyzeDocxInlineParagraph, renderDocxInlineRuns} = await import('../core/docxInline');
     const segmentByParagraph = new Map(part.paragraphSegments.map((entry) => [entry.paragraphIndex, entry.segmentIndex]));
     let paragraphIndex = 0;
     DOCX_PARAGRAPH_PATTERN.lastIndex = 0;
@@ -1785,11 +1781,22 @@ export function renderDocxPart(
         const segmentIndex = segmentByParagraph.get(paragraphIndex);
         paragraphIndex += 1;
         if (segmentIndex === undefined) return paragraph;
-        const translation = translations[segmentIndex] ?? document.segments[segmentIndex]?.source ?? '';
-        if (!hasDistinctTranslation(document.segments[segmentIndex]?.source ?? '', translation)) return paragraph;
-        return mode === 'bilingual'
-            ? `${paragraph}${translatedDocxParagraph(translation)}`
-            : replaceDocxParagraphText(paragraph, translation);
+        const segment = document.segments[segmentIndex];
+        const translation = translations[segmentIndex] ?? '';
+        if (!segment || !hasDistinctTranslation(segment.source, translation)) return paragraph;
+        const inline = analyzeDocxInlineParagraph(paragraph);
+        if (inline.kind === 'invalid') return paragraph;
+        const isBilingual = mode === 'bilingual';
+        if (inline.kind === 'free') {
+            const runs = renderDocxInlineRuns(inline, translation, docxTextNodes, isBilingual ? DOCX_TRANSLATED_PROPERTIES : '');
+            if (runs !== undefined) return isBilingual
+                ? `${paragraph}${DOCX_TRANSLATED_PARAGRAPH}${runs}</w:p>`
+                : `${inline.prefix}${runs}</w:p>`;
+        }
+        const plain = inline.kind === 'free' ? stripDocumentInlineMarkers(translation) : translation;
+        return hasDistinctTranslation(inline.kind === 'free' ? stripDocumentInlineMarkers(inline.source) : segment.source, plain)
+            ? `${paragraph}${DOCX_TRANSLATED_PARAGRAPH}<w:r>${DOCX_TRANSLATED_PROPERTIES}${docxTextNodes(plain)}</w:r></w:p>`
+            : paragraph;
     });
 }
 
@@ -1804,7 +1811,7 @@ async function renderDocx(document: ParsedDocument, translations: readonly strin
     for (const part of document.binary.parts) {
         await yieldDocumentTask();
         options.signal?.throwIfAborted();
-        zip.file(part.path, renderDocxPart(document, part, translations, mode));
+        zip.file(part.path, await renderDocxPart(document, part, translations, mode), {createFolders: false});
     }
     return generateDocumentArchive(zip, {
         mimeType: getDocumentMimeType('docx'),

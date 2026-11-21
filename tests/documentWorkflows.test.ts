@@ -318,6 +318,38 @@ describe('document import workflow ownership', () => {
         expect(f.tasks[3].bypassCache).toBe(false);
     });
 
+    it('rebuilds old Word segment formatting and keeps the previous manual translation at its original position', async () => {
+        const f = importFixture();f.ports.history = f.history;
+        const parts = [{path: 'word/document.xml', source: '', paragraphSegments: [{paragraphIndex: 0, segmentIndex: 0}]}];
+        const old: ParsedDocument = {...document(), fileName: 'legacy.docx', format: 'docx',
+            binary: {kind: 'docx', bytes: new Uint8Array([1]), parts}};
+        const fresh: ParsedDocument = {...old, segments: [{id: 0, source: '<g1>Source.</g1>', docxInline: true}],
+            binary: {kind: 'docx', bytes: new Uint8Array([1]), parts, inlineFormatting: true}};
+        const saved = record(old);
+        f.load.mockResolvedValue(saved);
+        vi.mocked(f.ports.parseFile).mockResolvedValueOnce(fresh);
+        await f.workflow.openHistory(saved.id);
+        expect(f.ports.parseFile).toHaveBeenCalledOnce();
+        expect(f.tasks[0].document).toBe(fresh);
+        expect(f.tasks[0].translations).toEqual(['Kept correction']);
+        expect(f.tasks[0].retainedRevisions).toEqual([]);
+    });
+
+    it('restores the saved CSV selection with every previously translated cell when reopening or importing it again', async () => {
+        const f = importFixture();f.ports.history = f.history;
+        const raw = 'Reference,Description\nKeep this,Read this';
+        const parsed = parseDocument('table.csv', raw);
+        const saved = {...record(parsed), bytes: new TextEncoder().encode(raw), translations: ['编号', '说明', '保留', '阅读'], delimitedColumns: [1, 8]};
+        f.load.mockResolvedValue(saved);
+        await f.workflow.openHistory(saved.id);
+        await f.workflow.loadFiles([new File([raw], 'table.csv')]);
+        expect(f.tasks).toHaveLength(2);
+        for (const task of f.tasks) {
+            expect(task.delimitedColumns).toEqual([1]);
+            expect(task.translations).toEqual(saved.translations);
+        }
+    });
+
     it.each(['bytes', 'history'] as const)('checks cancellation again after pending %s before advancing import', async stage => {
         const f = importFixture();f.ports.history = f.history;
         const buffer = new ArrayBuffer(7);new Uint8Array(buffer).set(new TextEncoder().encode('Source.'));

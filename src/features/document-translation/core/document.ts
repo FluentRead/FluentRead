@@ -3,13 +3,15 @@
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
  * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
- * GFM 表格在单元格内回填译文，字幕导出保护 cue 边界。
+ * GFM 表格和 CSV/TSV 在单元格内回填译文，字幕导出保护 cue 边界。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {decodeTextareaHtml} from '@/src/shared/text/htmlEntities';
 // 归一规则与服务候选验证共用，避免导出与免费线路接受不同的编号标签写法。
 import {normalizeDocumentInlineMarkers} from '@/src/core/translation/public';
 import {escapeMarkdownTableTranslation, markdownTableAlignments, splitMarkdownTableRow, type MarkdownTable} from './markdownTable';
+import {encodeDelimitedCell, isSpreadsheetFormula, isTranslatableDelimitedCell, readDelimitedCells, type DelimitedColumn} from './delimited';
+export type {DelimitedColumn} from './delimited';
 export const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
 /** 带插图的论文与扫描件常超过 10 MB；PDF 按页解析、译文量只取决于文字，单独放宽上限。 */
 export const PDF_MAX_BYTES = 50 * 1024 * 1024;
@@ -29,6 +31,8 @@ export const SUPPORTED_DOCUMENT_EXTENSIONS = [
     'ssa',
     'lrc',
     'json',
+    'csv',
+    'tsv',
 ] as const;
 
 export type DocumentFormat =
@@ -42,7 +46,9 @@ export type DocumentFormat =
     | 'vtt'
     | 'ass'
     | 'lrc'
-    | 'json';
+    | 'json'
+    | 'csv'
+    | 'tsv';
 
 export type DocumentRenderMode = 'bilingual' | 'translated';
 
@@ -60,6 +66,10 @@ export interface DocumentSegment {
     role?: 'title' | 'heading' | 'paragraph' | 'list-item' | 'header' | 'footer' | 'note';
     /** Markdown 片段是否从原始行首开始；false 表示链接/代码后的行内文本，不能剥离列表等前缀。 */
     markdownLineStart?: boolean;
+    /** Word 正文中具有需要回填的生成标记，字面标签不使用此标志。 */
+    docxInline?: true;
+    /** 零基源表格行列号，列选择与历史定位使用同一坐标。 */
+    delimitedCell?: {row: number; column: number};
 }
 
 export interface PdfDocumentRun {
@@ -163,7 +173,7 @@ export interface DocxDocumentPart {
 export type BinaryDocumentData =
     | {kind: 'pdf'; bytes: Uint8Array; pages: PdfDocumentPage[]}
     | {kind: 'epub'; bytes: Uint8Array; chapters: EpubDocumentChapter[]}
-    | {kind: 'docx'; bytes: Uint8Array; parts: DocxDocumentPart[]};
+    | {kind: 'docx'; bytes: Uint8Array; parts: DocxDocumentPart[]; inlineFormatting?: true};
 
 interface LiteralPart {
     kind: 'literal';
@@ -190,6 +200,8 @@ interface SegmentPart {
     markdownTokens?: Array<{open: string; close?: string}>;
     /** HTML 整句片段里行内标签的原文：送翻时写成编号占位符 `<gN>…</gN>`，渲染时按编号还原。 */
     htmlTags?: Array<{open: string; close: string}>;
+    /** 表格字段的 rawSource 包含原始引号与空白。 */
+    delimitedCell?: {delimiter: ',' | '\t'; quoted: boolean};
 }
 
 type DocumentPart = LiteralPart | SegmentPart;
@@ -224,7 +236,28 @@ export interface ParsedDocument {
     markdownCodeBlocks?: readonly MarkdownCodeBlock[];
     /** 旧解析快照没有表格范围，刷新时会从原文件补齐。 */
     markdownTables?: readonly MarkdownTable[];
+    delimitedColumns?: readonly DelimitedColumn[];
     binary?: BinaryDocumentData;
+}
+
+/** 列号取自源文件，非法或过期的存储项不会影响其它格式，也不会留下空选择。 */
+export function normalizeDelimitedColumns(document: ParsedDocument, input: unknown): number[] | undefined {
+    if (!document.delimitedColumns || !Array.isArray(input)) return undefined;
+    const requested = new Set(input);
+    const selected = document.delimitedColumns.filter(column => requested.has(column.index)).map(column => column.index);
+    return selected.length && selected.length !== document.delimitedColumns.length ? selected : undefined;
+}
+
+export function documentSegmentsInColumns(document: ParsedDocument, columns?: readonly number[]): readonly DocumentSegment[] {
+    if (!document.delimitedColumns || !columns) return document.segments;
+    const selected = new Set(columns);
+    return document.segments.filter(segment => selected.has(segment.delimitedCell!.column));
+}
+
+export function documentTranslationsInColumns(document: ParsedDocument, translations: readonly string[], columns?: readonly number[]): readonly string[] {
+    if (!document.delimitedColumns || !columns) return translations;
+    const selected = new Set(columns);
+    return document.segments.map(segment => selected.has(segment.delimitedCell!.column) ? translations[segment.id] ?? '' : '');
 }
 
 const FORMAT_LABELS: Record<DocumentFormat, string> = {
@@ -239,6 +272,8 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
     ass: 'ASS 字幕',
     lrc: 'LRC 歌词',
     json: 'JSON 文件',
+    csv: 'CSV',
+    tsv: 'TSV',
 };
 
 const PROTECTED_HTML_TAGS = new Set(['head', 'script', 'style', 'pre', 'code', 'textarea']);
@@ -264,6 +299,7 @@ export function getDocumentFormat(fileName: string): DocumentFormat | null {
     if (extension === 'ass' || extension === 'ssa') return 'ass';
     if (extension === 'lrc') return 'lrc';
     if (extension === 'json') return 'json';
+    if (extension === 'csv' || extension === 'tsv') return extension;
     return null;
 }
 
@@ -286,6 +322,8 @@ export function getDocumentMimeType(format: DocumentFormat): string {
     if (format === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     if (format === 'html') return 'text/html;charset=utf-8';
     if (format === 'json') return 'application/json;charset=utf-8';
+    if (format === 'csv') return 'text/csv;charset=utf-8';
+    if (format === 'tsv') return 'text/tab-separated-values;charset=utf-8';
     return 'text/plain;charset=utf-8';
 }
 
@@ -1251,6 +1289,29 @@ export interface ParseDocumentOptions {
     markdownSentences?: boolean;
 }
 
+function parseDelimitedDocument(content: string, delimiter: ',' | '\t'): Pick<ParsedDocument, 'parts' | 'segments' | 'delimitedColumns'> {
+    const parts: DocumentPart[] = [];
+    const segments: DocumentSegment[] = [];
+    const labels = new Map<number, string>();
+    const columns = new Set<number>();
+    let last = 0;
+    for (const cell of readDelimitedCells(content, delimiter)) {
+        const trimmed = trimSource(cell.value);
+        if (cell.row === 0 && trimmed) labels.set(cell.column, trimmed.source.replace(/\s+/gu, ' ').slice(0, 80));
+        if (!trimmed || !isTranslatableDelimitedCell(trimmed.source)) continue;
+        addLiteral(parts, content.slice(last, cell.start));
+        last = cell.end;
+        const id = segments.length;
+        segments.push({id, source: trimmed.source, pathLabel: `R${cell.row + 1}C${cell.column + 1}`, delimitedCell: {row: cell.row, column: cell.column}});
+        parts.push({kind: 'segment', segmentIndex: id, ...trimmed, rawSource: content.slice(cell.start, cell.end),
+            delimitedCell: {delimiter, quoted: cell.quoted}});
+        columns.add(cell.column);
+    }
+    addLiteral(parts, content.slice(last));
+    const delimitedColumns = [...columns].sort((left, right) => left - right).map(index => ({index, label: labels.get(index) ?? ''}));
+    return {parts, segments, delimitedColumns};
+}
+
 export function parseDocument(fileName: string, content: string, options: ParseDocumentOptions = {}): ParsedDocument {
     const format = getDocumentFormat(fileName);
     if (!format) {
@@ -1268,6 +1329,9 @@ export function parseDocument(fileName: string, content: string, options: ParseD
             parts: [],
             ...parseJsonDocument(content),
         };
+    }
+    if (format === 'csv' || format === 'tsv') {
+        return {fileName, format, label: getDocumentFormatLabel(format), ...parseDelimitedDocument(content, format === 'csv' ? ',' : '\t')};
     }
 
     const parsed = format === 'html'
@@ -1464,6 +1528,14 @@ function renderParts(document: ParsedDocument, translations: readonly string[], 
             continue;
         }
         const translation = resolveDocumentTranslation(part.source, translations[part.segmentIndex]);
+        if (part.delimitedCell) {
+            if (!hasDistinctTranslation(part.source, translation) || isSpreadsheetFormula(translation)) append(part.rawSource!);
+            else {
+                const value = mode === 'bilingual' ? `${part.source}\n${translation}` : translation;
+                append(encodeDelimitedCell(`${part.prefix}${value}${part.suffix}`, part.delimitedCell.delimiter, part.delimitedCell.quoted));
+            }
+            continue;
+        }
         if (!hasDistinctPartTranslation(document, part.source, translation)) {
             append(`${part.prefix}${originalPartSource(part)}${part.suffix}`);
             continue;

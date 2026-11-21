@@ -463,7 +463,10 @@ export default defineConfig({
             const requestEvidenceBudget = 30_000;
             // EPUB 导出按需加载 XML 目录解析，复用现有依赖。相对 a5ee53efe 的构建增量约 33 kB，无新增资源或权限。
             const epubNavigationBudget = 34_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + epubNavigationBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
+            // Word XML 解析按需加载；DOCX 行内回填、CSV/TSV 列选择及七语文案相比 dcefdd048 的 Chrome 构建增加 18,046 bytes。
+            // 复用现有依赖，无新增资源或权限，增加 18 kB 功能预算并保留磁盘产物门禁。
+            const wordAndDelimitedBudget = 18_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + epubNavigationBudget + wordAndDelimitedBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

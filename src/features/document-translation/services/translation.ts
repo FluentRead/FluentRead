@@ -40,6 +40,8 @@ export interface DocumentTranslationOptions {
     maxRetries?: number;
     /** 同一文档和语言对下已完成或人工校订的译文；切换服务或模型时仍复用，仅空白位置继续翻译。 */
     initialTranslations?: readonly string[];
+    /** CSV/TSV 列选择只限制本次送翻范围，片段编号和其余列已有译文照旧保留。 */
+    segmentIds?: ReadonlySet<number>;
     /** 当前阅读会话里经用户编辑确认的片段，历史机器译文不能冒充用户确认。 */
     confirmedTranslationIds?: readonly number[];
     /** 仅本次文档调用生效，默认开启；关闭时逐段请求，不修改网页或全局 AI 多段翻译设置。 */
@@ -378,7 +380,7 @@ function documentDiscourseBlocks(segments: readonly DocumentSegment[]): Discours
 export function createDocumentSegmentTranslator(
     gateway: DocumentTranslationGateway,
 ): TranslateDocumentSegments {
-    return async (segments, options) => {
+    return async (allSegments, options) => {
         throwIfAborted(options.signal);
         await waitWithAbort(Promise.resolve(gateway.waitUntilReady()), options.signal);
         throwIfAborted(options.signal);
@@ -390,9 +392,10 @@ export function createDocumentSegmentTranslator(
             glossaryRevision: options.glossaryRevision ?? glossary?.glossaryRevision,
         };
 
-        if (segments.length === 0) return [];
-        const translations = new Array<string>(segments.length).fill('');
-        segments.forEach(({id}) => { translations[id] = options.initialTranslations?.[id] || ''; });
+        const segments = options.segmentIds ? allSegments.filter(({id}) => options.segmentIds!.has(id)) : allSegments;
+        const translations = new Array<string>(allSegments.length).fill('');
+        allSegments.forEach(({id}) => { translations[id] = options.initialTranslations?.[id] || ''; });
+        if (segments.length === 0) return translations;
         const pending = segments.filter(({id}) => !translations[id].trim());
         const context = options.fileName || 'FluentRead 文档';
         const pageContext = buildDocumentContext(segments, context, options.pageContext);

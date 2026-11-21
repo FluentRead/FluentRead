@@ -3,6 +3,8 @@ import {PDFDocument} from 'pdf-lib';
 import {afterEach, describe, expect, it, vi} from 'vitest';
 
 import {parseDocument, type ParsedDocument} from '@/src/features/document-translation/core/document';
+import {analyzeDocxInlineParagraph, renderDocxInlineRuns} from '@/src/features/document-translation/core/docxInline';
+import {stripDocumentInlineMarkers} from '@/src/core/translation/documentInlineMarkers';
 import {readEpubHeadingTranslations, readEpubNavigation, renderEpubNavigation, resolveEpubNavigationTarget} from '@/src/features/document-translation/core/epubNavigation';
 import {pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
 import {
@@ -38,6 +40,54 @@ async function zipBytes(files: Record<string, string>): Promise<Uint8Array> {
 
 afterEach(() => {
     vi.unstubAllGlobals();
+});
+
+describe('DOCX inline run reconstruction', () => {
+    const run = (text: string) => `<w:r><w:t>${text}</w:t></w:r>`;
+    it('uses one reversible marker for a link and retains named styles, text entities and hard breaks', () => {
+        const style = '<w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr>';
+        const plan = analyzeDocxInlineParagraph(`<w:p><w:pPr/><w:r/><w:hyperlink w:anchor="appendix"><w:r>${style}<w:t><![CDATA[A > B]]></w:t><w:br w:type="textWrapping"/><w:t>&amp; more</w:t></w:r></w:hyperlink><w:r><w:t> &#x2013; see </w:t><w:tab/></w:r></w:p>`);
+        expect(plan).toMatchObject({kind: 'free', source: '<g1>A > B\n& more</g1> – see', prefix: '<w:p><w:pPr/>'});
+        if (plan.kind !== 'free') throw new Error('Expected ordinary Word paragraph');
+        expect(renderDocxInlineRuns(plan, '另见〈ｇ１〉附录 & 参数〈／ｇ１〉', docxTextNodes, '<w:rPr/>')).toBe(
+            '<w:r><w:rPr/><w:t xml:space="preserve">另见</w:t></w:r><w:hyperlink w:anchor="appendix"><w:r>'
+            + style + '<w:t xml:space="preserve">附录 &amp; 参数</w:t></w:r></w:hyperlink>',
+        );
+        expect(stripDocumentInlineMarkers('〈ｇ１〉附录〈／ｇ１〉')).toBe('附录');
+        expect(renderDocxInlineRuns(plan, '另见<g1> </g1>', docxTextNodes, '')).toBeUndefined();
+        expect(renderDocxInlineRuns(plan, '另见<g1/>', docxTextNodes, '')).toBeUndefined();
+    });
+
+    it.each([
+        ['<w:p><w:r></w:p>', 'invalid'],
+        ['<w:p/><w:p/>', 'invalid'],
+        [run('Text'), 'invalid'],
+        ['<w:p>direct text</w:p>', 'preserve'],
+        ['<w:p><w:hyperlink>direct text</w:hyperlink></w:p>', 'preserve'],
+        ['<w:p><w:hyperlink><w:bookmarkStart/></w:hyperlink></w:p>', 'preserve'],
+        ['<w:p><w:hyperlink><w:r/></w:hyperlink></w:p>', 'preserve'],
+        ['<w:p><w:hyperlink><w:r><w:t> </w:t></w:r></w:hyperlink></w:p>', 'preserve'],
+        ['<w:p><w:r>direct text</w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:rPr><w:rPrChange w:id="1"/></w:rPr><w:t>Text</w:t></w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:t><w:r/></w:t></w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:br w:type="page"/></w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:br>text</w:br></w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:tab>text</w:tab></w:r></w:p>', 'preserve'],
+        ['<w:p><w:r><w:t>&lt;g1&gt; literal</w:t></w:r></w:p>', 'preserve'],
+    ])('preserves unsupported structure in %s', (xml, result) => {
+        expect(analyzeDocxInlineParagraph(xml).kind).toBe(result);
+    });
+
+    it('keeps uniform and whitespace-only runs, handles a single short plain translation, and supports no-run paragraphs', () => {
+        const props = '<w:rPr><w:b/></w:rPr>';
+        const styleOnly = analyzeDocxInlineParagraph(`<w:p>\n<w:r>${props}<w:t>Use</w:t></w:r><w:r>${props}<w:t> it</w:t></w:r></w:p>`);
+        expect(styleOnly).toMatchObject({kind: 'free', source: 'Use it', properties: props, spans: []});
+        if (styleOnly.kind !== 'free') throw new Error('Expected ordinary Word paragraph');
+        expect(renderDocxInlineRuns(styleOnly, '使用', docxTextNodes, '')).toBe(`<w:r>${props}${docxTextNodes('使用')}</w:r>`);
+        expect(analyzeDocxInlineParagraph(' \n<w:p/>')).toMatchObject({kind: 'free', source: '', spans: []});
+        expect(analyzeDocxInlineParagraph(`<w:p>${run('One')}<w:r>${props}<w:t> </w:t></w:r>${run('Two')}</w:p>`)).toMatchObject({kind: 'free', source: 'One Two', spans: []});
+        expect(docxTextNodes('字\u0000\u000b \ud800🙂')).toBe('<w:t xml:space="preserve">字 🙂</w:t>');
+    });
 });
 
 function pdfItem(overrides: Partial<PdfTextItem> = {}): PdfTextItem {
@@ -463,7 +513,7 @@ describe('binary document low-level contracts', () => {
         expect(docxTextNodes('')).toBe('<w:t></w:t>');
     });
 
-    it('DOCX 部件渲染保留未映射段落并支持译文回退', () => {
+    it('DOCX 部件渲染保留未映射段落并支持译文回退', async () => {
         const source = '<w:p><w:r><w:t>One</w:t></w:r></w:p><w:p><w:r><w:t>Keep</w:t></w:r></w:p>';
         const document: ParsedDocument = {
             fileName: 'sample.docx',
@@ -474,10 +524,10 @@ describe('binary document low-level contracts', () => {
         };
         const part = {path: 'word/document.xml', source, paragraphSegments: [{paragraphIndex: 0, segmentIndex: 0}]};
 
-        expect(renderDocxPart(document, part, [], 'translated')).toContain('One');
-        expect(renderDocxPart(document, part, ['译文'], 'bilingual')).toContain('E83B6B');
-        expect(renderDocxPart({...document, segments: []}, part, [], 'translated')).toBe(part.source);
-        expect(renderDocxPart(document, part, ['译文'], 'translated')).toContain('Keep');
+        expect(await renderDocxPart(document, part, [], 'translated')).toContain('One');
+        expect(await renderDocxPart(document, part, ['译文'], 'bilingual')).toContain('E83B6B');
+        expect(await renderDocxPart({...document, segments: []}, part, [], 'translated')).toBe(part.source);
+        expect(await renderDocxPart(document, part, ['译文'], 'translated')).toContain('Keep');
     });
 
     it('公共入口拒绝错误格式，并覆盖文本下载与二进制状态不变量', async () => {

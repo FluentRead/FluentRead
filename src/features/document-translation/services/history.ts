@@ -36,6 +36,8 @@ export interface DocumentHistorySummary {
 export interface DocumentHistoryRecord extends DocumentHistorySummary {
     /** 批注与原始文件同生命周期、同一事务保存；删除历史时一起清除。 */
     pdfAnnotations?: PdfAnnotation[];
+    /** CSV/TSV 文件最后选择的源列号；缺省表示全部可译列。 */
+    delimitedColumns?: readonly number[];
     bytes: Uint8Array;
     mimeType: string;
     translations: string[];

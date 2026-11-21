@@ -190,6 +190,8 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .json-table-row code { color: #16855e; background: transparent; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .json-source { color: var(--ink); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .json-translation { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 64px; resize: vertical; color: var(--ink); background: var(--surface-soft); font-size: 13px; line-height: 1.55; }
+.delimited-document-reader .json-table-header, .delimited-document-reader .json-table-row { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr) minmax(0, 1fr); }
+.delimited-document-reader .json-table-header.single, .delimited-document-reader .json-table-row.single { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr); }
 .document-reader { overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 15px 34px rgba(46, 63, 106, .06); }
 .reader-block { padding: 22px 34px 23px; border-top: 1px solid var(--line); }
 .reader-block:first-child { border-top: 0; }
@@ -722,6 +724,11 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .taskbar-actions { display: flex; grid-column: 3; grid-row: 1; align-items: center; min-width: 0; margin-left: 0; gap: 10px; flex-wrap: nowrap; }
 .toolbar-translation-settings, .toolbar-primary-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .toolbar-primary-actions { flex: none; }
+.document-taskbar .delimited-column-picker { flex: none; width: min(132px, 33vw); }
+.document-taskbar .delimited-column-picker .el-select__wrapper { min-height: 32px; padding: 0 8px; border-radius: 9px; }
+.delimited-column-picker .el-select__selection { flex-wrap: nowrap; min-width: 0; gap: 4px; }
+.delimited-column-count { flex: none; white-space: nowrap; color: var(--ink); font-size: 12px; }
+.document-column-options .el-select-dropdown__item { max-width: min(340px, calc(100vw - 28px)); }
 .document-taskbar .toolbar-settings-toggle { display: none; }
 .document-taskbar .toolbar-field { min-width: 0; }
 .document-taskbar .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -784,6 +791,7 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .document-taskbar.has-pdf-controls:has(.material-save-button) .taskbar-actions { grid-row: 5; }
   .document-taskbar .toolbar-translation-settings { display: none; }
   .toolbar-primary-actions { width: 100%; }
+  .document-taskbar .delimited-column-picker { flex: 1 1 106px; width: auto; min-width: 80px; max-width: 158px; }
   .document-taskbar .toolbar-settings-toggle { display: inline-flex; align-items: center; justify-content: center; margin-right: auto; }
   .document-taskbar .toolbar-primary-actions .translation-actions { flex: 0 1 auto; min-width: 0; }
   .document-taskbar .toolbar-primary-actions button { overflow: hidden; text-overflow: ellipsis; }

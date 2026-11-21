@@ -12,6 +12,8 @@ export const DOCUMENT_EXAMPLES = [
     {fileName: 'sample.ssa', format: 'ass', markers: ['[Events]', 'Dialogue:', '{\\i1}']},
     {fileName: 'sample.lrc', format: 'lrc', markers: ['[ti:Document translation example]', '[00:01.00]']},
     {fileName: 'sample.json', format: 'json', markers: ['"keepNumber": 42']},
+    {fileName: 'sample.csv', format: 'csv', markers: ['12.50,https://example.com/guide']},
+    {fileName: 'sample.tsv', format: 'tsv', markers: ['\t=SUM(B3)']},
 ] as const;
 
 export const DOCUMENT_BINARY_EXAMPLES = [

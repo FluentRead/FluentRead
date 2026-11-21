@@ -665,6 +665,47 @@ describe('binary document translation formats', () => {
         expect(documentXml).not.toContain('Again');
     });
 
+    it('round-trips DOCX hyperlink labels, styles and run order in both download modes', async () => {
+        const run = (text: string, props = '') => `<w:r>${props}<w:t xml:space="preserve">${text}</w:t></w:r>`;
+        const bold = '<w:rPr><w:b/></w:rPr>';
+        const italic = '<w:rPr><w:i/></w:rPr>';
+        const hyperlink = '<w:hyperlink r:id="rId19">';
+        const paragraph = `<w:p w:rsidR="00000001"><w:pPr><w:jc w:val="center"/></w:pPr>${run('Read the ')}` +
+            `${hyperlink}${run('setup ', italic)}${run('guide')}</w:hyperlink>${run(' and keep the ')}${run('impor', bold)}${run('tant', bold)}${run(' step.')}</w:p>`;
+        const field = `<w:p><w:fldSimple w:instr=" DATE ">${run('Today')}</w:fldSimple></w:p>`;
+        const zip = new JSZip();
+        zip.file('[Content_Types].xml', '<Types/>');
+        zip.file('word/document.xml', `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:tbl><w:tr><w:tc>${paragraph}</w:tc></w:tr></w:tbl>${field}</w:body></w:document>`, {createFolders: false});
+        const relations = '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId19" Target="https://example.com/setup" TargetMode="External" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink"/></Relationships>';
+        zip.file('word/_rels/document.xml.rels', relations, {createFolders: false});
+        const parsed = await parseBinaryDocument('styled.docx', await zip.generateAsync({type: 'uint8array'}));
+        expect(parsed.segments.map(segment => segment.source)).toEqual(['Read the <g1><g2>setup </g2>guide</g1> and keep the <g3>important</g3> step.', 'Today']);
+        const corrected = ['先完成<g3>关键</g3>步骤，再读<g1><g2>安装</g2>指南</g1>。', '今天'];
+        for (const mode of ['bilingual', 'translated'] as const) {
+            const {data} = await createDocumentDownload(parsed, corrected, mode);
+            const saved = await JSZip.loadAsync(data as Uint8Array);
+            expect(Object.keys(saved.files).sort()).toEqual(Object.keys(zip.files).sort());
+            const xml = await saved.file('word/document.xml')!.async('string');
+            expect(() => new SaxesParser({xmlns: true}).write(xml).close()).not.toThrow();
+            expect(xml).toContain(run('关键', bold));
+            expect(xml).toContain(`${hyperlink}${run('安装', italic)}${run('指南')}</w:hyperlink>`);
+            expect(xml.indexOf(run('关键', bold))).toBeLessThan(xml.indexOf(`${hyperlink}${run('安装', italic)}`));
+            expect(xml.indexOf(run('指南'))).toBeLessThan(xml.indexOf('</w:tc>'));
+            expect(xml.match(/w:rsidR="00000001"/gu)).toHaveLength(1);
+            expect(xml).toContain('<w:jc w:val="center"/>');
+            expect(xml).toContain(field);
+            expect(xml).toContain('今天');
+            expect(xml.includes(paragraph)).toBe(mode === 'bilingual');
+            expect(xml).not.toMatch(/&lt;\/?g\d/u);
+            expect(await saved.file('word/_rels/document.xml.rels')!.async('string')).toBe(relations);
+        }
+        const legacy = await createDocumentDownload(parsed, ['人工校订的完整译句。', ''], 'translated');
+        const fallback = await (await JSZip.loadAsync(legacy.data as Uint8Array)).file('word/document.xml')!.async('string');
+        expect(fallback).toContain(paragraph);
+        expect(fallback).toContain('人工校订的完整译句。');
+        expect(fallback).toContain(field);
+    });
+
     it('PDF 双语导出将每张原页和保留版式的译页并排放在同一页', async () => {
         const parsed = await parseBinaryDocument('sample.pdf', loadBytes('sample.pdf'));
         const translations = parsed.segments.map((segment) => `Translated: ${segment.source}`);
@@ -690,6 +731,18 @@ describe('binary document translation formats', () => {
         });
         expect(parsed.format).toBe('epub');
         expect(parsed.segments.length).toBeGreaterThan(0);
+    });
+
+    it('保留从 UTF-8 或 UTF-16 文件导入的表格 BOM，并下载成 UTF-8 的 CSV 回读', async () => {
+        const text = '\ufeffName,Details\r\n1,"Hello, world"';
+        const utf8 = new TextEncoder().encode(text);
+        const utf16 = Uint8Array.from([...text].flatMap(character => [character.charCodeAt(0) & 255, character.charCodeAt(0) >> 8]));
+        for (const input of [utf8, utf16]) {
+            const parsed = await parseDocumentFile(new File([Uint8Array.from(input)], 'table.csv'));
+            const download = await createDocumentDownload(parsed, ['', '', '你好，世界'], 'translated');
+            expect(download.mimeType).toBe('text/csv;charset=utf-8');
+            expect(download.data).toBe('\ufeffName,Details\r\n1,"你好，世界"');
+        }
     });
 
     it('拒绝扩展名伪装或损坏的二进制文件', async () => {

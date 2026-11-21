@@ -520,13 +520,11 @@ describe('Englio word-segmented article paragraphs', () => {
         expect(core.resolve(article.firstElementChild!.firstChild)).toBeNull();
     });
 
-    it('requires both native paragraph and word markers', () => {
-        for (const remove of ['data-article-start', 'data-word-pos']) {
-            const {document, core, article} = fixture();
-            if (remove === 'data-article-start') article.removeAttribute(remove);
-            else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(remove));
-            expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
-        }
+    it.each(['data-article-start', 'data-word-pos'])('rejects the wide article without %s', marker => {
+        const {document, core, article} = fixture();
+        if (marker === 'data-article-start') article.removeAttribute(marker);
+        else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(marker));
+        expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
     });
 });
 

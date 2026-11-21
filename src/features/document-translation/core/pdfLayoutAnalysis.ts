@@ -5,6 +5,7 @@
  * 无边框数据表：独立表题、文字表头及重复数值列共同确认逻辑单元格，表题与整表一起参与分栏，先读完前方双栏正文再逐行读表，不绘制不存在的表线。
  * 开放表格与数学边界：只有表头线的表格由相接表头框、重复数值列与独立表题共同确认；精确数学字框不改变导出字号，横向排版字号及相邻锚点决定伸展分隔符归行，大算符抬高的提取基线仅在实际字框、同单元格关系符和右侧数学字形共同支持时归回公式，不吸附上方正文；分式单位由横线两侧字形与数学上下文确认。
  * 章节标题：已有章节名的字距化样式须有同栏正文支持；仅构造分类键，不压缩原文字串，公式、表格和作者区仍受保护。
+ * 论文署名：姓名识别兼容 PDF 提取时分离的重音符号；署名下方紧邻且对齐的机构、邮箱和网址与姓名一起保留原文。
  * 提示框边界：宽框内的正文项目列表与框顶大标题共同确认文字容器，编号后的竖分隔符不让章节标题吸附到插图。
  * 稀疏折行：只有未结束的普通正文、同字号左对齐且更短的小写续行，才允许在有界较大行距内继续；标题、列表和图表不扩大拼接范围。
  * 拼接边界：用 Unicode 锚定规则判断行尾与下一行首字，补充平面的汉字与常见汉字遵守相同规则，拉丁文折行仍保留必要的词间空格。
@@ -452,7 +453,9 @@ export function joinPdfSourceLines(lines: readonly PdfDocumentLine[], kind?: Pdf
 }
 
 /** 作者署名：以逗号分隔的多个“名 姓”，或带单位标记（上标字母、数字、星号等）的人名；只用 and 连接的两个词组更像标题，不算署名。 */
-const byline = /^(?=.*(?:,|[*†‡⇑]|\s[a-z\d]\b))(?:(?:[A-Z][\p{L}.'’-]*\s+){1,3}[A-Z][\p{L}'’-]+(?:\s*[a-z\d*†‡⇑](?:\s*,\s*[a-z\d*†‡⇑])*)?\s*(?:,|\band\b|&|$)\s*)+$/u;
+const byline = /^(?=.*(?:,|[*†‡⇑]|\s[a-z\d]\b))(?:(?:\p{Lu}[\p{L}\p{M}.'’-]*\s+){1,3}\p{Lu}[\p{L}\p{M}'’-]+(?:\s*[a-z\d*†‡⇑](?:\s*,\s*[a-z\d*†‡⇑])*)?\s*(?:,|\band\b|&|$)\s*)+$/u;
+const affiliationLine = /^(?:Department|Faculty|School|University|Institute|College|Laboratory)\s+(?:of|for)\b|(?:\b(?:University|College|Academy|Institute|Laborator(?:y|ies)|Group)|大学|学院|研究所|研究院|实验室)$/iu;
+const contactLine = /^(?:(?:https?:\/\/|www\.)\S+|[\w.+-]+@[\w.-]+\.[a-z]{2,})$/iu;
 /** 一行的“词数”：按空白分出的词，加上不用空格分词的中日韩文字（两个字约合一个词）。 */
 const textUnits = (text: string) => text.split(/\s+/u).filter(Boolean).length + (text.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/gu)?.length ?? 0) / 2;
 /** 三个以上的词里多半是单个拉丁字母或数字（“i k k 1 k word”）：这是散落的上下标，不是句子。 */
@@ -1035,6 +1038,23 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             && Math.min(right(line), right(previous)) > Math.max(line.x, previous.x));
         if (afterRule || continuation) footnotes.add(line);
     }
+    const authorDetails = new Set<LayoutLine>();
+    for (const [index, line] of ordinary.entries()) {
+        if (line.y >= input.height * 0.45 || captionStart.test(line.text) || bulleted.has(line) || tocEntries.has(line)) continue;
+        // LaTeX 的重音可能以单独字符落在姓名中间。只在匹配署名时拼回字母，原行与字形仍用于阅读和导出。
+        const nameText = line.text.replace(/(?<=\p{L})\s*[´¨]\s*(?=\p{Ll})/gu, '');
+        if (byline.test(nameText) && lines.some(above => above.baseline < line.baseline && above.fontSize > line.fontSize * 1.1)) {
+            authorDetails.add(line);
+            continue;
+        }
+        // 单位和联系方式须与上一行署名信息连续，按同一左缘或中心对齐。
+        const previous = ordinary[index - 1];
+        if (previous && authorDetails.has(previous) && line.text.length < 120
+            && (contactLine.test(line.text) || !sentenceLine(line) && affiliationLine.test(line.text))
+            && line.baseline > previous.baseline && line.baseline - previous.baseline <= previous.fontSize * 2.5
+            && line.fontSize <= previous.fontSize * 1.05 && (Math.abs(line.x - previous.x) <= font
+                || Math.abs(line.x + line.width / 2 - previous.x - previous.width / 2) <= font)) authorDetails.add(line);
+    }
     const classify = (line: LayoutLine): Draft['kind'] => {
         if (footnotes.has(line)) return 'text';
         if (line.y > input.height * 0.92 && /^\d{1,4}$/u.test(line.text.trim())) return 'footer';
@@ -1043,8 +1063,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         if ((header || trailer) && line.fontSize <= font * 1.05 && line.text.length < 120
             && !lines.some(near => header ? near.y >= bottom(line) - 1 && near.y - bottom(line) < font * 1.2 : bottom(near) <= line.y + 1 && line.y - bottom(near) < font * 1.2)) return 'footer';
         if (captionStart.test(line.text) || borderlessCaptions.has(line)) return 'caption';
-        // 标题下方的作者署名字号常大于正文，但它是人名与单位标记，既不该翻译也不该出现在目录里。
-        if (line.y < input.height * 0.45 && byline.test(line.text) && lines.some(above => above.baseline < line.baseline && above.fontSize > line.fontSize * 1.1)) return 'metadata';
+        if (authorDetails.has(line)) return 'metadata';
         // 字距化的 Abstract 等短标题不因单字母被当作公式；正文、位置与保护区共同约束，不能把字母枚举提升为章节。
         if (spacedSectionTitle(line) && !mathLabels.has(line) && !authorGrid.includes(line) && !regions.some(region => coversLine(region, line))
             && lines.some(near => near.baseline - line.baseline >= line.fontSize * .8 && near.baseline - line.baseline <= line.fontSize * 3.5

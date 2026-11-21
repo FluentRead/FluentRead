@@ -18,7 +18,7 @@ Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, and SRT, 
 2. Check the file, then start translation.
 3. Switch between original, bilingual, and translated views. Translation starts near your current reading position and completed passages appear as they arrive.
 
-Use **Files** in the sidebar to switch documents and **Outline** to jump to chapters. **Focus reading** hides surrounding controls; Esc exits. Zoom with the toolbar, a trackpad pinch, or Ctrl with the mouse wheel. After clicking the document, **Ctrl/Cmd +, −, and 0** also work. Zoom affects only the reading preview.
+Use **Files** in the sidebar to switch documents and **Outline** to jump to chapters. Detected PDF bylines, affiliations, and contact details appear on the page itself. **Focus reading** hides surrounding controls; Esc exits. Zoom with the toolbar, a trackpad pinch, or Ctrl with the mouse wheel. After clicking the document, **Ctrl/Cmd +, −, and 0** also work. Zoom affects only the reading preview.
 
 ### Pause, retry, or change services
 

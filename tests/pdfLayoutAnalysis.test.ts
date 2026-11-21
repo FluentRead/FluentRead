@@ -1613,6 +1613,20 @@ describe('PDF layout analysis on real paper typography', () => {
         // 标题末尾同一基线上的普通字母不是脚注标记。
         expect(analyze([atom('Appendix', 41, 100, 60, 14), atom('B', 105, 100, 8, 9), atom('Body text sets the page size and is long enough to be a real sentence here.', 41, 300, 420, 8), atom('More body text follows on the next line of the very same body paragraph.', 41, 310, 420, 8)]).blocks[0].source).toBe('Appendix B');
     });
+    it('leaves nearby prose and later affiliation-like section titles available for translation', () => {
+        const intro = 'We compare the baseline with the other group';
+        const section = 'University of Example';
+        const result = analyze([
+            atom('An Experimental Study', 50, 100, 190, 19),
+            atom('Ada Example, Ben Sample', 50, 134, 144, 12),
+            atom(intro, 50, 155, 206),
+            atom('using the same experimental settings on each run.', 50, 168, 210),
+            atom(section, 50, 196, 138, 14),
+            atom('We then consider several ways of measuring the same effect.', 50, 220, 270),
+        ]);
+        expect(result.blocks.find(block => block.source.startsWith(intro))).toMatchObject({kind: 'text', preserveSource: false});
+        expect(result.blocks.find(block => block.source === section)).toMatchObject({kind: 'heading', preserveSource: false});
+    });
     it('leaves bullet glyphs on the page, starts a block at every bullet and translates large text inside slide diagrams', () => {
         const slide = analyze([
             atom('u', 60, 100, 10, 22), atom('Compiler and linker', 75, 100, 200, 22), atom('u', 60, 130, 10, 22), atom('Debugger', 75, 130, 100, 22),

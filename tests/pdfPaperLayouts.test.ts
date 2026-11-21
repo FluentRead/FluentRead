@@ -156,6 +156,31 @@ describe('common paper layouts survive real PDF parsing', () => {
         expect(document.segments.filter(segment => segment.role === 'heading').map(segment => segment.source)).toEqual(['A Careful Study of Layout Preserving Translation', 'Abstract', '1 Introduction', '2 Method']);
         expectSoundStructure(document);
     });
+    it('keeps wrapped bylines with detached accents and adjacent affiliation details out of PDF headings', async () => {
+        const title = 'Measuring Query Performance on Large Datasets';
+        const authorRows = ['Ada Example, Dario Agui ´rre,', 'Émile Sample, J ¨org Writer'];
+        const affiliation = ['Computing Systems Group', 'Example University', 'research@example.org', 'https://example.org/lab'];
+        const document = await build(sheet => {
+            const {fonts, page, height} = sheet;
+            centered(sheet, title, 84, 18, fonts.bold);
+            authorRows.forEach((row, index) => centered(sheet, row, 125 + 18 * index, 12, fonts.sans));
+            affiliation.forEach((row, index) => centered(sheet, row, 167 + 12 * index, 11.5, fonts.sans));
+            page.drawText('ABSTRACT', {x: 54, y: height - 226, size: 12, font: fonts.bold});
+            paragraph(sheet, sentence('abstract', 4), 54, 241, 238, {size: 8.5, leading: 10});
+            page.drawText('1. INTRODUCTION', {x: 54, y: height - 344, size: 12, font: fonts.bold});
+            paragraph(sheet, sentence('opening', 4), 54, 359, 238, {size: 8.5, leading: 10});
+            paragraph(sheet, sentence('comparison', 8), 320, 226, 238, {size: 8.5, leading: 10});
+        });
+        const [page] = pages(document);
+        expect(page.blocks.filter(block => block.kind === 'heading').map(block => document.segments[block.segmentIndex].source))
+            .toEqual([title, 'ABSTRACT', '1. INTRODUCTION']);
+        expect(page.blocks.filter(block => block.kind === 'metadata').flatMap(block => block.lines!.map(line => line.text)))
+            .toEqual([...authorRows, ...affiliation]);
+        expect(page.blocks.filter(block => block.kind === 'metadata').every(block => block.preserveSource && block.segmentIndex === -1)).toBe(true);
+        const plan = buildPdfReadingPlan(document, page, []);
+        const metadata = plan.entries.flatMap(entry => entry.kind === 'text' && entry.role === 'metadata' ? [entry.source] : []);
+        expect(metadata.join(' ')).toBe([...authorRows, ...affiliation].join(' '));
+    });
 
     it('two-column conference paper: Roman-numeral sections, figure and table captions, reading order, footnote, running header', async () => {
         const left = 54, right = 318, column = 240;

@@ -234,25 +234,40 @@ beforeEach(() => {
 afterEach(() => {unmountImageTranslator();while (restoreAnimationPorts.length) restoreAnimationPorts.pop()!(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers();});
 
 describe('图片翻译前台交互与生命周期', () => {
-    it('缺CTD回退缓存先零OCR复用，离线导入后同图显式操作才重入一次且成功位图不再探测',async()=>{
+    it.each(['original','bitmap'] as const)('缺CTD的%s回退先零OCR复用，离线导入后同图显式操作才重入一次',async kind=>{
         settings.imageTranslationOcrEngine='paddle';
         const asset=MANGA_TEXT_SEGMENTATION_ASSET,cache=new Map<string,Response>(),network=vi.fn();
         vi.stubGlobal('fetch',network);vi.stubGlobal('Response',createVirtualModelResponsePort(Response));
         vi.stubGlobal('crypto',{subtle:{digest:vi.fn(async()=>Uint8Array.from(asset.sha256.match(/../gu)!,part=>parseInt(part,16)).buffer)}});
         vi.stubGlobal('caches',{open:async(name:string)=>{expect(name).toBe(MANGA_OCR_CACHE);return{put:async(key:string,value:Response)=>{cache.set(key,value);}};}});
         client.settings.mockImplementation(async()=>({success:true,ready:true,inpaintingReady:false,segmentationReady:cache.has(asset.url),bytes:cache.has(asset.url)?asset.bytes:0}));
-        client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines:[{text:'完整译文',sourceText:'SOURCE',renderSkipped:true,bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
+        const interim={...result,image:'data:image/png;base64,temporary',retryWhenSegmentationReady:true};
+        client.translate.mockResolvedValueOnce(kind==='original'?segmentationFallback:interim);
         const env=setup();env.hover();env.click();await flush();
-        expect(env.image.style.opacity).not.toBe('0');expect(env.bitmap()).toBeFalsy();expect(client.settings).not.toHaveBeenCalled();
+        const temporaryBitmap=env.bitmap();
+        expect(Boolean(temporaryBitmap)).toBe(kind==='bitmap');
+        expect(env.image.style.opacity==='0').toBe(kind==='bitmap');expect(client.settings).not.toHaveBeenCalled();
         env.click();env.click();await flush();expect(client.translate).toHaveBeenCalledOnce();
         await importMangaModel({name:asset.file,size:asset.bytes,arrayBuffer:async()=>virtualModelBuffer(asset.bytes)} as File);
         expect(cache.has(asset.url)).toBe(true);expect(client.translate).toHaveBeenCalledOnce();
         env.click();env.click();await flush();expect(client.translate).toHaveBeenCalledTimes(2);
-        const bitmap=env.bitmap();expect(bitmap).toBeTruthy();expect(env.image.style.opacity).toBe('0');
+        const bitmap=env.bitmap();expect(bitmap).toBeTruthy();expect(bitmap).not.toBe(temporaryBitmap);expect(env.image.style.opacity).toBe('0');
         expect(client.settings).toHaveBeenCalledWith({type:'fluentReadMangaModelStatus'});
         expect(client.settings).toHaveBeenCalledTimes(2);env.click();env.click();await flush();
         expect(env.bitmap()).toBe(bitmap);expect(client.translate).toHaveBeenCalledTimes(2);expect(client.settings).toHaveBeenCalledTimes(2);
         expect(network).not.toHaveBeenCalled();
+    });
+    it('分割资源状态读取失败时仍能切回已生成的临时译图',async()=>{
+        client.translate.mockResolvedValueOnce({...result,retryWhenSegmentationReady:true});
+        const env=setup();env.hover();env.click();await flush();
+        const bitmap=env.bitmap();
+        expect(bitmap).toBeTruthy();
+        client.settings.mockRejectedValueOnce(new Error('model status unavailable'));
+        env.click();env.click();await flush();
+        expect(client.settings).toHaveBeenCalledOnce();
+        expect(client.translate).toHaveBeenCalledOnce();
+        expect(env.bitmap()).toBe(bitmap);
+        expect(env.button().dataset.phase).toBe('translated');
     });
     it.each(['bitmap','safe-fallback','unchanged-text'] as const)('可选资源不探测或失效已完成%s结果',async kind=>{
         client.translate.mockResolvedValueOnce(kind==='bitmap'?result:kind==='safe-fallback'?{...segmentationFallback,retryWhenSegmentationReady:undefined}:{image:'',imageUnchanged:true,lines:[{...segmentationFallback.lines[0],text:'SOURCE',renderSkipped:undefined}]});

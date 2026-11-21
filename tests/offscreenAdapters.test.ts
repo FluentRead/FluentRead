@@ -131,11 +131,14 @@ describe('image translation Offscreen adapter', () => {
         expect(Object.hasOwn(message,'mangaViewport')).toBe(mangaViewport!==undefined);expect(message.mangaViewport).toEqual(mangaViewport);
         expect(options).toEqual({signal,timeoutMs:5000,cancelMessage:{type:OFFSCREEN_CANCEL_IMAGE_OPERATION_MESSAGE_TYPE,requestId:'viewport-adapter'}});
     });
-    it('validates the missing-segmentation retry marker only on an ordinary skipped unchanged result',async()=>{
+    it('accepts the missing-segmentation retry marker on a retained original or a temporary PNG with reading text',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true}];
         const response={success:true,image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines};
         send.mockResolvedValueOnce(response);
         await expect(adapter.translateImage('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
+        const interim={image:'data:image/png;base64,AA==',retryWhenSegmentationReady:true,lines:[{text:'你好',sourceText:'Hello'}]};
+        send.mockResolvedValueOnce({success:true,...interim});
+        await expect(adapter.translateImage('source','en','Page')).resolves.toEqual(interim);
         for(const invalid of [
             {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
             {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[]},{...response,lines:[null,'bad',{}, {renderSkipped:'true'}]},

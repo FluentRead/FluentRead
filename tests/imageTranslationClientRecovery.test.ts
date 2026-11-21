@@ -117,14 +117,19 @@ describe('图片翻译客户端断线恢复', () => {
         }
         expect(listeners.size).toBe(0);
     });
-    it('仅普通保留原图且确有未绘制译文的响应透传缺CTD重试标记',async()=>{
+    it('缺CTD重试支持保留原图和带阅读译文的临时PNG',async()=>{
         const lines=[{text:'你好',sourceText:'Hello',renderSkipped:true,bbox:{x0:0,y0:0,x1:5,y1:5},backgroundColor:'transparent'}];
         const response={success:true,image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines};
         sendMessage.mockResolvedValueOnce(response);
         await expect(translateImageInExtension('source','en','Page')).resolves.toEqual({image:'',imageUnchanged:true,retryWhenSegmentationReady:true,lines});
+        const interim={image:'data:image/png;base64,AA==',retryWhenSegmentationReady:true,lines:[{...lines[0],renderSkipped:undefined}]};
+        sendMessage.mockResolvedValueOnce({success:true,...interim});
+        await expect(translateImageInExtension('source','en','Page')).resolves.toEqual(interim);
         for(const invalid of [
             {...response,retryWhenSegmentationReady:false},{...response,retryWhenSegmentationReady:'true'},
             {...response,image:'encoded',imageUnchanged:undefined},{...response,lines:undefined},{...response,lines:[]},{...response,lines:[null,'bad',{}, {...lines[0],renderSkipped:'true'}]},
+            {success:true,...interim,mangaPatches:{}}, {success:true,...interim,image:null},
+            {success:true,...interim,imageUnchanged:false}, {success:true,...interim,lines:[null,'bad',{}, {text:' '}]},
         ]){sendMessage.mockResolvedValueOnce(invalid);await expect(translateImageInExtension('source','en','Page')).rejects.toThrow();}
         sendMessage.mockResolvedValueOnce(response);await expect(translateImageInExtension('source','en','Page',{manga:true})).rejects.toThrow();
         expect(listeners.size).toBe(0);

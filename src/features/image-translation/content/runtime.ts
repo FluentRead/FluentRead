@@ -1479,7 +1479,11 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         state.abortController = controller;
         setButtonState(state, 'loading', '正在读取图片…');
         try {
-            retryWithResource = await probeOptionalSegmentationReady(controller.signal);
+            retryWithResource = await probeOptionalSegmentationReady(controller.signal).catch(error => {
+                // 临时译图可用时，状态读取异常仍可复用它。原图保留分支继续显示可重试的错误。
+                if (retained.translatedImage) return false;
+                throw error;
+            });
             if (!requestIsCurrent(state, controller)) return;
             if (configurationIdentity(state.manga) !== identity) throw new Error('翻译设置已更改，请重试');
         } catch (error) {

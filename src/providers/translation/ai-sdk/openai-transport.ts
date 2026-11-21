@@ -188,13 +188,15 @@ function compatibilityFetch(
       response: Response;
       normalized: Awaited<ReturnType<typeof normalizeSuccessfulTextResponse>>;
       cooldownError?: TranslationRequestCooldownError | void;
+      startedAt: number;
     };
     try {
       const schedulerContext = getTranslationRequestScheduler(request);
       const identity = {...schedulerContext?.identity,
         service: request.serviceOverride || schedulerContext?.identity?.service, model: requestedModel};
       const fetchAttempt = (attemptLease?: TranslationRequestLease) => {
-        startedAt = Date.now();
+        const attemptStartedAt = Date.now();
+        startedAt = attemptStartedAt;
         // 使用独立的传输 signal：错误正文超限时可终止真实 fetch，且不把这次局部
         // 终止误当作调用方取消（原始 signal 仍负责调度和错误归属）。
         const callerSignal = init?.signal ?? (typeof Request !== 'undefined' && input instanceof Request ? input.signal : undefined);
@@ -208,7 +210,7 @@ function compatibilityFetch(
             errorBodyLimit: OPENAI_ERROR_BODY_LIMIT,
           });
           const cooldownError = schedulerContext?.scheduler.observeResponse(
-            identity, upstream, attemptLease ?? schedulerContext.lease, schedulerContext.deadlineAt,
+            identity, upstream, attemptLease, schedulerContext.deadlineAt,
           );
           let response = upstream;
           if (!response.ok) {
@@ -217,7 +219,7 @@ function compatibilityFetch(
             response = await bounded.result;
           }
           const normalized = await normalizeSuccessfulTextResponse(response);
-          return {response, normalized, cooldownError};
+          return {response, normalized, cooldownError, startedAt: attemptStartedAt};
         })();
         // 给调用方返回有界错误不代表不合作的底层传输已结束；同时持有真实
         // attempt 与旧外层槽直到原 reader 的 EOF/异常，不由超时提前释放槽位。
@@ -249,8 +251,7 @@ function compatibilityFetch(
       throw error;
     }
 
-    const {response, normalized, cooldownError} = result;
-    const observedStart = startedAt ?? Date.now();
+    const {response, normalized, cooldownError, startedAt: observedStart} = result;
     const choice = normalized.body?.choices?.[0];
     const outputLimited = compactBatch && choice?.finish_reason === 'length';
     const outputUnavailable = compactBatch && (choice?.finish_reason === 'content_filter'
@@ -270,7 +271,7 @@ function compatibilityFetch(
     }
     if (outputLimited || outputUnavailable) {
       cancelUnreadResponseBody(normalized.response);
-      throw new LlmTransportError(outputLimited ? 'AI 批量译文被截断' : '当前翻译服务未返回可用的译文', {
+      throw new LlmTransportError(outputLimited ? '批量翻译返回格式异常' : '翻译服务已响应，但没有返回有效译文。', {
         kind: 'response', retryable: false,
         ...(outputLimited ? {code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID'} : {}),
       });
@@ -340,7 +341,7 @@ async function runPreparedRequest(
   compactBatch: boolean,
 ): Promise<string> {
   try {
-    const raw = await execution.run(call) || '';
+    const raw = await execution.run(call);
     // JSON 字符串内可能包含字面 <think>，由批次解析器仅移除外层推理。
     if (compactBatch) return raw;
     const text = contentPostHandler(raw);

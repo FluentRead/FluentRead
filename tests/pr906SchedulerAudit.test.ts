@@ -140,6 +140,46 @@ describe('PR906 scheduler independent audit', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    it('keeps the recovery gate after a probe receives 503 without a new wait header', async () => {
+        const scheduler = createTranslationRequestScheduler(() => limits(3));
+        const identity = {quotaScope: 'limited'};
+        scheduler.observeResponse(identity, {status: 429, headers: new Headers({'retry-after-ms': '100'})});
+        const release = deferred<void>();
+        const probe = scheduler.scheduleAttempt(async lease => {
+            scheduler.observeResponse(identity, {status: 503, headers: new Headers()}, lease);
+        }, {identity, countConcurrency: true});
+        const next = vi.fn(() => release.promise);
+        const recovery = scheduler.scheduleAttempt(next, {identity, countConcurrency: true});
+        const following = vi.fn(async () => 'finished');
+        const final = scheduler.scheduleAttempt(following, {identity, countConcurrency: true});
+        await vi.advanceTimersByTimeAsync(100);
+        await probe;
+        try {
+            expect(next).toHaveBeenCalledOnce();
+            expect(following).not.toHaveBeenCalled();
+        } finally {
+            release.resolve();
+        }
+        await recovery;
+        await expect(final).resolves.toBe('finished');
+    });
+
+    it('forgets an old idle cooldown before handling the next burst of requests', async () => {
+        const scheduler = createTranslationRequestScheduler(() => limits(3));
+        const identity = {quotaScope: 'stale'};
+        scheduler.observeResponse(identity, {status: 429, headers: new Headers({'retry-after-ms': '100'})});
+        await vi.advanceTimersByTimeAsync(60_100);
+        const hold = deferred<void>();
+        const first = scheduler.scheduleAttempt(() => hold.promise, {identity, countConcurrency: true});
+        try {
+            await expect(scheduler.scheduleAttempt(async () => 'ready', {identity, countConcurrency: true}))
+                .resolves.toBe('ready');
+        } finally {
+            hold.resolve();
+            await first;
+        }
+    });
+
     it.each(['global-to-service', 'service-to-model', 'model-to-global'] as const)(
         'reprojects unsettled counted attempts across %s without freeing their slots',
         async (transition) => {

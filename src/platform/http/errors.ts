@@ -36,7 +36,7 @@ export function createHttpStatusError(response: HttpStatus, label = '请求失�
     const retryAfterMs = response.headers && readRetryAfterMs(response.headers);
     return Object.assign(new Error(`${label}: ${response.status}`), {
         statusCode: response.status,
-        ...(retryAfterMs === undefined ? {} : {retryAfterMs}),
+        ...(retryAfterMs ? {retryAfterMs} : {}),
     });
 }
 

@@ -3,7 +3,7 @@ import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 vi.mock('@/src/services/config/store', () => ({config: {}, configReady: Promise.resolve()}));
 
-import {resolveConfiguredModel, services, servicesType} from '@/src/core/config/catalog';
+import {defaultOption, resolveConfiguredModel, services, servicesType} from '@/src/core/config/catalog';
 import {Config} from '@/src/core/config/model';
 import {DOUBAO_SEED_TRANSLATION_MODEL_ID} from '@/src/core/config/doubaoSeedTranslation';
 import {getMissingCredentialMessage} from '@/src/core/config/validation';
@@ -69,9 +69,9 @@ function deferred<T>() {
   return {promise, resolve};
 }
 
-function success(text = '有效中文译文', finishReason = 'stop') {
+function success(text = '有效中文译文', finishReason = 'stop', refusal?: string) {
   return new Response(JSON.stringify({
-    choices: [{message: {role: 'assistant', content: text}, finish_reason: finishReason}],
+    choices: [{message: {role: 'assistant', content: text, refusal}, finish_reason: finishReason}],
     model: 'audit-model', usage: {prompt_tokens: 1, completion_tokens: 1, total_tokens: 2},
   }), {status: 200, headers: {'content-type': 'application/json'}});
 }
@@ -186,6 +186,38 @@ describe('PR #906 actual SDK settlement and effective pending policy', () => {
     await expect(brokerFor(current).translateWithCache({origin: paragraphs, aiMultiSegment: true}))
       .rejects.toMatchObject({code: 'AI_MULTI_SEGMENT_RESPONSE_INVALID', retryable: false});
     expect(fetchFixture).toHaveBeenCalledOnce();
+  });
+
+  it.each(['content_filter', 'tool_calls', 'function_call', 'stop'])(
+    'keeps unavailable compact responses from triggering a second provider request (%s)', async finishReason => {
+      const current = {...configFor(), system_role: {}, user_role: {}};
+      const body = JSON.stringify(translations.map((text, index) => [index, text]));
+      const fetchFixture = vi.fn(async () => success(body, finishReason, finishReason === 'stop' ? 'Synthetic refusal' : undefined));
+      setRuntimeFetch(fetchFixture);
+      await expect(brokerFor(current).translateWithCache({origin: paragraphs, aiMultiSegment: true}))
+        .rejects.toMatchObject({kind: 'response', retryable: false, code: undefined});
+      expect(fetchFixture).toHaveBeenCalledOnce();
+    },
+  );
+
+  it('limits remembered format mismatches and retries the oldest evicted model', async () => {
+    const current = {...configFor(),
+      system_role: {[services.custom]: defaultOption.system_role},
+      user_role: {[services.custom]: defaultOption.user_role}};
+    const fetchFixture = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) =>
+      readRequestBody(init).messages.at(-1)!.content.includes('zero-based index')
+        ? success('[[0,"缺项"]]')
+        : markerResponse(paragraphs));
+    setRuntimeFetch(fetchFixture);
+    const broker = brokerFor(current);
+    const translate = (index: number) => broker.translateWithCache({
+      origin: paragraphs, aiMultiSegment: true, modelOverride: `format-fixture-${index}`,
+    });
+    for (let index = 0; index < 65; index += 1) await expect(translate(index)).resolves.toEqual(translations);
+    await expect(translate(64)).resolves.toEqual(translations);
+    expect(fetchFixture).toHaveBeenCalledTimes(131);
+    await expect(translate(0)).resolves.toEqual(translations);
+    expect(fetchFixture).toHaveBeenCalledTimes(133);
   });
 
   it('returns the actual long cooldown without waiting out a short request budget or resending the batch', async () => {

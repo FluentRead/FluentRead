@@ -20,7 +20,7 @@ export function parseCompactBatch(result: unknown, count: number): string[] {
             return parsed.map(pair => pair[1]);
         }
     }
-    throw Object.assign(new Error('AI 批量翻译返回的 JSON 结构异常'), {
+    throw Object.assign(new Error('批量翻译返回格式异常'), {
         kind: 'response', retryable: false, code: COMPACT_BATCH_RESPONSE_INVALID,
     });
 }

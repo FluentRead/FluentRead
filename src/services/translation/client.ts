@@ -345,7 +345,7 @@ function captureTextRequest(options: TranslateOptions, batch = false) {
   return {
     timeout: getTranslationTimeout(service, options.timeout, batch),
     retryPolicy: getTranslationRetryPolicy(options, service),
-    excludedLanguages: [...(options.excludedLanguages ?? [])],
+    excludedLanguages: Object.freeze([...(options.excludedLanguages ?? [])]),
     fields: {
       ...glossary,
       ...getTranslationLanguages(options),

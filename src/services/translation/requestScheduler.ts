@@ -81,7 +81,8 @@ export class TranslationRequestCooldownError extends Error {
     readonly retryable = false;
 
     constructor(readonly statusCode: number, readonly retryAfterMs: number) {
-        super(statusCode === 429 ? '当前翻译服务已限流，请稍后重试。' : '当前翻译服务暂时不可用，请稍后重试。');
+        super(statusCode === 429 ? '当前翻译服务的请求频率或配额已达上限（HTTP 429），请稍后重试。'
+            : `当前翻译服务暂时不可用（HTTP ${statusCode}），请稍后重试。`);
         this.name = 'TranslationRequestCooldownError';
         this.kind = statusCode === 429 ? 'rate-limit' : 'provider';
     }

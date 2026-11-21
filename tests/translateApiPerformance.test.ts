@@ -722,7 +722,7 @@ describe('translation API request lifecycle performance', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('expires a retry waiting on concurrency without sending after the original deadline', async () => {
+  it.each(['timer', 'clock jump'])('expires a retry waiting on concurrency after the original deadline (%s)', async mode => {
     mocks.config.maxConcurrentTranslations = 1;
     const busy = deferred<string>();
     const failure = new Error('temporary failure');
@@ -730,9 +730,15 @@ describe('translation API request lifecycle performance', () => {
     const retry = translateText('Cooling source', 'Page', {timeout: 5_000}).catch(error => error);
     await flushMicrotasks(30);
     const other = translateText('Other source', 'Page', {timeout: 8_000});
-    await vi.advanceTimersByTimeAsync(3_000);
-    await expect(retry).resolves.toBe(failure);
+    if (mode === 'timer') {
+      await vi.advanceTimersByTimeAsync(3_000);
+      await expect(retry).resolves.toBe(failure);
+    } else {
+      await vi.advanceTimersByTimeAsync(1_000);
+      vi.setSystemTime(Date.now() + 2_001);
+    }
     busy.resolve('其他译文');
+    await expect(retry).resolves.toBe(failure);
     await expect(other).resolves.toBe('其他译文');
     expect(mocks.sendMessage).toHaveBeenCalledTimes(2);
   });

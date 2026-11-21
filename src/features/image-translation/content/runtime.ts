@@ -43,7 +43,7 @@ import {composeMangaPage} from './mangaCompositor';
 import {createMangaCanvas} from './mangaCanvas';
 import {createMangaBackground} from './mangaBackground';
 import {createMangaImageSegments, type MangaImageSegment} from './mangaImageSegments';
-import {getMangaOcrEngine} from '../ocrLanguages';
+import {getImageOcrEngine,getMangaOcrEngine} from '../ocrLanguages';
 
 let mangaReadingOpener: ((event: MouseEvent) => boolean) | undefined;
 /** 漫画入口注册可信点击动作；卸载时只撤销自己的注册。 */
@@ -408,7 +408,7 @@ function configurationIdentity(manga = false): string {
         config.minimaxBillingPlan, config.minimaxRegion, config.mimoBillingPlan, config.mimoRegion,
         document.title,
         manga,
-        manga ? getMangaOcrEngine(sourceLanguage) : config.imageTranslationOcrEngine,
+        getImageOcrEngine(sourceLanguage, manga ? 'paddle' : config.imageTranslationOcrEngine),
     ]);
 }
 
@@ -1459,7 +1459,7 @@ async function probeOptionalSegmentationReady(signal: AbortSignal): Promise<bool
 
 async function performImageTranslation(state: ImageTranslationState, prepareLanguages = false): Promise<void> {
     // 识别方式改变后，不继续下载旧方式的语言包；新方式在用户的翻译任务内准备自己的资源。
-    if (!state.manga && config.imageTranslationOcrEngine === 'paddle') prepareLanguages = false;
+    if (!state.manga && getImageOcrEngine(config.from, config.imageTranslationOcrEngine) === 'paddle') prepareLanguages = false;
     if (state.phase === 'loading' || !state.image.isConnected || !imageTranslationAllowed(state.manga === true)) return;
     state.hoverEntry = false;
     if (sourceIdentity(state.image) !== state.sourceIdentity || !presentationMatchesSource(state.image, state.presentation)) invalidateSource(state);

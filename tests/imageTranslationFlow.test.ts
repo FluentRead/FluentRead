@@ -26,6 +26,23 @@ function setup(extra = {}) {
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
 
+it.each(['ru-RU','ko-KR'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
+    const assertLanguagesDownloaded=vi.fn()
+        .mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'))
+        .mockResolvedValueOnce(undefined);
+    const translateImage=vi.fn(async (..._args:unknown[])=>({image:'data:image/png,fixture',lines:[]}));
+    const current=setup({getImageOcrEngine:()=> 'paddle',assertLanguagesDownloaded,translateImage});
+    const type=IMAGE_TRANSLATE_MESSAGE_TYPE;
+    const request={type,sourceLanguage,image:'data:image/png;base64,fixture'};
+    await expect(current.handler(type).handle(request)).rejects.toThrow('需要先下载对应语言包');
+    expect(translateImage).not.toHaveBeenCalled();
+    await expect(current.handler(type).handle(request)).resolves.toMatchObject({success:true});
+    expect(assertLanguagesDownloaded.mock.calls).toEqual([[sourceLanguage],[sourceLanguage]]);
+    const options=translateImage.mock.calls[0]?.[3];
+    expect(options).toBeDefined();
+    expect(options).not.toHaveProperty('ocrEngine');
+});
+
 it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker隐私边界兼容：%s',async mode=>{
     const config=new Config();config.service='google';config.from='en';config.to='zh-Hans';
     config.privacyProtection=normalizePrivacyPolicy({enabled:true,mode:mode==='block'?'block':'mask'});

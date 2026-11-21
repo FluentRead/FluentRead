@@ -574,6 +574,14 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(result.lines[0].sourceText).toBe('Hello');expect(mocks.repair).not.toHaveBeenCalled();
     });
 
+    it.each(['ru-RU','ko-KR'])('单图语言模型 %s 在实际识别入口使用轻量引擎',async sourceLanguage=>{
+        mocks.mangaRecognize.mockResolvedValue(lines);
+        const result=await translateImageInOffscreen('image',sourceLanguage,'Page',undefined,'single-localized',false,'paddle');
+        expect(mocks.recognize).toHaveBeenCalledExactlyOnceWith('image',sourceLanguage,undefined,expect.objectContaining({decodedImage:images[0]}));
+        expect(mocks.mangaRecognize).not.toHaveBeenCalled();
+        expect(result.image).toBe('data:image/png;base64,translated');
+    });
+
     it('漫画整段识别走专用模型与局部修补，保留对照并报告准备阶段',async()=>{
         const regions=[{...lines[0],fontSize:10,sourceBoxes:[lines[0].bbox]}];
         mocks.mangaRecognize.mockImplementationOnce(async(_image,_language,_w,_h,_signal,progress)=>{progress('preparing',23);progress('recognizing');return regions;});

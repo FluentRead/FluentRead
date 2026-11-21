@@ -10,6 +10,15 @@ const dist = path.join(root, 'docs/.vitepress/dist')
 const brandTaglines = JSON.parse(
   fs.readFileSync(path.join(root, 'src/core/i18n/messages/brand-taglines.json'), 'utf8')
 )
+const landingLocales = Object.values(JSON.parse(
+  fs.readFileSync(path.join(root, 'docs/.vitepress/landing-locales.json'), 'utf8')
+))
+const landingByFile = new Map(landingLocales.map(locale => [
+  locale.path.slice(1) + 'index.html', locale,
+]))
+const website = 'https://read.thinkstu.com'
+assert.deepEqual(landingLocales.map(locale => locale.assetLocale).sort(), Object.keys(brandTaglines).sort(),
+  'The website landings must cover each published brand language')
 const distReal = fs.realpathSync(dist)
 const isArtifactFile = (file) => {
   const inside = (base, target) => {
@@ -70,19 +79,66 @@ for (const [file, doc] of docs) {
     )
   } else {
     const route = path.relative(dist, file)
-    const alternatePath = (route.startsWith('en/') ? route.slice(3) : 'en/' + route)
-      .replace(/index\.html$/, '')
-      .replace(/\.html$/, '')
-    assert.equal(
-      doc.querySelector('.bv-language')?.getAttribute('href'),
-      '/' + alternatePath,
-      `Language switch must preserve the page without a language-specific hash: ${route}`
-    )
     const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href')
     assert(canonical?.startsWith('https://read.thinkstu.com/'), `Missing canonical: ${file}`)
     assert(resolve(canonical), `Missing canonical target: ${canonical}`)
-    for (const alternate of doc.querySelectorAll('link[rel="alternate"][hreflang]')) {
+    const alternates = [...doc.querySelectorAll('link[rel="alternate"][hreflang]')]
+    for (const alternate of alternates) {
       assert(resolve(alternate.getAttribute('href')), `Missing translated URL: ${file}`)
+    }
+    const landing = landingByFile.get(route)
+    if (landing) {
+      const languageLinks = [...doc.querySelectorAll('.bv-home-language a[hreflang]')]
+      assert.equal(doc.documentElement.lang, landing.lang, `Wrong document language: ${route}`)
+      assert.equal(canonical, website + landing.path)
+      assert.deepEqual(
+        languageLinks.map(link => [link.getAttribute('hreflang'), link.getAttribute('href')]),
+        landingLocales.map(locale => [locale.lang, locale.path]),
+        `Every localized landing must be reachable: ${route}`
+      )
+      assert.equal(doc.querySelector('.bv-home-language [aria-current="page"]')?.getAttribute('href'), landing.path)
+      assert.deepEqual(
+        alternates.map(link => [link.getAttribute('hreflang'), link.getAttribute('href')]),
+        [...landingLocales.map(locale => [locale.lang, website + locale.path]),
+          ['x-default', website + '/en/']],
+        `Missing reciprocal language metadata: ${route}`
+      )
+      const shareImage = `${website}/brand/share/${landing.assetLocale}.jpg`
+      const metadata = {
+        'og:locale': landing.socialLocale,
+        'og:title': landing.title,
+        'og:description': landing.description,
+        'og:image': shareImage,
+        'og:image:alt': landing.imageAlt,
+      }
+      for (const [property, content] of Object.entries(metadata)) {
+        assert.equal(doc.querySelector(`meta[property="${property}"]`)?.getAttribute('content'), content,
+          `Missing localized share metadata: ${property} in ${route}`)
+      }
+      assert.equal(doc.querySelector('title')?.textContent, landing.title)
+      assert.equal(doc.querySelector('meta[name="description"]')?.getAttribute('content'), landing.description)
+      assert(resolve(shareImage), `Missing share artwork: ${shareImage}`)
+      const reader = doc.querySelector('.fr-marketing-hero .fr-sample-reader')
+      assert(reader && reader.getAttribute('data-view') === 'bilingual', `Missing bilingual sample: ${route}`)
+      assert.equal(reader.querySelectorAll('.fr-reader-switch button').length, 2)
+      assert.equal(reader.querySelectorAll('.fr-reader-switch button[aria-pressed="true"]').length, 1)
+      assert.equal(reader.querySelectorAll('.fr-source[lang] + .fr-translation').length, 2)
+      if (landing.lang !== 'zh-CN' && landing.lang !== 'en') {
+        const installLinks = [...doc.querySelectorAll('.fr-install-actions a')].map(link => link.href)
+        assert.equal(installLinks.length, 3, `Missing browser installs: ${route}`)
+        assert(installLinks.some(url => new URL(url).hostname === 'chromewebstore.google.com'))
+        assert(installLinks.some(url => new URL(url).hostname === 'microsoftedge.microsoft.com'))
+        assert(installLinks.some(url => new URL(url).hostname === 'addons.mozilla.org'))
+      }
+    } else {
+      const alternatePath = (route.startsWith('en/') ? route.slice(3) : 'en/' + route)
+        .replace(/index\.html$/, '')
+        .replace(/\.html$/, '')
+      assert.equal(
+        doc.querySelector('.bv-language')?.getAttribute('href'),
+        '/' + alternatePath,
+        `Language switch must preserve the page without a language-specific hash: ${route}`
+      )
     }
   }
   for (const demo of doc.querySelectorAll('[data-visual],[data-demo]')) {
@@ -138,6 +194,10 @@ for (const [file, doc] of docs) {
     report.images++
   }
 }
+const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8')
+for (const locale of landingLocales) {
+  assert(sitemap.includes(`<loc>${website + locale.path}</loc>`), `Landing missing from sitemap: ${locale.path}`)
+}
 for (const file of files(path.join(root, 'docs/guide'))
   .concat(files(path.join(root, 'docs/config')))
   .filter((f) => f.endsWith('.md'))) {
@@ -169,7 +229,7 @@ for (const prefix of ['', '/en']) {
     ),
     'Video and meeting platforms missing'
   )
-  assert(!home.querySelector('.bv-hero [data-demo]'), 'Full demonstration belongs below the hero')
+  assert(!home.querySelector('.fr-marketing-hero [data-demo]'), 'Full demonstration belongs below the hero')
   assert(home.querySelector('.bv-home-header'), 'Homepage must use focused marketing navigation')
   assert(
     !home.querySelector('.bv-identity,.bv-platforms'),
@@ -180,13 +240,13 @@ for (const prefix of ['', '/en']) {
     'Translation demo must appear below the hero'
   )
   assert(!home.querySelector('.bv-walkthrough'), 'Numbered walkthrough controls must be removed')
-  assert.equal(home.querySelectorAll('.bv-hero h1').length, 1, 'Hero needs one primary headline')
+  assert.equal(home.querySelectorAll('.fr-marketing-hero h1').length, 1, 'Hero needs one primary headline')
   assert.equal(
-    home.querySelectorAll('.bv-hero .bv-install-actions > a.bv-primary').length,
+    home.querySelectorAll('.fr-marketing-hero .bv-install-actions > a.bv-primary').length,
     1,
     'Hero needs one primary install action'
   )
-  const docsAction = home.querySelector('.bv-hero .bv-docs-link')
+  const docsAction = home.querySelector('.fr-marketing-hero .bv-docs-link')
   assert.equal(docsAction?.getAttribute('href'), `${prefix}/docs/`)
   assert.equal(docsAction?.textContent.trim(), prefix ? 'Documentation' : '使用文档')
   const workflows = [...home.querySelectorAll('.bv-feature-row .ds')]
@@ -244,11 +304,8 @@ for (const prefix of ['', '/en']) {
     'Primary feature needs a visible bilingual translation heading'
   )
   assert(
-    home.querySelector('.bv-hero-intro > span')?.textContent.trim() ===
-      (prefix
-        ? 'FluentRead is an open-source browser extension for bilingual translation.'
-        : '流畅阅读，一款开源的浏览器双语翻译插件') &&
-      home.querySelector('.bv-hero h1.bv-hero-slogan')?.textContent.trim() ===
+    home.querySelector('.fr-hero-copy > p')?.textContent.includes(prefix ? 'FluentRead' : '流畅阅读') &&
+      home.querySelector('.fr-marketing-hero h1')?.textContent.trim() ===
         (prefix ? brandTaglines['en-US'] : brandTaglines['zh-CN']),
     'Canonical slogan must be the headline, with the product name in the localized introduction'
   )
@@ -256,21 +313,10 @@ for (const prefix of ['', '/en']) {
     home.querySelector('.bv-home-brand')?.textContent.includes(prefix ? 'FluentRead' : '流畅阅读'),
     'Localized product name missing'
   )
-  assert(
-    home.querySelector('.bv-hero-orbit')?.textContent.includes('Hello') &&
-      home.querySelector('.bv-hero-orbit')?.textContent.includes('你好'),
-    'Multilingual greetings missing'
-  )
   assert.equal(
     home.querySelectorAll('.bv-feature-row').length,
     5,
     'Five consistent feature sections required'
-  )
-  assert(
-    ['page', 'document', 'grammar'].every((kind) =>
-      home.querySelector(`.bv-hero-orbit .bv-orbit-${kind}`)
-    ),
-    'Hero scene decorations must stay present'
   )
   assert(
     home.querySelector(
@@ -291,7 +337,7 @@ for (const prefix of ['', '/en']) {
     'Homepage carries one introduction video'
   )
   assert(
-    !home.querySelector('.bv-hero video,.bv-hero iframe'),
+    !home.querySelector('.fr-marketing-hero video,.fr-marketing-hero iframe'),
     'Introduction video belongs below the hero'
   )
   const promo = home.querySelector('.bv-promo video')
@@ -321,7 +367,7 @@ for (const prefix of ['', '/en']) {
     'Confusing cursor paths and repeated installation section must be removed'
   )
   assert(
-    !home.querySelector('.bv-hero')?.textContent.includes('AI'),
+    !home.querySelector('.fr-marketing-hero')?.textContent.includes('AI'),
     'Hero should foreground translation, without AI marketing'
   )
   assert(

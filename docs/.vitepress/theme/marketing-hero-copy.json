@@ -1,0 +1,56 @@
+{
+  "zh": {
+    "original": "原文",
+    "bilingual": "双语",
+    "example": "网页翻译示例",
+    "exampleTitle": "午夜了，书店还开着。",
+    "exampleText": "我凭封面挑了本书，回来的路上就读了第一页。"
+  },
+  "en": {
+    "original": "Original",
+    "bilingual": "Bilingual",
+    "example": "Webpage translation sample",
+    "exampleTitle": "At midnight, the bookshop was still open.",
+    "exampleText": "I picked a book by its cover and read the first page on my way home."
+  },
+  "ja": {
+    "headline": "ウェブを原文と訳文で。",
+    "original": "原文",
+    "bilingual": "原文と訳文",
+    "example": "ウェブ翻訳の表示例",
+    "exampleTitle": "真夜中になっても、本屋はまだ開いていました。",
+    "exampleText": "表紙で本を一冊選び、帰り道で最初のページを読みました。"
+  },
+  "ko": {
+    "headline": "웹페이지를 두 언어로 읽어 보세요.",
+    "original": "원문",
+    "bilingual": "원문과 번역",
+    "example": "웹페이지 번역 예시",
+    "exampleTitle": "자정에도 서점은 문을 열고 있었다.",
+    "exampleText": "표지를 보고 책을 한 권 골랐고, 돌아가는 길에 첫 페이지를 읽었다."
+  },
+  "fr": {
+    "headline": "Lisez le Web en deux langues.",
+    "original": "Original",
+    "bilingual": "Version bilingue",
+    "example": "Exemple de traduction d’une page Web",
+    "exampleTitle": "À minuit, la librairie était encore ouverte.",
+    "exampleText": "J’ai choisi un livre d’après sa couverture et lu la première page en rentrant."
+  },
+  "es": {
+    "headline": "Lee la web en dos idiomas.",
+    "original": "Original",
+    "bilingual": "Vista bilingüe",
+    "example": "Ejemplo de traducción de una página web",
+    "exampleTitle": "A medianoche, la librería seguía abierta.",
+    "exampleText": "Elegí un libro por su portada y leí la primera página de camino a casa."
+  },
+  "ru": {
+    "headline": "Читайте сайты на двух языках.",
+    "original": "Оригинал",
+    "bilingual": "Оригинал и перевод",
+    "example": "Пример перевода веб-страницы",
+    "exampleTitle": "В полночь книжный магазин всё ещё был открыт.",
+    "exampleText": "Я выбрал книгу по обложке и прочитал первую страницу по дороге домой."
+  }
+}

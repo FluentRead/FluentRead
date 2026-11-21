@@ -343,7 +343,7 @@ function* paintPdfTranslationSteps(
             if (!translation.trim() || ![block.x, block.y, block.width, block.height, block.fontSize].every(Number.isFinite)) continue;
             const x = Math.max(0, Math.min(virtualWidth - 1, block.x * scaleX));
             const y = Math.max(0, Math.min(virtualHeight - 1, block.y * scaleY));
-            const width = Math.max(1, Math.min(virtualWidth - x, (block.width + (block.lineCount <= 1 ? spaceRight : 0)) * scaleX));
+            const width = Math.max(1, Math.min(virtualWidth - x, (block.width + spaceRight) * scaleX));
             const height = Math.max(1, Math.min(virtualHeight - y, (block.height + spaceBelow) * scaleY));
             // 步骤 1：只遮盖文字块，保留周围图表和分隔线，再用采样到的前景色绘制译文。
             const padding = Math.max(2, Math.min(scaleX, scaleY) * 1.2);

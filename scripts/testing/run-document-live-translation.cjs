@@ -64,7 +64,7 @@ async function readPublicResumeSettings() {
   const stored = await chrome.runtime.sendMessage({type: 'configStorageRead', key: 'local:config'});
   if (!stored?.success) throw new Error('Public resume configuration read failed');
   const config = typeof stored.value === 'string' ? JSON.parse(stored.value) : stored.value;
-  const batch = document.querySelector('.document-batch-translation input');
+  const batch = document.querySelector('.document-batch-translation:not([data-testid="document-ai-context-toggle"]) input');
   if (!config || typeof config !== 'object' || !batch || typeof batch.checked !== 'boolean') throw new Error('Invalid public resume configuration');
   return {name: document.querySelector('.workspace-heading h1')?.textContent.trim() || '',
     from: config.from, to: config.to, service: config.service, documentService: config.documentService,
@@ -395,12 +395,64 @@ async function inspectPdf(bytes, requireRepo) {
       const page = await pdf.getPage(number);
       try {
         const viewport = page.getViewport({scale: 1});
-        pages.push({number, label: labels?.[number - 1], width: viewport.width, height: viewport.height,
-          text: (await page.getTextContent()).items.filter(item => 'str' in item).map(item => item.str).join('\n')});
+        const label = labels?.[number - 1], items = (await page.getTextContent()).items.filter(item => 'str' in item);
+        const annotations = await page.getAnnotations();
+        const webLinks = annotations.flatMap(annotation => {
+          if (annotation.subtype !== 'Link' || !/^https?:\/\//u.test(annotation.url ?? '')
+            || !annotation.rect || (annotation.annotationFlags & 35)) return [];
+          const right = visibleLinkRight(annotation.rect, viewport);
+          return right === undefined ? [] : [{url: annotation.url, right}];
+        });
+        pages.push({number, label, width: viewport.width, height: viewport.height, text: items.map(item => item.str).join('\n'),
+          originalText: items.filter(item => item.transform[4] < viewport.width / 2).map(item => item.str).join('\n'),
+          translatedText: items.filter(item => item.transform[4] >= viewport.width / 2).map(item => item.str).join('\n'),
+          continuationText: /译文续页/u.test(label ?? '') ? items.filter(item => item.transform[5] > 34).map(item => item.str).join('\n') : '',
+          notes: annotations.filter(annotation => annotation.subtype === 'Text').map(annotation => annotation.contentsObj?.str ?? ''),
+          webLinks});
       } finally {page.cleanup();}
     }
     return pages;
   } finally {await task.destroy();}
+}
+
+function visibleLinkRight(rect, viewport) {
+  const [a, b, c, d, e, f] = viewport.transform;
+  const [x1, y1, x2, y2] = rect;
+  const x = a * x1 + c * y1 + e, y = b * x1 + d * y1 + f;
+  const right = a * x2 + c * y2 + e, bottom = b * x2 + d * y2 + f;
+  const visibleRight = Math.min(viewport.width, Math.max(x, right));
+  if (visibleRight > Math.max(0, Math.min(x, right)) && Math.min(viewport.height, Math.max(y, bottom)) > Math.max(0, Math.min(y, bottom))) return visibleRight;
+}
+
+/** 左侧原文不能代替译文；每个长段的完整文字须在所属页的续页上实际可提取。 */
+function validateLayoutCopyText(snapshot, output) {
+  const mapped = mapPdfLayoutPages(snapshot.pages.length, output);
+  const copyKey = text => text.normalize('NFKC').replace(/[\s\u200b]/gu, '');
+  const segments = new Map(snapshot.segments.map(segment => [segment.id, segment]));
+  const missingSegments = [], missingContinuationText = [], formatOnlyNotes = [];
+  let checkedSegments = 0, checkedNotes = 0;
+  for (const [index, {pageNumber, segmentIndexes}] of snapshot.pages.entries()) {
+    const page = mapped.pages[index];
+    const continuation = copyKey(mapped.continuations.filter(entry => entry.sourcePage === pageNumber)
+      .map(entry => output[entry.index].continuationText).join(''));
+    const main = copyKey(page?.translatedText || '');
+    for (const id of segmentIndexes) {
+      const segment = segments.get(id);
+      if (!segment?.translation.trim() || segment.translation.normalize('NFC').trim() === segment.source.normalize('NFC').trim()) continue;
+      const expected = copyKey(segment.translation);
+      checkedSegments++;
+      if (!main.includes(expected) && !continuation.includes(expected)) missingSegments.push({pageNumber, id, characters: expected.length});
+    }
+    for (const note of page?.notes ?? []) {
+      const text = copyKey(note);
+      if (!text) continue;
+      checkedNotes++;
+      if (!continuation.includes(text)) missingContinuationText.push({pageNumber, characters: text.length});
+      if (segmentIndexes.some(id => copyKey(segments.get(id)?.source ?? '') === text)) formatOnlyNotes.push({pageNumber, characters: text.length});
+    }
+  }
+  return {ok: mapped.ok && !missingSegments.length && !missingContinuationText.length,
+    checkedSegments, checkedNotes, missingSegments, missingContinuationText, formatOnlyNotes};
 }
 
 function validatePdf(source, output) {
@@ -413,11 +465,22 @@ function validatePdf(source, output) {
       if (anchor.length >= 24 && !sourceTexts.some((other, otherIndex) => otherIndex !== index && other.includes(anchor)) && !anchors.includes(anchor)) anchors.push(anchor);
     }
     const actual = mapped.pages[index], width = page.width * 2 + Math.max(8, Math.min(24, page.width * .025));
-    return {page: index + 1, anchors: anchors.length, sourceOrderOk: !anchors.length || Boolean(actual && anchors.every(anchor => compact(actual.text).includes(anchor))),
+    const originalLinks = (actual?.webLinks ?? []).filter(link => link.right <= page.width + .02);
+    const links = new Map();
+    for (const {url} of originalLinks) links.set(url, (links.get(url) ?? 0) + 1);
+    let missingWebLinks = 0;
+    for (const {url} of page.webLinks) {
+      const copies = links.get(url) ?? 0;
+      if (copies) links.set(url, copies - 1);
+      else missingWebLinks++;
+    }
+    const original = compact(actual?.originalText ?? '');
+    return {page: index + 1, anchors: anchors.length, sourceOrderOk: !anchors.length || anchors.every(anchor => original.includes(anchor)),
       dimensionsOk: Boolean(actual && Math.abs(actual.width - width) < .02 && Math.abs(actual.height - page.height) < .02),
+      missingWebLinks, sourceWebLinks: page.webLinks.length, outputWebLinks: originalLinks.length,
       expectedWidth: width, actualWidth: actual?.width, expectedHeight: page.height, actualHeight: actual?.height};
   });
-  return {ok: mapped.ok && evidence.every(page => page.sourceOrderOk && page.dimensionsOk),
+  return {ok: mapped.ok && evidence.every(page => page.sourceOrderOk && page.dimensionsOk && page.missingWebLinks === 0),
     layoutPageMapping: {ok: mapped.ok, labelled: mapped.labelled, indices: mapped.indices, continuations: mapped.continuations}, sourcePages: source.length, outputPages: output.length, pages: evidence};
 }
 
@@ -644,7 +707,7 @@ async function validateOtherDownload(sourceBytes, outputBytes, snapshot, require
 
 async function historySnapshot(page, name) {
   return page.evaluate(async name => {
-    const database = await new Promise((resolve, reject) => {const request = indexedDB.open('FluentReadDocumentHistory', 1); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
+    const database = await new Promise((resolve, reject) => {const request = indexedDB.open('FluentReadDocumentHistory'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
     try {
       const records = await new Promise((resolve, reject) => {const request = database.transaction('documents', 'readonly').objectStore('documents').getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);});
       const record = records.filter(value => value.name === name).sort((a, b) => b.updatedAt - a.updatedAt)[0];
@@ -808,6 +871,9 @@ async function main() {
   const capturePages = count => !process.argv.includes('--pdf-pages') && count <= samplePages.length
     ? Array.from({length: count}, (_value, index) => index + 1) : samplePages.filter(number => number <= count);
   const artifactsDir = path.resolve(arg('artifacts-dir', '/private/tmp/fluentread-document-live-translation'));
+  const diagnosticsPath = arg('runtime-diagnostics-helper', process.env.FLUENTREAD_RUNTIME_DIAGNOSTICS_HELPER);
+  const diagnosticsModule = diagnosticsPath ? require(path.resolve(diagnosticsPath)) : undefined;
+  const diagnostics = diagnosticsModule?.createRuntimeDiagnostics();
   const service = arg('service', 'freeTranslation'); assert(['freeTranslation', 'bilibili', 'microsoft', 'google'].includes(service), '--service only allows credential-free freeTranslation,bilibili,microsoft,google');
   fs.mkdirSync(artifactsDir, {recursive: true});
   const pdftoppm = arg('pdftoppm', 'pdftoppm');
@@ -825,7 +891,7 @@ async function main() {
       viewport: {width: 1440, height: 960}, narrowViewports: [{width: 820, height: 960}, {width: 390, height: 844}]},
     evidenceBoundary: `Real credential-free ${service} requests and actual document UI; no routes, fetch replacements, proxy, paid credentials or synthetic responses. Chinese/no-marker checks and two targeted inline-text regression assertions are evidence, not a general translation-quality score. Optional PDF UI coverage uses CDP keyboard and Ctrl/Cmd wheel against the actual document, not physical trackpad gestures. First-PDF narrow screenshots/geometry cover only 820x960 and 390x844. Review saved paragraphs and screenshots manually.`,
     documents: [], screenshots: [], network: [], consoleErrors: [], cleanupErrors: [], focusEvents: [], focusChecks: []};
-  let launched, page, launchAttempted = false, focusMonitor, ownedPid, focusFailure;
+  let launched, page, launchAttempted = false, focusMonitor, ownedPid, focusFailure, diagnosticsStarted = false;
   const responseObserver = createResponseBodyObserver(); report.responseBodyObservations = responseObserver.stats;
   const persist = () => fs.writeFileSync(path.join(artifactsDir, 'report.json'), JSON.stringify(report, null, 2));
   const stopForFocus = error => {
@@ -863,6 +929,7 @@ async function main() {
     assert.equal(report.launchMode, 'macos-background-cdp'); assert.equal(report.focusPolicy, 'launchservices-no-foreground'); assert.equal(report.windowPlacement.browserFrontmost, false);
     await checkFocus('initialization');
     const context = launched.context, requests = new Map();
+    if (diagnostics) {await diagnostics.start(context); diagnosticsStarted = true;}
     context.on('request', request => {
       const url = new URL(request.url()); if (url.protocol !== 'https:') return;
       const record = {id: report.network.length + 1, document: report.currentDocument ?? null, domain: url.hostname,
@@ -886,6 +953,8 @@ async function main() {
     const worker = context.serviceWorkers()[0] || await context.waitForEvent('serviceworker', {timeout: 30000});
     const origin = /^chrome-extension:\/\/[^/]+/u.exec(worker.url())[0];
     page = await newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
+    diagnostics?.setExtensionId(origin.split('//')[1]);
+    await diagnostics?.attachPage(page, 'document');
     // Keep diagnostic text short and exclude URLs/query strings that could contain upstream protocol identifiers.
     const diagnostic = text => String(text).replace(/https?:\/\/[^\s]+/gu, '[url]').slice(0, 500);
     page.on('pageerror', error => report.consoleErrors.push(diagnostic(error.message)));
@@ -926,7 +995,7 @@ async function main() {
     }
     const downloadFromDialog = (dialog, result, prefix, phase) => waitForDocumentDownload(page, dialog, {
       timeout: exportTimeout,
-      click: () => dialog.locator('.translate-document-button').click(),
+      click: () => dialog.locator('.download-submit').click(),
       assertActive: () => {
         if (focusFailure) throw focusFailure;
         if (page.isClosed()) throw new Error(`Document page closed during ${phase}`);
@@ -942,8 +1011,13 @@ async function main() {
         persist();
       },
     });
+    const closeDownload = async () => {
+      const dialog = page.locator('.download-dialog[open]');
+      if (await dialog.count()) await dialog.locator('.download-heading > button').click();
+    };
     const clearForImport = async () => {
-      const openDownload = page.locator('.download-dialog[open]'); if (await openDownload.count()) await openDownload.getByRole('button', {name: '返回文档', exact: true}).click();
+      await closeDownload();
+      if (await page.locator('.file-drop-zone').isVisible()) return;
       const sidebar = page.locator('aside.document-sidebar'); if (!await sidebar.isVisible()) await page.locator('.sidebar-toggle').click();
       await sidebar.getByRole('button', {name: '调整文档翻译设置', exact: true}).click();
       await page.locator('.document-settings-dialog[open] .sidebar-change-file').click();
@@ -963,7 +1037,7 @@ async function main() {
         await page.locator('.workspace-heading h1').filter({hasText: name}).waitFor();
         if (isPdf) await page.locator('.pdf-page-row[data-render-state="ready"] canvas').first().waitFor();
         result.importMs = Date.now() - importStart;
-        result.documentBatchTranslation = await page.locator('.document-batch-translation input').isChecked();
+        result.documentBatchTranslation = await page.locator('.document-batch-translation:not([data-testid="document-ai-context-toggle"]) input').isChecked();
         assert.equal(result.documentBatchTranslation, true, 'New documents should use the default transient batching');
         result.glossary = await page.evaluate(readPublicGlossaryState, builtinGlossary);
         if (builtinGlossary) assert.deepEqual(result.glossary, report.glossary, 'Each document must retain the actual enabled builtin selection before translation');
@@ -1118,7 +1192,7 @@ async function main() {
         }
         await checkFocus('export-dialog');
         await page.locator('.download-button').click(); const dialog = page.locator('.download-dialog[open]'); await dialog.waitFor();
-        await dialog.locator('.export-options button').first().click();
+        await dialog.locator('.download-version[data-mode="bilingual"]').click();
         await checkFocus('export-download');
         const exportStart = Date.now();
         const download = await downloadFromDialog(dialog, result, prefix, 'export-download');
@@ -1128,15 +1202,17 @@ async function main() {
         result.export = {output, suggestedFilename: download.suggestedFilename(), exportMs, bytes: fs.statSync(output).size};
         if (isPdf) {
           const outputPages = await inspectPdf(fs.readFileSync(output), requireRepo); result.export.validation = validatePdf(sourcePages, outputPages);
+          result.export.copyValidation = validateLayoutCopyText(snapshot, outputPages);
           result.export.previews = [];
           for (const number of capturePages(outputPages.length)) {
             const target = path.join(artifactsDir, `${prefix}-export-page-${number}`);
             await promisify(execFile)(pdftoppm, ['-f', String(number), '-l', String(number), '-singlefile', '-scale-to', '2200', '-png', output, target], {timeout: 60000, maxBuffer: 1024 * 1024});
             result.export.previews.push({page: number, path: `${target}.png`});
           }
-          assert(result.export.validation.ok, `PDF reopening/page-order/dimensions failed: ${JSON.stringify(result.export.validation)}`);
+          assert(result.export.validation.ok, `PDF pages or source links were lost: ${JSON.stringify(result.export.validation)}`);
+          assert(result.export.copyValidation.ok, `PDF translated text or continuation was lost: ${JSON.stringify(result.export.copyValidation)}`);
           if (index === 0 && report.parameters.readablePdfFirst) {
-            if (await dialog.count()) await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
+            await closeDownload();
             try {
               await checkFocus('readable-presentation');
               await page.locator('.pdf-presentation-control > .pdf-menu-button').click();
@@ -1144,7 +1220,7 @@ async function main() {
               await page.locator('.pdf-layout-viewer[data-pdf-presentation="readable"]').waitFor();
               await page.locator('.download-button').click();
               const readableDialog = page.locator('.download-dialog[open]'); await readableDialog.waitFor();
-              await readableDialog.locator('.export-options button').filter({hasText: '仅译文'}).click();
+              await readableDialog.locator('.download-version[data-mode="translated"]').click();
               await checkFocus('readable-export-download');
               const readableStart = Date.now();
               const readableDownload = await downloadFromDialog(readableDialog, result, prefix, 'readable-export-download');
@@ -1167,7 +1243,7 @@ async function main() {
               if (!focusFailure && !page.isClosed()) {
                 await checkFocus('readable-restore-defaults');
                 const restoreDialog = page.locator('.download-dialog[open]');
-                if (await restoreDialog.count()) await restoreDialog.getByRole('button', {name: '返回文档', exact: true}).click();
+                await closeDownload();
                 await page.getByRole('group', {name: '阅读方式', exact: true}).getByRole('button', {name: '双语', exact: true}).click();
                 if (await page.locator('.pdf-layout-viewer').getAttribute('data-pdf-presentation') !== 'layout') {
                   await page.locator('.pdf-presentation-control > .pdf-menu-button').click();
@@ -1175,9 +1251,10 @@ async function main() {
                   await page.locator('.pdf-layout-viewer[data-pdf-presentation="layout"]').waitFor();
                 }
                 await page.locator('.download-button').click(); await restoreDialog.waitFor();
-                await restoreDialog.locator('.export-options button').first().click();
-                assert.equal(await restoreDialog.locator('.export-options button').first().getAttribute('aria-pressed'), 'true');
-                await restoreDialog.getByRole('button', {name: '返回文档', exact: true}).click();
+                const bilingual = restoreDialog.locator('.download-version[data-mode="bilingual"]');
+                await bilingual.click();
+                assert(await bilingual.locator('input').isChecked());
+                await closeDownload();
                 result.readableRestore = {presentation: 'layout', previewMode: 'bilingual', outputMode: 'bilingual'}; persist();
               }
             }
@@ -1194,7 +1271,7 @@ async function main() {
           result.export.reopenedInProduct = true;
         }
         // 成功下载后页面会自行关闭弹窗；仅仍然打开时才操作返回按钮。
-        if (await dialog.count()) await dialog.getByRole('button', {name: '返回文档', exact: true}).click();
+        await closeDownload();
         await checkFocus('document-finished');
       } catch (error) {
         result.state = 'failed'; result.error = diagnostic(error.stack || String(error));
@@ -1230,14 +1307,18 @@ async function main() {
     report.failure = String(error.stack || error).replace(/https?:\/\/[^\s]+/gu, '[url]');
     if (page) await page.screenshot({path: path.join(artifactsDir, 'failure.png')}).catch(() => {}); process.exitCode = 1;
   } finally {
-    await closeLiveSession({launched, focusMonitor, profileDir, launchAttempted, report, responseObserver});
+    const cleanup = () => closeLiveSession({launched, focusMonitor, profileDir, launchAttempted, report, responseObserver});
+    if (diagnosticsStarted) {
+      try {await diagnosticsModule.finalizeRun({diagnostics, result: report, artifactsDir, cleanup: [{stage: 'browser', action: cleanup}]});}
+      catch (error) {report.ok = false; report.runtimeDiagnosticsFailure = String(error.message || error); process.exitCode = 1;}
+    } else await cleanup();
     if (focusFailure) {report.ok = false; process.exitCode = 1;}
     if (report.cleanupErrors.length) {report.ok = false; process.exitCode = 1;}
     persist(); console.log(JSON.stringify({ok: report.ok, report: path.join(artifactsDir, 'report.json'), documents: report.documents.map(({name, state}) => ({name, state})), failure: report.failure}));
   }
 }
 
-module.exports = {createResponseBodyObserver, closeLiveSession, isProviderDomain, shouldObserveResponseBody,
+module.exports = {createResponseBodyObserver, closeLiveSession, isProviderDomain, shouldObserveResponseBody, validateLayoutCopyText, validatePdf,
   parseBuiltinGlossaryArg, readPublicGlossaryState, selectPublicDocumentGlossary, installBuiltinGlossaryForLiveRun,
   parseTranslationResumesArg, readPublicResumeSettings, readProductionTranslationStatus, isResumableTranslationTimeout, isTranslationTimeoutSettling,
   assertPreservedTranslations, createTranslationResumeGuard, activateProductionTranslationContinue};

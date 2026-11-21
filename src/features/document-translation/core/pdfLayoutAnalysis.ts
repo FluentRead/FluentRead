@@ -13,10 +13,11 @@
  * 列表前缀：识别后的前缀同时保留原始字形位置，正文分段不吞掉圆点，扫描页选择层可按原图位置复制完整条目。
  * 参考文献：用同栏连续编号和悬挂缩进将网址、年份和页码续行归入各自条目；用原页链接目标确认断开的网址，保留路径连接符。
  * 并排表组：有共用表题、逐行成对的横线和稳定右对齐的数值列时，按每行实测空隙划定单元格。
+ * 图例和子图标记：紧贴图框并有短色标支撑的图例、以及图与主图注之间同基线的数字/缩写标记，共用原图范围。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
  */
 import type {PdfDocumentBlock, PdfDocumentLine, PdfDocumentRun, PdfPreservedRegion} from './document';
-import {findBorderlessTables} from './pdfBorderlessTable';
+import {findBorderlessTables, findRuledTableDividers} from './pdfBorderlessTable';
 
 type Rectangle = Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
 type Matrix = readonly number[];
@@ -850,6 +851,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     const captionedTables = [...captionedTableGeometry(input.atoms, input.graphics, input.width), ...borderlessTables];
     const sideBySideSections = sideBySideTableSections(input.atoms, input.graphics);
     const tableDividers = [...captionedTables.flatMap(table => table.dividers),
+        ...findRuledTableDividers(input.atoms, input.graphics.filter(shape => shape.kind === 'path' && shape.height <= 2), input.width),
         ...sideBySideSections.flatMap(section => [...section.dividers, {...section.bounds, width: 0}])];
     const dividerCandidates = input.graphics.filter(shape => shape.kind === 'path' && shape.width <= 2 && shape.height >= 4);
     // 只索引细笔画的连接端点；无关路径或重复描边不参与逐项全表扫描。
@@ -1036,6 +1038,18 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     // 插图上方的短居中标签属于图形本身；保留它们能让左右子图在裁剪后仍有完整标题。
     for (let index = 0; index < figures.length; index += 1) {
         const figure = figures[index];
+        const legend = input.graphics.find(shape => shape.kind !== 'image' && shape.width >= figure.width * 0.75 && shape.width <= figure.width + font * 2
+            && Math.abs(shape.x - figure.x) <= font && shape.height >= font && shape.height <= font * 3
+            && bottom(shape) <= figure.y + 1 && figure.y - bottom(shape) <= font * 0.55
+            && lines.filter(line => coversLine(shape, line) && line.fontSize < font * 0.85
+                && input.graphics.some(swatch => swatch.kind === 'path' && swatch.width >= line.fontSize * 0.5 && swatch.width <= line.fontSize * 3
+                    && swatch.height <= line.fontSize && line.x - right(swatch) >= -0.5 && line.x - right(swatch) <= line.fontSize
+                    && Math.abs(swatch.y - line.baseline) <= line.fontSize * 0.65)).length >= 2);
+        if (legend) {
+            figures[index] = union(figure, legend);
+            for (const line of lines) if (coversLine(legend, line)) attachedFigureLabels.add(line);
+            continue;
+        }
         const labels = lines.filter(line => bottom(line) <= figure.y && figure.y - line.baseline <= Math.max(font, line.fontSize) * 2.5
             && (Math.abs(line.x + line.width / 2 - figure.x - figure.width / 2) <= font * 2 || Math.abs(line.x - figure.x) <= font * 0.25)
             && line.height <= Math.max(font, line.fontSize) * 1.7 && line.width < input.width * .45 && line.text.length <= 80
@@ -1043,6 +1057,22 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             && !/^(?:Figure|Table)\s+\d/iu.test(line.text) && !/[.!?。！？]$/u.test(line.text) && !/[=∑∫√∈]/u.test(line.text));
         labels.sort((a, b) => b.baseline - a.baseline);
         if (labels.length) {figures[index] = union(figure, labels[0]); attachedFigureLabels.add(labels[0]);}
+    }
+    for (const caption of lines.filter(line => /^(?:Figure\s+\d+|Fig\.\s+\d+|图\s*\d+)[\s.:：]/iu.test(line.text))) {
+        const preceding = figures.map((figure, index) => ({figure, index})).filter(({figure}) =>
+            caption.y >= bottom(figure) && caption.y - bottom(figure) <= font * 3
+            && Math.min(right(caption), right(figure)) - Math.max(caption.x, figure.x) >= font);
+        const labels = lines.filter(line => /^\([a-z]\)\s*\d+(?:[.×/]\d+)*(?:[- ][A-Z][A-Z\d]{0,7})?$/u.test(line.text) && bottom(line) <= caption.y)
+            .flatMap(line => {
+                const chart = preceding.find(({figure}) => line.y >= bottom(figure) - 1 && line.x >= figure.x && right(line) <= right(figure));
+                return chart ? [{line, index: chart.index}] : [];
+            });
+        for (const {line: label, index} of labels) {
+            if (!labels.some(({line: peer}) => peer !== label && Math.abs(peer.baseline - label.baseline) <= font * 0.35
+                && Math.abs(peer.x - label.x) >= font * 4 && peer.text[1] !== label.text[1])) continue;
+            figures[index] = union(figures[index], label);
+            attachedFigureLabels.add(label);
+        }
     }
     const tables = [...tableRegions(input.graphics, input.width, figures), ...shadedTables, ...captionedTables.map(table => table.bounds)]
         .filter(table => !sideBySideSections.some(section => overlaps(table, section.bounds, -1)));

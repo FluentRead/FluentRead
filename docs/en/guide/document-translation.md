@@ -78,7 +78,9 @@ Original-layout downloads keep the source-page order. Bilingual output places ea
 
 Sequentially numbered references with hanging indents are translated by entry, with URLs, years, and page ranges kept together. Side-by-side table sections with a shared caption and matching row rules are laid out by cell, keeping values in their own columns.
 
-Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
+Three-rule tables with matching header and numeric column positions are translated cell by cell. Legends and numeric subplot labels stay with their figures. The original side of a bilingual export retains the source page's HTTP and HTTPS links.
+
+Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. Selectable figure and table labels follow their position in the reflowed page, so paragraphs can be copied across page breaks. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
 
 Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.
 

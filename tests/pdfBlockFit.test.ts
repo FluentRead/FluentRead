@@ -142,6 +142,15 @@ describe('PDF layout overlay block selection', () => {
         expect(overlay.block.lines).toBe(source.lines);
         expect(source.width).toBe(455.55796);
     });
+    it('limits an overlapping source paragraph before the next same-column block', () => {
+        const first = block(0, 45, 100, 232, 36);
+        const next = block(1, 45, 125, 223, 12);
+        const otherColumn = block(2, 305, 111, 230, 12);
+        const [overlay] = pdfOverlayBlocks(page([first, next, otherColumn]));
+        expect(overlay.block.height).toBe(24.5);
+        expect(overlay.spaceBelow).toBe(0);
+        expect(first.height).toBe(36);
+    });
 });
 
 describe('PDF layout overlay text fitting', () => {

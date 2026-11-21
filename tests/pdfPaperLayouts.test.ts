@@ -326,6 +326,61 @@ describe('common paper layouts survive real PDF parsing', () => {
         ]);
     });
 
+    it('keeps each wrapped header over its own numeric cell in a three-rule table', async () => {
+        const columns = [
+            {x: 323, title: 'Baseline', next: '(unfiltered)', value: '34.1 s'},
+            {x: 377, title: 'Full', next: 'decode', value: '19.3 s'},
+            {x: 412, title: '+Selective', next: 'decode', value: '13.1 s (-32%)'},
+            {x: 465, title: '+Late', next: 'analysis.', value: '5.0 s (-61%)'},
+            {x: 513, title: '+Eval on', next: 'records', value: '0.4 s (-91%)'},
+        ];
+        const document = await build(sheet => {
+            const {page, fonts, height} = sheet;
+            for (const baseline of [257, 283, 299]) {
+                const y = height - baseline;
+                page.drawLine({start: {x: 318, y}, end: {x: 559, y}, thickness: 0.5});
+            }
+            for (const {x, title, next, value} of columns) {
+                for (const [text, baseline] of [[title, 268], [next, 279], [value, 294]] as const) {
+                    page.drawText(text, {x, y: height - baseline, size: 8, font: fonts.serif});
+                }
+            }
+            page.drawText('Table 2: Example runtime for five configurations.', {x: 318, y: height - 309, size: 9, font: fonts.bold});
+        });
+        const cells = pages(document)[0].blocks.filter(block => block.kind === 'table');
+        const headers = cells.filter(cell => !cell.preserveSource);
+        const data = cells.filter(cell => cell.preserveSource);
+        expect(headers.map(cell => cell.source)).toEqual(columns.map(column => `${column.title} ${column.next}`));
+        expect(data.map(cell => cell.source)).toEqual(columns.map(column => column.value));
+        expect(headers.map(cell => cell.cellBounds!.x)).toEqual(data.map(cell => cell.cellBounds!.x));
+        expect(new Set(data.map(cell => cell.cellBounds!.x)).size).toBe(5);
+        expectSoundStructure(document);
+    });
+    it('keeps a framed legend and paired numeric labels with their chart and translates the main caption', async () => {
+        const caption = 'Figure 8. Measured runtime across configurations.';
+        const document = await build(sheet => {
+            const {page, fonts, height} = sheet;
+            page.drawRectangle({x: 64, y: height - 98, width: 236, height: 18, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+            page.drawRectangle({x: 64, y: height - 171, width: 236, height: 70, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+            for (const [x, label] of [[76, 'Primary series'], [206, 'Control series']] as const) {
+                page.drawLine({start: {x, y: height - 91}, end: {x: x + 12, y: height - 91}, thickness: 0.5});
+                page.drawText(label, {x: x + 15, y: height - 92, size: 6, font: fonts.serif});
+            }
+            for (const x of [64, 190]) {
+                page.drawRectangle({x, y: height - 171, width: 110, height: 70, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+                page.drawLine({start: {x: x + 8, y: height - 161}, end: {x: x + 103, y: height - 116}, thickness: 1});
+            }
+            page.drawText('(a) 8-GPU', {x: 102, y: height - 184, size: 8, font: fonts.serif});
+            page.drawText('(b) 32-GPU', {x: 240, y: height - 184, size: 8, font: fonts.serif});
+            page.drawText(caption, {x: 64, y: height - 200, size: 9, font: fonts.bold});
+        });
+        expect(sources(document)).toEqual([caption]);
+        const labels = pages(document)[0].blocks.filter(block => block.kind === 'figure-label').map(block => block.source).join(' ');
+        for (const label of ['Primary series', 'Control series', '(a) 8-GPU', '(b) 32-GPU']) expect(labels).toContain(label);
+        expect(pages(document)[0].preservedRegions?.some(region => region.kind === 'figure'
+            && region.source?.includes('Primary series') && region.source.includes('(b) 32-GPU'))).toBe(true);
+    });
+
     // 本地真实论文的结构检查：把 FLUENTREAD_PDF_CORPUS 指向一个放有 PDF 的目录即可启用；论文本身不进入仓库。
     it.runIf(Boolean(process.env.FLUENTREAD_PDF_CORPUS))('local paper corpus keeps the structural invariants', async () => {
         const directory = process.env.FLUENTREAD_PDF_CORPUS!;

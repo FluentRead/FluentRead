@@ -490,8 +490,8 @@ export default defineConfig({
             const courseraCaptionBudget = 4_000;
             // 与 CSV/TSV 选列流程整合后，Chrome 实测 70,406,656 字节，较原组合预算超出 2,656 字节。
             const documentGlossaryCandidateBudget = 16_000;
-            // 旋转标签复核仅增加代码；与阅读流程合并后 Chrome 实测 70,521,824 字节，较预算超出 2,324 字节。
-            const rotatedLabelBudget = browser === 'chrome' || browser === 'edge' ? 3_000 : 0;
+            // 旋转标签复核和底色恢复仅增加代码。逐列恢复后 Chrome 实测 70,524,244 字节，比上一批增加 1,862 字节。
+            const rotatedLabelBudget = browser === 'chrome' || browser === 'edge' ? 5_000 : 0;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

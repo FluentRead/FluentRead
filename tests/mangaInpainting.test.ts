@@ -14,6 +14,7 @@ import {mangaMaskBoxes} from '@/src/features/image-translation/mangaPatchResult'
 import {planMangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {createOffscreenMessageListener} from '@/src/app/offscreen/messageRouter';
 import {withMangaModelRemoval} from '@/src/features/image-translation/services/mangaOcrAssets';
+import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
 const region={text:'Hello world',fontSize:20,bbox:{x0:30,y0:30,x1:90,y1:70}};
 const pixels=()=>new Uint8ClampedArray(128*128*4).fill(255);
 const zero=(patch:{width:number;height:number})=>new Float32Array(patch.width*patch.height*3);
@@ -116,6 +117,33 @@ beforeEach(()=>{vi.useFakeTimers();vi.clearAllMocks();mocks.gpu.mockResolvedValu
 });
 afterEach(async()=>{await mangaInpaintingRuntime.dispose().catch(()=>undefined);vi.clearAllTimers();vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 describe('漫画局部神经修补',()=>{
+    it('旋转标签恢复精确逐列底色，即使旧采样判为近似均匀也通知绘制方',async()=>{
+        const f=rotatedSpineFixture(),before=f.pixels.slice(),create=vi.fn(),signal=vi.fn();
+        const runtime=createMangaInpaintingRuntime(create);
+        const backgrounds=[{uniform:true,color:'rgb(32,34,49)'}];
+        const result=await runtime.repair(f.pixels,f.width,f.height,[f.region],undefined,undefined,undefined,backgrounds,{reuseUniformPixels:true,onRotatedLabelRestored:signal});
+        expect(result).toEqual(f.background);expect(f.pixels).toEqual(before);expect(create).not.toHaveBeenCalled();
+        expect(signal).toHaveBeenCalledExactlyOnceWith(0);expect(backgrounds[0].uniform).toBe(true);
+        // 增加一个无法核对的静区像素，原近似均匀快路径仍完整可用。
+        f.pixels[f.offset(40,12)]++;
+        signal.mockClear();
+        expect(await runtime.repair(f.pixels,f.width,f.height,[f.region],undefined,undefined,undefined,backgrounds,{reuseUniformPixels:true,onRotatedLabelRestored:signal})).toBe(f.pixels);
+        expect(signal).not.toHaveBeenCalled();expect(create).not.toHaveBeenCalled();
+        await runtime.dispose();
+    });
+    it('混排时只让复杂区域进入模型，旋转标签仍按原像素恢复',async()=>{
+        const f=rotatedSpineFixture(),other={text:'OTHER',fontSize:12,bbox:{x0:68,y0:56,x1:84,y1:68}};
+        for(let y=50;y<76;y++)for(let x=63;x<90;x++)f.pixels.set([(x+y)%2*255,10,40,255],f.offset(x,y));
+        const port={run:vi.fn(async patch=>zero(patch)),release:vi.fn()},restored=vi.fn();
+        const runtime=createMangaInpaintingRuntime(async()=>port);
+        const result=await runtime.repair(f.pixels,f.width,f.height,[f.region,other],undefined,undefined,undefined,
+            [{uniform:true,color:'#1e222f'},{uniform:false,color:'#ffffff'}],{onRotatedLabelRestored:restored});
+        expect(port.run).toHaveBeenCalledOnce();expect(restored).toHaveBeenCalledExactlyOnceWith(0);
+        for(let y=14;y<69;y++){
+            expect(result.subarray(f.offset(29,y),f.offset(56,y))).toEqual(f.background.subarray(f.offset(29,y),f.offset(56,y)));
+        }
+        await runtime.dispose();
+    });
     it('完整验证的渐变直接恢复原背景，不初始化模型、不改源缓冲或延长模型驻留',async()=>{
         const clean=gradientPixels(),input=clean.slice();
         for(let y=35;y<65;y++)for(let x=35;x<85;x++)input.set([0,0,0,255],(y*128+x)*4);

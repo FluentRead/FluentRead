@@ -70,7 +70,7 @@ function replay(record:RecordedCrop,options:{spaceScale?:number;mutate?:(pixels:
     return {source,result:result[0]};
 }
 
-describe('浅底品红标签的真实词界',()=>{
+describe('紧裁彩字标签的真实词界',()=>{
     it.each(recording.records)('保持真实裁图的文字与空格边界 · $sdkText',record=>{
         expect(sha(readFileSync(new URL(recording.sourceManifest,fixtures)))).toBe(recording.sourceManifestSha256);
         expect(sha(readFileSync(new URL(record.source,fixtures)))).toBe(record.sourceSha256);
@@ -89,6 +89,13 @@ describe('浅底品红标签的真实词界',()=>{
             for(let y=0;y<48;y++)for(let x=197;x<230;x++)pixels.set([255,240,255,255],(y*record.crop.width+x)*4);
         }});
         expect(result.text).toBe('KEEPTHE PINK TAG');
+    });
+    it('重叠字形需要更强的模型词界和连续底色空列',()=>{
+        const record=recording.records.find(item=>item.sdkText==='NORTHDOOR')!;
+        expect(replay(record,{spaceScale:0.2}).result.text).toBe(record.sdkText);
+        expect(replay(record,{mutate:pixels=>{
+            for(let y=0;y<48;y++)pixels.set([50,110,147,255],(y*record.crop.width+238)*4);
+        }}).result.text).toBe(record.sdkText);
     });
     it('连续紧裁标签按页限制像素和模型时间步消耗',()=>{
         const record=recording.records.find(item=>item.sdkText==='KEEPTHE PINKTAG')!;

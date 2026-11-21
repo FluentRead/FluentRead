@@ -724,6 +724,7 @@ export default defineConfig({
                 'src/features/image-translation/services/rendering.ts',
                 'src/features/image-translation/services/sourceAppearance.ts',
                 'src/features/image-translation/services/sourceAlignment.ts',
+                'src/features/image-translation/services/mangaRecognitionConnectedBands.ts',
                 'src/features/image-translation/services/mangaRecognitionInkProjection.ts',
                 'src/features/image-translation/services/mangaDetectionCore.ts',
                 'src/features/image-translation/services/mangaDetectionRefinement.ts',

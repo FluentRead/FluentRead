@@ -303,7 +303,7 @@ describe('audit 49 E real Vue client model settings', () => {
         await vi.advanceTimersByTimeAsync(1500);await settle();
         expect(optional().querySelector('.ready')!.textContent).toBe('已就绪');
         expect(container.querySelector('.manga-resource-list')!.textContent).toContain('未下载');
-        props.imageRecognition=false;await settle();expect(optional()).toBeNull();
+        props.imageRecognition=false;props.showInpainting=true;await settle();expect(optional()).toBeNull();
         expect(container.querySelector('header small')!.textContent).toContain('用于漫画翻译');
     });
     it('persists the optional offline import through the real file control and restores its status after remount',async()=>{
@@ -558,6 +558,63 @@ describe('audit 49 E real Vue client model settings', () => {
         expect([...container.querySelectorAll('.manga-site')].every(site => site.textContent!.toLowerCase().includes('pixiv'))).toBe(true);
         search.value = 'no such fixture catalog site'; search.dispatchEvent(new Event('input', {bubbles: true})); await settle(); expect(container.textContent).toContain('没有匹配的网站');
         props.available = false; (props.settings as Config).useCache = false; await settle(); expect(container.querySelector('[data-settings-anchor="resources"]')).toBeNull();
+    });
+    it('shows the recognition model used by the selected image and manga language', async () => {
+        vi.useFakeTimers();
+        const settings = reactive(new Config());
+        settings.from = 'en';
+        settings.imageTranslationOcrEngine = 'paddle';
+        settings.imageTranslationMangaEnabled = true;
+        const {container} = await mount(MangaSettings, {settings, imageEnabled: true, available: true, serviceOptions: []});
+        const manager = () => container.querySelector('[data-testid="manga-model-manager"]')!;
+        expect(manager().querySelector('header')!.textContent).toContain('PaddleOCR · 用于图片与漫画');
+        for (const source of ['ru', 'ko', 'ar', 'he']) {
+            settings.from = source;
+            await settle();
+            expect(manager().querySelector('h2')!.textContent).toBe('背景文字清除');
+            expect(manager().textContent).toContain('需要时下载');
+            expect(manager().textContent).toContain('下载与管理');
+            expect(manager().textContent).not.toMatch(/PaddleOCR|图片文字识别|首次翻译时自动准备资源/u);
+        }
+        expect(settings.imageTranslationOcrEngine).toBe('paddle');
+        settings.from = 'en';
+        settings.imageTranslationOcrEngine = 'tesseract';
+        await settle();
+        expect(manager().querySelector('header')!.textContent).toContain('PaddleOCR · 用于漫画翻译');
+        settings.imageTranslationMangaEnabled = false;
+        await settle();
+        expect(manager()).toBeNull();
+        settings.imageTranslationOcrEngine = 'paddle';
+        await settle();
+        expect(manager().querySelector('header')!.textContent).toContain('PaddleOCR · 用于图片翻译');
+        expect(manager().textContent).not.toContain('背景文字清除');
+    });
+    it('places active image language packs first without remounting the resource controls', async () => {
+        vi.useFakeTimers();
+        const settings = reactive(new Config());
+        settings.from = 'en';
+        settings.imageTranslationOcrEngine = 'paddle';
+        settings.imageTranslationMangaEnabled = true;
+        const {container} = await mount({
+            render: () => h(MangaSettings, {settings, imageEnabled: true, available: true, serviceOptions: []}, {
+                resources: () => h('section', {'data-testid': 'fixture-language-packs'}, [h('input')]),
+            }),
+        });
+        const resources = container.querySelector('.manga-resource-body')!;
+        const manager = resources.querySelector('[data-testid="manga-model-manager"]')!;
+        const packs = resources.querySelector('[data-testid="fixture-language-packs"]')!;
+        expect(resources.firstElementChild).toBe(manager);
+        expect(resources.lastElementChild).toBe(packs);
+        packs.querySelector('input')!.value = 'fixture';
+        settings.from = 'ar';
+        await settle();
+        expect(resources.firstElementChild).toBe(packs);
+        expect(resources.lastElementChild).toBe(manager);
+        expect(resources.querySelector<HTMLInputElement>('[data-testid="fixture-language-packs"] input')!.value).toBe('fixture');
+        settings.from = 'en';
+        await settle();
+        expect(resources.firstElementChild).toBe(manager);
+        expect(resources.lastElementChild).toBe(packs);
     });
     it('rejects invalid manga URLs, selectors and a full rule list through the actual form', async () => {
         vi.useFakeTimers(); const settings = new Config(); settings.imageTranslationMangaSites = [];

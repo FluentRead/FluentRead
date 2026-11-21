@@ -496,7 +496,8 @@ export default defineConfig({
             // 按识别器原顺序恢复横排从右向左词序后为 70,525,152 字节，本轮对应 406 字节代码。
             // 阿拉伯语和希伯来语接入按需语言包后，Chrome 为 70,532,031 字节，增加 6,879 字节。
             // Firefox 和 Safari 分别超出原门槛 4,541 和 4,260 字节。增量为界面文案及代码。
-            const imageOcrLanguageBudget = browser === 'chrome' || browser === 'edge' ? 8_000 : 5_000;
+            // 识别资源按实际用途展示并排序后，Chrome 实测 70,533,076 字节，增量 1,045 字节。
+            const imageOcrLanguageBudget = browser === 'chrome' || browser === 'edge' ? 9_000 : 6_000;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

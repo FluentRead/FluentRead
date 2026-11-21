@@ -28,6 +28,7 @@ import {rejectUnsupportedContentFeature} from './featureRegistry';
 import {handleInformationHighlightMessage, type InformationHighlightMessageState} from './informationHighlight';
 import {handlePageTranslationFontMessage, type PageTranslationFontMessageState} from './pageTranslationFontMessage';
 import {handleHypothesisMessage, type HypothesisMessageState} from './hypothesisMessage';
+import {showFavoriteServiceNotice} from '@/src/features/page-notice/public';
 export interface ContentRuntimeMessageState extends InformationHighlightMessageState, PageTranslationFontMessageState, HypothesisMessageState {
     updateSiteDisabled(disabled: boolean): Promise<void>;
     reconcileUserscriptPage?(): Promise<boolean>;
@@ -81,6 +82,18 @@ export function createContentRuntimeMessageHandler(ctx: ContentScriptContext, st
         }
         if ((state.isSiteDisabled() || state.isPageSuspended?.()) && payload.type !== 'getFullPageTranslationState') {
             sendResponse({status: 'disabled'});
+            return true;
+        }
+        if (import.meta.env.BROWSER !== 'userscript' && payload.type === 'defaultServiceShortcutNotice') {
+            const senderId = (_sender as {id?: unknown} | undefined)?.id;
+            if (ctx.isInvalid || !config.on || !browser.runtime.id || senderId !== browser.runtime.id) return false;
+            const {choices, selectedIndex, failed} = payload;
+            if (!Array.isArray(choices) || choices.length > 100
+                || !choices.every(choice => typeof choice === 'string' && choice.length > 0 && choice.length <= 128)
+                || typeof selectedIndex !== 'number' || !Number.isInteger(selectedIndex)
+                || (choices.length > 0 ? selectedIndex < 0 || selectedIndex >= choices.length : selectedIndex !== -1)) return false;
+            showFavoriteServiceNotice(choices, selectedIndex, failed === true, ctx.signal);
+            sendResponse({status: 'success'});
             return true;
         }
         if (payload.type === 'toggleFloatingBall') {

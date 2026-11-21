@@ -1198,6 +1198,15 @@ function permissionsFor(browser: string, manifestVersion: 2 | 3): string[] {
 }
 
 describe('extension manifest capability contract', () => {
+    it('registers an unbound favorite-service shortcut on supported desktop builds (#1316)', () => {
+        for (const browser of ['chrome', 'edge', 'firefox']) {
+            const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
+            expect(manifest.commands?.['cycle-favorite-translation-services'])
+                .toEqual({description: 'Cycle favorite translation services'});
+        }
+        expect(createExtensionManifest({browser: 'safari', manifestVersion: 2})
+            .commands?.['cycle-favorite-translation-services']).toBeUndefined();
+    });
     it.each(['chrome', 'firefox', 'edge'] as const)('%s 安装名称使用浏览器本地化 metadata，不复用技术包名', (browser) => {
         const manifest = createExtensionManifest({browser, manifestVersion: browser === 'firefox' ? 2 : 3});
         expect(manifest.name).toBe('__MSG_extensionName__');

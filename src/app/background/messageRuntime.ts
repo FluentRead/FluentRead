@@ -99,7 +99,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
             getSnapshot: getFreeTranslationWeightSnapshot,
             isOptionsUrl: (url) => url.startsWith(browser.runtime.getURL('/options.html')),
         }),
-        ...createConfigBackgroundHandlers<BackgroundRuntimeContext>(tabBroadcast.registerContentReceiver),
+        ...createConfigBackgroundHandlers<BackgroundRuntimeContext>(tabBroadcast.registerContentReceiver, options.tabTranslationStates),
         ...createProviderTestRuntimeHandlers(),
         createInputBoxTranslationHandler({
             ready: configReady,

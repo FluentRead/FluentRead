@@ -1,12 +1,14 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {TabTranslationStateStore} from '@/src/app/background/tabTranslationState';
+import {createConfigMutationCoordinator} from '@/src/app/background/handlers/configPersistence';
 const env = vi.hoisted(() => ({config: {} as Record<string, any>, listeners: [] as Array<() => void>,
-    ready: Promise.resolve(), feedback: vi.fn()}));
+    ready: Promise.resolve(), feedback: vi.fn(), patch: vi.fn()}));
 vi.mock('@/src/services/config/store', () => ({config: env.config,
     configReady: {then: (fn: () => void) => env.ready.then(fn)},
-    subscribeConfig: (fn: () => void) => {env.listeners.push(fn);}}));
+    subscribeConfig: (fn: () => void) => {env.listeners.push(fn);}, requestConfigPatch: env.patch}));
 vi.mock('@/src/app/background/contextMenuFeedback', () => ({reportContextMenuFailure: env.feedback}));
 import {installToolbarActionRuntime, openToolbarQuickPanel} from '@/src/app/background/toolbarActionRuntime';
+import {installDefaultServiceShortcut} from '@/src/app/background/defaultServiceShortcut';
 function event() {const listeners: Function[] = [];return {addListener: (fn: Function) => listeners.push(fn), emit: (...args: unknown[]) => listeners.forEach(fn => fn(...args)), listeners};}
 function deferred<T>() {let resolve!: (value: T) => void;const promise = new Promise<T>(yes => {resolve = yes;});return {promise, resolve};}
 async function settle() {for (let i = 0; i < 100; i++) await Promise.resolve();}
@@ -14,6 +16,7 @@ function change(values: Record<string, unknown>) {Object.assign(env.config, valu
 let api: any, action: any, states: TabTranslationStateStore, pageStates: Map<number, boolean>;
 beforeEach(() => {
     env.listeners.length = 0;env.ready = Promise.resolve();env.feedback.mockReset();
+    env.patch.mockReset().mockImplementation(async fields => change(fields));
     for (const key of Object.keys(env.config)) delete env.config[key];
     Object.assign(env.config, {on: true, toolbarClickAction: 'translate', disabledExtensionDomains: []});
     states = new TabTranslationStateStore();pageStates = new Map();
@@ -34,6 +37,93 @@ beforeEach(() => {
 afterEach(() => {vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();});
 const click = (id: unknown = 9, url = 'https://example.com/article') => action.onClicked.emit({id, url});
 const commands = () => api.tabs.sendMessage.mock.calls.filter(([, message]: any[]) => message.type === 'contextMenuTranslate');
+describe('favorite translation service command (#1316)', () => {
+    function install() {
+        const tab = {id: 9, url: 'https://example.com/article'};
+        api.commands = {onCommand: event()};
+        api.tabs.query = vi.fn(async () => [tab]);
+        installDefaultServiceShortcut(states, createConfigMutationCoordinator());
+        return {tab, press: (target?: typeof tab) => api.commands.onCommand.emit('cycle-favorite-translation-services', target)};
+    }
+
+    it('serially cycles available favorites, marks the selected service, and preserves a dedicated hover service', async () => {
+        change({favoriteServices: ['openai', 'freeTranslation', 'myMemory', 'google'],
+            disabledTranslationServices: ['myMemory'], hoverTranslationService: 'microsoft', display: 1, service: 'freeTranslation'});
+        const {press, tab} = install();
+        api.commands.onCommand.emit('a-different-command', tab);
+        press(tab); press(tab);
+        await settle();
+        expect(env.patch.mock.calls).toEqual([[{service: 'google'}], [{service: 'freeTranslation'}]]);
+        expect(api.tabs.sendMessage.mock.calls.map(([id, message, target]: any[]) => [id, message.selectedIndex, message.choices.length, target.frameId]))
+            .toEqual([[9, 1, 2, 0], [9, 0, 2, 0]]);
+        expect(env.config.hoverTranslationService).toBe('microsoft');
+        expect(commands()).toEqual([]);
+    });
+
+    it.each([
+        {members: [], eligible: false},
+        {members: ['microsoft'], eligible: false},
+        {members: ['openai'], eligible: false},
+        {members: ['microsoft', 'openai', 'myMemory'], eligible: true},
+    ])('cycles a composite with members $members only when it has an eligible member', async ({members, eligible}) => {
+        const id = 'composite:fixture';
+        change({favoriteServices: ['freeTranslation', id], service: 'freeTranslation', display: 1,
+            disabledTranslationServices: ['microsoft'],
+            compositeTranslationProviders: [{id, name: 'Test composite', services: members, strategy: 'sequential', timeoutMs: 12000}]});
+        const {press, tab} = install();
+        press(tab);
+        await settle();
+        expect(env.patch.mock.calls).toEqual(eligible ? [[{service: id}]] : []);
+        expect(api.tabs.sendMessage.mock.calls.map(([, message]: any[]) => [message.selectedIndex, message.choices.length]))
+            .toEqual(eligible ? [[1, 2]] : [[0, 1]]);
+    });
+
+    it('does not change config on disabled sites, invalidated documents, or with no eligible services', async () => {
+        change({favoriteServices: ['google'], disabledTranslationServices: [], disabledExtensionDomains: ['example.com'], display: 0});
+        const {press, tab} = install();
+        press(tab); await settle(); expect(api.tabs.sendMessage).not.toHaveBeenCalled();
+        change({disabledExtensionDomains: []});
+        press(tab); states.reset(tab.id); await settle(); expect(api.tabs.sendMessage).not.toHaveBeenCalled();
+        press(); await settle();
+        expect(api.tabs.query).toHaveBeenCalledOnce();
+        expect(env.patch).not.toHaveBeenCalled();
+        expect(api.tabs.sendMessage).toHaveBeenCalledExactlyOnceWith(9,
+            {type: 'defaultServiceShortcutNotice', choices: [], selectedIndex: -1}, {frameId: 0});
+    });
+
+    it('keeps one selected favorite and skips tabs without a live webpage or a query result', async () => {
+        change({favoriteServices: ['freeTranslation'], disabledTranslationServices: [], display: 1, service: 'freeTranslation'});
+        const {press, tab} = install();
+        press({...tab, url: 'about:blank'});
+        press({...tab, id: -1});
+        api.tabs.query.mockRejectedValueOnce(new Error('No browser window'));
+        press();
+        await settle();
+        expect(api.tabs.sendMessage).not.toHaveBeenCalled();
+        api.tabs.sendMessage.mockRejectedValueOnce(new Error('No receiving content script'));
+        press(tab);
+        await settle();
+        expect(env.patch).not.toHaveBeenCalled();
+        expect(api.tabs.sendMessage).toHaveBeenCalledOnce();
+    });
+
+    it('reports a failed settings write and accepts the next command', async () => {
+        change({favoriteServices: ['freeTranslation'], disabledTranslationServices: [], service: 'microsoft', display: 1});
+        const {press, tab} = install();
+        const error = new Error('Storage write failed');
+        const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        env.patch.mockRejectedValueOnce(error);
+        press(tab);
+        await settle();
+        expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] 常用翻译服务快捷键切换失败', error);
+        expect(api.tabs.sendMessage.mock.calls[0][1]).toEqual(
+            {type: 'defaultServiceShortcutNotice', choices: [], selectedIndex: -1, failed: true});
+        press(tab);
+        await settle();
+        expect(env.config.service).toBe('freeTranslation');
+    });
+});
+
 describe('工具栏一键翻译', () => {
     it('兼容 action 与 browserAction，缺少能力或默认面板时保持原入口', async () => {
         for (const mode of ['missing', 'no-setPopup', 'no-onClicked', 'no-popup', 'browserAction']) {

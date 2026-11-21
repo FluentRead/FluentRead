@@ -43,9 +43,11 @@ const mocks = vi.hoisted(() => ({
     startSectionTranslationPicker: vi.fn(),
     sendMessage: vi.fn(),
     showPageNotice: vi.fn(),
+    showFavoriteServiceNotice: vi.fn(),
     dismissPageNotice: vi.fn(),
 }));
-vi.mock('@/src/features/page-notice/public', () => ({showPageNotice: mocks.showPageNotice, dismissPageNotice: mocks.dismissPageNotice}));
+vi.mock('@/src/features/page-notice/public', () => ({showPageNotice: mocks.showPageNotice,
+    showFavoriteServiceNotice: mocks.showFavoriteServiceNotice, dismissPageNotice: mocks.dismissPageNotice}));
 
 // Context 是受控外部生命周期端口；用原生 AbortController 驱动 invalid 门禁，避免伪造强转。
 // 本 suite 验证实际 handler，不声称执行 WXT 的启动广播或浏览器环境检测。
@@ -115,6 +117,25 @@ beforeEach(() => {
 });
 
 describe('内容脚本 runtime 消息协议', () => {
+    it('ties trusted favorite-service feedback to the current content context', async () => {
+        const {ContentScriptContext} = await import('wxt/utils/content-script-context');
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const ctx = new ContentScriptContext('favorite-service-notice');
+        const respond = vi.fn();
+        const handler = createContentRuntimeMessageHandler(ctx, {isSiteDisabled: () => false, updateSiteDisabled: vi.fn()});
+        vi.stubGlobal('browser', {runtime: {id: 'fluentread-fixture'}});
+        const sender = {id: 'fluentread-fixture'};
+        const message = {type: 'defaultServiceShortcutNotice', choices: ['Microsoft'], selectedIndex: 0};
+        expect(handler(message, {id: 'other-extension'}, respond)).toBe(false);
+        expect(handler({...message, choices: []}, sender, respond)).toBe(false);
+        expect(respond).not.toHaveBeenCalled();
+        expect(handler(message, sender, respond)).toBe(true);
+        expect(handler({...message, choices: [], selectedIndex: -1}, sender, respond)).toBe(true);
+        expect(respond.mock.calls).toEqual([[{status: 'success'}], [{status: 'success'}]]);
+        expect(mocks.showFavoriteServiceNotice).toHaveBeenNthCalledWith(1, ['Microsoft'], 0, false, ctx.signal);
+        expect(mocks.showFavoriteServiceNotice).toHaveBeenNthCalledWith(2, [], -1, false, ctx.signal);
+    });
+
     it('状态查询与全文及恢复回执共享当前文档标识，不缓存上一个文档标识', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
         const respond = vi.fn();

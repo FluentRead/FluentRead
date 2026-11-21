@@ -27,6 +27,8 @@ export function createThunderbirdManifest(firefox) {
         ...shared,
         name: `${firefox.name} (Thunderbird)`,
         description: '在 Thunderbird 邮件正文中使用 FluentRead 双语翻译。',
+        // 邮件工具栏沿用扩展名称，网页功能提示只用于浏览器。
+        ...(firefox.browser_action && {browser_action: {...firefox.browser_action, default_title: firefox.name}}),
         // Thunderbird 只暴露 menus 权限；浏览器版的 contextMenus 声明会产生安装警告。
         // 邮件操作由 message_display_action 完成，无需请求菜单权限。
         permissions: [...new Set([...firefox.permissions.filter(permission => permission !== 'contextMenus'), 'messagesModify'])],

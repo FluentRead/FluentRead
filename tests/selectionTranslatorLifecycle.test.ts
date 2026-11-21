@@ -5443,6 +5443,23 @@ it('shares only the currently displayed completed translation from the actual to
     fixture.state.isLoading=true;await Vue.nextTick();expect(port.root.querySelector('.fr-share-card-entry')).toBeNull();
 });
 
+it.each([
+    {mode: 'bilingual', translated: '所选句子的译文。', labels: ['原文', '译文']},
+    {mode: 'translation-only', translated: '所选句子的译文。', labels: ['译文']},
+    {mode: 'translation-only', translated: 'Read this selected sentence.', labels: ['原文']},
+] as const)('renders selection blocks in reading order for $mode and $translated', async ({mode, translated, labels}) => {
+    const fixture = mountSelection(false, {acceptsRange: () => true}, {}, true);
+    fixture.config.selectionTranslatorMode = mode;
+    fixture.notifyConfig();
+    const text = 'Read this selected sentence.';
+    Object.assign(fixture.state, {snapshot: fixture.selectedSnapshot(text), selectedText: text, translationResult: translated, translationParts: [{kind: 'text', text: translated}], showTooltip: true});
+    await Vue.nextTick();
+    const blocks = [...fixture.renderPort!.root.querySelectorAll('.fr-translation-container > .fr-text-block')];
+    expect(blocks.map(block => block.querySelector('.fr-text-label')?.textContent)).toEqual(labels);
+    expect(blocks.map(block => block.querySelector('pre')?.textContent)).toEqual(labels.map(label => label === '原文' ? text : translated));
+    expect(blocks.map(block => block.querySelector('[data-copy-kind]')?.getAttribute('data-copy-kind'))).toEqual(labels.map(label => label === '原文' ? 'source' : 'translation'));
+});
+
 it('retries the dictionary from its rendered error, copies the selected word and translation, and toggles Chinese support',async()=>{
     const fixture=mountSelection(false,{acceptsRange:()=>true},{},true);await Vue.nextTick();
     const card={word:'hello',normalizedWord:'hello',phonetics:[],sources:[{id:'fixture',label:'Dictionary',url:'https://dictionary.test/hello'}],meanings:[{partOfSpeech:'感叹词',definitions:[{definition:'A greeting',translatedDefinition:'打招呼',example:'Hello again',translatedExample:'再次问好'}]}]};

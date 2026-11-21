@@ -2,6 +2,12 @@
 
 [返回测试入口](../testing.md)。按本次改动选择下面的专项；这些条目不要求每次全部运行。
 
+## Inco 博客文章摘要
+
+Inco 把文章摘要放在页眉里的 `p.post-dek`。内置 `inco-blog` 规则将博客文章模板里的这个段落纳入正文范围，供全文和悬浮翻译共用。
+
+生产 Chrome 构建后，用 `scripts/run-site-translation-matrix.cjs --cases inco-blog-splash --mode both --controlled-provider` 验证摘要、标题和首段正文的翻译、恢复和再次翻译。提供网络许可、focus-safe helper、runtime-diagnostics helper 和证据目录，检查摘要的完整来源以及导航、日期、链接和代码块的保留。
+
 ## man7 Linux 手册正文
 
 man7 的 Linux 手册将自然语言正文、参数说明、终端会话和源码混放在 `pre` 中。翻译时按手册段落建立可恢复的正文边界，保留原来的换行、缩进和行内链接；命令会话与程序源码继续保持原文。此能力限定于经过结构核验的 man7 Linux 手册，普通网页代码块和 RFC 的格式化文本仍遵守原有保护策略。

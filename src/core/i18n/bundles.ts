@@ -3,7 +3,7 @@
  *
  * 文件职责：静态汇总中文以外六种界面语言的完整资源包，作为构建期 JSON 生成、userscript 单文件产物与测试的唯一来源。
  * 主要内容：导出包含稳定资源、旧文案词典和按语言展开的旧文案模板的 UI_LANGUAGE_BUNDLES，
- * 以及按 language.ts 路径规则生成扩展运行时按需加载文件的 createUiLanguageBundleFiles、复用七语品牌和产品说明生成浏览器 metadata 的 createExtensionMetadataLocaleFiles。
+ * 以及生成按需加载文件的 createUiLanguageBundleFiles、生成七语扩展名称、安装说明和工具栏提示的 createExtensionMetadataLocaleFiles。
  * 模块边界：扩展的 content、background 和扩展页面不得直接 import 本文件，否则会把六种语言重新打进每个 bundle；
  * 它们通过 src/platform/i18n 按当前界面语言加载构建产物。本文件不访问浏览器 API，也不读写配置。
  */
@@ -17,6 +17,7 @@ import {jaJPLegacyText, jaJPMessages} from './messages/ja-JP';
 import {koKRLegacyText, koKRMessages} from './messages/ko-KR';
 import {ruRULegacyText, ruRUMessages} from './messages/ru-RU';
 import productDescriptions from './messages/product-descriptions.json';
+import toolbarDescriptions from './messages/toolbar-descriptions.json';
 import {UI_LANGUAGE_OPTIONS} from './language';
 import type {RegisteredUiLanguage, UiLanguageBundle} from './types';
 
@@ -37,13 +38,17 @@ export function createUiLanguageBundleFiles(): Array<{relativeDest: string; cont
     }));
 }
 
-/** 构建期生成浏览器名称和功能说明；与 UI 共用语言注册表，不向 metadata 复制完整界面目录。 */
+/** 构建期生成浏览器原生本地化字段，工具栏提示复用扩展品牌名称。 */
 export function createExtensionMetadataLocaleFiles(): Array<{relativeDest: string; contents: string}> {
-    return UI_LANGUAGE_OPTIONS.map(({value: language}) => ({
-        relativeDest: `_locales/${language === 'zh-CN' ? 'zh_CN' : language.split('-')[0]}/messages.json`,
-        contents: JSON.stringify({
-            extensionName: {message: language === 'zh-CN' ? translate('common.brand', language) : UI_LANGUAGE_BUNDLES[language].messages['common.brand']},
-            extensionDescription: {message: productDescriptions[language]},
-        }),
-    }));
+    return UI_LANGUAGE_OPTIONS.map(({value: language}) => {
+        const name = language === 'zh-CN' ? translate('common.brand', language) : UI_LANGUAGE_BUNDLES[language].messages['common.brand'];
+        return {
+            relativeDest: `_locales/${language === 'zh-CN' ? 'zh_CN' : language.split('-')[0]}/messages.json`,
+            contents: JSON.stringify({
+                extensionName: {message: name},
+                extensionDescription: {message: productDescriptions[language]},
+                extensionToolbarTitle: {message: `${name} · ${toolbarDescriptions[language]}`},
+            }),
+        };
+    });
 }

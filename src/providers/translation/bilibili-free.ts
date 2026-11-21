@@ -68,7 +68,8 @@ async function translateChunk(text: string, sourceName: string, targetName: stri
 
 async function translatePlain(text: string, sourceName: string, targetName: string, signal?: AbortSignal): Promise<string> {
     const content = text.trim();
-    if (/[\r\n]/u.test(content) && Array.from(content).length <= MAX_CHUNK_CODEPOINTS) {
+    const fitsCombinedRequest = /[\r\n]/u.test(content) && Array.from(content).length <= MAX_CHUNK_CODEPOINTS;
+    if (fitsCombinedRequest) {
         const nonemptyLine = /\S[^\r\n]*/gu;
         const lineCount = content.match(nonemptyLine)?.length;
         const translation = await translateChunk(content, sourceName, targetName, signal, lineCount);
@@ -79,7 +80,9 @@ async function translatePlain(text: string, sourceName: string, targetName: stri
             return translateFreeTextChunks(text, text.length, async () => translatedLines[index++]!.trimEnd(), signal);
         }
     }
-    return translateFreeTextChunks(text, MAX_CHUNK_CODEPOINTS, chunk => translateChunk(chunk, sourceName, targetName, signal), signal);
+    // 合并请求已校验正文总长。逐行请求会先去除边缘空白，回退时每行只需发送一次。
+    const lineLimit = fitsCombinedRequest ? text.length : MAX_CHUNK_CODEPOINTS;
+    return translateFreeTextChunks(text, lineLimit, chunk => translateChunk(chunk, sourceName, targetName, signal), signal);
 }
 
 export async function translateBilibiliFree(request: TranslationProviderRequest<string>): Promise<string> {

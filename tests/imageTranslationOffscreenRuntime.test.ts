@@ -190,6 +190,68 @@ it.each([false,true])('倾斜原字在清字前核对并传到对应绘制入口
     expect(source).toEqual(before);expect(p.pixels).toEqual(pixels);expect(manga?result.mangaPatches:result.image).toBeTruthy();
 });
 
+describe('旋转窄标签先预检完整译文再清字',()=>{
+    const bbox={x0:42,y0:15,x1:64,y1:125};
+    const source:MangaRegion={text:'OPEN PANEL',fontSize:22,bbox,sourceBoxes:[bbox],quarterTurn:1,textAlign:'center'};
+    function prepare(manga:boolean,translation:string,recognition:MangaRegion[]= [source]){
+        imageOptions.push({width:180,height:150});
+        mocks.mangaRecognize.mockResolvedValueOnce(recognition);
+        mocks.repair.mockImplementationOnce(async pixels=>pixels);
+        sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+            ?{success:true,translations:recognition.map((_,index)=>index===0?translation:'下一页')}:undefined));
+        return ()=>translateImageInOffscreen('spine','en','Page',undefined,'rotate',manga,'paddle');
+    }
+    it.each([false,true])('字形可完整顺原方向放回后才清理紧框，manga=%s',async manga=>{
+        const result=await prepare(manga,'面板')();
+        const repair=manga?mocks.repair:mocks.inpaint;
+        expect(repair.mock.calls[0][3]).toEqual([{...source,text:'面板'}]);
+        expect(canvases[0].context.measureText.mock.invocationCallOrder.at(-1)!).toBeLessThan(repair.mock.invocationCallOrder[0]);
+        expect(result.lines[0].renderSkipped).toBeUndefined();
+        expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
+        if(!manga){
+            expect(mocks.draw.mock.calls[0].slice(1,6)).toEqual(['面板',42,15,22,110]);
+            expect(mocks.draw.mock.calls[0][13].radians).toBe(-Math.PI/2);
+        }else expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+    });
+    it.each([
+        [false,'长译文'.repeat(50)],
+        [true,'第一行\n第二行'],
+        [true,'太长'.repeat(200)],
+    ] as const)('全文在紧框内无法保持一行可读时留在文字面板，manga=%s',async(manga,translation)=>{
+        const result=await prepare(manga,translation)();
+        expect(result.lines[0]).toMatchObject({text:translation,sourceText:source.text,renderSkipped:true});
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
+        expect(mocks.repair).not.toHaveBeenCalled();expect(mocks.mangaDraw).not.toHaveBeenCalled();
+        expect(canvases).toHaveLength(1);
+        expect(canvases[0]).toMatchObject({width:0,height:0});
+    });
+    it('原样保留的粗框仍阻止相邻译文擦盖，远处正常绘制',async()=>{
+        const coarse:MangaRegion={text:'COARSE',fontSize:22,bbox:{x0:25,y0:10,x1:67,y1:125},preserveSource:true};
+        const near:MangaRegion={text:'NEAR',fontSize:8,bbox:{x0:68,y0:20,x1:94,y1:28}};
+        const far:MangaRegion={text:'FAR',fontSize:10,bbox:{x0:108,y0:35,x1:164,y1:46}};
+        const result=await prepare(false,'粗略',[coarse,near,far])();
+        expect(result.lines.map(r=>r.renderSkipped===true)).toEqual([true,true,false]);
+        expect(mocks.inpaint.mock.calls[0][3].map((r:ImageTextRegion)=>r.bbox)).toEqual([far.bbox]);
+    });
+    it('稀有字先等待可用字体，首个预检画布无法创建时释放资源',async()=>{
+        nullContext=true;
+        await expect(prepare(false,'𠀀')()).rejects.toThrow('浏览器不支持图片处理');
+        expect(prepareRareFont).toHaveBeenCalledOnce();
+        expect(canvases[0]).toMatchObject({width:0,height:0});
+        expect(mocks.inpaint).not.toHaveBeenCalled();
+    });
+    it('透明保护改变旋转标签的物理空间时保留该页原图',async()=>{
+        const run=prepare(false,'面板');
+        imageOptions.pop();
+        const pixels=opaqueAlphaPixels(180,150);
+        for(let y=64;y<67;y++)for(let x=53;x<55;x++)pixels.set([17,53,191,0],(y*180+x)*4);
+        ordinaryAlphaCanvas(180,150,pixels);
+        const result=await run();
+        expect(result).toMatchObject({imageUnchanged:true,lines:[{sourceText:source.text,text:'面板',renderSkipped:true}]});
+        expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
+    });
+});
+
 it.each(['gradient','flat'])('普通图%s源色沿用旧绘字框和清字框，字号采用真实墨迹',async kind=>{
     const width=240,height=120,pixels=new Uint8ClampedArray(width*height*4),source={text:'SOURCE',bbox:{x0:40,y0:40,x1:160,y1:64},...(kind==='gradient'?{textAlign:'right' as const}:{})};
     for(let y=0;y<height;y++)for(let x=0;x<width;x++)pixels.set(kind==='gradient'?[30+x*.2,40+y*.1,70,255]:[20,30,50,255],(y*width+x)*4);

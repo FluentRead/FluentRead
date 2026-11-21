@@ -179,8 +179,15 @@ export function getImageSourceFontLimit(context:CanvasRenderingContext2D,line:Im
 /** 只有同一次字宽/字高核对采用实测尺度时，才把实测位置传给绘字；清字与裁剪仍使用原范围。 */
 export function getImageSourceTextStyle(context:CanvasRenderingContext2D,line:ImageTextRegion,inkBoxes?:readonly OcrLine['bbox'][]):ImageSourceTextStyle {
     if(line.vertical)return {fontSize:Infinity};
-    const geometry=imageSourceInkGeometry(line,inkBoxes);
     const b=line.bbox,height=b.y1-b.y0,width=b.x1-b.x0,fallback=(line.fontSize??height)*1.2;
+    if(line.quarterTurn)return {
+        fontSize:width*1.05,
+        orientation:{owner:line,sourceText:line.text,radians:-line.quarterTurn*Math.PI/2,
+            originX:(b.x0+b.x1)/2,originY:(b.y0+b.y1)/2,
+            bounds:{x0:-height/2,y0:-width/2,x1:height/2,y1:width/2},
+            width:height,height:width,count:1,heightGain:0},
+    };
+    const geometry=imageSourceInkGeometry(line,inkBoxes);
     const legacyEligible=!(line.sourceBoxes&&line.sourceBoxes.length!==1||line.ruby?.length||line.text.length<3||line.text.length>256||/[\r\n]/u.test(line.text)
         ||![width,height].every(value=>Number.isFinite(value)&&value>0));
     if(!geometry&&!legacyEligible)return {fontSize:fallback};
@@ -487,6 +494,8 @@ export function canDrawTranslatedImageText(budget:ImageTextMeasureBudget,...args
 function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMeasureBudget):boolean {
     const [context,text,left,top,width,height,backgroundColor,maxFontSize=Infinity,textAlign='center',
         prepared,foregroundColor,outlineColor,sourceInkBounds,orientation]=args;
+    const rotated=orientation?.owner.quarterTurn;
+    if(rotated&&(text.length>256||/[\r\n]/u.test(text)))return false;
     const charge=(value:string)=>{
         if(preflight&&(--preflight.remaining<0||(preflight.characters-=value.length)<0))throw IMAGE_TEXT_PREFLIGHT_LIMIT;
     };
@@ -530,8 +539,10 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
         const plane=!prepared&&orientation&&text.length<=4096?createImageTypographyPlane({x0:left,y0:top,x1:left+width,y1:top+height},orientation,textAlign,(line,size)=>{
             const metric=measure(line,size);return {left:metric.actualBoundingBoxLeft,right:metric.actualBoundingBoxRight,ascent:metric.actualBoundingBoxAscent,descent:metric.actualBoundingBoxDescent};
         },bleed):undefined;
-        const tilted=plane?layoutImageTranslationText(text,plane.width,plane.height,textWidth,maxFontSize,textInk,plane.constraints):undefined;
+        const constraints=rotated&&plane?{...plane.constraints,accept:(layout:ImageTranslationTextLayout)=>layout.lines.length===1&&!!plane.plan(layout)}:plane?.constraints;
+        const tilted=plane?layoutImageTranslationText(text,plane.width,plane.height,textWidth,maxFontSize,textInk,constraints):undefined;
         const placement=tilted&&plane!.plan(tilted);
+        if(rotated&&(!placement||tilted!.lines.length!==1||tilted!.fontSize<Math.max(7,maxFontSize*.5)))return false;
         const layout = placement?tilted!:prepared ?? layoutImageTranslationText(text,width-paddingX*2,height-paddingY*2,textWidth,maxFontSize,textInk);
         if (layout.lines.length === 0) return false;
         if(!preflight){

@@ -138,20 +138,35 @@ function mountBall(initial: Record<string, unknown> = {}, navigatorPort: {maxTou
 async function flush() {await Vue.nextTick(); await Vue.nextTick();}
 
 describe('FloatingBall actual SFC lifecycle', () => {
-  it.each(['left', 'right'] as const)('keeps the full default button and its stable click corridor on the %s edge', async side => {
+  it.each(['left', 'right'] as const)('tucks the desktop button and retains its click corridor at the %s edge', async side => {
     const port = mountBall({position: side});
     const left = side === 'left';
     const x = () => port.style('--fr-ball-x');
     await flush();
-    expect(x()).toBe(left ? 0 : 966);
+    expect(x()).toBe(left ? -17 : 983);
     port.over();
     await flush();
     expect(x()).toBe(left ? 20 : 946);
-    expect(port.style(left ? '--fr-ball-hit-left' : '--fr-ball-hit-right')).toBe(20);
+    expect(port.style(left ? '--fr-ball-hit-left' : '--fr-ball-hit-right')).toBe(37);
     port.leave();
     vi.advanceTimersByTime(140);
     await flush();
-    expect(x()).toBe(left ? 0 : 966);
+    expect(x()).toBe(left ? -17 : 983);
+    port.props.presentation = {defaultMargin: 0, popoutMargin: 32};
+    await flush();
+    expect(x()).toBe(left ? -17 : 983);
+    port.focus();
+    await flush();
+    expect(x()).toBe(left ? 32 : 934);
+  });
+
+  it.each([0, 20])('keeps equal nonnegative margins at %d px while idle and expanded', async margin => {
+    const port = mountBall({presentation: {defaultMargin: margin, popoutMargin: margin}});
+    await flush();
+    expect(port.style('--fr-ball-x')).toBe(966 - margin);
+    port.over();
+    await flush();
+    expect(port.style('--fr-ball-x')).toBe(966 - margin);
   });
 
   it('centers settings above and hide below without moving the main button vertically', async () => {
@@ -291,7 +306,7 @@ describe('FloatingBall actual SFC lifecycle', () => {
   });
 
   it.each(['touch', 'mouse'])('uses the native %s click as the only activation', async pointerType => {
-    const port = mountBall();
+    const port = mountBall({}, {maxTouchPoints: pointerType === 'touch' ? 5 : 0});
     await flush();
     port.pointer('pointerdown', {pointerType});
     port.pointer('pointerup', {pointerType});
@@ -302,7 +317,7 @@ describe('FloatingBall actual SFC lifecycle', () => {
     await flush();
     expect(port.translate).toHaveBeenCalledExactlyOnceWith(true);
     expect(port.ball().classList.contains('floating-ball-expanded')).toBe(pointerType === 'touch');
-    expect(port.style('--fr-ball-x')).toBe(966);
+    expect(port.style('--fr-ball-x')).toBe(pointerType === 'touch' ? 956 : 983);
     expect(port.savePosition).not.toHaveBeenCalled();
     expect([...port.windowListeners.values()].every(listeners => listeners.size === 0)).toBe(true);
     port.click(port.main(), 0);
@@ -325,10 +340,10 @@ describe('FloatingBall actual SFC lifecycle', () => {
     expect(port.translate).toHaveBeenCalledTimes(1);
   });
 
-  it('coalesces drag movement into one frame and persists the actual release point without a click', async () => {
+  it('coalesces drag from the visible half into one frame and saves the release point without a click', async () => {
     const port = mountBall();
     await flush();
-    port.pointer('pointerdown');
+    port.pointer('pointerdown', {clientX: 993});
     port.pointer('pointermove', {clientX: 304, clientY: 330}, 'window');
     port.pointer('pointermove', {clientX: 300, clientY: 340}, 'window');
     expect(port.window.requestAnimationFrame).toHaveBeenCalledOnce();
@@ -336,7 +351,7 @@ describe('FloatingBall actual SFC lifecycle', () => {
     port.frame();
     await flush();
     expect(port.ball().classList.contains('dragging')).toBe(true);
-    expect(port.style('--fr-drag-x')).toBe(283);
+    expect(port.style('--fr-drag-x')).toBe(290);
     expect(port.style('--fr-drag-y')).toBe(323);
     expect(port.readMainRect).toHaveBeenCalledOnce();
     port.pointer('pointermove', {clientX: 310, clientY: 344}, 'window');

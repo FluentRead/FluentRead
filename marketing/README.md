@@ -47,3 +47,9 @@
 尺寸与用途核对于 2026-09-06，依据 [Chrome 官方图片指南](https://developer.chrome.com/docs/webstore/images) 与[商店资料说明](https://developer.chrome.com/docs/webstore/cws-dashboard-listing)。商店截图采用推荐的 1280×800；每种语言提供 5 张。宣传小图为 440×280，横幅为 1400×560，图标为 128×128。
 
 这些材料面向当前源码的能力。实际提交时请使用已包含对应功能的发布包，并在商店后台核对版本、隐私链接和数据披露。此目录不代表已经提交、审核通过或发布。
+
+## 官网宣传入口
+
+首页覆盖简体中文、英语、日语、韩语、法语、西语和俄语。中文与英文使用原有首页，其他语种提供本地化介绍、双语网页示例和三个浏览器商店入口。链接到英文使用文档时，在当地语言的入口上标明文档语言。
+
+官网标题、简介、语言导航和分享卡图路径统一维护在 [landing-locales.json](../docs/.vitepress/landing-locales.json)。[international-home-copy.json](../docs/.vitepress/theme/international-home-copy.json) 保存演示和功能介绍。1200×630 的分享图位于 [docs/public/brand/share](../docs/public/brand/share)，使用原有产品图标与宣传包的双层纸页主图。更新后运行 `pnpm docs:build` 和 `pnpm docs:check` 验证页面、语言链接、分享图和 sitemap。

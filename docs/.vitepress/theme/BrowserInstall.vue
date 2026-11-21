@@ -2,6 +2,7 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 import BrowserGlyph from './BrowserGlyph.vue'
+import { browserStores } from './browser-stores'
 defineProps<{ en?: boolean; showDocs?: boolean }>()
 const menu = ref<HTMLDetailsElement | null>(null)
 function outside(event: MouseEvent) {
@@ -28,7 +29,7 @@ onBeforeUnmount(() => {
     <div class="bv-install-actions">
       <a
         class="bv-button bv-primary"
-        href="https://chromewebstore.google.com/detail/djnlaiohfaaifbibleebjggkghlmcpcj"
+        :href="browserStores.Chrome"
         target="_blank"
         rel="noopener noreferrer"
       >
@@ -46,14 +47,14 @@ onBeforeUnmount(() => {
         </summary>
         <div class="bv-browser-options">
           <a
-            href="https://microsoftedge.microsoft.com/addons/detail/kakgmllfpjldjhcnkghpplmlbnmcoflp"
+            :href="browserStores.Edge"
             target="_blank"
             rel="noopener noreferrer"
             ><BrowserGlyph browser="Edge" /><span>Microsoft Edge</span
             ><span aria-hidden="true">↗</span></a
           >
           <a
-            href="https://addons.mozilla.org/firefox/addon/%E6%B5%81%E7%95%85%E9%98%85%E8%AF%BB/"
+            :href="browserStores.Firefox"
             target="_blank"
             rel="noopener noreferrer"
             ><BrowserGlyph browser="Firefox" /><span>Firefox</span

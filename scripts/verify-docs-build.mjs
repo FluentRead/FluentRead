@@ -10,6 +10,15 @@ const dist = path.join(root, 'docs/.vitepress/dist')
 const brandTaglines = JSON.parse(
   fs.readFileSync(path.join(root, 'src/core/i18n/messages/brand-taglines.json'), 'utf8')
 )
+const landingLocales = Object.values(JSON.parse(
+  fs.readFileSync(path.join(root, 'docs/.vitepress/landing-locales.json'), 'utf8')
+))
+const landingByFile = new Map(landingLocales.map(locale => [
+  locale.path.slice(1) + 'index.html', locale,
+]))
+const website = 'https://read.thinkstu.com'
+assert.deepEqual(landingLocales.map(locale => locale.assetLocale).sort(), Object.keys(brandTaglines).sort(),
+  'The website landings must cover each published brand language')
 const distReal = fs.realpathSync(dist)
 const isArtifactFile = (file) => {
   const inside = (base, target) => {
@@ -70,18 +79,63 @@ for (const [file, doc] of docs) {
     )
   } else {
     const route = path.relative(dist, file)
-    const alternatePath = (route.startsWith('en/') ? route.slice(3) : 'en/' + route)
-      .replace(/index\.html$/, '')
-      .replace(/\.html$/, '')
-    assert.equal(
-      doc.querySelector('.bv-language')?.getAttribute('href'),
-      '/' + alternatePath,
-      `Language switch must preserve the page without a language-specific hash: ${route}`
-    )
     const canonical = doc.querySelector('link[rel="canonical"]')?.getAttribute('href')
     assert(canonical?.startsWith('https://read.thinkstu.com/'), `Missing canonical: ${file}`)
     assert(resolve(canonical), `Missing canonical target: ${canonical}`)
-    for (const alternate of doc.querySelectorAll('link[rel="alternate"][hreflang]')) {
+    const alternates = [...doc.querySelectorAll('link[rel="alternate"][hreflang]')]
+    const landing = landingByFile.get(route)
+    if (landing) {
+      const languageLinks = [...doc.querySelectorAll('.bv-home-language a[hreflang]')]
+      assert.equal(doc.documentElement.lang, landing.lang, `Wrong document language: ${route}`)
+      assert.equal(canonical, website + landing.path)
+      assert.deepEqual(
+        languageLinks.map(link => [link.getAttribute('hreflang'), link.getAttribute('href')]),
+        landingLocales.map(locale => [locale.lang, locale.path]),
+        `Every localized landing must be reachable: ${route}`
+      )
+      assert.equal(doc.querySelector('.bv-home-language [aria-current="page"]')?.getAttribute('href'), landing.path)
+      assert.deepEqual(
+        alternates.map(link => [link.getAttribute('hreflang'), link.getAttribute('href')]),
+        [...landingLocales.map(locale => [locale.lang, website + locale.path]),
+          ['x-default', website + '/en/']],
+        `Missing reciprocal language metadata: ${route}`
+      )
+      const shareImage = `${website}/brand/share/${landing.assetLocale}.jpg`
+      const metadata = {
+        'og:locale': landing.socialLocale,
+        'og:title': landing.title,
+        'og:description': landing.description,
+        'og:image': shareImage,
+        'og:image:alt': landing.imageAlt,
+      }
+      for (const [property, content] of Object.entries(metadata)) {
+        assert.equal(doc.querySelector(`meta[property="${property}"]`)?.getAttribute('content'), content,
+          `Missing localized share metadata: ${property} in ${route}`)
+      }
+      assert.equal(doc.querySelector('title')?.textContent, landing.title)
+      assert.equal(doc.querySelector('meta[name="description"]')?.getAttribute('content'), landing.description)
+      assert(resolve(shareImage), `Missing share artwork: ${shareImage}`)
+      if (landing.lang !== 'zh-CN' && landing.lang !== 'en') {
+        const installLinks = [...doc.querySelectorAll('.fr-install-actions a')].map(link => link.href)
+        assert.equal(installLinks.length, 3, `Missing browser installs: ${route}`)
+        assert(installLinks.some(url => new URL(url).hostname === 'chromewebstore.google.com'))
+        assert(installLinks.some(url => new URL(url).hostname === 'microsoftedge.microsoft.com'))
+        assert(installLinks.some(url => new URL(url).hostname === 'addons.mozilla.org'))
+        assert.equal(doc.querySelectorAll('.fr-try-controls button').length, 2)
+        assert.equal(doc.querySelectorAll('.fr-try-controls button[aria-pressed="true"]').length, 1)
+        assert.equal(doc.querySelectorAll('.fr-sample-translation').length, 2)
+      }
+    } else {
+      const alternatePath = (route.startsWith('en/') ? route.slice(3) : 'en/' + route)
+        .replace(/index\.html$/, '')
+        .replace(/\.html$/, '')
+      assert.equal(
+        doc.querySelector('.bv-language')?.getAttribute('href'),
+        '/' + alternatePath,
+        `Language switch must preserve the page without a language-specific hash: ${route}`
+      )
+    }
+    for (const alternate of alternates) {
       assert(resolve(alternate.getAttribute('href')), `Missing translated URL: ${file}`)
     }
   }
@@ -137,6 +191,10 @@ for (const [file, doc] of docs) {
       )
     report.images++
   }
+}
+const sitemap = fs.readFileSync(path.join(dist, 'sitemap.xml'), 'utf8')
+for (const locale of landingLocales) {
+  assert(sitemap.includes(`<loc>${website + locale.path}</loc>`), `Landing missing from sitemap: ${locale.path}`)
 }
 for (const file of files(path.join(root, 'docs/guide'))
   .concat(files(path.join(root, 'docs/config')))

@@ -1,7 +1,7 @@
 /**
  * @file src/features/document-translation/core/document.ts
  * 文件职责：定义文档翻译的纯领域模型，并负责把多种文本格式解析为可翻译片段，再按双语或纯译文模式无损还原原格式结构。
- * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
+ * 主要内容：覆盖文本格式识别、片段切分、HTML 中被链接或强调等行内标签隔开的文字合成整句并以编号占位符保留标签（句中的行内代码整个保留、不翻译）、给出带占位符片段替换前的原文供校订显示、字幕译文丢了硬换行时按原文行数重新断行、被翻译服务转成实体或括号的字幕样式标签按真实闭合名还原（包含 VTT 样式类）、纯文本里按固定宽度折行的段落（含 LF、CRLF、CR）合成一个片段并按完整 Unicode 码点判断中日韩边界、Markdown 可选地把一行或一个普通折行段落作为一个片段整句翻译并以成对占位符保护强调和链接，恢复强调时把服务正文边缘的 CommonMark 空白移到分隔符外而保留内部间隔，仅在标点/符号或 underscore 词内边界要求时补外侧分隔空格，以单占位符保护行内代码与网址、Markdown 标题、列表、容器指令与独立 HTML 标记保留，以及围栏、受控缩进代码与行内位置保护、字幕标签保留、有界深度的非递归 JSON 遍历、空译文回退、MIME 信息、按格式区分的文件大小上限和下载文件命名；文本导出支持有界编码，下载摘录无需处理全文；相同译文保留原文且不重复展示。
  * 模块边界：该文件不读取 File、不解析 PDF/EPUB/DOCX 二进制，也不发起翻译请求；文件 I/O 与压缩包处理归 services/binary，批处理归 services/translation，展示归 preview/presentation。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
@@ -236,7 +236,7 @@ const FORMAT_LABELS: Record<DocumentFormat, string> = {
 };
 
 const PROTECTED_HTML_TAGS = new Set(['head', 'script', 'style', 'pre', 'code', 'textarea']);
-const MARKDOWN_PROTECTED_PATTERN = /(`{1,3}[^`\n]+`{1,3}|<https?:\/\/[^>]+>|https?:\/\/[^\s)]+|\$[^$\r\n]+\$|%%[^%\r\n]+%%|(?:^|\s)#[\p{L}\p{N}_/-]+)/gu;
+const MARKDOWN_PROTECTED_PATTERN = /(`{1,3}[^`]+`{1,3}|<https?:\/\/[^>]+>|https?:\/\/[^\s)]+|\$[^$\r\n]+\$|%%[^%\r\n]+%%|(?:^|\s)#[\p{L}\p{N}_/-]+)/gu;
 const TIMED_SUBTITLE_PATTERN = /^\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}\s*-->\s*(?:\d{1,3}:)?\d{2}:\d{2}[,.]\d{3}(?:\s+.*)?$/u;
 const LRC_TIME_PATTERN = /^(\s*(?:\[[^\]\r\n]+\])+)/u;
 
@@ -394,7 +394,7 @@ function addMarkdownProtectedText(
 }
 
 /**
- * 一行 Markdown 作为一个片段整句翻译：链接写成成对的编号占位符（链接文字仍然翻译，地址原样保留），
+ * 一行或一个折行段落作为一个片段翻译：链接写成成对的编号占位符（链接文字仍然翻译，地址原样保留），
  * 行内代码、网址、公式与标签写成单个占位符。这样句子不会被行内语法拆散，受保护的内容也不会被改写。
  * 仅在调用方启用整句方式时使用；默认仍按受保护内容把一行切成多段。
  */
@@ -403,6 +403,7 @@ function addMarkdownSentence(
     segments: DocumentSegment[],
     value: string,
     bilingualGroup: number,
+    rawValue = value,
 ): void {
     // 行首容器和标题语法留在本地：服务可能把 "# Heading" 改成 "#标题"，或擅自改动列表编号。
     const container = inspectMarkdownLine(value);
@@ -412,6 +413,7 @@ function addMarkdownSentence(
     if (prefixLength) {
         addLiteral(parts, value.slice(0, prefixLength), bilingualGroup);
         value = value.slice(prefixLength);
+        rawValue = rawValue.slice(prefixLength);
     }
     const pattern = MARKDOWN_PROTECTED_PATTERN;
     pattern.lastIndex = 0;
@@ -454,10 +456,13 @@ function addMarkdownSentence(
     source += emphasis(value.slice(cursor));
     const options: SegmentOptions = {bilingualGroup, markdownLineStart: true};
     // 没有行内语法，或文字本身含有占位符写法（无法区分真假占位符）时，整行按普通文字处理。
-    if (!tokens.length || MARKDOWN_PLACEHOLDER.test(value)) {addSegment(parts, segments, value, options); return;}
-    const trimmed = trimSource(value)!;
+    if (!tokens.length || MARKDOWN_PLACEHOLDER.test(value)) {
+        addSegment(parts, segments, rawValue, options, () => value.trim());
+        return;
+    }
+    const trimmed = trimSource(rawValue)!;
     // 一行里只有受保护的内容（单独一个网址、一段行内代码）：没有可翻译的文字。
-    if (!source.replace(/<g\d+\/>/gu, '').trim()) {addLiteral(parts, value, bilingualGroup); return;}
+    if (!source.replace(/<g\d+\/>/gu, '').trim()) {addLiteral(parts, rawValue, bilingualGroup); return;}
     const segmentIndex = segments.length;
     const text = source.trim();
     segments.push({id: segmentIndex, source: text, markdownLineStart: true});
@@ -616,6 +621,34 @@ function stripMarkdownCodeContainer(line: string, quoteDepth: number, indent: nu
 const UNSPACED_SCRIPT = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}，。、；：！？（）《》“”‘’]/u;
 const UNSPACED_WRAP_END = new RegExp(`${UNSPACED_SCRIPT.source}$`, 'u');
 const UNSPACED_WRAP_START = new RegExp(`^${UNSPACED_SCRIPT.source}`, 'u');
+const maxMarkdownParagraphLength = 3_500;
+
+/** 折行只在发给服务和阅读预览时展开，Markdown 受保护文本的末尾保留分隔，导出原文保留输入换行。 */
+export function unwrapDocumentSoftLines(source: string, format?: DocumentFormat): string {
+    const protectedEnds = new Set<number>();
+    const codeBreaks = new Set<number>();
+    if (format === 'markdown') {
+        for (const mark of source.matchAll(new RegExp(MARKDOWN_PROTECTED_PATTERN))) {
+            protectedEnds.add(mark.index + mark[0].length);
+            if (!mark[0].startsWith('`')) continue;
+            for (const lineBreak of mark[0].matchAll(/\r\n?|\n/gu)) codeBreaks.add(mark.index + lineBreak.index);
+        }
+    }
+    return source.replace(/(?<![^\S\r\n])[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) => {
+        // CommonMark 只替换行内代码的行尾，保留行尾两侧已有空格。
+        if (codeBreaks.size && codeBreaks.has(offset + wrap.search(/[\r\n]/u))) return wrap.replace(/\r\n?|\n/u, ' ');
+        return !protectedEnds.has(offset) && UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset))
+            && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' ';
+    });
+}
+
+function isMarkdownSoftParagraphLine(line: string): boolean {
+    // shortcut: 只合并顶层正文；需要合并列表、表格或引用时，先支持容器内的双语导出。
+    const blockStart = /^(?:#{1,6}(?:[ \t]|$)|(?:[-+*]|\d{1,9}[.)])(?:[ \t]|$)|`{3,}|~{3,}|[><]|:{3,}|\$\$|\[[^\]]+\]:|(?:[-*_][ \t]*){3,}$|(?:=+|-+)$)/u;
+    const text = line.trimEnd();
+    return /^ {0,3}\S/u.test(text) && !blockStart.test(text.trimStart()) && !text.includes('|')
+        && !text.endsWith('\\') && !line.slice(text.length).includes('  ');
+}
 
 /**
  * 纯文本里按固定宽度折行的段落：哪些行在下一行接着写。只在把握较大时才认定——这一行接近全文的折行宽度、
@@ -650,8 +683,11 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
     let inFrontmatter = format === 'markdown' && /^\uFEFF?---\s*$/u.test(lines[0]?.text ?? '');
     const wrapped = format === 'txt' ? wrappedTextLines(lines.map(line => line.text)) : undefined;
     let wrapStart: number | undefined;
+    let joinedThrough = -1;
+    let unjoinedThrough = -1;
 
     lines.forEach((line, lineIndex) => {
+        if (lineIndex <= joinedThrough) return;
         if (inFrontmatter) {
             addLiteral(parts, content.slice(line.start, line.end));
             if (lineIndex > 0 && /^(?:---|\.\.\.)\s*$/u.test(line.text)) inFrontmatter = false;
@@ -744,6 +780,23 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
                 addLiteral(parts, content.slice(line.start, line.end));
                 return;
             }
+            if (sentences && lineIndex > unjoinedThrough && !container.quoteDepth && !container.listIndent
+                && isMarkdownSoftParagraphLine(line.text)) {
+                let end = lineIndex;
+                while (end + 1 < lines.length && isMarkdownSoftParagraphLine(lines[end + 1].text)) end += 1;
+                const last = lines[end];
+                if (last.textEnd - line.start > maxMarkdownParagraphLength
+                    || /^ {0,3}(?:=+|-+)[ \t]*$/u.test(lines[end + 1]?.text ?? '')) {
+                    unjoinedThrough = end;
+                } else if (end > lineIndex) {
+                    const raw = content.slice(line.start, last.textEnd);
+                    addMarkdownSentence(parts, segments, unwrapDocumentSoftLines(raw, 'markdown'), lineIndex, raw);
+                    addLiteral(parts, content.slice(last.textEnd, last.end));
+                    joinedThrough = end;
+                    paragraph = container;
+                    return;
+                }
+            }
             (sentences ? addMarkdownSentence : addMarkdownProtectedText)(parts, segments, line.text, lineIndex);
             if (info.content) paragraph = /^#{1,6}\s/u.test(info.content) ? null : container;
         } else if (wrapped?.[lineIndex]) {
@@ -753,8 +806,7 @@ function parseTextDocument(content: string, format: 'txt' | 'markdown', sentence
         } else if (wrapStart !== undefined) {
             // 按固定宽度折行的一段话作为一个片段翻译；折行处在送翻的原文里是空格（中日韩文字之间不留空格）。
             // 相邻两个 UTF-16 单元足以容纳完整码点；锚定边缘，不能误用更前或更后的中日韩文字。
-            addSegment(parts, segments, content.slice(lines[wrapStart].start, line.textEnd), {}, source => source.replace(/[^\S\r\n]*(?:\r\n?|\n)[^\S\r\n]*/gu, (wrap: string, offset: number, text: string) =>
-                UNSPACED_WRAP_END.test(text.slice(Math.max(0, offset - 2), offset)) && UNSPACED_WRAP_START.test(text.slice(offset + wrap.length, offset + wrap.length + 2)) ? '' : ' '));
+            addSegment(parts, segments, content.slice(lines[wrapStart].start, line.textEnd), {}, unwrapDocumentSoftLines);
             wrapStart = undefined;
         } else {
             addSegment(parts, segments, line.text);

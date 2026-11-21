@@ -105,6 +105,8 @@ After a PDF is parsed again, edits are restored only when the source text and po
 
 Markdown, HTML, and ePub aim to retain links, emphasis, and inline code. URLs, email addresses, code blocks, and program identifiers remain unchanged. If formatting cannot be preserved, retry or change services. JSON keeps its structure and non-text values; nesting beyond 1000 levels is unsupported. Word tables remain tables, and ePub downloads retain chapters, images, links, and styles.
 
+Soft line breaks inside ordinary Markdown paragraphs are joined for translation. Blank lines still separate paragraphs, and headings, lists, quotes, and explicit line breaks keep their boundaries. Bilingual exports retain the original line breaks.
+
 Subtitle exports retain numbering, timing, and formatting tags. Translation-only output replaces the cue text; bilingual output keeps both texts in each cue. Fixed-width wrapped text is joined into paragraphs, while headings and lists stay separate where possible.
 
 **Translate multiple passages together** is enabled by default to reduce small requests. Disable it in the current document's settings without changing webpage settings. Format protection does not guarantee accurate or complete translation. Use a glossary for consistent terminology and review key passages.

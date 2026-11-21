@@ -15,6 +15,25 @@ function fixture(gradient=false,ink=[230,220,210]){
 const observe=(pixels=fixture(),bounds=box(),sources=[bounds])=>observeImageSourceInk(pixels,W,H,bounds,sources);
 
 describe('源墨色的只读渐变与完整物理框观察',()=>{
+    it('旋转书脊的上下静区与整列一致时复用原金色字，不把弧形底纹当成纯色',()=>{
+        const bbox=box(60,12,82,86),ink=[245,223,157,255],pixels=new Uint8ClampedArray(W*H*4);
+        for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+            const shade=30+Math.floor(Math.abs(x-71)*.7);
+            pixels.set([shade,shade+2,shade+15,255],(y*W+x)*4);
+        }
+        for(let y=18;y<80;y++)for(let x=63;x<78;x++)if(y%8<5)pixels.set(ink,(y*W+x)*4);
+        const before=pixels.slice(),source={text:'OPEN PANEL',bbox,sourceBoxes:[bbox],fontSize:22,quarterTurn:1 as const};
+        const expected={foreground:'rgb(245,223,157)',outline:'#111827',inkBoxes:[box(63,18,78,77)]};
+        expect(observeImageSourceAppearances(pixels,W,H,[source]).get(source)).toEqual(expected);
+        expect(pixels).toEqual(before);
+        expect(observe(pixels,bbox)).toBeUndefined();
+        expect(observeImageSourceInk(pixels,W,H,bbox,[bbox,bbox],true)).toBeUndefined();
+        for(const [x,y,color] of [[65,4,[30,32,45,0]],[68,5,[20,26,31,255]],[69,93,[49,115,127,255]],
+            [54,30,[240,50,30,255]],[70,32,[220,40,10,255]]] as const){
+            const modified=before.slice();modified.set(color,(y*W+x)*4);
+            expect(observeImageSourceInk(modified,W,H,bbox,[bbox],true)).toBeUndefined();
+        }
+    });
     it('从未修补的完整渐变恢复共同源色，并单独给出细对比描边',()=>{
         const pixels=fixture(true),before=pixels.slice(),bounds=Object.freeze(box());
         expect(observe(pixels,bounds)).toEqual({foreground:'rgb(230,220,210)',outline:'#111827',inkBoxes:[box(35,30,95,50)]});expect(pixels).toEqual(before);

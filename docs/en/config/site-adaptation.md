@@ -19,6 +19,8 @@ The X timeline keeps the native **Show more** button in its original language. T
 
 In the OpenAI Developer Community, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
 
+Full-page translation on Google Search also includes recognized AI Overview text.
+
 Full-page translation includes the Twitch live chat message text. Enable **Sidebar translation** to include streamer display names in the left sidebar.
 
 ## Translate every time—or leave it alone

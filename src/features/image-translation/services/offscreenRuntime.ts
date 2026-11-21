@@ -42,7 +42,7 @@ import {numericEvidenceKey,numericProtection} from './mangaNumeric';
 import {mangaInpaintingRuntime} from './mangaInpainting';
 import {encodeImageCanvas} from './imageEncoding';
 import {mangaMaskBoxes, mangaMaskBoxIntersects, createMangaMaskFontResolver, mangaPatchRects, type MangaPatchPacket} from '../mangaPatchResult';
-import {getMangaOcrEngine} from '../ocrLanguages';
+import {getImageOcrEngine} from '../ocrLanguages';
 
 export type OffscreenImageTranslationLine = OcrLine & { backgroundColor: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true };
 
@@ -561,7 +561,12 @@ async function prepareTranslatedImage(
             const protection = translatedLines.length?planMangaAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[]):undefined;
             const pixels = translatedLines.length?await mangaInpaintingRuntime.repair(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[],signal,
                 (percent,initializing)=>reportProgress(requestId,initializing?'initializing':'preparing',percent),
-                (done,total)=>reportProgress(requestId,'cleaning',Math.floor(done*100/total)),backgrounds,{reuseUniformPixels:true,protection}):sourcePixels.data;
+                (done,total)=>reportProgress(requestId,'cleaning',Math.floor(done*100/total)),backgrounds,{
+                    reuseUniformPixels:true,protection,
+                    ...(translatedLines.some(line=>line.quarterTurn)?{onRotatedLabelRestored:(index:number)=>{
+                        backgrounds[index]={...backgrounds[index],uniform:false};
+                    }}:{}),
+                }):sourcePixels.data;
             if(pixels!==sourcePixels.data)sourcePixels.data.set(pixels);
             if(translatedLines.length)context.putImageData(sourcePixels,0,0);
             reportProgress(requestId,'rendering');
@@ -764,7 +769,7 @@ export async function translateImageInOffscreen(
     const source = await loadImage(image, signal);
     try {
         throwIfImageOperationAborted(signal);
-        const usePaddle = (manga ? getMangaOcrEngine(sourceLanguage) : ocrEngine) === 'paddle';
+        const usePaddle = getImageOcrEngine(sourceLanguage, manga ? 'paddle' : ocrEngine) === 'paddle';
         if (!usePaddle) reportProgress(requestId, 'recognizing');
         const recognized = usePaddle ? await mangaOcrRuntime.recognize(image, sourceLanguage, source.naturalWidth || source.width,
             source.naturalHeight || source.height, signal,

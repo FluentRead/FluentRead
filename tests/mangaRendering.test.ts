@@ -32,6 +32,52 @@ function fragmentedSpaces(){
     expect(spaces).toHaveLength(32);expect(spaces.every(b=>b.x1-b.x0===3&&b.y1-b.y0===3)).toBe(true);return spaces;
 }
 
+describe('漫画译文的横向字形边界',()=>{
+    it.each([
+        ['右侧伸出',-.5,1.32,false],
+        ['左侧伸出',.35,.45,false],
+        ['字体确实过宽',.6,.95,true],
+    ] as const)('%s时按实际字形及描边完整绘制',(_case,left,right,shrink)=>{
+        const c=context(),bbox=box(81,60,121,142);
+        const r:MangaRegion={text:'لِأَنَّ',fontSize:32/1.05,bbox};
+        c.measureText.mockImplementation(()=>{
+            const size=Number(c.font.match(/ ([\d.e+-]+)px/)![1]);
+            return {width:size*.95,actualBoundingBoxLeft:left*size,actualBoundingBoxRight:right*size,
+                actualBoundingBoxAscent:size*.7,actualBoundingBoxDescent:size*.2};
+        });
+        let painted: {size:number;anchor:number;padding:number}|undefined;
+        c.fillText.mockImplementation((text,x,y)=>{
+            const size=Number(c.font.match(/ ([\d.e+-]+)px/)![1]);
+            painted={size,anchor:c.textAlign==='left'?x:x-size*.95/2,padding:c.lineWidth/2+.5};
+            return {text,x,y,font:c.font};
+        });
+        draw(c,r);
+        expect(c.fillText).toHaveBeenCalledExactlyOnceWith(r.text,expect.any(Number),expect.any(Number));
+        const {size,anchor,padding}=painted!;
+        expect(anchor-left*size-padding).toBeGreaterThanOrEqual(bbox.x0-1e-8);
+        expect(anchor+right*size+padding).toBeLessThanOrEqual(bbox.x1+1e-8);
+        if(shrink)expect(size).toBeLessThan(32);
+        else expect(size).toBeCloseTo(32,7);
+        expect(c.rect).toHaveBeenCalledWith(bbox.x0,bbox.y0,40,82);
+    });
+
+    it('白底旁置跳过原字号的笔画放不下的框，并在更宽的框完整绘制',()=>{
+        const c=context(),narrow=box(10,20,35,48),wide=box(45,20,90,48);
+        const r=region('أَ');
+        c.measureText.mockImplementation(()=>{
+            const size=Number(c.font.match(/ ([\d.e+-]+)px/)![1]);
+            return {width:size*.7,actualBoundingBoxLeft:size*.65,actualBoundingBoxRight:size*.65,
+                actualBoundingBoxAscent:size*.65,actualBoundingBoxDescent:size*.2};
+        });
+        expect(plan(c,r,[narrow])).toBeUndefined();
+        const selected=plan(c,r,[narrow,wide]);
+        expect(selected?.bbox).toEqual(wide);
+        draw(c,selected!);
+        expect(c.fillText).toHaveBeenCalledExactlyOnceWith(r.text,(wide.x0+wide.x1)/2,expect.any(Number));
+        expect(c.fillText.mock.results[0].value).toMatchObject({font:expect.stringContaining(' 21px ')});
+    });
+});
+
 describe('只在已证明白底放置完整漫画译文',()=>{
     it.each([1,-1] as const)('旋转标签保持原方向和物理剪裁，识别转向=%s',turn=>{
         const c=context(),bbox=box(123,35,148,183);

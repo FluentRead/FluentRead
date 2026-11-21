@@ -142,6 +142,23 @@ describe('B站官方免费翻译', () => {
         expect(sent).toEqual([source.trim(), ...lines]);
     });
 
+    it.each([504, 200])('整段 HTTP %s 需逐行回退时，长缩进不会把首行拆成两次请求', async status => {
+        const padding = ' '.repeat(1960);
+        const first = 'Set timeoutMs to 4500 before restarting the background service and record the result.';
+        const lines = [first, 'Do not enable automatic retries.', 'Save the config before closing the editor.',
+            'Restart the service when the queue is empty.'];
+        const source = `${padding}${lines[0]}  \r\n\r\n\t${lines[1]}\r\n${lines[2]}\n${lines[3]}   `;
+        const output = lines.map(line => '译文 ' + line);
+        const fetch = vi.fn().mockResolvedValueOnce(status === 504 ? new Response(null, {status}) : reply('合并后的单行回复'))
+            .mockImplementation(async (_url, init) => reply('译文 ' + JSON.parse(init.body).messages[0].content.split('\n\n').at(-1)));
+        setRuntimeFetch(fetch);
+
+        const translated = await translateBilibiliFree(request(source));
+        const sent = fetch.mock.calls.map(([, init]) => JSON.parse(init.body).messages[0].content.split('\n\n').slice(1).join('\n\n'));
+        expect(sent).toEqual([source.trim(), ...lines]);
+        expect(translated).toBe(`${padding}${output[0]}  \r\n\r\n\t${output[1]}\r\n${output[2]}\n${output[3]}   `);
+    });
+
     it.each([
         {case: '五个正文行', origin: 'First\nSecond\nThird\nFourth\nFifth', headers: new Headers(), expected: {statusCode: 504}},
         {case: '供应商要求等待', origin: 'First\nSecond', headers: new Headers({'Retry-After': '12'}), expected: {statusCode: 504, retryAfterMs: 12000}},

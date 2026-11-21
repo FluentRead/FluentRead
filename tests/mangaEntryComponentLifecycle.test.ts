@@ -145,7 +145,12 @@ describe('actual manga entry resource consent and lifecycle', () => {
     const button=find(value=>value.props.class?.includes('fr-manga-reading-launcher'))!;expect(panel.expanded).toBe(false);expect(button.props.class).toContain('is-touch');
     const event={stopPropagation:vi.fn()};button.props.onClick(event);expect(read).toHaveBeenCalledOnce();expect(props.toggle).not.toHaveBeenCalled();
   });
-  it.each([['ru', '俄语和英语', '16 MB'], ['ko', '韩语和英语', '13 MB']])('shows the actual %s resource disclosure and closes it after a source change', async (language, languages, size) => {
+  it.each([
+    ['ru', '俄语和英语', '16 MB'],
+    ['ko', '韩语和英语', '13 MB'],
+    ['ar', '阿拉伯语和英语', '4.6 MB'],
+    ['he', '希伯来语和英语', '3.5 MB'],
+  ])('shows the actual %s resource disclosure and closes it after a source change', async (language, languages, size) => {
     const {props,tick,find} = await mountEntry();
     props.settings.sourceLanguage = language; await tick();
     find(value => value.props.class?.split(/\s+/).includes('fr-manga-launcher'))!.props.onClick({detail:0});

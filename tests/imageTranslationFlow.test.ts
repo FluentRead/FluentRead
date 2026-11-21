@@ -26,6 +26,23 @@ function setup(extra = {}) {
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
 
+it.each(['ru-RU','ko-KR','ar-SA','he-IL'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
+    const assertLanguagesDownloaded=vi.fn()
+        .mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'))
+        .mockResolvedValueOnce(undefined);
+    const translateImage=vi.fn(async (..._args:unknown[])=>({image:'data:image/png,fixture',lines:[]}));
+    const current=setup({getImageOcrEngine:()=> 'paddle',assertLanguagesDownloaded,translateImage});
+    const type=IMAGE_TRANSLATE_MESSAGE_TYPE;
+    const request={type,sourceLanguage,image:'data:image/png;base64,fixture'};
+    await expect(current.handler(type).handle(request)).rejects.toThrow('需要先下载对应语言包');
+    expect(translateImage).not.toHaveBeenCalled();
+    await expect(current.handler(type).handle(request)).resolves.toMatchObject({success:true});
+    expect(assertLanguagesDownloaded.mock.calls).toEqual([[sourceLanguage],[sourceLanguage]]);
+    const options=translateImage.mock.calls[0]?.[3];
+    expect(options).toBeDefined();
+    expect(options).not.toHaveProperty('ocrEngine');
+});
+
 it.each(['mask','block','damaged'] as const)('图片编号说明与真实broker隐私边界兼容：%s',async mode=>{
     const config=new Config();config.service='google';config.from='en';config.to='zh-Hans';
     config.privacyProtection=normalizePrivacyPolicy({enabled:true,mode:mode==='block'?'block':'mask'});
@@ -109,6 +126,59 @@ it('AI 图片邻文走篇章通道，重复短句保留各自位置且已是目�
         expect(request).toMatchObject({pageContext:'',enableAIContext:true});
         expect(request.discourseContext).not.toContain('Unrelated webpage title');
     }
+});
+
+it.each(['fresh','cached','repeated'] as const)('AI 图片译文出现邻文边界时恢复完整译文：%s',async mode=>{
+    const config=Object.assign(new Config(),{service:'openai',from:'en',to:'zh-Hans',enableAIContext:true,useCache:true});
+    const stored=new Map<string,string>();
+    const cache={
+        get:vi.fn(async(key:string)=>stored.get(key)??null),
+        set:vi.fn(async(key:string,value:string)=>{stored.set(key,value);return true;}),
+        clear:vi.fn(async()=>{}),cleanup:vi.fn(async()=>{}),
+    };
+    const clean='向右转。';
+    const echoed=mode==='repeated'?'向右转。</DISCOURSE_EVIDENCE>':'向右转。<discourse_evidence>路线</discourse_evidence>';
+    const provider=vi.fn(async(request:TranslationProviderRequest)=>
+        mode==='repeated'||(mode==='fresh'&&request.pageContext)?echoed:clean);
+    const broker=createTranslationBroker({
+        ready:Promise.resolve(),getConfig:()=>config,providers:{openai:provider},cache,
+        serviceTypes:{machine:new Set(),isAI:service=>service==='openai',isAiSdk:()=>false,isUseAIContext:()=>true},
+        endpointResolver:{resolveOpenAICompatibleEndpoint:()=>({endpoint:'https://translation.invalid/v1'}),aiSdkTransportProfile:'test'},
+        promptBuilder:{buildPageSummaryPrompt:text=>text,buildPageSummarySystemPrompt:()=>''},
+        getMissingCredentialMessage:()=>null,getTranslationLanguages:()=>({sourceLanguage:config.from,targetLanguage:config.to}),
+        resolveConfiguredModel:(selected,custom)=>custom||selected||'',buildTranslationCacheKey:identity=>JSON.stringify(identity),
+        logger:{warn:vi.fn()},
+    });
+    const current=setup({
+        getTranslationService:()=> 'openai',getGlossaryConfig:()=>config,
+        isTextContextEnabled:()=>true,translateTexts:(request:TranslationRequestMessage)=>broker.translateWithCache(request),
+    });
+    const type=IMAGE_TRANSLATE_TEXTS_MESSAGE_TYPE;
+    const call=()=>current.handler(type).handle({type,texts:['路线说明','TURN RIGHT.'],title:'Image directions'});
+    const expected={success:true,translations:['路线说明',clean]};
+    if(mode==='cached'){
+        await expect(call()).resolves.toEqual(expected);
+        expect(stored.size).toBe(1);
+        const key=stored.keys().next().value!;
+        stored.set(key,echoed);
+        provider.mockClear();cache.set.mockClear();
+    }
+    if(mode==='repeated'){
+        await expect(call()).rejects.toThrow('图片第 2 段文字翻译失败');
+        expect(cache.set).toHaveBeenCalledTimes(0);
+    }else{
+        await expect(call()).resolves.toEqual(expected);
+        expect([...stored.values()]).toEqual([clean]);
+        expect(cache.set).toHaveBeenCalledExactlyOnceWith(expect.any(String),clean);
+        await expect(call()).resolves.toEqual(expected);
+    }
+    const calls=provider.mock.calls.map(([request])=>request);
+    expect(calls).toHaveLength(mode==='cached'?1:2);
+    if(mode!=='cached'){
+        expect(calls[0].pageContext).toContain('<discourse_evidence>');
+        expect(calls[0].pageContext).toContain('路线说明');
+    }
+    expect(calls.at(-1)).toMatchObject({origin:'TURN RIGHT.',context:'',pageContext:''});
 });
 
 it('图片篇章证据限制 JSON 编码预算且不截断 Unicode 码点，单独一段不添加参考', async () => {
@@ -335,7 +405,7 @@ it.each([
 });
 
 describe('图片翻译流程优化',()=>{
-    it.each(['ru', 'ko-KR'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
+    it.each(['ru', 'ko-KR', 'ar-SA', 'iw'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
         const {handler, dependencies} = setup({getImageOcrEngine: () => 'paddle'});
         const message = {type: IMAGE_TRANSLATE_MESSAGE_TYPE, image: 'data:image/png,x', sourceLanguage, manga: true};
         await handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle(message);

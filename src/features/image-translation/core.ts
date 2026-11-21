@@ -2,12 +2,14 @@
  * @file src/features/image-translation/core.ts
  * 文件职责：提供图片翻译可复用的纯数据算法，用于选择真正发生变化的译文、确定 OCR 语言组合并清理 OCR 行数据。
  * 竖排边界：合列保留各物理列框，坐标恢复同时缩放、去除边框并校验每个源框，防止清字误用整段包络擦掉列间画面。
+ * 横排词序：从右向左的整行与识别词相符时，按物理坐标保留原分组和框，组和词按整行证实的阅读顺序输出。
  * 主要内容：相同译文保留原文且不重复展示；从 shared/image 复用 OcrLine 类型，筛选有效译文、规划图片、圈选及扫描文档各自的有界 OCR 尺寸及边框，映回原图坐标，按完整 Unicode 码点连接词组、规范化标点和置信度，按基线方向区分横竖排并合并同一气泡的竖列，数字保护视图保留独立数值边界，路径压缩与原地分组避免竖列候选的反复数组复制，避免噪声进入翻译与绘制。
  * 文档保真：允许文档适配器按原词对象显式保留有字形证据的数字候选，不抬高其原始置信度；适配器同时负责核对提示，普通图片调用维持原来的过滤策略。
  * 模块边界：该模块不接触 Canvas、Tesseract、网络或浏览器消息；OCR 执行归 ocrRuntime，像素修补与文本绘制归 services，页面展示归 content/runtime。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import { getRequiredImageOcrLanguages, type ImageOcrLanguageCode } from './ocrLanguages';
+import {getImageTextDirection} from './textBoundary';
 import type {OcrLine} from '@/src/shared/image/types';
 import {numericEvidenceKey,numericInformation,numericProtection} from './services/mangaNumeric';
 
@@ -392,13 +394,22 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             return;
         }
 
+        const rawText = line.text.trim();
+        const rawLine = rawText.replace(/\s/gu, '');
+        const sourceOrder = !vertical && words.length>1 && getImageTextDirection(rawText)==='rtl'
+            && rawLine===rawWords.map(word=>word.text).join('').replace(/\s/gu,'')
+            ? {positions:new Map(rawWords.map((word,index)=>[word,index])), groups:[] as Array<{row:ParsedOcrLine;firstWord:number}>}
+            : undefined;
         let current = [words[0]];
         const startIndex = normalized.length;
         const flush = () => {
+            if (sourceOrder) current.sort((a,b)=>sourceOrder.positions.get(a)!-sourceOrder.positions.get(b)!);
             const bbox = unionOcrBoxes(current.map(word => word.bbox));
             const text = current.map(word => word.text).reduce(joinOcrWords, '');
             // current 始终由已经过滤的非空词组成，joinOcrWords 不会删除文字。
-            normalized.push({ text, bbox, ...orientation });
+            const row = {text,bbox,...orientation};
+            if (sourceOrder) sourceOrder.groups.push({row,firstWord:sourceOrder.positions.get(current[0])!});
+            else normalized.push(row);
         };
 
         for (let index = 1; index < words.length; index += 1) {
@@ -420,9 +431,10 @@ function parseOcrLines(blocks: OcrBlocks, includeNumericEvidence: boolean, fast?
             }
         }
         flush();
+        if (sourceOrder) {
+            for (const {row} of sourceOrder.groups.sort((a,b)=>a.firstWord-b.firstWord)) normalized.push(row);
+        }
         // 只有整个原行完整、未拆分且每个词均有可信显式分数时才保存证据。
-        const rawText = line.text.trim();
-        const rawLine = rawText.replace(/\s/gu, '');
         if(fast&&/\p{N}/u.test(rawLine))fast.noNumeric=false;
         const joinedWords = words.map(word => word.text).join('').replace(/\s/gu, '');
         if (includeNumericEvidence && normalized.length === startIndex + 1 && words.length === line.words?.length

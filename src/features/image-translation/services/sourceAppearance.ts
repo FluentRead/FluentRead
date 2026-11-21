@@ -62,7 +62,7 @@ export function observeImageSourceAppearances(pixels:Uint8ClampedArray,width:num
     for(const {region,bounds,sources,main} of jobs){
         const palettes=main.map(b=>observeImageMattePalette(pixels,width,height,b,budget));
         if(palettes.some(p=>!p)){
-            if(!region.ruby?.length){const appearance=observeImageSourceInk(pixels,width,height,bounds,sources);if(appearance)result.set(region,appearance);}
+            if(!region.ruby?.length){const appearance=observeImageSourceInk(pixels,width,height,bounds,sources,region.quarterTurn!==undefined);if(appearance)result.set(region,appearance);}
             continue;
         }
         const first=palettes[0]!;

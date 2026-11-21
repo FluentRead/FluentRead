@@ -1122,7 +1122,7 @@ describe('图片翻译前台交互与生命周期', () => {
         const bitmap = env.bitmap() as HTMLImageElement;
         expect(env.image.style.opacity).toBe('0');
         expect(env.image.style.getPropertyPriority('opacity')).toBe('important');
-        expect(env.image.style.transition).toBe('none');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('none');
         expect(bitmap.style.opacity).toBe('0.65'); expect(bitmap.parentElement!.style.display).toBe('block');
         expect(bitmap.style.backgroundColor).toBe('rgb(255, 255, 255)'); expect(bitmap.style.borderLeftColor).toBe('rgb(255, 0, 0)');
         expect(bitmap.style.borderLeftStyle).toBe('solid');
@@ -1153,6 +1153,48 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.image.style.getPropertyValue('transition-property')).toBe('opacity');
         expect(env.image.style.getPropertyPriority('transition-property')).toBe('important');
         expect(env.image.style.getPropertyValue('transition-duration')).toBe('2s');
+    });
+
+    it.each([null, '', 'border-radius:6px', 'opacity:.65!important;transition:opacity 2s ease'])(
+        '原始行内样式未被网站更新时按原始属性恢复（%s）', async original => {
+            const env = setup();
+            if (original === null) env.image.removeAttribute('style');
+            else env.image.setAttribute('style', original);
+            env.hover(); env.click(); await flush();
+            expect(env.image.style.opacity).toBe('0');
+            env.click();
+            expect(env.image.getAttribute('style')).toBe(original);
+        },
+    );
+
+    it('还原原图时保留网站更新的过渡时长及其他行内样式', async () => {
+        const env = setup();
+        env.image.style.setProperty('opacity', '0.65', 'important');
+        env.image.style.setProperty('transition-property', 'opacity');
+        env.image.style.setProperty('transition-duration', '2s');
+        env.hover(); env.click(); await flush();
+        expect(env.image.style.opacity).toBe('0');
+        env.image.style.setProperty('transition-duration', '900ms', 'important');
+        env.image.style.setProperty('color', 'blue');
+        env.click();
+        expect(env.image.style.getPropertyValue('opacity')).toBe('0.65');
+        expect(env.image.style.getPropertyPriority('opacity')).toBe('important');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('opacity');
+        expect(env.image.style.getPropertyValue('transition-duration')).toBe('900ms');
+        expect(env.image.style.getPropertyPriority('transition-duration')).toBe('important');
+        expect(env.image.style.color).toBe('blue');
+    });
+
+    it('网站接管过渡属性时只归还仍由扩展持有的透明度', async () => {
+        const env = setup();
+        env.image.style.opacity = '0.75';
+        env.hover(); env.click(); await flush();
+        expect(env.image.style.opacity).toBe('0');
+        env.image.style.setProperty('transition-property', 'transform', 'important');
+        env.click();
+        expect(env.image.style.opacity).toBe('0.75');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('transform');
+        expect(env.image.style.getPropertyPriority('transition-property')).toBe('important');
     });
 
     it('宿主修改 opacity 或 transition 时只归还仍属于自己的属性，不覆盖新样式', async () => {
@@ -1401,6 +1443,20 @@ describe('图片翻译前台交互与生命周期', () => {
         env.click(); client.translate.mockRejectedValueOnce(new Error('请求失败')); settings.useCache = false;
         env.click(); await flush(); env.dispatch(env.image, 'pointerout'); vi.advanceTimersByTime(200);
         expect(env.roots[0].querySelector('.fr-image-controls')).not.toBeNull();
+    });
+
+    it.each(['ru-RU','ko-KR','ar','he'])('单图语言模型 %s 缺包时点准备并继续当前图片',async sourceLanguage=>{
+        settings.from=sourceLanguage;
+        settings.imageTranslationOcrEngine='paddle';
+        client.translate.mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'));
+        const env=setup();env.hover();env.click();await flush();
+        const prepare=env.roots[0].querySelector('.fr-image-prepare') as HTMLButtonElement;
+        expect(prepare.hidden).toBe(false);
+        expect(client.prepare).not.toHaveBeenCalled();
+        env.dispatch(prepare,'click');await flush();
+        expect(client.prepare).toHaveBeenCalledExactlyOnceWith(sourceLanguage,expect.any(AbortSignal),expect.any(Function));
+        expect(client.translate.mock.calls.map(call=>call[1])).toEqual([sourceLanguage,sourceLanguage]);
+        expect(env.button().dataset.phase).toBe('translated');
     });
 
     it('语言包准备从当前图片原地继续，并展示后台真实进度', async () => {
@@ -2401,7 +2457,7 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         unmountImageTranslator();expect(env.image.style.opacity).not.toBe('0');
     });
-    it.each(['ru', 'ko-KR'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {
+    it.each(['ru', 'ko-KR', 'ar', 'he'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {
         const env = readerPage();settings.from = source;settings.imageTranslationOcrEngine = 'paddle';settings.imageTranslationMangaDownloadConfirmed = true;
         toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith(source, expect.any(AbortSignal), expect.any(Function));

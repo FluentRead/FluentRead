@@ -34,7 +34,7 @@
 import {computed, onBeforeUnmount, ref, watch} from 'vue';
 import {useUiI18n} from '@/src/ui/i18n';
 import type {MangaTranslationStatus} from '../content/mangaSession';
-import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '../ocrLanguages';
+import {getMangaTesseractPack} from '../ocrLanguages';
 import MangaReadingPanel from './MangaReadingPanel.vue';
 import type {MangaReadingList, MangaReadingResult} from '../content/mangaReadingCoordinator';
 const props = defineProps<{
@@ -53,12 +53,15 @@ const consent = ref(false), busy = ref(false), error = ref('');
 const standalone = computed(() => props.status.available && !props.settings.floatingBallVisible && props.settings.promptEnabled);
 const alwaysExpanded = computed(() => props.settings.toolsDisplay !== 'hover');
 const visible = computed(() => props.status.available && (consent.value || !!error.value));
+const tesseractResourceDescriptions = {
+  rus: '需要准备俄语和英语识别资源，约 16 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+  kor: '需要准备韩语和英语识别资源，约 13 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+  ara: '需要准备阿拉伯语和英语识别资源，约 4.6 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+  heb: '需要准备希伯来语和英语识别资源，约 3.5 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。',
+} satisfies Record<NonNullable<ReturnType<typeof getMangaTesseractPack>>, string>;
 const resourceDescription = computed(() => {
-  const sourceLanguage = props.settings.sourceLanguage ?? 'auto';
-  if (getMangaOcrEngine(sourceLanguage) === 'paddle') return t('需要下载约 30 MB 的文字识别资源，复杂画面另需约 197 MB 的文字清除资源。下载一次后可重复使用。');
-  return t(getRequiredImageOcrLanguages(sourceLanguage).includes('rus')
-    ? '需要准备俄语和英语识别资源，约 16 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。'
-    : '需要准备韩语和英语识别资源，约 13 MB。复杂画面另需约 197 MB 的文字清除资源，已下载资源可重复使用。');
+  const pack = getMangaTesseractPack(props.settings.sourceLanguage ?? 'auto');
+  return t(pack ? tesseractResourceDescriptions[pack] : '需要下载约 30 MB 的文字识别资源，复杂画面另需约 197 MB 的文字清除资源。下载一次后可重复使用。');
 });
 const actionLabel = computed(() => t(props.status.areaFallback ? '圈选漫画翻译' : props.status.active ? '暂停并显示原图' : '开启连续翻译'));
 const buttonTitle = computed(() => {

@@ -213,6 +213,18 @@ describe('旋转窄标签先预检完整译文再清字',()=>{
             expect(mocks.draw.mock.calls[0][13].radians).toBe(-Math.PI/2);
         }else expect(mocks.mangaDraw).toHaveBeenCalledOnce();
     });
+    it.each([true,false])('只在实际恢复旋转笔画后取消漫画均匀填色，restored=%s',async restored=>{
+        const run=prepare(true,'面板');
+        mocks.sampleManga.mockReturnValueOnce([{uniform:true,color:'rgb(32,34,49)'}]);
+        mocks.repair.mockReset().mockImplementationOnce(async(pixels,_w,_h,_regions,_signal,_prepare,_progress,backgrounds,options)=>{
+            expect(backgrounds[0].uniform).toBe(true);
+            expect(options.onRotatedLabelRestored).toBeTypeOf('function');
+            if(restored)options.onRotatedLabelRestored(0);
+            return pixels;
+        });
+        await run();
+        expect(mocks.mangaDraw.mock.calls[0][6][0]).toMatchObject({uniform:!restored,color:'rgb(32,34,49)'});
+    });
     it.each([
         [false,'长译文'.repeat(50)],
         [true,'第一行\n第二行'],
@@ -533,7 +545,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(canvases).toHaveLength(1);expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
         expect(images).toHaveLength(1);expect(images[0].src).toBe('');
     });
-    it.each(['ru-RU', 'ko'])('漫画 %s 采用已有 Tesseract，清字、排版和局部结果仍使用漫画链路', async sourceLanguage => {
+    it.each(['ru-RU', 'ko', 'ar', 'he'])('漫画 %s 采用已有 Tesseract，清字、排版和局部结果仍使用漫画链路', async sourceLanguage => {
         if (sourceLanguage === 'ko') imageOptions.push({naturalWidth: 0, naturalHeight: 0});
         const controller = new AbortController();
         mocks.repair.mockImplementationOnce(async pixels => pixels);
@@ -560,6 +572,14 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(mocks.recognize).not.toHaveBeenCalled();expect(mocks.mangaRecognize).toHaveBeenCalled();
         expect(result.image).toBe('data:image/png;base64,translated');expect(result.mangaPatches).toBeUndefined();
         expect(result.lines[0].sourceText).toBe('Hello');expect(mocks.repair).not.toHaveBeenCalled();
+    });
+
+    it.each(['ru-RU','ko-KR','ar','he'])('单图语言模型 %s 在实际识别入口使用轻量引擎',async sourceLanguage=>{
+        mocks.mangaRecognize.mockResolvedValue(lines);
+        const result=await translateImageInOffscreen('image',sourceLanguage,'Page',undefined,'single-localized',false,'paddle');
+        expect(mocks.recognize).toHaveBeenCalledExactlyOnceWith('image',sourceLanguage,undefined,expect.objectContaining({decodedImage:images[0]}));
+        expect(mocks.mangaRecognize).not.toHaveBeenCalled();
+        expect(result.image).toBe('data:image/png;base64,translated');
     });
 
     it('漫画整段识别走专用模型与局部修补，保留对照并报告准备阶段',async()=>{

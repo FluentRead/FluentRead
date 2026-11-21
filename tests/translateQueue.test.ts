@@ -32,6 +32,13 @@ afterEach(() => {
 });
 
 describe('translation queue', () => {
+  it('rejects a retry that cannot fit its deadline at queue admission', async () => {
+    const task = vi.fn(async () => 'unused');
+    const error = new Error('previous translation failure');
+    await expect(enqueueTranslation(task, undefined, undefined, {delayMs: 200, deadlineAt: Date.now() + 100, error}))
+      .rejects.toBe(error);
+    expect(task).not.toHaveBeenCalled();
+  });
   it('大页面队列压缩中保留后部取消空槽，其余任务按顺序完成且后续请求仍可执行', async () => {
     mockConfig.maxConcurrentTranslations = 1;
     const size = 2300, removed = 2200, caller = new AbortController(), ran: number[] = [];

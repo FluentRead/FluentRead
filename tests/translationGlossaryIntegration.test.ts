@@ -666,14 +666,16 @@ describe('术语库与真实翻译编排协作', () => {
         expect(JSON.stringify(h.calls[1].body)).not.toContain('智能体');
     });
 
-    it('AI多段真实broker协议保留首尾英文术语，哨兵本身不作为词条外发', async () => {
+    it.each([false, true])('AI 合批保留首尾术语且不外发标记对应的词条（紧凑 JSON %s）', async compact => {
         const h = harness();
         const origins = ['agent', 'Use agent'];
         const packet = serializeTranslationSlots(origins);
+        if (!compact) h.config.customBody.openai = '{"temperature":0.2}';
         h.config.glossaryLibraries[0].entries.push({id: 'protocol', source: packet.starts[0], target: '内部标记不外发', caseSensitive: true});
         const originalProvider = h.provider.getMockImplementation()!;
         h.provider.mockImplementation(async message => {
             await originalProvider(message);
+            if (compact) return JSON.stringify((JSON.parse(String(message.origin)) as string[]).map((text, index) => [index, text]));
             const snapshot = h.calls.at(-1)!.snapshot;
             let translated = String(message.origin);
             for (const term of getTranslationGlossaryTerms(snapshot, translated)) {
@@ -683,7 +685,12 @@ describe('术语库与真实翻译编排协作', () => {
         });
         await expect(h.request({origin: origins, aiMultiSegment: true})).resolves.toEqual(['智能体', 'Use 智能体']);
         expect(h.calls).toHaveLength(1);
-        expect(h.calls[0].message.origin).toContain(packet.starts[0]);
+        if (compact) {
+            expect(JSON.parse(String(h.calls[0].message.origin))).toEqual([
+                expect.stringMatching(/^__FRTERM_/u), expect.stringMatching(/^Use __FRTERM_/u),
+            ]);
+            expect(h.calls[0].message.origin).not.toContain(packet.starts[0]);
+        } else expect(h.calls[0].message.origin).toContain(packet.starts[0]);
         expect(h.calls[0].message.origin).toContain('__FRTERM_');
         const body = JSON.stringify(h.calls[0].body);
         expect(body).toContain('__FRTERM_');

@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/ui/translationIndicators.ts
  * 文件职责：创建全文翻译过程中插入原页面的加载指示器和失败重试提示，并将错误详情转换为页面通知或可操作的重试控件。
- * 主要内容：提供 insertLoadingSpinner 与 insertFailedTip，用 DOM/SVG API 组装 FluentRead 专属节点、完整点击区和按宿主语义启用的键盘操作控件；受信 man7 段的临时反馈用自有块包装，避免加载或失败时挤动下一段首行；受控重试由队列接管后才清理反馈，避免先移除控件的宿主观察记录撤销排队意图；隔离宿主链接导航，并使用内置或动态自定义服务名称生成错误文案。
+ * 主要内容：提供加载与失败控件，隔离宿主导航并保留键盘操作；冷却时点按重试显示剩余时间，不给每段译文创建计时器。受信 man7 段的反馈独占一行，受控重试由队列接管后清理旧反馈。
  * 模块边界：本文件不发起翻译、不判断候选，也不持有 session；重试回调由 runtime 注入，节点生命周期由 state 管理，全局页面通知通过 page-notice 公共接口显示。
  */
 // 全文翻译节点中的加载与失败反馈。
@@ -16,6 +16,7 @@ import {
   markTranslationFailedHost,
 } from '@/src/features/full-page-translation/core/hostMarkers';
 import {normalizeUiLanguage, translate} from '@/src/core/i18n';
+import type {Diagnostic} from '@/src/services/diagnostics';
 import {isPreparedManpageParagraph} from '@/src/core/translation/manpage';
 import {
   createTranslationLoadingIndicator,
@@ -65,6 +66,7 @@ export function insertFailedTip(
   node: HTMLElement,
   errMsg: string,
   onRetry: () => boolean | void,
+  cooldown?: {remainingMs: () => number; code: 'rate-limit' | 'provider'},
 ): HTMLElement {
   const contextInvalidated = isExtensionContextInvalidated(errMsg);
   const keyboardAccessible = node.closest(INTERACTIVE_HOST_SELECTOR) === null;
@@ -86,7 +88,7 @@ export function insertFailedTip(
     iconPaths.retry,
     contextInvalidated
       ? handleInvalidatedRetryClick(errMsg)
-      : handleRetryClick(node, feedback, onRetry),
+      : handleRetryClick(node, feedback, onRetry, cooldown),
     keyboardAccessible,
   );
 
@@ -150,10 +152,22 @@ function createActionElement(
 }
 
 // 处理重试按钮点击事件
-function handleRetryClick(node: HTMLElement, wrapper: HTMLElement, onRetry: () => boolean | void) {
+export function showTranslationRetryWait(diagnostic?: Pick<Diagnostic, 'code' | 'retryAfterMs'>): boolean {
+  const {code, retryAfterMs} = diagnostic ?? {};
+  if (!retryAfterMs || (code !== 'rate-limit' && code !== 'provider')) return false;
+  const language = normalizeUiLanguage(config.uiLanguage);
+  const label = translate(`diagnostics.${code}.summary`, language);
+  const wait = translate('diagnostics.action.retryCountdown', language, {seconds: Math.ceil(retryAfterMs / 1000)});
+  showPageNotice(`${label} · ${wait}`, 'error', {key: 'fluent-read-translation-retry-wait'});
+  return true;
+}
+
+function handleRetryClick(node: HTMLElement, wrapper: HTMLElement, onRetry: () => boolean | void,
+  cooldown?: {remainingMs: () => number; code: 'rate-limit' | 'provider'}) {
   return (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
+    if (cooldown && showTranslationRetryWait({retryAfterMs: cooldown.remainingMs(), code: cooldown.code})) return;
 
     // boolean 回调由 runtime 持有状态和排队所有权；受限 drain 开始重试时再恢复旧 DOM。
     // 此处先删除 wrapper 会被 MutationObserver 当作宿主撤下失败 UI，取消刚接受的 pending。

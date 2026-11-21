@@ -81,6 +81,8 @@ If a notice icon appears on the popup's translation button, select it to see the
 
 Retry individual failed passages directly. With the full-page progress panel enabled, **Locate failed passage** and **Retry failed items** handle failures in the current session while keeping successful text and your reading position. Passages you have not scrolled to are not failures.
 
+When the service specifies a cooldown, retrying early shows the remaining wait. You can keep reading or restore the original during the wait.
+
 A blocking dialog is translated first; closing it resumes the page. Restoring the original also cancels pending work, and old retry controls cannot restart it. A navigation that changes reading rules may restore the original first; start translation again on the new page.
 
 For missing article text or navigation-only results, see [Website reading area](/en/config/site-adaptation). Use [image translation](/en/guide/image-translation) or [area translation](/en/guide/area-translation) for text drawn in pictures or charts.

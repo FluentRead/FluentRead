@@ -83,7 +83,8 @@ it('preserves bounded Retry-After durations without reflecting raw headers', () 
             ['private-original-secret', undefined], ['1e1000', undefined],
             ['Thu, 01 Jan 1970 00:00:00 GMT', undefined],
         ] as const) {
-            const error = createHttpStatusError({status: 429, statusText: 'secret', headers: {get: () => header}});
+            const error = createHttpStatusError({status: 429, statusText: 'secret',
+                headers: {get: name => name === 'retry-after' ? header : null}});
             expect((error as Error & {retryAfterMs?: number}).retryAfterMs).toBe(expected);
             expect(error.message).toBe('请求失败: 429');
         }

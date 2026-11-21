@@ -41,7 +41,8 @@ import {
     isUnchangedTranslationResultAllowed,
     isImageTextBatch,
 } from './requestSnapshot';
-import {TRANSLATION_REMAINING_BUDGET, type TranslationRouteObservation} from './types';
+import {TRANSLATION_COMPACT_BATCH, TRANSLATION_REMAINING_BUDGET, type TranslationRouteObservation} from './types';
+import {COMPACT_BATCH_RESPONSE_INVALID, parseCompactBatch} from './compactBatch';
 import {DEFAULT_PROVIDER_TIMEOUT_MS, getExplicitTranslationBudget, normalizeDeadlineTimeoutMs,
     startTranslationRequest, TranslationProviderDeadlineError} from './requestDeadline';
 import {parseTranslationSlots, serializeTranslationSlots} from '@/src/core/translation/slotProtocol';
@@ -62,7 +63,7 @@ import {buildPageSummaryReference} from '@/src/core/translation/pageSummaryRefer
 import {isCustomOpenAIProviderId, LEGACY_CUSTOM_OPENAI_PROVIDER_ID} from '@/src/core/config/customOpenAI';
 import {getCompositeTranslationProvider, isCompositeTranslationProviderId} from '@/src/core/config/compositeTranslation';
 import {createCompositeTranslationRoutingState} from './compositeRouting';
-import {resolveCloudRegion, services} from '@/src/core/config/catalog';
+import {defaultOption, resolveCloudRegion, services} from '@/src/core/config/catalog';
 import {isTranslationServiceDisabled, TRANSLATION_SERVICE_DISABLED_MESSAGE} from '@/src/core/config/serviceAvailability';
 import {resolveTranslationRequestModel} from '@/src/core/config/requestModel';
 import {isValidInlineCodeSource, isValidInlineCodeTranslation} from '@/src/core/translation/inlineCodeMarkers';
@@ -138,6 +139,8 @@ const PAGE_SUMMARY_LIMIT = 1200;
 const DIRECT_PAGE_CONTEXT_LIMIT = 240;
 // 已消耗逐槽恢复预算时使用独立错误码，前端不能再将整个批次降级重发。
 const AI_MULTI_SEGMENT_REPAIR_FAILED = 'AI_MULTI_SEGMENT_REPAIR_FAILED';
+const COMPACT_BATCH_FALLBACK_MS = 5 * 60_000;
+const COMPACT_BATCH_FALLBACK_LIMIT = 64;
 type PageSummaryResult = {context: string; summarized: boolean};
 
 class AIMultiSegmentResponseError extends Error {
@@ -211,6 +214,7 @@ export {resolveTranslationRequestModel};
 export function createTranslationBroker(deps: TranslationBrokerDependencies): TranslationBroker {
     const pendingTranslations = new Map<string, Promise<string>>();
     const pendingBatches = new Map<string, Promise<string[]>>();
+    const legacyBatchUntil = new Map<string, number>();
     const pageSummaryCache = new Map<string, PageSummaryResult>();
     const pendingPageSummaries = new Map<string, Promise<PageSummaryResult>>();
     const pendingCacheWrites = new Map<Promise<unknown>, number>();
@@ -578,6 +582,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     async function callProviderWithinDeadline(
         execution: TranslationRequestExecution,
         message: TranslationRequestMessage,
+        compactBatch = false,
     ): Promise<unknown> {
         const deadlineAt = now() + normalizeDeadlineTimeoutMs(message.requestTimeoutMs as number);
         const model = getSelectedModel(execution.config, execution.service, message.modelOverride);
@@ -587,7 +592,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 ...message,
                 enableNativeBatch: message.enableNativeBatch ?? execution.nativeBatchEnabled,
                 requestTimeoutMs: attempt.attemptTimeoutMs ?? getRemainingDeadlineMs(deadlineAt),
-            }, selected), restoreLiteralEmoji),
+            }, selected), compactBatch, restoreLiteralEmoji),
             {signal: execution.abortSignal, deadlineAt, now, model},
         );
         try {
@@ -607,6 +612,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
     async function callProviderAttemptWithinDeadline(
         execution: TranslationRequestExecution,
         message: TranslationRequestMessage,
+        compactBatch: boolean,
         restoreLiteralEmoji?: (result: unknown) => string,
     ): Promise<unknown> {
         throwIfRequestAborted(execution.abortSignal);
@@ -621,7 +627,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             ));
         const identity = {
             service: execution.service, model,
-            ...(isAiSdk ? {quotaScope: quotaDigest(execution, model, true)} : {}),
+            ...(deps.serviceTypes.isAI(execution.service) ? {quotaScope: quotaDigest(execution, model, true)} : {}),
         };
 
 
@@ -657,7 +663,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                             abortSignal: controller.signal,
                         }, (observation) => observations.push({...observation})),
                         (observation) => collectRouteAttempt(execution.trace, observation),
-                    ), requestScheduler, identity, isAiSdk ? undefined : lease);
+                    ), requestScheduler, identity, isAiSdk ? undefined : lease, providerDeadline);
 
                     let timer: ReturnType<typeof setTimeout>;
                     const timeout = new Promise<never>((_resolve, reject) => {
@@ -672,6 +678,17 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                         try {
                             if (restoreLiteralEmoji) return restoreLiteralEmoji(privacy.restore(await provider({...privacy.message})));
                             const protectedRequest = prepareGlossaryRequest(privacy.message, privacy.config);
+                            const sources = protectedRequest.message.origin;
+                            if (compactBatch && Array.isArray(sources)) {
+                                const compact = attachTranslationProviderConfig({
+                                    ...protectedRequest.message, origin: JSON.stringify(sources),
+                                }, Object.freeze({
+                                    ...getTranslationProviderConfig(protectedRequest.message, privacy.config),
+                                    [TRANSLATION_COMPACT_BATCH]: true as const,
+                                }));
+                                const translated = parseCompactBatch(await provider(compact), sources.length);
+                                return privacy.restore(protectedRequest.restore(translated));
+                            }
                             return privacy.restore(protectedRequest.restore(await provider({...protectedRequest.message})));
                         } finally {privacy.dispose();}
                     });
@@ -883,48 +900,69 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 )];
         }
 
-        const packet = serializeTranslationSlots(message.origin);
         const requestContext = startWithoutPageContext ? '' : context;
         const requestPageContext = startWithoutPageContext ? '' : pageContext;
-        const requestBatch = async (nextContext: string, nextPageContext: string): Promise<string> => (
-            requireSingleResult(await callProviderWithinDeadline(
-                execution,
-                applyRemainingDeadline({
-                    ...message,
-                    origin: packet.payload,
-                    context: nextContext,
-                    pageContext: nextPageContext,
-                    subtitleContext: nextPageContext ? message.subtitleContext : undefined,
-                }, requestDeadline),
-            ))
-        );
+        const requestBatch = (
+            request: TranslationRequestMessage, nextContext: string, nextPageContext: string, compact = false,
+        ) => callProviderWithinDeadline(execution, applyRemainingDeadline({
+            ...request,
+            context: nextContext,
+            pageContext: nextPageContext,
+            subtitleContext: nextPageContext ? message.subtitleContext : undefined,
+        }, requestDeadline), compact);
 
         let usedContextFreeRequest = startWithoutPageContext;
-        let rawResult = await requestBatch(requestContext, requestPageContext);
-        // 协议完整时可以精确定位异常槽。先解析，再决定是否需要整包重译，
-        // 避免某一段的明确上下文标记导致已正确的其他段落也被重新发送。
-        let parsed = parseTranslationSlots(packet, rawResult);
-        if (!parsed && shouldRecoverPageContextLeak(
-            execution,
-            packet.payload,
-            rawResult,
-            requestPageContext,
-            message.modelOverride,
-        )) {
-            warn(
-                '[FluentRead] AI page context leaked into multi-segment translation; retrying once without page context:',
-                new Error('AI_PAGE_CONTEXT_LEAK'),
-            );
-            rawResult = await requestBatch('', '');
+        let parsed: string[] | null = null;
+        const {service, config: current} = execution;
+        // 高级 body 和自定义提示词可能依赖标记合同。只对已接入的通用聊天适配器启用 JSON。
+        if (deps.serviceTypes.isAiSdk(service)
+            && (!current.system_role[service] || current.system_role[service] === defaultOption.system_role)
+            && (!current.user_role[service] || current.user_role[service] === defaultOption.user_role)
+            && !current.customBody[service]?.trim()) {
+            const scope = quotaDigest(execution, getEffectiveRequestModel(current, service, message.modelOverride));
+            if ((legacyBatchUntil.get(scope) ?? -Infinity) <= now()) {
+                try {
+                    parsed = requireBatchResult(
+                        await requestBatch(message, requestContext, requestPageContext, true), message.origin.length,
+                    );
+                } catch (error) {
+                    const code = (error as {code?: string} | null)?.code;
+                    if (code !== COMPACT_BATCH_RESPONSE_INVALID && code !== 'GLOSSARY_PLACEHOLDER_INVALID'
+                        && code !== 'PRIVACY_RESTORE_FAILED' && code !== 'DOCUMENT_INLINE_MARKER_INVALID') throw error;
+                    legacyBatchUntil.delete(scope);
+                    legacyBatchUntil.set(scope, now() + COMPACT_BATCH_FALLBACK_MS);
+                    if (legacyBatchUntil.size > COMPACT_BATCH_FALLBACK_LIMIT) {
+                        legacyBatchUntil.delete(legacyBatchUntil.keys().next().value!);
+                    }
+                }
+            }
+        }
+
+        let packet: ReturnType<typeof serializeTranslationSlots> | undefined;
+        if (!parsed) {
+            packet = serializeTranslationSlots(message.origin);
+            const legacy = {...message, origin: packet.payload};
+            let rawResult = requireSingleResult(await requestBatch(legacy, requestContext, requestPageContext));
+            // 协议完整时先定位异常槽，避免同一处上下文泄漏导致整批再发送。
             parsed = parseTranslationSlots(packet, rawResult);
-            usedContextFreeRequest = true;
-            if (isDefiniteRecoveryPageContextLeak(
+            if (!parsed && shouldRecoverPageContextLeak(
                 execution,
                 packet.payload,
                 rawResult,
-                pageContext,
+                requestPageContext,
                 message.modelOverride,
-            )) throw new AIContextRecoveryResponseError();
+            )) {
+                warn(
+                    '[FluentRead] AI page context leaked into multi-segment translation; retrying once without page context:',
+                    new Error('AI_PAGE_CONTEXT_LEAK'),
+                );
+                rawResult = requireSingleResult(await requestBatch(legacy, '', ''));
+                parsed = parseTranslationSlots(packet, rawResult);
+                usedContextFreeRequest = true;
+                if (isDefiniteRecoveryPageContextLeak(
+                    execution, packet.payload, rawResult, pageContext, message.modelOverride,
+                )) throw new AIContextRecoveryResponseError();
+            }
         }
 
         // 严格解析器已经校验标记数量、顺序和每槽唯一性。
@@ -976,7 +1014,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
                 execution, {...message, origin}, parsed[index], requestDeadline, '', pageContext, usedContextFreeRequest, true,
             );
             // 单槽恢复不能把上一次完整协议包当作译文；来源已避让本包标记，出现即表示串槽。
-            if ([...packet.starts, ...packet.ends].some(marker => parsed[index].includes(marker))) {
+            if (packet && [...packet.starts, ...packet.ends].some(marker => parsed[index].includes(marker))) {
                 throw new TranslationSlotResponseError(AI_MULTI_SEGMENT_REPAIR_FAILED);
             }
         }

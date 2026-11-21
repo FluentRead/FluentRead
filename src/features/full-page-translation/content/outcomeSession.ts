@@ -45,7 +45,9 @@ export function* getFullPageModalOutcomePhases(session: OutcomeSession, targets:
     }
 }
 
-export function bindFullPageOutcomeRecovery(session: OutcomeSession, isCurrent: () => boolean, publish: () => void): () => void {
+export function bindFullPageOutcomeRecovery(
+    session: OutcomeSession, isCurrent: () => boolean, publish: () => void, onRetryBlocked?: () => void,
+): () => void {
     const current = () => session.active && isCurrent();
     const stop = subscribeTranslationStateChanges((node, state) => {
         if (!current() || !session.statefulAncestorsByTarget.has(node) || !session.outcomes.has(node)) return;
@@ -55,7 +57,11 @@ export function bindFullPageOutcomeRecovery(session: OutcomeSession, isCurrent: 
     setFullPageFailureActions(session.progressSessionId, (action) => {
         if (!current()) return 0;
         const eligible = (node: HTMLElement) => isRecoverable(session, node);
-        if (action === 'retry') return session.outcomes.retry(eligible);
+        if (action === 'retry') {
+            const retried = session.outcomes.retry(eligible);
+            if (!retried) onRetryBlocked?.();
+            return retried;
+        }
         const target = session.outcomes.firstFailure(eligible);
         if (!target) return 0;
         target.scrollIntoView({block: 'center', behavior: 'auto'});

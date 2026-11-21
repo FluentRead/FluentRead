@@ -53,6 +53,7 @@ const runtime = vi.hoisted(() => ({
     nativeBatchEnabled: false,
     cancelQueue: vi.fn(),
     retryCallbacks: [] as Array<() => void>,
+    showTranslationRetryWait: vi.fn(),
     config: {
         on: true,
         personalCorrectionsEnabled: false,
@@ -155,6 +156,7 @@ vi.mock('@/src/features/full-page-translation/ui/translationIndicators', () => (
         runtime.retryCallbacks.push(onRetry);
         return node.ownerDocument.createElement("span");
     },
+    showTranslationRetryWait: runtime.showTranslationRetryWait,
 }));
 // 标题走 <head> 的独立通路，与正文候选调度无关；本文件按请求顺序核对正文译文，
 // 放行标题翻译会多出一次 translateText 调用并打乱这里的请求计账。
@@ -566,6 +568,7 @@ describe("全文翻译可见性锚点", () => {
         runtime.nativeBatchEnabled = false;
         runtime.cancelQueue.mockReset();
         runtime.retryCallbacks = [];
+        runtime.showTranslationRetryWait.mockClear();
         runtime.config.on = true;
         runtime.config.personalCorrectionsEnabled = false;
         runtime.config.service = "microsoft";
@@ -10430,7 +10433,18 @@ describe("全文翻译可见性锚点", () => {
         expect(getFullPageTranslationDiagnostic()?.code).toBe(kind);
         expect(JSON.stringify(getFullPageTranslationDiagnostic())).not.toContain('private');
         runtime.requests.mockImplementation(async origins => origins.map(origin => `译:${origin}`));
-        expect(runtime.retryCallbacks).toHaveLength(1); runtime.retryCallbacks[0]!(); await finishScheduledWork();
+        expect(runtime.retryCallbacks).toHaveLength(1);
+        if (kind === 'rate-limit') {
+            const requestCount = runtime.requests.mock.calls.length;
+            expect(runFullPageFailureAction(getFullPageTranslationProgress().sessionId, 'retry')).toBe(0);
+            expect(runtime.showTranslationRetryWait).toHaveBeenCalledWith(expect.objectContaining({
+                code: 'rate-limit', retryAfterMs: expect.any(Number),
+            }));
+            runtime.retryCallbacks[0]!();
+            expect(runtime.requests).toHaveBeenCalledTimes(requestCount);
+            await vi.advanceTimersByTimeAsync(1000);
+        }
+        runtime.retryCallbacks[0]!(); await finishScheduledWork();
         expect(getFullPageTranslationDiagnostic()).toBeUndefined();
         expect(getTranslationToolbarStatus()).toBe('translated');
     });

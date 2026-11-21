@@ -21,7 +21,7 @@ function hoverConfigIdentity(source: Config): string {
         source.on, source.hotkey, source.customHotkey, source.mouseHoverTranslationDelay, source.quickTranslationProfiles, quickHoverServices,
         source.translationScope, source.minTranslationTextLength, source.sidebarTranslationEnabled,
         service, model, isModelThinkingEnabled(source.modelThinking, service, model),
-        source.from, source.to, source.excludedLanguages, source.useCache,
+        source.from, source.to, source.pageSourceLanguageOnly, source.excludedLanguages, source.useCache,
         source.enableAIContext, source.nativeBatchTranslationEnabled[service],
         buildGlossaryRevision(source.glossaryLibraries, source.glossaryEnabled),
         source.display, source.style, source.longParagraphLineBreakEnabled, source.translationBeforeOriginal,

@@ -5,6 +5,7 @@
  * 模块边界：只定义类型并复制传入数据，不读取全局配置、不调用 provider、不管理会话或 DOM；请求和正文回退链路共享同一复制规则。
  */
 import {normalizeAiMultiSegmentMaxCharacters, normalizeAiMultiSegmentMaxSegments} from '@/src/core/config/aiMultiSegment';
+import {isTextInLanguage} from '@/src/core/language/detect';
 
 export interface FullPageTranslationConfigSnapshot {
     glossaryRevision?: string;
@@ -17,6 +18,7 @@ export interface FullPageTranslationConfigSnapshot {
     model: string;
     thinking: boolean;
     sourceLanguage: string;
+    sourceLanguageOnly?: true;
     targetLanguage: string;
     excludedLanguages?: readonly string[];
     useCache: boolean;
@@ -46,6 +48,11 @@ export interface PageTranslationConfigOverrides {
     targetLanguage?: string;
     displayMode?: 'bilingual' | 'single';
     profileId?: string;
+}
+
+/** 严格模式只让可信识别为用户指定源语言的正文通过。 */
+export function allowsPageSourceLanguage(snapshot: Pick<FullPageTranslationConfigSnapshot, 'sourceLanguage' | 'sourceLanguageOnly'>, source: string): boolean {
+    return !snapshot.sourceLanguageOnly || snapshot.sourceLanguage === 'auto' || isTextInLanguage(source, snapshot.sourceLanguage);
 }
 
 /** 捕获这一调用的字段值；后续合批、等待与回退不读取调用者仍可修改的对象。 */

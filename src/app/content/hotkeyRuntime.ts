@@ -1,6 +1,6 @@
 /**
  * @file src/app/content/hotkeyRuntime.ts
- * 文件职责：在宿主页面统一接管 FluentRead 的键盘与鼠标快捷手势，并按配置、站点禁用状态和冲突优先级路由到相应翻译动作。
+ * 文件职责：在宿主页面统一接管 FluentRead 的键盘与全文触摸快捷手势，并按配置、站点禁用状态和冲突优先级路由到相应翻译动作。
  * 主要内容：复用 core 记录组合键并仲裁两点选取及划词优先级，将待回退的全文手势绑定主键/code 与全文、划词、悬浮快捷键身份；额外组合、不可用状态、失焦、中止和文档路由变化取消旧手势，同语言选区默认跳过，中英双向划词可保留反向候选，编辑区快捷键只接受完整落在同一局部宿主内的用户选区。
  * 模块边界：这里判定并分派手势，不实现语言检测算法、翻译请求、UI 挂载或配置持久化；具体动作由注入/导入的 feature 公共函数完成。
  */
@@ -23,6 +23,7 @@ import {
     isFullPageTranslationActive,
     restoreOriginalContent,
 } from '@/src/features/full-page-translation/public';
+import {installFullPageTouchShortcut} from './fullPageTouchShortcut';
 
 /** 悬浮、快捷翻译与邮件 frame 共享的划词快捷键仲裁端口，组合根整体注入，避免逐项重复接线。 */
 export interface SelectionShortcutPorts {
@@ -199,10 +200,12 @@ export function createContentHotkeyRuntime(isSiteDisabled: () => boolean,
             if (!event.shiftKey) hotkeysPressed.delete('shift');
         }, {signal, capture: true});
 
-        document.addEventListener('fluentread-route-change', resetKeyboardGesture, {signal});
-        window.addEventListener('blur', resetKeyboardGesture, {signal});
-        signal.addEventListener('abort', resetKeyboardGesture, {once: true});
-        return resetKeyboardGesture;
+        const resetTouchGesture = installFullPageTouchShortcut(signal, isSiteDisabled, toggleFullPageTranslation);
+        const resetGesture = () => {resetKeyboardGesture(); resetTouchGesture();};
+        document.addEventListener('fluentread-route-change', resetGesture, {signal});
+        window.addEventListener('blur', resetGesture, {signal});
+        signal.addEventListener('abort', resetGesture, {once: true});
+        return resetGesture;
     };
 
     const selectionShortcutPorts: SelectionShortcutPorts = {getConfiguredSelectionHotkey, hasActiveSelectionTranslationCandidate,

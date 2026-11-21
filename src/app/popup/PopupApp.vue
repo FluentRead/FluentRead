@@ -700,6 +700,7 @@ const aiContextPresentation = computed(() => resolveAIContextPresentation({
 }));
 const isSiteModuleVisible = computed(() => config.value.interfaceVisibility.popupSiteRule && !isThunderbird);
 const pageTranslationHotkey = computed(() => {
+  if (config.value.floatingBallHotkey === 'ThreeFinger') return translateLegacy('三指翻译');
   const shortcut = resolveConfiguredHotkey(config.value.floatingBallHotkey, config.value.customFloatingBallHotkey);
   if (!shortcut || shortcut === 'none') return '';
   let displayName = parseHotkey(shortcut).displayName;

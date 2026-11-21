@@ -128,6 +128,64 @@ function visibleSelection(text: string): Selection {
     } as unknown as Selection;
 }
 
+describe('全文三指轻点快捷键 (#1021)', () => {
+    const contacts = [1, 2, 3].map(identifier => ({identifier, clientX: identifier * 20, clientY: 40}));
+    async function install() {
+        mocks.config.floatingBallHotkey = 'ThreeFinger';
+        const {createContentHotkeyRuntime} = await import('@/src/app/content/hotkeyRuntime');
+        const controller = new AbortController();
+        const toggle = vi.fn();
+        const siteDisabled = vi.fn(() => false);
+        createContentHotkeyRuntime(siteDisabled, {toggleFullPage: toggle}).installFloatingBallHotkey(controller.signal);
+        const listeners = (document as unknown as {__listeners: Map<string, Listener[]>}).__listeners;
+        const emit = (type: string, touches = contacts, changedTouches = touches, overrides = {}) => {
+            const event = {isTrusted: true, timeStamp: 50, touches, changedTouches, preventDefault: vi.fn(), ...overrides};
+            for (const listener of listeners.get(type) ?? []) listener(event);
+            expect(event.preventDefault).not.toHaveBeenCalled();
+        };
+        return {controller, emit, siteDisabled, toggle};
+    }
+
+    it('toggles once when the last contact lifts and accepts another tap to restore', async () => {
+        const {emit, toggle} = await install();
+        emit('touchstart', contacts.slice(0, 2));
+        emit('touchstart');
+        emit('touchmove', contacts, [{...contacts[0]!, clientX: 21}]);
+        emit('touchend', [], contacts, {isTrusted: false});
+        emit('touchcancel', [], contacts, {isTrusted: false});
+        emit('touchend', contacts.slice(0, 2), contacts.slice(2));
+        expect(toggle).not.toHaveBeenCalled();
+        emit('touchend', [], contacts.slice(0, 2));
+        emit('touchend', [], contacts.slice(0, 2));
+        expect(toggle).toHaveBeenCalledTimes(1);
+        emit('touchstart');
+        emit('touchend', [], contacts);
+        expect(toggle).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(['move', 'cancel', 'cancel-all', 'hold', 'hold-during-release', 'extra-finger', 'replacement', 'route', 'disable', 'site', 'abort', 'synthetic'])(
+        'ignores a %s gesture', async kind => {
+            const {controller, emit, siteDisabled, toggle} = await install();
+            emit('touchstart', contacts, contacts, {isTrusted: kind !== 'synthetic'});
+            if (kind === 'move') emit('touchmove', contacts, [{...contacts[0]!, clientX: 65}]);
+            if (kind === 'cancel') emit('touchcancel', contacts.slice(1), contacts.slice(0, 1));
+            if (kind === 'cancel-all') emit('touchcancel', [], contacts);
+            if (kind === 'hold-during-release') emit('touchend', contacts.slice(1), contacts.slice(0, 1), {timeStamp: 700});
+            if (kind === 'extra-finger') emit('touchstart', [...contacts, {identifier: 4, clientX: 70, clientY: 45}]);
+            if (kind === 'replacement') {
+                emit('touchend', contacts.slice(1), contacts.slice(0, 1));
+                emit('touchstart');
+            }
+            if (kind === 'route') emit('fluentread-route-change');
+            if (kind === 'disable') mocks.config.floatingBallHotkey = 'none';
+            if (kind === 'site') siteDisabled.mockReturnValue(true);
+            if (kind === 'abort') controller.abort();
+            emit('touchend', [], contacts, {timeStamp: kind === 'hold' ? 700 : 150});
+            expect(toggle).not.toHaveBeenCalled();
+        },
+    );
+});
+
 describe('全文翻译快捷键状态联动', () => {
     it.each([false,true])('an existing translation card is excluded only when it is contained by the selection (%s)', async contains => {
         const host={} as HTMLElement,selection={...visibleSelection('Selected English text'),containsNode:vi.fn(()=>contains)};

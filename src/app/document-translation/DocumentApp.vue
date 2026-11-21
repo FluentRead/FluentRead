@@ -240,7 +240,7 @@
           :document="parsedDocument"
           :translations="translatedSegments"
           :annotations="activeTask?.pdfAnnotations ?? []"
-          :annotations-saved="historyAvailable && activeTask?.revision === activeTask?.savedRevision"
+          :annotation-storage-unavailable="!historyAvailable || activeTask?.historyVersion === undefined || !!(activeTask.historyReadUnavailable || activeTask.historyConflict)"
           @update:annotations="updatePdfAnnotations"
           v-model:presentation="pdfPresentation"
           :mode="effectivePreviewMode"

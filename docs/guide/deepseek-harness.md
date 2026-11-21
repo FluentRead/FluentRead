@@ -93,9 +93,10 @@
 
 「读懂」与共用模型网关的写作功能会继承所选 Chat Completions 服务的自定义请求体参数，例如 `service_tier` 和 `reasoning_effort`。参数在顶层覆盖默认值，但模型、会话消息、工具调用、响应格式和流式协议由功能自身管理，不能通过自定义请求体替换。非法 JSON 会在发送前报错；固定匿名服务及原生 Claude、Gemini 接口仍使用各自协议。
 
-翻译、阅读和写作按**实际请求端点**统一处理输出上限，不依赖模型名称：
+翻译、阅读和写作根据请求端点和 Azure 部署名称选择输出上限字段。
 
 - 官方 `https://api.openai.com/v1/chat/completions` 使用 `max_completion_tokens`，包括通过自定义服务直连官方端点的配置。
+- Azure 服务的 GPT-5、GPT-6、o1、o3、o4 系列部署（如 `gpt-5-mini`）使用 `max_completion_tokens`，包括版本化 deployment 端点。未知部署别名默认保留 `max_tokens`。
 - 第三方兼容端点默认保留 `max_tokens`。若服务要求新字段，在自定义请求体中明确提供 `max_completion_tokens`，请求会保留该字段并删除旧字段。内置 OpenAI 服务配置了第三方代理地址时也遵循这个规则。
 - 同时指定两个非空上限时，`max_completion_tokens` 优先；最终不会同时发送两个字段。空上限不发送，阅读和写作中的 `null` 不会覆盖功能默认预算。
 - Responses 的 `max_output_tokens` 属于另一套协议，不能靠修改一个字段把 Chat 请求变成 Responses 请求。

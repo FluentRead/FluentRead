@@ -18,6 +18,8 @@ If the webpage font is hard to read, select **Aa** at the bottom right of the qu
 
 Styles are grouped into **Text, Colors, Lines, Highlights, Cards, and Fun**. Start with plain text or a color, then try a card, sticky note, or speech bubble to emphasize translations. **Blur until hover** and blackout styles hide the translation until you point at it, useful for checking your understanding after reading the original.
 
+**Forest green** follows the color of the original text. It appears as a deep green on light pages and brightens alongside light text on dark pages.
+
 Cards and most Fun styles pair their background, text, and link colors with the text brightness in each part of the webpage. Different sections adapt separately, and existing translations follow website theme changes independently of the extension or system theme. **Terminal** and **Starlit reading** keep their dark themes. Browsers without automatic color support keep each style’s fixed palette.
 
 | Control | Effect |

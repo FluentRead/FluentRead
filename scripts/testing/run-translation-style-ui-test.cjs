@@ -17,7 +17,7 @@ const TRANSLATION = '阅读应该轻松、自然。颜色和线条应当贴合�
 const DEFAULT_APPEARANCE = {textColor: '', backgroundColor: '', lineColor: '', fillColor: '', fontScale: 100, fontWeight: 'default', fontFamily: 'default', opacity: 100, customCss: ''};
 const EXPECTED_CATEGORY_COUNTS = {文字: 12, 颜色: 12, 线条: 14, 标记: 9, 卡片: 12, 趣味: 12};
 const TEXT_COLOR_PRESETS = [
-  {value: 49, label: '森林绿', hex: '#15803d'},
+  {value: 49, label: '森林绿', hex: '#007824', baseWeight: 0.4},
   {value: 50, label: '澄澈蓝', hex: '#1d4ed8'},
   {value: 51, label: '优雅紫', hex: '#6d28d9'},
   {value: 52, label: '暖橙', hex: '#b45309'},
@@ -63,7 +63,8 @@ async function checkTextColors({options, page, group, preview, readConfig, patch
     const actual = await readColor(locator);
     if (preset.hex) {
       const base = preset.hex.slice(1).match(/../gu).map(value => Number.parseInt(value, 16));
-      const expected = base.map((value, index) => Math.round(value * 0.6 + actual.parentRgb[index] * 0.4));
+      const baseWeight = preset.baseWeight ?? 0.6;
+      const expected = base.map((value, index) => Math.round(value * baseWeight + actual.parentRgb[index] * (1 - baseWeight)));
       const matches = actual.rgb.every((value, index) => Math.abs(value - expected[index]) <= 1);
       if (!matches) {report.metrics.failedColor = {label, expected, actual}; await shot(group, `failure-${label.replace(/[^a-z0-9]+/giu, '-')}`);}
       assert(matches, `${label}: ${JSON.stringify(actual)} vs ${expected}`);

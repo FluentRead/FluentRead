@@ -1122,7 +1122,7 @@ describe('图片翻译前台交互与生命周期', () => {
         const bitmap = env.bitmap() as HTMLImageElement;
         expect(env.image.style.opacity).toBe('0');
         expect(env.image.style.getPropertyPriority('opacity')).toBe('important');
-        expect(env.image.style.transition).toBe('none');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('none');
         expect(bitmap.style.opacity).toBe('0.65'); expect(bitmap.parentElement!.style.display).toBe('block');
         expect(bitmap.style.backgroundColor).toBe('rgb(255, 255, 255)'); expect(bitmap.style.borderLeftColor).toBe('rgb(255, 0, 0)');
         expect(bitmap.style.borderLeftStyle).toBe('solid');
@@ -1153,6 +1153,48 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.image.style.getPropertyValue('transition-property')).toBe('opacity');
         expect(env.image.style.getPropertyPriority('transition-property')).toBe('important');
         expect(env.image.style.getPropertyValue('transition-duration')).toBe('2s');
+    });
+
+    it.each([null, '', 'border-radius:6px', 'opacity:.65!important;transition:opacity 2s ease'])(
+        '原始行内样式未被网站更新时按原始属性恢复（%s）', async original => {
+            const env = setup();
+            if (original === null) env.image.removeAttribute('style');
+            else env.image.setAttribute('style', original);
+            env.hover(); env.click(); await flush();
+            expect(env.image.style.opacity).toBe('0');
+            env.click();
+            expect(env.image.getAttribute('style')).toBe(original);
+        },
+    );
+
+    it('还原原图时保留网站更新的过渡时长及其他行内样式', async () => {
+        const env = setup();
+        env.image.style.setProperty('opacity', '0.65', 'important');
+        env.image.style.setProperty('transition-property', 'opacity');
+        env.image.style.setProperty('transition-duration', '2s');
+        env.hover(); env.click(); await flush();
+        expect(env.image.style.opacity).toBe('0');
+        env.image.style.setProperty('transition-duration', '900ms', 'important');
+        env.image.style.setProperty('color', 'blue');
+        env.click();
+        expect(env.image.style.getPropertyValue('opacity')).toBe('0.65');
+        expect(env.image.style.getPropertyPriority('opacity')).toBe('important');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('opacity');
+        expect(env.image.style.getPropertyValue('transition-duration')).toBe('900ms');
+        expect(env.image.style.getPropertyPriority('transition-duration')).toBe('important');
+        expect(env.image.style.color).toBe('blue');
+    });
+
+    it('网站接管过渡属性时只归还仍由扩展持有的透明度', async () => {
+        const env = setup();
+        env.image.style.opacity = '0.75';
+        env.hover(); env.click(); await flush();
+        expect(env.image.style.opacity).toBe('0');
+        env.image.style.setProperty('transition-property', 'transform', 'important');
+        env.click();
+        expect(env.image.style.opacity).toBe('0.75');
+        expect(env.image.style.getPropertyValue('transition-property')).toBe('transform');
+        expect(env.image.style.getPropertyPriority('transition-property')).toBe('important');
     });
 
     it('宿主修改 opacity 或 transition 时只归还仍属于自己的属性，不覆盖新样式', async () => {

@@ -6,6 +6,7 @@ import {
     canDrawTranslatedImageText,
     getImageTextBackgroundColor,
     getImageTextColor,
+    getImageTextDirection,
     getImageSourceFontLimit,
     getImageSourceInkFontSize,
     getImageSourceTextStyle,
@@ -16,6 +17,19 @@ import {
 } from '@/src/features/image-translation/services/rendering';
 
 const segmenter = new Intl.Segmenter(undefined, {granularity: 'grapheme'});
+
+it.each([
+    ['A12 לכיוון צפון', 'rtl'],
+    ['A12 إلى اليمين', 'rtl'],
+    ['  B7\u00a0לכיוון צפון', 'rtl'],
+    ['A12 on the right', 'ltr'],
+    ['Gate B7 בצד שמאל', 'ltr'],
+    ['A12\nלכיוון צפון', 'ltr'],
+    ['\u200eA12 לכיוון צפון', 'ltr'],
+    ['A12', 'ltr'],
+] as const)('译文的开头方向符合编号所在行 %s', (text, direction) => {
+    expect(getImageTextDirection(text)).toBe(direction);
+});
 
 describe('倾角旁证的独立原文字号核对',()=>{
     const source=()=>({text:'SOURCE WORDS',bbox:{x0:10,y0:10,x1:210,y1:70}});

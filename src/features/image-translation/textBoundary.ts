@@ -18,8 +18,10 @@ export function containsRightToLeftLetters(text: string): boolean {
 }
 
 export function getImageTextDirection(text:string):'ltr'|'rtl' {
-    const firstLetter=text.match(/\p{Letter}/u)?.[0]??'';
-    return containsRightToLeftLetters(firstLetter)?'rtl':'ltr';
+    // 编号后的同一行文字决定底层方向，绘制时仍使用完整译文。
+    const letterAfterCode = text.match(/^[ \t]*[A-Z]{1,3}[0-9]{1,4}[ \t\u00a0\u3000]+(\p{L})/u)?.[1];
+    const firstLetter = letterAfterCode ?? text.match(/\p{L}/u)?.[0] ?? '';
+    return containsRightToLeftLetters(firstLetter) ? 'rtl' : 'ltr';
 }
 
 /** 用 UTF-16 偏移逆向读取单个码点，不复制此前整段文本。 */

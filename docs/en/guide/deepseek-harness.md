@@ -10,6 +10,8 @@ Select a word or sentence to translate, look up a word, listen to it or request 
 2. Select text on a webpage and click the icon beside it.
 3. The card opens on **Translate**. English dictionary lookup works without AI setup.
 
+A bilingual card shows the **Original** above the **Translation**, each with its own copy and playback controls. The tabs wrap in narrow cards. In very short cards, scroll the toolbar horizontally.
+
 Use the share or save buttons to keep a result. Drag the top or blank space around the card to move it, and drag its edges to resize. Long content scrolls inside. The next selection restores the default size near the selected text.
 
 For “Invalid key or permission”, choose **Configure service**, then check the key and permissions under **General → Service assignments → Selection translation → Configure connection**. Return and retry manually.

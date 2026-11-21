@@ -738,6 +738,7 @@ export default defineConfig({
                 'src/features/image-translation/services/documentOcrBullets.ts',
                 'src/features/image-translation/services/offscreenRuntime.ts',
                 'src/features/image-translation/services/rendering.ts',
+                'src/features/image-translation/services/imageTextFont.ts',
                 'src/features/image-translation/services/sourceAppearance.ts',
                 'src/features/image-translation/services/sourceAlignment.ts',
                 'src/features/image-translation/services/mangaRecognitionConnectedBands.ts',

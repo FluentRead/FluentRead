@@ -79,6 +79,7 @@ function createCanvasStub() {
     const canvas = {
         width: 0,
         height: 0,
+        lang: '',
         context: {
             font:'',textAlign:'left',textBaseline:'alphabetic',save:vi.fn(),restore:vi.fn(),
             measureText:vi.fn((text:string)=>{
@@ -151,6 +152,41 @@ beforeEach(() => {
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it('普通译图保留原文字体度量，并使用本次译文语言绘制',async()=>{
+    const measurements:Array<[string,string]>=[];
+    vi.stubGlobal('document',{createElement:()=>{
+        const canvas=makeCanvas(),measure=canvas.context.measureText.getMockImplementation()!;
+        canvas.context.measureText.mockImplementation(text=>{
+            measurements.push([text,canvas.lang]);
+            return measure(text);
+        });
+        return canvas;
+    }});
+    mocks.draw.mockImplementation(()=>expect(canvases[0].lang).toBe('ja'));
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+        ? {success:true,translations:['直進'],targetLanguage:'ja'}:undefined));
+    const result=await translateImageInOffscreen('localized-image','en','Page');
+    expect(measurements).toContainEqual(['Hello','']);
+    expect(mocks.draw).toHaveBeenCalledOnce();
+    expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'直進'});
+});
+
+it('漫画先采集原文字形，再以同一译文语言排版和绘制图块',async()=>{
+    mocks.mangaRecognize.mockResolvedValue([{...lines[0],fontSize:10}]);
+    mocks.repair.mockImplementation(async pixels=>pixels);
+    mocks.sampleManga.mockImplementation(()=>{
+        expect(canvases[0].lang).toBe('');
+        return [{color:'rgb(255,255,255)',uniform:false}];
+    });
+    mocks.mangaDraw.mockImplementation(()=>expect(canvases[0].lang).toBe('zh-Hant'));
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+        ? {success:true,translations:['直行'],targetLanguage:'zh-Hant'}:undefined));
+    const result=await translateImageInOffscreen('localized-manga','en','Page',undefined,undefined,true);
+    expect(mocks.sampleManga).toHaveBeenCalledOnce();
+    expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+    expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'直行'});
+});
+
 it.each([false, true])('等待扩展字形时还未开始度量或清字，cancelled=%s', async cancelled => {
     const controller = new AbortController();
     let announcePreparation!: () => void;
@@ -199,18 +235,19 @@ it.each([false,true])('倾斜原字在清字前核对并传到对应绘制入口
 describe('旋转窄标签先预检完整译文再清字',()=>{
     const bbox={x0:42,y0:15,x1:64,y1:125};
     const source:MangaRegion={text:'OPEN PANEL',fontSize:22,bbox,sourceBoxes:[bbox],quarterTurn:1,textAlign:'center'};
-    function prepare(manga:boolean,translation:string,recognition:MangaRegion[]= [source]){
+    function prepare(manga:boolean,translation:string,recognition:MangaRegion[]= [source],targetLanguage?:string){
         imageOptions.push({width:180,height:150});
         mocks.mangaRecognize.mockResolvedValueOnce(recognition);
         mocks.repair.mockImplementationOnce(async pixels=>pixels);
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
-            ?{success:true,translations:recognition.map((_,index)=>index===0?translation:'下一页')}:undefined));
+            ?{success:true,translations:recognition.map((_,index)=>index===0?translation:'下一页'),targetLanguage}:undefined));
         return ()=>translateImageInOffscreen('spine','en','Page',undefined,'rotate',manga,'paddle');
     }
     it.each([false,true])('字形可完整顺原方向放回后才清理紧框，manga=%s',async manga=>{
-        const result=await prepare(manga,'面板')();
+        const result=await prepare(manga,'面板',[source],'zh-Hans')();
         const repair=manga?mocks.repair:mocks.inpaint;
         expect(repair.mock.calls[0][3]).toEqual([{...source,text:'面板'}]);
+        expect(canvases[0].lang).toBe('zh-Hans');
         expect(canvases[0].context.measureText.mock.invocationCallOrder.at(-1)!).toBeLessThan(repair.mock.invocationCallOrder[0]);
         expect(result.lines[0].renderSkipped).toBeUndefined();
         expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);

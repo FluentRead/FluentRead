@@ -63,6 +63,7 @@ function fixture(alpha=224):Fixture {
 }
 let source:Surface=fixture();
 let translations=['FULL TEXT'];
+let targetLanguage:string|undefined;
 let canvases:PixelCanvas[]=[];
 let images:PixelImage[]=[];
 let encoded:Uint8ClampedArray[]=[];
@@ -91,6 +92,7 @@ function color(value:string):Rgba {
 /** Small explicit Canvas port, extending the existing compositor test's source-over fake. */
 class PixelCanvas implements Surface {
     private w=0;private h=0;
+    lang='';
     pixels=new Pixels();
     private path:Rect[]=[];
     private allowed=(_x:number,_y:number)=>true;
@@ -208,6 +210,7 @@ async function detectionEvidence(regions:ImageTextRegion[],image:string,width:nu
 }
 beforeEach(()=>{
     vi.clearAllMocks();source=fixture();translations=['FULL TEXT'];canvases=[];images=[];encoded=[];fills=[];action=undefined;metrics='complete';glyphSupport=new Set<number>();detectorCore=MODEL_CORE;evidenceMode='valid';inputImage=STATIC_PNG;measureWidth=undefined;
+    targetLanguage=undefined;
     mocks.prepareSeg.mockReset().mockResolvedValue(false);mocks.segment.mockReset();
     setRegions([{...originalLine}]);mocks.recognize.mockResolvedValue([]);mocks.mangaRecognize.mockImplementation(async(image:string)=>{const regions=recognized.map(r=>({...r,bbox:{...r.bbox},...(r.sourceBoxes?{sourceBoxes:r.sourceBoxes.map(b=>({...b}))}:{})}));await detectionEvidence(regions,image,source.width,source.height,detectorCore,evidenceMode);return regions;});
     mocks.encode.mockImplementation(async(canvas:PixelCanvas,signal?:AbortSignal)=>{
@@ -215,7 +218,7 @@ beforeEach(()=>{
         encoded.push(new Pixels(canvas.pixels));return 'data:image/png;base64,matte-final';
     });
     vi.stubGlobal('Image',PixelImage);vi.stubGlobal('document',{createElement:()=>new PixelCanvas()});
-    vi.stubGlobal('chrome',{runtime:{sendMessage:(message:{type:string},callback:(value?:unknown)=>void)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations}:undefined)}});
+    vi.stubGlobal('chrome',{runtime:{sendMessage:(message:{type:string},callback:(value?:unknown)=>void)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations,targetLanguage}:undefined)}});
 });
 
 describe('RGBA救援全文预算和原始源相位边界',()=>{
@@ -267,7 +270,9 @@ describe('RGBA救援全文预算和原始源相位边界',()=>{
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();released();
     });
     it('真实DB已覆盖时不准备可选模型或分配分割张量',async()=>{
+        targetLanguage='en';
         const f=install(fixture(224));expect((await translate()).image).toBeTruthy();completeGlyphs();checkFrame(f);
+        expect(canvases[0].lang).toBe('en');
         expect(mocks.prepareSeg).not.toHaveBeenCalled();expect(mocks.segment).not.toHaveBeenCalled();
     });
     it('DB未覆盖但整页/全文已成立时才检查缓存，缺失时保留完整阅读结果',async()=>{

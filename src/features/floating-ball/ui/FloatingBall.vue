@@ -286,14 +286,14 @@ const dock = computed(() => {
   const bounds = viewport.value;
   const size = ballSize.value;
   const {defaultMargin, popoutMargin, toolsDisplay} = presentation.value;
-  const dockX = (margin: number) => {
-    // 桌面自定义负边距仍保留可拖动部分；触屏保留完整的 44px 点击目标。
-    const min = touchSized.value ? 0 : Math.min(0, 28 - size);
-    const inset = clamp(margin, min, bounds.width - size);
-    return side.value === 'left' ? bounds.left + inset : bounds.right - size - inset;
-  };
-  const restX = dockX(defaultMargin);
-  const x = toolsDisplay === 'hover' && isMenuExpanded.value && !touchExpanded.value ? dockX(popoutMargin) : restX;
+  const dockX = (inset: number) => side.value === 'left' ? bounds.left + inset : bounds.right - size - inset;
+  // 自定义负边距保留可拖动部分；触屏始终保留完整点击区。
+  const min = touchSized.value ? 0 : Math.min(0, 28 - size);
+  const max = bounds.width - size;
+  // 桌面悬停模式的 0 / 正边距组合在闲置时半藏；相同边距保持原地。
+  const tuck = !touchSized.value && toolsDisplay === 'hover' && defaultMargin === 0 && popoutMargin > 0;
+  const restX = dockX(tuck ? -size / 2 : clamp(defaultMargin, min, max));
+  const x = toolsDisplay === 'hover' && isMenuExpanded.value && !touchExpanded.value ? dockX(clamp(popoutMargin, min, max)) : restX;
   const y = bounds.top + resolveFloatingBallCenterY(verticalPosition.value, bounds.height, size) - size / 2;
   return {x, y, restX};
 });

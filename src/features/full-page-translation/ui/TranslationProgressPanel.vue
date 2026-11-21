@@ -53,17 +53,11 @@
           <strong>{{ panelTitle }}</strong>
           <span class="fr-progress-counts">
             <span>{{ t('fullPage.progress.running') }} <b>{{ progress.running }}</b></span>
-            <span class="fr-progress-divider" aria-hidden="true" />
             <span>{{ t('fullPage.progress.remaining') }} <b>{{ progress.remaining }}</b></span>
           </span>
           <span class="fr-progress-counts" v-if="(progress.completed ?? 0) > 0 || hasFailures">
             <span>{{ t('fullPage.progress.completed') }} <b>{{ progress.completed ?? 0 }}</b></span>
-            <span class="fr-progress-divider" aria-hidden="true" />
             <span>{{ t('fullPage.progress.failed') }} <b>{{ progress.failed ?? 0 }}</b></span>
-          </span>
-          <span v-if="hasFailures" class="fr-progress-actions">
-            <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('retry')">{{ t('fullPage.progress.retryFailed') }}</button>
-            <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('locate')">{{ t('fullPage.progress.locateFailed') }}</button>
           </span>
           <small v-if="isModalWaiting">
             {{ t('fullPage.progress.modalWaiting') }}
@@ -72,6 +66,11 @@
             {{ t('fullPage.progress.offscreenHint', {count: progress.offscreen}) }}
           </small>
         </span>
+
+        <div v-if="hasFailures" class="fr-progress-actions">
+          <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('retry')">{{ t('fullPage.progress.retryFailed') }}</button>
+          <button type="button" class="fr-progress-action" :disabled="!canRecover" @click="runFailureAction('locate')">{{ t('fullPage.progress.locateFailed') }}</button>
+        </div>
 
         <button type="button" class="fr-progress-dismiss" :aria-label="t('fullPage.progress.hide')" :title="t('fullPage.progress.hideTitle')" @click="dismiss">
           <svg viewBox="0 0 16 16" aria-hidden="true">
@@ -205,34 +204,31 @@ onBeforeUnmount(() => {
   display: grid;
   overflow: auto;
   overscroll-behavior: contain;
-  grid-template-columns: 34px minmax(0, 1fr) 28px;
-  gap: 10px;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 6px;
   align-items: center;
-  width: min(286px, calc(100vw - 32px));
-  padding: 11px 10px 11px 12px;
+  width: min(240px, calc(100vw - 32px));
+  padding: 6px 6px 6px 9px;
   border: 1px solid rgba(229, 88, 139, 0.24);
-  border-radius: 14px;
-  background: rgba(255, 252, 253, 0.84);
-  box-shadow: 0 10px 28px rgba(68, 38, 52, 0.14), 0 2px 7px rgba(68, 38, 52, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 252, 253, 0.88);
+  box-shadow: 0 4px 16px rgba(68, 38, 52, 0.12);
   color: #3f3540;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 12px;
   line-height: 1.35;
   pointer-events: auto;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .fr-progress-indicator {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  gap: 3px;
-  width: 34px;
-  height: 34px;
-  padding: 8px 7px;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #fff0f5, #ffe0eb);
+  gap: 2px;
+  width: 22px;
+  height: 22px;
   color: #e84f87;
 }
 
@@ -249,6 +245,8 @@ onBeforeUnmount(() => {
   background: rgba(240, 253, 244, 0.68);
   box-shadow: 0 4px 14px rgba(22, 101, 52, 0.1);
   pointer-events: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .fr-progress-compact-check,
@@ -294,6 +292,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+  overflow-wrap: anywhere;
 }
 
 .fr-progress-copy strong {
@@ -305,10 +304,10 @@ onBeforeUnmount(() => {
 
 .fr-progress-counts {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
+  gap: 0 8px;
   color: #746875;
-  white-space: nowrap;
 }
 
 .fr-progress-counts b {
@@ -317,27 +316,20 @@ onBeforeUnmount(() => {
   font-weight: 750;
 }
 
-.fr-progress-divider {
-  width: 1px;
-  height: 10px;
-  background: #e7dce1;
-}
-
 .fr-progress-copy small {
-  overflow: hidden;
   color: #70636e;
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 11px;
 }
 
 .fr-progress-dismiss {
   display: grid;
+  grid-area: 1 / 3;
+  place-items: center;
+  align-self: start;
   width: 28px;
   height: 28px;
   margin: 0;
   padding: 0;
-  place-items: center;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -365,6 +357,14 @@ onBeforeUnmount(() => {
   stroke-width: 1.6;
 }
 
+.fr-progress-warning { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 6px; background: #fff1d6; color: #9a5800; font-size: 15px; font-weight: 700; }
+.fr-progress-actions { display: grid; grid-area: 2 / 1 / auto / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fr-progress-action { min-height: 32px; border: 1px solid rgba(116, 104, 117, 0.32); border-radius: 6px; padding: 3px 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; overflow-wrap: anywhere; }
+.fr-progress-action:first-child { border-color: transparent; background: #fae9ef; color: #a62751; font-weight: 650; }
+.fr-progress-action:disabled { opacity: .45; cursor: default; }
+.fr-progress-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.fr-idle .fr-progress-indicator i { animation: none; }
+
 .fr-dark {
   border-color: rgba(242, 116, 162, 0.3);
   background: rgba(38, 31, 39, 0.84);
@@ -379,7 +379,6 @@ onBeforeUnmount(() => {
 }
 
 .fr-dark .fr-progress-indicator {
-  background: linear-gradient(145deg, #593043, #442635);
   color: #ff80ae;
 }
 
@@ -395,9 +394,8 @@ onBeforeUnmount(() => {
   color: #ff80ae;
 }
 
-.fr-dark .fr-progress-divider {
-  background: #5d4c55;
-}
+.fr-dark .fr-progress-warning { background: #493620; color: #ffd18c; }
+.fr-dark .fr-progress-action:first-child { background: #5b3044; color: #ffd0e1; }
 
 .fr-dark .fr-progress-copy small,
 .fr-dark .fr-progress-dismiss {
@@ -448,15 +446,13 @@ onBeforeUnmount(() => {
   .fr-translation-progress {
     right: max(10px, env(safe-area-inset-right));
     bottom: max(10px, env(safe-area-inset-bottom));
-    width: min(270px, calc(100vw - 20px));
+    width: min(240px, calc(100vw - 20px));
   }
 }
 
 @media (any-pointer: coarse), (max-width: 420px) {
-  .fr-translation-progress:not(.fr-compact) { grid-template-columns: 34px minmax(0, 1fr) 44px; }
-  .fr-progress-dismiss { width:44px; height:44px; align-self:start; touch-action:manipulation; }
-  .fr-progress-action { min-width:44px; min-height:44px; touch-action:manipulation; }
-  .fr-progress-counts { flex-wrap:wrap; }
+  .fr-progress-dismiss { width: 44px; height: 44px; touch-action: manipulation; }
+  .fr-progress-action { min-width: 44px; min-height: 44px; touch-action: manipulation; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -466,13 +462,4 @@ onBeforeUnmount(() => {
     transition: none;
   }
 }
-
-
-.fr-progress-warning { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #fff1d6; color: #9a5800; font-size: 22px; font-weight: 700; }
-.fr-progress-actions { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-.fr-progress-action { border: 1px solid currentColor; border-radius: 5px; padding: 3px 6px; background: transparent; color: inherit; cursor: pointer; font: inherit; }
-.fr-progress-action:disabled { opacity: .45; cursor: default; }
-.fr-progress-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
-.fr-idle .fr-progress-indicator i { animation: none; }
-.fr-dark .fr-progress-warning { background: #493620; color: #ffd18c; }
 </style>

@@ -7,8 +7,6 @@
 import type {RegisteredUiLanguage} from '../types';
 type Row = readonly [string, string, string, string, string, string, string];
 export const siteRuleTextRows: readonly Row[] = [
-  ['官方规则', 'Official rules', '公式ルール', '공식 규칙', 'Règles officielles', 'Официальные правила', 'Reglas oficiales'],
-  ['检查规则更新', 'Check for rule updates', 'ルールの更新を確認', '규칙 업데이트 확인', 'Vérifier les mises à jour', 'Проверить обновления правил', 'Buscar actualizaciones de reglas'],
   ['仅显示译文网站', 'Translation-only sites', '訳文のみを表示するサイト', '번역만 표시하는 사이트', 'Sites avec traduction seule', 'Сайты только с переводом', 'Sitios con solo traducción'],
   ["仅此网站使用仅译文，其他网站沿用全局显示模式；谷歌翻译仅支持双语", "Use translation only on this site; other sites follow the global mode. Google Translate supports bilingual mode only.", "このサイトでは訳文のみを表示し、他のサイトは全体設定に従います。Google 翻訳は対訳表示のみ対応します。", "이 사이트에서는 번역만 표시하며 다른 사이트는 전역 설정을 따릅니다. Google 번역은 이중 언어만 지원합니다.", "Traduction seule sur ce site ; les autres suivent le mode global. Google Traduction ne prend en charge que le mode bilingue.", "Только перевод на этом сайте; другие используют общий режим. Google Переводчик поддерживает только двуязычный режим.", "Solo traducción en este sitio; los demás siguen el modo global. Google Traductor solo admite el modo bilingüe."],
   ["此网站已设为仅译文，可在网站偏好中修改", "This site uses translation only. Change it in Site preferences.", "このサイトは訳文のみの表示です。サイト設定で変更できます。", "이 사이트는 번역만 표시합니다. 사이트 환경설정에서 변경하세요.", "Ce site affiche uniquement la traduction. Modifiez ce choix dans les préférences du site.", "На этом сайте показан только перевод. Измените это в настройках сайта.", "Este sitio muestra solo la traducción. Cámbialo en las preferencias del sitio."],
@@ -185,6 +183,8 @@ export function createSiteRuleText(language: RegisteredUiLanguage): Readonly<Rec
 }
 
 const extensionSiteActionRows: readonly Row[] = [
+  ['官方规则', 'Official rules', '公式ルール', '공식 규칙', 'Règles officielles', 'Официальные правила', 'Reglas oficiales'],
+  ['检查规则更新', 'Check for rule updates', 'ルールの更新を確認', '규칙 업데이트 확인', 'Vérifier les mises à jour', 'Проверить обновления правил', 'Buscar actualizaciones de reglas'],
   ["打开正文","Open article","本文を開く","본문 열기","Ouvrir l’article","Открыть статью","Abrir artículo"],
   ["在流畅阅读中打开正文","Open this article in FluentRead","FluentRead で本文を開く","FluentRead에서 본문 열기","Ouvrir cet article dans FluentRead","Открыть статью во FluentRead","Abrir este artículo en FluentRead"],
   ["未找到可打开的网页正文。","No readable article was found.","読み取り可能な本文が見つかりませんでした。","읽을 수 있는 본문을 찾지 못했습니다.","Aucun article lisible n’a été trouvé.","На странице не удалось найти текст статьи.","No se encontró un artículo legible."],
@@ -215,7 +215,7 @@ const extensionSiteActionRows: readonly Row[] = [
   ["已识别所选段落，当前会话尚未排入翻译队列。","The paragraph was detected and is currently absent from the translation queue.","選んだ段落を認識しましたが、現在の翻訳キューにはありません。","선택한 단락을 인식했지만 현재 번역 대기열에 없습니다.","Le paragraphe a été détecté. Il est actuellement absent de la file de traduction.","Абзац распознан, но сейчас отсутствует в очереди перевода.","Se detectó el párrafo y actualmente está fuera de la cola de traducción."],
 ];
 
-/** 网页诊断和正文工作台文案仅随扩展资源生成。 */
+/** 官方规则更新、网页诊断和正文工作台文案仅随扩展资源生成。 */
 export function createExtensionSiteActionText(language: RegisteredUiLanguage): Readonly<Record<string, string>> {
   return Object.fromEntries(extensionSiteActionRows.map(row => [row[0], row[columns[language]]]));
 }

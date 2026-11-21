@@ -480,7 +480,8 @@ export default defineConfig({
             const courseSubtitleLearningBudget = 214_000;
             // Coursera 复用课程菜单和 WebVTT 读取；术语候选新增文档页文本、匹配与审核 UI，未引入新依赖或模型。
             const courseraCaptionBudget = 4_000;
-            const documentGlossaryCandidateBudget = 12_000;
+            // 与 CSV/TSV 选列流程整合后，Chrome 实测 70,406,656 字节，较原组合预算超出 2,656 字节。
+            const documentGlossaryCandidateBudget = 16_000;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

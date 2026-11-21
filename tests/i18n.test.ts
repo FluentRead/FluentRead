@@ -1,4 +1,5 @@
 import {siteRuleTextRows} from '@/src/core/i18n/messages/siteRules';
+import {createUiLanguageBundleFiles} from '@/src/core/i18n/bundles';
 import {translateSharedVideoModelText} from '@/src/features/settings/model/sharedVideoModelText';
 import {readdirSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -11,6 +12,7 @@ import * as onboardingMessages from '@/src/core/i18n/messages/onboarding';
 
 import {
   DEFAULT_UI_LANGUAGE,
+  getUiLanguageBundlePath,
   getUiLanguageDisplayLabel,
   UI_LANGUAGE_OPTIONS,
   normalizeUiLanguage,
@@ -18,6 +20,7 @@ import {
   translate,
   translateLegacyText,
   registerUiLanguageBundle,
+  type UiLanguageBundle,
 } from '@/src/core/i18n';
 import {enUSLegacyText, enUSMessages} from '@/src/core/i18n/messages/en-US';
 import {esESLegacyText, esESMessages} from '@/src/core/i18n/messages/es-ES';
@@ -1026,6 +1029,13 @@ describe('i18n 全量界面扫描', () => {
   it('Vue 文案和展示注册表在非中文界面有本地化结果', async () => {
     const {collectUiSourceCopy} = await import('../scripts/testing/i18n-source-audit.mjs');
     const audit = collectUiSourceCopy(process.cwd());
+    const extensionCopyOwners = new Set([
+      'src/app/document-translation/DocumentApp.vue',
+      'src/app/popup/PopupSiteRuleDiagnosis.vue',
+      'src/features/settings/ui/SiteAdaptationSettings.vue',
+    ]);
+    const extensionLegacyText = new Map(createUiLanguageBundleFiles().map(({relativeDest, contents}) =>
+      [relativeDest, (JSON.parse(contents) as UiLanguageBundle).legacyText]));
     // 固定的中英术语演示、语言自身名称和装饰图标不属于界面译文。
     const examples = new Set(['中文', 'A中', '語言', '言語', 'large language model → 大语言模型', 'source,target,tgt_lng large language model,大语言模型,zh-Hans']);
     const readingPreviewFile = 'src/features/settings/ui/VideoSubtitleAppearanceSettings.vue';
@@ -1041,7 +1051,8 @@ describe('i18n 全量界面扫描', () => {
           // 共享目录文案只由扩展设置加载，按该组件实际使用的本地词典与公共回退共同验收。
           const local = file === 'src/features/settings/ui/VideoLocalModelSettings.vue'
             ? translateSharedVideoModelText(source, locale) : undefined;
-          const result = local ?? translateLegacyText(source, locale);
+          const extension = extensionCopyOwners.has(file) ? extensionLegacyText.get(getUiLanguageBundlePath(locale))?.[source] : undefined;
+          const result = local ?? extension ?? translateLegacyText(source, locale);
           if (/[\u3400-\u9fff]/u.test(result)) missing.push(`${locale} ${file}: ${source}`);
         }
       }

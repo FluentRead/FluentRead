@@ -48,9 +48,18 @@ function captured(kind: 'always' | 'disabled'): () => void {
     return actions;
 }
 beforeEach(() => {vi.clearAllMocks();host = document.createElement('div');document.body.append(host);});
-afterEach(() => {app?.unmount();app = undefined;host.remove();});
+afterEach(() => {app?.unmount();app = undefined;host.remove();vi.unstubAllEnvs();});
 
 describe('PopupSiteRule 真实组件的网站规则与事件归属', () => {
+    it('在油猴脚本中仅呈现支持的网站开关', async () => {
+        vi.stubEnv('BROWSER', 'userscript');
+        const read = vi.fn(async () => undefined);
+        await mount({tools: {read}});
+        expect(button('always')).not.toBeNull();
+        expect(host.querySelector('.site-diagnosis-toggle')).toBeNull();
+        expect(read).not.toHaveBeenCalled();
+    });
+
     it('按需显示诊断入口，打开时查询一次并显示当前规则', async () => {
         const read = vi.fn(async (): Promise<PageRuleDiagnosis> =>
             ({scope: 'content', ruleIds: ['product-docs'], selection: {reason: 'rule-protected', ruleId: 'product-docs'}}));

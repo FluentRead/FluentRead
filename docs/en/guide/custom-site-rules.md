@@ -29,6 +29,8 @@ Enter a complete HTTP(S) URL in Effective preview to see site preferences, match
 
 With all-node recognition, only rules that declare support for that scope apply. The advanced field is `allScopes`.
 
+Select some text in the main page, then open **Page translation diagnosis** in the popup's current website section. The panel shows the current recognition scope and matching rule IDs. It reports whether the first paragraph in the selection was excluded, kept in the source language, detected and awaiting translation, or already processed. You can also open the panel without selecting text to see the rules. Reopen it to read the current page state. The selected text stays on the page.
+
 ## Official rule updates
 
 Builds that support signed updates periodically check for official rules. Open **Site rules → Content rules** to see the release number or select **Check for rule updates**. Reopen a webpage to use the latest verified release. Custom rules and disabled entries still apply. Offline, the extension uses the last verified release or the rules bundled with a fresh installation.

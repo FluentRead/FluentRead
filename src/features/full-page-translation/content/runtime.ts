@@ -15,6 +15,7 @@ import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core
 import {getFullPageTranslationStateRevision, getFullPageTranslationDiagnostic, notifyFullPageTranslationDiagnostic, notifyFullPageTranslationState, notifyTranslationToolbarStatus} from './stateNotification';
 import {diagnoseFailure, type Diagnostic} from '@/src/services/diagnostics';
 import type {FrameTranslationState} from './frameSession';
+import {diagnosePageRuleSelection} from './pageRuleDiagnosis';
 import { checkConfig } from "@/src/features/full-page-translation/content/configCheck";
 import {insertFailedTip} from '@/src/features/full-page-translation/ui/translationIndicators';
 import {scheduleTranslationLoadingIndicator} from './loadingIndicator';
@@ -2153,6 +2154,14 @@ export function autoTranslateEnglishPage(invocation: PageTranslationInvocation =
 /** 当前全文会话的只读身份；与生命周期事件及页面内容无关。 */
 export function getFullPageTranslationSessionId(): number | undefined {
     return fullPageSession?.active ? fullPageSession.progressSessionId : undefined;
+}
+export function readPageRuleDiagnosis(start: Node | undefined) {
+    const session = fullPageSession?.active ? fullPageSession : undefined;
+    return import.meta.env.BROWSER === 'userscript' ? undefined : diagnosePageRuleSelection(start, config.translationScope, session, candidateLifecycleSource, (candidate, settings) => {
+        const source = candidateSourceText(candidate, getCurrentTranslationCore(candidate.scope),
+            {...getCandidateTranslationTextProtectionOptions(candidate), includeInlineCodeForLanguage: true});
+        return shouldSkipTranslationForTarget(source, settings.targetLanguage, settings.excludedLanguages);
+    });
 }
 /** 仅共享无凭据的会话快照；旧 QQ 邮件 frame 使用同一目标语言、服务和展示设置。 */
 export function getFullPageTranslationFrameState(): Omit<FrameTranslationState, 'enabled'> {

@@ -22,6 +22,7 @@ export default defineConfig({
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
                 'src/core/site-adaptation/officialRelease.ts',
+                'src/features/full-page-translation/content/pageRuleDiagnosis.ts',
                 'src/app/background/officialSiteRuleRuntime.ts',
                 'src/services/site-adaptation/officialClient.ts',
                 'src/services/site-adaptation/officialUpdates.ts',

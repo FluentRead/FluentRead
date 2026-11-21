@@ -31,6 +31,13 @@
       ],
       "scenario": "选项展开、语言切换和旧事件归属"
     },
+    "src/app/popup/PopupSiteRuleDiagnosis.vue": {
+      "kind": "behavior",
+      "tests": [
+        "tests/popupSiteRuleLifecycle.test.ts"
+      ],
+      "scenario": "当前网页规则和选区诊断显示、主动读取及导航后丢弃回执"
+    },
     "src/app/popup/PopupOnboarding.vue": {
       "kind": "behavior",
       "tests": [

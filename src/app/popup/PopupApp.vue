@@ -514,6 +514,7 @@ import ServiceIcon from '@/src/ui/components/ServiceIcon.vue';
 import {popupQuickFeatureIconPaths, popupQuickFeatureIconTones, type PopupQuickFeatureIconTone} from '@/src/ui/popupQuickFeatureIcons';
 import {useUiI18n} from '@/src/ui/i18n';
 import PopupSiteRule from './PopupSiteRule.vue';
+import type {PageRuleDiagnosis} from '@/src/core/translation/types';
 import {browserCapabilities} from '@/src/platform/browser/capabilities';
 import {isBrowserTabId} from '@/src/platform/browser/ids';
 import {canOpenTranslationSidepanel, openTranslationSidepanel} from '@/src/platform/browser/translationSidepanel';
@@ -767,6 +768,7 @@ const siteRuleModuleProps = computed(() => ({
   saving: pageState.savingRule,
   switchLabel: currentSiteSwitchLabel.value,
   extensionSwitchLabel: currentSiteExtensionSwitchLabel.value,
+  diagnose: pageRuleDiagnosisSource.value,
 }));
 const styleLabel = computed(() => options.styles.find((item: any) => item.value === config.value.style)?.label || '默认样式');
 const defaultHoverHotkey = computed(() => resolveConfiguredHotkey(config.value.hotkey, config.value.customHotkey));
@@ -875,6 +877,21 @@ const pageConfigurationIdentity = computed(() => JSON.stringify([config.value.on
   config.value.customModel[config.value.service], config.value.disabledExtensionDomains.join(','), config.value.alwaysTranslateDomains.join(','),
   config.value.autoTranslate, credentialWarning.value, createApiKeyCheckRevision(config.value, config.value.service)]));
 const pageContext = useSettingsActionContext(() => popupContext.active.value, () => [pageConfigurationIdentity.value]);
+const pageRuleDiagnosisSource = computed(() => {
+  if (import.meta.env.BROWSER === 'userscript') return undefined;
+  const tabId = currentTabId.value;
+  const pageUrl = pageState.url;
+  if (!popupContext.active.value || tabId === null || !currentSiteSupported.value || !config.value.on ||
+      currentSiteExtensionDisabled.value) return undefined;
+  const current = pageContext.capture();
+  return async (): Promise<PageRuleDiagnosis | undefined> => {
+    if (!current()) return undefined;
+    const result = await browser.tabs.sendMessage(tabId, {type: 'getFullPageTranslationState',
+      explainSelection: true, pageUrl}, {frameId: 0}) as {status?: string; diagnosis?: PageRuleDiagnosis} | undefined;
+    return current() && currentTabId.value === tabId && pageState.url === pageUrl && result?.status === 'success'
+      ? result.diagnosis : undefined;
+  };
+});
 const safariFreePool = computed(() => browserCapabilities.browser === 'safari' && config.value.service === services.freeTranslation);
 const freePoolAccess = shallowRef<FreePoolAccess | null>(null);
 const freePoolLoading = ref(false), freePoolBusy = ref(false), freePoolError = ref<'' | 'safari.freePool.error' | 'safari.freePool.requestDenied'>('');

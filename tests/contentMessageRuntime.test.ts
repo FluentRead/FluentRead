@@ -26,6 +26,8 @@ const mocks = vi.hoisted(() => ({
     getFullPageTranslationDiagnostic: vi.fn(),
     getFullPageTranslationDocumentToken: vi.fn(),
     readFullPageUnchangedCompletion: vi.fn(),
+    readPageRuleDiagnosis: vi.fn(),
+    readPageRuleSelection: vi.fn(),
     mountAreaTranslator: vi.fn(),
     mountFloatingBall: vi.fn(),
     toggleContextMenuImage: vi.fn(),
@@ -67,6 +69,8 @@ vi.mock('@/src/app/content/features', () => ({
     getFullPageTranslationDiagnostic: mocks.getFullPageTranslationDiagnostic,
     getFullPageTranslationDocumentToken: mocks.getFullPageTranslationDocumentToken,
     readFullPageUnchangedCompletion: mocks.readFullPageUnchangedCompletion,
+    readPageRuleDiagnosis: mocks.readPageRuleDiagnosis,
+    readPageRuleSelection: mocks.readPageRuleSelection,
     getFullPageTranslationFrameState: () => ({sessionId: 7}),
     mountAreaTranslator: mocks.mountAreaTranslator,
     mountFloatingBall: mocks.mountFloatingBall,
@@ -166,6 +170,41 @@ describe('内容脚本 runtime 消息协议', () => {
         });
         handler({type: 'contextMenuTranslate', action: 'restore'}, {}, respond);
         expect(respond).toHaveBeenLastCalledWith({status: 'success', action: 'restored', isTranslated: false, documentToken: 'fixture-document', toolbarStatus: 'idle'});
+    });
+    it('网页诊断只接受可信扩展对当前 URL 的显式请求，不转发正文', async () => {
+        const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');
+        const pageUrl = 'https://example.test/article';
+        const {document} = parseHTML('<html><body><p>Private selected text</p></body></html>');
+        vi.stubGlobal('window', {location: new URL(pageUrl)});
+        vi.stubGlobal('document', document);
+        vi.stubGlobal('browser', {runtime: {id: 'fixture-extension'}});
+        let disabled = false, suspended = false, invalid = false;
+        const handler = createContentRuntimeMessageHandler({get isInvalid() {return invalid;}} as ContentScriptContext, {
+            isSiteDisabled: () => disabled, isPageSuspended: () => suspended, updateSiteDisabled: vi.fn(),
+        });
+        const send = vi.fn(), request = {type: 'getFullPageTranslationState', explainSelection: true, pageUrl};
+        const sender = {id: 'fixture-extension'};
+        expect(handler(request, null, send)).toBe(true);
+        handler(request, {id: 'foreign-extension'}, send);
+        handler({...request, pageUrl: pageUrl + '/old'}, sender, send);
+        for (const restriction of ['config', 'site', 'suspend', 'context']) {
+            mocks.config.on = restriction !== 'config';
+            disabled = restriction === 'site';
+            suspended = restriction === 'suspend';
+            invalid = restriction === 'context';
+            handler(request, sender, send);
+        }
+        expect(send.mock.calls).toEqual(Array.from({length: 7}, () => [{status: 'unavailable'}]));
+        expect(mocks.readPageRuleSelection).not.toHaveBeenCalled();
+        invalid = false;
+        const node = document.querySelector('p')!.firstChild;
+        const diagnosis = {scope: 'content', ruleIds: ['fixture'], selection: {reason: 'rule-protected'}};
+        mocks.readPageRuleSelection.mockReturnValue(node);
+        mocks.readPageRuleDiagnosis.mockReturnValue(diagnosis);
+        expect(handler(request, sender, send)).toBe(true);
+        expect(mocks.readPageRuleSelection).toHaveBeenCalledWith(document);
+        expect(mocks.readPageRuleDiagnosis).toHaveBeenCalledWith(node);
+        expect(send).toHaveBeenLastCalledWith({status: 'success', diagnosis});
     });
     it('信息高亮状态在暂停或关闭时仍可读，关闭可抢占，开启和重试遵循当前页面门禁', async () => {
         const {createContentRuntimeMessageHandler} = await import('@/src/app/content/messageRuntime');

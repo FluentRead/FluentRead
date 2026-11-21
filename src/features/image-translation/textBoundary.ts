@@ -10,10 +10,16 @@ const PICTOGRAPHIC = /^\p{Extended_Pictographic}$/u;
 const HANGUL_LETTER = /^(?=\p{L})\p{Script=Hangul}$/u;
 const HANGUL_FILLERS = new Set([0x115F, 0x1160, 0x3164, 0xFFA0]);
 const HALF_WIDTH_KANA = /^[\uFF66-\uFF9D]$/u;
+const RIGHT_TO_LEFT_LETTER = /(?=\p{L})[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}]/u;
+
+/** OCR 可能把拉丁编号放在右到左正文开头，首字母无法判断是否需要保留混排词序。 */
+export function containsRightToLeftLetters(text: string): boolean {
+    return RIGHT_TO_LEFT_LETTER.test(text);
+}
 
 export function getImageTextDirection(text:string):'ltr'|'rtl' {
     const firstLetter=text.match(/\p{Letter}/u)?.[0]??'';
-    return /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Adlam}]/u.test(firstLetter)?'rtl':'ltr';
+    return containsRightToLeftLetters(firstLetter)?'rtl':'ltr';
 }
 
 /** 用 UTF-16 偏移逆向读取单个码点，不复制此前整段文本。 */

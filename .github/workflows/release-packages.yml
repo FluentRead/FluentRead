@@ -126,6 +126,7 @@ jobs:
       - name: Build and verify distribution packages
         env:
           RELEASE_GROUP: ${{ matrix.group }}
+          WXT_SITE_RULES_PUBLIC_KEY: ${{ vars.WXT_SITE_RULES_PUBLIC_KEY }}
         run: |
           case "$RELEASE_GROUP" in
             browsers)

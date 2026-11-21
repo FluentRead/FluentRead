@@ -78,7 +78,7 @@ export function installBackgroundMessageRuntime(options: BackgroundMessageRuntim
     });
     const handlers: Array<BackgroundMessageHandler<BackgroundRuntimeContext>> = [
         createDictionaryRuntimeHandler(),
-        ...createDocumentNavigationHandlers(),
+        ...createDocumentNavigationHandlers(options.tabTranslationStates),
         ...createPersonalCorrectionRuntimeHandlers<BackgroundRuntimeContext>(tabBroadcast),
         createChatGPTPlanHandler(),
         createTranslationCancelHandler(translationRequestRegistry),

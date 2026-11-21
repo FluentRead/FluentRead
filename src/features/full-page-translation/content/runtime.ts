@@ -15,6 +15,7 @@ import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core
 import {getFullPageTranslationStateRevision, getFullPageTranslationDiagnostic, notifyFullPageTranslationDiagnostic, notifyFullPageTranslationState, notifyTranslationToolbarStatus} from './stateNotification';
 import {diagnoseFailure, type Diagnostic} from '@/src/services/diagnostics';
 import type {FrameTranslationState} from './frameSession';
+import {readCurrentPageRuleDiagnosis} from './pageRuleDiagnosis';
 import { checkConfig } from "@/src/features/full-page-translation/content/configCheck";
 import {insertFailedTip, showTranslationRetryWait} from '@/src/features/full-page-translation/ui/translationIndicators';
 import {scheduleTranslationLoadingIndicator} from './loadingIndicator';
@@ -2161,6 +2162,7 @@ export function autoTranslateEnglishPage(invocation: PageTranslationInvocation =
 export function getFullPageTranslationSessionId(): number | undefined {
     return fullPageSession?.active ? fullPageSession.progressSessionId : undefined;
 }
+export const readPageRuleDiagnosis = (start: Node | undefined) => readCurrentPageRuleDiagnosis(start, config.translationScope, fullPageSession, candidateLifecycleSource, candidateSourceText);
 /** 仅共享无凭据的会话快照；旧 QQ 邮件 frame 使用同一目标语言、服务和展示设置。 */
 export function getFullPageTranslationFrameState(): Omit<FrameTranslationState, 'enabled'> {
     const session = fullPageSession?.active ? fullPageSession : null;

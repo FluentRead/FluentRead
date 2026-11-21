@@ -1,6 +1,8 @@
 import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 
 vi.mock('webextension-polyfill', () => ({default: {}}));
+// 共享入口的 edX 专用 Vue 面板由 videoCourseFrame 和课程字幕用例验证。
+vi.mock('@/src/app/content/courseCaptionFrame', () => ({startCourseCaptionFrameApp: vi.fn()}));
 
 const mocks = vi.hoisted(() => ({
     config: {on: true, disabledExtensionDomains: [], bilingualSentenceHighlightEnabled: false,

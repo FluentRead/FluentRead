@@ -214,6 +214,18 @@ describe('standalone default message provider', () => {
 });
 
 describe('userscript remote UI language data', () => {
+    it('keeps document workbench copy in the extension and shared editing copy in the userscript', () => {
+        const documentCopy = [
+            '文档换一种语言，阅读依然流畅',
+            '文件在本地解析，文字发送至所选服务。',
+            '重新翻译会替换现有译文和人工校订。你也可以返回并先下载当前结果。',
+        ];
+        for (const source of documentCopy) {
+            expect(extensionBundles['en-US'].legacyText[source]).toBeTruthy();
+            expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText).not.toHaveProperty(source);
+        }
+        expect(UI_LANGUAGE_BUNDLES['en-US'].legacyText['校订译文']).toBe(extensionBundles['en-US'].legacyText['校订译文']);
+    });
     it('keeps native manga filter labels in extension locales without adding them to userscript bundles', () => {
         const nativeLabels=['未绘制译文','查看全文','复制全文'];
         for(const language of Object.keys(extensionBundles) as (keyof typeof extensionBundles)[]){

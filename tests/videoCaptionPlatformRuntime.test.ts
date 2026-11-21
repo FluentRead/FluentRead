@@ -414,6 +414,31 @@ function courseFixture(platform: 'bilibili' | 'udemy' | 'edx') {
 }
 
 describe('完整课程字幕公共挂载', () => {
+    it.each(['bilibili', 'udemy', 'edx'] as const)('%s 从完整字幕轨按原时间轴导出双语', async platform => {
+        const f = courseFixture(platform);
+        f.config.videoCourseAutoStart[platform] = true;
+        f.start();
+        await vi.advanceTimersByTimeAsync(350);
+        const root = f.menu();
+        root.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click();
+        root.querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.click();
+        const format = root.querySelector<HTMLSelectElement>('[data-subtitle-format]')!;
+        format.value = 'vtt';
+        const download = root.querySelector<HTMLButtonElement>('[data-action="download-bilingual-subtitles"]')!;
+        expect(download.disabled).toBe(false);
+        download.click();
+        await vi.advanceTimersByTimeAsync(1);
+        expect(f.download).not.toHaveBeenCalled();
+        format.value = 'md';
+        const confirm = Object.assign(new f.window.Event('click', {bubbles: true, cancelable: true}), {isTrusted: true});
+        root.querySelector<HTMLButtonElement>('[data-export-choice="complete"]')!.dispatchEvent(confirm);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(f.download).toHaveBeenCalledWith(
+            expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'zh-Hans-bilingual',
+            [{startMs: 0, durationMs: 1000, text: `${f.source}\n测试译文`}], 'vtt',
+        );
+    });
+
     it('B 站中文人工轨排在英文前时显示英中双语，模式切换复用原文而语言变化重新选轨', async () => {
         const f = courseFixture('bilibili');
         const chinese = '这是视频的中文字幕。';
@@ -457,7 +482,9 @@ describe('完整课程字幕公共挂载', () => {
         expect(f.fetch).not.toHaveBeenCalled(); expect(f.manifest).not.toHaveBeenCalled();
         const button = f.menu().querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!; expect(button.classList.contains('fluent-read-video-subtitle-active')).toBe(false);
         expect(button.querySelector('img')?.getAttribute('src')).toBe('chrome-extension://fixture/icon/128.png');
-        expect(button.textContent).toBe(''); expect(f.menu().querySelector('select')).toBeNull();
+        expect(button.textContent).toBe('');
+        expect(f.menu().querySelector('[data-subtitle-format]')).not.toBeNull();
+        expect(f.menu().querySelector<HTMLButtonElement>('[data-action="open-sentence-learning"]')!.disabled).toBe(true);
         button.click(); expect(button.getAttribute('aria-expanded')).toBe('true');
         f.choose('bilingual'); await vi.advanceTimersByTimeAsync(350);
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
@@ -472,7 +499,8 @@ describe('完整课程字幕公共挂载', () => {
         expect(f.shadow()?.querySelector('.source')?.textContent).toBe(f.source);
         f.menu().querySelector<HTMLButtonElement>('[data-action="toggle-subtitle-downloads"]')!.click();
         f.menu().querySelector<HTMLButtonElement>('[data-action="download-subtitles"]')!.click();
-        expect(f.download).toHaveBeenCalledWith(expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'en');
+        await vi.advanceTimersByTimeAsync(0);
+        expect(f.download).toHaveBeenCalledWith(expect.stringContaining('00:00:00,000 --> 00:00:01,000'), 'en', expect.any(Array), 'srt');
         f.choose('off'); expect(f.config.videoSubtitleVisible).toBe(true); expect(f.document.getElementById('fluent-read-course-controls')).not.toBeNull();
         expect(native.style.getPropertyValue('visibility')).toBe('');
         f.choose('original-only'); await vi.advanceTimersByTimeAsync(350);
@@ -544,7 +572,7 @@ describe('完整课程字幕公共挂载', () => {
         expect(menu.classList.contains('fluent-read-video-subtitle-menu')).toBe(true);
         expect(menu.querySelectorAll('[role="menuitemradio"][data-mode]')).toHaveLength(4);
         expect(menu.querySelector('[data-action="toggle-ai-subtitle"]')).toBeNull();
-        expect(menu.querySelector('[data-action="open-sentence-learning"]')).toBeNull();
+        expect(menu.querySelector<HTMLButtonElement>('[data-action="open-sentence-learning"]')!.disabled).toBe(false);
         expect(menu.querySelector<HTMLElement>('[data-subtitle-downloads]')!.hidden).toBe(true);
         expect(menu.querySelector<HTMLElement>('.fluent-read-video-menu-tools')!.hidden).toBe(true);
         menu.querySelector<HTMLButtonElement>('[data-action="open-subtitle-tools"]')!.click();
@@ -925,10 +953,13 @@ describe('B 站无字幕本地识别接入', () => {
         expect(f.translate).toHaveBeenCalledWith(cues[0].text, expect.any(AbortSignal), f.config.videoSourceLanguage);
         const download = f.menu().querySelector<HTMLButtonElement>('[data-action="download-subtitles"]')!;
         expect(download.disabled).toBe(true);
+        expect(f.menu().querySelector<HTMLButtonElement>('[data-action="open-sentence-learning"]')!.disabled).toBe(true);
         await bilibiliCapture.options!.onTranscriptionComplete(cues, 1);
         bilibiliCapture.options!.onProgress!({phase: 'ready', progress: 1, capturedMs: 1, durationMs: 1, transcribedMs: 1, windowIndex: 1, windowCount: 1});
         await vi.advanceTimersByTimeAsync(200); expect(download.disabled).toBe(false);
-        download.click(); expect(f.download).toHaveBeenCalledWith(expect.stringContaining(cues[0].text), '');
+        expect(f.menu().querySelector<HTMLButtonElement>('[data-action="open-sentence-learning"]')!.disabled).toBe(false);
+        download.click(); await vi.advanceTimersByTimeAsync(0);
+        expect(f.download).toHaveBeenCalledWith(expect.stringContaining(cues[0].text), 'ai', expect.any(Array), 'srt');
     });
     it('BV1wRWX6SEmX 标题已声明中文字幕时，即使接口空列表也不自动生成', async () => {
         const f = aiFixture();

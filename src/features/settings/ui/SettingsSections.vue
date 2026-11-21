@@ -78,10 +78,13 @@
 </SettingsPanel>
     <SettingsPanel name="adaptation">
       <ServiceRepairReturn :active="viewActive && props.activeSection === 'settings-sites'" :context="siteRepairContext" context-key="settings-sites:adaptation" />
-      <SiteAdaptationSettings :model-value="config.siteAdaptation" :save-settings="saveSiteAdaptationSettings" :inspect-rule-id="siteRuleInspectId" :active="viewActive && props.activeSection === 'settings-sites'" />
+      <SiteAdaptationSettings :model-value="config.siteAdaptation" :save-settings="saveSiteAdaptationSettings" :inspect-rule-id="siteRuleInspectId" :active="viewActive && props.activeSection === 'settings-sites'"
+        :official-release="officialSiteRuleRelease" :official-updates-enabled="officialSiteRuleUpdatesEnabled" :checking-official-rules="checkingOfficialSiteRules"
+        @refresh-official="updateOfficialSiteRules(true)" />
 </SettingsPanel>
     <SettingsPanel name="preview">
-      <SiteRulePreview :settings="config" :adaptation="config.siteAdaptation" :scope="config.translationScope" @inspect-rule="inspectSiteRule" />
+      <SiteRulePreview :settings="config" :adaptation="config.siteAdaptation" :scope="config.translationScope"
+        :official-pack="officialSiteRuleRelease?.pack" @inspect-rule="inspectSiteRule" />
     </SettingsPanel>
   </section>
   <section v-if="hasVisitedSection('settings-translation-center')" v-show="props.activeSection === 'settings-translation-center'" id="settings-translation-center" class="settings-section translation-center-section">
@@ -694,6 +697,10 @@ async function inspectSiteRule(id: string) {
   openSettingsSection('settings-sites', 'adaptation');
 }
 import type {SiteAdaptationSettings as SiteAdaptationConfig} from '@/src/core/site-adaptation/types';
+import type {OfficialSiteRuleRelease} from '@/src/core/site-adaptation/officialRelease';
+import {
+  officialSiteRuleUpdatesEnabled, readOfficialSiteRuleRelease, refreshOfficialSiteRuleRelease,
+} from '@/src/services/site-adaptation/officialClient';
 import {
   getApiKeyRequirementKey,
   getMissingCredentialMessage,
@@ -771,6 +778,23 @@ watch(() => props.activeSection, (section) => {
 const {language, t, translateLegacy} = useUiI18n();
 const viewActive = ref(true);
 let disposed = false;
+const officialSiteRuleRelease = shallowRef<OfficialSiteRuleRelease | null>(null);
+const checkingOfficialSiteRules = ref(false);
+async function updateOfficialSiteRules(refresh = false): Promise<void> {
+  if (!officialSiteRuleUpdatesEnabled || checkingOfficialSiteRules.value || disposed) return;
+  checkingOfficialSiteRules.value = true;
+  try {
+    const release = await (refresh ? refreshOfficialSiteRuleRelease() : readOfficialSiteRuleRelease());
+    if (!disposed && release) officialSiteRuleRelease.value = release;
+  } finally {
+    if (!disposed) checkingOfficialSiteRules.value = false;
+  }
+}
+if (import.meta.env.BROWSER !== 'userscript') {
+  watch(() => viewActive.value && props.activeSection === 'settings-sites', active => {
+    if (active) void updateOfficialSiteRules();
+  }, {immediate: true});
+}
 let navigationRevision = 0;
 let pendingScroll: number | undefined;
 let scrollDestination: string | undefined;

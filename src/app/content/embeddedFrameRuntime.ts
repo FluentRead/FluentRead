@@ -31,6 +31,7 @@ import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {officialSiteRuleUpdatesEnabled, readOfficialSiteRuleRelease} from '@/src/services/site-adaptation/officialClient';
 import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 import {createPageTranslationFontRuntime} from './pageTranslationFont';
 
@@ -88,6 +89,7 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
     await configReady;
     if (ctx.isInvalid || disposed) { cleanup(); return; }
     await ensureUiLanguageBundle(config.uiLanguage);
+    const officialSiteRules = officialSiteRuleUpdatesEnabled ? await readOfficialSiteRuleRelease() : null;
     if (ctx.isInvalid || disposed) { cleanup(); return; }
 
     let activation: AbortController | null = null;
@@ -173,7 +175,7 @@ export async function startEmbeddedFrameApp(ctx: ContentScriptContext): Promise<
         return false;
     };
     const siteAdaptation = createContentSiteAdaptationRuntime(
-        config.siteAdaptation, new URL(window.location.href), () => controller.suspend());
+        config.siteAdaptation, new URL(window.location.href), () => controller.suspend(), officialSiteRules);
     let currentRouteHref = window.location.href;
     document.addEventListener('fluentread-route-change', () => {
         const nextRouteHref = window.location.href;

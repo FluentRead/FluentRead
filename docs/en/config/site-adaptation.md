@@ -15,7 +15,13 @@ Some sites keep author names, timestamps, votes, and navigation unchanged while 
 
 Explicit topic tags and Discourse category badges retain their original text. Examples include `chatgpt`, `rate-limit`, and `API` on forums, as well as standard tag links on blogs. Full-page and hover translation share this rule, including with **all-node recognition** enabled. Post titles and body text remain translatable.
 
+The X timeline keeps the native **Show more** button in its original language. The post text revealed by the button is still translatable.
+
 In the OpenAI Developer Community, navigation, filters, and activity dates also stay in their original language. Bilingual translations appear below topic titles and excerpts, and discussion text remains translatable.
+
+Full-page translation on Google Search also includes recognized AI Overview text.
+
+Full-page translation includes the Twitch live chat message text. Enable **Sidebar translation** to include streamer display names in the left sidebar.
 
 ## Translate every time—or leave it alone
 

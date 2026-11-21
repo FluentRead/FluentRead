@@ -5,7 +5,7 @@
  * 模块边界：仅汇总同目录纯模块，不依赖浏览器 API、Vue、存储和翻译供应商；内部解析辅助函数不向上层公开。
  */
 export {GLOSSARY_LIMITS, createGlossaryEntry, createGlossaryLibrary, normalizeGlossaryLibraries,
-    normalizeGlossaryDomain, normalizeGlossaryIds, buildGlossaryRevision} from './model';
+    cleanGlossaryText, normalizeGlossaryLanguage, normalizeGlossaryDomain, normalizeGlossaryIds, buildGlossaryRevision} from './model';
 export type {GlossaryLibrary, GlossaryEntry} from './model';
 export {createGlossaryRevisionMemoizer} from './revisionMemo';
 export {resolveGlossary, resolveGlossaryEntries, getGlossaryScopeReason, glossarySourcesOverlap, findGlossaryMatches} from './match';

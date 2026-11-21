@@ -34,6 +34,7 @@ import {mountConfiguredQuickTranslation} from './quickTranslationRuntime';
 import {installPageStyles} from './pageStyles';
 import {syncBilingualSentenceHighlight} from './bilingualSentenceHighlight';
 import {applyCoreTranslationPreferences, createContentSiteAdaptationRuntime} from './siteAdaptationRuntime';
+import {officialSiteRuleUpdatesEnabled, readOfficialSiteRuleRelease} from '@/src/services/site-adaptation/officialClient';
 import {createHoverTranslationConfigSubscription} from './hoverTranslationConfig';
 import {createPageTranslationFontRuntime} from './pageTranslationFont';
 
@@ -130,6 +131,7 @@ async function startMailFrameApp(ctx: ContentScriptContext, kind: MailFrameKind,
     await configReady;
     if (ctx.isInvalid || disposed) { cleanup(); return; }
     await ensureUiLanguageBundle(config.uiLanguage);
+    const officialSiteRules = officialSiteRuleUpdatesEnabled ? await readOfficialSiteRuleRelease() : null;
     if (ctx.isInvalid || disposed) { cleanup(); return; }
     let activation: AbortController | null = null;
     let toggleGeneration = 0;
@@ -236,7 +238,7 @@ async function startMailFrameApp(ctx: ContentScriptContext, kind: MailFrameKind,
         return false;
     };
     const siteAdaptation = createContentSiteAdaptationRuntime(
-        config.siteAdaptation, new URL(siteHref()), () => controller.suspend());
+        config.siteAdaptation, new URL(siteHref()), () => controller.suspend(), officialSiteRules);
     let currentRouteHref = window.location.href;
     let currentSiteHref = siteHref();
     document.addEventListener('fluentread-route-change', () => {

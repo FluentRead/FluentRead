@@ -94,6 +94,22 @@
     ]
   },
   {
+    "id": "twitch-live-chat",
+    "name": "Twitch 直播聊天",
+    "match": {"hosts": ["twitch.tv", "www.twitch.tv"]},
+    "mode": "augment",
+    "content": [
+      {
+        "css": [
+          ".chat-scrollable-area__message-container [data-a-target=\"chat-line-message-body\"]",
+          ".chat-scrollable-area__message-container .chat-line__message span[data-a-target=\"chat-message-text\"]:not([data-a-target=\"chat-line-message-body\"] *)"
+        ],
+        "resolve": "closest",
+        "key": "twitch-live-chat:message"
+      }
+    ]
+  },
+  {
     "id": "bilibili",
     "name": "哔哩哔哩",
     "match": {
@@ -374,6 +390,22 @@
     ],
     "watchIgnore": [
       "main article span:has(+ span > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > span.text-secondary.line-clamp-1) > a.x-link[href^=\"/\"]:not([href^=\"//\"]) > div.text-body.font-bold.line-clamp-1:not([dir=\"auto\"] *)"
+    ]
+  },
+  {
+    "id": "x-post-expand-control",
+    "name": "X 帖子展开控件",
+    "allScopes": true,
+    "match": {
+      "hosts": [
+        "*.x.com",
+        "*.twitter.com"
+      ]
+    },
+    "priority": 410,
+    "mode": "augment",
+    "omit": [
+      "main article [data-testid=\"tweet-text-show-more-link\"]"
     ]
   },
   {

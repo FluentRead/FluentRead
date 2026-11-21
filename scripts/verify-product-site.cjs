@@ -140,7 +140,7 @@ const contrast = (foreground, background) => {
   assert(!fs.existsSync(path.join(dist, 'maintainers')), 'Maintainer references must not publish')
   assert(!fs.existsSync(path.join(dist, 'marketing')), 'Store material must not publish')
   const manifest = JSON.parse(
-    fs.readFileSync(path.join(root, 'marketing/asset-manifest.json'), 'utf8')
+    fs.readFileSync(path.join(root, 'docs/maintainers/marketing/asset-manifest.json'), 'utf8')
   )
   for (const e of manifest.entries) {
     const meta = await sharp(path.join(root, e.file)).metadata()

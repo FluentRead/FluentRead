@@ -139,7 +139,7 @@ node scripts/testing/run-resource-safe.mjs -- node scripts/testing/run-affected-
 
 项目使用两道互补门禁，不能把“构建成功”和“代码行为已经覆盖”混为一谈：
 
-1. `vitest.coverage.config.ts` 中列出的已迁移 TypeScript 业务模块，V8 statements、branches、functions、lines 必须同时达到 100%。
+1. `tests/config/vitest.coverage.config.ts` 中列出的已迁移 TypeScript 业务模块，V8 statements、branches、functions、lines 必须同时达到 100%。
 2. `tests/architecture/verificationOwnership.test.ts` 审计其余 WXT entrypoint、Vue、CSS、HTML、browser runner、userscript 和文档文件，保证每个文件都由编译、双浏览器构建、静态契约、文档构建或隔离浏览器回归负责。
 
 严格覆盖率使用有界 30 秒用例预算：Vitest 5 会在同步用例返回后检查真实截止时间，完整源码图和冻结像素语料在 V8 插桩下实测需要 7–12 秒。普通回归预算、用例显式声明的超时及性能断言保持原值，四维 100% 门槛和完整测试发现范围保持不变。

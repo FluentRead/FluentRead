@@ -37,7 +37,7 @@ pnpm install --frozen-lockfile
 pnpm storybook
 ```
 
-打开终端显示的地址，默认 `http://127.0.0.1:6006`。示例位于 `storybook/`，配置位于 `.storybook/`；复用 `src/ui/components/` 和 `src/ui/styles/` 中的组件与样式。
+打开终端显示的地址，默认 `http://127.0.0.1:6006`。示例和配置都在 `docs/development/storybook/`，复用 `src/ui/components/` 和 `src/ui/styles/` 中的组件与样式。
 
 ### 卡片与信息层级
 

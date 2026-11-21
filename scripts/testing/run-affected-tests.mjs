@@ -12,6 +12,8 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import ts from 'typescript';
 
 const PROJECT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const COVERAGE_CONFIG = 'tests/config/vitest.coverage.config.ts';
+const LEGACY_COVERAGE_CONFIG = 'vitest.coverage.config.ts';
 const GROUPS = ['architecture', 'unit', 'functional', 'regression'];
 const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
 const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
@@ -35,7 +37,7 @@ export function changedPaths(root, base) {
 }
 
 export function strictCoveragePaths(source) {
-    const ast = ts.createSourceFile('vitest.coverage.config.ts', source, ts.ScriptTarget.Latest, true);
+    const ast = ts.createSourceFile(COVERAGE_CONFIG, source, ts.ScriptTarget.Latest, true);
     let include;
     const visit = node => {
         if (ts.isPropertyAssignment(node) && node.name.getText(ast) === 'coverage'
@@ -55,10 +57,17 @@ export function strictCoveragePaths(source) {
     return [...new Set(include)];
 }
 
-export function coverageRuntimeSignature(source) {
-    const ast = ts.createSourceFile('coverage.ts', source, ts.ScriptTarget.Latest, true);
+export function coverageRuntimeSignature(source, configPath = COVERAGE_CONFIG) {
+    const ast = ts.createSourceFile(configPath, source, ts.ScriptTarget.Latest, true);
+    const configDirectory = path.posix.dirname(configPath);
     const transformed = ts.transform(ast, [context => root => {
         const visit = node => {
+            // 配置移动时，相对导入按各自位置还原为仓库内的同一个路径。
+            if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text.startsWith('.')) {
+                const modulePath = path.posix.join(configDirectory, node.moduleSpecifier.text);
+                return ts.factory.updateImportDeclaration(node, node.modifiers, node.importClause,
+                    ts.factory.createStringLiteral(`./${modulePath}`), node.attributes);
+            }
             // 只登记新覆盖源码/测试不会改变执行环境；plugins、时钟、阈值或其他设置变化仍扩大行为范围。
             if (ts.isPropertyAssignment(node) && node.name.getText(ast) === 'include'
                 && ts.isObjectLiteralExpression(node.parent) && ts.isPropertyAssignment(node.parent.parent)
@@ -165,7 +174,7 @@ export function selectAffected({files, changed, matrix, coveragePaths, coverageA
         }
     }
     const globalInputs = changed.filter(file => GLOBAL_TEST_INPUTS.has(file));
-    if (coverageRuntimeChanged) globalInputs.push('vitest.coverage.config.ts');
+    if (coverageRuntimeChanged) globalInputs.push(COVERAGE_CONFIG);
     const affectedBehaviorTests = globalInputs.length ? behaviorTests : behaviorTests.filter(file => affected.has(file));
     const testFiles = [...new Set([...architectureTests, ...affectedBehaviorTests])];
     const coverageFiles = coveragePaths.filter(file => (changed.includes(file) || coverageAdded.includes(file)) && Object.hasOwn(files, file));
@@ -191,17 +200,21 @@ export function createPlan(root, base) {
     const files = Object.fromEntries(paths.filter(file => existsSync(path.join(root, file)))
         .map(file => [file, CODE.test(file) && (DEPENDENCY_CONTENT.test(file) || !file.includes('/'))
             ? readFileSync(path.join(root, file), 'utf8') : '']));
+    const coverageConfig = files[COVERAGE_CONFIG];
+    const coveragePaths = strictCoveragePaths(coverageConfig);
     let coverageRuntimeChanged = false;
     let coverageAdded = [];
-    if (difference.paths.includes('vitest.coverage.config.ts')) {
-        const previous = git(root, ['show', `${difference.base}:vitest.coverage.config.ts`]);
-        coverageRuntimeChanged = coverageRuntimeSignature(previous) !== coverageRuntimeSignature(files['vitest.coverage.config.ts']);
+    if (difference.paths.includes(COVERAGE_CONFIG)) {
+        const previousPath = git(root, ['ls-tree', '--name-only', difference.base, '--', COVERAGE_CONFIG]).trim()
+            ? COVERAGE_CONFIG : LEGACY_COVERAGE_CONFIG;
+        const previous = git(root, ['show', `${difference.base}:${previousPath}`]);
+        coverageRuntimeChanged = coverageRuntimeSignature(previous, previousPath) !== coverageRuntimeSignature(coverageConfig);
         const previousPaths = new Set(strictCoveragePaths(previous));
-        coverageAdded = strictCoveragePaths(files['vitest.coverage.config.ts']).filter(file => !previousPaths.has(file));
+        coverageAdded = coveragePaths.filter(file => !previousPaths.has(file));
     }
     return {base: difference.base, head: git(root, ['rev-parse', 'HEAD']).trim(),
         ...selectAffected({files, changed: difference.paths, matrix: JSON.parse(files['tests/test-matrix.json']),
-            coveragePaths: strictCoveragePaths(files['vitest.coverage.config.ts']), coverageAdded, coverageRuntimeChanged})};
+            coveragePaths, coverageAdded, coverageRuntimeChanged})};
 }
 
 export function scopedCoverageConfig(plan, baseConfigUrl) {
@@ -232,7 +245,7 @@ export async function executePlan(root, plan, runner = run) {
     const args = testInvocation(plan, configPath);
     if (!args) return {skipped: true, reason: 'no-affected-behavior-tests'};
     try {
-        if (plan.coverageFiles.length) writeFileSync(configPath, scopedCoverageConfig(plan, path.join(root, 'vitest.coverage.config.ts')));
+        if (plan.coverageFiles.length) writeFileSync(configPath, scopedCoverageConfig(plan, path.join(root, COVERAGE_CONFIG)));
         const result = await runner(root, args);
         if (result.code !== 0 || result.signal) throw new Error(`受影响测试失败：退出码 ${result.code ?? 'none'}，信号 ${result.signal ?? 'none'}`);
         return {skipped: false};

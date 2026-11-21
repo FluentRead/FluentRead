@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 
-export const exampleRoot = new URL('../examples/document-translation/', import.meta.url);
+export const exampleRoot = new URL('./fixtures/document-translation/', import.meta.url);
 
 export const DOCUMENT_EXAMPLES = [
     {fileName: 'sample.html', format: 'html', markers: ['<a href="https://example.com">', 'const untouched = true;']},

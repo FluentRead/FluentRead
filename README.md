@@ -74,6 +74,8 @@ corepack pnpm install --frozen-lockfile
 - `corepack pnpm dev` starts local development.
 - `corepack pnpm zip` builds and packages the Chrome extension.
 
+[Extension code](./src/) · [Integrations](./integrations/) · [Documentation source](./docs/) · [Component previews](./docs/development/storybook/) · [Tests](./tests/)
+
 [Other browsers](./docs/maintainers/releases.md#本地打包) · [Firefox source review](./scripts/amo/README.md)
 
 ## Contributing

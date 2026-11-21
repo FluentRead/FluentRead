@@ -407,7 +407,7 @@ async function main() {
             firefoxArchives.map((archive) => listArchiveArtifacts(path.join(outputDir, archive))),
         );
         for (const file of ['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
-            'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'patches/ppu-paddle-ocr@6.6.0.patch']) {
+            'src/app/background/runtime.ts', 'scripts/wasm/package-diagnostics.ts', 'scripts/patches/ppu-paddle-ocr@6.6.0.patch']) {
             assert(sourceArchive.includes(file), `Firefox 审核源码包缺少 ${file}`);
         }
         assert(!sourceArchive.some(file => /(?:^|\/)\.env(?:$|\.)|^(?:node_modules|coverage)\//u.test(file)),

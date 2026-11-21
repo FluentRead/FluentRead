@@ -69,6 +69,8 @@
 - `pnpm dev` 启动本地开发。
 - `pnpm zip` 构建并打包 Chrome 扩展。
 
+[扩展源码](../src/) · [第三方集成](../integrations/) · [文档源码](../docs/) · [组件预览](../docs/development/storybook/) · [测试](../tests/)
+
 [其他浏览器打包](../docs/maintainers/releases.md#本地打包)
 
 ## 贡献与反馈

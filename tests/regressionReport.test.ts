@@ -209,13 +209,13 @@ function fullCoverageMetric(total: number) {
 async function strictEvidenceFixture(directory: string) {
     const plan = fixturePlan(directory, [nodeStep('strict-coverage', 'console.log("strict fixture completed")')]);
     await mkdir(join(directory, 'src'), {recursive: true});
-    await mkdir(join(directory, 'tests'), {recursive: true});
+    await mkdir(join(directory, 'tests', 'config'), {recursive: true});
     const inputDirectory = join(directory, '.fixture-inputs');
     await mkdir(inputDirectory);
     const sourcePath = join(directory, 'src/probe.ts');
     await writeFile(sourcePath, 'export function probe(value: boolean) { return value ? 1 : 0; }\n');
     // 只允许静态读取这个配置；不执行配置里的 import 或任何任意代码。
-    await writeFile(join(directory, 'vitest.coverage.config.ts'),
+    await writeFile(join(directory, 'tests/config/vitest.coverage.config.ts'),
         'import {defineConfig} from "vitest/config";\n' +
         'export default defineConfig({test: {coverage: {include: ["src/probe.ts"]}}});\n');
     await writeFile(join(directory, 'tests/probe.test.ts'), '// 自包含的回归报告契约范围探针。\n');
@@ -559,7 +559,7 @@ describe('one-click regression report contracts', () => {
         const fixture = await strictEvidenceFixture(directory);
         const additionalSource = join(directory, 'src/omitted.ts');
         const additionalTest = join(directory, 'tests/omitted.test.ts');
-        const coverageConfig = join(directory, 'vitest.coverage.config.ts');
+        const coverageConfig = join(directory, 'tests/config/vitest.coverage.config.ts');
         const testMatrix = join(directory, 'tests/test-matrix.json');
         await writeFile(additionalSource, 'export const initialScopeMember = 2;\n');
         await writeFile(additionalTest, '// 初始测试范围内必须验证的另一个文件。\n');

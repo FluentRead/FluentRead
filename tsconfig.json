@@ -10,5 +10,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "exclude": ["node_modules", ".output", "storybook", ".storybook"]
+  "exclude": ["node_modules", ".output", "docs/development/storybook"]
 }

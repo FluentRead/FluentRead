@@ -27,6 +27,8 @@ pnpm docs:preview
 
 自定义域名使用根路径，VitePress 的 `base` 保持 `/`。不需要把构建文件提交到 `main`，也不需要 `gh-pages` 分支。维护文档不进入公开网站，见 VitePress 的 `srcExclude`。
 
+GitHub Actions 发布使用仓库 Pages 设置中的 **Custom domain**。[GitHub Pages 自定义域名文档](https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site#configuring-a-subdomain)
+
 ## 官方网站规则发布
 
 官网构建与扩展发布使用同一份正文适配规则源。启用签名更新时，将 P-256 公钥的 DER SPKI 以 Base64 写入仓库公开变量 `WXT_SITE_RULES_PUBLIC_KEY`，并将配对的 PEM 私钥放入 Actions secret `FLUENTREAD_SITE_RULES_PRIVATE_KEY`。官网的签名步骤会核对配对关系，扩展发布只读公钥。私钥仅提供给主线官网构建中的签名步骤。

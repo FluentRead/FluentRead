@@ -97,8 +97,10 @@ export function createImageGlossaryContext<TContext extends ImageGlossarySenderC
                     const fromOffscreen = frozenSender?.url === dependencies.offscreenUrl && frozenSender.tab === undefined;
                     const frozen = fromOffscreen ? active.get(requestId(message.requestId)) : snapshot(context, undefined);
                     if (!frozen) throw new Error('图片翻译上下文已失效，请重新翻译');
+                    const descriptors = Object.getOwnPropertyDescriptors(message);
+                    if (!fromOffscreen) delete descriptors.imageLabelSlots;
                     const forwarded = Object.defineProperties({}, {
-                        ...Object.getOwnPropertyDescriptors(message),
+                        ...descriptors,
                         ...Object.getOwnPropertyDescriptors({glossaryRevision: frozen.glossaryRevision, sourceLanguage: frozen.sourceLanguage}),
                     }) as BackgroundMessage;
                     return handler.handle(attachTranslationGlossaryContext(forwarded, {pageUrl: frozen.pageUrl, context: 'page',

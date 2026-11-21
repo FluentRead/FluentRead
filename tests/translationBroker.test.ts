@@ -35,6 +35,7 @@ import {
     allowUnchangedTranslationResult,
     markImageTextBatch,
     isImageTextBatch,
+    getImageLabelSlots,
 } from '@/src/services/translation/requestSnapshot';
 
 // 摘要专项使用超过压缩阈值的页面材料；短参考另有“不调用摘要”的真实回归。
@@ -2083,6 +2084,23 @@ describe('translation broker', () => {
         expect(mocks.service.mock.calls[0][0].origin).toEqual(['Right.', 'Continue.', 'Right.']);
     });
 
+    it('图片同栏短标签的译文缓存与相同文字的独立标签隔离', async () => {
+        mocks.config.service = 'google';
+        const origins = ['Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+        mocks.service.mockImplementation(async (message: {origin: string[]}) =>
+            ['查看公证印章。', getImageLabelSlots(message) ? '检查印章' : '检查密封', '比对印章。']);
+        const uncoupled = markImageTextBatch({origin: origins});
+        const coupled = markImageTextBatch({origin: origins}, [1]);
+        await expect(translateWithCache(uncoupled)).resolves.toEqual(['查看公证印章。', '检查密封', '比对印章。']);
+        await flushMicrotasks();
+        await expect(translateWithCache(coupled)).resolves.toEqual(['查看公证印章。', '检查印章', '比对印章。']);
+        expect(getImageLabelSlots(mocks.service.mock.calls[1][0])).toEqual([1]);
+        await flushMicrotasks();
+        await expect(translateWithCache(uncoupled)).resolves.toEqual(['查看公证印章。', '检查密封', '比对印章。']);
+        await expect(translateWithCache(coupled)).resolves.toEqual(['查看公证印章。', '检查印章', '比对印章。']);
+        expect(mocks.service).toHaveBeenCalledTimes(2);
+    });
+
     it('Google 同图批次部分缓存丢失时重算完整邻文，普通批译不复用同图槽缓存', async () => {
         mocks.config.service = 'google';
         mocks.service.mockImplementation(async ({origin}: {origin: string[]}) => origin.map((_, index) => `第${index + 1}句。`));
@@ -2117,9 +2135,10 @@ describe('translation broker', () => {
             if (Array.isArray(origin)) throw new NativeBatchResponseError('invalid slots');
             return origin === 'Right.' ? '对。' : '转弯。';
         });
-        await expect(translateWithCache(markImageTextBatch({origin: ['Right.', ' ', 'Turn.', 'Right.'], useCache: false})))
+        await expect(translateWithCache(markImageTextBatch({origin: ['Right.', ' ', 'Turn.', 'Right.'], useCache: false}, [2])))
             .resolves.toEqual(['对。', ' ', '转弯。', '对。']);
         expect(mocks.service.mock.calls[0][0].origin).toEqual(['Right.', 'Turn.', 'Right.']);
+        expect(getImageLabelSlots(mocks.service.mock.calls[0][0])).toBeUndefined();
         expect(mocks.service.mock.calls.slice(1).every(([message]) => !isImageTextBatch(message))).toBe(true);
     });
 

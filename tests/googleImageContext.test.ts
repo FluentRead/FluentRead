@@ -9,30 +9,63 @@ const paragraph = (...rows: string[]) => `<p>${rows.join(' ')}</p>`;
 describe('同图 Google HTML 位置和语气协议', () => {
     it('标题和残句保持独立，完整句子最多共享四个相邻位置，原文大小写和重复位置不变', () => {
         const texts = ['A TITLE', 'GO.', 'WAIT!', 'WHY?', 'GO.', 'ANOTHER SENTENCE.', 'Note:', 'Yes.'];
-        expect(createGoogleImageContext(texts, escape)).toEqual([
+        expect(createGoogleImageContext(texts, escape).documents).toEqual([
             `<pre>${slot(0, 'A TITLE')}</pre>`, paragraph(slot(1, 'GO.'), slot(2, 'WAIT!'), slot(3, 'WHY?'), slot(4, 'GO.')),
             paragraph(slot(5, 'ANOTHER SENTENCE.')), `<pre>${slot(6, 'Note:')}</pre>`, paragraph(slot(7, 'Yes.')),
         ]);
     });
     it('邻文达到 1200 字符即分组，过长单句保持完整且不与另一句连接', () => {
         const half = 'x'.repeat(599) + '.', large = 'x'.repeat(1200) + '.';
-        const docs = createGoogleImageContext([half, half, 'End.', large, 'After.'], escape);
+        const {documents: docs} = createGoogleImageContext([half, half, 'End.', large, 'After.'], escape);
         expect(docs).toHaveLength(4);
         expect(docs[0]).toBe(paragraph(slot(0, half), slot(1, half)));
         expect(docs[2]).toBe(paragraph(slot(3, large)));
-        expect(createGoogleImageContext([large], escape)).toEqual([paragraph(slot(0, large))]);
+        expect(createGoogleImageContext([large], escape).documents).toEqual([paragraph(slot(0, large))]);
     });
     it('空批次和纯标题不制造多余段落，原始标签和实体只作为文本', () => {
-        expect(createGoogleImageContext([], escape)).toEqual([]);
+        expect(createGoogleImageContext([], escape).documents).toEqual([]);
         expect(parseGoogleImageContext([], [], decode)).toEqual([]);
-        const docs = createGoogleImageContext(['<b>&amp;</b>', 'Next title'], escape);
+        const {documents: docs} = createGoogleImageContext(['<b>&amp;</b>', 'Next title'], escape);
         expect(docs).toEqual([`<pre>${slot(0, '&lt;b&gt;&amp;amp;&lt;/b&gt;')}</pre>`, `<pre>${slot(1, 'Next title')}</pre>`]);
         expect(parseGoogleImageContext(docs, ['<b>&amp;</b>', 'Next title'], decode)).toEqual(['<b>&amp;</b>', 'Next title']);
     });
     it('多行文字保留 pre 和原始换行，不能借邻文把列表或分行内容合成一句', () => {
-        expect(createGoogleImageContext(['Before.', 'First line.\nSecond line.', 'After.'], escape)).toEqual([
+        expect(createGoogleImageContext(['Before.', 'First line.\nSecond line.', 'After.'], escape).documents).toEqual([
             paragraph(slot(0, 'Before.')), `<pre>${slot(1, 'First line.\nSecond line.')}</pre>`, paragraph(slot(2, 'After.')),
         ]);
+    });
+    it('只给同栏标签发送有界前后文，并只还原实际补过句号的译文槽', () => {
+        const texts = ['Title.', 'Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.', 'Another label'];
+        const plan = createGoogleImageContext(texts, escape, [2, 4]);
+        expect(plan.documents).toEqual([
+            paragraph(slot(0, texts[0])),
+            paragraph(slot(1, texts[1]), slot(2, 'CHECK THE SEAL.'), slot(3, texts[3])),
+            `<pre>${slot(4, texts[4])}</pre>`,
+        ]);
+        expect([...plan.labelSlots]).toEqual([2]);
+        const response = [
+            paragraph(slot(0, '说明。')), paragraph(slot(1, '查看公证印章。'), slot(2, '检查印章。'), slot(3, '比对印章。')),
+            `<pre>${slot(4, '另一条标签')}</pre>`,
+        ];
+        expect(parseGoogleImageContext(response, texts, decode, plan.labelSlots))
+            .toEqual(['说明。', '查看公证印章。', '检查印章', '比对印章。', '另一条标签']);
+        expect(() => parseGoogleImageContext(response, texts, decode)).toThrow('槽位或句末边界');
+        expect(() => parseGoogleImageContext(
+            response.map(row => row.replace('检查印章。', '检查印章？')), texts, decode, plan.labelSlots,
+        )).toThrow('槽位或句末边界');
+    });
+    it.each([
+        ['Before', 'CHECK THE SEAL', 'After.'],
+        ['Before.', 'CHECK THE SEAL.', 'After.'],
+        ['Before.', 'CHECK ⟦GLOSSARY⟧ SEAL', 'After.'],
+        ['Before.', 'CHECK THE SEAL', 'After'],
+        ['x'.repeat(1200) + '.', 'CHECK THE SEAL', 'After.'],
+        ['First.\nSecond.', 'CHECK THE SEAL', 'After.'],
+    ])('拒绝缺少完整邻句、跨行或超预算的标签窗口 %#', (previous, label, next) => {
+        const texts = [previous, label, next];
+        const plan = createGoogleImageContext(texts, escape, [1]);
+        expect(plan.labelSlots.size).toBe(0);
+        expect(plan.documents).toEqual(createGoogleImageContext(texts, escape).documents);
     });
     it('按编号恢复乱序和重复对白，允许目标语言对应的句末符号和引号', () => {
         expect(parseGoogleImageContext([

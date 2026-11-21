@@ -32,6 +32,7 @@ import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry}
 import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
 import {hasUncoveredImageInk} from './imageEraseCoverage';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
+import {getAlignedImageLabelSlots} from '../labelContext';
 import {mangaOcrRuntime} from './mangaOcr';
 import {createMangaBlankLayoutBudget, drawMangaTranslations, planMangaBlankTranslation, sampleMangaBackgrounds} from './mangaRendering';
 import {getMangaBubblePlacement} from './mangaBubblePlacement';
@@ -132,6 +133,7 @@ export async function translateImageTextsInExtension(
     title: string,
     requestId: string | undefined,
     signal?: AbortSignal,
+    imageLabelSlots?: number[],
 ): Promise<string[]> {
     const operationId = requestId || `legacy-image-text-${++legacyImageTextRequestSequence}`;
     const response = await new Promise<any>((resolve, reject) => {
@@ -171,6 +173,7 @@ export async function translateImageTextsInExtension(
             chrome.runtime.sendMessage({
                 type: 'fluentReadImageTranslateTexts',
                 texts,
+                ...(imageLabelSlots?.length ? {imageLabelSlots} : {}),
                 title,
                 requestId: operationId,
                 timeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS,
@@ -841,7 +844,8 @@ export async function translateImageInOffscreen(
         const translations = lines.map(line => line.text);
         if (translatable.length) {
             reportProgress(requestId, 'translating');
-            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal);
+            const labels = manga ? undefined : getAlignedImageLabelSlots(translatable);
+            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal, labels);
             translatable.forEach(({index}, position) => {translations[index] = translated[position] ?? lines[index].text;});
         }
         throwIfImageOperationAborted(signal);

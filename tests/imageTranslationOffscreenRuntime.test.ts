@@ -1050,6 +1050,23 @@ describe('Offscreen 圈选裁剪生命周期', () => {
 });
 
 describe('Offscreen 图片文本 RPC 预算', () => {
+    it.each([false, true])('普通图片只发送可信同栏标签位置，跨栏=%s', async crossColumn => {
+        const texts = ['Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+        imageOptions.push({width: 640, height: 260});
+        mocks.recognize.mockResolvedValueOnce(texts.map((text, index) => {
+            const left = index === 1 && crossColumn ? 360 : 44;
+            return {text, bbox: {x0: left, x1: left + 260, y0: 32 + 66 * index, y1: 62 + 66 * index}};
+        }));
+        sendMessage.mockImplementation((message, callback) => callback(
+            message.type === 'fluentReadImageTranslateTexts' ? {success: true, translations: texts} : undefined,
+        ));
+        await translateImageInOffscreen('trusted-image-label', 'en', 'Page', undefined, 'label-test');
+        const request = sendMessage.mock.calls.find(([message]) => message.type === 'fluentReadImageTranslateTexts')![0];
+        expect(request).toMatchObject({texts, requestId: 'label-test'});
+        if (crossColumn) expect(request).not.toHaveProperty('imageLabelSlots');
+        else expect(request.imageLabelSlots).toEqual([1]);
+    });
+
     it('没有请求 ID 时生成独立请求标识，已取消请求只通知取消', async () => {
         const controller = new AbortController();
         controller.abort();

@@ -6,6 +6,7 @@
  * 细线背景：在原纯色与渐变规则之后，按单次修补共享的预付面积预算验证细线背景；只在完整不透明蒙版内采用源线条与横截面计划，保留已确认背景，少量跨度外像素仍走原扩散；透明保护路径保持原样。
  * 旋转短标签：独立物理字框可先验证书脊的逐列底色和真实墨迹，原清字蒙版与保护规则继续生效。
  * 斜向背景：独立窄横排框中的不透明背景经原图四边确认方向后沿斜边修补，整图共享独立工作预算。
+ * 普通扩散：窄横排框外沿的突变色只在相邻三层底色一致、且突变未向框内连续延伸时用作替换采样候选。仅改变扩散读取的颜色，不写外沿，避免被识别框切到的描边在框内扩散成色带。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
@@ -20,6 +21,65 @@ interface MaskRectangle {
     right: number;
     bottom: number;
     rotatedSource?: OcrLine['bbox'];
+}
+
+interface BoundarySampleBudget {
+    readonly rectangles: MaskRectangle[];
+    pixels: number;
+    comparisons: number;
+}
+
+interface BoundarySampleRows {
+    top?: Uint8ClampedArray;
+    bottom?: Uint8ClampedArray;
+}
+
+function rgbDistance(pixels: Uint8ClampedArray, a: number, b: number): number {
+    return Math.abs(pixels[a] - pixels[b]) + Math.abs(pixels[a + 1] - pixels[b + 1])
+        + Math.abs(pixels[a + 2] - pixels[b + 2]);
+}
+
+/** 外沿单点颜色不足以作证。只在同一侧有多处薄突变，且外侧颜色能互证时冻结采样行。 */
+function sampleBoundaryRow(pixels: Uint8ClampedArray, start: number, width: number, step: number): Uint8ClampedArray | undefined {
+    let samples: Uint8ClampedArray | undefined;
+    let count = 0;
+    for (let x = 0; x < width; x++) {
+        const first = start + x * 4;
+        const a = first + step, b = a + step, c = b + step;
+        if (rgbDistance(pixels, a, b) > 36 || rgbDistance(pixels, b, c) > 36 || rgbDistance(pixels, a, c) > 36
+            || rgbDistance(pixels, first, a) < 108 || rgbDistance(pixels, first, b) < 108 || rgbDistance(pixels, first, c) < 108
+            || (rgbDistance(pixels, first, first - step) < 72 && rgbDistance(pixels, first, first - step * 2) < 72)) continue;
+        // 两侧角点照读原图，便于扩散循环沿用局部横坐标。
+        samples ??= pixels.slice(start - 4, start + (width + 1) * 4);
+        for (let channel = 0; channel < 3; channel++) {
+            const p = pixels[a + channel], q = pixels[b + channel], r = pixels[c + channel];
+            samples[(x + 1) * 4 + channel] = p + q + r - Math.min(p, q, r) - Math.max(p, q, r);
+        }
+        count++;
+    }
+    return count >= 4 ? samples : undefined;
+}
+
+function planBoundarySampleRows(pixels: Uint8ClampedArray, imageWidth: number, imageHeight: number, box: MaskRectangle,
+    budget: BoundarySampleBudget): BoundarySampleRows | undefined {
+    const width = box.right - box.left, height = box.bottom - box.top;
+    if (width < 32 || width > 512 || height < 8 || height > 64 || width < height * 2 || width * height > 16_384) return;
+    const left = box.left - 4, top = box.top - 4, right = box.right + 4, bottom = box.bottom + 4;
+    const area = (right - left) * (bottom - top);
+    if (left < 0 || top < 0 || right > imageWidth || bottom > imageHeight || area > budget.pixels) return;
+    // 原位修补允许其他框已改变；所有外侧取样必须避开任何其他待擦除框。
+    for (const other of budget.rectangles) {
+        if (--budget.comparisons < 0) return;
+        if (other !== box && other.left < right && other.right > left && other.top < bottom && other.bottom > top) return;
+    }
+    budget.pixels -= area;
+    for (let y = top; y < bottom; y++) for (let x = left; x < right; x++) {
+        if (pixels[(y * imageWidth + x) * 4 + 3] !== 255) return;
+    }
+    const step = imageWidth * 4;
+    const upper = sampleBoundaryRow(pixels, ((box.top - 1) * imageWidth + box.left) * 4, width, -step);
+    const lower = sampleBoundaryRow(pixels, (box.bottom * imageWidth + box.left) * 4, width, step);
+    return upper || lower ? {top: upper, bottom: lower} : undefined;
 }
 
 function union(a: MaskRectangle, b: MaskRectangle): MaskRectangle {
@@ -113,12 +173,13 @@ export function inpaintTextRegions(
 
     const ruleBudget={remaining:IMAGE_RULED_REPAIR_LIMITS.pagePixels};
     const directionBudget={remaining:IMAGE_DIRECTIONAL_REPAIR_BUDGET};
-    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection,ruleBudget,directionBudget);
+    const boundaryBudget: BoundarySampleBudget = {rectangles, pixels:262_144, comparisons:65_536};
+    for (const group of clusters(rectangles)) repairCluster(result, width, height, group, protection,ruleBudget,directionBudget,boundaryBudget);
     return result;
 }
 
 function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[],
-    protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number},directionBudget:{remaining:number}): void {
+    protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number},directionBudget:{remaining:number},boundaryBudget:BoundarySampleBudget): void {
     const bounds = rectangles.reduce(union);
     if(!protection&&rectangles.length===1&&bounds.rotatedSource){
         const source=bounds.rotatedSource,mask={x0:bounds.left,y0:bounds.top,x1:bounds.right,y1:bounds.bottom};
@@ -191,6 +252,7 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
         if (repair) {repair(result); return;}
     }
 
+    let boundaryRows: BoundarySampleRows | undefined;
     if(!protection){
         const ruled=planImageRuledTextRepair(result,imageWidth,imageHeight,{left,top,width,height,mask},ruleBudget);
         if(ruled){
@@ -203,8 +265,10 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
                 mask[index]=0;maskedCount--;
             }
             if(maskedCount===0)return;
-        } else if (hasFullBorder && !bounds.rotatedSource
-            && repairDirectionalImageBackground(result,imageWidth,left,top,width,height,directionBudget)) return;
+        } else if (hasFullBorder && !bounds.rotatedSource) {
+            if (repairDirectionalImageBackground(result,imageWidth,left,top,width,height,directionBudget)) return;
+            boundaryRows = planBoundarySampleRows(result,imageWidth,imageHeight,bounds,boundaryBudget);
+        }
     }
 
     const queue = new Uint32Array(maskedCount);
@@ -265,15 +329,20 @@ function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeigh
             let alpha = 0;
             let weightTotal = 0;
             for (let ny = Math.max(0, y - 1); ny <= Math.min(height - 1, y + 1); ny += 1) {
+                const row = boundaryRows && (ny === 0 ? boundaryRows.top : ny === height - 1 ? boundaryRows.bottom : undefined);
+                const colors = row ?? result;
+                const rowOffset = ((ny + top) * imageWidth + left) * 4;
+                const colorStart = row ? 0 : rowOffset;
                 for (let nx = Math.max(0, x - 1); nx <= Math.min(width - 1, x + 1); nx += 1) {
                     const neighbour = ny * width + nx;
                     if (mask[neighbour] !== 0) continue;
-                    const offset = ((ny + top) * imageWidth + nx + left) * 4;
+                    const offset = rowOffset + nx * 4;
                     const weight = nx === x || ny === y ? 2 : 1;
                     const alphaWeight = result[offset + 3] * weight;
-                    red += result[offset] * alphaWeight;
-                    green += result[offset + 1] * alphaWeight;
-                    blue += result[offset + 2] * alphaWeight;
+                    const colorOffset = colorStart + nx * 4;
+                    red += colors[colorOffset] * alphaWeight;
+                    green += colors[colorOffset + 1] * alphaWeight;
+                    blue += colors[colorOffset + 2] * alphaWeight;
                     alpha += alphaWeight;
                     weightTotal += weight;
                 }

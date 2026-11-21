@@ -39,6 +39,8 @@ For fine ruled paper in ordinary images, repair preserves the background and fil
 
 When a horizontal line of text covers an angled edge in an opaque image, repair can continue the edge if the source colors agree on all four sides of the erasure box.
 
+When a recognition box clips a thin outline in a photo, repair can use nearby background samples that agree across several rows. This reduces streaking inside the erasure area.
+
 Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.
 
 On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. On photographs, automatic text color uses samples beneath each laid-out line. A contrasting outline can help when a line crosses light and dark areas.

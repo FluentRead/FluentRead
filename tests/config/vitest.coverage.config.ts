@@ -728,6 +728,7 @@ export default defineConfig({
                 'src/features/image-translation/ocrLanguages.ts',
                 'src/features/image-translation/services/client.ts',
                 'src/features/image-translation/services/inpainting.ts',
+                'src/features/image-translation/services/directionalTextRepair.ts',
                 'src/features/image-translation/services/ruledTextRepair.ts',
                 'src/features/image-translation/services/ocrWorkerRuntime.ts',
                 'src/features/image-translation/services/sharedOcrTasks.ts',

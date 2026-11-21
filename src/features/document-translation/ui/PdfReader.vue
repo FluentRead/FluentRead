@@ -477,7 +477,7 @@ const overlayPages = computed(() => {
       };
       if (!translated) return entry;
       const singleLine = block.lineCount <= 1;
-      const width = block.width + (singleLine ? spaceRight : 0);
+      const width = block.width + spaceRight;
       const height = block.height + spaceBelow;
       const serif = textFont.value === 'auto' ? /serif|roman|times|song|ming/iu.test(block.fontFamily) && !/sans/iu.test(block.fontFamily) : textFont.value === 'serif';
       const family = serif ? SERIF_FAMILY : SANS_FAMILY;

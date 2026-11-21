@@ -5,11 +5,14 @@
  * 模块边界：夹具文字均为测试自拟，不含任何真实论文内容；不启动浏览器、不调用翻译服务，译文叠放与选区由真实浏览器脚本覆盖。
  */
 import {readdirSync, readFileSync} from 'node:fs';
-import {join} from 'node:path';
-import {PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage} from 'pdf-lib';
-import {describe, expect, it} from 'vitest';
+import {createRequire} from 'node:module';
+import {dirname, join} from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {PDFDocument, PDFString, StandardFonts, degrees, rgb, type PDFFont, type PDFPage} from 'pdf-lib';
+import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import type {ParsedDocument, PdfDocumentBlock} from '@/src/features/document-translation/core/document';
 import {parseBinaryDocument} from '@/src/features/document-translation/services/binary';
+import {configurePdfResources} from '@/src/features/document-translation/services/pdfResources';
 import {buildPdfReadingPlan} from '@/src/features/document-translation/core/pdfReadingPlan';
 
 interface Fonts {serif: PDFFont; bold: PDFFont; italic: PDFFont; sans: PDFFont}
@@ -85,6 +88,13 @@ function expectSoundStructure(document: ParsedDocument): void {
 }
 
 describe('common paper layouts survive real PDF parsing', () => {
+    beforeAll(() => {
+        const resolve = createRequire(import.meta.url).resolve;
+        configurePdfResources({assetRoot: dirname(resolve('pdfjs-dist/package.json')),
+            workerUrl: pathToFileURL(resolve('pdfjs-dist/legacy/build/pdf.worker.mjs')).href});
+    });
+    afterAll(() => configurePdfResources());
+
     it.each([90, 180, 270] as const)('recovers physically turned source text when the PDF display rotation is %i degrees', async rotation => {
         const pdf = await PDFDocument.create(), font = await pdf.embedFont(StandardFonts.TimesRoman), sheet = pdf.addPage([612, 792]);
         sheet.setRotation(degrees(rotation));
@@ -241,6 +251,134 @@ describe('common paper layouts survive real PDF parsing', () => {
         expect(sources(document)).toEqual(['REFERENCES', ...Array.from({length: 10}, (_, index) => entry(index + 1))]);
         expect(blockOf(document, 'REFERENCES').kind).toBe('heading');
         expectSoundStructure(document);
+    });
+
+    it('keeps dense references with short URLs, numeric tails and capitalized continuations on their own entries', async () => {
+        const left = [
+            ['[52] An author. Proceedings of the example conference.', '742–755.'],
+            ['[53] A separate entry ends with a journal name.', '2023. Distributed storage for production workloads.', '(2023).'],
+        ];
+        const right = [
+            ['[70] An author. Extension for the database system.', 'https://example.org/project.'],
+            ['[71] A study of data lake storage. https://example.org/data-lake-', 'storage-query-acceleration'],
+            ['[72] Example Software. A portable embedded', 'Database using a columnar layout.'],
+            ['[73] Other Authors. Journal of Systems 6 (2023),', '97–105.'],
+        ];
+        const document = await build(sheet => {
+            for (const [entries, x] of [[left, 54], [right, 318]] as const) {
+                let y = 90;
+                for (const entry of entries) for (const [line, text] of entry.entries()) {
+                    sheet.page.drawText(text, {x: x + (line === 0 ? 0 : 16), y: sheet.height - y, size: 7, font: sheet.fonts.serif});
+                    y += 8;
+                }
+            }
+            centered(sheet, '5675', 760, 9, sheet.fonts.serif);
+        });
+        expect(sources(document)).toEqual([...left, ...right].map(lines => lines.join(' ').replace('data-lake- storage-', 'data-lake-storage-')));
+        expect(pages(document)[0].blocks.map(block => block.kind)).toEqual(['text', 'text', 'text', 'text', 'text', 'text', 'footer']);
+        expectSoundStructure(document);
+    });
+
+    it('keeps right-aligned values separate from the adjoining section of a ruled table', async () => {
+        const document = await build(sheet => {
+            for (const [x, width, operation] of [[322, 89, 'Read'], [417, 139, 'Write']] as const) {
+                const rightAligned = (text: string, baseline: number) => sheet.page.drawText(text,
+                    {x: x + width - sheet.fonts.serif.widthOfTextAtSize(text, 8), y: sheet.height - baseline, font: sheet.fonts.serif, size: 8});
+                for (let row = 0; row <= 4; row++) {
+                    const y = sheet.height - 240 - row * 13;
+                    sheet.page.drawLine({start: {x, y}, end: {x: x + width, y}, thickness: 0.5});
+                    if (row === 4) break;
+                    sheet.page.drawText(row === 0 ? 'Operation' : `${row}. ${operation} item`, {x, y: y - 9, font: sheet.fonts.serif, size: 8});
+                    rightAligned(row === 0 ? 'Lat (ms)' : String(86 + row * 31), 249 + row * 13);
+                }
+            }
+            sheet.page.drawText('Table 3: Cost of operations.', {x: 318, y: sheet.height - 304, font: sheet.fonts.bold, size: 9});
+        });
+        const table = pages(document)[0].blocks.filter(block => block.kind === 'table');
+        expect(table.filter(block => block.preserveSource).map(block => block.source).sort()).toEqual(['117', '117', '148', '148', '179', '179']);
+        const headers = table.filter(block => document.segments[block.segmentIndex]?.source === 'Lat (ms)');
+        expect(headers).toHaveLength(2);
+        expect(headers.every(block => block.textAlign === 'right' && block.cellBounds!.x < block.x)).toBe(true);
+        expect(sources(document).some(value => /^(?:Lat \(ms\) Operation|\d{2,} \d\.)/u.test(value))).toBe(false);
+        expectSoundStructure(document);
+    });
+
+    it('uses native link targets to reconnect typeset URLs while keeping the following words separate', async () => {
+        const document = await build(sheet => {
+            const entries = [
+                {first: '[10] Research manual. https://docs.example.', next: 'org/storage/index/ Accessed in 2025.', url: 'https://docs.example.org/storage/index/'},
+                {first: '[11] Public code repository. https:', next: '//example.net/a/project. Project page.', url: 'https://example.net/a/project'},
+                {first: '[12] Research website. https://example.edu/', next: 'Published in 2024.', url: 'https://example.edu/'},
+            ];
+            for (const [index, entry] of entries.entries()) {
+                const y = sheet.height - 90 - index * 16;
+                sheet.page.drawText(entry.first, {x: 54, y, font: sheet.fonts.serif, size: 7});
+                sheet.page.drawText(entry.next, {x: 70, y: y - 8, font: sheet.fonts.serif, size: 7});
+                const {context} = sheet.page.doc;
+                sheet.page.node.addAnnot(context.register(context.obj({Type: 'Annot', Subtype: 'Link',
+                    Rect: [70, y - 9, 158, y - 1], A: {S: 'URI', URI: PDFString.of(entry.url)}})));
+            }
+        });
+        expect(sources(document)).toEqual([
+            '[10] Research manual. https://docs.example.org/storage/index/ Accessed in 2025.',
+            '[11] Public code repository. https://example.net/a/project. Project page.',
+            '[12] Research website. https://example.edu/ Published in 2024.',
+        ]);
+    });
+
+    it('keeps each wrapped header over its own numeric cell in a three-rule table', async () => {
+        const columns = [
+            {x: 323, title: 'Baseline', next: '(unfiltered)', value: '34.1 s'},
+            {x: 377, title: 'Full', next: 'decode', value: '19.3 s'},
+            {x: 412, title: '+Selective', next: 'decode', value: '13.1 s (-32%)'},
+            {x: 465, title: '+Late', next: 'analysis.', value: '5.0 s (-61%)'},
+            {x: 513, title: '+Eval on', next: 'records', value: '0.4 s (-91%)'},
+        ];
+        const document = await build(sheet => {
+            const {page, fonts, height} = sheet;
+            for (const baseline of [257, 283, 299]) {
+                const y = height - baseline;
+                page.drawLine({start: {x: 318, y}, end: {x: 559, y}, thickness: 0.5});
+            }
+            for (const {x, title, next, value} of columns) {
+                for (const [text, baseline] of [[title, 268], [next, 279], [value, 294]] as const) {
+                    page.drawText(text, {x, y: height - baseline, size: 8, font: fonts.serif});
+                }
+            }
+            page.drawText('Table 2: Example runtime for five configurations.', {x: 318, y: height - 309, size: 9, font: fonts.bold});
+        });
+        const cells = pages(document)[0].blocks.filter(block => block.kind === 'table');
+        const headers = cells.filter(cell => !cell.preserveSource);
+        const data = cells.filter(cell => cell.preserveSource);
+        expect(headers.map(cell => cell.source)).toEqual(columns.map(column => `${column.title} ${column.next}`));
+        expect(data.map(cell => cell.source)).toEqual(columns.map(column => column.value));
+        expect(headers.map(cell => cell.cellBounds!.x)).toEqual(data.map(cell => cell.cellBounds!.x));
+        expect(new Set(data.map(cell => cell.cellBounds!.x)).size).toBe(5);
+        expectSoundStructure(document);
+    });
+    it('keeps a framed legend and paired numeric labels with their chart and translates the main caption', async () => {
+        const caption = 'Figure 8. Measured runtime across configurations.';
+        const document = await build(sheet => {
+            const {page, fonts, height} = sheet;
+            page.drawRectangle({x: 64, y: height - 98, width: 236, height: 18, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+            page.drawRectangle({x: 64, y: height - 171, width: 236, height: 70, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+            for (const [x, label] of [[76, 'Primary series'], [206, 'Control series']] as const) {
+                page.drawLine({start: {x, y: height - 91}, end: {x: x + 12, y: height - 91}, thickness: 0.5});
+                page.drawText(label, {x: x + 15, y: height - 92, size: 6, font: fonts.serif});
+            }
+            for (const x of [64, 190]) {
+                page.drawRectangle({x, y: height - 171, width: 110, height: 70, borderWidth: 0.5, borderColor: rgb(0, 0, 0)});
+                page.drawLine({start: {x: x + 8, y: height - 161}, end: {x: x + 103, y: height - 116}, thickness: 1});
+            }
+            page.drawText('(a) 8-GPU', {x: 102, y: height - 184, size: 8, font: fonts.serif});
+            page.drawText('(b) 32-GPU', {x: 240, y: height - 184, size: 8, font: fonts.serif});
+            page.drawText(caption, {x: 64, y: height - 200, size: 9, font: fonts.bold});
+        });
+        expect(sources(document)).toEqual([caption]);
+        const labels = pages(document)[0].blocks.filter(block => block.kind === 'figure-label').map(block => block.source).join(' ');
+        for (const label of ['Primary series', 'Control series', '(a) 8-GPU', '(b) 32-GPU']) expect(labels).toContain(label);
+        expect(pages(document)[0].preservedRegions?.some(region => region.kind === 'figure'
+            && region.source?.includes('Primary series') && region.source.includes('(b) 32-GPU'))).toBe(true);
     });
 
     // 本地真实论文的结构检查：把 FLUENTREAD_PDF_CORPUS 指向一个放有 PDF 的目录即可启用；论文本身不进入仓库。

@@ -3,6 +3,8 @@
  * 文件职责：处理 PDF、EPUB 与 DOCX 二进制文档的受限解析和导出，把压缩包或页面文本转换为统一 ParsedDocument，并生成可下载的双语产物；扫描页以图像并集和原生正文证据判定，兼容独立页码、图像外的少量原生页眉页脚及拼接扫描图。
  * 主要内容：相同译文回退原文；Word 段落记下表格单元格供阅读视图排版；按实际字节限制导入、按需加载二进制依赖，包含归档安全上限、可取消 PDF 提取与译文回填；原生旋转内容必要时沿用 sourceRotation 展示坐标，PDF 字形边界回退无效的零/负 ascent 并包含有限负 descent，原始字号与基线保持不变；复用已加载数学字形轮廓收紧通用字体边界，非剪切拉伸分隔符的横向字号只供行归组；零宽文字项使用受限同行位置估算，不把组合标记当作额外字形；默认逐页原版左右对照，保留旋转裁剪并直接嵌入 JPEG，支持文字几何的光栅端口添加可搜索复制的 Unicode 层（连接符与相邻字符共用 CID，保留组合表情及原行 advance）和溢出段落的可见全文续页，批注仍保留完整译文，候选标记避让复用已有几何数组而不逐候选复制；ePub/DOCX 导出让出主线程并使用可取消归档流，ePub 保持首项 mimetype 无压缩及 XHTML 章节格式；未改资源保留原压缩方式，文本导出直接使用 core 的回退规则避免重复规范化。
  * 模块边界：此服务可以依赖 JSZip、pdf-lib 和二进制 I/O，但不负责调用翻译服务或渲染设置页；文本格式规则归 core/document，目录书签由按需加载的 pdfOutline 按实际输出落点写入，浏览器 Canvas 光栅实现由 ui/pdfPreview 通过接口注入，独立应用的 PDF.js 静态地址由 pdfResources 端口提供。
+ * 原文网页链接：嵌入原页后用相同裁剪和旋转恢复其可点击区域，译页使用独立的文字几何。
+ * 重排文字层：在图表实际排入的位置写入其原文标签，保持跨页正文在 PDF 文字流中连续。
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 import {pdfFallbackBidiLine} from '../core/pdfFallbackBidi';
@@ -10,9 +12,9 @@ import type JSZip from 'jszip';
 import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
 import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
-import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
+import {analyzePdfPageLayout, extractPdfGraphicsShapes, joinPdfSourceLines, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
-import {paginatePdfReadingPlan, type PdfReadingOutputPage, type PdfTextMeasure} from '../core/pdfTextLayout';
+import {paginatePdfReadingPlan, type PdfReadingOutputPage, type PdfReadingRegionDraw, type PdfTextMeasure} from '../core/pdfTextLayout';
 import type {PdfReadingTextEntry} from '../core/pdfReadingRegions';
 
 import {
@@ -883,6 +885,20 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
                 const graphics = operators ? extractPdfGraphicsShapes(operators, pdfJs.OPS, viewport) : [];
                 signal?.throwIfAborted();
                 const {blocks: layoutBlocks, preservedRegions} = analyzePdfPageLayout({atoms, graphics, width: viewport.width, height: viewport.height});
+                // 原页链接可确认被折到下一行的域名或路径。只恢复已印刷的文字，不用链接目标替换可见标签。
+                const linkBlocks = layoutBlocks.filter(block => block.lines?.slice(0, -1).some(line => /https?:\S*$/u.test(line.text)));
+                if (linkBlocks.length && typeof page.getAnnotations === 'function') {
+                    const annotations = await awaitDocumentRead(page.getAnnotations().catch(() => []), signal);
+                    signal?.throwIfAborted();
+                    const links = new Set<string>();
+                    for (const {subtype, url, unsafeUrl} of annotations) {
+                        if (subtype !== 'Link') continue;
+                        for (const target of [url, unsafeUrl]) {
+                            if (typeof target === 'string' && /^https?:\/\//u.test(target)) links.add(target);
+                        }
+                    }
+                    if (links.size) for (const block of linkBlocks) block.source = joinPdfSourceLines(block.lines!, block.kind, links);
+                }
                 const {blocks, segmentIndexes} = pdfPageSegments(layoutBlocks, pageNumber, segments);
                 pages.push({
                     pageNumber,
@@ -1199,19 +1215,24 @@ async function renderPdf(
     await yieldToBrowser();
     options.signal?.throwIfAborted();
     // 一次复制共享资源；逐页 embedPage 会反复复制同一套字体与图片。
-    const sourcePages = new Map<number, PDFEmbeddedPage>();
-    const drawSourcePage = (target: ReturnType<typeof outputPdf.addPage>, source: PDFEmbeddedPage, pageData: PdfDocumentPage, offsetX = 0) => {
+    const {readPdfWebLinks, drawPdfWebLinks} = await import('./pdfExportLinks');
+    type EmbeddedSource = {page: PDFEmbeddedPage; links: ReturnType<typeof readPdfWebLinks>};
+    const sourcePages = new Map<number, EmbeddedSource>();
+    const drawSourcePage = (target: ReturnType<typeof outputPdf.addPage>, source: EmbeddedSource, pageData: PdfDocumentPage, offsetX = 0) => {
         const rotation = pageData.rotation ?? pageData.sourceRotation ?? 0;
-        if (!rotation) {target.drawPage(source, {x: offsetX, y: 0, width: pageData.width, height: pageData.height}); return;}
-        const quarterTurn = rotation === 90 || rotation === 270;
-        // embedPage 只包含内容流，/Rotate 不会被嵌入；在 PDF 底部向上的坐标系中顺时针旋转并移回正象限。
-        target.drawPage(source, {
-            x: offsetX + (rotation === 180 || rotation === 270 ? pageData.width : 0),
-            y: rotation === 90 || rotation === 180 ? pageData.height : 0,
-            width: quarterTurn ? pageData.height : pageData.width,
-            height: quarterTurn ? pageData.width : pageData.height,
-            rotate: degrees(-rotation),
-        });
+        if (!rotation) target.drawPage(source.page, {x: offsetX, y: 0, width: pageData.width, height: pageData.height});
+        else {
+            const quarterTurn = rotation === 90 || rotation === 270;
+            // embedPage 只包含内容流，/Rotate 不会被嵌入；在 PDF 底部向上的坐标系中顺时针旋转并移回正象限。
+            target.drawPage(source.page, {
+                x: offsetX + (rotation === 180 || rotation === 270 ? pageData.width : 0),
+                y: rotation === 90 || rotation === 180 ? pageData.height : 0,
+                width: quarterTurn ? pageData.height : pageData.width,
+                height: quarterTurn ? pageData.width : pageData.height,
+                rotate: degrees(-rotation),
+            });
+        }
+        drawPdfWebLinks(target, source.links, pageData.width, pageData.height, rotation, offsetX);
     };
     // 默认下载与原版对照阅读一致，一张原页对应一张译页；重排续页仅供显式阅读导出端口使用。
     const readingExport = Boolean((options.pdfReadingRenderer || options.pdfReadingRasterizer)
@@ -1250,7 +1271,7 @@ async function renderPdf(
             return intersection.right > intersection.left && intersection.top > intersection.bottom ? intersection : media;
         });
         const embedded = await awaitDocumentRead(outputPdf.embedPages(pages.map(({page}) => page), boundingBoxes), options.signal);
-        pages.forEach(({pageNumber}, index) => sourcePages.set(pageNumber, embedded[index]));
+        pages.forEach(({page, pageNumber}, index) => sourcePages.set(pageNumber, {page: embedded[index], links: readPdfWebLinks(page, boundingBoxes[index])}));
     }
     const embedImage = async (data: Uint8Array, format?: 'png' | 'jpeg') => {
         options.signal?.throwIfAborted();
@@ -1414,18 +1435,20 @@ async function renderPdf(
             if (++processed % 32 === 0) {await yieldToBrowser(); options.signal?.throwIfAborted();}
         }
     };
-    const readingRegionText = (pageData: PdfDocumentPage, items: PdfReadingOutputPage['items']): PdfRasterTextItem[] => {
+    const readingRegionText = (pageData: PdfDocumentPage, items: PdfReadingOutputPage['items']) => {
+        const regions = items.filter(item => item.kind === 'region');
+        const projected = new Map<PdfReadingRegionDraw, PdfRasterTextItem[]>();
+        if (!regions.length) return projected;
         const sourceRuns = pageData.blocks.map((block, index) => ({block, order: block.readingOrder ?? index}))
             .sort((left, right) => left.order - right.order).flatMap(({block}) => (block.lines?.length
             ? block.lines.flatMap(line => (line.runs?.length ? line.runs : [line]).map(run => ({...run, fontSize: run.fontSize ?? line.fontSize ?? block.fontSize})))
             : [{...block, text: document.segments[block.segmentIndex]?.source ?? block.source ?? ''}])
             .map(run => ({...run, segmentIndex: block.segmentIndex})));
-        const projected: PdfRasterTextItem[] = [];
-        for (const item of items) {
-            if (item.kind !== 'region') continue;
+        for (const item of regions) {
             const rect = item.sourceRect;
             if (!(rect.width > 0) || !(rect.height > 0)) continue;
             const scaleX = item.width / rect.width, scaleY = item.height / rect.height;
+            const lines: PdfRasterTextItem[] = [];
             for (const run of sourceRuns) {
                 if (!run.text || ![run.x, run.y, run.width, run.height, run.fontSize].every(Number.isFinite) || run.width <= 0 || run.height <= 0) continue;
                 // 一个字形只归属于包含其中心的条带；跨页边界采用半开区间，既不重复也不丢掉压线文字。
@@ -1437,11 +1460,12 @@ async function renderPdf(
                     return centerX >= rect.x && centerX < rect.x + rect.width;
                 });
                 if (!selected.length) continue;
-                projected.push({segmentIndex: run.segmentIndex, text: selected.map(value => value.text).join(''),
+                lines.push({segmentIndex: run.segmentIndex, text: selected.map(value => value.text).join(''),
                     x: item.x + (run.x + selected[0].index * advance - rect.x) * scaleX,
                     y: item.y + (run.y - rect.y) * scaleY,
                     width: selected.length * advance * scaleX, fontSize: run.fontSize * scaleY});
             }
+            if (lines.length) projected.set(item, lines);
         }
         return projected;
     };
@@ -1454,7 +1478,14 @@ async function renderPdf(
         for await (const rendered of options.pdfReadingRasterizer!({...pageData, sourceBytes: binary.bytes, translations: visibleTranslations,
             signal: options.signal, plan, imageFormat: 'png', footerLabel: settings.footerLabel})) {
             options.signal?.throwIfAborted();
-            const text = [...(rendered.textItems ?? []), ...readingRegionText(pageData, rendered.items ?? [])];
+            let text = rendered.textItems ?? [];
+            const regionText = readingRegionText(pageData, rendered.items ?? []);
+            if (regionText.size) {
+                // 整个区域按其版面位置插入，内部字形沿用源文档阅读顺序。
+                const groups = [...text.map(item => ({y: item.y, lines: [item]})),
+                    ...Array.from(regionText, ([region, lines]) => ({y: region.y, lines}))];
+                text = groups.sort((left, right) => left.y - right.y).flatMap(({lines}) => lines);
+            }
             if (settings.requireText) {
                 const reported = (rendered.textItems ?? []).filter(item => validRasterTextItem(item, rendered.width, rendered.height));
                 const missingText = rendered.items?.some(item => item.kind === 'text' && item.text.trim()
@@ -1529,7 +1560,7 @@ async function renderPdf(
         const pageChanged = changedPages[index];
         const source = sourcePages.get(pageData.pageNumber);
         // 分散到每页嵌入，避免 save() 一次性解压并重压全部原页内容流，令进度和取消失去响应。
-        if (source) await source.embed();
+        if (source) await source.page.embed();
         options.signal?.throwIfAborted();
         const gap = Math.max(8, Math.min(24, pageData.width * 0.025));
         const offsetX = mode === 'bilingual' && !readingExport ? pageData.width + gap : 0;
@@ -1580,15 +1611,20 @@ async function renderPdf(
                         const image = await embedImage(rendered.regionImage, 'png');
                         page.drawImage(image, {x: 0, y: 0, width: rendered.width, height: rendered.height});
                     }
-                    for (const item of rendered.items) if (item.kind === 'text' && item.text) {
-                        options.signal?.throwIfAborted();
-                        embedded.drawText(page, item.text.replace(/\t/gu, ' '), {size: item.font.size,
-                            x: item.x, y: rendered.height - item.y - embedded.font.heightAtSize(item.font.size, {descender: false}),
-                            color: rgb(0.094, 0.129, 0.184),
-                        });
-                    }
                     const regionText = readingRegionText(pageData, rendered.items);
-                    if (regionText.length) await drawSelectableLayout(page, {...pageData, rotation: 0, width: rendered.width, height: rendered.height, blocks: []}, regionText, 0);
+                    const textPage = {...pageData, rotation: 0 as const, width: rendered.width, height: rendered.height, blocks: []};
+                    for (const item of rendered.items) {
+                        options.signal?.throwIfAborted();
+                        if (item.kind === 'region') {
+                            const lines = regionText.get(item);
+                            if (lines) await drawSelectableLayout(page, textPage, lines, 0);
+                        } else if (item.text) {
+                            embedded.drawText(page, item.text.replace(/\t/gu, ' '), {size: item.font.size,
+                                x: item.x, y: rendered.height - item.y - embedded.font.heightAtSize(item.font.size, {descender: false}),
+                                color: rgb(0.094, 0.129, 0.184),
+                            });
+                        }
+                    }
                     await yieldToBrowser();
                     options.signal?.throwIfAborted();
                 }

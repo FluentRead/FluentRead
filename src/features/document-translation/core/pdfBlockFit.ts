@@ -3,6 +3,8 @@
  * 文件职责：为“原版排版”阅读把一段译文放回原文段落所占的矩形，决定哪些段落可以原位替换、可用高度和最终字号与分行。
  * 主要内容：筛选可原位替换的正文块并排除版面分析标记为保留的公式、图内标签、数字表格单元格与页眉页脚，含词语的表格单元格可以替换；量出段落下方到相邻内容之间的空白；从原字号开始按面积比例收缩，能完整放下时保留该布局。仍然溢出时采用能够容纳一行的最大已测字号作可读预览，完整文本交给全文面板与导出续页，不因缩成小字也放不下而牺牲预览可读性。
  * 题注边界：靠近图表上下沿的题注只在原宽度或所属图表宽度内扩展，避免两栏题注在不同基线上相互占位；右栏短题注也可以使用图表本身的可用宽度。
+ * 单元格边界：右对齐表头可借用同一格左侧的空白，右侧对齐位置与原文字形擦除范围独立保留。
+ * 重叠边界：同栏后一段与原段外框相交时，在后一段之前截住可绘制区域；单元格的多行译文也可以用本格内的横向空白。
  * 模块边界：纯几何与文字分行，不创建 DOM 或 Canvas、不读取像素、不调用翻译；表格和图文卡片保留自身边界，字宽测量由调用方注入，页面旋转由展示层处理。
  */
 import type {PdfDocumentBlock, PdfDocumentPage} from './document';
@@ -43,13 +45,20 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
     return page.blocks.flatMap(sourceBlock => {
         if (sourceBlock.preserveSource || PROTECTED_KINDS.has(sourceBlock.kind ?? '') || !(sourceBlock.width > 0) || !(sourceBlock.height > 0)) return [];
         const boundary = sourceBlock.cellBounds ?? sourceBlock.panelBounds;
+        const left = sourceBlock.cellBounds && sourceBlock.textAlign === 'right' && sourceBlock.lines?.length
+            ? Math.min(sourceBlock.x, sourceBlock.cellBounds.x + 0.5) : sourceBlock.x;
         const captionGap = (region: (typeof regions)[number]) => region.y >= bottom(sourceBlock) - 1 ? Math.max(0, region.y - bottom(sourceBlock))
             : sourceBlock.y >= bottom(region) - 1 ? Math.max(0, sourceBlock.y - bottom(region)) : Infinity;
         const captionRegion = sourceBlock.kind === 'caption' ? regions.filter(region => sourceBlock.x + sourceBlock.width / 2 >= region.x - 1
             && sourceBlock.x + sourceBlock.width / 2 <= right(region) + 1 && captionGap(region) <= sourceBlock.fontSize * 3)
             .sort((a,b)=>captionGap(a)-captionGap(b))[0] : undefined;
         const rightLimit = boundary ? right(boundary) - 0.5 : captionRegion ? Math.max(right(sourceBlock), right(captionRegion)) : Infinity;
-        const bottomLimit = boundary ? bottom(boundary) - 0.5 : contentHeight;
+        let bottomLimit = boundary ? bottom(boundary) - 0.5 : contentHeight;
+        for (const other of page.blocks) {
+            if (other.segmentIndex < 0 || other.y <= sourceBlock.y + sourceBlock.fontSize * 0.5 || other.y >= bottom(sourceBlock) - 1) continue;
+            const overlap = Math.min(right(sourceBlock), right(other)) - Math.max(sourceBlock.x, other.x);
+            if (overlap >= Math.min(sourceBlock.width, other.width) * 0.5) bottomLimit = Math.min(bottomLimit, other.y - 0.5);
+        }
         // 段落末行旁的 QED/式号可能落在该段的外接矩形里；让出右侧这一小条，不能将译文排到保留符号上。
         const rightInset = page.blocks.reduce((edge, other) => {
             const protectedSource = other.preserveSource || PROTECTED_KINDS.has(other.kind ?? '');
@@ -58,8 +67,8 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
                 ? Math.min(edge, other.x - 1.5) : edge;
         }, Math.min(right(sourceBlock), rightLimit));
         const clippedHeight = Math.max(1, Math.min(sourceBlock.height, bottomLimit - sourceBlock.y));
-        const block = rightInset < right(sourceBlock) || clippedHeight < sourceBlock.height
-            ? {...sourceBlock, width: Math.max(1, rightInset - sourceBlock.x), height: clippedHeight} : sourceBlock;
+        const block = left < sourceBlock.x || rightInset < right(sourceBlock) || clippedHeight < sourceBlock.height
+            ? {...sourceBlock, x: left, width: Math.max(1, rightInset - left), height: clippedHeight} : sourceBlock;
         let limit = Math.min(contentHeight, bottomLimit);
         let edge = boundary || captionRegion ? contentWidth : Math.max(right(block), contentWidth - Math.max(0, block.x));
         for (const other of neighbours) {
@@ -70,7 +79,8 @@ export function pdfOverlayBlocks(page: PdfDocumentPage): PdfOverlayBlock[] {
         // 居中/右对齐文字扩宽会移动它的对齐锚点；延长一行的右边界也不能侵入下方错开的另一栏。
         // 单元格和图文卡片采用自己的右边界，同时为相邻文字和实际页边留出间隙。
         const usableEdge = Math.min(rightLimit - 2, edge - 6);
-        const spaceRight = block.lineCount <= 1 && block.textAlign === 'left' ? Math.max(0, usableEdge - right(block)) : 0;
+        const canWiden = block.lineCount <= 1 || (block.kind === 'table' && block.cellBounds);
+        const spaceRight = canWiden && block.textAlign === 'left' ? Math.max(0, usableEdge - right(block)) : 0;
         for (const other of neighbours) {
             if (other === sourceBlock) continue;
             if (other.y >= bottom(block) - 1 && other.x < right(block) + spaceRight && right(other) > block.x) limit = Math.min(limit, other.y);

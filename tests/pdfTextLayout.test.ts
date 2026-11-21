@@ -23,6 +23,21 @@ describe('PDF fixed-font complete-text pagination', () => {
         expect(lines.some(line => line.includes('👩‍💻'))).toBe(true);
         expect(lines.filter(Boolean).every(line => measure(line) <= 72)).toBe(true);
     });
+    it('moves the protocol and domain together when a long URL starts after Chinese text', () => {
+        const title = '一段靠近行尾的参考文献。';
+        const prefix = 'https://example.org/';
+        const url = `${prefix}a-long-storage-documentation-path`;
+        const lines = wrapPdfReadingText(title + url, 29, body, text => text.length);
+        expect(lines[0]).toBe(title);
+        expect(lines[1].startsWith(prefix)).toBe(true);
+        expect(lines.join('')).toBe(title + url);
+        expect(lines.every(line => line.length <= 29)).toBe(true);
+    });
+    it('wraps Chinese prose touching a short URL independently of the URL', () => {
+        const prefix = '书目信息。https://example.org/';
+        expect(wrapPdfReadingText(prefix + '这里是研究文档。', prefix.length, body, text => text.length))
+            .toEqual([prefix, '这里是研究文档。']);
+    });
     it('ignores empty boundary paragraphs while retaining every internal blank line', () => {
         const value = '\r\n \t\r\n首段\r\n\r\n \t\r\n尾段\r\n \t\r\n';
         expect(wrapPdfReadingText(value, 528, body, measure)).toEqual(['首段', '', '', '尾段']);

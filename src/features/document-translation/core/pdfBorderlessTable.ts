@@ -1,8 +1,9 @@
 /**
  * @file src/features/document-translation/core/pdfBorderlessTable.ts
- * 文件职责：在已有整行文字几何中识别带表题、重复数值列的无边框数据表。
+ * 文件职责：在文字和横线几何中推导无竖线数据表的逻辑列界。
  * 主要内容：要求独立表题、至少三列文字表头与三行完整记录、稳定列对齐和至少两列连续数字；仅为确认的空白间隔推导逻辑单元格，不添加或改写文字。候选数量、行列数和搜索高度均有界，已有图形、正文和不完整结构不参与推断。
  * 模块边界：纯数据分析，不进行 OCR、不绘制表线、不访问文件或网络；推导框只供既有 PDF 布局、阅读与导出使用，原页像素保持不变。
+ * 三线表：表底邻接表题、表头与首条记录在各列重复对齐、有连续数值与明确列间空白时，以实际空白定界。
  */
 interface Rectangle {x: number; y: number; width: number; height: number}
 interface Line extends Rectangle {text: string; fontSize: number; baseline: number}
@@ -11,6 +12,41 @@ const right = (box: Rectangle) => box.x + box.width;
 const bottom = (box: Rectangle) => box.y + box.height;
 const numeric = (text: string) => /^[+−-]?(?:\d+(?:[.,]\d+)?|\.\d+)(?:[eE][+−-]?\d+)?%?$/u.test(text.trim());
 const caption = (text: string) => /^(?:表\s*\d+(?:[.．-]\d+)*[\s:：.．\p{Script=Han}]|Table\s+\d+(?:[.．-]\d+)*[\s:：.．])/iu.test(text);
+
+/** 在通行的三线表内，跨行表头与数值应有相同的列起点，分界须落在整列字形之外。 */
+export function findRuledTableDividers(atoms: readonly Line[], horizontalRules: readonly Rectangle[], pageWidth: number): Rectangle[] {
+    const dividers: Rectangle[] = [];
+    for (const title of atoms.filter(line => caption(line.text)).slice(0, 16)) {
+        const size = title.fontSize;
+        const nearby = horizontalRules.filter(rule => rule.width >= pageWidth * 0.2 && Math.abs(rule.x - title.x) <= size
+            && rule.y < title.y + 1 && rule.y >= title.y - size * 15).sort((a, b) => a.y - b.y);
+        const last = nearby.at(-1);
+        if (!last || title.y - bottom(last) > size * 1.1) continue;
+        const rules = nearby.filter(rule => Math.abs(rule.x - last.x) <= 1 && Math.abs(right(rule) - right(last)) <= 1);
+        if (rules.length !== 3) continue;
+        const [top, middle] = rules;
+        if (middle.y - top.y < size || last.y - middle.y < size) continue;
+        const cells = atoms.filter(atom => atom.baseline > bottom(top) && atom.baseline < last.y
+            && atom.x >= top.x - 0.5 && right(atom) <= right(top) + 0.5).sort((a, b) => a.baseline - b.baseline);
+        const header = cells.filter(atom => atom.baseline < middle.y);
+        const firstData = cells.find(atom => atom.baseline > bottom(middle));
+        if (!header.length || !firstData) continue;
+        const row = cells.filter(atom => Math.abs(atom.baseline - firstData.baseline) <= size * 0.3).sort((a, b) => a.x - b.x);
+        const numericData = (text: string) => numeric(text)
+            || /^[+−-]?\d+(?:[.,]\d+)?\s*[\p{L}%°]+(?:\s*\([+−-]?\d+(?:[.,]\d+)?%\))?$/u.test(text.trim());
+        if (row.length < 3 || row.length > 12 || row.filter(atom => numericData(atom.text)).length < 2
+            || row.some(atom => !header.some(line => Math.abs(line.x - atom.x) <= 0.8 && /\p{L}/u.test(line.text)))) continue;
+        const rowDividers: Rectangle[] = [];
+        for (const [index, cell] of row.slice(1).entries()) {
+            const boundary = cell.x - 0.8;
+            const previousEnd = Math.max(right(row[index]), ...cells.filter(atom => atom.x >= row[index].x - 0.8 && atom.x < boundary).map(right));
+            if (cell.x - previousEnd < 1.5) break;
+            rowDividers.push({x: (previousEnd + cell.x) / 2, y: top.y, width: 0, height: last.y - top.y});
+        }
+        if (rowDividers.length === row.length - 1) dividers.push(...rowDividers);
+    }
+    return dividers;
+}
 
 export function findBorderlessTables(atoms: readonly Line[], graphics: readonly Rectangle[], pageWidth: number): BorderlessTable[] {
     const captions = atoms.filter(line => caption(line.text)).slice(0, 16);

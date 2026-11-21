@@ -651,6 +651,7 @@ export default defineConfig({
                 'src/app/document-translation/downloadCopy.ts',
                 'src/features/document-translation/services/binary.ts',
                 'src/features/document-translation/services/pdfOutline.ts',
+                'src/features/document-translation/services/pdfExportLinks.ts',
                 'src/features/document-translation/services/pdfResources.ts',
                 'src/features/document-translation/services/archive.ts',
                 'src/features/document-translation/services/translation.ts',

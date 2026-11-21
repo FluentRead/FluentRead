@@ -437,10 +437,13 @@ export default defineConfig({
             // 合入混元段落分组、推理恢复及下载来源后，Chrome 由 68,600,232 增至 68,601,308 字节。
             // Firefox 实测 68,221,411 字节，各追加 2 kB 代码预算，继续校验实际安装包大小。
             const localTranslationRecoveryBudget = 2_000;
+            // 本地基线 36815fb7b 的 PDF 导出修复使 Chrome 增加 8,589 字节、Firefox 增加 8,476 字节。
+            // 按代码增量向上取整，继续校验实际安装包大小。
+            const pdfExportCodeBudget = 9_000;
             const featureBudget = courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget
                 + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget
                 + legacyTranslationTextBudget + boundaryEmojiBudget + epubCoveragePreviewBudget
-                + requestEvidenceBudget + localTranslationRecoveryBudget;
+                + requestEvidenceBudget + localTranslationRecoveryBudget + pdfExportCodeBudget;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : featureBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

@@ -2000,6 +2000,7 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
   it.each([
     ['普通原文', 'First source sentence.', ['First source sentence.']],
     ['合法重复原文', 'No no', ['No', 'no']],
+    ['滚动同文行', 'A timed source sentence.', ['A timed source sentence.', 'A timed source sentence.']],
   ] as const)('实际人工目标轨loader命中%s后进入空档，下一轮仍回退原文cue和缓存译文', async (_name, first, parts) => {
     Object.assign(ports.config, {from: 'en', videoPreferHumanSubtitles: true});
     const second = 'Second source sentence.', human = '第一句人工字幕。';
@@ -2037,7 +2038,7 @@ describe('public mounted YouTube nonfinite time and human track fallback', () =>
     try {
       f.emitVideo('timeupdate');
       expect(spy).toHaveBeenCalledTimes(1);
-      expect(spy.mock.calls[0][1]).toBe(first);
+      expect(spy.mock.calls[0][1]).toBe(parts.join(' '));
       spy.mockClear();
       f.video.currentTime = 1.5; f.setCaptionSegments([second]); f.emitVideo('timeupdate');
       missSelections = spy.mock.calls.length;

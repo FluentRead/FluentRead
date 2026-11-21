@@ -1508,16 +1508,17 @@ function mountVideoSubtitleRuntime(): () => void {
     }
     if (youtubeSelection?.stale) return resetTranslationState();
     const human = config.videoPreferHumanSubtitles && isYouTubeVideoPage()
-      ? humanCaptions.at(getCurrentVideoTimeMs() - subtitleOffsetMs) : '';
+      ? humanCaptions.at((youtubeSelection?.currentMs ?? getCurrentVideoTimeMs()) - subtitleOffsetMs) : '';
     if (human) {
-      const key = `${source}:${human}`;
+      const original = youtubeSelection?.cue?.text || source;
+      const key = `${original}:${human}`;
       if (key !== humanCaptionKey) {
         resetTranslationState();
         videoTranslator.cancelPending();
         humanCaptionKey = key;
       }
       normalizedCaptionActive = true;
-      reading.renderCaption(player, container, source, visibleTranslation(human, source));
+      reading.renderCaption(player, container, original, visibleTranslation(human, original));
       return;
     }
     if (humanCaptionKey) resetTranslationState();

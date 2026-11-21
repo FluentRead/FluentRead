@@ -666,7 +666,8 @@ async function google(message: TranslationProviderRequest) {
     const enableNativeBatch = message.enableNativeBatch
         ?? isNativeTranslationBatchEnabled('google', current.nativeBatchTranslationEnabled);
     const texts = typeof message.origin === 'string' ? [message.origin] : message.origin;
-    const imageContext = isImageTextBatch(message) && (getImageLabelSlots(message) ?? true);
+    const imageContext = import.meta.env.BROWSER !== 'userscript' && isImageTextBatch(message)
+        && (getImageLabelSlots(message) ?? true);
     const results = await translateGoogleTexts(texts, sourceLanguage, targetLanguage, message.abortSignal, message.requestTimeoutMs,
         enableNativeBatch, getTranslationRequestScheduler(message)?.lease, imageContext);
     return typeof message.origin === 'string' ? results[0]! : results;

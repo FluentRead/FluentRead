@@ -50,7 +50,8 @@ export function createTranslationRequestSnapshot<T extends object>(message: T): 
         const descriptor = descriptors[key];
         const value = 'value' in descriptor ? descriptor.value : Reflect.get(message, key);
         descriptors[key] = {
-            value: (key === 'origin' || key === 'glossaryIds' || key === 'texts' || key === 'imageLabelSlots') && Array.isArray(value) ? [...value] : value,
+            value: (key === 'origin' || key === 'glossaryIds' || key === 'texts'
+                || (import.meta.env.BROWSER !== 'userscript' && key === 'imageLabelSlots')) && Array.isArray(value) ? [...value] : value,
             enumerable: descriptor.enumerable,
             configurable: descriptor.configurable,
             writable: descriptor.writable ?? false,

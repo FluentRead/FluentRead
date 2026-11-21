@@ -22,6 +22,7 @@ const assertions = [
     [source.includes('fluentread-userscript-settings'), 'Full Options route is missing'],
     [!source.includes('fluent-read-writing-assistant'), 'Writing assistant runtime must be excluded'],
     [!source.includes('data-fr-slot'), 'Extension-only image context protocol must be excluded'],
+    [!source.includes('imageLabelContext') && !source.includes('imageLabelSlots'), 'Extension-only image label metadata must be excluded'],
     [!source.includes('fr-selection-highlight') && !source.includes('fr-selection-underline'), 'Native PDF annotation controls must be excluded'],
     [!source.includes('hypothesis/build/'), 'Packaged Hypothesis client must be excluded'],
     [source.includes('__FLUENTREAD_BROWSER_CAPABILITY_BUILD__:userscript:mv2__'), 'Userscript browser capability marker is missing'],

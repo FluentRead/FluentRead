@@ -1417,7 +1417,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         pendingBudgetMs: number,
         recoverSharedDeadline = true,
     ): Promise<string[]> {
-        const imageContext = usesImageTextContext(execution, message);
+        const imageContext = import.meta.env.BROWSER !== 'userscript' && usesImageTextContext(execution, message);
         const cacheMode: CacheRequestMode = imageContext ? 'image-context-v1'
             : message.aiMultiSegment === true && !supportsNativeTranslationBatch(execution.service)
             ? 'ai-multi-segment'

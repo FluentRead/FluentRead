@@ -90,8 +90,8 @@ describe('Google 批量传输与换线', () => {
             fetchMock.mockImplementation(async (url, init) => successfulResponse(url,
                 requestData(url, init).texts.map(text => text.replace('FIRST.', '第一。').replace('SECOND.', '第二。'))));
             const sources = ['FIRST.\nSECOND.', 'SECOND.'];
-            await expect(flush(imageRequest(sources))).resolves.toEqual(['第一。\n第二。', '第二。']);
-            await expect(flush(api.translateGoogleTexts(sources, 'en', 'zh-Hans', undefined, undefined, true, undefined, true)))
+            await expect(flush(imageRequest(sources, {labelSlots: [1]}))).resolves.toEqual(['第一。\n第二。', '第二。']);
+            await expect(flush(api.translateGoogleTexts(sources, 'en', 'zh-Hans', undefined, undefined, true, undefined, [1])))
                 .resolves.toEqual(['第一。\n第二。', '第二。']);
             expect(fetchMock).toHaveBeenCalledTimes(2);
             for (const [url, init] of fetchMock.mock.calls) {

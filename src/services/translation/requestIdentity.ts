@@ -127,7 +127,8 @@ export function createTranslationIdentityPolicy(deps: TranslationIdentityPorts) 
         return deps.buildTranslationCacheKey({
             requestMode: mode,
             sourceText: origin,
-            ...(imageLabelSlots ? {imageLabelContext: {version: 1, slots: imageLabelSlots}} : {}),
+            ...(import.meta.env.BROWSER !== 'userscript' && imageLabelSlots
+                ? {imageLabelContext: {version: 1, slots: imageLabelSlots}} : {}),
             // 仅含 emoji 的正文采用新恢复契约；不能复用保护前已经丢失字素的结果。
             ...(hasEmojiLiterals(origin) ? {emojiLiteralProtection: {version: 1}} : {}),
             sourceLanguage,

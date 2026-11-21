@@ -58,7 +58,7 @@
   .image-ocr-required {display:none;}
 }
 @media(prefers-reduced-motion:reduce) {.image-ocr-spinner{animation:none}}
-.image-ocr-section.is-embedded { width:100%; margin:16px 0 0; padding-top:4px; border:0; border-top:1px solid var(--line); border-radius:0; background:transparent; }
+.image-ocr-section.is-embedded { width:100%; margin:0; padding:0; border:0; border-radius:0; background:transparent; }
 .is-embedded .image-ocr-heading { padding:0 0 12px; border:0; }
 .is-embedded .image-ocr-heading h2 { font-size:14px; }
 .is-embedded .image-ocr-heading > div:first-child { min-width:0; }

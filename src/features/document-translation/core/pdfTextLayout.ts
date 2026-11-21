@@ -2,6 +2,7 @@
  * @file src/features/document-translation/core/pdfTextLayout.ts
  * 文件职责：将 PDF 阅读计划中的完整文字和原图区域分页为可读的下载版面。
  * 主要内容：正文固定可读字号与行距，按字素和词边界换行并用有界先进先出缓存复用近期字宽；保留当前页能容纳的段内空行，避免空行单独成页，不改写存储文字；整页可容纳的公式或插图整体换页，长段落与真实超高原图跨页续排，把源坐标浮点尾差并入末条带并保全全部图像几何；原版译文续页可按最后一张的内容缩短页高，保留正文下方的页脚空间。
+ * 网址折行：能放入一行的地址整体处理；长地址优先让协议和域名一起换行，路径继续按可用宽度折行。
  * 模块边界：只消费纯阅读计划和注入的字体测量，不使用 DOM、Canvas、浏览器 API 或文件 I/O；具体绘制与编码由 PDF 光栅端口负责。
  */
 import type {PdfReadingPlan, PdfReadingRect} from './pdfReadingPlan';
@@ -21,6 +22,8 @@ export interface PdfReadingOutputPage {width: number; height: number; items: Pdf
 
 const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const CLOSING = /^[，。！？；：、,.!?;:%）\]】》」』”’]/u;
+// 翻译服务可能在短网址后直接接中文。正文仍按中日韩字素折行，不能一并占住网址的不可拆分宽度。
+const URL = /https?:\/\/[^\s<>"'`，。、；：！？（）【】《》「」“”‘’\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu;
 const MAX_MEASURED_TOKENS = 512;
 // 一张输入页的续页预算；损坏或极端的几何不能令分页无限增长。
 const MAX_READING_PAGES = 4096;
@@ -76,12 +79,21 @@ export function wrapPdfReadingText(value: string, width: number, font: PdfReadin
         const tokens: string[] = [];
         let word = '';
         const flushWord = () => {if (word) {tokens.push(word); word = '';}};
-        for (const character of graphemes(paragraph)) {
-            if (CJK.test(character) || /\s/u.test(character)) {flushWord(); tokens.push(character);}
-            else if (CLOSING.test(character) && !word && tokens.length && !/\s/u.test(tokens.at(-1)!)) tokens[tokens.length - 1] += character;
-            else word += character;
+        const tokenize = (text: string) => {
+            for (const character of graphemes(text)) {
+                if (CJK.test(character) || /\s/u.test(character)) {flushWord(); tokens.push(character);}
+                else if (CLOSING.test(character) && !word && tokens.length && !/\s/u.test(tokens.at(-1)!)) tokens[tokens.length - 1] += character;
+                else word += character;
+            }
+            flushWord();
+        };
+        let start = 0;
+        for (const match of paragraph.matchAll(URL)) {
+            tokenize(paragraph.slice(start, match.index));
+            tokens.push(match[0]);
+            start = match.index + match[0].length;
         }
-        flushWord();
+        tokenize(paragraph.slice(start));
         let line = '', used = 0;
         const flush = () => {lines.push(line.trimEnd()); line = ''; used = 0;};
         const append = (token: string) => {
@@ -93,7 +105,11 @@ export function wrapPdfReadingText(value: string, width: number, font: PdfReadin
         };
         for (const token of tokens) {
             if (measured(token) > maxWidth && graphemes(token).length > 1) {
-                for (const character of graphemes(token)) append(character);
+                const prefix = /^https?:\/\/[^/?#]+[/?#]?/u.exec(token)?.[0];
+                if (prefix && measured(prefix) <= maxWidth) {
+                    append(prefix);
+                    for (const character of graphemes(token.slice(prefix.length))) append(character);
+                } else for (const character of graphemes(token)) append(character);
             } else append(token);
         }
         if (line) flush();

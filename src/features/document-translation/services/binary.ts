@@ -10,7 +10,7 @@ import type JSZip from 'jszip';
 import type {PDFDict, PDFDocument, PDFEmbeddedPage} from 'pdf-lib';
 import {getPdfResources} from './pdfResources';
 import {generateDocumentArchive, preserveStoredDocumentEntries} from './archive';
-import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
+import {analyzePdfPageLayout, extractPdfGraphicsShapes, joinPdfSourceLines, type PdfGraphicsShape, type PdfLayoutAtom, type PdfLayoutBlock} from '../core/pdfLayoutAnalysis';
 import {buildPdfReadingPlan, type PdfReadingPlan, type PdfReadingPresentation} from '../core/pdfReadingPlan';
 import {paginatePdfReadingPlan, type PdfReadingOutputPage, type PdfTextMeasure} from '../core/pdfTextLayout';
 import type {PdfReadingTextEntry} from '../core/pdfReadingRegions';
@@ -883,6 +883,20 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
                 const graphics = operators ? extractPdfGraphicsShapes(operators, pdfJs.OPS, viewport) : [];
                 signal?.throwIfAborted();
                 const {blocks: layoutBlocks, preservedRegions} = analyzePdfPageLayout({atoms, graphics, width: viewport.width, height: viewport.height});
+                // 原页链接可确认被折到下一行的域名或路径。只恢复已印刷的文字，不用链接目标替换可见标签。
+                const linkBlocks = layoutBlocks.filter(block => block.lines?.slice(0, -1).some(line => /https?:\S*$/u.test(line.text)));
+                if (linkBlocks.length && typeof page.getAnnotations === 'function') {
+                    const annotations = await awaitDocumentRead(page.getAnnotations().catch(() => []), signal);
+                    signal?.throwIfAborted();
+                    const links = new Set<string>();
+                    for (const {subtype, url, unsafeUrl} of annotations) {
+                        if (subtype !== 'Link') continue;
+                        for (const target of [url, unsafeUrl]) {
+                            if (typeof target === 'string' && /^https?:\/\//u.test(target)) links.add(target);
+                        }
+                    }
+                    if (links.size) for (const block of linkBlocks) block.source = joinPdfSourceLines(block.lines!, block.kind, links);
+                }
                 const {blocks, segmentIndexes} = pdfPageSegments(layoutBlocks, pageNumber, segments);
                 pages.push({
                     pageNumber,

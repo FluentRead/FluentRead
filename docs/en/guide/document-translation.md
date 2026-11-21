@@ -76,6 +76,8 @@ You can select, copy, and translate original-page text. Selection uses your sepa
 
 Original-layout downloads keep the source-page order. Bilingual output places each source page beside its translation; translation-only output keeps translated pages. Long passages retain a full PDF comment and continue on extra text pages after their matching source page, so the exported file can have more pages. Translated text can be searched, selected, and copied.
 
+Sequentially numbered references with hanging indents are translated by entry, with URLs, years, and page ranges kept together. Side-by-side table sections with a shared caption and matching row rules are laid out by cell, keeping values in their own columns.
+
 Downloading one document in **Reflowed text** uses fixed-size text with automatic page breaks. Bilingual output follows each source page with its translation. Figures and formulas stay together where possible; use Original layout when exact original glyphs matter. The first reflowed export prepares a font of about 5 MB online, then reuses it locally. Font requests contain no document text, translations, or credentials. Uncommon glyphs may depend on local fonts. Batch exports use Original layout.
 
 Identical text painted again in place for bold or shadow effects is counted once in the analyzed source and translation input. Adjacent repeated words, different text, and partial overlaps are retained. Original-page pixels are unchanged.

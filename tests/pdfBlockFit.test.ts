@@ -122,6 +122,18 @@ describe('PDF layout overlay block selection', () => {
         expect(bounded.spaceRight).toBe(0);
         expect(fit(bounded).overflow).toBe(true);
     });
+    it('borrows left-side space for a right-aligned table header while retaining its source glyph coordinates', () => {
+        const line = {x: 384, y: 462, width: 26.5, height: 8, text: 'Lat (ms)'};
+        const source = block(0, line.x, line.y, line.width, line.height, {kind: 'table', lineCount: 1,
+            fontSize: 8, textAlign: 'right', lines: [line], cellBounds: {x: 369, y: 458, width: 42, height: 15}});
+        const [overlay] = pdfOverlayBlocks(page([source]));
+        expect(overlay.block).toMatchObject({x: 369.5, width: 41, textAlign: 'right', lines: [line]});
+        expect(overlay.spaceRight).toBe(0);
+        const fit = fitPdfBlockText({text: '延迟（毫秒）', width: overlay.block.width * 0.985,
+            height: overlay.block.height + overlay.spaceBelow, fontSize: 8, lineHeight: 8, minFontSize: 6, weight: 400}, monospace);
+        expect(fit).toMatchObject({lines: ['延迟（毫秒）'], overflow: false});
+        expect(source).toMatchObject({x: line.x, width: line.width, lines: [line]});
+    });
     it('keeps a paragraph beside its preserved QED mark without changing source line erasure geometry', () => {
         const source = block(0, 70.86614, 686.88898, 455.55796, 26.87523, {lines: [{text: 'Source line', x: 70.86614, y: 686.88898, width: 455.55796, height: 11}]});
         const mark = block(-1, 515.85144, 701.88421, 8.558, 11, {kind: 'formula', preserveSource: true});

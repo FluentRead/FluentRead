@@ -250,6 +250,24 @@ describe('旋转窄标签先预检完整译文再清字',()=>{
         expect(result).toMatchObject({imageUnchanged:true,lines:[{sourceText:source.text,text:'面板',renderSkipped:true}]});
         expect(mocks.inpaint).not.toHaveBeenCalled();expect(mocks.draw).not.toHaveBeenCalled();
     });
+    it.each([false,true])('过长标签不耗尽另一条短标签的预检额度，manga=%s',async manga=>{
+        const box={x0:108,y0:15,x1:131,y1:125};
+        const short:MangaRegion={text:'READ MAP',fontSize:23,bbox:box,sourceBoxes:[box],quarterTurn:-1,textAlign:'center'};
+        const long='这段译文在文字面板内查看'.repeat(16);
+        const result=await prepare(manga,long,[source,short])();
+        expect(result.lines.map(line=>[line.text,line.renderSkipped===true])).toEqual([[long,true],['下一页',false]]);
+        const measures=canvases[0].context.measureText.mock.calls;
+        expect(measures.filter(([text])=>text===long)).toHaveLength(1);
+        expect(measures.length).toBeLessThan(80);
+        const repair=manga?mocks.repair:mocks.inpaint;
+        expect(repair.mock.calls[0][3]).toEqual([{...short,text:'下一页'}]);
+    });
+    it('一行宽度足够但字形厚度低于可读字号时仍保留原图',async()=>{
+        const thin={...bbox,x1:bbox.x0+8};
+        const result=await prepare(false,'面板',[{...source,bbox:thin,sourceBoxes:[thin],fontSize:8}])();
+        expect(result).toMatchObject({imageUnchanged:true,lines:[{text:'面板',renderSkipped:true}]});
+        expect(mocks.inpaint).not.toHaveBeenCalled();
+    });
 });
 
 it.each(['gradient','flat'])('普通图%s源色沿用旧绘字框和清字框，字号采用真实墨迹',async kind=>{

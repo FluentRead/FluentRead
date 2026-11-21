@@ -539,10 +539,16 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
         const plane=!prepared&&orientation&&text.length<=4096?createImageTypographyPlane({x0:left,y0:top,x1:left+width,y1:top+height},orientation,textAlign,(line,size)=>{
             const metric=measure(line,size);return {left:metric.actualBoundingBoxLeft,right:metric.actualBoundingBoxRight,ascent:metric.actualBoundingBoxAscent,descent:metric.actualBoundingBoxDescent};
         },bleed):undefined;
+        const labelMinimum=rotated?Math.max(7,maxFontSize*.5):0;
+        if(rotated&&plane){
+            // 标签必须保留单行和最低字号，先按同一词界度量完整行，避免为必然超宽的译文尝试拆字与缩小。
+            const fullLine=tokenize(text.trim()).map(token=>token??' ').join('');
+            if(textWidth(fullLine,labelMinimum)>plane.width)return false;
+        }
         const constraints=rotated&&plane?{...plane.constraints,accept:(layout:ImageTranslationTextLayout)=>layout.lines.length===1&&!!plane.plan(layout)}:plane?.constraints;
         const tilted=plane?layoutImageTranslationText(text,plane.width,plane.height,textWidth,maxFontSize,textInk,constraints):undefined;
         const placement=tilted&&plane!.plan(tilted);
-        if(rotated&&(!placement||tilted!.lines.length!==1||tilted!.fontSize<Math.max(7,maxFontSize*.5)))return false;
+        if(rotated&&(!placement||tilted!.lines.length!==1||tilted!.fontSize<labelMinimum))return false;
         const layout = placement?tilted!:prepared ?? layoutImageTranslationText(text,width-paddingX*2,height-paddingY*2,textWidth,maxFontSize,textInk);
         if (layout.lines.length === 0) return false;
         if(!preflight){

@@ -5,6 +5,7 @@ import {
   cleanServiceLabel,
   getServiceWebsite,
   searchServiceOptions,
+  serviceDirectorySearchText,
   splitServiceChoices,
 } from '@/src/ui/view-model/serviceCatalog'
 import { customModelString, defaultModels, models, options as catalogOptions, services, servicesType } from '@/src/core/config/catalog'
@@ -20,6 +21,23 @@ const options = [
   { value: 'openai', label: 'OpenAI', catalogKind: 'provider' },
   { value: 'newapi', label: 'New API', catalogKind: 'platform' },
 ]
+
+describe('Rapid-MLX local provider catalog', () => {
+  it('uses manual server model IDs, local capabilities and a searchable official entry', () => {
+    expect(buildServiceGroups([])).toEqual([])
+    const service = services.rapidmlx
+    expect(models.get(service)).toEqual([customModelString])
+    expect(defaultModels.get(service)).toBe(customModelString)
+    expect(servicesType.isAI(service)).toBe(true)
+    expect(servicesType.isUseProxy(service)).toBe(true)
+    expect(servicesType.isUseModel(service)).toBe(true)
+    expect(servicesType.isUseToken(service)).toBe(false)
+    expect(getServiceWebsite(service)).toEqual({url: 'https://rapidmlx.com', kind: 'website'})
+    const entry = catalogOptions.services.find(item => item.value === service)!
+    expect(serviceDirectorySearchText(entry)).toContain('rapid-mlx')
+    expect(serviceDirectorySearchText({value: service, label: 'Rapid-MLX'})).toContain('rapidmlx')
+  })
+})
 
 describe('service catalog helpers', () => {
   it('points combinations to the guide without using any member endpoint', () => {

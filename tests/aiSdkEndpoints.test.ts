@@ -36,7 +36,7 @@ describe('AI SDK 首批服务路由', () => {
         expect(AI_SDK_TRANSPORT_PROFILE).toBe('vercel-ai-sdk-openai-compatible-v1');
     });
 
-    it('精确覆盖 23 个 common 服务和 3 个专用入口', () => {
+    it('精确覆盖兼容平台的 common 服务和 3 个专用入口', () => {
         expect(AI_SDK_COMMON_SERVICE_IDS).toEqual([
             services.yiyan,
             services.infini,
@@ -54,6 +54,7 @@ describe('AI SDK 首批服务路由', () => {
             services.openrouter,
             services.grok,
             services.ollama,
+            services.rapidmlx,
             services.mistral,
             services.cohere,
             services.togetherai,
@@ -66,7 +67,7 @@ describe('AI SDK 首批服务路由', () => {
             services.cheaperinference,
             services.cheapaimodel,
         ]);
-        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(30);
+        expect(new Set(AI_SDK_SERVICE_IDS).size).toBe(31);
         expect(getAiSdkEndpointRoute(services.custom)).toBe('custom');
         expect(getAiSdkEndpointRoute(services.newapi)).toBe('newapi');
         expect(getAiSdkEndpointRoute(services.azureOpenai)).toBe('azure');

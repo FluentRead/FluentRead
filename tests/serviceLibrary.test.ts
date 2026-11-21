@@ -27,6 +27,8 @@ describe('personal translation service library', () => {
       ['openai', {token: {openai: 'fixture-key'}}],
       ['baiduTranslation', {secret: {baiduTranslation: 'partial-secret'}}],
       ['ollama', {proxy: {ollama: 'http://localhost:11435/v1'}}],
+      ['rapidmlx', {proxy: {rapidmlx: 'http://127.0.0.1:8012/v1/chat/completions'}}],
+      ['rapidmlx', {customModel: {rapidmlx: 'mlx-community/Qwen3.5-4B-MLX-4bit'}}],
       ['gemini', {customBody: {gemini: '{}'}}],
       ['newapi', {customHeaders: {newapi: '{}'}}],
       ['openai', {customModel: {openai: 'private-model'}}],

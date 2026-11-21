@@ -1,5 +1,6 @@
 /**
  * @file src/core/config/catalog.ts
+ * 本地服务：Rapid-MLX 复用无密钥 OpenAI 兼容分类，仅提供自定义模型入口，模型编号由用户查询服务端后填写。
  *
  * 文件职责：维护 FluentRead 翻译语言、服务与模型的领域目录，让设置、校验和运行时能够引用同一组稳定的服务标识与模型元数据。
  * 主要内容：明确区分简体中文和繁体中文，统一源语言、目标语言和输入框语言选项，并定义 services、servicesType、服务目录展示分类与排序（含“云服务厂商”分组）、模型候选、云厂商地域白名单、MiniMax 与 MiMo 的计费和地域选项；ChatGPT 套餐服务使用本机助手发现账户模型，不预置 API 模型或密钥字段。提供 resolveConfiguredModel、resolveCloudRegion 等解析函数，把“自定义模型”选择归一为可请求的模型编号。 同时维护默认翻译提示词与历史默认提示词清单，供配置归一化升级未被用户改写的旧默认值。 可核对的公开符号包括 services、cloudVendorServices、referenceAiPlatformServices、servicesType、customModelString、cloudRegionOptions、getDefaultCloudRegion、resolveCloudRegion、minimaxBillingPlans、MiniMaxBillingPlan、minimaxRegions、MiniMaxRegion、mimoBillingPlans、defaultOption、LEGACY_DEFAULT_USER_ROLES。
@@ -64,6 +65,7 @@ export const services = {
     grok: "grok", // X.AI 的 Grok
     newapi: "newapi", // New API 接口
     ollama: "ollama", // 本地 Ollama 运行时
+    rapidmlx: "rapidmlx", // Apple Silicon 本地 Rapid-MLX 运行时
     mistral: "mistral", // Mistral AI
     cohere: "cohere", // Cohere
     togetherai: "togetherai", // Together AI
@@ -109,9 +111,10 @@ export const cloudVendorServices = Object.freeze([
     services.volcTranslation,
 ]);
 
-/** 支持的 OpenAI 兼容平台；除本地 Ollama 外都需要平台密钥。 */
+/** 支持的 OpenAI 兼容平台；除本地 Ollama 与 Rapid-MLX 外都需要平台密钥。 */
 export const referenceAiPlatformServices = Object.freeze([
     services.ollama,
+    services.rapidmlx,
     services.mistral,
     services.cohere,
     services.togetherai,
@@ -213,8 +216,8 @@ export const servicesType = {
         services.openrouter,
         services.grok,
         services.newapi,
-        // 本地 Ollama 默认无鉴权，不纳入密钥要求。
-        ...referenceAiPlatformServices.filter((service) => service !== services.ollama),
+        // 本地 Ollama 与 Rapid-MLX 默认无鉴权，不纳入密钥要求。
+        ...referenceAiPlatformServices.filter((service) => service !== services.ollama && service !== services.rapidmlx),
         // 云服务厂商统一把主密钥存放在 token[service]。
         ...cloudVendorServices.filter((service) => service !== services.tencent),
     ]),
@@ -526,6 +529,7 @@ export const models = new Map<string, Array<string>>([
     [services.cloudgpu, [defaultModelIds[services.cloudgpu], "kimi-k3", "qwen3.6-35b", customModelString]],
     [services.cheaperinference, [defaultModelIds[services.cheaperinference], "deepseek-v4-flash", "glm-5.3", "claude-sonnet-5", customModelString]],
     [services.cheapaimodel, [defaultModelIds[services.cheapaimodel], "glm-5.3-flash", "glm-5.3", customModelString]],
+    [services.rapidmlx, [customModelString]],
     [services.ollama, [defaultModelIds[services.ollama], "qwen3.8:27b", "qwen3.8-flash-next:125b-a6b-q4_K_M", "qwen3.8-flash-next:125b-mlx", "qwen3:8b", "gemma3:12b", "llama3.2:3b", "mistral:7b", customModelString]],
 ]);
 
@@ -672,6 +676,7 @@ export const options = {
         {value: services.cloudgpu, label: "CloudGPU", catalogKind: "platform"},
         {value: services.cheaperinference, label: "Cheaper Inference", catalogKind: "platform"},
         {value: services.cheapaimodel, label: "cheapaimodel", catalogKind: "platform"},
+        {value: services.rapidmlx, label: "Rapid-MLX", description: "Apple Silicon · OpenAI API · localhost", catalogKind: "platform", searchTerms: ["rapid mlx rapid-mlx local localhost 本地 Mac"]},
         {value: services.ollama, label: "Ollama", description: "连接本机 Ollama，无需密钥，模型与数据都留在本地。", catalogKind: "platform", searchTerms: ["local localhost 本地"]},
         {value: services.custom, label: "自定义接口", catalogKind: "platform"},
     ],

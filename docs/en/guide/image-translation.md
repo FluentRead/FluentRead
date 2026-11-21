@@ -63,6 +63,8 @@ When Google native batching is enabled, complete sentences from an image can sha
 
 Ordinary rotated, scaled, mirrored and perspective images follow the page's native transforms. Styling changes reuse the existing recognition and translation. If overlay alignment or shared ancestor clipping cannot be verified, the original stays visible with an entry to read the translated text. Examples include fixed positioning with rotation, or a rotated image inside an overflow-clipping container that does not establish its positioning reference. A supported layout can display the existing translation again.
 
+Switching back to the original uses the page's responsive image source. Inline styles added or changed by the page while a translation is visible are preserved. If the page leaves the styles alone, FluentRead restores the original declaration as written.
+
 Nearby centered small text uses the image's blank space and smooth background to identify continued lines, reducing sentences split across translation requests. Verified spacing corrections retain their original layout relationship. Columns and intervening text or artwork still keep regions separate.
 
 Adjacent horizontal text on the same paper also checks actual glyph bounds and connected background, reducing split sentences when OCR boxes fit strokes too tightly. A verified closed paper boundary can reduce the background area that needs inspection. Borders, separate cards and intervening text continue to constrain grouping.

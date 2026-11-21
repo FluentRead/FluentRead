@@ -427,7 +427,10 @@ export default defineConfig({
             const lightColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
             // 重叠字形的二维词界复核实测 Chrome 增加2367字节，超原预算1884字节。Firefox 增加2369字节且仍在原预算内。
             const connectedColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 2_000 : 0;
-            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000) + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget + connectedColorRecognitionBudget;
+            // 图片生僻字回退实测 Chrome 增加85,380、Firefox 增加85,372字节，其中84,778字节为共同的包内资源。
+            const imageFontBudget = 86_000;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000)
+                + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget + connectedColorRecognitionBudget + imageFontBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
             // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
             if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');

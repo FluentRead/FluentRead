@@ -26,7 +26,8 @@ import {isSingleFrameImageData} from './imageDetectionSnapshot';
 import {createImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
 import { recognizeImage } from './ocrRuntime';
-import { getImageTextBackgroundColor, drawTranslatedImageText,canDrawTranslatedImageText,getImageTextDirection,getImageSourceTextStyle,getImageSourceTypographyStyle,getImageSingleLineHeight,IMAGE_TEXT_FONT,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import { getImageTextBackgroundColor, drawTranslatedImageText,canDrawTranslatedImageText,getImageTextDirection,getImageSourceTextStyle,getImageSourceTypographyStyle,getImageSingleLineHeight,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
+import {IMAGE_TEXT_FONT, mightNeedRareImageFont, prepareRareImageFont} from './imageTextFont';
 import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
 import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
 import {hasUncoveredImageInk} from './imageEraseCoverage';
@@ -476,6 +477,11 @@ async function prepareTranslatedImage(
         ...(skipped.has(index) ? {renderSkipped: true as const} : {})}]);
     // 品牌名或已经是目标语言的文字仍可阅读/复制，不应把识别成功显示为错误。
     if (translatedLines.length === 0&&!blankCandidates.length) return manga ? {image: '', mangaPatches: {width: source.naturalWidth || source.width, height: source.naturalHeight || source.height, patches: []}, lines: readingLines} : {image: '', imageUnchanged: true, lines: readingLines};
+    if (translatedLines.some(line => mightNeedRareImageFont(line.text))
+        || blankCandidates.some(({candidate}) => mightNeedRareImageFont(candidate.translated.text))) {
+        await prepareRareImageFont(signal);
+        throwIfImageOperationAborted(signal);
+    }
     const canvas = document.createElement('canvas');
     try {
         canvas.width = source.naturalWidth || source.width;

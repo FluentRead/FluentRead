@@ -18,6 +18,7 @@ export type {ImageTranslationTextLayout,ImageTextLayoutConstraints} from './text
 import type {ImageTextRegion} from '../paragraphs';
 import {isSpaceGraphemeExtension, isSpaceGraphemePrepend} from '../graphemeSpaceData';
 import {bindImageTextPunctuation} from './imageTextPunctuation';
+import {IMAGE_TEXT_FONT} from './imageTextFont';
 
 /** 从 OCR 框外围采样主色，忽略透明像素且不遍历框内面积。 */
 export function getImageTextBackgroundColor(
@@ -97,8 +98,6 @@ export function getImageTextColor(backgroundColor: string): string {
     const lightContrast = 1.05 / (luminance + 0.05);
     return darkContrast >= lightContrast ? '#111827' : '#ffffff';
 }
-
-export const IMAGE_TEXT_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", "Noto Sans CJK SC", "Noto Sans CJK TC", "Noto Sans CJK JP", "Noto Sans CJK KR", sans-serif';
 
 interface ImageSourceInkGeometry {width:number;height:number;count:number;bounds:OcrLine['bbox']}
 export interface ImageSourceTextStyle {fontSize:number;inkBounds?:OcrLine['bbox'];orientation?:ImageSourceTypographyGeometry}

@@ -4,17 +4,20 @@
  * 主要内容：按源行框及有界边缘修补，提供与实际蒙版一致的碰撞判断，保留行间图案；相接簇用链表连接成员后一次展开，避免重复复制和参数展开；已确认低 alpha 行段既不可写也不可作为扩散背景，隔离无种子的原字岛时显式拒绝；纯色边界省去队列，独立不透明矩形在完整边界符合平滑渐变时重建渐变，避免扩散造成条纹；共享渐变规划只在完整外周匹配且内部不含透明像素时冻结颜色，失败不写入，供漫画按原清字框复用；默认保留输入，也可显式复用调用方独占的像素缓冲。
  * 模块边界：本模块是无 DOM、无网络的轻量像素算法，不进行 OCR 或译文绘制，也不宣称能够重建复杂纹理；输入和输出保持原图尺寸，无保护参数时保持原有无边界行为；保护路径失败由调用方在发布前撤回。
  * 细线背景：在原纯色与渐变规则之后，按单次修补共享的预付面积预算验证细线背景；只在完整不透明蒙版内采用源线条与横截面计划，保留已确认背景，少量跨度外像素仍走原扩散；透明保护路径保持原样。
+ * 旋转短标签：独立物理字框可先验证书脊的逐列底色和真实墨迹，原清字蒙版与保护规则继续生效。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageTextRegion} from '../paragraphs';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from './mangaAlphaProtection';
 import {IMAGE_RULED_REPAIR_LIMITS,planImageRuledTextRepair} from './ruledTextRepair';
+import {planImageFlatTextRepair} from './flatTextRepair';
 
 interface MaskRectangle {
     left: number;
     top: number;
     right: number;
     bottom: number;
+    rotatedSource?: OcrLine['bbox'];
 }
 
 function union(a: MaskRectangle, b: MaskRectangle): MaskRectangle {
@@ -95,8 +98,14 @@ export function inpaintTextRegions(
     if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height)
         || width <= 0 || height <= 0 || source.length < width * height * 4 || lines.length === 0) return result;
 
-    const rectangles = lines.flatMap(line => (line.sourceBoxes ?? [line.bbox])
-        .map(bbox => getMaskRectangle({text: line.text, bbox}, width, height)))
+    const rectangles = lines.flatMap(line => {
+        const sources=line.sourceBoxes??[line.bbox];
+        return sources.map(bbox=>{
+            const rectangle=getMaskRectangle({text:line.text,bbox},width,height);
+            if(rectangle&&line.quarterTurn&&sources.length===1)rectangle.rotatedSource=bbox;
+            return rectangle;
+        });
+    })
         .filter((rectangle): rectangle is MaskRectangle => rectangle !== undefined);
     if (rectangles.length === 0) return result;
 
@@ -107,6 +116,11 @@ export function inpaintTextRegions(
 
 function repairCluster(result: Uint8ClampedArray, imageWidth: number, imageHeight: number, rectangles: MaskRectangle[], protection: MangaAlphaProtection|undefined,ruleBudget:{remaining:number}): void {
     const bounds = rectangles.reduce(union);
+    if(!protection&&rectangles.length===1&&bounds.rotatedSource){
+        const source=bounds.rotatedSource,mask={x0:bounds.left,y0:bounds.top,x1:bounds.right,y1:bounds.bottom};
+        const repair=planImageFlatTextRepair(result,imageWidth,imageHeight,{mask,source,fontSize:source.x1-source.x0,rotatedLabel:true},ruleBudget);
+        if(repair){repair(result);return;}
+    }
     // 一像素已知边界保留原八邻域；触图边时不引入不存在的外围像素。
     const left = Math.max(0, bounds.left - 1), top = Math.max(0, bounds.top - 1);
     const width = Math.min(imageWidth, bounds.right + 1) - left;

@@ -2,6 +2,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {createHash} from 'node:crypto';
 import {imageMaskBoxes,inpaintTextRegions,planImageGradientRepair} from '@/src/features/image-translation/services/inpainting';
 import {ImageAlphaProtectionUnavailableError,type MangaAlphaProtection} from '@/src/features/image-translation/services/mangaAlphaProtection';
+import {rotatedSpineFixture} from './helpers/rotatedSpineFixture';
 
 function solidPixels(width: number, height: number, color = [180, 200, 220, 255]): Uint8ClampedArray {
     const result = new Uint8ClampedArray(width * height * 4);
@@ -69,6 +70,18 @@ function knownHoleFixture() {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('图片文字背景修复', () => {
+    it('普通图片的独立旋转字框恢复书脊逐列原像素，未知、相接或组合框沿用既有修补',()=>{
+        const f=rotatedSpineFixture(),before=f.pixels.slice(),{width,height,region}=f;
+        expect(inpaintTextRegions(f.pixels,width,height,[region])).toEqual(f.background);
+        expect(f.pixels).toEqual(before);
+        const normal={...region,quarterTurn:undefined};
+        const neighbour={text:'OTHER',bbox:{x0:57,y0:24,x1:69,y1:38}};
+        expect(inpaintTextRegions(f.pixels,width,height,[region,neighbour])).toEqual(inpaintTextRegions(f.pixels,width,height,[normal,neighbour]));
+        const sourceBoxes=[region.bbox,neighbour.bbox];
+        expect(inpaintTextRegions(f.pixels,width,height,[{...region,sourceBoxes}])).toEqual(inpaintTextRegions(f.pixels,width,height,[{...normal,sourceBoxes}]));
+        f.pixels[f.offset(40,12)]++;
+        expect(inpaintTextRegions(f.pixels,width,height,[region])).toEqual(inpaintTextRegions(f.pixels,width,height,[normal]));
+    });
     it.each([
         [0,1,1,4,4],[12,-1,1,4,4],[12,1,-1,4,4],[12,1,1,2,4],[12,1,1,4,2],
         [12,10,1,4,4],[12,1,10,4,4],[12,1.5,1,4,4],[NaN,1,1,4,4],

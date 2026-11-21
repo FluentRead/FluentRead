@@ -213,6 +213,18 @@ describe('旋转窄标签先预检完整译文再清字',()=>{
             expect(mocks.draw.mock.calls[0][13].radians).toBe(-Math.PI/2);
         }else expect(mocks.mangaDraw).toHaveBeenCalledOnce();
     });
+    it.each([true,false])('只在实际恢复旋转笔画后取消漫画均匀填色，restored=%s',async restored=>{
+        const run=prepare(true,'面板');
+        mocks.sampleManga.mockReturnValueOnce([{uniform:true,color:'rgb(32,34,49)'}]);
+        mocks.repair.mockReset().mockImplementationOnce(async(pixels,_w,_h,_regions,_signal,_prepare,_progress,backgrounds,options)=>{
+            expect(backgrounds[0].uniform).toBe(true);
+            expect(options.onRotatedLabelRestored).toBeTypeOf('function');
+            if(restored)options.onRotatedLabelRestored(0);
+            return pixels;
+        });
+        await run();
+        expect(mocks.mangaDraw.mock.calls[0][6][0]).toMatchObject({uniform:!restored,color:'rgb(32,34,49)'});
+    });
     it.each([
         [false,'长译文'.repeat(50)],
         [true,'第一行\n第二行'],

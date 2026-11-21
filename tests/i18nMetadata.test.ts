@@ -11,11 +11,17 @@ import {createUserscriptMetadata} from '@/userscript/metadata';
 
 const root = resolve(__dirname, '..');
 const read = (file: string) => readFileSync(resolve(root, file), 'utf8');
-const metadataManifest = {name: '__MSG_extensionName__', description: '__MSG_extensionDescription__', default_locale: 'en'};
+const metadataManifest = {
+    manifest_version: 3,
+    name: '__MSG_extensionName__',
+    description: '__MSG_extensionDescription__',
+    default_locale: 'en',
+    action: {default_title: '__MSG_extensionToolbarTitle__'},
+};
 
 async function metadataVerifier() {
     return import(/* @vite-ignore */ pathToFileURL(resolve(root, 'scripts/testing/verify-extension-manifests.mjs')).href) as Promise<{
-        verifyLocalizedExtensionMetadata(directory: string, manifest: Record<string, string>): Promise<string[]>;
+        verifyLocalizedExtensionMetadata(directory: string, manifest: Record<string, unknown>): Promise<string[]>;
     }>;
 }
 
@@ -71,13 +77,17 @@ describe('localized installation and publication descriptions', () => {
         const directory = createMetadataFixture();
         try {
             const {verifyLocalizedExtensionMetadata} = await metadataVerifier();
-            expect(await verifyLocalizedExtensionMetadata(directory, metadataManifest)).toEqual(['en', 'es', 'fr', 'ja', 'ko', 'ru', 'zh_CN']);
+            const expectedLocales = ['en', 'es', 'fr', 'ja', 'ko', 'ru', 'zh_CN'];
+            const {action, ...metadataFields} = metadataManifest;
+            expect(await verifyLocalizedExtensionMetadata(directory, metadataManifest)).toEqual(expectedLocales);
+            expect(await verifyLocalizedExtensionMetadata(directory, {...metadataFields, manifest_version: 2, browser_action: action})).toEqual(expectedLocales);
             await expect(verifyLocalizedExtensionMetadata(directory, {...metadataManifest, description: productDescriptions['en-US']})).rejects.toThrow('浏览器本地化');
             await expect(verifyLocalizedExtensionMetadata(directory, {...metadataManifest, default_locale: 'zh_CN'})).rejects.toThrow('英文默认语言');
+            await expect(verifyLocalizedExtensionMetadata(directory, {...metadataManifest, action: {default_title: '__MSG_extensionName__'}})).rejects.toThrow('工具栏提示');
         } finally {rmSync(directory, {recursive: true, force: true});}
     });
 
-    it('rejects missing languages, missing names and descriptions that drift from the reviewed source', async () => {
+    it('rejects missing locales, missing names and tooltips, and outdated descriptions', async () => {
         const directory = createMetadataFixture();
         try {
             const {verifyLocalizedExtensionMetadata} = await metadataVerifier();
@@ -86,6 +96,8 @@ describe('localized installation and publication descriptions', () => {
             await expect(verifyLocalizedExtensionMetadata(directory, metadataManifest)).rejects.toThrow('缺少本地化扩展名称');
             writeFileSync(japaneseFile, JSON.stringify({extensionName: {message: 'FluentRead'}, extensionDescription: {message: 'Old slogan'}}));
             await expect(verifyLocalizedExtensionMetadata(directory, metadataManifest)).rejects.toThrow('扩展说明缺失、漂移');
+            writeFileSync(japaneseFile, JSON.stringify({extensionName: {message: 'FluentRead'}, extensionDescription: {message: productDescriptions['ja-JP']}}));
+            await expect(verifyLocalizedExtensionMetadata(directory, metadataManifest)).rejects.toThrow('工具栏提示缺失');
             rmSync(resolve(directory, '_locales/ja'), {recursive: true});
             await expect(verifyLocalizedExtensionMetadata(directory, metadataManifest)).rejects.toThrow('语言集合');
         } finally {rmSync(directory, {recursive: true, force: true});}

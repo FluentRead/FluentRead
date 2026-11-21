@@ -13,6 +13,7 @@
  * 深色底续证：非恒色外周且原路径没有旁证时，独立核对主导暗底、单一高对比墨色、三层同字形及完整背景空列；允许原字触边，不提高彩色边缘阈值。每页另限262144像素、512组件、512时间步，失败不退款；不占原有路径额度，不保留原裁图或改变字符与物理框。
  * 浅中性底彩字：在其他投影未发现词界且外周仍有底色候选时，复用紧裁三层投影。主导浅底与高对比彩墨须解释全裁图颜色，完整空列仍须和原 CTC 对齐。单独计费，保持其他底色的观察额度。
  * 彩底重叠字形：其他颜色投影没有词界时，最多在65536像素的单个裁图核对三层二维字形。强颜色变化、公共完整空列与更高的原模型空格分数同时通过才恢复词界，整页另计扫描、组件和模型时间步。
+ * 紧裁彩字的单层投影：墨迹触及上下边缘时，断掉的横笔可能留下假的空列。已有空格与独立空列吻合时，借同一行的模型帧距离排除偏短的新增候选。
  * 模块边界：只给锁定的 per-box、原比例 SDK 路径提供可选文字后处理，不导入 SDK 私有解码器，不修改概率或原像素；
  * CTC 横坐标只是空间候选，不是字形或擦除边界，物理空隙仍不能证明作者的语义空格，真实异常由调用方保留首因。
  */
@@ -39,8 +40,19 @@ export interface MangaWhitespaceReceipt {
 }
 interface Gap {start:number;end:number;after?:number}
 export interface MangaTerminalPeriodEvidence {start:number;previousInkEnd:number}
-interface Projection {width:number;gaps:Gap[];characters?:number;neutral?:true;tinted?:true;dark?:true;lightColor?:true;connectedColor?:true;terminalPeriod?:MangaTerminalPeriodEvidence}
+interface Projection {width:number;gaps:Gap[];characters?:number;neutral?:true;tinted?:true;dark?:true;lightColor?:true;connectedColor?:true;clippedInk?:true;terminalPeriod?:MangaTerminalPeriodEvidence}
 interface Trace {indices:Uint32Array;spaces:Float32Array;valid:number;paddedWidth:number}
+
+function gapAt(gaps:readonly Gap[],x:number):Gap|undefined {
+    let low=0,high=gaps.length;
+    while(low<high){
+        const mid=(low+high)>>1;
+        if(gaps[mid].start<x)low=mid+1;
+        else high=mid;
+    }
+    const gap=gaps[low-1];
+    return gap&&x<gap.end?gap:undefined;
+}
 
 /** @internal Pure, bounded edge-pixel classifier used by the OCR observer and its ambiguity regression. */
 export function findClippedTerminalPeriodEvidence(edgeInk:Uint8Array,edgeWidth:number,width:number,counts:Uint8Array):MangaTerminalPeriodEvidence|undefined {
@@ -141,6 +153,7 @@ export function createMangaRecognitionWhitespace(){
         };
 
         const counts=new Uint8Array(width),edgeWidth=Math.min(24,width),edgeStart=width-edgeWidth,edgeInk=new Uint8Array(edgeWidth*48);
+        let clippedInk=false;
         if(flatBorder){
             for(let y=0;y<48;y++)for(let x=0;x<width;x++){
                 const offset=(y*width+x)*4;
@@ -157,7 +170,11 @@ export function createMangaRecognitionWhitespace(){
                 const offset=(y*width+x)*4,r=data[offset],g=data[offset+1],b=data[offset+2];
                 if(data[offset+3]!==255)return;
                 const high=Math.max(r,g,b),chroma=high-Math.min(r,g,b);
-                if(chroma>=24&&high<=170){counts[x]++;if(x>=edgeStart)edgeInk[y*edgeWidth+x-edgeStart]=1;}
+                if(chroma>=24&&high<=170){
+                    counts[x]++;
+                    clippedInk ||= y===0||y===47;
+                    if(x>=edgeStart)edgeInk[y*edgeWidth+x-edgeStart]=1;
+                }
             }
         }
         const terminalPeriod=findClippedTerminalPeriodEvidence(edgeInk,edgeWidth,width,counts);
@@ -194,7 +211,8 @@ export function createMangaRecognitionWhitespace(){
         sorted.forEach((gap,index)=>{rank[gap.index]=index;});
         const mid=Math.floor((gaps.length-1)/2);
         const significant=gaps.filter(gap=>{const other=sorted[mid+(rank[gap.index]<=mid?1:0)];return gap.end-gap.start>=2*(other.end-other.start)+1;});
-        if(significant.length||terminalPeriod)return{width,gaps:significant.map(({start,end})=>({start,end})),...(terminalPeriod?{terminalPeriod}:{})};
+        if(significant.length||terminalPeriod)return{width,gaps:significant.map(({start,end})=>({start,end})),
+            ...(clippedInk?{clippedInk:true}:{}),...(terminalPeriod?{terminalPeriod}:{})};
         return tightProjection();
     }
     function capture(data:Float32Array,row:number,T:number,width:number,paddedWidth:number):Trace|undefined {
@@ -225,23 +243,35 @@ export function createMangaRecognitionWhitespace(){
         if(projection.characters!==undefined&&(chars.length!==projection.characters||chars.some(char=>!/^[A-Za-z0-9]$/u.test(char.character))))return text;
         const existing=new Set<number>();let units=0;
         for(const char of text){if(char===' ')existing.add(units);else units+=char.length;}
-        const candidates:Array<{units:number;gap:Gap}>=[];units=0;
+        const candidates:Array<{units:number;gap:Gap;frameSpan:number}>=[];units=0;
+        const frameWidth=trace.paddedWidth/trace.indices.length;
+        let knownWordSpan=Infinity;
         const minimumSpaceScore=projection.connectedColor ? 0.1 : 0.001;
         for(let i=0;i+1<chars.length;i++){
             const left=chars[i],right=chars[i+1];units+=left.character.length;
-            if(existing.has(units)||!/^[A-Za-z0-9]$/u.test(left.character)||!/^[A-Za-z0-9]$/u.test(right.character))continue;
+            if(!/^[A-Za-z0-9]$/u.test(left.character)||!/^[A-Za-z0-9]$/u.test(right.character))continue;
+            const frameSpan=right.t-left.t;
+            if(existing.has(units)){
+                if(projection.clippedInk){
+                    const leftCenter=(left.t+.5)*frameWidth,rightCenter=(right.t+.5)*frameWidth;
+                    const gap=gapAt(projection.gaps,(leftCenter+rightCenter)/2);
+                    if(gap&&gap.start>leftCenter&&gap.end<rightCenter)knownWordSpan=Math.min(knownWordSpan,frameSpan);
+                }
+                continue;
+            }
             let count=0,inside=false,foreign=false,peak=-1;
             for(let t=left.t+1;t<right.t;t++){
                 if(trace.indices[t]===0){if(!inside)count++;inside=true;if(peak<0||trace.spaces[t]>trace.spaces[peak])peak=t;}
                 else{inside=false;if(trace.indices[t]!==left.index)foreign=true;}
             }
             if(count!==1||foreign||peak<0||!(trace.spaces[peak]>minimumSpaceScore))continue;
-            const x=(peak+.5)*trace.paddedWidth/trace.indices.length,gaps=projection.gaps;let low=0,high=gaps.length;
-            while(low<high){const mid=(low+high)>>1;if(gaps[mid].start<x)low=mid+1;else high=mid;}
-            const gap=gaps[low-1];if(gap&&x<gap.end&&(projection.characters===undefined||gap.after===i+1))candidates.push({units,gap});
+            const gap=gapAt(projection.gaps,(peak+.5)*trace.paddedWidth/trace.indices.length);
+            if(gap&&(projection.characters===undefined||gap.after===i+1))candidates.push({units,gap,frameSpan});
         }
         const uses=new Map<Gap,number>();for(const candidate of candidates)uses.set(candidate.gap,(uses.get(candidate.gap)??0)+1);
-        const at=new Set(candidates.filter(candidate=>uses.get(candidate.gap)===1).map(candidate=>candidate.units));
+        // 允许一个离散模型帧的偏差，同一行内已有多处词界时采用最短的有效观测。
+        const minimumWordSpan=Number.isFinite(knownWordSpan)?knownWordSpan-1:0;
+        const at=new Set(candidates.filter(candidate=>uses.get(candidate.gap)===1&&candidate.frameSpan>=minimumWordSpan).map(candidate=>candidate.units));
         let output='';units=0;
         for(const char of text){output+=char;if(char!==' '){units+=char.length;if(at.has(units))output+=' ';}}
         const lastCharacter=chars.at(-1),position=lastCharacter&&output===output.trimEnd()&&/[A-Za-z]$/u.test(output)

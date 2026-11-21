@@ -87,7 +87,7 @@ Independent labels on a shared background use their actual ink spacing to stay s
 
 In manga mode, neighboring gradient headings with a clear shared left or right edge can keep that alignment for single-line translations. This helps short translations preserve the original hierarchy. Centered text, wrapping, transparency avoidance or insufficient space retain the existing layout.
 
-The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. For an explicitly selected Russian or Korean source, single-image translation shows and uses Tesseract. If a pack is missing, you can prepare it and continue from the current image. Switching to another language restores your preferred engine. Changing recognition engines makes the next translation recognize the image again; selecting an engine alone does not start a download.
+The default **PaddleOCR (standard model)** prepares about **30 MB** on the first translation and shares its resources with manga. **Tesseract (lightweight model)** uses packs for the selected source language. Single-image translation uses Tesseract when you explicitly select Russian, Korean, Arabic, or Hebrew as the source. If a pack is missing, you can prepare it and continue from the current image. Switching to another language restores your preferred engine. The next translation uses your selected engine to recognize the image again. Downloads start when you translate or choose to prepare a pack.
 
 PaddleOCR automatically enhances recognition contrast for some colored text on light backgrounds and bright text on dark backgrounds, without another model download. Very faint, thin lettering and complex backgrounds can still lose text; check the original or text panel.
 
@@ -118,7 +118,7 @@ Search **Supported websites** by name or domain and check the reader type. Some 
 
 ### Download manga models
 
-Manga normally uses local PaddleOCR, with LaMa to repair lettering on complex backgrounds. Recognition needs about **30 MB** and repair about **197 MB**. Single-image PaddleOCR does not load the manga repair model. For Russian or Korean manga, explicitly select the source language to use its language pack; the automatic manga model does not contain these scripts.
+Manga normally uses local PaddleOCR, with LaMa to repair lettering on complex backgrounds. Recognition needs about **30 MB** and repair about **197 MB**. Single-image PaddleOCR does not load the manga repair model. For Russian, Korean, Arabic, or Hebrew manga, select the source language to prepare the corresponding Tesseract pack.
 
 View resource status under **Image/manga translation → Recognition resources**. Expand download management to remove resources or import existing files. Failed connections or checks retry automatically. Complete files are kept and only missing files are downloaded; an incomplete individual file must restart. Imports must match the required names, sizes, and integrity checks and stay on your device.
 

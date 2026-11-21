@@ -11,7 +11,7 @@ import {
     restoreOcrLineCoordinates,
     selectChangedTranslations,
 } from '@/src/features/image-translation/core';
-import {getMangaOcrEngine, getRequiredImageOcrLanguages} from '@/src/features/image-translation/ocrLanguages';
+import {getMangaOcrEngine, getRequiredImageOcrLanguages, IMAGE_OCR_LANGUAGE_PACKS, IMAGE_OCR_SOURCE_LANGUAGES, normalizeImageOcrLanguageCodes} from '@/src/features/image-translation/ocrLanguages';
 import {inpaintTextRegions} from '@/src/features/image-translation/services/inpainting';
 import {groupMangaOcrLines} from '@/src/features/image-translation/services/mangaRegions';
 
@@ -577,6 +577,19 @@ describe('图片 OCR 有界尺寸和可信文本', () => {
             expect(getRequiredImageOcrLanguages(source)).toEqual(['kor', 'eng']);
         }
         for (const source of ['auto', '', 'en', 'ja', 'zh-Hans', 'es', 'fr', 'uk', 'russian', 'korean']) expect(getMangaOcrEngine(source)).toBe('paddle');
+    });
+    it.each([
+        ['ar', 'ara', 'العربية', ['ar', ' ar_SA ']],
+        ['he', 'heb', 'עברית', ['he', 'HE-IL', ' iw_IL ']],
+    ] as const)('在源语言列表中提供 %s，并只在明确选择后要求该语言包', (language, pack, label, aliases) => {
+        expect(IMAGE_OCR_SOURCE_LANGUAGES).toContainEqual({value: language, label});
+        expect(IMAGE_OCR_LANGUAGE_PACKS).toContainEqual(expect.objectContaining({code: pack, label, recommended: false}));
+        expect(normalizeImageOcrLanguageCodes([pack, 'eng', pack])).toEqual([pack, 'eng']);
+        expect(getRequiredImageOcrLanguages('auto')).not.toContain(pack);
+        for (const source of aliases) {
+            expect(getRequiredImageOcrLanguages(source)).toEqual([pack, 'eng']);
+            expect(getMangaOcrEngine(source)).toBe('tesseract');
+        }
     });
     it('普通图片保留原始尺寸，大图同时受像素总数和最长边约束', () => {
         expect(getOcrImageSize(320, 180)).toEqual({width: 320, height: 180});

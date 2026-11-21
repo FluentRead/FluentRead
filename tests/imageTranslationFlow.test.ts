@@ -26,7 +26,7 @@ function setup(extra = {}) {
     return {dependencies, handler:(type:string)=>handlers.find(h=>h.type===type)!};
 }
 
-it.each(['ru-RU','ko-KR'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
+it.each(['ru-RU','ko-KR','ar-SA','he-IL'])('单图语言模型 %s 在后台先确认语言包，再使用轻量识别',async sourceLanguage=>{
     const assertLanguagesDownloaded=vi.fn()
         .mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'))
         .mockResolvedValueOnce(undefined);
@@ -405,7 +405,7 @@ it.each([
 });
 
 describe('图片翻译流程优化',()=>{
-    it.each(['ru', 'ko-KR'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
+    it.each(['ru', 'ko-KR', 'ar-SA', 'iw'])('漫画 %s 先核对语言包，继续携带漫画模式且不采用单图引擎设置', async sourceLanguage => {
         const {handler, dependencies} = setup({getImageOcrEngine: () => 'paddle'});
         const message = {type: IMAGE_TRANSLATE_MESSAGE_TYPE, image: 'data:image/png,x', sourceLanguage, manga: true};
         await handler(IMAGE_TRANSLATE_MESSAGE_TYPE).handle(message);

@@ -545,7 +545,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(canvases).toHaveLength(1);expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
         expect(images).toHaveLength(1);expect(images[0].src).toBe('');
     });
-    it.each(['ru-RU', 'ko'])('漫画 %s 采用已有 Tesseract，清字、排版和局部结果仍使用漫画链路', async sourceLanguage => {
+    it.each(['ru-RU', 'ko', 'ar', 'he'])('漫画 %s 采用已有 Tesseract，清字、排版和局部结果仍使用漫画链路', async sourceLanguage => {
         if (sourceLanguage === 'ko') imageOptions.push({naturalWidth: 0, naturalHeight: 0});
         const controller = new AbortController();
         mocks.repair.mockImplementationOnce(async pixels => pixels);
@@ -574,7 +574,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(result.lines[0].sourceText).toBe('Hello');expect(mocks.repair).not.toHaveBeenCalled();
     });
 
-    it.each(['ru-RU','ko-KR'])('单图语言模型 %s 在实际识别入口使用轻量引擎',async sourceLanguage=>{
+    it.each(['ru-RU','ko-KR','ar','he'])('单图语言模型 %s 在实际识别入口使用轻量引擎',async sourceLanguage=>{
         mocks.mangaRecognize.mockResolvedValue(lines);
         const result=await translateImageInOffscreen('image',sourceLanguage,'Page',undefined,'single-localized',false,'paddle');
         expect(mocks.recognize).toHaveBeenCalledExactlyOnceWith('image',sourceLanguage,undefined,expect.objectContaining({decodedImage:images[0]}));

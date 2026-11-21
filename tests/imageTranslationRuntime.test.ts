@@ -1445,7 +1445,7 @@ describe('图片翻译前台交互与生命周期', () => {
         expect(env.roots[0].querySelector('.fr-image-controls')).not.toBeNull();
     });
 
-    it.each(['ru-RU','ko-KR'])('单图语言模型 %s 缺包时点准备并继续当前图片',async sourceLanguage=>{
+    it.each(['ru-RU','ko-KR','ar','he'])('单图语言模型 %s 缺包时点准备并继续当前图片',async sourceLanguage=>{
         settings.from=sourceLanguage;
         settings.imageTranslationOcrEngine='paddle';
         client.translate.mockRejectedValueOnce(new Error('图片文字识别需要先下载对应语言包'));
@@ -2457,7 +2457,7 @@ describe('视频预览不自动显示图片翻译', () => {
         expect(await readMangaReadingCandidate(candidates.items[0].token,new AbortController().signal)).toEqual({status:'empty'});
         unmountImageTranslator();expect(env.image.style.opacity).not.toBe('0');
     });
-    it.each(['ru', 'ko-KR'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {
+    it.each(['ru', 'ko-KR', 'ar', 'he'])('漫画 %s 已确认后准备语言包，暂停再开复用译图，单图引擎不影响准备', async source => {
         const env = readerPage();settings.from = source;settings.imageTranslationOcrEngine = 'paddle';settings.imageTranslationMangaDownloadConfirmed = true;
         toggleMangaTranslation();await flush(); env.runFrames(); await flush();
         expect(client.prepare).toHaveBeenCalledWith(source, expect.any(AbortSignal), expect.any(Function));

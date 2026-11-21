@@ -428,7 +428,8 @@ export default defineConfig({
             // 重叠字形的二维词界复核实测 Chrome 增加2367字节，超原预算1884字节。Firefox 增加2369字节且仍在原预算内。
             const connectedColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 2_000 : 0;
             // 图片生僻字回退实测 Chrome 增加85,380、Firefox 增加85,372字节，其中84,778字节为共同的包内资源。
-            const imageFontBudget = 86_000;
+            // 同一来源补入485条异体映射，Chrome 产物另增19,386字节，增量均来自字体和来源记录。
+            const imageFontBudget = 105_500;
             const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000)
                 + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget + connectedColorRecognitionBudget + imageFontBudget;
             const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;

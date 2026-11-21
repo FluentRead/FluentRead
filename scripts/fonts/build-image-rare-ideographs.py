@@ -1,4 +1,4 @@
-"""Subset the pinned Hanazono TrueType font for image translation.
+"""Subset the pinned Hanazono TrueType font and its glyph variants.
 
 Offline maintenance command. Use Python 3.9, fontTools 4.38, and Node 24.
 The original font and accompanying license are documented in PROVENANCE.json.
@@ -14,7 +14,7 @@ from fontTools import subset
 from fontTools.ttLib import TTFont, woff2
 
 
-SOURCE_DIGEST = '829543436cdf7b4c6730e2af5806fa406f8ddf0d4b656e0cd49c58d4db1c8d3c'
+SOURCE_DIGEST = '7ca87559414474848fc513a8d8eb42d5b0f8194c30c2abdfbfedff5398ec88d7'
 FONT_FAMILY = 'FluentRead Rare Ideographs'
 FONT_NAME = 'FluentReadRareIdeographs-Regular'
 DESTINATION = Path(__file__).resolve().parents[2] / 'public' / 'fluent-read-image-fonts'
@@ -63,6 +63,10 @@ def main():
     subsetter.subset(font)
     if not len(jis) == 303 or set(font.getBestCmap()) != codepoints:
         raise ValueError('Font subsetting changed the expected repertoire.')
+    variation_map = next(table.uvsDict for table in font['cmap'].tables if table.format == 14)
+    variations = [(base, glyph) for pairs in variation_map.values() for base, glyph in pairs]
+    if len(variations) != 485 or any(base not in codepoints or glyph is None for base, glyph in variations):
+        raise ValueError('Font subsetting changed the expected variation sequences.')
 
     license_text = (DESTINATION / 'OFL.txt').read_text().strip()
     names = {
@@ -83,6 +87,7 @@ def main():
         'size': asset.stat().st_size,
         'sha256': hashlib.sha256(asset.read_bytes()).hexdigest(),
         'codepoints': len(codepoints),
+        'variationSequences': len(variations),
     }))
 
 

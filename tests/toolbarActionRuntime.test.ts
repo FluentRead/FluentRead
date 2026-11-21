@@ -35,6 +35,32 @@ afterEach(() => {vi.useRealTimers();vi.unstubAllGlobals();vi.restoreAllMocks();}
 const click = (id: unknown = 9, url = 'https://example.com/article') => action.onClicked.emit({id, url});
 const commands = () => api.tabs.sendMessage.mock.calls.filter(([, message]: any[]) => message.type === 'contextMenuTranslate');
 describe('工具栏一键翻译', () => {
+    it('opens the translation window from its browser shortcut and releases a failed opening', async () => {
+        const command = event();
+        api.commands = {onCommand: command};
+        const opening = deferred<void>();
+        api.windows = {create: vi.fn().mockReturnValueOnce(opening.promise)};
+        api.runtime.getManifest.mockReturnValue({commands: {'open-translation-window': {description: 'Open translation window'}}});
+        delete api.action;
+        const error = new Error('native window failed');
+        api.windows.create.mockRejectedValueOnce(error);
+        const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+        installToolbarActionRuntime(states);
+        command.emit('other');
+        command.emit('open-translation-window');
+        command.emit('open-translation-window');
+        expect(api.windows.create).toHaveBeenCalledExactlyOnceWith({
+            url: 'chrome-extension://fixture/sidepanel.html', type: 'popup', width: 520, height: 680,
+        });
+        opening.resolve();
+        await settle();
+        command.emit('open-translation-window');
+        await settle();
+        expect(log).toHaveBeenCalledExactlyOnceWith('[FluentRead] 翻译窗口打开失败', error);
+        command.emit('open-translation-window');
+        expect(api.windows.create).toHaveBeenCalledTimes(3);
+        expect(api.tabs.create).not.toHaveBeenCalled();
+    });
     it('兼容 action 与 browserAction，缺少能力或默认面板时保持原入口', async () => {
         for (const mode of ['missing', 'no-setPopup', 'no-onClicked', 'no-popup', 'browserAction']) {
             delete api.action;delete api.browserAction;

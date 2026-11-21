@@ -15,6 +15,88 @@ function line(x0: number, y0: number, x1: number, y1: number) {
     return {text: '文字', bbox: {x0, y0, x1, y1}};
 }
 
+function clippedOutlineFixture(side: 'top' | 'bottom', count = 9, connected = false) {
+    const width = 92, height = 64, region = line(24, 21, 63, 37);
+    const source = solidPixels(width, height);
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        source.set([122 + x % 26 * 5, 131 + y * 2, 181 + (x + y) % 13 * 3, 255], (y * width + x) * 4);
+    }
+    const original = source.slice();
+    const [mask] = imageMaskBoxes(region, width, height);
+    const edge = side === 'top' ? mask.y0 - 1 : mask.y1;
+    const direction = side === 'top' ? 1 : -1;
+    const mark = (x: number, y: number) => source.set([14, 18, 23, 255], (y * width + x) * 4);
+    for (let y = mask.y0 + 4; y < mask.y1 - 4; y++) for (let x = 27; x < 51; x++) mark(x, y);
+    for (let x = 28; x < 28 + count; x++) {
+        mark(x, edge);
+        if (connected) {mark(x, edge + direction);mark(x, edge + direction * 2);}
+    }
+    const referenceWithoutSamples = source.slice();
+    // 此透明点在扩散通常读取的单像素外沿之外，只拒绝新的多层取样。
+    referenceWithoutSamples[((mask.y0 - 4) * width + mask.x0 - 3) * 4 + 3] = 254;
+    const before = inpaintTextRegions(referenceWithoutSamples, width, height, [region]);
+    const interior = (data: Uint8ClampedArray) => {
+        const rows = [];
+        for (let y = mask.y0; y < mask.y1; y++) rows.push(...data.slice((y * width + mask.x0) * 4, (y * width + mask.x1) * 4));
+        return rows;
+    };
+    return {source, original, width, height, region, edge, direction, mask, before, interior};
+}
+
+describe('普通不透明图的外沿重新取样', () => {
+    it.each(['top', 'bottom'] as const)('仅用可靠外层颜色降低 %s 侧在框内形成的暗带，保留整个框外', side => {
+        const {source, original, width, height, region, edge, direction, mask, before} = clippedOutlineFixture(side);
+        const saved = source.slice(), after = inpaintTextRegions(source, width, height, [region], true);
+        expect(after).toBe(source);
+        const point = ((edge + direction) * width + 31) * 4;
+        expect(Math.abs(after[point] - original[point])).toBeLessThan(Math.abs(before[point] - original[point]));
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            if (x >= mask.x0 && x < mask.x1 && y >= mask.y0 && y < mask.y1) continue;
+            const start = (y * width + x) * 4;
+            if (after.subarray(start, start + 4).some((value, i) => value !== saved[start + i]))
+                throw new Error(`像素 ${x}, ${y} 超出擦除范围`);
+        }
+    });
+
+    it.each([{count: 3, connected: false}, {count: 9, connected: true}])('离群样本稀疏或连续进入内部时沿用扩散 %j', ({count, connected}) => {
+        const {source, width, height, region, before, interior} = clippedOutlineFixture('top', count, connected);
+        expect(interior(inpaintTextRegions(source, width, height, [region]))).toEqual(interior(before));
+    });
+
+    it('外层取样接近另一个擦除框时，对处理顺序保持一致', () => {
+        const {source, width, height, region, before, interior} = clippedOutlineFixture('top');
+        const neighbor = line(23, 5, 32, 16);
+        const first = inpaintTextRegions(source.slice(), width, height, [region, neighbor], true);
+        const last = inpaintTextRegions(source.slice(), width, height, [neighbor, region], true);
+        expect(interior(first)).toEqual(interior(before));
+        expect(interior(last)).toEqual(interior(before));
+    });
+
+    it.each([200, 400])('密集独立框耗尽外层扫描或分离核对预算后继续普通扩散 %i', count => {
+        const fixture = clippedOutlineFixture('top');
+        const {mask, region} = fixture, columns = 20;
+        const tile = {x:mask.x0 - 4, y:mask.y0 - 4, width:mask.x1 - mask.x0 + 8, height:mask.y1 - mask.y0 + 8};
+        const width = tile.width * columns, height = tile.height * Math.ceil(count / columns);
+        const bitmap = new Uint8ClampedArray(width * height * 4);
+        const regions = Array.from({length: count}, (_, i) => {
+            const x = i % columns * tile.width, y = Math.floor(i / columns) * tile.height;
+            for (let row = 0; row < tile.height; row++) {
+                const src = ((row + tile.y) * fixture.width + tile.x) * 4;
+                bitmap.set(fixture.source.subarray(src, src + tile.width * 4), ((y + row) * width + x) * 4);
+            }
+            return line(region.bbox.x0 - tile.x + x, region.bbox.y0 - tile.y + y,
+                region.bbox.x1 - tile.x + x, region.bbox.y1 - tile.y + y);
+        });
+        const repaired = inpaintTextRegions(bitmap, width, height, regions, true);
+        const first = ((mask.y0 - tile.y) * width + 31 - tile.x) * 4;
+        const prior = fixture.before[(mask.y0 * fixture.width + 31) * 4];
+        const lastTile = count - 1;
+        const last = first + ((lastTile % columns) * tile.width + Math.floor(lastTile / columns) * tile.height * width) * 4;
+        expect(repaired[first]).not.toBe(prior);
+        expect(repaired[last]).toBe(prior);
+    });
+});
+
 function protectedRuns(height:number,coordinates:Array<[number,number,number]>):MangaAlphaProtection {
     const sorted=coordinates.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
     const rowStarts=new Uint32Array(height+1);let cursor=0;

@@ -107,26 +107,33 @@ function buildPageCandidate(
     }
     for(const line of lines){
         const sources=line.sourceBoxes??[line.bbox];if(!sources.length||sources.length>MAX_ATTEMPTS-attempts)return;
-        const bounds=drawBounds(line,width,height),draw=integerBox(bounds,width,height);
-        if(!draw||bounds.x0<0||bounds.y0<0||bounds.x1>width||bounds.y1>height)return;
+        const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
+        if(decoration&&!singleHorizontal)return;
+        const legacy=decoration?imageMaskBoxes(line,width,height)[0]:undefined;
+        if(decoration&&!legacy)return;
+        const requested=drawBounds(line,width,height);
+        if(!valid(requested)||requested.x0<0||requested.y0<0||requested.x1>width||requested.y1>height)return;
+        // 空心边饰只处理旧擦除范围；原绘字余量可能正压在框外保留的笔画上。
+        const bounds=decoration?.enclosed?{
+            x0:Math.max(requested.x0,legacy!.x0),y0:Math.max(requested.y0,legacy!.y0),
+            x1:Math.min(requested.x1,legacy!.x1),y1:Math.min(requested.y1,legacy!.y1),
+        }:requested;
+        const draw=integerBox(bounds,width,height);
+        if(!draw)return;
         if(!reserve((draw.x1-draw.x0)*(draw.y1-draw.y0)))return;
         for(const old of drawings){if(--checks<0||overlap(draw,old.bounds))return;}
         for(const box of protectedBoxes){if(--checks<0||overlap(draw,box))return;}
         const group:ImageMatteRepair[]=[];
-        const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
-        if(decoration&&!singleHorizontal)return;
         for(const source of sources){
             attempts++;
             const observation=imageMatteObservationBox(width,height,source);
             if(!observation||!reserve(observation.width*observation.height))return;
             const supportAt=support?.forBox(source,observation);if(support&&!supportAt)return;
-            const purpose=decoration?'decoration':allowFringe&&singleHorizontal?'recognition':undefined;
+            const purpose=decoration&&!decoration.enclosed?'decoration'
+                :decoration?.enclosed||allowFringe&&singleHorizontal?'recognition':undefined;
             const plan=support?planImageMatteRepair(pixels,width,height,source,supportAt!,fitBudget)
                 :planImageMatteCandidate(pixels,width,height,source,fitBudget,purpose);if(!plan)return;
-            if(decoration){
-                const [legacy]=imageMaskBoxes({bbox:source,text:''},width,height);
-                if(!keepImageMatteDecoration(plan,decoration,legacy))return;
-            }
+            if(decoration&&!keepImageMatteDecoration(plan,decoration,legacy!))return;
             if(group.length&&!equal(group[0].background,plan.background))return;
             // 支持可超出原排版框；不同背景不能按应用顺序争用同一个原墨迹像素。
             for(const old of repairs){

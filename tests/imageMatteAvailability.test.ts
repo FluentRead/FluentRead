@@ -402,6 +402,50 @@ function pair(){
     return{width,height,pixels,expected,lines,art};
 }
 
+describe('空心边饰与完整译文渲染',()=>{
+    function enclosed(){
+        const width=128,height=80,matte=mattes[255],pixels=new Pixels(width*height*4);
+        const foreground=[255,255,255,255] as const;
+        const mark={x0:86,y0:35,x1:95,y1:44};
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);
+        for(const x0 of [29,42,55,68])fill(pixels,width,{x0,y0:16,x1:x0+6,y1:46},foreground);
+        fill(pixels,width,mark,foreground);
+        fill(pixels,width,{x0:88,y0:37,x1:93,y1:42},matte);
+        const bounds={x0:24,y0:22,x1:96,y1:52};
+        source={width,height,pixels};
+        setRegions([{text:'OPEN .',bbox:bounds,fontSize:16}]);
+        evidenceMode='missing';
+        return {width,height,matte,pixels,mark};
+    }
+
+    it('同帧空心标记保持原色，框内旧墨迹只用已证底色且译文完整',async()=>{
+        const {width,height,matte,pixels,mark}=enclosed(),before=pixels.slice();
+        const erase=vi.spyOn(imageInpainting,'inpaintTextRegions');
+        const result=await translate();
+        expect(result).toMatchObject({image:'data:image/png;base64,matte-final',lines:[{text:'FULL TEXT',sourceText:'OPEN .'}]});
+        expect(erase).not.toHaveBeenCalled();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        expect(mocks.segment).not.toHaveBeenCalled();
+        completeGlyphs();
+        for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+            if(!inside(mark,x,y)&&glyphSupport.has(y*width+x))continue;
+            const color=x<85&&y>=19&&y<46?Array.from(matte):at(before,width,x,y);
+            expect(at(encoded[0],width,x,y)).toEqual(color);
+        }
+        expect(pixels).toEqual(before);
+        released();
+    });
+
+    it('边饰旁完整字形度量失败时保留原图并照常提供全文',async()=>{
+        enclosed();
+        metrics='missing';
+        const result=await translate();
+        expect(result).toMatchObject({imageUnchanged:true,lines:[{sourceText:'OPEN .',text:'FULL TEXT',renderSkipped:true}]});
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        preserved();
+    });
+});
+
 describe('不透明原字超出旧清字框时复用模型授权',()=>{
     function clipped(){
         const f=fixture(255);

@@ -47,6 +47,8 @@ Some fine serifs also benefit from matching weaker strokes to their original gly
 
 Small detached decorations included in a solid label's OCR box can stay in the translated image when the original glyphs are individually confirmed and the translation fits beside the decoration.
 
+When OCR reads a detached hollow decoration as a period, the extension checks for a clear gap and an enclosed area of the original background. The translation fits beside the decoration, and cleanup stays inside the original erasure bounds.
+
 When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
 
 For a translated image on a solid background with clipped source strokes, importing the optional text segmentation model lets you regenerate the affected translation. On the same page, switch to the original and select Translate again.

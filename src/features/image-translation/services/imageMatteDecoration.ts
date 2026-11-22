@@ -3,7 +3,7 @@
  * 文件职责：识别原 OCR 横行末端误入物理擦除矩形的独立小图案。
  * 主要内容：在已观察纯色墨迹框的两端检查完整空白列；只接纳与大写原文逐字对应、具有共同字高的正文。用同一闭环提案内的九成墨迹复核字形，并确认图案从全强度墨迹上也独立，完整正文仍位于旧擦除范围内。
  * 模块边界：只借原 RGBA 或本次未授权的局部蒙版，不运行模型、不移动 OCR 框、不写原图。页规划仍须校验译文与图案的冲突和独占写入权限。
- * 行末空心边饰：识别为独立句点的小图案须与正文有完整空白列，并包住可验证的原底色。该路径只精确清除落在原擦除框内的正文墨迹。
+ * 行末空心边饰：识别为独立句点的小图案须与正文有完整空白列，并包住可验证的原底色。原擦除框外的单侧窄边仅作为可选分割的候选。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageMatteRepair} from './imageMatteRepair';
@@ -140,15 +140,34 @@ export function keepImageMatteDecoration(repair:ImageMatteRepair,decoration:Imag
         else if(++letters>characters||bounds.y0>textBounds.y0+1||bounds.y1<textBounds.y1-1||bounds.x1-bounds.x0>height*2)return false;
     }
     if((!enclosed&&letters!==characters)||ornaments!==1)return false;
+    // 右侧边饰已在旧框内，正文右边不会超出旧框。
+    if(enclosed&&textBounds.x0>=legacy.x0){
+        // 只保存贴着一侧原擦除边的最多三行。横向超界、两侧超界和较大的缺口仍按旧范围处理。
+        const above=legacy.y0-textBounds.y0,below=textBounds.y1-legacy.y1;
+        const rows=Math.max(above,below);
+        if(rows>0&&rows<=3&&Math.min(above,below)<=0){
+            repair.decorationFringe={
+                firstRow:(above>0?legacy.y0-1:legacy.y1)-top,
+                step:above>0?-1:1,
+                mask:new Uint8Array(rows*width),
+            };
+        }
+    }
+    const fringe=repair.decorationFringe;
     for(let index=0;index<mask.length;index++){
         if(!mask[index])continue;
         const x=left+index%width;
         if(towardArt(x)){
             artMask[index]=1;
             mask[index]=0;
-        }else if(enclosed&&!contains(legacy,x,top+Math.floor(index/width)))mask[index]=0;
+        }else if(enclosed){
+            const row=Math.floor(index/width);
+            if(contains(legacy,x,top+row))continue;
+            if(fringe)fringe.mask[(row-fringe.firstRow)*fringe.step*width+index%width]=1;
+            mask[index]=0;
+        }
     }
-    // 只有旧掩码内的已知正文可以写。独立边饰的保留不能借用衬线提案的框外权限。
+    // 框外候选不能借用一般的衬线授权，只有页规划取得同帧分割证据后才能使用。
     if(enclosed)delete repair.fringeCore;
     repair.supportBox=enclosed?clippedText:textBounds;
     return true;

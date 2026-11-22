@@ -9,7 +9,7 @@ import type {ImageMatteRepair} from '@/src/features/image-translation/services/i
 import type {ImageDetectionSupport} from '@/src/features/image-translation/services/imageDetectionEvidence';
 const ports=vi.hoisted(()=>({observe:vi.fn(),plan:vi.fn(),candidate:vi.fn(),forBox:vi.fn()}));
 vi.mock('@/src/features/image-translation/services/imageMatteRepair',()=>({imageMatteObservationBox:ports.observe,planImageMatteRepair:ports.plan,planImageMatteCandidate:ports.candidate}));
-import {applyImageMattePage,authorizeImageMatteProposal,discardImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage,type ImageMattePagePlan,type ImageMatteProposal} from '@/src/features/image-translation/services/imageMattePage';
+import {applyImageMattePage,authorizeImageMatteDecorationFringe,authorizeImageMatteProposal,discardImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage,type ImageMattePagePlan,type ImageMatteProposal} from '@/src/features/image-translation/services/imageMattePage';
 type Box=ImageTextRegion['bbox'];
 const matte=[230,220,210,224] as const;
 const line=(bbox:Box={x0:12,y0:12,x1:28,y1:28}):ImageTextRegion=>({text:'COMPLETE',bbox,fontSize:16});
@@ -57,6 +57,7 @@ describe('ImageMattePage：无权限提案与分阶段授权',()=>{
         expect(Object.keys(proposal)).toEqual([]);expect(Object.isFrozen(proposal)).toBe(true);
         const view=getImageMatteProposalDrawings(proposal)!;
         expect(Object.keys(view)).toEqual(['drawings','rectangles','observations']);
+        expect(authorizeImageMatteDecorationFringe(proposal,support)).toBeUndefined();
         expect(view.drawings[0].line).toBe(l);expect(view.observations).toEqual([{sourceBox:l.bbox,left:4,top:4,width:32,height:32}]);
         for(const value of [view,view.observations,view.observations[0],view.observations[0].sourceBox])expect(Object.isFrozen(value)).toBe(true);
         expect(()=>applyImageMattePage(pixels,64,64,proposal as unknown as ImageMattePagePlan)).toThrow('已失效');
@@ -280,6 +281,28 @@ describe('ImageMattePage：全页授权与上传',()=>{
             for(let y=8;y<120;y+=2)for(let x=40;x<248;x+=2)p.set([48,104,124,96],(y*256+x)*4);
         }
         expect(planImageMattePage(p,256,256,[l],[],draw,support)).toBeUndefined();expect(ports.plan).toHaveBeenCalledOnce();
+    });
+    it('新增的精确窄边行段超出已有上传预算时可撤回完整增强计划',()=>{
+        const p=solid(256,128),l=line({x0:8,y0:8,x1:248,y1:112});
+        const r=blankPlan(l.bbox,0,0,256,128);
+        let remaining=4096;
+        for(let y=8;y<112&&remaining;y+=2)for(let x=8;x<248&&remaining;x+=2){
+            r.mask[y*256+x]=1;
+            remaining--;
+        }
+        paint(p,256,r);
+        const margin=new Uint8Array(256);
+        margin[9]=1;
+        p.set([0,0,0,255],(7*256+9)*4);
+        r.decorationFringe={firstRow:7,step:-1,mask:margin};
+        const before=p.slice();
+        ports.observe.mockReturnValue({left:0,top:0,width:256,height:128});
+        ports.candidate.mockReturnValue(r);
+        const proposal=proposeImageMattePage(p,256,128,[l],[],draw)!;
+        expect(getImageMatteProposalDrawings(proposal)?.hasDecorationFringe).toBe(true);
+        expect(authorizeImageMatteDecorationFringe(proposal,support)).toBeUndefined();
+        expect(getImageMatteProposalDrawings(proposal)).toBeDefined();
+        expect(p).toEqual(before);
     });
     it('不同matte支持包络相交但真实ink逐点不交时，不按包络误拒完整页',()=>{
         const first=line(),second=line({x0:36,y0:12,x1:52,y1:28}),a=local(first.bbox),b=local(second.bbox);

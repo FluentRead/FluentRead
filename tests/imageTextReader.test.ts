@@ -55,6 +55,21 @@ describe('图片文字独立阅读面板', () => {
         event(compare());expect(body().textContent).toBe('译文仅译文');
         reader.setLines([{text:'没有原文'}]);expect((compare() as HTMLElement).hidden).toBe(true);
     });
+    it('原文、译文和保留原文各使用对应语言，换结果后未知原文不继承旧语言', () => {
+        const paragraphs = () => Array.from(body().querySelectorAll('pre'), node => [
+            node.textContent, node.getAttribute('lang'), node.getAttribute('dir'),
+        ]);
+        const lines = [{sourceText: 'Look ahead', text: '骨直令羽'}, {sourceText: 'A12', text: 'A12'}];
+        reader.setLines(lines, {source: 'en', target: 'zh-Hans'});
+        reader.open();
+        expect(paragraphs()).toEqual([['骨直令羽', 'zh-Hans', 'auto'], ['A12', 'en', 'auto']]);
+        event(compare());
+        expect(paragraphs()).toEqual([
+            ['Look ahead', 'en', 'auto'], ['骨直令羽', 'zh-Hans', 'auto'], ['A12', 'en', 'auto'],
+        ]);
+        reader.setLines([{sourceText: '留意', text: 'Attention'}], {source: '', target: 'fr'});
+        expect(paragraphs()).toEqual([['留意', '', 'auto'], ['Attention', 'fr', 'auto']]);
+    });
     it('只复制当前展示模式并提供成功或可手动复制的失败提示', async () => {
         reader.setLines([{sourceText:'Hello',text:'你好'}, {text:'第二段'}]);reader.open();
         event(copy());await Promise.resolve();

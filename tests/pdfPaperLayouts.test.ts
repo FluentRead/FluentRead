@@ -304,6 +304,26 @@ describe('common paper layouts survive real PDF parsing', () => {
         expectSoundStructure(document);
     });
 
+    it('keeps two entries that repeat the same reference number as separate lines', async () => {
+        // 合并稿常见编号复用：同一编号的两条记录仍是各自独立的送翻片段。
+        const entries = [
+            ['[6] An earlier author. Journal of Systems 5 (2022).', '21–33.'],
+            ['[7] A repeated label. Proceedings of the example conference.', '742–755.'],
+            ['[7] The same label again. A portable embedded database.', '97–105.'],
+            ['[8] A later author. Distributed storage for production workloads.', '2023.'],
+        ];
+        const document = await build(sheet => {
+            let y = 90;
+            for (const entry of entries) for (const [line, text] of entry.entries()) {
+                sheet.page.drawText(text, {x: 54 + (line === 0 ? 0 : 16), y: sheet.height - y, size: 7, font: sheet.fonts.serif});
+                y += 8;
+            }
+            centered(sheet, '5675', 760, 9, sheet.fonts.serif);
+        });
+        expect(sources(document)).toEqual(entries.map(lines => lines.join(' ')));
+        expectSoundStructure(document);
+    });
+
     it('keeps right-aligned values separate from the adjoining section of a ruled table', async () => {
         const document = await build(sheet => {
             for (const [x, width, operation] of [[322, 89, 'Read'], [417, 139, 'Write']] as const) {

@@ -2470,3 +2470,32 @@ describe('paired subfigure markers between a chart and its caption', () => {
         expect(result.preservedRegions.filter(region => region.kind === 'figure')).toEqual([]);
     });
 });
+
+describe('adjacent ruled table sections under one caption', () => {
+    /** 每条横线的 x/右边界固定，行间距 20；表题紧贴最末一条横线。 */
+    const rules = (x: number, width: number, bottom: number) => Array.from({length: 6}, (_, row) =>
+        ({kind: 'path' as const, x, y: bottom - row * 20, width, height: 0.5}));
+    const rowAtoms = (x: number, numericRows: number) => {
+        const atoms: PdfLayoutAtom[] = [];
+        for (let row = 0; row < numericRows; row++) {
+            atoms.push(atom('Alpha', x + 2, 208 + row * 20, 60), atom('12', x + 160, 208 + row * 20, 40));
+        }
+        return atoms;
+    };
+    it('pairs two right-aligned numeric columns and keeps the row-gap refusals out', () => {
+        const left = rules(40, 200, 292), right = rules(250, 200, 292);
+        const atoms = [atom('Table 3: Runtime by configuration.', 40, 300, 180),
+            ...rowAtoms(40, 3), ...rowAtoms(250, 3),
+            // 第四条记录没有右对齐数值，第五条记录与正文只隔 1pt：两种行都不构成数值列。
+            atom('Beta', 42, 268, 60), atom('Beta', 252, 268, 60),
+            atom('Gamma', 42, 288, 157), atom('9', 199, 288, 41),
+            atom('Gamma', 252, 288, 157), atom('9', 409, 288, 41),
+            atom('Table 4: Unpaired grouping.', 40, 640, 160)];
+        const boxes = analyze(atoms, [...left, ...right, ...rules(40, 200, 632), ...rules(400, 150, 632)]).preservedRegions
+            .filter(region => region.kind === 'table').map(region => [region.x, region.y, region.width, region.height]);
+        expect(boxes).toContainEqual([39.25, 192, 201.5, 100.5]);
+        expect(boxes).toContainEqual([249.25, 192, 201.5, 100.5]);
+        // 第二组表题只有左侧一段对齐，右侧 150pt 的段既不配对也不与表题对齐。
+        expect(boxes.some(([x]) => x === 399.25)).toBe(false);
+    });
+});

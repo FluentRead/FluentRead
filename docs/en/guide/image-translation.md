@@ -43,6 +43,8 @@ When a recognition box clips a thin outline in a photo, repair can use nearby ba
 
 For one line of uppercase text on a solid background, the default Paddle model can repair clipped edges when the glyphs match the recognition evidence individually. This also works for some serif lettering clipped at both edges when only the antialiasing joins the glyphs and detection covers the middle of the strokes.
 
+Small detached decorations included in a solid label's OCR box can stay in the translated image when the original glyphs are individually confirmed and the translation fits beside the decoration.
+
 When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
 
 For a translated image on a solid background with clipped source strokes, importing the optional text segmentation model lets you regenerate the affected translation. On the same page, switch to the original and select Translate again.

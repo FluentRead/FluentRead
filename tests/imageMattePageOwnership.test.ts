@@ -6,9 +6,90 @@
 import {describe,expect,it} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import {createImageDetectionEvidenceBudget,bindImageDetectionEvidence,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
-import {planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
+import {observeImageMattePalette,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
+import {keepImageMatteDecoration,observeImageMatteDecoration} from '@/src/features/image-translation/services/imageMatteDecoration';
 import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
 import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
+
+describe('单行旧擦除框内的脱离边饰',()=>{
+    const width=90,height=60,background=[240,234,225,255],ink=[31,44,78,255],box={x0:14,y0:15,x1:74,y1:39};
+    function fixture(side:'left'|'right'='right'){
+        const pixels=new Uint8ClampedArray(width*height*4);
+        for(let i=0;i<pixels.length;i+=4)pixels.set(background,i);
+        const put=(x:number,y:number,value=ink)=>pixels.set(value,(y*width+x)*4);
+        for(const column of [25,36,47,58])for(let y=20;y<35;y++)for(let x=column;x<column+5;x++)put(x,y);
+        const x0=side==='left'?18:66;
+        const art={x0,y0:18,x1:x0+3,y1:24};
+        for(let y=art.y0;y<art.y1;y++)for(let x=art.x0;x<art.x1;x++)put(x,y);
+        const palette=()=>observeImageMattePalette(pixels,width,height,box,{remaining:40_000})!;
+        const observe=(text='OPEN')=>{
+            const seen=palette();
+            return observeImageMatteDecoration(pixels,width,text,{background:seen.background,inkBoxes:[seen.supportBox]});
+        };
+        const repair=()=>planImageMatteCandidate(pixels,width,height,box,{remaining:40_000},true)!;
+        return {pixels,put,art,observe,repair};
+    }
+    it.each(['left','right'] as const)('把 %s 端原图案移出待擦蒙版并完整保留 RGBA',side=>{
+        const {pixels,art,observe}=fixture(side),hint=observe()!,before=pixels.slice();
+        expect(hint.side).toBe(side);
+        const line:ImageTextRegion={text:'开放',bbox:box};
+        const draw=side==='left'?{...box,x0:hint.gap+1}:{...box,x1:hint.gap};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],()=>draw,hint)!;
+        expect(getImageMatteProposalDrawings(proposal)!.rectangles).toEqual([art]);
+        expect(pixels).toEqual(before);
+        const plan=authorizeImageMatteWithinExistingMasks(proposal)!;
+        expect(plan.uploads).toEqual([{x0:12,y0:13,x1:76,y1:41}]);
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=before.slice();
+        for(const column of [25,36,47,58])for(let y=20;y<35;y++)for(let x=column;x<column+5;x++){
+            expected.set(background,(y*width+x)*4);
+        }
+        expect(pixels).toEqual(expected);
+    });
+    it('只接纳纯色单行标签，排除真实连接、低位标点和有歧义的双边小图案',()=>{
+        const {pixels,observe,put}=fixture();
+        expect(observe('Open')).toBeUndefined();
+        expect(observe('AB')).toBeUndefined();
+        expect(observe('A'.repeat(49))).toBeUndefined();
+        expect(observeImageMatteDecoration(pixels,width,'OPEN',undefined)).toBeUndefined();
+        expect(observeImageMatteDecoration(pixels,width,'OPEN',{background:[240,234,225,127],inkBoxes:[box]})).toBeUndefined();
+        expect(observeImageMatteDecoration(pixels,width,'OPEN',{background:[240,234,225,255]})).toBeUndefined();
+        for(let y=18;y<24;y++)for(let x=18;x<21;x++)put(x,y);
+        expect(observe()).toBeUndefined();
+        for(let y=18;y<24;y++)for(let x=18;x<21;x++)put(x,y,background);
+        for(let y=18;y<24;y++)for(let x=66;x<69;x++)put(x,y,background);
+        for(let x=66;x<69;x++)put(x,34);
+        expect(observe()).toBeUndefined();
+        put(63,34);put(64,34);put(65,34);
+        expect(observe()).toBeUndefined();
+    });
+    it('闭环墨迹与空列、字数或原擦除范围不一致时不变更提案',()=>{
+        const {observe,repair,pixels}=fixture(),hint=observe()!,before=pixels.slice();
+        const margin={x0:0,y0:0,x1:width,y1:height};
+        const noCore=repair();delete noCore.inkCore;
+        expect(keepImageMatteDecoration(noCore,hint,margin)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),{...hint,gap:67},margin)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),{...hint,characters:3},margin)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),{...hint,characters:5},margin)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),hint,{...margin,x1:64})).toBe(false);
+        expect(keepImageMatteDecoration(repair(),hint,{...margin,x0:28})).toBe(false);
+        const line:ImageTextRegion={text:'开放',bbox:box};
+        expect(proposeImageMattePage(pixels,width,height,[line,line],[],()=>box,hint)).toBeUndefined();
+        expect(proposeImageMattePage(pixels,width,height,[{...line,vertical:true}],[],()=>box,hint)).toBeUndefined();
+        expect(proposeImageMattePage(pixels,width,height,[line],[],()=>box,{...hint,characters:5})).toBeUndefined();
+        expect(pixels).toEqual(before);
+    });
+    it('覆盖率不足的正文边缘仍是墨迹，两处独立边饰拒绝整项授权',()=>{
+        const {put,observe,repair}=fixture(),legacy={x0:0,y0:0,x1:width,y1:height};
+        put(30,27,[136,139,152,255]);
+        const plan=repair(),index=(27-plan.top)*plan.width+30-plan.left;
+        expect(plan.mask[index]).toBe(1);
+        expect(plan.inkCore?.[index]).toBe(0);
+        expect(keepImageMatteDecoration(plan,observe()!,legacy)).toBe(true);
+        for(let x=66;x<69;x++)put(x,20,background);
+        expect(keepImageMatteDecoration(repair(),observe()!,legacy)).toBe(false);
+    });
+});
 
 describe('整页RGBA修补的重叠墨迹归属',()=>{
     it('原宽灰牌被薄AA准入提前拒绝，旧像素及正反序整页拒绝继续保留',()=>{

@@ -20,7 +20,7 @@ import { selectChangedTranslations, type OcrLine } from '@/src/features/image-tr
 import type {ImageViewport} from '@/src/shared/image/types';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
 import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
-import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
+import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
 import {getImageDetectionEvidence,type ImageDetectionSupport} from './imageDetectionEvidence';
 import {getImageParagraphGapEvidence} from './imageParagraphGapEvidence';
 import {isSingleFrameImageData} from './imageDetectionSnapshot';
@@ -605,7 +605,6 @@ async function prepareTranslatedImage(
             return {image: '', mangaPatches: {width: canvas.width, height: canvas.height, patches}, lines: readingLines};
         }
         let sourceUnchanged=true;
-        let retryWhenSegmentationReady=false;
         try {
         // 先在原图上准入整个擦字/绘字足迹。undefined在严格模式下仅表示已确认无需保护。
         const protection=planMaskAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines,imageAlphaSamplingAndWriteBoxes,{requireConfirmedTransparency:true});
@@ -658,7 +657,7 @@ async function prepareTranslatedImage(
                 drawing.set(line,{...drawing.get(line)!,bounds,prepared});
             }
         }
-        // 墨迹遗漏仅触发提案；颜色与几何不能替代同帧模型逐像素授权。整页提案失败保留原修补策略。
+        // 墨迹遗漏仅触发提案。普通同帧检测可以结合 OCR 原文复核一致的字形裁切。
         repairClippedInk: if(!protection&&hasUncoveredImageInk(sourcePixels.data,canvas.width,canvas.height,appearances)
             &&isSingleFrameImageData(source.currentSrc||source.src)){
             const owners=new Set(selected.map(candidate=>candidate.original));
@@ -686,22 +685,25 @@ async function prepareTranslatedImage(
                 const preflight=()=>args.every(item=>canDrawTranslatedImageText(budget,...item));
                 if(!preflight())return await retainSource();
                 await checkImageCancellation(signal);
-                let plan=support?authorizeImageMatteProposal(proposal,support):undefined;
+                let retryWhenSegmentationReady=false;
+                let plan=support?authorizeImageMatteProposal(proposal,support,
+                    new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
                 if(!plan){
                     const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
                     await checkImageCancellation(signal);
                     if(!ready){
                         retryWhenSegmentationReady=true;
-                        break repairClippedInk;
-                    }
-                    const seg=await mangaInferenceClient.segmentText(()=>{
+                        plan=authorizeImageMatteWithinExistingMasks(proposal);
+                    }else{
+                        const seg=await mangaInferenceClient.segmentText(()=>{
+                            throwIfImageOperationAborted(signal);
+                            return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
+                        },signal);
                         throwIfImageOperationAborted(signal);
-                        return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
-                    },signal);
-                    throwIfImageOperationAborted(signal);
-                    const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
-                    try {plan=authorizeImageMatteProposal(proposal,segmentation);}
-                    finally {segmentation.dispose();}
+                        const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
+                        try {plan=authorizeImageMatteProposal(proposal,segmentation);}
+                        finally {segmentation.dispose();}
+                    }
                     if(!plan)return await retainSource();
                 }
                 await checkImageCancellation(signal);
@@ -714,7 +716,7 @@ async function prepareTranslatedImage(
                 await checkImageCancellation(signal);
                 const image=await encodeImageCanvas(canvas,signal);
                 throwIfImageOperationAborted(signal);
-                return {image,lines:readingLines};
+                return {image,lines:readingLines,...(retryWhenSegmentationReady?{retryWhenSegmentationReady:true as const}:{})};
             }finally {discardImageMatteProposal(proposal);}
         }
         // 全文布局先全部通过才擦除；保护点不可写也不可当作已知背景，无法完整修补时撤回。
@@ -736,7 +738,7 @@ async function prepareTranslatedImage(
         await checkImageCancellation(signal);
         const image = await encodeImageCanvas(canvas, signal);
         throwIfImageOperationAborted(signal);
-        return { image, lines: readingLines, ...(retryWhenSegmentationReady ? {retryWhenSegmentationReady: true as const} : {}) };
+        return { image, lines: readingLines };
         } catch(error) {
             if(!(error instanceof MangaAlphaProtectionLimitError)&&!(error instanceof ImageAlphaProtectionUnavailableError))throw error;
             if(sourceUnchanged&&error instanceof ImageAlphaProtectionUnavailableError&&support&&isSingleFrameImageData(source.currentSrc||source.src)){

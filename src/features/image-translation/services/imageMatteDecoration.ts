@@ -140,7 +140,8 @@ export function keepImageMatteDecoration(repair:ImageMatteRepair,decoration:Imag
         else if(++letters>characters||bounds.y0>textBounds.y0+1||bounds.y1<textBounds.y1-1||bounds.x1-bounds.x0>height*2)return false;
     }
     if((!enclosed&&letters!==characters)||ornaments!==1)return false;
-    if(enclosed&&textBounds.x0>=legacy.x0&&textBounds.x1<=legacy.x1){
+    // 右侧边饰已在旧框内，正文右边不会超出旧框。
+    if(enclosed&&textBounds.x0>=legacy.x0){
         // 只保存贴着一侧原擦除边的最多三行。横向超界、两侧超界和较大的缺口仍按旧范围处理。
         const above=legacy.y0-textBounds.y0,below=textBounds.y1-legacy.y1;
         const rows=Math.max(above,below);
@@ -166,7 +167,7 @@ export function keepImageMatteDecoration(repair:ImageMatteRepair,decoration:Imag
             mask[index]=0;
         }
     }
-    // 只有旧掩码内的已知正文可以写。独立边饰的保留不能借用衬线提案的框外权限。
+    // 框外候选不能借用一般的衬线授权，只有页规划取得同帧分割证据后才能使用。
     if(enclosed)delete repair.fringeCore;
     repair.supportBox=enclosed?clippedText:textBounds;
     return true;

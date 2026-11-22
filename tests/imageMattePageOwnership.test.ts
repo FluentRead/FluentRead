@@ -209,8 +209,8 @@ describe('被识别成句点的独立空心边饰',()=>{
 
     it.each([false,true])('同帧分割只延伸到连着已证墨迹的窄边（翻转 %s）',flipped=>{
         const {pixels,put}=fixture();
-        // 独立点与正文末端同色，位于框外且受到宽松分割支持，仍不能借走旧墨迹权限。
-        put(68,15);
+        // 延伸至观察边缘的独立小图案同样受到宽松分割支持，不能借走正文权限。
+        for(let y=13;y<=15;y++)put(68,y);
         const yAt=(y:number)=>flipped?height-y-1:y;
         const bbox=flipped?{...box,y0:height-box.y1,y1:height-box.y0}:box;
         const source=flipped?pixels.slice():pixels;
@@ -244,6 +244,16 @@ describe('被识别成句点的独立空心边饰',()=>{
         }
         expect(source).toEqual(expected);
         expect(plan.uploads.some(r=>r.y0<=yAt(15)&&r.y1>yAt(15))).toBe(true);
+    });
+
+    it.each([
+        {x0:24,y0:18,x1:107,y1:52},
+        {x0:13,y0:19,x1:107,y1:52},
+        {x0:13,y0:18,x1:107,y1:41},
+    ])('横向、较大或双侧越界时只保留旧范围内的权限 %#',bounds=>{
+        const {observe,repair}=fixture(),candidate=repair();
+        expect(keepImageMatteDecoration(candidate,observe()!,bounds)).toBe(true);
+        expect(candidate.decorationFringe).toBeUndefined();
     });
 
     it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{

@@ -1077,6 +1077,7 @@ it('普通图片未绘制译文时显示可操作提示，并在文字面板标�
     ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
     const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
     expect(ui.feedback.hidden).toBe(false);expect(warning?.hidden).toBe(false);
+    expect(warning.getAttribute('aria-label')).toBe('部分译文未绘制，请查看图片文字');
     const click=(trusted:boolean)=>{const event=new window.Event('click',{bubbles:true});Object.defineProperty(event,'isTrusted',{value:trusted});warning.dispatchEvent(event);};
     click(false);expect(ui.reader.hidden).toBe(true);click(true);expect(ui.reader.hidden).toBe(false);
     expect(ui.reader.textContent).toContain('为保留原文，此译文未绘制到图片');expect(ui.reader.textContent).toContain('你好');
@@ -1092,7 +1093,7 @@ it('普通窄图提示使用短图标和完整本地化名称，键盘与触摸�
     ui.feedback.style.maxWidth='64px';ui.setLines([{text:'Bonjour',sourceText:'Hello',renderSkipped:true}]);
     ui.update('translated','部分译文未绘制，请查看图片文字',{warning:true,warningAction:true});
     const warning=ui.feedback.querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
-    expect(warning.textContent).toBe('!');expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('部分译文未绘制，请查看图片文字','fr-FR'));expect(warning.getAttribute('aria-label')).toContain(translateLegacyText('查看图片文字','fr-FR'));
+    expect(warning.textContent).toBe('!');expect(warning.getAttribute('aria-label')).toBe(translateLegacyText('部分译文未绘制，请查看图片文字','fr-FR'));
     const host=vi.fn();for(const type of ['keydown','touchstart','touchend'])document.body.addEventListener(type,host);
     for(const type of ['keydown','touchstart','touchend']){const event=new window.Event(type,{bubbles:true,cancelable:true});warning.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);}
     expect(host).not.toHaveBeenCalled();const click=new window.Event('click',{bubbles:true});Object.defineProperty(click,'isTrusted',{value:true});warning.dispatchEvent(click);

@@ -24,6 +24,8 @@ export interface ImageMatteRepair extends ImageMatteObservationBox {
     inkCore?:Uint8Array;
     /** 细笔画复核用的同帧墨迹，1为至少五成覆盖，2为至少九成覆盖。 */
     fringeCore?:Uint8Array;
+    /** 边饰已独立确认后的框外墨迹候选，按离原擦除框从近到远排布。 */
+    decorationFringe?:{firstRow:number;step:-1|1;mask:Uint8Array};
     sourceBox:Box;
     supportBox:Box;
 }

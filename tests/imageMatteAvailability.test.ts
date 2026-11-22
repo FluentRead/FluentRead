@@ -403,12 +403,12 @@ function pair(){
 }
 
 describe('空心边饰与完整译文渲染',()=>{
-    function enclosed(){
+    function enclosed(top=16){
         const width=128,height=80,matte=mattes[255],pixels=new Pixels(width*height*4);
         const foreground=[255,255,255,255] as const;
         const mark={x0:86,y0:35,x1:95,y1:44};
         fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);
-        for(const x0 of [29,42,55,68])fill(pixels,width,{x0,y0:16,x1:x0+6,y1:46},foreground);
+        for(const x0 of [29,42,55,68])fill(pixels,width,{x0,y0:top,x1:x0+6,y1:46},foreground);
         fill(pixels,width,mark,foreground);
         fill(pixels,width,{x0:88,y0:37,x1:93,y1:42},matte);
         const bounds={x0:24,y0:22,x1:96,y1:52};
@@ -418,13 +418,14 @@ describe('空心边饰与完整译文渲染',()=>{
         return {width,height,matte,pixels,mark};
     }
 
-    it('同帧空心标记保持原色，框内旧墨迹只用已证底色且译文完整',async()=>{
-        const {width,height,matte,pixels,mark}=enclosed(),before=pixels.slice();
+    it.each([16,19])('原字顶部 %s 时保留空心标记，框内旧墨迹只用已证底色且译文完整',async top=>{
+        const {width,height,matte,pixels,mark}=enclosed(top),before=pixels.slice();
         const erase=vi.spyOn(imageInpainting,'inpaintTextRegions');
         const result=await translate();
         expect(result).toMatchObject({image:'data:image/png;base64,matte-final',lines:[{text:'FULL TEXT',sourceText:'OPEN .'}]});
         expect(erase).not.toHaveBeenCalled();
-        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        expect(mocks.prepareSeg).toHaveBeenCalledTimes(top===16?1:0);
+        expect(result.retryWhenSegmentationReady).toBe(top===16?true:undefined);
         expect(mocks.segment).not.toHaveBeenCalled();
         completeGlyphs();
         for(let y=0;y<height;y++)for(let x=0;x<width;x++){
@@ -434,6 +435,45 @@ describe('空心边饰与完整译文渲染',()=>{
         }
         expect(pixels).toEqual(before);
         released();
+    });
+
+    it.each(['supported','unsupported','worker-failed'] as const)('分割 %s 时只更新允许的连续边缘，完整保留边饰',async mode=>{
+        const {width,height,matte,pixels,mark}=enclosed(),before=pixels.slice();
+        mocks.prepareSeg.mockResolvedValue(true);
+        if(mode==='worker-failed')mocks.segment.mockRejectedValue(new Error('optional session unavailable'));
+        else mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{
+            const source=factory();
+            expect(source.width).toBe(width);
+            expect(source.height).toBe(height);
+            expect(source.pixels).toEqual(before);
+            return new Uint8Array(1024*1024).fill(mode==='supported'?255:0);
+        });
+        const result=await translate();
+        expect(result.image).toBeTruthy();
+        expect(mocks.segment).toHaveBeenCalledOnce();
+        expect(result.retryWhenSegmentationReady).toBeUndefined();
+        const image=encoded[0];
+        for(let y=16;y<19;y++)for(let x=55;x<61;x++){
+            expect(at(image,width,x,y)).toEqual(mode==='supported'?Array.from(matte):at(before,width,x,y));
+        }
+        for(let y=mark.y0;y<mark.y1;y++)for(let x=mark.x0;x<mark.x1;x++){
+            expect(at(image,width,x,y)).toEqual(at(before,width,x,y));
+        }
+        expect(pixels).toEqual(before);
+        completeGlyphs();
+        released();
+    });
+
+    it.each(['cancelled-signal','cancelled-worker'] as const)('边饰旁分割失败保留取消语义 %s',async mode=>{
+        enclosed();
+        const controller=new AbortController();
+        mocks.prepareSeg.mockResolvedValue(true);
+        mocks.segment.mockImplementation(async()=>{
+            if(mode==='cancelled-signal')controller.abort();
+            throw new DOMException('segmentation cancelled','AbortError');
+        });
+        await expect(translate(controller.signal)).rejects.toMatchObject({name:'AbortError'});
+        preserved();
     });
 
     it('边饰旁完整字形度量失败时保留原图并照常提供全文',async()=>{

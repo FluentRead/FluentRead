@@ -22,11 +22,11 @@ import { selectChangedTranslations, type OcrLine } from '@/src/features/image-tr
 import type {ImageViewport} from '@/src/shared/image/types';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
 import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
-import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
+import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,authorizeImageMatteDecorationFringe,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
 import {getImageDetectionEvidence,type ImageDetectionSupport} from './imageDetectionEvidence';
 import {getImageParagraphGapEvidence} from './imageParagraphGapEvidence';
 import {isSingleFrameImageData} from './imageDetectionSnapshot';
-import {createImageTextSegmentationSupport} from './imageTextSegmentation';
+import {createImageTextSegmentationSupport,type ImageTextSegmentationSupport} from './imageTextSegmentation';
 import {mangaInferenceClient} from './mangaInferenceClient';
 import { recognizeImage } from './ocrRuntime';
 import { getImageTextBackgroundColor, drawTranslatedImageText,canDrawTranslatedImageText,getImageTextDirection,getImageSourceTextStyle,getImageSourceTypographyStyle,getImageSingleLineHeight,layoutImageTranslationText,type ImageTranslationTextLayout } from './rendering';
@@ -308,6 +308,18 @@ function imageAlphaUnchanged(lines:OffscreenImageTranslationLine[]):OffscreenIma
     }))};
 }
 
+async function segmentImageMatte(sourcePixels:ImageData,width:number,height:number,signal?:AbortSignal):Promise<ImageTextSegmentationSupport|undefined> {
+    const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
+    await checkImageCancellation(signal);
+    if(!ready)return;
+    const seg=await mangaInferenceClient.segmentText(()=>{
+        throwIfImageOperationAborted(signal);
+        return {pixels:sourcePixels.data,width,height};
+    },signal);
+    throwIfImageOperationAborted(signal);
+    return createImageTextSegmentationSupport(seg,width,height);
+}
+
 /** 严格 alpha 准入失败时才尝试完整 RGBA 证明；全页预检通过前不更改像素或上传。 */
 async function renderImageMatteRescue(context:CanvasRenderingContext2D,canvas:HTMLCanvasElement,sourcePixels:ImageData,
     translated:ImageTextRegion[],retained:ImageTextRegion[],reading:OffscreenImageTranslationLine[],support:ImageDetectionSupport,signal?:AbortSignal,
@@ -343,19 +355,10 @@ async function renderImageMatteRescue(context:CanvasRenderingContext2D,canvas:HT
     await checkImageCancellation(signal);
     if(!plan){
         // 无缓存时不下载、不构造张量；所有颜色、归属与完整字形均已通过才准备可选会话。
-        const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
-        if(!ready){
-            // 缺资源也是异步结果；保留外层撤回前的让出与取消检查，不能发布迟到的可重试结果。
-            await checkImageCancellation(signal);
+        const segmentation=await segmentImageMatte(sourcePixels,canvas.width,canvas.height,signal);
+        if(!segmentation){
             return {...imageAlphaUnchanged(reading),retryWhenSegmentationReady:true};
         }
-        throwIfImageOperationAborted(signal);
-        const seg=await mangaInferenceClient.segmentText(()=>{
-            throwIfImageOperationAborted(signal);
-            return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
-        },signal);
-        throwIfImageOperationAborted(signal);
-        const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
         try {plan=authorizeImageMatteProposal(proposal,segmentation);}
         finally {segmentation.dispose();}
         if(!plan)return;
@@ -703,26 +706,26 @@ async function prepareTranslatedImage(
                 }
                 await checkImageCancellation(signal);
                 let retryWhenSegmentationReady=false;
-                let plan=decoration?authorizeImageMatteWithinExistingMasks(proposal)
-                    :support?authorizeImageMatteProposal(proposal,support,new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
+                let plan=!decoration&&support
+                    ?authorizeImageMatteProposal(proposal,support,new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
                 if(!plan){
                     if(view.requiresGlyphProof)break repairClippedInk;
-                    if(decoration)return await retainSource();
-                    const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
-                    await checkImageCancellation(signal);
-                    if(!ready){
-                        retryWhenSegmentationReady=true;
-                        plan=authorizeImageMatteWithinExistingMasks(proposal);
-                    }else{
-                        const seg=await mangaInferenceClient.segmentText(()=>{
+                    if(!decoration||view.hasDecorationFringe){
+                        let segmentation:ImageTextSegmentationSupport|undefined;
+                        try {
+                            segmentation=await segmentImageMatte(sourcePixels,canvas.width,canvas.height,signal);
+                            retryWhenSegmentationReady=!segmentation;
+                        }catch(error){
                             throwIfImageOperationAborted(signal);
-                            return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
-                        },signal);
-                        throwIfImageOperationAborted(signal);
-                        const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
-                        try {plan=authorizeImageMatteProposal(proposal,segmentation);}
-                        finally {segmentation.dispose();}
+                            if(!decoration||(error instanceof Error&&error.name==='AbortError'))throw error;
+                            // 边饰已具备旧框内的修补证明，可选模型失败时仍交付该结果。
+                        }
+                        if(segmentation){
+                            try {plan=decoration?authorizeImageMatteDecorationFringe(proposal,segmentation):authorizeImageMatteProposal(proposal,segmentation);}
+                            finally {segmentation.dispose();}
+                        }
                     }
+                    if(!plan&&(decoration||retryWhenSegmentationReady))plan=authorizeImageMatteWithinExistingMasks(proposal);
                     if(!plan)return await retainSource();
                 }
                 await checkImageCancellation(signal);

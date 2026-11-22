@@ -9,7 +9,7 @@ import {createImageDetectionEvidenceBudget,bindImageDetectionEvidence,getImageDe
 import {observeImageMattePalette,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
 import {keepImageMatteDecoration,observeImageMatteDecoration} from '@/src/features/image-translation/services/imageMatteDecoration';
 import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
-import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
+import {applyImageMattePage,authorizeImageMatteDecorationFringe,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
 
 describe('细衬线的半覆盖字形复核',()=>{
     const width=64,height=56,ink=[25,25,25,255],background=[225,225,225,255];
@@ -205,6 +205,45 @@ describe('被识别成句点的独立空心边饰',()=>{
         const expected=before.slice();
         for(let y=legacy.y0;y<44;y++)for(let x=legacy.x0;x<hint.gap;x++)expected.set(background,(y*width+x)*4);
         expect(pixels).toEqual(expected);
+    });
+
+    it.each([false,true])('同帧分割只延伸到连着已证墨迹的窄边（翻转 %s）',flipped=>{
+        const {pixels,put}=fixture();
+        // 独立点与正文末端同色，位于框外且受到宽松分割支持，仍不能借走旧墨迹权限。
+        put(68,15);
+        const yAt=(y:number)=>flipped?height-y-1:y;
+        const bbox=flipped?{...box,y0:height-box.y1,y1:height-box.y0}:box;
+        const source=flipped?pixels.slice():pixels;
+        if(flipped)for(let y=0;y<height;y++)source.set(pixels.subarray(y*width*4,(y+1)*width*4),yAt(y)*width*4);
+        const palette=observeImageMattePalette(source,width,height,bbox,{remaining:40_000})!;
+        const hint=observeImageMatteDecoration(source,width,'OPEN .',{background:palette.background,inkBoxes:[palette.supportBox]})!;
+        const line:ImageTextRegion={text:'开放。',bbox};
+        const draft=()=>proposeImageMattePage(source,width,height,[line],[],()=>({...bbox,x1:hint.gap}),hint)!;
+        const proposal=draft(),before=source.slice();
+        expect(getImageMatteProposalDrawings(proposal)?.hasDecorationFringe).toBe(true);
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>undefined})).toBeUndefined();
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>()=>false})).toBeUndefined();
+        // 即便全量支持，已经撤回的提案也无法发布计划。
+        const cancelled=draft();
+        expect(authorizeImageMatteDecorationFringe(cancelled,{forBox:()=>{
+            discardImageMatteProposal(cancelled);
+            return ()=>true;
+        }})).toBeUndefined();
+        expect(source).toEqual(before);
+        const plan=authorizeImageMatteDecorationFringe(proposal,{forBox:()=> (x,y)=>!(
+            (x<32&&y===yAt(18)) || (x>=39&&x<45&&y===yAt(16))
+        )})!;
+        expect(plan).toBeDefined();
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>()=>true})).toBeUndefined();
+        applyImageMattePage(source,width,height,plan);
+
+        const expected=before.slice();
+        for(const x0 of [23,39,55,75]){
+            const firstRow=x0===23?18:x0===39?17:15;
+            for(let y=firstRow;y<44;y++)for(let x=x0;x<x0+6;x++)expected.set(background,(yAt(y)*width+x)*4);
+        }
+        expect(source).toEqual(expected);
+        expect(plan.uploads.some(r=>r.y0<=yAt(15)&&r.y1>yAt(15))).toBe(true);
     });
 
     it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{

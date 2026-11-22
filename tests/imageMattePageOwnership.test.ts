@@ -156,6 +156,79 @@ describe('单行旧擦除框内的脱离边饰',()=>{
     });
 });
 
+describe('被识别成句点的独立空心边饰',()=>{
+    const width=128,height=68,background=[245,245,245,255],ink=[25,25,25,255];
+    const box={x0:16,y0:21,x1:104,y1:49},legacy={x0:13,y0:18,x1:107,y1:52};
+    const mark={x0:89,y0:31,x1:98,y1:40};
+
+    function fixture(markType:'ring'|'diamond'|'solid'|'open'|'small'|'pin-hole'='ring'){
+        const pixels=new Uint8ClampedArray(width*height*4);
+        const put=(x:number,y:number,color=ink)=>pixels.set(color,(y*width+x)*4);
+        for(let i=0;i<pixels.length;i+=4)pixels.set(background,i);
+        for(const start of [23,39,55,75])for(let y=15;y<44;y++)for(let x=start;x<start+6;x++)put(x,y);
+        const right=markType==='small'?mark.x0+3:mark.x1;
+        for(let y=mark.y0;y<mark.y1;y++)for(let x=mark.x0;x<right;x++){
+            if(markType==='diamond'){
+                const distance=Math.abs(x-93)+Math.abs(y-35);
+                if(distance>=3&&distance<=4)put(x,y);
+            }else if(markType==='solid'||markType==='pin-hole'||y<mark.y0+2||y>=mark.y1-2||x<mark.x0+2||x>=right-2)put(x,y);
+        }
+        if(markType==='open'){put(93,31,background);put(93,32,background);}
+        if(markType==='pin-hole')put(93,35,background);
+        const observe=(label='OPEN .')=>{
+            const palette=observeImageMattePalette(pixels,width,height,box,{remaining:40_000})!;
+            return observeImageMatteDecoration(pixels,width,label,{background:palette.background,inkBoxes:[palette.supportBox]});
+        };
+        const repair=()=>planImageMatteCandidate(pixels,width,height,box,{remaining:40_000},'recognition')!;
+        return {pixels,put,observe,repair};
+    }
+
+    it.each([['ring',false],['ring',true],['diamond',false]] as const)('保留 %s 边饰和原框外笔画，细边缘 %s 不改变旧框权限',(markType,fine)=>{
+        const {pixels,put,observe,repair}=fixture(markType);
+        if(fine){
+            for(let x=29;x<32;x++)put(x,29,[100,100,100,255]);
+            put(32,29,[185,185,185,255]);
+        }
+        expect(Boolean(repair().fringeCore)).toBe(fine);
+        const hint=observe()!;
+        expect(hint).toEqual({side:'right',gap:88,characters:4,enclosed:true});
+        const line:ImageTextRegion={text:'开放。',bbox:box};
+        const before=pixels.slice();
+        const requested={x0:box.x0-5,y0:box.y0-7,x1:hint.gap,y1:box.y1+6};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],()=>requested,hint)!;
+        expect(getImageMatteProposalDrawings(proposal)?.requiresGlyphProof).toBeUndefined();
+        expect(getImageMatteProposalDrawings(proposal)?.drawings[0].bounds).toEqual({...legacy,x1:hint.gap});
+        expect(pixels).toEqual(before);
+        const plan=authorizeImageMatteWithinExistingMasks(proposal)!;
+        expect(plan.uploads).toEqual([legacy]);
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=before.slice();
+        for(let y=legacy.y0;y<44;y++)for(let x=legacy.x0;x<hint.gap;x++)expected.set(background,(y*width+x)*4);
+        expect(pixels).toEqual(expected);
+    });
+
+    it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{
+        const {observe,repair}=fixture(markType);
+        expect(observe('OPEN.')).toBeUndefined();
+        const draft=repair(),mask=draft.mask.slice();
+        expect(keepImageMatteDecoration(draft,observe()!,legacy)).toBe(false);
+        expect(draft.mask).toEqual(mask);
+    });
+
+    it('边饰靠近正文、横向位置错误或旧清字范围内没有正文时不发布权限',()=>{
+        const {pixels,observe,repair,put}=fixture();
+        const hint=observe()!;
+        expect(keepImageMatteDecoration(repair(),{...hint,side:'left'},legacy)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),hint,{...legacy,x0:hint.gap})).toBe(false);
+        const line:ImageTextRegion={text:'开放。',bbox:box};
+        expect(proposeImageMattePage(pixels,width,height,[line],[],()=>({...box,y0:3,y1:10}),hint)).toBeUndefined();
+        put(87,35);
+        expect(keepImageMatteDecoration(repair(),observe()!,legacy)).toBe(false);
+        const invalid={...box,x1:box.x0};
+        expect(proposeImageMattePage(pixels,width,height,[{text:'开放。',bbox:invalid}],[],()=>box,hint)).toBeUndefined();
+    });
+});
+
 describe('整页RGBA修补的重叠墨迹归属',()=>{
     it('原宽灰牌被薄AA准入提前拒绝，旧像素及正反序整页拒绝继续保留',()=>{
         const width=64,height=48,pixels=new Uint8ClampedArray(width*height*4);

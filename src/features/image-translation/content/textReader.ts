@@ -6,6 +6,7 @@
  */
 import {hasDistinctTranslation} from '@/src/core/translation/result';
 export interface ImageReaderLine {text: string; sourceText?: string; renderSkipped?: true; numericUncertain?: true}
+export interface ImageReaderLanguages {source: string; target: string}
 export {default as IMAGE_READER_CSS} from '../ui/image-text-reader.css?inline';
 
 export function createImageTextReader(localize: (source: string) => string, onClose: (ownedFocus: boolean) => void) {
@@ -34,6 +35,8 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     footer.append(feedback, copy);
     element.append(header, body, footer);
     let lines: ImageReaderLine[] = [];
+    let sourceLanguage = '';
+    let targetLanguage = '';
     let comparing = false;
     let disposed = false;
     let revision = 0;
@@ -57,12 +60,15 @@ export function createImageTextReader(localize: (source: string) => string, onCl
                 const source = document.createElement('pre');
                 source.className = 'fr-image-reader-source';
                 source.dir = 'auto';
+                source.lang = sourceLanguage;
                 source.textContent = line.sourceText!;
                 article.append(source);
             }
             const translated = document.createElement('pre');
             translated.dir = 'auto';
-            translated.textContent = !changed && line.sourceText !== undefined ? line.sourceText : line.text;
+            const unchangedSource = changed ? undefined : line.sourceText;
+            translated.lang = unchangedSource === undefined ? targetLanguage : sourceLanguage;
+            translated.textContent = unchangedSource ?? line.text;
             article.append(translated);
             if (line.numericUncertain) {
                 const note = document.createElement('p');
@@ -137,7 +143,15 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     refreshLanguage();
     return {
         element, refreshLanguage,
-        setLines(next: ImageReaderLine[]) {revision += 1; clearTimeout(feedbackTimer); lines = next.map(line => ({...line})); render();},
+        setLines(next: ImageReaderLine[], languages?: ImageReaderLanguages) {
+            revision += 1;
+            clearTimeout(feedbackTimer);
+            lines = next.map(line => ({...line}));
+            // 空 lang 表示语言未知，避免自动识别的原文沿用宿主网页语言。
+            sourceLanguage = languages?.source ?? '';
+            targetLanguage = languages?.target ?? '';
+            render();
+        },
         open(takeFocus = true) {
             // 外层也可直接隐藏面板；新展示周期不能接收之前复制操作的迟到反馈。
             revision += 1;

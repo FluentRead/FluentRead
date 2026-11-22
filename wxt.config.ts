@@ -502,7 +502,8 @@ export default defineConfig({
             // 斜向背景修补使 Chrome 从 70,535,048 增至 70,536,383 字节，294 份静态资源摘要相同。
             const imageDirectionalRepairBudget = 1_500;
             // 译图语言贯通增加 339 字节 Chrome 代码，沿用现有字体文件。
-            const imageTextLocaleBudget = 400;
+            // 阅读面板声明原文和译文语言再增加 157 字节代码。
+            const imageTextLocaleBudget = 600;
             // 照片边缘的有界重新取样使 Chrome 增加 1,132 字节代码，294 份静态资源摘要相同。
             const imageBoundarySamplingBudget = 1_200;
             // 紧裁彩字的词界复核使 Chrome 从 70,538,403 增至 70,538,723 字节，增量为代码。

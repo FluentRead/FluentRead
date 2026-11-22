@@ -1,0 +1,753 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fluentread:translation-document-consistency-annotation:draft-1.1",
+  "title": "FluentRead document consistency and scientific stance annotation (draft 1.1)",
+  "$comment": "Exploratory schema for blinded bilingual review only. Keep condition-to-model mapping in a private sidecar until double review closes. Record what the rater saw separately from what the translation system received. Scientific stance observations are separate from adequacy/fluency scores and are not prefilled by source heuristics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "sample_id",
+    "track",
+    "document_id",
+    "language_pair",
+    "blind_condition_code",
+    "context_policy",
+    "segment_annotations",
+    "document_consistency",
+    "cross_segment_issue_links",
+    "rater_pseudonym",
+    "rubric_version",
+    "completed_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "draft-1.1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "track": {
+      "enum": [
+        "general_web",
+        "scientific_paper",
+        "technical_documentation",
+        "manga",
+        "educational_document"
+      ]
+    },
+    "document_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language_pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "target"
+      ],
+      "properties": {
+        "source": {
+          "type": "string",
+          "minLength": 2
+        },
+        "target": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "blind_condition_code": {
+      "type": "string",
+      "pattern": "^[A-Z0-9_-]{8,40}$",
+      "description": "Opaque code shown in the rater export. Keep its mapping to SEG/DOC/MIX in a private sidecar until blind review closes."
+    },
+    "segment_annotations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/segmentAnnotation"
+      }
+    },
+    "document_consistency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "score",
+        "confidence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "scored",
+            "not_applicable",
+            "cannot_judge"
+          ]
+        },
+        "score": {
+          "description": "1 = cross-segment relations contradict or cannot be tracked; 2 = multiple or severe inconsistencies; 3 = at least one localized inconsistency but relations remain recoverable; 4 = minor variation without confusion; 5 = terminology, entities, reference, register, and transitions remain coherent or variations have clear reasons.",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "confidence": {
+          "description": "Rater confidence: 1 low, 4 high.",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "phenomena": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "terminology",
+              "entity_form",
+              "coreference",
+              "register_or_tone",
+              "tense_or_aspect",
+              "discourse_relation",
+              "logical_continuity",
+              "character_voice",
+              "other"
+            ]
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 800
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "scored"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              "confidence": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_applicable",
+                  "cannot_judge"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "scored"
+              },
+              "score": {
+                "maximum": 4
+              }
+            },
+            "required": [
+              "status",
+              "score"
+            ]
+          },
+          "then": {
+            "properties": {
+              "cross_segment_issue_links": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cross_segment_issue_links": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/crossSegmentIssueLink"
+      }
+    },
+    "pairwise_consistency_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_id",
+        "document_a_id",
+        "document_b_id",
+        "choice",
+        "confidence"
+      ],
+      "properties": {
+        "control_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_a_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "document_b_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "choice": {
+          "enum": [
+            "A_more_consistent",
+            "B_more_consistent",
+            "equally_consistent",
+            "cannot_judge"
+          ]
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "terminology",
+              "entity_form",
+              "coreference",
+              "register_or_tone",
+              "tense_or_aspect",
+              "discourse_relation",
+              "logical_continuity",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "rater_pseudonym": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rubric_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "scientific_stance_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "annotations"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "annotated",
+            "not_applicable",
+            "cannot_judge"
+          ]
+        },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scientificStanceAnnotation"
+          }
+        },
+        "rationale": {
+          "type": "string",
+          "maxLength": 800
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "annotated"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "annotations": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_applicable",
+                  "cannot_judge"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "annotations": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "context_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rater_context_scope",
+        "model_context_scope",
+        "reference_available",
+        "model_received_reference",
+        "reference_exposure",
+        "model_received_image"
+      ],
+      "properties": {
+        "rater_context_scope": {
+          "enum": [
+            "source_segment_only",
+            "neighboring_segments",
+            "same_document_context",
+            "full_document",
+            "page_image",
+            "page_text_and_image",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "model_context_scope": {
+          "enum": [
+            "source_segment_only",
+            "neighboring_source_segments",
+            "same_document_source_context",
+            "full_source_document",
+            "page_image_only",
+            "source_text_and_page_image",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "reference_available": {
+          "type": "boolean"
+        },
+        "model_received_reference": {
+          "type": "boolean"
+        },
+        "reference_exposure": {
+          "enum": [
+            "not_available",
+            "hidden_until_after_initial_scoring",
+            "visible_during_scoring",
+            "exposed_after_initial_scoring",
+            "unknown"
+          ]
+        },
+        "model_received_image": {
+          "type": "boolean"
+        },
+        "context_source_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    }
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "segment_id",
+        "start_char",
+        "end_char"
+      ],
+      "properties": {
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_char": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_char": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "errorEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "error_id",
+        "category",
+        "severity",
+        "source_span",
+        "target_span",
+        "evidence"
+      ],
+      "properties": {
+        "error_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "mistranslation",
+            "omission",
+            "addition",
+            "terminology",
+            "number_or_unit",
+            "named_entity",
+            "grammar",
+            "fluency",
+            "discourse_context",
+            "style_register",
+            "untranslated",
+            "other"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ]
+        },
+        "source_span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        }
+      },
+      "anyOf": [
+        {
+          "properties": {
+            "source_span": {
+              "$ref": "#/$defs/span"
+            }
+          }
+        },
+        {
+          "properties": {
+            "target_span": {
+              "$ref": "#/$defs/span"
+            }
+          }
+        }
+      ]
+    },
+    "scientificStanceAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "annotation_id",
+        "category",
+        "source_span",
+        "target_span",
+        "scope_note",
+        "severity",
+        "confidence",
+        "rationale",
+        "transfer_effects"
+      ],
+      "properties": {
+        "annotation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "hedge",
+            "booster",
+            "attitude_marker",
+            "self_mention",
+            "other"
+          ]
+        },
+        "source_span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_span": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope_note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "The proposition, comparison, result, limitation or contribution affected by this stance instance."
+        },
+        "transfer": {
+          "enum": [
+            "preserved",
+            "strengthened",
+            "weakened",
+            "omitted",
+            "added",
+            "scope_shift",
+            "actor_shift",
+            "cannot_judge"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "major",
+            "minor",
+            "not_applicable"
+          ]
+        },
+        "confidence": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 800
+        },
+        "transfer_effects": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "preserved",
+              "strengthened",
+              "weakened",
+              "omitted",
+              "added",
+              "scope_shift",
+              "actor_shift",
+              "cannot_judge"
+            ]
+          },
+          "description": "Multiple effects may be recorded for one stance instance; use a separate target-only annotation when the translation adds a stance cue without a source cue."
+        }
+      },
+      "allOf": []
+    },
+    "segmentAnnotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "segment_id",
+        "ordinal_index",
+        "adequacy",
+        "fluency",
+        "errors"
+      ],
+      "properties": {
+        "segment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ordinal_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "adequacy": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 5
+        },
+        "fluency": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 5
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/errorEvidence"
+          }
+        }
+      }
+    },
+    "crossSegmentIssueLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "link_id",
+        "span_a",
+        "span_b",
+        "phenomenon",
+        "direction",
+        "severity"
+      ],
+      "properties": {
+        "link_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "span_a": {
+          "$ref": "#/$defs/span"
+        },
+        "span_b": {
+          "$ref": "#/$defs/span"
+        },
+        "phenomenon": {
+          "enum": [
+            "terminology",
+            "entity_form",
+            "coreference",
+            "register_or_tone",
+            "tense_or_aspect",
+            "discourse_relation",
+            "logical_continuity",
+            "character_voice",
+            "other"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "unjustified_variation",
+            "incompatible_reference",
+            "contradiction",
+            "break_in_continuity",
+            "other"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "critical",
+            "major",
+            "minor"
+          ]
+        },
+        "short_note": {
+          "type": "string",
+          "maxLength": 500
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "track": {
+            "const": "scientific_paper"
+          }
+        },
+        "required": [
+          "track"
+        ]
+      },
+      "then": {
+        "required": [
+          "scientific_stance_review"
+        ]
+      }
+    }
+  ]
+}

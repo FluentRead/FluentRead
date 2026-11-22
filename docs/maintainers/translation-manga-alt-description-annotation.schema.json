@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:fluentread:translation-manga-visual-alt-description-review:draft-1.0",
+  "title": "FluentRead visual alt-description translation review (draft 1.0)",
+  "$comment": "Track-specific schema using the benchmark schema-v2 envelope. For text-only image-alt-description translation. Do not use it to score OCR or visual understanding when no image is provided.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "track",
+    "track_schema_version",
+    "rubric_version",
+    "blind_assignment_id",
+    "created_at",
+    "reviewer_id",
+    "context_policy",
+    "completed_samples",
+    "total_samples",
+    "complete",
+    "track_data"
+  ],
+  "properties": {
+    "schema_version": {"const": 2},
+    "dataset_id": {"type": "string", "minLength": 1},
+    "track": {"const": "manga"},
+    "track_schema_version": {"const": "visual_alt_description_v1"},
+    "rubric_version": {"type": "string", "minLength": 1},
+    "blind_assignment_id": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "reviewer_id": {"type": "string", "minLength": 1},
+    "context_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "reviewer_sees",
+        "model_received",
+        "rater_saw_image",
+        "model_received_image",
+        "reference_available",
+        "model_received_reference",
+        "reference_exposure"
+      ],
+      "properties": {
+        "reviewer_sees": {"const": "source_alt_text_and_anonymous_translation_only"},
+        "model_received": {"const": "source_alt_text_only"},
+        "rater_saw_image": {"const": false},
+        "model_received_image": {"const": false},
+        "reference_available": {"type": "boolean"},
+        "model_received_reference": {"const": false},
+        "reference_exposure": {
+          "enum": [
+            "hidden_until_after_initial_scoring",
+            "not_available",
+            "unknown"
+          ]
+        },
+        "notes": {"type": "string", "maxLength": 500}
+      }
+    },
+    "completed_samples": {"type": "integer", "minimum": 0},
+    "total_samples": {"type": "integer", "minimum": 1},
+    "complete": {
+      "type": "boolean",
+      "description": "Must be true exactly when completed_samples equals total_samples; check this cross-field invariant in the packet validator."
+    },
+    "track_data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task_type", "samples"],
+      "properties": {
+        "task_type": {"const": "visual_alt_description_translation"},
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/sample"}
+        }
+      }
+    },
+    "note": {"type": ["string", "null"], "maxLength": 1000}
+  },
+  "$defs": {
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["score", "confidence"],
+      "properties": {
+        "score": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1, "maximum": 5},
+            {"type": "null"}
+          ]
+        },
+        "confidence": {
+          "oneOf": [
+            {"type": "integer", "minimum": 1, "maximum": 4},
+            {"type": "null"}
+          ]
+        },
+        "rationale": {"type": ["string", "null"], "maxLength": 800}
+      }
+    },
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_char", "end_char"],
+      "properties": {
+        "start_char": {"type": "integer", "minimum": 0},
+        "end_char": {"type": "integer", "minimum": 1}
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "severity", "source_span", "target_span", "evidence"],
+      "properties": {
+        "category": {
+          "enum": [
+            "entity_or_name_error",
+            "action_or_relation_error",
+            "location_or_direction_error",
+            "salient_detail_omission",
+            "unsupported_addition",
+            "terminology_inconsistency",
+            "unnatural_or_ambiguous_zh_hans",
+            "accessibility_oververbosity",
+            "other"
+          ]
+        },
+        "severity": {"enum": ["critical", "major", "minor"]},
+        "source_span": {"oneOf": [{"$ref": "#/$defs/span"}, {"type": "null"}]},
+        "target_span": {"oneOf": [{"$ref": "#/$defs/span"}, {"type": "null"}]},
+        "evidence": {"type": "string", "minLength": 1, "maxLength": 800}
+      },
+      "anyOf": [
+        {"properties": {"source_span": {"$ref": "#/$defs/span"}}},
+        {"properties": {"target_span": {"$ref": "#/$defs/span"}}}
+      ]
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anonymous_sample_id",
+        "candidate_id",
+        "asset_id",
+        "blind_condition_code",
+        "source_text_sha256",
+        "translation_sha256",
+        "image_status",
+        "status",
+        "scores",
+        "completeness",
+        "acceptability",
+        "issues"
+      ],
+      "properties": {
+        "anonymous_sample_id": {"type": "string", "minLength": 1},
+        "candidate_id": {"type": "string", "minLength": 1},
+        "asset_id": {"type": "string", "minLength": 1},
+        "blind_condition_code": {"type": "string", "pattern": "^[A-Z0-9_-]{8,40}$"},
+        "source_text_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "translation_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "image_status": {"const": "not_provided_visual_grounding_not_applicable"},
+        "status": {"enum": ["scored", "cannot_judge", "incomplete"]},
+        "scores": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "entity_action_relation_fidelity",
+            "detail_coverage",
+            "unsupported_additions",
+            "zh_hans_readability",
+            "term_and_name_consistency"
+          ],
+          "properties": {
+            "entity_action_relation_fidelity": {"$ref": "#/$defs/score"},
+            "detail_coverage": {"$ref": "#/$defs/score"},
+            "unsupported_additions": {"$ref": "#/$defs/score"},
+            "zh_hans_readability": {"$ref": "#/$defs/score"},
+            "term_and_name_consistency": {"$ref": "#/$defs/score"}
+          }
+        },
+        "completeness": {"enum": ["complete", "omission", "addition", "both", "cant_judge"]},
+        "acceptability": {"enum": ["use_as_is", "revise", "unusable", "cant_judge"]},
+        "reference_exposure": {"enum": ["not_exposed", "after_initial_scoring", "not_available", "unknown"]},
+        "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}},
+        "note": {"type": ["string", "null"], "maxLength": 1000}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "scored"}}, "required": ["status"]},
+          "then": {
+            "properties": {
+              "scores": {
+                "properties": {
+                  "entity_action_relation_fidelity": {"properties": {"score": {"type": "integer"}, "confidence": {"type": "integer"}}},
+                  "detail_coverage": {"properties": {"score": {"type": "integer"}, "confidence": {"type": "integer"}}},
+                  "unsupported_additions": {"properties": {"score": {"type": "integer"}, "confidence": {"type": "integer"}}},
+                  "zh_hans_readability": {"properties": {"score": {"type": "integer"}, "confidence": {"type": "integer"}}},
+                  "term_and_name_consistency": {"properties": {"score": {"type": "integer"}, "confidence": {"type": "integer"}}}
+                }
+              },
+              "completeness": {"not": {"const": "cant_judge"}},
+              "acceptability": {"not": {"const": "cant_judge"}}
+            }
+          }
+        },
+        {
+          "if": {"properties": {"status": {"const": "cannot_judge"}}, "required": ["status"]},
+          "then": {
+            "properties": {
+              "scores": {
+                "properties": {
+                  "entity_action_relation_fidelity": {"properties": {"score": {"type": "null"}, "confidence": {"type": "null"}}},
+                  "detail_coverage": {"properties": {"score": {"type": "null"}, "confidence": {"type": "null"}}},
+                  "unsupported_additions": {"properties": {"score": {"type": "null"}, "confidence": {"type": "null"}}},
+                  "zh_hans_readability": {"properties": {"score": {"type": "null"}, "confidence": {"type": "null"}}},
+                  "term_and_name_consistency": {"properties": {"score": {"type": "null"}, "confidence": {"type": "null"}}}
+                }
+              },
+              "completeness": {"const": "cant_judge"},
+              "acceptability": {"const": "cant_judge"},
+              "issues": {"maxItems": 0}
+            }
+          }
+        }
+      ]
+    }
+  }
+}

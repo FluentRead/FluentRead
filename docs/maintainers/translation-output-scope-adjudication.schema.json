@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "translation-output-scope-adjudication-v1.json",
+  "title": "Translation Output Scope Adjudication",
+  "description": "A blind-review annotation for checking whether a translation output covers the units requested by a frozen task plan.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "annotation_id",
+    "stimulus_id",
+    "reviewer_id",
+    "expected_scope",
+    "observed_scope_status",
+    "included_expected_unit_ids",
+    "included_unrequested_unit_ids",
+    "omitted_expected_unit_ids",
+    "evidence_spans",
+    "confidence",
+    "adjudication_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "annotation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stimulus_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Opaque identifier; do not reveal model, prompt condition, or run identifier to the reviewer."
+    },
+    "reviewer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expected_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_unit_granularity",
+        "expected_output_unit_ids",
+        "context_only_unit_ids",
+        "allowed_output_policy"
+      ],
+      "properties": {
+        "target_unit_granularity": {
+          "enum": [
+            "sentence",
+            "paragraph",
+            "section",
+            "page",
+            "region",
+            "document",
+            "mixed"
+          ]
+        },
+        "expected_output_unit_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "context_only_unit_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allowed_output_policy": {
+          "enum": [
+            "target_units_only",
+            "target_units_plus_required_structure",
+            "whole_document",
+            "structured_regions",
+            "other"
+          ]
+        }
+      }
+    },
+    "observed_scope_status": {
+      "enum": [
+        "compliant",
+        "includes_unrequested_units",
+        "omits_required_units",
+        "wrong_target_units",
+        "mixed",
+        "ambiguous",
+        "unjudgeable",
+        "not_applicable"
+      ]
+    },
+    "included_expected_unit_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "included_unrequested_unit_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "omitted_expected_unit_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence_spans": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "output_start",
+          "output_end",
+          "source_unit_ids",
+          "relation"
+        ],
+        "properties": {
+          "output_start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "output_end": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_unit_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "relation": {
+            "enum": [
+              "expected_unit_content",
+              "unrequested_unit_content",
+              "unclear"
+            ]
+          }
+        }
+      }
+    },
+    "reviewer_note": {
+      "type": "string"
+    },
+    "confidence": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "adjudication_status": {
+      "enum": [
+        "independent_annotation",
+        "needs_adjudication",
+        "adjudicated"
+      ]
+    }
+  }
+}

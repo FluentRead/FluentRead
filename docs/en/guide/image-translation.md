@@ -41,7 +41,7 @@ When a horizontal line of text covers an angled edge in an opaque image, repair 
 
 When a recognition box clips a thin outline in a photo, repair can use nearby background samples that agree across several rows. This reduces streaking inside the erasure area.
 
-For a single line of uppercase text on a solid background, including opaque PNGs, the default Paddle model can repair clipped strokes when each glyph matches the recognition evidence and the gaps follow a common cropped edge. Closely spaced glyphs can be checked individually as long as their strokes stay separate.
+For one line of uppercase text on a solid background, the default Paddle model can repair clipped edges when the glyphs match the recognition evidence individually. This also works for some serif lettering clipped at both edges when only the antialiasing joins the glyphs and detection covers the middle of the strokes.
 
 When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
 

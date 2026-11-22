@@ -6,7 +6,7 @@
 import {describe,expect,it} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import {createImageDetectionEvidenceBudget,bindImageDetectionEvidence,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
-import {planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
+import {planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
 import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
 import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
 
@@ -146,6 +146,72 @@ describe('同帧检测支持的整行字形裁切',()=>{
         expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
         for(let y=7;y<19;y++){mask[y*width+5]=1;mask[y*width+42]=0;}
         expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
+    });
+    function dualCaps(){
+        const input=fourCaps().repair,width=72,height=48,ink=[23,28,54,255],pixels=new Uint8ClampedArray(width*height*4);
+        const box={...input.sourceBox,y0:17,y1:26};
+        for(let i=0;i<pixels.length;i+=4)pixels.set(input.background,i);
+        const setColor=(x:number,y:number,color:readonly number[])=>pixels.set(color,(y*width+x)*4);
+        for(let i=0;i<input.mask.length;i++){
+            if(input.mask[i])setColor(input.left+i%input.width,input.top+Math.floor(i/input.width),ink);
+        }
+        for(let x=19;x<23;x++)setColor(x,21,[190,186,186,255]);
+        setColor(6,21,[14,54,28,255]);
+        const repair=planImageMatteCandidate(pixels,width,height,box,{remaining:65_536})!;
+        return {pixels,width,height,repair,box};
+    }
+    const central=(_x:number,y:number)=>y>=18&&y<26;
+
+    it('双侧裁过的抗锯齿相接轮廓按九成墨色分字，整页只移除原墨色',()=>{
+        const {pixels,width,height,repair,box}=dualCaps(),before=pixels.slice();
+        const bridge=(21-repair.top)*repair.width+20-repair.left;
+        expect(repair.mask[bridge]).toBe(1);
+        expect(repair.inkCore?.[bridge]).toBe(0);
+        expect(coversClippedImageGlyphs(repair,'OPEN',central)).toBe(true);
+        const line:ImageTextRegion={text:'开放',bbox:box,fontSize:12};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],l=>l.bbox)!;
+        const plan=authorizeImageMatteProposal(proposal,{forBox:()=>central},new Map([[line,'OPEN']]))!;
+        expect(plan).toBeDefined();
+        expect(pixels).toEqual(before);
+        applyImageMattePage(pixels,width,height,plan);
+        expect(pixels.slice((21*width+20)*4,(21*width+21)*4)).toEqual(Uint8ClampedArray.from(repair.background));
+        expect(pixels.slice((21*width+6)*4,(21*width+7)*4)).toEqual(before.slice((21*width+6)*4,(21*width+7)*4));
+    });
+    it('中央的薄墨也须有检测支持，同色粗连接不可算作两个字',()=>{
+        const {repair}=dualCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>central(x,y)&&(x!==20||y!==21))).toBe(false);
+        const row=(21-repair.top)*repair.width;
+        repair.inkCore!.fill(1,row+19-repair.left,row+23-repair.left);
+        expect(coversClippedImageGlyphs(repair,'OPEN',central)).toBe(false);
+    });
+    it('双侧裁切须有足够原框、中段及每个字两端的独立证据',()=>{
+        const {repair,box}=dualCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>central(x,y)&&y!==25)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,x0:17}},'OPEN',central)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y1:25}},'OPEN',()=>true)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:18}},'OPEN',central)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:16,y1:25}},'OPEN',()=>true)).toBe(true);
+        const core=repair.inkCore!.slice();
+        const topRow=(15-repair.top)*repair.width;
+        core.fill(0,topRow+23-repair.left,topRow+29-repair.left);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:16,y1:25},inkCore:core},'OPEN',()=>true)).toBe(false);
+        core.set(repair.inkCore!);
+        const bottomRow=(26-repair.top)*repair.width;
+        core.fill(0,bottomRow+23-repair.left,bottomRow+29-repair.left);
+        expect(coversClippedImageGlyphs({...repair,inkCore:core},'OPEN',central)).toBe(false);
+    });
+    it('双侧判断按完整墨迹与强核心两次观察收费',()=>{
+        const {repair}=dualCaps(),remaining={remaining:repair.mask.length*2-1};
+        expect(coversClippedImageGlyphs(repair,'OPEN',()=>{throw new Error('unexpected support query');},remaining)).toBe(false);
+        expect(remaining.remaining).toBe(-1);
+    });
+    it('短窄行被两端容差耗尽或根本没有横向裁切时不借用空的中央区域',()=>{
+        const {repair,box}=dualCaps();
+        const tiny={...repair,sourceBox:{...box,x0:25,x1:33},supportBox:{...repair.supportBox,x0:20,x1:37}};
+        expect(coversClippedImageGlyphs(tiny,'OPEN',()=>{throw new Error('unexpected support query');})).toBe(false);
+        const wider={...repair,sourceBox:{...box,x0:12,x1:52}};
+        expect(coversClippedImageGlyphs(wider,'OPEN',central)).toBe(true);
+        expect(coversClippedImageGlyphs(wider,'OPEN',(x,y)=>central(x,y)&&(x!==13||y!==20))).toBe(false);
     });
     it.each(['Abcd','AB','A'.repeat(49),'ABCDE','ABC!'])('原文或连通对应不足时没有额外授权 %s',source=>{
         expect(coversClippedImageGlyphs(fourCaps().repair,source,above)).toBe(false);

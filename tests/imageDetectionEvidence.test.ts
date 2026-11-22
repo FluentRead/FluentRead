@@ -59,6 +59,74 @@ async function actualSdkPlane(data:Float32Array,width:number,height:number,origi
 const adjacentFloat=(value:number,step:number)=>{const value32=new Float32Array([value]),bits=new Uint32Array(value32.buffer);bits[0]+=step;return value32[0];};
 const unpack=(f:ImageDetectionFrame)=>Array.from({length:f.width*f.height},(_,i)=>(f.bits[i>>>3]&(1<<(i&7)))!==0);
 
+describe('不透明底上疑似漏擦行的局部原比例位图',()=>{
+    const source=geometry({pageWidth:192,pageHeight:192,x:40,y:35,width:64,height:64});
+    const line={x0:19,y0:22,x1:47,y1:34};
+    const write=(pixels:Uint8ClampedArray,x:number,y:number,rgba:readonly number[]=[0,0,0,255])=>
+        pixels.set(rgba,(y*source.pageWidth+x)*4);
+    const solid=()=>new Uint8ClampedArray(source.pageWidth*source.pageHeight*4).fill(255);
+    it.each(['top','bottom'])('只扫描 %s 裁切附近的原模型像素，瓦片和页坐标准确映射',side=>{
+        const pixels=solid(),data=new Float32Array(64*64),budget=createImageDetectionEvidenceBudget(),regions:object[]=[];
+        write(pixels,59,side==='top'?52:73);
+        data[22*64+19]=.9;
+        data[0]=NaN; // 远离已验证的局部视图。
+        budget.capture(data,64,64,source,{box:line,pixels});
+        const frames=budget.frames();
+        expect(frames).toHaveLength(1);
+        expect(frames[0]).toMatchObject({pageWidth:192,pageHeight:192,x:49,y:47,width:48,height:32});
+        expect(frames[0].bits).toHaveLength(192);
+        expect(unpack(frames[0]).flatMap((value,index)=>value?[index]:[])).toEqual([10*48+10]);
+        bindImageDetectionEvidence(regions,'tile',192,192,frames);
+        const query=getImageDetectionEvidence(regions,'tile',192,192)!
+            .forBox({x0:59,y0:57,x1:87,y1:69},{left:51,top:49,width:44,height:28})!;
+        expect(query(59,57)).toBe(true);
+        expect(query(59,54)).toBe(false);
+        data[20*64+19]=NaN;
+        budget.capture(data,64,64,source,{box:line,pixels});
+        expect(budget.frames()).toHaveLength(1);
+    });
+    it.each([
+        ['no clip',null],['leading alpha',[52,50,128]],['top ridge',[59,50,255]],['bottom ridge',[59,75,255]],
+        ['left ridge',[52,63,255]],['right ridge',[93,63,255]],
+    ] as const)('%s 时不保存模型区域',(name,pixel)=>{
+        const pixels=solid();
+        if(name!=='no clip')write(pixels,59,52);
+        if(pixel)write(pixels,pixel[0],pixel[1],[0,0,0,pixel[2]]);
+        const budget=createImageDetectionEvidenceBudget();
+        budget.capture(new Float32Array(64*64),64,64,source,{box:line,pixels});
+        expect(budget.frames()).toEqual([]);
+    });
+    it.each([
+        {x0:19.5},{y1:29},{x1:42},{x0:-34},{y0:-29,y1:-17},{x1:147},{y0:42,y1:151},
+        {x0:9},{y0:9,y1:21},{x1:55},{y0:43,y1:55},
+    ])('越界、非横行或跨切片观察区不借用数据 %j',change=>{
+        const budget=createImageDetectionEvidenceBudget();
+        budget.capture(new Float32Array(64*64),64,64,source,{box:{...line,...change},pixels:solid()});
+        expect(budget.frames()).toEqual([]);
+    });
+    it('无完整原像素或超过擦除观察面积均拒绝',()=>{
+        const budget=createImageDetectionEvidenceBudget();
+        budget.capture(new Float32Array(64*64),64,64,source,{box:line,pixels:new Uint8ClampedArray()});
+        budget.capture(new Float32Array(512*512),512,512,
+            geometry({pageWidth:512,pageHeight:512,width:512,height:512}),
+            {box:{x0:13,y0:18,x1:470,y1:245},pixels:new Uint8ClampedArray(512*512*4)});
+        expect(budget.frames()).toEqual([]);
+    });
+    it('局部位图每块均向上取整，总位数达到容量时不能借剩余扫描预算',()=>{
+        const size=1536,frame=geometry({pageWidth:size,pageHeight:size,width:size,height:size});
+        const data=new Float32Array(size*size),pixels=new Uint8ClampedArray(size*size*4).fill(255);
+        pixels[(15*size+20)*4]=0;
+        const budget=createImageDetectionEvidenceBudget();
+        budget.capture(data,size,size,frame);
+        const crop={x0:20,y0:20,x1:641,y1:101};
+        for(let i=0;i<28;i++)budget.capture(data,size,size,frame,{box:crop,pixels});
+        expect(budget.frames()).toHaveLength(29);
+        // 面积恰到 4 Mi，28 个局部块的尾数补齐使实际字节多 11。
+        budget.capture(data,size,size,frame,{box:{x0:20,y0:20,x1:795,y1:28},pixels});
+        expect(budget.frames()).toHaveLength(29);
+    });
+});
+
 describe('同次检测概率的独占有界位图',()=>{
     it('内容区逐行低位打包，模型padding不产生支持，忠实锁定SDK的实际量化二值平面',async()=>{
         const b=createImageDetectionEvidenceBudget(),data=new Float32Array(32*32).fill(1);

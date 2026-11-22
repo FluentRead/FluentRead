@@ -130,6 +130,23 @@ describe('同帧检测支持的整行字形裁切',()=>{
         const {repair}=fourCaps();repair.sourceBox.y0=13;repair.sourceBox.y1=24;
         expect(coversClippedImageGlyphs(repair,'OPEN',(_x,y)=>y<23)).toBe(true);
     });
+    it('横向投影重叠的字形仍须逐个连通并拥有各自的过半支持',()=>{
+        const {repair}=fourCaps(),{mask,width}=repair;
+        mask.fill(1,7*width+11,7*width+14);
+        mask.fill(1,18*width+13,18*width+15);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(true);
+        mask[7*width+14]=1; // 同投影的合法字距变成真实连接。
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    it('两端的额外一像素检测缺口只归给实际被框裁边的字形',()=>{
+        const {repair}=fourCaps(),{width,mask}=repair;
+        const support=(x:number,y:number)=>above(x,y)&&x!==18&&x!==45;
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(true);
+        for(let y=7;y<19;y++)mask[y*width+5]=0;
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
+        for(let y=7;y<19;y++){mask[y*width+5]=1;mask[y*width+42]=0;}
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
+    });
     it.each(['Abcd','AB','A'.repeat(49),'ABCDE','ABC!'])('原文或连通对应不足时没有额外授权 %s',source=>{
         expect(coversClippedImageGlyphs(fourCaps().repair,source,above)).toBe(false);
     });

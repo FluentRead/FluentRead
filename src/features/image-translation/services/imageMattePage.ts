@@ -3,9 +3,11 @@
  * 文件职责：在普通图片的严格透明准入失败后，原子规划同一原始帧的完整 RGBA 墨迹修补。
  * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；无权限提案只公开完整译文字形预检与模型投影需要的冻结几何，真实同帧支持逐点授权后才登记一次性写入计划。显式传入 OCR 原文时，允许纯色标签逐字形复核一致的裁切。分割资源缺失时，可在已有清字几何内使用确认的纯色底，精确更新交集墨迹。保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
  * 模块边界：纯数据规划和独占像素写入，不创建 Canvas、不运行模型、不修改 OCR；仅消费同帧局部 RGBA 证明，不能证明相连同色装饰的语义。调用方必须在可选模型准备前完成所有完整译文字形预检，并保持原像素独占和同帧身份；失败授权不改候选或像素，取消时丢弃提案，授权成功后只能向原像素应用一次。
+ * 图案保留：限单行，完整验证同底色字形与独立边饰，再在旧物理擦除框内用同一计划只写正文墨迹。
  */
 import type {ImageTextRegion} from '../paragraphs';
 import {coversClippedImageGlyphs} from './imageClippedGlyphs';
+import {keepImageMatteDecoration,type ImageMatteDecoration} from './imageMatteDecoration';
 import {imageMatteObservationBox,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from './imageMatteRepair';
 import type {ImageDetectionSupport} from './imageDetectionEvidence';
 import {imageMaskBoxes} from './inpainting';
@@ -80,7 +82,7 @@ function rectangles(rows:Run[]):Readonly<Box>[]|undefined {
 /** 原框不变；两种入口共享所有预算、局部证明和全页碰撞，始终借读尚未回写的同一原始像素。 */
 function buildPageCandidate(
     pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
-    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,support?:ImageDetectionSupport,decoration?:ImageMatteDecoration,
 ):PageCandidate|undefined {
     if(!(pixels instanceof Uint8ClampedArray)||![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=8192)
         ||width*height>16_777_216||pixels.length<width*height*4||lines.length===0||lines.length>MAX_ATTEMPTS)return;
@@ -90,6 +92,7 @@ function buildPageCandidate(
     const repairLines:Array<ImageTextRegion|undefined>=[];
     const protectedBoxes:Box[]=[];
     const fitBudget={remaining:4_194_304};
+    if(decoration&&lines.length!==1)return;
     for(const line of retained){
         const sources=line.sourceBoxes;
         for(let index=-1;index<(sources?.length??0);index++){
@@ -108,13 +111,18 @@ function buildPageCandidate(
         for(const box of protectedBoxes){if(--checks<0||overlap(draw,box))return;}
         const group:ImageMatteRepair[]=[];
         const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
+        if(decoration&&!singleHorizontal)return;
         for(const source of sources){
             attempts++;
             const observation=imageMatteObservationBox(width,height,source);
             if(!observation||!reserve(observation.width*observation.height))return;
             const supportAt=support?.forBox(source,observation);if(support&&!supportAt)return;
             const plan=support?planImageMatteRepair(pixels,width,height,source,supportAt!,fitBudget)
-                :planImageMatteCandidate(pixels,width,height,source,fitBudget);if(!plan)return;
+                :planImageMatteCandidate(pixels,width,height,source,fitBudget,decoration!==undefined);if(!plan)return;
+            if(decoration){
+                const [legacy]=imageMaskBoxes({bbox:source,text:''},width,height);
+                if(!keepImageMatteDecoration(plan,decoration,legacy))return;
+            }
             if(group.length&&!equal(group[0].background,plan.background))return;
             // 支持可超出原排版框；不同背景不能按应用顺序争用同一个原墨迹像素。
             for(const old of repairs){
@@ -185,9 +193,9 @@ export function planImageMattePage(
 /** 无模型支持的整页预提案；完整冲突检查完成后才公开布局几何，提案本身永远不可apply。 */
 export function proposeImageMattePage(
     pixels:Uint8ClampedArray,width:number,height:number,lines:ImageTextRegion[],retained:ImageTextRegion[],
-    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,
+    drawBounds:(line:ImageTextRegion,width:number,height:number)=>Box,decoration?:ImageMatteDecoration,
 ):ImageMatteProposal|undefined {
-    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds);if(!candidate)return;
+    const candidate=buildPageCandidate(pixels,width,height,lines,retained,drawBounds,undefined,decoration);if(!candidate)return;
     const view:ImageMatteProposalView=Object.freeze({drawings:candidate.plan.drawings,rectangles:candidate.plan.rectangles,
         observations:Object.freeze(candidate.authority.repairs.map(repair=>Object.freeze({
             sourceBox:Object.freeze({...repair.sourceBox}),left:repair.left,top:repair.top,width:repair.width,height:repair.height,

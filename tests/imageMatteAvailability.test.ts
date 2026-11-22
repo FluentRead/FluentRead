@@ -409,6 +409,42 @@ describe('不透明原字超出旧清字框时复用模型授权',()=>{
         for(let y=r.y0;y<r.y1;y++)for(let x=r.x0;x<r.x1;x++)f.ink.add(y*f.width+x);
         install(f);evidenceMode='missing';return f;
     }
+    it.each(['left','right','revoked'] as const)('普通译图处理原擦除框内独立小图案 %s',async mode=>{
+        const f=fixture(255),{width,height,matte,pixels}=f;
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);
+        f.ink.clear();
+        for(const x0 of [34,44,54,64,74,84]){
+            const glyph={x0,y0:34,x1:x0+5,y1:53};
+            fill(pixels,width,glyph,[255,255,255,255]);
+            for(let y=glyph.y0;y<glyph.y1;y++)for(let x=glyph.x0;x<glyph.x1;x++)f.ink.add(y*width+x);
+        }
+        const x0=mode==='left'?29:93,art={x0,y0:31,x1:x0+3,y1:38,rgba:[255,255,255,255] as const};
+        fill(pixels,width,art,art.rgba);f.art=[art];
+        const sourceBox={x0:25,y0:28,x1:101,y1:55};
+        f.line={...f.line,bbox:sourceBox,sourceBoxes:[sourceBox],fontSize:24};
+        install(f);translations=['OK'];
+        if(mode==='revoked'){
+            const authorization=vi.spyOn(mattePage,'authorizeImageMatteWithinExistingMasks').mockReturnValueOnce(undefined);
+            try{
+                const result=await translate();
+                expect(authorization).toHaveBeenCalledOnce();
+                expect(result.imageUnchanged).toBe(true);
+                expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE'});
+                expect(mocks.prepareSeg).not.toHaveBeenCalled();
+                preserved();
+            }finally{authorization.mockRestore();}
+            return;
+        }
+        const result=await translate();
+        expect(result.image).toBeTruthy();
+        expect(result.retryWhenSegmentationReady).toBeUndefined();
+        expect(mocks.prepareSeg).not.toHaveBeenCalled();
+        const bitmap=encoded[0];
+        for(let y=art.y0;y<art.y1;y++)for(let x=art.x0;x<art.x1;x++)expect(at(bitmap,width,x,y)).toEqual(art.rgba);
+        expect(at(bitmap,width,86,50)).toEqual(matte);
+        expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE',bbox:sourceBox});
+        expect(canvases[0].reads).toEqual([[0,0,width,height]]);
+    });
     it('仅用真实受控分割授权，清掉旧框外原字并保留样式、单次读回和图外像素',async()=>{
         const f=clipped();mocks.prepareSeg.mockResolvedValue(true);
         mocks.segment.mockImplementation(async(factory:()=>ImageTextSegmentationSource)=>{

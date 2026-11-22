@@ -4,6 +4,7 @@
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，常规擦除按原始行框，完整墨迹修补须另外逐点授权；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明常规修补不额外复制整页，可选分割沿用独立 Worker 快照；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 漏擦救援：不透明纯色文字有原墨迹落在旧掩码外时，复用完整 RGBA 提案与缓存分割逐像素授权；整页成功才回填原字像素，保留原色、字号与坐标，绘字框含图案或完整字形无法容纳时保留原图与阅读译文。提案不成立、混合透明度或缺可选缓存时仍可按原范围生成译图。
+ * 独立边饰：对单一纯色横行先复核正文墨迹与同色边饰，整页计划验过原擦除范围与完整译文空间后才应用精确正文蒙版。
  * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹。确实到达分割而缺文件时，为保留原图或临时译图携带私有重试标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
@@ -32,6 +33,7 @@ import {IMAGE_TEXT_FONT, mightNeedRareImageFont, prepareRareImageFont} from './i
 import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
 import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
 import {hasUncoveredImageInk} from './imageEraseCoverage';
+import {observeImageMatteDecoration,type ImageMatteDecoration} from './imageMatteDecoration';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
 import {getAlignedImageLabelSlots} from '../labelContext';
 import {mangaOcrRuntime} from './mangaOcr';
@@ -657,12 +659,22 @@ async function prepareTranslatedImage(
                 drawing.set(line,{...drawing.get(line)!,bounds,prepared});
             }
         }
-        // 墨迹遗漏仅触发提案。普通同帧检测可以结合 OCR 原文复核一致的字形裁切。
-        repairClippedInk: if(!protection&&hasUncoveredImageInk(sourcePixels.data,canvas.width,canvas.height,appearances)
-            &&isSingleFrameImageData(source.currentSrc||source.src)){
+        // 单行边饰先借静区几何提出候选，完整复核后在旧擦除框内保留其原像素。
+        const single=selected.length===1&&lines.length===1?selected[0].original:undefined;
+        let decoration=!protection&&single&&!single.vertical&&!single.quarterTurn
+            ?observeImageMatteDecoration(sourcePixels.data,canvas.width,single.text,appearances.get(single)):undefined;
+        const uncovered=!protection&&hasUncoveredImageInk(sourcePixels.data,canvas.width,canvas.height,appearances);
+        repairClippedInk: if((decoration||uncovered)&&isSingleFrameImageData(source.currentSrc||source.src)){
             const owners=new Set(selected.map(candidate=>candidate.original));
-            const proposal=proposeImageMattePage(sourcePixels.data,canvas.width,canvas.height,translatedLines,
-                lines.filter(line=>!owners.has(line)),line=>drawing.get(line)!.bounds);
+            const retained=lines.filter(line=>!owners.has(line));
+            const propose=(hint?:ImageMatteDecoration)=>proposeImageMattePage(sourcePixels.data,canvas.width,canvas.height,translatedLines,
+                retained,line=>{
+                    const bounds=drawing.get(line)!.bounds;
+                    if(!hint)return bounds;
+                    return hint.side==='left'?{...bounds,x0:Math.max(bounds.x0,hint.gap+1)}:{...bounds,x1:Math.min(bounds.x1,hint.gap)};
+                },hint);
+            let proposal=decoration&&propose(decoration);
+            if(!proposal&&uncovered){decoration=undefined;proposal=propose();}
             if(proposal)try {
                 const retainSource=async()=>{await checkImageCancellation(signal);return imageAlphaUnchanged(readingLines);};
                 const view=getImageMatteProposalDrawings(proposal)!;
@@ -670,7 +682,7 @@ async function prepareTranslatedImage(
                 if(view.drawings.some(item=>item.background[3]!==255))break repairClippedInk;
                 const args:Array<Parameters<typeof drawTranslatedImageText>>=[];
                 for(const item of view.drawings){
-                    const plan=drawing.get(item.line)!,b=plan.bounds;
+                    const plan=drawing.get(item.line)!,b=item.bounds;
                     // 至多128个绘字框与4096个图案矩形；保留原排版，不以裁字或移动译文绕过保护。
                     for(const art of view.rectangles){
                         if(b.x0<art.x1&&art.x0<b.x1&&b.y0<art.y1&&art.y0<b.y1)
@@ -686,9 +698,10 @@ async function prepareTranslatedImage(
                 if(!preflight())return await retainSource();
                 await checkImageCancellation(signal);
                 let retryWhenSegmentationReady=false;
-                let plan=support?authorizeImageMatteProposal(proposal,support,
-                    new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
+                let plan=decoration?authorizeImageMatteWithinExistingMasks(proposal)
+                    :support?authorizeImageMatteProposal(proposal,support,new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
                 if(!plan){
+                    if(decoration)return await retainSource();
                     const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
                     await checkImageCancellation(signal);
                     if(!ready){

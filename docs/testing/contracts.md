@@ -147,6 +147,16 @@ pnpm test:coverage:gaps --json                  # 供脚本消费；存在缺口
 
 该工具只读分析，不执行测试、不修改源码，也不替代门禁本身；补齐用例后必须重跑受影响测试确认。
 
+需要解释「为什么改一个文件要跑几百个测试」时，用同源依赖图诊断该文件的反向触达范围、第一层放大通道与最长扩散链：
+
+```bash
+pnpm test:impact --explain src/core/translation/localInference.ts
+pnpm test:impact --why tests/implementationAudit49H.test.ts   # 逐条列出依赖来源，目录回退排在最前
+pnpm test:impact                                  # 诊断当前分支相对 origin/main 的每处改动
+```
+
+`--explain` 回答「范围有多大」，`--why` 回答「这条边从哪来」。因为依赖图对字符串是宽松召回（为了不漏掉夹具读取），审查范围是否被误报撑大时应先看 `--why`：`精确命中`是真实 import 或明确路径，`目录回退`才需要人工判断该目录读取是否真实存在。
+
 诊断复用与门禁相同的依赖图算法（含 `@/` 别名、barrel、SFC 与动态 import），结论可直接对照计划结果；它只读运行，不改变选择结果。
 
 没有受影响测试时，入口明确跳过执行，不向 Vitest 传空筛选而误跑全量。缺失 Git 基线、无效覆盖清单、测试失败或子进程终止均使入口失败。源码头审计仅忽略 Finder 的精确 `.DS_Store` 文件名；隐藏源码、相似文件名和未知资产仍遵循原规则。

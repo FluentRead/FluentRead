@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {observeMangaRecognitionInkProjection as project,observeMangaRecognitionNeutralProjection as neutral} from '@/src/features/image-translation/services/mangaRecognitionInkProjection';
+import {observeMangaRecognitionClippedTintedGap as clippedGap} from '@/src/features/image-translation/services/mangaRecognitionInkProjection';
 import {createMangaRecognitionWhitespace,MANGA_RECOGNITION_WHITESPACE_LIMITS as limits} from '@/src/features/image-translation/services/mangaRecognitionWhitespace';
 const BG=[240,180,100],INK=[40,30,80],C=18710;
 function frame(spans=[[10,26],[28,44],[46,62],[90,106],[108,124],[126,142]],width=160,background=BG,ink=INK){
@@ -25,6 +26,73 @@ function cycle(controller:ReturnType<typeof createMangaRecognitionWhitespace>,f=
     controller.observeBorrowedRead(0,f.width,48,f.data);controller.bindInput(input,{readIndices:[0],resizedWidths:[f.width],paddedWidth:f.width,height:48});controller.observeOutput(input,output);
     const source={text,box,confidence:.99},result=controller.applyToSdkResults([source]);controller.endRun();return{source,result:result[0]};
 }
+
+describe('浅有色底紧裁衬线的单个宽词隙',()=>{
+    const background=[237,240,217],ink=[49,64,52];
+    const spans=[[0,24],[28,42],[46,62],[90,104],[108,122],[126,142]];
+    const pale=(ranges=spans)=>frame(ranges,160,background,ink);
+    const observe=(item:ReturnType<typeof frame>,remaining=512)=>clippedGap(item.data,item.width,{remaining});
+
+    it('从同色底完整空列观察一个宽间隙，保留原裁图',()=>{
+        const item=pale(),before=item.data.slice();
+        expect(observe(item)).toEqual({start:62,end:90});
+        expect(item.data).toEqual(before);
+        const right=pale([[18,32],[36,50],[54,70],[98,112],[116,130],[134,160]]);
+        expect(observe(right)).toEqual({start:70,end:98});
+    });
+
+    it('排除两侧完整留白、平齐间隙、短间隙、组件不足和非同色层',()=>{
+        expect(observe(pale([[10,26],...spans.slice(1)]))).toBeUndefined();
+        expect(observe(pale([[0,16],[42,58],[60,76],[102,118],[120,136]]))).toBeUndefined();
+        expect(observe(pale([[0,26],[28,44],[46,62],[82,98],[100,116],[118,134]]))).toBeUndefined();
+        expect(observe(pale([[0,40],[80,120]]))).toBeUndefined();
+        expect(observe(pale(),1)).toBeUndefined();
+        const mixed=pale();
+        mixed.data.set([210,162,90,255],(20*mixed.width+17)*4);
+        expect(observe(mixed)).toBeUndefined();
+        expect(observe(frame(spans,160,[237,237,237],ink))).toBeUndefined();
+        expect(observe(frame(spans,160,background,[40,20,72]))).toBeUndefined();
+    });
+
+    it('空格峰须在宽间隙内，且间隙完整位于同帧相邻字符之间',()=>{
+        const c=createMangaRecognitionWhitespace();
+        c.beginPage();
+        const positive=cycle(c,pale());
+        expect(positive.result.text).toBe('ABC DEF');
+        expect(positive.result.box).toBe(positive.source.box);
+        expect(positive.result.confidence).toBe(positive.source.confidence);
+        for(const value of [
+            tensor(20,[2,4,6,12,14,16],9,.05),
+            tensor(20,[2,4,9,12,14,16],10),
+            tensor(20,[2,4,6,10,14,16],9),
+        ]){
+            const r=cycle(c,pale(),value);
+            expect(r.result).toBe(r.source);
+        }
+        for(const text of ['ABC DEF','ABCDEF.']){
+            const r=cycle(c,pale(),tensor(),text);
+            expect(r.result).toBe(r.source);
+        }
+        c.endPage();
+    });
+
+    it('独立读取额度在换页后恢复，时间步不足不读模型数组',()=>{
+        const c=createMangaRecognitionWhitespace();
+        c.beginPage();
+        let reads=0;
+        const diagnostic={dims:[1,1,C],get data(){reads++;return new Float32Array(C);}};
+        const beyond={dims:[1,limits.clippedTintedSteps+1,C],get data():never{throw new Error('超过额度时读取了模型');}};
+        cycle(c,pale(),beyond);
+        for(let i=0;i<19;i++)cycle(c,pale(),diagnostic);
+        const expected=Math.floor(limits.clippedTintedPixels/(160*48*2))-1;
+        expect(reads).toBe(expected);
+        c.beginPage();
+        cycle(c,pale(),diagnostic);
+        expect(reads).toBe(expected+1);
+        c.endPage();
+    });
+});
+
 describe('同一墨色的稳定字形与共同空列',()=>{
     it('抗锯齿残色不修改像素；两层稳定字形给出原词隙和字形序号',()=>{
         const f=frame(),before=f.data.slice(),result=inspect(f);expect(result).toEqual({value:{characters:6,gaps:[{start:62,end:90,after:3}]},remaining:494});expect(f.data).toEqual(before);

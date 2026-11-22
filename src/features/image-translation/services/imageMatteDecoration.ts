@@ -3,7 +3,7 @@
  * 文件职责：识别原 OCR 横行末端误入物理擦除矩形的独立小图案。
  * 主要内容：在已观察纯色墨迹框的两端检查完整空白列；只接纳与大写原文逐字对应、具有共同字高的正文。用同一闭环提案内的九成墨迹复核字形，并确认图案从全强度墨迹上也独立，完整正文仍位于旧擦除范围内。
  * 模块边界：只借原 RGBA 或本次未授权的局部蒙版，不运行模型、不移动 OCR 框、不写原图。页规划仍须校验译文与图案的冲突和独占写入权限。
- * 行末空心边饰：识别为独立句点的小图案须与正文有完整空白列，并包住可验证的原底色。原擦除框外的单侧窄边仅作为可选分割的候选。
+ * 行末空心边饰：是否识别为独立句点只影响如何寻找候选。小图案仍须由完整空白列与正文分开，并包住可验证的原底色。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageMatteRepair} from './imageMatteRepair';
@@ -56,15 +56,15 @@ function enclosesBackground(repair:ImageMatteRepair,box:Box):boolean {
 /** 从两端最多读半个字宽；疑似空列只用于触发完整蒙版复核。 */
 export function observeImageMatteDecoration(pixels:Uint8ClampedArray,width:number,sourceText:string,
     appearance:ImageSourceAppearance|undefined):ImageMatteDecoration|undefined {
-    const enclosed=sourceText.endsWith(' .');
-    const label=enclosed?sourceText.slice(0,-2).trimEnd():sourceText;
+    const spacedPeriod=sourceText.endsWith(' .');
+    const label=spacedPeriod?sourceText.slice(0,-2).trimEnd():sourceText;
     if(!/^[A-Z0-9]+(?: +[A-Z0-9]+)*$/u.test(label))return;
     const characters=label.replaceAll(' ','').length,background=appearance?.background,boxes=appearance?.inkBoxes;
     if(characters<4||characters>48||background?.[3]!==255||boxes?.length!==1)return;
     const {x0,y0,x1,y1}=boxes[0],height=y1-y0;
     if(height<12||height>96||x1-x0<height*2)return;
     let match:ImageMatteDecoration|undefined;
-    const sides=enclosed?['right'] as const:['left','right'] as const;
+    const sides=spacedPeriod?['right'] as const:['left','right'] as const;
     for(const side of sides){
         const edge=emptyBox(),direction=side==='left'?1:-1;
         for(let step=0;step<=Math.floor(height/2);step++){
@@ -77,7 +77,10 @@ export function observeImageMatteDecoration(pixels:Uint8ClampedArray,width:numbe
                 include(edge,x,y);
             }
             if(hasInk)continue;
-            if(step>0&&edge.y1-edge.y0<=height*.55&&(enclosed||edge.y1<=y1-Math.floor(height/4))){
+            const raised=edge.y1<=y1-Math.floor(height/4);
+            // OCR 可能略过紧靠基线的图案。右侧这种候选必须另证闭孔，普通实心句点不能通过。
+            const enclosed=spacedPeriod||(!raised&&side==='right'&&edge.x1-edge.x0>=4&&edge.y1-edge.y0>=4);
+            if(step>0&&edge.y1-edge.y0<=height*.55&&(enclosed||raised)){
                 if(match)return;
                 match={side,gap:x,characters,...(enclosed?{enclosed:true as const}:{})};
             }

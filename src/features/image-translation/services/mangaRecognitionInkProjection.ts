@@ -77,6 +77,10 @@ export function isMangaRecognitionLightNeutral(maximum:number,minimum:number):bo
     return minimum>=220&&maximum-minimum<=16;
 }
 
+export function isMangaRecognitionLightTint(maximum:number,minimum:number):boolean {
+    return minimum>=200&&maximum-minimum>16;
+}
+
 export function isMangaRecognitionMidColor(maximum:number,minimum:number):boolean {
     return maximum>64&&minimum<220&&maximum-minimum>=48;
 }
@@ -112,8 +116,10 @@ function resolveConnectedColors(strength:Uint8Array,width:number,levels:readonly
     return gaps.length?{characters:glyphs.middle.length,gaps}:undefined;
 }
 
-function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget,
-    mode:'dark'|'light-color'|'connected-color'):MangaRecognitionInkProjection|undefined {
+type TightPaletteMode='dark'|'light-color'|'connected-color'|'tinted-gap';
+
+function observeTightPalette(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget,mode:TightPaletteMode):
+    {background:number[];inkDistance:number}|undefined {
     if(!Number.isSafeInteger(width)||width<8||width*48>262_144||!(data instanceof Uint8ClampedArray)||data.length!==width*48*4
         ||!Number.isSafeInteger(budget.remaining)||budget.remaining<=0)return;
     const colors=new Map<number,number>(),rgb=(key:number)=>[key&255,key>>>8&255,key>>>16&255];
@@ -133,11 +139,13 @@ function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budge
     if(ambiguous||backgroundCount<width*48*.2)return;
     const background=rgb(backgroundKey),distance=(color:readonly number[])=>Math.max(...color.map((value,c)=>Math.abs(value-background[c])));
     if(connectedColor&&!isMangaRecognitionMidColor(Math.max(...background),Math.min(...background)))return;
+    if(mode==='tinted-gap'&&!isMangaRecognitionLightTint(Math.max(...background),Math.min(...background)))return;
     let candidate=0,count=0,significantPixels=0;
     for(const [key,n]of colors){if(distance(rgb(key))<24)continue;significantPixels+=n;if(n>count){candidate=key;count=n;}}
     if(count<8)return;
     const ink=rgb(candidate);let support=0;
     if(lightColor&&Math.max(...ink)-Math.min(...ink)<24)return;
+    if(mode==='tinted-gap'&&Math.max(...ink)-Math.min(...ink)>=24)return;
     for(const [key,n]of colors)if(rgb(key).every((value,c)=>Math.abs(value-ink[c])<=1))support+=n;
     if(support<significantPixels*.1)return;
     if(connectedColor){
@@ -145,9 +153,17 @@ function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budge
         if(distance(ink)<128||Math.max(...deltas)<64||Math.min(...deltas)>-64)return;
     }else if(getImageRgbContrast(ink,background)<3)return;
     for(const key of colors.keys())if(!matchesImageSourceInk(rgb(key),background,ink))return;
+    return {background,inkDistance:distance(ink)};
+}
+
+function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget,
+    mode:Exclude<TightPaletteMode,'tinted-gap'>):MangaRecognitionInkProjection|undefined {
+    const palette=observeTightPalette(data,width,budget,mode);
+    if(!palette)return;
+    const {background,inkDistance}=palette;
     const low=new Uint8Array(width),middle=new Uint8Array(width),high=new Uint8Array(width),empty=new Uint8Array(width).fill(1);
-    const strength=connectedColor?new Uint8Array(width*48):undefined;
-    const lowLevel=Math.ceil(distance(ink)/16),middleLevel=Math.ceil(distance(ink)/8),highLevel=Math.ceil(distance(ink)/4);
+    const strength=mode==='connected-color'?new Uint8Array(width*48):undefined;
+    const lowLevel=Math.ceil(inkDistance/16),middleLevel=Math.ceil(inkDistance/8),highLevel=Math.ceil(inkDistance/4);
     for(let y=0;y<48;y++)for(let x=0;x<width;x++){
         const p=(y*width+x)*4,d=Math.max(Math.abs(data[p]-background[0]),Math.abs(data[p+1]-background[1]),Math.abs(data[p+2]-background[2]));
         if(d!==0)empty[x]=0;
@@ -170,6 +186,31 @@ function observeTightPaletteProjection(data:Uint8ClampedArray,width:number,budge
         if(clear)gaps.push({start,end,after:gap.after});
     }
     return gaps.length?{characters:projection.characters,gaps}:undefined;
+}
+
+/** 裁框穿过较浅有色底上的灰暗衬线时，只提取明显最宽的完整底色间隙。 */
+export function observeMangaRecognitionClippedTintedGap(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget):Band|undefined {
+    const palette=observeTightPalette(data,width,budget,'tinted-gap');
+    if(!palette)return;
+    const [red,green,blue]=palette.background;
+    const columns=new Uint8Array(width);
+    for(let y=0;y<48;y++)for(let x=0;x<width;x++){
+        const p=(y*width+x)*4;
+        if(data[p]!==red||data[p+1]!==green||data[p+2]!==blue)columns[x]=1;
+    }
+    if(!columns[0]&&!columns[width-1])return;
+    const items=bands(columns,budget);
+    if(!items||items.length<3)return;
+    let widest:Band|undefined,maximum=0,runnerUp=0;
+    for(let i=1;i<items.length;i++){
+        const start=items[i-1].end,end=items[i].start,length=end-start;
+        if(length>maximum){
+            runnerUp=maximum;maximum=length;
+            widest={start,end};
+        }else runnerUp=Math.max(runnerUp,length);
+    }
+    // 48px是本次识别裁图高度；一半字高以及与次宽间隙的比例共同排除普通字距。
+    if(maximum>=24&&maximum*4>=runnerUp*7)return widest;
 }
 
 function observePaletteProjection(data:Uint8ClampedArray,width:number,budget:MangaRecognitionInkBudget,tinted:boolean):MangaRecognitionInkProjection|undefined {

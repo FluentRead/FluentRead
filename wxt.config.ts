@@ -500,8 +500,22 @@ export default defineConfig({
             // 按识别器原顺序恢复横排从右向左词序后为 70,525,152 字节，本轮对应 406 字节代码。
             // 阿拉伯语和希伯来语接入按需语言包后，Chrome 为 70,532,031 字节，增加 6,879 字节。
             // Firefox 和 Safari 分别超出原门槛 4,541 和 4,260 字节。增量为界面文案及代码。
-            const imageOcrLanguageBudget = browser === 'chrome' || browser === 'edge' ? 8_000 : 5_000;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));
+            // 识别资源按实际用途展示并排序后，Chrome 实测 70,533,076 字节，增量 1,045 字节。
+            // 图片同栏短标签的语境范围和缓存位置使 Chrome 实测 70,534,871 字节，代码增加 1,795 字节。
+            const imageOcrLanguageBudget = browser === 'chrome' || browser === 'edge' ? 11_000 : 8_000;
+            // 斜向背景修补使 Chrome 从 70,535,048 增至 70,536,383 字节，294 份静态资源摘要相同。
+            const imageDirectionalRepairBudget = 1_500;
+            // 译图语言贯通增加 339 字节 Chrome 代码，沿用现有字体文件。
+            const imageTextLocaleBudget = 400;
+            // 照片边缘的有界重新取样使 Chrome 增加 1,132 字节代码，294 份静态资源摘要相同。
+            const imageBoundarySamplingBudget = 1_200;
+            // 紧裁彩字的词界复核使 Chrome 从 70,538,403 增至 70,538,723 字节，增量为代码。
+            const imageClippedSpacingBudget = 350;
+            // 临时译图在导入可选文字分割后可重试，限额覆盖消息校验及资源状态回退代码。
+            const imageSegmentationRetryBudget = 700;
+            // 使用已有检测数据复核裁切字形。双侧衬线修补使 Chrome 增加 481 字节本地验证代码。
+            const imageClippedGlyphBudget = 2_800;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

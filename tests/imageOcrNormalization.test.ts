@@ -77,6 +77,22 @@ describe('OCR 横排右到左词序',()=>{
         ]);
     });
 
+    it.each([
+        ['A12 לכיוון צפון', ['A12', 'לכיוון', 'צפון']],
+        ['A12 إلى اليمين', ['A12', 'إلى', 'اليمين']],
+    ] as const)('包含拉丁编号开头的横排行按识别器核对后的词序恢复 %s', (text, input) => {
+        const words = input.map((value,index)=>word(value,234-index*62,280-index*62));
+        const {ordinary,manga} = views(text, words);
+        expect(ordinary).toEqual([{text, bbox:box(110,280)}]);
+        expect(manga).toHaveLength(1);
+        expect(manga[0]).toMatchObject(ordinary[0]);
+    });
+
+    it('只含拉丁文字的行依照物理顺序，即使识别器词数组顺序相反', () => {
+        const {ordinary} = views('Gate A12', [word('Gate', 178, 224), word('A12', 121, 160)]);
+        expect(ordinary).toEqual([{text:'A12 Gate', bbox:box(121,224)}]);
+    });
+
     it('识别词组无法与整行核对时继续按位置恢复已有分组',()=>{
         const {ordinary}=views('باب صحيح', [word('باب',140,180),word('فرعي',75,125)]);
         expect(ordinary).toEqual([{text:'فرعي باب',bbox:box(75,180)}]);

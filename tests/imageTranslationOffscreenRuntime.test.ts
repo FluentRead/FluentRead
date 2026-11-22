@@ -7,6 +7,12 @@ import type {ImageViewport} from '@/src/shared/image/types';
 import {page,word} from './helpers/imageTypographyFixture';
 
 const mocks = vi.hoisted(() => ({recognize: vi.fn(), inpaint: vi.fn(), background: vi.fn(), draw: vi.fn(), mangaRecognize:vi.fn(), repair:vi.fn(), mangaDraw:vi.fn(), sampleManga:vi.fn(), alphaProtection:vi.fn(), encode:vi.fn(), setBackend:vi.fn()}));
+function drawArguments(index = 0) {
+    const args = mocks.draw.mock.calls[index].slice(1, 14);
+    while (args.length && args.at(-1) === undefined) args.pop();
+    return args;
+}
+
 const prepareRareFont = vi.hoisted(() => vi.fn());
 vi.mock('@/src/features/image-translation/services/imageTextFont', async importOriginal => ({
     ...await importOriginal<typeof import('@/src/features/image-translation/services/imageTextFont')>(),
@@ -73,6 +79,7 @@ function createCanvasStub() {
     const canvas = {
         width: 0,
         height: 0,
+        lang: '',
         context: {
             font:'',textAlign:'left',textBaseline:'alphabetic',save:vi.fn(),restore:vi.fn(),
             measureText:vi.fn((text:string)=>{
@@ -145,6 +152,41 @@ beforeEach(() => {
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
+it('普通译图保留原文字体度量，并使用本次译文语言绘制',async()=>{
+    const measurements:Array<[string,string]>=[];
+    vi.stubGlobal('document',{createElement:()=>{
+        const canvas=makeCanvas(),measure=canvas.context.measureText.getMockImplementation()!;
+        canvas.context.measureText.mockImplementation(text=>{
+            measurements.push([text,canvas.lang]);
+            return measure(text);
+        });
+        return canvas;
+    }});
+    mocks.draw.mockImplementation(()=>expect(canvases[0].lang).toBe('ja'));
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+        ? {success:true,translations:['直進'],targetLanguage:'ja'}:undefined));
+    const result=await translateImageInOffscreen('localized-image','en','Page');
+    expect(measurements).toContainEqual(['Hello','']);
+    expect(mocks.draw).toHaveBeenCalledOnce();
+    expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'直進'});
+});
+
+it('漫画先采集原文字形，再以同一译文语言排版和绘制图块',async()=>{
+    mocks.mangaRecognize.mockResolvedValue([{...lines[0],fontSize:10}]);
+    mocks.repair.mockImplementation(async pixels=>pixels);
+    mocks.sampleManga.mockImplementation(()=>{
+        expect(canvases[0].lang).toBe('');
+        return [{color:'rgb(255,255,255)',uniform:false}];
+    });
+    mocks.mangaDraw.mockImplementation(()=>expect(canvases[0].lang).toBe('zh-Hant'));
+    sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
+        ? {success:true,translations:['直行'],targetLanguage:'zh-Hant'}:undefined));
+    const result=await translateImageInOffscreen('localized-manga','en','Page',undefined,undefined,true);
+    expect(mocks.sampleManga).toHaveBeenCalledOnce();
+    expect(mocks.mangaDraw).toHaveBeenCalledOnce();
+    expect(result.lines[0]).toMatchObject({sourceText:'Hello',text:'直行'});
+});
+
 it.each([false, true])('等待扩展字形时还未开始度量或清字，cancelled=%s', async cancelled => {
     const controller = new AbortController();
     let announcePreparation!: () => void;
@@ -193,18 +235,19 @@ it.each([false,true])('倾斜原字在清字前核对并传到对应绘制入口
 describe('旋转窄标签先预检完整译文再清字',()=>{
     const bbox={x0:42,y0:15,x1:64,y1:125};
     const source:MangaRegion={text:'OPEN PANEL',fontSize:22,bbox,sourceBoxes:[bbox],quarterTurn:1,textAlign:'center'};
-    function prepare(manga:boolean,translation:string,recognition:MangaRegion[]= [source]){
+    function prepare(manga:boolean,translation:string,recognition:MangaRegion[]= [source],targetLanguage?:string){
         imageOptions.push({width:180,height:150});
         mocks.mangaRecognize.mockResolvedValueOnce(recognition);
         mocks.repair.mockImplementationOnce(async pixels=>pixels);
         sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'
-            ?{success:true,translations:recognition.map((_,index)=>index===0?translation:'下一页')}:undefined));
+            ?{success:true,translations:recognition.map((_,index)=>index===0?translation:'下一页'),targetLanguage}:undefined));
         return ()=>translateImageInOffscreen('spine','en','Page',undefined,'rotate',manga,'paddle');
     }
     it.each([false,true])('字形可完整顺原方向放回后才清理紧框，manga=%s',async manga=>{
-        const result=await prepare(manga,'面板')();
+        const result=await prepare(manga,'面板',[source],'zh-Hans')();
         const repair=manga?mocks.repair:mocks.inpaint;
         expect(repair.mock.calls[0][3]).toEqual([{...source,text:'面板'}]);
+        expect(canvases[0].lang).toBe('zh-Hans');
         expect(canvases[0].context.measureText.mock.invocationCallOrder.at(-1)!).toBeLessThan(repair.mock.invocationCallOrder[0]);
         expect(result.lines[0].renderSkipped).toBeUndefined();
         expect(canvases.every(canvas=>canvas.width===0&&canvas.height===0)).toBe(true);
@@ -289,7 +332,7 @@ it.each(['gradient','flat'])('普通图%s源色沿用旧绘字框和清字框，
     ordinaryAlphaCanvas(width,height,pixels);mocks.recognize.mockResolvedValueOnce([source]);
     const result=await translateImageInOffscreen('gradient-style','en','Page');expect(result.image).toBeTruthy();
     const observedSize=(50/(6*50-2)*100+15/90*100)/2;
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['你好',38,36,124,32,kind==='gradient'?'rgb(240,240,240)':'rgb(20,30,50)',observedSize,kind==='gradient'?'right':'left',undefined,'rgb(245,245,250)',kind==='gradient'?'#111827':undefined,{x0:50,y0:45,x1:100,y1:60}]);
+    expect(drawArguments()).toEqual(['你好',38,36,124,32,kind==='gradient'?'rgb(240,240,240)':'rgb(20,30,50)',observedSize,kind==='gradient'?'right':'left',undefined,'rgb(245,245,250)',kind==='gradient'?'#111827':undefined,{x0:50,y0:45,x1:100,y1:60}]);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);
 });
 
@@ -326,7 +369,7 @@ it.each(['clear','art','retained','retained-physical','far-retained','fits','wra
     const result=await translateImageInOffscreen('source-style','en','Page');expect(result.image).toBeTruthy();
     expect(mocks.draw).toHaveBeenCalledOnce();
     const expanded=mode==='clear'||mode==='far-retained';
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual([target,38,expanded?25:36,124,expanded?54:32,'rgb(255,255,255)',48,'left',undefined,'rgb(25,48,75)']);
+    expect(drawArguments()).toEqual([target,38,expanded?25:36,124,expanded?54:32,'rgb(255,255,255)',48,'left',undefined,'rgb(25,48,75)']);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);expect(pixels).toEqual(before);
     expect(result.lines.find(line=>line.sourceText==='SOURCE')).not.toHaveProperty('renderSkipped');
 });
@@ -341,7 +384,7 @@ it.each(['flat','gradient'] as const)('竖排原色沿用居中和原有绘字�
     sendMessage.mockImplementation((message,callback)=>callback(message.type==='fluentReadImageTranslateTexts'?{success:true,translations:['风']}:undefined));
     const result=await translateImageInOffscreen('vertical-source-style','ja','Page');
     expect(result.image).toBeTruthy();expect(mocks.draw).toHaveBeenCalledOnce();
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(background==='gradient'
+    expect(drawArguments()).toEqual(background==='gradient'
         ?['风',37,18,30,84,'rgb(240,240,240)',Infinity,'center',undefined,'rgb(245,245,250)','#111827']
         :['风',37,18,30,84,'rgb(255,255,255)',Infinity,'center',undefined,'rgb(25,48,75)']);
     expect(mocks.inpaint.mock.calls[0][3][0].bbox).toEqual(source.bbox);expect(pixels).toEqual(before);
@@ -383,7 +426,10 @@ it('普通opaque图沿用原修补和原绘字坐标，不因alpha保护增加�
     const pixels=opaqueAlphaPixels(64,48),line={text:'ORIGINAL',bbox:{x0:8,y0:10,x1:56,y1:30},fontSize:20};
     ordinaryAlphaCanvas(64,48,pixels);mocks.recognize.mockResolvedValueOnce([line]);
     await translateImageInOffscreen('ordinary-opaque','en','Page');
-    expect(mocks.draw.mock.calls[0].slice(1)).toEqual(['你好',6,6,52,28,'rgb(240,240,240)',24,'left']);
+    expect(drawArguments()).toEqual(['你好',6,6,52,28,'rgb(240,240,240)',24,'left']);
+    const {pixels: backdrop, width, height, remaining} = mocks.draw.mock.calls[0][14];
+    expect(backdrop === pixels).toBe(true);
+    expect([width,height,remaining]).toEqual([64,48,8192]);
     expect(mocks.inpaint).toHaveBeenCalledWith(pixels,64,48,[{...line,text:'你好'}],true);
 });
 
@@ -473,7 +519,9 @@ it('alpha只校验孔确实改变的行，prepared复用后未受影响行仍用
     const original=await vi.importActual<typeof rendering>('@/src/features/image-translation/services/rendering');
     const layout=vi.spyOn(rendering,'layoutImageTranslationText').mockImplementation(original.layoutImageTranslationText);
     await translateImageInOffscreen('alpha-unchanged-bounds','en','Page');
-    expect(layout).toHaveBeenCalledOnce();expect(mocks.draw.mock.calls[0]).toHaveLength(10);expect(mocks.draw.mock.calls[1]).toHaveLength(9);
+    expect(layout).toHaveBeenCalledOnce();
+    expect(drawArguments()).toHaveLength(9);expect(drawArguments(1)).toHaveLength(8);
+    expect([mocks.draw.mock.calls[0][14],mocks.draw.mock.calls[1][14]].every(value=>value===undefined)).toBe(true);
 });
 
 it('面积更大的400×6细带不能只凭完整metadata放行，实际字形不fit时保留完整文本',async()=>{
@@ -712,8 +760,9 @@ describe('Offscreen 图片完整操作生命周期', () => {
         });
         const result = await translateImageInOffscreen('manga', 'ja', 'Page');
         expect(result.lines[1]).toMatchObject({text: '今天真的很开心。', vertical: true});
-        expect(mocks.draw).toHaveBeenNthCalledWith(1, expect.anything(), '第三话', 58, 43, 264, 54, 'rgb(240,240,240)', 48, 'left');
-        expect(mocks.draw).toHaveBeenNthCalledWith(2, expect.anything(), '今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)', Infinity, 'center');
+        expect(drawArguments()).toEqual(['第三话', 58, 43, 264, 54, 'rgb(240,240,240)', 48, 'left']);
+        expect(drawArguments(1)).toEqual(['今天真的很开心。', 595, 99, 170, 193, 'rgb(240,240,240)', Infinity, 'center']);
+        expect(mocks.draw.mock.calls[0][14]===mocks.draw.mock.calls[1][14]).toBe(true);
     });
 
     it.each(['tesseract', 'paddle'] as const)('%s 普通图片将跨行说明整段送翻译，擦除和字号保持源行粒度', async engine => {
@@ -730,7 +779,7 @@ describe('Offscreen 图片完整操作生命周期', () => {
         expect(result.lines).toHaveLength(1);
         expect(result.lines[0].sourceText).toBe(request.texts[0]);
         expect(mocks.inpaint.mock.calls[0][3][0].sourceBoxes).toEqual(source.map(line => line.bbox));
-        expect(mocks.draw).toHaveBeenCalledWith(expect.anything(), '你好', 59, 76, 310, 44, 'rgb(240,240,240)', 12 * 1.2, 'left');
+        expect(drawArguments()).toEqual(['你好', 59, 76, 310, 44, 'rgb(240,240,240)', 12 * 1.2, 'left']);
         if (engine === 'paddle') expect(mocks.mangaRecognize.mock.calls[0][7]).toBe('image');
     });
 
@@ -1050,6 +1099,23 @@ describe('Offscreen 圈选裁剪生命周期', () => {
 });
 
 describe('Offscreen 图片文本 RPC 预算', () => {
+    it.each([false, true])('普通图片只发送可信同栏标签位置，跨栏=%s', async crossColumn => {
+        const texts = ['Look at the notary stamp.', 'CHECK THE SEAL', 'Compare the stamp.'];
+        imageOptions.push({width: 640, height: 260});
+        mocks.recognize.mockResolvedValueOnce(texts.map((text, index) => {
+            const left = index === 1 && crossColumn ? 360 : 44;
+            return {text, bbox: {x0: left, x1: left + 260, y0: 32 + 66 * index, y1: 62 + 66 * index}};
+        }));
+        sendMessage.mockImplementation((message, callback) => callback(
+            message.type === 'fluentReadImageTranslateTexts' ? {success: true, translations: texts} : undefined,
+        ));
+        await translateImageInOffscreen('trusted-image-label', 'en', 'Page', undefined, 'label-test');
+        const request = sendMessage.mock.calls.find(([message]) => message.type === 'fluentReadImageTranslateTexts')![0];
+        expect(request).toMatchObject({texts, requestId: 'label-test'});
+        if (crossColumn) expect(request).not.toHaveProperty('imageLabelSlots');
+        else expect(request.imageLabelSlots).toEqual([1]);
+    });
+
     it('没有请求 ID 时生成独立请求标识，已取消请求只通知取消', async () => {
         const controller = new AbortController();
         controller.abort();

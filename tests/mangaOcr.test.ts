@@ -61,11 +61,54 @@ describe('同次原比例检测侧车生产与私有绑定',()=>{
         const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box'});
         expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();expect(page.results).toEqual(response.results);await port.destroy();
     });
-    it('完全不透明图像即使选择Paddle图片模式也不打包或复制侧车',async()=>{
+    it('没有候选行的不透明图像不打包检测侧车',async()=>{
         const fixture=detectorFixture(false),port=await createBrowserMangaOcr();
         const page=await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true});
         expect(page.imageDetectionFrames).toBeUndefined();expect(fixture.run).toHaveBeenCalledOnce();expect(page.results).toEqual(response.results);await port.destroy();
     });
+    it.each(['image','manga','unobserved-canvas','changed-height'] as const)(
+        '不透明图片只对拥有当次检测帧的普通图片保存裁切行局部数据：%s',async mode=>{
+            const fixture=detectorFixture(false),pixels=opaquePixels().fill(255);
+            pixels[(45*200+35)*4]=0;
+            const original=vi.mocked(document.createElement).getMockImplementation()!;
+            vi.mocked(document.createElement).mockImplementationOnce(()=>{
+                const canvas=original('canvas');
+                mocks.contexts.at(-1).getImageData.mockReturnValue({data:pixels});
+                return canvas;
+            });
+            const line={x0:35,y0:50,x1:95,y1:68};
+            fixture.probabilities[55*224+40]=.9;
+            mocks.createProcessor.mockImplementation(()=>({findRegions:vi.fn(()=>[{bbox:line,area:1080}])}));
+            mocks.detectionRun.mockImplementation(async function(this:any,canvas:{width:number;height:number}){
+                await this.session.run(fixture.feeds);
+                if(mode==='changed-height')canvas.height++;
+                return this.platform.canvas.createProcessor({width:224,height:224}).findRegions().map(({bbox}:any)=>
+                    ({x:bbox.x0,y:bbox.y0,width:bbox.x1-bbox.x0,height:bbox.y1-bbox.y0}));
+            });
+            if(mode==='unobserved-canvas')mocks.recognize.mockImplementation(async function(this:any){
+                await this.detector.run({width:200,height:200});return response;
+            });
+            const port=await createBrowserMangaOcr();
+            try{
+                const page=await port.recognize('opaque label',{flatten:true,noCache:true,strategy:'per-box',
+                    ...(mode==='manga'?{}:{imageDetectionEvidence:true as const})});
+                expect(fixture.run).toHaveBeenCalledOnce();
+                if(mode==='image'){
+                    expect(page.imageDetectionFrames).toHaveLength(1);
+                    const frame=page.imageDetectionFrames![0],index=15*80+15;
+                    expect(frame).toMatchObject({pageWidth:200,pageHeight:200,x:25,y:40,width:80,height:38});
+                    expect(frame.bits[index>>>3]&(1<<(index&7))).not.toBe(0);
+                }else expect(page.imageDetectionFrames).toBeUndefined();
+                expect(mocks.contexts[0].getImageData).toHaveBeenCalledOnce();
+                expect(mocks.contexts[0].fillRect).not.toHaveBeenCalled();
+                expect(page.results).toEqual(response.results);
+                if(mode==='image'){
+                    const manga=await port.recognize('opaque label',{flatten:true,noCache:true,strategy:'per-box'});
+                    expect(manga.imageDetectionFrames).toBeUndefined();
+                }
+            }finally{await port.destroy();}
+        },
+    );
     it('维度不符或检测中原Canvas变更都不产生可借用侧车',async()=>{
         const fixture=detectorFixture();fixture.output.probability.dims=[1,1,192,224];
         const port=await createBrowserMangaOcr();expect((await port.recognize('image',{flatten:true,noCache:true,strategy:'per-box',imageDetectionEvidence:true})).imageDetectionFrames).toBeUndefined();

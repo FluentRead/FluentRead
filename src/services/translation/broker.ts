@@ -40,6 +40,7 @@ import {
     attachTranslationImageInput,
     isUnchangedTranslationResultAllowed,
     isImageTextBatch,
+    getImageLabelSlots,
 } from './requestSnapshot';
 import {TRANSLATION_COMPACT_BATCH, TRANSLATION_REMAINING_BUDGET, type TranslationRouteObservation} from './types';
 import {COMPACT_BATCH_RESPONSE_INVALID, parseCompactBatch} from './compactBatch';
@@ -1416,7 +1417,8 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
         pendingBudgetMs: number,
         recoverSharedDeadline = true,
     ): Promise<string[]> {
-        const cacheMode: CacheRequestMode = usesImageTextContext(execution, message) ? 'image-context-v1'
+        const imageContext = import.meta.env.BROWSER !== 'userscript' && usesImageTextContext(execution, message);
+        const cacheMode: CacheRequestMode = imageContext ? 'image-context-v1'
             : message.aiMultiSegment === true && !supportsNativeTranslationBatch(execution.service)
             ? 'ai-multi-segment'
             : 'batch';
@@ -1429,6 +1431,7 @@ export function createTranslationBroker(deps: TranslationBrokerDependencies): Tr
             message.modelOverride,
             undefined,
             message.subtitleContext,
+            imageContext ? getImageLabelSlots(message) : undefined,
         );
         // 完整批次身份只计算一次；有语境的分项用定长摘要保留邻段和槽位语义，避免逐项携带整个批次。
         const batchFingerprint = cacheMode !== 'batch' ? sha256Hex(batchKey) : '';

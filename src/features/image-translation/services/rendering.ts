@@ -9,6 +9,7 @@
  * 原字尺度与位置：优先使用同帧观察到的逐行墨迹，独立核对原文字的参考宽度与字高；多行要求独立上下排列、相近字高及宽度区间同时吻合，未知断行空格不能人为提高字号。采用实测尺度时也保留墨迹位置，按源边线和垂直中心放置完整译文并夹紧到原绘字框；不改源框、字体族、字重、裁剪或修补范围。透视和混合字号无法一致解释时沿用原路径。
  * 倾斜译文：源方向须与原文字尺度分别核对；真实回退字形和描边旋转后仍须完整位于原框内，同行数参考源行距，只作最小整体平移。既有透明避让计划或缺失指标保持原布局，不新增清字权限。
  * 完整字形预检：复用绘字的实际字体、对齐、源墨迹锚点及倾角变换，在共享度量预算内检查描边与抗锯齿足迹；不绘字、不授权原图修补。
+ * 照片选色：根据排版完成后的逐行字形落点采样已修补像素。样点透明、指标不可靠或预算用尽时采用既有字色和描边。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 import type {ImageSourceTypographyGeometry} from './sourceTypographyGeometry';
@@ -91,14 +92,58 @@ export function getImageRgbContrast(foreground:readonly number[],background:read
     return (Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 }
 
+const DARK_TEXT = '#111827', LIGHT_TEXT = '#ffffff';
+const DARK_TEXT_LUMINANCE = relativeLuminance([17, 24, 39]);
+
 /** 选择与背景对比度较高的深色或白色，避免饱和色被简单灰度阈值误判。 */
 export function getImageTextColor(backgroundColor: string): string {
     const channels = backgroundColor.match(/\d+(?:\.\d+)?/g)?.map(Number);
     const luminance = relativeLuminance(channels && channels.length >= 3 ? channels.slice(0, 3) : [255, 255, 255]);
-    const dark = relativeLuminance([17, 24, 39]);
-    const darkContrast = (Math.max(luminance, dark) + 0.05) / (Math.min(luminance, dark) + 0.05);
+    const darkContrast = (Math.max(luminance, DARK_TEXT_LUMINANCE) + 0.05) / (Math.min(luminance, DARK_TEXT_LUMINANCE) + 0.05);
     const lightContrast = 1.05 / (luminance + 0.05);
-    return darkContrast >= lightContrast ? '#111827' : '#ffffff';
+    return darkContrast >= lightContrast ? DARK_TEXT : LIGHT_TEXT;
+}
+
+export interface ImageTextBackground {
+    pixels: Uint8ClampedArray;
+    width: number;
+    height: number;
+    remaining: number;
+}
+
+const DARK_TEXT_LIMIT = (DARK_TEXT_LUMINANCE + .05) * 3 - .05;
+const LIGHT_TEXT_LIMIT = 1.05 / 3 - .05;
+const TEXT_COLOR_COLUMNS = 8, TEXT_COLOR_ROWS = 4;
+const TEXT_COLOR_SAMPLES = TEXT_COLOR_COLUMNS * TEXT_COLOR_ROWS;
+
+function sampleImageTextStyle(image: ImageTextBackground, ink: OcrLine['bbox'], clip: OcrLine['bbox'],
+    transform: readonly number[] | undefined, fallback: string): {fill: string; outline?: string} | undefined {
+    const inkWidth = ink.x1 - ink.x0, inkHeight = ink.y1 - ink.y0;
+    if (!(inkWidth > 0 && inkHeight > 0) || !Number.isFinite(inkWidth + inkHeight)) return;
+    const left = Math.max(0, clip.x0), right = Math.min(image.width, clip.x1);
+    const top = Math.max(0, clip.y0), bottom = Math.min(image.height, clip.y1);
+    let darkFailures = 0, lightFailures = 0;
+    for (let row = 0; row < TEXT_COLOR_ROWS; row++) {
+        const y = ink.y0 + (row + .5) * inkHeight / TEXT_COLOR_ROWS;
+        for (let column = 0; column < TEXT_COLOR_COLUMNS; column++) {
+            const x = ink.x0 + (column + .5) * inkWidth / TEXT_COLOR_COLUMNS;
+            const px = transform ? transform[0] * x + transform[2] * y + transform[4] : x;
+            const py = transform ? transform[1] * x + transform[3] * y + transform[5] : y;
+            if (px < left || px >= right || py < top || py >= bottom) return;
+            const offset = (Math.floor(py) * image.width + Math.floor(px)) * 4;
+            if (image.pixels[offset + 3] !== 255) return;
+            const value = relativeLuminance([image.pixels[offset], image.pixels[offset + 1], image.pixels[offset + 2]]);
+            if (value < DARK_TEXT_LIMIT) darkFailures++;
+            if (value > LIGHT_TEXT_LIMIT) lightFailures++;
+        }
+    }
+    // 少量明暗像素不触发换色；横跨不同底色时整行仍使用统一字色。
+    let fill = fallback;
+    if (darkFailures + 4 <= lightFailures) fill = DARK_TEXT;
+    else if (lightFailures + 4 <= darkFailures) fill = LIGHT_TEXT;
+    const failures = fill === DARK_TEXT ? darkFailures : lightFailures;
+    if (failures < 4) return {fill};
+    return {fill, outline: fill === DARK_TEXT ? LIGHT_TEXT : DARK_TEXT};
 }
 
 interface ImageSourceInkGeometry {width:number;height:number;count:number;bounds:OcrLine['bbox']}
@@ -473,9 +518,10 @@ export function drawTranslatedImageText(
     outlineColor?: string,
     sourceInkBounds?: OcrLine['bbox'],
     orientation?:ImageSourceTypographyGeometry,
+    background?:ImageTextBackground,
 ): void {
     renderTranslatedImageText([context,text,left,top,width,height,backgroundColor,maxFontSize,textAlign,
-        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation]);
+        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation,background]);
 }
 
 type ImageTextDrawing=Parameters<typeof drawTranslatedImageText>;
@@ -490,7 +536,7 @@ export function canDrawTranslatedImageText(budget:ImageTextMeasureBudget,...args
 
 function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMeasureBudget):boolean {
     const [context,text,left,top,width,height,backgroundColor,maxFontSize=Infinity,textAlign='center',
-        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation]=args;
+        prepared,foregroundColor,outlineColor,sourceInkBounds,orientation,background]=args;
     const rotated=orientation?.owner.quarterTurn;
     if(rotated&&(text.length>256||/[\r\n]/u.test(text)))return false;
     const charge=(value:string)=>{
@@ -556,12 +602,30 @@ function renderTranslatedImageText(args:ImageTextDrawing,preflight?:ImageTextMea
         context.font = `400 ${layout.fontSize}px ${IMAGE_TEXT_FONT}`;
         context.textAlign = layout.ink ? 'left' : textAlign;
         context.textBaseline = layout.ink ? 'alphabetic' : 'middle';
-        context.fillStyle = foregroundColor ?? getImageTextColor(backgroundColor);
-        context.strokeStyle = outlineColor ?? backgroundColor;
+        const fill = foregroundColor ?? getImageTextColor(backgroundColor), stroke = outlineColor ?? backgroundColor;
+        const sample = background && !foregroundColor && !outlineColor;
+        const clip = {x0:left,y0:top,x1:left+width,y1:top+height};
+        context.fillStyle = fill;
+        context.strokeStyle = stroke;
         context.lineWidth = Math.max(0.35, layout.fontSize * (outlineColor ? 0.025 : 0.06));
         context.lineJoin = 'round';
         const paint=(line:string,x:number,y:number):boolean=>{
-            if(!preflight){context.strokeText(line,x,y);context.fillText(line,x,y);return true;}
+            if(!preflight){
+                if (sample) {
+                    let style: ReturnType<typeof sampleImageTextStyle>;
+                    if (background.remaining >= TEXT_COLOR_SAMPLES && line.length <= 4096) {
+                        background.remaining -= TEXT_COLOR_SAMPLES;
+                        const m = layout.ink ? measure(line, layout.fontSize) : context.measureText(line);
+                        style = sampleImageTextStyle(background,
+                            {x0:x-m.actualBoundingBoxLeft,y0:y-m.actualBoundingBoxAscent,
+                                x1:x+m.actualBoundingBoxRight,y1:y+m.actualBoundingBoxDescent},
+                            clip, placement?.transform, fill);
+                    }
+                    context.fillStyle = style?.fill ?? fill;
+                    context.strokeStyle = style?.outline ?? stroke;
+                }
+                context.strokeText(line,x,y);context.fillText(line,x,y);return true;
+            }
             if(!line.trim())return true;
             charge(line);
             // measure 的缓存采用 alphabetic/left；预排版也可能使用 middle/right，必须读取当前真实基线与对齐。

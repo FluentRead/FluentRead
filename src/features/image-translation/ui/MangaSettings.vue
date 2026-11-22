@@ -44,7 +44,14 @@
     </SettingsGroup>
     <slot />
     <SettingsGroup v-if="available" :title="t('识别资源')" data-settings-anchor="resources" :data-settings-anchor-label="t('识别资源')">
-      <div class="manga-resource-body"><MangaModelSettings v-if="settings.imageTranslationMangaEnabled || imageOcrEngine === 'paddle'" embedded :image-recognition="imageOcrEngine === 'paddle'" :show-inpainting="settings.imageTranslationMangaEnabled" /><slot name="resources" /></div>
+      <div class="manga-resource-body">
+        <template v-for="resource in resourceOrder" :key="resource">
+          <slot v-if="resource === 'language-packs'" name="resources" />
+          <MangaModelSettings v-else-if="settings.imageTranslationMangaEnabled || imageOcrEngine === 'paddle'"
+                              embedded :image-recognition="imageOcrEngine === 'paddle'" :manga-recognition="paddleSupportsSource"
+                              :show-inpainting="settings.imageTranslationMangaEnabled" />
+        </template>
+      </div>
     </SettingsGroup>
     <section class="manga-settings-card manga-sites" data-settings-anchor="sites" :data-settings-anchor-label="t('支持的网站')">
       <header class="settings-card-heading"><h2>{{ t('支持的网站') }}</h2></header>
@@ -90,6 +97,9 @@ const imageOcrEngine = computed({
   get: () => getImageOcrEngine(props.settings.from, props.settings.imageTranslationOcrEngine),
   set: engine => {props.settings.imageTranslationOcrEngine = engine;},
 });
+const resourceOrder = computed(() => imageOcrEngine.value === 'paddle'
+  ? ['local-models', 'language-packs']
+  : ['language-packs', 'local-models']);
 const targetLanguages = options.to, sourceLanguages = options.from;
 const url = ref(''), selector = ref('main img, article img'), error = ref('');
 const siteSearch = ref('');
@@ -120,6 +130,7 @@ function addSite() {
 .manga-settings { width:min(100%,1080px); margin-inline:auto; gap:20px; }
 .manga-settings-card { border-color:var(--line); border-radius:10px; background:var(--surface); }
 .manga-resource-body { padding:20px; }
+.manga-resource-body > :deep(:is(.image-ocr-section, .manga-model-settings):not(:first-child)) { margin-top:16px; padding-top:8px; border-top:1px solid var(--line); }
 .manga-preview-preferences :deep(.settings-item) { grid-template-columns:minmax(0,1fr) auto; padding:16px 0; gap:12px; }
 .manga-preview-preferences :deep(.settings-item:first-child) { padding-top:0; }
 .manga-preview-preferences :deep(.settings-item.stacked) { grid-template-columns:minmax(0,1fr); }

@@ -127,6 +127,37 @@ describe('彩色文字与抗锯齿边缘的受限空格投影',()=>{
         const {original,result}=finish(controller,boxes);
         expect(result[0].text).toBe('AB12 CD');expect(result[0].box).toBe(boxes[0]);expect(original[0].text).toBe('AB12CD');expect(pixels).toEqual(copy);
     });
+    it.each([
+        {source:'OUTDOOR ACCESS',thirdFrame:15,expected:'OUTDOOR ACCESS'},
+        {source:'INFIELD ACCESS',thirdFrame:16,expected:'IN FIELD ACCESS'},
+    ])('紧裁彩字用已确认词界校验额外空格，允许一个离散帧的偏差：$expected',({source,thirdFrame,expected})=>{
+        const width=640,time=80,physical={width:320,height:24};
+        const {controller}=start({boxes:[physical]});
+        const pixels=new Uint8ClampedArray(width*48*4),background=[248,244,235,255],ink=[82,40,21,255];
+        for(let offset=0;offset<pixels.length;offset+=4)pixels.set(background,offset);
+        const strokes=[[5,42],[49,90],[112,122],[143,178],[185,220],[227,278],
+            [286,340],[360,411],[418,456],[463,504],[511,549],[556,594],[601,636]];
+        for(const [index,[left,right]] of strokes.entries()){
+            for(let y=index===2?0:12;y<36;y++)for(let x=left;x<right;x++)pixels.set(ink,(y*width+x)*4);
+        }
+        borrowed(controller,0,pixels,width);
+        const data=new Float32Array(time*C);
+        for(let t=0;t<time;t++)data[t*C]=.9;
+        for(const [index,letter] of Array.from(source.replace(' ','')).entries()){
+            const frame=[2,8,thirdFrame,20,26,33,39,48,54,60,66,72,77][index];
+            data[frame*C+letter.charCodeAt(0)]=.99;
+        }
+        data[12*C+C-1]=.04;
+        data[16*C+C-1]=.06;
+        const input={};
+        controller.bindInput(input,{readIndices:[0],resizedWidths:[width],paddedWidth:width,height:48});
+        controller.observeOutput(input,{dims:[1,time,C],data});
+        const original=[{text:source,box:physical,confidence:.99}];
+        const result=controller.applyToSdkResults(original);
+        expect(result[0].text).toBe(expected);
+        expect(result[0].box).toBe(physical);
+        expect(original[0].text).toBe(source);
+    });
     it.each(['busy-border','bright-ink','interior-alpha'] as const)('彩色边缘占比过高、文字过亮或内部透明像素时不读CTC：%s',mode=>{
         const {controller,boxes}=start();borrowed(controller,0,chromaticImage(120,mode));
         expect(finish(controller,boxes,noRead()).result[0].text).toBe('AB12CD');

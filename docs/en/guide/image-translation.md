@@ -27,6 +27,8 @@ Press **Escape** inside the text panel to close it and return to an available en
 
 Recognized decomposed Hangul, extended Han characters, and their variation selectors keep their original text form. Layout avoids splitting combining characters and emoji. Complex unbroken words may still require smaller text in older browsers; use the text panel to read them.
 
+Image and manga translations use the target language when measuring and drawing text. This helps the browser choose the appropriate glyph forms available on your device for Japanese, Simplified Chinese, Traditional Chinese, and other languages.
+
 During automatic wrapping in ordinary images, closing punctuation stays with the preceding character and opening punctuation with the following text. Small Japanese kana and prolonged sound marks also stay attached. Explicit line breaks are preserved.
 
 When the last line of a short paragraph is much shorter than the others, line widths can be balanced while retaining the current font size, line count and complete words.
@@ -35,11 +37,21 @@ Ordinary images use the actual glyph bounds of your device's fonts to reduce cli
 
 For fine ruled paper in ordinary images, repair preserves the background and fills line segments hidden by text when the source supports consistent direction, spacing and color. This reduces broad smudges. Dashed lines, crossing patterns, curved textures and uncertain regions keep the existing repair method.
 
+When a horizontal line of text covers an angled edge in an opaque image, repair can continue the edge if the source colors agree on all four sides of the erasure box.
+
+When a recognition box clips a thin outline in a photo, repair can use nearby background samples that agree across several rows. This reduces streaking inside the erasure area.
+
+For one line of uppercase text on a solid background, the default Paddle model can repair clipped edges when the glyphs match the recognition evidence individually. This also works for some serif lettering clipped at both edges when only the antialiasing joins the glyphs and detection covers the middle of the strokes.
+
+When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
+
+For a translated image on a solid background with clipped source strokes, importing the optional text segmentation model lets you regenerate the affected translation. On the same page, switch to the original and select Translate again.
+
 Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.
 
-On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. Complex backgrounds or uncertain color relationships keep the default dark or white text.
+On solid backgrounds, reliable source text colors are retained when their contrast is sufficient. Single horizontal lines can receive a little extra drawing height after the entire added area is confirmed to be the same opaque background color and clear of other text. Nearby artwork and transparency limit expansion. On photographs, automatic text color uses samples beneath each laid-out line. A contrasting outline can help when a line crosses light and dark areas.
 
-Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Uncertain mixed colors and textures keep their existing handling.
+Text on a smooth gradient can also retain a verified source color, with a thin contrasting outline. This reduces white or colored headings being rendered as dark text. Sampling that encounters transparent pixels uses the existing color selection.
 
 Manga translations use the direction of their paragraph when measuring and drawing text. This helps keep numbers, brackets and punctuation in Arabic and Hebrew text from following an unrelated default canvas direction.
 
@@ -63,7 +75,7 @@ Some numbered descriptions made of several uppercase words are passed to the cur
 
 With a prompt-based AI service (or a composite containing one) and **AI context** enabled, each text region can reference up to two recognized regions before and after it, without an extra summary request. Repeated short phrases retain their own positions and neighboring context; changed context cannot reuse a translation cached for another meaning. Turning the setting off keeps the existing translation behavior. If a translation includes a marker added to identify neighboring text, FluentRead retries that region once without the reference. If the marker appears again, the translation reports an error. Context can help resolve ambiguity, but recognition errors and model mistakes still require checking the original.
 
-When Google native batching is enabled, complete sentences from an image can share context in groups of up to four, while headings remain separate. The extension checks region identifiers and sentence endings, then falls back to independent translation if a result loses a region, mixes positions or changes an independent sentence into a comma continuation. Repeated phrases keep their positions and group context in the cache. Only recognized text is sent, not the original image; check specific meanings against the source.
+When Google native batching is enabled, complete sentences from an image can share context in groups of up to four. Headings stay separate. In an ordinary image, a short label can borrow the sentence on each side when all three lines align in the same column and use similar text sizes. The translated label keeps its punctuation-free form. The extension checks region identifiers and sentence endings, then falls back to independent translation if a result loses a region, mixes positions or changes a sentence ending into a comma. The cache keeps repeated phrases tied to their positions and context. Google receives the recognized text.
 
 Ordinary rotated, scaled, mirrored and perspective images follow the page's native transforms. Styling changes reuse the existing recognition and translation. If overlay alignment or shared ancestor clipping cannot be verified, the original stays visible with an entry to read the translated text. Examples include fixed positioning with rotation, or a rotated image inside an overflow-clipping container that does not establish its positioning reference. A supported layout can display the existing translation again.
 
@@ -76,6 +88,8 @@ Adjacent horizontal text on the same paper also checks actual glyph bounds and c
 Scaling small text on solid backgrounds, or dark text on slightly varying light gray backgrounds, can join English words and identifiers. When both model evidence and the original glyph gaps support it, missing spaces can be restored, for example from `ROUTEC4` to `ROUTE C4`, or `ISAVED` to `I SAVED`. Tightly cropped text on light tinted backgrounds also checks the background and glyphs, for example restoring `FIELDNOTE 12` to `FIELD NOTE 12`. Existing letters, digits and source bounds stay unchanged.
 
 Bright text on dark backgrounds also checks complete blank columns and model evidence when strokes touch the recognition crop edges, for example restoring `CHECKTHE OXYGEN` to `CHECK THE OXYGEN`. Existing spaces, characters and positions are preserved. Mixed colors, uncertain backgrounds, connected strokes or insufficient evidence retain the original recognition result.
+
+For tightly cropped colored text with a verified word break, image translation checks new spaces against the spacing on the same line to avoid splitting a word such as `OUTDOOR`.
 
 Image translation also checks text detection evidence alongside recognition to reduce highlights, textures and decorative lines being mistaken for text.
 

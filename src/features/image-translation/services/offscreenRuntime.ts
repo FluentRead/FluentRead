@@ -4,7 +4,7 @@
  * 文件职责：在隔离 Offscreen 文档中编排图片重绘翻译，并为圈选文本翻译提供仅裁剪和本地 OCR 的独立入口。
  * 主要内容：单图可选与漫画共用的 PaddleOCR，两种引擎均按普通段落合行翻译、限制字号并保留对齐，常规擦除按原始行框，完整墨迹修补须另外逐点授权；独立数字保留原图与可读原文，不发送翻译；单图与漫画按实际清字和绘字范围对未变化原文进行有界级联保护，碰撞后仍保留原文与完整阅读译文；保留单图完整译图与原文对照，不自动加载漫画修补模型；图片解码时前置尺寸校验和取消/超时清理，普通修补复用独占像素，透明图先完整全文避孔预检，再将低alpha从擦写与背景采样中排除，未知透明先按同帧完整RGBA静区与墨迹组件进行有界全页救援，所有图案、原文保护和完整译字均通过才精确上传墨迹脏矩形；证明不足、不可达修补或预算不足原子保留原图与完整阅读译文；不透明常规修补不额外复制整页，可选分割沿用独立 Worker 快照；完整译图、漫画局部图块和圈选裁剪共用可取消的异步 PNG 编码；漫画在原始像素尚未回写前计算全局透明孔保护，与背景分类一起交给修补及绘字，避免重叠写入破坏已保护的画面；确认整页均匀时复用本次独占 ImageData 并跳过同一数组的拷回，复杂页仍分离输入与输出，完成或失败后释放临时图像与画布。
  * 漏擦救援：不透明纯色文字有原墨迹落在旧掩码外时，复用完整 RGBA 提案与缓存分割逐像素授权；整页成功才回填原字像素，保留原色、字号与坐标，绘字框含图案或完整字形无法容纳时保留原图与阅读译文。提案不成立、混合透明度或缺可选缓存时仍可按原范围生成译图。
- * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹，不自动下载可选模型；实际到达分割而缺文件的保留原图结果携带私有重试标记，其他安全撤回不标记。
+ * 可选分割：整页颜色、归属和完整译文预检后，先验证已有检测支持；不足时只读用户已导入的 CTD 缓存，只发送本帧有界 RGBA，由独立 Worker 缩放和构造张量，同帧量化 seg 经局部投影与全页授权后才上传墨迹。确实到达分割而缺文件时，为保留原图或临时译图携带私有重试标记。
  * 段落关系：普通识别数组的私有同帧布局证据只豁免相邻物理行距；过滤后的数字框仍作遮挡，逐行擦除框与所有回填权限保持独立。
  * 注音边界：原文碰撞与漫画修补共用注音自己的字高余量，按候选缓存坐标查询，避免扩大清字范围或在级联保护中重复扫描注音。
  * 字号尺度与原色：普通图先通过透明准入，再在原图中观察背景、字色及逐行墨迹，优先用原文字与实测字形核对字号，同次核对通过的位置用于原绘字框内的译文对齐；只有新增范围全部是已证不透明底色且避开其他文字时，才为完整单行少量增高绘字框，清字始终沿原掩码。可确认的渐变字色不借此扩框。漫画修补前也用原文字保存源色和可信字号，不把译文长度当作原字体比例，不从修补结果反推样式；原OCR字号、物理框和白底旁置规则保持独立。
@@ -12,6 +12,7 @@
  * 气泡补绘：漫画发生原文碰撞时保持全部原文保护；仅同源局部气泡提示有效、原闭合组件内有足够纯白空处且完整译文字号不低于源字号时另放译文，不清除原文、不新增 OCR、翻译或修补模型；分段显示窗口同时限制原段归属和完整补绘位置，非法范围仅撤回补绘，不改变正常清字；已使用补绘范围参与后续避让，阅读定位仍保留原坐标，无安全位置时继续标记未绘制。
  * 模块边界：该运行时只在具备 Canvas/DOM 的 Offscreen 环境执行，不直接接收 browser.runtime 事件；消息入口由 app/offscreen 组装，翻译函数由依赖注入，几何算法来自 area feature。
  * 倾斜排版：在原像素上独立观察方向，再用原文字核对尺度；普通图与漫画只向对应绘制传递同源样式，不扩大擦字范围，也不绕过透明预检或完整译文要求。
+ * 译文字形：背景返回本次翻译选用的目标语言。原文字体尺度度量完成后，为译文排版画布指定该语言，预检和实际绘制使用相同的字形回退。
  */
 import {createImageTranslationFailure} from '../failure';
 import {IMAGE_PROGRESS_MESSAGE_TYPE, type ImageTranslationStage} from '../progress';
@@ -19,7 +20,7 @@ import { selectChangedTranslations, type OcrLine } from '@/src/features/image-tr
 import type {ImageViewport} from '@/src/shared/image/types';
 import { areaRectToImageCrop, type AreaTranslationSelection, type AreaRecognitionResult } from '@/src/features/area-translation/protocol';
 import { imageMaskBoxes, imageMaskBoxIntersects, inpaintTextRegions } from './inpainting';
-import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
+import {proposeImageMattePage,getImageMatteProposalDrawings,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,applyImageMattePage} from './imageMattePage';
 import {getImageDetectionEvidence,type ImageDetectionSupport} from './imageDetectionEvidence';
 import {getImageParagraphGapEvidence} from './imageParagraphGapEvidence';
 import {isSingleFrameImageData} from './imageDetectionSnapshot';
@@ -32,6 +33,7 @@ import {observeImageSourceTypographyGeometry,type ImageSourceTypographyGeometry}
 import {observeImageSourceAppearances,expandImageTextBounds} from './sourceAppearance';
 import {hasUncoveredImageInk} from './imageEraseCoverage';
 import {groupImageParagraphs, type ImageTextRegion} from '../paragraphs';
+import {getAlignedImageLabelSlots} from '../labelContext';
 import {mangaOcrRuntime} from './mangaOcr';
 import {createMangaBlankLayoutBudget, drawMangaTranslations, planMangaBlankTranslation, sampleMangaBackgrounds} from './mangaRendering';
 import {getMangaBubblePlacement} from './mangaBubblePlacement';
@@ -132,7 +134,8 @@ export async function translateImageTextsInExtension(
     title: string,
     requestId: string | undefined,
     signal?: AbortSignal,
-): Promise<string[]> {
+    imageLabelSlots?: number[],
+): Promise<{translations: string[]; targetLanguage?: string}> {
     const operationId = requestId || `legacy-image-text-${++legacyImageTextRequestSequence}`;
     const response = await new Promise<any>((resolve, reject) => {
         let settled = false;
@@ -171,6 +174,7 @@ export async function translateImageTextsInExtension(
             chrome.runtime.sendMessage({
                 type: 'fluentReadImageTranslateTexts',
                 texts,
+                ...(imageLabelSlots?.length ? {imageLabelSlots} : {}),
                 title,
                 requestId: operationId,
                 timeoutMs: IMAGE_TEXT_TRANSLATION_TIMEOUT_MS,
@@ -186,7 +190,8 @@ export async function translateImageTextsInExtension(
     if (!response?.success || !Array.isArray(response.translations)) {
         throw createImageTranslationFailure(response?.error || '图片文字翻译失败', response);
     }
-    return response.translations;
+    const targetLanguage = typeof response.targetLanguage === 'string' ? response.targetLanguage : undefined;
+    return {translations: response.translations, targetLanguage};
 }
 
 async function cropImage(dataUrl: string, selection: AreaTranslationSelection, signal?: AbortSignal): Promise<string> {
@@ -393,6 +398,7 @@ async function prepareTranslatedImage(
     support?:ImageDetectionSupport,
     placementImage?:string,
     mangaViewport?:ImageViewport,
+    targetLanguage?:string,
 ): Promise<OffscreenImageTranslationResult> {
     await checkImageCancellation(signal);
     const width = source.naturalWidth || source.width, height = source.naturalHeight || source.height;
@@ -415,6 +421,7 @@ async function prepareTranslatedImage(
         const scratch=document.createElement('canvas');
         try{
             scratch.width=scratch.height=1;
+            if(targetLanguage)scratch.lang=targetLanguage;
             const context=scratch.getContext('2d');
             if(!context)throw new Error('浏览器不支持图片处理');
             const budget={remaining:2048,characters:262_144};
@@ -516,6 +523,8 @@ async function prepareTranslatedImage(
         const sourcePixels = context.getImageData(0, 0, canvas.width, canvas.height);
         throwIfImageOperationAborted(signal);
         if (manga) {
+            const backgrounds = translatedLines.length?sampleMangaBackgrounds(sourcePixels.data,canvas.width,canvas.height,selected.map(candidate=>candidate.original as MangaRegion),context):[];
+            if(targetLanguage)canvas.lang=targetLanguage;
             const placed:Array<{index:number;region:MangaRegion}>=[];
             if(blankCandidates.length){
                 const obstacles:OcrLine['bbox'][]=[],seen=new Set<string>();let valid=true;
@@ -557,7 +566,6 @@ async function prepareTranslatedImage(
                     if(!valid)break;
                 }
             }
-            const backgrounds = translatedLines.length?sampleMangaBackgrounds(sourcePixels.data,canvas.width,canvas.height,selected.map(candidate=>candidate.original as MangaRegion),context):[];
             const protection = translatedLines.length?planMangaAlphaProtection(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[]):undefined;
             const pixels = translatedLines.length?await mangaInpaintingRuntime.repair(sourcePixels.data,canvas.width,canvas.height,translatedLines as MangaRegion[],signal,
                 (percent,initializing)=>reportProgress(requestId,initializing?'initializing':'preparing',percent),
@@ -609,6 +617,7 @@ async function prepareTranslatedImage(
             const style=getImageSourceTypographyStyle(context,candidate.original,orientations.get(candidate.original));
             if(style)fontStyles.set(candidate.translated,style);
         }
+        if(targetLanguage)canvas.lang=targetLanguage;
         const drawing=new Map<ImageTextRegion,{bounds:OcrLine['bbox'];prepared?:ImageTranslationTextLayout;foreground?:string;background?:string;outline?:string;sourceInkBounds?:OcrLine['bbox'];orientation?:ImageSourceTypographyGeometry}>();
         const expansionBudget={remaining:262_144};
         function* otherTextBoxes(owner:ImageTextRegion){
@@ -648,7 +657,7 @@ async function prepareTranslatedImage(
                 drawing.set(line,{...drawing.get(line)!,bounds,prepared});
             }
         }
-        // 墨迹遗漏仅触发提案；颜色与几何不能替代同帧模型逐像素授权。整页提案失败保留原修补策略。
+        // 墨迹遗漏仅触发提案。普通同帧检测可以结合 OCR 原文复核一致的字形裁切。
         repairClippedInk: if(!protection&&hasUncoveredImageInk(sourcePixels.data,canvas.width,canvas.height,appearances)
             &&isSingleFrameImageData(source.currentSrc||source.src)){
             const owners=new Set(selected.map(candidate=>candidate.original));
@@ -676,19 +685,25 @@ async function prepareTranslatedImage(
                 const preflight=()=>args.every(item=>canDrawTranslatedImageText(budget,...item));
                 if(!preflight())return await retainSource();
                 await checkImageCancellation(signal);
-                let plan=support?authorizeImageMatteProposal(proposal,support):undefined;
+                let retryWhenSegmentationReady=false;
+                let plan=support?authorizeImageMatteProposal(proposal,support,
+                    new Map(selected.map(item=>[item.translated,item.original.text]))):undefined;
                 if(!plan){
                     const ready=await mangaInferenceClient.prepareTextSegmentation(signal);
                     await checkImageCancellation(signal);
-                    if(!ready)break repairClippedInk;
-                    const seg=await mangaInferenceClient.segmentText(()=>{
+                    if(!ready){
+                        retryWhenSegmentationReady=true;
+                        plan=authorizeImageMatteWithinExistingMasks(proposal);
+                    }else{
+                        const seg=await mangaInferenceClient.segmentText(()=>{
+                            throwIfImageOperationAborted(signal);
+                            return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
+                        },signal);
                         throwIfImageOperationAborted(signal);
-                        return {pixels:sourcePixels.data,width:canvas.width,height:canvas.height};
-                    },signal);
-                    throwIfImageOperationAborted(signal);
-                    const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
-                    try {plan=authorizeImageMatteProposal(proposal,segmentation);}
-                    finally {segmentation.dispose();}
+                        const segmentation=createImageTextSegmentationSupport(seg,canvas.width,canvas.height);
+                        try {plan=authorizeImageMatteProposal(proposal,segmentation);}
+                        finally {segmentation.dispose();}
+                    }
                     if(!plan)return await retainSource();
                 }
                 await checkImageCancellation(signal);
@@ -701,7 +716,7 @@ async function prepareTranslatedImage(
                 await checkImageCancellation(signal);
                 const image=await encodeImageCanvas(canvas,signal);
                 throwIfImageOperationAborted(signal);
-                return {image,lines:readingLines};
+                return {image,lines:readingLines,...(retryWhenSegmentationReady?{retryWhenSegmentationReady:true as const}:{})};
             }finally {discardImageMatteProposal(proposal);}
         }
         // 全文布局先全部通过才擦除；保护点不可写也不可当作已知背景，无法完整修补时撤回。
@@ -711,27 +726,14 @@ async function prepareTranslatedImage(
         await checkImageCancellation(signal);
         context.putImageData(sourcePixels, 0, 0);
 
-        const renderedLines = translatedLines.map(line => ({
-            ...line,
-            backgroundColor: drawing.get(line)!.background??getImageTextBackgroundColor(pixels, canvas.width, canvas.height, line.bbox),
-            drawing:drawing.get(line)!,
-            maxFontSize:fontStyles.get(line)!.fontSize,
-        }));
-        for(const line of renderedLines){
+        const background = protection ? undefined : {pixels, width:canvas.width, height:canvas.height, remaining:8192};
+        for(const line of translatedLines){
             throwIfImageOperationAborted(signal);
-            const plan=line.drawing,bounds=plan.bounds,alignment=line.vertical?'center':line.textAlign??'left';
-            if(plan.orientation)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds,plan.orientation);
-            else if(plan.sourceInkBounds)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds);
-            else if(plan.outline)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground,plan.outline);
-            else if(plan.foreground)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared,plan.foreground);
-            else if(plan.prepared)drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment,plan.prepared);
-            else drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
-                line.backgroundColor,line.maxFontSize,alignment);
+            const plan=drawing.get(line)!,bounds=plan.bounds,alignment=line.vertical?'center':line.textAlign??'left';
+            const color=plan.background??getImageTextBackgroundColor(pixels,canvas.width,canvas.height,line.bbox);
+            drawTranslatedImageText(context,line.text,bounds.x0,bounds.y0,bounds.x1-bounds.x0,bounds.y1-bounds.y0,
+                color,fontStyles.get(line)!.fontSize,alignment,plan.prepared,plan.foreground,plan.outline,plan.sourceInkBounds,plan.orientation,
+                plan.background?undefined:background);
         }
         await checkImageCancellation(signal);
         const image = await encodeImageCanvas(canvas, signal);
@@ -740,6 +742,7 @@ async function prepareTranslatedImage(
         } catch(error) {
             if(!(error instanceof MangaAlphaProtectionLimitError)&&!(error instanceof ImageAlphaProtectionUnavailableError))throw error;
             if(sourceUnchanged&&error instanceof ImageAlphaProtectionUnavailableError&&support&&isSingleFrameImageData(source.currentSrc||source.src)){
+                if(targetLanguage)canvas.lang=targetLanguage;
                 const selected=new Set(candidates.filter(candidate=>!skipped.has(candidate.index)).map(candidate=>candidate.original));
                 const rescued=await renderImageMatteRescue(context,canvas,sourcePixels,translatedLines,lines.filter(line=>!selected.has(line)),readingLines,support,signal);
                 if(rescued)return rescued;
@@ -839,14 +842,17 @@ export async function translateImageInOffscreen(
         const lines:ImageTextRegion[]=[...readable,...guards];
         const translatable = lines.map((line, index) => ({line, index})).filter(({line}) => !line.guardOnly && !numericProtection(line.text));
         const translations = lines.map(line => line.text);
+        let targetLanguage: string | undefined;
         if (translatable.length) {
             reportProgress(requestId, 'translating');
-            const translated = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal);
-            translatable.forEach(({index}, position) => {translations[index] = translated[position] ?? lines[index].text;});
+            const labels = manga ? undefined : getAlignedImageLabelSlots(translatable);
+            const result = await translateImageTextsInExtension(translatable.map(({line}) => line.text), title, requestId, signal, labels);
+            targetLanguage = result.targetLanguage;
+            translatable.forEach(({index}, position) => {translations[index] = result.translations[position] ?? lines[index].text;});
         }
         throwIfImageOperationAborted(signal);
         reportProgress(requestId, manga ? 'cleaning' : 'rendering');
-        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined,mangaViewport);
+        return await prepareTranslatedImage(source, lines, translations, signal, manga, requestId,detectionSupport,manga?image:undefined,mangaViewport,targetLanguage);
     } finally {
         source.src = '';
     }

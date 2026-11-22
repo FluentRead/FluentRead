@@ -6,8 +6,9 @@
 import {describe,expect,it} from 'vitest';
 import type {ImageTextRegion} from '@/src/features/image-translation/paragraphs';
 import {createImageDetectionEvidenceBudget,bindImageDetectionEvidence,getImageDetectionEvidence} from '@/src/features/image-translation/services/imageDetectionEvidence';
-import {planImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
-import {applyImageMattePage,authorizeImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
+import {planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
+import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
+import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
 
 describe('整页RGBA修补的重叠墨迹归属',()=>{
     it('原宽灰牌被薄AA准入提前拒绝，旧像素及正反序整页拒绝继续保留',()=>{
@@ -105,5 +106,201 @@ describe('整页RGBA修补的重叠墨迹归属',()=>{
             const offset=(y*width+x)*4,changed=(x>=20&&x<23&&y>=20&&y<27)||(x===27&&y===26);
             expect(Array.from(pixels.subarray(offset,offset+4))).toEqual(changed?matte:Array.from(before.subarray(offset,offset+4)));
         }
+    });
+});
+
+describe('同帧检测支持的整行字形裁切',()=>{
+    function fourCaps(){
+        const left=8,top=8,width=52,height=28,mask=new Uint8Array(width*height);
+        const columns=[5,15,26,37];
+        for(const x0 of columns)for(let y=7;y<19;y++)mask.fill(1,y*width+x0,y*width+x0+6);
+        const repair:ImageMatteRepair={left,top,width,height,mask,artMask:new Uint8Array(mask.length),
+            background:[245,238,230,255],sourceBox:{x0:14,y0:18,x1:50,y1:29},
+            supportBox:{x0:13,y0:15,x1:51,y1:27}};
+        return {repair,columns};
+    }
+    const above=(_x:number,y:number)=>y>18;
+
+    it('四个各自过半被检测支持的连通字形可确认同一上缘裁切和两端窄缺口',()=>{
+        const {repair}=fourCaps(),before=repair.mask.slice();
+        expect(coversClippedImageGlyphs(repair,'A BCD',(x,y)=>above(x,y)&&x!==13&&x!==50)).toBe(true);
+        expect(repair.mask).toEqual(before);
+    });
+    it('同证据支持反向的共同下缘裁切',()=>{
+        const {repair}=fourCaps();repair.sourceBox.y0=13;repair.sourceBox.y1=24;
+        expect(coversClippedImageGlyphs(repair,'OPEN',(_x,y)=>y<23)).toBe(true);
+    });
+    it('横向投影重叠的字形仍须逐个连通并拥有各自的过半支持',()=>{
+        const {repair}=fourCaps(),{mask,width}=repair;
+        mask.fill(1,7*width+11,7*width+14);
+        mask.fill(1,18*width+13,18*width+15);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(true);
+        mask[7*width+14]=1; // 同投影的合法字距变成真实连接。
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    it('两端的额外一像素检测缺口只归给实际被框裁边的字形',()=>{
+        const {repair}=fourCaps(),{width,mask}=repair;
+        const support=(x:number,y:number)=>above(x,y)&&x!==18&&x!==45;
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(true);
+        for(let y=7;y<19;y++)mask[y*width+5]=0;
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
+        for(let y=7;y<19;y++){mask[y*width+5]=1;mask[y*width+42]=0;}
+        expect(coversClippedImageGlyphs(repair,'OPEN',support)).toBe(false);
+    });
+    function dualCaps(){
+        const input=fourCaps().repair,width=72,height=48,ink=[23,28,54,255],pixels=new Uint8ClampedArray(width*height*4);
+        const box={...input.sourceBox,y0:17,y1:26};
+        for(let i=0;i<pixels.length;i+=4)pixels.set(input.background,i);
+        const setColor=(x:number,y:number,color:readonly number[])=>pixels.set(color,(y*width+x)*4);
+        for(let i=0;i<input.mask.length;i++){
+            if(input.mask[i])setColor(input.left+i%input.width,input.top+Math.floor(i/input.width),ink);
+        }
+        for(let x=19;x<23;x++)setColor(x,21,[190,186,186,255]);
+        setColor(6,21,[14,54,28,255]);
+        const repair=planImageMatteCandidate(pixels,width,height,box,{remaining:65_536})!;
+        return {pixels,width,height,repair,box};
+    }
+    const central=(_x:number,y:number)=>y>=18&&y<26;
+
+    it('双侧裁过的抗锯齿相接轮廓按九成墨色分字，整页只移除原墨色',()=>{
+        const {pixels,width,height,repair,box}=dualCaps(),before=pixels.slice();
+        const bridge=(21-repair.top)*repair.width+20-repair.left;
+        expect(repair.mask[bridge]).toBe(1);
+        expect(repair.inkCore?.[bridge]).toBe(0);
+        expect(coversClippedImageGlyphs(repair,'OPEN',central)).toBe(true);
+        const line:ImageTextRegion={text:'开放',bbox:box,fontSize:12};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],l=>l.bbox)!;
+        const plan=authorizeImageMatteProposal(proposal,{forBox:()=>central},new Map([[line,'OPEN']]))!;
+        expect(plan).toBeDefined();
+        expect(pixels).toEqual(before);
+        applyImageMattePage(pixels,width,height,plan);
+        expect(pixels.slice((21*width+20)*4,(21*width+21)*4)).toEqual(Uint8ClampedArray.from(repair.background));
+        expect(pixels.slice((21*width+6)*4,(21*width+7)*4)).toEqual(before.slice((21*width+6)*4,(21*width+7)*4));
+    });
+    it('中央的薄墨也须有检测支持，同色粗连接不可算作两个字',()=>{
+        const {repair}=dualCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>central(x,y)&&(x!==20||y!==21))).toBe(false);
+        const row=(21-repair.top)*repair.width;
+        repair.inkCore!.fill(1,row+19-repair.left,row+23-repair.left);
+        expect(coversClippedImageGlyphs(repair,'OPEN',central)).toBe(false);
+    });
+    it('双侧裁切须有足够原框、中段及每个字两端的独立证据',()=>{
+        const {repair,box}=dualCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>central(x,y)&&y!==25)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,x0:17}},'OPEN',central)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y1:25}},'OPEN',()=>true)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:18}},'OPEN',central)).toBe(false);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:16,y1:25}},'OPEN',()=>true)).toBe(true);
+        const core=repair.inkCore!.slice();
+        const topRow=(15-repair.top)*repair.width;
+        core.fill(0,topRow+23-repair.left,topRow+29-repair.left);
+        expect(coversClippedImageGlyphs({...repair,sourceBox:{...box,y0:16,y1:25},inkCore:core},'OPEN',()=>true)).toBe(false);
+        core.set(repair.inkCore!);
+        const bottomRow=(26-repair.top)*repair.width;
+        core.fill(0,bottomRow+23-repair.left,bottomRow+29-repair.left);
+        expect(coversClippedImageGlyphs({...repair,inkCore:core},'OPEN',central)).toBe(false);
+    });
+    it('双侧判断按完整墨迹与强核心两次观察收费',()=>{
+        const {repair}=dualCaps(),remaining={remaining:repair.mask.length*2-1};
+        expect(coversClippedImageGlyphs(repair,'OPEN',()=>{throw new Error('unexpected support query');},remaining)).toBe(false);
+        expect(remaining.remaining).toBe(-1);
+    });
+    it('短窄行被两端容差耗尽或根本没有横向裁切时不借用空的中央区域',()=>{
+        const {repair,box}=dualCaps();
+        const tiny={...repair,sourceBox:{...box,x0:25,x1:33},supportBox:{...repair.supportBox,x0:20,x1:37}};
+        expect(coversClippedImageGlyphs(tiny,'OPEN',()=>{throw new Error('unexpected support query');})).toBe(false);
+        const wider={...repair,sourceBox:{...box,x0:12,x1:52}};
+        expect(coversClippedImageGlyphs(wider,'OPEN',central)).toBe(true);
+        expect(coversClippedImageGlyphs(wider,'OPEN',(x,y)=>central(x,y)&&(x!==13||y!==20))).toBe(false);
+    });
+    it.each(['Abcd','AB','A'.repeat(49),'ABCDE','ABC!'])('原文或连通对应不足时没有额外授权 %s',source=>{
+        expect(coversClippedImageGlyphs(fourCaps().repair,source,above)).toBe(false);
+    });
+    it('透明底不参与字形外补',()=>{
+        const {repair}=fourCaps();repair.background=[245,238,230,128];
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    it.each([
+        ['未裁切',{y0:14},{}],['双侧',{y1:25},{}],['超上限',{y0:22},{}],
+        ['过矮',{y0:16},{y1:21}],['左侧越界',{x0:17},{}],['右侧越界',{x1:47},{}],
+    ] as const)('%s的观察范围不授权',(_name,source,ink)=>{
+        const {repair}=fourCaps();Object.assign(repair.sourceBox,source);Object.assign(repair.supportBox,ink);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    it('行内墨迹断失不能由其他像素的检测支持代替',()=>{
+        const {repair}=fourCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>above(x,y)&&(x!==24||y!==21))).toBe(false);
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>above(x,y)&&x>17)).toBe(false);
+    });
+    it('只有一个字形缺边或只有横向细缺口不是一致裁切',()=>{
+        const {repair}=fourCaps();
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x,y)=>x>=18||above(x,y))).toBe(false);
+        expect(coversClippedImageGlyphs(repair,'OPEN',(x)=>x!==13)).toBe(false);
+    });
+    it('超出源字符数的额外独立墨迹和多字相连的同色装饰都不能授权',()=>{
+        const {repair}=fourCaps(),{width,mask}=repair;
+        for(let y=7;y<19;y++)mask.fill(1,y*width+45,y*width+47);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+        mask.fill(1,7*width+5,7*width+42);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    it.each(['detached','offset-top','offset-bottom'] as const)('保持不符合共同连通轮廓的物体 %s',shape=>{
+        const {repair,columns}=fourCaps(),{width,mask}=repair;
+        const x=columns[1];
+        const rows=shape==='detached'?[10]:shape==='offset-top'?[7,8]:[17,18];
+        for(const row of rows)mask.fill(0,row*width+x,row*width+x+6);
+        expect(coversClippedImageGlyphs(repair,'OPEN',above)).toBe(false);
+    });
+    function cardProposal(alpha=255){
+        const {repair}=fourCaps(),width=72,height=48,pixels=new Uint8ClampedArray(width*height*4);
+        repair.background=[245,238,230,alpha];
+        for(let offset=0;offset<pixels.length;offset+=4)pixels.set(repair.background,offset);
+        for(let index=0;index<repair.mask.length;index++)if(repair.mask[index]){
+            const x=repair.left+index%repair.width,y=repair.top+Math.floor(index/repair.width);
+            pixels.set([23,28,54,255],(y*width+x)*4);
+        }
+        const art=[12,6];
+        pixels.set([230,50,100,255],(art[1]*width+art[0])*4);
+        const line:ImageTextRegion={text:'已开放',bbox:repair.sourceBox,fontSize:12};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],l=>l.bbox)!;
+        expect(proposal).toBeDefined();
+        return {repair,width,height,pixels,proposal,line,art};
+    }
+    it('只为同次原文授权同帧缺口，并且只写已确认的字形像素',()=>{
+        const {repair,width,height,pixels,proposal,line,art}=cardProposal();
+        const support={forBox:()=>above};
+        expect(authorizeImageMatteProposal(proposal,support)).toBeUndefined();
+        expect(authorizeImageMatteProposal(proposal,support,new Map([[{...line},'OPEN']]))).toBeUndefined();
+        const plan=authorizeImageMatteProposal(proposal,support,new Map([[line,'OPEN']]))!;
+        expect(plan.uploads).toHaveLength(4);
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=new Uint8ClampedArray(pixels.length);
+        for(let offset=0;offset<expected.length;offset+=4)expected.set(repair.background,offset);
+        expected.set([230,50,100,255],(art[1]*width+art[0])*4);
+        expect(pixels).toEqual(expected);
+    });
+    it('有限补底仅移除已有擦除范围内的原墨，保留裁切边和其他图案',()=>{
+        const {repair,width,height,pixels,proposal}=cardProposal();
+        const original=pixels.slice(),plan=authorizeImageMatteWithinExistingMasks(proposal)!;
+        expect(plan.uploads).toEqual([{x0:12,y0:16,x1:52,y1:31}]);
+        expect(authorizeImageMatteWithinExistingMasks(proposal)).toBeUndefined();
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=original.slice();
+        for(let index=0;index<repair.mask.length;index++)if(repair.mask[index]){
+            const y=repair.top+Math.floor(index/repair.width);
+            if(y>=16)expected.set(repair.background,(y*width+repair.left+index%repair.width)*4);
+        }
+        expect(pixels).toEqual(expected);
+        expect(()=>applyImageMattePage(pixels,width,height,plan)).toThrow('图片背景修补计划已失效');
+    });
+    it('有限补底不接纳半透明像素的提案',()=>{
+        const {pixels,proposal}=cardProposal(196),before=pixels.slice();
+        expect(authorizeImageMatteWithinExistingMasks(proposal)).toBeUndefined();
+        expect(pixels).toEqual(before);
+    });
+    it('预算耗尽时不扫描同帧支持',()=>{
+        const {repair}=fourCaps(),remaining={remaining:repair.mask.length-1};
+        expect(coversClippedImageGlyphs(repair,'OPEN',()=>{throw new Error('unexpected query');},remaining)).toBe(false);
+        expect(remaining.remaining).toBe(-1);
     });
 });

@@ -50,7 +50,7 @@ describe('图片 OCR 同目标源头过滤', () => {
         const {call, translate} = setup(true, 'zh-Hans', 'google');
         translate.mockImplementation(async request => (request.origin as string[]).map((_, index) => `位置${index + 1}。`));
         await expect(call(['Right.', samples[0][1], 'Turn.', 'Right.', '123']))
-            .resolves.toEqual({success: true, translations: ['位置1。', samples[0][1], '位置2。', '位置3。', '123']});
+            .resolves.toEqual({success: true, translations: ['位置1。', samples[0][1], '位置2。', '位置3。', '123'], targetLanguage:'zh-Hans'});
         expect(translate).toHaveBeenCalledOnce();
         expect(translate.mock.calls[0][0].origin).toEqual(['Right.', 'Turn.', 'Right.']);
         expect(isImageTextBatch(translate.mock.calls[0][0])).toBe(true);
@@ -58,7 +58,7 @@ describe('图片 OCR 同目标源头过滤', () => {
     it.each(samples)('%s 普通 OCR 行同目标零 broker 请求', async (target, source) => {
         const {call, translate} = setup(true, target);
         await expect(call([source, source, '123', 'https://example.test']))
-            .resolves.toEqual({success: true, translations: [source, source, '123', 'https://example.test']});
+            .resolves.toEqual({success: true, translations: [source, source, '123', 'https://example.test'], targetLanguage:target});
         expect(translate).not.toHaveBeenCalled();
     });
 
@@ -67,7 +67,7 @@ describe('图片 OCR 同目标源头过滤', () => {
         const chinese = samples[0][1];
         const foreign = samples[2][1];
         await expect(call([chinese, foreign, chinese, foreign, '123']))
-            .resolves.toEqual({success: true, translations: [chinese, `T(${foreign})`, chinese, `T(${foreign})`, '123']});
+            .resolves.toEqual({success: true, translations: [chinese, `T(${foreign})`, chinese, `T(${foreign})`, '123'], targetLanguage:'zh-Hans'});
         expect(translate).toHaveBeenCalledOnce();
         expect(translate).toHaveBeenCalledWith(expect.objectContaining({origin: batch ? [foreign] : foreign, targetLanguage: 'zh-Hans'}));
     });
@@ -77,7 +77,9 @@ describe('图片 OCR 同目标源头过滤', () => {
         await call([samples[0][1]]);
         current.to = 'en';
         translate.mockImplementationOnce(async request => {current.to = 'zh-Hans'; return `T(${request.origin})`;});
-        await call([samples[0][1]]);
+        await expect(call([samples[0][1]])).resolves.toEqual({
+            success: true, translations: [`T(${samples[0][1]})`], targetLanguage:'en',
+        });
         expect(translate).toHaveBeenCalledOnce();
         expect(translate).toHaveBeenCalledWith(expect.objectContaining({targetLanguage: 'en'}));
     });

@@ -6,7 +6,7 @@
  * 识别颜色：仅装饰原生识别缩放副本的一次既有读回，在完整不透明端点边缘和原页像素预算内补足红通道缺失对比；复用原会话，不改裁切、原图或检测输入，推理收尾恢复上下文，页级 finally 清理取消信号。
  * 模型形状：资源层仅在原文件完整校验与入库后生成固定识别图的内存副本，CPU 重载同样处理；本入口固定识别高度48，并在每次原生调用前核对正 batch、三通道和至少八像素宽度，不把未证明输入交给优化图。
  * 视图词界：所有局部框映回后，仅对同字符且空格边界不同的重叠拉丁行生成有界原像素证明；索引、比较和尝试均有限，保持最终页面与气泡对象引用，原文字、数字证据与几何不改；原图回读与已有方向和斜行预处理共用两百万像素余额，独立于既有识别颜色读回适配。
- * 普通图片旁证：复用既有透明度扫描，仅透明图片按需捕获同次检测原概率的有界位图；依锁定SDK及实际检测配置核对原比例帧和填充张量，不借放大气泡概率；自有位图只在Worker私有响应传输，按结果数组、原图和尺寸绑定后供修补查询，不进入文字、阅读或缓存。
+ * 普通图片旁证：复用既有透明度扫描和原 RGBA。透明图按需捕获同次检测的有界位图，不透明图只保存疑似裁切的纯色横行周边；核对原比例帧和填充张量，不借放大气泡概率。自有位图只走 Worker 私有响应，按结果数组、原图和尺寸绑定供修补查询。
  * 段落间距：普通图片与漫画均在全部物理框映回后借用仍存活的既有识别像素，生成有界局部静区关系；不新增画布读回、整图副本或推理。漫画只请求轻量段落侧车，不开启普通图片检测帧；关系随同一结果对象图传输，漫画收集器只采用仍为单原框的整页物理行，不授予擦除权限。
  * 气泡补绘：仅漫画结果将收集阶段记录的局部气泡提示绑定到当前原图与尺寸，不向公开行属性附加坐标，也不增加 Worker 消息或模型调用；提示只供后续纯白空处复核。
  * 检测核心：借用同次原概率与未加留白组件，将完全没有0.3响应的候选绑定到原SDK Box；保留原检测和识别批次，原数字证据先进入保护，再在识别重试结束后排除弱结果。反向重检的新候选仍按其自身检测旁证核对，不改弱边缘修补侧车；页内有界观察，取消和失败清除引用。
@@ -285,12 +285,18 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
         }
     }
     let detectionBudget:ReturnType<typeof createImageDetectionEvidenceBudget>|undefined;
+    let opaqueDetectionPixels:Uint8ClampedArray|undefined;
     let detectionObservation:{canvas:HTMLCanvasElement|OffscreenCanvas;frame:Omit<ImageDetectionFrameSource,'resizeRatio'>}|undefined;
     let activeDetectionFrame:(ImageDetectionFrameSource&{canvas:HTMLCanvasElement|OffscreenCanvas})|undefined;
     const rotatedLabelParents:MangaOcrItem['box'][]=[];
     class MangaDetection extends DetectionService {
         private readonly evidenceSideLimit:number|undefined;
-        readonly detectionCore=createMangaDetectionCore();
+        readonly detectionCore=createMangaDetectionCore((data,width,height,box)=>{
+            const frame=activeDetectionFrame;
+            if(frame?.resizeRatio!==1||!opaqueDetectionPixels
+                ||frame.canvas.width!==frame.width||frame.canvas.height!==frame.height)return;
+            detectionBudget?.capture(data,width,height,frame,{box,pixels:opaqueDetectionPixels});
+        });
         constructor(session:ConstructorParameters<typeof DetectionService>[0],options:ConstructorParameters<typeof DetectionService>[1]){
             super(session,options);
             this.evidenceSideLimit=typeof options?.maxSideLength==='number'?options.maxSideLength:undefined;
@@ -635,7 +641,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                                 }
                                 return output;
                             });
-                            if(key==='detection'&&detectionBudget&&activeDetectionFrame){
+                            if(key==='detection'&&detectionBudget&&activeDetectionFrame&&!opaqueDetectionPixels){
                                 const frame=activeDetectionFrame,input=args[0]?.x,output=result[session.outputNames[0]||'sigmoid_0.tmp_0'];
                                 if(frame.canvas.width===frame.width&&frame.canvas.height===frame.height&&input?.dims.length===4
                                     &&input.dims[0]===1&&input.dims[1]===3&&output?.dims.length===4&&output.dims[0]===1&&output.dims[1]===1
@@ -662,7 +668,6 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                 assertMangaOcrActive(options.signal);
                 service.beginMangaPage();
                 let remainingRubyRescues=2;
-                detectionBudget=undefined;
                 const recognizeFrame=async(canvas:HTMLCanvasElement|OffscreenCanvas,frame:Omit<ImageDetectionFrameSource,'resizeRatio'>)=>{
                     detectionObservation={canvas,frame};
                     try{return await service.recognizeManga(canvas,{flatten:true,noCache:true,strategy:'per-box'});}
@@ -690,8 +695,10 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                             context.fillStyle=alphaBackground===0?'#000':'#fff';
                             context.fillRect(0,0,canvas.width,canvas.height);
                         }finally{context.globalCompositeOperation=previousComposite;}
-                        // 复用原有alpha扫描结果；整张不透明图片不捕获或复制任何新检测侧车。
-                        if(options.imageDetectionEvidence===true)detectionBudget=createImageDetectionEvidenceBudget();
+                    }
+                    if(options.imageDetectionEvidence===true){
+                        detectionBudget=createImageDetectionEvidenceBudget();
+                        if(alphaBackground===undefined)opaqueDetectionPixels=pixels.data;
                     }
                     const {recognition:boxes,ownership}=findMangaBubbleLayout(pixels.data,canvas.width,canvas.height);
                     const sdkOptions={flatten:true as const,noCache:true as const,strategy:'per-box' as const};
@@ -790,7 +797,7 @@ export async function createBrowserMangaOcr(signal?: AbortSignal, progress?: Pro
                     return finalPage;
                 }finally{canvas.width=0;canvas.height=0;}
                 }finally{if ('close' in bitmap)bitmap.close();}
-                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{try{whitespace.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}}
+                }finally{try{service.clearMangaSource();}finally{try{colorAdapter.endPage();}finally{try{whitespace.endPage();}finally{activeSignal=undefined;detectionBudget=undefined;opaqueDetectionPixels=undefined;detectionObservation=undefined;activeDetectionFrame=undefined;}}}}
             },
             destroy: () => service.destroy(),
         };

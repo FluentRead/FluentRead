@@ -8,14 +8,19 @@
 <template>
   <section class="manga-model-settings" :class="{'is-embedded': embedded}" data-testid="manga-model-manager">
     <header class="manga-resource-heading" :class="{'settings-card-heading': !embedded}">
-      <div><h2>{{ translateLegacy('标准识别') }}</h2><small>PaddleOCR · {{ translateLegacy(imageRecognition ? showInpainting ? '用于图片与漫画' : '用于图片翻译' : '用于漫画翻译') }}</small></div>
-      <span class="manga-resource-current">{{ translateLegacy('当前使用') }}</span>
+      <div>
+        <h2>{{ translateLegacy(recognitionUse ? '标准识别' : '背景文字清除') }}</h2>
+        <small v-if="recognitionUse">PaddleOCR · {{ translateLegacy(recognitionUse) }}</small>
+        <small v-else>LaMa · {{ translateLegacy('约 197 MB') }}</small>
+      </div>
+      <span v-if="recognitionUse" class="manga-resource-current">{{ translateLegacy('当前使用') }}</span>
+      <span v-else class="manga-resource-state" :class="{ready: status?.inpaintingReady}">{{ translateLegacy(inpaintingState) }}</span>
     </header>
-    <div class="manga-resource-list">
+    <div v-if="recognitionUse" class="manga-resource-list">
       <div class="manga-resource"><div><strong>{{ translateLegacy('图片文字识别') }}</strong><small>{{ translateLegacy('约 30 MB') }}</small></div><span class="manga-resource-state" :class="{ready: status?.ready}">{{ translateLegacy(!status ? '正在检查' : status.ready ? '已就绪' : '未下载') }}</span></div>
-      <div v-if="showInpainting" class="manga-resource"><div><strong>{{ translateLegacy('背景文字清除') }}</strong><small>{{ translateLegacy('约 197 MB') }}</small></div><span class="manga-resource-state" :class="{ready: status?.inpaintingReady}">{{ translateLegacy(!status ? '正在检查' : status.inpaintingReady ? '已就绪' : '需要时下载') }}</span></div>
+      <div v-if="showInpainting" class="manga-resource"><div><strong>{{ translateLegacy('背景文字清除') }}</strong><small>{{ translateLegacy('约 197 MB') }}</small></div><span class="manga-resource-state" :class="{ready: status?.inpaintingReady}">{{ translateLegacy(inpaintingState) }}</span></div>
     </div>
-    <p class="manga-resource-hint">{{ translateLegacy('首次翻译时自动准备资源') }}</p>
+    <p v-if="recognitionUse && !status?.ready" class="manga-resource-hint">{{ translateLegacy('首次翻译时自动准备资源') }}</p>
     <div v-if="status?.download" class="manga-model-progress" role="status" data-i18n-ignore>
       <strong>{{ translateLegacy(phaseLabel) }}</strong><span>{{ Math.min(100, Math.floor(status.download.loaded * 100 / status.download.total)) }}% · {{ Math.round(status.download.loaded / 1048576) }} / {{ Math.round(status.download.total / 1048576) }} MB</span>
       <progress v-if="downloading" :value="status.download.loaded" :max="status.download.total" />
@@ -44,9 +49,17 @@ import browser from 'webextension-polyfill';
 import {useUiI18n} from '@/src/ui/i18n';
 import {importMangaModel,MANGA_TEXT_SEGMENTATION_ASSET,type MangaDownloadState} from '../services/mangaOcrAssets';
 import type {MangaInferenceDiagnostics} from '../services/mangaInferenceClient';
-withDefaults(defineProps<{showInpainting?: boolean; embedded?: boolean; imageRecognition?: boolean}>(),{showInpainting:true,embedded:false,imageRecognition:true});
+const props = withDefaults(defineProps<{showInpainting?: boolean; embedded?: boolean; imageRecognition?: boolean; mangaRecognition?: boolean}>(), {
+  showInpainting: true, embedded: false, imageRecognition: true, mangaRecognition: true,
+});
 const {translateLegacy}=useUiI18n();
 const status=ref<{ready:boolean;inpaintingReady?:boolean;segmentationReady?:boolean;bytes:number;download?:MangaDownloadState;inference?:MangaInferenceDiagnostics}|null>(null);
+const recognitionUse = computed(() => {
+  const forManga = props.showInpainting && props.mangaRecognition;
+  if (props.imageRecognition) return forManga ? '用于图片与漫画' : '用于图片翻译';
+  return forManga ? '用于漫画翻译' : null;
+});
+const inpaintingState = computed(() => !status.value ? '正在检查' : status.value.inpaintingReady ? '已就绪' : '需要时下载');
 const stageLabels={idle:'等待中',preparing:'正在准备…',initializing:'正在初始化本地模型…',recognizing:'正在处理图片',completed:'已完成',canceled:'已取消',error:'失败'} as const;
 const busy=ref(false),error=ref(''),statusError=ref(''),input=ref<HTMLInputElement>();
 const downloading=computed(()=>['downloading','verifying'].includes(status.value?.download?.phase??''));
@@ -102,7 +115,7 @@ onBeforeUnmount(()=>{disposed=true;clearTimeout(timer);});
 .manga-resource { padding:14px 0; }
 .manga-resource:last-child { border-bottom:0; }
 .manga-resource-state { padding:4px 9px; border-radius:6px; background:var(--surface-soft); }
-.manga-resource-state.ready { background:var(--el-color-success-light-9); }
+.manga-resource-state.ready { background:var(--el-color-success-light-9); color:var(--el-color-success); }
 .manga-model-settings .manga-resource-hint { margin:4px 0 12px; font-size:12px; }
 .manga-download-settings { border-top:1px solid var(--line); }
 :global(.settings-app .workspace .settings-card .manga-model-settings details > summary) { min-height:36px; padding:10px 0; border:0; border-radius:0; background:transparent; font-weight:550; }

@@ -399,7 +399,11 @@ describe('图片翻译前台交互与生命周期', () => {
         const env=setup();Object.defineProperties(env.image,{naturalWidth:{value:6000,configurable:true},naturalHeight:{value:4000,configurable:true}});
         env.hover();env.click();await flush();
         expect(env.button().dataset.phase).toBe('translated');expect(env.bitmap()).toBeFalsy();expect(env.image.style.opacity).not.toBe('0');expect(env.decoded).toHaveLength(0);
-        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;expect(warning).toBeTruthy();
+        const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
+        expect(warning.textContent).toBe('文字');
+        expect(warning.getAttribute('aria-label')).toBe('已识别文字，原图未改动 · 查看图片文字');
+        expect(env.button().textContent).toBe('关闭');
+        expect(env.button().getAttribute('aria-label')).toContain('关闭图片翻译提示');
         env.dispatch(warning,'click');const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
         expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('为保留原文，此译文未绘制到图片');
         env.click();expect(env.image.style.opacity).not.toBe('0');env.click();await flush();
@@ -416,7 +420,7 @@ describe('图片翻译前台交互与生命周期', () => {
         client.translate.mockResolvedValueOnce({image:'',imageUnchanged:true,lines:[{text:'KEEP',sourceText:'KEEP',bbox:{x0:0,y0:0,x1:20,y1:10},backgroundColor:'transparent'}]});
         const env=setup();env.hover();env.click();await flush();env.dispatch(env.image,'pointerout');
         const warning=env.roots[0].querySelector<HTMLButtonElement>('.fr-image-warning-button')!;
-        expect(warning).toBeTruthy();expect(warning.textContent).toBe('ℹ');expect(warning.title).toContain('已识别文字，原图未改动');expect(warning.getAttribute('aria-label')).toContain('查看图片文字');
+        expect(warning.textContent).toBe('文字');expect(warning.title).toContain('已识别文字，原图未改动');expect(warning.getAttribute('aria-label')).toContain('查看图片文字');
         env.dispatch(warning,'click',true,{pointerType:'touch'});const reader=env.roots[0].querySelector<HTMLElement>('.fr-image-reader')!;
         expect(reader.hidden).toBe(false);expect(reader.textContent).toContain('KEEP');
         env.dispatch(warning,'click',true,{pointerType:'touch'});expect(reader.hidden).toBe(false);expect(env.image.style.opacity).not.toBe('0');

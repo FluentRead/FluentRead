@@ -506,19 +506,24 @@ export default defineConfig({
             // 斜向背景修补使 Chrome 从 70,535,048 增至 70,536,383 字节，294 份静态资源摘要相同。
             const imageDirectionalRepairBudget = 1_500;
             // 译图语言贯通增加 339 字节 Chrome 代码，沿用现有字体文件。
-            const imageTextLocaleBudget = 400;
+            // 阅读面板声明原文和译文语言再增加 157 字节代码。
+            const imageTextLocaleBudget = 600;
             // 照片边缘的有界重新取样使 Chrome 增加 1,132 字节代码，294 份静态资源摘要相同。
             const imageBoundarySamplingBudget = 1_200;
             // 紧裁彩字的词界复核使 Chrome 从 70,538,403 增至 70,538,723 字节，增量为代码。
-            const imageClippedSpacingBudget = 350;
+            // 浅有色底紧裁文字的旁证与同帧空格复核增加 1,284 字节。
+            const imageClippedSpacingBudget = 1_650;
             // 临时译图在导入可选文字分割后可重试，限额覆盖消息校验及资源状态回退代码。
             const imageSegmentationRetryBudget = 700;
             // 使用已有检测数据复核裁切字形。双侧衬线修补使 Chrome 增加 481 字节本地验证代码。
             // 原框内的独立边饰保留使 Chrome 再增加 2,293 字节。
             // 细衬线的五成墨色核心复核使 Chrome 增加 739 字节代码。
-            const imageClippedGlyphBudget = 6_000;
+            // 行末空心边饰与译文范围核对使 Chrome 增加 1,083 字节代码。
+            // 分割复核边饰旁的框外窄笔画再增加 1,083 字节代码。
+            const imageClippedGlyphBudget = 8_100;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));
-        },        'entrypoints:grouped': (_wxt, groups) => {
+        },
+        'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {

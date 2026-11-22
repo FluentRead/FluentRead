@@ -42,6 +42,26 @@ describe('图片文字独立阅读面板', () => {
         event(copy());await Promise.resolve();
         expect(writeText).toHaveBeenLastCalledWith('近\n\n90%');
     });
+    it('多段均未绘制时共用保留提示，混合结果和数字提示仍对应各段', () => {
+        const notice = '为保留原文，此译文未绘制到图片';
+        const skipped = [
+            {sourceText: 'Keep clear', text: '保持通道畅通', renderSkipped: true},
+            {sourceText: 'Gate 12', text: '12 号门', renderSkipped: true, numericUncertain: true},
+        ] as const;
+        const paintNotices = () => Array.from(body().querySelectorAll('.fr-image-reader-note'))
+            .filter(note => note.textContent === notice);
+        reader.setLines([...skipped]);
+        reader.open();
+        expect(paintNotices()).toEqual([body().firstElementChild]);
+        expect(body().querySelector('article:nth-of-type(2) .fr-image-reader-note')?.textContent)
+            .toBe('数字识别可能有误，请对照原图');
+        event(compare());
+        expect(paintNotices()).toEqual([body().firstElementChild]);
+        expect(body().querySelectorAll('.fr-image-reader-source')).toHaveLength(2);
+        reader.setLines([...skipped, {sourceText: 'Exit', text: '出口'}]);
+        expect(paintNotices()).toHaveLength(2);
+        expect(paintNotices().every(note => note.parentElement?.tagName === 'ARTICLE')).toBe(true);
+    });
     it('安全呈现原文和译文，切换对照不会把识别内容当 HTML 执行', () => {
         reader.setLines([{sourceText:'<img src=x onerror=evil()>',text:'译文'}, {text:'仅译文'}]);
         expect(reader.element.hidden).toBe(true);
@@ -54,6 +74,21 @@ describe('图片文字独立阅读面板', () => {
         reader.refreshLanguage();expect(body().textContent).toContain('译文');
         event(compare());expect(body().textContent).toBe('译文仅译文');
         reader.setLines([{text:'没有原文'}]);expect((compare() as HTMLElement).hidden).toBe(true);
+    });
+    it('原文、译文和保留原文各使用对应语言，换结果后未知原文不继承旧语言', () => {
+        const paragraphs = () => Array.from(body().querySelectorAll('pre'), node => [
+            node.textContent, node.getAttribute('lang'), node.getAttribute('dir'),
+        ]);
+        const lines = [{sourceText: 'Look ahead', text: '骨直令羽'}, {sourceText: 'A12', text: 'A12'}];
+        reader.setLines(lines, {source: 'en', target: 'zh-Hans'});
+        reader.open();
+        expect(paragraphs()).toEqual([['骨直令羽', 'zh-Hans', 'auto'], ['A12', 'en', 'auto']]);
+        event(compare());
+        expect(paragraphs()).toEqual([
+            ['Look ahead', 'en', 'auto'], ['骨直令羽', 'zh-Hans', 'auto'], ['A12', 'en', 'auto'],
+        ]);
+        reader.setLines([{sourceText: '留意', text: 'Attention'}], {source: '', target: 'fr'});
+        expect(paragraphs()).toEqual([['留意', '', 'auto'], ['Attention', 'fr', 'auto']]);
     });
     it('只复制当前展示模式并提供成功或可手动复制的失败提示', async () => {
         reader.setLines([{sourceText:'Hello',text:'你好'}, {text:'第二段'}]);reader.open();

@@ -9,7 +9,7 @@ import {createImageDetectionEvidenceBudget,bindImageDetectionEvidence,getImageDe
 import {observeImageMattePalette,planImageMatteCandidate,planImageMatteRepair,type ImageMatteRepair} from '@/src/features/image-translation/services/imageMatteRepair';
 import {keepImageMatteDecoration,observeImageMatteDecoration} from '@/src/features/image-translation/services/imageMatteDecoration';
 import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
-import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
+import {applyImageMattePage,authorizeImageMatteDecorationFringe,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,discardImageMatteProposal,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
 
 describe('细衬线的半覆盖字形复核',()=>{
     const width=64,height=56,ink=[25,25,25,255],background=[225,225,225,255];
@@ -153,6 +153,128 @@ describe('单行旧擦除框内的脱离边饰',()=>{
         expect(keepImageMatteDecoration(plan,observe()!,legacy)).toBe(true);
         for(let x=66;x<69;x++)put(x,20,background);
         expect(keepImageMatteDecoration(repair(),observe()!,legacy)).toBe(false);
+    });
+});
+
+describe('被识别成句点的独立空心边饰',()=>{
+    const width=128,height=68,background=[245,245,245,255],ink=[25,25,25,255];
+    const box={x0:16,y0:21,x1:104,y1:49},legacy={x0:13,y0:18,x1:107,y1:52};
+    const mark={x0:89,y0:31,x1:98,y1:40};
+
+    function fixture(markType:'ring'|'diamond'|'solid'|'open'|'small'|'pin-hole'='ring'){
+        const pixels=new Uint8ClampedArray(width*height*4);
+        const put=(x:number,y:number,color=ink)=>pixels.set(color,(y*width+x)*4);
+        for(let i=0;i<pixels.length;i+=4)pixels.set(background,i);
+        for(const start of [23,39,55,75])for(let y=15;y<44;y++)for(let x=start;x<start+6;x++)put(x,y);
+        const right=markType==='small'?mark.x0+3:mark.x1;
+        for(let y=mark.y0;y<mark.y1;y++)for(let x=mark.x0;x<right;x++){
+            if(markType==='diamond'){
+                const distance=Math.abs(x-93)+Math.abs(y-35);
+                if(distance>=3&&distance<=4)put(x,y);
+            }else if(markType==='solid'||markType==='pin-hole'||y<mark.y0+2||y>=mark.y1-2||x<mark.x0+2||x>=right-2)put(x,y);
+        }
+        if(markType==='open'){put(93,31,background);put(93,32,background);}
+        if(markType==='pin-hole')put(93,35,background);
+        const observe=(label='OPEN .')=>{
+            const palette=observeImageMattePalette(pixels,width,height,box,{remaining:40_000})!;
+            return observeImageMatteDecoration(pixels,width,label,{background:palette.background,inkBoxes:[palette.supportBox]});
+        };
+        const repair=()=>planImageMatteCandidate(pixels,width,height,box,{remaining:40_000},'recognition')!;
+        return {pixels,put,observe,repair};
+    }
+
+    it.each([['ring',false],['ring',true],['diamond',false]] as const)('保留 %s 边饰和原框外笔画，细边缘 %s 不改变旧框权限',(markType,fine)=>{
+        const {pixels,put,observe,repair}=fixture(markType);
+        if(fine){
+            for(let x=29;x<32;x++)put(x,29,[100,100,100,255]);
+            put(32,29,[185,185,185,255]);
+        }
+        expect(Boolean(repair().fringeCore)).toBe(fine);
+        const hint=observe()!;
+        expect(hint).toEqual({side:'right',gap:88,characters:4,enclosed:true});
+        const line:ImageTextRegion={text:'开放。',bbox:box};
+        const before=pixels.slice();
+        const requested={x0:box.x0-5,y0:box.y0-7,x1:hint.gap,y1:box.y1+6};
+        const proposal=proposeImageMattePage(pixels,width,height,[line],[],()=>requested,hint)!;
+        expect(getImageMatteProposalDrawings(proposal)?.requiresGlyphProof).toBeUndefined();
+        expect(getImageMatteProposalDrawings(proposal)?.drawings[0].bounds).toEqual({...legacy,x1:hint.gap});
+        expect(pixels).toEqual(before);
+        const plan=authorizeImageMatteWithinExistingMasks(proposal)!;
+        expect(plan.uploads).toEqual([legacy]);
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=before.slice();
+        for(let y=legacy.y0;y<44;y++)for(let x=legacy.x0;x<hint.gap;x++)expected.set(background,(y*width+x)*4);
+        expect(pixels).toEqual(expected);
+    });
+
+    it.each([false,true])('同帧分割只延伸到连着已证墨迹的窄边（翻转 %s）',flipped=>{
+        const {pixels,put}=fixture();
+        // 延伸至观察边缘的独立小图案同样受到宽松分割支持，不能借走正文权限。
+        for(let y=13;y<=15;y++)put(68,y);
+        const yAt=(y:number)=>flipped?height-y-1:y;
+        const bbox=flipped?{...box,y0:height-box.y1,y1:height-box.y0}:box;
+        const source=flipped?pixels.slice():pixels;
+        if(flipped)for(let y=0;y<height;y++)source.set(pixels.subarray(y*width*4,(y+1)*width*4),yAt(y)*width*4);
+        const palette=observeImageMattePalette(source,width,height,bbox,{remaining:40_000})!;
+        const hint=observeImageMatteDecoration(source,width,'OPEN .',{background:palette.background,inkBoxes:[palette.supportBox]})!;
+        const line:ImageTextRegion={text:'开放。',bbox};
+        const draft=()=>proposeImageMattePage(source,width,height,[line],[],()=>({...bbox,x1:hint.gap}),hint)!;
+        const proposal=draft(),before=source.slice();
+        expect(getImageMatteProposalDrawings(proposal)?.hasDecorationFringe).toBe(true);
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>undefined})).toBeUndefined();
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>()=>false})).toBeUndefined();
+        // 即便全量支持，已经撤回的提案也无法发布计划。
+        const cancelled=draft();
+        expect(authorizeImageMatteDecorationFringe(cancelled,{forBox:()=>{
+            discardImageMatteProposal(cancelled);
+            return ()=>true;
+        }})).toBeUndefined();
+        expect(source).toEqual(before);
+        const plan=authorizeImageMatteDecorationFringe(proposal,{forBox:()=> (x,y)=>!(
+            (x<32&&y===yAt(18)) || (x>=39&&x<45&&y===yAt(16))
+        )})!;
+        expect(plan).toBeDefined();
+        expect(authorizeImageMatteDecorationFringe(proposal,{forBox:()=>()=>true})).toBeUndefined();
+        applyImageMattePage(source,width,height,plan);
+
+        const expected=before.slice();
+        for(const x0 of [23,39,55,75]){
+            const firstRow=x0===23?18:x0===39?17:15;
+            for(let y=firstRow;y<44;y++)for(let x=x0;x<x0+6;x++)expected.set(background,(yAt(y)*width+x)*4);
+        }
+        expect(source).toEqual(expected);
+        expect(plan.uploads.some(r=>r.y0<=yAt(15)&&r.y1>yAt(15))).toBe(true);
+    });
+
+    it.each([
+        {x0:24,y0:18,x1:107,y1:52},
+        {x0:13,y0:19,x1:107,y1:52},
+        {x0:13,y0:18,x1:107,y1:41},
+    ])('横向、较大或双侧越界时只保留旧范围内的权限 %#',bounds=>{
+        const {observe,repair}=fixture(),candidate=repair();
+        expect(keepImageMatteDecoration(candidate,observe()!,bounds)).toBe(true);
+        expect(candidate.decorationFringe).toBeUndefined();
+    });
+
+    it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{
+        const {observe,repair}=fixture(markType);
+        expect(observe('OPEN.')).toBeUndefined();
+        const draft=repair(),mask=draft.mask.slice();
+        expect(keepImageMatteDecoration(draft,observe()!,legacy)).toBe(false);
+        expect(draft.mask).toEqual(mask);
+    });
+
+    it('边饰靠近正文、横向位置错误或旧清字范围内没有正文时不发布权限',()=>{
+        const {pixels,observe,repair,put}=fixture();
+        const hint=observe()!;
+        expect(keepImageMatteDecoration(repair(),{...hint,side:'left'},legacy)).toBe(false);
+        expect(keepImageMatteDecoration(repair(),hint,{...legacy,x0:hint.gap})).toBe(false);
+        const line:ImageTextRegion={text:'开放。',bbox:box};
+        expect(proposeImageMattePage(pixels,width,height,[line],[],()=>({...box,y0:3,y1:10}),hint)).toBeUndefined();
+        put(87,35);
+        expect(keepImageMatteDecoration(repair(),observe()!,legacy)).toBe(false);
+        const invalid={...box,x1:box.x0};
+        expect(proposeImageMattePage(pixels,width,height,[{text:'开放。',bbox:invalid}],[],()=>box,hint)).toBeUndefined();
     });
 });
 

@@ -3,7 +3,7 @@
  * 文件职责：在普通图片的严格透明准入失败后，原子规划同一原始帧的完整 RGBA 墨迹修补。
  * 主要内容：共享整页观察、绘字扫描、候选和碰撞预算，逐物理源框验证局部背景；无权限提案只公开完整译文字形预检与模型投影需要的冻结几何，真实同帧支持逐点授权后才登记一次性写入计划。显式传入 OCR 原文时，允许纯色标签逐字形复核一致的裁切。分割资源缺失时，可在已有清字几何内使用确认的纯色底，精确更新交集墨迹。保留原文与相邻行的原像素必须避开实际新墨迹支持；绘字框内未归属源墨且不同于观测背景的像素只作图案保护；全页填充与图案冲突即撤回，精确墨迹行段合并为有界脏矩形，仅上传确实改变的字形像素，不回写整页图案。
  * 模块边界：纯数据规划和独占像素写入，不创建 Canvas、不运行模型、不修改 OCR；仅消费同帧局部 RGBA 证明，不能证明相连同色装饰的语义。调用方必须在可选模型准备前完成所有完整译文字形预检，并保持原像素独占和同帧身份；失败授权不改候选或像素，取消时丢弃提案，授权成功后只能向原像素应用一次。
- * 图案保留：限单行，完整验证同底色字形与独立边饰，再在旧物理擦除框内用同一计划只写正文墨迹。
+ * 图案保留：限单行，完整验证同底色字形与独立边饰。原框外至多三行，仅将同帧分割支持且与已确认正文相连的像素计入写入。
  * 细衬线：较淡笔画提案必须通过原文逐字核对和同帧模型授权，不参与缺模型时的旧框内补底。
  */
 import type {ImageTextRegion} from '../paragraphs';
@@ -31,6 +31,7 @@ export interface ImageMatteProposalView {
     readonly rectangles:readonly Readonly<Box>[];
     readonly observations:readonly Readonly<{sourceBox:Readonly<Box>;left:number;top:number;width:number;height:number}>[];
     readonly requiresGlyphProof?:true;
+    readonly hasDecorationFringe?:true;
 }
 interface Authority {pixels:Uint8ClampedArray;width:number;height:number;repairs:ImageMatteRepair[];repairLines:Array<ImageTextRegion|undefined>;applied:boolean}
 interface PageCandidate {plan:ImageMattePagePlan;authority:Authority}
@@ -107,26 +108,33 @@ function buildPageCandidate(
     }
     for(const line of lines){
         const sources=line.sourceBoxes??[line.bbox];if(!sources.length||sources.length>MAX_ATTEMPTS-attempts)return;
-        const bounds=drawBounds(line,width,height),draw=integerBox(bounds,width,height);
-        if(!draw||bounds.x0<0||bounds.y0<0||bounds.x1>width||bounds.y1>height)return;
+        const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
+        if(decoration&&!singleHorizontal)return;
+        const legacy=decoration?imageMaskBoxes(line,width,height)[0]:undefined;
+        if(decoration&&!legacy)return;
+        const requested=drawBounds(line,width,height);
+        if(!valid(requested)||requested.x0<0||requested.y0<0||requested.x1>width||requested.y1>height)return;
+        // 空心边饰只处理旧擦除范围；原绘字余量可能正压在框外保留的笔画上。
+        const bounds=decoration?.enclosed?{
+            x0:Math.max(requested.x0,legacy!.x0),y0:Math.max(requested.y0,legacy!.y0),
+            x1:Math.min(requested.x1,legacy!.x1),y1:Math.min(requested.y1,legacy!.y1),
+        }:requested;
+        const draw=integerBox(bounds,width,height);
+        if(!draw)return;
         if(!reserve((draw.x1-draw.x0)*(draw.y1-draw.y0)))return;
         for(const old of drawings){if(--checks<0||overlap(draw,old.bounds))return;}
         for(const box of protectedBoxes){if(--checks<0||overlap(draw,box))return;}
         const group:ImageMatteRepair[]=[];
-        const singleHorizontal=sources.length===1&&!line.vertical&&!line.quarterTurn&&!line.ruby?.length;
-        if(decoration&&!singleHorizontal)return;
         for(const source of sources){
             attempts++;
             const observation=imageMatteObservationBox(width,height,source);
             if(!observation||!reserve(observation.width*observation.height))return;
             const supportAt=support?.forBox(source,observation);if(support&&!supportAt)return;
-            const purpose=decoration?'decoration':allowFringe&&singleHorizontal?'recognition':undefined;
+            const purpose=decoration&&!decoration.enclosed?'decoration'
+                :decoration?.enclosed||allowFringe&&singleHorizontal?'recognition':undefined;
             const plan=support?planImageMatteRepair(pixels,width,height,source,supportAt!,fitBudget)
                 :planImageMatteCandidate(pixels,width,height,source,fitBudget,purpose);if(!plan)return;
-            if(decoration){
-                const [legacy]=imageMaskBoxes({bbox:source,text:''},width,height);
-                if(!keepImageMatteDecoration(plan,decoration,legacy))return;
-            }
+            if(decoration&&!keepImageMatteDecoration(plan,decoration,legacy!))return;
             if(group.length&&!equal(group[0].background,plan.background))return;
             // 支持可超出原排版框；不同背景不能按应用顺序争用同一个原墨迹像素。
             for(const old of repairs){
@@ -203,7 +211,8 @@ export function proposeImageMattePage(
     const view:ImageMatteProposalView=Object.freeze({drawings:candidate.plan.drawings,rectangles:candidate.plan.rectangles,
         observations:Object.freeze(candidate.authority.repairs.map(repair=>Object.freeze({
             sourceBox:Object.freeze({...repair.sourceBox}),left:repair.left,top:repair.top,width:repair.width,height:repair.height,
-        }))),...(candidate.authority.repairs.some(repair=>repair.fringeCore)?{requiresGlyphProof:true as const}:{})});
+        }))),...(candidate.authority.repairs.some(repair=>repair.fringeCore)?{requiresGlyphProof:true as const}:{}),
+        ...(candidate.authority.repairs.some(repair=>repair.decorationFringe)?{hasDecorationFringe:true as const}:{})});
     const proposal=Object.freeze({}) as ImageMatteProposal;
     proposals.set(proposal,{...candidate,view});return proposal;
 }
@@ -236,6 +245,49 @@ export function authorizeImageMatteProposal(proposal:ImageMatteProposal,support:
     // 同步支持回调也可能撤销或重入；失去提案所有权后不能重新发布旧授权。
     if(proposals.get(proposal)!==candidate)return;
     proposals.delete(proposal);authorities.set(candidate.plan,candidate.authority);return candidate.plan;
+}
+
+/** 边饰已从蒙版删除。由旧框内有分割支持的墨迹起步，逐行只纳入相连且受支持的原墨。 */
+export function authorizeImageMatteDecorationFringe(proposal:ImageMatteProposal,support:ImageDetectionSupport):ImageMattePagePlan|undefined {
+    const candidate=proposals.get(proposal);
+    if(!candidate)return;
+    const [repair]=candidate.authority.repairs;
+    const fringe=repair.decorationFringe;
+    if(!fringe)return;
+    const [observation]=candidate.view.observations;
+    const supportAt=support.forBox(observation.sourceBox,observation);
+    if(!supportAt)return;
+
+    const {left,top,width}=repair;
+    const mask=repair.mask.slice();
+    const anchorRow=fringe.firstRow-fringe.step;
+    let anchored=mask.slice(anchorRow*width,(anchorRow+1)*width);
+    for(let x=1;x<width-1;x++){
+        if(anchored[x]&&supportAt(left+x,top+anchorRow)!==true)anchored[x]=0;
+    }
+    let changed=false;
+    for(let offset=0;offset<fringe.mask.length;offset+=width){
+        const y=fringe.firstRow+fringe.step*offset/width;
+        const row=mask.subarray(y*width,(y+1)*width);
+        // 闭环墨迹不会接触观察框边，连接只可来自上一行的三个相邻位置。
+        for(let x=1;x<width-1;x++){
+            if(fringe.mask[offset+x]&&(anchored[x-1]||anchored[x]||anchored[x+1])&&supportAt(left+x,top+y)===true){
+                row[x]=1;
+                changed=true;
+            }
+        }
+        anchored=row;
+    }
+    if(!changed)return;
+    const runs:Run[]=[];
+    // 单一观察框至多有 MAX_RUNS 个像素，逐行合并后不会超过行段预算。
+    appendMaskRuns(repair,mask,runs,MAX_RUNS);
+    const uploads=rectangles(runs);
+    if(!uploads||proposals.get(proposal)!==candidate)return;
+    const plan=Object.freeze({...candidate.plan,uploads:Object.freeze(uploads)});
+    proposals.delete(proposal);
+    authorities.set(plan,{...candidate.authority,repairs:[{...repair,mask}]});
+    return plan;
 }
 
 /** 缺分割时仅使用原有清字范围，避免把框外原字的颜色当成底色扩散进去。 */

@@ -17,6 +17,7 @@ import { config, subscribeConfig } from '@/src/services/config/store';
 import {watch} from 'vue';
 import {getCompositeTranslationConfigFingerprint} from '@/src/core/config/compositeTranslation';
 import {normalizeUiLanguage, translateLegacyText} from '@/src/core/i18n';
+import {normalizeLanguageCode} from '@/src/core/language/codes';
 import {renderWithUiLanguageBundle} from '@/src/platform/i18n/uiLanguageBundles';
 import {
     fetchImageInExtension,
@@ -1357,9 +1358,19 @@ function restoreOriginalImage(state: ImageTranslationState): void {
 }
 
 function translatedImageMessage(state: ImageTranslationState): string {
-    return state.layoutFallback ? '当前布局无法覆盖，请查看译文' : state.lines.some(line => line.renderSkipped)
-        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !state.translatedImage && state.lines.length
-            ? '已识别文字，原图未改动' : state.translatedImage || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图';
+    if (state.layoutFallback) return '当前布局无法覆盖，请查看译文';
+    if ((state.manga || state.translatedImage) && state.lines.some(line => line.renderSkipped)) {
+        return state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字';
+    }
+    if (state.translatedImage) return '已翻译 · 点击恢复原图';
+    return state.lines.length ? '已识别文字，原图未改动' : '未检测到文字，已保留原图';
+}
+
+function setImageReaderLines(state: ImageTranslationState): void {
+    state.controls.setLines(state.lines, {
+        source: normalizeLanguageCode(state.manga ? mangaSourceLanguage() : config.from),
+        target: normalizeLanguageCode(config.to),
+    });
 }
 
 function showTranslatedImage(state: ImageTranslationState): void {
@@ -1370,7 +1381,7 @@ function showTranslatedImage(state: ImageTranslationState): void {
         image.setAttribute('aria-hidden', 'true');
         if (!state.localBitmapHost) state.overlay.prepend(image);
     }
-    state.controls.setLines(state.lines);
+    setImageReaderLines(state);
     setButtonState(state, 'translated', translatedImageMessage(state));
     updateOverlayPosition(state);
 }
@@ -1474,7 +1485,7 @@ async function performImageTranslation(state: ImageTranslationState, prepareLang
         // 恢复原图已清空活动文字，探测失败或等待时仍保留缓存中的完整阅读译文。
         state.lines = retained.lines;
         state.retryWhenSegmentationReady = true;
-        state.controls.setLines(state.lines);
+        setImageReaderLines(state);
         const controller = new AbortController();
         state.abortController = controller;
         setButtonState(state, 'loading', '正在读取图片…');

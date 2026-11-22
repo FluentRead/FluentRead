@@ -5,7 +5,7 @@
  * 主要内容：单图提供无额外外框的淡色图标入口、隔离操作条、可信手势按钮与全文详情；缺资源回退的已有译文在状态探测或失败时保留可见主入口和展开面板，普通加载与错误仍默认隐藏旧阅读器；文字面板记录实际触发入口并按焦点所有权归还，入口消失时仅回退到同一结果的可见文字按钮，品牌提示沿用注入的界面本地化端口；漫画处理时在图片可见边缘延迟显示轻量进度，暂停会话后的单页排队可取消，失败时在同一边缘提供紧凑的重试、详情及设置入口，恢复动作先于独立滚动的长错误详情，完成或切回原图即撤下，不展开常驻阅读面板；任务旋转独立于装饰动画开关并保留系统减少动态效果偏好。
  * 模块边界：仅操作所属 Shadow DOM，不读取配置、不访问网络、不持有图片请求；业务动作及生命周期由 content/runtime 注入。
  */
-import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine} from './textReader';
+import {createImageTextReader, IMAGE_READER_CSS, type ImageReaderLine, type ImageReaderLanguages} from './textReader';
 import {normalizeImageProgress} from '../progress';
 import imageControlsCss from '../ui/image-controls.css?inline';
 import brandIcon from '../../../../public/icon/32.png?inline';
@@ -151,13 +151,17 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         dismiss.textContent = localize('关闭');
         dismiss.title = localize('关闭图片翻译提示');
         dismiss.setAttribute('aria-label', dismiss.title);
-        button.textContent = localize(phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' && feedback.dataset.preparation === 'true' ? '关闭' : phase === 'error' ? '重试' : '翻译');
-        button.title = localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : phase === 'error' && feedback.dataset.preparation === 'true' ? '关闭图片翻译提示' : sourceMessage);
-        button.title = `${brand} · ${button.title}`;
+        const manga = feedback.dataset.manga === 'true';
+        const originalRetained = !manga && sourceMessage === '已识别文字，原图未改动';
+        const dismissAction = originalRetained || (phase === 'error' && feedback.dataset.preparation === 'true');
+        button.textContent = localize(dismissAction ? '关闭' : phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' ? '重试' : '翻译');
+        const actionTitle = dismissAction ? dismiss.title : localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : sourceMessage);
+        button.title = `${brand} · ${actionTitle}`;
         button.setAttribute('aria-label', button.title);
         const localizedMessage = localize(sourceMessage);
-        warningButton.textContent = feedback.dataset.manga === 'true' ? localize('未绘制') : sourceMessage === '已识别文字，原图未改动' ? 'ℹ' : '!';
-        warningButton.title = feedback.dataset.manga === 'true' ? localizedMessage : `${localizedMessage} · ${localize('查看图片文字')}`;
+        warningButton.textContent = manga ? localize('未绘制') : originalRetained ? inspect.textContent : '!';
+        warningButton.title = manga || sourceMessage === '部分译文未绘制，请查看图片文字'
+            ? localizedMessage : `${localizedMessage} · ${localize('查看图片文字')}`;
         warningButton.setAttribute('aria-label', warningButton.title);
         statusText.textContent = (feedback.dataset.warning === 'true' && feedback.dataset.warningAction !== 'true'
             ? localize('已识别') : localizedMessage) + (progress === undefined ? '' : ` ${progress}%`);
@@ -289,9 +293,9 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         element, feedback, button, status, spinner, dismiss, update, refreshLanguage, reader: details,
         setHovered(value: boolean) {hovered = value; refreshVisibility();},
         hideReader() {details.hidden = true; readerTrigger = null; inspect.setAttribute('aria-expanded', 'false'); refreshVisibility();},
-        setLines(lines: ImageReaderLine[]) {
+        setLines(lines: ImageReaderLine[], languages?: ImageReaderLanguages) {
             hasLines = lines.length > 0;
-            reader.setLines(lines);
+            reader.setLines(lines, languages);
             inspect.hidden = !canRead();
         },
         dispose() {

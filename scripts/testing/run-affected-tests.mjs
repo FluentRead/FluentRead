@@ -6,24 +6,55 @@
  * 本入口不启动浏览器、不调用在线供应商，也不把构建或静态归属描述为行为覆盖。
  */
 import {spawn, execFileSync} from 'node:child_process';
-import {existsSync, readFileSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
+import {appendFileSync, existsSync, readFileSync, mkdirSync, writeFileSync, rmSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import ts from 'typescript';
+import {analyze as analyzeCoverage, formatText as formatCoverageGaps} from './coverage-gaps.mjs';
 
 const PROJECT_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const COVERAGE_CONFIG = 'tests/config/vitest.coverage.config.ts';
 const LEGACY_COVERAGE_CONFIG = 'vitest.coverage.config.ts';
 const GROUPS = ['architecture', 'unit', 'functional', 'regression'];
-const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
-const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
+export const CODE = /\.(?:[cm]?[jt]sx?|vue|css|html|json)$/u;
+export const DEPENDENCY_CONTENT = /^(?:src|entrypoints|userscript|scripts|tests|docs\/\.vitepress)\//u;
 const GLOBAL_TEST_INPUTS = new Set(['.nvmrc', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json',
     'vitest.config.ts',
     'scripts/testing/vitest-resource-lock.mjs']);
+// 只有这些字段改变才会影响测试的解析与执行环境；scripts、version、描述性字段不影响用例集合。
+const PACKAGE_RUNTIME_FIELDS = ['type', 'imports', 'exports', 'engines', 'packageManager', 'dependencies',
+    'devDependencies', 'optionalDependencies', 'peerDependencies', 'peerDependenciesMeta', 'workspaces', 'pnpm',
+    'overrides', 'resolutions'];
+// 这些是「前缀声明」而非「读取整个目录」：源码里出现 'src/'、'docs/' 常是在做 startsWith
+// 判断或写架构规则，若回退成整个目录，会让一个字符串把数百个文件挂成依赖。
+const PROJECT_ROOTS = new Set(['src', 'tests', 'scripts', 'entrypoints', 'userscript', 'docs', 'public', 'styles',
+    'assets', 'docs/.vitepress']);
 const slash = value => value.split(path.sep).join('/');
 
+/** 键序稳定化：依赖字段可能被包管理器重排，键序不同不代表依赖变化。 */
+function stableStringify(value) {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`;
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort()
+            .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+    }
+    return JSON.stringify(value) ?? 'null';
+}
+
+/** 提取 package.json 中真正影响测试行为的字段签名；无法解析时抛错，由调用方退回全量。 */
+export function packageJsonRuntimeSignature(source) {
+    const parsed = JSON.parse(source);
+    const selected = {};
+    for (const field of PACKAGE_RUNTIME_FIELDS) {
+        if (parsed[field] !== undefined) selected[field] = parsed[field];
+    }
+    return stableStringify(selected);
+}
+
 function git(root, args) {
-    return execFileSync('git', args, {cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024});
+    // stderr 一并捕获：`git show <ref>:<path>` 在路径缺席时会打印 fatal，不能污染命令输出。
+    return execFileSync('git', args, {cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+        stdio: ['ignore', 'pipe', 'pipe']});
 }
 
 export function changedPaths(root, base) {
@@ -103,53 +134,77 @@ function references(source, filename) {
     return [...values, ...templates.values()];
 }
 
+function projectPath(owner, value) {
+    let candidate;
+    if (value.startsWith('@/')) candidate = value.slice(2);
+    // '/src/' 常是 startsWith 比较用的字面量，本身不指向任何文件，必须要求后面还有路径段。
+    else if (value.startsWith('/src/') && value.length > 5) candidate = value.slice(1);
+    else if (/^(?:src|scripts|tests|userscript|entrypoints|docs|public|styles|assets)\//u.test(value)) candidate = value;
+    // 只有 './' 与 '../' 才是相对模块路径；裸 '.' 是标点映射表里的普通字符串，
+    // 若当作相对路径会解析成所在目录，再由目录回退把整层源码误算成依赖。
+    else if (value.startsWith('./') || value.startsWith('../')) {
+        // './'、'../'、'../../' 去掉前导点段后没有名称，同样不是模块引用；
+        // 否则它们会归一化成所在目录或父目录，被目录回退当成整层依赖。
+        if (!value.replace(/^(?:\.\.?\/)+/u, '')) return null;
+        candidate = path.posix.normalize(path.posix.join(path.posix.dirname(owner), value));
+    } else return null;
+    return candidate;
+}
+
+/** 解析单个引用的落点；via 标明是精确命中还是目录回退，诊断时可据此判断依赖真假。 */
+function resolveReference(known, owner, reference) {
+    if (typeof reference !== 'string') {
+        const [head, ...tails] = reference.parts;
+        const prefix = projectPath(owner, head);
+        if (!prefix || reference.parts.some(part => part.includes('\n'))) return {files: [], via: 'none'};
+        const directory = head.endsWith('/') ? prefix.replace(/\/$/u, '') : path.posix.dirname(prefix);
+        // 至少固定一个项目根内的子目录，例如 tests/fixtures 或 src/features。
+        // `src/${name}`、`./${name}`、外部 URL 与越出仓库的路径没有可靠边界，要求调用者显式登记目录。
+        if (!/^(?:src|entrypoints|userscript|scripts|tests|docs|public|styles|assets)\/[^/]+(?:\/[^/]+)*$/u.test(directory)
+            || directory.split('/').some(part => part === '..' || part === '.')) return {files: [], via: 'none'};
+        const parts = [prefix, ...tails];
+        const query = parts.findIndex(part => /[?#]/u.test(part));
+        if (query >= 0) {parts.splice(query + 1);parts[query] = parts[query].split(/[?#]/u)[0];}
+        const escape = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+        const pattern = new RegExp('^' + parts.map(escape).join('.*') + '$', 'u');
+        return {files: [...known].filter(file => file.startsWith(directory + '/') && pattern.test(file)), via: 'template'};
+    }
+    if (reference.includes('${') || reference.includes('\n')) return {files: [], via: 'none'};
+    let candidate = projectPath(owner, reference);
+    if (!candidate) return {files: [], via: 'none'};
+    candidate = candidate.split(/[?#]/u)[0];
+    const alternatives = [candidate, ...['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.vue', '.json', '.css'].map(extension => candidate + extension),
+        ...['index.ts', 'index.tsx', 'index.mts', 'index.js', 'index.vue'].map(index => `${candidate}/${index}`)];
+    const exact = alternatives.find(item => known.has(item));
+    if (exact) return {files: [exact], via: 'exact'};
+    // 读取整个夹具目录也应受其中任一资源的变化影响。但空路径与项目根只是前缀声明
+    // （例如源码里的 'src/'、'docs/' 用于 startsWith 判断），回退会把整层源码挂成依赖。
+    const directory = candidate.replace(/\/+$/u, '');
+    if (!directory || directory === '.' || directory === '..' || PROJECT_ROOTS.has(directory)) return {files: [], via: 'none'};
+    return {files: [...known].filter(item => item.startsWith(directory + '/')), via: 'directory'};
+}
+
+/** 诊断：列出某个文件每条向上依赖的来源字符串与落点，回答「这条边从哪来」。 */
+export function explainDependencies(owner, source, known) {
+    return references(source, owner).map(reference => {
+        const label = typeof reference === 'string' ? reference : reference.parts.join('${…}');
+        const {files, via} = resolveReference(known, owner, reference);
+        return {reference: label, via, files};
+    }).filter(row => row.files.length);
+}
+
 export function buildDependencyGraph(files) {
     const graph = new Map();
     const known = new Set(Object.keys(files));
-    const projectPath = (owner, value) => {
-        let candidate;
-        if (value.startsWith('@/')) candidate = value.slice(2);
-        else if (value.startsWith('/src/')) candidate = value.slice(1);
-        else if (/^(?:src|scripts|tests|userscript|entrypoints|docs|public|styles|assets)\//u.test(value)) candidate = value;
-        else if (value.startsWith('.')) candidate = path.posix.normalize(path.posix.join(path.posix.dirname(owner), value));
-        else return null;
-        return candidate;
-    };
-    const resolveReference = (owner, reference) => {
-        if (typeof reference !== 'string') {
-            const [head, ...tails] = reference.parts;
-            const prefix = projectPath(owner, head);
-            if (!prefix || reference.parts.some(part => part.includes('\n'))) return [];
-            const directory = head.endsWith('/') ? prefix.replace(/\/$/u, '') : path.posix.dirname(prefix);
-            // 至少固定一个项目根内的子目录，例如 tests/fixtures 或 src/features。
-            // `src/${name}`、`./${name}`、外部 URL 与越出仓库的路径没有可靠边界，要求调用者显式登记目录。
-            if (!/^(?:src|entrypoints|userscript|scripts|tests|docs|public|styles|assets)\/[^/]+(?:\/[^/]+)*$/u.test(directory)
-                || directory.split('/').some(part => part === '..' || part === '.')) return [];
-            const parts = [prefix, ...tails];
-            const query = parts.findIndex(part => /[?#]/u.test(part));
-            if (query >= 0) {parts.splice(query + 1);parts[query] = parts[query].split(/[?#]/u)[0];}
-            const escape = value => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-            const pattern = new RegExp('^' + parts.map(escape).join('.*') + '$', 'u');
-            return [...known].filter(file => file.startsWith(directory + '/') && pattern.test(file));
-        }
-        if (reference.includes('${') || reference.includes('\n')) return [];
-        let candidate = projectPath(owner, reference);
-        if (!candidate) return [];
-        candidate = candidate.split(/[?#]/u)[0];
-        const alternatives = [candidate, ...['.ts', '.tsx', '.mts', '.cts', '.js', '.mjs', '.cjs', '.vue', '.json', '.css'].map(extension => candidate + extension),
-            ...['index.ts', 'index.tsx', 'index.mts', 'index.js', 'index.vue'].map(index => `${candidate}/${index}`)];
-        const exact = alternatives.find(item => known.has(item));
-        if (exact) return [exact];
-        // 读取整个夹具目录也应受其中任一资源的变化影响。
-        return [...known].filter(item => item.startsWith(candidate.replace(/\/$/u, '') + '/'));
-    };
     for (const [owner, source] of Object.entries(files)) {
-        graph.set(owner, new Set(CODE.test(owner) ? references(source, owner).flatMap(value => resolveReference(owner, value)) : []));
+        graph.set(owner, new Set(CODE.test(owner)
+            ? references(source, owner).flatMap(value => resolveReference(known, owner, value).files) : []));
     }
     return graph;
 }
 
-export function selectAffected({files, changed, matrix, coveragePaths, coverageAdded = [], coverageRuntimeChanged = false}) {
+export function selectAffected({files, changed, matrix, coveragePaths, coverageAdded = [], coverageRuntimeChanged = false,
+    inertGlobalInputs = []}) {
     const allTests = GROUPS.flatMap(group => matrix.groups?.[group] ?? []);
     if (new Set(allTests).size !== allTests.length) throw new Error('测试矩阵存在重复归类');
     const architecture = new Set(matrix.groups?.architecture ?? []);
@@ -173,7 +228,8 @@ export function selectAffected({files, changed, matrix, coveragePaths, coverageA
             if (!affected.has(owner)) {affected.add(owner);queue.push(owner);}
         }
     }
-    const globalInputs = changed.filter(file => GLOBAL_TEST_INPUTS.has(file));
+    // inertGlobalInputs 只用于撤销「文件被改但语义未变」的扩大，例如仅新增 npm script 的 package.json。
+    const globalInputs = changed.filter(file => GLOBAL_TEST_INPUTS.has(file) && !inertGlobalInputs.includes(file));
     if (coverageRuntimeChanged) globalInputs.push(COVERAGE_CONFIG);
     const affectedBehaviorTests = globalInputs.length ? behaviorTests : behaviorTests.filter(file => affected.has(file));
     const testFiles = [...new Set([...architectureTests, ...affectedBehaviorTests])];
@@ -212,9 +268,23 @@ export function createPlan(root, base) {
         const previousPaths = new Set(strictCoveragePaths(previous));
         coverageAdded = coveragePaths.filter(file => !previousPaths.has(file));
     }
+    // 仅改动 scripts、version 等字段时，package.json 不应把选择范围扩大到全部行为测试。
+    let inertGlobalInputs = [];
+    const baselineManifest = difference.paths.includes('package.json')
+        && git(root, ['ls-tree', '--name-only', difference.base, '--', 'package.json']).trim();
+    if (baselineManifest && Object.hasOwn(files, 'package.json')) {
+        try {
+            const previous = git(root, ['show', `${difference.base}:package.json`]);
+            if (packageJsonRuntimeSignature(previous) === packageJsonRuntimeSignature(files['package.json'])) {
+                inertGlobalInputs = ['package.json'];
+            }
+        } catch {
+            // 基线缺失或 JSON 不可解析时保持原有全量扩大，不静默缩小验证范围。
+        }
+    }
     return {base: difference.base, head: git(root, ['rev-parse', 'HEAD']).trim(),
         ...selectAffected({files, changed: difference.paths, matrix: JSON.parse(files['tests/test-matrix.json']),
-            coveragePaths, coverageAdded, coverageRuntimeChanged})};
+            coveragePaths, coverageAdded, coverageRuntimeChanged, inertGlobalInputs})};
 }
 
 export function scopedCoverageConfig(plan, baseConfigUrl) {
@@ -237,6 +307,23 @@ function run(root, args) {
     });
 }
 
+/**
+ * 覆盖率门禁失败时附带缺口清单：Vitest 只报告文件名和百分比，不指出具体行。
+ * 复用同一份 istanbul 产物，让 CI 日志一次给出可改代码的位置，省掉一轮重跑。
+ */
+function reportCoverageGaps(root, plan) {
+    if (!plan.coverageFiles.length) return;
+    try {
+        const report = analyzeCoverage(path.join(root, 'coverage', 'affected', 'coverage-final.json'));
+        if (!report.files.length) return;
+        console.error(`\n[affected-tests] 严格覆盖率缺口：${report.totals.failing} 个文件未达 100%\n`);
+        console.error(formatCoverageGaps(report, {max: 3}));
+        console.error('');
+    } catch {
+        // 产物缺失或格式异常不得掩盖原始失败原因。
+    }
+}
+
 export async function executePlan(root, plan, runner = run) {
     const directory = path.join(root, 'coverage', 'affected-plan');
     mkdirSync(directory, {recursive: true});
@@ -247,15 +334,31 @@ export async function executePlan(root, plan, runner = run) {
     try {
         if (plan.coverageFiles.length) writeFileSync(configPath, scopedCoverageConfig(plan, path.join(root, COVERAGE_CONFIG)));
         const result = await runner(root, args);
-        if (result.code !== 0 || result.signal) throw new Error(`受影响测试失败：退出码 ${result.code ?? 'none'}，信号 ${result.signal ?? 'none'}`);
+        if (result.code !== 0 || result.signal) {
+            reportCoverageGaps(root, plan);
+            throw new Error(`受影响测试失败：退出码 ${result.code ?? 'none'}，信号 ${result.signal ?? 'none'}`);
+        }
         return {skipped: false};
     } finally {
         rmSync(configPath, {force: true});
     }
 }
 
+/** 人读摘要：只给出规模与影响面，避免把数百个测试路径刷进终端和上下文。 */
+export function renderSummary(plan) {
+    const lines = [
+        `基线 ${plan.base.slice(0, 7)} → ${plan.head.slice(0, 7)}，选择原因 ${plan.reason}`,
+        `改动 ${plan.changed.length} 个文件`,
+        `将运行 ${plan.testFiles.length} 个测试文件`,
+        `严格覆盖 ${plan.coverageFiles.length} 个源文件（statements/branches/functions/lines 各 100%）`,
+        `扩展产物受影响 ${plan.extensionChanged ? '是（含类型检查、Chrome/Firefox 与 userscript 构建）' : '否'}`,
+    ];
+    if (plan.globalInputs.length) lines.push(`共享测试输入 ${plan.globalInputs.join(', ')}（整体扩大到全部行为测试）`);
+    return lines.join('\n');
+}
+
 export async function main(argv = process.argv.slice(2), env = process.env) {
-    const allowed = new Set(['--base', '--report', '--plan-only', '--help']);
+    const allowed = new Set(['--base', '--report', '--plan-only', '--summary', '--help']);
     const options = {};
     for (let index = 0; index < argv.length; index++) {
         const arg = argv[index];
@@ -267,7 +370,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         } else options[arg] = true;
     }
     if (options['--help']) {
-        console.log('node scripts/testing/run-affected-tests.mjs --base <git-ref> [--report <json>] [--plan-only]');
+        console.log('node scripts/testing/run-affected-tests.mjs --base <git-ref> [--report <json>] [--plan-only] [--summary]');
         return;
     }
     const plan = createPlan(PROJECT_ROOT, options['--base'] ?? env.FLUENTREAD_CI_BASE);
@@ -276,11 +379,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         mkdirSync(path.dirname(report), {recursive: true});
         writeFileSync(report, JSON.stringify(plan, null, 2) + '\n');
     }
-    console.log(JSON.stringify(plan, null, 2));
-    if (env.GITHUB_OUTPUT) {
-        const {appendFileSync} = await import('node:fs');
-        appendFileSync(env.GITHUB_OUTPUT, `extension_changed=${plan.extensionChanged}\n`);
-    }
+    console.log(options['--summary'] ? renderSummary(plan) : JSON.stringify(plan, null, 2));
+    if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `extension_changed=${plan.extensionChanged}\n`);
     if (!options['--plan-only']) await executePlan(PROJECT_ROOT, plan);
 }
 

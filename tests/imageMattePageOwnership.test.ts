@@ -11,6 +11,71 @@ import {keepImageMatteDecoration,observeImageMatteDecoration} from '@/src/featur
 import {coversClippedImageGlyphs} from '@/src/features/image-translation/services/imageClippedGlyphs';
 import {applyImageMattePage,authorizeImageMatteProposal,authorizeImageMatteWithinExistingMasks,getImageMatteProposalDrawings,planImageMattePage,proposeImageMattePage} from '@/src/features/image-translation/services/imageMattePage';
 
+describe('细衬线的半覆盖字形复核',()=>{
+    const width=64,height=56,ink=[25,25,25,255],background=[225,225,225,255];
+    function fixture(flipped=false,alpha=255){
+        const pixels=new Uint8ClampedArray(width*height*4);
+        const yAt=(y:number)=>flipped?height-y-1:y;
+        for(let i=0;i<pixels.length;i+=4)pixels.set([225,225,225,alpha],i);
+        const put=(x:number,y:number,rgba=ink)=>pixels.set([rgba[0],rgba[1],rgba[2],alpha],(yAt(y)*width+x)*4);
+        for(const x0 of [13,23,33,43])for(let x=x0;x<x0+3;x++)for(let y=17;y<33;y++)put(x,y);
+        for(let x=16;x<19;x++)put(x,24,[95,95,95,255]);
+        put(19,24,[175,175,175,255]);
+        const box={x0:10,y0:flipped?height-32:21,x1:53,y1:flipped?height-21:32};
+        const budget=()=>({remaining:1_048_576});
+        const repair=()=>planImageMatteCandidate(pixels,width,height,box,budget(),'recognition')!;
+        const inside=(x:number,y:number)=>x>=box.x0&&x<box.x1&&y>=box.y0&&y<box.y1;
+        return {pixels,put,box,budget,repair,inside};
+    }
+    it.each([false,true])('主要裁切边可在任一方向，原文字形和同帧支持共同决定写入（反向 %s）',flipped=>{
+        const {pixels,box,budget,repair,inside}=fixture(flipped),before=pixels.slice();
+        expect(planImageMatteCandidate(pixels,width,height,box,budget())).toBeUndefined();
+        expect(planImageMatteCandidate(pixels,width,height,box,budget(),'decoration')).toBeUndefined();
+        expect(planImageMatteRepair(pixels,width,height,box,()=>true,budget())).toBeUndefined();
+        const candidate=repair();
+        expect(candidate.fringeCore).toBeDefined();
+        expect(candidate.inkCore).toBeUndefined();
+        expect(candidate.fringeCore!.filter(value=>value===2)).toHaveLength(192);
+        expect(candidate.fringeCore!.filter(value=>value===1)).toHaveLength(3);
+        expect(candidate.mask.filter(Boolean)).toHaveLength(196);
+        const line:ImageTextRegion={text:'开放',bbox:box},get=()=>proposeImageMattePage(pixels,width,height,[line],[],()=>box,undefined,true)!;
+        const proposal=get(),support={forBox:()=>inside};
+        expect(getImageMatteProposalDrawings(proposal)?.requiresGlyphProof).toBe(true);
+        expect(authorizeImageMatteWithinExistingMasks(proposal)).toBeUndefined();
+        expect(authorizeImageMatteProposal(proposal,{forBox:()=>()=>true})).toBeUndefined();
+        expect(authorizeImageMatteProposal(proposal,support,new Map([[line,'OPENX']]))).toBeUndefined();
+        expect(authorizeImageMatteProposal(proposal,{forBox:()=>undefined},new Map([[line,'OPEN']]))).toBeUndefined();
+        expect(pixels).toEqual(before);
+        const plan=authorizeImageMatteProposal(proposal,support,new Map([[line,'OPEN']]))!;
+        applyImageMattePage(pixels,width,height,plan);
+        const expected=new Uint8ClampedArray(pixels.length);
+        for(let i=0;i<expected.length;i+=4)expected.set(background,i);
+        expect(pixels).toEqual(expected);
+    });
+    it('排除窄框比例不足、双方裁切、无明显裁切、半透明以及超薄边距离的形状',()=>{
+        const {pixels,put,repair,box,budget}=fixture();
+        for(const change of [{y0:24},{y1:31},{y0:18,y1:33}]){
+            expect(planImageMatteCandidate(pixels,width,height,{...box,...change},budget(),'recognition')).toBeUndefined();
+        }
+        const translucent=fixture(false,224);
+        expect(translucent.repair()).toBeUndefined();
+        expect(planImageMatteCandidate(pixels,width,height,box,{remaining:196},'recognition')).toBeUndefined();
+        for(let x=16;x<22;x++)put(x,30,[154,154,154,255]);
+        expect(repair()).toBeUndefined();
+    });
+    it('灰条、支持空洞或与单侧裁切不同的字形几何不能借反走样提案擦除',()=>{
+        const {repair,inside,box}=fixture(),r=repair(),{left,top,width,fringeCore}=r;
+        const check=(change:Partial<ImageMatteRepair>={})=>coversClippedImageGlyphs({...r,...change},'OPEN',inside);
+        expect(check()).toBe(true);
+        expect(check({sourceBox:{...box,y0:18,y1:33}})).toBe(false);
+        expect(check({sourceBox:{...box,y1:31}})).toBe(false);
+        expect(coversClippedImageGlyphs(r,'OPEN',(x,y)=>inside(x,y)&&(x!==24||y!==26))).toBe(false);
+        const gray=fringeCore!.slice();
+        for(let y=17;y<33;y++)for(let x=23;x<26;x++)gray[(y-top)*width+x-left]=1;
+        expect(check({fringeCore:gray})).toBe(false);
+    });
+});
+
 describe('单行旧擦除框内的脱离边饰',()=>{
     const width=90,height=60,background=[240,234,225,255],ink=[31,44,78,255],box={x0:14,y0:15,x1:74,y1:39};
     function fixture(side:'left'|'right'='right'){
@@ -26,7 +91,7 @@ describe('单行旧擦除框内的脱离边饰',()=>{
             const seen=palette();
             return observeImageMatteDecoration(pixels,width,text,{background:seen.background,inkBoxes:[seen.supportBox]});
         };
-        const repair=()=>planImageMatteCandidate(pixels,width,height,box,{remaining:40_000},true)!;
+        const repair=()=>planImageMatteCandidate(pixels,width,height,box,{remaining:40_000},'decoration')!;
         return {pixels,put,art,observe,repair};
     }
     it.each(['left','right'] as const)('把 %s 端原图案移出待擦蒙版并完整保留 RGBA',side=>{

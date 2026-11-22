@@ -9,6 +9,15 @@ export interface ImageReaderLine {text: string; sourceText?: string; renderSkipp
 export interface ImageReaderLanguages {source: string; target: string}
 export {default as IMAGE_READER_CSS} from '../ui/image-text-reader.css?inline';
 
+const PAINT_SKIPPED_MESSAGE = '为保留原文，此译文未绘制到图片';
+
+function appendReaderNote(parent: HTMLElement, message: string): void {
+    const note = parent.ownerDocument.createElement('p');
+    note.className = 'fr-image-reader-note';
+    note.setAttribute('data-message', message);
+    parent.append(note);
+}
+
 export function createImageTextReader(localize: (source: string) => string, onClose: (ownedFocus: boolean) => void) {
     const element = document.createElement('section');
     element.className = 'fr-image-reader';
@@ -53,6 +62,8 @@ export function createImageTextReader(localize: (source: string) => string, onCl
     };
     const render = () => {
         body.replaceChildren();
+        const sharedPaintNotice = lines.length > 1 && lines.every(line => line.renderSkipped);
+        if (sharedPaintNotice) appendReaderNote(body, PAINT_SKIPPED_MESSAGE);
         for (const line of lines) {
             const article = document.createElement('article');
             const changed = line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text);
@@ -70,18 +81,8 @@ export function createImageTextReader(localize: (source: string) => string, onCl
             translated.lang = unchangedSource === undefined ? targetLanguage : sourceLanguage;
             translated.textContent = unchangedSource ?? line.text;
             article.append(translated);
-            if (line.numericUncertain) {
-                const note = document.createElement('p');
-                note.className = 'fr-image-reader-note';
-                note.setAttribute('data-message', '数字识别可能有误，请对照原图');
-                article.append(note);
-            }
-            if (line.renderSkipped) {
-                const note = document.createElement('p');
-                note.className = 'fr-image-reader-note';
-                note.setAttribute('data-message', '为保留原文，此译文未绘制到图片');
-                article.append(note);
-            }
+            if (line.numericUncertain) appendReaderNote(article, '数字识别可能有误，请对照原图');
+            if (line.renderSkipped && !sharedPaintNotice) appendReaderNote(article, PAINT_SKIPPED_MESSAGE);
             body.append(article);
         }
         compare.hidden = !lines.some(line => line.sourceText !== undefined && hasDistinctTranslation(line.sourceText, line.text));

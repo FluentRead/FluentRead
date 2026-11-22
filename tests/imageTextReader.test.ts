@@ -42,6 +42,26 @@ describe('图片文字独立阅读面板', () => {
         event(copy());await Promise.resolve();
         expect(writeText).toHaveBeenLastCalledWith('近\n\n90%');
     });
+    it('多段均未绘制时共用保留提示，混合结果和数字提示仍对应各段', () => {
+        const notice = '为保留原文，此译文未绘制到图片';
+        const skipped = [
+            {sourceText: 'Keep clear', text: '保持通道畅通', renderSkipped: true},
+            {sourceText: 'Gate 12', text: '12 号门', renderSkipped: true, numericUncertain: true},
+        ] as const;
+        const paintNotices = () => Array.from(body().querySelectorAll('.fr-image-reader-note'))
+            .filter(note => note.textContent === notice);
+        reader.setLines([...skipped]);
+        reader.open();
+        expect(paintNotices()).toEqual([body().firstElementChild]);
+        expect(body().querySelector('article:nth-of-type(2) .fr-image-reader-note')?.textContent)
+            .toBe('数字识别可能有误，请对照原图');
+        event(compare());
+        expect(paintNotices()).toEqual([body().firstElementChild]);
+        expect(body().querySelectorAll('.fr-image-reader-source')).toHaveLength(2);
+        reader.setLines([...skipped, {sourceText: 'Exit', text: '出口'}]);
+        expect(paintNotices()).toHaveLength(2);
+        expect(paintNotices().every(note => note.parentElement?.tagName === 'ARTICLE')).toBe(true);
+    });
     it('安全呈现原文和译文，切换对照不会把识别内容当 HTML 执行', () => {
         reader.setLines([{sourceText:'<img src=x onerror=evil()>',text:'译文'}, {text:'仅译文'}]);
         expect(reader.element.hidden).toBe(true);

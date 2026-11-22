@@ -265,6 +265,12 @@ describe('被识别成句点的独立空心边饰',()=>{
         expect(pixels).toEqual(before);
     });
 
+    it('低位细线没有容纳闭孔的高度，无需生成边饰候选',()=>{
+        const {put,observe}=fixture();
+        for(let y=mark.y0;y<mark.y1;y++)for(let x=mark.x0;x<mark.x1;x++)put(x,y,y===38?ink:background);
+        expect(observe('OPEN')).toBeUndefined();
+    });
+
     it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{
         const {observe,repair}=fixture(markType);
         expect(observe('OPEN.')).toBeUndefined();

@@ -79,7 +79,7 @@ export function observeImageMatteDecoration(pixels:Uint8ClampedArray,width:numbe
             if(hasInk)continue;
             const raised=edge.y1<=y1-Math.floor(height/4);
             // OCR 可能略过紧靠基线的图案。右侧这种候选必须另证闭孔，普通实心句点不能通过。
-            const enclosed=spacedPeriod||(!raised&&side==='right');
+            const enclosed=spacedPeriod||(!raised&&side==='right'&&edge.x1-edge.x0>=4&&edge.y1-edge.y0>=4);
             if(step>0&&edge.y1-edge.y0<=height*.55&&(enclosed||raised)){
                 if(match)return;
                 match={side,gap:x,characters,...(enclosed?{enclosed:true as const}:{})};

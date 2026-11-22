@@ -41,6 +41,10 @@ When a horizontal line of text covers an angled edge in an opaque image, repair 
 
 When a recognition box clips a thin outline in a photo, repair can use nearby background samples that agree across several rows. This reduces streaking inside the erasure area.
 
+For a single line of uppercase text on a solid background, the default model can also repair clipped strokes when each glyph matches the recognition evidence and the gaps follow a common cropped edge.
+
+When full stroke repair needs the optional segmentation model, verified solid colors can still fill the old ink inside the existing erasure bounds. This reduces streaks from clipped strokes along the edge.
+
 For a translated image on a solid background with clipped source strokes, importing the optional text segmentation model lets you regenerate the affected translation. On the same page, switch to the original and select Translate again.
 
 Horizontal text uses confirmed source glyph widths and heights from individual lines to estimate font size and align translations within the existing region. This reduces enlargement caused by padding in recognition boxes. Complex fonts, backgrounds and perspective can still affect the result; these estimates do not recover the original font family or decorative style.

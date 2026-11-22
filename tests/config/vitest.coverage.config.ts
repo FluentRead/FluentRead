@@ -300,6 +300,7 @@ export default defineConfig({
                 'src/features/image-translation/services/imageMatteBoundary.ts',
                 'src/features/image-translation/services/imageDetectionSnapshot.ts',
                 'src/features/image-translation/services/imageMattePage.ts',
+                'src/features/image-translation/services/imageClippedGlyphs.ts',
                 'src/features/image-translation/services/imageMatteRepair.ts',
                 'src/features/image-translation/services/imageTextSegmentation.ts',
                 'src/features/image-translation/services/mangaTypography.ts',

@@ -151,13 +151,17 @@ export function createImageControls(actions: {onAction(): void; onPrepare(): voi
         dismiss.textContent = localize('关闭');
         dismiss.title = localize('关闭图片翻译提示');
         dismiss.setAttribute('aria-label', dismiss.title);
-        button.textContent = localize(phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' && feedback.dataset.preparation === 'true' ? '关闭' : phase === 'error' ? '重试' : '翻译');
-        button.title = localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : phase === 'error' && feedback.dataset.preparation === 'true' ? '关闭图片翻译提示' : sourceMessage);
-        button.title = `${brand} · ${button.title}`;
+        const manga = feedback.dataset.manga === 'true';
+        const originalRetained = !manga && sourceMessage === '已识别文字，原图未改动';
+        const dismissAction = originalRetained || (phase === 'error' && feedback.dataset.preparation === 'true');
+        button.textContent = localize(dismissAction ? '关闭' : phase === 'loading' ? '取消' : phase === 'translated' ? '原图' : phase === 'error' ? '重试' : '翻译');
+        const actionTitle = dismissAction ? dismiss.title : localize(phase === 'loading' ? '取消图片翻译' : phase === 'translated' ? '恢复原图' : sourceMessage);
+        button.title = `${brand} · ${actionTitle}`;
         button.setAttribute('aria-label', button.title);
         const localizedMessage = localize(sourceMessage);
-        warningButton.textContent = feedback.dataset.manga === 'true' ? localize('未绘制') : sourceMessage === '已识别文字，原图未改动' ? 'ℹ' : '!';
-        warningButton.title = feedback.dataset.manga === 'true' ? localizedMessage : `${localizedMessage} · ${localize('查看图片文字')}`;
+        warningButton.textContent = manga ? localize('未绘制') : originalRetained ? inspect.textContent : '!';
+        warningButton.title = manga || sourceMessage === '部分译文未绘制，请查看图片文字'
+            ? localizedMessage : `${localizedMessage} · ${localize('查看图片文字')}`;
         warningButton.setAttribute('aria-label', warningButton.title);
         statusText.textContent = (feedback.dataset.warning === 'true' && feedback.dataset.warningAction !== 'true'
             ? localize('已识别') : localizedMessage) + (progress === undefined ? '' : ` ${progress}%`);

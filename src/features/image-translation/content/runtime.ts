@@ -1357,9 +1357,12 @@ function restoreOriginalImage(state: ImageTranslationState): void {
 }
 
 function translatedImageMessage(state: ImageTranslationState): string {
-    return state.layoutFallback ? '当前布局无法覆盖，请查看译文' : state.lines.some(line => line.renderSkipped)
-        ? state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字' : !state.translatedImage && state.lines.length
-            ? '已识别文字，原图未改动' : state.translatedImage || state.lines.length ? '已翻译 · 点击恢复原图' : '未检测到文字，已保留原图';
+    if (state.layoutFallback) return '当前布局无法覆盖，请查看译文';
+    if ((state.manga || state.translatedImage) && state.lines.some(line => line.renderSkipped)) {
+        return state.manga ? '部分译文未绘制，请查看漫画文字' : '部分译文未绘制，请查看图片文字';
+    }
+    if (state.translatedImage) return '已翻译 · 点击恢复原图';
+    return state.lines.length ? '已识别文字，原图未改动' : '未检测到文字，已保留原图';
 }
 
 function showTranslatedImage(state: ImageTranslationState): void {

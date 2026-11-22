@@ -256,6 +256,15 @@ describe('被识别成句点的独立空心边饰',()=>{
         expect(candidate.decorationFringe).toBeUndefined();
     });
 
+    it.each([['ring',true],['solid',false],['open',false]] as const)('OCR 只报告正文时仍按闭孔证明处理低位 %s', (markType,protectedMark)=>{
+        const {observe,repair,pixels}=fixture(markType);
+        const before=pixels.slice();
+        const hint=observe('OPEN')!;
+        expect(hint).toMatchObject({side:'right',enclosed:true,characters:4});
+        expect(keepImageMatteDecoration(repair(),hint,legacy)).toBe(protectedMark);
+        expect(pixels).toEqual(before);
+    });
+
     it.each(['solid','open','small','pin-hole'] as const)('空白无法形成有面积的闭孔时保留 %s 拒绝路径',markType=>{
         const {observe,repair}=fixture(markType);
         expect(observe('OPEN.')).toBeUndefined();

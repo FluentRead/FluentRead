@@ -515,9 +515,10 @@ export default defineConfig({
             const imageSegmentationRetryBudget = 700;
             // 使用已有检测数据复核裁切字形。双侧衬线修补使 Chrome 增加 481 字节本地验证代码。
             // 原框内的独立边饰保留使 Chrome 再增加 2,293 字节。
-            const imageClippedGlyphBudget = 5_200;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));        },
-        'entrypoints:grouped': (_wxt, groups) => {
+            // 细衬线的五成墨色核心复核使 Chrome 增加 739 字节代码。
+            const imageClippedGlyphBudget = 6_000;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));
+        },        'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {

@@ -8,7 +8,7 @@ import {readdirSync, readFileSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {dirname, join} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {PDFDocument, PDFString, StandardFonts, degrees, rgb, type PDFFont, type PDFPage} from 'pdf-lib';
+import {PDFDocument, PDFName, PDFNumber, PDFString, StandardFonts, degrees, rgb, type PDFFont, type PDFPage} from 'pdf-lib';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import type {ParsedDocument, PdfDocumentBlock} from '@/src/features/document-translation/core/document';
 import {parseBinaryDocument} from '@/src/features/document-translation/services/binary';
@@ -372,6 +372,16 @@ describe('common paper layouts survive real PDF parsing', () => {
             '[11] Public code repository. https://example.net/a/project. Project page.',
             '[12] Research website. https://example.edu/ Published in 2024.',
         ]);
+    });
+
+    it('keeps a folded URL unjoined when the annotation table is unreadable', async () => {
+        const document = await build(sheet => {
+            sheet.page.drawText('Full report at https://', {x: 54, y: sheet.height - 90, size: 8, font: sheet.fonts.serif});
+            sheet.page.drawText('docs.example.com/guide', {x: 54, y: sheet.height - 98, size: 8, font: sheet.fonts.serif});
+            // 损坏的注解表：读取失败时不得凭空补出链接目标。
+            sheet.page.node.set(PDFName.of('Annots'), PDFNumber.of(3));
+        });
+        expect(sources(document)).toEqual(['Full report at https:// docs.example.com/guide']);
     });
 
     it('keeps each wrapped header over its own numeric cell in a three-rule table', async () => {

@@ -14,7 +14,7 @@ import {describe, expect, it} from 'vitest';
 import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {analyzePdfPageLayout, extractPdfGraphicsShapes, pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
+import {analyzePdfPageLayout, extractPdfGraphicsShapes, joinPdfSourceLines, pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
 import {findDocumentLiteralTerms} from '@/src/core/translation/documentLiterals';
 import {protectGlossaryText} from '@/src/core/glossary';
 
@@ -2468,6 +2468,17 @@ describe('paired subfigure markers between a chart and its caption', () => {
     it('does not borrow markers when no chart precedes the caption', () => {
         const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), atom('Figure 2. Unrelated.', 64, 400, 120, 10)], []);
         expect(result.preservedRegions.filter(region => region.kind === 'figure')).toEqual([]);
+    });
+});
+
+describe('folded URL reconnection with native link targets', () => {
+    const urlLine = (text: string, baseline: number) => atom(text, 42, baseline, text.length * 4, 8);
+    it('joins the printed path only when the link target confirms the whole address', () => {
+        const lines = [urlLine('Full report at https://', 100), urlLine('docs.example.com/guide', 108)];
+        expect(joinPdfSourceLines(lines, 'text', new Set(['https://docs.example.com/guide'])))
+            .toBe('Full report at https://docs.example.com/guide');
+        // 没有链接目标佐证时保留词距，不猜测可见文字。
+        expect(joinPdfSourceLines(lines, 'text')).toBe('Full report at https:// docs.example.com/guide');
     });
 });
 

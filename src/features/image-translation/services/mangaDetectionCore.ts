@@ -4,6 +4,7 @@
  * 主要内容：按锁定浏览器检测器的缩放与32像素填充验证原输入/输出形状，读取未加留白的完整组件包围框；所有有限概率均低于0.3时才记为弱候选，保留有任意强响应、未知或超额候选。以帧票据、唯一映射和Box对象及坐标快照关联，页内预付像素与组件余额，取消、失败和换页均可撤回。
  * 模块边界：不改检测概率、检测框、原图、识别批次、字母或置信，不创建模型/Canvas，不处理翻译或擦除。弱组件排除只依据整个组件没有0.3响应；另行采集的强核心只供原批次完成后的独立复核，不能收缩原弱边缘或改变透明修补侧车。调用方先保留原数字证据，再排除弱识别结果。
  * 补充候选：仅同次原像素视图可旁观稀疏大组件中的完整水平核心，绑定唯一原Box与坐标快照后映回本页；后续帧复用原Box时撤回其旧视图候选，其他Box保留各自来源。采用独立像素/组件额度，不改变弱框排除规则。候选仅供原识别全部结束后的独立复核，取消、未知归属和超额均不能获得替代结果。
+ * 原始区域观察器可在同一票据和合法原框确认后同步读取当前检测平面，借用在回调返回时结束。
  */
 import {collectMangaDetectionRefinementCores,createMangaDetectionRefinementBudget,MANGA_DETECTION_REFINEMENT_LIMITS,
     type MangaDetectionRefinement,type MangaDetectionRefinementCore,type MangaDetectionRefinementSource} from './mangaDetectionRefinement';
@@ -30,7 +31,7 @@ function originalFrame(source:MangaDetectionRefinementSource|undefined,width:num
 }
 
 /** 每个检测器独占；raw数据只借用到该次检测结束，弱Box快照只存活于当前页。 */
-export function createMangaDetectionCore(){
+export function createMangaDetectionCore(observeRegionPixels?:(data:Float32Array,width:number,height:number,box:Rect)=>void){
     const limits=MANGA_DETECTION_CORE_LIMITS;
     let active=false,signal:AbortSignal|undefined,frame:Frame|undefined,negative=new WeakMap<object,string>(),pixels=0,regions=0;
     let refinementBudget=createMangaDetectionRefinementBudget(),refinements:Array<{value:MangaDetectionRefinement;box:Box;key:string}>=[],refinementOverflow=false;
@@ -65,6 +66,7 @@ export function createMangaDetectionCore(){
             if(!key)return;
             const duplicate=value.scores.has(key);value.scores.set(key,false);value.refinements.delete(key);if(duplicate)return;
             if(!rectKey(raw)||raw.x1>width||raw.y1>height)return;
+            observeRegionPixels?.(value.data,width,height,output);
             if(value.refinementSource&&!refinementOverflow){
                 const candidates=collectMangaDetectionRefinementCores(value.data,width,height,raw,output,refinementBudget);
                 if(candidates?.length)value.refinements.set(key,candidates);

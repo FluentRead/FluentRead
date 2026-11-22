@@ -588,6 +588,23 @@ describe('visible Unicode PDF reading export', () => {
         expect(text.join('')).toContain(`本页译文0${adapter === 'fallback' ? '🦄' : ''}跨页段落结尾`);
     });
 
+    it('skips a preserved region with no source glyphs and a blank text entry in the vector reading export', async () => {
+        const document = await fixture();
+        const items = [
+            // 图版区域里没有源字形：可搜索文字层保持为空，但图片与页框仍要写出。
+            {kind: 'region' as const, entryId: 'artwork', sourceRect: {x: 40, y: 300, width: 200, height: 40}, x: 42, y: 42, width: 200, height: 40},
+            {kind: 'text' as const, entryId: 'blank', segmentIndex: 1, text: '', x: 42, y: 120, width: 0, font: {size: 12, weight: 400 as const, lineHeight: 19.2}},
+            {kind: 'text' as const, entryId: 'translated-0', segmentIndex: 1, text: '可见译文', x: 42, y: 160, width: 80, font: {size: 12, weight: 400 as const, lineHeight: 19.2}},
+        ];
+        const download = await createDocumentDownload(document, ['标题', '可见译文'], 'translated', {
+            pdfReadingRenderer: async function* () {yield {width: 612, height: 792, items};},
+            pdfFontLoader: async () => fontBytes,
+        });
+        const pages = (await extract(download.data as Uint8Array)).map(compact);
+        expect(pages).toHaveLength(1);
+        expect(pages[0]).toBe('可见译文');
+    });
+
     it('closes a readable Unicode fallback iterator on cancellation without committing a partial download', async () => {
         const controller = new AbortController();
         let released = false;

@@ -2448,3 +2448,25 @@ console.log('result:' + JSON.stringify({results, unchanged:before===JSON.stringi
         }
     });
 });
+
+describe('paired subfigure markers between a chart and its caption', () => {
+    const chart = {kind: 'image' as const, x: 64, y: 100, width: 200, height: 100};
+    const caption = atom('Figure 1. Measured speedups.', 64, 226, 140, 10);
+    it('grows the preserved figure to the same-baseline lettered markers under the chart', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), atom('(b) 32-GPU', 190, 212, 46, 8), caption], [chart]);
+        const figure = result.preservedRegions.find(region => region.kind === 'figure');
+        expect(figure).toMatchObject({x: 64, y: 100, width: 200});
+        // 两侧标记共用原图范围，裁剪后仍带完整子图标题。
+        expect(figure!.y + figure!.height).toBeCloseTo(213.6, 6);
+        expect(result.preservedRegions.some(region => region.kind === 'figure' && region.source?.includes('(a) 8-GPU'))).toBe(true);
+    });
+    it('leaves an unpaired lettered marker outside the figure bounds', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), caption], [chart]);
+        const figure = result.preservedRegions.find(region => region.kind === 'figure');
+        expect(figure).toMatchObject({x: 64, y: 100, width: 200, height: 100});
+    });
+    it('does not borrow markers when no chart precedes the caption', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), atom('Figure 2. Unrelated.', 64, 400, 120, 10)], []);
+        expect(result.preservedRegions.filter(region => region.kind === 'figure')).toEqual([]);
+    });
+});

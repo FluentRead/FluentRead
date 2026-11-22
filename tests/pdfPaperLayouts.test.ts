@@ -342,6 +342,9 @@ describe('common paper layouts survive real PDF parsing', () => {
                 const {context} = sheet.page.doc;
                 sheet.page.node.addAnnot(context.register(context.obj({Type: 'Annot', Subtype: 'Link',
                     Rect: [70, y - 9, 158, y - 1], A: {S: 'URI', URI: PDFString.of(entry.url)}})));
+                // 同一页上的高亮/批注也出现在注解表里；只有 Link 的 URI 能确认折行地址。
+                if (!index) sheet.page.node.addAnnot(context.register(context.obj({Type: 'Annot', Subtype: 'Square',
+                    Rect: [54, y - 9, 158, y - 1], Border: [0, 0, 0]})));
             }
         });
         expect(sources(document)).toEqual([

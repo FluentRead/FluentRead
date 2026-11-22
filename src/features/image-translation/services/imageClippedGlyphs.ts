@@ -1,7 +1,7 @@
 /**
  * @file src/features/image-translation/services/imageClippedGlyphs.ts
  * 文件职责：复核纯色不透明底上的单行字形是否被识别框裁去字高。
- * 主要内容：在闭环墨迹中复核八邻域连通字形，要求数量、公共字高和同帧支持吻合。单侧裁切允许分离字形横向投影重叠；双侧裁切用九成覆盖的核心区分抗锯齿相接的字形，同时复核完整墨迹的中央区域及逐字占比。
+ * 主要内容：在闭环墨迹中复核八邻域连通字形，要求数量、公共字高和同帧支持吻合。单侧裁切允许分离字形横向投影重叠；双侧裁切用九成覆盖的核心区分抗锯齿相接的字形。细衬线借五成覆盖核心组织字形，要求高覆盖墨迹仍过半、中央区域和切边均有同次文字证据。
  * 模块边界：只读取已验证的局部墨迹和本次检测，不生成像素蒙版，不推断相连装饰的语义，不运行模型。调用方仍须校验图案碰撞和全页独占写入。
  */
 import type {ImageMatteRepair} from './imageMatteRepair';
@@ -22,14 +22,18 @@ export function coversClippedImageGlyphs(
     const clippedTop = above > 0;
     const inkHeight = ink.y1 - ink.y0;
     const bothEdges = clippedTop && below > 0;
-    const glyphMask = bothEdges ? repair.inkCore : mask;
-    const horizontalLimit = bothEdges ? 6 : 3;
-    if (!glyphMask || Math.max(above, below) <= 0 || inkHeight < 8
-        || Math.max(above, below) > (bothEdges ? Math.min(4, inkHeight / 5) : Math.min(6, inkHeight / 3))
+    const fringe = repair.fringeCore;
+    const glyphMask = fringe ?? (bothEdges ? repair.inkCore : mask);
+    const verifyInside = bothEdges || !!fringe;
+    const horizontalLimit = bothEdges && !fringe ? 6 : 3;
+    const maxCut = fringe ? Math.min(6, inkHeight / 4) : bothEdges ? Math.min(4, inkHeight / 5) : Math.min(6, inkHeight / 3);
+    const cut = Math.max(above, below);
+    if (!glyphMask || cut <= 0 || inkHeight < 8 || cut > maxCut
+        || (fringe && (cut < 2 || Math.min(above, below) > 1))
         || ink.x0 < x0 - horizontalLimit || ink.x1 > x1 + horizontalLimit) return false;
-    if ((budget.remaining -= mask.length * (bothEdges ? 2 : 1)) < 0) return false;
+    if ((budget.remaining -= mask.length * (verifyInside ? 2 : 1)) < 0) return false;
 
-    if (bothEdges) {
+    if (verifyInside) {
         if ((y1 - y0 - 3) * 2 < inkHeight) return false;
         const innerLeft = ink.x0 < x0 ? x0 + 5 : x0;
         const innerRight = ink.x1 > x1 ? x1 - 5 : x1;
@@ -55,6 +59,7 @@ export function coversClippedImageGlyphs(
         let length = 1;
         let firstX = ink.x1, lastX = ink.x0;
         let firstY = ink.y1, lastY = ink.y0, supported = 0, inside = 0, missedAtCut = false;
+        let strong = 0;
         let needsLeftEdge = false, needsRightEdge = false;
         for (let cursor = 0; cursor < length; cursor++) {
             const index = queue[cursor];
@@ -63,7 +68,8 @@ export function coversClippedImageGlyphs(
             lastX = Math.max(lastX, x);
             firstY = Math.min(firstY, y);
             lastY = Math.max(lastY, y);
-            if (bothEdges) {
+            if (verifyInside) {
+                if (fringe?.[index] === 2) strong++;
                 if (x >= x0 && x < x1 && y >= y0 && y < y1) {
                     inside++;
                     if (supportAt(x, y) === true) supported++;
@@ -87,15 +93,16 @@ export function coversClippedImageGlyphs(
                 }
             }
         }
-        if ((lastX - firstX + 1) * 2 > inkHeight * (bothEdges ? 4 : 3)
+        if ((lastX - firstX + 1) * 2 > inkHeight * (verifyInside ? 4 : 3)
             || firstY > ink.y0 + 1 || lastY < ink.y1 - 2) return false;
-        if (bothEdges) {
-            // 几何上至少过半核心在原框内，框内证明至少覆盖五分之四；每个字自己的两端都确实被裁到。
-            if (inside * 2 <= length || supported * 5 < inside * 4 || firstY >= y0 || lastY < y1) return false;
+        if (verifyInside) {
+            // 公共字高已保证细衬线逐字越过至少两像素的主要裁切边。双侧裁切仍逐字核对小裁边。
+            if (inside * 2 <= length || supported * 5 < inside * 4) return false;
+            if (fringe ? strong * 2 <= length : firstY >= y0 || lastY < y1) return false;
         } else if (supported * 2 <= length || (needsLeftEdge && firstX >= x0) || (needsRightEdge && lastX < x1)) {
             return false;
         }
         if (missedAtCut) clippedGlyphs++;
     }
-    return glyphs === characters && (bothEdges || clippedGlyphs * 2 >= characters);
+    return glyphs === characters && (verifyInside || clippedGlyphs * 2 >= characters);
 }

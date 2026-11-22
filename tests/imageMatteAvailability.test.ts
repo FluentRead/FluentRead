@@ -16,6 +16,7 @@ vi.mock('@/src/features/image-translation/services/imageEncoding',()=>({encodeIm
 vi.mock('@/src/features/image-translation/services/mangaInferenceClient',()=>({mangaInferenceClient:{prepareTextSegmentation:mocks.prepareSeg,segmentText:mocks.segment}}));
 import {translateImageInOffscreen} from '@/src/features/image-translation/services/offscreenRuntime';
 import * as imageInpainting from '@/src/features/image-translation/services/inpainting';
+import * as imageRendering from '@/src/features/image-translation/services/rendering';
 import * as mattePage from '@/src/features/image-translation/services/imageMattePage';
 import {ImageAlphaProtectionUnavailableError} from '@/src/features/image-translation/services/mangaAlphaProtection';
 import {produceImageParagraphGapProofs,createImageParagraphGapConsumer,bindImageParagraphGapEvidence} from '@/src/features/image-translation/services/imageParagraphGapEvidence';
@@ -409,6 +410,42 @@ describe('不透明原字超出旧清字框时复用模型授权',()=>{
         for(let y=r.y0;y<r.y1;y++)for(let x=r.x0;x<r.x1;x++)f.ink.add(y*f.width+x);
         install(f);evidenceMode='missing';return f;
     }
+    it.each(['verified','empty-detection','layout','layout-after-authorization'] as const)('细衬线精确擦除或沿用原回退 %s',async mode=>{
+        const f=fixture(255),{width,height,pixels}=f,oldInk=[25,25,25,255] as const;
+        f.matte=[225,225,225,255];
+        f.art=[];f.ink.clear();
+        fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},f.matte);
+        for(const x0 of [34,44,54,64,74,84]){
+            const box={x0,y0:32,x1:x0+3,y1:52};
+            fill(pixels,width,box,oldInk);
+            for(let y=box.y0;y<box.y1;y++)for(let x=box.x0;x<box.x1;x++)f.ink.add(y*width+x);
+        }
+        fill(pixels,width,{x0:37,y0:43,x1:40,y1:44},[95,95,95,255]);
+        fill(pixels,width,{x0:40,y0:43,x1:41,y1:44},[175,175,175,255]);
+        for(let x=37;x<41;x++)f.ink.add(43*width+x);
+        const box={x0:28,y0:37,x1:103,y1:51};
+        f.line={...f.line,bbox:box,sourceBoxes:[box],fontSize:16};
+        install(f);translations=['OK'];
+        const marks:Array<readonly[number,number,number]>=[];
+        for(let y=39;y<50;y+=3)for(let x=32;x<99;x+=3)marks.push([x,y,.82]);
+        detectorCore=marks;
+        if(mode==='empty-detection')evidenceMode='empty';
+        const layout=vi.spyOn(imageRendering,'canDrawTranslatedImageText');
+        if(mode==='layout')layout.mockReturnValueOnce(false);
+        if(mode==='layout-after-authorization')layout.mockReturnValueOnce(true).mockReturnValueOnce(false);
+        try{
+            const result=await translate();
+            expect(result.image).toBeTruthy();
+            expect(result.lines[0]).toMatchObject({text:'OK',sourceText:'SOURCE',bbox:box});
+            expect(result.retryWhenSegmentationReady).toBeUndefined();
+            expect(mocks.prepareSeg).not.toHaveBeenCalled();
+            expect(layout).toHaveBeenCalledTimes(mode==='verified'||mode==='layout-after-authorization'?2:1);
+            expect(at(encoded[0],width,85,32)).toEqual(mode==='verified'?f.matte:oldInk);
+            if(mode==='verified')checkFrame(f);
+            expect(canvases[0].reads).toEqual([[0,0,width,height]]);
+            released();
+        }finally{layout.mockRestore();}
+    });
     it.each(['left','right','revoked'] as const)('普通译图处理原擦除框内独立小图案 %s',async mode=>{
         const f=fixture(255),{width,height,matte,pixels}=f;
         fill(pixels,width,{x0:0,y0:0,x1:width,y1:height},matte);

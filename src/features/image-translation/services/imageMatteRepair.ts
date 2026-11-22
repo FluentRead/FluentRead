@@ -1,10 +1,11 @@
 /**
  * @file src/features/image-translation/services/imageMatteRepair.ts
  * 文件职责：在原文字框的八像素观察域内证明一致RGBA静区、完整墨迹与外部图案的几何分离。
- * 主要内容：最多八个实际像素色仅提出背景候选，完整静区闭环及整项共享的背景与墨色端点生成无写入权限的候选；旧准入API额外要求逐像素真实检测支持。同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
+ * 主要内容：最多八个实际像素色仅提出背景候选，完整静区闭环及整项共享的背景与墨色端点生成无写入权限的候选；旧准入API额外要求逐像素真实检测支持。同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，每次薄边复核用最终mask作截断距离场并线性扫描两趟；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
  * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；真实同帧模型支持由调用方验证并提供查询，不能从本mask反造支持。候选不含应用权限，也不证明语义分割；页规划必须在首次原图上预付共享预算，完成全页冲突、完整译字预检和真实支持授权后才应用，不能覆盖OCR框或扩大原文保护权限。
  * 样式观察：不透明调色板只返回同一静区与共同墨色端点，不要求用于擦除的薄AA形状；它没有mask，不能替代修补准入。
  * 字形复核：无检测写入权限的双侧裁切或行末图案提案可保留已验证的近端核心，供逐个复核抗锯齿相接的独立字形。
+ * 细衬线：仅普通图片的轻微偏侧裁切可在九成墨色薄边不足时，按同一精确混色域复核五成覆盖核心。所得提案需要独立的原文字形与同帧检测授权。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -12,6 +13,7 @@ type Box=OcrLine['bbox'];
 type Rgba=readonly [number,number,number,number];
 export interface ImageMatteObservationBox {left:number;top:number;width:number;height:number}
 export interface ImageMatteFitBudget {remaining:number}
+type ImageMatteCorePurpose='decoration'|'recognition';
 export interface ImageMatteRepair extends ImageMatteObservationBox {
     /** ROI内明确墨迹为1，不能据supportBox擦除包络内的其他像素。 */
     mask:Uint8Array;
@@ -20,6 +22,8 @@ export interface ImageMatteRepair extends ImageMatteObservationBox {
     artMask:Uint8Array;
     /** 需要复核字形的无写入权限提案中，至少九成覆盖的墨迹。 */
     inkCore?:Uint8Array;
+    /** 细笔画复核用的同帧墨迹，1为至少五成覆盖，2为至少九成覆盖。 */
+    fringeCore?:Uint8Array;
     sourceBox:Box;
     supportBox:Box;
 }
@@ -149,12 +153,28 @@ function observeMoat(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:B
     return {labels,background,supportBox:{x0:left+supportLeft,y0:top+supportTop,x1:left+supportRight,y1:top+supportBottom}};
 }
 
+/** 两趟截断距离变换，判定所有已归属墨迹是否处于核心的两像素邻域。 */
+function hasThinFringe(mask:Uint8Array,labels:Uint8Array,{width,height}:ImageMatteObservationBox):boolean {
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+        const index=y*width+x;
+        mask[index]=Math.min(mask[index],x?mask[index-1]+1:3,y?mask[index-width]+1:3,
+            x&&y?mask[index-width-1]+1:3,y&&x+1<width?mask[index-width+1]+1:3);
+    }
+    for(let y=height-1;y>=0;y--)for(let x=width-1;x>=0;x--){
+        const index=y*width+x;
+        mask[index]=Math.min(mask[index],x+1<width?mask[index+1]+1:3,y+1<height?mask[index+width]+1:3,
+            x+1<width&&y+1<height?mask[index+width+1]+1:3,x&&y+1<height?mask[index+width-1]+1:3);
+    }
+    for(let index=0;index<labels.length;index++)if(labels[index]===2&&mask[index]>2)return false;
+    return true;
+}
+
 function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
     supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly:true):ImageMattePalette|undefined;
 function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
-    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly?:false,retainCore?:boolean):ImageMatteRepair|undefined;
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly?:false,corePurpose?:ImageMatteCorePurpose):ImageMatteRepair|undefined;
 function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,observed:ObservedMoat,
-    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly=false,retainCore=false):ImageMatteRepair|ImageMattePalette|undefined {
+    supportAt:((x:number,y:number)=>boolean)|undefined,fitBudget:ImageMatteFitBudget,paletteOnly=false,corePurpose?:ImageMatteCorePurpose):ImageMatteRepair|ImageMattePalette|undefined {
     const {labels,background,supportBox}=observed,area=colors.length,bgAlpha=background>>>24;
     let peak=0,largest=0;
     for(let index=0;index<area;index++)if(labels[index]===2){
@@ -204,21 +224,28 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
     if(!fits)return;
     if(paletteOnly)return {...roi,background:[background&255,(background>>>8)&255,(background>>>16)&255,bgAlpha],
         ink:[peak&255,(peak>>>8)&255,(peak>>>16)&255,inkAlpha],supportBox:{...supportBox}};
-    // 只对首个canonical有效共同端点跑一次薄边准入；不以64次距离变换穷举其他解释。
-    // 中间coverage只能作薄AA，不能让与黑字同色线上的整块灰牌都被当成字擦掉。
-    for(let y=0;y<roi.height;y++)for(let x=0;x<roi.width;x++){
-        const index=y*roi.width+x;
-        mask[index]=Math.min(mask[index],x?mask[index-1]+1:3,y?mask[index-roi.width]+1:3,
-            x&&y?mask[index-roi.width-1]+1:3,y&&x+1<roi.width?mask[index-roi.width+1]+1:3);
+    // 首个合法共同端点仍是唯一依据。只在疑似单侧裁切时，借同一端点再复核一次细笔画。
+    const above=Math.floor(sourceBox.y0)-supportBox.y0,below=supportBox.y1-Math.ceil(sourceBox.y1);
+    let fringeCore:Uint8Array|undefined;
+    if(!hasThinFringe(mask,labels,roi)){
+        if(corePurpose!=='recognition'||bgAlpha!==255||Math.min(above,below)>1)return;
+        const cut=Math.max(above,below);
+        if(cut<2||cut>Math.min(6,(supportBox.y1-supportBox.y0)/4))return;
+        fringeCore=new Uint8Array(area);
+        mask.fill(3);
+        for(let i=0;i<inkIndices.length;i++){
+            const index=inkIndices[i];
+            if(--fitBudget.remaining<0)return;
+            // 同一原像素和端点已验证相容，这里只恢复该像素的量化区间。
+            forwardFits(colors[index]>>>24,ranges,i*3,endpoints,bgAlpha,inkAlpha,interval);
+            if(!constrain(interval,-1,2,false))continue;
+            mask[index]=0;
+            fringeCore[index]=constrain(interval,-9,10,false)?2:1;
+        }
+        if(!hasThinFringe(mask,labels,roi))return;
     }
-    for(let y=roi.height-1;y>=0;y--)for(let x=roi.width-1;x>=0;x--){
-        const index=y*roi.width+x;
-        mask[index]=Math.min(mask[index],x+1<roi.width?mask[index+1]+1:3,y+1<roi.height?mask[index+roi.width]+1:3,
-            x+1<roi.width&&y+1<roi.height?mask[index+roi.width+1]+1:3,x&&y+1<roi.height?mask[index+roi.width-1]+1:3);
-    }
-    for(let index=0;index<area;index++)if(labels[index]===2&&mask[index]>2)return;
     const artMask=new Uint8Array(area);
-    const keepCore=!supportAt&&bgAlpha===255&&(retainCore||supportBox.y0<Math.floor(sourceBox.y0)&&supportBox.y1>Math.ceil(sourceBox.y1));
+    const keepCore=!fringeCore&&!supportAt&&bgAlpha===255&&(corePurpose==='decoration'||above>0&&below>0);
     for(let index=0;index<area;index++){
         const ink=labels[index]===2;
         artMask[index]=+(labels[index]===3);
@@ -226,7 +253,7 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
         mask[index]=+ink;
     }
     return {...roi,mask,artMask,background:[background&255,(background>>>8)&255,(background>>>16)&255,bgAlpha],sourceBox:{...sourceBox},
-        supportBox,...(keepCore?{inkCore:labels}:{})};
+        supportBox,...(fringeCore?{fringeCore}:keepCore?{inkCore:labels}:{})};
 }
 
 function observeCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box) {
@@ -270,16 +297,16 @@ export function observeImageMattePalette(pixels:Uint8ClampedArray,width:number,h
 }
 
 function planCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
-    fitBudget:ImageMatteFitBudget,supportAt?:((x:number,y:number)=>boolean),retainCore=false):ImageMatteRepair|undefined {
+    fitBudget:ImageMatteFitBudget,supportAt?:((x:number,y:number)=>boolean),corePurpose?:ImageMatteCorePurpose):ImageMatteRepair|undefined {
     if(!fitBudget||!Number.isSafeInteger(fitBudget.remaining)||fitBudget.remaining<0)return;
     const observation=observeCandidate(pixels,width,height,sourceBox);
-    return observation?finish(observation.colors,observation.roi,observation.box,observation.result,supportAt,fitBudget,false,retainCore):undefined;
+    return observation?finish(observation.colors,observation.roi,observation.box,observation.result,supportAt,fitBudget,false,corePurpose):undefined;
 }
 
 /** 固定H8/64Ki ROI的只读候选，不查询模型且没有应用权限；页级调用方必须累计ROI及共同端点预算。 */
 export function planImageMatteCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box,
-    fitBudget:ImageMatteFitBudget,retainCore=false):ImageMatteRepair|undefined {
-    return planCandidate(pixels,width,height,sourceBox,fitBudget,undefined,retainCore);
+    fitBudget:ImageMatteFitBudget,corePurpose?:ImageMatteCorePurpose):ImageMatteRepair|undefined {
+    return planCandidate(pixels,width,height,sourceBox,fitBudget,undefined,corePurpose);
 }
 
 /** 保留旧的真实支持准入；无支持不会降级为候选，也不能用候选反造模型支持。 */

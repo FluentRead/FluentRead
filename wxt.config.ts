@@ -515,7 +515,8 @@ export default defineConfig({
             // 原框内的独立边饰保留使 Chrome 再增加 2,293 字节。
             // 细衬线的五成墨色核心复核使 Chrome 增加 739 字节代码。
             // 行末空心边饰与译文范围核对使 Chrome 增加 1,083 字节代码。
-            const imageClippedGlyphBudget = 7_000;
+            // 分割复核边饰旁的框外窄笔画再增加 1,083 字节代码。
+            const imageClippedGlyphBudget = 8_100;
             await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {

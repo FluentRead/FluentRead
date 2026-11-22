@@ -2480,6 +2480,17 @@ describe('folded URL reconnection with native link targets', () => {
         // 没有链接目标佐证时保留词距，不猜测可见文字。
         expect(joinPdfSourceLines(lines, 'text')).toBe('Full report at https:// docs.example.com/guide');
     });
+    it('accepts the printed tail only when the address shape itself is unambiguous', () => {
+        // 斜杠结尾的网址后接带目录层级的路径，目录里还有数字：属于被折行的地址。
+        expect(joinPdfSourceLines([urlLine('See https://', 100), urlLine('example.com/v2/items', 108)], 'text'))
+            .toBe('See https://example.com/v2/items');
+        // 连字符结尾的网址后接连字符或斜杠：续行仍是同一个地址。
+        expect(joinPdfSourceLines([urlLine('Token at https://api.example.com/v1/abc-', 100), urlLine('def/ghi', 108)], 'text'))
+            .toBe('Token at https://api.example.com/v1/abc-def/ghi');
+        // 单纯断词：连字符结尾但续行没有层次，按断词规则去掉连字符。
+        expect(joinPdfSourceLines([urlLine('Token at https://api.example.com/v1/abc-', 100), urlLine('yz', 108)], 'text'))
+            .toBe('Token at https://api.example.com/v1/abcyz');
+    });
 });
 
 describe('adjacent ruled table sections under one caption', () => {
@@ -2508,5 +2519,16 @@ describe('adjacent ruled table sections under one caption', () => {
         expect(boxes).toContainEqual([249.25, 192, 201.5, 100.5]);
         // 第二组表题只有左侧一段对齐，右侧 150pt 的段既不配对也不与表题对齐。
         expect(boxes.some(([x]) => x === 399.25)).toBe(false);
+    });
+
+    it('refuses a second caption over the same paired sections', () => {
+        const left = rules(40, 200, 292), right = rules(250, 200, 292);
+        const atoms = [atom('Table 3: Runtime by configuration.', 40, 300, 180),
+            atom('Table 4: Repeats the same rules.', 42, 300, 170),
+            ...rowAtoms(40, 3), ...rowAtoms(250, 3)];
+        const boxes = analyze(atoms, [...left, ...right]).preservedRegions
+            .filter(region => region.kind === 'table').map(region => [region.x, region.y]);
+        // 同一组横线只登记一次：第二个表题算出的配对与已有结果重叠，不再重复计入。
+        expect(boxes.filter(([x]) => x === 39.25 || x === 249.25)).toHaveLength(2);
     });
 });

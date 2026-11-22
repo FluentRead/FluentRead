@@ -7,7 +7,7 @@
 import {readFileSync} from 'node:fs';
 import {describe, expect, it} from 'vitest';
 import {PDFDocument, rgb, StandardFonts} from 'pdf-lib';
-import {parseBinaryDocument, pdfPageSegments, pdfTextAtoms, type PdfTextStyle} from '@/src/features/document-translation/services/binary';
+import {parseBinaryDocument, pdfLinkTargets, pdfPageSegments, pdfTextAtoms, type PdfTextStyle} from '@/src/features/document-translation/services/binary';
 import {analyzePdfPageLayout, extractPdfGraphicsShapes, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
 import {pdfOverlayBlocks} from '@/src/features/document-translation/core/pdfBlockFit';
 import type {DocumentSegment, PdfDocumentPage} from '@/src/features/document-translation/core/document';
@@ -249,5 +249,25 @@ describe('real PDF structural parsing', () => {
         const scanned = await parseBinaryDocument('scanned.pdf', await scan.save());
         expect(scanned.segments).toEqual([]);
         expect(scanned.binary?.kind === 'pdf' && scanned.binary.pages[0].blocks).toEqual([]);
+    });
+});
+
+describe('原页注解里的链接目标', () => {
+    it('只收集 Link 注解里可点击的 http(s) 目标', async () => {
+        const links = await pdfLinkTargets({getAnnotations: async () => [
+            {subtype: 'Link', url: 'https://docs.example.com/guide'},
+            {subtype: 'Link', unsafeUrl: 'http://example.net/a'},
+            {subtype: 'Link', url: 'javascript:alert(1)'},
+            {subtype: 'Text', url: 'https://ignored.example.com'},
+        ]});
+        expect([...links]).toEqual(['https://docs.example.com/guide', 'http://example.net/a']);
+    });
+    it('注解表读取失败时按无链接处理，不阻断解析', async () => {
+        // PDF.js 遇到损坏的 Annots 会直接 reject；这里没有链接可用，但要保住整篇解析。
+        const links = await pdfLinkTargets({getAnnotations: () => Promise.reject(new Error('broken annotation tree'))});
+        expect(links.size).toBe(0);
+    });
+    it('页面不提供注解接口时不发起读取', async () => {
+        expect((await pdfLinkTargets({})).size).toBe(0);
     });
 });

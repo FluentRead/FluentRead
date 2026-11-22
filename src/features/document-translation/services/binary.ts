@@ -836,6 +836,31 @@ function pdfMathGlyphStyles(items: readonly PdfTextItem[], styles: Record<string
     return result;
 }
 
+/** 原页注解里与本功能相关的最小字段。 */
+export interface PdfAnnotationTarget {
+    subtype?: string;
+    url?: string;
+    unsafeUrl?: string;
+}
+
+/**
+ * 读取原页的可点击链接目标，供被折到下一行的域名或路径拼接时核对。
+ * 注解表损坏或页面不提供该接口时按无链接处理：可选元数据不该让整篇解析失败。
+ */
+export async function pdfLinkTargets(page: {getAnnotations?: () => Promise<readonly PdfAnnotationTarget[]>}, signal?: AbortSignal): Promise<Set<string>> {
+    const links = new Set<string>();
+    if (typeof page.getAnnotations !== 'function') return links;
+    const annotations = await awaitDocumentRead(page.getAnnotations().catch(() => []), signal);
+    signal?.throwIfAborted();
+    for (const {subtype, url, unsafeUrl} of annotations) {
+        if (subtype !== 'Link') continue;
+        for (const target of [url, unsafeUrl]) {
+            if (typeof target === 'string' && /^https?:\/\//u.test(target)) links.add(target);
+        }
+    }
+    return links;
+}
+
 async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSignal, onProgress?: ParseDocumentFileOptions['onPdfProgress']): Promise<ParsedDocument> {
     if (new TextDecoder('latin1').decode(bytes.slice(0, 5)) !== '%PDF-') {
         throw new Error('PDF 文件签名无效，文件可能已损坏或扩展名不正确');
@@ -892,16 +917,8 @@ async function parsePdf(fileName: string, bytes: Uint8Array, signal?: AbortSigna
                 const {blocks: layoutBlocks, preservedRegions} = analyzePdfPageLayout({atoms, graphics, width: viewport.width, height: viewport.height});
                 // 原页链接可确认被折到下一行的域名或路径。只恢复已印刷的文字，不用链接目标替换可见标签。
                 const linkBlocks = layoutBlocks.filter(block => block.lines?.slice(0, -1).some(line => /https?:\S*$/u.test(line.text)));
-                if (linkBlocks.length && typeof page.getAnnotations === 'function') {
-                    const annotations = await awaitDocumentRead(page.getAnnotations().catch(() => []), signal);
-                    signal?.throwIfAborted();
-                    const links = new Set<string>();
-                    for (const {subtype, url, unsafeUrl} of annotations) {
-                        if (subtype !== 'Link') continue;
-                        for (const target of [url, unsafeUrl]) {
-                            if (typeof target === 'string' && /^https?:\/\//u.test(target)) links.add(target);
-                        }
-                    }
+                if (linkBlocks.length) {
+                    const links = await pdfLinkTargets(page, signal);
                     if (links.size) for (const block of linkBlocks) block.source = joinPdfSourceLines(block.lines!, block.kind, links);
                 }
                 const {blocks, segmentIndexes} = pdfPageSegments(layoutBlocks, pageNumber, segments);

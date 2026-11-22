@@ -6,22 +6,37 @@
 
 | 环节 | 结果 |
 | --- | --- |
-| Safari 扩展构建 | 通过，`.output/safari-mv3`，61.5 MB |
+| 上游基线 | 已同步至 `FluentRead/FluentRead` main（0.0.42，含 1944 个提交） |
+| Safari 扩展构建 | 通过，`.output/safari-mv2`（MV2），70.2 MB |
 | Xcode 容器工程 | 已生成，`safari/流畅阅读/流畅阅读.xcodeproj` |
-| 应用编译 | 通过，`build/dist/流畅阅读.app`（ad-hoc 签名，`codesign --verify` 通过） |
+| 应用编译 | 通过，`build/dist/流畅阅读.app`（Apple Development 证书签名） |
 | 引导界面 | 已本地化并截图核对（品牌卡片、状态徽标、三步引导、品牌图标） |
+
+## 与上游同步
+
+上游在 0.0.42 已自带 Safari 支持：`build:safari --mv2` + `scripts/safari/package.mjs` + MV2 后台页。同步时曾尝试保留本分支早期的 MV3 路线，实测发现 **Safari MV3 的 service worker 无法稳定响应配置代理**，设置页与弹窗会停在「正在读取设置…」；因此本轮起 **对齐上游改用 MV2**，容器与图标管线仍用自己的（`scripts/safari/convert.mjs`、`build-app.mjs`、`safari/流畅阅读/`）。
+
+同步时做了这些取舍：
+
+- **能力矩阵与容器选择同时支持两条路线**：`capabilities.ts` 里 MV2 走 `backgroundPageDom`，MV3 走 `safariMv3`；`extensionClient.ts` 按 MV 分派到后台 iframe 或后台标签页。虽然当前产物是 MV2，两处分支都保留，避免下游改 MV 时再次分叉。
+- **最低版本对齐上游的 Safari 26.0**：上游按 Safari 26 才支持现有 DNR `initiatorDomains`/`requestMethods` 条件来设定，本分支的 `scopeToInitiator` 降级逻辑仍然保留，作为更严格限制下的兜底。
+- **上游的 `safari:package`/`safari:check` 脚本原样保留但不使用**，它们面向 MV2 产物；日常发布走 `safari:app`。
+- **体积门禁**：多出的品牌图标（清单深色五档 + 工具栏模板四档，合计 17.1 kB）单列为 `safariBrandIconBudget`，不从其他浏览器余量里挤。
+- **根配置跟随上游**：`pnpm-workspace.yaml`（overrides / patchedDependencies / allowBuilds）、`.nvmrc`（22.23.4）、根级 `vitest.config.ts` 均已同步；`userscript/` 仅补入 `globals.d.ts`（其余 417 MB 资源不参与 Safari 构建）。
+
 
 ## 构建与产物
 
 ```sh
 pnpm install          # 也可用 npm install --legacy-peer-deps
-pnpm build:safari     # wxt build -b safari --mv3 → .output/safari-mv3
+pnpm build:safari     # wxt build -b safari --mv2 → .output/safari-mv2
 pnpm safari:app       # 同步扩展资源 + xcodebuild → build/dist/流畅阅读.app
 ```
 
 - **`pnpm safari:convert` 只在首次生成 Xcode 工程时执行。** 它会调用 `safari-web-extension-converter --force`，覆盖容器应用里的 Swift 与界面改动。
 - 日常改动扩展代码后，只需 `build:safari` + `safari:app`；后者会把新产物同步进工程的 `Resources`。
-- Safari 目标强制 MV3：WXT 0.20 默认把 Safari 输出成 MV2，而 MV2 后台是持久页面，会改变本项目 `isBackgroundContext` 的判定与权限模型，因此构建脚本显式带 `--mv3`。
+- **appex 资源以产物目录为准**：转换器生成的工程用显式文件列表引用资源，扩展新增的顶层文件（例如 MV2 的 `safari-background.html`）不会被 Xcode 打包，导致清单引用的页面 404、后台页起不来（设置页与弹窗会停在「正在读取设置…」）。`build-app.mjs` 的 `syncPackagedExtension` 会在构建后用 `.output/safari-mv2` 整目录覆盖 appex 的 `Resources` 再重签，绕开该限制。
+- **Safari 目标使用 MV2**：后台是 `safari-background.html` 非持久页，配置读取与共享 DOM 都由它承载。MV3 在 Safari 下后台为 service worker，实测无法稳定响应配置代理，设置页会卡在加载态。
 
 ## 安装与启用
 
@@ -36,8 +51,8 @@ pnpm safari:app       # 同步扩展资源 + xcodebuild → build/dist/流畅阅
 
 | 主题 | Chromium | Safari | 处理方式 |
 | --- | --- | --- | --- |
-| 后台 DOM 容器 | MV3 service worker + Offscreen API | 只有 service worker，无 Offscreen | 扩展自己的后台标签页承载同一份 `offscreen.html`；tabId 存 `storage.local`，空闲 10 分钟自动关闭（`src/platform/offscreen/safariDocument.ts`） |
-| 能力矩阵 | `extensionDom` 由 Offscreen 决定 | 由后台标签页决定 | `resolveBrowserCapabilities` 增加 `safari` 分支；并按 UA 兜底，Chromium 产物被侧载进 Safari 时同样按 Safari 降级 |
+| 后台 DOM 容器 | MV3 service worker + Offscreen API | 无 Offscreen API | MV2 后台页本身有 DOM，复用 `firefoxDocument.ts` 的隐藏 iframe 承载同一份 `offscreen.html`；MV3 分支（`safariDocument.ts` 后台标签页）保留但当前未启用 |
+| 能力矩阵 | `extensionDom` 由 Offscreen 决定 | 由 MV2 后台页决定 | `resolveBrowserCapabilities` 对 `safari+MV2` 计入 `backgroundPageDom`，`safari+MV3` 计入 `safariMv3`；并按 UA 兜底，Chromium 产物被侧载进 Safari 时同样按 Safari 降级 |
 | 请求头规则 | `initiatorDomains` 限定发起方 | DNR 条件不支持 `initiatorDomains` / `requestMethods` | 规则只按精确域名 + `xmlhttprequest` 收窄（`requestHeaderRules.ts`、`doubaoGuest.ts`） |
 | Google Drive 备份 | `identity` API | 未声明该权限 | 设置页在 Safari 只显示 WebDAV |
 | 动态资源地址 | `use_dynamic_url` | 不支持 | 转换前从清单移除（`scripts/safari/convert.mjs`） |

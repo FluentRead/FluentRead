@@ -1,7 +1,7 @@
 <!--
 @file src/features/settings/ui/components/PopupPreview.vue
 文件职责：用真实 DOM 按菜单栏的实际结构、尺寸和皮肤变量还原一份 Popup，供风格预览和菜单栏布局预览共用，保证两处看到的是同一个界面。
-主要内容：优先复用脚本构建注入的品牌图标并保留扩展资源回退，依次绘制品牌与版本、赞赏与设置、语言与服务、网页及局部翻译、站点开关、快捷入口卡片和底部信息栏；按构建与实际平台能力过滤专属入口，区域与快捷入口按传入顺序渲染，传入编辑层级和排序控制器时叠加拖动手柄与插入提示。
+主要内容：优先复用脚本构建注入的品牌图标并保留扩展资源回退，依次绘制品牌与版本、赞赏图标、受支持时的侧边栏图标和设置、语言与服务、网页及局部翻译、站点开关、快捷入口卡片和底部信息栏；按构建与实际平台能力过滤专属入口，区域与快捷入口按传入顺序渲染，传入编辑层级和排序控制器时叠加拖动手柄与插入提示。
 模块边界：只负责展示与把排序手势交给外部控制器，不读取用户配置、不连接浏览器状态，也不执行菜单栏业务；范例里的服务、快捷键和开关状态是固定示意，不代表用户当前设置。
 -->
 <template>
@@ -18,8 +18,9 @@
         <span><strong>{{ t('common.brand') }}</strong><small>v{{ version }}</small></span>
       </span>
       <span class="preview-header-actions">
-        <span><Coffee />{{ t('popup.donationButton') }}</span>
-        <span><Setting />{{ translateLegacy('设置') }}</span>
+        <span class="preview-header-icon"><Coffee /></span>
+        <span v-if="sidepanelAvailable" class="preview-header-icon"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"/><path d="M12.5 3.5v13M5.5 8h4M5.5 11h4"/></svg></span>
+        <span class="preview-settings"><Setting /><span>{{ translateLegacy('设置') }}</span></span>
       </span>
     </header>
 
@@ -47,34 +48,38 @@
           </div>
 
           <div class="preview-service" aria-hidden="true">
-            <strong>{{ t('popup.providers.title') }}</strong>
+            <span class="preview-service-copy"><small>{{ t('popup.providers.title') }}</small><strong>{{ translateLegacy('微软翻译') }}</strong></span>
             <span class="preview-provider-icons">
-              <span v-for="service in previewProviders" :key="service" class="preview-provider-avatar">
-                <ServiceIcon :service="service" size="small" />
-              </span>
+              <span class="preview-provider-avatar"><ServiceIcon service="microsoft" size="small" /></span>
               <b>›</b>
             </span>
           </div>
 
           <div class="preview-action-row" aria-hidden="true">
-            <span class="preview-action"><b>A↔译</b><strong>{{ t('popup.translateCurrentPage') }}</strong><kbd>Option+T</kbd></span>
+            <span class="preview-action"><strong>{{ t('popup.compact.translate') }} (⌥+T)</strong></span>
             <span class="preview-section-action">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15M10 10l7 2.6-3 1.1-1.1 3z" /></svg>
-              {{ t('popup.sectionTranslation') }}
+              <span>{{ t('popup.sectionTranslation') }}</span>
             </span>
           </div>
 
-          <PopupLayoutPreviewItem
-            v-if="siteModuleNestedInTranslation && siteModule"
-            :item="siteModule"
-            :editable="editScope === 'popupModule'"
-            :controller="moduleDrag"
-            class="preview-site-rules nested"
-            data-preview-popup-module="siteRule"
-          >
-            <span class="preview-site-rule-button" aria-hidden="true">{{ translateLegacy('始终翻译此网站') }}<i /></span>
-            <span class="preview-site-rule-button preview-site-disable" aria-hidden="true">{{ translateLegacy('在此网站禁用扩展') }}<i /></span>
-          </PopupLayoutPreviewItem>
+          <div v-if="(siteModuleNestedInTranslation && siteModule) || skin.kind === 'default'" class="preview-meta">
+            <PopupLayoutPreviewItem
+              v-if="siteModuleNestedInTranslation && siteModule"
+              :item="siteModule"
+              :editable="editScope === 'popupModule'"
+              :controller="moduleDrag"
+              class="preview-site-rules nested"
+              data-preview-popup-module="siteRule"
+            >
+              <span class="preview-site-rule-button" aria-hidden="true"><span>{{ translateLegacy('始终翻译此网站') }}</span><i /></span>
+              <span class="preview-site-rule-button preview-site-disable" aria-hidden="true"><span>{{ translateLegacy('在此网站禁用扩展') }}</span><i /></span>
+            </PopupLayoutPreviewItem>
+            <span v-if="skin.kind === 'default'" class="preview-tools" aria-hidden="true">
+              <span>Aa</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path :d="featurePath('appearance')" /></svg>
+            </span>
+          </div>
         </PopupLayoutPreviewItem>
 
         <PopupLayoutPreviewItem
@@ -85,8 +90,8 @@
           class="preview-site-rules"
           data-preview-popup-module="siteRule"
         >
-          <span class="preview-site-rule-button" aria-hidden="true">{{ translateLegacy('始终翻译此网站') }}<i /></span>
-          <span class="preview-site-rule-button preview-site-disable" aria-hidden="true">{{ translateLegacy('在此网站禁用扩展') }}<i /></span>
+          <span class="preview-site-rule-button" aria-hidden="true"><span>{{ translateLegacy('始终翻译此网站') }}</span><i /></span>
+          <span class="preview-site-rule-button preview-site-disable" aria-hidden="true"><span>{{ translateLegacy('在此网站禁用扩展') }}</span><i /></span>
         </PopupLayoutPreviewItem>
 
         <PopupLayoutPreviewItem
@@ -135,7 +140,7 @@
           <span aria-hidden="true">{{ t('popup.translationCount', {count: 0}) }}</span>
           <span class="preview-open-source" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .3a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.26c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.08 1.84 1.24 1.84 1.24 1.07 1.83 2.81 1.3 3.5.99.11-.77.42-1.3.76-1.6-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.24-3.22-.12-.3-.54-1.52.12-3.17 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.66 1.65.24 2.87.12 3.17.77.84 1.24 1.91 1.24 3.22 0 4.62-2.81 5.65-5.49 5.95.43.37.81 1.1.81 2.22v3.29c0 .32.22.69.83.57A12 12 0 0 0 12 .3" /></svg>
-            {{ t('popup.openSourceProject') }} ↗
+            <span>{{ t('popup.openSourceProject') }}</span><span class="preview-external-mark">↗</span>
           </span>
           <span class="preview-clear-cache" aria-hidden="true">{{ t('popup.clearCache') }}</span>
         </PopupLayoutPreviewItem>
@@ -149,6 +154,7 @@ import {computed} from 'vue'
 import {Coffee, Setting} from '@element-plus/icons-vue'
 import {version} from '@/package.json'
 import ServiceIcon from '@/src/ui/components/ServiceIcon.vue'
+import {canOpenTranslationSidepanel} from '@/src/platform/browser/translationSidepanel'
 import {
   POPUP_QUICK_FEATURE_IDS,
   popupModuleOptions,
@@ -179,9 +185,9 @@ const props = defineProps<{
 const emit = defineEmits<{'edit:scope': [scope: 'popupModule' | 'quickFeature']}>()
 const {t, translateLegacy} = useUiI18n()
 const iconUrl = globalThis.__FLUENTREAD_ICON_DATA__ || '/icon/128.png'
+const sidepanelAvailable = import.meta.env.BROWSER !== 'userscript' && canOpenTranslationSidepanel()
 
 // 固定范例用于比较外观，不表示这些服务、快捷键或开关已在用户配置中启用。
-const previewProviders = ['localTranslation', 'freeTranslation', 'microsoft', 'deepseek']
 const sampleQuickFeatureIds: PopupQuickFeatureId[] = ['hover', 'selection', 'image', 'document']
 const sampleSummaries: Record<PopupQuickFeatureId, string> = {
   hover: 'Ctrl',
@@ -250,6 +256,7 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
   border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 700;
 }
 .preview-header-actions > span:first-child { color: var(--muted); }
+.preview-header-actions > .preview-header-icon { width: 34px; padding: 0; }
 .preview-header-actions svg { width: 16px; height: 16px; flex: none; }
 
 .preview-flow { display: flex; flex-direction: column; gap: 10px; }
@@ -271,7 +278,8 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
   display: flex; min-width: 0; min-height: 40px; align-items: center; justify-content: space-between; gap: 10px; padding: 5px 9px;
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft);
 }
-.preview-popup .preview-service > strong { font-size: 12px; font-weight: 600; }
+.preview-service-copy { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 5px; }
+.preview-popup .preview-service-copy strong { font-size: 12px; font-weight: 600; }
 .preview-provider-icons { display: flex; flex: none; align-items: center; padding-left: 6px; }
 .preview-provider-avatar {
   display: grid; width: 29px; height: 29px; margin-left: -6px; place-items: center;
@@ -285,12 +293,7 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
   border-radius: 14px; color: #fff; background: linear-gradient(135deg, #f35482, #e93267);
   box-shadow: 0 6px 16px rgba(233, 50, 103, .16);
 }
-.preview-action > b { flex: none; font-size: 9px; font-weight: 850; }
 .preview-popup .preview-action > strong { min-width: 0; font-size: 12px; font-weight: 750; text-align: center; overflow-wrap: anywhere; }
-.preview-action kbd {
-  display: inline-flex; min-height: 22px; flex: none; align-items: center; padding: 0 5px; border: 1px solid rgba(255, 255, 255, .42);
-  border-radius: 7px; color: inherit; background: rgba(255, 255, 255, .16); font: inherit; font-size: 9px; font-weight: 700; white-space: nowrap;
-}
 .preview-section-action {
   display: inline-flex; min-width: 50px; flex: none; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 3px 8px;
   border: 1px solid var(--line); border-radius: 14px; color: var(--brand-strong); background: var(--surface-soft);
@@ -353,7 +356,35 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-section-heading button:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
 .preview-footer.editable > span:first-of-type { padding-left: 10px; }
 
-/* 默认：五个入口图标统一为品牌色。 */
+/* 默认预览与实际菜单共用固定槽位与站点状态圆点。 */
+[data-preview-kind="default"] .preview-header { flex-wrap: nowrap; }
+[data-preview-kind="default"] .preview-settings { width: 68px; padding-inline: 5px; }
+[data-preview-kind="default"] .preview-service { height: 43px; }
+[data-preview-kind="default"] .preview-service-copy { display: grid; grid-template-columns: min(52px, 42%) minmax(0, 1fr); }
+.preview-popup[data-preview-kind="default"] .preview-service-copy > small { font-size: 11px; }
+[data-preview-kind="default"] .preview-action-row { gap: 6px; }
+[data-preview-kind="default"] :is(.preview-action, .preview-section-action) { min-height: 42px; border-radius: 10px; }
+[data-preview-kind="default"] .preview-section-action { width: 46px; min-width: 46px; padding-inline: 5px; }
+[data-preview-kind="default"] .preview-meta { display: flex; gap: 6px; }
+[data-preview-kind="default"] .preview-site-rules {
+  display: grid; grid-template-columns: minmax(0, 10fr) minmax(0, 11fr); min-height: 24px; padding: 0; border: 0; background: transparent;
+}
+[data-preview-kind="default"] .preview-site-rules.nested { flex: 1; min-width: 0; }
+[data-preview-kind="default"] .preview-site-rule-button { justify-content: space-between; }
+.preview-tools { display: flex; flex: none; gap: 6px; margin-inline-start: auto; color: var(--brand-strong); }
+.preview-tools > * { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 6px; background: var(--surface-soft); }
+.preview-tools > span { font: 600 14px Georgia, serif; }
+.preview-tools > svg { padding: 3px; }
+[data-preview-kind="default"] .preview-footer { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+[data-preview-kind="default"] .preview-open-source { min-width: 0; justify-content: center; padding-inline: 3px; }
+.preview-external-mark { flex: none; }
+[data-preview-kind="default"] :is(
+  .preview-brand strong, .preview-settings > span, .preview-language-select strong, .preview-language > small, .preview-service-copy > *,
+  .preview-action > strong, .preview-section-action > span, .preview-site-rule-button > span,
+  .preview-feature-copy > *, .preview-footer > span:not(.preview-open-source), .preview-open-source > span:not(.preview-external-mark)
+) { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; overflow-wrap: normal; }
+
+/* 默认快捷卡沿用品牌色。 */
 .preview-popup[data-preview-kind="default"] .preview-feature-icon { color: var(--brand-strong); background: var(--brand-soft); }
 
 /* 简约：对应 minimal.css——没有卡片外框，控件是中性浅灰，入口只留标题。 */
@@ -370,8 +401,6 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
 .preview-popup[data-preview-kind="minimal"] .preview-action {
   min-height: 46px; padding: 10px 12px; border: 1px solid transparent; color: var(--ink); background: var(--surface-soft); box-shadow: none;
 }
-.preview-popup[data-preview-kind="minimal"] .preview-action > b { color: var(--brand-strong); }
-.preview-popup[data-preview-kind="minimal"] .preview-action kbd { border-color: var(--line); border-radius: 5px; color: var(--muted); background: var(--surface); }
 .preview-popup[data-preview-kind="minimal"] .preview-site-rules { border: 0; border-radius: 13px; }
 .preview-popup[data-preview-kind="minimal"] .preview-site-rule-button { min-height: 22px; padding: 3px 6px; border-radius: 6px; }
 .preview-popup[data-preview-kind="minimal"] .preview-features { gap: 5px; }
@@ -455,7 +484,6 @@ const featureStatus = (id: string) => isQuickFeatureId(id) ? sampleStatus[id] : 
   border: var(--skin-action-border, 0); border-radius: var(--skin-action-radius, var(--skin-control-radius, 10px)); color: var(--skin-action-text, #fff);
   background: var(--skin-action-background, var(--brand)); box-shadow: var(--skin-action-shadow, none);
 }
-.preview-popup[data-preview-kind="palette"] .preview-action kbd { border-color: color-mix(in srgb, currentColor 30%, transparent); border-radius: min(6px, var(--skin-control-radius, 6px)); background: color-mix(in srgb, currentColor 8%, transparent); }
 .preview-popup[data-preview-kind="palette"] .preview-feature {
   border: var(--skin-feature-border, 1px solid var(--line)); border-radius: var(--skin-feature-radius, 10px);
   background: var(--skin-feature-background, var(--surface)); box-shadow: var(--skin-feature-shadow, none);

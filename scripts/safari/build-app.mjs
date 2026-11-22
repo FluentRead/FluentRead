@@ -11,7 +11,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import {fileURLToPath} from 'node:url';
-import {convert, patchXcodeProject, syncExtensionResources, BUNDLE_ID, XCODE_PROJECT_DIR} from './convert.mjs';
+import {convert, patchXcodeProject, syncExtensionResources, BUNDLE_ID, EXTENSION_DIR, XCODE_PROJECT_DIR} from './convert.mjs';
 
 const ROOT = path.resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const OUT_DIR = path.join(ROOT, 'build', 'dist');
@@ -111,6 +111,27 @@ function resign(appPath) {
         : `[safari] 已用证书签名：${identity}`);
 }
 
+/**
+ * 用 .output 的扩展产物整体覆盖 appex 内资源。
+ *
+ * 转换器生成的工程用显式文件列表引用资源，扩展新增的顶层文件（例如 MV2 的
+ * safari-background.html）不会被 Xcode 打进 appex，导致清单引用的页面 404、
+ * 后台页无法启动。这里按目录替换，随后统一重签。
+ */
+function syncPackagedExtension(appPath) {
+    if (!existsSync(path.join(EXTENSION_DIR, 'manifest.json'))) {
+        throw new Error('未找到 .output/safari-mv2，请先运行 npm run build:safari');
+    }
+    const plugins = path.join(appPath, 'Contents', 'PlugIns');
+    if (!existsSync(plugins)) throw new Error('应用包内没有 PlugIns，无法同步扩展资源');
+    const appex = readdirSync(plugins).find(name => name.endsWith('.appex'));
+    if (!appex) throw new Error('应用包内没有 .appex，无法同步扩展资源');
+    const dest = path.join(plugins, appex, 'Contents', 'Resources');
+    rmSync(dest, {recursive: true, force: true});
+    cpSync(EXTENSION_DIR, dest, {recursive: true});
+    console.log('[safari] 已用产物覆盖 appex 资源');
+}
+
 function findProject() {
     const safariDir = path.join(ROOT, 'safari');
     if (!existsSync(safariDir)) return undefined;
@@ -171,6 +192,7 @@ function main() {
         const target = path.join(OUT_DIR, app);
         rmSync(target, {recursive: true, force: true});
         cpSync(path.join(products, app), target, {recursive: true});
+        syncPackagedExtension(target);
         applyLayeredIcon(target);
         console.log(`[safari] 已生成 ${path.relative(ROOT, target)}`);
     }

@@ -1,7 +1,9 @@
 /**
  * @file src/app/document-translation/document-page.css
- * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读。
- * 主要内容：声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载预览和响应式断点。
+ * PDF 窄屏工具：将批注与显示、搜索、阅读外观排在同一行，信息高亮使用保留可访问名称和提示的紧凑图标。
+ * 文件职责：定义文档翻译独立页面的完整布局与主题表现，使导入区、阅读器、翻译进度、原文件保存、格式预览和导出操作在桌面与窄屏下保持可读；下载面板在工具栏旁以小幅版式示意选择双语或仅译文，排版细项默认收起，在选择之后提供单一品牌下载按钮，不重复文件名，未完成时才确认一次，错误详情按需展开，工具栏消息与持续警告不遮挡正文。
+ * 主要内容：让数字进度完整可见，保留零进度和完成进度条，失败后的续译提示保持紧凑单行且仅按需展开技术详情；声明页面级颜色变量与暗色覆盖，打开文档后的单行工具栏（内含翻译服务与目标语言选择）、可折叠的文件与目录侧栏和铺满窗口的阅读区，设置可收起的文件队列、本地范例、品牌头部、拖放卡片、工具栏、PDF 连续页及其不可见字体测量画布、EPUB/DOCX 分区、字幕与 JSON 行、设置摘要、下载动作与状态和响应式断点；材料保存按钮在各格式工具栏中保持紧凑宽度，窄屏独立排布并避免覆盖阅读控件。
+ * ePub 章节目录在闲置时显示本地已译/总片段数，翻译期间隐藏静态计数；数值采用紧凑的等宽字形，不改变侧栏层级和跳转行为。
  * 模块边界：样式仅服务 DocumentApp 的 class 结构，不解析文档、不控制翻译状态，也不覆盖 content 宿主页面；跨页面基础视觉 token 仍由 src/ui/styles/tokens.css 管理。
  */
 @import "../../ui/styles/feedback.css";
@@ -70,6 +72,18 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .privacy-note { white-space: nowrap; color: var(--muted); font-size: 11px; }
 .privacy-note i { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #2db483; box-shadow: 0 0 0 4px rgba(45, 180, 131, .12); }
 .ghost-button { white-space: nowrap; min-height: 36px; padding: 0 13px; border: 1px solid var(--line); border-radius: 11px; color: var(--ink); background: var(--surface); font-size: 11px; font-weight: 700; cursor: pointer; }
+.document-glossary-extract { justify-self: start; margin-top: 8px; }
+.document-glossary-review { display: grid; gap: 10px; margin-top: 16px; }
+.document-glossary-destination { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 4px 8px; color: var(--ink); font-size: 12px; }
+.document-glossary-destination small { grid-column: 2; color: var(--muted); }
+.document-glossary-translation { min-width: 0; width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--ink); background: var(--surface); font: inherit; }
+.document-glossary-list { display: grid; max-height: min(48dvh, 340px); overflow: auto; margin: 0; padding: 0 6px 0 0; list-style: none; font-size: 12px; }
+.document-glossary-list > li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr); align-items: center; gap: 4px 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.document-glossary-term { display: flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; cursor: pointer; }
+.document-glossary-term input { flex: none; accent-color: var(--brand-strong); }
+.document-glossary-evidence { grid-column: 1 / -1; margin: 0; color: var(--muted); line-height: 1.5; overflow-wrap: anywhere; }
+.document-glossary-review .setup-privacy { margin: 0; }
+.document-glossary-actions .translate-document-button { white-space: normal; }
 .ghost-button:hover:not(:disabled) { border-color: rgba(239, 71, 118, .42); color: var(--brand-strong); background: var(--brand-soft); }
 .ghost-button:disabled { cursor: not-allowed; opacity: .55; }
 
@@ -189,12 +203,13 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .json-table-row code { color: #16855e; background: transparent; font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
 .json-source { color: var(--ink); font-size: 13px; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
 .json-translation { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 64px; resize: vertical; color: var(--ink); background: var(--surface-soft); font-size: 13px; line-height: 1.55; }
+.delimited-document-reader .json-table-header, .delimited-document-reader .json-table-row { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr) minmax(0, 1fr); }
+.delimited-document-reader .json-table-header.single, .delimited-document-reader .json-table-row.single { min-width: 0; grid-template-columns: minmax(64px, 8%) minmax(0, 1fr); }
 .document-reader { overflow: hidden; border: 1px solid var(--line); border-radius: 20px; background: var(--surface); box-shadow: 0 15px 34px rgba(46, 63, 106, .06); }
 .reader-block { padding: 22px 34px 23px; border-top: 1px solid var(--line); }
 .reader-block:first-child { border-top: 0; }
 .reader-context { display: inline-flex; margin-bottom: 9px; padding: 4px 8px; border-radius: 999px; color: var(--brand-strong); background: var(--brand-soft); font-size: 10px; font-weight: 800; }
 .reader-source { color: var(--ink); font-size: 17px; font-weight: 520; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; }
-.reader-source.reader-heading { margin-top: 3px; font-size: 23px; font-weight: 820; letter-spacing: -.03em; line-height: 1.35; }
 .reader-translation { display: block; width: 100%; min-height: 34px; margin-top: 7px; padding: 0; resize: vertical; border: 0; color: var(--ink); background: transparent; font-size: 17px; font-weight: 720; line-height: 1.75; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; }
 .reader-translation:not(:disabled):focus { padding: 7px 10px; border-radius: 9px; background: var(--brand-soft); }
 .reader-translation::placeholder { color: #aeb5c5; font-size: 14px; font-weight: 500; }
@@ -221,7 +236,7 @@ button:focus-visible, select:focus-visible, textarea:focus-visible, [role="butto
 .segment-edit-columns textarea { display: block; width: 100%; min-height: 96px; margin-top: 7px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); color: var(--ink); resize: vertical; font-size: 14px; line-height: 1.85; }.segment-edit-columns textarea:disabled { opacity: .75; }
 .reader-pagination { display: flex; align-items: center; justify-content: center; gap: 20px; padding: 18px; color: var(--muted); font-size: 12px; }.reader-pagination button, .reader-pagination select { padding: 7px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); cursor: pointer; }.reader-pagination button:disabled { cursor: not-allowed; opacity: .4; }
 .document-dialog { width: min(460px, calc(100% - 32px)); padding: 28px; border: 1px solid var(--line); border-radius: 20px; color: var(--ink); background: var(--surface); box-shadow: 0 24px 90px #10182833; }.document-dialog::backdrop { background: #10182866; backdrop-filter: blur(3px); }.document-dialog h2 { margin: 0 0 12px; font-size: 21px; }.document-dialog > p { color: var(--muted); font-size: 13px; line-height: 1.8; }.dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 12px; margin-top: 25px; }
-.export-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }.export-options button { padding: 18px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface-soft); cursor: pointer; text-align: left; }.export-options .selected { border-color: var(--brand); background: var(--brand-soft); }.export-options strong, .export-options span { display: block; }.export-options strong { font-size: 14px; }.export-options span { margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.7; }.partial-export { display: flex; align-items: center; gap: 8px; font-size: 12px; }.document-dialog .export-note { font-size: 11px; }.document-dialog .notice.error { color: #ce365e; }.document-dialog .notice.warning { color: #956500; }
+.partial-export { display: flex; align-items: center; gap: 8px; font-size: 12px; }.document-dialog .export-note { font-size: 11px; }.document-dialog .notice.error { color: #ce365e; }.document-dialog .notice.warning { color: #956500; }
 input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid var(--brand-soft); outline-offset: 2px; }.file-heading > div { min-width: 0; }.workspace-heading h1 { max-width: 75vw; }.document-footer { margin-top: 32px; }
 .document-app.is-workspace { display: flex; flex-direction: column; height: 100dvh; min-height: 0; overflow: hidden; background: var(--surface-soft); }
 .is-workspace .document-header { width: calc(100% - 48px); max-width: 1600px; flex: none; padding: 18px 0; }
@@ -310,36 +325,69 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .sample-buttons button:disabled { opacity: .55; cursor: wait; }
 .batch-toolbar .batch-toggle { display: inline-flex; align-items: center; justify-content: space-between; gap: 14px; border-color: transparent; background: transparent; cursor: pointer; }
 .batch-toggle span { color: var(--brand); font-size: 18px; }
-.download-dialog { width: min(620px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; }
-.original-download { display: flex; align-items: center; gap: 16px; margin-top: 22px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
-.original-download > div { flex: 1; min-width: 0; }
-.original-download strong { display: block; overflow-wrap: anywhere; font-size: 13px; }
-.document-dialog .original-download p { margin: 6px 0 0; font-size: 11px; }
-.original-download button { flex: none; white-space: nowrap; }
-.export-file-name { padding: 10px 12px; border-radius: 9px; background: var(--surface-soft); overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.export-preview { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.export-preview > strong { display: block; padding: 10px 14px; color: var(--muted); background: var(--surface-soft); font-size: 11px; font-weight: 600; }
-.export-preview pre { max-height: 180px; overflow-y: auto; margin: 0; padding: 14px; color: var(--ink); font: 12px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.download-dialog { position: fixed; box-sizing: border-box; width: min(360px, calc(100% - 24px)); max-height: calc(100dvh - 24px); margin: 0; padding: 22px; overflow-y: auto; border-radius: var(--fr-menu-radius, 14px); box-shadow: var(--fr-menu-shadow, 0 12px 36px #10182820); }
+.download-dialog::backdrop { background: transparent; backdrop-filter: none; }
+.download-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.download-heading h2 { margin: 0; color: var(--ink); font-size: 16px; font-weight: 650; }
+.download-heading button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; }
+.download-heading button:hover:not(:disabled) { background: var(--brand-soft); color: var(--brand-strong); }
+.download-versions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.download-version { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0; padding: 16px 10px 14px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: var(--surface); text-align: center; line-height: 1.5; overflow-wrap: anywhere; cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.download-version:hover { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); background: var(--surface-soft); }
+.download-version[data-selected="true"] { border-color: var(--brand); background: color-mix(in srgb, var(--brand-soft) 42%, var(--surface)); }
+.download-version:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 3px; }
+.download-version input { appearance: none; position: absolute; top: 10px; right: 10px; width: 14px; height: 14px; margin: 0; border: 1px solid var(--muted); border-radius: 50%; background: var(--surface); cursor: pointer; }
+.download-version input:checked { border: 4px solid var(--brand); }
+.download-version input:focus-visible { outline: none; }
+.download-versions:disabled .download-version { opacity: .55; cursor: not-allowed; }
+.download-version-title { font-size: 13px; font-weight: 600; }
+.download-version-hint { color: var(--muted); font-size: 11px; font-weight: 400; }
+.download-miniature { display: grid; place-items: center; width: 100%; height: 72px; margin-bottom: 7px; }
+.download-miniature-page { display: flex; gap: 9px; width: 49px; height: 62px; padding: 12px 8px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); box-shadow: 0 3px 7px #1018280a; }
+.download-version[data-mode="bilingual"] .download-miniature-page { width: 94px; }
+.download-miniature-source, .download-miniature-translation { flex: 1; min-width: 0; background: repeating-linear-gradient(to bottom, currentColor 0 2px, transparent 2px 8px); clip-path: polygon(0 0, 100% 0, 100% 80%, 65% 80%, 65% 100%, 0 100%); }
+.download-miniature-source { color: color-mix(in srgb, var(--muted) 34%, transparent); }
+.download-miniature-translation { color: color-mix(in srgb, var(--brand) 54%, transparent); }
+.download-miniature[data-presentation="readable"] .download-miniature-page { width: 49px; flex-direction: column; gap: 5px; }
+.download-miniature[data-presentation="readable"] .download-miniature-source, .download-miniature[data-presentation="readable"] .download-miniature-translation { min-height: 0; }
+.download-dialog button:disabled { opacity: .45; cursor: not-allowed; }
+.download-layout { margin: 16px 0 0; }
+.download-layout > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; color: var(--muted); font-size: 12px; line-height: 1.5; list-style: none; cursor: pointer; }
+.download-layout > summary::-webkit-details-marker { display: none; }
+.download-layout > summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+.download-layout-value { display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; color: var(--ink); text-align: right; }
+.download-layout[open] > summary .fr-ui-icon { transform: rotate(180deg); }
+.download-layout-control { width: 100%; min-width: 0; margin-top: 8px; }
+.download-layout-hint { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
+.download-submit { display: block; width: 100%; min-height: 44px; margin-top: 18px; padding: 11px 14px; border: 0; border-radius: var(--fr-control-radius, 9px); color: #fff; background: linear-gradient(135deg, #f35482, #e93267); box-shadow: 0 4px 10px #e9326714; font-size: 13px; font-weight: 600; line-height: 1.5; cursor: pointer; }
+.download-submit:hover:enabled { filter: brightness(1.04); box-shadow: 0 5px 14px #e9326724; }
+.download-original-row { margin-top: 12px; text-align: center; }
+.download-original { min-height: 28px; padding: 3px 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; cursor: pointer; }
+.download-original:hover:not(:disabled) { color: var(--brand-strong); }
+.download-confirmation, .download-dialog .export-progress { padding: 16px; border-radius: 12px; background: var(--surface-soft); }
+.download-confirmation h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.download-dialog .notice, .download-dialog .export-progress p { margin: 8px; font-size: 12px; line-height: 1.6; }
+.download-confirmation .notice, .download-dialog .export-progress p { margin: 0; color: var(--muted); }
+.download-dialog .dialog-actions { gap: 8px; margin-top: 14px; }
+.download-dialog .dialog-actions button { min-width: 0; min-height: 38px; height: auto; padding: 8px 12px; border-radius: 8px; font-size: 12px; }
+.download-dialog .download-help { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.download-cancel { margin-top: 10px; padding: 4px 0; border: 0; background: transparent; color: var(--brand-strong); font-size: 12px; cursor: pointer; }
+.download-failure { margin-top: 16px; padding: 14px; border-radius: 10px; background: var(--surface-soft); }
+.download-failure .notice { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.7; }
+.download-failure strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 13px; font-weight: 600; }
+.download-failure details { margin-top: 10px; }
+.download-failure summary { color: var(--muted); font-size: 11px; cursor: pointer; }
+.download-failure pre { max-height: 100px; margin: 8px 0 0; overflow: auto; color: var(--muted); font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.pdf-source-actions {display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px;}
+.pdf-source-actions p {flex-basis: 100%; margin: 0;}
 .document-batch-translation { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; font-size: 12px; cursor: pointer; }
 .document-batch-translation input { flex: none; margin-top: 3px; }
 .document-batch-translation strong, .document-batch-translation small { display: block; }
 .document-batch-translation small { margin-top: 4px; color: var(--muted); font-size: 11px; line-height: 1.6; }
-.pdf-export-summary { display: flex; align-items: center; gap: 20px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-soft); }
-.pdf-export-summary strong { font-size: 13px; }
-.document-dialog .pdf-export-summary p { margin: 6px 0 0; font-size: 11px; }
-.pdf-export-page-pair { display: flex; flex: none; gap: 6px; }
-.pdf-export-page { width: 64px; height: 82px; padding: 8px 7px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); box-shadow: 0 2px 5px #10182808; }
-.pdf-export-page span { display: block; margin-bottom: 10px; font-size: 9px; color: var(--muted); }
-.pdf-export-page i { display: block; height: 3px; margin-top: 5px; border-radius: 2px; background: var(--line); }
-.pdf-export-page i:last-child { width: 65%; }
-.pdf-export-page.translated { border-color: var(--brand); }
-.pdf-export-page.translated span { color: var(--brand); }
-.pdf-export-page.translated i { background: var(--brand-soft); }
 .export-progress progress { display: block; width: 100%; height: 6px; margin: 10px 0 0; border: 0; border-radius: 3px; overflow: hidden; accent-color: var(--brand); }
 .export-progress progress::-webkit-progress-bar { border-radius: 3px; background: var(--line); }
 .export-progress progress::-webkit-progress-value { border-radius: 3px; background: var(--brand); }
 .export-progress progress::-moz-progress-bar { border-radius: 3px; background: var(--brand); }
-.export-options button:disabled { opacity: .55; cursor: wait; }
 @media (max-width: 760px) {
   .document-samples { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
   .sample-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -349,10 +397,6 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .batch-toolbar > span { flex: 1; }
   .batch-toolbar label { flex: 1; }
   .batch-files { max-height: 170px; }
-  .download-dialog { padding: 20px; }
-  .original-download { align-items: stretch; flex-direction: column; gap: 12px; padding: 12px; }
-  .export-options { gap: 8px; }
-  .export-preview pre { max-height: 140px; }
 }
 
 /* 阅读是文档页的中心；设置和文件管理按需打开，避免重复说明挤占正文。 */
@@ -370,8 +414,31 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-settings-button small { color: var(--brand-strong); font-size: 11px; }
 .task-progress { grid-column: 1 / -1; height: 3px; overflow: hidden; border-radius: 10px; background: var(--line); }
 .task-progress i { display: block; height: 100%; background: var(--brand); transition: width .2s; }
-.task-progress.complete, .task-progress[aria-valuenow="0"] { display: none; }
+.task-progress.complete i { background: #279672; }
 .task-notice { grid-column: 1 / -1; margin: 0; }
+.document-context-choice { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.document-context-choice .document-batch-translation { min-width: 0; flex: 1; margin-top: 14px; }
+.document-context-inherit { flex: none; padding: 5px 8px; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); background: var(--surface); font: inherit; font-size: 11px; cursor: pointer; }
+.document-context-inherit:disabled { cursor: default; opacity: .55; }
+.document-request-evidence { grid-column: 1 / -1; min-width: 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.document-request-evidence > summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px 12px; padding-top: 8px; cursor: pointer; }
+.document-request-evidence > summary span { color: var(--ink); font-weight: 600; }
+.document-request-evidence > summary small { font-size: 10.5px; }
+.document-request-evidence-body { display: grid; gap: 7px; padding: 8px 0 2px; }
+.document-request-evidence-body p { margin: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.document-request-location { color: var(--muted); }
+.document-request-empty { color: var(--muted); }
+.document-request-context-list, .document-request-glossary-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.document-request-context-list li { min-width: 0; padding: 7px 9px; border-radius: 7px; background: var(--surface-soft); }
+.document-request-context-list li > strong { color: var(--brand-strong); font-size: 10px; font-weight: 600; }
+.document-request-context-list li > small { margin-left: 8px; font-size: 10px; }
+.document-request-context-list li > p { margin-top: 3px; color: var(--ink); white-space: pre-wrap; }
+.document-request-context-list li > .document-request-evidence-translation { color: var(--muted); }
+.document-request-glossary-summary { color: var(--ink); }
+.document-request-glossary-list li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.document-request-glossary-list small { flex: none; color: var(--muted); }
+.document-request-glossary-list span { min-width: 0; color: var(--ink); overflow-wrap: anywhere; }
+.document-request-glossary-list b { flex: none; color: var(--muted); font-size: 10px; font-weight: 500; }
 .document-batch { padding: 10px 16px; margin-bottom: 14px; border-radius: 14px; }
 .batch-files { grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); max-height: 150px; }
 .batch-files li { padding: 10px; }
@@ -436,6 +503,23 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .task-file-format { width: auto; height: 20px; padding: 0 6px; border-radius: 5px; font-size: 9px; letter-spacing: .04em; }
 .document-taskbar h1 { overflow: hidden; margin: 0; max-width: none; font-size: 13px; font-weight: 650; line-height: 1.3; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
 .document-taskbar .document-status { margin: 1px 0 0; font-size: 10.5px; line-height: 1.3; white-space: nowrap; }
+.document-taskbar .document-translation-count { display: inline; margin-left: 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.editor-retained { margin: 0 20px 16px; border: 1px solid var(--line); border-radius: 9px; }
+.editor-retained > summary { padding: 10px 12px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.editor-retained .document-translation { margin: 0; white-space: pre-wrap; user-select: text; }
+.editor-retained > .ghost-button { margin: 12px; }
+.translation-recovery { position: relative; grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 4px 0 2px; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.recovery-message { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recovery-service { flex: none; padding: 0; border: 0; background: transparent; color: var(--brand-strong); font: inherit; white-space: nowrap; cursor: pointer; }
+.recovery-service:hover { text-decoration: underline; text-underline-offset: 3px; }
+.recovery-details { flex: none; }
+.recovery-details summary { cursor: pointer; white-space: nowrap; }
+.recovery-details[open] summary { color: var(--ink); }
+.recovery-service:focus-visible, .recovery-details summary:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 3px; }
+.recovery-error-detail { position: absolute; z-index: 26; top: 100%; left: 0; box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-height: 160px; margin: 8px 0 0; padding: 10px 12px; overflow: auto; overflow-wrap: anywhere; white-space: pre-wrap; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); box-shadow: 0 6px 18px #1018281a; font-size: 12px; line-height: 1.5; }
+.document-taskbar .task-notice button { display: inline-flex; align-items: center; margin: 4px 6px; padding: 3px 8px; border: 1px solid currentColor; border-radius: 6px; background: transparent; color: inherit; font: inherit; white-space: nowrap; cursor: pointer; }
+.document-taskbar .task-notice button:disabled { opacity: .5; cursor: default; }
+.document-taskbar .task-notice button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .document-taskbar .reader-toolbar { position: static; display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; margin: 0; padding: 0; border: 0; background: none; }
 .document-taskbar .mode-buttons { height: 32px; min-height: 32px; flex-wrap: nowrap; padding: 2px; border-radius: 9px; }
 .document-taskbar .mode-buttons button { min-width: 0; padding: 0 11px; border-radius: 7px; font-size: 12px; white-space: nowrap; }
@@ -454,7 +538,7 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .download-button:enabled:hover { border-color: rgba(239, 71, 118, .42); color: var(--brand-strong); background: var(--brand-soft); }
 .document-taskbar .download-button:disabled { border-color: var(--line); color: var(--muted); background: transparent; cursor: not-allowed; opacity: .5; }
 .document-taskbar .add-file-button { border-color: transparent; color: var(--muted); background: transparent; font-weight: 600; }
-.document-taskbar .task-progress { position: absolute; inset: auto 0 -1px; height: 2px; border-radius: 0; background: transparent; }
+.document-taskbar .task-progress { position: absolute; inset: auto 0 -1px; height: 3px; border-radius: 0; background: var(--line); }
 .document-taskbar .task-notice, .document-taskbar .document-import-progress { flex-basis: 100%; margin: 0; padding: 2px 0 4px; font-size: 11.5px; }
 .is-workspace .document-reading-pane { border: 0; border-radius: 0; background: var(--reader-canvas); }
 .is-workspace .document-reading-pane .reading-content { padding: 16px max(16px, calc((100% - 1180px) / 2)); }
@@ -495,7 +579,6 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .is-workspace .document-sidebar .document-batch { position: static; width: auto; max-height: none; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
 .is-workspace .document-sidebar .batch-toggle { display: none; }
 .is-workspace .document-sidebar .batch-toolbar { gap: 6px; padding: 0 2px 8px; }
-.is-workspace .document-sidebar .batch-toolbar:not(:has(> button:not(.batch-toggle), > label)) > span[role="status"] { display: none; }
 .is-workspace .document-sidebar .batch-toolbar > span { flex-basis: 100%; }
 .is-workspace .document-sidebar .batch-toolbar button { padding: 6px 10px; font-size: 11.5px; cursor: pointer; }
 .is-workspace .document-sidebar .batch-files { display: grid !important; grid-template-columns: 1fr; gap: 4px; max-height: none; margin: 0; overflow: visible; }
@@ -515,8 +598,10 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .document-settings-button { display: inline-grid; flex: none; place-items: center; width: 32px; max-width: none; height: 32px; padding: 0; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); }
 .document-taskbar .document-settings-button svg { width: 17px; height: 17px; }
 .document-taskbar .document-settings-button > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.document-taskbar .download-button:enabled { border-color: var(--brand); color: #fff; background: var(--brand); font-weight: 700; }
-.document-taskbar .download-button:enabled:hover { border-color: var(--brand-strong); color: #fff; background: var(--brand-strong); }
+.document-taskbar [data-primary-action="download"] .download-button:enabled { border-color: var(--brand); color: #fff; background: var(--brand); font-weight: 700; }
+.document-taskbar [data-primary-action="download"] .download-button:enabled:hover { border-color: var(--brand-strong); color: #fff; background: var(--brand-strong); }
+.document-taskbar [data-primary-action="download"] .translate-document-button { border: 1px solid var(--line); color: var(--ink); background: var(--surface); }
+.document-taskbar [data-primary-action="download"] .translate-document-button:hover:not(:disabled) { border-color: var(--brand); color: var(--brand-strong); background: var(--brand-soft); }
 .document-taskbar .workspace-heading { max-width: min(26vw, 360px); }
 @media (max-width: 760px) {
   .is-workspace .document-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
@@ -553,14 +638,17 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-sidebar .sidebar-outline { margin-bottom: 10px; }
 .document-sidebar .document-batch { margin-bottom: 10px; }
 
-/* 文件页：每份文件一行（名称、状态、进度条），批量操作收在列表下方。 */
+/* 文件页：每份文件一行（名称、状态、进度条）；导入状态与批量操作各占一行，操作收在列表下方。 */
 .is-workspace .document-sidebar .document-batch { display: flex; flex-direction: column; }
-.is-workspace .document-sidebar .batch-toolbar { order: 3; flex-direction: column; align-items: stretch; gap: 8px; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--line); }
+.is-workspace .document-sidebar .batch-toolbar { order: 3; display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 8px; margin-top: 10px; padding: 10px 0 0; border-top: 1px solid var(--line); }
 .is-workspace .document-sidebar .batch-toolbar:not(:has(> button:not(.batch-toggle), > label, > .batch-status:not(.idle), > .queue-error)) { display: none; }
 .is-workspace .document-sidebar .batch-status.idle { display: none; }
-.is-workspace .document-sidebar .batch-toolbar > button { width: 100%; min-height: 32px; border-radius: 9px; font-weight: 650; }
+.is-workspace .document-sidebar .batch-toolbar > :not(.batch-toggle) { min-width: 0; max-width: 100%; }
+.is-workspace .document-sidebar .batch-toolbar > .batch-status, .is-workspace .document-sidebar .batch-toolbar > .queue-error { width: 100%; overflow-wrap: anywhere; }
+.is-workspace .document-sidebar .batch-toolbar > button { width: 100%; min-width: 0; min-height: 32px; border-radius: 9px; font-weight: 650; }
 .is-workspace .document-sidebar .batch-toolbar > .batch-start { border-color: var(--brand); color: #fff; background: var(--brand); }
-.is-workspace .document-sidebar .batch-toolbar > label { justify-content: space-between; color: var(--muted); }
+.is-workspace .document-sidebar .batch-toolbar > label { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+.is-workspace .document-sidebar .batch-toolbar > label .batch-output { flex: none; max-width: 100%; }
 .is-workspace .document-sidebar .batch-files { order: 1; }
 .is-workspace .document-sidebar .sidebar-add-file { order: 2; }
 .is-workspace .document-sidebar .document-batch > .notice { order: 4; }
@@ -618,9 +706,6 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .restoring-section { display: grid; place-items: center; min-height: 100dvh; }
 .restoring-section .spinner { width: 22px; height: 22px; margin: 0; }
 .is-restoring .document-main { width: 100%; padding: 0; }
-.taskbar-toast { position: absolute; top: calc(100% + 10px); left: 50%; z-index: 25; margin: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--surface); box-shadow: 0 10px 28px #10182826; font-size: 12px; white-space: nowrap; transform: translateX(-50%); pointer-events: none; }
-.taskbar-toast { animation: taskbar-toast-in .2s ease-out; }
-@keyframes taskbar-toast-in { from { opacity: 0; transform: translate(-50%, -6px); } }
 /* 导入中：进度条 + 次要的取消链接。 */
 .import-progress { width: min(320px, 80%); height: 6px; margin-top: 4px; overflow: hidden; border-radius: 6px; background: var(--brand-soft); }
 .import-progress i { display: block; height: 100%; border-radius: 6px; background: var(--brand); transition: width .2s; }
@@ -628,28 +713,36 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 @keyframes import-slide { from { transform: translateX(-20%); } to { transform: translateX(210%); } }
 .import-cancel { margin-top: 12px; padding: 0; border: 0; color: var(--muted); background: none; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .import-cancel:hover { color: var(--brand-strong); }
-/* 工具栏提示：浮在工具栏下方的提示条，不占行、不推动正文。 */
-.taskbar-notices { position: absolute; top: calc(100% + 10px); left: 50%; z-index: 25; display: flex; flex-direction: column; align-items: center; gap: 8px; width: max-content; max-width: min(720px, calc(100% - 32px)); transform: translateX(-50%); pointer-events: none; }
+/* 工具栏提示保留紧凑的正常布局行；正文随提示高度排布，不被长文案和窄屏换行遮挡。 */
+.taskbar-notices { grid-column: 1 / -1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .taskbar-notices:empty { display: none; }
-.document-taskbar .taskbar-notices > * { position: static; flex: none; margin: 0; padding: 8px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 28px #10182826; font-size: 12px; line-height: 1.5; white-space: normal; transform: none; pointer-events: auto; animation: taskbar-notice-in .2s ease-out; }
+.document-taskbar .taskbar-notices > * { flex: none; margin: 0; padding: 4px 0; min-width: 0; font-size: 12px; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.document-taskbar .taskbar-notices > .taskbar-toast { color: var(--muted); }
+.document-taskbar .taskbar-notices > .notice { padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; }
 .document-taskbar .taskbar-notices > .notice.warning { border-color: #f1dfb4; background: #fffaf0; }
 .document-taskbar .taskbar-notices > .notice.error { border-color: #f3c8d2; background: #fff5f7; }
 .dark .document-taskbar .taskbar-notices > .notice.warning, .dark .document-taskbar .taskbar-notices > .notice.error { background: var(--surface); }
-@keyframes taskbar-notice-in { from { opacity: 0; transform: translateY(-6px); } }
-/* 工具栏按完整功能组排布；宽度不足时明确分行，阅读和任务入口始终可达。 */
+/* 工具栏按完整功能组排布；常见桌面 PDF 使用两行，较窄桌面用设置入口收起翻译字段，保留阅读与任务操作。 */
 .document-taskbar { display: grid; grid-template-columns: minmax(100px, 170px) minmax(0, 1fr) auto; gap: 8px 10px; overflow: visible; }
 .document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; width: 100%; max-width: none; min-width: 0; flex-wrap: nowrap; gap: 8px; }
 .document-taskbar .file-heading, .document-taskbar .file-heading > div { min-width: 0; }
 .document-taskbar .document-status { overflow: hidden; text-overflow: ellipsis; }
+.document-taskbar .article-source-link { display: inline-block; margin-top: 3px; color: var(--brand); font-size: 11px; }
 .document-taskbar .reader-toolbar { grid-column: 2; grid-row: 1; flex-wrap: nowrap; gap: 8px; min-width: 0; padding-left: 10px; }
 .document-taskbar .reader-tabs { flex: none; }
 .document-taskbar .reader-reading-controls { display: flex; flex: 1 1 auto; align-items: center; gap: 8px; min-width: 0; }
 .document-taskbar .reader-reading-controls > .mode-buttons, .document-taskbar .focus-toggle { flex: none; }
+.document-taskbar .material-save-button { flex: none; width: max-content; max-width: 100%; justify-self: start; }
 .document-taskbar .reader-controls-slot { flex: 0 1 auto; min-width: 0; padding-left: 8px; overflow: visible; }
 .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { gap: 8px; flex-wrap: nowrap; }
 .document-taskbar .taskbar-actions { display: flex; grid-column: 3; grid-row: 1; align-items: center; min-width: 0; margin-left: 0; gap: 10px; flex-wrap: nowrap; }
 .toolbar-translation-settings, .toolbar-primary-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .toolbar-primary-actions { flex: none; }
+.document-taskbar .delimited-column-picker { flex: none; width: min(132px, 33vw); }
+.document-taskbar .delimited-column-picker .el-select__wrapper { min-height: 32px; padding: 0 8px; border-radius: 9px; }
+.delimited-column-picker .el-select__selection { flex-wrap: nowrap; min-width: 0; gap: 4px; }
+.delimited-column-count { flex: none; white-space: nowrap; color: var(--ink); font-size: 12px; }
+.document-column-options .el-select-dropdown__item { max-width: min(340px, calc(100vw - 28px)); }
 .document-taskbar .toolbar-settings-toggle { display: none; }
 .document-taskbar .toolbar-field { min-width: 0; }
 .document-taskbar .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -660,12 +753,14 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-taskbar .translation-actions button { width: auto; }
 @media (min-width: 1000px) and (max-width: 1759px) {
   .document-taskbar { grid-template-columns: minmax(120px, 1fr) auto auto auto auto; gap: 8px 12px; }
+  .document-taskbar:has(.material-save-button) { grid-template-columns: minmax(120px, 1fr) auto auto auto auto auto; }
   .document-taskbar .taskbar-logo { display: none; }
   .document-taskbar .reader-toolbar, .document-taskbar .reader-reading-controls { display: contents; }
   .document-taskbar .reader-tabs { grid-column: 2; grid-row: 1; }
   .document-taskbar .reader-reading-controls > .mode-buttons { grid-column: 3; grid-row: 1; }
   .document-taskbar .document-zoom-control { grid-column: 4; grid-row: 1; }
   .document-taskbar .focus-toggle { grid-column: 5; grid-row: 1; }
+  .document-taskbar .material-save-button { grid-column: 6; grid-row: 1; }
   .document-taskbar .reader-controls-slot { grid-column: 1 / -1; grid-row: 2; padding: 8px 0 0; border: 0; border-top: 1px solid var(--line); }
   .document-taskbar .taskbar-actions { display: grid; grid-column: 1 / -1; grid-row: 2; grid-template-columns: minmax(0, 1fr) auto; padding-top: 7px; border-top: 1px solid var(--line); }
   .document-taskbar.has-pdf-controls .taskbar-actions { grid-row: 3; }
@@ -675,6 +770,22 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .document-taskbar .toolbar-language { width: 120px; }
   .document-taskbar .toolbar-model { width: 150px; }
 }
+@media (min-width: 1000px) {
+  .document-taskbar.has-pdf-controls { grid-template-columns: minmax(0, 1fr) auto; }
+  .document-taskbar.has-pdf-controls .reader-toolbar { display: flex; grid-column: 2; grid-row: 1; justify-content: flex-end; padding-left: 0; }
+  .document-taskbar.has-pdf-controls .reader-reading-controls { display: flex; flex: none; }
+  .document-taskbar.has-pdf-controls .reader-controls-slot { grid-column: 1; grid-row: 2; padding: 7px 0 0; border: 0; border-top: 1px solid var(--line); }
+  .document-taskbar.has-pdf-controls .taskbar-actions { display: flex; grid-column: 2; grid-row: 2; padding-top: 7px; border-top: 1px solid var(--line); }
+  .document-taskbar.has-pdf-controls .toolbar-translation-settings { gap: 8px; }
+  .document-taskbar.has-pdf-controls .toolbar-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .document-taskbar.has-pdf-controls .toolbar-service { width: 150px; }
+  .document-taskbar.has-pdf-controls .toolbar-language { width: 110px; }
+  .document-taskbar.has-pdf-controls .toolbar-model { width: 130px; }
+}
+@media (min-width: 1000px) and (max-width: 1359px) {
+  .document-taskbar.has-pdf-controls .toolbar-translation-settings { display: none; }
+  .document-taskbar.has-pdf-controls .toolbar-settings-toggle { display: inline-flex; }
+}
 @media (max-width: 999px) {
   .document-taskbar { grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 8px 10px; }
   .document-taskbar .workspace-heading { grid-column: 1; grid-row: 1; }
@@ -683,32 +794,47 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .document-taskbar .reader-tabs { grid-column: 2 / -1; grid-row: 1; justify-self: end; }
   .document-taskbar .reader-reading-controls > .mode-buttons { grid-column: 1; grid-row: 2; justify-self: start; }
   .document-taskbar .document-zoom-control { grid-column: 2; grid-row: 2; }
+  .document-taskbar .material-save-button { grid-column: 1 / -1; grid-row: 3; }
   .document-taskbar .reader-controls-slot { grid-column: 1 / -1; grid-row: 3; padding: 7px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  .document-taskbar:has(.material-save-button) .reader-controls-slot { grid-row: 4; }
   .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { gap: 7px; }
   .document-taskbar .focus-toggle { grid-column: 3; grid-row: 2; justify-self: end; margin-left: 0; }
   .document-taskbar .taskbar-actions { display: block; grid-column: 1 / -1; grid-row: 3; padding-top: 7px; border-top: 1px solid var(--line); }
+  .document-taskbar:has(.material-save-button) .taskbar-actions { grid-row: 4; }
   .document-taskbar.has-pdf-controls .taskbar-actions { grid-row: 4; }
+  .document-taskbar.has-pdf-controls:has(.material-save-button) .taskbar-actions { grid-row: 5; }
   .document-taskbar .toolbar-translation-settings { display: none; }
   .toolbar-primary-actions { width: 100%; }
+  .document-taskbar .delimited-column-picker { flex: 1 1 106px; width: auto; min-width: 80px; max-width: 158px; }
   .document-taskbar .toolbar-settings-toggle { display: inline-flex; align-items: center; justify-content: center; margin-right: auto; }
   .document-taskbar .toolbar-primary-actions .translation-actions { flex: 0 1 auto; min-width: 0; }
   .document-taskbar .toolbar-primary-actions button { overflow: hidden; text-overflow: ellipsis; }
   .document-taskbar .toolbar-primary-actions .translation-actions button { max-width: 100%; }
+  .document-taskbar.has-pdf-controls .workspace-heading { grid-column: 1 / -1; }
+  .document-taskbar.has-pdf-controls .reader-tabs { grid-column: 2; grid-row: 2; }
   .document-taskbar .mode-buttons button { padding: 0 8px; }
   .is-workspace .document-reading-pane .reading-content, .document-reading-pane .reading-content.reading-pdf { min-height: 0; }
 }
 @media (max-width: 599px) {
-  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto minmax(0, 1fr); gap: 7px; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar { display: grid; width: 100%; grid-template-columns: auto auto auto auto minmax(0, 1fr); gap: 7px; }
   .reader-controls-slot .pdf-page-navigation { grid-column: 1 / 3; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-zoom-control { grid-column: 3 / -1; grid-row: 1; justify-self: start; }
   .reader-controls-slot .pdf-presentation-control { grid-column: 1; grid-row: 2; justify-self: start; }
   .reader-controls-slot .pdf-search { grid-column: 2; grid-row: 2; }
   .reader-controls-slot .pdf-style { grid-column: 3; grid-row: 2; }
-  .reader-controls-slot .pdf-information-highlight { grid-column: 4; grid-row: 2; justify-self: start; }
+  .reader-controls-slot .pdf-annotations { grid-column: 4; grid-row: 2; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight { grid-column: 5; grid-row: 2; justify-self: start; width: 30px; padding: 0; overflow: hidden; font-size: 0; }
+  .document-taskbar .reader-controls-slot .pdf-viewer-toolbar .pdf-information-highlight::before { content: '✦'; font-size: 17px; }
   .reader-controls-slot .pdf-information-status { grid-column: 1 / -1; grid-row: 3; }
 }
 @media (max-width: 760px) {
   .is-workspace .document-sidebar { width: auto; max-height: min(28dvh, 200px); }
+  /* 窄屏工具栏已有同一翻译设置入口，侧栏只保留文件与目录，避免重复入口挤压列表。 */
+  .is-workspace .document-sidebar .document-settings-button { display: none; }
+}
+@media (max-width: 760px) and (min-height: 521px) {
+  /* 自动高度的窄屏侧栏按内容分配列表空间，达到上限后内部滚动，不将文件与目录压为零高度。 */
+  .is-workspace .document-sidebar .document-batch, .is-workspace .document-sidebar .sidebar-outline { flex-basis: auto; }
 }
 @media (max-width: 420px) {
   .document-taskbar { padding-inline: 8px; }
@@ -727,10 +853,13 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
 .document-outline-language { display: flex; margin: 0 4px 8px; padding: 2px; border-radius: 8px; background: var(--surface-soft); }
 .document-outline-language button { flex: 1; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; }
 .document-outline-language button.selected { color: var(--brand-strong); background: var(--surface); box-shadow: 0 1px 4px rgba(35, 47, 82, .1); font-weight: 700; }
-.document-outline-item { display: block; width: 100%; padding: 6px 10px 6px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; line-height: 1.45; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.document-outline-item { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 6px 10px 6px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; line-height: 1.45; text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.document-outline-label { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.document-outline-progress { flex: none; padding-top: 1px; color: var(--muted); font-size: 10.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .document-outline-item:hover { background: var(--surface-soft); }
 .document-outline-item.chapter { font-weight: 600; }
 .document-outline-item.current { color: var(--brand-strong); background: var(--brand-soft); }
+.document-outline-item.current .document-outline-progress { color: var(--brand-strong); }
 
 /* HTML、Markdown、纯文本与 ePub 的预览占满阅读区：不留卡片外边距，把空间交给正文。 */
 .is-workspace .document-reading-pane .reading-content:has(> .rich-document-reader) { display: flex; flex-direction: column; padding: 0; overflow: hidden; }
@@ -750,3 +879,5 @@ input { accent-color: var(--brand); }input:focus-visible { outline: 3px solid va
   .docx-document-reader.bilingual .docx-source, .docx-document-reader.bilingual .docx-translation { margin: 0; }
   .docx-document-reader.bilingual .docx-role-paragraph .docx-translation, .docx-document-reader.bilingual .docx-role-list-item .docx-translation { font-weight: 500; }
 }
+
+.document-taskbar .download-button { display: inline-flex; align-items: center; gap: 6px; }

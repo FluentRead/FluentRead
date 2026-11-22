@@ -5,7 +5,9 @@
  * 模块边界：提示只用于预取，不缓存、不渲染、不写入；未经授权的嵌入页不导入配置，mount.ts 从新配置快照决定实际界面。
  */
 import './popup.css';
+import {createPopupStartupFeedback} from './startupFeedback';
 import 'element-plus/es/components/base/style/css';
+import 'element-plus/es/components/tooltip/style/css';
 import '@/src/ui/styles/interface-skins.css';
 import '@/src/ui/styles/brand-icon.css';
 import {isEmbeddedPopup, isPopupSurfaceActive, observeEmbeddedPopupSize, preparePopupSurface} from './embedded';
@@ -46,8 +48,12 @@ function wakePopupWorker(): void {
 export async function mountPopupApp(selector: string): Promise<void> {
   if (!await preparePopupSurface() || !isPopupSurfaceActive()) return;
   wakePopupWorker();
-  const {mountPreparedPopupApp} = await import('./mount');
-  if (!isPopupSurfaceActive()) return;
-  await mountPreparedPopupApp(selector);
-  if (isEmbeddedPopup()) observeEmbeddedPopupSize();
+  const feedback = createPopupStartupFeedback(selector);
+  try {
+    const {mountPreparedPopupApp} = await import('./mount');
+    if (!isPopupSurfaceActive()) {feedback.dispose();return;}
+    await mountPreparedPopupApp(selector);
+    feedback.dispose();
+    if (isEmbeddedPopup()) observeEmbeddedPopupSize();
+  } catch {feedback.fail();}
 }

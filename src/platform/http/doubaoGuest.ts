@@ -5,7 +5,7 @@
  * 模块边界：不获取访客凭据、不读取用户 Cookie 或配置；平台仅消费 provider 给出的临时 ttwid，其他网络请求保持原有传输。
  */
 import type {DeclarativeNetRequest} from 'webextension-polyfill';
-import {abortErrorFromSignal, type RuntimeFetch} from './runtime';
+import {abortErrorFromSignal, cancelUnreadResponseBody, type RuntimeFetch} from './runtime';
 
 export const DOUBAO_GUEST_HEADER = 'X-FluentRead-Doubao-Ttwid';
 export const DOUBAO_GUEST_RULE_ID = 2_764_000;
@@ -85,7 +85,7 @@ export function createDoubaoGuestFetch(
                 try { await api.updateSessionRules({removeRuleIds: [DOUBAO_GUEST_RULE_ID], addRules: []}); }
                 catch {
                     // 清理失败时不把已收到的长连接留给无人消费的 Response。
-                    await response?.body?.cancel().catch(() => undefined);
+                    if (response) cancelUnreadResponseBody(response);
                     checkAbort();
                     throw unavailable();
                 }

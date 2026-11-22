@@ -1,11 +1,11 @@
 <!--
  @file src/app/options/OptionsApp.vue
  文件职责：实现扩展 Options 页的顶层布局，组织设置导航、全局搜索结果和学习中心入口，并把选中分区交给对应 feature UI。
- 主要内容：侧栏展示品牌与多语言宣传语；关于页以随界面语言显示产品名的宽幅品牌介绍、项目链接卡片、开源项目下方的微信交流按钮和独立赞赏区组织内容，联系二维码与赞赏码在当前页弹窗展示；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索，搜索只在同次派生内复用原始查询的小写值和语言入口判断，语言恢复查询优先展示现有软件语言入口并定位选择控件；普通设置连续展示并提供顶部滚动定位导航，统计保留任务视图切换，智能高亮锚点及搜索入口随脚本版能力隐藏，服务目录使用完整工作区，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，同步 URL hash 的深链接与前进后退导航，兼容模型用量迁入翻译统计后的旧链接；界面根节点注册在卸载时只释放本页面句柄。
+ 主要内容：页面名称由 main 辅助技术标签提供，内容直接从统一的紧凑页内导航或表单开始，不再渲染重复页面标题；侧栏展示品牌与多语言宣传语；关于页以随界面语言显示产品名的宽幅品牌介绍、项目链接卡片、开源项目下方的微信交流按钮和独立赞赏区组织内容，联系二维码与赞赏码在当前页弹窗展示；渲染默认展开的分组侧栏、窄屏分类选择和全局搜索，搜索只在同次派生内复用原始查询的小写值和语言入口判断，语言恢复查询优先展示现有软件语言入口并定位选择控件；普通设置连续展示并提供顶部滚动定位导航，统计保留任务视图切换，智能高亮锚点及搜索入口随脚本版能力隐藏，服务目录使用完整工作区，复用 settingsNavigation 的项目解析/过滤逻辑，在 SettingsSections 与 LearningCenter 之间切换并重置内容区滚动，通过当前导航 getter 向迟到学习面板提供可见性，同步 URL hash 的深链接与前进后退导航，URL 目标仅接受当前分区登记的具体设置或可用分类并复用已有滚动定位，兼容模型用量迁入翻译统计后的旧链接；界面根节点注册在卸载时只释放本页面句柄。
  模块边界：组件负责页面壳、导航状态和主题、界面皮肤根属性同步，不定义具体配置字段、不直接写 browser.storage，也不实现词汇仓库；设置表单、收藏与阅读记录业务由各 feature 组件拥有；学习栏目加载失败的重载动作在普通设置页保留栏目参数，页内设置只重载宿主文档。
 -->
 <template>
-  <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}">
+  <div class="settings-app" :class="{'has-overlay-close': Boolean(props.onClose)}" @click="dismissSearchOutside">
     <aside class="sidebar">
       <a class="brand" :href="websiteUrl" target="_blank" rel="noopener noreferrer" :aria-label="t('options.aboutWebsite')" :title="t('options.aboutWebsite')">
         <img class="brand-icon" :src="iconUrl" alt="" />
@@ -15,10 +15,18 @@
         </div>
       </a>
 
-          <label class="search-box">
-            <UiIcon name="search" :size="16" />
-            <input v-model.trim="query" type="search" :placeholder="t('options.search')" :aria-label="t('options.search')" @keydown.esc="query = ''" />
-          </label>
+      <label class="search-box">
+        <UiIcon name="search" :size="16" />
+        <input
+          ref="searchInput"
+          v-model.trim="query"
+          type="search"
+          :placeholder="t('options.search')"
+          :aria-label="t('options.search')"
+          @keydown.esc="query = ''"
+          @keydown.down="focusSearchResult"
+        />
+      </label>
 
       <nav ref="navigationElement" :aria-label="t('options.navLabel')">
         <section v-for="(group, index) in localizedNavigationGroups" :key="group.label" class="nav-group">
@@ -48,10 +56,9 @@
       </select>
     </aside>
 
-    <main class="workspace">
-      <h1 class="settings-content-title">{{ activeItem.title }}</h1>
+    <main class="workspace" :aria-label="activeItem.title">
       <header v-show="((activePanels.length || hasSectionAnchors) && !userscriptUnavailableSection) || props.onClose" class="topbar">
-        <nav v-if="activePanels.length && !userscriptUnavailableSection" class="settings-page-tabs" :aria-label="t('options.categories')">
+        <nav v-if="activePanels.length && !userscriptUnavailableSection" class="settings-page-tabs settings-subnavigation" :aria-label="t('options.categories')">
         <button v-for="panel in activePanels" :key="panel.id" type="button" :data-settings-category="panel.id" :aria-current="activePanel === panel.id ? 'true' : undefined" @click="selectPanel(panel.id)">{{ t(panel.labelKey) }}</button>
       </nav>
         <SettingsSectionNavigation
@@ -68,9 +75,10 @@
         </button>
       </header>
 
-      <div v-if="query && filteredResults.length" class="search-results">
+      <div v-if="query && filteredResults.length" ref="searchResultsElement" class="search-results" @keydown.esc.stop.prevent="closeSearchResults">
         <button v-for="result in filteredResults" :key="result.id" type="button" @click="selectResult(result)">
-          <span><strong>{{ result.label }}</strong><small>{{ result.searchDescription }}</small></span><b>{{ t('options.open') }} →</b>
+          <span><strong>{{ result.label }}</strong><small>{{ result.searchDescription }}</small></span>
+          <UiIcon name="arrow-right" :size="14" />
         </button>
       </div>
       <div v-else-if="query" class="search-empty">{{ t('options.searchEmpty', {query}) }}</div>
@@ -87,7 +95,7 @@
           <header class="about-hero">
             <div class="about-intro">
               <div class="about-identity">
-                <img class="about-logo brand-icon" :src="iconUrl" alt="流畅阅读图标" />
+                <img class="about-logo brand-icon" :src="iconUrl" alt="" />
                 <div>
                   <strong>{{ t('common.brand') }}</strong>
                   <span class="about-version">V{{ version }} · {{ t('options.aboutHeroDescription') }}</span>
@@ -179,6 +187,7 @@
 </template>
 
 <script setup lang="ts">
+import '@/src/features/settings/ui/components/settings-navigation.css'
 import UiIcon from '@/src/ui/components/UiIcon.vue'
 import {getSupportImageUrl, getContactImageUrl} from './aboutImages'
 import {SETTINGS_TABBED_SECTION_IDS, settingsPagePanels, resolveSettingsPanel, filterNavigationItems, filterSettingsSearchTargets, isUiLanguageSearch, settingsSearchTargets} from '@/src/features/settings/model/navigation';
@@ -233,12 +242,33 @@ function restoreApprovePreviewFocus() {
 }
 const aboutLinks = [
   {href: websiteUrl, icon: 'globe', label: 'options.aboutWebsite', description: 'options.aboutWebsiteDescription'},
-  {href: 'https://fluent.thinkstu.com/', icon: 'book', label: 'options.aboutDocs', description: 'options.aboutDocsDescription'},
+  {href: 'https://read.thinkstu.com/', icon: 'book', label: 'options.aboutDocs', description: 'options.aboutDocsDescription'},
   {href: 'https://github.com/Bistutu/FluentRead', icon: 'card', label: 'options.aboutProject', description: 'options.aboutProjectDescription'},
   {href: 'https://github.com/Bistutu/FluentRead/issues', icon: 'info', label: 'options.aboutFeedback', description: 'options.aboutFeedbackDescription'},
 ]
 const {t, translateLegacy} = useUiI18n()
 const query = ref('')
+const searchInput = ref<HTMLInputElement>()
+const searchResultsElement = ref<HTMLElement>()
+
+function dismissSearchOutside(event: MouseEvent) {
+  if (query.value && event.target instanceof Element && !event.target.closest('.search-box, .search-results, .search-empty')) {
+    query.value = ''
+  }
+}
+
+function focusSearchResult(event: KeyboardEvent) {
+  const result = searchResultsElement.value?.querySelector('button')
+  if (event.isComposing || !result) return
+  event.preventDefault()
+  result.focus()
+}
+
+function closeSearchResults() {
+  query.value = ''
+  searchInput.value?.focus()
+}
+
 function sectionFromHash(hash: string): string {
   if (!props.settingsHashPrefix) return hash.replace(/^#/, '')
   const prefix = `${props.settingsHashPrefix}/`
@@ -308,8 +338,10 @@ function reloadLearningPage(tab: string): void {
   }
   window.location.reload()
 }
+// getter 在旧 KeepAlive VNode 中仍读取当前导航，异步面板迟到挂载时不会使用过期的布尔快照。
+function isLearningVisible(): boolean {return activeSection.value === 'settings-vocabulary'}
 const contentComponentProps = computed(() => activeSection.value === 'settings-vocabulary'
-  ? {onNavigate: selectSection, onReload: reloadLearningPage, initialTab: new URLSearchParams(window.location.search).get('learningTab') || 'saved'}
+  ? {onNavigate: selectSection, onReload: reloadLearningPage, isVisible: isLearningVisible, initialTab: new URLSearchParams(window.location.search).get('learningTab') || 'saved'}
   : {
       activeSection: activeSection.value,
       activePanel: activePanels.value.length ? activePanel.value : undefined,
@@ -455,6 +487,7 @@ async function revealSettingsTarget(result: SearchResult) {
       // 连续表单可能由多个同级 section 组成，目标不一定是首个 section 的后代。
       const target = Array.from(content.querySelectorAll<HTMLElement>(selector)).find(element => element.getClientRects().length)
       if (!target?.getClientRects().length) return
+      if (target.tagName === 'DETAILS' && !target.hasAttribute('open')) target.setAttribute('open', '')
       const targetRect = target.getBoundingClientRect()
       const contentTop = content.getBoundingClientRect().top
       const centerOffset = result.targetId && !target.matches('.settings-section, .settings-page-panel') && targetRect.height < content.clientHeight
@@ -518,9 +551,10 @@ function syncSectionFromHash() {
   const requested = sectionFromHash(window.location.hash)
   const section = resolveRequestedSection(requested)
   const targetId = new URLSearchParams(window.location.search).get('target')
-  // 仅允许导航目录中登记且属于当前分区的目标；不把 URL 当任意 CSS 选择器。
+  // 优先具体设置，再接受当前分区已登记且可用的分类；URL 永远不能成为任意 CSS 或跨分区目标。
   const target = localizedSearchTargets.value.find(item => item.sectionId === section && item.targetId === targetId)
-  selectSection(requested, target?.targetId)
+  const panel = settingsPagePanels[section]?.find(item => item.id === targetId && isAvailableSettingsEntry(item))
+  selectSection(requested, target?.targetId ?? panel?.id)
 }
 
 onMounted(() => {

@@ -7,6 +7,9 @@ node_modules
 coverage
 temp
 
+# Release assembly and rehearsal artifacts
+reports/release/
+
 # Production
 build
 dist
@@ -96,5 +99,6 @@ web-ext.config.ts
 *.sln
 *.sw?
 .continue/
+
 # Safari：由 pnpm safari:app 从 .output 同步进 Xcode 工程的扩展产物（约 62MB）
 safari/**/*Extension/Resources/

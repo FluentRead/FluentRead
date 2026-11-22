@@ -3,16 +3,27 @@ import {defineConfig, type ConfigEnv, type UserManifest, type Entrypoint, type E
 import vue from '@vitejs/plugin-vue';
 import {resolve} from 'path';
 import fs from 'fs';
-import {randomUUID} from 'node:crypto';
 import JSZip from 'jszip';
 import {resolveBrowserCapabilities} from './src/platform/browser/capabilities';
 import {checkExtensionSize} from './scripts/testing/extension-size-budget';
 import {wllamaExtensionWorker} from './scripts/testing/wllama-extension-build';
-import {createExtensionNameLocaleFiles, createUiLanguageBundleFiles} from './src/core/i18n/bundles';
+import {createExtensionMetadataLocaleFiles, createUiLanguageBundleFiles} from './src/core/i18n/bundles';
 import {UI_LANGUAGE_BUNDLE_DIRECTORY} from './src/core/i18n/language';
-import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker} from './scripts/wasm/package-diagnostics';
+import {packageWasmDiagnostics, packageTesseractWasm, packageTesseractWorker, resolveTesseractSources} from './scripts/wasm/package-diagnostics';
 import {tesseractSdkBuildPlugin} from './scripts/wasm/tesseract-sdk-build';
 import {GOOGLE_DRIVE_DEFAULT_CLIENT_ID, GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY, GOOGLE_DRIVE_SCOPES} from './src/platform/google-drive/constants';
+import {createDeepLXRuntimeBuildPlugin} from './scripts/testing/deeplx-runtime-build';
+import {createPdfReaderBidiBuildPlugin} from './scripts/testing/pdfjs-bidi-build';
+import {PDFJS_DECODER_FILES} from './scripts/testing/pdfjs-assets.mjs';
+import {FREE_PROVIDER_ORIGINS} from './src/core/config/freeProviderOrigins';
+import {createReadingDictionaryAliases} from './scripts/testing/reading-annotation-build';
+import {dictionaryScriptBuildPlugin, dictionaryScriptAssets} from './scripts/testing/dictionary-script-build';
+import {extensionCspBuildPlugin} from './scripts/testing/extension-csp-build';
+import {defuddleEntityBuildPlugin} from './scripts/testing/defuddle-entity-build';
+import {francRuntimeBuildPlugin} from './scripts/testing/franc-runtime-build';
+import {hypothesisAssets} from './scripts/testing/hypothesis-assets';
+import {compactExtensionZip} from './scripts/wasm/compact-extension-zip';
+import type {InlineConfig} from 'vite';
 
 
 const packageJson = JSON.parse(fs.readFileSync(resolve(__dirname, 'package.json'), 'utf-8'));
@@ -20,26 +31,74 @@ const firefoxRunnerBinary = process.env.FLUENTREAD_FIREFOX_RUNNER_BINARY;
 const firefoxRunnerProfile = process.env.FLUENTREAD_FIREFOX_RUNNER_PROFILE;
 const firefoxRunnerStartUrl = process.env.FLUENTREAD_FIREFOX_RUNNER_START_URL;
 
-/** 仅商店 ZIP 移除开发用固定 ID；保留本地构建的 key、OAuth 和全部运行文件。 */
-export async function prepareExtensionStoreZip(browser: string, zipPath: string): Promise<void> {
+/** Safari 的自动 MV2 后台页没有编码声明；显式页面在任何宿主语言下均按 UTF-8 加载原后台脚本。 */
+export function createSafariBackgroundPage(env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>): {relativeDest: string; contents: string}[] {
+    if (env.browser !== 'safari' || env.manifestVersion !== 2) return [];
+    return [{relativeDest: 'safari-background.html', contents: '<!doctype html>\n<html>\n<head><meta charset="utf-8"></head>\n<body><script src="./background.js"></script></body>\n</html>\n'}];
+}
+
+/** WXT 先由入口生成 scripts，再调用 manifestGenerated；在此保留非持久生命周期并替换页面。 */
+export function configureSafariBackgroundPage(
+    env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>,
+    manifest: {background?: {scripts?: string[]; persistent?: boolean; page?: string; service_worker?: string}},
+): void {
+    if (env.browser !== 'safari' || env.manifestVersion !== 2) return;
+    const background = manifest.background;
+    if (background?.persistent !== false || background.scripts?.length !== 1 || background.scripts[0] !== 'background.js'
+        || background.page !== undefined || background.service_worker !== undefined) {
+        throw new Error('Safari 后台入口已变化，无法安全生成显式 UTF-8 页面');
+    }
+    manifest.background = {persistent: false, page: 'safari-background.html'};
+}
+
+/**
+ * Chromium 重载扩展会更换动态资源 UUID，旧页面保存的 CSS/图标地址因此失效。
+ * WXT 在生成清单时才追加 Shadow UI CSS，故在 manifestGenerated 阶段
+ * 仅将这几项已公开的界面资源改为稳定地址；语言包和其他资源继续保持原规则。
+ * edX 学习面板的共用 frame 样式只在对应课程源公开；稳定地址的公开 UI 资产可被网页按固定 ID 探测。
+ */
+export function configureStableContentUiResources(
+    env: Pick<ConfigEnv, 'browser' | 'manifestVersion'>,
+    manifest: Pick<UserManifest, 'web_accessible_resources'>,
+): void {
+    if (env.manifestVersion !== 3 || !['chrome', 'edge'].includes(env.browser)) return;
+    const rules = manifest.web_accessible_resources;
+    if (!rules || rules.some(rule => typeof rule === 'string')) return;
+    const stableResources = new Set([
+        'icon/32.png', 'icon/48.png', 'icon/128.png',
+        'content-scripts/content.css',
+        'content-scripts/neteaseMailFrame.css',
+    ]);
+    const courseStylesheet = 'content-scripts/supportedFrame.css';
+    const courseOrigin = 'https://courses.edx.org/*';
+    manifest.web_accessible_resources = rules.flatMap(rule => {
+        if (typeof rule === 'string') return [];
+        const stable = rule.resources.filter(resource => stableResources.has(resource));
+        const course = rule.resources.includes(courseStylesheet);
+        if (stable.length === 0 && !course) return [rule];
+        const remaining = rule.resources.filter(resource => resource !== courseStylesheet && !stableResources.has(resource));
+        return [
+            ...(stable.length ? [{...rule, resources: stable, use_dynamic_url: false}] : []),
+            ...(course && rule.matches?.includes(courseOrigin)
+                ? [{...rule, resources: [courseStylesheet], matches: [courseOrigin], use_dynamic_url: false}] : []),
+            ...(remaining.length ? [{...rule, resources: remaining}] : []),
+        ];
+    });
+}
+
+/** Chrome 只交付保留固定身份的原 ZIP；验证成功后清理同版本旧商店包。 */
+export async function finalizeExtensionZip(browser: string, zipPath: string): Promise<void> {
     if (browser !== 'chrome') return;
+    if (!zipPath.endsWith('.zip')) throw new Error('Chrome 安装包路径必须以 .zip 结尾');
     const archive = await JSZip.loadAsync(fs.readFileSync(zipPath), {checkCRC32: true});
     const entry = archive.file('manifest.json');
-    if (!entry) throw new Error('Chrome 商店包缺少 manifest.json');
+    if (!entry) throw new Error('Chrome 安装包缺少 manifest.json');
     const manifest = JSON.parse(await entry.async('string'));
-    if (!Object.hasOwn(manifest, 'key')) return;
-    delete manifest.key;
-    archive.file('manifest.json', `${JSON.stringify(manifest, null, 2)}\n`, {date: entry.date});
-    const data = await archive.generateAsync({
-        type: 'nodebuffer', compression: 'DEFLATE', compressionOptions: {level: 6},
-    });
-    const temporary = `${zipPath}.${randomUUID()}.tmp`;
-    try {
-        fs.writeFileSync(temporary, data, {flag: 'wx'});
-        fs.renameSync(temporary, zipPath);
-    } finally {
-        fs.rmSync(temporary, {force: true});
+    if (typeof manifest.key !== 'string' || !manifest.key.trim()) {
+        throw new Error('Chrome 安装包缺少固定扩展 ID 的 key');
     }
+    // 只删除本次产物的确切旧命名，不扫描历史版本、其他浏览器或证据目录。
+    fs.rmSync(`${zipPath.slice(0, -4)}-store.zip`, {force: true});
 }
 
 /**
@@ -90,14 +149,14 @@ export function extendRemoteConfigBuildConfig(
     entrypoints: readonly {type: string}[],
     viteConfig: {plugins?: unknown[]},
 ): void {
-    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page']);
+    const remoteOnlyTypes = new Set(['content-script', 'popup', 'options', 'unlisted-page', 'sidepanel']);
     if (entrypoints.length === 0 || !entrypoints.every((entrypoint) => remoteOnlyTypes.has(entrypoint.type))) return;
     viteConfig.plugins = [...(viteConfig.plugins ?? []), remoteConfigStorageBuildPlugin()];
 }
 
 /** 这些入口都由 new Worker(..., {type: 'module'}) 启动，可共享一次 ESM 构建及依赖 chunk。 */
 export function groupModuleWorkers(groups: EntrypointGroup[]): void {
-    const moduleWorkers = new Set(['localTranslationWorker', 'localTtsWorker', 'videoTranscriptionWorker', 'mangaInferenceWorker', 'informationHighlightWorker']);
+    const moduleWorkers = new Set(['localTranslationWorker', 'localTtsWorker', 'videoTranscriptionWorker', 'mangaInferenceWorker', 'informationHighlightWorker', 'readingAnnotationWorker']);
     const workers = groups.filter((group): group is Entrypoint =>
         !Array.isArray(group) && group.type === 'unlisted-script' && moduleWorkers.has(group.name));
     if (workers.length < 2) return;
@@ -105,6 +164,22 @@ export function groupModuleWorkers(groups: EntrypointGroup[]): void {
     for (const worker of workers) groups.splice(groups.indexOf(worker), 1);
     // 只组合明确使用模块加载的自有 Worker；内容脚本和 classic background 仍由 WXT 单独打包。
     groups.splice(index, 0, workers);
+}
+
+/** 页面共用的框架与域名数据独立成块，避免与中文目录及配置合成一个超大公共块。 */
+export function configureExtensionUiChunks(entrypoints: readonly {type: string}[], config: InlineConfig): void {
+    const pages = new Set(['popup', 'options', 'unlisted-page', 'sidepanel']);
+    if (entrypoints.length === 0 || !entrypoints.every(entrypoint => pages.has(entrypoint.type)) || config.build?.lib) return;
+    const build = config.build ??= {};
+    const rolldown = build.rolldownOptions ??= {};
+    const output = rolldown.output ??= {};
+    for (const target of Array.isArray(output) ? output : [output]) {
+        if (target.codeSplitting !== undefined || target.manualChunks !== undefined) continue;
+        target.codeSplitting = {groups: [
+            {name: 'vue-runtime', test: /[\\/]node_modules[\\/](?:@vue[\\/](?:reactivity|runtime-core|runtime-dom|shared)|vue)[\\/]/u},
+            {name: 'domain-parser', test: /[\\/]node_modules[\\/](?:tldts|tldts-core)[\\/]/u},
+        ]};
+    }
 }
 
 /** 根据编译目标能力生成权限，避免 Firefox/MV2 产物声明不可用的 Offscreen API。 */
@@ -118,10 +193,14 @@ export function createExtensionManifest(
         key: process.env.WXT_EXTENSION_KEY?.trim() || GOOGLE_DRIVE_EXTENSION_PUBLIC_KEY,
     } : {};
     const firefoxManifest = env.browser === 'firefox' ? {
+        // 大型材料备份需要在用户主动导出时观察下载终态；安装时不请求此权限。
+        optional_permissions: ['downloads'],
         browser_specific_settings: {
             gecko: {
                 id: '{3096bd53-3bda-4556-b076-ebf47442a5c1}',
-                // data_collection_permissions requires Firefox 140 or later.
+                // 桌面内置同意机制从 Firefox 140 起支持，保留 ESR 140。
+                // Android 从 142 起支持；未经实机验收不通过 gecko_android 声明 Android 支持。
+                // 因而 AMO 可能提示 Android 最低版本告警，提交说明中应解释这一兼容范围。
                 strict_min_version: '140.0',
                 // Firefox taxonomy counts any transmission outside the add-on/browser.
                 // FluentRead sends page/image/subtitle text, user-supplied provider credentials,
@@ -132,9 +211,13 @@ export function createExtensionManifest(
             },
         },
     } : {};
-    // Safari 16.4 起支持 MV3 与模块化 service worker；17 起 offscreen 依赖的后台标签页行为稳定。
+    // Safari 26 起支持现有 DNR initiatorDomains/requestMethods 隔离条件；iOS 与 Safari 版本号一致。
+    // 更早系统不应安装后才发现请求头适配不可用，最低版本同时写入可检查的清单。
     const safariManifest = env.browser === 'safari' ? {
-        browser_specific_settings: {safari: {strict_min_version: '17.0'}},
+        browser_specific_settings: {safari: {strict_min_version: '26.0'}},
+        // iOS 26.2 单变量验收中，只有显式 optional_permissions 才实际弹出服务域授权。
+        // 这是 MV2 字段；required 网页访问保持原样，授权入口每次仅请求一个服务的精确域。
+        ...(env.manifestVersion === 2 ? {optional_permissions: Object.values(FREE_PROVIDER_ORIGINS).flat()} : {}),
         // Safari 设置里的扩展列表图标由系统直接渲染清单图标，不支持按外观切换，
         // 因此 Safari 产物固定使用深色版（近黑底 + 品牌粉字形），与深色系统一致。
         icons: {
@@ -163,8 +246,13 @@ export function createExtensionManifest(
     };
     return {
         name: '__MSG_extensionName__',
+        description: '__MSG_extensionDescription__',
         default_locale: 'en',
+        ...(['chrome', 'edge', 'firefox'].includes(env.browser) ? {
+            commands: {'open-translation-window': {description: 'Open translation window'}},
+        } : {}),
         permissions: [
+            ...(env.manifestVersion === 3 ? ['scripting'] : []),
             'storage',
             'unlimitedStorage',
             'alarms',
@@ -191,17 +279,20 @@ export function createExtensionManifest(
         ],
         web_accessible_resources: [
             {
+                resources: ['videoPcmWorklet.js'],
+                matches: ['<all_urls>'],
+            },
+            {
                 // 页内快捷面板只暴露 HTML；任何 iframe 都须先兑换内容脚本持有的一次性凭据，才可加载界面和配置。
                 resources: ['popup.html'],
                 matches: ['<all_urls>'],
             },
             {
-                // 界面语言资源包由内容脚本按需 fetch；use_dynamic_url 避免网页用固定地址探测扩展。
+                // 语言包保持动态 URL；Chromium 的公开 UI 图标在清单生成后与语言包拆分为稳定地址。
                 // 不要把需要 import() 执行的脚本放进这里：动态 ID 地址不满足内容脚本隔离环境的 script-src 'self'。
                 resources: ['icon/32.png', 'icon/48.png', 'icon/128.png', `${UI_LANGUAGE_BUNDLE_DIRECTORY}/*.json`],
                 matches: ['<all_urls>'],
-                // Safari 与 Firefox 没有动态 URL 机制，声明后会被忽略，这里只为支持的浏览器保留。
-                ...(env.browser === 'chrome' || env.browser === 'edge' ? {use_dynamic_url: true} : {}),
+                ...(env.browser === 'safari' ? {} : {use_dynamic_url: true}),
             },
         ],
         ...firefoxManifest,
@@ -245,65 +336,245 @@ export default defineConfig({
     },
     vite: (env) => {
         const isProductionBuild = env.command === 'build' && env.mode === 'production';
+        const browserTargets: Readonly<Record<string, string>> = {chrome: 'chrome87', edge: 'edge88', firefox: 'firefox140', safari: 'safari26'};
         return {
-            plugins: [vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
+            // 固定版本的本地分词算法通过缓存适配器读取纯数据，不采用供应商自带的网络加载器。
+            resolve: {alias: createReadingDictionaryAliases(__dirname)},
+            plugins: [dictionaryScriptBuildPlugin(), createDeepLXRuntimeBuildPlugin(__dirname), createPdfReaderBidiBuildPlugin(__dirname), extensionCspBuildPlugin(), defuddleEntityBuildPlugin(), francRuntimeBuildPlugin(), vue(), sharedOnnxBuildPlugin(), wllamaExtensionWorker(), tesseractSdkBuildPlugin(), escapeExtensionNoncharacters()],
             // WXT 默认在每个开发脚本中内联源码与 sourcemap；需要源码调试时显式开启。
-            build: env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' : false} : undefined,
+            build: {
+                // WXT 不展示 Vite 的 gzip 统计；实际产物和安装包继续由独立体积门禁校验。
+                reportCompressedSize: false,
+                // Chromium 沿用 Vite 5 基线。Firefox 和 Safari 已在 manifest 明确最低版本。
+                target: browserTargets[env.browser] ?? ['es2020', 'edge88', 'firefox78', 'chrome87', 'safari14'],
+                // 源码层脱敏之外，生产构建也移除 console 和 debugger。
+                ...(isProductionBuild ? {rolldownOptions: {output: {minify: {mangle: true, compress: {dropConsole: true, dropDebugger: true}}}}} : {}),
+                ...(env.command === 'serve' ? {sourcemap: process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 'inline' as const : false} : {}),
+            },
             define: {
                 'process.env.VUE_APP_VERSION': JSON.stringify(packageJson.version),
             },
-            // 源码层脱敏是主要控制；生产构建再移除诊断输出，作为未来新增日志的纵深防护。
-            esbuild: isProductionBuild ? {drop: ['console', 'debugger']} : undefined,
         };
     },
     manifest: createExtensionManifest,
     zip: {
         name: 'fluent-read',
-        // 默认等级 9 的压缩耗时明显更长；6 保留标准 DEFLATE 和全部文件，平衡打包速度与体积。
-        compressionLevel: 6,
-        // AMO 源码包保留扩展源码、锁文件、构建脚本及字体/OCR 资产，
-        // 排除网站素材、测试证据和其他发布出口，避免超过 200 MB 上传限制。
-        excludeSources: [
-            'coverage/**',
-            'docs/**',
-            'marketing/**',
-            'userscript/**',
-            'storybook/**',
-            'integrations/**',
-            'examples/**',
-            'scripts/testing/evidence/**',
+        // 发布包采用标准 DEFLATE 的最高压缩等级；仅增加打包时间，不改变解压后的资源或运行时。
+        compressionLevel: 9,
+        // WXT 0.21 将 includeSources 作为白名单。仅包含复现扩展和审核所需的
+        // 文件，点文件只明确允许 .nvmrc，避免带入 .env 等本地配置。
+        includeSources: [
+            '.nvmrc', 'LICENSE', 'README.md', 'PRIVACY.md', 'package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.json', 'wxt.config.ts',
+            'entrypoints/**', 'src/**', 'assets/**', 'misc/**', 'public/**', 'scripts/**',
+            'docs/development/service-icons.md', 'docs/guide/deepseek-harness.md',
         ],
-        // 保留源码中的第三方来源说明；includeSources 会覆盖上述排除规则。
-        includeSources: ['docs/development/service-icons.md', 'docs/guide/deepseek-harness.md'],
+        excludeSources: ['coverage/**', 'scripts/testing/evidence/**', '**/.DS_Store'],
     },
     hooks: {
+        'build:manifestGenerated': (wxt, manifest) => {
+            configureSafariBackgroundPage(wxt.config, manifest);
+            configureStableContentUiResources(wxt.config, manifest);
+            // 保留 WXT 构建的侧边栏页面及权限，显示范围由打开操作注册。
+            if (wxt.config.browser === 'chrome' || wxt.config.browser === 'edge') delete manifest.side_panel;
+        },
         'zip:extension:done': async (wxt, zipPath) => {
-            await prepareExtensionStoreZip(wxt.config.browser, zipPath);
+            await finalizeExtensionZip(wxt.config.browser, zipPath);
+            const compact = await compactExtensionZip(zipPath, __dirname);
+            wxt.logger.info(`WASM ZIP compression saved ${compact.savedBytes.toLocaleString('en-US')} bytes`);
         },
         'build:done': async (wxt) => {
             const dev = wxt.config.command === 'serve';
+            const browser = wxt.config.browser;
+            // 课程时间轴、共用菜单与 edX 子 frame 的文本代码增量单独记账，保留主线其他功能的体积门槛。
+            const courseCaptionBudget = browser === 'chrome' || browser === 'edge' ? 171_000 : 26_000;
+            // YouTube 内嵌播放器保留独立 document_start 入口；改为视频公共接口后，Chrome 比聚合入口包减少442,186bytes。
+            // 合入主线配色后 Chrome/Firefox 实测68,472,474/68,093,606bytes；原门槛66,485,000/66,138,000bytes，仅补足按1kB取整的代码增量。
+            const youtubeEmbedBudget = browser === 'chrome' || browser === 'edge' ? 1_988_000 : 1_956_000;
             // PDF 字体首次导出时下载并缓存，不进入安装包；fontkit 仍使用包内静态代码。
-            // 恢复字体加入前的生产体积预算，防止完整字体再次随 public/ 打包。
-            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : 65_000_000;
-            await checkExtensionSize(wxt.config.outDir, budget);
+            // AI SDK 7 的后台脚本使 Chrome 和 Edge 的解包产物分别达到约 66.06 和 66.03 MB。
+            // 图片 CPU 选项、七语文案和阶段诊断实测新增约 9.2 kB。
+            // 旧配置迁移保留既有服务选择和平台设置；基线实测 Chrome/Firefox 分别增加 17,099/17,002 bytes，两平台门槛各加 18 kB。
+            const aiPlatformDefaultRemovalBudget = 18_000;
+            // GitHub 名称保护和 Mac 基准页面适配已在主线；扫描论文及原文校订单独实测比 dc7bff026 基线增加 66,822 bytes。
+            // 图片 OCR 批次主线重新构建为 66,186,315 bytes；汉字复核合并后为 66,190,277 bytes，增加 3,962 bytes，保留约 1.7 kB 余量。
+            // 断句与无边框表格在上述主线增加 2,790 bytes；当前实测 66,193,067 bytes，门槛仅随代码增量调整。
+            // 扫描字母复核后的主线实测66,194,339bytes；原生图片变换与裁切守卫合并后66,199,309bytes，增加4,970bytes；只增加5kB代码预算，不新增模型或依赖。
+            // AI 图片语境版本实测66,199,480bytes；Google 有序语境合并后66,201,032bytes，净增1,552bytes；Chrome/Edge 门槛增加1kB，Firefox 保持原门槛，无新模型或依赖。
+            // 整合课程字幕主线后，背景实色均值、补丁采样与渐变修补使 Chrome 从66,371,605增至66,375,556bytes，Firefox 从66,025,897增至66,029,740bytes。
+            // 纯代码分别增加3,951和3,843bytes，各增加4kB门槛；课程预算仍单独累加，无新模型或依赖。
+            // 注音归属与独立清字余量使 Chrome 从66,375,556增至66,380,053bytes，Firefox 从66,029,740增至66,034,157bytes；仅 offscreen 和推理 Worker 代码改变。
+            // 使用原余量后门槛分别增加4kB和5kB，课程预算仍独立累加，不新增模型或依赖。
+            // 原色与安全留白排版使 Chrome 从66,380,850增至66,385,831bytes，Firefox 从66,034,936增至66,039,887bytes，仅 offscreen 代码改变。
+            // 分别增加4,981和4,951bytes，各增加5kB门槛；不新增模型或依赖，课程预算不变。
+            // 渐变原字色观察使 Chrome 从66,385,901增至66,388,719bytes，Firefox 从66,039,956增至66,042,728bytes，仅 offscreen 代码改变。
+            // 分别增加2,818和2,772bytes，各增加3kB门槛；没有新增模型或依赖，课程预算不变。
+            // 混合标题样式守卫使 Chrome 从66,388,719增至66,391,861bytes，Firefox 从66,042,728增至66,045,810bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 分别增加3,142和3,082bytes，沿用余量后各增加3kB门槛；没有新增模型或依赖，课程预算不变。
+            // 标题共同边线提示使 Chrome 从66,391,861增至66,393,872bytes，Firefox 从66,045,810增至66,047,790bytes，仅 offscreen 代码改变。
+            // 分别增加2,011和1,980bytes，沿用余量后各增加2kB门槛；没有新增模型或依赖，课程预算不变。
+            // 抗锯齿词隙复核使 Chrome 从66,393,872增至66,396,372bytes，Firefox 从66,047,790增至66,050,334bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 分别增加2,500和2,544bytes，各增加3kB门槛；没有新增模型或依赖，课程预算不变。
+            // 灰度词隙复核使 Chrome 从66,396,372增至66,397,239bytes，Firefox 从66,050,334增至66,051,201bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 两个平台各增加867bytes，门槛各增加1kB；没有新增模型或依赖，课程预算不变。
+            // 检测核心复核使 Chrome 从66,397,239增至66,400,523bytes，Firefox 从66,051,201增至66,054,306bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 分别增加3,284和3,105bytes，沿用余量后各增加3kB门槛；没有新增模型或依赖，课程预算不变。
+            // 标点换行使 Chrome 从66,400,523增至66,406,453bytes，Firefox 从66,054,306增至66,060,236bytes，仅 offscreen 代码和 Unicode 来源说明改变。
+            // 每个平台增加5,930bytes，其中代码4,924bytes、来源说明1,006bytes；门槛各增加6kB，没有新增模型或依赖，课程预算不变。
+            // 短末行平衡使 Chrome 从66,406,453增至66,407,303bytes，Firefox 从66,060,236增至66,061,086bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 两个平台各增加850bytes，门槛各增加1kB；没有新增模型或依赖，课程预算不变。
+            // 漏行复核与跨帧归属守卫使 Chrome 从66,407,303增至66,415,350bytes，Firefox 从66,061,086增至66,069,088bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 分别增加8,047和8,002bytes，沿用余量后各增加8kB门槛；没有新增模型或依赖，课程预算不变。
+            // 源字形字号、位置与完整词换行使 Chrome 从66,415,627增至66,418,853bytes，Firefox 从66,069,365增至66,072,535bytes，仅 offscreen 和推理 Worker 代码改变。
+            // 分别增加3,226和3,170bytes，使用现有余量后各增加3kB门槛；没有新增模型或依赖，课程预算不变。
+            // 倾角与完整旋转字形适配使 Chrome 从66,418,853增至66,429,276bytes，Firefox 从66,072,535增至66,082,844bytes，仅 offscreen 代码改变。
+            // 分别增加10,423和10,309bytes，使用现有余量后门槛分别增加11kB和10kB；没有新增模型或依赖，课程预算不变。
+            // 本地隐私防护与七语设置：同环境 Chrome 基线 66,414,783 → 66,465,891 bytes（+51,108，敏感词字段兼容旧版清洗器）。
+            // 仅增加规则、恢复协议和 UI，不新增模型/运行依赖；两平台预算各增加 55 kB。
+            // 集成到最新 main 时保留图片排版已增加的预算，再叠加隐私防护的 55 kB。
+            // 大气泡注音归属在旧基线上仅增加 Chrome 492、Firefox 473 bytes；集成后先沿用最新主干余量，并重新实测。
+            // 纯色文字修补集成已修正主干后，Chrome 从68,472,474增至68,476,844bytes，Firefox 从68,093,606增至68,097,978bytes。
+            // 仅 offscreen 和推理 Worker 改变；利用已有余量后，两平台门槛各增加4kB，没有新增模型或依赖，课程与YouTube预算不变。
+            // 浅色底词隙复核已单独实测两平台各增加675bytes；门槛各追加1kB，无新增模型或依赖，独立frame预算不变。
+            // 细线纸面修补实测 Chrome 从68,477,519增至68,483,277bytes，Firefox 从68,098,653增至68,104,401bytes。
+            // 只增加有界像素算法与常量，门槛各追加6kB；无新增模型、依赖或Canvas读取，独立frame预算不变。
+            // 纸面外轮廓归属与完整贴边字形修补实测：Chrome 从68,483,277增至68,484,772bytes，Firefox 从68,104,401增至68,105,870bytes。
+            // 利用现有余量后各增加1kB门槛；不新增模型、依赖或源像素预算。
+            // 深色底紧裁空格复核实测：Chrome 从68,501,871增至68,503,598bytes，Firefox 从68,122,872增至68,124,597bytes。
+            // 增量仅为既有OCR worker算法与共享限额常量；利用余量后各追加1kB，无新增模型、依赖或Canvas读回。
+            // Safari DOM 页面与同源消息传输：Safari 同环境基线67,864,461→68,133,060bytes；Chrome 为68,506,284bytes。
+            // 使用既有余量后，Safari 仅需追加9kB，Chrome/Firefox 共用适配器追加3kB；没有新增模型或依赖。
+            const domRuntimeBudget = browser === 'safari' ? 9_000 : 3_000;
+            // Safari 品牌图标：清单固定深色版（16/32/48/64/128 共 15.8kB），工具栏另用透明底模板图
+            // （16/19/32/38 共 1.3kB），合计 17.1kB；只存在于 Safari 产物，单独列预算，
+            // 不挤占其他浏览器余量。同时删除了未被引用的浅色小尺寸档位。
+            const safariBrandIconBudget = browser === 'safari' ? 18_000 : 0;
+            // #1362 的 WebDAV 子目录、同源 href 识别和七语文案：同环境 e124325e8 的 Chrome
+            // 68,568,810→68,573,795bytes（+4,985），Firefox 68,188,992→68,193,941bytes（+4,949）。
+            // 各追加5kB代码文本预算；271份非代码资源摘要不变，无新增依赖、模型或WASM，保留原始体积检查。
+            const webDavPathBudget = 5_000;
+            // 浅底彩字词界复核实测 Chrome 增加615字节，超原预算517字节。Firefox 增加616字节且仍在原预算内。
+            const lightColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            // 重叠字形的二维词界复核实测 Chrome 增加2367字节，超原预算1884字节。Firefox 增加2369字节且仍在原预算内。
+            const connectedColorRecognitionBudget = browser === 'chrome' || browser === 'edge' ? 2_000 : 0;
+            // 图片生僻字回退实测 Chrome 增加85,380、Firefox 增加85,372字节，其中84,778字节为共同的包内资源。
+            // 同一来源补入485条异体映射，Chrome 产物另增19,386字节，增量均来自字体和来源记录。
+            const imageFontBudget = 105_500;
+            const productionBudget = (browser === 'chrome' || browser === 'edge' ? 66_327_000 : 66_125_000)
+                + domRuntimeBudget + webDavPathBudget + lightColorRecognitionBudget + connectedColorRecognitionBudget + imageFontBudget
+                + safariBrandIconBudget;
+            const budget = dev ? (process.env.FLUENTREAD_DEV_SOURCEMAPS === '1' ? 170_000_000 : 70_000_000) : productionBudget;
+            // 可选词典按需下载，不再为离线读音放宽安装包体积预算。
+            if (fs.existsSync(resolve(wxt.config.outDir, 'reading-annotation'))) throw new Error('读音离线数据不得随扩展打包');
+            // 同环境 f0daab6d1：共享 Whisper 目录使 Chrome 68,503,659 → 68,545,144 bytes（+41,485），
+            // Firefox 68,124,625 → 68,165,889 bytes（+41,264）；模型和 WASM 摘要不变，各追加 42 kB。
+            const sharedWhisperBudget = 42_000;
+            // 同环境 6d1496387：浮动学习卡、七语操作文案及导入布局使 Chrome +15,855、Firefox +15,288 bytes。
+            // 实测为 68,561,219/68,181,391 bytes；仅追加 16 kB 文本代码预算，模型与 WASM 不变。
+            const floatingLearningBudget = 16_000;
+            // GitHub 原生 PR 列表页标题的精确保护规则在五份入口中共增加2,340bytes；
+            // 相比9032adeac，Chrome为68,521,516、Firefox为68,141,936bytes，全部非代码文件摘要不变。
+            // 利用已有余量后各补2kB，继续检查真实磁盘总量，不增加资源或依赖。
+            const githubPullListHeadingBudget = 2_000;
+            // 合入本地主线有效旧界面译文后，Chrome 68,564,682 → 68,567,508 bytes（+2,826）。
+            // 仅六份 i18n JSON 改变，552 份其余产物摘要相同；沿用余量后 Chrome/Edge 仅补1kB。
+            const legacyTranslationTextBudget = browser === 'chrome' || browser === 'edge' ? 1_000 : 0;
+            // 合入 #1353 的两端表情保留与 B站重试后，Chrome/Firefox 各增加753bytes。
+            // 360份非JS/HTML产物摘要相同；用尽既有余量后，除Edge外各补1kB代码预算。
+            const boundaryEmojiBudget = browser === 'edge' ? 0 : 1_000;
+            // #1356 复用既有字幕 frame；Chrome 对照 e124325e8 净增54,778 bytes，新增媒体定位、词查询、虚拟全文、七语文案、AudioWorklet 与导出格式。
+            // 不增加模型、WASM、权限或依赖；保留可核对的55kB功能预算。
+            const htmlMediaSubtitleBudget = 55_000;
+            // #1359：同环境 e124325e8 为68,568,810 bytes，原文重排、七语外观和原生批注后为68,579,140（+10,330）。
+            // 先消除异步阅读器未使用导出带入后台的482,943 bytes，最初补12kB文本代码预算；无新增模型、WASM或依赖。
+            // 合入主线后，原页 sRGB 配色、插图保色和划词批注让 Chrome 68,609,437 → 68,617,539（+8,102）；合计补20kB代码预算，无新模型或依赖。
+            const pdfReadingToolsBudget = 20_000;
+            // 固定 Hypothesis 1.1771.0 官方 Guest、CSS 与许可，Chrome 实测较68,634,324新增292,475bytes；仅按实际增量补预算。
+            const hypothesisClientBudget = 298_000;
+            // #1357 同环境 e124325e8 基线 68,568,810 bytes；高级词典初版 69,642,530（+1,073,720）。
+            // 新增本地 QuickJS WASM、离线格式 Worker 和配方/模板 UI；WASM 独立交付，使用脚本时才加载。
+            const dictionaryWorkspaceBudget = 1_090_000;
+            // #1360 连续编辑、平铺区域设置和七语说明：同环境 Chrome 基线为68,568,810bytes。
+            // 原余量仅1,190bytes；清理退役标签后为本次UI与文本登记12kB预算，无新增依赖或模型。
+            const siteRuleEditorBudget = 12_000;
+            // ePub 章级范围预览在同环境 Chrome 构建从68,568,261增至68,569,164bytes（+903）；仅文档页与样式改变，无新资源或依赖。
+            // 按既有余量规则追加1kB代码预算，继续由实际产物门禁校验。
+            const epubCoveragePreviewBudget = 1_000;
+            // “本次依据”在 Chrome 产物较 ePub 预览后增加28,878bytes（68,569,164→68,598,042）；新增文案、界面与摘要逻辑，无外部资源或依赖。
+            const requestEvidenceBudget = 30_000;
+            // EPUB 目录、Word 行内回填、Markdown 表格、字幕和 CSV/TSV 共用已有依赖，按需加载 XML 解析。
+            // 同环境 55bfab088 基线 70,079,902 bytes，整合后增至 70,134,258（+54,356），登记 55 kB 功能预算。
+            const documentFormatsBudget = 55_000;
+            // Chrome 同环境 55bfab088 对照为 70,079,902 → 70,083,642 bytes，登记 4 kB 翻译链路代码预算。
+            const translationPipelineBudget = browser === 'chrome' ? 4_000 : 0;
+            // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
+            const pageRuleDiagnosisBudget = 12_000;
+            // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
+            const webArticleBudget = 26_000;
+            // 课程复用逐句学习组件，edX 子 frame 需要独立的 UI 和播放装配；Chrome 实测代码与样式增量约 204 kB。
+            const courseSubtitleLearningBudget = 214_000;
+            // Coursera 复用课程菜单和 WebVTT 读取；术语候选新增文档页文本、匹配与审核 UI，未引入新依赖或模型。
+            const courseraCaptionBudget = 4_000;
+            // 与 CSV/TSV 选列流程整合后，Chrome 实测 70,406,656 字节，较原组合预算超出 2,656 字节。
+            const documentGlossaryCandidateBudget = 16_000;
+            // 旋转标签复核和底色恢复仅增加代码。逐列恢复后 Chrome 实测 70,524,244 字节，比上一批增加 1,862 字节。
+            const rotatedLabelBudget = browser === 'chrome' || browser === 'edge' ? 5_000 : 0;
+            // 俄语和韩语单图复用轻量识别。Chrome 产物由 70,524,421 增至 70,524,746 字节，增量来自路由与设置代码。
+            // 按识别器原顺序恢复横排从右向左词序后为 70,525,152 字节，本轮对应 406 字节代码。
+            // 阿拉伯语和希伯来语接入按需语言包后，Chrome 为 70,532,031 字节，增加 6,879 字节。
+            // Firefox 和 Safari 分别超出原门槛 4,541 和 4,260 字节。增量为界面文案及代码。
+            // 识别资源按实际用途展示并排序后，Chrome 实测 70,533,076 字节，增量 1,045 字节。
+            // 图片同栏短标签的语境范围和缓存位置使 Chrome 实测 70,534,871 字节，代码增加 1,795 字节。
+            const imageOcrLanguageBudget = browser === 'chrome' || browser === 'edge' ? 11_000 : 8_000;
+            // 斜向背景修补使 Chrome 从 70,535,048 增至 70,536,383 字节，294 份静态资源摘要相同。
+            const imageDirectionalRepairBudget = 1_500;
+            // 译图语言贯通增加 339 字节 Chrome 代码，沿用现有字体文件。
+            // 阅读面板声明原文和译文语言再增加 157 字节代码。
+            const imageTextLocaleBudget = 600;
+            // 照片边缘的有界重新取样使 Chrome 增加 1,132 字节代码，294 份静态资源摘要相同。
+            const imageBoundarySamplingBudget = 1_200;
+            // 紧裁彩字的词界复核使 Chrome 从 70,538,403 增至 70,538,723 字节，增量为代码。
+            // 浅有色底紧裁文字的旁证与同帧空格复核增加 1,284 字节。
+            const imageClippedSpacingBudget = 1_650;
+            // 临时译图在导入可选文字分割后可重试，限额覆盖消息校验及资源状态回退代码。
+            const imageSegmentationRetryBudget = 700;
+            // 使用已有检测数据复核裁切字形。双侧衬线修补使 Chrome 增加 481 字节本地验证代码。
+            // 原框内的独立边饰保留使 Chrome 再增加 2,293 字节。
+            // 细衬线的五成墨色核心复核使 Chrome 增加 739 字节代码。
+            // 行末空心边饰与译文范围核对使 Chrome 增加 1,083 字节代码。
+            // 分割复核边饰旁的框外窄笔画再增加 1,083 字节代码。
+            const imageClippedGlyphBudget = 8_100;
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);
         },
         'vite:build:extendConfig': (entrypoints, viteConfig) => {
             extendRemoteConfigBuildConfig(entrypoints, viteConfig as {plugins?: unknown[]});
+            configureExtensionUiChunks(entrypoints, viteConfig);
             // Vite 的动态导入预加载帮助器访问 document；模块 Worker 只能使用原生 import。
             if (entrypoints.every(entrypoint => entrypoint.type === 'unlisted-script')) {
                 viteConfig.build = {...viteConfig.build, modulePreload: false};
             }
         },
-        'build:publicAssets': (_wxt, files) => {
+        'build:publicAssets': (wxt, files) => {
+            files.push(...hypothesisAssets(__dirname));
+            files.push(...dictionaryScriptAssets(__dirname));
+            files.push(...createSafariBackgroundPage(wxt.config));
+            // 仅保留本地算法的许可；日语词典与印地语语言数据首次使用时下载校验并缓存。
+            for (const [source, destination] of [['@faanau/kuromoji/LICENSE-2.0.txt','kuromoji-Apache-2.0.txt'],['@faanau/kuromoji/NOTICE.md','kuromoji-NOTICE.md'],['kuroshiro/LICENSE','kuroshiro-MIT.txt'],['pinyin-pro/LICENSE','pinyin-pro-MIT.txt'],['thai-rtgs/LICENSE','thai-rtgs-MIT.txt']]) {
+                files.push({absoluteSrc: resolve(__dirname, 'node_modules', source), relativeDest: `third-party-notices/${destination}`});
+            }
             // 非中文界面文案只生成一份 JSON，由各运行上下文按当前语言加载，不再内联进每个 bundle。
             files.push(...createUiLanguageBundleFiles());
-            // 安装名称由浏览器原生 locale 解析，复用七语品牌，不复制完整界面目录。
-            files.push(...createExtensionNameLocaleFiles());
+            // 安装名称、功能说明和工具栏提示由浏览器按界面语言解析，复用七语资源。
+            files.push(...createExtensionMetadataLocaleFiles());
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/LICENCE'), relativeDest: 'third-party-notices/wllama-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@noble/hashes/LICENSE'), relativeDest: 'third-party-notices/noble-hashes-MIT.txt'});
+            files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/LICENSE'), relativeDest: 'third-party-notices/pdfjs-bidi-Apache-2.0.txt'});
+            for (const file of PDFJS_DECODER_FILES) {
+                files.push({absoluteSrc: resolve(__dirname, 'node_modules/pdfjs-dist/wasm', file), relativeDest: `pdfjs/wasm/${file}`});
+            }
+            files.push({absoluteSrc: resolve(__dirname, 'node_modules/bidi-js/LICENSE.txt'), relativeDest: 'third-party-notices/bidi-js-MIT.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/ppu-paddle-ocr/LICENSE'), relativeDest: 'third-party-notices/ppu-paddle-ocr-MIT.txt'});
             files.push({absoluteSrc: resolve(fs.realpathSync(resolve(__dirname, 'node_modules/ppu-paddle-ocr')), '../ppu-ocv/LICENSE'), relativeDest: 'third-party-notices/ppu-ocv-MIT.txt'});
             // JS 和 WASM 来自同一锁定版本；模型数据继续按需下载，执行代码只用包内资源。
@@ -311,14 +582,11 @@ export default defineConfig({
             files.push({absoluteSrc: packageWasmDiagnostics(__dirname, resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.mjs'), 'ort-wasm-simd-threaded.asyncify.mjs', 'onnx'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.mjs'});
             files.push({absoluteSrc: resolve(ortDist, 'ort-wasm-simd-threaded.asyncify.wasm'), relativeDest: 'fluent-read-ai/ort-wasm-simd-threaded.asyncify.wasm'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/@wllama/wllama/esm/wasm/wllama.wasm'), relativeDest: 'fluent-read-ai/wllama.wasm'});
-            const ocrCore = files.find(file => file.relativeDest === 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js');
-            if (!ocrCore || !('absoluteSrc' in ocrCore)) throw new Error('Missing packaged OCR core');
-            const packagedOcr = packageTesseractWasm(__dirname, ocrCore.absoluteSrc);
-            ocrCore.absoluteSrc = packagedOcr.glue;
+            const ocrSources = resolveTesseractSources(__dirname);
+            const packagedOcr = packageTesseractWasm(__dirname, ocrSources.glue);
+            files.push({absoluteSrc: packagedOcr.glue, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm.js'});
             files.push({absoluteSrc: packagedOcr.wasm, relativeDest: 'fluent-read-ocr/core/tesseract-core-simd-lstm.wasm'});
-            const ocrWorker = files.find(file => file.relativeDest === 'fluent-read-ocr/worker/worker.min.js');
-            if (!ocrWorker || !('absoluteSrc' in ocrWorker)) throw new Error('Missing packaged OCR worker');
-            ocrWorker.absoluteSrc = packageTesseractWorker(__dirname, ocrWorker.absoluteSrc);
+            files.push({absoluteSrc: packageTesseractWorker(__dirname, ocrSources.worker), relativeDest: 'fluent-read-ocr/worker/worker.min.js'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/dist/worker.min.js.LICENSE.txt'), relativeDest: 'fluent-read-ocr/worker/worker.min.js.LICENSE.txt'});
             files.push({absoluteSrc: resolve(__dirname, 'node_modules/tesseract.js/LICENSE.md'), relativeDest: 'fluent-read-ocr/LICENSE.md'});
         },

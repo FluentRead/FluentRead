@@ -4,6 +4,7 @@
  * 主要内容：最多八个实际像素色仅提出背景候选，完整静区闭环及整项共享的背景与墨色端点生成无写入权限的候选；旧准入API额外要求逐像素真实检测支持。同alpha但RGB不同的AA仍属墨迹；作者混合保持下闭上开的前向域，Canvas读回逆域仅在精确半值处兼容相邻舍入结果，不使用通用色差容忍，共享预算限定最多64组端点；选定首个canonical共同端点后，全部墨迹还须位于可达九成coverage近端核心的两像素裙边，最终mask暂作截断距离场并只线性扫两趟，不逐候选重复全ROI工作；不能排除同形实色图案，端点不确定时也不穷举其他薄边解释；穿出观察域、孤立未归属或多个背景均可解释时整项撤回。
  * 模块边界：纯同步只读像素，不创建DOM或模型、不生成概率或作者背景；真实同帧模型支持由调用方验证并提供查询，不能从本mask反造支持。候选不含应用权限，也不证明语义分割；页规划必须在首次原图上预付共享预算，完成全页冲突、完整译字预检和真实支持授权后才应用，不能覆盖OCR框或扩大原文保护权限。
  * 样式观察：不透明调色板只返回同一静区与共同墨色端点，不要求用于擦除的薄AA形状；它没有mask，不能替代修补准入。
+ * 上下裁切：无检测写入权限的双侧裁切提案可保留已经验证的近端核心，供逐个复核抗锯齿相接的独立字形。
  */
 import type {OcrLine} from '@/src/shared/image/types';
 
@@ -17,6 +18,8 @@ export interface ImageMatteRepair extends ImageMatteObservationBox {
     background:Rgba;
     /** 与原框及墨迹隔离、连接观察域外缘的完整非背景组件。 */
     artMask:Uint8Array;
+    /** 双侧裁切提案中至少九成覆盖的墨迹，供字形识别使用。 */
+    inkCore?:Uint8Array;
     sourceBox:Box;
     supportBox:Box;
 }
@@ -215,9 +218,15 @@ function finish(colors:Uint32Array,roi:ImageMatteObservationBox,sourceBox:Box,ob
     }
     for(let index=0;index<area;index++)if(labels[index]===2&&mask[index]>2)return;
     const artMask=new Uint8Array(area);
-    for(let index=0;index<area;index++){mask[index]=+(labels[index]===2);artMask[index]=+(labels[index]===3);}
+    const keepCore=!supportAt&&bgAlpha===255&&supportBox.y0<Math.floor(sourceBox.y0)&&supportBox.y1>Math.ceil(sourceBox.y1);
+    for(let index=0;index<area;index++){
+        const ink=labels[index]===2;
+        artMask[index]=+(labels[index]===3);
+        if(keepCore)labels[index]=+(ink&&mask[index]===0);
+        mask[index]=+ink;
+    }
     return {...roi,mask,artMask,background:[background&255,(background>>>8)&255,(background>>>16)&255,bgAlpha],sourceBox:{...sourceBox},
-        supportBox};
+        supportBox,...(keepCore?{inkCore:labels}:{})};
 }
 
 function observeCandidate(pixels:Uint8ClampedArray,width:number,height:number,sourceBox:Box) {

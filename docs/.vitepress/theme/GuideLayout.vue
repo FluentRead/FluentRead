@@ -3,11 +3,10 @@ import DefaultTheme from 'vitepress/theme'
 import { useData, useRoute, withBase } from 'vitepress'
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import LandingHeader from './LandingHeader.vue'
-import { getLandingLocale } from '../landing-locales'
 const route = useRoute()
 const { lang, page } = useData()
 const english = computed(() => lang.value.startsWith('en'))
-const landing = computed(() => getLandingLocale(page.value.relativePath))
+const landing = computed(() => /^(en\/)?index\.md$/.test(page.value.relativePath))
 // Headings differ between languages. Keep the corresponding page, without carrying its hash.
 const languageLink = computed(() => {
   if (page.value.isNotFound) return withBase(english.value ? '/' : '/en/')
@@ -56,7 +55,7 @@ onBeforeUnmount(() => {
 </script>
 <template>
   <div v-if="landing" class="bv-home-shell">
-    <LandingHeader :locale="landing" />
+    <LandingHeader :en="english" :language-link="languageLink" />
     <main id="VPContent"><Content /></main>
   </div>
   <DefaultTheme.Layout v-else>

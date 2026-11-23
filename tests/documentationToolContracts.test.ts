@@ -17,17 +17,6 @@ const roots: string[] = [];
 const taglines = JSON.parse(fs.readFileSync(path.join(repo, 'src/core/i18n/messages/brand-taglines.json'), 'utf8')) as Record<string, string>;
 const descriptions = JSON.parse(fs.readFileSync(path.join(repo, 'src/core/i18n/messages/product-descriptions.json'), 'utf8')) as Record<string, string>;
 const combined = `${taglines['en-US']} ${taglines['zh-CN']}`;
-const website = 'https://read.thinkstu.com';
-const landingMetadataPath = 'docs/.vitepress/landing-locales.json';
-const landingMetadata = path.join(sourceRoot, landingMetadataPath);
-const landingMetadataText = fs.existsSync(landingMetadata) ? fs.readFileSync(landingMetadata, 'utf8') : null;
-type LandingLocale = {
-    path: string; lang: string; socialLocale: string; assetLocale: string;
-    brand: string; name: string; title: string; description: string; imageAlt: string;
-};
-const landingLocales: LandingLocale[] = landingMetadataText ? Object.values(JSON.parse(landingMetadataText)) : [];
-const docsPageCount = 9 + Math.max(0, landingLocales.length - 2);
-const homepageLinkIncrease = landingLocales.length ? landingLocales.length ** 2 - 2 : 0;
 function fixture() {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fluentread-doc-contract-'));
     roots.push(root);
@@ -102,31 +91,10 @@ function page(route: string, body: string) {
     const productName = route.startsWith('en/') ? 'FluentRead' : '流畅阅读';
     return `<!doctype html><html><head><title>${productName}</title><meta property="og:site_name" content="${productName}"><link rel="canonical" href="https://read.thinkstu.com/${route}"><link rel="alternate" hreflang="en" href="/${alternate}"></head><body><a class="bv-language" href="/${alternate}">Language</a>${body}</body></html>`;
 }
-const readingSample = `<article class="fr-sample-reader" data-view="bilingual"><div class="fr-reader-switch"><button aria-pressed="false">Original</button><button aria-pressed="true">Bilingual</button></div>${
-    '<div><p class="fr-source" lang="en">Source</p><div class="fr-translation">Translation</div></div>'.repeat(2)
-}</article>`;
-function landingPage(locale: LandingLocale, body: string) {
-    const alternate = [...landingLocales.map(item => [item.lang, item.path]), ['x-default', '/en/']]
-        .map(([lang, href]) => `<link rel="alternate" hreflang="${lang}" href="${website + href}">`).join('');
-    const navigation = landingLocales.map(item =>
-        `<a hreflang="${item.lang}" href="${item.path}"${item.path === locale.path ? ' aria-current="page"' : ''}>${item.name}</a>`
-    ).join('');
-    const og = {'site_name': locale.brand, locale: locale.socialLocale, title: locale.title,
-        description: locale.description, image: `${website}/brand/share/${locale.assetLocale}.jpg`,
-        'image:alt': locale.imageAlt};
-    const shareMeta = Object.entries(og).map(([property, content]) =>
-        `<meta property="og:${property}" content="${content}">`).join('');
-    return `<!doctype html><html lang="${locale.lang}"><head><title>${locale.title}</title><meta name="description" content="${locale.description}"><link rel="canonical" href="${website + locale.path}">${alternate}${shareMeta}</head><body><nav class="bv-home-language">${navigation}</nav>${body}</body></html>`;
-}
 function home(prefix: string) {
     const english = Boolean(prefix), slogan = taglines[english ? 'en-US' : 'zh-CN'];
-    const productName = english ? 'FluentRead' : '流畅阅读';
-    const install = `<div class="bv-install-actions"><a class="bv-primary" href="https://example.test/install">Install</a></div><a class="bv-docs-link" href="${prefix}/docs/">${english ? 'Documentation' : '使用文档'}</a>`;
-    const hero = landingLocales.length
-        ? `<section class="fr-marketing-hero"><div class="fr-hero-copy"><h1>${slogan}</h1><p>${productName}</p>${install}</div>${readingSample}</section>`
-        : `<section class="bv-hero"><h1 class="bv-hero-slogan">${slogan}</h1><div class="bv-hero-intro"><span>${english ? 'FluentRead is an open-source browser extension for bilingual translation.' : '流畅阅读，一款开源的浏览器双语翻译插件'}</span></div>${install}<div class="bv-hero-orbit">Hello 你好<i class="bv-orbit-page"></i><i class="bv-orbit-document"></i><i class="bv-orbit-grammar"></i></div></section>`;
     return `<div class="bv-site"><header class="bv-home-header"><div class="bv-home-brand"><img src="/brand-icon.webp" width="96" height="96">${english ? 'FluentRead' : '流畅阅读'}</div></header>
-        ${hero}
+        <section class="bv-hero"><h1 class="bv-hero-slogan">${slogan}</h1><div class="bv-hero-intro"><span>${english ? 'FluentRead is an open-source browser extension for bilingual translation.' : '流畅阅读，一款开源的浏览器双语翻译插件'}</span></div><div class="bv-install-actions"><a class="bv-primary" href="https://example.test/install">Install</a></div><a class="bv-docs-link" href="${prefix}/docs/">${english ? 'Documentation' : '使用文档'}</a><div class="bv-hero-orbit">Hello 你好<i class="bv-orbit-page"></i><i class="bv-orbit-document"></i><i class="bv-orbit-grammar"></i></div></section>
         <section class="bv-translation-section"><h2>${english ? 'Bilingual' : '双语翻译'}</h2><div class="bv-feature-row"><div data-demo="brand-reader" data-playing="true">${workflow}<div class="fd-sentence-card"></div><div class="fd-structure-card"></div><div class="fd-word-card"></div></div></div></section>
         ${['document', 'image', 'video', 'selection'].map(kind => `<div class="bv-feature-row"><div data-visual="${kind}" data-playing="true">${workflow}</div></div>`).join('')}
         <div class="bv-video-platforms">YouTube X Google Meet Teams Zoom</div><div class="bv-browser-options"><a>1</a><a>2</a><a>3</a></div>
@@ -136,21 +104,8 @@ function home(prefix: string) {
 function docsFixture(extra = '') {
     const root = fixture(), dist = 'docs/.vitepress/dist';
     write(root, 'src/core/i18n/messages/brand-taglines.json', JSON.stringify(taglines));
-    if (landingMetadataText) {
-        write(root, landingMetadataPath, landingMetadataText);
-        const storeActions = ['chromewebstore.google.com', 'microsoftedge.microsoft.com', 'addons.mozilla.org']
-            .map(host => `<a href="https://${host}/">Install</a>`).join('');
-        for (const locale of landingLocales) {
-            write(root, `${dist}/brand/share/${locale.assetLocale}.jpg`, 'fixture artwork');
-            if (locale.lang === 'zh-CN' || locale.lang === 'en') continue;
-            const body = `<section class="fr-marketing-hero"><h1>${locale.title}</h1><div class="fr-install-actions">${storeActions}</div>${readingSample}</section>`;
-            write(root, `${dist}${locale.path}index.html`, landingPage(locale, body));
-        }
-    }
     for (const prefix of ['', 'en/']) {
-        const body = home(prefix ? '/en' : '') + extra;
-        const locale = landingLocales.find(item => item.path === '/' + prefix);
-        write(root, `${dist}/${prefix}index.html`, locale ? landingPage(locale, body) : page(`${prefix}index.html`, body));
+        write(root, `${dist}/${prefix}index.html`, page(`${prefix}index.html`, home(prefix ? '/en' : '') + extra));
         write(root, `${dist}/${prefix}docs/index.html`, page(`${prefix}docs/index.html`, `<h1>Documentation</h1><div class="VPNavBarTitle"><div class="title"><strong>${prefix ? 'FluentRead' : '流畅阅读'}</strong></div></div><div class="fr-docs-start"><a href="/docs/">Start</a></div><div class="fr-docs-links">${'<a href="/docs/">Guide</a>'.repeat(20)}</div>`));
         write(root, `${dist}/${prefix}config/translation-engines.html`, page(`${prefix}config/translation-engines.html`, '<h1>Engines</h1><div class="vp-doc">{{apiKey}}</div>'));
         write(root, `${dist}/${prefix}guide/input-translation.html`, page(`${prefix}guide/input-translation.html`, '<h1>Input</h1><div class="vp-doc">{{origin}} {{to}}</div>'));
@@ -158,8 +113,7 @@ function docsFixture(extra = '') {
         write(root, `docs/${prefix}config/translation-engines.md`, 'Fixture');
     }
     write(root, `${dist}/404.html`, '<meta name="robots" content="noindex">');
-    write(root, `${dist}/sitemap.xml`, '<urlset>' + landingLocales.map(locale => `<url><loc>${website + locale.path}</loc></url>`).join('') + '</urlset>');
-    for (const name of ['brand-icon.webp', 'videos/fluentread-promo-en.mp4', 'videos/fluentread-promo-zh.mp4', 'videos/fluentread-promo-en-poster.webp', 'videos/fluentread-promo-zh-poster.webp']) write(root, `${dist}/${name}`, 'fixture asset');
+    for (const name of ['brand-icon.webp', 'sitemap.xml', 'videos/fluentread-promo-en.mp4', 'videos/fluentread-promo-zh.mp4', 'videos/fluentread-promo-en-poster.webp', 'videos/fluentread-promo-zh-poster.webp']) write(root, `${dist}/${name}`, 'fixture asset');
     return root;
 }
 
@@ -316,7 +270,7 @@ describe('documentation delivery CLI contracts', () => {
         write(root, 'docs/.vitepress/dist/storybook/iframe.html', '<!doctype html><div id="storybook-root"></div>');
         const result = await checker(root, 'verify-docs-build.mjs');
         expect(result.code, result.err).toBe(0);
-        expect(JSON.parse(result.out).pages).toBe(docsPageCount);
+        expect(JSON.parse(result.out).pages).toBe(9);
     });
     it('validates the Storybook index and relative assets in the combined shipped artifact', async () => {
         const result = await checker(storybookFixture(), 'verify-storybook-build.mjs');
@@ -411,7 +365,7 @@ describe('documentation delivery CLI contracts', () => {
         write(root, 'docs/.vitepress/dist/space image.png', 'image');
         const result = await checker(root, 'verify-docs-build.mjs');
         expect(result.code, result.err).toBe(0);
-        expect(JSON.parse(result.out)).toEqual({ok:true,pages:docsPageCount,links:54 + homepageLinkIncrease,anchors:2,images:4});
+        expect(JSON.parse(result.out)).toEqual({ok:true,pages:9,links:54,anchors:2,images:4});
     });
     it.each(['/%E0%A4%A', '#%E0%A4%A', '/safe%00.bin'])('rejects malformed encoded target %s with contextual diagnostics', async href => {
         const result = await checker(docsFixture(`<a href="${href}">Invalid</a>`), 'verify-docs-build.mjs');
@@ -443,12 +397,11 @@ describe('documentation delivery CLI contracts', () => {
     it('accepts valid relative links and external protocol-relative images', async () => {
         const result = await checker(docsFixture('<a href="docs/">Relative</a><a href="mailto:fixture@example.test">Mail</a><img src="//cdn.example.test/external.png">'), 'verify-docs-build.mjs');
         expect(result.code, result.err).toBe(0);
-        expect(JSON.parse(result.out)).toEqual({ok:true,pages:docsPageCount,links:54 + homepageLinkIncrease,anchors:0,images:2});
+        expect(JSON.parse(result.out)).toEqual({ok:true,pages:9,links:54,anchors:0,images:2});
     });
     it('rejects a translated URL on another origin even when its pathname exists locally', async () => {
         const root = docsFixture(), file = path.join(root,'docs/.vitepress/dist/index.html');
-        const original = landingLocales.length ? website + '/en/' : '/en/';
-        fs.writeFileSync(file, fs.readFileSync(file,'utf8').replace(`rel="alternate" hreflang="en" href="${original}"`, 'rel="alternate" hreflang="en" href="https://outside.example.test/en/"'));
+        fs.writeFileSync(file, fs.readFileSync(file,'utf8').replace('hreflang="en" href="/en/"', 'hreflang="en" href="https://outside.example.test/en/"'));
         const result = await checker(root, 'verify-docs-build.mjs');
         expect(result.code).toBe(1); expect(result.err).toContain('Missing translated URL');
     });
@@ -723,7 +676,7 @@ describe('documentation delivery CLI contracts', () => {
         const result = await checker(root, 'verify-docs-build.mjs');
         expect(result.code, result.err).toBe(0);
         const report = JSON.parse(result.out);
-        expect(report).toEqual({ok:true,pages:docsPageCount,links:292 + homepageLinkIncrease,anchors:0,images:2});
-        if (process.env.DOCUMENTATION_TOOL_PROOF) fs.writeFileSync(process.env.DOCUMENTATION_TOOL_PROOF, JSON.stringify({sourceRoot,input:{repeatedLinksPerHome:120,pages:docsPageCount},output:report,sha256:createHash('sha256').update(result.out).digest('hex'),operations:JSON.parse(fs.readFileSync(path.join(root,'operations.json'),'utf8'))}, null, 2));
+        expect(report).toEqual({ok:true,pages:9,links:292,anchors:0,images:2});
+        if (process.env.DOCUMENTATION_TOOL_PROOF) fs.writeFileSync(process.env.DOCUMENTATION_TOOL_PROOF, JSON.stringify({sourceRoot,input:{repeatedLinksPerHome:120,pages:9},output:report,sha256:createHash('sha256').update(result.out).digest('hex'),operations:JSON.parse(fs.readFileSync(path.join(root,'operations.json'),'utf8'))}, null, 2));
     });
 });

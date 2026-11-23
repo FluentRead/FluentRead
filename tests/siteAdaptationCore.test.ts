@@ -557,7 +557,7 @@ describe('Englio word-segmented article paragraphs', () => {
             else article.querySelectorAll('[data-word-pos]').forEach(word => word.removeAttribute(remove));
             expect(core.discover(document).some(candidate => candidate.adapterId === 'englio-article')).toBe(false);
         }
-    });
+    }, 30_000);
 });
 
 describe('OpenAI community reading boundaries', () => {

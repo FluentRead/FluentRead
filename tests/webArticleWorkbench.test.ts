@@ -13,7 +13,11 @@ describe('Reading saved webpage articles in the document workbench', () => {
     it('validates the original webpage URL and reading position of a saved article', () => {
         const sourceUrl = 'https://example.test/news/study';
         expect(normalizeWebArticleUrl(sourceUrl)).toBe(sourceUrl);
-        for (const invalid of [undefined, '', 'file:///tmp/x', 'javascript:void(0)', 'https://user:secret@example.test']) {
+        expect(normalizeWebArticleUrl('/note?query=true', sourceUrl)).toBe('https://example.test/note?query=true');
+        for (const invalid of [
+            null, '', ' ', 'https://user@example.test/', 'https://:secret@example.test/',
+            'file:///tmp/x', 'javascript:void(0)', ':/', 'x'.repeat(8193),
+        ]) {
             expect(normalizeWebArticleUrl(invalid)).toBeNull();
         }
         for (const invalid of [NaN, Infinity, -0.1, 1.1, null, '0.5']) expect(normalizeWebArticleProgress(invalid)).toBeUndefined();

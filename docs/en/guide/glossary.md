@@ -24,7 +24,7 @@ Glossary settings save automatically; entry edits require **Save**. Switching gl
 
 ## Find glossary candidates in a document
 
-Open an English paper with a text layer in the document workspace, or import a long web page with **Open article**. In the document's translation settings, select **Find glossary candidates**. The workspace looks for defined English abbreviations, their full forms and recurring proper names locally. It sends the candidate terms to your current translation service for suggestions and shows the original sentence alongside each suggestion.
+Open an English paper with a text layer in the document workspace, or open a saved webpage article from document history. In the document's translation settings, select **Find glossary candidates**. The workspace looks for defined English abbreviations, their full forms and recurring proper names locally. It sends the candidate terms to your current translation service for suggestions and shows the original sentence alongside each suggestion.
 
 Select the entries you want, edit the suggested translations and choose a compatible glossary or create one for the language pair. Confirm to save the terms and retranslate the paragraphs where glossary matches changed. Each new translation replaces the existing translation and its edits only after the request succeeds. If you pause, use **Resume glossary retranslation** in the current workspace.
 

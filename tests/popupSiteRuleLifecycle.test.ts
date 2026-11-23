@@ -11,9 +11,6 @@ vi.mock('@/src/ui/i18n', () => ({useUiI18n: () => ({t: (key: string) => key, tra
 
 import {createApp, defineComponent, h, KeepAlive, nextTick, reactive, ref, type App} from 'vue';
 import PopupSiteRule from '@/src/app/popup/PopupSiteRule.vue';
-import PopupSiteRuleDiagnosis from '@/src/app/popup/PopupSiteRuleDiagnosis.vue';
-import type {PageRuleDiagnosis} from '@/src/core/translation/types';
-import type {WebArticleOpenStatus} from '@/src/features/document-translation/core/webArticle';
 
 let app: App | undefined;
 let host: HTMLDivElement;
@@ -21,8 +18,7 @@ const always = vi.fn(), disabled = vi.fn();
 const Empty = defineComponent({render: () => null});
 const defaults = () => ({active: true, context: {}, domain: 'example.com', supported: true,
     alwaysTranslated: false, alwaysPaused: false, extensionDisabled: false, autoTranslate: false,
-    translating: false, saving: false, switchLabel: '始终翻译 example.com', extensionSwitchLabel: '禁用 example.com',
-    tools: undefined as {read: () => Promise<PageRuleDiagnosis | undefined>} | undefined});
+    translating: false, saving: false, switchLabel: '始终翻译 example.com', extensionSwitchLabel: '禁用 example.com'});
 type Props = ReturnType<typeof defaults>;
 
 async function mount(overrides: Partial<Props> = {}, keepAlive = false) {
@@ -48,81 +44,14 @@ function captured(kind: 'always' | 'disabled'): () => void {
     return actions;
 }
 beforeEach(() => {vi.clearAllMocks();host = document.createElement('div');document.body.append(host);});
-afterEach(() => {app?.unmount();app = undefined;host.remove();vi.unstubAllEnvs();});
+afterEach(() => {app?.unmount();app = undefined;host.remove();});
 
 describe('PopupSiteRule 真实组件的网站规则与事件归属', () => {
-    it('在油猴脚本中仅呈现支持的网站开关', async () => {
-        vi.stubEnv('BROWSER', 'userscript');
-        const read = vi.fn(async () => undefined);
-        await mount({tools: {read}});
-        expect(button('always')).not.toBeNull();
-        expect(host.querySelector('.site-diagnosis-toggle')).toBeNull();
-        expect(read).not.toHaveBeenCalled();
+    it('网站区只显示两个网站开关', async () => {
+        await mount();
+        expect([...host.querySelectorAll('button')]).toEqual([button('always'), button('disabled')]);
     });
 
-    it('按需显示诊断入口，打开时查询一次并显示当前规则', async () => {
-        const read = vi.fn(async (): Promise<PageRuleDiagnosis> =>
-            ({scope: 'content', ruleIds: ['product-docs'], selection: {reason: 'rule-protected', ruleId: 'product-docs'}}));
-        await mount({tools: {read}});
-        const toggle = await vi.waitFor(() => {
-            const element = host.querySelector<HTMLButtonElement>('.site-diagnosis-toggle');
-            expect(element).not.toBeNull();
-            return element!;
-        });
-        expect(read).not.toHaveBeenCalled();
-        toggle.click();
-        await vi.waitFor(() => expect(host.textContent).toContain('站点规则将所选文字保留为原文。'));
-        expect(host.textContent).toContain('product-docs');
-        expect(toggle.getAttribute('aria-expanded')).toBe('true');
-        expect(read).toHaveBeenCalledOnce();
-    });
-
-    it('页面身份变化关闭诊断且丢弃迟到结果，重新打开时查询新页', async () => {
-        let finish!: (value: PageRuleDiagnosis) => void;
-        const props = reactive({active: true, read: () => new Promise<PageRuleDiagnosis>(resolve => {finish = resolve;})});
-        app = createApp(defineComponent({render: () => h(PopupSiteRuleDiagnosis, props)}));
-        app.mount(host);
-        const button = host.querySelector<HTMLButtonElement>('.site-diagnosis-toggle')!;
-        button.click();
-        await nextTick();
-        expect(button.disabled).toBe(true);
-        props.read = async () => ({scope: 'all', ruleIds: [], selection: {reason: 'no-selection'}});
-        await nextTick();
-        expect(button.getAttribute('aria-expanded')).toBe('false');
-        finish({scope: 'content', ruleIds: ['late-rule'], selection: {reason: 'translated'}});
-        await nextTick();
-        expect(host.textContent).not.toContain('late-rule');
-        button.click();
-        await vi.waitFor(() => expect(host.textContent).toContain('无专站规则'));
-        expect(host.textContent).toContain('先在网页选中一段文字');
-        button.click();
-        await nextTick();
-        expect(host.querySelector('.site-diagnosis-result')).toBeNull();
-    });
-
-    it('正文入口等待时去重，切换页面后丢弃迟到反馈并允许重试', async () => {
-        let finish!: (status: WebArticleOpenStatus) => void;
-        const open = vi.fn(() => new Promise<WebArticleOpenStatus>(resolve => {finish = resolve;}));
-        const props = reactive({active: true, read: async () => undefined, openArticle: open});
-        app = createApp(defineComponent({render: () => h(PopupSiteRuleDiagnosis, props)}));
-        app.mount(host);
-        const button = Array.from(host.querySelectorAll('button')).find(element => element.textContent?.trim() === '打开正文')!;
-        button.click();button.click();
-        await nextTick();
-        expect(open).toHaveBeenCalledOnce();
-        expect(button.disabled).toBe(true);
-        props.openArticle = vi.fn(async (): Promise<WebArticleOpenStatus> => 'too-large');
-        await nextTick();
-        finish('no-article');
-        await nextTick();
-        expect(host.textContent).not.toContain('未找到可打开的网页正文');
-        button.click();
-        await vi.waitFor(() => expect(host.textContent).toContain('网页正文太长'));
-        props.openArticle.mockResolvedValueOnce('opened');
-        button.click();
-        await vi.waitFor(() => expect(button.disabled).toBe(false));
-        expect(host.querySelector('.article-open-error')).toBeNull();
-    });
     it('显示域名、作用域与可访问状态，发送开启和关闭意图', async () => {
         const {props} = await mount();
         expect(button('always').getAttribute('aria-checked')).toBe('false');

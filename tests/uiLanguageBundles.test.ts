@@ -71,9 +71,9 @@ describe('界面语言注册表', () => {
             const siteActions = createExtensionSiteActionText(language);
             const extensionBundle = JSON.parse(contents);
             expect(extensionBundle).toEqual({...shared, legacyText: {...shared.legacyText, ...siteActions}});
-            expect(shared.legacyText).not.toHaveProperty('打开正文');
+            expect(shared.legacyText).not.toHaveProperty('查看原网页');
             i18n.registerUiLanguageBundle(language, extensionBundle);
-            expect(i18n.translateLegacyText('打开正文', language)).toBe(siteActions['打开正文']);
+            expect(i18n.translateLegacyText('查看原网页', language)).toBe(siteActions['查看原网页']);
         }
 
         bundles.registerAllUiLanguageBundles();

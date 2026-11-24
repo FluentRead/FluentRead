@@ -546,7 +546,7 @@ describe('X 实际中文界面标签的全文请求边界', () => {
         expect(result).toEqual([`T:${labels[0]}`, english, ...labels.slice(1).map(label => `T:${label}`)]);
     });
 
-    it.each(services)('%s：简繁转换继续请求，混合正文、日韩文与不确定纯 Han 不误跳过', async service => {
+    it.each(services)('%s：简繁转换继续请求，混合正文、日韩文与短纯 Han 不误跳过', async service => {
         Object.assign(runtime.config, {service, from: 'auto', to: 'zh-Hant'});
         // 七个完整标签含简体字形；同形片段「注册」不单独证明任意纯 Han 属于中文。
         const traditional = '這個網頁可以翻譯繁體中文。';
@@ -558,7 +558,6 @@ describe('X 实际中文界面标签的全文请求边界', () => {
         runtime.config.to = 'zh-Hans';
         const foreignOrUncertain = [
             traditional,
-            '这些算法使用 AI，可以降低成本，但是 Please translate this sentence.',
             'この機能は誰でも簡単に使うことが出来ます。',
             '경제(經濟) 성장률이 올해 크게 높아졌습니다.',
             '時間',
@@ -578,6 +577,15 @@ describe('X 实际中文界面标签的全文请求边界', () => {
         Object.assign(runtime.config, {to: 'en', excludedLanguages: ['zh-Hant']});
         await expect(translateTextSlots(['趨勢'], captureFullPageTranslationConfig())).resolves.toEqual(['T:趨勢']);
         expect(submitted()).toEqual(['趨勢']);
+    });
+
+    it.each(services)('%s：中文目标下含八个汉字的混合段落不再送翻', async service => {
+        Object.assign(runtime.config, {service, from: 'auto', to: 'zh-Hans'});
+        // 识别为混合的中文正文段落（夹英文句子）按用户要求保留原文，相邻英文正文照常翻译。
+        const mixedChinese = '这些算法使用 AI，可以降低成本，但是 Please translate this sentence.';
+        const result = await translateTextSlots([mixedChinese, english], captureFullPageTranslationConfig());
+        expect(result).toEqual([mixedChinese, `T:${english}`]);
+        expect(submitted()).toEqual([english]);
     });
 });
 

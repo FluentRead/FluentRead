@@ -2,7 +2,7 @@
  * @file src/core/language/chineseText.ts
  *
  * 文件职责：以保守字形与中文词语证据区分简体、繁体、简繁同形和未知的纯汉字正文，供统一语言识别器使用。
- * 主要内容：按原顺序构造可逐对审核的简繁冲突表与 Unicode 简繁专属字数据证据，排除简繁混排、罕见扩展字和粤语口语；组合中文操作词、状态词、请求句架及有界的人称情态、条件关联、时态、补语和示例引导句关系，补足短界面及自然中文正文的语境证据，同时保持字形和语言证据分离；导出 classifyChineseHan、hasSimplifiedChineseEvidence 与 hasTraditionalChineseEvidence，并保留日文、韩文排除中文语境所需的字形规则。
+ * 主要内容：按原顺序构造可逐对审核的简繁冲突表与 Unicode 简繁专属字数据证据，排除简繁混排、罕见扩展字和粤语口语；组合中文操作词、状态词、请求句架及有界的人称情态、条件关联、时态、补语和示例引导句关系，补足短界面及自然中文正文的语境证据，同时保持字形和语言证据分离；导出 classifyChineseHan、hasSimplifiedChineseEvidence、hasTraditionalChineseEvidence 与供中文目标段落跳过使用的 hasOppositeChineseScriptForms，并保留日文、韩文排除中文语境所需的字形规则。
  * 模块边界：本文件属于 core 纯文本算法，只接受调用方已排除其他文字的汉字正文；不处理语言标签、不转换原文、不猜测地区或方言，不读取配置、页面、浏览器、网络或翻译服务。ChineseScript 仅作类型依赖，配置与纯标签消费者无需加载字符表和本模块。
  */
 
@@ -104,6 +104,17 @@ function hasChineseGrammarEvidence(value: string): boolean {
 export function hasSimplifiedChineseEvidence(value: string): boolean {
     return simplifiedChineseOnlyPattern.test(value)
         || chineseInterfaceEvidencePattern.test(value) && simplifiedScriptPattern.test(value);
+}
+
+/**
+ * 段落正文是否出现与指定书写体系相反的专属字形。只看字形证据、不要求词语或语法证据，
+ * 供中文目标的全文段落跳过判断保留简繁转换：简体目标下出现繁体专属字形的段落仍可请求
+ * 翻译，反之亦然。本函数不改变原文、不识别语言，也不访问配置、页面或网络。
+ */
+export function hasOppositeChineseScriptForms(value: string, script: ChineseScript): boolean {
+    return script === 'Hans'
+        ? traditionalScriptPattern.test(value)
+        : simplifiedScriptPattern.test(value);
 }
 
 export function hasTraditionalChineseEvidence(value: string): boolean {

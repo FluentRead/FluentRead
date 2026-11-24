@@ -1,7 +1,7 @@
 /**
  * @file src/features/full-page-translation/content/titleTranslation.ts
  * 文件职责：在全文翻译会话期间翻译页面标题，并在恢复时把标题交还给页面。
- * 主要内容：精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；以 <title> 当前文本为源、复用会话冻结的配置快照发起翻译；观察 head 子树及根节点的直接子级以跟随 SPA 替换 head/html 或改写标题；用「上次写入值」区分自身写入与页面写入来阻断自激循环；源标题变化时取消旧请求，并用 generation 与写前快照丢弃迟到结果；恢复时仅在译文仍然在位时写回原标题。
+ * 主要内容：精确相同译文和有同目标语言证据的排版回显保留原文且不重复展示；中文目标下含连续汉字正文且无假名谚文的标题经 shouldSkipChineseTargetParagraph 直接保留原文，不再送翻一遍中文；以 <title> 当前文本为源、复用会话冻结的配置快照发起翻译；观察 head 子树及根节点的直接子级以跟随 SPA 替换 head/html 或改写标题；用「上次写入值」区分自身写入与页面写入来阻断自激循环；源标题变化时取消旧请求，并用 generation 与写前快照丢弃迟到结果；恢复时仅在译文仍然在位时写回原标题。
  * 模块边界：本文件只读写 document.title；根节点仅观察结构更换，正文子树不进入标题观察，不参与正文候选遍历、不渲染双语 DOM、不读取配置存储；翻译经 translateText 发出，配置由调用方传入的快照提供。
  *
  * 背景：正文候选遍历把整个 <head> 列为硬裁剪标签（core/translation/dom.ts），标题因此
@@ -10,7 +10,7 @@
  */
 import {hasDistinctTargetTranslation as hasDistinctTranslation} from '@/src/core/translation/targetResult';
 import {translateText} from '@/src/services/translation/client';
-import {shouldSkipTranslationForTarget} from '@/src/core/language/detect';
+import {shouldSkipChineseTargetParagraph, shouldSkipTranslationForTarget} from '@/src/core/language/detect';
 import {createSnapshotTranslateOptions, type FullPageTranslationConfigSnapshot} from './translationRequest';
 
 /** SPA 的一次路由切换常连续改写标题；合并抖动，只翻译稳定下来的那一次。 */
@@ -37,8 +37,10 @@ async function translateCurrentTitle(active: TitleTranslationState): Promise<voi
     const source = active.originalTitle;
     const generation = active.generation;
     if (!source.trim()) return;
-    // 与正文一致：已是目标语言或命中会话排除列表的标题不再发请求。
-    if (shouldSkipTranslationForTarget(source, active.snapshot.targetLanguage, active.snapshot.excludedLanguages)) return;
+    // 与正文一致：已是目标语言或命中会话排除列表的标题不再发请求；
+    // 中文目标下含连续汉字正文的标题同样保留原文，不再翻一遍中文。
+    if (shouldSkipTranslationForTarget(source, active.snapshot.targetLanguage, active.snapshot.excludedLanguages)
+        || shouldSkipChineseTargetParagraph(source, active.snapshot.targetLanguage)) return;
 
     let translated: string;
     try {

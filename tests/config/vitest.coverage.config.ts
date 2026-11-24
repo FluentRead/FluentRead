@@ -22,12 +22,8 @@ export default defineConfig({
             reporter: ['text', 'json-summary', 'json', 'html'],
             include: [
                 'src/core/site-adaptation/officialRelease.ts',
-                'src/features/full-page-translation/content/pageRuleDiagnosis.ts',
-                'src/features/document-translation/content/extractWebArticle.ts',
                 'src/features/document-translation/core/webArticle.ts',
                 'src/features/document-translation/ui/webArticleReading.ts',
-                'src/app/background/webArticleRuntime.ts',
-                'src/app/content/webArticleMessage.ts',
                 'src/app/background/officialSiteRuleRuntime.ts',
                 'src/services/site-adaptation/officialClient.ts',
                 'src/services/site-adaptation/officialUpdates.ts',

@@ -288,12 +288,7 @@ export class TranslationCandidateCore {
     shouldStayOriginal = (element: Element): boolean => this.shouldStayOriginalWithContext(element, this.context);
 
     private shouldStayOriginalWithContext(element: Element, context: AdapterContext): boolean {
-        return this.findOriginalProtectionAdapter(element, context) !== undefined;
-    }
-
-    /** 返回决定保留原文的适配器，供当前页诊断显示规则标识。 */
-    findOriginalProtectionAdapter(element: Element, context = this.context): TranslationSiteAdapter | undefined {
-        return this.adapters.find((adapter) => {
+        return this.adapters.some((adapter) => {
             try {
                 return adapter.shouldStayOriginal?.(element, context) === true;
             } catch {
@@ -319,7 +314,7 @@ export class TranslationCandidateCore {
         }
     });
 
-    findAdapterPrunedAncestor(
+    private hasAdapterPrunedAncestor(
         element: Element,
         evaluationContext?: ResolutionEvaluationContext,
     ): AdapterPrunedAncestor | null {
@@ -478,7 +473,7 @@ export class TranslationCandidateCore {
             return {candidate: null};
         }
 
-        const pruned = this.findAdapterPrunedAncestor(element, evaluationContext);
+        const pruned = this.hasAdapterPrunedAncestor(element, evaluationContext);
         if (pruned) {
             return {candidate: null};
         }
@@ -811,7 +806,7 @@ export class TranslationCandidateCore {
             // 全文发现会在遍历子节点前裁剪适配器拥有的受控子树；悬浮解析也必须先应用
             // 相同的继承裁剪，再尝试通用内联 run。否则命中 GitHub Quick Search 等区域时，
             // 可能解析出本应被 discover() 排除的对话框祖先。
-            if (this.findAdapterPrunedAncestor(current, evaluationContext)) return null;
+            if (this.hasAdapterPrunedAncestor(current, evaluationContext)) return null;
             // 当前元素已经由继承硬守卫拒绝，内联屏障与子树探测不可能产生候选。
             // 仍向上寻找合法宿主，并保留上面的适配器裁剪边界。
             if (guard.prune) {
@@ -911,12 +906,12 @@ export class TranslationCandidateCore {
             // 正文候选，因此局部重扫应回到同一控件边界；被明确保护的脏子树不能提升。
             const controlOwner = findTranslationControlOwner(root);
             let scanRoot = controlOwner && controlOwner !== root &&
-                !evaluateHardGuard(root, this.textOptions()).prune && !this.findAdapterPrunedAncestor(root)
+                !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root)
                 ? controlOwner : root;
             if (promoteExplicitOwner && scanRoot === root && !controlOwner && this.scope === 'content' && this.adapters.length > 0) {
                 initialAdapter = this.adapterDecision(root);
                 if (initialAdapter.decision.kind === 'pass' &&
-                    !evaluateHardGuard(root, this.textOptions()).prune && !this.findAdapterPrunedAncestor(root) &&
+                    !evaluateHardGuard(root, this.textOptions()).prune && !this.hasAdapterPrunedAncestor(root) &&
                     !isTranslationTextElementProtected(root, this.shouldStayOriginal, textProtectionCache, this.textOptions())) {
                     // 硬守卫已验证整条 composed 祖先链不超过预算。这里只走 light DOM，
                     // 不跨 ShadowRoot；遇到最近显式决策即停止，不越过原子目标或重定向。

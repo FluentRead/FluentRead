@@ -69,7 +69,6 @@ export default defineConfig({
         resolve(__dirname, 'src/app/popup/PopupLanguageSelect.vue'),
         resolve(__dirname, 'src/app/popup/PopupOnboarding.vue'),
         resolve(__dirname, 'src/app/popup/PopupSiteRule.vue'),
-        resolve(__dirname, 'src/app/popup/PopupSiteRuleDiagnosis.vue'),
         resolve(__dirname, 'src/app/popup/PopupApp.vue'),
         resolve(__dirname, 'src/app/sidepanel/SidepanelApp.vue'),
         resolve(__dirname, 'src/app/options/OptionsApp.vue'),

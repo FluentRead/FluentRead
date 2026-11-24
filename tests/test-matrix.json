@@ -357,7 +357,6 @@
       "tests/siteAdaptationCore.test.ts",
       "tests/siteAdaptationOfficialRelease.test.ts",
       "tests/siteAdaptationOfficialRuntime.test.ts",
-      "tests/pageRuleDiagnosis.test.ts",
       "tests/bbcCreditCaption.test.ts",
       "tests/xGifLabel.test.ts",
       "tests/xVideoMutationRescan.test.ts",

@@ -14,11 +14,9 @@ Supported formats are PDF, ePub, Word DOCX, HTML, TXT, Markdown, JSON, CSV, TSV,
 
 Text imports support UTF-8 and UTF-16 files with a byte order mark. Text exports use UTF-8. If you get an encoding error, save the source file as UTF-8 and import it again.
 
-## Open an article from a webpage
+## Read saved webpage articles
 
-On a news, blog, or documentation page, open the extension popup and choose **Open article** in the current website section. FluentRead extracts the loaded title, headings, text, and links into the document workbench. Choose a translation service to read in two languages, edit translations, or export HTML.
-
-Choose **View original webpage** beneath the title to open the source. Reopen the article from local document history, or open it again from the source while the article is unchanged, to recover your reading position, translations, and edits.
+Open a saved webpage article from document history to resume reading and see the saved translations and edits. **View original webpage** under the workbench title opens the source URL.
 
 ## Translate and read
 

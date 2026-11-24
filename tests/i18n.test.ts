@@ -1031,7 +1031,6 @@ describe('i18n 全量界面扫描', () => {
     const audit = collectUiSourceCopy(process.cwd());
     const extensionCopyOwners = new Set([
       'src/app/document-translation/DocumentApp.vue',
-      'src/app/popup/PopupSiteRuleDiagnosis.vue',
       'src/features/settings/ui/SiteAdaptationSettings.vue',
     ]);
     const extensionLegacyText = new Map(createUiLanguageBundleFiles().map(({relativeDest, contents}) =>

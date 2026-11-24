@@ -480,6 +480,10 @@ export default defineConfig({
             const documentFormatsBudget = 55_000;
             // Chrome 同环境 55bfab088 对照为 70,079,902 → 70,083,642 bytes，登记 4 kB 翻译链路代码预算。
             const translationPipelineBudget = browser === 'chrome' ? 4_000 : 0;
+            // 本地混元段落分组、推理恢复及下载来源：Chrome 由 68,600,232 增至 68,601,308 字节，登记 2 kB 预算。
+            const localTranslationRecoveryBudget = 2_000;
+            // 本地 PDF 导出修复（版式、原文链接、重排文字层）在合并前环境实测 Chrome +8,589 / Firefox +8,476 字节。
+            const pdfExportCodeBudget = 9_000;
             // 当前页规则诊断新增约 9 kB 的扩展代码、样式及七语文案；不含依赖、模型或 WASM。
             const pageRuleDiagnosisBudget = 12_000;
             // 正文抽取、文档历史及界面复用现有依赖；同环境的 Chrome 生产包增量为 23,362 字节。
@@ -517,7 +521,7 @@ export default defineConfig({
             // 行末空心边饰与译文范围核对使 Chrome 增加 1,083 字节代码。
             // 分割复核边饰旁的框外窄笔画再增加 1,083 字节代码。
             const imageClippedGlyphBudget = 8_100;
-            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget));
+            await checkExtensionSize(wxt.config.outDir, budget + (dev ? 0 : courseCaptionBudget + youtubeEmbedBudget + aiPlatformDefaultRemovalBudget + sharedWhisperBudget + floatingLearningBudget + githubPullListHeadingBudget + legacyTranslationTextBudget + boundaryEmojiBudget + siteRuleEditorBudget + epubCoveragePreviewBudget + requestEvidenceBudget + documentFormatsBudget + pdfReadingToolsBudget + hypothesisClientBudget + dictionaryWorkspaceBudget + htmlMediaSubtitleBudget + translationPipelineBudget + pageRuleDiagnosisBudget + webArticleBudget + courseSubtitleLearningBudget + courseraCaptionBudget + documentGlossaryCandidateBudget + rotatedLabelBudget + imageOcrLanguageBudget + imageDirectionalRepairBudget + imageTextLocaleBudget + imageBoundarySamplingBudget + imageClippedSpacingBudget + imageSegmentationRetryBudget + imageClippedGlyphBudget + localTranslationRecoveryBudget + pdfExportCodeBudget));
         },
         'entrypoints:grouped': (_wxt, groups) => {
             groupModuleWorkers(groups);

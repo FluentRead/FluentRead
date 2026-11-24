@@ -1072,8 +1072,8 @@ function scheduleHistorySave(): void {
 }
 // 刷新后回到正在阅读的文档：当前标签页记住它在本地历史里的标识，新开的标签页仍从首页开始。
 const SESSION_KEY = 'fluentread.document.open';
-/** PDF 署名识别变化后重解析旧快照，按原文及位置恢复校订。 */
-const PARSED_VERSION = 26;
+/** PDF 图例、表格分段和署名识别变化后重解析旧快照，按原文及位置恢复校订。 */
+const PARSED_VERSION = 29;
 function rememberOpenDocument(id: string | undefined | null): void {
   try {
     if (id) globalThis.sessionStorage?.setItem(SESSION_KEY, id);

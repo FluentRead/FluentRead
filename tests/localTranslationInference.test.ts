@@ -54,6 +54,20 @@ describe('local model language routes and bounded generation', () => {
     expect(splitLocalTranslationText('')).toEqual([]);
   });
 
+  it('groups sentences within a line and within the budget while preserving paragraph separators', () => {
+    const text = '  Hello. Goodbye!\r\n\r\n第一句。第二句。\u2029Last.';
+    expect(splitLocalTranslationText(text, 50, 'paragraph')).toEqual([
+      '  Hello. Goodbye!\r\n', '\r\n', '第一句。第二句。\u2029', 'Last.',
+    ]);
+    expect(splitLocalTranslationText('Hello. Goodbye!', 9, 'paragraph')).toEqual(['Hello. ', 'Goodbye!']);
+    expect(splitLocalTranslationText('Hello. Goodbye!')).toEqual(['Hello. ', 'Goodbye!']);
+
+    const long = 'First. ' + '材料😀'.repeat(220) + ' Done! Next.';
+    const parts = splitLocalTranslationText(long, 80, 'paragraph');
+    expect(parts.join('')).toBe(long);
+    expect(parts.every((part) => part.length <= 80 && !/[\uD800-\uDBFF]$/u.test(part))).toBe(true);
+  });
+
   it('uses the translation-specific Hunyuan prompt and preserves the original source literally', () => {
     expect(hunyuanTranslationPrompt('材料 <x>', 'zh', 'en')).toContain('材料 <x>');
     expect(hunyuanTranslationPrompt('print', 'en', 'ja')).toContain('Japanese');

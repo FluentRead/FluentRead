@@ -134,6 +134,15 @@ async function main() {
     const shot = async name => {const file = path.join(artifacts, `${name}.png`); await page.screenshot({path: file}); report.screenshots.push(file);};
     const showEdit = async () => {await page.locator('.reader-tabs button').nth(1).click(); await page.locator('.segment-editor').waitFor();};
     const showRead = async () => {await page.locator('.reader-tabs button').first().click(); await page.locator('[data-pdf-scroll]').waitFor();};
+    const resetDocument = async () => {
+      const sidebar = page.locator('aside.document-sidebar');
+      if (!await sidebar.isVisible()) await page.locator('.sidebar-toggle').click();
+      await sidebar.getByRole('button', {name: '调整文档翻译设置', exact: true}).click();
+      await page.locator('.document-settings-dialog[open] .sidebar-change-file').click();
+      const confirmation = page.locator('dialog[open]').filter({has: page.locator('#confirm-document-heading')});
+      if (await confirmation.count()) await confirmation.locator('.translate-document-button').click();
+      await page.locator('.file-drop-zone').waitFor();
+    };
     const importPdf = async input => {
       await page.locator('input[type=file]').setInputFiles({name: input.name, mimeType: 'application/pdf', buffer: input.bytes});
       await page.locator('.workspace-heading h1').filter({hasText: input.name}).waitFor();
@@ -251,9 +260,7 @@ async function main() {
       report.cases.push({name: 'partial-confirmation-independent-layout-original-bytes-escape-outside-click', ok: true});
       const shortEntries = await correct(rows, row => `第${row.id + 1}段校订保留。`, 'complete-dialog');
       await download('download-panel-direct-bilingual', 'layout', 'bilingual', shortEntries, 1);
-      await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
-      await diagnostics.attachPage(page, 'download-dialog-protected');
-      await page.goto(`${origin}/document.html`); await page.locator('.file-drop-zone').waitFor();
+      await resetDocument();
       const input = {name: '一份文件名较长的研究资料-用于验证下载文件名不会超出窗口-protected.pdf', bytes: fs.readFileSync(encryptedInput)};
       const protectedRows = await importPdf(input);
       const entries = await correct(protectedRows, row => `第${row.id + 1}段校订内容保留。`, 'protected-dialog');
@@ -338,22 +345,14 @@ async function main() {
           if (kind === 'layout' && mode === 'bilingual') assert(result.chapters.slice(0, 3).every(item => item.x > 600), 'Bilingual bookmark must target the translated side');
           if (kind === 'readable') assert(result.chapters[1].page > result.chapters[0].page, 'Long body must move the next heading to a later reflow page');
         }
-        // 隔离下一次导入的队列和会话状态；采集器在新页导航前继续附着。
-        await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
-        if (diagnostics) await diagnostics.attachPage(page, 'pdf-export-document-next');
-        await page.goto(`${origin}/document.html`); await page.locator('.file-drop-zone').waitFor();
+        if (native) await resetDocument();
       }
     } else {
     const shortRows = await importPdf(short); assert.equal(shortRows.length, 3, 'Three separate source paragraphs must be parsed');
     const shortCorrections = await correct(shortRows, row => `\n\n短译文第${row.id + 1}段完整保留。\n \t\n`, 'short-whitespace');
     await download('short-layout-bilingual', 'layout', 'bilingual', shortCorrections, 1);
     await download('short-layout-translated', 'layout', 'translated', shortCorrections, 1);
-    // 独立后台页签不继承上一个页签的 sessionStorage，避免把队列/会话恢复混入分页专项。
-    await page.close(); page = await helper.newPageWithoutForeground(context, 30000); page.setDefaultTimeout(30000);
-    page.on('pageerror', error => report.consoleErrors.push(error.message));
-    page.on('console', message => {if (message.type() === 'error') report.consoleErrors.push(message.text());});
-    await page.goto(`${origin}/document.html`);
-    await page.locator('.file-drop-zone').waitFor();
+    await resetDocument();
     const singleRows = await importPdf(single); assert.equal(singleRows.length, 1);
     const lines = await correct(singleRows, () => '译文\n'.repeat(36) + ' \t\r\n\r\n', 'readable-36-lines');
     await download('readable-36-lines-translated', 'readable', 'translated', lines, 1);

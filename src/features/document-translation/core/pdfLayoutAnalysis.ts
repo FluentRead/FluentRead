@@ -12,10 +12,13 @@
  * 重描边界：分级物理网格检查同位重描并跨相邻字号级查询；跨字体或提取分段时须完整字串、连续局部几何和相同外框共同确认，部分重叠与不同横向尺度保留。
  * 整页矢量容器：跳过覆盖页高的 Form 外框及其同边界底色，图中文字需要独立图形支持；同一装饰底框内连续对齐的正文先独立归行，避免与邻框文字串接。
  * 列表前缀：识别后的前缀同时保留原始字形位置，正文分段不吞掉圆点，扫描页选择层可按原图位置复制完整条目。
+ * 参考文献：用同栏连续编号和悬挂缩进将网址、年份和页码续行归入各自条目；用原页链接目标确认断开的网址，保留路径连接符。
+ * 并排表组：有共用表题、逐行成对的横线和稳定右对齐的数值列时，按每行实测空隙划定单元格。
+ * 图例和子图标记：紧贴图框并有短色标支撑的图例、以及图与主图注之间同基线的数字/缩写标记，共用原图范围。
  * 模块边界：纯几何分析，不加载 PDF.js、不访问 Canvas、网络或 DOM，不修改来源文字或文件。
  */
 import type {PdfDocumentBlock, PdfDocumentLine, PdfDocumentRun, PdfPreservedRegion} from './document';
-import {findBorderlessTables} from './pdfBorderlessTable';
+import {findBorderlessTables, findRuledTableDividers} from './pdfBorderlessTable';
 
 type Rectangle = Pick<PdfDocumentRun, 'x' | 'y' | 'width' | 'height'>;
 type Matrix = readonly number[];
@@ -432,14 +435,19 @@ const cjkLine = (text: string) => (text.match(cjkGlyphs)?.length ?? 0) * 2 >= te
 const cjkLineEnd = new RegExp(`[${CJK}，。、；：！？（）《》“”]$`, 'u');
 const cjkLineStart = new RegExp(`^[${CJK}，。、；：！？（）《》“”]`, 'u');
 /** 复用已确认同属一块的逐行原文拼接规则；人工 OCR 校对与首次解析使用同一文字契约。 */
-export function joinPdfSourceLines(lines: readonly PdfDocumentLine[], kind?: PdfDocumentBlock['kind']): string {
+export function joinPdfSourceLines(lines: readonly PdfDocumentLine[], kind?: PdfDocumentBlock['kind'], links?: ReadonlySet<string>): string {
     if (!lines.length) return '';
     const joined = lines.reduce((text, line, index) => {
         if (!text) return line.text;
-        // 段落/分栏关联已确认两行同属一块；只有 URL 尾斜杠和带数字的路径首词共同确认续行，后续正文空白不变。
+        // 两行已归入同一段落。只有行尾地址与下一行的路径组件都可辨认时才直接拼接。
         const path = line.text.match(/^[A-Za-z0-9._~%/?#&=+-]+(?=\s|$)/u)?.[0];
-        if (/(?:^|[\s(["'])https?:\/\/[^\s<>"'`，。、；：！？（）【】《》「」“”‘’]+\/$/u.test(lines[index - 1].text)
-            && path?.includes('/') && /\d/u.test(path)) return text + line.text;
+        const url = /(?:^|[\s(["'])(https?:(?:\/\/[^\s<>"'`，。、；：！？（）【】《》「」“”‘’]*)?)$/u.exec(lines[index - 1].text)?.[1];
+        if (url && path) {
+            const candidate = (url + path).replace(/[.,;!?]+$/u, '');
+            if (links?.has(candidate)
+                || url.endsWith('/') && path.includes('/') && /\d/u.test(path)
+                || url.endsWith('-') && (path.includes('-') || path.includes('/'))) return text + line.text;
+        }
         return /[-‐‑\u00AD]$/u.test(text) && /^[a-z]/u.test(line.text) ? text.slice(0, -1) + line.text
             : cjkLineEnd.test(text) && cjkLineStart.test(line.text) ? text + line.text : `${text} ${line.text}`;
     }, '');
@@ -462,6 +470,44 @@ const textUnits = (text: string) => text.split(/\s+/u).filter(Boolean).length + 
 const looseSymbols = (text: string) => {const tokens = text.trim().split(/\s+/u); return tokens.length >= 3 && tokens.filter(token => /^[\p{Script=Latin}\d]$/u.test(token)).length >= tokens.length * 0.6;};
 /** 含有可读词语（至少三个连续字母或一个中日韩文字，数学函数名除外）的文字才值得翻译；根号横线在部分数学字体里被读成一串 ffi，不是词语。 */
 const readable = (text: string) => !/(?:ffi){3,}/u.test(text) && !looseSymbols(text) && (/\p{L}{3,}|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(text.replace(/\b(?:lim|min|max|log|exp|sin|cos|tan|arg|sup|inf)\b/giu, '')));
+
+/** 同一栏两个连续编号提供条目证据；只收紧邻条目、同字号且向内悬挂的续行。 */
+function numberedReferenceLines(lines: readonly LayoutLine[], loose: number): Map<LayoutLine, LayoutLine> {
+    const starts = new Map<LayoutLine, number>();
+    const byNumber = new Map<number, LayoutLine[]>();
+    for (const line of lines) {
+        const match = /^\[\s*(\d{1,4})\s*\]\s*(?=\p{L})/u.exec(line.text);
+        if (!match) continue;
+        const number = Number(match[1]);
+        starts.set(line, number);
+        const siblings = byNumber.get(number);
+        if (siblings) siblings.push(line); else byNumber.set(number, [line]);
+    }
+    const references = new Map<LayoutLine, LayoutLine>();
+    for (const [index, first] of lines.entries()) {
+        const number = starts.get(first);
+        if (number === undefined) continue;
+        const size = first.fontSize;
+        const peer = [...byNumber.get(number - 1) ?? [], ...byNumber.get(number + 1) ?? []].find(line => Math.abs(line.x - first.x) <= 1.5
+            && Math.abs(line.fontSize - size) <= 0.6 && Math.abs(line.baseline - first.baseline) <= size * 14 * loose
+            && Math.sign(line.baseline - first.baseline) === Math.sign(starts.get(line)! - number));
+        if (!peer) continue;
+        references.set(first, first);
+        let last = first;
+        for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+            const line = lines[cursor];
+            const gap = line.baseline - last.baseline;
+            if (gap > size * 1.6 * loose) break;
+            if (line.x < first.x - 1.5 || line.x > first.x + size * 3.5 || gap < size * 0.45) continue;
+            if (starts.has(line) || line.x < first.x + size * 0.45 || Math.abs(line.fontSize - size) > 0.6
+                || right(line) > Math.max(right(first), right(peer)) + size * 3.5) break;
+            references.set(line, first);
+            last = line;
+        }
+    }
+    return references;
+}
+
 const sectionTitle = /^(?:Abstract|References|Acknowledge?ments?|Appendix(?:\s+[A-Z])?(?:\.\s.*)?)$/iu;
 /** 仅识别已支持章节名的逐字母普通空格样式；压缩键不写回来源文字，双空格的词界也只供识别。 */
 function spacedSectionTitle(line: LayoutLine): boolean {
@@ -748,13 +794,68 @@ function captionedTableGeometry(atoms: readonly PdfLayoutAtom[], shapes: readonl
     return result;
 }
 
+/** 并排的两组横线与组内重复右对齐数值共同确认列界，避免把左组数值归入右组操作。 */
+function sideBySideTableSections(atoms: readonly PdfLayoutAtom[], shapes: readonly PdfGraphicsShape[]): Array<{bounds: Rectangle; dividers: Rectangle[]}> {
+    const result: Array<{bounds: Rectangle; dividers: Rectangle[]}> = [];
+    const captions = atoms.filter(atom => /^(?:Table\s+\d+[:.]|表\s*\d+[:：.．])/iu.test(atom.text)).slice(0, 16);
+    for (const caption of captions) {
+        const size = caption.fontSize;
+        const groups = new Map<string, PdfGraphicsShape[]>();
+        for (const shape of shapes) {
+            if (shape.kind !== 'path' || shape.height > 1 || shape.width < size * 5 || shape.x < caption.x - size
+                || shape.y > caption.y + 1 || shape.y < caption.y - size * 16) continue;
+            const key = `${Math.round(2 * shape.x)}:${Math.round(2 * right(shape))}`;
+            const rules = groups.get(key);
+            if (rules) rules.push(shape); else groups.set(key, [shape]);
+        }
+        const sections = [...groups.values()].filter(rules => rules.length >= 4).map(rules => rules.sort((a, b) => a.y - b.y))
+            .filter(rules => Math.abs(caption.y - bottom(rules.at(-1)!)) <= size
+                && rules.slice(1).every((rule, index) => rule.y - rules[index].y >= size * 0.8 && rule.y - rules[index].y <= size * 2.5))
+            .sort((a, b) => a[0].x - b[0].x);
+        for (const [index, left] of sections.entries()) {
+            if (Math.abs(left[0].x - caption.x) > size) continue;
+            const rightSection = sections.slice(index + 1).find(rules => rules[0].x - right(left[0]) > 2
+                && rules[0].x - right(left[0]) <= size * 2 && rules.length === left.length
+                && rules.every((rule, row) => Math.abs(rule.y - left[row].y) <= 1));
+            if (!rightSection) continue;
+            const pair = [left, rightSection].map(rules => {
+                const first = rules[0], end = right(first);
+                const bounds = {x: first.x - 0.75, y: first.y, width: first.width + 1.5, height: bottom(rules.at(-1)!) - first.y};
+                const content = atoms.filter(atom => atom.x >= bounds.x && right(atom) <= right(bounds)
+                    && atom.baseline > bounds.y && atom.baseline < bottom(bounds));
+                const dividers: Rectangle[] = [];
+                let numericRows = 0;
+                for (const [row, lower] of rules.slice(1).entries()) {
+                    const upper = rules[row];
+                    const glyphs = content.filter(atom => atom.baseline > upper.y && atom.baseline <= lower.y);
+                    const value = glyphs.find(atom => Math.abs(right(atom) - end) <= 1 && atom.x > first.x + first.width / 2);
+                    if (!value) continue;
+                    const proseEdge = Math.max(first.x, ...glyphs.filter(atom => atom.x < value.x).map(right));
+                    if (proseEdge <= first.x || value.x - proseEdge < 2) continue;
+                    if (/^\d+(?:[.,]\d+)?$/u.test(value.text.trim())) numericRows++;
+                    dividers.push({x: (value.x + proseEdge) / 2, y: upper.y, width: 0, height: lower.y - upper.y});
+                }
+                return {bounds, dividers, numericRows};
+            });
+            if (pair.every(section => section.numericRows >= 3) && !pair.some(section => result.some(other => overlaps(section.bounds, other.bounds, -1)))) {
+                result.push(...pair);
+                break;
+            }
+        }
+    }
+    return result;
+}
+
 export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; graphics: readonly PdfGraphicsShape[]; width: number; height: number}): {blocks: PdfLayoutBlock[]; preservedRegions: PdfPreservedRegion[]} {
     // 项目符号是单独的一个字形：符号字体里的圆点方块常被读成 n、u、l 这样的字母。它留在原页上不参与翻译，
     // 所在的行从符号之后算起，并且总是另起一段。
     // 可见竖线比词距推断更可靠；紧挨分隔线的两格文字也不能串成一个段落。
     const borderlessTables = findBorderlessTables(input.atoms, input.graphics, input.width);
     const captionedTables = [...captionedTableGeometry(input.atoms, input.graphics, input.width), ...borderlessTables];
-    const tableDividers = captionedTables.flatMap(table => table.dividers);
+    const sideBySideSections = sideBySideTableSections(input.atoms, input.graphics);
+    const tableDividers = [...captionedTables.flatMap(table => table.dividers),
+        ...findRuledTableDividers(input.atoms, input.graphics.filter(shape => shape.kind === 'path' && shape.height <= 2), input.width),
+        ...sideBySideSections.flatMap(section => [...section.dividers, {...section.bounds, width: 0}])];
     const dividerCandidates = input.graphics.filter(shape => shape.kind === 'path' && shape.width <= 2 && shape.height >= 4);
     // 只索引细笔画的连接端点；无关路径或重复描边不参与逐项全表扫描。
     const pathEnds = new Map<string, Rectangle[]>(), pathStarts = new Map<string, Rectangle[]>(), seenPaths = new Set<string>();
@@ -940,6 +1041,18 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     // 插图上方的短居中标签属于图形本身；保留它们能让左右子图在裁剪后仍有完整标题。
     for (let index = 0; index < figures.length; index += 1) {
         const figure = figures[index];
+        const legend = input.graphics.find(shape => shape.kind !== 'image' && shape.width >= figure.width * 0.75 && shape.width <= figure.width + font * 2
+            && Math.abs(shape.x - figure.x) <= font && shape.height >= font && shape.height <= font * 3
+            && bottom(shape) <= figure.y + 1 && figure.y - bottom(shape) <= font * 0.55
+            && lines.filter(line => coversLine(shape, line) && line.fontSize < font * 0.85
+                && input.graphics.some(swatch => swatch.kind === 'path' && swatch.width >= line.fontSize * 0.5 && swatch.width <= line.fontSize * 3
+                    && swatch.height <= line.fontSize && line.x - right(swatch) >= -0.5 && line.x - right(swatch) <= line.fontSize
+                    && Math.abs(swatch.y - line.baseline) <= line.fontSize * 0.65)).length >= 2);
+        if (legend) {
+            figures[index] = union(figure, legend);
+            for (const line of lines) if (coversLine(legend, line)) attachedFigureLabels.add(line);
+            continue;
+        }
         const labels = lines.filter(line => bottom(line) <= figure.y && figure.y - line.baseline <= Math.max(font, line.fontSize) * 2.5
             && (Math.abs(line.x + line.width / 2 - figure.x - figure.width / 2) <= font * 2 || Math.abs(line.x - figure.x) <= font * 0.25)
             && line.height <= Math.max(font, line.fontSize) * 1.7 && line.width < input.width * .45 && line.text.length <= 80
@@ -948,8 +1061,31 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         labels.sort((a, b) => b.baseline - a.baseline);
         if (labels.length) {figures[index] = union(figure, labels[0]); attachedFigureLabels.add(labels[0]);}
     }
-    const tables = [...tableRegions(input.graphics, input.width, figures), ...shadedTables, ...captionedTables.map(table => table.bounds)];
+    for (const caption of lines.filter(line => /^(?:Figure\s+\d+|Fig\.\s+\d+|图\s*\d+)[\s.:：]/iu.test(line.text))) {
+        const preceding = figures.map((figure, index) => ({figure, index})).filter(({figure}) =>
+            caption.y >= bottom(figure) && caption.y - bottom(figure) <= font * 3
+            && Math.min(right(caption), right(figure)) - Math.max(caption.x, figure.x) >= font);
+        const labels = lines.filter(line => /^\([a-z]\)\s*\d+(?:[.×/]\d+)*(?:[- ][A-Z][A-Z\d]{0,7})?$/u.test(line.text) && bottom(line) <= caption.y)
+            .flatMap(line => {
+                const chart = preceding.find(({figure}) => line.y >= bottom(figure) - 1 && line.x >= figure.x && right(line) <= right(figure));
+                return chart ? [{line, index: chart.index}] : [];
+            });
+        for (const {line: label, index} of labels) {
+            if (!labels.some(({line: peer}) => peer !== label && Math.abs(peer.baseline - label.baseline) <= font * 0.35
+                && Math.abs(peer.x - label.x) >= font * 4 && peer.text[1] !== label.text[1])) continue;
+            figures[index] = union(figures[index], label);
+            attachedFigureLabels.add(label);
+        }
+    }
+    const tables = [...tableRegions(input.graphics, input.width, figures), ...shadedTables, ...captionedTables.map(table => table.bounds)]
+        .filter(table => !sideBySideSections.some(section => overlaps(table, section.bounds, -1)));
     const regions: PdfPreservedRegion[] = [...figures.map((box, index) => ({...box, id: `figure-${index + 1}`, kind: 'figure' as const})), ...tables.map((box, index) => ({...box, id: `table-${index + 1}`, kind: 'table' as const}))];
+    const sectionByRegion = new Map<PdfPreservedRegion, (typeof sideBySideSections)[number]>();
+    for (const section of sideBySideSections) {
+        const region: PdfPreservedRegion = {...section.bounds, id: `table-${tables.length + sectionByRegion.size + 1}`, kind: 'table'};
+        regions.push(region);
+        sectionByRegion.set(region, section);
+    }
     // 图形包围盒可能跨栏并圈入下方的正文：图内只有小字短标签属于图形，题注、成句的行、紧随成句行的续行以及幻灯片这类大字号页面上 12 磅以上的图内文字（流程图里的文字）仍是正文；论文页眉图里的期刊名等大字仍属于图。
     const directFigureLines = new Set(wrappers.length ? lines.filter(line => attachedFigureLabels.has(line)
         || figureShapes.some(shape => coversLine(shape, line))) : []);
@@ -964,6 +1100,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         && !(region.kind === 'figure' && (prose.has(line) || wrappers.length > 0 && !directFigureLines.has(line)
             || (font >= 14 && line.fontSize >= 12 && readable(line.text))));
     const ordinary = lines.filter(line => !regions.some(region => inRegion(region, line)));
+    const references = numberedReferenceLines(ordinary.filter(line => !panelLines.has(line) && !tocEntries.has(line)), loose);
     const mathLabels = isolatedMathLabels(ordinary, input.graphics, font, input.width, input.height);
     // 行内分式的分子/分母可能是可读单位或多字母变量；真实横分数线、上下两侧字形及紧邻数学符号共同确认它们。
     const fractionFragments = new Set<LayoutLine>();
@@ -986,14 +1123,14 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     // 相邻的多个分母可能共用一条提取行；括号组件留在分式周围，不能把它们当成新的可读段落。
     for (const line of ordinary) if (line.text.length <= 45 && textUnits(line.text) <= 5 && line.runs.some(run => fractionRuns.has(run))
         && line.runs.every(run => fractionRuns.has(run) || /^[()[\]{}⎛⎜⎝⎞⎟⎠⎡⎢⎣⎤⎥⎦⎧⎨⎩⎫⎬⎭\s]+$/u.test(run.text))) fractionFragments.add(line);
-    const formulas = ordinary.filter(line => fractionFragments.has(line) || formulaLine(line, input.width, ordinary, font));
+    const formulas = ordinary.filter(line => !references.has(line) && (fractionFragments.has(line) || formulaLine(line, input.width, ordinary, font)));
     for (const line of formulas) {
         let bounds: Rectangle = piecewiseFormulaBounds(line, ordinary, font) ?? line;
         const fractionRules = input.graphics.filter(rule => rule.kind === 'path' && rule.height <= 1 && rule.width >= font * 0.5
             && rule.x <= right(line) + font && right(rule) >= line.x - font && Math.abs(rule.y - line.baseline) <= font);
         // 独立公式的小上下标、分式和式号与公式一起保留；不能把下一行正文并入遮盖区域。
         for (const near of ordinary) {
-            if (near === line || near.text.length > 45 || near.width > input.width * 0.5) continue;
+            if (near === line || references.has(near) || near.text.length > 45 || near.width > input.width * 0.5) continue;
             // 教材的短提问紧接着上一题的答案公式；独立列表条目和成句文字不是该公式的上下标。
             if (bulleted.has(near) || readable(near.text) && textUnits(near.text) >= 4
                 && !/(?:(?:^|\s)(?:if|when|for)\b.*\p{Sm}|^otherwise\b)/iu.test(near.text)
@@ -1023,6 +1160,7 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
     type Draft = {lines: LayoutLine[]; kind: NonNullable<PdfDocumentBlock['kind']>; region?: PdfPreservedRegion; bounds: Rectangle; panel?: TextPanel};
     const drafts: Draft[] = [];
     const panelDrafts = new Map<TextPanel, Draft>();
+    const referenceDrafts = new Map<LayoutLine, Draft>();
     let active: Draft[] = [];
     // 页底小字不能仅按百分比归为页脚：论文脚注常越过版心下缘。
     // 只接受下半页短水平分隔线之后、同栏且小于正文的可读文字，并沿紧邻行延续；另一栏页脚和独立页码不借用该证据。
@@ -1142,8 +1280,11 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const {xs, ys, rules} = tableEdges.get(region)!;
         const center = draft.bounds.x + draft.bounds.width / 2;
         const first = draft.lines[0], last = draft.lines.at(-1)!;
-        const x = [...xs].reverse().find(edge => edge <= center) ?? region.x;
-        const endX = xs.find(edge => edge > center) ?? right(region);
+        const section = sectionByRegion.get(region);
+        const columns = section ? [region.x, ...section.dividers.filter(divider => divider.y < first.baseline
+            && first.baseline <= bottom(divider)).map(divider => divider.x), right(region)] : xs;
+        const x = [...columns].reverse().find(edge => edge <= center) ?? region.x;
+        const endX = columns.find(edge => edge > center) ?? right(region);
         // 合并行单元格的中间没有横线；其它列的行线不能把它的物理边界切碎。
         const localRows = uniqueEdges(rules.filter(shape => shape.height <= 2 && shape.width >= 6 && shape.x <= x + 2 && right(shape) >= endX - 2)
             .flatMap(shape => [shape.y, bottom(shape)]));
@@ -1205,9 +1346,16 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             }
             continue;
         }
-        const kind = region ? region.kind === 'figure' ? 'figure-label' : region.kind : classify(line);
+        const reference = references.get(line);
+        if (reference && reference !== line) {
+            const draft = referenceDrafts.get(reference)!;
+            draft.lines.push(line);
+            draft.bounds = union(draft.bounds, line);
+            continue;
+        }
+        const kind = region ? region.kind === 'figure' ? 'figure-label' : region.kind : reference ? 'text' : classify(line);
         let selected: Draft | undefined;
-        if (kind !== 'footer' && !/^\(\d+\)\s/u.test(line.text) && !bulleted.has(line) && !tocEntries.has(line)) {
+        if (!reference && kind !== 'footer' && !/^\(\d+\)\s/u.test(line.text) && !bulleted.has(line) && !tocEntries.has(line)) {
             for (const draft of active) {
                 const last = draft.lines.at(-1)!;
                 if (tocEntries.has(last)) continue;
@@ -1242,7 +1390,12 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
             }
         }
         if (selected) {selected.lines.push(line); selected.bounds = union(selected.bounds, line);}
-        else {const draft = {lines: [line], kind, region, bounds: line}; drafts.push(draft); active.push(draft);}
+        else {
+            const draft = {lines: [line], kind, region, bounds: line};
+            drafts.push(draft);
+            active.push(draft);
+            if (reference) referenceDrafts.set(reference, draft);
+        }
     }
     // 密排表头里上下两行的单元格可能被当成一个单元格的续行；合并后的矩形一旦压到别的块上，就退回到一行一个单元格，译文才不会互相覆盖。
     for (let index = drafts.length - 1; index >= 0; index -= 1) {
@@ -1272,9 +1425,11 @@ export function analyzePdfPageLayout(input: {atoms: readonly PdfLayoutAtom[]; gr
         const center = draft.bounds.x + draft.bounds.width / 2;
         const centered = draft.panel?.centered || (draft.kind === 'heading' || draft.kind === 'metadata' || draft.kind === 'footer') && Math.abs(center - input.width / 2) <= input.width * 0.045;
         const cell = cellBounds(draft);
+        const rightAligned = draft.region && sectionByRegion.has(draft.region) && cell && cell.x > draft.region.x
+            && right(draft.region) - right(draft.bounds) <= 2;
         const panel = draft.panel?.box;
         const marker = listMarkers.get(first);
-        const block: PdfLayoutBlock = {...draft.bounds, source, ...(marker ? {listMarker: marker.text, listMarkerRun: {...marker.run, text: marker.text}} : {}), ...(cell ? {cellBounds: cell} : {}), fontSize: median(draft.lines.map(line => line.fontSize)), lineHeight: leading.length ? median(leading) : first.fontSize, lineCount: draft.lines.length, fontFamily: first.fontFamily, fontWeight: draft.kind === 'heading' ? 700 : 400, textAlign: centered ? 'center' : 'left', kind: draft.kind, preserveSource: (draft.region ? draft.region.kind !== 'table' || !readable(source) : false) || draft.kind === 'metadata' || draft.kind === 'footer' || draft.kind === 'formula', lines: draft.lines};
+        const block: PdfLayoutBlock = {...draft.bounds, source, ...(marker ? {listMarker: marker.text, listMarkerRun: {...marker.run, text: marker.text}} : {}), ...(cell ? {cellBounds: cell} : {}), fontSize: median(draft.lines.map(line => line.fontSize)), lineHeight: leading.length ? median(leading) : first.fontSize, lineCount: draft.lines.length, fontFamily: first.fontFamily, fontWeight: draft.kind === 'heading' ? 700 : 400, textAlign: centered ? 'center' : rightAligned ? 'right' : 'left', kind: draft.kind, preserveSource: (draft.region ? draft.region.kind !== 'table' || !readable(source) : false) || draft.kind === 'metadata' || draft.kind === 'footer' || draft.kind === 'formula', lines: draft.lines};
         // 底框是不规则矢量形状的外接矩形；少量贴边字形需要保留现有擦除留边。
         if (panel) block.panelBounds = union(panel, {x: block.x - 1.5, y: block.y - 1.5, width: block.width + 3, height: block.height + 4});
         if (draft.region?.kind === 'table') blockTables.set(block, draft.region);

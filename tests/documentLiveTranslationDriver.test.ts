@@ -48,9 +48,13 @@ interface ResumeGuard {
     tryResume(current: TranslationStatus, ports: ResumePorts): Promise<boolean>;
     verifyFinal(snapshot: ResumeSnapshot, readSettings: ResumePorts['readSettings']): Promise<Record<string, unknown> | null>;
 }
+interface AuditedPdfPage {
+    label?: string; width: number; height: number; text: string; originalText?: string;
+    webLinks: Array<{url: string; right: number}>;
+}
 const require = createRequire(import.meta.url);
 const fileSystem = require('node:fs') as typeof import('node:fs');
-const {createResponseBodyObserver, closeLiveSession, isProviderDomain, shouldObserveResponseBody,
+const {createResponseBodyObserver, closeLiveSession, isProviderDomain, shouldObserveResponseBody, validateLayoutCopyText, validatePdf,
     parseBuiltinGlossaryArg, readPublicGlossaryState, selectPublicDocumentGlossary, installBuiltinGlossaryForLiveRun,
     parseTranslationResumesArg, readPublicResumeSettings, readProductionTranslationStatus, isResumableTranslationTimeout, isTranslationTimeoutSettling, assertPreservedTranslations, createTranslationResumeGuard,
     activateProductionTranslationContinue} = require(resolve(__dirname, '../scripts/testing/run-document-live-translation.cjs')) as {
@@ -58,6 +62,12 @@ const {createResponseBodyObserver, closeLiveSession, isProviderDomain, shouldObs
     closeLiveSession(options: {launched?: {close(): Promise<void>}; focusMonitor?: {stop(): Promise<void>}; profileDir: string; launchAttempted: boolean; report: CleanupReport; responseObserver?: BodyObserver}): Promise<void>;
     isProviderDomain(host: string): boolean;
     shouldObserveResponseBody(record: {providerCandidate: boolean}, response: {url(): string; headers(): Record<string, string>}): boolean;
+    validateLayoutCopyText(snapshot: {pages: Array<{pageNumber: number; segmentIndexes: number[]}>; segments: ResumeSnapshot['segments']},
+        output: Array<{label: string; translatedText?: string; continuationText?: string; notes?: string[]; text?: string}>): {
+        ok: boolean; checkedSegments: number; checkedNotes: number; missingSegments: Array<{pageNumber: number; id: number; characters: number}>;
+        missingContinuationText: Array<{pageNumber: number; characters: number}>; formatOnlyNotes: Array<{pageNumber: number; characters: number}>;
+    };
+    validatePdf(source: AuditedPdfPage[], output: AuditedPdfPage[]): {ok: boolean; pages: Array<{sourceOrderOk: boolean; missingWebLinks: number}>};
     parseBuiltinGlossaryArg(args: string[]): string | null;
     readPublicGlossaryState(presetId?: string | null): Promise<PublicGlossaryState>;
     selectPublicDocumentGlossary(value: {id: string; presetId: string}): Promise<void>;
@@ -466,7 +476,7 @@ describe('真实文档工具有界超时继续（离线守卫，不调用 MT）'
         const port = publicConfigPort([aiLibrary()], true);
         Object.assign(port.config, {from: 'en', to: 'zh-Hans', service: 'freeTranslation', documentService: 'freeTranslation',
             freeTranslationOrder: ['microsoft'], freeTranslationMode: 'hedged', freeTranslationTimeoutMs: 20000, apiKey: 'private-api-key'});
-        vi.stubGlobal('document', {querySelector: (selector: string) => selector === '.document-batch-translation input'
+        vi.stubGlobal('document', {querySelector: (selector: string) => selector === '.document-batch-translation:not([data-testid="document-ai-context-toggle"]) input'
             ? {checked: true} : {textContent: ' public.pdf '}});
         const state = await readPublicResumeSettings();
         expect(state).toEqual({name: 'public.pdf', from: 'en', to: 'zh-Hans', service: 'freeTranslation', documentService: 'freeTranslation',
@@ -614,5 +624,29 @@ describe('source page labels with visible translation continuations', () => {
     it('rejects unlabelled output with an extra or missing page', () => {
         expect(mapPdfLayoutPages(2, [{}, {}, {}]).ok).toBe(false);
         expect(mapPdfLayoutPages(2, [{}]).ok).toBe(false);
+    });
+    it('requires source text and every repeated web link to survive on the original side', () => {
+        const url = 'https://example.org/papers/linked-material';
+        const text = 'Unique source paragraph long enough to serve as a page-order anchor.';
+        const links = [{url, right: 170}, {url, right: 240}];
+        const source = [{width: 600, height: 800, text, webLinks: links}];
+        const primary = {...source[0], label: '1', width: 1215, originalText: text};
+        expect(validatePdf(source, [primary]).ok).toBe(true);
+        expect(validatePdf(source, [{...primary, originalText: '', webLinks: [links[0], {url, right: 910}]}]))
+            .toMatchObject({ok: false, pages: [{sourceOrderOk: false, missingWebLinks: 1}]});
+    });
+    it('checks actual translated-side text and joins a passage split across consecutive continuation pages', () => {
+        const snapshot = {pages: [{pageNumber: 1, segmentIndexes: [0, 1]}, {pageNumber: 2, segmentIndexes: [2]}],
+            segments: [{id: 0, source: 'Title', translation: '可复制标题'}, {id: 1, source: 'Long', translation: '完整长段与末尾'},
+                {id: 2, source: '(a) 8-GPU', translation: '（a） 8-GPU'}]};
+        const first = {label: '1', translatedText: '标题', text: '左侧恰巧包含可复制标题', notes: ['完整长段与末尾']};
+        const output = [first, {label: '1 · 译文续页 1', continuationText: '完整长段'},
+            {label: '1 · 译文续页 2', continuationText: '与末尾'}, {label: '2', notes: ['（a） 8-GPU']},
+            {label: '2 · 译文续页 1', continuationText: '（a） 8-GPU'}];
+        expect(validateLayoutCopyText(snapshot, output)).toMatchObject({ok: false, checkedSegments: 3, checkedNotes: 2,
+            missingSegments: [{pageNumber: 1, id: 0}], missingContinuationText: [], formatOnlyNotes: [{pageNumber: 2}]});
+        expect(validateLayoutCopyText(snapshot, [{...first, translatedText: '可复制标题'}, ...output.slice(1)]).ok).toBe(true);
+        expect(validateLayoutCopyText(snapshot, [first, {...output[1], continuationText: '完整…'}, ...output.slice(2)]))
+            .toMatchObject({ok: false, missingContinuationText: [{pageNumber: 1}]});
     });
 });

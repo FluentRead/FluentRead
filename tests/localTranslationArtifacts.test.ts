@@ -36,6 +36,23 @@ describe('verified resumable model downloads', () => {
     vi.stubGlobal('fetch',fetcher);await downloadTranslationArtifact(file,new AbortController().signal,()=>undefined);
     expect(fetcher).toHaveBeenCalledTimes(2);expect(await artifactComplete(file)).toBe(true);
   });
+
+  it.each([
+    ['zh-CN', ['modelscope.cn', 'hf-mirror.com', 'huggingface.co']],
+    ['en-US', ['huggingface.co', 'hf-mirror.com', 'modelscope.cn']],
+  ] as const)('includes the pinned ModelScope version of Hunyuan for %s', async (language, hosts) => {
+    const [file] = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.hunyuan);
+    vi.stubGlobal('navigator', {language});
+    const fetcher = vi.fn(async (_url: string, _init: RequestInit) => new Response(null, {status: 503}));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(downloadTranslationArtifact(file, new AbortController().signal, () => undefined)).rejects.toThrow('NETWORK');
+    expect(fetcher.mock.calls.map(([url]) => new URL(url).hostname)).toEqual(hosts);
+    expect(fetcher).toHaveBeenCalledWith(
+      expect.stringContaining('/resolve/ef1d40b8b315575d30d1eb6579996130b8fc0bb2/Hy-MT2-1.8B-Q4_K_M.gguf'),
+      expect.objectContaining({credentials: 'omit', referrerPolicy: 'no-referrer'}),
+    );
+    expect(await artifactComplete(file)).toBe(false);
+  });
   it('assembles partial network chunks before writing and verifying the complete model chunk',async()=>{
     const bytes=new Uint8Array([1,2,3,4,5]),file=fileFor(bytes),progress=vi.fn();
     vi.stubGlobal('fetch',vi.fn(async()=>new Response(new ReadableStream<Uint8Array>({start(controller){controller.enqueue(bytes.subarray(0,2));controller.enqueue(bytes.subarray(2));controller.close();}}))));

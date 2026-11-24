@@ -39,6 +39,18 @@ FLUENTREAD_PDF_CORPUS=/path/to/papers pnpm exec vitest run tests/pdfPaperLayouts
 
 隔离浏览器文档流程按页标签逐一核对原版页与紧随的续页；受限表格单元格的完整校订须同时保留在所属页批注及可复制的续页正文中。静态原文块使用来源块身份，不冒充送翻片段。
 
+公开论文的实机导出可用以下入口。它按原页检查顺序、尺寸和原文侧的可见网页链接次数，并在译文侧及所属原页的续页文字层核对译文。报告记录出现在续页批注中的仅字形变化结果，供复核误续页。验收时同时查看问题页的渲染图，确认 PDF 的文字层与看得见的版式相符。
+
+```bash
+node scripts/testing/run-document-live-translation.cjs \
+  --inputs <paper.pdf>[,<paper2.pdf>] --service microsoft --pdf-pages 1,8,11 \
+  --playwright-root <playwright-packages> \
+  --runtime-diagnostics-helper <browser-skill>/scripts/runtime-diagnostics.cjs \
+  --artifacts-dir <evidence-directory>
+```
+
+论文单测还覆盖独立数值列的多行三线表头、成对的数字型子图标记和紧贴图框的图例。带裁剪和旋转的网页链接夹具核对导出后可点击区域的位置。加上 `--readable-pdf-first` 同时检查首份论文的重排导出，逐段核对复制顺序。单测在矢量、光栅和字体回退三条路径中验证跨页段落复制的连续性与图文顺序。
+
 ## 扫描版 PDF 识别
 
 `tests/pdfLayoutAnalysis.test.ts` 重放真实 OCR 的稀疏长行距句尾，验证未结束正文只在左对齐、同字号和小写短续行共同成立时合段，并保留新段、列表与标题边界。

@@ -4,7 +4,7 @@ import {tmpdir} from 'node:os';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
 import {inflateSync} from 'node:zlib';
-import {PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream} from 'pdf-lib';
+import {degrees, PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRawStream, PDFString} from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import type {TextItem} from 'pdfjs-dist/types/src/display/api';
@@ -37,7 +37,9 @@ function nativeCanvas() {
 
 async function fixture(): Promise<ParsedDocument> {
     const source = await PDFDocument.create();
-    source.addPage([600, 800]).drawText('Original selectable source page', {x: 42, y: 720, size: 14});
+    const page = source.addPage([600, 800]);
+    page.drawText('Original selectable source page', {x: 42, y: 720, size: 14});
+    page.node.delete(PDFName.of('Annots'));
     return {fileName: 'copyable.pdf', format: 'pdf', label: 'PDF 文件', parts: [],
         segments: [{id: 0, source: 'Original title', contextLabel: '第 1 页', role: 'title'},
             {id: 1, source: 'Original paragraph', contextLabel: '第 1 页', role: 'paragraph'}],
@@ -77,6 +79,53 @@ function saveEvidence(name: string, bytes: Uint8Array): void {
 }
 
 describe('visible Unicode PDF reading export', () => {
+    it.each([0, 90, 180, 270] as const)('keeps a cropped original panel web link at %d degrees without moving it onto the translated side', async rotation => {
+        const document = await fixture();
+        if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
+        const source = await PDFDocument.load(document.binary.bytes);
+        const page = source.getPage(0);
+        page.setCropBox(100, 120, 300, 400);
+        page.setRotation(degrees(rotation));
+        const {context} = source;
+        const add = (rect: number[], uri: PDFString | PDFHexString, flags?: number) => page.node.addAnnot(context.register(context.obj({
+            Type: 'Annot', Subtype: 'Link', Rect: rect, ...(flags === undefined ? {} : {F: flags}), A: {S: 'URI', URI: uri},
+        })));
+        const url = 'https://example.org/papers/full-text?edition=(rev.1)';
+        const uri = PDFString.of(url);
+        add([80, 220, 140, 260], rotation === 270 ? PDFHexString.of(Buffer.from(url).toString('hex')) : uri);
+        add([120, 220, 140, 260], PDFString.of('ftp://example.org/file'), 0);
+        add([20, 220, 80, 260], uri);
+        add([120, 220, 140, 260], uri, 2);
+        if (rotation === 0) {
+            add([120, 220, 130], uri);
+            add([120, 220, 140, 260], PDFString.of('invalid URL'));
+            for (const malformed of [
+                10,
+                {Subtype: 'Text'},
+                {Subtype: 'Link'},
+                {Subtype: 'Link', A: {S: 'GoTo'}},
+                {Subtype: 'Link', A: {S: 'URI', URI: 12}},
+                {Subtype: 'Link', A: {S: 'URI', URI: uri}},
+                {Subtype: 'Link', A: {S: 'URI', URI: uri}, Rect: [120, 'Unknown', 140, 260]},
+            ]) {
+                const object = typeof malformed === 'number' ? PDFNumber.of(malformed) : context.obj(malformed);
+                page.node.addAnnot(context.register(object));
+            }
+        }
+        document.binary.bytes = await source.save();
+        const quarterTurn = rotation === 90 || rotation === 270;
+        Object.assign(document.binary.pages[0], {rotation, width: quarterTurn ? 400 : 300, height: quarterTurn ? 300 : 400});
+        const download = await createDocumentDownload(document, ['中文标题', ''], 'bilingual', {pdfPageRasterizer: async () => layoutPng});
+        const task = getDocument({data: (download.data as Uint8Array).slice(), standardFontDataUrl, disableFontFace: true});
+        try {
+            const original = await (await task.promise).getPage(1);
+            const links = (await original.getAnnotations()).filter(annotation => annotation.subtype === 'Link');
+            expect(links.map(annotation => annotation.url)).toEqual([url]);
+            const expected = {0: [0, 100, 40, 140], 90: [100, 260, 140, 300], 180: [260, 260, 300, 300], 270: [260, 0, 300, 40]}[rotation];
+            links[0].rect.forEach((number: number, index: number) => expect(number).toBeCloseTo(expected[index], 6));
+        } finally {await task.destroy();}
+    });
+
     it.each([0, 90, 180, 270] as const)('keeps emoji joiners in searchable raster text without changing line advance at %s degrees', async rotation => {
         const document = await fixture(); if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
         const page = document.binary.pages[0]; page.rotation = rotation;
@@ -492,7 +541,7 @@ describe('visible Unicode PDF reading export', () => {
         })).rejects.toThrow('过多独立字形');
     });
 
-    it.each(['vector', 'raster', 'fallback'] as const)('keeps original region characters searchable once at split boundaries in %s readable export', async adapter => {
+    it.each(['vector', 'raster', 'fallback'] as const)('keeps searchable region characters in order and whole passages across pages in %s readable export', async adapter => {
         const document = await fixture();
         if (document.binary?.kind !== 'pdf') throw new Error('PDF expected');
         const block = document.binary.pages[0].blocks[1];
@@ -510,7 +559,10 @@ describe('visible Unicode PDF reading export', () => {
         document.binary.pages[0].blocks.push({...block, segmentIndex: -1, kind: 'metadata', source: 'ORPHAN SOURCE', readingOrder: 0,
             x: 200, y: 100, width: 110, height: 10, lines: undefined},
         {...block, segmentIndex: -1, kind: 'metadata', source: undefined, x: 200, y: 130, width: 110, height: 10, lines: undefined});
+        const continued = {kind: 'text' as const, entryId: 'translated-0', segmentIndex: 1, text: '跨页段落结尾',
+            x: 42, y: 18, width: 120, font: {size: 12, weight: 400 as const, lineHeight: 19.2}};
         const pages: PdfReadingOutputPage[] = [100, 120].map((y, index) => ({width: 612, height: 792, items: [
+            ...(index ? [continued] : []),
             {kind: 'region', entryId: `table-${index}`, sourceRect: {x: 40, y, width: 300, height: 20}, x: 42, y: 42, width: 300, height: 20},
             {kind: 'region', entryId: `invalid-${index}`, sourceRect: {x: 40, y, width: 0, height: 20}, x: 42, y: 42, width: 0, height: 20},
             {kind: 'text', entryId: `translated-${index}`, segmentIndex: 1, text: `本页译文${index}${adapter === 'fallback' ? '🦄' : ''}`, x: 42, y: 100, width: 120, font: {size: 12, weight: 400, lineHeight: 19.2}},
@@ -531,7 +583,26 @@ describe('visible Unicode PDF reading export', () => {
         expect(text.join('').match(/BOUNDARYSOURCE/gu)).toHaveLength(1);
         expect(text.join('')).not.toContain('OUTSIDESOURCE'); expect(text.join('')).not.toContain('INVALIDSOURCE');
         expect(text[0]).toContain('本页译文0'); expect(text[1]).toContain('本页译文1');
-        if (adapter === 'fallback') expect(text.join('')).toContain('🦄');
+        expect(text[0].indexOf('LEFTSOURCE')).toBeLessThan(text[0].indexOf('本页译文0'));
+        expect(text[1].indexOf('BOUNDARYSOURCE')).toBeLessThan(text[1].indexOf('本页译文1'));
+        expect(text.join('')).toContain(`本页译文0${adapter === 'fallback' ? '🦄' : ''}跨页段落结尾`);
+    });
+
+    it('skips a preserved region with no source glyphs and a blank text entry in the vector reading export', async () => {
+        const document = await fixture();
+        const items = [
+            // 图版区域里没有源字形：可搜索文字层保持为空，但图片与页框仍要写出。
+            {kind: 'region' as const, entryId: 'artwork', sourceRect: {x: 40, y: 300, width: 200, height: 40}, x: 42, y: 42, width: 200, height: 40},
+            {kind: 'text' as const, entryId: 'blank', segmentIndex: 1, text: '', x: 42, y: 120, width: 0, font: {size: 12, weight: 400 as const, lineHeight: 19.2}},
+            {kind: 'text' as const, entryId: 'translated-0', segmentIndex: 1, text: '可见译文', x: 42, y: 160, width: 80, font: {size: 12, weight: 400 as const, lineHeight: 19.2}},
+        ];
+        const download = await createDocumentDownload(document, ['标题', '可见译文'], 'translated', {
+            pdfReadingRenderer: async function* () {yield {width: 612, height: 792, items};},
+            pdfFontLoader: async () => fontBytes,
+        });
+        const pages = (await extract(download.data as Uint8Array)).map(compact);
+        expect(pages).toHaveLength(1);
+        expect(pages[0]).toBe('可见译文');
     });
 
     it('closes a readable Unicode fallback iterator on cancellation without committing a partial download', async () => {

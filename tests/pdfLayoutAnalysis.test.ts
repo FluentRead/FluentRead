@@ -14,7 +14,7 @@ import {describe, expect, it} from 'vitest';
 import {spawnSync} from 'node:child_process';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
-import {analyzePdfPageLayout, extractPdfGraphicsShapes, pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
+import {analyzePdfPageLayout, extractPdfGraphicsShapes, joinPdfSourceLines, pdfLayoutLines, type PdfLayoutAtom} from '@/src/features/document-translation/core/pdfLayoutAnalysis';
 import {findDocumentLiteralTerms} from '@/src/core/translation/documentLiterals';
 import {protectGlossaryText} from '@/src/core/glossary';
 
@@ -2446,5 +2446,89 @@ console.log('result:' + JSON.stringify({results, unchanged:before===JSON.stringi
             if (hasOperator) expect(result.blocks.some(block => block.source === '∫')).toBe(true);
             expect(endpointReads).toBeLessThan(verticalCount * 20);
         }
+    });
+});
+
+describe('paired subfigure markers between a chart and its caption', () => {
+    const chart = {kind: 'image' as const, x: 64, y: 100, width: 200, height: 100};
+    const caption = atom('Figure 1. Measured speedups.', 64, 226, 140, 10);
+    it('grows the preserved figure to the same-baseline lettered markers under the chart', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), atom('(b) 32-GPU', 190, 212, 46, 8), caption], [chart]);
+        const figure = result.preservedRegions.find(region => region.kind === 'figure');
+        expect(figure).toMatchObject({x: 64, y: 100, width: 200});
+        // 两侧标记共用原图范围，裁剪后仍带完整子图标题。
+        expect(figure!.y + figure!.height).toBeCloseTo(213.6, 6);
+        expect(result.preservedRegions.some(region => region.kind === 'figure' && region.source?.includes('(a) 8-GPU'))).toBe(true);
+    });
+    it('leaves an unpaired lettered marker outside the figure bounds', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), caption], [chart]);
+        const figure = result.preservedRegions.find(region => region.kind === 'figure');
+        expect(figure).toMatchObject({x: 64, y: 100, width: 200, height: 100});
+    });
+    it('does not borrow markers when no chart precedes the caption', () => {
+        const result = analyze([atom('(a) 8-GPU', 90, 212, 40, 8), atom('Figure 2. Unrelated.', 64, 400, 120, 10)], []);
+        expect(result.preservedRegions.filter(region => region.kind === 'figure')).toEqual([]);
+    });
+});
+
+describe('folded URL reconnection with native link targets', () => {
+    const urlLine = (text: string, baseline: number) => atom(text, 42, baseline, text.length * 4, 8);
+    it('joins the printed path only when the link target confirms the whole address', () => {
+        const lines = [urlLine('Full report at https://', 100), urlLine('docs.example.com/guide', 108)];
+        expect(joinPdfSourceLines(lines, 'text', new Set(['https://docs.example.com/guide'])))
+            .toBe('Full report at https://docs.example.com/guide');
+        // 没有链接目标佐证时保留词距，不猜测可见文字。
+        expect(joinPdfSourceLines(lines, 'text')).toBe('Full report at https:// docs.example.com/guide');
+    });
+    it('accepts the printed tail only when the address shape itself is unambiguous', () => {
+        // 斜杠结尾的网址后接带目录层级的路径，目录里还有数字：属于被折行的地址。
+        expect(joinPdfSourceLines([urlLine('See https://', 100), urlLine('example.com/v2/items', 108)], 'text'))
+            .toBe('See https://example.com/v2/items');
+        // 连字符结尾的网址后接连字符或斜杠：续行仍是同一个地址。
+        expect(joinPdfSourceLines([urlLine('Token at https://api.example.com/v1/abc-', 100), urlLine('def/ghi', 108)], 'text'))
+            .toBe('Token at https://api.example.com/v1/abc-def/ghi');
+        // 单纯断词：连字符结尾但续行没有层次，按断词规则去掉连字符。
+        expect(joinPdfSourceLines([urlLine('Token at https://api.example.com/v1/abc-', 100), urlLine('yz', 108)], 'text'))
+            .toBe('Token at https://api.example.com/v1/abcyz');
+    });
+});
+
+describe('adjacent ruled table sections under one caption', () => {
+    /** 每条横线的 x/右边界固定，行间距 20；表题紧贴最末一条横线。 */
+    const rules = (x: number, width: number, bottom: number) => Array.from({length: 6}, (_, row) =>
+        ({kind: 'path' as const, x, y: bottom - row * 20, width, height: 0.5}));
+    const rowAtoms = (x: number, numericRows: number) => {
+        const atoms: PdfLayoutAtom[] = [];
+        for (let row = 0; row < numericRows; row++) {
+            atoms.push(atom('Alpha', x + 2, 208 + row * 20, 60), atom('12', x + 160, 208 + row * 20, 40));
+        }
+        return atoms;
+    };
+    it('pairs two right-aligned numeric columns and keeps the row-gap refusals out', () => {
+        const left = rules(40, 200, 292), right = rules(250, 200, 292);
+        const atoms = [atom('Table 3: Runtime by configuration.', 40, 300, 180),
+            ...rowAtoms(40, 3), ...rowAtoms(250, 3),
+            // 第四条记录没有右对齐数值，第五条记录与正文只隔 1pt：两种行都不构成数值列。
+            atom('Beta', 42, 268, 60), atom('Beta', 252, 268, 60),
+            atom('Gamma', 42, 288, 157), atom('9', 199, 288, 41),
+            atom('Gamma', 252, 288, 157), atom('9', 409, 288, 41),
+            atom('Table 4: Unpaired grouping.', 40, 640, 160)];
+        const boxes = analyze(atoms, [...left, ...right, ...rules(40, 200, 632), ...rules(400, 150, 632)]).preservedRegions
+            .filter(region => region.kind === 'table').map(region => [region.x, region.y, region.width, region.height]);
+        expect(boxes).toContainEqual([39.25, 192, 201.5, 100.5]);
+        expect(boxes).toContainEqual([249.25, 192, 201.5, 100.5]);
+        // 第二组表题只有左侧一段对齐，右侧 150pt 的段既不配对也不与表题对齐。
+        expect(boxes.some(([x]) => x === 399.25)).toBe(false);
+    });
+
+    it('refuses a second caption over the same paired sections', () => {
+        const left = rules(40, 200, 292), right = rules(250, 200, 292);
+        const atoms = [atom('Table 3: Runtime by configuration.', 40, 300, 180),
+            atom('Table 4: Repeats the same rules.', 42, 300, 170),
+            ...rowAtoms(40, 3), ...rowAtoms(250, 3)];
+        const boxes = analyze(atoms, [...left, ...right]).preservedRegions
+            .filter(region => region.kind === 'table').map(region => [region.x, region.y]);
+        // 同一组横线只登记一次：第二个表题算出的配对与已有结果重叠，不再重复计入。
+        expect(boxes.filter(([x]) => x === 39.25 || x === 249.25)).toHaveLength(2);
     });
 });

@@ -13,6 +13,7 @@ import {
     collectLiveTranslationTextSlots,
     createTranslationTextProtectionCache,
     extractTranslationText,
+    extractTranslationTextFromNodes,
     getComposedParent,
     getCurrentTranslationCore,
     getTranslationCandidateKey,
@@ -302,11 +303,15 @@ export function createTranslationMutationStabilityChecks() {
 
 export function getCurrentTranslationStateSourceText(node: HTMLElement, state: TranslationState): string {
     if (!isTranslationApplicationShellPolicyCurrent(node, state)) return '';
+    const core = getCurrentTranslationCore(state.scope);
+    const sharedCache = !state.syntheticSegment && state.allowTopLevelApplicationShell !== true
+        ? core.getSynchronousTextProtectionCache?.() : undefined;
     return extractTranslationText(
         node,
-        getCurrentTranslationCore(state.scope).shouldStayOriginal,
+        core.shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
         getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
+        sharedCache,
     );
 }
 
@@ -314,12 +319,16 @@ export function getCurrentTranslationStateTextNodes(
     node: HTMLElement, state: TranslationState, protectionCache?: TranslationTextProtectionCache,
 ): Text[] {
     if (!isTranslationApplicationShellPolicyCurrent(node, state)) return [];
+    const core = getCurrentTranslationCore(state.scope);
+    const sharedCache = state.syntheticSegment || state.allowTopLevelApplicationShell === true
+        ? undefined
+        : protectionCache ?? core.getSynchronousTextProtectionCache?.();
     return collectLiveTranslationTextSlots(
         node,
-        getCurrentTranslationCore(state.scope).shouldStayOriginal,
+        core.shouldStayOriginal,
         getTranslationStateProtectionBoundary(node, state),
         getTranslationTextProtectionOptions(state.allowTopLevelApplicationShell, node, state.scope),
-        state.syntheticSegment || state.allowTopLevelApplicationShell === true ? undefined : protectionCache,
+        sharedCache,
     ).map((slot) => slot.node);
 }
 
@@ -367,7 +376,62 @@ function sourceHTMLWithoutDirectBilingualArtifacts(node: HTMLElement): string {
     return clone.innerHTML;
 }
 
+export function withCoreReadCache<T>(
+    core: ReturnType<typeof getCurrentTranslationCore>,
+    callback: (invalidate: () => void) => T,
+): T {
+    return typeof core.withSynchronousReadCache === 'function'
+        ? core.withSynchronousReadCache(callback)
+        : callback(() => undefined);
+}
+
+/** 读取候选当前原文；常规路径在同步只读批次内共享保护缓存，减少重复祖先样式与选择器查询。 */
+export function extractCandidateSourceText(
+    candidate: TranslationCandidate,
+    core: ReturnType<typeof getCurrentTranslationCore>,
+    protectionOptions: TranslationTextProtectionOptions | undefined,
+): string {
+    if (candidate.visualRange) {
+        if (candidate.visualSourceText) return candidate.visualSourceText;
+        try {
+            const range = candidate.element.ownerDocument.createRange();
+            range.setStart(candidate.visualRange.startContainer, candidate.visualRange.startOffset);
+            range.setEnd(candidate.visualRange.endContainer, candidate.visualRange.endOffset);
+            return range.toString();
+        } catch {
+            return '';
+        }
+    }
+    const sharedCache = !candidate.manualChunk && !protectionOptions?.includeInlineCodeForLanguage &&
+        !protectionOptions?.allowTopLevelApplicationShell && !protectionOptions?.sourceTextSlotHosts
+        ? core.getSynchronousTextProtectionCache?.() : undefined;
+    if (candidate.nodes?.length) {
+        return extractTranslationTextFromNodes(
+            candidate.nodes,
+            core.shouldStayOriginal,
+            undefined,
+            protectionOptions,
+            sharedCache,
+        );
+    }
+    return extractTranslationText(
+        candidate.element,
+        core.shouldStayOriginal,
+        candidate.manualChunk ? candidate.element : undefined,
+        protectionOptions,
+        sharedCache,
+    );
+}
+
 export function statefulSourceAndTextSlotsAreCurrent(
+    node: HTMLElement,
+    state: TranslationState,
+): boolean {
+    const core = getCurrentTranslationCore(state.scope);
+    return withCoreReadCache(core, () => statefulSourceAndTextSlotsAreCurrentImpl(node, state));
+}
+
+function statefulSourceAndTextSlotsAreCurrentImpl(
     node: HTMLElement,
     state: TranslationState,
 ): boolean {

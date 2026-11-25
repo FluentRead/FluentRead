@@ -128,9 +128,9 @@ function compileRule(pack: SiteRulePack, rule: SiteRule): TranslationSiteAdapter
             selector: content.css, match: content.resolve, atomic: content.atomic, splitOnBr: content.splitOnBr,
             reason: content.key ?? `${rule.id}:content`,
         })),
-        prune: [{selector: [...recipe.exclude!, ...recipe.omit!], reason: `${rule.id}:exclude`}],
+        prune: [{selector: [...new Set([...recipe.exclude!, ...recipe.omit!])], reason: `${rule.id}:exclude`}],
         // 排除区域也必须进入文本保护，避免祖先候选的快照包含被裁剪子树。
-        keepOriginal: [{selector: [...recipe.protect!, ...recipe.exclude!, ...recipe.omit!], reason: `${rule.id}:protect`}],
+        keepOriginal: [{selector: [...new Set([...recipe.protect!, ...recipe.exclude!, ...recipe.omit!])], reason: `${rule.id}:protect`}],
         omitFromTranslation: [{selector: recipe.omit!, reason: `${rule.id}:omit`}],
         mutationExclude: [{selector: recipe.watchIgnore!, reason: `${rule.id}:watch-ignore`}],
     });

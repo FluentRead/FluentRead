@@ -5417,10 +5417,17 @@
     "match": {
       "hosts": [
         "www.google.com",
+        "google.com",
         "www.google.co.uk",
         "www.google.co.jp",
         "www.google.de",
-        "www.google.com.hk"
+        "www.google.com.hk",
+        "www.google.com.tw",
+        "www.google.com.sg",
+        "www.google.ca",
+        "www.google.com.au",
+        "www.google.fr",
+        "www.google.co.kr"
       ],
       "paths": [
         "/search"
@@ -5447,12 +5454,24 @@
         "css": [
           "#search h3",
           "#search .VwiC3b",
-          "#m-x-content :is(p, li, [role=\"listitem\"])",
+          "#m-x-content :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
           "[data-attrid=\"VisualDigestGeneratedDescription\"]",
-          "[data-attrid=\"VisualDigestGeneratedDescription\"] :is(p, li, [role=\"listitem\"])"
+          "[data-attrid=\"VisualDigestGeneratedDescription\"] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-attrid=\"AIOverview\"]",
+          "[data-attrid=\"AIOverview\"] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-mcpr] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-tr-rsts] :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)",
+          "[data-subtree=\"aimp\"]",
+          ":is([data-subtree=\"aimc\"], [data-subtree=\"aimp\"], [data-subtree=\"aimfl\"]) :is(h2, h3, h4, h5, h6, [role=\"heading\"], p, li, [role=\"listitem\"], blockquote, dt, dd, th, td, figcaption, div)"
         ],
         "atomic": false
       }
+    ],
+    "exclude": [
+      "[role=\"button\"]",
+      "[data-container-id=\"rhs-col\"]",
+      "[data-attrid=\"VisualDigestWebResult\"]",
+      "[data-attrid=\"VisualDigestVideoResult\"]"
     ]
   },
   {

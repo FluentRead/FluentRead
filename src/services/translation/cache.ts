@@ -17,7 +17,7 @@ import {
 export const TRANSLATION_CACHE_VERSION = 3;
 export const TRANSLATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 export const TRANSLATION_CACHE_MAX_ENTRY_BYTES = 256 * 1024;
-export const TRANSLATION_CACHE_MEMORY_ENTRIES = 128;
+export const TRANSLATION_CACHE_MEMORY_ENTRIES = 384;
 /** 命中后访问时间只是 LRU 排序提示；短窗口内合并为一次读写事务，避免整页命中逐条排队写库。 */
 export const TRANSLATION_CACHE_TOUCH_FLUSH_MS = 32;
 
@@ -317,6 +317,146 @@ class TranslationCache {
     } catch (error) {
       console.warn('[FluentRead] translation cache write failed:', error);
       return false;
+    }
+  }
+
+  private async removeExpiredMany(keys: readonly string[], now: number, epoch: number): Promise<void> {
+    if (keys.length === 0) return;
+    await translationCacheDb.transaction('rw', translationCacheDb.entries, translationCacheDb.totals, async () => {
+      if (epoch !== this.clearEpoch) return;
+      const records = await translationCacheDb.entries.bulkGet([...keys]);
+      const removable: string[] = [];
+      let freedBytes = 0;
+      for (const record of records) {
+        if (!record || !isExpired(record, now)) continue;
+        removable.push(record.key);
+        freedBytes += record.byteSize;
+      }
+      if (removable.length === 0) return;
+      const totals = await this.readTotals();
+      totals.bytes -= freedBytes;
+      await this.deleteRecords(removable, totals);
+      await translationCacheDb.totals.put(totals);
+    });
+  }
+
+  async getMany(keys: readonly string[], now = Date.now()): Promise<Array<string | null>> {
+    if (keys.length === 0) return [];
+    const epoch = this.clearEpoch;
+    const revision = this.contentRevision;
+    const results = new Array<string | null>(keys.length).fill(null);
+    const missedByKey = new Map<string, number[]>();
+    const expiredMemoryKeys: string[] = [];
+
+    for (let index = 0; index < keys.length; index += 1) {
+      const key = keys[index]!;
+      const memoryRecord = this.memory.get(key);
+      if (memoryRecord) {
+        if (isExpired(memoryRecord, now)) {
+          this.memory.delete(key);
+          expiredMemoryKeys.push(key);
+        } else {
+          this.touch(memoryRecord, now);
+          results[index] = memoryRecord.translation;
+        }
+        continue;
+      }
+      let slots = missedByKey.get(key);
+      if (!slots) {
+        slots = [];
+        missedByKey.set(key, slots);
+      }
+      slots.push(index);
+    }
+
+    if (expiredMemoryKeys.length > 0) {
+      void this.removeExpiredMany(expiredMemoryKeys, now, epoch).catch((error) => {
+        console.warn('[FluentRead] translation cache read failed:', error);
+      });
+    }
+    if (missedByKey.size === 0) return results;
+
+    try {
+      const missedKeys = [...missedByKey.keys()];
+      const records = await translationCacheDb.entries.bulkGet(missedKeys);
+      if (epoch !== this.clearEpoch || revision !== this.contentRevision) return results;
+      const expiredDbKeys: string[] = [];
+      for (let index = 0; index < missedKeys.length; index += 1) {
+        const record = records[index];
+        if (!record) continue;
+        if (isExpired(record, now)) {
+          expiredDbKeys.push(record.key);
+          continue;
+        }
+        this.touch(record, now);
+        for (const slot of missedByKey.get(missedKeys[index]!)!) {
+          results[slot] = record.translation;
+        }
+      }
+      if (expiredDbKeys.length > 0) {
+        await this.removeExpiredMany(expiredDbKeys, now, epoch);
+      }
+      return results;
+    } catch (error) {
+      console.warn('[FluentRead] translation cache read failed:', error);
+      return results;
+    }
+  }
+
+  async setMany(entries: readonly {key: string; value: string}[], now = Date.now()): Promise<number> {
+    if (entries.length === 0) return 0;
+    const deduped = new Map<string, TranslationCacheRecord>();
+    for (const {key, value: translation} of entries) {
+      if (typeof key !== 'string' || typeof translation !== 'string' || !translation) continue;
+      if (key.length + translation.length > TRANSLATION_CACHE_MAX_ENTRY_BYTES) continue;
+      const byteSize = getByteSize(key) + getByteSize(translation);
+      if (byteSize > TRANSLATION_CACHE_MAX_ENTRY_BYTES) continue;
+      deduped.set(key, {
+        key,
+        translation,
+        createdAt: now,
+        lastAccessedAt: now,
+        expiresAt: now + TRANSLATION_CACHE_TTL_MS,
+        byteSize,
+      });
+    }
+    const records = [...deduped.values()];
+    if (records.length === 0) return 0;
+    if (records.length === 1) {
+      const only = records[0]!;
+      return (await this.set(only.key, only.translation, now)) ? 1 : 0;
+    }
+
+    const epoch = this.clearEpoch;
+    let persistedRecords: TranslationCacheRecord[] = [];
+    let writeRevision = this.contentRevision;
+    await this.flushPendingTouches();
+    try {
+      await translationCacheDb.transaction('rw', translationCacheDb.entries, translationCacheDb.totals, async () => {
+        if (epoch !== this.clearEpoch) return;
+        const totals = await this.readTotals();
+        const keys = records.map((record) => record.key);
+        const previousRecords = await translationCacheDb.entries.bulkGet(keys);
+        for (let index = 0; index < records.length; index += 1) {
+          const record = records[index]!;
+          const previous = previousRecords[index];
+          totals.bytes += record.byteSize - (previous?.byteSize ?? 0);
+          if (!previous) totals.entries += 1;
+        }
+        await translationCacheDb.entries.bulkPut(records);
+        this.contentRevision += 1;
+        for (const key of keys) this.memory.delete(key);
+        const removed = await this.prune(totals, now);
+        await translationCacheDb.totals.put(totals);
+        persistedRecords = records.filter((record) => !removed.has(record.key));
+        writeRevision = this.contentRevision;
+      });
+      if (epoch !== this.clearEpoch || writeRevision !== this.contentRevision) return 0;
+      for (const record of persistedRecords) this.remember(record);
+      return persistedRecords.length;
+    } catch (error) {
+      console.warn('[FluentRead] translation cache write failed:', error);
+      return 0;
     }
   }
 

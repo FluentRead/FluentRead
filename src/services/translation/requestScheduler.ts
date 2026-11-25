@@ -188,18 +188,39 @@ export function createTranslationRequestScheduler(
         }
     }
 
-    /** 只比较调度字段，避免序列化整份应用配置；原位修改和新对象都能正确失效。 */
+    /** 只比较调度字段，避免序列化整份应用配置；未启用独立限流时直接返回紧凑签名，减少每次入队分配。 */
     function configSignature(config: TranslationRequestSchedulerConfig): string {
+        const globalConcurrency = normalizeMaxConcurrentTranslations(config.maxConcurrentTranslations);
+        const globalRps = normalizeTranslationRequestsPerSecond(config.translationRequestsPerSecond);
+        const globalRpm = normalizeTranslationRequestsPerMinute(config.translationRequestsPerMinute);
+        const serviceLimits = config.serviceRequestLimits;
+        const modelLimits = config.modelRequestLimits;
+        let hasCustom = false;
+        if (serviceLimits) {
+            for (const key in serviceLimits) {
+                if (serviceLimits[key]?.enabled === true) { hasCustom = true; break; }
+            }
+        }
+        if (!hasCustom && modelLimits) {
+            outer: for (const service in modelLimits) {
+                const models = modelLimits[service];
+                if (!models) continue;
+                for (const model in models) {
+                    if (models[model]?.enabled === true) { hasCustom = true; break outer; }
+                }
+            }
+        }
+        if (!hasCustom) return `${globalConcurrency}|${globalRps}|${globalRpm}`;
         const limits = (value: TranslationRequestLimits | undefined) => [
             normalizeMaxConcurrentTranslations(value?.maxConcurrentTranslations),
             normalizeTranslationRequestsPerSecond(value?.translationRequestsPerSecond),
             normalizeTranslationRequestsPerMinute(value?.translationRequestsPerMinute),
         ];
         return JSON.stringify([
-            limits(config),
-            Object.entries(config.serviceRequestLimits ?? {}).flatMap(([service, setting]) =>
+            [globalConcurrency, globalRps, globalRpm],
+            Object.entries(serviceLimits ?? {}).flatMap(([service, setting]) =>
                 setting?.enabled === true ? [[service, limits(setting.limits)]] : []),
-            Object.entries(config.modelRequestLimits ?? {}).flatMap(([service, models]) =>
+            Object.entries(modelLimits ?? {}).flatMap(([service, models]) =>
                 Object.entries(models ?? {}).flatMap(([model, setting]) =>
                     setting?.enabled === true ? [[service, model, limits(setting.limits)]] : [])),
         ]);

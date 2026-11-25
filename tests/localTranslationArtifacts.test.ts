@@ -282,9 +282,30 @@ describe('verified resumable model downloads', () => {
 
   it('pins the real lightweight and Hunyuan artifacts with content hashes', () => {
     const light = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.opusZhEn);
-    const hy = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.hunyuan);
+    const hyMt3 = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3);
+    const hyMt2 = getTranslationArtifacts(LOCAL_TRANSLATION_MODEL_IDS.hunyuan);
     expect(light.reduce((sum, file) => sum + file.size, 0)).toBe(238991573);
-    expect(hy[0]).toMatchObject({repo: 'tencent/Hy-MT2-1.8B-GGUF', path: 'Hy-MT2-1.8B-Q4_K_M.gguf', size: 1133080448});
-    expect([...light, ...hy].every((file) => /^[a-f0-9]{40}$/u.test(file.revision) && /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
+    expect(hyMt3[0]).toMatchObject({
+      repo: 'tencent/Hy-MT3-1.8B-GGUF',
+      path: 'Hy-MT3-1.8B-Q4_K_M.gguf',
+      size: 1348432160,
+      sha256: 'bae6e591103654ff43ef0de7d1492f6e6df1f955505f6bb2cc52e86fc399a942',
+    });
+    expect(hyMt2[0]).toMatchObject({repo: 'tencent/Hy-MT2-1.8B-GGUF', path: 'Hy-MT2-1.8B-Q4_K_M.gguf', size: 1133080448});
+    expect([...light, ...hyMt3, ...hyMt2].every((file) => /^[a-f0-9]{40}$/u.test(file.revision) && /^[a-f0-9]{64}$/u.test(file.sha256))).toBe(true);
+  });
+
+  it.each([
+    ['zh-CN', LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, ['https://modelscope.cn', 'https://hf-mirror.com', 'https://huggingface.co']],
+    ['en-US', LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, ['https://huggingface.co', 'https://hf-mirror.com', 'https://modelscope.cn']],
+    ['zh-CN', LOCAL_TRANSLATION_MODEL_IDS.hunyuan, ['https://modelscope.cn', 'https://hf-mirror.com', 'https://huggingface.co']],
+  ] as const)('orders ModelScope mirror for %s browser downloading %s', async (language, model, expectedOrigins) => {
+    vi.stubGlobal('navigator', {language});
+    const pinned = getTranslationArtifacts(model)[0]!;
+    const fetcher = vi.fn().mockResolvedValue(new Response('', {status: 503}));
+    vi.stubGlobal('fetch', fetcher);
+    await expect(downloadTranslationArtifact(pinned, new AbortController().signal, () => undefined)).rejects.toThrow('LOCAL_TRANSLATION_NETWORK');
+    expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).origin)).toEqual(expectedOrigins);
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes('/Tencent-Hunyuan/') && String(url).endsWith(`/${pinned.path}`))).toBe(true);
   });
 });

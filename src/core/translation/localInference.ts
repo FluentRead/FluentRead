@@ -5,7 +5,7 @@
  * 主要内容：保留句间空白的分段、混元官方翻译提示词和重复输出检查，避免小模型陷入重复生成。
  * 模块边界：只处理文本，不加载模型、不修改宿主 DOM，也不把无效结果标记为成功。
  */
-import {HUNYUAN_LANGUAGE_NAMES} from '@/src/core/config/localTranslation';
+import {getHunyuanLanguageNames} from '@/src/core/config/localTranslation';
 
 export function splitLocalTranslationText(text: string, maxLength = 480): string[] {
     // 至少容纳一个 UTF-16 代理对，否则退让边界会得到零长度并反复切同一段。
@@ -27,8 +27,8 @@ export function splitLocalTranslationText(text: string, maxLength = 480): string
     return result;
 }
 
-export function hunyuanTranslationPrompt(text: string, source: string, target: string): string {
-    const targetName = HUNYUAN_LANGUAGE_NAMES[target];
+export function hunyuanTranslationPrompt(text: string, source: string, target: string, model?: unknown): string {
+    const targetName = getHunyuanLanguageNames(model)[target];
     if (!targetName) throw new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED');
     if (source.startsWith('zh') || target.startsWith('zh')) {
         return `将以下文本翻译成${targetName}，注意只需要输出翻译后的结果，不要额外解释：\n\n${text}`;

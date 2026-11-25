@@ -13,7 +13,7 @@ import {
     getLocalTranslationModel,
     normalizeLocalTranslationModel,
     LOCAL_TRANSLATION_MODEL_IDS,
-    HUNYUAN_LANGUAGE_NAMES,
+    getHunyuanLanguageNames,
     type LocalTranslationModelId,
 } from '@/src/core/config/localTranslation';
 
@@ -78,8 +78,15 @@ export function resolveLocalTranslationLanguageCode(
         throw new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED');
     }
     if (engine === 'hunyuan') {
+        const languages = getHunyuanLanguageNames(model);
         if (normalized === 'zh-Hant') return 'zh-Hant';
-        if (HUNYUAN_LANGUAGE_NAMES[base]) return base;
+        const cyrillicVariant = /^(kk|mn)-cyrl$/iu.exec(normalized);
+        if (cyrillicVariant) {
+            const code = `${cyrillicVariant[1]!.toLowerCase()}-Cyrl`;
+            if (languages[code]) return code;
+        }
+        const hunyuanCode = base === 'no' ? 'nb' : base;
+        if (languages[hunyuanCode]) return hunyuanCode;
         throw new Error('LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED');
     }
     if (modelFamily(model) === 'nllb') {

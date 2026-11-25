@@ -2,7 +2,7 @@
  * @file src/core/config/localTranslation.ts
  *
  * 文件职责：定义浏览器本地翻译静态模型目录、下载状态键与无需文本识别的模型配置规则。
- * 主要内容：提供中英/日英轻量语言包、混元翻译和旧模型兼容目录，定义持久下载任务、模型语言名称与 OPUS 仓库映射。
+ * 主要内容：提供中英/日英轻量语言包、优先推荐的混元 Hy-MT3、兼容保留的混元 Hy-MT2 和旧模型兼容目录，定义持久下载任务、模型语言名称表（Hy-MT2 38 种与 Hy-MT3 102 种）及 OPUS 仓库映射。
  * 模块边界：只处理静态配置、下载状态与模型元数据，不导入文本检测或读取浏览器存储；指定和自动语言解析由 core/language/localTranslation.ts 消费本目录。
  */
 
@@ -16,6 +16,7 @@ export const LOCAL_TRANSLATION_MODEL_REVISION = 'main' as const;
 export const LOCAL_TRANSLATION_MODEL_IDS = {
     opusZhEn: 'fluentread/opus-zh-en',
     opusJaEn: 'fluentread/opus-ja-en',
+    hunyuanMt3: 'tencent/Hy-MT3-1.8B-GGUF',
     hunyuan: 'tencent/Hy-MT2-1.8B-GGUF',
     m2m100: 'Xenova/m2m100_418M',
     nllb: 'Xenova/nllb-200-distilled-600M',
@@ -64,15 +65,15 @@ export const LOCAL_TRANSLATION_MODELS: readonly LocalTranslationModel[] = [
         repositories: ['Xenova/opus-mt-en-zh', 'Xenova/opus-mt-zh-en'],
     },
     {
-        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuan,
-        label: 'Hy-MT2 1.8B',
-        nameKey: 'settings.localTranslation.hunyuan',
-        descriptionKey: 'settings.localTranslation.hunyuanDescription',
-        languagesKey: 'settings.localTranslation.languagesHunyuan',
-        downloadSizeMb: 1133,
-        memoryMb: [1500, 2500],
+        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3,
+        label: 'Hy-MT3 1.8B',
+        nameKey: 'settings.localTranslation.hunyuanMt3',
+        descriptionKey: 'settings.localTranslation.hunyuanMt3Description',
+        languagesKey: 'settings.localTranslation.languagesHunyuanMt3',
+        downloadSizeMb: 1348,
+        memoryMb: [1700, 2800],
         engine: 'hunyuan',
-        repositories: ['tencent/Hy-MT2-1.8B-GGUF'],
+        repositories: ['tencent/Hy-MT3-1.8B-GGUF'],
     },
     {
         value: LOCAL_TRANSLATION_MODEL_IDS.opusJaEn,
@@ -84,6 +85,18 @@ export const LOCAL_TRANSLATION_MODELS: readonly LocalTranslationModel[] = [
         memoryMb: [500, 2000],
         engine: 'opus',
         repositories: ['Xenova/opus-mt-ja-en', 'Xenova/opus-mt-en-jap'],
+    },
+    {
+        value: LOCAL_TRANSLATION_MODEL_IDS.hunyuan,
+        label: 'Hy-MT2 1.8B',
+        nameKey: 'settings.localTranslation.hunyuan',
+        descriptionKey: 'settings.localTranslation.hunyuanDescription',
+        languagesKey: 'settings.localTranslation.languagesHunyuan',
+        downloadSizeMb: 1133,
+        memoryMb: [1500, 2500],
+        engine: 'hunyuan',
+        repositories: ['tencent/Hy-MT2-1.8B-GGUF'],
+        legacy: true,
     },
     {
         value: LOCAL_TRANSLATION_MODEL_IDS.m2m100,
@@ -106,6 +119,7 @@ export const LOCAL_TRANSLATION_MODELS: readonly LocalTranslationModel[] = [
 ] as const;
 
 export const DEFAULT_LOCAL_TRANSLATION_MODEL = LOCAL_TRANSLATION_MODEL_IDS.opusZhEn;
+export const PREFERRED_HUNYUAN_LOCAL_TRANSLATION_MODEL = LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3;
 
 export function getLocalTranslationModel(value: unknown): LocalTranslationModel {
     return LOCAL_TRANSLATION_MODELS.find((model) => model.value === value) || LOCAL_TRANSLATION_MODELS[0]!;
@@ -149,6 +163,27 @@ export const HUNYUAN_LANGUAGE_NAMES: Readonly<Record<string, string>> = {
     mr: 'Marathi', he: 'Hebrew', bn: 'Bengali', ta: 'Tamil', uk: 'Ukrainian',
     bo: 'Tibetan', kk: 'Kazakh', mn: 'Mongolian', ug: 'Uyghur', yue: 'Cantonese',
 };
+
+export const HUNYUAN_MT3_LANGUAGE_NAMES: Readonly<Record<string, string>> = {
+    ...HUNYUAN_LANGUAGE_NAMES,
+    el: 'Greek', ro: 'Romanian', hu: 'Hungarian', bg: 'Bulgarian', sr: 'Serbian',
+    hr: 'Croatian', sk: 'Slovak', sl: 'Slovenian', sq: 'Albanian', mk: 'Macedonian',
+    be: 'Belarusian', lt: 'Lithuanian', lv: 'Latvian', et: 'Estonian', fi: 'Finnish',
+    sv: 'Swedish', da: 'Danish', nb: 'Norwegian', nn: 'Norwegian Nynorsk', is: 'Icelandic',
+    ga: 'Irish', gd: 'Scottish Gaelic', cy: 'Welsh', ca: 'Catalan', gl: 'Galician',
+    eu: 'Basque', af: 'Afrikaans', lb: 'Luxembourgish', mt: 'Maltese', eo: 'Esperanto',
+    yi: 'Yiddish', hy: 'Armenian', ka: 'Georgian', az: 'Azerbaijani', uz: 'Uzbek',
+    ky: 'Kyrgyz', tk: 'Turkmen', tg: 'Tajik', tt: 'Tatar', ba: 'Bashkir',
+    ku: 'Kurdish', ckb: 'Central Kurdish', ps: 'Pashto', ne: 'Nepali', si: 'Sinhala',
+    pa: 'Punjabi', sd: 'Sindhi', as: 'Assamese', or: 'Odia', kn: 'Kannada',
+    ml: 'Malayalam', sa: 'Sanskrit', lo: 'Lao', jv: 'Javanese', su: 'Sundanese',
+    ceb: 'Cebuano', war: 'Waray', sw: 'Swahili', am: 'Amharic', so: 'Somali',
+    mg: 'Malagasy', ht: 'Haitian Creole', 'kk-Cyrl': 'Cyrillic Kazakh', 'mn-Cyrl': 'Cyrillic Mongolian',
+};
+
+export function getHunyuanLanguageNames(model: unknown): Readonly<Record<string, string>> {
+    return model === LOCAL_TRANSLATION_MODEL_IDS.hunyuan ? HUNYUAN_LANGUAGE_NAMES : HUNYUAN_MT3_LANGUAGE_NAMES;
+}
 
 export function resolveOpusTranslationRepository(model: unknown, source: string, target: string): string {
     const item = getLocalTranslationModel(model);

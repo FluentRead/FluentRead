@@ -227,6 +227,27 @@ describe('actual local translation Worker message boundary', () => {
         expect(engine.loadModel).toHaveBeenCalledOnce();
     });
 
+    it('reloads Wllama when switching between Hy-MT3 and Hy-MT2 models and enforces each model language set', async () => {
+        const first = hunyuanEngine(), second = hunyuanEngine();
+        mocks.engine.mockReturnValueOnce(first).mockReturnValueOnce(second);
+        const mt3Blob = new Blob(['mt3']), mt2Blob = new Blob(['mt2']);
+        mocks.artifacts.mockImplementation((model: string) => [{repo: model, revision: 'pinned'}]);
+        mocks.artifactBlob.mockImplementation(async (file: {repo: string}) => file.repo === LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3 ? mt3Blob : mt2Blob);
+        const scope = await start();
+        const mt3Reply = await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuanMt3, targetLanguage: 'el', requestId: 1});
+        expect(mt3Reply).toMatchObject({success: true, result: '你好', backend: 'wasm'});
+        expect(first.loadModel).toHaveBeenCalledWith([mt3Blob], expect.anything());
+        expect(first.createChatCompletion).toHaveBeenCalledWith(expect.objectContaining({
+            messages: [{role: 'user', content: expect.stringContaining('Greek')}],
+        }));
+        const mt2Reply = await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, targetLanguage: 'zh', requestId: 2});
+        expect(mt2Reply).toMatchObject({success: true, result: '你好', backend: 'wasm'});
+        expect(first.exit).toHaveBeenCalledOnce();
+        expect(second.loadModel).toHaveBeenCalledWith([mt2Blob], expect.anything());
+        const unsupported = await reply(scope, {...command, model: LOCAL_TRANSLATION_MODEL_IDS.hunyuan, targetLanguage: 'el', requestId: 3});
+        expect(unsupported).toMatchObject({success: false, error: 'LOCAL_TRANSLATION_LANGUAGE_UNSUPPORTED'});
+    });
+
     it('interrupts an overdue inference, rejects its late output, and keeps the queue usable', async () => {
         vi.useFakeTimers();let finish!: (value: unknown) => void;
         const translator = Object.assign(vi.fn().mockImplementationOnce(() => new Promise(resolve => {finish = resolve;})).mockResolvedValue([{translation_text: '你好'}]), {dispose: mocks.dispose});

@@ -5,12 +5,14 @@ import {writeFile} from 'node:fs/promises';
 const repositories = [
     'Xenova/opus-mt-en-zh', 'Xenova/opus-mt-zh-en',
     'Xenova/opus-mt-ja-en', 'Xenova/opus-mt-en-jap',
+    'tencent/Hy-MT3-1.8B-GGUF',
     'tencent/Hy-MT2-1.8B-GGUF',
 ];
 const names = new Set([
     'config.json', 'generation_config.json', 'tokenizer.json',
     'tokenizer_config.json', 'special_tokens_map.json',
     'onnx/encoder_model_quantized.onnx', 'onnx/decoder_model_merged_quantized.onnx',
+    'Hy-MT3-1.8B-Q4_K_M.gguf',
     'Hy-MT2-1.8B-Q4_K_M.gguf',
 ]);
 async function request(url) {

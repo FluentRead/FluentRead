@@ -50,6 +50,8 @@ export const enUSMessages = {
     "document.config.loadFailed": "Could not load settings. Reload and try again.",
     "popup.compact.translate": "Translate",
     "popup.compact.restore": "Restore",
+    "selection.targetLanguage": "Switch target language",
+    "selection.targetLanguageHint": "Switch the target language for this selection only; default settings stay unchanged",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['en-US'],

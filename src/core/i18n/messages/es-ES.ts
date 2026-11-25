@@ -49,6 +49,8 @@ export const esESMessages = {
     "document.config.loadFailed": "No se pudieron cargar los ajustes. Recarga la página e inténtalo de nuevo.",
     "popup.compact.translate": "Traducir",
     "popup.compact.restore": "Restaurar",
+    "selection.targetLanguage": "Cambiar idioma de destino",
+    "selection.targetLanguageHint": "Cambiar el idioma de destino solo para esta selección; los ajustes predeterminados no cambian",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['es-ES'],

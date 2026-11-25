@@ -49,6 +49,8 @@ export const koKRMessages = {
     "document.config.loadFailed": "설정을 불러오지 못했습니다. 새로고침 후 다시 시도하세요.",
     "popup.compact.translate": "번역",
     "popup.compact.restore": "복원",
+    "selection.targetLanguage": "번역 언어 전환",
+    "selection.targetLanguageHint": "이 선택 번역의 대상 언어만 전환하며 기본 설정은 유지됩니다",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['ko-KR'],

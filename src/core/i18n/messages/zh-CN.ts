@@ -45,6 +45,8 @@ export const zhCNMessages = {
     "document.config.loadFailed": "设置未能读取，请重新加载后再试。",
     "popup.compact.translate": "翻译",
     "popup.compact.restore": "还原",
+    "selection.targetLanguage": "切换译文语言",
+    "selection.targetLanguageHint": "切换本次划词的译文语言，不修改默认设置",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationChineseMessages,

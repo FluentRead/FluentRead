@@ -49,6 +49,8 @@ export const ruRUMessages = {
     "document.config.loadFailed": "Не удалось загрузить настройки. Обновите страницу и повторите попытку.",
     "popup.compact.translate": "Перевести",
     "popup.compact.restore": "Вернуть",
+    "selection.targetLanguage": "Переключить язык перевода",
+    "selection.targetLanguageHint": "Переключить язык перевода только для этого выделения; настройки по умолчанию не изменятся",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['ru-RU'],

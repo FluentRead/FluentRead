@@ -1,6 +1,7 @@
 import {parseHTML} from 'linkedom';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    buildSelectionTargetOptions,
     canUseBundledDictionaryFallback,
     calculateSelectionPopupPosition,
     chooseSelectionRect,
@@ -12,11 +13,13 @@ import {
     normalizeSelectionText,
     readSelectionText,
     readSelectionParts,
+    resolveSelectionDirection,
     translateSelectionParts,
     normalizeSpeechLanguage,
     reconcileSelectionPresentation,
     resolveSelectionDictionaryFallback,
     selectionReverseTarget,
+    selectionTargetShortLabel,
     resolveSelectionVocabularyAnswer,
     SelectionRequestTokenGate,
     shouldIgnoreSelection,
@@ -40,6 +43,89 @@ describe('中英划词方向', () => {
         expect(selectionReverseTarget('This is an English sentence.', 'zh-Hans', 'auto')).toBeNull();
         expect(selectionReverseTarget('你好，世界！', 'ja', 'auto')).toBeNull();
         expect(selectionReverseTarget('API', 'en', 'auto')).toBeNull();
+    });
+
+    it('生成去重且默认目标置顶的划词目标语言列表和紧凑标签', () => {
+        expect(selectionTargetShortLabel('de')).toBe('Deutsch');
+        expect(selectionTargetShortLabel('zh-Hans')).toBe('简体中文');
+        expect(selectionTargetShortLabel('en')).toBe('English');
+        expect(selectionTargetShortLabel('custom-lang')).toBe('custom-lang');
+        expect(selectionTargetShortLabel('de', '   ')).toBe('de');
+
+        const options = buildSelectionTargetOptions('en', 'de');
+        expect(options[0]).toEqual({value: 'de', label: 'Deutsch / German / 德语', shortLabel: 'Deutsch'});
+        expect(options[1]).toEqual({value: 'en', label: 'English', shortLabel: 'English'});
+        expect(options.filter(item => item.value === 'de')).toHaveLength(1);
+        expect(options.filter(item => item.value === 'en')).toHaveLength(1);
+
+        const custom = buildSelectionTargetOptions('pt-PT', '  ');
+        expect(custom[0]).toEqual({value: 'pt-PT', label: 'pt-PT', shortLabel: 'pt-PT'});
+        expect(buildSelectionTargetOptions('', '')[0]?.value).toBe('zh-Hans');
+    });
+
+    it('在单次目标语言覆盖与配置方向之间正确解析源语言和目标语言', () => {
+        expect(resolveSelectionDirection({
+            text: '我使用 markedit 的 file explorer 打开文件。',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'en',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Hello world',
+            configuredFrom: 'en',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'en',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Hello world',
+            configuredFrom: 'en',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'zh-Hans',
+        })).toEqual({sourceLanguage: 'en', targetLanguage: 'zh-Hans'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'zh-Hans',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: 'zh-Hans',
+        })).toEqual({sourceLanguage: 'auto', targetLanguage: 'zh-Hans'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: true,
+            manuallyRequested: false,
+            targetOverride: '   ',
+        })).toEqual({sourceLanguage: 'zh-Hans', targetLanguage: 'en'});
+
+        expect(resolveSelectionDirection({
+            text: 'Bonjour tout le monde.',
+            configuredFrom: 'fr',
+            configuredTo: 'de',
+            bidirectional: false,
+            manuallyRequested: false,
+            targetOverride: null,
+        })).toEqual({sourceLanguage: 'fr', targetLanguage: 'de'});
+
+        expect(resolveSelectionDirection({
+            text: '你好，世界！',
+            configuredFrom: 'auto',
+            configuredTo: 'zh-Hans',
+            bidirectional: false,
+            manuallyRequested: true,
+            targetOverride: null,
+        })).toEqual({sourceLanguage: 'zh-Hans', targetLanguage: 'en'});
     });
 });
 

@@ -49,6 +49,8 @@ export const frFRMessages = {
     "document.config.loadFailed": "Impossible de charger les paramètres. Rechargez la page et réessayez.",
     "popup.compact.translate": "Traduire",
     "popup.compact.restore": "Rétablir",
+    "selection.targetLanguage": "Changer la langue cible",
+    "selection.targetLanguageHint": "Changer la langue cible pour cette sélection uniquement ; les réglages par défaut restent inchangés",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['fr-FR'],

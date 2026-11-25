@@ -49,6 +49,8 @@ export const jaJPMessages = {
     "document.config.loadFailed": "設定を読み込めませんでした。再読み込みしてもう一度お試しください。",
     "popup.compact.translate": "翻訳",
     "popup.compact.restore": "戻す",
+    "selection.targetLanguage": "翻訳先の言語を切り替え",
+    "selection.targetLanguageHint": "この選択翻訳のみ翻訳先を切り替えます（既定設定は変更されません）",
     ...videoLearningText,
     ...selfHelpText,
     ...compositeTranslationMessages['ja-JP'],

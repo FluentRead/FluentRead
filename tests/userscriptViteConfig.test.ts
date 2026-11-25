@@ -921,7 +921,7 @@ describe('userscript browser shim injection', () => {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }
-        for (const key of ['popup.compact.translate', 'popup.compact.restore', 'popup.displayMode.bilingual', 'popup.displayMode.translationOnly', 'popup.displayMode.googleBilingualOnly']) {
+        for (const key of ['popup.compact.translate', 'popup.compact.restore', 'popup.displayMode.bilingual', 'popup.displayMode.translationOnly']) {
             expect(extension[key]).toBeTruthy();
             expect(Object.hasOwn(projected, key)).toBe(false);
         }

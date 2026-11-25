@@ -1037,10 +1037,9 @@ const displayModeContext = useSettingsActionContext(() => popupContext.active.va
   () => [config.value, config.value.on, config.value.service, config.value.display, currentSiteTranslationOnly.value, pageState.url, translating.value, pageState.savingRule]);
 const displayModeButton = computed(() => {
   const current = displayModeContext.capture(), next = config.value.display === 1 ? 0 : 1;
-  const googleOnly = config.value.service === 'google' && next === 0;
-  const disabled = !config.value.on || translating.value || pageState.savingRule || googleOnly || currentSiteTranslationOnly.value;
-  return {disabled, label: currentSiteTranslationOnly.value ? translateLegacy('此网站已设为仅译文，可在网站偏好中修改') : t(googleOnly ? 'popup.displayMode.googleBilingualOnly'
-    : config.value.display === 1 ? 'popup.displayMode.bilingual' : 'popup.displayMode.translationOnly'),
+  const disabled = !config.value.on || translating.value || pageState.savingRule || currentSiteTranslationOnly.value;
+  return {disabled, label: currentSiteTranslationOnly.value ? translateLegacy('此网站已设为仅译文，可在网站偏好中修改')
+    : t(config.value.display === 1 ? 'popup.displayMode.bilingual' : 'popup.displayMode.translationOnly'),
     toggle: () => {if (current() && !disabled) config.value.display = next}};
 });
 const drawerContext = useSettingsActionContext(() => popupContext.active.value && drawerVisible.value,
@@ -1096,8 +1095,8 @@ const drawerSelectionModes = computed(() => {
 });
 const drawerDisplayModes = computed(() => {
   const current = drawerContext.capture();
-  return options.display.map(item => ({...item, disabled: !config.value.on || (config.value.service === 'google' && item.value === 0),
-    choose: () => {if (current() && config.value.on && (config.value.service !== 'google' || item.value !== 0)) config.value.display = item.value}}));
+  return options.display.map(item => ({...item, disabled: !config.value.on,
+    choose: () => {if (current() && config.value.on) config.value.display = item.value}}));
 });
 watch(popupContext.active, enabled => {if (!enabled) {drawerVisible.value = false;donationVisible.value = false;notice.value = '';if (noticeTimer) clearTimeout(noticeTimer)}}, {flush: 'sync'});
 // 只向自己实际 teleport 的遮罩提供内部抽屉定位变量；遮罩仍覆盖整页，键盘视口不参与根 popup 尺寸协商。

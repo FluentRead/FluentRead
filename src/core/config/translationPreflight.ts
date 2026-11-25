@@ -1,10 +1,10 @@
 /**
  * @file src/core/config/translationPreflight.ts
  * 文件职责：按显式配置和本次调用覆盖判断页面翻译能否启动，保持配置政策独立于页面通知与全局存储。
- * 主要内容：检查启停、必需模型及谷歌仅译文限制，返回可区分的拒绝原因；快捷方案沿用本次服务、模型和显示方式。
+ * 主要内容：检查启停与必需模型，返回可区分的拒绝原因；快捷方案沿用本次服务和模型。
  * 模块边界：仅消费传入数据与静态服务目录，不读取配置、不访问 DOM、不显示通知、不发起请求。
  */
-import {customModelString, services, servicesType} from './catalog';
+import {customModelString, servicesType} from './catalog';
 
 export interface TranslationConfigCheckOptions {
     service?: string;
@@ -22,7 +22,7 @@ export interface TranslationPreflightConfig {
 
 export type TranslationPreflightResult = {allowed: true} | {
     allowed: false;
-    reason: 'disabled' | 'missing-model' | 'unsupported-display';
+    reason: 'disabled' | 'missing-model';
 };
 
 export function resolveTranslationPreflight(current: TranslationPreflightConfig, options: TranslationConfigCheckOptions = {}): TranslationPreflightResult {
@@ -37,7 +37,5 @@ export function resolveTranslationPreflight(current: TranslationPreflightConfig,
             return {allowed: false, reason: 'missing-model'};
         }
     }
-    const displayMode = options.displayMode ?? (current.display === 0 ? 'single' : 'bilingual');
-    if (displayMode === 'single' && service === services.google) return {allowed: false, reason: 'unsupported-display'};
     return {allowed: true};
 }
